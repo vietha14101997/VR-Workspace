@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 public enum WPDockButtonType
 {
@@ -12,7 +13,7 @@ public enum WPDockButtonType
 }
 
 [RequireComponent(typeof(BoxCollider))]
-public class WorldPanelPlusDockButton : MonoBehaviour
+public class WorldPanelPlusDockButton : MonoBehaviour, IPointerDownHandler
 {
     [HideInInspector] public WorldPanelPlus panel;
     public WPDockButtonType type;
@@ -29,5 +30,13 @@ public class WorldPanelPlusDockButton : MonoBehaviour
         var col = quad.GetComponent<Collider>(); if (col) GameObject.DestroyImmediate(col);
         var mr = quad.GetComponent<MeshRenderer>();
         mr.sharedMaterial = mat;
+    }
+
+    public void OnPointerDown(PointerEventData eventData)
+    {
+        if (type == WPDockButtonType.MoveMode && panel)
+        {
+            panel.moveAnchorWorld = transform.position;   // cố định anchor
+        }
     }
 }

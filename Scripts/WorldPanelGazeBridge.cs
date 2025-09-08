@@ -198,16 +198,23 @@ public class WorldPanelGazeBridge : MonoBehaviour
     {
         var p = btn.panel; if (!p) return;
 
+        bool isYaw = btn.type == WPDockButtonType.YawLeft15 || btn.type == WPDockButtonType.YawRight15;
+        bool isPitch = btn.type == WPDockButtonType.PitchUp15 || btn.type == WPDockButtonType.PitchDown15;
+
+        if ((p.axisLock == WorldPanelPlus.WPAxisLock.YawOnly && isPitch) || (p.axisLock == WorldPanelPlus.WPAxisLock.PitchOnly && isYaw))
+        {
+            return;
+        }
+
         switch (btn.type)
         {
             case WPDockButtonType.MoveMode:
                 {
-                    // Bật Move + đặt MỐC = vị trí nút Move
                     p.centerDragEnabled = true;
-                    p.moveAnchorWorld = btn.transform.position;
+                    p.moveAnchorWorld = btn.transform.position;    // anchor = nút Move
                     if (p.dock) p.dock.CaptureYawOffsetToCamera();
 
-                    // Bắt đầu kéo Center ngay
+                    // Bắt đầu drag Center ngay lập tức
                     var c = GetCenterHandle(p);
                     if (c != null)
                     {

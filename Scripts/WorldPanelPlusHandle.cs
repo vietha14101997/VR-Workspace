@@ -30,6 +30,10 @@ public class WorldPanelPlusHandle : MonoBehaviour,
     float _lastCamYaw, _lastCamPitch;
     Quaternion _moveRotOffset;
 
+    // Move mode (anchor = nút Move)
+    Vector3 _moveAnchor;          // vị trí world của nút Move tại thời điểm bắt đầu
+    bool _isCornerResizing = false;
+
     // ===== Hover =====
     public void OnPointerEnter(PointerEventData e) { if (panel) panel.OnHover(true, type); }
     public void OnPointerExit(PointerEventData e) { if (panel) panel.OnHover(false, type); }
@@ -66,30 +70,41 @@ public class WorldPanelPlusHandle : MonoBehaviour,
         _panelStartRot = panel.transform.rotation;
         _startW = panel.width; _startH = panel.height;
 
+        // === Corner => vào chế độ resize (target = Tray) ===
+        _isCornerResizing =
+            (type == WPHandleType.CornerTL || type == WPHandleType.CornerTR ||
+             type == WPHandleType.CornerBL || type == WPHandleType.CornerBR);
+        if (_isCornerResizing) panel.SetResizeMode(true);
+
         if (type == WPHandleType.Center && _dragCam)
         {
-            Vector3 anchor = panel.moveAnchorWorld.HasValue ? panel.moveAnchorWorld.Value : _startHitWorld;
+            // Anchor đã được set khi bấm nút Move; fallback về dock/panel nếu thiếu
+            _moveAnchor = panel.moveAnchorWorld.HasValue
+                ? panel.moveAnchorWorld.Value
+                : (panel.dock ? panel.dock.transform.position : panel.transform.position);
 
-            // 1) Khoảng cách neo = khoảng cách camera → NÚT MOVE
-            _grabCamDist = Vector3.Distance(_dragCam.transform.position, anchor);
+            // 1) Khoảng cách camera → anchor
+            _grabCamDist = Vector3.Distance(_dragCam.transform.position, _moveAnchor);
 
-            // 2) Giữ lệch xoay ban đầu của panel so với "nhìn vào camera"
-            Vector3 toCam = _dragCam.transform.position - panel.transform.position;
-            if (toCam.sqrMagnitude < 1e-6f) toCam = -panel.transform.forward;
-            Quaternion lookAtCam = Quaternion.LookRotation(toCam.normalized, Vector3.up);
-            _moveRotOffset = Quaternion.Inverse(lookAtCam) * panel.transform.rotation;
+            // 2) Hướng ban đầu từ camera → anchor (để KHÔNG nhảy frame đầu)
+            Vector3 v = (_moveAnchor - _dragCam.transform.position);
+            if (v.sqrMagnitude < 1e-6f) v = _dragCam.transform.forward;
+            v.Normalize();
+            float yaw0 = Mathf.Atan2(v.x, v.z) * Mathf.Rad2Deg;                               // [-180..180]
+            float pitch0 = Mathf.Atan2(-v.y, Mathf.Max(1e-6f, new Vector2(v.x, v.z).magnitude)) // "ngửa" dương
+                           * Mathf.Rad2Deg;
 
-            // 3) KHỞI TẠO HƯỚNG QUỸ ĐẠO = hướng từ camera → NÚT MOVE
-            // Vector3 v = (anchor - _dragCam.transform.position).normalized;
-            // float yaw0 = Mathf.Atan2(v.x, v.z) * Mathf.Rad2Deg;                                  // [-180..180]
-            // float pitch0 = Mathf.Atan2(-v.y, Mathf.Max(1e-6f, new Vector2(v.x, v.z).magnitude))  // "ngửa lên" dương
-            //                 * Mathf.Rad2Deg;
+            _orbitYawAccum = yaw0;
+            _orbitPitchAccum = pitch0;
 
             _lastCamYaw = _dragCam.transform.eulerAngles.y;
             _lastCamPitch = _dragCam.transform.eulerAngles.x;
 
-            _orbitYawAccum = _lastCamYaw;
-            _orbitPitchAccum = 0f;     // <<< quan trọng
+            // 3) Giữ lệch xoay ban đầu của panel so với "nhìn vào camera"
+            Vector3 toCam = _dragCam.transform.position - panel.transform.position;
+            if (toCam.sqrMagnitude < 1e-6f) toCam = -panel.transform.forward;
+            Quaternion lookAtCam = Quaternion.LookRotation(toCam.normalized, Vector3.up);
+            _moveRotOffset = Quaternion.Inverse(lookAtCam) * panel.transform.rotation;
         }
 
         _dragging = true;
@@ -113,7 +128,7 @@ public class WorldPanelPlusHandle : MonoBehaviour,
                     {
                         float dyLocal = hitLocal.y - _refLocalHit.y;
                         float deltaDeg = dyLocal * rotateDegPerMeter;
-                        panel.AddPitchClamped(deltaDeg);  // dùng API kẹp ±45° + set axis lock
+                        panel.AddPitchClamped(deltaDeg);   // <-- dùng API kẹp + lock
                         _refLocalHit = hitLocal;
                         break;
                     }
@@ -122,7 +137,7 @@ public class WorldPanelPlusHandle : MonoBehaviour,
                     {
                         float dxLocal = hitLocal.x - _refLocalHit.x;
                         float deltaDeg = -dxLocal * rotateDegPerMeter;
-                        panel.AddYawClamped(deltaDeg);    // dùng API kẹp ±45° + set axis lock
+                        panel.AddYawClamped(deltaDeg);     // <-- dùng API kẹp + lock
                         _refLocalHit = hitLocal;
                         break;
                     }
@@ -144,25 +159,24 @@ public class WorldPanelPlusHandle : MonoBehaviour,
             float camYaw = _dragCam.transform.eulerAngles.y;
             float camPitch = _dragCam.transform.eulerAngles.x;
 
-            // Tích lũy thay đổi đầu người dùng
-            _orbitPitchAccum = Mathf.Clamp(_orbitPitchAccum, -80f, 80f);
             _orbitYawAccum += Mathf.DeltaAngle(_lastCamYaw, camYaw);
             _orbitPitchAccum += Mathf.DeltaAngle(_lastCamPitch, camPitch);
             _lastCamYaw = camYaw; _lastCamPitch = camPitch;
-
-            // Giới hạn pitch để tránh lộn ngược
             _orbitPitchAccum = Mathf.Clamp(_orbitPitchAccum, -80f, 80f);
 
             float dist = Mathf.Clamp(_grabCamDist, panel.moveOrbitMin, panel.moveOrbitMax);
 
-            // HƯỚNG QUỸ ĐẠO = (pitch,yaw) tích lũy (không lấy pitch trực tiếp từ camera nữa)
             Quaternion dirRot = Quaternion.Euler(_orbitPitchAccum, _orbitYawAccum, 0f);
             Vector3 dir = dirRot * Vector3.forward;
 
-            Vector3 targetPos = _dragCam.transform.position + dir * dist;
+            // Vị trí MỚI mong muốn của chính "nút Move" (anchor)
+            Vector3 wantAnchor = _dragCam.transform.position + dir * dist;
 
-            float k = (panel.moveOrbitLerp > 0f) ? (1f - Mathf.Exp(-panel.moveOrbitLerp * dt)) : 1f;
-            panel.transform.position = Vector3.Lerp(panel.transform.position, targetPos, k);
+            // Dịch chuyển cả panel sao cho anchor dịch đúng như mong muốn
+            Vector3 delta = wantAnchor - _moveAnchor;
+            panel.transform.position += delta;
+            _moveAnchor = wantAnchor;                  // cập nhật anchor
+            panel.moveAnchorWorld = _moveAnchor;       // lưu lại để lần sau vào Move không bị “nhảy”
 
             // Giữ lệch xoay ban đầu với camera
             Vector3 toCamNow = _dragCam.transform.position - panel.transform.position;
@@ -170,12 +184,13 @@ public class WorldPanelPlusHandle : MonoBehaviour,
             {
                 Quaternion lookAtNow = Quaternion.LookRotation(toCamNow.normalized, Vector3.up);
                 Quaternion wantRot = lookAtNow * _moveRotOffset;
+                float k = (panel.moveOrbitLerp > 0f) ? (1f - Mathf.Exp(-panel.moveOrbitLerp * dt)) : 1f;
                 panel.transform.rotation = Quaternion.Slerp(panel.transform.rotation, wantRot, k);
             }
         }
         else
         {
-            // fallback: kéo theo mặt phẳng panel
+            // fallback kéo theo mặt phẳng panel
             if (!_dragPlane.Raycast(r, out float d)) return;
             var hitWorld = r.GetPoint(d);
             var targetWorld = hitWorld - panel.transform.TransformVector(_grabLocal)
@@ -188,6 +203,7 @@ public class WorldPanelPlusHandle : MonoBehaviour,
     {
         if (!_dragging) return;
         _dragging = false;
+        if (_isCornerResizing) { panel.SetResizeMode(false); _isCornerResizing = false; }
         if (panel) panel.OnHover(false, type);
     }
 

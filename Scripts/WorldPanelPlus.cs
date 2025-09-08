@@ -71,6 +71,26 @@ public class WorldPanelPlus : MonoBehaviour
     [HideInInspector] public bool dockMinimized = false;   // trạng thái Dock
     [HideInInspector] public bool forceTrayHidden = false;  // ép ẩn tray khi dockMinimized
 
+    [HideInInspector] public bool isResizing = false;
+
+    public void SetResizeMode(bool on)
+    {
+        isResizing = on;
+
+        // Ẩn collider Board khi resize để ray vào Tray/Hover
+        if (board)
+        {
+            var col = board.GetComponent<BoxCollider>();
+            if (col) col.enabled = !on;
+        }
+        // Bật Hover collider để resize qua Tray
+        if (hover)
+        {
+            var bc = hover.GetComponent<BoxCollider>();
+            if (bc) bc.enabled = true; // giữ bật để resize mượt
+        }
+    }
+
     public void ToggleDockMinimized()
     {
         dockMinimized = !dockMinimized;
@@ -101,7 +121,21 @@ public class WorldPanelPlus : MonoBehaviour
     }
 
     void Reset() { Rebuild(); }
-    void OnValidate() { Apply(); }
+    void OnValidate()
+    {
+        // Tránh NRE trong Editor khi object mới được tạo/chưa Rebuild
+        if (!isActiveAndEnabled) return;
+
+        // Nếu thiếu board/tray (chưa Rebuild) thì đừng Apply vội
+        if (!board || !tray)
+        {
+            // Chỉ đảm bảo material không null để SceneView không báo lỗi
+            EnsureMaterials();
+            return;
+        }
+
+        Apply();
+    }
 
     [ContextMenu("Rebuild")]
     public void Rebuild()
@@ -230,22 +264,47 @@ public class WorldPanelPlus : MonoBehaviour
 
     void UpdateTrayScaleAndMaterial()
     {
+        // 0) Chưa có tray => bỏ qua (tránh NRE khi OnValidate chạy trước Rebuild)
         if (!tray) return;
 
-        // Luôn đặt KHAY lùi ra sau bảng so với camera
-        float sign = -1f; // mặc định
+        // 1) Đảm bảo có renderer + material
+        var mr = tray.GetComponent<MeshRenderer>();
+        if (!mr) mr = tray.gameObject.AddComponent<MeshRenderer>();
+
+        // Luôn chắc có _trayMat
+        EnsureMaterials(); // đảm bảo _trayMat không null
+
+        if (mr.sharedMaterial == null)
+        {
+            // gắn material mặc định
+            mr.sharedMaterial = _trayMat != null
+                ? new Material(_trayMat)
+                : new Material(Shader.Find("Unlit/Transparent"));
+        }
+
+        var mat = mr.sharedMaterial;
+        if (mat == null)
+        {
+            // vẫn null (trường hợp hiếm) → tạo fallback
+            mat = new Material(Shader.Find("Unlit/Transparent"));
+            mr.sharedMaterial = mat;
+        }
+
+        // 2) Đặt vị trí Z của Tray phía sau board tùy hướng camera
+        float sign = -1f; // mặc định lùi theo -forward
         var cam = Camera.main;
         if (cam)
         {
             Vector3 toCam = cam.transform.position - transform.position;
-            // Nếu camera đang ở "trước mặt" (cùng phía với forward của panel) => khay đi -forward để lùi
             sign = Vector3.Dot(transform.forward, toCam) > 0f ? -1f : 1f;
         }
         tray.localPosition = new Vector3(0, 0, sign * trayBehind);
+
+        // 3) Cập nhật scale
         tray.localScale = new Vector3(width + trayPadding * 2f, height + trayPadding * 2f, 1);
 
-        var mr = tray.GetComponent<MeshRenderer>();
-        var mat = mr.sharedMaterial;
+        // 4) Gán màu/bo góc — chịu được cả shader rounded lẫn Transparent
+        if (mat.HasProperty("_MaskEnable")) mat.SetFloat("_MaskEnable", 0f);
 
         if (mat.HasProperty("_FillColor"))
         {
@@ -259,19 +318,16 @@ public class WorldPanelPlus : MonoBehaviour
         }
         else
         {
-            // Fallback Unlit/Color
+            // Fallback Unlit/Transparent
+            if (mat.shader != Shader.Find("Unlit/Transparent"))
+                mat.shader = Shader.Find("Unlit/Transparent");
             mat.color = new Color(trayFill.r, trayFill.g, trayFill.b, trayFill.a * _trayAlpha);
         }
 
-        var rend = tray.GetComponent<MeshRenderer>();
+        // 5) PropertyBlock: luôn tắt mask nếu shader có
         if (_mpb == null) _mpb = new MaterialPropertyBlock();
-        // ép tắt mask
         _mpb.SetFloat("_MaskEnable", 0f);
-        // _mpb.SetFloat("_MaskEnable", trayMaskEnabled ? 1f : 0f);
-        // _mpb.SetVector("_MaskCenter", new Vector4(_maskUV.x, _maskUV.y, 0, 0));
-        // _mpb.SetVector("_MaskSize", new Vector4(trayMaskSizeUV.x, trayMaskSizeUV.y, 0, 0));
-        // _mpb.SetFloat("_MaskFeather", trayMaskFeather);
-        rend.SetPropertyBlock(_mpb);
+        mr.SetPropertyBlock(_mpb);
     }
 
     GameObject CreateQuad(string name, Material mat)
@@ -353,6 +409,8 @@ public class WorldPanelPlus : MonoBehaviour
     public void Apply()
     {
         EnsureMaterials();
+
+        if (!board || !tray) return;
 
         if (board)
         {
