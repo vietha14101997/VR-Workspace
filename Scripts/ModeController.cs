@@ -9,11 +9,10 @@ public class ModeController : MonoBehaviour
 {
     public Camera backgroundReal;     // BackgroundCamera_Real
     public Camera backgroundVirtual;  // BackgroundCamera_Virtual
-    public GameObject virtualObjects; // luôn bật
-    public GameObject virtualEnvironment; // chỉ để tiện bật/tắt nếu muốn giấu ở Real
-    public WorldTransitionManager transitionManager; // Reference to transition manager
+    public CameraPassthrough cameraPassthrough; // Script trên PassthroughQuad
+    public GameObject virtualEnvironment; // Virtual environment objects
     public float transitionDuration = 0.5f;
-    
+
     private bool isTransitioning;
     private Coroutine transitionCoroutine;
 
@@ -21,16 +20,19 @@ public class ModeController : MonoBehaviour
 
     void Start()
     {
-        // Ensure we have a reference to the transition manager
-        if (transitionManager == null)
+        // Validate required references
+        if (backgroundReal == null || backgroundVirtual == null)
         {
-            transitionManager = FindObjectOfType<WorldTransitionManager>();
-            if (transitionManager == null)
-            {
-                Debug.LogError("WorldTransitionManager not found in scene!");
-            }
+            Debug.LogError("Background cameras not set in ModeController!");
+            return;
         }
-        
+
+        if (cameraPassthrough == null)
+        {
+            Debug.LogError("CameraPassthrough reference not set in ModeController!");
+            return;
+        }
+
         Apply();
     }
 
@@ -45,25 +47,47 @@ public class ModeController : MonoBehaviour
         if (isTransitioning) yield break;
         isTransitioning = true;
 
-        // Start the visual transition using WorldTransitionManager
-        if (transitionManager != null)
+        float startTime = Time.time;
+        bool real = (mode == ViewMode.RealWorld);
+
+        // Enable necessary cameras for transition
+        if (real)
         {
-            transitionManager.SetWorldMode(mode, false);
+            backgroundReal.enabled = true;
+            cameraPassthrough.enabled = true;
+            yield return new WaitForEndOfFrame(); // Wait for camera to initialize
         }
 
-        // Wait for half the transition time before changing actual game objects
-        yield return new WaitForSeconds(transitionDuration * 0.5f);
+        // Animate transition
+        while (Time.time - startTime < transitionDuration)
+        {
+            float t = (Time.time - startTime) / transitionDuration;
 
-        // Apply actual mode change at the transition midpoint
-        bool real = (mode == ViewMode.RealWorld);
-        
-        // These cameras are now controlled by WorldTransitionManager
-        // but we still need to update the game objects
-        if (virtualObjects) virtualObjects.SetActive(true);
-        if (virtualEnvironment) virtualEnvironment.SetActive(!real);
+            // Apply smoothstep for more natural easing
+            t = t * t * (3f - 2f * t); // Smoothstep formula
 
-        // Wait for the rest of the transition to complete
-        yield return new WaitForSeconds(transitionDuration * 0.5f);
+            // Fade virtual environment opacity if needed
+            if (virtualEnvironment)
+            {
+                // You can add fade effect here if needed
+            }
+
+            yield return null;
+        }
+
+        // Set final states
+        if (real)
+        {
+            backgroundVirtual.enabled = false;
+            if (virtualEnvironment) virtualEnvironment.SetActive(false);
+        }
+        else
+        {
+            backgroundReal.enabled = false;
+            cameraPassthrough.enabled = false;
+            backgroundVirtual.enabled = true;
+            if (virtualEnvironment) virtualEnvironment.SetActive(true);
+        }
 
         isTransitioning = false;
     }
