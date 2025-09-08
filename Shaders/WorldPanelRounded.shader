@@ -3,10 +3,11 @@ Shader "Unlit/WorldPanelRounded"
     Properties
     {
         _FillColor    ("Fill Color", Color) = (0.2,0.2,0.2,0.25)
-        _BorderColor  ("Border Color", Color) = (1,1,1,0.8)
+        _BorderColor  ("Border Color", Color) = (1,1,1,0.85) // Trắng hơn một chút
         _Radius       ("Corner Radius (m)", Float) = 0.06
-        _Border       ("Border (m)", Float) = 0.004
-        _Feather      ("Feather", Float) = 0.003
+        _Border       ("Border (m)", Float) = 0.009         // Viền dày gấp 1.5 lần
+        _Feather      ("Feather", Float) = 0.005          // Độ mờ viền tăng theo
+        _BorderFade   ("Border Fade", Float) = 0.6        // Độ mờ từ tâm ra
 
         // --- New: gaze mask ---
         _MaskEnable   ("Mask Enable (0/1)", Float) = 1
@@ -32,7 +33,7 @@ Shader "Unlit/WorldPanelRounded"
             struct v2f { float4 pos:SV_POSITION; float2 uv:TEXCOORD0; };
 
             float4 _FillColor, _BorderColor;
-            float  _Radius, _Border, _Feather;
+            float  _Radius, _Border, _Feather, _BorderFade;
 
             // mask
             float  _MaskEnable;
@@ -67,8 +68,14 @@ Shader "Unlit/WorldPanelRounded"
                 float dOuter = sdRoundRect(p, halfSize, _Radius*2.0);
                 float dInner = sdRoundRect(p, halfSize - _Border*2.0, max(_Radius*2.0 - _Border*2.0, 0));
 
-                float alphaFill   = saturate(1.0 - smoothstep(0.0, _Feather, dInner));
+                float alphaFill = saturate(1.0 - smoothstep(0.0, _Feather, dInner));
                 float alphaBorder = saturate(1.0 - smoothstep(0.0, _Feather, dOuter)) - alphaFill;
+                
+                // Thêm gradient alpha cho border (đậm ở giữa, nhạt dần ra)
+                float2 center = abs(p);
+                float dist = length(center);
+                float borderGradient = 1.0 - smoothstep(0.0, _BorderFade, dist);
+                alphaBorder *= lerp(0.6, 1.0, borderGradient);  // Giữ ít nhất 60% alpha
 
                 float4 col = _FillColor * alphaFill + _BorderColor * alphaBorder;
                 col.a = saturate(col.a);

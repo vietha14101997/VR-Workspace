@@ -4,7 +4,7 @@ using System.Collections;
 
 [ExecuteAlways]
 [RequireComponent(typeof(Transform))]
-public class WorldPanelPlusControlDock : MonoBehaviour
+public partial class WorldPanelPlusControlDock : MonoBehaviour
 {
     [Header("Screen-space Y lock")]
     public bool lockScreenYToTray = true;
@@ -72,59 +72,6 @@ public class WorldPanelPlusControlDock : MonoBehaviour
     void OnValidate()
     {
         ApplyMinimizeVisualState();
-    }
-
-    IEnumerator AnimateDock(bool minimize)
-    {
-        // Bật tất cả để tween, nhưng icon BG có thể fade
-        foreach (var b in _buttons) b.gameObject.SetActive(true);
-        SetDockRenderersAndColliders(panel.GetTrayAlpha01() > 0.02f || _minimized);
-
-        // Danh sách các nút (trừ Minimize)
-        var actives = new List<WorldPanelPlusDockButton>();
-        foreach (var b in _buttons) if (b.type != WPDockButtonType.MinimizeToggle) actives.Add(b);
-
-        // Tạo keyframe
-        var start = new Dictionary<WorldPanelPlusDockButton, Vector3>();
-        var end = new Dictionary<WorldPanelPlusDockButton, Vector3>();
-        foreach (var b in actives)
-        {
-            start[b] = b.transform.localPosition;
-            end[b] = minimize ? (_toggleBtnTr ? _toggleBtnTr.localPosition : Vector3.zero)
-                                : _expandedPos[b];
-        }
-
-        // Fade BG/Icon của các nút khác
-        float t = 0f;
-        while (t < _animDuration)
-        {
-            t += Time.deltaTime;
-            float k = Mathf.SmoothStep(0, 1, t / _animDuration);
-
-            foreach (var b in actives)
-            {
-                b.transform.localPosition = Vector3.Lerp(start[b], end[b], k);
-
-                var bg = b.transform.Find("BG")?.GetComponent<MeshRenderer>();
-                var ic = b.transform.Find("Icon")?.GetComponent<MeshRenderer>();
-                float a = minimize ? (1f - k) : k;
-                if (bg && bg.sharedMaterial.HasProperty("_FillColor"))
-                {
-                    var c = bg.sharedMaterial.GetColor("_FillColor"); c.a = 0.35f * a; bg.sharedMaterial.SetColor("_FillColor", c);
-                }
-                if (ic) ic.enabled = a > 0.02f;
-            }
-
-            yield return null;
-        }
-
-        // Kết thúc: nếu minimize thì tắt hẳn các nút khác
-        foreach (var b in actives) b.gameObject.SetActive(!minimize);
-        ApplyMinimizeVisualState();
-        SetDockRenderersAndColliders(!_minimized);
-
-        // Sắp xếp lại Backplate theo số nút đang hiển thị
-        ResizeBackplateToActiveButtons();
     }
 
     public void SetMinimized(bool on)
@@ -287,15 +234,51 @@ public class WorldPanelPlusControlDock : MonoBehaviour
         _backplate.name = "DockBackplate";
         _backplate.SetParent(_neutralRoot, false);
         var col = _backplate.GetComponent<Collider>(); if (col) DestroyImmediate(col);
-        _backplate.localScale = new Vector3(totalW + 0.04f, buttonSize.y + 0.04f, 1);
+
+        // Store expanded size for animation
+        float expandedWidth = totalW + border * 2;
+        float expandedHeight = buttonSize.y + border * 2;
+
+        // Start with minimized size if _minimized is true
+        float startWidth = _minimized ? (buttonSize.x + border * 2) : expandedWidth;
+        _backplate.localScale = new Vector3(startWidth, expandedHeight, 1);
         var mr = _backplate.GetComponent<MeshRenderer>();
-        mr.sharedMaterial = new Material(trayMatLike);
+        // Sử dụng shader riêng cho Dock
+        var dockShader = Shader.Find("Unlit/WorldPanelDock");
+        Material newMat;
+        if (dockShader != null)
+        {
+            newMat = new Material(dockShader);
+        }
+        else
+        {
+            newMat = new Material(trayMatLike);
+        }
+        mr.sharedMaterial = newMat;
         var m = mr.sharedMaterial;
-        if (m.HasProperty("_MaskEnable")) m.SetFloat("_MaskEnable", 1f);
-        if (m.HasProperty("_CornerRadius")) m.SetFloat("_CornerRadius", cornerRadius);
-        if (m.HasProperty("_Border")) m.SetFloat("_Border", border);
-        if (m.HasProperty("_FillColor")) m.SetColor("_FillColor", new Color(0f, 0f, 0f, 0.22f));
-        if (m.HasProperty("_BorderColor")) m.SetColor("_BorderColor", new Color(1f, 1f, 1f, 0.35f));
+
+        // Thiết lập các thuộc tính chung
+        if (m.HasProperty("_FillColor"))
+        {
+            m.SetColor("_FillColor", new Color(0f, 0f, 0f, 0.22f));
+            m.SetColor("_BorderColor", new Color(1f, 1f, 1f, 0.35f));
+        }
+
+        // Thiết lập thuộc tính riêng của Dock shader
+        if (dockShader != null)
+        {
+            if (m.HasProperty("_Radius")) m.SetFloat("_Radius", cornerRadius);
+            if (m.HasProperty("_Border")) m.SetFloat("_Border", border);
+            if (m.HasProperty("_Feather")) m.SetFloat("_Feather", 0.006f);
+            if (m.HasProperty("_BorderFade")) m.SetFloat("_BorderFade", 0.5f);
+        }
+        // Fallback cho Tray shader
+        else if (m.HasProperty("_MaskEnable"))
+        {
+            m.SetFloat("_MaskEnable", 1f);
+            if (m.HasProperty("_CornerRadius")) m.SetFloat("_CornerRadius", cornerRadius);
+            if (m.HasProperty("_Border")) m.SetFloat("_Border", border);
+        }
 
         for (int i = 0; i < types.Length; i++)
         {
@@ -313,20 +296,27 @@ public class WorldPanelPlusControlDock : MonoBehaviour
             var icon = GameObject.CreatePrimitive(PrimitiveType.Quad);
             icon.name = "Icon";
             icon.transform.SetParent(go.transform, false);
-            icon.transform.localScale = new Vector3(buttonSize.x * 0.8f, buttonSize.y * 0.8f, 1);
+            // Thay đổi từ chữ nhật sang hình vuông, lấy kích thước nhỏ nhất
+            float iconSize = Mathf.Min(buttonSize.x, buttonSize.y);
+            icon.transform.localScale = new Vector3(iconSize, iconSize, 1);
             icon.transform.localPosition = new Vector3(0, 0, 0.015f);
             DestroyImmediate(icon.GetComponent<Collider>());
             var iconMr = icon.GetComponent<MeshRenderer>();
 
-            if (btn.type == WPDockButtonType.MoveMode && moveIconTexture != null)
-            {
-                iconMr.sharedMaterial = new Material(iconMat);
-                iconMr.sharedMaterial.mainTexture = moveIconTexture;
-            }
-            else
-            {
-                iconMr.enabled = false;
-            }
+            // Set material trong suốt cho icon
+            var transparentMat = new Material(Shader.Find("Unlit/Transparent"));
+            transparentMat.color = new Color(1, 1, 1, 0);
+            iconMr.sharedMaterial = transparentMat;
+
+            // if (btn.type == WPDockButtonType.MoveMode && moveIconTexture != null)
+            // {
+            //     iconMr.sharedMaterial = new Material(iconMat);
+            //     iconMr.sharedMaterial.mainTexture = moveIconTexture;
+            // }
+            // else
+            // {
+            //     iconMr.enabled = false;
+            // }
 
             _buttons.Add(btn);
         }
@@ -350,29 +340,80 @@ public class WorldPanelPlusControlDock : MonoBehaviour
             bool isToggle = (_toggleBtnTr && b.transform == _toggleBtnTr);
             bool show = !_minimized || isToggle;
 
+            // Kích hoạt/vô hiệu hóa GameObject của button
             b.gameObject.SetActive(show);
-            var rds = b.GetComponentsInChildren<Renderer>(true);
-            foreach (var r in rds) r.enabled = show;
-            var cols = b.GetComponentsInChildren<Collider>(true);
-            foreach (var c in cols) c.enabled = show;
+
+            // Lấy tất cả Renderer (bao gồm cả icon) và ẩn/hiện chúng
+            var renderers = b.GetComponentsInChildren<Renderer>(true);
+            foreach (var renderer in renderers)
+            {
+                if (renderer == null) continue;
+                renderer.enabled = show;
+            }
+
+            // Lấy tất cả Collider và ẩn/hiện chúng  
+            var colliders = b.GetComponentsInChildren<Collider>(true);
+            foreach (var collider in colliders)
+            {
+                if (collider == null) continue;
+                collider.enabled = show;
+            }
         }
+
+        // Cập nhật kích thước backplate
         ResizeBackplateToActiveButtons();
     }
 
     void ResizeBackplateToActiveButtons()
     {
-        int activeCount = 0;
-        foreach (var b in _buttons) if (b && b.gameObject.activeSelf) activeCount++;
-        if (_toggleBtnTr) activeCount = Mathf.Max(activeCount, 1);
+        if (!_backplate) return;
 
+        // Đếm số nút đang active
+        int activeCount = 0;
+        foreach (var b in _buttons)
+        {
+            if (b && b.gameObject.activeSelf) activeCount++;
+        }
+
+        // Đảm bảo luôn có ít nhất 1 nút (nút minimize)
+        activeCount = Mathf.Max(activeCount, 1);
+
+        // Tính toán lại kích thước backplate
         float totalW = activeCount * buttonSize.x + (activeCount - 1) * buttonGap;
-        if (_backplate) _backplate.localScale = new Vector3(totalW + 0.04f, buttonSize.y + 0.04f, 1);
+        float padding = 0.04f; // padding cho backplate
+
+        // Cập nhật scale của backplate
+        if (_backplate)
+        {
+            _backplate.localScale = new Vector3(totalW + padding, buttonSize.y + padding, 1);
+        }
+
+        // Cập nhật layout các nút
+        float x0 = -(totalW * 0.5f) + (buttonSize.x * 0.5f);
+        int index = 0;
 
         foreach (var b in _buttons)
         {
-            bool on = b && b.gameObject.activeSelf;
+            if (b && b.gameObject.activeSelf)
+            {
+                b.transform.localPosition = new Vector3(
+                    x0 + index * (buttonSize.x + buttonGap),
+                    0,
+                    0.01f
+                );
+                index++;
+            }
+        }
+
+        // Cập nhật visibility
+        foreach (var b in _buttons)
+        {
             if (!b) continue;
-            foreach (var r in b.GetComponentsInChildren<Renderer>(true)) r.enabled = on;
+            bool on = b.gameObject.activeSelf;
+            foreach (var r in b.GetComponentsInChildren<Renderer>(true))
+            {
+                if (r) r.enabled = on;
+            }
         }
     }
 

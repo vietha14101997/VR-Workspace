@@ -123,8 +123,10 @@ public class WorldPanelPlus : MonoBehaviour
     void Reset() { Rebuild(); }
     void OnValidate()
     {
-        // Tránh NRE trong Editor khi object mới được tạo/chưa Rebuild
         if (!isActiveAndEnabled) return;
+#if UNITY_EDITOR
+        _shaderPropertiesNeedUpdate = true;
+#endif
 
         // Nếu thiếu board/tray (chưa Rebuild) thì đừng Apply vội
         if (!board || !tray)
@@ -244,7 +246,21 @@ public class WorldPanelPlus : MonoBehaviour
 
     void EnsureMaterials()
     {
-        if (_panelMat == null) _panelMat = new Material(Shader.Find("Unlit/Texture"));
+        var boardShader = Shader.Find("Unlit/WorldPanelBoard");
+        if (_panelMat == null)
+        {
+            _panelMat = new Material(boardShader != null ? boardShader : Shader.Find("Unlit/Texture"));
+            if (boardShader != null)
+            {
+                // Tính fade zone dựa trên kích thước thực tế của panel
+                float fadeX = 0.05f;  // 5% chiều rộng
+                float fadeY = fadeX * (height / width);  // Điều chỉnh theo tỷ lệ width/height
+
+                _panelMat.SetFloat("_EdgeFadeX", fadeX);
+                _panelMat.SetFloat("_EdgeFadeY", fadeY);
+                _panelMat.SetFloat("_FadeAmount", 0.25f); // Giảm xuống 25% alpha
+            }
+        }
 
         var sRounded = Shader.Find("Unlit/WorldPanelRounded");
         if (sRounded != null && sRounded.isSupported)
@@ -408,9 +424,17 @@ public class WorldPanelPlus : MonoBehaviour
 
     public void Apply()
     {
-        EnsureMaterials();
-
         if (!board || !tray) return;
+
+#if UNITY_EDITOR
+        if (_shaderPropertiesNeedUpdate)
+        {
+            UpdateBoardShaderProperties();
+            _shaderPropertiesNeedUpdate = false;
+        }
+#else
+        UpdateBoardShaderProperties();
+#endif
 
         if (board)
         {
@@ -666,4 +690,29 @@ public class WorldPanelPlus : MonoBehaviour
 
         SetHintsActive(on && showEdge);
     }
+
+    void UpdateBoardShaderProperties()
+    {
+        if (_panelMat != null && _panelMat.shader.name == "Unlit/WorldPanelBoard")
+        {
+            // Tính trung bình của khoảng làm mờ
+            float fadeX = 0.05f * width;   // 5% chiều rộng
+            float fadeY = 0.05f * height;  // 5% chiều dài
+            float avgFadeDistance = (fadeX + fadeY) * 0.5f;  // Trung bình cộng
+
+            // Chuyển về UV space (0-1)
+            float avgFadeUV = avgFadeDistance / Mathf.Max(width, height);
+
+            _panelMat.SetFloat("_EdgeFade", avgFadeUV);
+            _panelMat.SetFloat("_FadeAmount", 0.25f);
+            _panelMat.SetVector("_PanelSize", new Vector4(width, height, 0, 0));
+
+            // Debug mode (bạn có thể bật/tắt trong Inspector)
+            //_panelMat.SetFloat("_DebugFade", 1); // Uncomment để debug
+        }
+    }
+
+#if UNITY_EDITOR
+    private bool _shaderPropertiesNeedUpdate = true;
+#endif
 }
