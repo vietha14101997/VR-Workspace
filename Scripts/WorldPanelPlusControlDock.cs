@@ -6,12 +6,6 @@ using System.Collections;
 [RequireComponent(typeof(Transform))]
 public class WorldPanelPlusControlDock : MonoBehaviour
 {
-    [Header("Screen-space Y lock")]
-    public bool lockScreenYToTray = true;
-    [Range(0f, 0.5f)] public float dockViewportYOffset = 0.06f;
-    public enum DockYRef { TrayBottom, TrayCenter }
-    public DockYRef yReference = DockYRef.TrayBottom;
-
     [Header("Bind")]
     public WorldPanelPlus panel;
 
@@ -45,13 +39,14 @@ public class WorldPanelPlusControlDock : MonoBehaviour
     Coroutine _dockAnim;
     readonly Dictionary<WorldPanelPlusDockButton, Vector3> _expandedPos = new();
     Transform _toggleBtnTr;
-    float _animDuration = 0.25f;
+    const float _animDuration = 0.25f;
     Transform _visualRoot;
     Transform _neutralRoot;
     Vector3 _lastNeutralRef;
     bool _built;
     Vector3 _lastLossyDock;
 
+    // ===== Public API =====
     public void SetMinimized(bool on)
     {
         if (_minimized == on) return;
@@ -72,27 +67,11 @@ public class WorldPanelPlusControlDock : MonoBehaviour
             bool isYaw = b.type == WPDockButtonType.YawLeft15 || b.type == WPDockButtonType.YawRight15;
             bool isPitch = b.type == WPDockButtonType.PitchUp15 || b.type == WPDockButtonType.PitchDown15;
 
-            bool enable = true;
-            if (lockState == WorldPanelPlus.WPAxisLock.YawOnly) enable = !isPitch;
-            if (lockState == WorldPanelPlus.WPAxisLock.PitchOnly) enable = !isYaw;
+            bool enable = (lockState == WorldPanelPlus.WPAxisLock.None)
+                       || (lockState == WorldPanelPlus.WPAxisLock.YawOnly && !isPitch)
+                       || (lockState == WorldPanelPlus.WPAxisLock.PitchOnly && !isYaw);
 
             var bc = b.GetComponent<BoxCollider>(); if (bc) bc.enabled = enable;
-
-            var bgMr = b.transform.Find("BG")?.GetComponent<MeshRenderer>();
-            // if (bgMr && bgMr.sharedMaterial)
-            // {
-            //     if (bgMr.sharedMaterial.HasProperty("_FillColor"))
-            //     {
-            //         var c = bgMr.sharedMaterial.GetColor("_FillColor");
-            //         c.a = enable ? 0.35f : 0.12f;
-            //         bgMr.sharedMaterial.SetColor("_FillColor", c);
-            //     }
-            //     else
-            //     {
-            //         var c = bgMr.sharedMaterial.color; c.a = enable ? 0.35f : 0.12f;
-            //         bgMr.sharedMaterial.color = c;
-            //     }
-            // }
         }
     }
 
@@ -152,6 +131,7 @@ public class WorldPanelPlusControlDock : MonoBehaviour
         transform.position = pos;
     }
 
+    // ===== Unity =====
     void Reset() { panel = GetComponentInParent<WorldPanelPlus>(); }
 
     void Awake()
@@ -161,12 +141,11 @@ public class WorldPanelPlusControlDock : MonoBehaviour
 
     void Start()
     {
-        // LUÔN dọn sạch trước khi build để tránh “VisualRoot x3”
+        // luôn dọn sạch trước khi build để tránh nhân bản
         ClearChildren();
         var trayMat = panel ? panel.GetTrayMaterial() : null;
         Build(trayMat);
         RecomputeFromPanel();
-        PurgeUnknownBackgrounds();
     }
 
     void OnTransformParentChanged() { PlaceDockImmediate(); }
@@ -226,7 +205,7 @@ public class WorldPanelPlusControlDock : MonoBehaviour
         if (_neutralRoot && (_neutralRoot.parent && (_neutralRoot.parent.lossyScale - _lastNeutralRef).sqrMagnitude > 1e-8f))
             RefreshNeutralScale();
 
-        // backplate alpha
+        // backplate alpha (viền + trong suốt)
         var backMr = _backplate ? _backplate.GetComponent<MeshRenderer>() : null;
         if (backMr && backMr.sharedMaterial)
         {
@@ -236,7 +215,7 @@ public class WorldPanelPlusControlDock : MonoBehaviour
             if (m.HasProperty("_MaskEnable")) m.SetFloat("_MaskEnable", 0f);
             if (m.HasProperty("_FillColor"))
             {
-                // m.SetColor("_FillColor", new Color(0f, 0f, 0f, 0.18f * a));
+                // giữ _FillColor = 0 alpha như đã chỉnh trong shader
                 m.SetColor("_BorderColor", new Color(1f, 1f, 1f, 0.28f * a));
             }
             else
@@ -260,10 +239,8 @@ public class WorldPanelPlusControlDock : MonoBehaviour
     }
 
     // ===================== Build =====================
-
     public void Build(Material trayMatLike)
     {
-        // Luôn dọn sạch trước khi dựng mới để tránh nhân bản
         ClearChildren();
         _built = true;
 
@@ -349,8 +326,10 @@ public class WorldPanelPlusControlDock : MonoBehaviour
             icon.transform.localPosition = new Vector3(0, 0, 0.0015f);
             DestroyImmediate(icon.GetComponent<Collider>());
             var iconMr = icon.GetComponent<MeshRenderer>();
-            var transparentMat = new Material(Shader.Find("Unlit/Transparent"));
-            transparentMat.color = new Color(1, 1, 1, 0); // tạm ẩn icon
+            var transparentMat = new Material(Shader.Find("Unlit/Transparent"))
+            {
+                color = new Color(1, 1, 1, 0) // ẩn icon (placeholder)
+            };
             iconMr.sharedMaterial = transparentMat;
 
             _buttons.Add(btn);
@@ -367,10 +346,9 @@ public class WorldPanelPlusControlDock : MonoBehaviour
         ApplyMinimizeVisualState();
         ResizeBackplateToActiveButtons(bleed);
         CenterButtonsVertically();
-
-        PurgeUnknownBackgrounds();
     }
 
+    // ===== Helpers =====
     void ClearChildren()
     {
         for (int i = transform.childCount - 1; i >= 0; i--)
@@ -614,54 +592,26 @@ public class WorldPanelPlusControlDock : MonoBehaviour
         CenterButtonsVertically();
     }
 
-    float EaseInQuad(float t) => t * t;
-    float EaseOutQuad(float t) => t * (2f - t);
+    static float EaseInQuad(float t) => t * t;
+    static float EaseOutQuad(float t) => t * (2f - t);
 
     static Mesh BuildUnitQuad()
     {
-        var m = new Mesh();
-        m.name = "UnitQuad";
-        m.vertices = new[]
+        var m = new Mesh
         {
-            new Vector3(-0.5f,-0.5f,0),
-            new Vector3( 0.5f,-0.5f,0),
-            new Vector3( 0.5f, 0.5f,0),
-            new Vector3(-0.5f, 0.5f,0),
+            name = "UnitQuad",
+            vertices = new[]
+            {
+                new Vector3(-0.5f,-0.5f,0),
+                new Vector3( 0.5f,-0.5f,0),
+                new Vector3( 0.5f, 0.5f,0),
+                new Vector3(-0.5f, 0.5f,0),
+            },
+            uv = new[] { new Vector2(0, 0), new Vector2(1, 0), new Vector2(1, 1), new Vector2(0, 1) },
+            triangles = new[] { 0, 1, 2, 0, 2, 3 }
         };
-        m.uv = new[]
-        {
-            new Vector2(0,0), new Vector2(1,0), new Vector2(1,1), new Vector2(0,1)
-        };
-        m.triangles = new[] { 0, 1, 2, 0, 2, 3 };
         m.RecalculateNormals();
         return m;
-    }
-
-    // Dọn renderer lạ để không xuất hiện nền tối rác
-    void PurgeUnknownBackgrounds()
-    {
-        if (_backplate == null) return;
-
-        bool IsAllowed(Renderer r)
-        {
-            if (r == null) return false;
-            var t = r.transform;
-            if (t == _backplate) return true;
-            if (t.name == "Icon")
-            {
-                foreach (var b in _buttons)
-                    if (b != null && t.IsChildOf(b.transform)) return true;
-            }
-            return false;
-        }
-
-        var rends = GetComponentsInChildren<Renderer>(true);
-        foreach (var r in rends)
-        {
-            if (r == null) continue;
-            if (IsAllowed(r)) continue;
-            r.enabled = false;
-        }
     }
 }
 
@@ -682,7 +632,7 @@ public class RoundedBackplateBinder : MonoBehaviour
     void Awake() { _r = GetComponent<Renderer>(); _t = transform; }
     void OnEnable() { Sync(); }
 #if UNITY_EDITOR
-    void OnValidate(){ Sync(); }
+    void OnValidate() { Sync(); }
 #endif
     void LateUpdate() { Sync(); }
 
@@ -699,7 +649,6 @@ public class RoundedBackplateBinder : MonoBehaviour
 
         float halfMin = 0.5f * Mathf.Min(s.x, s.y);
         float r = forceCircle ? halfMin : Mathf.Min(halfMin, fallbackRadiusWhenExpanded);
-
         if (m.HasProperty("_Radius")) m.SetFloat("_Radius", r);
     }
 }

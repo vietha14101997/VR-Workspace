@@ -5,30 +5,49 @@ using Google.XR.Cardboard;
 
 public class CardboardQR : MonoBehaviour
 {
-    [SerializeField] float holdToRescan = 1.2f;
-    float holdTimer = 0f;
+    [SerializeField] private float holdToRescan = 1.2f;
 
-    void Start()
-    {
 #if UNITY_ANDROID && !UNITY_EDITOR
-        if (!Api.HasDeviceParams()) Api.ScanDeviceParams();
-#endif
+    private float _holdTimer;
+
+    private void Start()
+    {
+        if (!Api.HasDeviceParams())
+            Api.ScanDeviceParams();
     }
-    void Update()
+
+    private void Update()
     {
-#if UNITY_ANDROID && !UNITY_EDITOR
-        if (Api.HasNewDeviceParams()) Api.ReloadDeviceParams();
+        // Apply new params if user has updated the QR profile in another flow
+        if (Api.HasNewDeviceParams())
+            Api.ReloadDeviceParams();
+
+        // Hold trigger to rescan
         if (Api.IsTriggerPressed)
         {
-            holdTimer += Time.deltaTime;
-            if (holdTimer >= holdToRescan){ Api.ScanDeviceParams(); holdTimer = 0f; }
-        } else holdTimer = 0f;
-#endif
+            _holdTimer += Time.deltaTime;
+            if (_holdTimer >= holdToRescan)
+            {
+                Api.ScanDeviceParams();
+                _holdTimer = 0f;
+            }
+        }
+        else
+        {
+            _holdTimer = 0f;
+        }
     }
-    void OnApplicationPause(bool pause)
+
+    private void OnApplicationPause(bool pause)
     {
-#if UNITY_ANDROID && !UNITY_EDITOR
-        if (!pause) Api.ReloadDeviceParams();
-#endif
+        // On resume, ensure parameters are applied
+        if (!pause)
+            Api.ReloadDeviceParams();
     }
+#else
+    // Non-Android/editor stub to avoid platform compilation issues
+    private void Start() { }
+    private void Update() { }
+    private void OnApplicationPause(bool pause) { }
+#endif
 }

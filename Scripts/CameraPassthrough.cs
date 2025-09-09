@@ -1,30 +1,59 @@
 using UnityEngine;
 using UnityEngine.Android;
-using System.Collections;
-using System.Collections.Generic;
 
+/// <summary>
+/// Simple, robust camera passthrough quad for Mobile VR.
+/// - Picks the back camera when available.
+/// - Scales/rotates the quad to fully cover the camera frustum without stretching.
+/// - Avoids per-frame material allocations; uses sharedMaterial when safe.
+/// </summary>
 [RequireComponent(typeof(MeshRenderer))]
 public class CameraPassthrough : MonoBehaviour
 {
-    public Camera cam;           // kéo Main Camera vào
-    public float distance = -1f; // -1 = tự đặt gần far clip
-    public int requestedFPS = 30;
+    [Header("Bind")]
+    [Tooltip("Reference to the rendering camera (usually Main Camera). If null, will auto-detect.")]
+    public Camera cam;
 
-    WebCamTexture _tex;
-    MeshRenderer _mr;
+    [Header("Framing")]
+    [Tooltip("Z distance from the camera. -1 = near farClipPlane.")]
+    public float distance = -1f;
 
-    void Awake() { _mr = GetComponent<MeshRenderer>(); if (!cam) cam = GetComponentInParent<Camera>(); }
+    [Header("WebCam")]
+    [Tooltip("Requested webcam FPS")]
+    public int requestedFPS = 60;
+    [Tooltip("Requested webcam width")]
+    public int requestedWidth = 1920;
+    [Tooltip("Requested webcam height")]
+    public int requestedHeight = 1080;
+
+    private WebCamTexture _tex;
+    private MeshRenderer _mr;
+    private int _selectedDeviceIndex = -1;
+
+    void Awake()
+    {
+        _mr = GetComponent<MeshRenderer>();
+        if (!cam) cam = GetComponentInParent<Camera>();
+        // Ensure we have a visible, simple material
+        if (_mr.sharedMaterial == null)
+            _mr.sharedMaterial = new Material(Shader.Find("Unlit/Texture"));
+    }
+
     void OnEnable() { StartCam(); }
     void OnDisable() { StopCam(); }
 
     void LateUpdate()
     {
         if (!cam) return;
-        float d = (distance > 0f) ? distance : (cam.farClipPlane - 1f);
-        float h = 2f * d * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
+
+        // Choose distance
+        float d = (distance > 0f) ? distance : Mathf.Max(0.01f, cam.farClipPlane - 1f);
+        // Match frustum size at distance d
+        float halfHeight = d * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
+        float h = 2f * halfHeight;
         float w = h * cam.aspect;
 
-        // aspect “cover” để không méo + xử lý xoay/mirror
+        // Compute target aspect to *cover* frustum
         float texAspect = 1f;
         if (_tex != null && _tex.width > 16 && _tex.height > 16)
         {
@@ -36,154 +65,57 @@ public class CameraPassthrough : MonoBehaviour
         if (texAspect > frustumAspect) { targetH = h; targetW = targetH * texAspect; }
         else { targetW = w; targetH = targetW / texAspect; }
 
+        // Mirror/rotation from device
         float xFlip = (_tex != null && _tex.videoVerticallyMirrored) ? -1f : 1f;
         float zRot = (_tex != null) ? -_tex.videoRotationAngle : 0f;
 
-        transform.localPosition = new Vector3(0, 0, d);
-        transform.localRotation = Quaternion.Euler(0, 0, zRot);
+        // Apply transform
+        transform.SetLocalPositionAndRotation(new Vector3(0f, 0f, d), Quaternion.Euler(0f, 0f, zRot));
+
         transform.localScale = new Vector3(targetW * xFlip, targetH, 1f);
     }
 
+    // ------------------------- Camera start/stop -------------------------
     void StartCam()
     {
-        Debug.Log("Starting camera passthrough");
-        
 #if UNITY_ANDROID && !UNITY_EDITOR
         if (!Permission.HasUserAuthorizedPermission(Permission.Camera))
         {
-            Debug.Log("Requesting camera permission");
             Permission.RequestUserPermission(Permission.Camera);
+            // Note: subsequent enable will start once permission is granted
         }
 #endif
-        var devs = WebCamTexture.devices;
-        if (devs.Length == 0) 
-        { 
-            Debug.LogWarning("No camera devices found"); 
-            return; 
-        }
-        
-        Debug.Log("Found " + devs.Length + " camera devices");
-        for (int i = 0; i < devs.Length; i++)
-        {
-            Debug.Log("Camera " + i + ": " + devs[i].name + " (front facing: " + devs[i].isFrontFacing + ")");
-        }
+        var devices = WebCamTexture.devices;
+        if (devices == null || devices.Length == 0) { Debug.LogWarning("[CameraPassthrough] No camera devices."); return; }
 
-        // ưu tiên camera sau
-        int idx = 0; 
-        for (int i = 0; i < devs.Length; i++) 
-        {
-            if (!devs[i].isFrontFacing) 
-            { 
-                idx = i; 
-                Debug.Log("Selected back camera: " + devs[i].name);
-                break; 
-            }
-        }
+        // Prefer back camera
+        _selectedDeviceIndex = 0;
+        for (int i = 0; i < devices.Length; i++)
+            if (!devices[i].isFrontFacing) { _selectedDeviceIndex = i; break; }
 
-        // Ensure we have a valid material renderer
-        if (_mr == null)
-        {
-            _mr = GetComponent<MeshRenderer>();
-            if (_mr == null)
-            {
-                Debug.LogError("No MeshRenderer found on CameraPassthrough object");
-                return;
-            }
-        }
+        // Reuse existing material, avoid per-frame material access
+        var mat = GetComponent<MeshRenderer>().sharedMaterial != null ? GetComponent<MeshRenderer>().sharedMaterial : (GetComponent<MeshRenderer>().sharedMaterial = new Material(Shader.Find("Unlit/Texture")));
 
-        // Ensure we have a valid material
-        if (_mr.material == null)
-        {
-            Debug.LogError("No material found on MeshRenderer");
-            // Create a default material if none exists
-            _mr.material = new Material(Shader.Find("Unlit/Texture"));
-        }
-
-        // Create and start the webcam texture with higher resolution
-        _tex = new WebCamTexture(devs[idx].name, 1280, 720, requestedFPS);
-        
-        // Set the texture and ensure it's properly configured
-        _mr.material.mainTexture = _tex;
-        _mr.material.renderQueue = 1000; // Ensure it renders before other objects but after background
-        _mr.material.SetFloat("_Glossiness", 0f); // Reduce any potential glossiness
-        _mr.material.SetFloat("_Metallic", 0f); // Reduce any potential metallic effect
-        
-        // Ensure the material is not culled and is visible from both sides
-        _mr.material.SetInt("_Cull", 0); // 0 = Off (double-sided)
-        
-        Debug.Log("Starting webcam texture: " + devs[idx].name + " at 1280x720");
+        // Create and start the webcam
+        var devName = devices[_selectedDeviceIndex].name;
+        _tex = new WebCamTexture(devName, requestedWidth, requestedHeight, requestedFPS);
+        mat.mainTexture = _tex;
         _tex.Play();
-        
-        // Wait a few frames to ensure the texture is initialized
-        StartCoroutine(EnsureTextureStarted());
     }
 
     void StopCam()
     {
-        Debug.Log("Stopping camera passthrough");
-        if (_tex != null) 
-        { 
-            if (_tex.isPlaying) 
-            {
-                Debug.Log("Stopping webcam texture");
-                _tex.Stop(); 
-            }
-            
-            Debug.Log("Destroying webcam texture");
-            Destroy(_tex); 
-            _tex = null; 
-            
-            // Clear the texture reference in the material
-            if (_mr != null && _mr.material != null)
-            {
-                _mr.material.mainTexture = null;
-            }
-        }
-    }
-    
-    IEnumerator EnsureTextureStarted()
-    {
-        // Wait for a few frames to ensure the texture is properly initialized
-        for (int i = 0; i < 5; i++)
-        {
-            yield return new WaitForEndOfFrame();
-        }
-        
-        // Check if texture is valid and playing
         if (_tex != null)
         {
-            if (!_tex.isPlaying)
-            {
-                Debug.Log("Restarting webcam texture as it was not playing");
-                _tex.Play();
-            }
-            
-            // Wait for texture to be ready
-            int attempts = 0;
-            while (!_tex.didUpdateThisFrame && attempts < 30)
-            {
-                yield return new WaitForEndOfFrame();
-                attempts++;
-            }
-            
-            if (attempts >= 30)
-            {
-                Debug.LogWarning("Webcam texture did not initialize properly after 30 frames");
-            }
-            else
-            {
-                Debug.Log("Webcam texture initialized successfully after " + attempts + " frames");
-                
-                // Force material update
-                if (_mr != null && _mr.material != null)
-                {
-                    // Ensure the texture is properly set
-                    _mr.material.mainTexture = _tex;
-                    
-                    // Force material to update
-                    _mr.material.SetFloat("_UpdateFlag", Time.time);
-                }
-            }
+            if (_tex.isPlaying) _tex.Stop();
+#if UNITY_EDITOR
+            DestroyImmediate(_tex);
+#else
+            Destroy(_tex);
+#endif
+            _tex = null;
+            var mr = GetComponent<MeshRenderer>();
+            if (mr && mr.sharedMaterial) mr.sharedMaterial.mainTexture = null;
         }
     }
 }

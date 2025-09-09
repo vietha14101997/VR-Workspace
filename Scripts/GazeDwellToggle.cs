@@ -3,61 +3,76 @@ using UnityEngine;
 public class GazeDwellToggle : MonoBehaviour
 {
     [Header("Refs")]
-    public Camera vrCamera;              // kéo VRCamera (Main Camera) vào
-    public ModeController modeController;// script đổi Virtual/Real (tên bạn đang dùng)
+    [SerializeField] private Camera vrCamera;               // Main Camera
+    [SerializeField] private ModeController modeController; // Toggle Virtual/Real
+
     [Header("Gaze")]
-    public float dwellTime = 2.0f;       // nhìn đủ 2s thì chuyển mode
-    public float maxDistance = 10f;      // tầm ray
-    public LayerMask hitMask;            // chọn VirtualObjects
-    public bool requireExitToRetrigger = true; // phải rời mắt mới cho kích lại
+    [Min(0.05f)] public float dwellTime = 2.0f;     // hold to toggle
+    public float maxDistance = 10f;                 // ray length
+    public LayerMask hitMask;                       // target layer(s)
+    public bool requireExitToRetrigger = true;      // must look away to retrigger
 
-    float _timer;
-    bool _armed = true;                  // chờ được kích lại
-    Renderer _rend;
-    Color _baseColor;
-    MaterialPropertyBlock _mpb;
+    private float _timer;
+    private bool _armed = true;                     // ready to trigger again
+    private Renderer _rend;
+    private Color _baseColor;
+    private MaterialPropertyBlock _mpb;
 
-    void Awake()
+    private static readonly int _ColorID = Shader.PropertyToID("_Color");
+
+    private void Awake()
     {
         _rend = GetComponentInChildren<Renderer>();
-        if (_rend) { _mpb = new MaterialPropertyBlock(); _baseColor = _rend.sharedMaterial.HasProperty("_Color") ? _rend.sharedMaterial.color : Color.white; }
+        if (_rend)
+        {
+            _mpb = new MaterialPropertyBlock();
+            // avoid touching sharedMaterial each frame; read once
+            var mat = _rend.sharedMaterial;
+            _baseColor = (mat && mat.HasProperty(_ColorID)) ? mat.color : Color.white;
+        }
+        // default mask once if user left it empty
         if (hitMask.value == 0) hitMask = LayerMask.GetMask("VirtualObjects");
+        if (dwellTime < 0.05f) dwellTime = 0.05f;
     }
 
-    void Update()
+    private void Update()
     {
         if (!vrCamera || !modeController) return;
 
-        var ray = new Ray(vrCamera.transform.position, vrCamera.transform.forward);
-        bool hitTreasure = Physics.Raycast(ray, out var hit, maxDistance, hitMask)
-                           && hit.collider.transform.IsChildOf(transform);
+        // Ray straight from camera forward
+        var origin = vrCamera.transform.position;
+        var dir = vrCamera.transform.forward;
 
-        if (hitTreasure && _armed)
+        bool hitSelf =
+            Physics.Raycast(origin, dir, out var hit, maxDistance, hitMask, QueryTriggerInteraction.Ignore)
+            && hit.collider && hit.collider.transform.IsChildOf(transform);
+
+        if (hitSelf && _armed)
         {
             _timer += Time.deltaTime;
             SetProgressVisual(_timer / dwellTime);
+
             if (_timer >= dwellTime)
             {
                 modeController.ToggleMode();
                 _timer = 0f;
-                if (requireExitToRetrigger) _armed = false; // phải nhìn chỗ khác rồi mới cho lần sau
+                if (requireExitToRetrigger) _armed = false; // need gaze exit to re-arm
             }
         }
         else
         {
-            // Reset khi rời mắt
-            _timer = 0f;
-            SetProgressVisual(0f);
-            if (!hitTreasure) _armed = true;
+            // Reset when gaze leaves, and re-arm if we’re no longer hitting
+            if (!hitSelf) _armed = true;
+            if (_timer != 0f) { _timer = 0f; SetProgressVisual(0f); }
         }
     }
 
-    void SetProgressVisual(float t)
+    private void SetProgressVisual(float t01)
     {
-        if (_rend == null || _mpb == null) return;
-        Color c = Color.Lerp(_baseColor, Color.green, Mathf.Clamp01(t));
-        _rend.GetPropertyBlock(_mpb);
-        _mpb.SetColor("_Color", c);
+        if (!_rend || _mpb == null) return;
+
+        Color c = Color.Lerp(_baseColor, Color.green, Mathf.Clamp01(t01));
+        _mpb.SetColor(_ColorID, c);
         _rend.SetPropertyBlock(_mpb);
     }
 }

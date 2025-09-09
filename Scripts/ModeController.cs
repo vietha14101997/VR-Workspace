@@ -1,103 +1,106 @@
 using UnityEngine;
-#if ENABLE_INPUT_SYSTEM
-using UnityEngine.InputSystem;
-#endif
 
 public enum ViewMode { VirtualSpace, RealWorld }
 
 public class ModeController : MonoBehaviour
 {
-    public Camera backgroundReal;     // BackgroundCamera_Real
-    public Camera backgroundVirtual;  // BackgroundCamera_Virtual
-    public CameraPassthrough cameraPassthrough; // Script trên PassthroughQuad
-    public GameObject virtualEnvironment; // Virtual environment objects
-    public float transitionDuration = 0.5f;
+    [Header("Bind")]
+    [SerializeField] private Camera backgroundReal;      // BG camera showing passthrough quad
+    [SerializeField] private Camera backgroundVirtual;   // BG camera for virtual skybox/etc
+    [SerializeField] private CameraPassthrough cameraPassthrough;
+    [SerializeField] private GameObject virtualEnvironment;
 
-    private bool isTransitioning;
-    private Coroutine transitionCoroutine;
+    [Header("Transition")]
+    [Min(0f)] public float transitionDuration = 0.5f;
 
+    [Header("State")]
     public ViewMode mode = ViewMode.VirtualSpace;
+
+    // internals
+    bool _transitioning;
+    Coroutine _co;
+    static readonly WaitForEndOfFrame _endOfFrame = new();
 
     void Start()
     {
-        // Validate required references
-        if (backgroundReal == null || backgroundVirtual == null)
+        if (!backgroundReal || !backgroundVirtual || !cameraPassthrough)
         {
-            Debug.LogError("Background cameras not set in ModeController!");
+            Debug.LogError("[ModeController] Missing references.");
+            enabled = false;
             return;
         }
-
-        if (cameraPassthrough == null)
-        {
-            Debug.LogError("CameraPassthrough reference not set in ModeController!");
-            return;
-        }
-
-        Apply();
+        // snap to initial state without animation on first frame
+        Apply(instant: true);
     }
 
     public void ToggleMode()
     {
-        mode = (mode == ViewMode.VirtualSpace) ? ViewMode.RealWorld : ViewMode.VirtualSpace;
-        Apply();
+        SetMode(mode == ViewMode.VirtualSpace ? ViewMode.RealWorld : ViewMode.VirtualSpace);
     }
 
-    System.Collections.IEnumerator TransitionRoutine(bool toRealWorld)
+    public void SetMode(ViewMode newMode, bool instant = false)
     {
-        if (isTransitioning) yield break;
-        isTransitioning = true;
+        if (mode == newMode && !_transitioning && !instant) return;
+        mode = newMode;
+        Apply(instant);
+    }
 
-        float startTime = Time.time;
-        bool real = (mode == ViewMode.RealWorld);
-
-        // Enable necessary cameras for transition
-        if (real)
+    void Apply(bool instant = false)
+    {
+        if (_co != null) { StopCoroutine(_co); _co = null; }
+        if (instant || transitionDuration <= 0f)
         {
-            backgroundReal.enabled = true;
-            cameraPassthrough.enabled = true;
-            yield return new WaitForEndOfFrame(); // Wait for camera to initialize
-        }
-
-        // Animate transition
-        while (Time.time - startTime < transitionDuration)
-        {
-            float t = (Time.time - startTime) / transitionDuration;
-
-            // Apply smoothstep for more natural easing
-            t = t * t * (3f - 2f * t); // Smoothstep formula
-
-            // Fade virtual environment opacity if needed
-            if (virtualEnvironment)
-            {
-                // You can add fade effect here if needed
-            }
-
-            yield return null;
-        }
-
-        // Set final states
-        if (real)
-        {
-            backgroundVirtual.enabled = false;
-            if (virtualEnvironment) virtualEnvironment.SetActive(false);
+            SetFinalStates(mode == ViewMode.RealWorld);
         }
         else
         {
-            backgroundReal.enabled = false;
-            cameraPassthrough.enabled = false;
+            _co = StartCoroutine(TransitionRoutine(mode == ViewMode.RealWorld));
+        }
+    }
+
+    System.Collections.IEnumerator TransitionRoutine(bool toReal)
+    {
+        if (_transitioning) yield break;
+        _transitioning = true;
+
+        // pre-enable what's needed before blend
+        if (toReal)
+        {
+            backgroundReal.enabled = true;
+            cameraPassthrough.enabled = true;
+            yield return _endOfFrame; // let camera/texture warm up one frame
+        }
+        else
+        {
             backgroundVirtual.enabled = true;
             if (virtualEnvironment) virtualEnvironment.SetActive(true);
         }
 
-        isTransitioning = false;
+        float t0 = Time.time;
+        while (true)
+        {
+            float t = Mathf.InverseLerp(0f, transitionDuration, Time.time - t0);
+            if (t >= 1f) break;
+
+            // smoothstep
+            float s = t * t * (3f - 2f * t);
+            // (optional) hook to fade post-process/UI based on s if needed
+            yield return null;
+        }
+
+        SetFinalStates(toReal);
+        _transitioning = false;
+        _co = null;
     }
 
-    void Apply()
+    void SetFinalStates(bool real)
     {
-        if (transitionCoroutine != null)
-            StopCoroutine(transitionCoroutine);
+        // Real world
+        backgroundReal.enabled = real;
+        cameraPassthrough.enabled = real;
 
-        bool toRealWorld = (mode == ViewMode.RealWorld);
-        transitionCoroutine = StartCoroutine(TransitionRoutine(toRealWorld));
+        // Virtual world
+        backgroundVirtual.enabled = !real;
+        if (virtualEnvironment) virtualEnvironment.SetActive(!real);
     }
 }

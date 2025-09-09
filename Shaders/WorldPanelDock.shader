@@ -2,7 +2,7 @@ Shader "Unlit/WorldPanelDock"
 {
     Properties
     {
-        _FillColor   ("Fill Color", Color) = (0,0,0,0.22)
+        _FillColor   ("Fill Color", Color) = (0,0,0,0)
         _BorderColor ("Border Color", Color) = (1,1,1,0.35)
         _RectWH      ("Rect Size (W,H)", Vector) = (1,1,0,0)
         _Radius      ("Corner Radius (units)", Float) = 0.06
