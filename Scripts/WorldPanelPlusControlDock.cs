@@ -52,8 +52,6 @@ public class WorldPanelPlusControlDock : MonoBehaviour
     bool _built;
     Vector3 _lastLossyDock;
 
-    // ===================== PUBLIC API =====================
-
     public void SetMinimized(bool on)
     {
         if (_minimized == on) return;
@@ -154,8 +152,6 @@ public class WorldPanelPlusControlDock : MonoBehaviour
         transform.position = pos;
     }
 
-    // ===================== Unity lifecycle =====================
-
     void Reset() { panel = GetComponentInParent<WorldPanelPlus>(); }
 
     void Awake()
@@ -165,11 +161,10 @@ public class WorldPanelPlusControlDock : MonoBehaviour
 
     void Start()
     {
-        if (_backplate == null)
-        {
-            var trayMat = panel ? panel.GetTrayMaterial() : null;
-            Build(trayMat);
-        }
+        // LUÔN dọn sạch trước khi build để tránh “VisualRoot x3”
+        ClearChildren();
+        var trayMat = panel ? panel.GetTrayMaterial() : null;
+        Build(trayMat);
         RecomputeFromPanel();
         PurgeUnknownBackgrounds();
     }
@@ -252,7 +247,7 @@ public class WorldPanelPlusControlDock : MonoBehaviour
             }
         }
 
-        // collider scale refresh (1 lần khi thay đổi)
+        // collider scale refresh
         if ((transform.lossyScale - _lastLossyDock).sqrMagnitude > 1e-6f)
         {
             foreach (var b in _buttons)
@@ -268,10 +263,10 @@ public class WorldPanelPlusControlDock : MonoBehaviour
 
     public void Build(Material trayMatLike)
     {
-        if (_built) ClearChildren();
+        // Luôn dọn sạch trước khi dựng mới để tránh nhân bản
+        ClearChildren();
         _built = true;
 
-        // Root
         var vr = new GameObject("VisualRoot");
         vr.transform.SetParent(transform, false);
         _visualRoot = vr.transform;
@@ -302,20 +297,19 @@ public class WorldPanelPlusControlDock : MonoBehaviour
         float expandedW = innerW + 2f * (border + bleed);
         float expandedH = innerH + 2f * (border + bleed);
 
-        // == BACKPLATE (không CreatePrimitive để tránh Collider/ngầm) ==
+        // == BACKPLATE ==
         _backplate = new GameObject("DockBackplate").transform;
         _backplate.SetParent(_neutralRoot, false);
         _backplate.localPosition = Vector3.zero;
 
-        // MeshFilter + MeshRenderer với quad sạch
         var mf = _backplate.gameObject.AddComponent<MeshFilter>();
-        mf.sharedMesh = BuildUnitQuad(); // quad (0..1) – sẽ dùng scale để đặt kích thước
+        mf.sharedMesh = BuildUnitQuad();
 
         var mr = _backplate.gameObject.AddComponent<MeshRenderer>();
         var mat = new Material(Shader.Find("Unlit/WorldPanelDock"));
         mr.sharedMaterial = mat;
 
-        float startW = _minimized ? expandedH : expandedW; // minimize -> W=H (hình tròn)
+        float startW = _minimized ? expandedH : expandedW;
         float startH = expandedH;
         _backplate.localScale = new Vector3(startW, startH, 1f);
 
@@ -325,12 +319,11 @@ public class WorldPanelPlusControlDock : MonoBehaviour
         if (mat.HasProperty("_Border")) mat.SetFloat("_Border", border);
         if (mat.HasProperty("_RectWH")) mat.SetVector("_RectWH", new Vector4(startW, startH, 0, 0));
 
-        // binder bo tròn
         var binder = _backplate.gameObject.GetComponent<RoundedBackplateBinder>();
         if (!binder) binder = _backplate.gameObject.AddComponent<RoundedBackplateBinder>();
         binder.border = border;
         binder.fallbackRadiusWhenExpanded = cornerRadius;
-        binder.forceCircle = _minimized;
+        binder.SetForceCircle(_minimized);
 
         // == BUTTONS ==
         float x0 = -(innerW * 0.5f) + buttonSize.x * 0.5f;
@@ -339,7 +332,6 @@ public class WorldPanelPlusControlDock : MonoBehaviour
         {
             var go = new GameObject("Btn_" + types[i]);
             go.transform.SetParent(_neutralRoot, false);
-            // Y = 0 để căn giữa thẳng backplate. Z nâng nhẹ toàn bộ button (không nâng riêng icon)
             go.transform.localPosition = new Vector3(x0 + i * (buttonSize.x + buttonGap + extraGap), 0f, 0.01f);
 
             var btn = go.AddComponent<WorldPanelPlusDockButton>();
@@ -349,7 +341,6 @@ public class WorldPanelPlusControlDock : MonoBehaviour
             var bc = go.AddComponent<BoxCollider>();
             SetColliderWorldSize(bc, new Vector3(buttonSize.x, buttonSize.y, 0.02f), 0.01f);
 
-            // Icon đúng tâm, chỉ nâng Z rất nhẹ để trên backplate
             var icon = GameObject.CreatePrimitive(PrimitiveType.Quad);
             icon.name = "Icon";
             icon.transform.SetParent(go.transform, false);
@@ -365,7 +356,6 @@ public class WorldPanelPlusControlDock : MonoBehaviour
             _buttons.Add(btn);
         }
 
-        // ràng buộc pose & layout
         _frozenWorldRot = transform.rotation;
         ComputeLocalOffset();
         AnchorToWorld(transform.position, Camera.main);
@@ -378,11 +368,8 @@ public class WorldPanelPlusControlDock : MonoBehaviour
         ResizeBackplateToActiveButtons(bleed);
         CenterButtonsVertically();
 
-        // loại bỏ mọi nền cũ lỡ tồn tại
         PurgeUnknownBackgrounds();
     }
-
-    // ===================== Helpers =====================
 
     void ClearChildren()
     {
@@ -426,8 +413,7 @@ public class WorldPanelPlusControlDock : MonoBehaviour
         {
             var b = _buttons[i]; if (!b) continue;
             var t = b.transform;
-            t.localPosition = new Vector3(t.localPosition.x, 0f, t.localPosition.z); // y=0 là giữa backplate
-            // đảm bảo icon cũng 0 theo trục Y
+            t.localPosition = new Vector3(t.localPosition.x, 0f, t.localPosition.z);
             var icon = t.Find("Icon"); if (icon) icon.localPosition = new Vector3(icon.localPosition.x, 0f, icon.localPosition.z);
         }
     }
@@ -543,19 +529,6 @@ public class WorldPanelPlusControlDock : MonoBehaviour
         bc.center = new Vector3(0f, 0f, worldZCenter / sz);
     }
 
-    void EnsureButtonColliders()
-    {
-        if (_buttons == null || _buttons.Count == 0) return;
-        RefreshNeutralScale();
-        foreach (var b in _buttons)
-        {
-            if (!b) continue;
-            var bc = b.GetComponent<BoxCollider>();
-            if (!bc) continue;
-            SetColliderWorldSize(bc, new Vector3(buttonSize.x, buttonSize.y, 0.02f), 0.01f);
-        }
-    }
-
     void CaptureExpandedLayout()
     {
         _expandedPos.Clear();
@@ -589,9 +562,7 @@ public class WorldPanelPlusControlDock : MonoBehaviour
         float minimizedWidth = buttonSize.x + border * 2;
         float height = buttonSize.y + border * 2;
 
-        Vector3 backplateStartPos = _backplate.localPosition;
         Dictionary<WorldPanelPlusDockButton, Vector3> buttonStart = new();
-
         foreach (var btn in _buttons) buttonStart[btn] = btn.transform.localPosition;
 
         float startWidth = _backplate.localScale.x;
@@ -608,13 +579,12 @@ public class WorldPanelPlusControlDock : MonoBehaviour
             {
                 float currentWidth = Mathf.Lerp(startWidth, targetWidth, easedT);
                 _backplate.localScale = new Vector3(currentWidth, height, 1);
-                _backplate.localPosition = new Vector3(centerPos.x, backplateStartPos.y, backplateStartPos.z);
+                _backplate.localPosition = new Vector3(centerPos.x, 0f, 0f);
             }
 
             foreach (var btn in _buttons)
             {
                 if (btn.type == WPDockButtonType.MinimizeToggle) continue;
-
                 Vector3 s = buttonStart[btn];
                 Vector3 targetPos = minimize ? _toggleBtnTr.localPosition : _expandedPos[btn];
                 btn.transform.localPosition = Vector3.Lerp(s, targetPos, easedT);
@@ -627,7 +597,7 @@ public class WorldPanelPlusControlDock : MonoBehaviour
         {
             Vector3 centerPos = _toggleBtnTr != null ? _toggleBtnTr.localPosition : Vector3.zero;
             _backplate.localScale = new Vector3(targetWidth, height, 1);
-            _backplate.localPosition = new Vector3(centerPos.x, backplateStartPos.y, backplateStartPos.z);
+            _backplate.localPosition = new Vector3(centerPos.x, 0f, 0f);
         }
 
         foreach (var btn in _buttons)
@@ -647,7 +617,6 @@ public class WorldPanelPlusControlDock : MonoBehaviour
     float EaseInQuad(float t) => t * t;
     float EaseOutQuad(float t) => t * (2f - t);
 
-    // Quad mesh (unit) để tránh CreatePrimitive
     static Mesh BuildUnitQuad()
     {
         var m = new Mesh();
@@ -668,42 +637,24 @@ public class WorldPanelPlusControlDock : MonoBehaviour
         return m;
     }
 
-    // Quét toàn bộ cây con của Dock và xoá/ẩn mọi renderer không thuộc backplate hoặc các Icon của button
-    /// <summary>
-    /// Purges any stray renderer objects from the dock. The dock should only contain a single
-    /// backplate and the icon quads under each button. Any MeshRenderers outside of these
-    /// whitelisted objects will be disabled. This method takes a conservative approach by
-    /// enumerating all renderers in the dock hierarchy and turning off anything that isn't
-    /// explicitly recognized. This helps to clean up leftover quads from previous builds or
-    /// imported prefabs which can cause dark, non-rounded backgrounds to appear behind the
-    /// rounded backplate.
-    /// </summary>
+    // Dọn renderer lạ để không xuất hiện nền tối rác
     void PurgeUnknownBackgrounds()
     {
         if (_backplate == null) return;
 
-        // Helper to determine if a renderer belongs to an allowed object. We only allow
-        // (1) the dock backplate itself and (2) the icon quad children of our buttons.
         bool IsAllowed(Renderer r)
         {
             if (r == null) return false;
             var t = r.transform;
-            // backplate itself
             if (t == _backplate) return true;
-            // icon quads: child of a button with name "Icon"
             if (t.name == "Icon")
             {
                 foreach (var b in _buttons)
-                {
                     if (b != null && t.IsChildOf(b.transform)) return true;
-                }
             }
             return false;
         }
 
-        // Disable any renderer that isn't explicitly allowed. This ensures that the dock
-        // never accidentally renders extra geometry. Destroying GameObjects outright can
-        // disrupt references during design time, so we opt to disable them instead.
         var rends = GetComponentsInChildren<Renderer>(true);
         foreach (var r in rends)
         {
@@ -731,10 +682,6 @@ public class RoundedBackplateBinder : MonoBehaviour
     void Awake() { _r = GetComponent<Renderer>(); _t = transform; }
     void OnEnable() { Sync(); }
 #if UNITY_EDITOR
-    // In the editor we only need to sync shader properties when values change.
-    // Purging stray backgrounds is handled by the parent dock class; calling it
-    // from here would cause compile errors because this binder has no access
-    // to the dock's PurgeUnknownBackgrounds method.
     void OnValidate(){ Sync(); }
 #endif
     void LateUpdate() { Sync(); }
@@ -746,7 +693,7 @@ public class RoundedBackplateBinder : MonoBehaviour
         if (!_r || !_t) return;
         var m = _r.sharedMaterial; if (!m) return;
 
-        var s = _t.localScale;               // (W,H,1)
+        var s = _t.localScale;
         if (m.HasProperty("_RectWH")) m.SetVector("_RectWH", new Vector4(s.x, s.y, 0, 0));
         if (m.HasProperty("_Border")) m.SetFloat("_Border", border);
 

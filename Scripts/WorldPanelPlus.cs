@@ -139,15 +139,18 @@ public class WorldPanelPlus : MonoBehaviour
 
         EnsureMaterials();
 
-        // Board (TURNED INVISIBLE: keep collider & raycatcher only)
+        // === Board (giữ renderer bật, nhưng alpha=0 để không “che trắng”) ===
         board = CreateQuad("Board", _panelMat).transform;
         board.localScale = new Vector3(width, height, 1);
         var mrBoard = board.GetComponent<MeshRenderer>();
         mrBoard.sharedMaterial = _panelMat;
         mrBoard.sharedMaterial.mainTexture = contentTexture;
-        mrBoard.sharedMaterial.color = panelTint;
-        // Hide the renderer to eliminate the flat dark background under the rounded tray
-        mrBoard.enabled = false;
+        // ép alpha 0 cho trong suốt
+        var tint = panelTint; tint.a = 0f;
+        if (mrBoard.sharedMaterial.HasProperty("_Color"))
+            mrBoard.sharedMaterial.SetColor("_Color", tint);
+        else
+            mrBoard.sharedMaterial.color = tint;
 
         var bc = board.gameObject.AddComponent<BoxCollider>();
         bc.size = new Vector3(1, 1, 0.02f);
@@ -179,7 +182,7 @@ public class WorldPanelPlus : MonoBehaviour
             if (!t.GetComponent<WorldPanelPlusHandleSphere>()) t.gameObject.AddComponent<WorldPanelPlusHandleSphere>();
         }
 
-        // Hover collider (covers tray+ dock)
+        // Hover collider (covers tray + dock)
         hover = new GameObject("Hover").transform; hover.SetParent(transform, false);
         var bcHover = hover.gameObject.AddComponent<BoxCollider>(); bcHover.isTrigger = false;
         hover.gameObject.AddComponent<WorldPanelPlusTrayRaycatcher>().panel = this;
@@ -247,7 +250,6 @@ public class WorldPanelPlus : MonoBehaviour
             _panelMat = new Material(boardShader != null ? boardShader : Shader.Find("Unlit/Texture"));
             if (boardShader != null)
             {
-                // Disable all fades/vignette
                 _panelMat.SetFloat("_EdgeFadeX", 0f);
                 _panelMat.SetFloat("_EdgeFadeY", 0f);
                 _panelMat.SetFloat("_EdgeFade", 0f);
@@ -416,9 +418,13 @@ public class WorldPanelPlus : MonoBehaviour
             {
                 mr.sharedMaterial = _panelMat;
                 mr.sharedMaterial.mainTexture = contentTexture;
-                mr.sharedMaterial.color = panelTint;
-                // ensure it's hidden
-                mr.enabled = false;
+
+                // ép alpha 0 để Board không nhìn thấy
+                var tint = panelTint; tint.a = 0f;
+                if (mr.sharedMaterial.HasProperty("_Color"))
+                    mr.sharedMaterial.SetColor("_Color", tint);
+                else
+                    mr.sharedMaterial.color = tint;
             }
             var col = board.GetComponent<BoxCollider>(); if (col) { col.size = new Vector3(1, 1, 0.02f); col.center = new Vector3(0, 0, 0.01f); }
         }
@@ -659,14 +665,24 @@ public class WorldPanelPlus : MonoBehaviour
 
     void UpdateBoardShaderProperties()
     {
-        if (_panelMat != null && _panelMat.shader.name == "Unlit/WorldPanelBoard")
+        if (_panelMat != null)
         {
-            // ensure no vignette/fades, but renderer is hidden anyway
-            _panelMat.SetFloat("_EdgeFade", 0f);
-            _panelMat.SetFloat("_EdgeFadeX", 0f);
-            _panelMat.SetFloat("_EdgeFadeY", 0f);
-            _panelMat.SetFloat("_FadeAmount", 0f);
-            _panelMat.SetVector("_PanelSize", new Vector4(width, height, 0, 0));
+            // giữ Board trong suốt
+            var tint = panelTint; tint.a = 0f;
+            if (_panelMat.HasProperty("_Color")) _panelMat.SetColor("_Color", tint);
+            else _panelMat.color = tint;
+
+            if (_panelMat.shader != null && _panelMat.shader.name == "Unlit/WorldPanelBoard")
+            {
+                _panelMat.SetFloat("_EdgeFade", 0f);
+                _panelMat.SetFloat("_EdgeFadeX", 0f);
+                _panelMat.SetFloat("_EdgeFadeY", 0f);
+                _panelMat.SetFloat("_FadeAmount", 0f);
+                _panelMat.SetVector("_PanelSize", new Vector4(width, height, 0, 0));
+            }
+
+            if (_panelMat.HasProperty("_Surface")) _panelMat.SetFloat("_Surface", 1f); // Transparent (URP)
+            _panelMat.renderQueue = 3000;
         }
     }
 
