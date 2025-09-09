@@ -79,20 +79,20 @@ public class WorldPanelPlusControlDock : MonoBehaviour
             var bc = b.GetComponent<BoxCollider>(); if (bc) bc.enabled = enable;
 
             var bgMr = b.transform.Find("BG")?.GetComponent<MeshRenderer>();
-            if (bgMr && bgMr.sharedMaterial)
-            {
-                if (bgMr.sharedMaterial.HasProperty("_FillColor"))
-                {
-                    var c = bgMr.sharedMaterial.GetColor("_FillColor");
-                    c.a = enable ? 0.35f : 0.12f;
-                    bgMr.sharedMaterial.SetColor("_FillColor", c);
-                }
-                else
-                {
-                    var c = bgMr.sharedMaterial.color; c.a = enable ? 0.35f : 0.12f;
-                    bgMr.sharedMaterial.color = c;
-                }
-            }
+            // if (bgMr && bgMr.sharedMaterial)
+            // {
+            //     if (bgMr.sharedMaterial.HasProperty("_FillColor"))
+            //     {
+            //         var c = bgMr.sharedMaterial.GetColor("_FillColor");
+            //         c.a = enable ? 0.35f : 0.12f;
+            //         bgMr.sharedMaterial.SetColor("_FillColor", c);
+            //     }
+            //     else
+            //     {
+            //         var c = bgMr.sharedMaterial.color; c.a = enable ? 0.35f : 0.12f;
+            //         bgMr.sharedMaterial.color = c;
+            //     }
+            // }
         }
     }
 
@@ -236,8 +236,8 @@ public class WorldPanelPlusControlDock : MonoBehaviour
             if (m.HasProperty("_MaskEnable")) m.SetFloat("_MaskEnable", 0f);
             if (m.HasProperty("_FillColor"))
             {
-                m.SetColor("_FillColor", new Color(0f, 0f, 0f, 0.18f * a));
-                m.SetColor("_BorderColor", new Color(1f, 1f, 1f, 0.18f * a));
+                // m.SetColor("_FillColor", new Color(0f, 0f, 0f, 0.18f * a));
+                m.SetColor("_BorderColor", new Color(1f, 1f, 1f, 0.28f * a));
             }
             else
             {
@@ -313,7 +313,7 @@ public class WorldPanelPlusControlDock : MonoBehaviour
         float startH = expandedH;
         _backplate.localScale = new Vector3(startW, startH, 1f);
 
-        if (mat.HasProperty("_FillColor")) mat.SetColor("_FillColor", new Color(0, 0, 0, 0.22f));
+        if (mat.HasProperty("_FillColor")) mat.SetColor("_FillColor", new Color(0, 0, 0, 0));
         if (mat.HasProperty("_BorderColor")) mat.SetColor("_BorderColor", new Color(1, 1, 1, 0.35f));
         if (mat.HasProperty("_Feather")) mat.SetFloat("_Feather", 0.006f);
         if (mat.HasProperty("_Border")) mat.SetFloat("_Border", border);

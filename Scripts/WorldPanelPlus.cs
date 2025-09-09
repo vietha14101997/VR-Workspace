@@ -61,10 +61,14 @@ public class WorldPanelPlus : MonoBehaviour
     public Transform hover;
     public WorldPanelPlusControlDock dock;
 
-    Material _panelMat, _trayMat, _dashMat;
+    //=== Board visuals ===
+    [Header("Board visuals")]
     public Texture contentTexture;
     public Color panelTint = Color.white;
+    public bool boardVisible = true;               // NEW: cho phép bật/tắt Board
+    [Range(0, 1)] public float boardAlpha = 1f;     // NEW: alpha riêng cho Board
 
+    Material _panelMat, _trayMat, _dashMat;
     float FadeSpeedIn => 1f / Mathf.Max(0.0001f, trayFadeInDuration);
     float FadeSpeedOut => 1f / Mathf.Max(0.0001f, trayFadeOutDuration);
     MaterialPropertyBlock _mpb;
@@ -139,18 +143,16 @@ public class WorldPanelPlus : MonoBehaviour
 
         EnsureMaterials();
 
-        // === Board (giữ renderer bật, nhưng alpha=0 để không “che trắng”) ===
+        // === Board (hiển thị texture) ===
         board = CreateQuad("Board", _panelMat).transform;
         board.localScale = new Vector3(width, height, 1);
         var mrBoard = board.GetComponent<MeshRenderer>();
         mrBoard.sharedMaterial = _panelMat;
         mrBoard.sharedMaterial.mainTexture = contentTexture;
-        // ép alpha 0 cho trong suốt
-        var tint = panelTint; tint.a = 0f;
-        if (mrBoard.sharedMaterial.HasProperty("_Color"))
-            mrBoard.sharedMaterial.SetColor("_Color", tint);
-        else
-            mrBoard.sharedMaterial.color = tint;
+        mrBoard.enabled = boardVisible;
+
+        // màu + alpha theo panelTint & boardAlpha
+        ApplyBoardTint(mrBoard);
 
         var bc = board.gameObject.AddComponent<BoxCollider>();
         bc.size = new Vector3(1, 1, 0.02f);
@@ -418,13 +420,8 @@ public class WorldPanelPlus : MonoBehaviour
             {
                 mr.sharedMaterial = _panelMat;
                 mr.sharedMaterial.mainTexture = contentTexture;
-
-                // ép alpha 0 để Board không nhìn thấy
-                var tint = panelTint; tint.a = 0f;
-                if (mr.sharedMaterial.HasProperty("_Color"))
-                    mr.sharedMaterial.SetColor("_Color", tint);
-                else
-                    mr.sharedMaterial.color = tint;
+                mr.enabled = boardVisible;
+                ApplyBoardTint(mr);
             }
             var col = board.GetComponent<BoxCollider>(); if (col) { col.size = new Vector3(1, 1, 0.02f); col.center = new Vector3(0, 0, 0.01f); }
         }
@@ -467,6 +464,21 @@ public class WorldPanelPlus : MonoBehaviour
 
         if (dock) dock.RecomputeFromPanel();
         UpdateHandlesLayout();
+    }
+
+    void ApplyBoardTint(MeshRenderer mr)
+    {
+        if (!mr) return;
+        var tint = panelTint;
+        tint.a = boardVisible ? Mathf.Clamp01(boardAlpha) : 0f;
+
+        if (mr.sharedMaterial.HasProperty("_Color"))
+            mr.sharedMaterial.SetColor("_Color", tint);
+        else
+            mr.sharedMaterial.color = tint;
+
+        mr.sharedMaterial.mainTexture = contentTexture;
+        mr.sortingOrder = 0;
     }
 
     public void UpdateHandleLocks()
@@ -667,8 +679,8 @@ public class WorldPanelPlus : MonoBehaviour
     {
         if (_panelMat != null)
         {
-            // giữ Board trong suốt
-            var tint = panelTint; tint.a = 0f;
+            // màu/alpha Board theo panelTint và boardAlpha
+            var tint = panelTint; tint.a = boardVisible ? Mathf.Clamp01(boardAlpha) : 0f;
             if (_panelMat.HasProperty("_Color")) _panelMat.SetColor("_Color", tint);
             else _panelMat.color = tint;
 
