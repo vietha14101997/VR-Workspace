@@ -34,8 +34,8 @@ public class WorldPanelPlus : MonoBehaviour
     public float height = 0.72f;
 
     [Header("Tray visuals")]
-    public float trayPadding = 0.08f;
-    public float trayHoverExtra = 0.05f;
+    public float trayPadding = 0.025f;
+    public float trayHoverExtra = 0.035f;
     public float trayBehind = 0.02f;
     public float trayCornerRadius = 0.06f;
     public float trayBorder = 0.004f;
@@ -250,13 +250,13 @@ public class WorldPanelPlus : MonoBehaviour
         if (_panelMat == null)
         {
             _panelMat = new Material(boardShader != null ? boardShader : Shader.Find("Unlit/Texture"));
-            if (boardShader != null)
-            {
-                _panelMat.SetFloat("_EdgeFadeX", 0f);
-                _panelMat.SetFloat("_EdgeFadeY", 0f);
-                _panelMat.SetFloat("_EdgeFade", 0f);
-                _panelMat.SetFloat("_FadeAmount", 0f);
-            }
+            // if (boardShader != null)
+            // {
+            //     _panelMat.SetFloat("_EdgeFadeX", 0f);
+            //     _panelMat.SetFloat("_EdgeFadeY", 0f);
+            //     _panelMat.SetFloat("_EdgeFade", 0f);
+            //     _panelMat.SetFloat("_FadeAmount", 0f);
+            // }
         }
 
         var sRounded = Shader.Find("Unlit/WorldPanelRounded");
@@ -679,18 +679,26 @@ public class WorldPanelPlus : MonoBehaviour
     {
         if (_panelMat != null)
         {
-            // màu/alpha Board theo panelTint và boardAlpha
+            // màu/alpha Board theo panelTint & boardAlpha
             var tint = panelTint; tint.a = boardVisible ? Mathf.Clamp01(boardAlpha) : 0f;
             if (_panelMat.HasProperty("_Color")) _panelMat.SetColor("_Color", tint);
             else _panelMat.color = tint;
 
             if (_panelMat.shader != null && _panelMat.shader.name == "Unlit/WorldPanelBoard")
             {
-                _panelMat.SetFloat("_EdgeFade", 0f);
-                _panelMat.SetFloat("_EdgeFadeX", 0f);
-                _panelMat.SetFloat("_EdgeFadeY", 0f);
-                _panelMat.SetFloat("_FadeAmount", 0f);
-                _panelMat.SetVector("_PanelSize", new Vector4(width, height, 0, 0));
+                float thick = 0.05f;
+                float thin = 0.03f;
+
+                bool widthIsLonger = width >= height;
+                float edgeX = widthIsLonger ? thin : thick;
+                float edgeY = widthIsLonger ? thick : thin;
+
+                if (_panelMat.HasProperty("_EdgeFadeX")) _panelMat.SetFloat("_EdgeFadeX", edgeX);
+                if (_panelMat.HasProperty("_EdgeFadeY")) _panelMat.SetFloat("_EdgeFadeY", edgeY);
+                if (_panelMat.HasProperty("_EdgeMinAlpha")) _panelMat.SetFloat("_EdgeMinAlpha", 0.40f);
+
+                if (_panelMat.HasProperty("_PanelSize"))
+                    _panelMat.SetVector("_PanelSize", new Vector4(width, height, 0, 0));
             }
 
             if (_panelMat.HasProperty("_Surface")) _panelMat.SetFloat("_Surface", 1f); // Transparent (URP)

@@ -2,19 +2,23 @@ Shader "Unlit/WorldPanelBoard"
 {
     Properties
     {
-        [NoScaleOffset] _MainTex ("Texture", 2D) = "white" {}
-        _Color       ("Tint", Color) = (1,1,1,1)
-        _EdgeFade    ("Edge Fade", Range(0.01, 0.1)) = 0.03  // 3% rìa làm mờ
-        _FadeAmount  ("Fade Amount", Range(0, 1)) = 0.4      // Giảm xuống 40% alpha
-        _PanelSize   ("Panel Size", Vector) = (1.2,0.72,0,0) // Width, Height của panel
-        [Toggle] _DebugFade ("Debug Fade", Float) = 0        // Để debug trên mobile
+        _MainTex ("Texture", 2D) = "white" {}
+        _Color   ("Tint", Color) = (1,1,1,1)
+
+        // Viền mờ độc lập theo trục:
+        _EdgeFadeX ("Edge Fade X (0..0.25)", Range(0,0.25)) = 0.06  // ngang (trái/phải)
+        _EdgeFadeY ("Edge Fade Y (0..0.25)", Range(0,0.25)) = 0.03  // dọc (trên/dưới)
+        _EdgeMinAlpha ("Edge Min Alpha (0..1)", Range(0,1)) = 0.4
+
+        _PanelSize ("Panel Size (W,H)", Vector) = (1,1,0,0)
     }
     SubShader
     {
-        Tags { "RenderType"="Transparent" "Queue"="Transparent" }
+        Tags { "Queue"="Transparent" "RenderType"="Transparent" "IgnoreProjector"="True" }
         LOD 100
-        Blend SrcAlpha OneMinusSrcAlpha
+        Cull Off
         ZWrite Off
+        Blend SrcAlpha OneMinusSrcAlpha
 
         Pass
         {
@@ -23,62 +27,50 @@ Shader "Unlit/WorldPanelBoard"
             #pragma fragment frag
             #include "UnityCG.cginc"
 
-            struct appdata
-            {
-                float4 vertex : POSITION;
-                float2 uv : TEXCOORD0;
-            };
+            sampler2D _MainTex; float4 _MainTex_ST;
+            fixed4 _Color;
 
-            struct v2f
-            {
-                float2 uv : TEXCOORD0;
-                float4 vertex : SV_POSITION;
-            };
+            float _EdgeFadeX;
+            float _EdgeFadeY;
+            float _EdgeMinAlpha;
+            float4 _PanelSize; // (W,H,0,0) — giữ tương thích
 
-            sampler2D _MainTex;
-            float4 _MainTex_ST;
-            float4 _Color;
-            float _EdgeFade;
-            float _FadeAmount;
-            float4 _PanelSize;
-            float _DebugFade;
+            struct appdata { float4 vertex:POSITION; float2 uv:TEXCOORD0; };
+            struct v2f     { float4 pos:SV_POSITION; float2 uv:TEXCOORD0; };
 
-            v2f vert (appdata v)
-            {
+            v2f vert (appdata v) {
                 v2f o;
-                o.vertex = UnityObjectToClipPos(v.vertex);
-                o.uv = v.uv;
+                o.pos = UnityObjectToClipPos(v.vertex);
+                o.uv  = TRANSFORM_TEX(v.uv, _MainTex);
                 return o;
             }
 
             fixed4 frag (v2f i) : SV_Target
             {
-                // Sample texture
                 fixed4 col = tex2D(_MainTex, i.uv) * _Color;
-                
-                // Đơn giản hóa: Tính khoảng cách UV đến rìa gần nhất
-                float2 uvDist = min(i.uv, 1 - i.uv);  // Khoảng cách đến cả 4 rìa
-                float minDist = min(uvDist.x, uvDist.y);  // Lấy khoảng cách nhỏ nhất
-                
-                // Vùng fade dựa trên _EdgeFade
-                float fadeAmount = saturate(minDist / _EdgeFade);
-                
-                // Lerp từ _FadeAmount (25%) đến 1.0
-                fadeAmount = lerp(_FadeAmount, 1.0, fadeAmount);
-                
-                // Debug mode để kiểm tra trên mobile
-                if (_DebugFade > 0.5)
-                {
-                    return float4(fadeAmount.xxx, 1.0);
-                }
-                
-                // Áp dụng fade cho cả màu và alpha
-                col.rgb *= fadeAmount;
-                col.a *= fadeAmount;
-                
+
+                // khoảng cách tới mép dọc/ngang
+                float dx = min(i.uv.x, 1.0 - i.uv.x);
+                float dy = min(i.uv.y, 1.0 - i.uv.y);
+
+                // tránh chia 0
+                float ex = max(_EdgeFadeX, 1e-6);
+                float ey = max(_EdgeFadeY, 1e-6);
+
+                // Chuẩn hoá khoảng cách theo mỗi trục -> lấy trục "gần mép hơn"
+                float nx = dx / ex;   // 0 ở sát mép X, 1 ở trong rìa mờ X
+                float ny = dy / ey;   // 0 ở sát mép Y, 1 ở trong rìa mờ Y
+                float t  = saturate(min(nx, ny));
+                t = smoothstep(0.0, 1.0, t);
+
+                // Alpha: mép ngoài -> _EdgeMinAlpha, vào trong -> 1
+                float alphaMul = lerp(_EdgeMinAlpha, 1.0, t);
+                col.a *= alphaMul;
+
                 return col;
             }
             ENDCG
         }
     }
+    FallBack Off
 }
