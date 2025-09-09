@@ -156,29 +156,21 @@ public class WorldPanelPlusHandle : MonoBehaviour,
         // CENTER: Move-orbit quanh camera 360° (unbounded yaw)
         if (panel.moveOrbitCamera && _dragCam)
         {
-            float camYaw = _dragCam.transform.eulerAngles.y;
-            float camPitch = _dragCam.transform.eulerAngles.x;
-
-            _orbitYawAccum += Mathf.DeltaAngle(_lastCamYaw, camYaw);
-            _orbitPitchAccum += Mathf.DeltaAngle(_lastCamPitch, camPitch);
-            _lastCamYaw = camYaw; _lastCamPitch = camPitch;
-            _orbitPitchAccum = Mathf.Clamp(_orbitPitchAccum, -80f, 80f);
-
+            // 1) Giữ khoảng cách neo ban đầu
             float dist = Mathf.Clamp(_grabCamDist, panel.moveOrbitMin, panel.moveOrbitMax);
 
-            Quaternion dirRot = Quaternion.Euler(_orbitPitchAccum, _orbitYawAccum, 0f);
-            Vector3 dir = dirRot * Vector3.forward;
+            // 2) Đặt anchor MỚI đúng trên tia nhìn tại khoảng cách dist
+            Vector3 wantAnchor = r.origin + r.direction.normalized * dist;
 
-            // Vị trí MỚI mong muốn của chính "nút Move" (anchor)
-            Vector3 wantAnchor = _dragCam.transform.position + dir * dist;
-
-            // Dịch chuyển cả panel sao cho anchor dịch đúng như mong muốn
+            // 3) Dịch panel sao cho anchor (nút Move) “theo” reticle
             Vector3 delta = wantAnchor - _moveAnchor;
             panel.transform.position += delta;
-            _moveAnchor = wantAnchor;                  // cập nhật anchor
-            panel.moveAnchorWorld = _moveAnchor;       // lưu lại để lần sau vào Move không bị “nhảy”
 
-            // Giữ lệch xoay ban đầu với camera
+            // 4) Cập nhật neo để khung hình sau tiếp tục mượt
+            _moveAnchor = wantAnchor;
+            panel.moveAnchorWorld = _moveAnchor;
+
+            // 5) Giữ lệch xoay ban đầu so với camera (giữ cảm giác tự nhiên)
             Vector3 toCamNow = _dragCam.transform.position - panel.transform.position;
             if (toCamNow.sqrMagnitude > 1e-6f)
             {

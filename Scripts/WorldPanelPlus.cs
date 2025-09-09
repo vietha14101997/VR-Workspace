@@ -194,7 +194,7 @@ public class WorldPanelPlus : MonoBehaviour
         dockGO.transform.SetParent(transform, false);
         dock = dockGO.AddComponent<WorldPanelPlusControlDock>();
         dock.panel = this;
-        dock.Build(_trayMat);
+        dock.Build();
 
         Apply();
         _rotBasis = transform.rotation;
@@ -208,9 +208,7 @@ public class WorldPanelPlus : MonoBehaviour
     {
         if (axisLock == WPAxisLock.PitchOnly) return;
         yawAccum = Mathf.Clamp(yawAccum + deg, -45f, 45f);
-        axisLock = Mathf.Approximately(yawAccum, 0f)
-            ? (Mathf.Approximately(pitchAccum, 0f) ? WPAxisLock.None : WPAxisLock.PitchOnly)
-            : WPAxisLock.YawOnly;
+        axisLock = Mathf.Approximately(yawAccum, 0f) ? (Mathf.Approximately(pitchAccum, 0f) ? WPAxisLock.None : WPAxisLock.PitchOnly) : WPAxisLock.YawOnly;
         ApplyAccumulatedRotation();
         if (dock) dock.SetAxisLock(axisLock);
         UpdateHandleLocks();
@@ -220,9 +218,7 @@ public class WorldPanelPlus : MonoBehaviour
     {
         if (axisLock == WPAxisLock.YawOnly) return;
         pitchAccum = Mathf.Clamp(pitchAccum + deg, -45f, 45f);
-        axisLock = Mathf.Approximately(pitchAccum, 0f)
-            ? (Mathf.Approximately(yawAccum, 0f) ? WPAxisLock.None : WPAxisLock.YawOnly)
-            : WPAxisLock.PitchOnly;
+        axisLock = Mathf.Approximately(pitchAccum, 0f) ? (Mathf.Approximately(yawAccum, 0f) ? WPAxisLock.None : WPAxisLock.YawOnly) : WPAxisLock.PitchOnly;
         ApplyAccumulatedRotation();
         if (dock) dock.SetAxisLock(axisLock);
         UpdateHandleLocks();

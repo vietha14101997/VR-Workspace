@@ -24,9 +24,6 @@ public class WorldPanelPlusControlDock : MonoBehaviour
     public float buttonGap = 0.02f;
 
     [Header("Visuals")]
-    public Material dockMat;
-    public Material iconMat;
-    public Material iconWhiteMat;
     public float cornerRadius = 0.06f;
     public float border = 0.004f;
 
@@ -49,7 +46,6 @@ public class WorldPanelPlusControlDock : MonoBehaviour
     Transform _visualRoot;
     Transform _neutralRoot;
     Vector3 _lastNeutralRef;
-    bool _built;
     Vector3 _lastLossyDock;
 
     public void SetMinimized(bool on)
@@ -79,20 +75,20 @@ public class WorldPanelPlusControlDock : MonoBehaviour
             var bc = b.GetComponent<BoxCollider>(); if (bc) bc.enabled = enable;
 
             var bgMr = b.transform.Find("BG")?.GetComponent<MeshRenderer>();
-            // if (bgMr && bgMr.sharedMaterial)
-            // {
-            //     if (bgMr.sharedMaterial.HasProperty("_FillColor"))
-            //     {
-            //         var c = bgMr.sharedMaterial.GetColor("_FillColor");
-            //         c.a = enable ? 0.35f : 0.12f;
-            //         bgMr.sharedMaterial.SetColor("_FillColor", c);
-            //     }
-            //     else
-            //     {
-            //         var c = bgMr.sharedMaterial.color; c.a = enable ? 0.35f : 0.12f;
-            //         bgMr.sharedMaterial.color = c;
-            //     }
-            // }
+            if (bgMr && bgMr.sharedMaterial)
+            {
+                if (bgMr.sharedMaterial.HasProperty("_FillColor"))
+                {
+                    var c = bgMr.sharedMaterial.GetColor("_FillColor");
+                    c.a = enable ? 0.35f : 0.12f;
+                    bgMr.sharedMaterial.SetColor("_FillColor", c);
+                }
+                else
+                {
+                    var c = bgMr.sharedMaterial.color; c.a = enable ? 0.35f : 0.12f;
+                    bgMr.sharedMaterial.color = c;
+                }
+            }
         }
     }
 
@@ -163,8 +159,7 @@ public class WorldPanelPlusControlDock : MonoBehaviour
     {
         // LUÔN dọn sạch trước khi build để tránh “VisualRoot x3”
         ClearChildren();
-        var trayMat = panel ? panel.GetTrayMaterial() : null;
-        Build(trayMat);
+        Build();
         RecomputeFromPanel();
         PurgeUnknownBackgrounds();
     }
@@ -261,11 +256,10 @@ public class WorldPanelPlusControlDock : MonoBehaviour
 
     // ===================== Build =====================
 
-    public void Build(Material trayMatLike)
+    public void Build()
     {
         // Luôn dọn sạch trước khi dựng mới để tránh nhân bản
         ClearChildren();
-        _built = true;
 
         var vr = new GameObject("VisualRoot");
         vr.transform.SetParent(transform, false);
@@ -275,10 +269,6 @@ public class WorldPanelPlusControlDock : MonoBehaviour
         neutral.SetParent(_visualRoot, false);
         _neutralRoot = neutral;
         RefreshNeutralScale();
-
-        dockMat ??= trayMatLike;
-        if (iconMat == null) { iconMat = new Material(Shader.Find("Unlit/Texture")) { color = Color.white }; }
-        if (iconWhiteMat == null) { iconWhiteMat = new Material(Shader.Find("Unlit/Color")) { color = Color.white }; }
 
         var types = new[]
         {
@@ -335,7 +325,8 @@ public class WorldPanelPlusControlDock : MonoBehaviour
             go.transform.localPosition = new Vector3(x0 + i * (buttonSize.x + buttonGap + extraGap), 0f, 0.01f);
 
             var btn = go.AddComponent<WorldPanelPlusDockButton>();
-            btn.panel = panel; btn.type = types[i];
+            btn.panel = panel;
+            btn.type = types[i];
             if (btn.type == WPDockButtonType.MinimizeToggle) _toggleBtnTr = go.transform;
 
             var bc = go.AddComponent<BoxCollider>();
@@ -349,10 +340,8 @@ public class WorldPanelPlusControlDock : MonoBehaviour
             icon.transform.localPosition = new Vector3(0, 0, 0.0015f);
             DestroyImmediate(icon.GetComponent<Collider>());
             var iconMr = icon.GetComponent<MeshRenderer>();
-            var transparentMat = new Material(Shader.Find("Unlit/Transparent"));
-            transparentMat.color = new Color(1, 1, 1, 0); // tạm ẩn icon
-            iconMr.sharedMaterial = transparentMat;
-
+            var iconMat = GetDockIconMat(btn.type);
+            if (iconMat) iconMr.sharedMaterial = iconMat;
             _buttons.Add(btn);
         }
 
@@ -369,6 +358,29 @@ public class WorldPanelPlusControlDock : MonoBehaviour
         CenterButtonsVertically();
 
         PurgeUnknownBackgrounds();
+    }
+
+    Material GetDockIconMat(WPDockButtonType type)
+    {
+        // 1) Load texture từ Resources
+        var tex = Resources.Load<Texture2D>("WorldPanelPlus/DockControl/icon_move");
+        if (tex == null)
+        {
+            Debug.LogError("Không tìm thấy icon: Resources/WorldPanelPlus/DockControl/icon_move.png");
+            return null;
+        }
+
+        // 2) Chọn shader có alpha (ưu tiên Unlit/Transparent)
+        var shader = Shader.Find("Unlit/Transparent");
+        if (shader == null) shader = Shader.Find("Unlit/Texture");
+
+        // 3) Tạo material dùng chung
+        var iconMat = new Material(shader);
+        iconMat.color = Color.white;     // ĐỪNG để alpha=0 kẻo icon biến mất
+        iconMat.mainTexture = tex;
+        iconMat.renderQueue = 3000;      // đảm bảo vẽ trong suốt đúng thứ tự
+
+        return iconMat;
     }
 
     void ClearChildren()
@@ -682,7 +694,7 @@ public class RoundedBackplateBinder : MonoBehaviour
     void Awake() { _r = GetComponent<Renderer>(); _t = transform; }
     void OnEnable() { Sync(); }
 #if UNITY_EDITOR
-    void OnValidate(){ Sync(); }
+    void OnValidate() { Sync(); }
 #endif
     void LateUpdate() { Sync(); }
 

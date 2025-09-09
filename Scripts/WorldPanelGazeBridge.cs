@@ -227,13 +227,13 @@ public class WorldPanelGazeBridge : MonoBehaviour
             case WPDockButtonType.YawLeft15:
                 {
                     p.centerDragEnabled = false;
-                    RotateStable(p, Vector3.up, -15f);
+                    p.AddYawClamped(-15f);
                     break;
                 }
             case WPDockButtonType.YawRight15:
                 {
                     p.centerDragEnabled = false;
-                    RotateStable(p, Vector3.up, 15f);
+                    p.AddYawClamped(15f);
                     break;
                 }
             case WPDockButtonType.MinimizeToggle:
@@ -244,14 +244,14 @@ public class WorldPanelGazeBridge : MonoBehaviour
             case WPDockButtonType.PitchUp15:
                 {
                     p.centerDragEnabled = false;
-                    RotateStable(p, Vector3.right, 15f);
+                    p.AddYawClamped(15f);
                     break;
                 }
 
             case WPDockButtonType.PitchDown15:
                 {
                     p.centerDragEnabled = false;
-                    RotateStable(p, Vector3.right, -15f);
+                    p.AddYawClamped(-15f);
                     break;
                 }
 
