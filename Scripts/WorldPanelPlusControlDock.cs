@@ -4,7 +4,7 @@ using System.Collections;
 
 [ExecuteAlways]
 [RequireComponent(typeof(Transform))]
-public partial class WorldPanelPlusControlDock : MonoBehaviour
+public class WorldPanelPlusControlDock : MonoBehaviour
 {
     [Header("Screen-space Y lock")]
     public bool lockScreenYToTray = true;
@@ -29,7 +29,6 @@ public partial class WorldPanelPlusControlDock : MonoBehaviour
     public Material iconWhiteMat;
     public float cornerRadius = 0.06f;
     public float border = 0.004f;
-    public Color buttonBg = new Color(0f, 0f, 0f, 0.35f);
 
     [Header("Icons")]
     public Texture2D moveIconTexture;
@@ -53,58 +52,23 @@ public partial class WorldPanelPlusControlDock : MonoBehaviour
     bool _built;
     Vector3 _lastLossyDock;
 
-    void ClearChildren()
-    {
-        for (int i = transform.childCount - 1; i >= 0; i--)
-            DestroyImmediate(transform.GetChild(i).gameObject);
-        _buttons.Clear();
-        _backplate = null;
-        _visualRoot = null;
-        _neutralRoot = null;
-    }
-
-    void OnEnable()
-    {
-        if (!panel) panel = GetComponentInParent<WorldPanelPlus>();
-        ApplyMinimizeVisualState();
-    }
-
-    void OnValidate()
-    {
-        ApplyMinimizeVisualState();
-    }
+    // ===================== PUBLIC API =====================
 
     public void SetMinimized(bool on)
     {
         if (_minimized == on) return;
         _minimized = on;
 
+        var binder = _backplate ? _backplate.GetComponent<RoundedBackplateBinder>() : null;
+        if (binder) binder.SetForceCircle(_minimized);
+        ResizeBackplateToActiveButtons();
+
         if (_dockAnim != null) StopCoroutine(_dockAnim);
         _dockAnim = StartCoroutine(AnimateDock(on));
     }
 
-    void LayoutButtons()
-    {
-        // Đặt các nút theo _minimized
-        var list = _buttons;
-        int count = 0;
-        foreach (var b in list) if (b.gameObject.activeSelf) count++;
-
-        float totalW = count * buttonSize.x + (count - 1) * buttonGap;
-        float x0 = -totalW * 0.5f + buttonSize.x * 0.5f;
-
-        int k = 0;
-        foreach (var b in list)
-        {
-            if (!b.gameObject.activeSelf) continue;
-            b.transform.localPosition = new Vector3(x0 + k * (buttonSize.x + buttonGap), 0, 0.01f);
-            k++;
-        }
-    }
-
     public void SetAxisLock(WorldPanelPlus.WPAxisLock lockState)
     {
-        // Khoá các NÚT của trục còn lại
         foreach (var b in _buttons)
         {
             bool isYaw = b.type == WPDockButtonType.YawLeft15 || b.type == WPDockButtonType.YawRight15;
@@ -114,17 +78,15 @@ public partial class WorldPanelPlusControlDock : MonoBehaviour
             if (lockState == WorldPanelPlus.WPAxisLock.YawOnly) enable = !isPitch;
             if (lockState == WorldPanelPlus.WPAxisLock.PitchOnly) enable = !isYaw;
 
-            // Tắt/bật collider để reticle không bấm được
-            var bc = b.GetComponent<BoxCollider>(); if (bc) bc.enabled = enable; // fix: enable, không phải 'enabled'
+            var bc = b.GetComponent<BoxCollider>(); if (bc) bc.enabled = enable;
 
-            // Làm mờ nền nút (BG) cho biết nút bị khóa
             var bgMr = b.transform.Find("BG")?.GetComponent<MeshRenderer>();
             if (bgMr && bgMr.sharedMaterial)
             {
                 if (bgMr.sharedMaterial.HasProperty("_FillColor"))
                 {
                     var c = bgMr.sharedMaterial.GetColor("_FillColor");
-                    c.a = enable ? 0.35f : 0.12f; // mờ khi khóa
+                    c.a = enable ? 0.35f : 0.12f;
                     bgMr.sharedMaterial.SetColor("_FillColor", c);
                 }
                 else
@@ -136,39 +98,54 @@ public partial class WorldPanelPlusControlDock : MonoBehaviour
         }
     }
 
-    float GetDockTopYWorldAt(Vector3 worldPos)
+    public void CaptureYawOffsetToCamera()
     {
-        // Tính topY của backplate nếu Dock đặt tại worldPos và rotation hiện tại
-        if (_backplate == null) return worldPos.y;
-        float half = _backplate.localScale.y * 0.5f;
-        // điểm top trong local của Dock là (0,+half,0)
-        return (worldPos + transform.rotation * new Vector3(0, half, 0)).y;
+        var cam = Camera.main; if (!cam) return;
+        _yawOffsetToCam = transform.eulerAngles.y - cam.transform.eulerAngles.y;
     }
 
-    float MeasureCurrentGapY()
+    public void RecomputeFromPanel()
     {
-        var cam = Camera.main;
-        float trayBottom = panel ? panel.GetTrayBottomYWorld(cam) : transform.position.y;
-        float dockTop = GetDockTopYWorldAt(transform.position);
-        return trayBottom - dockTop;
+        ComputeLocalOffset();
+        EnsurePose();
+        PlaceDockImmediate();
+        _targetGapY = MeasureCurrentGapY();
+        CenterButtonsVertically();
+        ResizeBackplateToActiveButtons();
     }
 
-    // Căn Dock nằm giữa theo trục X, giữ đúng khoảng cách Y và z-lift
+    public float GetBackplateHeight()
+    {
+        return _backplate ? _backplate.localScale.y : (buttonSize.y + 0.04f);
+    }
+
+    public void AnchorToWorld(Vector3 worldPos, Camera cam)
+    {
+        if (panel == null) return;
+        if (cam == null) cam = Camera.main;
+
+        Vector3 viewDir = (cam != null)
+            ? (cam.transform.position - panel.transform.position).normalized
+            : -panel.transform.forward;
+        Vector3 zOffset = -viewDir * _zLift;
+
+        Vector3 wantLocal = panel.transform.InverseTransformPoint(worldPos - zOffset);
+        wantLocal.z = 0f;
+        _offsetLocalNoZ = wantLocal;
+    }
+
     public void CenterXUnderTray()
     {
         if (!panel) return;
         var cam = Camera.main;
 
-        // 1) ép offset local theo X về 0 (nằm giữa Tray)
         _offsetLocalNoZ.x = 0f;
 
-        // 2) vị trí cơ bản + z-lift theo hướng camera
         Vector3 baseWorld = panel.transform.TransformPoint(_offsetLocalNoZ);
         Vector3 viewDir = cam ? (panel.transform.position - cam.transform.position).normalized : -panel.transform.forward;
         Vector3 zOffset = -viewDir * _zLift;
         Vector3 pos = baseWorld + zOffset;
 
-        // 3) giữ khoảng cách Y (đáy Tray – đỉnh Dock) = _targetGapY như hiện tại
         float trayBottomY = panel.GetTrayBottomYWorld(cam);
         float dockTopY = GetDockTopYWorldAt(pos);
         float deltaY = (trayBottomY - dockTopY) - _targetGapY;
@@ -177,11 +154,7 @@ public partial class WorldPanelPlusControlDock : MonoBehaviour
         transform.position = pos;
     }
 
-    public void CaptureYawOffsetToCamera()
-    {
-        var cam = Camera.main; if (!cam) return;
-        _yawOffsetToCam = transform.eulerAngles.y - cam.transform.eulerAngles.y;
-    }
+    // ===================== Unity lifecycle =====================
 
     void Reset() { panel = GetComponentInParent<WorldPanelPlus>(); }
 
@@ -192,22 +165,113 @@ public partial class WorldPanelPlusControlDock : MonoBehaviour
 
     void Start()
     {
-        // Nếu chưa Build (ví dụ scene có sẵn Dock), tự Build bằng material của Tray
         if (_backplate == null)
         {
             var trayMat = panel ? panel.GetTrayMaterial() : null;
             Build(trayMat);
         }
-        // Đặt đúng chỗ ngay khi vào Play
         RecomputeFromPanel();
+        PurgeUnknownBackgrounds();
     }
+
     void OnTransformParentChanged() { PlaceDockImmediate(); }
+
+    void OnEnable()
+    {
+        if (!panel) panel = GetComponentInParent<WorldPanelPlus>();
+        ApplyMinimizeVisualState();
+    }
+
+    void OnValidate()
+    {
+        ApplyMinimizeVisualState();
+        CenterButtonsVertically();
+        ResizeBackplateToActiveButtons();
+    }
+
+    void LateUpdate()
+    {
+        if (!panel) return;
+        var cam = Camera.main;
+
+        bool visible = panel.GetTrayAlpha01() > 0.02f || _minimized;
+        SetDockRenderersAndColliders(visible);
+        if (!visible) return;
+
+        // rotation
+        if (cam)
+        {
+            if (panel.centerDragEnabled && keepYawRelativeToCameraInMove)
+            {
+                float yaw = cam.transform.eulerAngles.y + _yawOffsetToCam;
+                transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+            }
+            else
+            {
+                Vector3 toCam = cam.transform.position - transform.position;
+                toCam.y = 0f;
+                if (toCam.sqrMagnitude > 1e-6f)
+                    transform.rotation = Quaternion.LookRotation(-toCam.normalized, Vector3.up);
+            }
+        }
+
+        // position
+        Vector3 baseWorld = panel.transform.TransformPoint(_offsetLocalNoZ);
+        Vector3 viewDir = cam ? (panel.transform.position - cam.transform.position).normalized : -panel.transform.forward;
+        Vector3 zOffset = -viewDir * _zLift;
+        Vector3 pos = baseWorld + zOffset;
+
+        float trayBottomY = panel.GetTrayBottomYWorld(cam);
+        float dockTopY = GetDockTopYWorldAt(pos);
+        float deltaY = trayBottomY - dockTopY - _targetGapY;
+        pos.y += deltaY;
+        transform.position = pos;
+
+        // neutral scale refresh
+        if (_neutralRoot && (_neutralRoot.parent && (_neutralRoot.parent.lossyScale - _lastNeutralRef).sqrMagnitude > 1e-8f))
+            RefreshNeutralScale();
+
+        // backplate alpha
+        var backMr = _backplate ? _backplate.GetComponent<MeshRenderer>() : null;
+        if (backMr && backMr.sharedMaterial)
+        {
+            float a = panel.dockMinimized ? 1f : panel.GetTrayAlpha01();
+            var m = backMr.sharedMaterial;
+
+            if (m.HasProperty("_MaskEnable")) m.SetFloat("_MaskEnable", 0f);
+            if (m.HasProperty("_FillColor"))
+            {
+                m.SetColor("_FillColor", new Color(0f, 0f, 0f, 0.18f * a));
+                m.SetColor("_BorderColor", new Color(1f, 1f, 1f, 0.18f * a));
+            }
+            else
+            {
+                if (m.shader != Shader.Find("Unlit/Transparent"))
+                    m.shader = Shader.Find("Unlit/Transparent");
+                var c = m.color; c.a = 0.18f * a; m.color = c;
+            }
+        }
+
+        // collider scale refresh (1 lần khi thay đổi)
+        if ((transform.lossyScale - _lastLossyDock).sqrMagnitude > 1e-6f)
+        {
+            foreach (var b in _buttons)
+            {
+                var bc = b.GetComponent<BoxCollider>();
+                if (bc) SetColliderWorldSize(bc, new Vector3(buttonSize.x, buttonSize.y, 0.02f), 0.01f);
+            }
+            _lastLossyDock = transform.lossyScale;
+        }
+    }
+
+    // ===================== Build =====================
 
     public void Build(Material trayMatLike)
     {
         if (_built) ClearChildren();
         _built = true;
 
+        // Root
         var vr = new GameObject("VisualRoot");
         vr.transform.SetParent(transform, false);
         _visualRoot = vr.transform;
@@ -217,74 +281,66 @@ public partial class WorldPanelPlusControlDock : MonoBehaviour
         _neutralRoot = neutral;
         RefreshNeutralScale();
 
-        dockMat = trayMatLike;
-        if (iconMat == null) iconMat = new Material(Shader.Find("Unlit/Texture"));
-        if (iconWhiteMat == null) iconWhiteMat = new Material(Shader.Find("Unlit/Color")) { color = Color.white };
+        dockMat ??= trayMatLike;
+        if (iconMat == null) { iconMat = new Material(Shader.Find("Unlit/Texture")) { color = Color.white }; }
+        if (iconWhiteMat == null) { iconWhiteMat = new Material(Shader.Find("Unlit/Color")) { color = Color.white }; }
 
-        var types = new[]{
+        var types = new[]
+        {
             WPDockButtonType.MoveMode, WPDockButtonType.YawLeft15, WPDockButtonType.YawRight15,
             WPDockButtonType.MinimizeToggle, WPDockButtonType.PitchUp15, WPDockButtonType.PitchDown15,
-            WPDockButtonType.ResetFaceCamera };
+            WPDockButtonType.ResetFaceCamera
+        };
 
         float extraGap = 0.03f;
+        float bleed = 0.015f;
+
         float totalW = types.Length * buttonSize.x + (types.Length - 1) * (buttonGap + extraGap);
-        float x0 = -totalW * 0.5f + buttonSize.x * 0.5f;
+        float innerW = totalW;
+        float innerH = buttonSize.y;
 
-        _backplate = GameObject.CreatePrimitive(PrimitiveType.Quad).transform;
-        _backplate.name = "DockBackplate";
+        float expandedW = innerW + 2f * (border + bleed);
+        float expandedH = innerH + 2f * (border + bleed);
+
+        // == BACKPLATE (không CreatePrimitive để tránh Collider/ngầm) ==
+        _backplate = new GameObject("DockBackplate").transform;
         _backplate.SetParent(_neutralRoot, false);
-        var col = _backplate.GetComponent<Collider>(); if (col) DestroyImmediate(col);
+        _backplate.localPosition = Vector3.zero;
 
-        // Store expanded size for animation
-        float expandedWidth = totalW + border * 2;
-        float expandedHeight = buttonSize.y + border * 2;
+        // MeshFilter + MeshRenderer với quad sạch
+        var mf = _backplate.gameObject.AddComponent<MeshFilter>();
+        mf.sharedMesh = BuildUnitQuad(); // quad (0..1) – sẽ dùng scale để đặt kích thước
 
-        // Start with minimized size if _minimized is true
-        float startWidth = _minimized ? (buttonSize.x + border * 2) : expandedWidth;
-        _backplate.localScale = new Vector3(startWidth, expandedHeight, 1);
-        var mr = _backplate.GetComponent<MeshRenderer>();
-        // Sử dụng shader riêng cho Dock
-        var dockShader = Shader.Find("Unlit/WorldPanelDock");
-        Material newMat;
-        if (dockShader != null)
-        {
-            newMat = new Material(dockShader);
-        }
-        else
-        {
-            newMat = new Material(trayMatLike);
-        }
-        mr.sharedMaterial = newMat;
-        var m = mr.sharedMaterial;
+        var mr = _backplate.gameObject.AddComponent<MeshRenderer>();
+        var mat = new Material(Shader.Find("Unlit/WorldPanelDock"));
+        mr.sharedMaterial = mat;
 
-        // Thiết lập các thuộc tính chung
-        if (m.HasProperty("_FillColor"))
-        {
-            m.SetColor("_FillColor", new Color(0f, 0f, 0f, 0.22f));
-            m.SetColor("_BorderColor", new Color(1f, 1f, 1f, 0.35f));
-        }
+        float startW = _minimized ? expandedH : expandedW; // minimize -> W=H (hình tròn)
+        float startH = expandedH;
+        _backplate.localScale = new Vector3(startW, startH, 1f);
 
-        // Thiết lập thuộc tính riêng của Dock shader
-        if (dockShader != null)
-        {
-            if (m.HasProperty("_Radius")) m.SetFloat("_Radius", cornerRadius);
-            if (m.HasProperty("_Border")) m.SetFloat("_Border", border);
-            if (m.HasProperty("_Feather")) m.SetFloat("_Feather", 0.006f);
-            if (m.HasProperty("_BorderFade")) m.SetFloat("_BorderFade", 0.5f);
-        }
-        // Fallback cho Tray shader
-        else if (m.HasProperty("_MaskEnable"))
-        {
-            m.SetFloat("_MaskEnable", 1f);
-            if (m.HasProperty("_CornerRadius")) m.SetFloat("_CornerRadius", cornerRadius);
-            if (m.HasProperty("_Border")) m.SetFloat("_Border", border);
-        }
+        if (mat.HasProperty("_FillColor")) mat.SetColor("_FillColor", new Color(0, 0, 0, 0.22f));
+        if (mat.HasProperty("_BorderColor")) mat.SetColor("_BorderColor", new Color(1, 1, 1, 0.35f));
+        if (mat.HasProperty("_Feather")) mat.SetFloat("_Feather", 0.006f);
+        if (mat.HasProperty("_Border")) mat.SetFloat("_Border", border);
+        if (mat.HasProperty("_RectWH")) mat.SetVector("_RectWH", new Vector4(startW, startH, 0, 0));
 
+        // binder bo tròn
+        var binder = _backplate.gameObject.GetComponent<RoundedBackplateBinder>();
+        if (!binder) binder = _backplate.gameObject.AddComponent<RoundedBackplateBinder>();
+        binder.border = border;
+        binder.fallbackRadiusWhenExpanded = cornerRadius;
+        binder.forceCircle = _minimized;
+
+        // == BUTTONS ==
+        float x0 = -(innerW * 0.5f) + buttonSize.x * 0.5f;
+        _buttons.Clear();
         for (int i = 0; i < types.Length; i++)
         {
             var go = new GameObject("Btn_" + types[i]);
             go.transform.SetParent(_neutralRoot, false);
-            go.transform.localPosition = new Vector3(x0 + i * (buttonSize.x + buttonGap + extraGap), 0, 0.01f);
+            // Y = 0 để căn giữa thẳng backplate. Z nâng nhẹ toàn bộ button (không nâng riêng icon)
+            go.transform.localPosition = new Vector3(x0 + i * (buttonSize.x + buttonGap + extraGap), 0f, 0.01f);
 
             var btn = go.AddComponent<WorldPanelPlusDockButton>();
             btn.panel = panel; btn.type = types[i];
@@ -293,34 +349,23 @@ public partial class WorldPanelPlusControlDock : MonoBehaviour
             var bc = go.AddComponent<BoxCollider>();
             SetColliderWorldSize(bc, new Vector3(buttonSize.x, buttonSize.y, 0.02f), 0.01f);
 
+            // Icon đúng tâm, chỉ nâng Z rất nhẹ để trên backplate
             var icon = GameObject.CreatePrimitive(PrimitiveType.Quad);
             icon.name = "Icon";
             icon.transform.SetParent(go.transform, false);
-            // Thay đổi từ chữ nhật sang hình vuông, lấy kích thước nhỏ nhất
             float iconSize = Mathf.Min(buttonSize.x, buttonSize.y);
             icon.transform.localScale = new Vector3(iconSize, iconSize, 1);
-            icon.transform.localPosition = new Vector3(0, 0, 0.015f);
+            icon.transform.localPosition = new Vector3(0, 0, 0.0015f);
             DestroyImmediate(icon.GetComponent<Collider>());
             var iconMr = icon.GetComponent<MeshRenderer>();
-
-            // Set material trong suốt cho icon
             var transparentMat = new Material(Shader.Find("Unlit/Transparent"));
-            transparentMat.color = new Color(1, 1, 1, 0);
+            transparentMat.color = new Color(1, 1, 1, 0); // tạm ẩn icon
             iconMr.sharedMaterial = transparentMat;
-
-            // if (btn.type == WPDockButtonType.MoveMode && moveIconTexture != null)
-            // {
-            //     iconMr.sharedMaterial = new Material(iconMat);
-            //     iconMr.sharedMaterial.mainTexture = moveIconTexture;
-            // }
-            // else
-            // {
-            //     iconMr.enabled = false;
-            // }
 
             _buttons.Add(btn);
         }
 
+        // ràng buộc pose & layout
         _frozenWorldRot = transform.rotation;
         ComputeLocalOffset();
         AnchorToWorld(transform.position, Camera.main);
@@ -328,7 +373,25 @@ public partial class WorldPanelPlusControlDock : MonoBehaviour
         PlaceDockImmediate();
         _targetGapY = MeasureCurrentGapY();
         CaptureExpandedLayout();
+
         ApplyMinimizeVisualState();
+        ResizeBackplateToActiveButtons(bleed);
+        CenterButtonsVertically();
+
+        // loại bỏ mọi nền cũ lỡ tồn tại
+        PurgeUnknownBackgrounds();
+    }
+
+    // ===================== Helpers =====================
+
+    void ClearChildren()
+    {
+        for (int i = transform.childCount - 1; i >= 0; i--)
+            DestroyImmediate(transform.GetChild(i).gameObject);
+        _buttons.Clear();
+        _backplate = null;
+        _visualRoot = null;
+        _neutralRoot = null;
     }
 
     void ApplyMinimizeVisualState()
@@ -340,81 +403,122 @@ public partial class WorldPanelPlusControlDock : MonoBehaviour
             bool isToggle = (_toggleBtnTr && b.transform == _toggleBtnTr);
             bool show = !_minimized || isToggle;
 
-            // Kích hoạt/vô hiệu hóa GameObject của button
             b.gameObject.SetActive(show);
 
-            // Lấy tất cả Renderer (bao gồm cả icon) và ẩn/hiện chúng
             var renderers = b.GetComponentsInChildren<Renderer>(true);
-            foreach (var renderer in renderers)
-            {
-                if (renderer == null) continue;
-                renderer.enabled = show;
-            }
+            foreach (var r in renderers) if (r) r.enabled = show;
 
-            // Lấy tất cả Collider và ẩn/hiện chúng  
             var colliders = b.GetComponentsInChildren<Collider>(true);
-            foreach (var collider in colliders)
-            {
-                if (collider == null) continue;
-                collider.enabled = show;
-            }
+            foreach (var c in colliders) if (c) c.enabled = show;
         }
 
-        // Cập nhật kích thước backplate
         ResizeBackplateToActiveButtons();
+        CenterButtonsVertically();
+
+        var binder = _backplate ? _backplate.GetComponent<RoundedBackplateBinder>() : null;
+        if (binder) binder.SetForceCircle(_minimized);
     }
 
-    void ResizeBackplateToActiveButtons()
+    void CenterButtonsVertically()
+    {
+        if (_buttons == null) return;
+        for (int i = 0; i < _buttons.Count; i++)
+        {
+            var b = _buttons[i]; if (!b) continue;
+            var t = b.transform;
+            t.localPosition = new Vector3(t.localPosition.x, 0f, t.localPosition.z); // y=0 là giữa backplate
+            // đảm bảo icon cũng 0 theo trục Y
+            var icon = t.Find("Icon"); if (icon) icon.localPosition = new Vector3(icon.localPosition.x, 0f, icon.localPosition.z);
+        }
+    }
+
+    void ResizeBackplateToActiveButtons(float bleed = 0.015f)
     {
         if (!_backplate) return;
 
-        // Đếm số nút đang active
-        int activeCount = 0;
+        float minX = +999f, maxX = -999f;
         foreach (var b in _buttons)
         {
-            if (b && b.gameObject.activeSelf) activeCount++;
+            if (!b || !b.gameObject.activeInHierarchy) continue;
+            float x = b.transform.localPosition.x;
+            float half = buttonSize.x * 0.5f;
+            minX = Mathf.Min(minX, x - half);
+            maxX = Mathf.Max(maxX, x + half);
         }
+        if (minX > maxX) return;
 
-        // Đảm bảo luôn có ít nhất 1 nút (nút minimize)
-        activeCount = Mathf.Max(activeCount, 1);
+        float innerW = (maxX - minX);
+        float innerH = buttonSize.y;
+        float W = innerW + 2f * (border + bleed);
+        float H = innerH + 2f * (border + bleed);
 
-        // Tính toán lại kích thước backplate
-        float totalW = activeCount * buttonSize.x + (activeCount - 1) * buttonGap;
-        float padding = 0.04f; // padding cho backplate
+        if (_minimized) W = H;
 
-        // Cập nhật scale của backplate
-        if (_backplate)
+        _backplate.localScale = new Vector3(W, H, 1f);
+
+        var mr = _backplate.GetComponent<MeshRenderer>();
+        if (mr && mr.sharedMaterial && mr.sharedMaterial.HasProperty("_RectWH"))
+            mr.sharedMaterial.SetVector("_RectWH", new Vector4(W, H, 0, 0));
+
+        var binder = _backplate.GetComponent<RoundedBackplateBinder>();
+        if (binder) binder.SetForceCircle(_minimized);
+    }
+
+    void EnsurePose()
+    {
+        if (!panel) return;
+        var cam = Camera.main;
+        if (cam)
         {
-            _backplate.localScale = new Vector3(totalW + padding, buttonSize.y + padding, 1);
-        }
-
-        // Cập nhật layout các nút
-        float x0 = -(totalW * 0.5f) + (buttonSize.x * 0.5f);
-        int index = 0;
-
-        foreach (var b in _buttons)
-        {
-            if (b && b.gameObject.activeSelf)
+            if (panel.centerDragEnabled && keepYawRelativeToCameraInMove)
             {
-                b.transform.localPosition = new Vector3(
-                    x0 + index * (buttonSize.x + buttonGap),
-                    0,
-                    0.01f
-                );
-                index++;
+                float yaw = cam.transform.eulerAngles.y + _yawOffsetToCam;
+                transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+            }
+            else
+            {
+                Vector3 toCam = cam.transform.position - transform.position;
+                toCam.y = 0f;
+                if (toCam.sqrMagnitude > 1e-6f)
+                    transform.rotation = Quaternion.LookRotation(-toCam.normalized, Vector3.up);
             }
         }
+    }
 
-        // Cập nhật visibility
-        foreach (var b in _buttons)
-        {
-            if (!b) continue;
-            bool on = b.gameObject.activeSelf;
-            foreach (var r in b.GetComponentsInChildren<Renderer>(true))
-            {
-                if (r) r.enabled = on;
-            }
-        }
+    void ComputeLocalOffset()
+    {
+        if (!panel) return;
+        float below = (panel.height * 0.5f + panel.trayPadding + panel.trayHoverExtra);
+        float halfDock = (_backplate ? _backplate.localScale.y * 0.5f : 0f);
+        float margin = 0.01f;
+        _offsetLocalNoZ = new Vector3(0, -(below + halfDock + margin), 0);
+    }
+
+    float GetDockTopYWorldAt(Vector3 worldPos)
+    {
+        if (_backplate == null) return worldPos.y;
+        float half = _backplate.localScale.y * 0.5f;
+        return (worldPos + transform.rotation * new Vector3(0, half, 0)).y;
+    }
+
+    float MeasureCurrentGapY()
+    {
+        var cam = Camera.main;
+        float trayBottom = panel ? panel.GetTrayBottomYWorld(cam) : transform.position.y;
+        float dockTop = GetDockTopYWorldAt(transform.position);
+        return trayBottom - dockTop;
+    }
+
+    void PlaceDockImmediate()
+    {
+        if (!panel) return;
+        var cam = Camera.main;
+
+        Vector3 baseWorld = panel.transform.TransformPoint(_offsetLocalNoZ);
+        Vector3 viewDir = cam ? (panel.transform.position - cam.transform.position).normalized : -panel.transform.forward;
+        Vector3 zOffset = -viewDir * _zLift;
+
+        transform.position = baseWorld + zOffset;
     }
 
     void RefreshNeutralScale()
@@ -456,177 +560,13 @@ public partial class WorldPanelPlusControlDock : MonoBehaviour
     {
         _expandedPos.Clear();
         foreach (var b in _buttons)
-            _expandedPos[b] = b.transform.localPosition;  // vị trí khi mở rộng
-    }
-
-    void EnsurePose()
-    {
-        if (!panel) return;
-        var cam = Camera.main;
-        if (cam)
-        {
-            if (panel.centerDragEnabled && keepYawRelativeToCameraInMove)
-            {
-                // chỉ lấy yaw của camera + offset, giữ mặt phẳng thẳng đứng
-                float yaw = cam.transform.eulerAngles.y + _yawOffsetToCam;
-                transform.rotation = Quaternion.Euler(0f, yaw, 0f);
-            }
-            else
-            {
-                Vector3 toCam = cam.transform.position - transform.position;
-                toCam.y = 0f;
-                if (toCam.sqrMagnitude > 1e-6f)
-                    transform.rotation = Quaternion.LookRotation(-toCam.normalized, Vector3.up);
-            }
-        }
-    }
-
-    void ComputeLocalOffset()
-    {
-        if (!panel) return;
-        float below = (panel.height * 0.5f + panel.trayPadding + panel.trayHoverExtra);
-        float halfDock = (_backplate ? _backplate.localScale.y * 0.5f : 0f);
-        float margin = 0.01f;
-        _offsetLocalNoZ = new Vector3(0, -(below + halfDock + margin), 0); // << KHÔNG Z ở đây
-    }
-
-    public void RecomputeFromPanel()
-    {
-        ComputeLocalOffset();
-        EnsurePose();
-        PlaceDockImmediate();
-        _targetGapY = MeasureCurrentGapY();
-    }
-
-    void PlaceDockImmediate()
-    {
-        if (!panel) return;
-        var cam = Camera.main;
-
-        // 1) Vị trí gốc: offset local đã tính để Dock nằm dưới Tray
-        Vector3 baseWorld = panel.transform.TransformPoint(_offsetLocalNoZ);
-
-        // 2) Nhô nhẹ về phía camera (tránh chênh z khi nhìn nghiêng)
-        Vector3 viewDir = cam ? (panel.transform.position - cam.transform.position).normalized : -panel.transform.forward;
-        Vector3 zOffset = -viewDir * _zLift;
-
-        transform.position = baseWorld + zOffset;
-    }
-
-    public float GetBackplateHeight()
-    {
-        return _backplate ? _backplate.localScale.y : (buttonSize.y + 0.04f);
-    }
-
-    public void AnchorToWorld(Vector3 worldPos, Camera cam)
-    {
-        if (panel == null) return;
-        if (cam == null) cam = Camera.main;
-
-        // zOffset: Dock luôn nhô theo hướng nhìn camera
-        Vector3 viewDir = (cam != null)
-            ? (cam.transform.position - panel.transform.position).normalized
-            : -panel.transform.forward;
-        Vector3 zOffset = -viewDir * _zLift;
-
-        // Tính lại offset local (chỉ Y) để TransformPoint(offset)+zOffset == worldPos
-        Vector3 wantLocal = panel.transform.InverseTransformPoint(worldPos - zOffset);
-        wantLocal.z = 0f;                 // giữ đúng quy ước "no Z" cho offset
-        _offsetLocalNoZ = wantLocal;
-    }
-
-    void LateUpdate()
-    {
-        if (!panel) return;
-        var cam = Camera.main;
-
-        // 0) Hiển thị Dock khi: đang minimize hoặc Tray đang hiện
-        bool visible = panel.GetTrayAlpha01() > 0.02f || _minimized;
-        SetDockRenderersAndColliders(visible);
-        if (!visible) return;
-
-        // 1) Rotation: luôn face camera; nếu đang move và muốn giữ yaw relative thì chỉ lấy yaw
-        if (cam)
-        {
-            if (panel.centerDragEnabled && keepYawRelativeToCameraInMove)
-            {
-                float yaw = cam.transform.eulerAngles.y + _yawOffsetToCam;
-                transform.rotation = Quaternion.Euler(0f, yaw, 0f);
-            }
-            else
-            {
-                Vector3 toCam = cam.transform.position - transform.position;
-                toCam.y = 0f;
-                if (toCam.sqrMagnitude > 1e-6f)
-                    transform.rotation = Quaternion.LookRotation(-toCam.normalized, Vector3.up);
-            }
-        }
-
-        // 2) Position: offset theo local + nhô về phía camera
-        Vector3 baseWorld = panel.transform.TransformPoint(_offsetLocalNoZ);
-        Vector3 viewDir = cam ? (panel.transform.position - cam.transform.position).normalized
-                              : -panel.transform.forward;
-        Vector3 zOffset = -viewDir * _zLift;
-        Vector3 pos = baseWorld + zOffset;
-
-        // 3) Khóa khoảng cách Y giữa Tray và Dock
-        float trayBottomY = panel.GetTrayBottomYWorld(cam);
-        float dockTopY = GetDockTopYWorldAt(pos);
-        float deltaY = trayBottomY - dockTopY - _targetGapY;
-        pos.y += deltaY;
-        transform.position = pos;
-
-        if (_neutralRoot && (_neutralRoot.parent && (_neutralRoot.parent.lossyScale - _lastNeutralRef).sqrMagnitude > 1e-8f))
-        {
-            RefreshNeutralScale();
-        }
-
-        if ((transform.lossyScale - _lastLossyDock).sqrMagnitude > 1e-6f)
-        {
-            foreach (var b in _buttons)
-            {
-                var bc = b.GetComponent<BoxCollider>();
-                if (bc) SetColliderWorldSize(bc, new Vector3(buttonSize.x, buttonSize.y, 0.02f), 0.01f);
-            }
-            _lastLossyDock = transform.lossyScale;
-        }
-
-        // 4) Cập nhật alpha backplate (không baseline, chỉ khi visible)
-        var backMr = _backplate ? _backplate.GetComponent<MeshRenderer>() : null;
-        if (backMr && backMr.sharedMaterial)
-        {
-            float a = panel.dockMinimized ? 1f : panel.GetTrayAlpha01(); // minimize: alpha ổn định
-            var m = backMr.sharedMaterial;
-
-            if (m.HasProperty("_MaskEnable")) m.SetFloat("_MaskEnable", 0f);
-            if (m.HasProperty("_FillColor"))
-            {
-                m.SetColor("_FillColor", new Color(0f, 0f, 0f, 0.18f * a));
-                m.SetColor("_BorderColor", new Color(1f, 1f, 1f, 0.18f * a));
-            }
-            else
-            {
-                if (m.shader != Shader.Find("Unlit/Transparent"))
-                    m.shader = Shader.Find("Unlit/Transparent");
-                var c = m.color; c.a = 0.18f * a; m.color = c;
-            }
-        }
-
-        if ((transform.lossyScale - _lastLossyDock).sqrMagnitude > 1e-6f)
-        {
-            foreach (var b in _buttons)
-            {
-                var bc = b.GetComponent<BoxCollider>();
-                if (bc) SetColliderWorldSize(bc, new Vector3(buttonSize.x, buttonSize.y, 0.02f), 0.01f);
-            }
-            _lastLossyDock = transform.lossyScale;
-        }
+            _expandedPos[b] = b.transform.localPosition;
     }
 
     void SetDockRenderersAndColliders(bool on)
     {
         if (_visualRoot)
-            _visualRoot.gameObject.SetActive(on || _minimized); // vẫn hiển thị toggle khi minimize
+            _visualRoot.gameObject.SetActive(on || _minimized);
 
         var cols = GetComponentsInChildren<Collider>(true);
         foreach (var c in cols)
@@ -636,5 +576,183 @@ public partial class WorldPanelPlusControlDock : MonoBehaviour
             bool allow = (!_minimized) || isToggle;
             c.enabled = on && allow && c.gameObject.activeInHierarchy;
         }
+    }
+
+    IEnumerator AnimateDock(bool minimize)
+    {
+        float startTime = Time.time;
+        float endTime = startTime + _animDuration;
+
+        float extraGap = 0.03f;
+        float totalW = _buttons.Count * buttonSize.x + (_buttons.Count - 1) * (buttonGap + extraGap);
+        float expandedWidth = totalW + border * 2;
+        float minimizedWidth = buttonSize.x + border * 2;
+        float height = buttonSize.y + border * 2;
+
+        Vector3 backplateStartPos = _backplate.localPosition;
+        Dictionary<WorldPanelPlusDockButton, Vector3> buttonStart = new();
+
+        foreach (var btn in _buttons) buttonStart[btn] = btn.transform.localPosition;
+
+        float startWidth = _backplate.localScale.x;
+        float targetWidth = minimize ? minimizedWidth : expandedWidth;
+
+        while (Time.time < endTime)
+        {
+            float t = (Time.time - startTime) / _animDuration;
+            float easedT = minimize ? EaseInQuad(t) : EaseOutQuad(t);
+
+            Vector3 centerPos = _toggleBtnTr != null ? _toggleBtnTr.localPosition : Vector3.zero;
+
+            if (_backplate != null)
+            {
+                float currentWidth = Mathf.Lerp(startWidth, targetWidth, easedT);
+                _backplate.localScale = new Vector3(currentWidth, height, 1);
+                _backplate.localPosition = new Vector3(centerPos.x, backplateStartPos.y, backplateStartPos.z);
+            }
+
+            foreach (var btn in _buttons)
+            {
+                if (btn.type == WPDockButtonType.MinimizeToggle) continue;
+
+                Vector3 s = buttonStart[btn];
+                Vector3 targetPos = minimize ? _toggleBtnTr.localPosition : _expandedPos[btn];
+                btn.transform.localPosition = Vector3.Lerp(s, targetPos, easedT);
+            }
+
+            yield return null;
+        }
+
+        if (_backplate != null)
+        {
+            Vector3 centerPos = _toggleBtnTr != null ? _toggleBtnTr.localPosition : Vector3.zero;
+            _backplate.localScale = new Vector3(targetWidth, height, 1);
+            _backplate.localPosition = new Vector3(centerPos.x, backplateStartPos.y, backplateStartPos.z);
+        }
+
+        foreach (var btn in _buttons)
+        {
+            if (btn.type != WPDockButtonType.MinimizeToggle)
+                btn.transform.localPosition = minimize ? _toggleBtnTr.localPosition : _expandedPos[btn];
+        }
+
+        _minimized = minimize;
+        var binder = _backplate ? _backplate.GetComponent<RoundedBackplateBinder>() : null;
+        if (binder) binder.SetForceCircle(_minimized);
+
+        ResizeBackplateToActiveButtons();
+        CenterButtonsVertically();
+    }
+
+    float EaseInQuad(float t) => t * t;
+    float EaseOutQuad(float t) => t * (2f - t);
+
+    // Quad mesh (unit) để tránh CreatePrimitive
+    static Mesh BuildUnitQuad()
+    {
+        var m = new Mesh();
+        m.name = "UnitQuad";
+        m.vertices = new[]
+        {
+            new Vector3(-0.5f,-0.5f,0),
+            new Vector3( 0.5f,-0.5f,0),
+            new Vector3( 0.5f, 0.5f,0),
+            new Vector3(-0.5f, 0.5f,0),
+        };
+        m.uv = new[]
+        {
+            new Vector2(0,0), new Vector2(1,0), new Vector2(1,1), new Vector2(0,1)
+        };
+        m.triangles = new[] { 0, 1, 2, 0, 2, 3 };
+        m.RecalculateNormals();
+        return m;
+    }
+
+    // Quét toàn bộ cây con của Dock và xoá/ẩn mọi renderer không thuộc backplate hoặc các Icon của button
+    /// <summary>
+    /// Purges any stray renderer objects from the dock. The dock should only contain a single
+    /// backplate and the icon quads under each button. Any MeshRenderers outside of these
+    /// whitelisted objects will be disabled. This method takes a conservative approach by
+    /// enumerating all renderers in the dock hierarchy and turning off anything that isn't
+    /// explicitly recognized. This helps to clean up leftover quads from previous builds or
+    /// imported prefabs which can cause dark, non-rounded backgrounds to appear behind the
+    /// rounded backplate.
+    /// </summary>
+    void PurgeUnknownBackgrounds()
+    {
+        if (_backplate == null) return;
+
+        // Helper to determine if a renderer belongs to an allowed object. We only allow
+        // (1) the dock backplate itself and (2) the icon quad children of our buttons.
+        bool IsAllowed(Renderer r)
+        {
+            if (r == null) return false;
+            var t = r.transform;
+            // backplate itself
+            if (t == _backplate) return true;
+            // icon quads: child of a button with name "Icon"
+            if (t.name == "Icon")
+            {
+                foreach (var b in _buttons)
+                {
+                    if (b != null && t.IsChildOf(b.transform)) return true;
+                }
+            }
+            return false;
+        }
+
+        // Disable any renderer that isn't explicitly allowed. This ensures that the dock
+        // never accidentally renders extra geometry. Destroying GameObjects outright can
+        // disrupt references during design time, so we opt to disable them instead.
+        var rends = GetComponentsInChildren<Renderer>(true);
+        foreach (var r in rends)
+        {
+            if (r == null) continue;
+            if (IsAllowed(r)) continue;
+            r.enabled = false;
+        }
+    }
+}
+
+[ExecuteAlways]
+public class RoundedBackplateBinder : MonoBehaviour
+{
+    Renderer _r; Transform _t;
+
+    [Tooltip("Độ dày viền (m) – trùng với border của Dock")]
+    public float border = 0.004f;
+
+    [Tooltip("Bo góc khi Dock ở trạng thái mở rộng")]
+    public float fallbackRadiusWhenExpanded = 0.06f;
+
+    [Tooltip("Ép hình tròn (dùng khi minimize)")]
+    public bool forceCircle = false;
+
+    void Awake() { _r = GetComponent<Renderer>(); _t = transform; }
+    void OnEnable() { Sync(); }
+#if UNITY_EDITOR
+    // In the editor we only need to sync shader properties when values change.
+    // Purging stray backgrounds is handled by the parent dock class; calling it
+    // from here would cause compile errors because this binder has no access
+    // to the dock's PurgeUnknownBackgrounds method.
+    void OnValidate(){ Sync(); }
+#endif
+    void LateUpdate() { Sync(); }
+
+    public void SetForceCircle(bool on) { forceCircle = on; }
+
+    void Sync()
+    {
+        if (!_r || !_t) return;
+        var m = _r.sharedMaterial; if (!m) return;
+
+        var s = _t.localScale;               // (W,H,1)
+        if (m.HasProperty("_RectWH")) m.SetVector("_RectWH", new Vector4(s.x, s.y, 0, 0));
+        if (m.HasProperty("_Border")) m.SetFloat("_Border", border);
+
+        float halfMin = 0.5f * Mathf.Min(s.x, s.y);
+        float r = forceCircle ? halfMin : Mathf.Min(halfMin, fallbackRadiusWhenExpanded);
+
+        if (m.HasProperty("_Radius")) m.SetFloat("_Radius", r);
     }
 }
