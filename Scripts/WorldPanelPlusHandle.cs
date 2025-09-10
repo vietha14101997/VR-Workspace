@@ -123,24 +123,24 @@ public class WorldPanelPlusHandle : MonoBehaviour,
 
             switch (type)
             {
-                case WPHandleType.EdgeTop:
-                case WPHandleType.EdgeBottom:
-                    {
-                        float dyLocal = hitLocal.y - _refLocalHit.y;
-                        float deltaDeg = dyLocal * rotateDegPerMeter;
-                        panel.AddPitchClamped(deltaDeg);   // <-- dùng API kẹp + lock
-                        _refLocalHit = hitLocal;
-                        break;
-                    }
-                case WPHandleType.EdgeLeft:
-                case WPHandleType.EdgeRight:
-                    {
-                        float dxLocal = hitLocal.x - _refLocalHit.x;
-                        float deltaDeg = -dxLocal * rotateDegPerMeter;
-                        panel.AddYawClamped(deltaDeg);     // <-- dùng API kẹp + lock
-                        _refLocalHit = hitLocal;
-                        break;
-                    }
+                // case WPHandleType.EdgeTop:
+                // case WPHandleType.EdgeBottom:
+                //     {
+                //         float dyLocal = hitLocal.y - _refLocalHit.y;
+                //         float deltaDeg = dyLocal * rotateDegPerMeter;
+                //         panel.AddPitchClamped(deltaDeg);   // <-- dùng API kẹp + lock
+                //         _refLocalHit = hitLocal;
+                //         break;
+                //     }
+                // case WPHandleType.EdgeLeft:
+                // case WPHandleType.EdgeRight:
+                //     {
+                //         float dxLocal = hitLocal.x - _refLocalHit.x;
+                //         float deltaDeg = -dxLocal * rotateDegPerMeter;
+                //         panel.AddYawClamped(deltaDeg);     // <-- dùng API kẹp + lock
+                //         _refLocalHit = hitLocal;
+                //         break;
+                //     }
                 case WPHandleType.CornerTL:
                 case WPHandleType.CornerTR:
                 case WPHandleType.CornerBL:

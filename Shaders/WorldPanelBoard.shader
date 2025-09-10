@@ -2,75 +2,135 @@ Shader "Unlit/WorldPanelBoard"
 {
     Properties
     {
-        _MainTex ("Texture", 2D) = "white" {}
-        _Color   ("Tint", Color) = (1,1,1,1)
+        _MainTex       ("Texture", 2D) = "white" {}
+        _Color         ("Tint", Color) = (1,1,1,1)
 
-        // Viền mờ độc lập theo trục:
-        _EdgeFadeX ("Edge Fade X (0..0.25)", Range(0,0.25)) = 0.06  // ngang (trái/phải)
-        _EdgeFadeY ("Edge Fade Y (0..0.25)", Range(0,0.25)) = 0.03  // dọc (trên/dưới)
-        _EdgeMinAlpha ("Edge Min Alpha (0..1)", Range(0,1)) = 0.4
+        // Kích thước panel theo mét (được set từ WorldPanelPlus)
+        _PanelSize     ("Panel Size (W,H)", Vector) = (1,1,0,0)
 
-        _PanelSize ("Panel Size (W,H)", Vector) = (1,1,0,0)
+        // Fade mép (theo mét) — giữ lại hành vi cũ
+        _EdgeFadeX     ("Edge Fade X (m)", Float) = 0 // 0.03
+        _EdgeFadeY     ("Edge Fade Y (m)", Float) = 0 //0.05
+        _EdgeMinAlpha  ("Edge Min Alpha", Range(0,1)) = 0 // 0.40
+
+        // NEW: Bo góc (theo mét) + feather của mép
+        _CornerRadius  ("Corner Radius (m)", Float) = 0.06
+        _EdgeFeather   ("Edge Feather (m)", Float) = 0.003
     }
+
     SubShader
     {
-        Tags { "Queue"="Transparent" "RenderType"="Transparent" "IgnoreProjector"="True" }
+        Tags { "Queue"="Transparent" "RenderType"="Transparent" }
         LOD 100
-        Cull Off
+
+        Cull Back
         ZWrite Off
         Blend SrcAlpha OneMinusSrcAlpha
 
         Pass
         {
             CGPROGRAM
-            #pragma vertex vert
+            #pragma vertex   vert
             #pragma fragment frag
             #include "UnityCG.cginc"
 
-            sampler2D _MainTex; float4 _MainTex_ST;
-            fixed4 _Color;
+            sampler2D _MainTex;
+            float4    _MainTex_ST;
+            float4    _Color;
 
-            float _EdgeFadeX;
-            float _EdgeFadeY;
-            float _EdgeMinAlpha;
-            float4 _PanelSize; // (W,H,0,0) — giữ tương thích
+            float4 _PanelSize;   // (W,H,0,0)
+            float   _EdgeFadeX;
+            float   _EdgeFadeY;
+            float   _EdgeMinAlpha;
 
-            struct appdata { float4 vertex:POSITION; float2 uv:TEXCOORD0; };
-            struct v2f     { float4 pos:SV_POSITION; float2 uv:TEXCOORD0; };
+            float   _CornerRadius;
+            float   _EdgeFeather;
 
-            v2f vert (appdata v) {
+            struct appdata
+            {
+                float4 vertex : POSITION;
+                float2 uv     : TEXCOORD0;
+            };
+
+            struct v2f
+            {
+                float4 pos : SV_POSITION;
+                float2 uv  : TEXCOORD0;
+            };
+
+            v2f vert (appdata v)
+            {
                 v2f o;
                 o.pos = UnityObjectToClipPos(v.vertex);
                 o.uv  = TRANSFORM_TEX(v.uv, _MainTex);
                 return o;
             }
 
+            // Tính alpha fade viền theo mét quanh cạnh trái/phải & trên/dưới
+            float EdgeFade(float2 pMeters, float2 halfSize, float fadeX, float fadeY, float minA)
+            {
+                // khoảng cách (m) từ tâm theo trục X/Y
+                float ax = abs(pMeters.x);
+                float ay = abs(pMeters.y);
+
+                // khoảng cách còn lại tới biên (m)
+                float rx = halfSize.x - ax;
+                float ry = halfSize.y - ay;
+
+                // 0 ở trong, →1 khi sát biên (trong dải fade)
+                float ex = saturate(1.0 - saturate(rx / max(1e-6, fadeX)));
+                float ey = saturate(1.0 - saturate(ry / max(1e-6, fadeY)));
+
+                // lấy mức fade lớn hơn theo 2 chiều
+                float e = max(ex, ey);
+
+                // nội suy alpha về minA tại mép
+                return lerp(1.0, minA, e);
+            }
+
+            // SDF cho rounded-rect theo mét
+            // pMeters: toạ độ từ tâm (m), halfSize: nửa kích thước (m), r: bán kính (m)
+            float RoundRectSDF(float2 pMeters, float2 halfSize, float r)
+            {
+                // co lại nửa kích thước để chừa chỗ cho bán kính
+                float2 q = abs(pMeters) - (halfSize - r);
+                // length(max(q,0)) - r  : >0 ngoài bo, <0 trong bo
+                return length(max(q, 0.0)) - r;
+            }
+
             fixed4 frag (v2f i) : SV_Target
             {
+                // ---- Tính toạ độ theo mét (gốc giữa panel) ----
+                float2 size     = _PanelSize.xy;
+                float2 halfSize = 0.5 * size;
+
+                // UV 0..1  ->  (-W/2..+W/2, -H/2..+H/2) mét
+                float2 pMeters = (i.uv - 0.5) * size;
+
+                // ---- Rounded-rect clip + feather ----
+                float r   = max(0.0, _CornerRadius);
+                float sdf = RoundRectSDF(pMeters, halfSize, r);
+
+                // clip ngoài viền (giữ cạnh mượt bằng feather)
+                // dist < 0 => bên trong; dùng smooth edge quanh 0..+_EdgeFeather
+                float aRound = 1.0 - smoothstep(0.0, max(1e-6, _EdgeFeather), sdf);
+                clip(aRound - 0.001); // bỏ hoàn toàn pixel ngoài bo
+
+                // ---- Lấy màu texture + tint ----
                 fixed4 col = tex2D(_MainTex, i.uv) * _Color;
 
-                // khoảng cách tới mép dọc/ngang
-                float dx = min(i.uv.x, 1.0 - i.uv.x);
-                float dy = min(i.uv.y, 1.0 - i.uv.y);
+                // ---- Edge fade cũ (mờ dần về mép) ----
+                float aEdge = EdgeFade(pMeters, halfSize, _EdgeFadeX, _EdgeFadeY, _EdgeMinAlpha);
 
-                // tránh chia 0
-                float ex = max(_EdgeFadeX, 1e-6);
-                float ey = max(_EdgeFadeY, 1e-6);
-
-                // Chuẩn hoá khoảng cách theo mỗi trục -> lấy trục "gần mép hơn"
-                float nx = dx / ex;   // 0 ở sát mép X, 1 ở trong rìa mờ X
-                float ny = dy / ey;   // 0 ở sát mép Y, 1 ở trong rìa mờ Y
-                float t  = saturate(min(nx, ny));
-                t = smoothstep(0.0, 1.0, t);
-
-                // Alpha: mép ngoài -> _EdgeMinAlpha, vào trong -> 1
-                float alphaMul = lerp(_EdgeMinAlpha, 1.0, t);
-                col.a *= alphaMul;
+                // ---- Hợp alpha: bo góc trước, rồi fade mép ----
+                col.a *= aRound;
+                col.a *= aEdge;
 
                 return col;
             }
             ENDCG
         }
     }
+
     FallBack Off
 }
