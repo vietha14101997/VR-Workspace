@@ -19,6 +19,10 @@ public class WorldPanelPlus : MonoBehaviour
 
     Quaternion _rotBasis;
 
+    [Header("Hover behaviour")]
+    public bool hoverWorldAligned = true;   // giữ Hover không xoay theo panel
+    public bool hoverFaceCameraYawOnly = true; // giữ Hover không xoay theo panel, chỉ xoay theo yaw camera
+
     [Header("Interaction Gates")]
     public bool centerDragEnabled = false;
 
@@ -34,7 +38,7 @@ public class WorldPanelPlus : MonoBehaviour
     public float height = 0.72f;
 
     [Header("Tray visuals")]
-    public float trayPadding = 0.025f;
+    public float trayPadding = 0.045f;
     public float trayHoverExtra = 0.035f;
     public float trayBehind = 0.02f;
     public float trayCornerRadius = 0.06f;
@@ -209,7 +213,7 @@ public class WorldPanelPlus : MonoBehaviour
         if (axisLock == WPAxisLock.PitchOnly) return;
         yawAccum = Mathf.Clamp(yawAccum + deg, -45f, 45f);
         axisLock = Mathf.Approximately(yawAccum, 0f) ? (Mathf.Approximately(pitchAccum, 0f) ? WPAxisLock.None : WPAxisLock.PitchOnly) : WPAxisLock.YawOnly;
-        ApplyAccumulatedRotation();
+        ApplyAccumulatedRotationStable();
         if (dock) dock.SetAxisLock(axisLock);
         UpdateHandleLocks();
     }
@@ -219,7 +223,7 @@ public class WorldPanelPlus : MonoBehaviour
         if (axisLock == WPAxisLock.YawOnly) return;
         pitchAccum = Mathf.Clamp(pitchAccum + deg, -45f, 45f);
         axisLock = Mathf.Approximately(pitchAccum, 0f) ? (Mathf.Approximately(yawAccum, 0f) ? WPAxisLock.None : WPAxisLock.YawOnly) : WPAxisLock.PitchOnly;
-        ApplyAccumulatedRotation();
+        ApplyAccumulatedRotationStable();
         if (dock) dock.SetAxisLock(axisLock);
         UpdateHandleLocks();
     }
@@ -227,33 +231,15 @@ public class WorldPanelPlus : MonoBehaviour
     public void ResetYawPitchLocks()
     {
         yawAccum = 0f; pitchAccum = 0f; axisLock = WPAxisLock.None;
-        ApplyAccumulatedRotation();
+        ApplyAccumulatedRotationStable();
         if (dock) dock.SetAxisLock(axisLock);
         UpdateHandleLocks();
-    }
-
-    void ApplyAccumulatedRotation()
-    {
-        Quaternion q = Quaternion.AngleAxis(yawAccum, _rotBasis * Vector3.up)
-                     * Quaternion.AngleAxis(pitchAccum, _rotBasis * Vector3.right)
-                     * _rotBasis;
-        transform.rotation = q;
     }
 
     void EnsureMaterials()
     {
         var boardShader = Shader.Find("Unlit/WorldPanelBoard");
-        if (_panelMat == null)
-        {
-            _panelMat = new Material(boardShader != null ? boardShader : Shader.Find("Unlit/Texture"));
-            // if (boardShader != null)
-            // {
-            //     _panelMat.SetFloat("_EdgeFadeX", 0f);
-            //     _panelMat.SetFloat("_EdgeFadeY", 0f);
-            //     _panelMat.SetFloat("_EdgeFade", 0f);
-            //     _panelMat.SetFloat("_FadeAmount", 0f);
-            // }
-        }
+        _panelMat ??= new Material(boardShader != null ? boardShader : Shader.Find("Unlit/Texture"));
 
         var sRounded = Shader.Find("Unlit/WorldPanelRounded");
         if (sRounded != null && sRounded.isSupported)
@@ -382,7 +368,8 @@ public class WorldPanelPlus : MonoBehaviour
         if (type == WPHandleType.Center)
         {
             box.enabled = false;
-            go.layer = LayerMask.NameToLayer("Ignore Raycast");
+            int lr = LayerMask.NameToLayer("Ignore Raycast");
+            if (lr >= 0) go.layer = lr;  // chỉ gán nếu layer tồn tại
         }
         var h = go.AddComponent<WorldPanelPlusHandle>();
         h.type = type; h.panel = this;
@@ -657,7 +644,36 @@ public class WorldPanelPlus : MonoBehaviour
                 if (mk) mk.SetVisible(showMarkers);
             }
         }
+        LateUpdate();
     }
+
+    void LateUpdate()
+    {
+        if (!hover || !hoverWorldAligned) return;
+
+        var cam = Camera.main;
+        if (cam)
+        {
+            if (hoverFaceCameraYawOnly)
+            {
+                // chỉ theo Y (yaw) của camera -> hover luôn thẳng, dễ hit
+                Vector3 toCam = cam.transform.position - transform.position;
+                toCam.y = 0f;
+                if (toCam.sqrMagnitude > 1e-6f)
+                    hover.rotation = Quaternion.LookRotation(-toCam.normalized, Vector3.up);
+            }
+            else
+            {
+                // hoặc cố định hẳn về world, không theo camera
+                hover.rotation = Quaternion.identity;
+            }
+        }
+        else
+        {
+            hover.rotation = Quaternion.identity;
+        }
+    }
+
 
     public void OnHover(bool on, WPHandleType? handleType = null)
     {
@@ -700,6 +716,66 @@ public class WorldPanelPlus : MonoBehaviour
             if (_panelMat.HasProperty("_Surface")) _panelMat.SetFloat("_Surface", 1f); // Transparent (URP)
             _panelMat.renderQueue = 3000;
         }
+    }
+
+    // === NO-ROLL helpers ===
+    public void EnforceNoRoll()
+    {
+        var f = transform.forward;
+        if (f.sqrMagnitude < 1e-6f) return;
+        transform.rotation = Quaternion.LookRotation(f, Vector3.up); // z=0
+    }
+    static Quaternion NoRollOf(Quaternion q)
+    {
+        var f = q * Vector3.forward;
+        if (f.sqrMagnitude < 1e-6f) return q;
+        return Quaternion.LookRotation(f, Vector3.up); // z=0
+    }
+
+    // === Xoay giữ Dock đứng yên + bảo toàn gap Y giữa Tray và Dock ===
+    void ApplyAccumulatedRotationStable()
+    {
+        var cam = Camera.main;
+        var dock = this.dock;
+        Vector3 pivot = dock ? dock.transform.position : transform.position;
+
+        // Lưu gap Y hiện tại để phục hồi sau xoay
+        float gapY0 = 0f;
+        if (dock)
+        {
+            float trayBottom = GetTrayBottomYWorld(cam);
+            float dockTop = dock.transform.TransformPoint(0, dock.GetBackplateHeight() * 0.5f, 0).y;
+            gapY0 = trayBottom - dockTop;
+        }
+
+        // Tính rotation mới theo yaw/pitch accum trên basis
+        Quaternion q = Quaternion.AngleAxis(yawAccum, _rotBasis * Vector3.up)
+                     * Quaternion.AngleAxis(pitchAccum, _rotBasis * Vector3.right)
+                     * _rotBasis;
+        q = NoRollOf(q); // chặn roll tuyệt đối
+
+        // Quay panel quanh pivot (Dock) thay vì quanh tâm panel
+        Quaternion delta = q * Quaternion.Inverse(transform.rotation);
+        Vector3 r = transform.position - pivot;
+        transform.position = pivot + delta * r;
+        transform.rotation = q;
+
+        // Giữ Dock đứng yên đúng worldPos pivot và phục hồi gap Y
+        if (dock)
+        {
+            dock.AnchorToWorld(pivot, cam); // neo lại ngay
+            float trayBottom = GetTrayBottomYWorld(cam);
+            float dockTop = dock.transform.TransformPoint(0, dock.GetBackplateHeight() * 0.5f, 0).y;
+            float dY = gapY0 - (trayBottom - dockTop);
+            if (Mathf.Abs(dY) > 1e-6f)
+            {
+                transform.position += Vector3.up * dY;
+                dock.AnchorToWorld(pivot, cam); // re-anchor sau khi dịch
+            }
+        }
+
+        // Cập nhật mặt trước/sau của Tray ngay frame này
+        UpdateTrayScaleAndMaterial();
     }
 
 #if UNITY_EDITOR

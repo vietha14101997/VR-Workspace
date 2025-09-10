@@ -167,7 +167,15 @@ public class WorldPanelPlusHandle : MonoBehaviour,
             panel.transform.position += delta;
 
             // 4) Cập nhật neo để khung hình sau tiếp tục mượt
-            _moveAnchor = wantAnchor;
+            Transform moveTr = panel && panel.dock ? panel.dock.GetMoveButtonTransform() : null;
+            if (moveTr)
+            {
+                _moveAnchor = moveTr.position;
+            }
+            else
+            {
+                _moveAnchor = wantAnchor; // fallback nếu vì lý do nào đó chưa có Dock/nút
+            }
             panel.moveAnchorWorld = _moveAnchor;
 
             // 5) Giữ lệch xoay ban đầu so với camera (giữ cảm giác tự nhiên)
@@ -178,6 +186,7 @@ public class WorldPanelPlusHandle : MonoBehaviour,
                 Quaternion wantRot = lookAtNow * _moveRotOffset;
                 float k = (panel.moveOrbitLerp > 0f) ? (1f - Mathf.Exp(-panel.moveOrbitLerp * dt)) : 1f;
                 panel.transform.rotation = Quaternion.Slerp(panel.transform.rotation, wantRot, k);
+                panel.EnforceNoRoll();
             }
         }
         else

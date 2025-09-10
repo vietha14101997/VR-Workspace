@@ -296,7 +296,10 @@ public class WorldPanelPlusControlDock : MonoBehaviour
         mf.sharedMesh = BuildUnitQuad();
 
         var mr = _backplate.gameObject.AddComponent<MeshRenderer>();
-        var mat = new Material(Shader.Find("Unlit/WorldPanelDock"));
+        var dockShader = Shader.Find("Unlit/WorldPanelDock");
+        dockShader ??= Shader.Find("Unlit/Transparent");
+        var mat = new Material(dockShader);
+
         mr.sharedMaterial = mat;
 
         float startW = _minimized ? expandedH : expandedW;
@@ -499,6 +502,13 @@ public class WorldPanelPlusControlDock : MonoBehaviour
         return (worldPos + transform.rotation * new Vector3(0, half, 0)).y;
     }
 
+    public Transform GetMoveButtonTransform()
+    {
+        foreach (var b in _buttons)
+            if (b && b.type == WPDockButtonType.MoveMode) return b.transform;
+        return null;
+    }
+
     float MeasureCurrentGapY()
     {
         var cam = Camera.main;
@@ -557,7 +567,8 @@ public class WorldPanelPlusControlDock : MonoBehaviour
         foreach (var c in cols)
         {
             if (!c) continue;
-            bool isToggle = (_toggleBtnTr && c.transform.IsChildOf(_toggleBtnTr));
+
+            bool isToggle = _toggleBtnTr && c.transform.IsChildOf(_toggleBtnTr);
             bool allow = (!_minimized) || isToggle;
             c.enabled = on && allow && c.gameObject.activeInHierarchy;
         }

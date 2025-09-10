@@ -13,7 +13,9 @@ public class WorldPanelPlusHandleSphere : MonoBehaviour
     {
         if (_defMat == null)
         {
-            _defMat = new Material(Shader.Find("Unlit/Color"));
+            var shader = Shader.Find("Unlit/Color");
+            shader ??= Shader.Find("Unlit/Texture"); // Fallback
+            _defMat = new Material(shader);
             _defMat.color = Color.white;
         }
         return _defMat;

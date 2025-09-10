@@ -84,6 +84,17 @@ public class WorldPanelGazeBridge : MonoBehaviour
         if (_lockoutCollider != null && hitCol == _lockoutCollider) { hitHandle = null; hitDockBtn = null; }
         else if (_lockoutCollider != null && hitCol != _lockoutCollider) { _lockoutCollider = null; }
 
+
+        if (hitPanel != null && hitPanel.forceTrayHidden)
+        {
+            if (hitDockBtn == null)
+            {
+                hitHandle = null;
+                hitPanel = null;
+                hitCol = null;
+            }
+        }
+
         // Hover
         bool hovering = (hitPanel != null);
         if (!hovering && _hoverPanel) { _hoverPanel.OnHover(false, null); _hoverPanel = null; _hoverHandle = null; }
@@ -130,6 +141,8 @@ public class WorldPanelGazeBridge : MonoBehaviour
                 {
                     _activeHandle.panel.centerDragEnabled = false;
                     _activeHandle.panel.moveAnchorWorld = null;
+                    _activeHandle.panel.SetRotationBasisNow();  // chốt gốc mới = pose hiện tại
+                    _activeHandle.panel.ResetYawPitchLocks();   // xóa tích lũy cũ
                 }
                 _activeHandle = null;
                 if (hitCol) _lockoutCollider = hitCol; // buộc rời
@@ -144,6 +157,8 @@ public class WorldPanelGazeBridge : MonoBehaviour
             {
                 _activeHandle.panel.centerDragEnabled = false;
                 _activeHandle.panel.moveAnchorWorld = null;
+                _activeHandle.panel.SetRotationBasisNow();  // chốt gốc mới = pose hiện tại
+                _activeHandle.panel.ResetYawPitchLocks();   // xóa tích lũy cũ
             }
             _activeHandle = null;
             if (hitCol) _lockoutCollider = hitCol;
@@ -212,7 +227,11 @@ public class WorldPanelGazeBridge : MonoBehaviour
                 {
                     p.centerDragEnabled = true;
                     p.moveAnchorWorld = btn.transform.position;    // anchor = nút Move
-                    if (p.dock) p.dock.CaptureYawOffsetToCamera();
+                    if (p.dock)
+                    {
+                        p.dock.CaptureYawOffsetToCamera();
+                        p.dock.CenterXUnderTray(); // giữ Dock cân tâm ngay từ đầu để trực quan hơn
+                    }
 
                     // Bắt đầu drag Center ngay lập tức
                     var c = GetCenterHandle(p);
@@ -227,12 +246,16 @@ public class WorldPanelGazeBridge : MonoBehaviour
             case WPDockButtonType.YawLeft15:
                 {
                     p.centerDragEnabled = false;
+                    p.SetRotationBasisNow();
+                    p.ResetYawPitchLocks();
                     p.AddYawClamped(-15f);
                     break;
                 }
             case WPDockButtonType.YawRight15:
                 {
                     p.centerDragEnabled = false;
+                    p.SetRotationBasisNow();
+                    p.ResetYawPitchLocks();
                     p.AddYawClamped(15f);
                     break;
                 }
@@ -244,20 +267,24 @@ public class WorldPanelGazeBridge : MonoBehaviour
             case WPDockButtonType.PitchUp15:
                 {
                     p.centerDragEnabled = false;
-                    p.AddYawClamped(15f);
+                    p.SetRotationBasisNow();      // <<< rebase (xem mục B)
+                    p.ResetYawPitchLocks();       // <<< reset accumulators
+                    p.AddPitchClamped(15f);       // <<< đúng hàm
                     break;
                 }
 
             case WPDockButtonType.PitchDown15:
                 {
                     p.centerDragEnabled = false;
-                    p.AddYawClamped(-15f);
+                    p.SetRotationBasisNow();      // <<< rebase
+                    p.ResetYawPitchLocks();       // <<< reset
+                    p.AddPitchClamped(-15f);      // <<< đúng hàm
                     break;
                 }
 
             case WPDockButtonType.ResetFaceCamera:
                 {
-                    FaceCamera(p);
+                    FaceCameraStable(p);
                     p.SetRotationBasisNow();   // gốc mới
                     p.ResetYawPitchLocks();    // mở khóa 2 trục
                     if (p.dock)
@@ -315,14 +342,51 @@ public class WorldPanelGazeBridge : MonoBehaviour
         }
     }
 
-    void FaceCamera(WorldPanelPlus p)
+    void FaceCameraStable(WorldPanelPlus p)
     {
         var cam = eventCamera ? eventCamera : Camera.main;
-        if (!cam) return;
+        if (!cam || !p) return;
+
+        var dock = p.dock;
+        Vector3 pivot = dock ? dock.transform.position : p.transform.position;
+
+        // Chụp gap trước khi reset
+        float gapY0 = 0f;
+        if (dock)
+        {
+            float trayBottom = p.GetTrayBottomYWorld(cam);
+            float dockTop = dock.transform.TransformPoint(0, dock.GetBackplateHeight() * 0.5f, 0).y;
+            gapY0 = trayBottom - dockTop;
+        }
+
+        // Nhìn thẳng camera, ép z=0 (no roll)
         Vector3 toCam = cam.transform.position - p.transform.position;
-        if (toCam.sqrMagnitude < 1e-6f) return;
-        var look = Quaternion.LookRotation(-toCam.normalized, Vector3.up);
+        if (toCam.sqrMagnitude < 1e-6f) toCam = -p.transform.forward;
+        Quaternion look = Quaternion.LookRotation(-toCam.normalized, Vector3.up);
+
+        // Quay quanh pivot để Dock đứng yên
+        Quaternion delta = look * Quaternion.Inverse(p.transform.rotation);
+        Vector3 r = p.transform.position - pivot;
+        p.transform.position = pivot + delta * r;
         p.transform.rotation = look;
+
+        // Cập nhật tray facing + neo Dock + phục hồi gap
+        p.Apply();                     // cập nhật sign của tray (trước/sau camera)
+        if (dock)
+        {
+            dock.AnchorToWorld(pivot, cam);
+            float trayBottom = p.GetTrayBottomYWorld(cam);
+            float dockTop = dock.transform.TransformPoint(0, dock.GetBackplateHeight() * 0.5f, 0).y;
+            float dY = gapY0 - (trayBottom - dockTop);
+            if (Mathf.Abs(dY) > 1e-6f)
+            {
+                p.transform.position += Vector3.up * dY;
+                dock.AnchorToWorld(pivot, cam);
+            }
+
+            // Sau cùng, căn X để Dock luôn tâm dưới Tray cho trực quan
+            dock.CenterXUnderTray();
+        }
     }
 
     bool IsPressed()
