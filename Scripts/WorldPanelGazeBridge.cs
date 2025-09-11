@@ -129,6 +129,10 @@ public class WorldPanelGazeBridge : MonoBehaviour
         if (_activeHandle != null && (pressed || useDwellActivation))
         {
             _activeHandle.UpdateDragFromRay(ray, eventCamera, Time.deltaTime);
+            if (_activeHandle.type == WPHandleType.Center && _activeHandle.panel)
+            {
+                _activeHandle.panel.EnforceNoRoll();
+            }
 
             float ang = Vector3.Angle(_prevDir, ray.direction);
             if (ang < stillAngleDeg) _stillTimer += Time.deltaTime; else _stillTimer = 0f;
@@ -246,6 +250,7 @@ public class WorldPanelGazeBridge : MonoBehaviour
             case WPDockButtonType.YawLeft15:
                 {
                     p.centerDragEnabled = false;
+                    FaceCameraStable(p);
                     p.SetRotationBasisNow();
                     p.ResetYawPitchLocks();
                     p.AddYawClamped(-15f);
@@ -254,6 +259,7 @@ public class WorldPanelGazeBridge : MonoBehaviour
             case WPDockButtonType.YawRight15:
                 {
                     p.centerDragEnabled = false;
+                    FaceCameraStable(p);
                     p.SetRotationBasisNow();
                     p.ResetYawPitchLocks();
                     p.AddYawClamped(15f);
@@ -267,6 +273,7 @@ public class WorldPanelGazeBridge : MonoBehaviour
             case WPDockButtonType.PitchUp15:
                 {
                     p.centerDragEnabled = false;
+                    FaceCameraStable(p);
                     p.SetRotationBasisNow();      // <<< rebase (xem mục B)
                     p.ResetYawPitchLocks();       // <<< reset accumulators
                     p.AddPitchClamped(15f);       // <<< đúng hàm
@@ -276,6 +283,7 @@ public class WorldPanelGazeBridge : MonoBehaviour
             case WPDockButtonType.PitchDown15:
                 {
                     p.centerDragEnabled = false;
+                    FaceCameraStable(p);
                     p.SetRotationBasisNow();      // <<< rebase
                     p.ResetYawPitchLocks();       // <<< reset
                     p.AddPitchClamped(-15f);      // <<< đúng hàm

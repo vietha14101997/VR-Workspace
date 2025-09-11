@@ -17,15 +17,15 @@ public class WorldPanelPlus : MonoBehaviour
     // =========================
     [Header("Build Toggles")]
     [Tooltip("Sinh các edge/corner handles (khuyến nghị: OFF nếu không dùng).")]
-    public bool generateHandles = false;
+    public bool generateHandles = true;
     [Tooltip("Chỉ sinh 4 corner handles (bật nếu muốn giữ 4 góc).")]
-    public bool generateCornerHandles = false;
+    public bool generateCornerHandles = true;
     [Tooltip("Tự thêm sphere marker lên các handle (trừ Center).")]
     public bool generateHandleSpheres = false;
     [Tooltip("Sinh & cho phép Hints.")]
     public bool generateHints = false;
     [Tooltip("Dùng shader có mờ rìa cho Board.")]
-    public bool useBoardEdgeFeather = false;
+    public bool useBoardEdgeFeather = true;
 
     [Header("Rotation clamp")]
     public float yawAccum = 0f;
@@ -235,7 +235,7 @@ public class WorldPanelPlus : MonoBehaviour
     public void AddYawClamped(float deg)
     {
         if (axisLock == WPAxisLock.PitchOnly) return;
-        yawAccum = Mathf.Clamp(yawAccum + deg, -45f, 45f);
+        yawAccum = Mathf.Clamp(yawAccum + deg, -15f, 15f);   // was ±45
         axisLock = Mathf.Approximately(yawAccum, 0f) ? (Mathf.Approximately(pitchAccum, 0f) ? WPAxisLock.None : WPAxisLock.PitchOnly) : WPAxisLock.YawOnly;
         ApplyAccumulatedRotationStable();
         if (dock) dock.SetAxisLock(axisLock);
@@ -245,7 +245,7 @@ public class WorldPanelPlus : MonoBehaviour
     public void AddPitchClamped(float deg)
     {
         if (axisLock == WPAxisLock.YawOnly) return;
-        pitchAccum = Mathf.Clamp(pitchAccum + deg, -45f, 45f);
+        pitchAccum = Mathf.Clamp(pitchAccum + deg, -15f, 15f); // was ±45
         axisLock = Mathf.Approximately(pitchAccum, 0f) ? (Mathf.Approximately(yawAccum, 0f) ? WPAxisLock.None : WPAxisLock.YawOnly) : WPAxisLock.PitchOnly;
         ApplyAccumulatedRotationStable();
         if (dock) dock.SetAxisLock(axisLock);
