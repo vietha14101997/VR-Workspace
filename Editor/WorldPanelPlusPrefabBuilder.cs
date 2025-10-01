@@ -16,7 +16,7 @@ public static class WorldPanelPlusPrefabBuilder
         if (!AssetDatabase.IsValidFolder("Assets/VR-Workspace")) AssetDatabase.CreateFolder("Assets", "VR-Workspace");
         if (!AssetDatabase.IsValidFolder(dir)) AssetDatabase.CreateFolder("Assets/VR-Workspace", "Prefabs");
 
-        var path = Path.Combine(dir, "WorldPanelPlus.prefab").Replace("\\","/");
+        var path = Path.Combine(dir, "WorldPanelPlus.prefab").Replace("\\", "/");
         PrefabUtility.SaveAsPrefabAssetAndConnect(go, path, InteractionMode.UserAction);
         Selection.activeObject = AssetDatabase.LoadAssetAtPath<Object>(path);
         Debug.Log($"WorldPanelPlus prefab saved: {path}");
