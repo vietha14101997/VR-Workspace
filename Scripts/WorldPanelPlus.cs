@@ -96,6 +96,21 @@ public class WorldPanelPlus : MonoBehaviour
     [HideInInspector] public bool forceTrayHidden = false;
 
     [HideInInspector] public bool isResizing = false;
+    // cache để không tạo Material fallback nhiều lần
+    [SerializeField, HideInInspector] private Material _fallbackPanelMat;
+
+    private Material GetPanelMaterial()
+    {
+        if (_panelMat != null) return _panelMat;
+
+        if (_fallbackPanelMat == null)
+        {
+            var sh = Shader.Find("Unlit/Texture");
+            if (sh == null) sh = Shader.Find("Sprites/Default"); // fallback cuối
+            _fallbackPanelMat = new Material(sh) { name = "WorldPanelPlus_FallbackPanel" };
+        }
+        return _fallbackPanelMat;
+    }
 
 #if UNITY_EDITOR
     private bool _shaderPropertiesNeedUpdate = true;
@@ -149,11 +164,12 @@ public class WorldPanelPlus : MonoBehaviour
 #if UNITY_EDITOR
         _shaderPropertiesNeedUpdate = true;
 #endif
-        if (!board || !tray)
-        {
-            EnsureMaterials();
-            return;
-        }
+        // LUÔN bảo đảm material trước, kể cả khi board/tray đã tồn tại
+        EnsureMaterials();
+
+        // Trong lúc Validate có thể child chưa kịp tái tạo → đừng Apply nếu thiếu
+        if (!board || !tray) return;
+
         Apply();
     }
 
@@ -422,7 +438,11 @@ public class WorldPanelPlus : MonoBehaviour
 
     public void Apply()
     {
+        // Nếu thiếu những thành phần cơ bản thì không làm gì cả
         if (!board || !tray) return;
+
+        // BẢO ĐẢM shader/material LUÔN sẵn sàng trước khi set vào renderer
+        EnsureMaterials();
 
 #if UNITY_EDITOR
         if (_shaderPropertiesNeedUpdate)
@@ -434,28 +454,41 @@ public class WorldPanelPlus : MonoBehaviour
         UpdateBoardShaderProperties();
 #endif
 
+        // --- Board ---
         if (board)
         {
             board.localScale = new Vector3(width, height, 1);
+
             var mr = board.GetComponent<MeshRenderer>();
             if (mr)
             {
-                mr.sharedMaterial = _panelMat;
-                mr.sharedMaterial.mainTexture = contentTexture;
-                mr.enabled = boardVisible;
-                ApplyBoardTint(mr);
+                // Bảo đảm luôn có material
+                var mat = GetPanelMaterial();
+                if (mr.sharedMaterial != mat) mr.sharedMaterial = mat;
+
+                // Bảo vệ truy cập null
+                if (mr.sharedMaterial != null)
+                {
+                    mr.sharedMaterial.mainTexture = contentTexture;
+                    mr.enabled = boardVisible;
+                    ApplyBoardTint(mr);
+                }
             }
-            var col = board.GetComponent<BoxCollider>(); if (col) { col.size = new Vector3(1, 1, 0.02f); col.center = new Vector3(0, 0, 0.01f); }
+
+            var col = board.GetComponent<BoxCollider>();
+            if (col) { col.size = new Vector3(1, 1, 0.02f); col.center = new Vector3(0, 0, 0.01f); }
         }
+
         UpdateTrayScaleAndMaterial();
 
         float TrayW = width + trayPadding * 2f;
         float TrayH = height + trayPadding * 2f;
 
-        // Hover collider covers Dock too
+        // --- Hover collider (bảo đảm tồn tại) ---
         if (hover)
         {
             var bc = hover.GetComponent<BoxCollider>();
+            if (!bc) bc = hover.gameObject.AddComponent<BoxCollider>(); // đảm bảo có collider
             float dockH = (dock != null) ? dock.GetBackplateHeight() : 0f;
             float extra = trayHoverExtra;
             bc.size = new Vector3(
