@@ -3,13 +3,7 @@ using UnityEngine.EventSystems;
 
 public enum WPDockButtonType
 {
-    MoveMode,        // bật chế độ kéo-di chuyển (Center) qua Dock
-    YawLeft15,       // xoay Y -15°
-    YawRight15,      // xoay Y +15°
-    MinimizeToggle, // thu nhỏ/hiện Dock
-    PitchUp15,       // xoay X +15°
-    PitchDown15,     // xoay X -15°
-    ResetFaceCamera  // reset: đối diện camera (giữ vị trí)
+    MinimizeToggle // thu nhỏ/hiện Dock
 }
 
 [RequireComponent(typeof(BoxCollider))]
@@ -34,9 +28,6 @@ public class WorldPanelPlusDockButton : MonoBehaviour, IPointerDownHandler
 
     public void OnPointerDown(PointerEventData eventData)
     {
-        if (type == WPDockButtonType.MoveMode && panel)
-        {
-            panel.moveAnchorWorld = transform.position;   // cố định anchor
-        }
+        
     }
 }

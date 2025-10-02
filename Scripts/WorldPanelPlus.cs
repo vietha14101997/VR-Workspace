@@ -3,60 +3,40 @@ using System.Collections.Generic;
 
 public enum WPHandleType
 {
-    Center, EdgeTop, EdgeBottom, EdgeLeft, EdgeRight,
-    CornerTL, CornerTR, CornerBL, CornerBR
+    Center, CornerTL, CornerTR, CornerBL, CornerBR
 }
 
 [ExecuteAlways]
 public class WorldPanelPlus : MonoBehaviour
 {
-    public enum WPAxisLock { None, YawOnly, PitchOnly }
-
-    // =========================
-    // Build Toggles (new)
-    // =========================
     [Header("Build Toggles")]
-    [Tooltip("Sinh các edge/corner handles (khuyến nghị: OFF nếu không dùng).")]
-    public bool generateHandles = true;
-    [Tooltip("Chỉ sinh 4 corner handles (bật nếu muốn giữ 4 góc).")]
+    public bool generateHandles = false;
     public bool generateCornerHandles = true;
-    [Tooltip("Tự thêm sphere marker lên các handle (trừ Center).")]
-    public bool generateHandleSpheres = false;
-    [Tooltip("Sinh & cho phép Hints.")]
+    public bool generateHandleSpheres = true;
+    [Tooltip("Hiện marker cả ở Center handle")]
+    public bool markerIncludeCenter = true;
     public bool generateHints = false;
-    [Tooltip("Dùng shader có mờ rìa cho Board.")]
     public bool useBoardEdgeFeather = true;
 
-    [Header("Rotation clamp")]
-    public float yawAccum = 0f;
-    public float pitchAccum = 0f;
-    public WPAxisLock axisLock = WPAxisLock.None;
-
-    Quaternion _rotBasis;
-
     [Header("Hover behaviour")]
-    public bool hoverWorldAligned = true;   // giữ Hover không xoay theo panel
-    public bool hoverFaceCameraYawOnly = true; // Hover chỉ xoay theo yaw camera
+    public bool hoverWorldAligned = true;
+    public bool hoverFaceCameraYawOnly = true;
 
-    [Header("Interaction Gates")]
-    public bool centerDragEnabled = false;
-
-    [Header("Move Mode (Center)")]
+    [Header("Move (Center handle)")]
     public bool moveOrbitCamera = true;
     public float moveOrbitLerp = 12f;
     public float moveOrbitMin = 0.25f;
     public float moveOrbitMax = 6.0f;
-    [HideInInspector] public Vector3? moveAnchorWorld = null;
 
     [Header("Panel (content) size, meters")]
     public float width = 1.366f;
     public float height = 0.768f;
 
     [Header("Tray visuals")]
-    public float trayPadding = 0.045f;
-    public float trayHoverExtra = 0.035f;
+    public float trayPadding = 0.05f;
+    public float trayHoverExtra = 0.025f;
     public float trayBehind = 0.02f;
-    public float trayCornerRadius = 0.02f;
+    public float trayCornerRadius = 0.03f;
     public float trayBorder = 0.004f;
     public Color trayFill = new Color(0.2f, 0.2f, 0.2f, 0.25f);
     public Color trayBorderColor = new Color(1, 1, 1, 0.85f);
@@ -69,7 +49,7 @@ public class WorldPanelPlus : MonoBehaviour
     [Header("Handles & frame")]
     public float handleDepth = 0.03f;
     public float handleEdgeThickness = 0.02f;
-    public float cornerHandleSize = 0.06f;
+    public float cornerHandleSize = 0.06f;  // resize
     [Range(0.2f, 1f)] public float edgeActivePercent = 0.5f;
 
     [Header("Generated")]
@@ -96,17 +76,15 @@ public class WorldPanelPlus : MonoBehaviour
     [HideInInspector] public bool forceTrayHidden = false;
 
     [HideInInspector] public bool isResizing = false;
-    // cache để không tạo Material fallback nhiều lần
     [SerializeField, HideInInspector] private Material _fallbackPanelMat;
 
     private Material GetPanelMaterial()
     {
         if (_panelMat != null) return _panelMat;
-
         if (_fallbackPanelMat == null)
         {
             var sh = Shader.Find("Unlit/Texture");
-            if (sh == null) sh = Shader.Find("Sprites/Default"); // fallback cuối
+            if (sh == null) sh = Shader.Find("Sprites/Default");
             _fallbackPanelMat = new Material(sh) { name = "WorldPanelPlus_FallbackPanel" };
         }
         return _fallbackPanelMat;
@@ -119,7 +97,6 @@ public class WorldPanelPlus : MonoBehaviour
     public void SetResizeMode(bool on)
     {
         isResizing = on;
-
         if (board)
         {
             var col = board.GetComponent<BoxCollider>();
@@ -164,19 +141,14 @@ public class WorldPanelPlus : MonoBehaviour
 #if UNITY_EDITOR
         _shaderPropertiesNeedUpdate = true;
 #endif
-        // LUÔN bảo đảm material trước, kể cả khi board/tray đã tồn tại
         EnsureMaterials();
-
-        // Trong lúc Validate có thể child chưa kịp tái tạo → đừng Apply nếu thiếu
         if (!board || !tray) return;
-
         Apply();
     }
 
     [ContextMenu("Rebuild")]
     public void Rebuild()
     {
-        // clear children
         var kill = new List<GameObject>();
         foreach (Transform c in transform) kill.Add(c.gameObject);
         foreach (var go in kill) { if (Application.isEditor) DestroyImmediate(go); else Destroy(go); }
@@ -204,29 +176,13 @@ public class WorldPanelPlus : MonoBehaviour
 
         // === Hints ===
         hintsParent = new GameObject("Hints").transform; hintsParent.SetParent(transform, false);
-        if (generateHints)
-        {
-            // Nếu muốn bật Hint dải cạnh thì bổ sung CreateEdgeHint(...) ở đây.
-            // Ví dụ (đang để tắt mặc định):
-            //CreateEdgeHint("Hint_Top", new Vector3(0, height/2f + trayPadding*0.5f, -trayBehind*0.5f), new Vector3(width + trayPadding*0.5f, 0.01f, 1));
-        }
         SetHintsActive(false);
 
         // === Handles ===
-        handlesParent = new GameObject("Handles").transform;
-        handlesParent.SetParent(transform, false);
+        handlesParent = new GameObject("Handles").transform; handlesParent.SetParent(transform, false);
         CreateHandlesConditional();
 
-        // === Marker spheres ===
-        if (generateHandleSpheres && handlesParent)
-        {
-            foreach (Transform t in handlesParent)
-            {
-                var h = t.GetComponent<WorldPanelPlusHandle>();
-                if (!h || h.type == WPHandleType.Center) continue;
-                if (!t.GetComponent<WorldPanelPlusHandleSphere>()) t.gameObject.AddComponent<WorldPanelPlusHandleSphere>();
-            }
-        }
+        EnsureHandleSpheresAttached();
 
         // === Hover collider ===
         hover = new GameObject("Hover").transform; hover.SetParent(transform, false);
@@ -241,60 +197,57 @@ public class WorldPanelPlus : MonoBehaviour
         dock.Build();
 
         Apply();
-        _rotBasis = transform.rotation;
     }
 
     public float GetTrayAlpha01() => forceTrayHidden ? 0f : _trayAlpha;
 
-    public void SetRotationBasisNow() { _rotBasis = transform.rotation; }
-
-    public void AddYawClamped(float deg)
-    {
-        if (axisLock == WPAxisLock.PitchOnly) return;
-        yawAccum = Mathf.Clamp(yawAccum + deg, -15f, 15f);   // was ±45
-        axisLock = Mathf.Approximately(yawAccum, 0f) ? (Mathf.Approximately(pitchAccum, 0f) ? WPAxisLock.None : WPAxisLock.PitchOnly) : WPAxisLock.YawOnly;
-        ApplyAccumulatedRotationStable();
-        if (dock) dock.SetAxisLock(axisLock);
-        UpdateHandleLocks();
-    }
-
-    public void AddPitchClamped(float deg)
-    {
-        if (axisLock == WPAxisLock.YawOnly) return;
-        pitchAccum = Mathf.Clamp(pitchAccum + deg, -15f, 15f); // was ±45
-        axisLock = Mathf.Approximately(pitchAccum, 0f) ? (Mathf.Approximately(yawAccum, 0f) ? WPAxisLock.None : WPAxisLock.YawOnly) : WPAxisLock.PitchOnly;
-        ApplyAccumulatedRotationStable();
-        if (dock) dock.SetAxisLock(axisLock);
-        UpdateHandleLocks();
-    }
-
-    public void ResetYawPitchLocks()
-    {
-        yawAccum = 0f; pitchAccum = 0f; axisLock = WPAxisLock.None;
-        ApplyAccumulatedRotationStable();
-        if (dock) dock.SetAxisLock(axisLock);
-        UpdateHandleLocks();
-    }
-
     void EnsureMaterials()
     {
-        // Board: chọn shader theo toggle (tắt mờ rìa => Unlit/Texture)
         Shader sBoard = useBoardEdgeFeather ? Shader.Find("Unlit/WorldPanelBoard") : Shader.Find("Unlit/Texture");
         if (sBoard == null) sBoard = Shader.Find("Unlit/Texture");
         _panelMat ??= new Material(sBoard);
 
-        // Tray
         var sRounded = Shader.Find("Unlit/WorldPanelRounded");
         if (sRounded != null && sRounded.isSupported)
             _trayMat = (_trayMat && _trayMat.shader == sRounded) ? _trayMat : new Material(sRounded);
         else
             _trayMat = new Material(Shader.Find("Unlit/Transparent"));
 
-        // Dash
         var sDash = Shader.Find("Unlit/WorldPanelDash");
         _dashMat = (sDash != null && sDash.isSupported)
             ? (_dashMat && _dashMat.shader == sDash ? _dashMat : new Material(sDash))
             : new Material(Shader.Find("Unlit/Color"));
+    }
+
+    void EnsureHandleSpheresAttached()
+    {
+        if (!handlesParent) return;
+
+        foreach (Transform t in handlesParent)
+        {
+            var h = t.GetComponent<WorldPanelPlusHandle>();
+            if (!h) continue;
+
+            // Nếu đang tắt tính năng -> ẩn marker nếu có
+            if (!generateHandleSpheres)
+            {
+                var mkOff = t.GetComponent<WorldPanelPlusHandleSphere>();
+                if (mkOff) mkOff.SetVisible(false);
+                continue;
+            }
+
+            // Nếu không muốn hiện ở Center
+            if (!markerIncludeCenter && h.type == WPHandleType.Center)
+            {
+                var mkOff = t.GetComponent<WorldPanelPlusHandleSphere>();
+                if (mkOff) mkOff.SetVisible(false);
+                continue;
+            }
+
+            // Gắn marker nếu thiếu
+            if (!t.GetComponent<WorldPanelPlusHandleSphere>())
+                t.gameObject.AddComponent<WorldPanelPlusHandleSphere>();
+        }
     }
 
     void UpdateTrayScaleAndMaterial()
@@ -358,19 +311,10 @@ public class WorldPanelPlus : MonoBehaviour
         return go;
     }
 
-    void CreateEdgeHint(string name, Vector3 localPos, Vector3 localScale)
-    {
-        var go = CreateQuad(name, _dashMat);
-        go.transform.localPosition = localPos;
-        go.transform.localScale = localScale;
-        go.GetComponent<MeshRenderer>().enabled = false;
-        go.transform.SetParent(hintsParent, true);
-    }
-
     void SetHintsActive(bool on)
     {
         if (!hintsParent) return;
-        if (!generateHints) on = false; // guard cứng
+        if (!generateHints) on = false;
         foreach (Transform c in hintsParent)
         {
             var mr = c.GetComponent<MeshRenderer>();
@@ -384,21 +328,10 @@ public class WorldPanelPlus : MonoBehaviour
         float TrayH = height + trayPadding * 2f;
         float thw = TrayW * 0.5f, thh = TrayH * 0.5f;
 
-        // Luôn tạo Center (collider disable & IgnoreRaycast như cũ)
-        CreateHandle("Handle_Center", WPHandleType.Center, Vector3.zero,
-            new Vector2(TrayW - handleEdgeThickness * 2f, TrayH - handleEdgeThickness * 2f));
+        // CENTER HANDLE: đặt giữa cạnh TOP của Tray
+        CreateHandle("Handle_Center", WPHandleType.Center, new Vector3(0, thh, 0), new Vector2(cornerHandleSize, cornerHandleSize));
 
-        // Nếu muốn edges => có thể mở thêm (đang tắt mặc định)
-        if (generateHandles)
-        {
-            // float edgeLenW = TrayW * edgeActivePercent;
-            // float edgeLenH = TrayH * edgeActivePercent;
-            // CreateHandle("Handle_Top", WPHandleType.EdgeTop,    new Vector3(0, thh, 0),    new Vector2(edgeLenW, handleEdgeThickness));
-            // CreateHandle("Handle_Bottom", WPHandleType.EdgeBottom,new Vector3(0, -thh, 0),  new Vector2(edgeLenW, handleEdgeThickness));
-            // CreateHandle("Handle_Left", WPHandleType.EdgeLeft,  new Vector3(-thw, 0, 0),   new Vector2(handleEdgeThickness, edgeLenH));
-            // CreateHandle("Handle_Right", WPHandleType.EdgeRight,new Vector3(thw, 0, 0),    new Vector2(handleEdgeThickness, edgeLenH));
-        }
-
+        // Corner handles để RESIZE (uniform)
         if (generateCornerHandles)
         {
             CreateHandle("Handle_TL", WPHandleType.CornerTL, new Vector3(-thw, thh, 0), new Vector2(cornerHandleSize, cornerHandleSize));
@@ -418,14 +351,7 @@ public class WorldPanelPlus : MonoBehaviour
         box.size = new Vector3(size.x, size.y, handleDepth);
         box.center = new Vector3(0, 0, handleDepth * 0.5f);
 
-        if (type == WPHandleType.Center)
-        {
-            box.enabled = false;
-            int lr = LayerMask.NameToLayer("Ignore Raycast");
-            if (lr >= 0) go.layer = lr;
-        }
-
-        // Nếu không bật generateHandles/generateCornerHandles thì các handle (trừ Center) sẽ không được tạo
+        // Center giữ collider bật và layer mặc định để nhận raycast
         var h = go.AddComponent<WorldPanelPlusHandle>();
         h.type = type; h.panel = this;
     }
@@ -438,10 +364,8 @@ public class WorldPanelPlus : MonoBehaviour
 
     public void Apply()
     {
-        // Nếu thiếu những thành phần cơ bản thì không làm gì cả
         if (!board || !tray) return;
 
-        // BẢO ĐẢM shader/material LUÔN sẵn sàng trước khi set vào renderer
         EnsureMaterials();
 
 #if UNITY_EDITOR
@@ -454,7 +378,6 @@ public class WorldPanelPlus : MonoBehaviour
         UpdateBoardShaderProperties();
 #endif
 
-        // --- Board ---
         if (board)
         {
             board.localScale = new Vector3(width, height, 1);
@@ -462,11 +385,8 @@ public class WorldPanelPlus : MonoBehaviour
             var mr = board.GetComponent<MeshRenderer>();
             if (mr)
             {
-                // Bảo đảm luôn có material
                 var mat = GetPanelMaterial();
                 if (mr.sharedMaterial != mat) mr.sharedMaterial = mat;
-
-                // Bảo vệ truy cập null
                 if (mr.sharedMaterial != null)
                 {
                     mr.sharedMaterial.mainTexture = contentTexture;
@@ -484,11 +404,10 @@ public class WorldPanelPlus : MonoBehaviour
         float TrayW = width + trayPadding * 2f;
         float TrayH = height + trayPadding * 2f;
 
-        // --- Hover collider (bảo đảm tồn tại) ---
         if (hover)
         {
             var bc = hover.GetComponent<BoxCollider>();
-            if (!bc) bc = hover.gameObject.AddComponent<BoxCollider>(); // đảm bảo có collider
+            if (!bc) bc = hover.gameObject.AddComponent<BoxCollider>();
             float dockH = (dock != null) ? dock.GetBackplateHeight() : 0f;
             float extra = trayHoverExtra;
             bc.size = new Vector3(
@@ -506,42 +425,13 @@ public class WorldPanelPlus : MonoBehaviour
     void ApplyBoardTint(MeshRenderer mr)
     {
         if (!mr) return;
-        var tint = panelTint;
-        tint.a = boardVisible ? Mathf.Clamp01(boardAlpha) : 0f;
-
+        var tint = panelTint; tint.a = boardVisible ? Mathf.Clamp01(boardAlpha) : 0f;
         if (mr.sharedMaterial.HasProperty("_Color"))
             mr.sharedMaterial.SetColor("_Color", tint);
         else
             mr.sharedMaterial.color = tint;
-
         mr.sharedMaterial.mainTexture = contentTexture;
         mr.sortingOrder = 0;
-    }
-
-    public void UpdateHandleLocks()
-    {
-        if (!handlesParent) return;
-
-        foreach (Transform t in handlesParent)
-        {
-            var h = t.GetComponent<WorldPanelPlusHandle>();
-            if (!h) continue;
-            var col = t.GetComponent<BoxCollider>();
-            if (!col) continue;
-
-            bool isYawEdge = (h.type == WPHandleType.EdgeLeft || h.type == WPHandleType.EdgeRight);
-            bool isPitchEdge = (h.type == WPHandleType.EdgeTop || h.type == WPHandleType.EdgeBottom);
-
-            switch (axisLock)
-            {
-                case WPAxisLock.None:
-                    col.enabled = true; break;
-                case WPAxisLock.YawOnly:
-                    col.enabled = !isPitchEdge; break;
-                case WPAxisLock.PitchOnly:
-                    col.enabled = !isYawEdge; break;
-            }
-        }
     }
 
     void UpdateHandlesLayout()
@@ -560,12 +450,12 @@ public class WorldPanelPlus : MonoBehaviour
             switch (h.type)
             {
                 case WPHandleType.Center:
-                    t.localPosition = Vector3.zero;
+                    t.localPosition = new Vector3(0, thh, 0);
                     {
                         var box = t.GetComponent<BoxCollider>();
                         if (box)
                         {
-                            box.size = new Vector3(TrayW - handleEdgeThickness * 2f, TrayH - handleEdgeThickness * 2f, handleDepth);
+                            box.size = new Vector3(cornerHandleSize, cornerHandleSize, handleDepth);
                             box.center = new Vector3(0, 0, handleDepth * 0.5f);
                         }
                     }
@@ -622,8 +512,6 @@ public class WorldPanelPlus : MonoBehaviour
                         }
                     }
                     break;
-
-                    // Nếu sau này bật edge handles, bổ sung case tương tự.
             }
         }
     }
@@ -645,14 +533,24 @@ public class WorldPanelPlus : MonoBehaviour
         if (forceTrayHidden) SetHintsActive(false);
 
         bool showMarkers = generateHandleSpheres && !forceTrayHidden && _trayAlpha > 0.02f;
+        EnsureHandleSpheresAttached();
+
         if (handlesParent)
         {
             foreach (Transform t in handlesParent)
             {
+                var h = t.GetComponent<WorldPanelPlusHandle>();
+                if (!h) continue;
+
                 var mk = t.GetComponent<WorldPanelPlusHandleSphere>();
-                if (mk) mk.SetVisible(showMarkers);
+                if (mk)
+                {
+                    bool allowThis = markerIncludeCenter || h.type != WPHandleType.Center;
+                    mk.SetVisible(showMarkers && allowThis);
+                }
             }
         }
+
         LateUpdate();
     }
 
@@ -685,19 +583,17 @@ public class WorldPanelPlus : MonoBehaviour
     {
         if (forceTrayHidden) return;
         _wantHover = on;
-        SetHintsActive(false); // luôn off trừ khi generateHints bật và bạn tự show
+        SetHintsActive(false);
     }
 
     void UpdateBoardShaderProperties()
     {
         if (_panelMat != null)
         {
-            // màu/alpha Board theo panelTint & boardAlpha
             var tint = panelTint; tint.a = boardVisible ? Mathf.Clamp01(boardAlpha) : 0f;
             if (_panelMat.HasProperty("_Color")) _panelMat.SetColor("_Color", tint);
             else _panelMat.color = tint;
 
-            // Chỉ set tham số mờ rìa khi đang dùng shader có mờ rìa
             if (useBoardEdgeFeather && _panelMat.shader != null && _panelMat.shader.name == "Unlit/WorldPanelBoard")
             {
                 if (_panelMat.HasProperty("_PanelSize"))
@@ -708,67 +604,15 @@ public class WorldPanelPlus : MonoBehaviour
                     _panelMat.SetFloat("_EdgeFeather", 0.003f);
             }
 
-            if (_panelMat.HasProperty("_Surface")) _panelMat.SetFloat("_Surface", 1f); // Transparent (URP)
+            if (_panelMat.HasProperty("_Surface")) _panelMat.SetFloat("_Surface", 1f);
             _panelMat.renderQueue = 3000;
         }
     }
 
-    // === NO-ROLL helpers ===
     public void EnforceNoRoll()
     {
         var f = transform.forward;
         if (f.sqrMagnitude < 1e-6f) return;
-        transform.rotation = Quaternion.LookRotation(f, Vector3.up); // z=0
-    }
-    static Quaternion NoRollOf(Quaternion q)
-    {
-        var f = q * Vector3.forward;
-        if (f.sqrMagnitude < 1e-6f) return q;
-        return Quaternion.LookRotation(f, Vector3.up); // z=0
-    }
-
-    // === Xoay giữ Dock đứng yên + bảo toàn gap Y giữa Tray và Dock ===
-    void ApplyAccumulatedRotationStable()
-    {
-        var cam = Camera.main;
-        var dock = this.dock;
-        Vector3 pivot = dock ? dock.transform.position : transform.position;
-
-        // Lưu gap Y hiện tại để phục hồi sau xoay
-        float gapY0 = 0f;
-        if (dock)
-        {
-            float trayBottom = GetTrayBottomYWorld(cam);
-            float dockTop = dock.transform.TransformPoint(0, dock.GetBackplateHeight() * 0.5f, 0).y;
-            gapY0 = trayBottom - dockTop;
-        }
-
-        // Tính rotation mới theo yaw/pitch accum trên basis
-        Quaternion q = Quaternion.AngleAxis(yawAccum, _rotBasis * Vector3.up)
-                     * Quaternion.AngleAxis(pitchAccum, _rotBasis * Vector3.right)
-                     * _rotBasis;
-        q = NoRollOf(q); // chặn roll tuyệt đối
-
-        // Quay panel quanh pivot (Dock) thay vì quanh tâm panel
-        Quaternion delta = q * Quaternion.Inverse(transform.rotation);
-        Vector3 r = transform.position - pivot;
-        transform.position = pivot + delta * r;
-        transform.rotation = q;
-
-        // Giữ Dock đứng yên đúng worldPos pivot và phục hồi gap Y
-        if (dock)
-        {
-            dock.AnchorToWorld(pivot, cam);
-            float trayBottom = GetTrayBottomYWorld(cam);
-            float dockTop = dock.transform.TransformPoint(0, dock.GetBackplateHeight() * 0.5f, 0).y;
-            float dY = gapY0 - (trayBottom - dockTop);
-            if (Mathf.Abs(dY) > 1e-6f)
-            {
-                transform.position += Vector3.up * dY;
-                dock.AnchorToWorld(pivot, cam);
-            }
-        }
-
-        UpdateTrayScaleAndMaterial();
+        transform.rotation = Quaternion.LookRotation(f, Vector3.up);
     }
 }
