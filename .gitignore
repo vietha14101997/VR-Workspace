@@ -1,3 +1,5 @@
 *.meta
 *.unity
 *.prefab
+Scenes/MainScene.unity
+/Scenes
