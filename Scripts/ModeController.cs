@@ -1,4 +1,6 @@
 using UnityEngine;
+using System.Collections;
+
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -7,97 +9,106 @@ public enum ViewMode { VirtualSpace, RealWorld }
 
 public class ModeController : MonoBehaviour
 {
-    public Camera backgroundReal;     // BackgroundCamera_Real
-    public Camera backgroundVirtual;  // BackgroundCamera_Virtual
-    public CameraPassthrough cameraPassthrough; // Script trên PassthroughQuad
-    public GameObject virtualEnvironment; // Virtual environment objects
-    public float transitionDuration = 0.5f;
+    [Header("Cameras")]
+    public Camera backgroundReal;          // Base (Culling: Passthrough) — LUÔN BẬT
+    public Camera backgroundVirtual;       // Overlay (Culling: VirtualEnvironment)
 
-    private bool isTransitioning;
-    private Coroutine transitionCoroutine;
+    [Header("Passthrough")]
+    public CameraPassthrough cameraPassthrough; // gắn trên PassthroughQuad (con của backgroundReal)
 
+    [Header("Scene Roots (optional)")]
+    public GameObject virtualEnvironment;  // tắt/bật mesh môi trường nếu muốn tiết kiệm
+
+    [Header("Transition (optional)")]
+    public CanvasGroup fadeCanvas;         // UI full-screen đen (alpha 0..1). Có thể để trống
+    public float transitionDuration = 0.25f;
+
+    [Header("State")]
     public ViewMode mode = ViewMode.VirtualSpace;
+
+    bool _isTransitioning;
+    Coroutine _co;
 
     void Start()
     {
-        // Validate required references
-        if (backgroundReal == null || backgroundVirtual == null)
-        {
-            Debug.LogError("Background cameras not set in ModeController!");
-            return;
-        }
+        // Kiểm tra nhưng KHÔNG dừng hẳn—để bạn có thể chạy 1 chế độ tối thiểu
+        if (!backgroundReal) Debug.LogError("ModeController: backgroundReal (Base) is not set.");
+        if (!backgroundVirtual) Debug.LogError("ModeController: backgroundVirtual (Overlay) is not set.");
+        if (!cameraPassthrough) Debug.LogWarning("ModeController: cameraPassthrough not set (RealWorld mode will be blank).");
 
-        if (cameraPassthrough == null)
-        {
-            Debug.LogError("CameraPassthrough reference not set in ModeController!");
-            return;
-        }
+        // Base luôn bật để giữ stack ổn định
+        if (backgroundReal) backgroundReal.enabled = true;
 
-        Apply();
+        // Áp dụng trạng thái ban đầu không cần fade
+        ApplyImmediate(mode);
     }
 
     public void ToggleMode()
     {
-        mode = (mode == ViewMode.VirtualSpace) ? ViewMode.RealWorld : ViewMode.VirtualSpace;
-        Apply();
+        SetMode(mode == ViewMode.VirtualSpace ? ViewMode.RealWorld : ViewMode.VirtualSpace);
     }
 
-    System.Collections.IEnumerator TransitionRoutine(bool toRealWorld)
+    public void SetMode(ViewMode newMode)
     {
-        if (isTransitioning) yield break;
-        isTransitioning = true;
+        if (mode == newMode) return;
+        mode = newMode;
 
-        float startTime = Time.time;
-        bool real = (mode == ViewMode.RealWorld);
+        if (_co != null) StopCoroutine(_co);
+        _co = StartCoroutine(TransitionRoutine(mode));
+    }
 
-        // Enable necessary cameras for transition
-        if (real)
+    IEnumerator TransitionRoutine(ViewMode targetMode)
+    {
+        if (_isTransitioning) yield break;
+        _isTransitioning = true;
+
+        // Fade out
+        if (fadeCanvas)
         {
-            backgroundReal.enabled = true;
-            cameraPassthrough.enabled = true;
-            yield return new WaitForEndOfFrame(); // Wait for camera to initialize
-        }
-
-        // Animate transition
-        while (Time.time - startTime < transitionDuration)
-        {
-            float t = (Time.time - startTime) / transitionDuration;
-
-            // Apply smoothstep for more natural easing
-            t = t * t * (3f - 2f * t); // Smoothstep formula
-
-            // Fade virtual environment opacity if needed
-            if (virtualEnvironment)
+            float t = 0f;
+            while (t < transitionDuration)
             {
-                // You can add fade effect here if needed
+                t += Time.unscaledDeltaTime;
+                fadeCanvas.alpha = Mathf.Clamp01(t / transitionDuration);
+                yield return null;
             }
-
-            yield return null;
+            fadeCanvas.alpha = 1f;
         }
 
-        // Set final states
-        if (real)
+        // Chuyển trạng thái NGAY LÚC NÀY (Base vẫn bật)
+        ApplyImmediate(targetMode);
+
+        // Fade in
+        if (fadeCanvas)
         {
-            backgroundVirtual.enabled = false;
-            if (virtualEnvironment) virtualEnvironment.SetActive(false);
-        }
-        else
-        {
-            backgroundReal.enabled = false;
-            cameraPassthrough.enabled = false;
-            backgroundVirtual.enabled = true;
-            if (virtualEnvironment) virtualEnvironment.SetActive(true);
+            float t = 0f;
+            while (t < transitionDuration)
+            {
+                t += Time.unscaledDeltaTime;
+                fadeCanvas.alpha = 1f - Mathf.Clamp01(t / transitionDuration);
+                yield return null;
+            }
+            fadeCanvas.alpha = 0f;
         }
 
-        isTransitioning = false;
+        _isTransitioning = false;
+        _co = null;
     }
 
-    void Apply()
+    void ApplyImmediate(ViewMode m)
     {
-        if (transitionCoroutine != null)
-            StopCoroutine(transitionCoroutine);
+        bool toVirtual = (m == ViewMode.VirtualSpace);
 
-        bool toRealWorld = (mode == ViewMode.RealWorld);
-        transitionCoroutine = StartCoroutine(TransitionRoutine(toRealWorld));
+        // Base luôn bật
+        if (backgroundReal) backgroundReal.enabled = true;
+
+        // Toggle Overlay Virtual
+        if (backgroundVirtual) backgroundVirtual.enabled = toVirtual;
+
+        // Toggle Passthrough (script chạy trên quad thuộc Base)
+        if (cameraPassthrough) cameraPassthrough.enabled = !toVirtual;
+
+        // Tùy chọn tắt/bật mesh môi trường
+        if (virtualEnvironment) virtualEnvironment.SetActive(toVirtual);
     }
 }

@@ -1,189 +1,133 @@
 using UnityEngine;
 using UnityEngine.Android;
-using System.Collections;
-using System.Collections.Generic;
 
 [RequireComponent(typeof(MeshRenderer))]
 public class CameraPassthrough : MonoBehaviour
 {
-    public Camera cam;           // kéo Main Camera vào
-    public float distance = -1f; // -1 = tự đặt gần far clip
-    public int requestedFPS = 30;
+    [Header("References")]
+    public Camera cam;                 // Kéo BackgroundCamera_Real vào
+    [Header("Placement")]
+    public float distance = -1f;       // -1 = tự đặt gần far clip
+    [Header("Webcam")]
+    public int requestedFPS = 60;
+    public int requestedWidth = 1366;
+    public int requestedHeight = 768;
+    public int deviceIndex = 0;        // 0 = camera mặc định
 
-    WebCamTexture _tex;
     MeshRenderer _mr;
+    WebCamTexture _tex;
 
-    void Awake() { _mr = GetComponent<MeshRenderer>(); if (!cam) cam = GetComponentInParent<Camera>(); }
+    void Awake()
+    {
+        _mr = GetComponent<MeshRenderer>();
+        if (!cam) cam = GetComponentInParent<Camera>();
+    }
+
     void OnEnable() { StartCam(); }
     void OnDisable() { StopCam(); }
 
     void LateUpdate()
     {
         if (!cam) return;
+
+        // Đặt quad trước camera ở khoảng cách d
         float d = (distance > 0f) ? distance : (cam.farClipPlane - 1f);
         float h = 2f * d * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
         float w = h * cam.aspect;
 
-        // aspect “cover” để không méo + xử lý xoay/mirror
+        // Tính aspect “cover” cho texture
         float texAspect = 1f;
         if (_tex != null && _tex.width > 16 && _tex.height > 16)
         {
-            bool rot90 = (_tex.videoRotationAngle % 180) != 0;
-            texAspect = rot90 ? (float)_tex.height / _tex.width : (float)_tex.width / _tex.height;
+            bool rot90 = (_tex.videoRotationAngle == 90 || _tex.videoRotationAngle == 270);
+            int tw = rot90 ? _tex.height : _tex.width;
+            int th = rot90 ? _tex.width : _tex.height;
+            texAspect = (th > 0) ? (tw / (float)th) : 1f;
         }
-        float frustumAspect = w / h;
-        float targetW, targetH;
-        if (texAspect > frustumAspect) { targetH = h; targetW = targetH * texAspect; }
-        else { targetW = w; targetH = targetW / texAspect; }
 
-        float xFlip = (_tex != null && _tex.videoVerticallyMirrored) ? -1f : 1f;
-        float zRot = (_tex != null) ? -_tex.videoRotationAngle : 0f;
+        // Scale để hình che kín khung nhìn camera (cover)
+        float targetW = w;
+        float targetH = w / texAspect;
+        if (targetH < h)
+        {
+            targetH = h;
+            targetW = h * texAspect;
+        }
 
-        transform.localPosition = new Vector3(0, 0, d);
-        transform.localRotation = Quaternion.Euler(0, 0, zRot);
+        // Xử lý mirror + rotation theo WebCamTexture
+        float xFlip = 1f;
+        float zRot = 0f;
+        if (_tex != null)
+        {
+            if (_tex.videoVerticallyMirrored) xFlip = -1f;
+            zRot = -_tex.videoRotationAngle; // WebCamTexture quay ngược chiều kim đồng hồ
+        }
+
+        transform.localPosition = new Vector3(0f, 0f, d);
+        transform.localRotation = Quaternion.Euler(0f, 0f, zRot);
         transform.localScale = new Vector3(targetW * xFlip, targetH, 1f);
     }
 
-    void StartCam()
+    // ============== Webcam lifetime ==============
+
+    public void StartCam()
     {
-        Debug.Log("Starting camera passthrough");
-        
 #if UNITY_ANDROID && !UNITY_EDITOR
         if (!Permission.HasUserAuthorizedPermission(Permission.Camera))
         {
-            Debug.Log("Requesting camera permission");
             Permission.RequestUserPermission(Permission.Camera);
+            // Không block chờ permission; OnEnable sẽ được gọi lại khi script bật
         }
 #endif
-        var devs = WebCamTexture.devices;
-        if (devs.Length == 0) 
-        { 
-            Debug.LogWarning("No camera devices found"); 
-            return; 
-        }
-        
-        Debug.Log("Found " + devs.Length + " camera devices");
-        for (int i = 0; i < devs.Length; i++)
-        {
-            Debug.Log("Camera " + i + ": " + devs[i].name + " (front facing: " + devs[i].isFrontFacing + ")");
-        }
-
-        // ưu tiên camera sau
-        int idx = 0; 
-        for (int i = 0; i < devs.Length; i++) 
-        {
-            if (!devs[i].isFrontFacing) 
-            { 
-                idx = i; 
-                Debug.Log("Selected back camera: " + devs[i].name);
-                break; 
-            }
-        }
-
-        // Ensure we have a valid material renderer
-        if (_mr == null)
-        {
-            _mr = GetComponent<MeshRenderer>();
-            if (_mr == null)
-            {
-                Debug.LogError("No MeshRenderer found on CameraPassthrough object");
-                return;
-            }
-        }
-
-        // Ensure we have a valid material
-        if (_mr.material == null)
-        {
-            Debug.LogError("No material found on MeshRenderer");
-            // Create a default material if none exists
-            _mr.material = new Material(Shader.Find("Unlit/Texture"));
-        }
-
-        // Create and start the webcam texture with higher resolution
-        _tex = new WebCamTexture(devs[idx].name, 1280, 720, requestedFPS);
-        
-        // Set the texture and ensure it's properly configured
-        _mr.material.mainTexture = _tex;
-        _mr.material.renderQueue = 1000; // Ensure it renders before other objects but after background
-        _mr.material.SetFloat("_Glossiness", 0f); // Reduce any potential glossiness
-        _mr.material.SetFloat("_Metallic", 0f); // Reduce any potential metallic effect
-        
-        // Ensure the material is not culled and is visible from both sides
-        _mr.material.SetInt("_Cull", 0); // 0 = Off (double-sided)
-        
-        Debug.Log("Starting webcam texture: " + devs[idx].name + " at 1280x720");
-        _tex.Play();
-        
-        // Wait a few frames to ensure the texture is initialized
-        StartCoroutine(EnsureTextureStarted());
-    }
-
-    void StopCam()
-    {
-        Debug.Log("Stopping camera passthrough");
-        if (_tex != null) 
-        { 
-            if (_tex.isPlaying) 
-            {
-                Debug.Log("Stopping webcam texture");
-                _tex.Stop(); 
-            }
-            
-            Debug.Log("Destroying webcam texture");
-            Destroy(_tex); 
-            _tex = null; 
-            
-            // Clear the texture reference in the material
-            if (_mr != null && _mr.material != null)
-            {
-                _mr.material.mainTexture = null;
-            }
-        }
-    }
-    
-    IEnumerator EnsureTextureStarted()
-    {
-        // Wait for a few frames to ensure the texture is properly initialized
-        for (int i = 0; i < 5; i++)
-        {
-            yield return new WaitForEndOfFrame();
-        }
-        
-        // Check if texture is valid and playing
         if (_tex != null)
         {
-            if (!_tex.isPlaying)
-            {
-                Debug.Log("Restarting webcam texture as it was not playing");
-                _tex.Play();
-            }
-            
-            // Wait for texture to be ready
-            int attempts = 0;
-            while (!_tex.didUpdateThisFrame && attempts < 30)
-            {
-                yield return new WaitForEndOfFrame();
-                attempts++;
-            }
-            
-            if (attempts >= 30)
-            {
-                Debug.LogWarning("Webcam texture did not initialize properly after 30 frames");
-            }
-            else
-            {
-                Debug.Log("Webcam texture initialized successfully after " + attempts + " frames");
-                
-                // Force material update
-                if (_mr != null && _mr.material != null)
-                {
-                    // Ensure the texture is properly set
-                    _mr.material.mainTexture = _tex;
-                    
-                    // Force material to update
-                    _mr.material.SetFloat("_UpdateFlag", Time.time);
-                }
-            }
+            if (!_tex.isPlaying) _tex.Play();
+            ApplyTextureToMaterial();
+            return;
+        }
+
+        // Tạo vật liệu URP Unlit nếu chưa có
+        if (_mr.material == null || _mr.material.shader == null ||
+            _mr.material.shader.name.Contains("Standard"))
+        {
+            var sh = Shader.Find("Universal Render Pipeline/Unlit");
+            _mr.material = new Material(sh);
+        }
+
+        var devs = WebCamTexture.devices;
+        string devName = (devs != null && devs.Length > 0)
+            ? devs[Mathf.Clamp(deviceIndex, 0, devs.Length - 1)].name
+            : null;
+
+        _tex = (devName != null)
+            ? new WebCamTexture(devName, requestedWidth, requestedHeight, requestedFPS)
+            : new WebCamTexture(requestedWidth, requestedHeight, requestedFPS);
+
+        _tex.filterMode = FilterMode.Bilinear;
+        _tex.wrapMode = TextureWrapMode.Clamp;
+        _tex.Play();
+
+        ApplyTextureToMaterial();
+    }
+
+    public void StopCam()
+    {
+        if (_tex != null)
+        {
+            if (_tex.isPlaying) _tex.Stop();
+            if (_mr != null && _mr.material != null) _mr.material.mainTexture = null;
+            Destroy(_tex);
+            _tex = null;
+        }
+    }
+
+    void ApplyTextureToMaterial()
+    {
+        if (_mr != null && _mr.material != null)
+        {
+            _mr.material.mainTexture = _tex;
+            // Nếu shader có _Cull, tắt cull để nhìn cả 2 mặt khi cần
+            if (_mr.material.HasProperty("_Cull")) _mr.material.SetInt("_Cull", 0);
         }
     }
 }
