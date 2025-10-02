@@ -49,8 +49,8 @@ public class WorldPanelPlus : MonoBehaviour
     [HideInInspector] public Vector3? moveAnchorWorld = null;
 
     [Header("Panel (content) size, meters")]
-    public float width = 1.2f;
-    public float height = 0.72f;
+    public float width = 1.366f;
+    public float height = 0.768f;
 
     [Header("Tray visuals")]
     public float trayPadding = 0.045f;
