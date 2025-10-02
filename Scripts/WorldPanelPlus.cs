@@ -56,7 +56,7 @@ public class WorldPanelPlus : MonoBehaviour
     public float trayPadding = 0.045f;
     public float trayHoverExtra = 0.035f;
     public float trayBehind = 0.02f;
-    public float trayCornerRadius = 0.06f;
+    public float trayCornerRadius = 0.02f;
     public float trayBorder = 0.004f;
     public Color trayFill = new Color(0.2f, 0.2f, 0.2f, 0.25f);
     public Color trayBorderColor = new Color(1, 1, 1, 0.85f);

@@ -14,8 +14,8 @@ Shader "Unlit/WorldPanelBoard"
         _EdgeMinAlpha  ("Edge Min Alpha", Range(0,1)) = 0 // 0.40
 
         // NEW: Bo góc (theo mét) + feather của mép
-        _CornerRadius  ("Corner Radius (m)", Float) = 0.06
-        _EdgeFeather   ("Edge Feather (m)", Float) = 0.003
+        _CornerRadius  ("Corner Radius (m)", Float) = 0.03
+        _EdgeFeather   ("Edge Feather (m)", Float) = 0.001
     }
 
     SubShader

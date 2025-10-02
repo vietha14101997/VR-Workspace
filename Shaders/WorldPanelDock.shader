@@ -5,9 +5,9 @@ Shader "Unlit/WorldPanelDock"
         _FillColor   ("Fill Color", Color) = (0,0,0,0.22)
         _BorderColor ("Border Color", Color) = (1,1,1,0.35)
         _RectWH      ("Rect Size (W,H)", Vector) = (1,1,0,0)
-        _Radius      ("Corner Radius (units)", Float) = 0.06
+        _Radius      ("Corner Radius (units)", Float) = 0.03
         _Border      ("Border Thickness (units)", Float) = 0.004
-        _Feather     ("Edge Feather (units)", Float) = 0.006
+        _Feather     ("Edge Feather (units)", Float) = 0.003
     }
     SubShader
     {
