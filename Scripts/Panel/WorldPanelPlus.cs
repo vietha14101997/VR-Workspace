@@ -92,6 +92,13 @@ public class WorldPanelPlus : MonoBehaviour
     public WorldPanelPlus neighborUp;
     public WorldPanelPlus neighborDown;
 
+    static Texture GetSafeTex(Texture t) => t ? t : Texture2D.blackTexture;
+
+    void EnsureDefaultContentTexture()
+    {
+        if (contentTexture == null) contentTexture = Texture2D.blackTexture;
+    }
+
     // gọi khi panel này sắp nhận con trỏ từ panel khác
     public void CursorFocusStealFrom(WorldPanelPlus fromPanel, float startU01, float startV01)
     {
@@ -185,10 +192,10 @@ public class WorldPanelPlus : MonoBehaviour
         float newU = active.cursor.u + du;
         float newV = active.cursor.v + dv;
 
-        bool goLeft  = newU < 0f;
+        bool goLeft = newU < 0f;
         bool goRight = newU > 1f;
-        bool goDown  = newV < 0f;
-        bool goUp    = newV > 1f;
+        bool goDown = newV < 0f;
+        bool goUp = newV > 1f;
 
         // Nếu chưa vượt biên: cập nhật bình thường
         if (!goLeft && !goRight && !goDown && !goUp)
@@ -204,16 +211,16 @@ public class WorldPanelPlus : MonoBehaviour
         // Thử theo trục lớn hơn trước
         if (overX >= overY)
         {
-            if (goLeft  && SwitchNeighbor(ref active, active.neighborLeft,  1f + newU, Mathf.Clamp01(newV))) return;
+            if (goLeft && SwitchNeighbor(ref active, active.neighborLeft, 1f + newU, Mathf.Clamp01(newV))) return;
             if (goRight && SwitchNeighbor(ref active, active.neighborRight, newU - 1f, Mathf.Clamp01(newV))) return;
-            if (goDown  && SwitchNeighbor(ref active, active.neighborDown,  Mathf.Clamp01(newU), 1f + newV)) return;
-            if (goUp    && SwitchNeighbor(ref active, active.neighborUp,    Mathf.Clamp01(newU), newV - 1f)) return;
+            if (goDown && SwitchNeighbor(ref active, active.neighborDown, Mathf.Clamp01(newU), 1f + newV)) return;
+            if (goUp && SwitchNeighbor(ref active, active.neighborUp, Mathf.Clamp01(newU), newV - 1f)) return;
         }
         else
         {
-            if (goDown  && SwitchNeighbor(ref active, active.neighborDown,  Mathf.Clamp01(newU), 1f + newV)) return;
-            if (goUp    && SwitchNeighbor(ref active, active.neighborUp,    Mathf.Clamp01(newU), newV - 1f)) return;
-            if (goLeft  && SwitchNeighbor(ref active, active.neighborLeft,  1f + newU, Mathf.Clamp01(newV))) return;
+            if (goDown && SwitchNeighbor(ref active, active.neighborDown, Mathf.Clamp01(newU), 1f + newV)) return;
+            if (goUp && SwitchNeighbor(ref active, active.neighborUp, Mathf.Clamp01(newU), newV - 1f)) return;
+            if (goLeft && SwitchNeighbor(ref active, active.neighborLeft, 1f + newU, Mathf.Clamp01(newV))) return;
             if (goRight && SwitchNeighbor(ref active, active.neighborRight, newU - 1f, Mathf.Clamp01(newV))) return;
         }
 
@@ -238,7 +245,7 @@ public class WorldPanelPlus : MonoBehaviour
     }
 
     public void CursorClickDown() { if (cursor && cursor.visible) cursor.ClickDown(); }
-    public void CursorClickUp()   { if (cursor && cursor.visible) cursor.ClickUp(); }
+    public void CursorClickUp() { if (cursor && cursor.visible) cursor.ClickUp(); }
 
     private Material GetPanelMaterial()
     {
@@ -311,6 +318,7 @@ public class WorldPanelPlus : MonoBehaviour
     [ContextMenu("Rebuild")]
     public void Rebuild()
     {
+        EnsureDefaultContentTexture();
         var kill = new List<GameObject>();
         foreach (Transform c in transform) kill.Add(c.gameObject);
         foreach (var go in kill) { if (Application.isEditor) DestroyImmediate(go); else Destroy(go); }
@@ -322,7 +330,7 @@ public class WorldPanelPlus : MonoBehaviour
         board.localScale = new Vector3(width, height, 1);
         var mrBoard = board.GetComponent<MeshRenderer>();
         mrBoard.sharedMaterial = _panelMat;
-        mrBoard.sharedMaterial.mainTexture = contentTexture;
+        mrBoard.sharedMaterial.mainTexture = GetSafeTex(contentTexture);
         mrBoard.enabled = boardVisible;
         ApplyBoardTint(mrBoard);
 
@@ -527,6 +535,8 @@ public class WorldPanelPlus : MonoBehaviour
 
     public void Apply()
     {
+        EnsureDefaultContentTexture();
+        ApplyBoardTint(board.GetComponent<MeshRenderer>());
         if (!board || !tray) return;
 
         EnsureMaterials();
@@ -552,7 +562,7 @@ public class WorldPanelPlus : MonoBehaviour
                 if (mr.sharedMaterial != mat) mr.sharedMaterial = mat;
                 if (mr.sharedMaterial != null)
                 {
-                    mr.sharedMaterial.mainTexture = contentTexture;
+                    mr.sharedMaterial.mainTexture = GetSafeTex(contentTexture);
                     mr.enabled = boardVisible;
                     ApplyBoardTint(mr);
                 }
@@ -589,13 +599,32 @@ public class WorldPanelPlus : MonoBehaviour
     void ApplyBoardTint(MeshRenderer mr)
     {
         if (!mr) return;
-        var tint = panelTint; tint.a = boardVisible ? Mathf.Clamp01(boardAlpha) : 0f;
-        if (mr.sharedMaterial.HasProperty("_Color"))
-            mr.sharedMaterial.SetColor("_Color", tint);
-        else
-            mr.sharedMaterial.color = tint;
-        mr.sharedMaterial.mainTexture = contentTexture;
-        mr.sortingOrder = 0;
+
+        // Chọn shader: Opaque nếu alpha~1, Transparent nếu <1
+        var shOpaque = Shader.Find("Unlit/Texture");
+        var shTrans = Shader.Find("Unlit/Transparent");
+
+        float a = Mathf.Clamp01(boardAlpha);       // alpha global của board
+        bool opaque = a >= 0.999f;
+
+        var mat = mr.sharedMaterial;
+        if (!mat)
+            mat = mr.sharedMaterial = new Material(opaque ? shOpaque : shTrans);
+        else if (mat.shader != (opaque ? shOpaque : shTrans))
+            mat.shader = (opaque ? shOpaque : shTrans);
+
+        // Texture luôn hợp lệ (UnityBlack nếu None)
+        mat.mainTexture = GetSafeTex(contentTexture);
+
+        // Màu tint: dùng panelTint nhưng ép alpha = boardAlpha
+        var c = panelTint;
+        c.a = a;
+        if (mat.HasProperty("_Color")) mat.SetColor("_Color", c);
+
+        // Các tuỳ chọn thêm (an toàn)
+        mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        mr.receiveShadows = false;
+        // renderQueue để mặc định theo shader (Opaque/Transparent) là đủ
     }
 
     void UpdateHandlesLayout()
@@ -678,6 +707,21 @@ public class WorldPanelPlus : MonoBehaviour
                     break;
             }
         }
+    }
+
+    public void SetHandlesCenterOnly(bool centerOnly)
+    {
+        if (!handlesParent) return;
+        var hs = handlesParent.GetComponentsInChildren<WorldPanelPlusHandle>(true);
+        foreach (var h in hs)
+        {
+            // Nếu enum của bạn khác tên, chỉ cần sửa điều kiện dưới
+            bool isCenter = (h.type == WPHandleType.Center);
+            h.gameObject.SetActive(centerOnly ? isCenter : true);
+        }
+
+        // Nếu có Hint/hover riêng cho các góc/cạnh, có thể ẩn luôn:
+        if (hintsParent) hintsParent.gameObject.SetActive(!centerOnly);
     }
 
     void Update()

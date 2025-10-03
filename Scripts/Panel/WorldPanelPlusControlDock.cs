@@ -80,7 +80,7 @@ public class WorldPanelPlusControlDock : MonoBehaviour
         Vector3 pos = baseWorld + zOffset;
         float trayBottomY = panel.GetTrayBottomYWorld(cam);
         float dockTopY = GetDockTopYWorldAt(pos);
-        float deltaY = (trayBottomY - dockTopY) - _targetGapY;
+        float deltaY = trayBottomY - dockTopY - _targetGapY;
         pos.y += deltaY;
         transform.position = pos;
     }
@@ -179,7 +179,8 @@ public class WorldPanelPlusControlDock : MonoBehaviour
         _backplate.localPosition = Vector3.zero;
         var mf = _backplate.gameObject.AddComponent<MeshFilter>(); mf.sharedMesh = BuildUnitQuad();
         var mr = _backplate.gameObject.AddComponent<MeshRenderer>();
-        var dockShader = Shader.Find("Unlit/WorldPanelDock"); dockShader ??= Shader.Find("Unlit/Transparent");
+        var dockShader = Shader.Find("Unlit/WorldPanelDock");
+        dockShader ??= Shader.Find("Unlit/Transparent");
         var mat = new Material(dockShader); mr.sharedMaterial = mat;
         _backplate.localScale = new Vector3(expandedW, expandedH, 1f);
         if (mat.HasProperty("_FillColor")) mat.SetColor("_FillColor", new Color(0,0,0,0));
@@ -198,27 +199,37 @@ public class WorldPanelPlusControlDock : MonoBehaviour
             go.transform.SetParent(_neutralRoot, false);
             go.transform.localPosition = new Vector3(0, 0f, 0.01f);
             var btn = go.AddComponent<WorldPanelPlusDockButton>();
-            btn.panel = panel; btn.type = types[i];
+            btn.panel = panel;
+            btn.type = types[i];
             _toggleBtnTr = go.transform; // chính là nút minimize
             var bc = go.AddComponent<BoxCollider>();
             SetColliderWorldSize(bc, new Vector3(buttonSize.x, buttonSize.y, 0.02f), 0.01f);
 
             var icon = GameObject.CreatePrimitive(PrimitiveType.Quad);
-            icon.name = "Icon"; icon.transform.SetParent(go.transform, false);
+            icon.name = "Icon";
+            icon.transform.SetParent(go.transform, false);
             float iconSize = Mathf.Min(buttonSize.x, buttonSize.y);
             icon.transform.localScale = new Vector3(iconSize, iconSize, 1);
             icon.transform.localPosition = new Vector3(0, 0, 0.0015f);
             DestroyImmediate(icon.GetComponent<Collider>());
             var iconMr = icon.GetComponent<MeshRenderer>();
             // dùng chung icon minimize trong Resources nếu có, hoặc để màu trắng nếu thiếu
-            var shader = Shader.Find("Unlit/Transparent"); if (shader == null) shader = Shader.Find("Unlit/Texture");
-            var iconMat = new Material(shader); iconMat.color = Color.white; iconMr.sharedMaterial = iconMat;
+            var shader = Shader.Find("Unlit/Transparent");
+            if (shader == null) shader = Shader.Find("Unlit/Texture");
+            var iconMat = new Material(shader);
+            iconMat.color = Color.white;
+            iconMr.sharedMaterial = iconMat;
             _buttons.Add(btn);
         }
 
-        ComputeLocalOffset(); EnsurePose(); PlaceDockImmediate();
+        ComputeLocalOffset();
+        EnsurePose();
+        PlaceDockImmediate();
         _targetGapY = MeasureCurrentGapY();
-        CaptureExpandedLayout(); ApplyMinimizeVisualState(); ResizeBackplateToActiveButtons(bleed); CenterButtonsVertically();
+        CaptureExpandedLayout();
+        ApplyMinimizeVisualState();
+        ResizeBackplateToActiveButtons(bleed);
+        CenterButtonsVertically();
         PurgeUnknownBackgrounds();
     }
 
@@ -234,7 +245,7 @@ public class WorldPanelPlusControlDock : MonoBehaviour
         foreach (var b in _buttons)
         {
             if (!b) continue;
-            bool isToggle = (_toggleBtnTr && b.transform == _toggleBtnTr);
+            bool isToggle = _toggleBtnTr && b.transform == _toggleBtnTr;
             bool show = !_minimized || isToggle;
             b.gameObject.SetActive(show);
             foreach (var r in b.GetComponentsInChildren<Renderer>(true)) if (r) r.enabled = show;
@@ -276,8 +287,8 @@ public class WorldPanelPlusControlDock : MonoBehaviour
     void ComputeLocalOffset()
     {
         if (!panel) return;
-        float below = (panel.height * 0.5f + panel.trayPadding + panel.trayHoverExtra);
-        float halfDock = (_backplate ? _backplate.localScale.y * 0.5f : 0f);
+        float below = panel.height * 0.5f + panel.trayPadding + panel.trayHoverExtra;
+        float halfDock = _backplate ? _backplate.localScale.y * 0.5f : 0f;
         float margin = 0.01f;
         _offsetLocalNoZ = new Vector3(0, -(below + halfDock + margin), 0);
     }
