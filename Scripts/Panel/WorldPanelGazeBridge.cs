@@ -21,7 +21,7 @@ public class WorldPanelGazeBridge : MonoBehaviour
     [Header("Focus dwell (đổi panel)")]
     public float focusDwellSeconds = 1.0f;            // dwell để đổi focus panel
     [Range(1f, 15f)] public float focusDwellMaxAngle = 8f;     // dung sai rung cho Android
-    [Range(0f, 1f)]  public float focusDwellSmoothing = 0.25f; // low-pass 0..1
+    [Range(0f, 1f)] public float focusDwellSmoothing = 0.25f; // low-pass 0..1
 
     [Header("Thoát khi giữ yên (đang kéo)")]
     public float exitAfterSeconds = 2f;
@@ -93,7 +93,7 @@ public class WorldPanelGazeBridge : MonoBehaviour
         {
             var h = hits[i];
             var handle = h.collider.GetComponent<WorldPanelPlusHandle>();
-            var board  = h.collider.GetComponent<WorldPanelPlusBoardRaycatcher>();
+            var board = h.collider.GetComponent<WorldPanelPlusBoardRaycatcher>();
             var hoverC = h.collider.GetComponent<WorldPanelPlusTrayRaycatcher>();
 
             if (handle)
@@ -171,19 +171,28 @@ public class WorldPanelGazeBridge : MonoBehaviour
         // ======= Input states
         bool pressed = IsPressed();
         bool down = pressed && !_prevPressed;
-        bool up   = !pressed && _prevPressed;
+        bool up = !pressed && _prevPressed;
         _prevPressed = pressed;
 
         // ======= Tap-to-focus (fallback tức thời)
         if (down && panelUnderGaze != null && panelUnderGaze != _focusedPanel)
         {
-            if (!warpPointValid && panelUnderGaze && panelUnderGaze.board)
-                warpPoint = panelUnderGaze.board.position; // fallback tâm Board
-            SetFocusTo(panelUnderGaze, warpPoint, eventCamera);
+            // Nếu cùng cụm → không đổi focus
+            if (WorldPanelPlus.InSameCluster(_focusedPanel, panelUnderGaze))
+            {
+                _focusCandidate = null;
+                _focusDwellTimer = 0f;
+            }
+            else
+            {
+                if (!warpPointValid && panelUnderGaze && panelUnderGaze.board)
+                    warpPoint = panelUnderGaze.board.position;
+                SetFocusTo(panelUnderGaze, warpPoint, eventCamera);
+            }
         }
 
         // ======= Focus bằng dwell (warp ONE-SHOT khi đổi panel)
-        if (panelUnderGaze != null && panelUnderGaze != _focusedPanel)
+        if (panelUnderGaze != null && panelUnderGaze != _focusedPanel && !WorldPanelPlus.InSameCluster(_focusedPanel, panelUnderGaze))
         {
             if (_focusCandidate != panelUnderGaze)
             {
@@ -258,10 +267,9 @@ public class WorldPanelGazeBridge : MonoBehaviour
         {
             var md = GetMouseDeltaUniversal();
             if (md.sqrMagnitude > 0.000001f)
-                _focusedPanel.CursorMoveByMouseDelta(md.x, md.y);
-
+                WorldPanelPlus.CursorMoveInCluster(ref _focusedPanel, md.x, md.y);
             if (down) _focusedPanel.CursorClickDown();
-            if (up)   _focusedPanel.CursorClickUp();
+            if (up) _focusedPanel.CursorClickUp();
         }
 
         // Đảm bảo cursor panel đã focus luôn bật (phòng case bị tắt bởi nhánh khác)

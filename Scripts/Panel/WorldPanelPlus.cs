@@ -86,6 +86,48 @@ public class WorldPanelPlus : MonoBehaviour
     [HideInInspector] public bool isResizing = false;
     [SerializeField, HideInInspector] private Material _fallbackPanelMat;
 
+    [Header("Cluster linking (optional)")]
+    public WorldPanelPlus neighborLeft;
+    public WorldPanelPlus neighborRight;
+    public WorldPanelPlus neighborUp;
+    public WorldPanelPlus neighborDown;
+
+    // gọi khi panel này sắp nhận con trỏ từ panel khác
+    public void CursorFocusStealFrom(WorldPanelPlus fromPanel, float startU01, float startV01)
+    {
+        EnsureCursor();
+        CursorFocusBegin(board.TransformPoint(new Vector3(startU01 - 0.5f, startV01 - 0.5f, 0)), Camera.main);
+    }
+
+    // Duyệt BFS qua các neighbor để kiểm tra 2 panel có cùng cụm không
+    public static bool InSameCluster(WorldPanelPlus a, WorldPanelPlus b, int maxHops = 32)
+    {
+        if (!a || !b) return false;
+        if (a == b) return true;
+
+        var visited = new HashSet<WorldPanelPlus>();
+        var q = new Queue<WorldPanelPlus>();
+        q.Enqueue(a); visited.Add(a);
+
+        int hops = 0;
+        while (q.Count > 0 && hops++ < maxHops)
+        {
+            var p = q.Dequeue();
+            if (!p) continue;
+            if (p == b) return true;
+
+            void Push(WorldPanelPlus n)
+            {
+                if (n != null && !visited.Contains(n)) { visited.Add(n); q.Enqueue(n); }
+            }
+            Push(p.neighborLeft);
+            Push(p.neighborRight);
+            Push(p.neighborUp);
+            Push(p.neighborDown);
+        }
+        return false;
+    }
+
     public void EnsureCursor()
     {
         if (!cursorEnable) { if (cursor) cursor.SetVisible(false); return; }
@@ -127,6 +169,72 @@ public class WorldPanelPlus : MonoBehaviour
         float signY = cursorInvertY ? -1f : 1f;
         float dv = dyPixel * cursorSpeedPerPixel * signY;
         cursor.NudgeUV(du, dv);
+    }
+
+    /// Di chuyển con trỏ bằng delta pixel, có hỗ trợ nhảy qua láng giềng trong cụm.
+    /// - active sẽ có thể bị đổi sang panel láng giềng (ref).
+    public static void CursorMoveInCluster(ref WorldPanelPlus active, float dxPixel, float dyPixel)
+    {
+        if (!active || !active.cursor || !active.cursor.visible) return;
+
+        float du = dxPixel * active.cursorSpeedPerPixel;
+        float signY = active.cursorInvertY ? -1f : 1f;
+        float dv = dyPixel * active.cursorSpeedPerPixel * signY;
+
+        // Giá trị mới (chưa clamp)
+        float newU = active.cursor.u + du;
+        float newV = active.cursor.v + dv;
+
+        bool goLeft  = newU < 0f;
+        bool goRight = newU > 1f;
+        bool goDown  = newV < 0f;
+        bool goUp    = newV > 1f;
+
+        // Nếu chưa vượt biên: cập nhật bình thường
+        if (!goLeft && !goRight && !goDown && !goUp)
+        {
+            active.cursor.SetUV(Mathf.Clamp01(newU), Mathf.Clamp01(newV));
+            return;
+        }
+
+        // Ưu tiên trục có overflow lớn hơn (tránh kẹt ở góc)
+        float overX = Mathf.Max(-newU, newU - 1f, 0f); // lượng vượt biên theo X (dương)
+        float overY = Mathf.Max(-newV, newV - 1f, 0f); // theo Y
+
+        // Thử theo trục lớn hơn trước
+        if (overX >= overY)
+        {
+            if (goLeft  && SwitchNeighbor(ref active, active.neighborLeft,  1f + newU, Mathf.Clamp01(newV))) return;
+            if (goRight && SwitchNeighbor(ref active, active.neighborRight, newU - 1f, Mathf.Clamp01(newV))) return;
+            if (goDown  && SwitchNeighbor(ref active, active.neighborDown,  Mathf.Clamp01(newU), 1f + newV)) return;
+            if (goUp    && SwitchNeighbor(ref active, active.neighborUp,    Mathf.Clamp01(newU), newV - 1f)) return;
+        }
+        else
+        {
+            if (goDown  && SwitchNeighbor(ref active, active.neighborDown,  Mathf.Clamp01(newU), 1f + newV)) return;
+            if (goUp    && SwitchNeighbor(ref active, active.neighborUp,    Mathf.Clamp01(newU), newV - 1f)) return;
+            if (goLeft  && SwitchNeighbor(ref active, active.neighborLeft,  1f + newU, Mathf.Clamp01(newV))) return;
+            if (goRight && SwitchNeighbor(ref active, active.neighborRight, newU - 1f, Mathf.Clamp01(newV))) return;
+        }
+
+        // Không có láng giềng theo hướng vượt biên -> kẹp trong panel hiện tại
+        active.cursor.SetUV(Mathf.Clamp01(newU), Mathf.Clamp01(newV));
+    }
+
+    static bool SwitchNeighbor(ref WorldPanelPlus active, WorldPanelPlus next, float u01, float v01)
+    {
+        if (next == null) return false;
+
+        // Ẩn cursor panel cũ
+        if (active && active.cursor) active.cursor.SetVisible(false);
+
+        // Bật ở panel mới & đặt UV đầu vào (clamp để an toàn)
+        next.EnsureCursor();
+        next.cursor.SetVisible(true);
+        next.cursor.SetUV(Mathf.Clamp01(u01), Mathf.Clamp01(v01), silent: true);
+
+        active = next; // đổi panel đang active
+        return true;
     }
 
     public void CursorClickDown() { if (cursor && cursor.visible) cursor.ClickDown(); }
