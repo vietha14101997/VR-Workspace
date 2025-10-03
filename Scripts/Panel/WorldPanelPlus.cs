@@ -60,6 +60,14 @@ public class WorldPanelPlus : MonoBehaviour
     public Transform hover;
     public WorldPanelPlusControlDock dock;
 
+    [Header("Cursor")]
+    public bool cursorEnable = true;
+    public float cursorSpeedPerPixel = 0.0015f;   // độ nhạy khi dịch chuyển bằng chuột (ΔUV mỗi pixel)
+    public Texture2D cursorTexture;               // để trống thì sẽ nạp Resources/icon_cursor
+    public bool cursorInvertY = false;
+
+    [HideInInspector] public WorldPanelCursor cursor;
+
     //=== Board visuals ===
     [Header("Board visuals")]
     public Texture contentTexture;
@@ -77,6 +85,52 @@ public class WorldPanelPlus : MonoBehaviour
 
     [HideInInspector] public bool isResizing = false;
     [SerializeField, HideInInspector] private Material _fallbackPanelMat;
+
+    public void EnsureCursor()
+    {
+        if (!cursorEnable) { if (cursor) cursor.SetVisible(false); return; }
+        if (!board) return;
+        if (cursor == null)
+        {
+            var go = new GameObject("Cursor");
+            go.transform.SetParent(board, false);
+            cursor = go.AddComponent<WorldPanelCursor>();
+            if (cursorTexture) cursor.cursorTexture = cursorTexture;
+        }
+        cursor.AttachToBoard(board, width, height);
+        cursor.SetVisible(false);
+    }
+
+    public void CursorFocusBegin(Vector3 worldHit, Camera cam)
+    {
+        if (!cursorEnable) return;
+        EnsureCursor();
+        if (!cursor) return;
+
+        // Tính UV từ điểm va chạm lên Board
+        Vector3 local = board.InverseTransformPoint(worldHit);  // x,y ∈ [-0.5..0.5]
+        float u = Mathf.Clamp01(local.x + 0.5f);
+        float v = Mathf.Clamp01(local.y + 0.5f);
+        cursor.SetUV(u, v, silent: true);
+        cursor.SetVisible(true);
+    }
+
+    public void CursorFocusEnd()
+    {
+        if (cursor) cursor.SetVisible(false);
+    }
+
+    public void CursorMoveByMouseDelta(float dxPixel, float dyPixel)
+    {
+        if (!cursor || !cursor.visible) return;
+        float du = dxPixel * cursorSpeedPerPixel;
+        float signY = cursorInvertY ? -1f : 1f;
+        float dv = dyPixel * cursorSpeedPerPixel * signY;
+        cursor.NudgeUV(du, dv);
+    }
+
+    public void CursorClickDown() { if (cursor && cursor.visible) cursor.ClickDown(); }
+    public void CursorClickUp()   { if (cursor && cursor.visible) cursor.ClickUp(); }
 
     private Material GetPanelMaterial()
     {
@@ -197,6 +251,7 @@ public class WorldPanelPlus : MonoBehaviour
         dock.Build();
 
         Apply();
+        EnsureCursor();
     }
 
     public float GetTrayAlpha01() => forceTrayHidden ? 0f : _trayAlpha;
@@ -420,6 +475,7 @@ public class WorldPanelPlus : MonoBehaviour
 
         if (dock) dock.RecomputeFromPanel();
         UpdateHandlesLayout();
+        EnsureCursor();
     }
 
     void ApplyBoardTint(MeshRenderer mr)

@@ -22,7 +22,6 @@ public class PCStreamClient : MonoBehaviour
     private VideoStreamTrack _remoteVideoTrack;
     private Texture _remoteTexture;
     private OnVideoReceived _onVideoReceived;
-    private bool _offerSent = false;
     private readonly System.Collections.Generic.List<string> _pendingLocalCands = new();
     int _rxFrames = 0;
 
@@ -98,7 +97,6 @@ public class PCStreamClient : MonoBehaviour
             if (fallbackRawImage != null)
                 fallbackRawImage.texture = _remoteTexture;
         }
-        if (Time.frameCount % 30 == 0) Debug.Log("[PCStreamClient] rxFrames=" + _rxFrames);
     }
 
     async Task ConnectAndSignalOffer()
@@ -119,7 +117,6 @@ public class PCStreamClient : MonoBehaviour
         await _ws.SendAsync(new ArraySegment<byte>(msg), WebSocketMessageType.Text, true, _cts.Token);
 
         // bật cờ + xả các candidate đã queue
-        _offerSent = true;
         foreach (var line in _pendingLocalCands)
         {
             await _ws.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(line)), WebSocketMessageType.Text, true, _cts.Token);

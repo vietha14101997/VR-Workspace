@@ -169,7 +169,7 @@ public class WorldPanelPlusControlDock : MonoBehaviour
         // Chỉ còn 1 nút: MinimizeToggle
         var types = new[] { WPDockButtonType.MinimizeToggle };
 
-        float extraGap = 0.03f; float bleed = 0.015f;
+        float bleed = 0.015f;
         float innerW = buttonSize.x; float innerH = buttonSize.y;
         float expandedW = innerW + 2f * (border + bleed);
         float expandedH = innerH + 2f * (border + bleed);
