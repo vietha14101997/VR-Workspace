@@ -147,7 +147,7 @@ public class WorldPanelPlus : MonoBehaviour
             if (cursorTexture) cursor.cursorTexture = cursorTexture;
         }
         cursor.AttachToBoard(board, width, height);
-        cursor.SetVisible(false);
+        if (cursor) cursor.SetVisible(cursor.visible);
     }
 
     public void CursorFocusBegin(Vector3 worldHit, Camera cam)
@@ -535,6 +535,7 @@ public class WorldPanelPlus : MonoBehaviour
 
     public void Apply()
     {
+        bool _keepCursorVisible = (cursor != null && cursor.visible);
         EnsureDefaultContentTexture();
         ApplyBoardTint(board.GetComponent<MeshRenderer>());
         if (!board || !tray) return;
@@ -594,6 +595,7 @@ public class WorldPanelPlus : MonoBehaviour
         if (dock) dock.RecomputeFromPanel();
         UpdateHandlesLayout();
         EnsureCursor();
+        if (cursor != null) cursor.SetVisible(_keepCursorVisible);
     }
 
     void ApplyBoardTint(MeshRenderer mr)

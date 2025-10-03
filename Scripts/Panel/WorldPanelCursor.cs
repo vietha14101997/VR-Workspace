@@ -68,10 +68,13 @@ public class WorldPanelCursor : MonoBehaviour
 
         _mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         _mr.receiveShadows = false;
-        _mr.sharedMaterial.renderQueue = 4000;
-        
+        _mr.sharedMaterial.renderQueue = 5000;
+
         if (_mr.sharedMaterial.HasProperty("_ZWrite"))
             _mr.sharedMaterial.SetInt("_ZWrite", 0);
+
+        if (_mr.sharedMaterial.HasProperty("_ZTest"))
+            _mr.sharedMaterial.SetInt("_ZTest", 8);
     }
 
     public void AttachToBoard(Transform board, float boardWidth, float boardHeight)
@@ -132,7 +135,7 @@ public class WorldPanelCursor : MonoBehaviour
         transform.position = worldPoint + n * zWorldOffset;
         transform.rotation = _board.rotation;  // cùng hướng với mặt Board
     }
-    
+
     void UpdateScaleMeters()
     {
         if (_board == null) return;

@@ -47,9 +47,21 @@ public class WorldPanelPlusControlDock : MonoBehaviour
     {
         if (_minimized == on) return;
         _minimized = on;
-        var binder = _backplate ? _backplate.GetComponent<RoundedBackplateBinder>() : null;
-        if (binder) binder.SetForceCircle(_minimized);
+
+        // Nếu đang ở Editor (chưa Play) hoặc chưa Build xong dock → áp dụng tức thời, KHÔNG chạy coroutine
+        if (!Application.isPlaying || _backplate == null || _toggleBtnTr == null)
+        {
+            var binder = _backplate ? _backplate.GetComponent<RoundedBackplateBinder>() : null;
+            if (binder) binder.SetForceCircle(_minimized);
+            ApplyMinimizeVisualState();
+            ResizeBackplateToActiveButtons();
+            return;
+        }
+
+        var b = _backplate.GetComponent<RoundedBackplateBinder>();
+        if (b) b.SetForceCircle(_minimized);
         ResizeBackplateToActiveButtons();
+
         if (_dockAnim != null) StopCoroutine(_dockAnim);
         _dockAnim = StartCoroutine(AnimateDock(on));
     }
@@ -183,8 +195,8 @@ public class WorldPanelPlusControlDock : MonoBehaviour
         dockShader ??= Shader.Find("Unlit/Transparent");
         var mat = new Material(dockShader); mr.sharedMaterial = mat;
         _backplate.localScale = new Vector3(expandedW, expandedH, 1f);
-        if (mat.HasProperty("_FillColor")) mat.SetColor("_FillColor", new Color(0,0,0,0));
-        if (mat.HasProperty("_BorderColor")) mat.SetColor("_BorderColor", new Color(1,1,1,0.35f));
+        if (mat.HasProperty("_FillColor")) mat.SetColor("_FillColor", new Color(0, 0, 0, 0));
+        if (mat.HasProperty("_BorderColor")) mat.SetColor("_BorderColor", new Color(1, 1, 1, 0.35f));
         if (mat.HasProperty("_Feather")) mat.SetFloat("_Feather", 0.006f);
         if (mat.HasProperty("_Border")) mat.SetFloat("_Border", border);
         if (mat.HasProperty("_RectWH")) mat.SetVector("_RectWH", new Vector4(expandedW, expandedH, 0, 0));
@@ -333,33 +345,48 @@ public class WorldPanelPlusControlDock : MonoBehaviour
 
     IEnumerator AnimateDock(bool minimize)
     {
-        float startTime = Time.time; float endTime = startTime + _animDuration;
-        float height = buttonSize.y + border * 2; float minimizedWidth = height; float expandedWidth = buttonSize.x + border * 2;
-        float startWidth = _backplate.localScale.x; float targetWidth = minimize ? minimizedWidth : expandedWidth;
+        if (_backplate == null) yield break;
+        float startTime = Time.time;
+        float endTime = startTime + _animDuration;
 
-        Vector3 startPos = _backplate.localPosition; Vector3 centerPos = _toggleBtnTr != null ? _toggleBtnTr.localPosition : Vector3.zero;
+        float height = buttonSize.y + border * 2;
+        float minimizedWidth = height;
+        float expandedWidth = buttonSize.x + border * 2;
+
+        float startWidth = _backplate ? _backplate.localScale.x : expandedWidth;
+        float targetWidth = minimize ? minimizedWidth : expandedWidth;
+
+        Vector3 startPos = _backplate ? _backplate.localPosition : Vector3.zero;
+        Vector3 centerPos = (_toggleBtnTr != null) ? _toggleBtnTr.localPosition : Vector3.zero;
+
         while (Time.time < endTime)
         {
-            float t = (Time.time - startTime) / _animDuration; float easedT = minimize ? t * t : t * (2f - t);
-            if (_backplate != null)
-            {
-                float currentWidth = Mathf.Lerp(startWidth, targetWidth, easedT);
-                _backplate.localScale = new Vector3(currentWidth, height, 1);
-                _backplate.localPosition = Vector3.Lerp(startPos, new Vector3(centerPos.x, 0f, 0f), easedT);
-            }
+            if (_backplate == null) yield break;
+            float t = (Time.time - startTime) / _animDuration;
+            float easedT = minimize ? t * t : t * (2f - t);
+            _backplate.localScale = new Vector3(Mathf.Lerp(startWidth, targetWidth, easedT), height, 1);
+            _backplate.localPosition = Vector3.Lerp(startPos, new Vector3(centerPos.x, 0f, 0f), easedT);
             yield return null;
         }
+
         if (_backplate != null)
-        { _backplate.localScale = new Vector3(targetWidth, height, 1); _backplate.localPosition = new Vector3(centerPos.x, 0f, 0f); }
-        _minimized = minimize; var binder = _backplate ? _backplate.GetComponent<RoundedBackplateBinder>() : null; if (binder) binder.SetForceCircle(_minimized); ResizeBackplateToActiveButtons(); CenterButtonsVertically();
+        {
+            _backplate.localScale = new Vector3(targetWidth, height, 1);
+            _backplate.localPosition = new Vector3(centerPos.x, 0f, 0f);
+            var binder = _backplate.GetComponent<RoundedBackplateBinder>();
+            if (binder) binder.SetForceCircle(minimize);
+        }
+        _minimized = minimize;
+        ResizeBackplateToActiveButtons();
+        CenterButtonsVertically();
     }
 
     static Mesh BuildUnitQuad()
     {
         var m = new Mesh(); m.name = "UnitQuad";
-        m.vertices = new[] { new Vector3(-0.5f,-0.5f,0), new Vector3(0.5f,-0.5f,0), new Vector3(0.5f,0.5f,0), new Vector3(-0.5f,0.5f,0), };
-        m.uv = new[] { new Vector2(0,0), new Vector2(1,0), new Vector2(1,1), new Vector2(0,1) };
-        m.triangles = new[] { 0,1,2, 0,2,3 }; m.RecalculateNormals(); return m;
+        m.vertices = new[] { new Vector3(-0.5f, -0.5f, 0), new Vector3(0.5f, -0.5f, 0), new Vector3(0.5f, 0.5f, 0), new Vector3(-0.5f, 0.5f, 0), };
+        m.uv = new[] { new Vector2(0, 0), new Vector2(1, 0), new Vector2(1, 1), new Vector2(0, 1) };
+        m.triangles = new[] { 0, 1, 2, 0, 2, 3 }; m.RecalculateNormals(); return m;
     }
 
     void PurgeUnknownBackgrounds()
@@ -372,31 +399,5 @@ public class WorldPanelPlusControlDock : MonoBehaviour
         }
         var rends = GetComponentsInChildren<Renderer>(true);
         foreach (var r in rends) { if (r == null) continue; if (IsAllowed(r)) continue; r.enabled = false; }
-    }
-}
-
-[ExecuteAlways]
-public class RoundedBackplateBinder : MonoBehaviour
-{
-    Renderer _r; Transform _t;
-    public float border = 0.004f;
-    public float fallbackRadiusWhenExpanded = 0.06f;
-    public bool forceCircle = false;
-
-    void Awake() { _r = GetComponent<Renderer>(); _t = transform; }
-    void OnEnable() { Sync(); }
-#if UNITY_EDITOR
-    void OnValidate() { Sync(); }
-#endif
-    void LateUpdate() { Sync(); }
-
-    public void SetForceCircle(bool on) { forceCircle = on; }
-
-    void Sync()
-    {
-        if (!_r || !_t) return; var m = _r.sharedMaterial; if (!m) return;
-        var s = _t.localScale; if (m.HasProperty("_RectWH")) m.SetVector("_RectWH", new Vector4(s.x, s.y, 0, 0)); if (m.HasProperty("_Border")) m.SetFloat("_Border", border);
-        float halfMin = 0.5f * Mathf.Min(s.x, s.y); float r = forceCircle ? halfMin : Mathf.Min(halfMin, fallbackRadiusWhenExpanded);
-        if (m.HasProperty("_Radius")) m.SetFloat("_Radius", r);
     }
 }

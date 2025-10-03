@@ -23,7 +23,8 @@ public class PCStreamClient : MonoBehaviour
     private Texture _remoteTexture;
     private OnVideoReceived _onVideoReceived;
     private readonly System.Collections.Generic.List<string> _pendingLocalCands = new();
-    int _rxFrames = 0;
+    private bool _cursorPinned = false;
+    private Texture _appliedTexture;
 
     async void Start()
     {
@@ -73,7 +74,7 @@ public class PCStreamClient : MonoBehaviour
             if (e.Track is VideoStreamTrack v)
             {
                 _remoteVideoTrack = v;
-                _onVideoReceived = tex => { _remoteTexture = tex; _rxFrames++; };
+                _onVideoReceived = tex => { _remoteTexture = tex; };
                 _remoteVideoTrack.OnVideoReceived += _onVideoReceived;
                 Debug.Log("[PCStreamClient] Video track bound (OnVideoReceived subscribed)");
             }
@@ -91,8 +92,21 @@ public class PCStreamClient : MonoBehaviour
         {
             if (worldPanel != null)
             {
-                worldPanel.contentTexture = _remoteTexture;
-                worldPanel.Apply();
+                if (!ReferenceEquals(_appliedTexture, _remoteTexture))
+                {
+                    worldPanel.contentTexture = _remoteTexture;
+                    worldPanel.Apply();                 // chỉ Apply khi texture đổi
+                    _appliedTexture = _remoteTexture;
+                }
+
+                // ĐẢM BẢO CURSOR HIỆN SAU KHI BIND VIDEO
+                worldPanel.EnsureCursor();
+                if (worldPanel.cursor != null && !_cursorPinned)
+                {
+                    // đặt queue cao để luôn nổi trên board (cursor script đã set 4000, giữ nguyên hoặc cao hơn)
+                    worldPanel.cursor.SetVisible(true);
+                    _cursorPinned = true;
+                }
             }
             if (fallbackRawImage != null)
                 fallbackRawImage.texture = _remoteTexture;
