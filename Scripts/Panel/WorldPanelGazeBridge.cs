@@ -326,23 +326,47 @@ public class WorldPanelGazeBridge : MonoBehaviour
     {
 #if UNITY_ANDROID
         // Cardboard trigger nếu có
-        try { return Google.XR.Cardboard.Api.IsTriggerPressed; } catch { }
+        try { if (Google.XR.Cardboard.Api.IsTriggerPressed) return true; } catch { }
 #endif
+
+#if ENABLE_INPUT_SYSTEM
+        // Chuột thật (OTG / Bluetooth)
+        if (Mouse.current != null)
+            return Mouse.current.leftButton.isPressed;
+
+        // Một số thiết bị Android báo là Pointer (trackpad, chuột ảo…)
+        if (Pointer.current != null)
+            return Pointer.current.press.isPressed;
+
+        // Bút (nếu có)
+        if (Pen.current != null)
+            return Pen.current.tip.isPressed;
+#endif
+
+        // Fallback cho touch (Legacy vẫn dùng được trên Android)
         if (Input.touchCount > 0)
         {
-            var ph = Input.GetTouch(0).phase; // legacy Input
+            var ph = Input.GetTouch(0).phase;
             return ph != UnityEngine.TouchPhase.Ended && ph != UnityEngine.TouchPhase.Canceled;
         }
+
+#if !ENABLE_INPUT_SYSTEM || UNITY_EDITOR
+        // Chỉ còn dùng khi đang chạy với Legacy hoặc trong Editor
         return Input.GetMouseButton(0);
+#else
+    return false;
+#endif
     }
 
     Vector2 GetMouseDeltaUniversal()
     {
 #if ENABLE_INPUT_SYSTEM
         if (Mouse.current != null)
-        {
-            return Mouse.current.delta.ReadValue(); // relative pixels/frame
-        }
+            return Mouse.current.delta.ReadValue();   // pixel/frame (relative)
+
+        // Nhiều máy Android chỉ có Pointer.current
+        if (Pointer.current != null)
+            return Pointer.current.delta.ReadValue();
 #endif
         float dx = Input.GetAxisRaw("Mouse X");
         float dy = Input.GetAxisRaw("Mouse Y");
@@ -359,20 +383,30 @@ public class WorldPanelGazeBridge : MonoBehaviour
 
 #if UNITY_ANDROID && !UNITY_EDITOR
     // API 26+: bắt/nhả pointer capture để ẩn OS cursor và nhận relative mouse event
-    void AndroidTryPointerCapture(bool capture)
+    public static void AndroidTryPointerCapture(bool enable)
     {
+#if UNITY_ANDROID && !UNITY_EDITOR
         try
         {
             using (var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
             using (var activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity"))
             using (var window = activity.Call<AndroidJavaObject>("getWindow"))
-            using (var view = window.Call<AndroidJavaObject>("getDecorView"))
+            using (var decor  = window.Call<AndroidJavaObject>("getDecorView"))
             {
-                if (capture) view.Call("requestPointerCapture");
-                else         view.Call("releasePointerCapture");
+                if (enable)
+                {
+                    // TRƯỚC ĐÂY: decor.Call("requestPointerCapture");
+                    // ĐỔI THÀNH: thả capture để tiếp tục nhận delta dạng tuyệt đối
+                    decor.Call("releasePointerCapture");
+                }
+                else
+                {
+                    // Không làm gì, giữ trạng thái mặc định
+                }
             }
         }
-        catch { /* Thiết bị cũ hơn API 26: bỏ qua */ }
+        catch { /* ignore */ }
+#endif
     }
 #endif
 }

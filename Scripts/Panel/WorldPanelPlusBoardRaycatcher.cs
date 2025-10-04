@@ -9,6 +9,9 @@ public class WorldPanelPlusBoardRaycatcher : MonoBehaviour, IPointerEnterHandler
 {
     public WorldPanelPlus panel;
 
+    public void OnPointerEnter() { /* no-op or forward */ }
+    public void OnPointerExit() { /* no-op or forward */ }
+
     public void OnPointerEnter(PointerEventData eventData)
     {
         if (panel) panel.OnHover(true, null);
