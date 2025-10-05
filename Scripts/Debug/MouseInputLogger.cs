@@ -4,8 +4,13 @@ public class MouseInputLogger : MonoBehaviour
 {
     [Header("Logging")]
     public bool enableLogs = true;
-    public float moveDeltaThreshold = 0.5f;   // chỉ log khi dịch chuyển đáng kể
-    public float summaryEverySeconds = 1.0f;  // tóm tắt mỗi N giây
+    public float moveDeltaThreshold = 0.5f;      // chỉ log move khi thay đổi đáng kể
+    public float summaryEverySeconds = 1.0f;     // tóm tắt mỗi N giây
+
+    [Header("Click/Drag detection")]
+    public float clickMaxDuration = 0.3f;        // <= thế này thì tính là click
+    public float doubleClickMaxGap = 0.3f;       // khoảng cách 2 lần click
+    public float dragThresholdPixels = 4f;       // vượt ngưỡng => drag
 
     [Header("On-screen overlay")]
     public bool showOverlay = true;
@@ -24,6 +29,12 @@ public class MouseInputLogger : MonoBehaviour
     private bool _lWasDown, _rWasDown, _mWasDown;
     private float _tSummary;
 
+    // click/drag state
+    private Vector2 _lDownPos, _rDownPos, _mDownPos;
+    private float _lDownTime, _rDownTime, _mDownTime;
+    private float _lastLClickTime, _lastRClickTime, _lastMClickTime;
+    private bool _draggingL, _draggingR, _draggingM;
+
 #if ENABLE_INPUT_SYSTEM
     void OnEnable()
     {
@@ -35,7 +46,7 @@ public class MouseInputLogger : MonoBehaviour
 
         if (enableLogs)
         {
-            Debug.Log($"[MIL] (Input System) init: ms={_ms != null}, ptr={_ptr != null}, pen={_pen != null}");
+            Debug.Log($"[MIL] (IS) init: Mouse={_ms != null}, Pointer={_ptr != null}, Pen={_pen != null}");
         }
     }
 
@@ -48,13 +59,11 @@ public class MouseInputLogger : MonoBehaviour
                                 UnityEngine.InputSystem.InputDeviceChange change)
     {
         if (!enableLogs) return;
-        // Chỉ quan tâm đến Mouse/Pointer/Pen
         if (!(dev is UnityEngine.InputSystem.Mouse) &&
             !(dev is UnityEngine.InputSystem.Pointer) &&
             !(dev is UnityEngine.InputSystem.Pen)) return;
 
         Debug.Log($"[MIL] Device {dev.layout}/{dev.displayName}: {change}");
-        // Refresh tham chiếu
         _ms = UnityEngine.InputSystem.Mouse.current;
         _ptr = UnityEngine.InputSystem.Pointer.current;
         _pen = UnityEngine.InputSystem.Pen.current;
@@ -66,10 +75,12 @@ public class MouseInputLogger : MonoBehaviour
         // ---- Lấy dữ liệu chuột/Pointer theo Input System nếu có ----
 #if ENABLE_INPUT_SYSTEM
         bool hasIS = false;
+#endif
         Vector2 pos = Vector2.zero, delta = Vector2.zero;
         float wheel = 0f;
         bool lDown = false, rDown = false, mDown = false;
 
+#if ENABLE_INPUT_SYSTEM
         if (_ms != null)
         {
             hasIS = true;
@@ -87,7 +98,7 @@ public class MouseInputLogger : MonoBehaviour
             hasIS = true;
             pos = _ptr.position.ReadValue();
             delta = _ptr.delta.ReadValue();
-            // Pointer thường không có scroll, giữ 0
+            // Pointer thường không có scroll
             lDown = _ptr.press.isPressed;
         }
         else if (_pen != null)
@@ -120,32 +131,36 @@ public class MouseInputLogger : MonoBehaviour
         }
 #endif
 
-        // ---- Log theo thay đổi ----
+        // ---- LOG MOVE ----
+        if (enableLogs && (delta - _lastDelta).sqrMagnitude > moveDeltaThreshold * moveDeltaThreshold)
+        {
+            Debug.Log($"[MIL] Move delta={delta} pos={pos}");
+        }
+
+        // ---- LOG SCROLL (mỗi lần lăn) ----
+        if (enableLogs && Mathf.Abs(wheel - _lastWheel) > 0.0001f)
+        {
+            // một số thiết bị trả về giá trị rất nhỏ → nhân lên cho dễ đọc
+            float steps = wheel; // để nguyên thô; bạn có thể *100 nếu muốn
+            Debug.Log($"[MIL] Scroll steps={steps:+0.###;-0.###;0} (raw={wheel})");
+        }
+
+        // ---- DOWN/UP + CLICK/DOUBLECLICK + DRAG cho từng nút ----
+        HandleButton("Left", lDown, ref _lWasDown, ref _lDownTime, ref _lastLClickTime,
+                     ref _draggingL, ref _lDownPos, pos, delta);
+        HandleButton("Right", rDown, ref _rWasDown, ref _rDownTime, ref _lastRClickTime,
+                     ref _draggingR, ref _rDownPos, pos, delta);
+        HandleButton("Middle", mDown, ref _mWasDown, ref _mDownTime, ref _lastMClickTime,
+                     ref _draggingM, ref _mDownPos, pos, delta);
+
+        // ---- TÓM TẮT ĐỊNH KỲ ----
         if (enableLogs)
         {
-            // Move
-            if ((delta - _lastDelta).sqrMagnitude > moveDeltaThreshold * moveDeltaThreshold)
-            {
-                Debug.Log($"[MIL] Move delta={delta} pos={pos}");
-            }
-
-            // Wheel
-            if (Mathf.Abs(wheel - _lastWheel) > 0.0001f)
-            {
-                Debug.Log($"[MIL] Scroll wheel={wheel}");
-            }
-
-            // Buttons
-            if (lDown != _lWasDown) Debug.Log($"[MIL] Left  {(lDown ? "DOWN" : "UP")}");
-            if (rDown != _rWasDown) Debug.Log($"[MIL] Right {(rDown ? "DOWN" : "UP")}");
-            if (mDown != _mWasDown) Debug.Log($"[MIL] Middle {(mDown ? "DOWN" : "UP")}");
-
-            // Tóm tắt định kỳ
             _tSummary += Time.unscaledDeltaTime;
             if (_tSummary >= summaryEverySeconds)
             {
                 _tSummary = 0f;
-                Debug.Log($"[MIL] Summary pos={pos} delta={delta} L={lDown} R={rDown} M={mDown}");
+                Debug.Log($"[MIL] Summary pos={pos} delta={delta} L={lDown} R={rDown} M={mDown} wheel={wheel}");
             }
         }
 
@@ -153,9 +168,71 @@ public class MouseInputLogger : MonoBehaviour
         _lastPos = pos;
         _lastDelta = delta;
         _lastWheel = wheel;
-        _lWasDown = lDown;
-        _rWasDown = rDown;
-        _mWasDown = mDown;
+    }
+
+    private void HandleButton(string name,
+                              bool isDown,
+                              ref bool wasDown,
+                              ref float downTime,
+                              ref float lastClickTime,
+                              ref bool dragging,
+                              ref Vector2 downPos,
+                              Vector2 pos,
+                              Vector2 delta)
+    {
+        if (!enableLogs) { wasDown = isDown; return; }
+
+        // Down
+        if (isDown && !wasDown)
+        {
+            downTime = Time.unscaledTime;
+            downPos = pos;
+            dragging = false;
+            Debug.Log($"[MIL] {name} DOWN @ {pos}");
+        }
+
+        // Drag begin / drag
+        if (isDown)
+        {
+            if (!dragging && (pos - downPos).sqrMagnitude > dragThresholdPixels * dragThresholdPixels)
+            {
+                dragging = true;
+                Debug.Log($"[MIL] {name} DRAG BEGIN (start={downPos})");
+            }
+            if (dragging && (delta.sqrMagnitude > moveDeltaThreshold * moveDeltaThreshold))
+            {
+                Debug.Log($"[MIL] {name} DRAG delta={delta} pos={pos}");
+            }
+        }
+
+        // Up (+ click / double click / drag end)
+        if (!isDown && wasDown)
+        {
+            float held = Time.unscaledTime - downTime;
+            if (dragging)
+            {
+                Debug.Log($"[MIL] {name} DRAG END  (held={held:0.###}s, from={downPos} -> {pos})");
+            }
+            Debug.Log($"[MIL] {name} UP   (held={held:0.###}s)");
+
+            // Click?
+            if (!dragging && held <= clickMaxDuration)
+            {
+                // Double click?
+                if (Time.unscaledTime - lastClickTime <= doubleClickMaxGap)
+                {
+                    Debug.Log($"[MIL] {name} DOUBLE CLICK @ {pos}");
+                    lastClickTime = 0; // reset
+                }
+                else
+                {
+                    Debug.Log($"[MIL] {name} CLICK @ {pos}");
+                    lastClickTime = Time.unscaledTime;
+                }
+            }
+        }
+
+        wasDown = isDown;
     }
 
     void OnGUI()
@@ -171,9 +248,9 @@ public class MouseInputLogger : MonoBehaviour
             $"Input System: OFF\n" +
 #endif
             $"pos={_lastPos}  delta={_lastDelta}\n" +
-            $"L={_lWasDown} R={_rWasDown} M={_mWasDown}  wheel={_lastWheel}\n";
+            $"wheel={_lastWheel}\n";
 
-        var rect = new Rect(8, 8, 560, 64);
+        var rect = new Rect(8, 8, 560, 72);
         GUI.Box(rect, GUIContent.none);
         GUI.Label(new Rect(16, 12, rect.width - 16, rect.height - 16), txt);
     }
