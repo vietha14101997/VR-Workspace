@@ -29,8 +29,8 @@ public class WorldPanelPlus : MonoBehaviour
     public float moveOrbitMax = 6.0f;
 
     [Header("Panel (content) size, meters")]
-    public float width = 1.366f;
-    public float height = 0.768f;
+    public float width = 1.600f;
+    public float height = 0.9f;
 
     [Header("Tray visuals")]
     public float trayPadding = 0.05f;
@@ -74,6 +74,13 @@ public class WorldPanelPlus : MonoBehaviour
     public Color panelTint = Color.white;
     public bool boardVisible = true;
     [Range(0, 1)] public float boardAlpha = 1f;
+
+    [Header("Board edge feather (anti-aliased border)")]
+    public Color boardEdgeColor = Color.white;
+    [Range(0, 0.25f)] public float boardEdgeWidthUV = 0.02f;
+    [Range(0, 1f)] public float boardEdgeMinAlpha = 0.10f;
+    [Range(0, 1f)] public float boardEdgeSoften = 0.35f;
+    public bool boardEdgeRespectContentAlpha = true;
 
     Material _panelMat, _trayMat, _dashMat;
     float FadeSpeedIn => 1f / Mathf.Max(0.0001f, trayFadeInDuration);
@@ -602,31 +609,29 @@ public class WorldPanelPlus : MonoBehaviour
     {
         if (!mr) return;
 
-        // Chọn shader: Opaque nếu alpha~1, Transparent nếu <1
-        var shOpaque = Shader.Find("Unlit/Texture");
-        var shTrans = Shader.Find("Unlit/Transparent");
-
-        float a = Mathf.Clamp01(boardAlpha);       // alpha global của board
+        float a = Mathf.Clamp01(boardAlpha);
         bool opaque = a >= 0.999f;
 
         var mat = mr.sharedMaterial;
-        if (!mat)
-            mat = mr.sharedMaterial = new Material(opaque ? shOpaque : shTrans);
-        else if (mat.shader != (opaque ? shOpaque : shTrans))
-            mat.shader = (opaque ? shOpaque : shTrans);
+        if (!mat) mat = mr.sharedMaterial = new Material(Shader.Find("Unlit/WorldPanelBoard"));
 
-        // Texture luôn hợp lệ (UnityBlack nếu None)
+        // Nếu đang dùng shader viền, KHÔNG ép đổi qua Unlit/Texture/Transparent mặc định
+        if (!(useBoardEdgeFeather && mat.shader && mat.shader.name == "Unlit/WorldPanelBoard"))
+        {
+            var shOpaque = Shader.Find("Unlit/Texture");
+            var shTrans = Shader.Find("Unlit/Transparent");
+            if (mat.shader != (opaque ? shOpaque : shTrans))
+                mat.shader = (opaque ? shOpaque : shTrans);
+        }
+
         mat.mainTexture = GetSafeTex(contentTexture);
 
-        // Màu tint: dùng panelTint nhưng ép alpha = boardAlpha
-        var c = panelTint;
-        c.a = a;
+        var c = panelTint; c.a = boardVisible ? a : 0f;
         if (mat.HasProperty("_Color")) mat.SetColor("_Color", c);
+        else mat.color = c;
 
-        // Các tuỳ chọn thêm (an toàn)
         mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         mr.receiveShadows = false;
-        // renderQueue để mặc định theo shader (Opaque/Transparent) là đủ
     }
 
     void UpdateHandlesLayout()
@@ -804,9 +809,18 @@ public class WorldPanelPlus : MonoBehaviour
             if (_panelMat.HasProperty("_Color")) _panelMat.SetColor("_Color", tint);
             else _panelMat.color = tint;
 
+            // Các tham số riêng của shader feather
             if (useBoardEdgeFeather && _panelMat.shader != null && _panelMat.shader.name == "Unlit/WorldPanelBoard")
             {
-                if (_panelMat.HasProperty("_PanelSize"))
+                if (_panelMat.HasProperty("_BorderColor")) _panelMat.SetColor("_BorderColor", boardEdgeColor);
+                if (_panelMat.HasProperty("_BorderWidth")) _panelMat.SetFloat("_BorderWidth", boardEdgeWidthUV);
+                if (_panelMat.HasProperty("_MinAlphaEdge")) _panelMat.SetFloat("_MinAlphaEdge", boardEdgeMinAlpha);
+                if (_panelMat.HasProperty("_Soften")) _panelMat.SetFloat("_Soften", boardEdgeSoften);
+                if (_panelMat.HasProperty("_EdgeRespectContentAlpha"))
+                    _panelMat.SetFloat("_EdgeRespectContentAlpha", boardEdgeRespectContentAlpha ? 1f : 0f);
+
+                // Giữ lại các property cũ nếu bạn muốn (không bắt buộc với shader mới)
+                if (_panelMat && _panelMat.HasProperty("_PanelSize"))
                     _panelMat.SetVector("_PanelSize", new Vector4(width, height, 0, 0));
                 if (_panelMat.HasProperty("_CornerRadius"))
                     _panelMat.SetFloat("_CornerRadius", trayCornerRadius);
@@ -815,7 +829,7 @@ public class WorldPanelPlus : MonoBehaviour
             }
 
             if (_panelMat.HasProperty("_Surface")) _panelMat.SetFloat("_Surface", 1f);
-            _panelMat.renderQueue = 3000;
+            _panelMat.renderQueue = 3000; // Transparent
         }
     }
 
