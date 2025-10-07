@@ -85,7 +85,12 @@ public class WorldPanelClusterRig : MonoBehaviour
             p.EnforceNoRoll();
 
             // Đảm bảo tham số tray khi ở trong cluster
-            if (hideTrayAndDock) { p.forceTrayHidden = true; if (p.dock) p.dock.SetMinimized(true); }
+            if (hideTrayAndDock)
+            {
+                p.forceTrayHidden = true;
+                p.dockHardHidden = true;
+                if (p.dock) p.dock.SetMinimized(true);
+            }
             // Luôn set trayPadding = 0 trong cluster
             if (Mathf.Abs(p.trayPadding) > 1e-6f) { p.trayPadding = 0f; p.Apply(); }
         }
@@ -129,6 +134,7 @@ public class WorldPanelClusterRig : MonoBehaviour
         // Ẩn Tray/Dock khi ở cluster
         p.forceTrayHidden = hideTrayAndDock;
         p.dockMinimized = hideTrayAndDock;
+        p.dockHardHidden = hideTrayAndDock;
         p.Apply();
         p.SetHandlesCenterOnly(hideTrayAndDock);
         return p;
@@ -156,6 +162,7 @@ public class WorldPanelClusterRig : MonoBehaviour
         {
             if (!p) return;
             p.forceTrayHidden = on;
+            p.dockHardHidden = on;
             if (p.dock) p.dock.SetMinimized(on);
             // padding = 0 trong cluster
             if (on) p.trayPadding = 0f;

@@ -93,6 +93,8 @@ public class WorldPanelPlus : MonoBehaviour
     [HideInInspector] public bool isResizing = false;
     [SerializeField, HideInInspector] private Material _fallbackPanelMat;
 
+    [HideInInspector] public bool dockHardHidden = false;
+
     [Header("Cluster linking (optional)")]
     public WorldPanelPlus neighborLeft;
     public WorldPanelPlus neighborRight;
@@ -556,8 +558,11 @@ public class WorldPanelPlus : MonoBehaviour
             _shaderPropertiesNeedUpdate = false;
         }
 #else
-        UpdateBoardShaderProperties();
+    UpdateBoardShaderProperties();
 #endif
+
+        // Ẩn/hiện hẳn GameObject của Dock khi ở cluster
+        if (dock) dock.gameObject.SetActive(!dockHardHidden);
 
         if (board)
         {
@@ -589,7 +594,10 @@ public class WorldPanelPlus : MonoBehaviour
         {
             var bc = hover.GetComponent<BoxCollider>();
             if (!bc) bc = hover.gameObject.AddComponent<BoxCollider>();
-            float dockH = (dock != null) ? dock.GetBackplateHeight() : 0f;
+
+            // Nếu Dock bị ẩn cứng thì không cộng chiều cao Dock
+            float dockH = (!dockHardHidden && dock != null) ? dock.GetBackplateHeight() : 0f;
+
             float extra = trayHoverExtra;
             bc.size = new Vector3(
                 TrayW + extra * 2f,
@@ -599,7 +607,9 @@ public class WorldPanelPlus : MonoBehaviour
             bc.center = new Vector3(0, -(dockH + extra) * 0.5f, handleDepth * 0.5f);
         }
 
-        if (dock) dock.RecomputeFromPanel();
+        // Không recompute Dock khi đang bị ẩn cứng
+        if (!dockHardHidden && dock) dock.RecomputeFromPanel();
+
         UpdateHandlesLayout();
         EnsureCursor();
         if (cursor != null) cursor.SetVisible(_keepCursorVisible);
