@@ -23,6 +23,18 @@ public class PCStreamClient : MonoBehaviour
     public WorldPanelPlus worldPanel;
     public RawImage fallbackRawImage;
 
+    [Header("UV Crop (Grid Cell)")]
+    public bool useUVCrop = false;
+    public int gridCol = 0;
+    public int gridRow = 0;
+    public int gridCols = 3;
+    public int gridRows = 2;
+    public int frameWidth = 4082;
+    public int frameHeight = 1532;
+    public int cellWidth = 1360;
+    public int cellHeight = 765;
+    public int gapPixels = 1;
+
     // ---- WebRTC / Signal ----
     private RTCPeerConnection _pc;
     private ClientWebSocket _ws;
@@ -35,6 +47,14 @@ public class PCStreamClient : MonoBehaviour
     // ---- Cursor / Binding ----
     private bool _cursorBound;
     private Texture _appliedTexture;
+
+    // ---- UV Crop ----
+    private RenderTexture _croppedRT;
+
+    /// <summary>
+    /// Trả về texture gốc (chưa crop) để các UVCropReceiver khác sử dụng
+    /// </summary>
+    public Texture GetRawTexture() => _remoteTexture;
 
     // ---- Single-sender guard (owner) ----
     static PCStreamClient s_InputOwner;
@@ -120,13 +140,21 @@ public class PCStreamClient : MonoBehaviour
         // ------- Apply texture to panel / fallback -------
         if (_remoteTexture != null)
         {
+            Texture textureToApply = _remoteTexture;
+
+            // Nếu bật UV crop, tạo RenderTexture chỉ chứa phần cell cần hiển thị
+            if (useUVCrop)
+            {
+                textureToApply = GetCroppedTexture(_remoteTexture);
+            }
+
             if (worldPanel != null && !ReferenceEquals(_appliedTexture, _remoteTexture))
             {
-                worldPanel.contentTexture = _remoteTexture;
+                worldPanel.contentTexture = textureToApply;
                 worldPanel.Apply();
                 _appliedTexture = _remoteTexture;
             }
-            if (fallbackRawImage != null) fallbackRawImage.texture = _remoteTexture;
+            if (fallbackRawImage != null) fallbackRawImage.texture = textureToApply;
 
             // Bind cursor + forwarders đúng 1 lần (chỉ owner mới bind để gửi input trái)
             if (_isInputOwner && worldPanel != null && worldPanel.cursor != null && !_cursorBound)
@@ -281,6 +309,50 @@ public class PCStreamClient : MonoBehaviour
 #if ENABLE_INPUT_SYSTEM
         _keysHeldVK.Clear();
 #endif
+
+        // Cleanup UV crop resources
+        if (_croppedRT != null)
+        {
+            _croppedRT.Release();
+            Destroy(_croppedRT);
+            _croppedRT = null;
+        }
+    }
+
+    // =========================== UV CROP ===========================
+    Texture GetCroppedTexture(Texture source)
+    {
+        if (source == null) return null;
+
+        // Tính vị trí pixel của cell trong frame
+        int xStart = gridCol * (cellWidth + gapPixels);
+        int yStart = gridRow * (cellHeight + gapPixels);
+
+        // Tính UV scale và offset
+        float scaleX = (float)cellWidth / frameWidth;
+        float scaleY = (float)cellHeight / frameHeight;
+
+        // Offset: UV origin (0,0) = bottom-left, image (0,0) = top-left
+        float offsetX = (float)xStart / frameWidth;
+        float offsetY = 1f - (float)(yStart + cellHeight) / frameHeight;
+
+        // Tạo RenderTexture nếu cần
+        if (_croppedRT == null || _croppedRT.width != cellWidth || _croppedRT.height != cellHeight)
+        {
+            if (_croppedRT != null)
+            {
+                _croppedRT.Release();
+                Destroy(_croppedRT);
+            }
+            _croppedRT = new RenderTexture(cellWidth, cellHeight, 0, RenderTextureFormat.ARGB32);
+            _croppedRT.filterMode = FilterMode.Bilinear;
+            _croppedRT.Create();
+        }
+
+        // Dùng Graphics.Blit với scale/offset trực tiếp
+        Graphics.Blit(source, _croppedRT, new Vector2(scaleX, scaleY), new Vector2(offsetX, offsetY));
+
+        return _croppedRT;
     }
 
     // =========================== FORWARDERS (cursor) ===========================
@@ -290,10 +362,17 @@ public class PCStreamClient : MonoBehaviour
 
         worldPanel.cursor.onMovedUV += (u, v) =>
         {
-            string su = u.ToString("F6", CultureInfo.InvariantCulture);
-            string sv = v.ToString("F6", CultureInfo.InvariantCulture);
+            // Chuyển đổi UV cục bộ của cell sang UV toàn frame
+            float frameU = u, frameV = v;
+            if (useUVCrop)
+            {
+                (frameU, frameV) = CellUVToFrameUV(u, v);
+            }
+
+            string su = frameU.ToString("F6", CultureInfo.InvariantCulture);
+            string sv = frameV.ToString("F6", CultureInfo.InvariantCulture);
             var json = $"{{\"input\":\"move_uv\",\"u\":{su},\"v\":{sv}}}";
-            Debug.Log($"[PC->SRV] move_uv u={su} v={sv}");
+            Debug.Log($"[PC->SRV] move_uv u={su} v={sv} (cell {gridCol},{gridRow})");
             var bytes = Encoding.UTF8.GetBytes(json);
             try { _ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, _cts.Token); } catch { }
         };
@@ -301,6 +380,26 @@ public class PCStreamClient : MonoBehaviour
         // Left click từ cursor
         worldPanel.cursor.onClickDown += () => SendMouseDown("left");
         worldPanel.cursor.onClickUp += () => SendMouseUp("left");
+    }
+
+    // Chuyển đổi UV cục bộ của cell (0-1) sang UV toàn frame (0-1)
+    (float frameU, float frameV) CellUVToFrameUV(float cellU, float cellV)
+    {
+        // Vị trí pixel bắt đầu của cell
+        int xStart = gridCol * (cellWidth + gapPixels);
+        int yStart = gridRow * (cellHeight + gapPixels);
+
+        // Pixel position trong frame
+        float pixelX = xStart + cellU * cellWidth;
+        float pixelY = yStart + (1f - cellV) * cellHeight; // cellV=1 là top của cell = yStart
+
+        // Chuyển sang UV của frame
+        // frameU: pixelX / frameWidth
+        // frameV: 1 - pixelY / frameHeight (vì UV v=1 là top)
+        float frameU = pixelX / frameWidth;
+        float frameV = 1f - pixelY / frameHeight;
+
+        return (Mathf.Clamp01(frameU), Mathf.Clamp01(frameV));
     }
 
     // =========================== SEND JSON HELPERS ===========================
