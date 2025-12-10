@@ -5,6 +5,13 @@ using UnityEngine.AdaptivePerformance;
 
 public class APBootstrap : MonoBehaviour
 {
+    [Header("Main Menu")]
+    public bool spawnMainMenu = true;
+    public float menuSpawnDelay = 0.5f;
+    public float menuDistanceFromCamera = 1.5f;
+
+    private MainMenuPanel _mainMenu;
+
     void Awake()
     {
         Application.targetFrameRate = 60;      // Cardboard/stream: giữ 60 cho ổn định
@@ -12,8 +19,20 @@ public class APBootstrap : MonoBehaviour
         Screen.sleepTimeout = SleepTimeout.NeverSleep;
     }
 
-#if ADAPTIVE_PERFORMANCE_AVAILABLE
     void Start()
+    {
+        if (spawnMainMenu)
+        {
+            Invoke(nameof(SpawnMainMenu), menuSpawnDelay);
+        }
+
+#if ADAPTIVE_PERFORMANCE_AVAILABLE
+        SetupAdaptivePerformance();
+#endif
+    }
+
+#if ADAPTIVE_PERFORMANCE_AVAILABLE
+    void SetupAdaptivePerformance()
     {
         var ap = Holder.Instance?.AdaptivePerformance;
         if (ap == null) return;
@@ -31,4 +50,51 @@ public class APBootstrap : MonoBehaviour
         if (fps != null) fps.Enabled = false;
     }
 #endif
+
+    void SpawnMainMenu()
+    {
+        if (_mainMenu != null) return;
+
+        var cam = Camera.main;
+        if (cam == null)
+        {
+            Debug.LogWarning("[APBootstrap] No main camera found for MainMenu");
+            return;
+        }
+
+        // Find VirtualObjects parent or create one
+        var virtualObjects = GameObject.Find("VirtualObjects");
+        if (virtualObjects == null)
+        {
+            virtualObjects = new GameObject("VirtualObjects");
+            virtualObjects.layer = LayerMask.NameToLayer("VirtualObjects");
+        }
+
+        // Create MainMenu
+        var menuGO = new GameObject("MainMenu");
+        menuGO.transform.SetParent(virtualObjects.transform, false);
+        menuGO.layer = LayerMask.NameToLayer("VirtualObjects");
+
+        _mainMenu = menuGO.AddComponent<MainMenuPanel>();
+        _mainMenu.vrCamera = cam;
+
+        Debug.Log("[APBootstrap] MainMenu spawned");
+    }
+
+    public void ShowMainMenu()
+    {
+        if (_mainMenu != null) _mainMenu.Show();
+        else if (spawnMainMenu) SpawnMainMenu();
+    }
+
+    public void HideMainMenu()
+    {
+        if (_mainMenu != null) _mainMenu.Hide();
+    }
+
+    public void ToggleMainMenu()
+    {
+        if (_mainMenu != null) _mainMenu.Toggle();
+        else if (spawnMainMenu) SpawnMainMenu();
+    }
 }
