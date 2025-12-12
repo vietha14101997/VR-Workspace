@@ -1,12 +1,10 @@
 using UnityEngine;
-using System.Net.Http;
-using System.Threading.Tasks;
 using System.Collections.Generic;
 
 /// <summary>
 /// Dynamic Combined Stream approach:
 /// - Server ghép N màn hình thành 1 frame lớn (side-by-side)
-/// - Client tự động nhận diện số lượng monitors từ server
+/// - Client tự động kết nối tới signal URL với cấu hình cố định
 /// - Tạo đúng số panel tương ứng và bind UV crop cho từng panel
 /// </summary>
 public class ClusterAutoBinder : MonoBehaviour
@@ -14,50 +12,30 @@ public class ClusterAutoBinder : MonoBehaviour
     public string serverBase = "http://localhost:8288";
     public WorldPanelClusterRig rig;
 
-    [Header("Stream Settings")]
-    public int fps = 30;
-    public int kbps = 4000;
-    public bool zeroLatency = true;
+    [Header("Signal URL Path (appended to serverBase)")]
+    [Tooltip("Signal path with query params. Example: signal?mode=cluster&monitors=2&resW=1920&resH=1080&kbps=8000&fps=30")]
+    public string signalPath = "signal?mode=cluster&monitors=2&resW=1920&resH=1080&kbps=8000&fps=30";
 
-    [Header("Layout Info (auto-fetched from server)")]
-    [SerializeField] private int monitorCount = 3;
-    [SerializeField] private int frameWidth = 4096;
-    [SerializeField] private int frameHeight = 768;
-    [SerializeField] private int cellWidth = 1364;
-    [SerializeField] private int cellHeight = 768;
-    [SerializeField] private int gapPixels = 1;
+    [Header("Layout Info (fixed defaults)")]
+    [SerializeField] private int monitorCount = 2;
+    [SerializeField] private int frameWidth = 3840;
+    [SerializeField] private int frameHeight = 1080;
+    [SerializeField] private int cellWidth = 1920;
+    [SerializeField] private int cellHeight = 1080;
+    [SerializeField] private int gapPixels = 0;
 
     private PCStreamClient _masterClient;
     private List<UVCropReceiver> _cropReceivers = new List<UVCropReceiver>();
 
-    async void Start()
+    void Start()
     {
         if (!rig) rig = GetComponent<WorldPanelClusterRig>();
         if (!rig) return;
 
-        // Fetch layout from server (includes monitor count)
-        var layout = await FetchLayout(serverBase + "/api/layout");
-        if (layout.monitors > 0)
-        {
-            monitorCount = layout.monitors;
-            frameWidth = layout.frameWidth;
-            frameHeight = layout.frameHeight;
-            cellWidth = layout.cellWidth;
-            cellHeight = layout.cellHeight;
-            gapPixels = layout.gap;
-            
-            Debug.Log($"[ClusterAutoBinder] Server config: {monitorCount} monitors, frame={frameWidth}x{frameHeight}, cell={cellWidth}x{cellHeight}");
-        }
-        else
-        {
-            Debug.LogWarning("[ClusterAutoBinder] Could not fetch layout, using defaults");
-        }
+        Debug.Log($"[ClusterAutoBinder] Using fixed config: {monitorCount} monitors, frame={frameWidth}x{frameHeight}, cell={cellWidth}x{cellHeight}");
 
         // Build rig with correct number of panels
         rig.BuildWithPanelCount(monitorCount);
-
-        // Wait a frame for panels to be created
-        await Task.Yield();
 
         // Bind panels to stream
         BindPanelsToStream();
@@ -96,7 +74,7 @@ public class ClusterAutoBinder : MonoBehaviour
         client.worldPanel = panel;
 
         var wsBase = serverBase.Replace("http://", "ws://").Replace("https://", "wss://");
-        client.signalUrl = $"{wsBase}/signal?mode=cluster&fps={fps}&kbps={kbps}&zerolat={(zeroLatency ? 1 : 0)}";
+        client.signalUrl = $"{wsBase}/{signalPath}";
 
         client.useUVCrop = true;
         client.gridCol = col;
@@ -132,36 +110,6 @@ public class ClusterAutoBinder : MonoBehaviour
 
         _cropReceivers.Add(receiver);
         Debug.Log($"[ClusterAutoBinder] CropReceiver on panel[{col}]");
-    }
-
-    async Task<(int monitors, int frameWidth, int frameHeight, int cellWidth, int cellHeight, int gap)> FetchLayout(string url)
-    {
-        try
-        {
-            using var http = new HttpClient();
-            http.Timeout = System.TimeSpan.FromSeconds(5);
-            var json = await http.GetStringAsync(url);
-            Debug.Log($"[ClusterAutoBinder] /api/layout: {json}");
-
-            int Get(string key)
-            {
-                var tag = $"\"{key}\"";
-                int i = json.IndexOf(tag);
-                if (i < 0) return -1;
-                i = json.IndexOf(':', i) + 1;
-                int j = json.IndexOfAny(new[] { ',', '}' }, i);
-                var sub = json.Substring(i, j - i).Trim();
-                int.TryParse(sub, out var v);
-                return v;
-            }
-
-            return (Get("monitors"), Get("frameWidth"), Get("frameHeight"), Get("cellWidth"), Get("cellHeight"), Get("gap"));
-        }
-        catch (System.Exception ex)
-        {
-            Debug.LogWarning($"[ClusterAutoBinder] FetchLayout failed: {ex.Message}");
-            return (-1, -1, -1, -1, -1, -1);
-        }
     }
 
     void OnDestroy()

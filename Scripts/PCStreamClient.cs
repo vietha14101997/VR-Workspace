@@ -109,8 +109,18 @@ public class PCStreamClient : MonoBehaviour
 
         _pc.OnIceCandidate = cand =>
         {
-            var txt = string.IsNullOrEmpty(cand.Candidate) ? "end-of-candidates" : cand.Candidate;
-            _ws?.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(txt)),
+            string msg;
+            if (string.IsNullOrEmpty(cand.Candidate))
+            {
+                msg = "end-of-candidates";
+            }
+            else
+            {
+                // Add 'candidate:' prefix for server to recognize
+                msg = "candidate:" + cand.Candidate;
+            }
+            Debug.Log($"[PCStreamClient] Sending local ICE: {msg.Substring(0, Mathf.Min(50, msg.Length))}...");
+            _ws?.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(msg)),
                            WebSocketMessageType.Text, true, _cts.Token);
         };
 
@@ -273,16 +283,22 @@ public class PCStreamClient : MonoBehaviour
             else if (text.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase))
             {
                 var raw = text.Substring("candidate:".Length).Trim();
-                if (raw.Contains(':')) continue;                    // bỏ IPv6
-                if (raw.Contains(" tcp ") || raw.Contains("tcptype")) continue; // bỏ TCP
+                // Chỉ lọc TCP candidates, chấp nhận cả IPv4 và IPv6 UDP
+                if (raw.Contains(" tcp ", StringComparison.OrdinalIgnoreCase) || 
+                    raw.Contains("tcptype", StringComparison.OrdinalIgnoreCase)) 
+                {
+                    Debug.Log("[PCStreamClient] skip TCP candidate: " + raw);
+                    continue;
+                }
 
                 var full = "candidate:" + raw;
                 _pc.AddIceCandidate(new RTCIceCandidate(new RTCIceCandidateInit
                 {
                     candidate = full,
-                    sdpMLineIndex = 0
+                    sdpMLineIndex = 0,
+                    sdpMid = "0"
                 }));
-                Debug.Log("[PCStreamClient] add remote cand (UDP): " + full);
+                Debug.Log("[PCStreamClient] add remote cand: " + full);
             }
             else if (text.StartsWith("end-of-candidates", StringComparison.OrdinalIgnoreCase))
             {
