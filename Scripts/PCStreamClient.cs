@@ -286,16 +286,7 @@ public class PCStreamClient : MonoBehaviour
 
         var cfg = new RTCConfiguration
         {
-            iceServers = new[] { 
-                // Thử nhiều STUN servers khác nhau để tránh firewall issue
-                new RTCIceServer { urls = new[] { "stun:stun.l.google.com:19302" } },
-                new RTCIceServer { urls = new[] { "stun:stun1.l.google.com:19302" } },
-                new RTCIceServer { urls = new[] { "stun:stun2.l.google.com:19302" } },
-                new RTCIceServer { urls = new[] { "stun:stun3.l.google.com:19302" } },
-                new RTCIceServer { urls = new[] { "stun:stun4.l.google.com:19302" } },
-                new RTCIceServer { urls = new[] { "stun:stun.stunprotocol.org:3478" } },
-                new RTCIceServer { urls = new[] { "stun:stun.sipgate.net:3478" } }
-            },
+            iceServers = Array.Empty<RTCIceServer>(),
             iceCandidatePoolSize = 0  // Không sử dụng candidate pool để đơn giản
         };
         Debug.Log($"[PCStreamClient] Creating RTCPeerConnection with signalUrl: {signalUrl}");
