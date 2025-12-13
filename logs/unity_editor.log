@@ -52,7 +52,7 @@ UnityEngine.Debug:Log (object)
 ClusterAutoBinder:BindPanelsToStream () (at Assets/VR-Workspace/Scripts/ClusterAutoBinder.cs:66)
 ClusterAutoBinder:Start () (at Assets/VR-Workspace/Scripts/ClusterAutoBinder.cs:41)
 
-[PCStreamClient] Local ICE: candidate:2670921792 1 udp 2122129151 192.168.1.9 61081 typ ...
+[PCStreamClient] Local ICE: candidate:1317760402 1 udp 2122129151 192.168.1.9 51529 typ ...
 UnityEngine.Debug:Log (object)
 PCStreamClient/<>c__DisplayClass28_0:<Start>b__3 (Unity.WebRTC.RTCIceCandidate) (at Assets/VR-Workspace/Scripts/PCStreamClient.cs:132)
 Unity.WebRTC.RTCPeerConnection/<>c__DisplayClass49_0:<PCOnIceCandidate>b__0 () (at ./Library/PackageCache/com.unity.webrtc@3.0.0-pre.8/Runtime/Scripts/RTCPeerConnection.cs:431)
@@ -74,7 +74,7 @@ Unity.WebRTC.ExecutableUnitySynchronizationContext:ExecuteAndAppendNextExecute (
 Unity.WebRTC.ExecutableUnitySynchronizationContext:SendOrPostCallback (object) (at ./Library/PackageCache/com.unity.webrtc@3.0.0-pre.8/Runtime/Scripts/Internal/ExecutableUnitySynchronizationContext.cs:57)
 UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
-[PCStreamClient] Local ICE: candidate:2897298652 1 udp 2122262783 2402:800:610d:265a:20f...
+[PCStreamClient] Local ICE: candidate:3070308529 1 udp 2122262783 2402:800:610d:265a:20f...
 UnityEngine.Debug:Log (object)
 PCStreamClient/<>c__DisplayClass28_0:<Start>b__3 (Unity.WebRTC.RTCIceCandidate) (at Assets/VR-Workspace/Scripts/PCStreamClient.cs:132)
 Unity.WebRTC.RTCPeerConnection/<>c__DisplayClass49_0:<PCOnIceCandidate>b__0 () (at ./Library/PackageCache/com.unity.webrtc@3.0.0-pre.8/Runtime/Scripts/RTCPeerConnection.cs:431)
@@ -96,7 +96,7 @@ Unity.WebRTC.ExecutableUnitySynchronizationContext:ExecuteAndAppendNextExecute (
 Unity.WebRTC.ExecutableUnitySynchronizationContext:SendOrPostCallback (object) (at ./Library/PackageCache/com.unity.webrtc@3.0.0-pre.8/Runtime/Scripts/Internal/ExecutableUnitySynchronizationContext.cs:57)
 UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
-[PCStreamClient] Local ICE: candidate:2407770052 1 udp 2122197247 2402:800:610d:265a:c29...
+[PCStreamClient] Local ICE: candidate:2756614660 1 udp 2122197247 2402:800:610d:265a:c29...
 UnityEngine.Debug:Log (object)
 PCStreamClient/<>c__DisplayClass28_0:<Start>b__3 (Unity.WebRTC.RTCIceCandidate) (at Assets/VR-Workspace/Scripts/PCStreamClient.cs:132)
 Unity.WebRTC.RTCPeerConnection/<>c__DisplayClass49_0:<PCOnIceCandidate>b__0 () (at ./Library/PackageCache/com.unity.webrtc@3.0.0-pre.8/Runtime/Scripts/RTCPeerConnection.cs:431)
@@ -118,12 +118,12 @@ Unity.WebRTC.ExecutableUnitySynchronizationContext:ExecuteAndAppendNextExecute (
 Unity.WebRTC.ExecutableUnitySynchronizationContext:SendOrPostCallback (object) (at ./Library/PackageCache/com.unity.webrtc@3.0.0-pre.8/Runtime/Scripts/Internal/ExecutableUnitySynchronizationContext.cs:57)
 UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
-Webcam texture initialized successfully after 0 frames
+Webcam texture initialized successfully after 1 frames
 UnityEngine.Debug:Log (object)
 CameraPassthrough/<EnsureTextureStarted>d__11:MoveNext () (at Assets/VR-Workspace/Scripts/CameraPassthrough.cs:175)
 UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
-[PCStreamClient] Local ICE: candidate:3405852023 1 udp 1685921535 171.241.38.173 61081 t...
+[PCStreamClient] Local ICE: candidate:4133681848 1 udp 1685921535 171.241.38.173 51529 t...
 UnityEngine.Debug:Log (object)
 PCStreamClient/<>c__DisplayClass28_0:<Start>b__3 (Unity.WebRTC.RTCIceCandidate) (at Assets/VR-Workspace/Scripts/PCStreamClient.cs:132)
 Unity.WebRTC.RTCPeerConnection/<>c__DisplayClass49_0:<PCOnIceCandidate>b__0 () (at ./Library/PackageCache/com.unity.webrtc@3.0.0-pre.8/Runtime/Scripts/RTCPeerConnection.cs:431)
@@ -145,7 +145,7 @@ Unity.WebRTC.ExecutableUnitySynchronizationContext:ExecuteAndAppendNextExecute (
 Unity.WebRTC.ExecutableUnitySynchronizationContext:SendOrPostCallback (object) (at ./Library/PackageCache/com.unity.webrtc@3.0.0-pre.8/Runtime/Scripts/Internal/ExecutableUnitySynchronizationContext.cs:57)
 UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
-[PCStreamClient] Local ICE: candidate:3786222925 1 tcp 1518149375 192.168.1.9 56014 typ ...
+[PCStreamClient] Local ICE: candidate:809799434 1 tcp 1518149375 192.168.1.9 56373 typ h...
 UnityEngine.Debug:Log (object)
 PCStreamClient/<>c__DisplayClass28_0:<Start>b__3 (Unity.WebRTC.RTCIceCandidate) (at Assets/VR-Workspace/Scripts/PCStreamClient.cs:132)
 Unity.WebRTC.RTCPeerConnection/<>c__DisplayClass49_0:<PCOnIceCandidate>b__0 () (at ./Library/PackageCache/com.unity.webrtc@3.0.0-pre.8/Runtime/Scripts/RTCPeerConnection.cs:431)
@@ -167,7 +167,7 @@ Unity.WebRTC.ExecutableUnitySynchronizationContext:ExecuteAndAppendNextExecute (
 Unity.WebRTC.ExecutableUnitySynchronizationContext:SendOrPostCallback (object) (at ./Library/PackageCache/com.unity.webrtc@3.0.0-pre.8/Runtime/Scripts/Internal/ExecutableUnitySynchronizationContext.cs:57)
 UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
-[PCStreamClient] Local ICE: candidate:3526320593 1 tcp 1518283007 2402:800:610d:265a:20f...
+[PCStreamClient] Local ICE: candidate:3385774633 1 tcp 1518283007 2402:800:610d:265a:20f...
 UnityEngine.Debug:Log (object)
 PCStreamClient/<>c__DisplayClass28_0:<Start>b__3 (Unity.WebRTC.RTCIceCandidate) (at Assets/VR-Workspace/Scripts/PCStreamClient.cs:132)
 Unity.WebRTC.RTCPeerConnection/<>c__DisplayClass49_0:<PCOnIceCandidate>b__0 () (at ./Library/PackageCache/com.unity.webrtc@3.0.0-pre.8/Runtime/Scripts/RTCPeerConnection.cs:431)
@@ -189,7 +189,7 @@ Unity.WebRTC.ExecutableUnitySynchronizationContext:ExecuteAndAppendNextExecute (
 Unity.WebRTC.ExecutableUnitySynchronizationContext:SendOrPostCallback (object) (at ./Library/PackageCache/com.unity.webrtc@3.0.0-pre.8/Runtime/Scripts/Internal/ExecutableUnitySynchronizationContext.cs:57)
 UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
-[PCStreamClient] Local ICE: candidate:4045243081 1 tcp 1518217471 2402:800:610d:265a:c29...
+[PCStreamClient] Local ICE: candidate:3665918108 1 tcp 1518217471 2402:800:610d:265a:c29...
 UnityEngine.Debug:Log (object)
 PCStreamClient/<>c__DisplayClass28_0:<Start>b__3 (Unity.WebRTC.RTCIceCandidate) (at Assets/VR-Workspace/Scripts/PCStreamClient.cs:132)
 Unity.WebRTC.RTCPeerConnection/<>c__DisplayClass49_0:<PCOnIceCandidate>b__0 () (at ./Library/PackageCache/com.unity.webrtc@3.0.0-pre.8/Runtime/Scripts/RTCPeerConnection.cs:431)
@@ -232,8 +232,8 @@ CameraPassthrough:OnDisable () (at Assets/VR-Workspace/Scripts/CameraPassthrough
 ModeController/<TransitionRoutine>d__10:MoveNext () (at Assets/VR-Workspace/Scripts/ModeController.cs:87)
 UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
 
-[PCStreamClient] RAW WS RECV (763 chars): answer:v=0
-o=- 87846 0 IN IP4 127.0.0.1
+[PCStreamClient] RAW WS RECV (762 chars): answer:v=0
+o=- 78315 0 IN IP4 127.0.0.1
 s=sipsorcery
 t=0 0
 a=group:BUNDLE 0
@@ -242,7 +242,7 @@ UnityEngine.Debug:Log (object)
 PCStreamClient/<ConnectAndSignalOffer>d__32:MoveNext () (at Assets/VR-Workspace/Scripts/PCStreamClient.cs:307)
 UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
-[PCStreamClient] Setting remote Answer SDP (754 chars)...
+[PCStreamClient] Setting remote Answer SDP (753 chars)...
 UnityEngine.Debug:Log (object)
 PCStreamClient/<ConnectAndSignalOffer>d__32:MoveNext () (at Assets/VR-Workspace/Scripts/PCStreamClient.cs:320)
 UnityEngine.UnitySynchronizationContext:ExecuteTasks ()

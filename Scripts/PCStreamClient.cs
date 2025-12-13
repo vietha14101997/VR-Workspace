@@ -317,24 +317,28 @@ public class PCStreamClient : MonoBehaviour
                 }
                 
                 var sdp = text.Substring("answer:".Length).Trim();
-                Debug.Log($"[PCStreamClient] Setting remote Answer SDP ({sdp.Length} chars)...");
+                Debug.Log($"[PCStreamClient] Setting remote Answer SDP. Length: {sdp.Length}. Content:\n{sdp}");
                 
                 try
                 {
                     var answer = new RTCSessionDescription { type = RTCSdpType.Answer, sdp = sdp };
                     var setRemoteOp2 = _pc.SetRemoteDescription(ref answer); 
                     
-                    float timeout = 10f;
+                    float timeout = 5f;
                     float elapsed = 0f;
+                    int frames = 0;
                     while (!setRemoteOp2.IsDone && elapsed < timeout)
                     {
+                        // Heartbeat log every ~60 frames (approx 1 sec if running at 60fps) to check if thread is alive
+                        if (frames++ % 60 == 0) Debug.Log($"[PCStreamClient] Waiting for SetRemoteDescr... {elapsed:F1}s");
+                        
                         await Task.Yield();
                         elapsed += Time.deltaTime;
                     }
                     
                     if (!setRemoteOp2.IsDone)
                     {
-                        Debug.LogError($"[PCStreamClient] SetRemoteDescription TIMED OUT after {timeout}s!");
+                        Debug.LogError($"[PCStreamClient] SetRemoteDescription TIMED OUT after {timeout}s! Operation seems stuck.");
                         // Cannot proceed if SDP not set
                         return;
                     }
