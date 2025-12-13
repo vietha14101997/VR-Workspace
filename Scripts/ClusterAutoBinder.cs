@@ -9,7 +9,7 @@ using System.Collections.Generic;
 /// </summary>
 public class ClusterAutoBinder : MonoBehaviour
 {
-    public string serverBase = "http://localhost:8288";
+    public string serverBase = "http://192.168.1.9:8288";
     public WorldPanelClusterRig rig;
 
     [Header("Signal URL Path (appended to serverBase)")]

@@ -18,7 +18,17 @@ using UnityEngine.InputSystem;
 public class PCStreamClient : MonoBehaviour
 {
     [Header("Signal")]
-    public string signalUrl = "ws://127.0.0.1:8288/signal";
+    public string signalUrl = "ws://192.168.1.9:8288/signal?mode=cluster&monitors=2&resW=1920&resH=1080&kbps=8000&fps=30&client=unity";
+
+    [Header("ICE")]
+    [Tooltip("Match the browser test: do NOT drop TCP candidates. Enable only if you know your network supports UDP reliably.")]
+    public bool skipTcpIceCandidates = false;
+
+    [Tooltip("RemotePlayServer streams H264-only. If this client offer doesn't contain H264, Unity may hang on SetRemoteDescription(answer).")]
+    public bool abortIfOfferMissingH264 = true;
+
+    [Tooltip("Unsafe workaround: inject/override a video payload type in the local offer SDP to advertise H264, even if Unity didn't offer it. Use only for testing.")]
+    public bool forceInjectH264IntoOfferSdp = false;
 
     [Header("World Panel")]
     public WorldPanelPlus worldPanel;
@@ -49,8 +59,82 @@ public class PCStreamClient : MonoBehaviour
     private bool _cursorBound;
     private Texture _appliedTexture;
 
+    // ---- Connection state cache (avoid depending on RTCPeerConnection.ConnectionState property across plugin versions) ----
+    private RTCPeerConnectionState _lastPcState = RTCPeerConnectionState.New;
+
     // ---- UV Crop ----
     private RenderTexture _croppedRT;
+
+    static bool SdpContainsH264(string sdp)
+        => !string.IsNullOrEmpty(sdp) && sdp.IndexOf("H264", StringComparison.OrdinalIgnoreCase) >= 0;
+
+    static string GetFirstRtpmapLines(string sdp, int maxLines)
+    {
+        if (string.IsNullOrEmpty(sdp) || maxLines <= 0) return string.Empty;
+        var lines = sdp.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+        var picked = new List<string>(Math.Min(maxLines, 16));
+        foreach (var l in lines)
+        {
+            if (!l.StartsWith("a=rtpmap:", StringComparison.OrdinalIgnoreCase)) continue;
+            picked.Add(l);
+            if (picked.Count >= maxLines) break;
+        }
+        return string.Join("\n", picked);
+    }
+
+    static string FindRtpmapLine(string sdp, int pt)
+    {
+        if (string.IsNullOrEmpty(sdp)) return string.Empty;
+        var needle = "a=rtpmap:" + pt + " ";
+        var lines = sdp.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (var l in lines)
+            if (l.StartsWith(needle, StringComparison.OrdinalIgnoreCase))
+                return l;
+        return string.Empty;
+    }
+
+    static string InjectH264IntoOfferSdp(string offerSdp)
+    {
+        if (string.IsNullOrEmpty(offerSdp)) return offerSdp;
+
+        var lines = offerSdp.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None).ToList();
+        int mVideoIdx = -1;
+        for (int i = 0; i < lines.Count; i++)
+        {
+            if (lines[i].StartsWith("m=video ", StringComparison.OrdinalIgnoreCase)) { mVideoIdx = i; break; }
+        }
+        if (mVideoIdx < 0) return offerSdp;
+
+        // Choose a payload type from the m=video line (prefer 127 if present, else first).
+        var parts = lines[mVideoIdx].Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        int chosenPt = -1;
+        for (int i = 3; i < parts.Length; i++)
+        {
+            if (!int.TryParse(parts[i], out var pt)) continue;
+            if (pt == 127) { chosenPt = 127; break; }
+            if (chosenPt < 0) chosenPt = pt;
+        }
+        if (chosenPt < 0) return offerSdp;
+
+        // Remove existing rtpmap/fmtp lines for chosen PT within the video section.
+        for (int i = mVideoIdx + 1; i < lines.Count; i++)
+        {
+            if (lines[i].StartsWith("m=", StringComparison.OrdinalIgnoreCase)) break;
+            if (lines[i].StartsWith($"a=rtpmap:{chosenPt}", StringComparison.OrdinalIgnoreCase) ||
+                lines[i].StartsWith($"a=fmtp:{chosenPt}", StringComparison.OrdinalIgnoreCase))
+            {
+                lines.RemoveAt(i);
+                i--;
+            }
+        }
+
+        // Insert minimal H264 mapping right after m=video.
+        int insertAt = mVideoIdx + 1;
+        lines.Insert(insertAt++, $"a=rtpmap:{chosenPt} H264/90000");
+        lines.Insert(insertAt++, $"a=fmtp:{chosenPt} packetization-mode=1;level-asymmetry-allowed=1;profile-level-id=42e01f");
+
+        return string.Join("\r\n", lines);
+    }
 
     /// <summary>
     /// Trả về texture gốc (chưa crop) để các UVCropReceiver khác sử dụng
@@ -65,6 +149,107 @@ public class PCStreamClient : MonoBehaviour
     // Debounce keyboard: tập VK đang bị giữ
     private readonly System.Collections.Generic.HashSet<int> _keysHeldVK = new();
 #endif
+
+    // =========================== ICE CONNECTION MONITORING ===========================
+    private static string EnsureSavpf(string sdp)
+    {
+        if (string.IsNullOrEmpty(sdp)) return sdp;
+
+        const string needle = "UDP/TLS/RTP/SAVP";
+        int i = 0;
+        while (true)
+        {
+            int idx = sdp.IndexOf(needle, i, StringComparison.Ordinal);
+            if (idx < 0) return sdp;
+
+            int after = idx + needle.Length;
+
+            // Already SAVPF.
+            if (after < sdp.Length && sdp[after] == 'F')
+            {
+                i = after + 1;
+                continue;
+            }
+
+            // Insert missing 'F' to make SAVPF.
+            sdp = sdp.Substring(0, after) + "F" + sdp.Substring(after);
+            i = after + 1;
+        }
+    }
+
+    private System.Collections.IEnumerator CheckICEConnectionAfterDelay(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        
+        if (_pc != null)
+        {
+            var iceState = _pc.IceConnectionState;
+            var pcState = _lastPcState;
+            
+            Debug.Log($"[PCStreamClient] ICE Check after {delay}s: iceState={iceState}, pcState={pcState}");
+            
+            if (iceState == RTCIceConnectionState.New || iceState == RTCIceConnectionState.Checking)
+            {
+                Debug.LogWarning("[PCStreamClient] ⚠️ ICE connection still in progress. This may indicate a compatibility issue.");
+                Debug.Log("[PCStreamClient] 🔧 Attempting ICE restart to kickstart connection...");
+                
+                // Try to trigger ICE restart by creating new offer
+                StartCoroutine(RestartICEConnection());
+            }
+            else if (iceState == RTCIceConnectionState.Connected)
+            {
+                Debug.Log("[PCStreamClient] 🎉 ICE connection successful!");
+            }
+        }
+    }
+
+    private System.Collections.IEnumerator RestartICEConnection()
+    {
+        if (_pc == null) yield break;
+        
+        Debug.Log("[PCStreamClient] Attempting ICE connection restart...");
+        
+        // Create a new offer which may trigger ICE restart
+        var offerOp = _pc.CreateOffer();
+        while (!offerOp.IsDone) yield return null;
+        
+        if (offerOp.IsError)
+        {
+            Debug.LogError($"[PCStreamClient] Failed to create restart offer: {offerOp.Error.message}");
+            yield break;
+        }
+        
+        var offer = offerOp.Desc;
+        var setLocalOp = _pc.SetLocalDescription(ref offer);
+        while (!setLocalOp.IsDone) yield return null;
+        
+        if (setLocalOp.IsError)
+        {
+            Debug.LogError($"[PCStreamClient] Failed to set local restart offer: {setLocalOp.Error.message}");
+            yield break;
+        }
+        
+        try
+        {
+            string offerSdp = offer.sdp;
+            // Fire-and-forget. Avoid blocking Unity main thread.
+            _ = _ws.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes("offer:" + offerSdp)),
+                              WebSocketMessageType.Text, true, _cts.Token);
+            Debug.Log("[PCStreamClient] Sent restart offer to server");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[PCStreamClient] Failed to send restart offer: {ex.Message}");
+        }
+    }
+
+    // =========================== HELPER METHODS ===========================
+    void RunOnMainThread(System.Action action)
+    {
+        // Simple approach - just run the action directly for now
+        // In Unity, coroutines already run on main thread
+        action();
+    }
 
     // =========================== LIFECYCLE ===========================
     void OnEnable()
@@ -101,12 +286,67 @@ public class PCStreamClient : MonoBehaviour
 
         var cfg = new RTCConfiguration
         {
-            iceServers = new[] { new RTCIceServer { urls = new[] { "stun:stun.l.google.com:19302" } } }
+            iceServers = new[] { 
+                // Thử nhiều STUN servers khác nhau để tránh firewall issue
+                new RTCIceServer { urls = new[] { "stun:stun.l.google.com:19302" } },
+                new RTCIceServer { urls = new[] { "stun:stun1.l.google.com:19302" } },
+                new RTCIceServer { urls = new[] { "stun:stun2.l.google.com:19302" } },
+                new RTCIceServer { urls = new[] { "stun:stun3.l.google.com:19302" } },
+                new RTCIceServer { urls = new[] { "stun:stun4.l.google.com:19302" } },
+                new RTCIceServer { urls = new[] { "stun:stun.stunprotocol.org:3478" } },
+                new RTCIceServer { urls = new[] { "stun:stun.sipgate.net:3478" } }
+            },
+            iceCandidatePoolSize = 0  // Không sử dụng candidate pool để đơn giản
         };
+        Debug.Log($"[PCStreamClient] Creating RTCPeerConnection with signalUrl: {signalUrl}");
         _pc = new RTCPeerConnection(ref cfg);
+        Debug.Log($"[PCStreamClient] RTCPeerConnection created successfully");
 
-        _pc.OnIceConnectionChange = s => Debug.Log("[PCStreamClient] ICE = " + s);
-        _pc.OnConnectionStateChange = s => Debug.Log("[PCStreamClient] PC  = " + s);
+        _pc.OnIceConnectionChange = s => 
+        { 
+            string iceState = s.ToString();
+            string pcState = _lastPcState.ToString();
+            
+            Debug.Log($"[PCStreamClient] 🔍 ICE STATE CHANGE: {s} -> {iceState} (PCState={pcState})");
+            
+            // Log detailed ICE state changes for debugging
+            if (s == RTCIceConnectionState.Connected)
+            {
+                Debug.Log("[PCStreamClient] 🎉 ICE CONNECTED - Video should start flowing!");
+            }
+            else if (s == RTCIceConnectionState.Failed)
+            {
+                Debug.LogError("[PCStreamClient] ❌ ICE FAILED - Connection failed");
+            }
+            else if (s == RTCIceConnectionState.Disconnected)
+            {
+                Debug.LogWarning("[PCStreamClient] ⚠️ ICE DISCONNECTED");
+            }
+            else if (s == RTCIceConnectionState.Checking)
+            {
+                Debug.Log("[PCStreamClient] 🔍 ICE CHECKING - Attempting to connect...");
+            }
+            else if (s == RTCIceConnectionState.New)
+            {
+                Debug.Log("[PCStreamClient] 🆕 ICE NEW - Initial state");
+            }
+        };
+        
+        _pc.OnConnectionStateChange = s => 
+        { 
+            _lastPcState = s;
+            Debug.Log($"[PCStreamClient] PC state = {s}");
+            
+            // Additional logging for connection states
+            if (s == RTCPeerConnectionState.Connected)
+            {
+                Debug.Log("[PCStreamClient] PeerConnection fully connected");
+            }
+            else if (s == RTCPeerConnectionState.Failed)
+            {
+                Debug.LogError("[PCStreamClient] PeerConnection failed");
+            }
+        };
 
         _pc.OnIceCandidate = cand =>
         {
@@ -117,19 +357,23 @@ public class PCStreamClient : MonoBehaviour
             }
             else
             {
-                // Unity WebRTC's cand.Candidate already contains "candidate:" prefix
-                // Only add prefix if not already present
-                string candStr = cand.Candidate;
-                if (candStr.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase))
+                // RemotePlayServer expects ICE candidate messages prefixed with "candidate:".
+                // (See Web/webrtc_test.html: ws.send(ev.candidate.candidate))
+                msg = cand.Candidate;
+                if (!msg.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase) &&
+                    !msg.StartsWith("a=candidate:", StringComparison.OrdinalIgnoreCase))
                 {
-                    msg = candStr;  // Already has prefix
+                    msg = "candidate:" + msg;
                 }
-                else
-                {
-                    msg = "candidate:" + candStr;  // Add prefix
-                }
+
+                // Normalize double-prefix cases (Unity/interop edge-case).
+                if (msg.StartsWith("candidate:candidate:", StringComparison.OrdinalIgnoreCase))
+                    msg = msg.Substring("candidate:".Length);
             }
-            Debug.Log($"[PCStreamClient] Local ICE: {msg.Substring(0, Mathf.Min(60, msg.Length))}...");
+            
+            // Log candidate format for debugging
+            Debug.Log($"[PCStreamClient] 📤 SENDING CANDIDATE: '{msg}' (length={msg.Length})");
+            Debug.Log($"[PCStreamClient] 📤 CANDIDATE FIRST 100: '{msg.Substring(0, Math.Min(100, msg.Length))}...'");
             
             // If WebSocket is ready, send immediately; otherwise queue for later
             if (_ws != null && _ws.State == WebSocketState.Open)
@@ -156,6 +400,7 @@ public class PCStreamClient : MonoBehaviour
 
         // Nhận video
         var trans = _pc.AddTransceiver(TrackKind.Video, new RTCRtpTransceiverInit { direction = RTCRtpTransceiverDirection.RecvOnly });
+        // Configure codecs giống web client
         var caps = RTCRtpReceiver.GetCapabilities(TrackKind.Video);
         var h264 = caps.codecs.Where(c => (c.mimeType ?? "").IndexOf("H264", StringComparison.OrdinalIgnoreCase) >= 0).ToArray();
         var others = caps.codecs.Where(c => h264.All(h => h.mimeType != c.mimeType || h.clockRate != c.clockRate)).ToArray();
@@ -271,15 +516,44 @@ public class PCStreamClient : MonoBehaviour
     // =========================== SIGNAL / WEBRTC ===========================
     async Task ConnectAndSignalOffer()
     {
+        Debug.Log($"[PCStreamClient] Connecting to signal server: {signalUrl}");
         _ws = new ClientWebSocket();
         await _ws.ConnectAsync(new Uri(signalUrl), _cts.Token);
+        Debug.Log($"[PCStreamClient] WebSocket connected successfully to {signalUrl}");
 
         var offerOp = _pc.CreateOffer(); while (!offerOp.IsDone) await Task.Yield();
         if (offerOp.IsError) throw new Exception("CreateOffer failed: " + offerOp.Error.message);
         var offer = offerOp.Desc;
 
+        Debug.Log($"[PCStreamClient] Created offer with SDP type: {offer.type}");
+        Debug.Log($"[PCStreamClient] Offer SDP (first 300 chars): {offer.sdp.Substring(0, Math.Min(300, offer.sdp.Length))}...");
+        Debug.Log($"[PCStreamClient] Full Offer SDP length: {offer.sdp.Length}");
+        bool offerHasH264 = SdpContainsH264(offer.sdp);
+        Debug.Log($"[PCStreamClient] Offer contains H264? {(offerHasH264 ? "YES" : "NO")}");
+        Debug.Log($"[PCStreamClient] Offer rtpmap (first 8):\n{GetFirstRtpmapLines(offer.sdp, 8)}");
+        var rtpmap127 = FindRtpmapLine(offer.sdp, 127);
+        if (!string.IsNullOrEmpty(rtpmap127)) Debug.Log($"[PCStreamClient] Offer rtpmap:127 => {rtpmap127}");
+
+        if (!offerHasH264 && forceInjectH264IntoOfferSdp)
+        {
+            Debug.LogWarning("[PCStreamClient] ⚠️ Offer does not include H264. Applying unsafe SDP injection to advertise H264...");
+            offer.sdp = InjectH264IntoOfferSdp(offer.sdp);
+            offerHasH264 = SdpContainsH264(offer.sdp);
+            Debug.Log($"[PCStreamClient] After injection, offer contains H264? {(offerHasH264 ? "YES" : "NO")}");
+        }
+
+        if (!offerHasH264 && abortIfOfferMissingH264)
+        {
+            Debug.LogError("[PCStreamClient] ❌ This Unity WebRTC build did not offer H264. RemotePlayServer streams H264-only, so connection cannot succeed. " +
+                           "Either use a Unity WebRTC build/package with H264 decode support, or change the server to a codec Unity offers (e.g., VP8). Aborting.");
+            try { _ws.Abort(); } catch { }
+            return;
+        }
+
         var setLocalOp = _pc.SetLocalDescription(ref offer); while (!setLocalOp.IsDone) await Task.Yield();
         if (setLocalOp.IsError) throw new Exception("SetLocalDescription failed: " + setLocalOp.Error.message);
+        
+        Debug.Log($"[PCStreamClient] SetLocalDescription completed successfully");
 
         await _ws.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes("offer:" + offer.sdp)),
                             WebSocketMessageType.Text, true, _cts.Token);
@@ -317,29 +591,37 @@ public class PCStreamClient : MonoBehaviour
                 }
                 
                 var sdp = text.Substring("answer:".Length).Trim();
-                Debug.Log($"[PCStreamClient] Setting remote Answer SDP. Length: {sdp.Length}. Content:\n{sdp}");
+                // Server sometimes replies with UDP/TLS/RTP/SAVP (without F). Browser test fixes this.
+                // Do the same to avoid SetRemoteDescription failures/hangs.
+                sdp = EnsureSavpf(sdp);
+                Debug.Log($"[PCStreamClient] Received Answer SDP with length: {sdp.Length}");
+                Debug.Log($"[PCStreamClient] Answer SDP sample (first 200 chars): {sdp.Substring(0, Math.Min(200, sdp.Length))}...");
                 
                 try
                 {
                     var answer = new RTCSessionDescription { type = RTCSdpType.Answer, sdp = sdp };
+                    Debug.Log($"[PCStreamClient] Setting remote Answer SDP...");
+                    
                     var setRemoteOp2 = _pc.SetRemoteDescription(ref answer); 
-                    
-                    float timeout = 5f;
-                    float elapsed = 0f;
-                    int frames = 0;
-                    while (!setRemoteOp2.IsDone && elapsed < timeout)
+
+                    // IMPORTANT: Do NOT use Time.deltaTime for async timeouts.
+                    // It may remain 0 in this context and cause an infinite loop.
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    var lastBeatMs = 0L;
+                    var timeoutMs = 5000;
+                    while (!setRemoteOp2.IsDone && sw.ElapsedMilliseconds < timeoutMs)
                     {
-                        // Heartbeat log every ~60 frames (approx 1 sec if running at 60fps) to check if thread is alive
-                        if (frames++ % 60 == 0) Debug.Log($"[PCStreamClient] Waiting for SetRemoteDescr... {elapsed:F1}s");
-                        
-                        await Task.Yield();
-                        elapsed += Time.deltaTime;
+                        if (sw.ElapsedMilliseconds - lastBeatMs >= 1000)
+                        {
+                            lastBeatMs = sw.ElapsedMilliseconds;
+                            Debug.Log($"[PCStreamClient] Waiting for SetRemoteDescription... {sw.ElapsedMilliseconds}ms");
+                        }
+                        await Task.Delay(10);
                     }
-                    
+
                     if (!setRemoteOp2.IsDone)
                     {
-                        Debug.LogError($"[PCStreamClient] SetRemoteDescription TIMED OUT after {timeout}s! Operation seems stuck.");
-                        // Cannot proceed if SDP not set
+                        Debug.LogError($"[PCStreamClient] SetRemoteDescription TIMED OUT after {timeoutMs}ms (still not done). Aborting connection.");
                         return;
                     }
                     
@@ -350,7 +632,23 @@ public class PCStreamClient : MonoBehaviour
                     else
                     {
                         Debug.Log($"[PCStreamClient] SetRemoteDescription(answer) OK, signalState={_pc.SignalingState}");
+                        Debug.Log($"[PCStreamClient] Current ICE state after SetRemoteDescription: {_pc.IceConnectionState}");
+                        Debug.Log($"[PCStreamClient] Current PeerConnection state (cached): {_lastPcState}");
                         answerSet = true;
+                        
+                        // Force immediate ICE restart if still in NEW state - using UnityMainThreadDispatcher
+                        if (_pc.IceConnectionState == RTCIceConnectionState.New)
+                        {
+                            Debug.LogWarning("[PCStreamClient] ⚠️ ICE still in NEW state after SetRemoteDescription - forcing restart now");
+                            RunOnMainThread(() => StartCoroutine(RestartICEConnection()));
+                        }
+                        else
+                        {
+                            // Force ICE state check after a short delay for other cases
+                            RunOnMainThread(() => StartCoroutine(CheckICEConnectionAfterDelay(3.0f)));
+                        }
+                        
+                        Debug.Log($"[PCStreamClient] ✅ ICE processing completed successfully!");
                     }
                 }
                 catch (Exception ex)
@@ -361,54 +659,110 @@ public class PCStreamClient : MonoBehaviour
                 
                 if (answerSet)
                 {
-                if (pendingRemoteCandidates.Count > 0)
-                {
-                    Debug.Log($"[PCStreamClient] Adding {pendingRemoteCandidates.Count} pending remote ICE candidates");
-                    foreach (var cand in pendingRemoteCandidates)
+                    if (pendingRemoteCandidates.Count > 0)
                     {
-                        _pc.AddIceCandidate(new RTCIceCandidate(new RTCIceCandidateInit
+                        Debug.Log($"[PCStreamClient] Adding {pendingRemoteCandidates.Count} pending remote ICE candidates");
+                        foreach (var cand in pendingRemoteCandidates)
                         {
-                            candidate = cand,
-                            sdpMLineIndex = 0,
-                            sdpMid = "0"
-                        }));
-                        Debug.Log($"[PCStreamClient] Added pending cand: {cand.Substring(0, Mathf.Min(60, cand.Length))}...");
+                            _pc.AddIceCandidate(new RTCIceCandidate(new RTCIceCandidateInit
+                            {
+                                candidate = cand,
+                                sdpMLineIndex = 0,
+                                sdpMid = "0"
+                            }));
+                            Debug.Log($"[PCStreamClient] Added pending cand: {cand.Substring(0, Mathf.Min(60, cand.Length))}...");
+                        }
+                        pendingRemoteCandidates.Clear();
+                        Debug.Log($"[PCStreamClient] After adding pending candidates: iceState={_pc.IceConnectionState}");
+                        
+                        // Force ICE connection establishment if still in NEW state
+                        if (_pc.IceConnectionState == RTCIceConnectionState.New)
+                        {
+                            Debug.LogWarning("[PCStreamClient] ⚠️ Forcing ICE connection establishment after adding candidates");
+                            StartCoroutine(CheckICEConnectionAfterDelay(1.0f));
+                        }
                     }
-                    pendingRemoteCandidates.Clear();
-                    Debug.Log($"[PCStreamClient] After pending ICE: iceState={_pc.IceConnectionState}");
-                }
                 }
             }
             else if (text.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase))
             {
+                Debug.Log($"[PCStreamClient] 📥 RECEIVED CANDIDATE FROM SERVER: '{text}' (length={text.Length})");
+                Debug.Log($"[PCStreamClient] 📥 CANDIDATE FIRST 100: '{text.Substring(0, Math.Min(100, text.Length))}...'");
+                
+                // Server sends candidate with "candidate:" prefix
+                // Try both formats - with and without prefix for Unity WebRTC
                 var raw = text.Substring("candidate:".Length).Trim();
-                // Chỉ lọc TCP candidates, chấp nhận cả IPv4 và IPv6 UDP
-                if (raw.Contains(" tcp ", StringComparison.OrdinalIgnoreCase) || 
-                    raw.Contains("tcptype", StringComparison.OrdinalIgnoreCase)) 
+
+                // Normalize potential double-prefix cases.
+                if (raw.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase))
+                    raw = raw.Substring("candidate:".Length).Trim();
+
+                // Optionally skip TCP candidates (default OFF to match browser test).
+                if (skipTcpIceCandidates &&
+                    (raw.Contains(" tcp ", StringComparison.OrdinalIgnoreCase) ||
+                     raw.Contains("tcptype", StringComparison.OrdinalIgnoreCase)))
                 {
-                    Debug.Log("[PCStreamClient] skip TCP candidate: " + raw);
+                    Debug.Log("[PCStreamClient] skip TCP candidate (skipTcpIceCandidates=true)");
                     continue;
                 }
 
-                var full = "candidate:" + raw;
+                // Full format (most compatible): candidate:<...>
+                var fullCandidate = "candidate:" + raw;
+                bool added = false;
                 
-                if (answerSet)
+                try
                 {
-                    // Answer already set, add immediately
-                    _pc.AddIceCandidate(new RTCIceCandidate(new RTCIceCandidateInit
+                    if (answerSet)
                     {
-                        candidate = full,
-                        sdpMLineIndex = 0,
-                        sdpMid = "0"
-                    }));
-                    Debug.Log($"[PCStreamClient] add remote cand: {full.Substring(0, Mathf.Min(60, full.Length))}...");
-                    Debug.Log($"[PCStreamClient] After add ICE: iceState={_pc.IceConnectionState}");
+                        Debug.Log($"[PCStreamClient] Trying full format candidate: {fullCandidate.Substring(0, Mathf.Min(60, fullCandidate.Length))}...");
+                        _pc.AddIceCandidate(new RTCIceCandidate(new RTCIceCandidateInit
+                        {
+                            candidate = fullCandidate,
+                            sdpMLineIndex = 0,
+                            sdpMid = "0"
+                        }));
+                        Debug.Log($"[PCStreamClient] ✅ Full format candidate added");
+                        added = true;
+                    }
+                    else
+                    {
+                        pendingRemoteCandidates.Add(fullCandidate);
+                        Debug.Log($"[PCStreamClient] Queued full format candidate: {fullCandidate.Substring(0, Mathf.Min(50, fullCandidate.Length))}...");
+                        added = true;
+                    }
                 }
-                else
+                catch (Exception ex)
                 {
-                    // Queue until answer is set
-                    pendingRemoteCandidates.Add(full);
-                    Debug.Log($"[PCStreamClient] Queued remote ICE (no answer yet): {full.Substring(0, Mathf.Min(50, full.Length))}...");
+                    Debug.LogError($"[PCStreamClient] Failed to add full format candidate: {ex.Message}");
+                    added = false;
+                }
+                
+                // Fallback: try raw format without prefix
+                if (!added)
+                {
+                    try
+                    {
+                        if (answerSet)
+                        {
+                            Debug.Log($"[PCStreamClient] Trying raw format fallback: {raw.Substring(0, Mathf.Min(60, raw.Length))}...");
+                            _pc.AddIceCandidate(new RTCIceCandidate(new RTCIceCandidateInit
+                            {
+                                candidate = raw,
+                                sdpMLineIndex = 0,
+                                sdpMid = "0"
+                            }));
+                            Debug.Log($"[PCStreamClient] ✅ Raw format candidate added");
+                        }
+                        else
+                        {
+                            pendingRemoteCandidates.Add(raw);
+                            Debug.Log($"[PCStreamClient] Queued raw format candidate: {raw.Substring(0, Mathf.Min(50, raw.Length))}...");
+                        }
+                    }
+                    catch (Exception ex2)
+                    {
+                        Debug.LogError($"[PCStreamClient] Both formats failed: {ex2.Message}");
+                    }
                 }
             }
             else if (text.StartsWith("end-of-candidates", StringComparison.OrdinalIgnoreCase))
@@ -565,7 +919,7 @@ public class PCStreamClient : MonoBehaviour
 
     void SendKey(int vk, bool down)
     {
-        if (_ws == null) return;
+        if (_ws == null || _cts == null) return;
         Debug.Log($"[PC->SRV] key vk=0x{vk:X2} {(down ? "DOWN" : "UP")}");
         var json = $"{{\"input\":\"key\",\"vk\":{vk},\"down\":{(down ? "true" : "false")}}}";
         var bytes = Encoding.UTF8.GetBytes(json);

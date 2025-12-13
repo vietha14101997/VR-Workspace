@@ -18,6 +18,10 @@ public class AndroidCursorHider : MonoBehaviour
             {
                 // Lưu icon hiện tại để có thể khôi phục
                 _prevIcon = decor.Call<AndroidJavaObject>("getPointerIcon");
+                
+                // Reference _prevIcon to avoid warning (used in OnDisable)
+                if (_prevIcon == null) 
+                    Debug.Log("[AndroidCursorHider] No previous icon detected");
 
                 // Tạo bitmap trong suốt 1x1
                 using (var bitmapCls = new AndroidJavaClass("android.graphics.Bitmap"))
