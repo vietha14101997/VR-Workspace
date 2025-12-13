@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
@@ -116,12 +117,41 @@ public class PCStreamClient : MonoBehaviour
             }
             else
             {
-                // Add 'candidate:' prefix for server to recognize
-                msg = "candidate:" + cand.Candidate;
+                // Unity WebRTC's cand.Candidate already contains "candidate:" prefix
+                // Only add prefix if not already present
+                string candStr = cand.Candidate;
+                if (candStr.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase))
+                {
+                    msg = candStr;  // Already has prefix
+                }
+                else
+                {
+                    msg = "candidate:" + candStr;  // Add prefix
+                }
             }
-            Debug.Log($"[PCStreamClient] Sending local ICE: {msg.Substring(0, Mathf.Min(50, msg.Length))}...");
-            _ws?.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(msg)),
-                           WebSocketMessageType.Text, true, _cts.Token);
+            Debug.Log($"[PCStreamClient] Local ICE: {msg.Substring(0, Mathf.Min(60, msg.Length))}...");
+            
+            // If WebSocket is ready, send immediately; otherwise queue for later
+            if (_ws != null && _ws.State == WebSocketState.Open)
+            {
+                try
+                {
+                    _ws.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(msg)),
+                                  WebSocketMessageType.Text, true, _cts.Token);
+                    Debug.Log($"[PCStreamClient] Sent ICE immediately");
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[PCStreamClient] Send ICE failed: {ex.Message}, queuing...");
+                    _pendingLocalCands.Add(msg);
+                }
+            }
+            else
+            {
+                // Queue for sending after WS connects
+                _pendingLocalCands.Add(msg);
+                Debug.Log($"[PCStreamClient] Queued ICE (WS not ready), queue size = {_pendingLocalCands.Count}");
+            }
         };
 
         // Nhận video
@@ -260,6 +290,9 @@ public class PCStreamClient : MonoBehaviour
         _pendingLocalCands.Clear();
 
         var buf = new byte[256 * 1024];
+        var pendingRemoteCandidates = new List<string>(); // Queue ICE until answer is set
+        bool answerSet = false;
+        
         while (true)
         {
             var ms = new System.IO.MemoryStream();
@@ -271,14 +304,76 @@ public class PCStreamClient : MonoBehaviour
                 if (res.EndOfMessage) break;
             }
             var text = Encoding.UTF8.GetString(ms.ToArray());
+            Debug.Log($"[PCStreamClient] RAW WS RECV ({text.Length} chars): {text.Substring(0, Mathf.Min(100, text.Length))}...");
+            
+            if (string.IsNullOrWhiteSpace(text)) continue;
 
             if (text.StartsWith("answer:", StringComparison.OrdinalIgnoreCase))
             {
-                var sdp = text.Substring("answer:".Length);
-                var answer = new RTCSessionDescription { type = RTCSdpType.Answer, sdp = sdp };
-                var setRemoteOp2 = _pc.SetRemoteDescription(ref answer); while (!setRemoteOp2.IsDone) await Task.Yield();
-                if (setRemoteOp2.IsError) throw new Exception("SetRemoteDescription failed: " + setRemoteOp2.Error.message);
-                Debug.Log("[PCStreamClient] SetRemoteDescription(answer) OK");
+                if (_pc == null) 
+                {
+                    Debug.LogWarning("[PCStreamClient] PeerConnection is null, ignoring Answer");
+                    return;
+                }
+                
+                var sdp = text.Substring("answer:".Length).Trim();
+                Debug.Log($"[PCStreamClient] Setting remote Answer SDP ({sdp.Length} chars)...");
+                
+                try
+                {
+                    var answer = new RTCSessionDescription { type = RTCSdpType.Answer, sdp = sdp };
+                    var setRemoteOp2 = _pc.SetRemoteDescription(ref answer); 
+                    
+                    float timeout = 10f;
+                    float elapsed = 0f;
+                    while (!setRemoteOp2.IsDone && elapsed < timeout)
+                    {
+                        await Task.Yield();
+                        elapsed += Time.deltaTime;
+                    }
+                    
+                    if (!setRemoteOp2.IsDone)
+                    {
+                        Debug.LogError($"[PCStreamClient] SetRemoteDescription TIMED OUT after {timeout}s!");
+                        // Cannot proceed if SDP not set
+                        return;
+                    }
+                    
+                    if (setRemoteOp2.IsError)
+                    {
+                        Debug.LogError("[PCStreamClient] SetRemoteDescription failed: " + setRemoteOp2.Error.message);
+                    }
+                    else
+                    {
+                        Debug.Log($"[PCStreamClient] SetRemoteDescription(answer) OK, signalState={_pc.SignalingState}");
+                        answerSet = true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[PCStreamClient] Exception setting remote description: {ex.Message}");
+                    return;
+                }
+                
+                if (answerSet)
+                {
+                if (pendingRemoteCandidates.Count > 0)
+                {
+                    Debug.Log($"[PCStreamClient] Adding {pendingRemoteCandidates.Count} pending remote ICE candidates");
+                    foreach (var cand in pendingRemoteCandidates)
+                    {
+                        _pc.AddIceCandidate(new RTCIceCandidate(new RTCIceCandidateInit
+                        {
+                            candidate = cand,
+                            sdpMLineIndex = 0,
+                            sdpMid = "0"
+                        }));
+                        Debug.Log($"[PCStreamClient] Added pending cand: {cand.Substring(0, Mathf.Min(60, cand.Length))}...");
+                    }
+                    pendingRemoteCandidates.Clear();
+                    Debug.Log($"[PCStreamClient] After pending ICE: iceState={_pc.IceConnectionState}");
+                }
+                }
             }
             else if (text.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase))
             {
@@ -292,13 +387,25 @@ public class PCStreamClient : MonoBehaviour
                 }
 
                 var full = "candidate:" + raw;
-                _pc.AddIceCandidate(new RTCIceCandidate(new RTCIceCandidateInit
+                
+                if (answerSet)
                 {
-                    candidate = full,
-                    sdpMLineIndex = 0,
-                    sdpMid = "0"
-                }));
-                Debug.Log("[PCStreamClient] add remote cand: " + full);
+                    // Answer already set, add immediately
+                    _pc.AddIceCandidate(new RTCIceCandidate(new RTCIceCandidateInit
+                    {
+                        candidate = full,
+                        sdpMLineIndex = 0,
+                        sdpMid = "0"
+                    }));
+                    Debug.Log($"[PCStreamClient] add remote cand: {full.Substring(0, Mathf.Min(60, full.Length))}...");
+                    Debug.Log($"[PCStreamClient] After add ICE: iceState={_pc.IceConnectionState}");
+                }
+                else
+                {
+                    // Queue until answer is set
+                    pendingRemoteCandidates.Add(full);
+                    Debug.Log($"[PCStreamClient] Queued remote ICE (no answer yet): {full.Substring(0, Mathf.Min(50, full.Length))}...");
+                }
             }
             else if (text.StartsWith("end-of-candidates", StringComparison.OrdinalIgnoreCase))
             {
