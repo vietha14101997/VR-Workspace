@@ -513,7 +513,10 @@ public class PCStreamClient : MonoBehaviour
         {
             iceServers = Array.Empty<RTCIceServer>(),
             iceCandidatePoolSize = 0,  // Không sử dụng candidate pool để đơn giản
-            iceTransportPolicy = forceUdpOnly ? RTCIceTransportPolicy.Relay : RTCIceTransportPolicy.All  // Force UDP-only if enabled
+            // NOTE: Use RTCIceTransportPolicy.All to allow host candidates (LAN direct connection)
+            // TCP filtering is handled separately in OnIceCandidate callback via skipTcpIceCandidates
+            // RTCIceTransportPolicy.Relay would require a TURN server which we don't have
+            iceTransportPolicy = RTCIceTransportPolicy.All
         };
         
         string optimizedUrl = BuildOptimizedSignalUrl();
