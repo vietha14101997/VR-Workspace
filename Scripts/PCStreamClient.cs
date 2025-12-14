@@ -443,10 +443,14 @@ public class PCStreamClient : MonoBehaviour
         Debug.Log($"[PCStreamClient] LAN auto-detect: {autoDetectLAN}");
         Debug.Log($"[PCStreamClient] Skip TCP ICE: {skipTcpIceCandidates} (RECOMMENDED: true)");
         Debug.Log($"[PCStreamClient] ===== FIXES APPLIED =====");
-        Debug.Log($"[PCStreamClient] ✅ TCP candidate filtering enabled (fixes ICE negotiation)");
+        Debug.Log($"[PCStreamClient] ✅ TCP candidate GENERATION filtering (prevents Unity sending TCP to server)");
+        Debug.Log($"[PCStreamClient] ✅ TCP candidate RECEPTION filtering (prevents Unity accepting TCP from server)");
         Debug.Log($"[PCStreamClient] ✅ Enhanced debugging and timeout handling");
         Debug.Log($"[PCStreamClient] ✅ Multiple ICE connection checkpoints");
         Debug.Log($"[PCStreamClient] ✅ LAN optimization with lan=1 parameter");
+        Debug.Log($"[PCStreamClient] ===== EXPECTED BEHAVIOR =====");
+        Debug.Log($"[PCStreamClient] • Unity will only send UDP candidates (matching browser)");
+        Debug.Log($"[PCStreamClient] • Unity will only accept UDP candidates from server");
         Debug.Log($"[PCStreamClient] Creating RTCPeerConnection...");
         
         _pc = new RTCPeerConnection(ref cfg);
@@ -521,6 +525,16 @@ public class PCStreamClient : MonoBehaviour
                 if (msg.StartsWith("candidate:candidate:", StringComparison.OrdinalIgnoreCase))
                     msg = msg.Substring("candidate:".Length);
                 
+                // CRITICAL FIX: Filter out TCP candidates BEFORE sending to server
+                // Browser only sends UDP, Unity generates both UDP+TCP causing ICE failures
+                if (skipTcpIceCandidates && 
+                    (msg.Contains(" tcp ", StringComparison.OrdinalIgnoreCase) || 
+                     msg.Contains("tcptype", StringComparison.OrdinalIgnoreCase)))
+                {
+                    Debug.Log($"[PCStreamClient] ❌ FILTERED LOCAL TCP candidate (not sending to server): {msg.Substring(0, Math.Min(60, msg.Length))}...");
+                    return; // Don't send TCP candidates to server
+                }
+                
                 // Check for host candidates (LAN optimization)
                 bool isHost = msg.Contains(" typ host ", StringComparison.OrdinalIgnoreCase);
                 bool isPrivateIP = msg.Contains("192.168.") || msg.Contains("10.") || 
@@ -528,11 +542,11 @@ public class PCStreamClient : MonoBehaviour
                 
                 if (isHost && isPrivateIP)
                 {
-                    Debug.Log($"[PCStreamClient] 📤 LOCAL HOST (LAN): {msg.Substring(0, Math.Min(80, msg.Length))}...");
+                    Debug.Log($"[PCStreamClient] 📤 SENDING LOCAL HOST (LAN UDP): {msg.Substring(0, Math.Min(80, msg.Length))}...");
                 }
                 else
                 {
-                    Debug.Log($"[PCStreamClient] 📤 LOCAL CANDIDATE: {msg.Substring(0, Math.Min(60, msg.Length))}...");
+                    Debug.Log($"[PCStreamClient] 📤 SENDING LOCAL CANDIDATE: {msg.Substring(0, Math.Min(60, msg.Length))}...");
                 }
             }
             
