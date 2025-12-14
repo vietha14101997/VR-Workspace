@@ -27,6 +27,9 @@ public class PCStreamClient : MonoBehaviour
     [Header("ICE")]
     [Tooltip("RECOMMENDED: Skip TCP candidates to match browser behavior. TCP candidates can cause ICE negotiation issues with some servers.")]
     public bool skipTcpIceCandidates = true;
+    
+    [Tooltip("Force UDP-only ICE transport policy to prevent any TCP candidate generation")]
+    public bool forceUdpOnly = true;
 
     [Tooltip("RemotePlayServer streams H264-only. If this client offer doesn't contain H264, Unity may hang on SetRemoteDescription(answer).")]
     public bool abortIfOfferMissingH264 = true;
@@ -433,7 +436,8 @@ public class PCStreamClient : MonoBehaviour
         var cfg = new RTCConfiguration
         {
             iceServers = Array.Empty<RTCIceServer>(),
-            iceCandidatePoolSize = 0  // Không sử dụng candidate pool để đơn giản
+            iceCandidatePoolSize = 0,  // Không sử dụng candidate pool để đơn giản
+            iceTransportPolicy = forceUdpOnly ? RTCIceTransportPolicy.Relay : RTCIceTransportPolicy.All  // Force UDP-only if enabled
         };
         
         string optimizedUrl = BuildOptimizedSignalUrl();
@@ -442,9 +446,11 @@ public class PCStreamClient : MonoBehaviour
         Debug.Log($"[PCStreamClient] Optimized URL: {optimizedUrl}");
         Debug.Log($"[PCStreamClient] LAN auto-detect: {autoDetectLAN}");
         Debug.Log($"[PCStreamClient] Skip TCP ICE: {skipTcpIceCandidates} (RECOMMENDED: true)");
+        Debug.Log($"[PCStreamClient] Force UDP-only: {forceUdpOnly} (RECOMMENDED: true)");
         Debug.Log($"[PCStreamClient] ===== FIXES APPLIED =====");
         Debug.Log($"[PCStreamClient] ✅ TCP candidate GENERATION filtering (prevents Unity sending TCP to server)");
         Debug.Log($"[PCStreamClient] ✅ TCP candidate RECEPTION filtering (prevents Unity accepting TCP from server)");
+        Debug.Log($"[PCStreamClient] ✅ UDP-only ICE transport policy (prevents any TCP generation)");
         Debug.Log($"[PCStreamClient] ✅ Enhanced debugging and timeout handling");
         Debug.Log($"[PCStreamClient] ✅ Multiple ICE connection checkpoints");
         Debug.Log($"[PCStreamClient] ✅ LAN optimization with lan=1 parameter");
@@ -531,7 +537,7 @@ public class PCStreamClient : MonoBehaviour
                     (msg.Contains(" tcp ", StringComparison.OrdinalIgnoreCase) || 
                      msg.Contains("tcptype", StringComparison.OrdinalIgnoreCase)))
                 {
-                    Debug.Log($"[PCStreamClient] ❌ FILTERED LOCAL TCP candidate (not sending to server): {msg.Substring(0, Math.Min(60, msg.Length))}...");
+                    Debug.LogError($"[PCStreamClient] ❌ FILTERED LOCAL TCP candidate (TCP candidates cause failures): {msg.Substring(0, Math.Min(60, msg.Length))}...");
                     return; // Don't send TCP candidates to server
                 }
                 
