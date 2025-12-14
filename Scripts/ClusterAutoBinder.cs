@@ -38,7 +38,7 @@ public class ClusterAutoBinder : MonoBehaviour
     [SerializeField] private int gapPixels = 0;
 
     private PCStreamClient _masterClient;
-    private MultiTrackStreamClient _multiTrackClient;
+    private MultiPCStreamClient _multiPCClient;  // Option B: N separate PeerConnections
     private List<UVCropReceiver> _cropReceivers = new List<UVCropReceiver>();
 
     void Start()
@@ -72,18 +72,18 @@ public class ClusterAutoBinder : MonoBehaviour
             return;
         }
 
-        // Create single MultiTrackStreamClient with all panels
+        // Create MultiPCStreamClient (Option B: N separate PeerConnections)
         var centerPanel = panels[panels.Count / 2];
-        _multiTrackClient = centerPanel.gameObject.AddComponent<MultiTrackStreamClient>();
+        _multiPCClient = centerPanel.gameObject.AddComponent<MultiPCStreamClient>();
 
         var wsBase = serverBase.Replace("http://", "ws://").Replace("https://", "wss://");
-        _multiTrackClient.signalUrl = $"{wsBase}/{multiTrackSignalPath}";
+        _multiPCClient.signalUrl = $"{wsBase}/{multiTrackSignalPath}";
 
-        // Assign all panels to the multi-track client
-        _multiTrackClient.panels = panels.ToArray();
+        // Assign all panels to the multi-PC client
+        _multiPCClient.panels = panels.ToArray();
 
-        Debug.Log($"[ClusterAutoBinder] Multi-track client created, url={_multiTrackClient.signalUrl}");
-        Debug.Log($"[ClusterAutoBinder] Bound {panels.Count} panels to {panels.Count} video tracks");
+        Debug.Log($"[ClusterAutoBinder] MultiPC client created (Option B), url={_multiPCClient.signalUrl}");
+        Debug.Log($"[ClusterAutoBinder] Bound {panels.Count} panels to {panels.Count} PeerConnections");
     }
 
     void BindPanelsToStream()
@@ -160,7 +160,7 @@ public class ClusterAutoBinder : MonoBehaviour
     void OnDestroy()
     {
         if (_masterClient) Destroy(_masterClient);
-        if (_multiTrackClient) Destroy(_multiTrackClient);
+        if (_multiPCClient) Destroy(_multiPCClient);
         foreach (var r in _cropReceivers)
             if (r) Destroy(r);
         _cropReceivers.Clear();
