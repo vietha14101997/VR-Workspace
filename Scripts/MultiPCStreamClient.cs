@@ -24,6 +24,10 @@ public class MultiPCStreamClient : MonoBehaviour
 
     [Header("ICE")]
     public bool skipTcpIceCandidates = true;
+    
+    [Header("LAN Optimization")]
+    [Tooltip("Auto-detect LAN connection and add &lan=1 parameter")]
+    public bool autoDetectLAN = true;
 
     private ClientWebSocket _ws;
     private CancellationTokenSource _cts;
@@ -41,6 +45,41 @@ public class MultiPCStreamClient : MonoBehaviour
 
     public int MonitorCount => _pcs.Count;
     public Texture GetTexture(int index) => index >= 0 && index < _pcs.Count ? _pcs[index].Texture : null;
+
+    static bool IsPrivateHost(string host)
+    {
+        if (string.IsNullOrWhiteSpace(host)) return false;
+        if (System.Text.RegularExpressions.Regex.IsMatch(host.Trim(), @"^(\d+)\.(\d+)\.(\d+)\.(\d+)$"))
+        {
+            var parts = host.Trim().Split('.');
+            if (parts.Length == 4 && int.TryParse(parts[0], out int first) && int.TryParse(parts[1], out int second))
+            {
+                if (first == 10) return true;
+                if (first == 192 && second == 168) return true;
+                if (first == 172 && second >= 16 && second <= 31) return true;
+            }
+        }
+        return false;
+    }
+
+    string BuildOptimizedSignalUrl()
+    {
+        string url = signalUrl;
+        if (autoDetectLAN && !string.IsNullOrEmpty(url))
+        {
+            try
+            {
+                var uri = new Uri(url);
+                if (IsPrivateHost(uri.Host) && !url.Contains("lan="))
+                {
+                    url += url.Contains("?") ? "&lan=1" : "?lan=1";
+                    Debug.Log($"[MultiPC] LAN optimization: added lan=1 for {uri.Host}");
+                }
+            }
+            catch { }
+        }
+        return url;
+    }
 
     int GetExpectedMonitors()
     {
@@ -83,16 +122,41 @@ public class MultiPCStreamClient : MonoBehaviour
             pc.OnIceConnectionChange = s => Debug.Log($"[MultiPC] PC{idx} ICE: {s}");
             pc.OnConnectionStateChange = s => Debug.Log($"[MultiPC] PC{idx} State: {s}");
 
-            // ICE candidates - send with index prefix
+            // ICE candidates - send with index prefix (matching PCStreamClient format)
             pc.OnIceCandidate = cand =>
             {
-                if (string.IsNullOrEmpty(cand.Candidate)) return;
-                string msg = cand.Candidate;
-                if (skipTcpIceCandidates && (msg.Contains(" tcp ", StringComparison.OrdinalIgnoreCase) || msg.Contains("tcptype", StringComparison.OrdinalIgnoreCase)))
+                if (string.IsNullOrEmpty(cand.Candidate)) 
+                {
+                    Debug.Log($"[MultiPC] PC{idx} ICE gathering complete");
                     return;
+                }
+                
+                string msg = cand.Candidate;
+                
+                // Skip TCP candidates (matching browser behavior)
+                if (skipTcpIceCandidates && (msg.Contains(" tcp ", StringComparison.OrdinalIgnoreCase) || msg.Contains("tcptype", StringComparison.OrdinalIgnoreCase)))
+                {
+                    Debug.Log($"[MultiPC] PC{idx} Skipped TCP candidate");
+                    return;
+                }
+                
+                // Normalize candidate format
                 if (!msg.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase))
                     msg = "candidate:" + msg;
-                SendWs($"candidate:{idx}:{msg.Substring(10)}"); // Strip "candidate:" prefix, server will add it
+                
+                // Handle double-prefix edge case
+                if (msg.StartsWith("candidate:candidate:", StringComparison.OrdinalIgnoreCase))
+                    msg = msg.Substring("candidate:".Length);
+                
+                // Extract raw candidate (without "candidate:" prefix)
+                string rawCandidate = msg.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase) 
+                    ? msg.Substring("candidate:".Length) 
+                    : msg;
+                
+                // Send format: candidate:{monitorIndex}:{rawCandidate}
+                string toSend = $"candidate:{idx}:{rawCandidate}";
+                Debug.Log($"[MultiPC] PC{idx} Sending ICE: {toSend.Substring(0, Math.Min(80, toSend.Length))}...");
+                SendWs(toSend);
             };
 
             // Track received
@@ -138,10 +202,11 @@ public class MultiPCStreamClient : MonoBehaviour
 
     async Task ConnectAndSignal()
     {
-        Debug.Log($"[MultiPC] Connecting to {signalUrl}");
+        string url = BuildOptimizedSignalUrl();
+        Debug.Log($"[MultiPC] Connecting to {url}");
         _ws = new ClientWebSocket();
         _ws.Options.KeepAliveInterval = TimeSpan.FromSeconds(30);
-        await _ws.ConnectAsync(new Uri(signalUrl), _cts.Token);
+        await _ws.ConnectAsync(new Uri(url), _cts.Token);
         Debug.Log("[MultiPC] WebSocket connected");
 
         // Send offers for all PCs
@@ -221,8 +286,17 @@ public class MultiPCStreamClient : MonoBehaviour
                 if (colonIdx > 0 && int.TryParse(rest.Substring(0, colonIdx), out int monIdx))
                 {
                     var candStr = rest.Substring(colonIdx + 1);
+                    
+                    // Skip TCP candidates (matching browser behavior)
                     if (skipTcpIceCandidates && (candStr.Contains(" tcp ", StringComparison.OrdinalIgnoreCase) || candStr.Contains("tcptype", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        Debug.Log($"[MultiPC] PC{monIdx} Skipped remote TCP candidate");
                         continue;
+                    }
+                    
+                    // Log received candidate
+                    bool isHost = candStr.Contains(" typ host ", StringComparison.OrdinalIgnoreCase);
+                    Debug.Log($"[MultiPC] PC{monIdx} Received {(isHost ? "HOST" : "SRFLX")} ICE: {candStr.Substring(0, Math.Min(60, candStr.Length))}...");
                     
                     if (monIdx >= 0 && monIdx < _pcs.Count)
                     {
@@ -244,12 +318,28 @@ public class MultiPCStreamClient : MonoBehaviour
     {
         try
         {
+            // Normalize: remove double-prefix if present
+            if (candStr.StartsWith("candidate:candidate:", StringComparison.OrdinalIgnoreCase))
+                candStr = candStr.Substring("candidate:".Length);
+            
+            // Ensure proper format
             var fullCand = candStr.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase) ? candStr : "candidate:" + candStr;
+            
             wrapper.PC.AddIceCandidate(new RTCIceCandidate(new RTCIceCandidateInit { candidate = fullCand, sdpMLineIndex = 0, sdpMid = "0" }));
+            Debug.Log($"[MultiPC] PC{wrapper.Index} Added ICE candidate");
         }
         catch (Exception ex)
         {
             Debug.LogWarning($"[MultiPC] PC{wrapper.Index} AddICE error: {ex.Message}");
+            
+            // Fallback: try without prefix
+            try
+            {
+                var rawCand = candStr.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase) ? candStr.Substring("candidate:".Length) : candStr;
+                wrapper.PC.AddIceCandidate(new RTCIceCandidate(new RTCIceCandidateInit { candidate = rawCand, sdpMLineIndex = 0, sdpMid = "0" }));
+                Debug.Log($"[MultiPC] PC{wrapper.Index} Added ICE candidate (fallback format)");
+            }
+            catch { }
         }
     }
 
@@ -265,11 +355,43 @@ public class MultiPCStreamClient : MonoBehaviour
     string FixSdp(string sdp)
     {
         if (string.IsNullOrEmpty(sdp)) return sdp;
+        
+        // 1. Fix SAVP -> SAVPF
         sdp = sdp.Replace("UDP/TLS/RTP/SAVP", "UDP/TLS/RTP/SAVPF");
-        if (sdp.Contains("IP4 0.0.0.0")) sdp = sdp.Replace("IP4 0.0.0.0", "IP4 127.0.0.1");
-        var lines = sdp.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)
-            .Where(l => !l.TrimStart().StartsWith("a=candidate:", StringComparison.OrdinalIgnoreCase));
-        return string.Join("\r\n", lines) + "\r\n";
+        
+        // 2. Fix 0.0.0.0 in connection line
+        if (sdp.Contains("IP4 0.0.0.0")) 
+        {
+            Debug.Log("[MultiPC] Fixing SDP: IP4 0.0.0.0 -> IP4 127.0.0.1");
+            sdp = sdp.Replace("IP4 0.0.0.0", "IP4 127.0.0.1");
+        }
+        
+        // 3. Remove embedded candidates and fix ice-options
+        var lines = sdp.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+        var filtered = new List<string>();
+        
+        foreach (var rawLine in lines)
+        {
+            var line = rawLine.Trim();
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            
+            // Skip embedded candidates
+            if (line.StartsWith("a=candidate:", StringComparison.OrdinalIgnoreCase))
+                continue;
+            
+            // Fix ice-options: remove 'ice2' 
+            if (line.StartsWith("a=ice-options:", StringComparison.OrdinalIgnoreCase) && line.Contains("ice2"))
+            {
+                line = line.Replace("ice2,", "").Replace(",ice2", "").Replace("ice2", "trickle");
+            }
+            
+            filtered.Add(line);
+        }
+        
+        sdp = string.Join("\r\n", filtered);
+        if (!sdp.EndsWith("\r\n")) sdp += "\r\n";
+        
+        return sdp;
     }
 
     System.Collections.IEnumerator PingKeepalive()
