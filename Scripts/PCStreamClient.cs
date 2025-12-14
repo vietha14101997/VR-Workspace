@@ -824,7 +824,7 @@ public class PCStreamClient : MonoBehaviour
     {
         // ------- WORKAROUND: Poll VideoStreamTrack.Texture directly -------
         // Unity WebRTC Android bug: OnVideoReceived callback stops firing after first frame
-        // Solution: Poll the Texture property directly every frame
+        // Solution: Poll the Texture property directly every frame for display
         if (_remoteVideoTrack != null && _lastPcState == RTCPeerConnectionState.Connected)
         {
             try
@@ -834,8 +834,8 @@ public class PCStreamClient : MonoBehaviour
                 {
                     // Always update texture reference - decoder updates content internally
                     _remoteTexture = tex;
-                    // Increment frame count to signal video is active
-                    _frameReceiveCount++;
+                    // Note: Don't increment _frameReceiveCount here - it's updated by OnVideoReceived callback
+                    // Texture content is updated by decoder even if callback doesn't fire
                 }
             }
             catch (System.Exception) { /* Ignore errors during texture polling */ }
@@ -861,13 +861,14 @@ public class PCStreamClient : MonoBehaviour
             }
 
             // Apply to worldPanel if available
-            if (worldPanel != null && !ReferenceEquals(_appliedTexture, _remoteTexture))
+            // NOTE: Must call Apply() every frame because texture content changes 
+            // even though texture reference stays the same
+            if (worldPanel != null)
             {
                 try
                 {
                     worldPanel.contentTexture = textureToApply;
-                    worldPanel.Apply();
-                    _appliedTexture = _remoteTexture;
+                    worldPanel.Apply(); // Call every frame to update display
                 }
                 catch (System.Exception ex)
                 {
