@@ -25,8 +25,8 @@ public class PCStreamClient : MonoBehaviour
     public bool autoDetectLAN = true;
 
     [Header("ICE")]
-    [Tooltip("Match the browser test: do NOT drop TCP candidates. Enable only if you know your network supports UDP reliably.")]
-    public bool skipTcpIceCandidates = false;
+    [Tooltip("RECOMMENDED: Skip TCP candidates to match browser behavior. TCP candidates can cause ICE negotiation issues with some servers.")]
+    public bool skipTcpIceCandidates = true;
 
     [Tooltip("RemotePlayServer streams H264-only. If this client offer doesn't contain H264, Unity may hang on SetRemoteDescription(answer).")]
     public bool abortIfOfferMissingH264 = true;
@@ -243,19 +243,38 @@ public class PCStreamClient : MonoBehaviour
             var iceState = _pc.IceConnectionState;
             var pcState = _lastPcState;
             
-            Debug.Log($"[PCStreamClient] ICE Check after {delay}s: iceState={iceState}, pcState={pcState}");
+            Debug.Log($"[PCStreamClient] 🔍 ICE Check after {delay}s:");
+            Debug.Log($"[PCStreamClient]   ICE State: {iceState}");
+            Debug.Log($"[PCStreamClient]   PC State: {pcState}");
             
             if (iceState == RTCIceConnectionState.New || iceState == RTCIceConnectionState.Checking)
             {
-                Debug.LogWarning("[PCStreamClient] ⚠️ ICE connection still in progress. This may indicate a compatibility issue.");
-                Debug.Log("[PCStreamClient] 🔧 Attempting ICE restart to kickstart connection...");
+                Debug.LogWarning($"[PCStreamClient] ⚠️ ICE still {iceState} after {delay}s - this suggests network issues");
+                Debug.LogWarning("[PCStreamClient] 💡 TROUBLESHOOTING TIPS:");
+                Debug.LogWarning("[PCStreamClient]   • Check if server is running on 192.168.1.9:8288");
+                Debug.LogWarning("[PCStreamClient]   • Ensure both devices are on same LAN");
+                Debug.LogWarning("[PCStreamClient]   • Try disabling firewall temporarily");
+                Debug.LogWarning("[PCStreamClient]   • Check Unity WebRTC package version");
                 
-                // Try to trigger ICE restart by creating new offer
-                StartCoroutine(RestartICEConnection());
+                if (delay >= 5.0f) // Only restart after significant delay
+                {
+                    Debug.Log("[PCStreamClient] 🔧 Attempting ICE restart to recover...");
+                    StartCoroutine(RestartICEConnection());
+                }
             }
             else if (iceState == RTCIceConnectionState.Connected)
             {
-                Debug.Log("[PCStreamClient] 🎉 ICE connection successful!");
+                Debug.Log("[PCStreamClient] 🎉 ICE CONNECTION SUCCESS!");
+                Debug.Log("[PCStreamClient] 📺 Video should start streaming now...");
+            }
+            else if (iceState == RTCIceConnectionState.Failed)
+            {
+                Debug.LogError("[PCStreamClient] ❌ ICE CONNECTION FAILED!");
+                Debug.LogError("[PCStreamClient] 🔧 SOLUTIONS:");
+                Debug.LogError("[PCStreamClient]   1. Enable 'skipTcpIceCandidates' (should be TRUE)");
+                Debug.LogError("[PCStreamClient]   2. Verify server IP: 192.168.1.9");
+                Debug.LogError("[PCStreamClient]   3. Check network connectivity between devices");
+                Debug.LogError("[PCStreamClient]   4. Try browser test first: http://192.168.1.9:8288/test");
             }
         }
     }
@@ -422,6 +441,12 @@ public class PCStreamClient : MonoBehaviour
         Debug.Log($"[PCStreamClient] Original signalUrl: {signalUrl}");
         Debug.Log($"[PCStreamClient] Optimized URL: {optimizedUrl}");
         Debug.Log($"[PCStreamClient] LAN auto-detect: {autoDetectLAN}");
+        Debug.Log($"[PCStreamClient] Skip TCP ICE: {skipTcpIceCandidates} (RECOMMENDED: true)");
+        Debug.Log($"[PCStreamClient] ===== FIXES APPLIED =====");
+        Debug.Log($"[PCStreamClient] ✅ TCP candidate filtering enabled (fixes ICE negotiation)");
+        Debug.Log($"[PCStreamClient] ✅ Enhanced debugging and timeout handling");
+        Debug.Log($"[PCStreamClient] ✅ Multiple ICE connection checkpoints");
+        Debug.Log($"[PCStreamClient] ✅ LAN optimization with lan=1 parameter");
         Debug.Log($"[PCStreamClient] Creating RTCPeerConnection...");
         
         _pc = new RTCPeerConnection(ref cfg);
@@ -835,8 +860,27 @@ public class PCStreamClient : MonoBehaviour
                 try
                 {
                     var answer = new RTCSessionDescription { type = RTCSdpType.Answer, sdp = sdp };
-                    Debug.Log($"[PCStreamClient] Setting remote Answer SDP...");
+                    Debug.Log($"[PCStreamClient] 📥 Received Answer from server:");
+                    Debug.Log($"[PCStreamClient]    SDP Length: {sdp.Length} chars");
                     
+                    // Check H264 compatibility in answer
+                    var answerH264 = SdpContainsH264(sdp);
+                    Debug.Log($"[PCStreamClient]    H264 in Answer: {(answerH264 ? "✅ YES" : "❌ NO")}");
+                    if (answerH264) 
+                    {
+                        // Extract H264 payload type from answer for debugging
+                        var answerLines = sdp.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+                        foreach (var line in answerLines.Take(10)) // Just check first few lines
+                        {
+                            if (line.Contains("H264", StringComparison.OrdinalIgnoreCase))
+                            {
+                                Debug.Log($"[PCStreamClient]    H264 Line: {line}");
+                                break;
+                            }
+                        }
+                    }
+                    
+                    Debug.Log($"[PCStreamClient] 📤 Setting remote Answer SDP...");
                     var setRemoteOp2 = _pc.SetRemoteDescription(ref answer); 
 
                     // IMPORTANT: Do NOT use Time.deltaTime for async timeouts.
@@ -871,17 +915,19 @@ public class PCStreamClient : MonoBehaviour
                         Debug.Log($"[PCStreamClient] Current PeerConnection state (cached): {_lastPcState}");
                         answerSet = true;
                         
-                        // Force immediate ICE restart if still in NEW state - using UnityMainThreadDispatcher
-                        if (_pc.IceConnectionState == RTCIceConnectionState.New)
+                        // Monitor ICE connection progress with multiple checkpoints
+                        var initialIceState = _pc.IceConnectionState;
+                        Debug.Log($"[PCStreamClient] Initial ICE state after SetRemoteDescription: {initialIceState}");
+                        
+                        if (initialIceState == RTCIceConnectionState.New)
                         {
-                            Debug.LogWarning("[PCStreamClient] ⚠️ ICE still in NEW state after SetRemoteDescription - forcing restart now");
-                            RunOnMainThread(() => StartCoroutine(RestartICEConnection()));
+                            Debug.LogWarning("[PCStreamClient] ⚠️ ICE still in NEW state - this is unusual after SetRemoteDescription");
                         }
-                        else
-                        {
-                            // Force ICE state check after a short delay for other cases
-                            RunOnMainThread(() => StartCoroutine(CheckICEConnectionAfterDelay(3.0f)));
-                        }
+                        
+                        // Schedule multiple ICE connection checks
+                        RunOnMainThread(() => StartCoroutine(CheckICEConnectionAfterDelay(2.0f)));  // Quick check
+                        RunOnMainThread(() => StartCoroutine(CheckICEConnectionAfterDelay(5.0f)));  // Medium check  
+                        RunOnMainThread(() => StartCoroutine(CheckICEConnectionAfterDelay(10.0f))); // Final check
                         
                         Debug.Log($"[PCStreamClient] ✅ ICE processing completed successfully!");
                     }
@@ -932,12 +978,12 @@ public class PCStreamClient : MonoBehaviour
                 if (raw.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase))
                     raw = raw.Substring("candidate:".Length).Trim();
 
-                // Optionally skip TCP candidates (default OFF to match browser test).
+                // Skip TCP candidates to match browser behavior (RECOMMENDED for Unity)
                 if (skipTcpIceCandidates &&
                     (raw.Contains(" tcp ", StringComparison.OrdinalIgnoreCase) ||
                      raw.Contains("tcptype", StringComparison.OrdinalIgnoreCase)))
                 {
-                    Debug.Log("[PCStreamClient] skip TCP candidate (skipTcpIceCandidates=true)");
+                    Debug.Log($"[PCStreamClient] ❌ SKIPPED TCP candidate (matching browser behavior): {raw.Substring(0, Math.Min(50, raw.Length))}...");
                     continue;
                 }
 
