@@ -19,6 +19,10 @@ public class PCStreamClient : MonoBehaviour
 {
     [Header("Signal")]
     public string signalUrl = "ws://192.168.1.9:8288/signal?mode=cluster&monitors=2&resW=1920&resH=1080&kbps=8000&fps=30&client=unity";
+    
+    [Header("LAN Optimization")]
+    [Tooltip("Auto-detect LAN connection and add &lan=1 parameter for better ICE candidate filtering on private networks")]
+    public bool autoDetectLAN = true;
 
     [Header("ICE")]
     [Tooltip("Match the browser test: do NOT drop TCP candidates. Enable only if you know your network supports UDP reliably.")]
@@ -67,6 +71,59 @@ public class PCStreamClient : MonoBehaviour
 
     static bool SdpContainsH264(string sdp)
         => !string.IsNullOrEmpty(sdp) && sdp.IndexOf("H264", StringComparison.OrdinalIgnoreCase) >= 0;
+
+    static bool IsPrivateHost(string host)
+    {
+        if (string.IsNullOrWhiteSpace(host)) return false;
+        
+        // Check for common private IP patterns
+        if (System.Text.RegularExpressions.Regex.IsMatch(host.Trim(), @"^(\d+)\.(\d+)\.(\d+)\.(\d+)$"))
+        {
+            var parts = host.Trim().Split('.');
+            if (parts.Length == 4)
+            {
+                if (int.TryParse(parts[0], out int first) && 
+                    int.TryParse(parts[1], out int second))
+                {
+                    // 10.x.x.x
+                    if (first == 10) return true;
+                    // 192.168.x.x  
+                    if (first == 192 && second == 168) return true;
+                    // 172.16.x.x - 172.31.x.x
+                    if (first == 172 && second >= 16 && second <= 31) return true;
+                }
+            }
+        }
+        
+        return false;
+    }
+
+    string BuildOptimizedSignalUrl()
+    {
+        string url = signalUrl;
+        
+        if (autoDetectLAN && !string.IsNullOrEmpty(url))
+        {
+            try
+            {
+                var uri = new Uri(url);
+                string host = uri.Host;
+                
+                // Add lan=1 parameter for private networks to enable ICE candidate filtering
+                if (IsPrivateHost(host) && !url.Contains("lan="))
+                {
+                    url += url.Contains("?") ? "&lan=1" : "?lan=1";
+                    Debug.Log($"[PCStreamClient] Private IP detected ({host}), adding LAN optimization: lan=1");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[PCStreamClient] URL parsing failed: {ex.Message}, using original URL");
+            }
+        }
+        
+        return url;
+    }
 
     static string GetFirstRtpmapLines(string sdp, int maxLines)
     {
@@ -250,6 +307,76 @@ public class PCStreamClient : MonoBehaviour
         // In Unity, coroutines already run on main thread
         action();
     }
+    
+    System.Collections.IEnumerator PingKeepalive()
+    {
+        // Wait a bit for connection to establish
+        yield return new WaitForSeconds(2.0f);
+        
+        while (_ws != null && _ws.State == WebSocketState.Open && !_cts.Token.IsCancellationRequested)
+        {
+            try
+            {
+                // Send ping to keep connection alive and measure latency
+                // Use fire-and-forget pattern for coroutine
+                _ = _ws.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes("ping")),
+                                 WebSocketMessageType.Text, true, _cts.Token);
+                Debug.Log("[PCStreamClient] Sent ping keepalive");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[PCStreamClient] Ping keepalive failed: {ex.Message}");
+                break;
+            }
+            
+            // Send ping every 5 seconds (more conservative than webrtc_test.html's 2s)
+            yield return new WaitForSeconds(5.0f);
+        }
+        
+        Debug.Log("[PCStreamClient] Ping keepalive stopped");
+    }
+    
+    System.Collections.IEnumerator MonitorConnection()
+    {
+        yield return new WaitForSeconds(1.0f);
+        
+        while (_pc != null && !_cts.Token.IsCancellationRequested)
+        {
+            try
+            {
+                // Log connection state every 10 seconds
+                Debug.Log($"[PCStreamClient] 📊 CONNECTION STATUS:");
+                Debug.Log($"[PCStreamClient]   WebSocket: {(_ws?.State.ToString() ?? "null")}");
+                Debug.Log($"[PCStreamClient]   ICE: {_pc.IceConnectionState}");
+                Debug.Log($"[PCStreamClient]   PC: {_lastPcState}");
+                Debug.Log($"[PCStreamClient]   Signaling: {_pc.SignalingState}");
+                Debug.Log($"[PCStreamClient]   Video: {(_remoteTexture != null ? "✅ Receiving" : "❌ No video")}");
+                
+                // Check for issues and suggest fixes
+                if (_pc.IceConnectionState == RTCIceConnectionState.Failed)
+                {
+                    Debug.LogError("[PCStreamClient] ❌ ICE connection failed - connection lost");
+                }
+                else if (_pc.IceConnectionState == RTCIceConnectionState.Disconnected)
+                {
+                    Debug.LogWarning("[PCStreamClient] ⚠️ ICE disconnected - trying to reconnect...");
+                }
+                else if (_pc.IceConnectionState == RTCIceConnectionState.Checking)
+                {
+                    Debug.Log("[PCStreamClient] 🔍 ICE checking - connection in progress...");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[PCStreamClient] Monitor error: {ex.Message}");
+            }
+            
+            // Monitor every 10 seconds
+            yield return new WaitForSeconds(10.0f);
+        }
+        
+        Debug.Log("[PCStreamClient] Connection monitoring stopped");
+    }
 
     // =========================== LIFECYCLE ===========================
     void OnEnable()
@@ -289,7 +416,14 @@ public class PCStreamClient : MonoBehaviour
             iceServers = Array.Empty<RTCIceServer>(),
             iceCandidatePoolSize = 0  // Không sử dụng candidate pool để đơn giản
         };
-        Debug.Log($"[PCStreamClient] Creating RTCPeerConnection with signalUrl: {signalUrl}");
+        
+        string optimizedUrl = BuildOptimizedSignalUrl();
+        Debug.Log($"[PCStreamClient] ===== CONNECTION SETUP =====");
+        Debug.Log($"[PCStreamClient] Original signalUrl: {signalUrl}");
+        Debug.Log($"[PCStreamClient] Optimized URL: {optimizedUrl}");
+        Debug.Log($"[PCStreamClient] LAN auto-detect: {autoDetectLAN}");
+        Debug.Log($"[PCStreamClient] Creating RTCPeerConnection...");
+        
         _pc = new RTCPeerConnection(ref cfg);
         Debug.Log($"[PCStreamClient] RTCPeerConnection created successfully");
 
@@ -345,6 +479,7 @@ public class PCStreamClient : MonoBehaviour
             if (string.IsNullOrEmpty(cand.Candidate))
             {
                 msg = "end-of-candidates";
+                Debug.Log("[PCStreamClient] 📤 Local ICE gathering complete");
             }
             else
             {
@@ -360,24 +495,35 @@ public class PCStreamClient : MonoBehaviour
                 // Normalize double-prefix cases (Unity/interop edge-case).
                 if (msg.StartsWith("candidate:candidate:", StringComparison.OrdinalIgnoreCase))
                     msg = msg.Substring("candidate:".Length);
+                
+                // Check for host candidates (LAN optimization)
+                bool isHost = msg.Contains(" typ host ", StringComparison.OrdinalIgnoreCase);
+                bool isPrivateIP = msg.Contains("192.168.") || msg.Contains("10.") || 
+                                 (msg.Contains("172.") && System.Text.RegularExpressions.Regex.IsMatch(msg, @"172\.(1[6-9]|2\d|3[01])\."));
+                
+                if (isHost && isPrivateIP)
+                {
+                    Debug.Log($"[PCStreamClient] 📤 LOCAL HOST (LAN): {msg.Substring(0, Math.Min(80, msg.Length))}...");
+                }
+                else
+                {
+                    Debug.Log($"[PCStreamClient] 📤 LOCAL CANDIDATE: {msg.Substring(0, Math.Min(60, msg.Length))}...");
+                }
             }
-            
-            // Log candidate format for debugging
-            Debug.Log($"[PCStreamClient] 📤 SENDING CANDIDATE: '{msg}' (length={msg.Length})");
-            Debug.Log($"[PCStreamClient] 📤 CANDIDATE FIRST 100: '{msg.Substring(0, Math.Min(100, msg.Length))}...'");
             
             // If WebSocket is ready, send immediately; otherwise queue for later
             if (_ws != null && _ws.State == WebSocketState.Open)
             {
                 try
                 {
-                    _ws.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(msg)),
-                                  WebSocketMessageType.Text, true, _cts.Token);
-                    Debug.Log($"[PCStreamClient] Sent ICE immediately");
+                    // Fire-and-forget for better performance
+                    _ = _ws.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(msg)),
+                                     WebSocketMessageType.Text, true, _cts.Token);
+                    Debug.Log($"[PCStreamClient] ✅ Sent ICE candidate immediately");
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning($"[PCStreamClient] Send ICE failed: {ex.Message}, queuing...");
+                    Debug.LogWarning($"[PCStreamClient] ⚠️ Send ICE failed: {ex.Message}, queuing...");
                     _pendingLocalCands.Add(msg);
                 }
             }
@@ -385,7 +531,7 @@ public class PCStreamClient : MonoBehaviour
             {
                 // Queue for sending after WS connects
                 _pendingLocalCands.Add(msg);
-                Debug.Log($"[PCStreamClient] Queued ICE (WS not ready), queue size = {_pendingLocalCands.Count}");
+                Debug.Log($"[PCStreamClient] 📦 Queued ICE (WS not ready), queue size = {_pendingLocalCands.Count}");
             }
         };
 
@@ -404,7 +550,16 @@ public class PCStreamClient : MonoBehaviour
                 _remoteVideoTrack = v;
                 _onVideoReceived = tex => { _remoteTexture = tex; };
                 _remoteVideoTrack.OnVideoReceived += _onVideoReceived;
-                Debug.Log("[PCStreamClient] Video track bound");
+                Debug.Log("[PCStreamClient] 🎥 Video track received and bound successfully");
+                
+                // Log video track properties for debugging
+                Debug.Log($"[PCStreamClient] Video track ID: {v.Id}");
+                Debug.Log($"[PCStreamClient] Video track enabled: {v.Enabled}");
+                Debug.Log($"[PCStreamClient] Video track ready state: {v.ReadyState}");
+            }
+            else
+            {
+                Debug.LogWarning($"[PCStreamClient] ⚠️ Received non-video track: {e.Track?.GetType()?.Name}");
             }
         };
 
@@ -507,23 +662,72 @@ public class PCStreamClient : MonoBehaviour
     // =========================== SIGNAL / WEBRTC ===========================
     async Task ConnectAndSignalOffer()
     {
-        Debug.Log($"[PCStreamClient] Connecting to signal server: {signalUrl}");
-        _ws = new ClientWebSocket();
-        await _ws.ConnectAsync(new Uri(signalUrl), _cts.Token);
-        Debug.Log($"[PCStreamClient] WebSocket connected successfully to {signalUrl}");
+        string optimizedUrl = BuildOptimizedSignalUrl();
+        Debug.Log($"[PCStreamClient] ===== STARTING CONNECTION =====");
+        Debug.Log($"[PCStreamClient] 🔗 Connecting to signal server: {optimizedUrl}");
+        
+        try
+        {
+            _ws = new ClientWebSocket();
+            
+            // Set WebSocket options for better compatibility
+            _ws.Options.KeepAliveInterval = TimeSpan.FromSeconds(30);
+            
+            await _ws.ConnectAsync(new Uri(optimizedUrl), _cts.Token);
+            Debug.Log($"[PCStreamClient] ✅ WebSocket connected successfully!");
+            Debug.Log($"[PCStreamClient] WebSocket state: {_ws.State}");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[PCStreamClient] ❌ WebSocket connection failed: {ex.Message}");
+            Debug.LogError($"[PCStreamClient] Exception type: {ex.GetType().Name}");
+            if (ex.InnerException != null)
+            {
+                Debug.LogError($"[PCStreamClient] Inner exception: {ex.InnerException.Message}");
+            }
+            throw;
+        }
 
-        var offerOp = _pc.CreateOffer(); while (!offerOp.IsDone) await Task.Yield();
-        if (offerOp.IsError) throw new Exception("CreateOffer failed: " + offerOp.Error.message);
+        Debug.Log($"[PCStreamClient] 🎬 Creating WebRTC offer...");
+        var offerOp = _pc.CreateOffer(); 
+        while (!offerOp.IsDone) await Task.Yield();
+        
+        if (offerOp.IsError) 
+        {
+            string errorMsg = $"CreateOffer failed: {offerOp.Error.message}";
+            Debug.LogError($"[PCStreamClient] ❌ {errorMsg}");
+            throw new Exception(errorMsg);
+        }
+        
         var offer = offerOp.Desc;
 
-        Debug.Log($"[PCStreamClient] Created offer with SDP type: {offer.type}");
-        Debug.Log($"[PCStreamClient] Offer SDP (first 300 chars): {offer.sdp.Substring(0, Math.Min(300, offer.sdp.Length))}...");
-        Debug.Log($"[PCStreamClient] Full Offer SDP length: {offer.sdp.Length}");
+        Debug.Log($"[PCStreamClient] ✅ Offer created successfully!");
+        Debug.Log($"[PCStreamClient] 📄 SDP type: {offer.type}");
+        Debug.Log($"[PCStreamClient] 📄 SDP length: {offer.sdp.Length} characters");
+        Debug.Log($"[PCStreamClient] 📄 SDP preview (first 200 chars):");
+        Debug.Log($"[PCStreamClient]    {offer.sdp.Substring(0, Math.Min(200, offer.sdp.Length))}...");
+        
         bool offerHasH264 = SdpContainsH264(offer.sdp);
-        Debug.Log($"[PCStreamClient] Offer contains H264? {(offerHasH264 ? "YES" : "NO")}");
-        Debug.Log($"[PCStreamClient] Offer rtpmap (first 8):\n{GetFirstRtpmapLines(offer.sdp, 8)}");
+        Debug.Log($"[PCStreamClient] 🎥 H264 codec support: {(offerHasH264 ? "✅ YES" : "❌ NO")}");
+        
+        if (!offerHasH264)
+        {
+            Debug.LogWarning("[PCStreamClient] ⚠️ No H264 support detected in offer!");
+        }
+        
+        // Log available codecs for debugging
+        var rtpmapLines = GetFirstRtpmapLines(offer.sdp, 5);
+        if (!string.IsNullOrEmpty(rtpmapLines))
+        {
+            Debug.Log($"[PCStreamClient] 🎬 Available video codecs:");
+            Debug.Log($"[PCStreamClient]    {rtpmapLines.Replace("\n", "\n[PCStreamClient]    ")}");
+        }
+        
         var rtpmap127 = FindRtpmapLine(offer.sdp, 127);
-        if (!string.IsNullOrEmpty(rtpmap127)) Debug.Log($"[PCStreamClient] Offer rtpmap:127 => {rtpmap127}");
+        if (!string.IsNullOrEmpty(rtpmap127)) 
+        {
+            Debug.Log($"[PCStreamClient] 📺 rtpmap:127 => {rtpmap127}");
+        }
 
         if (!offerHasH264 && forceInjectH264IntoOfferSdp)
         {
@@ -541,18 +745,58 @@ public class PCStreamClient : MonoBehaviour
             return;
         }
 
-        var setLocalOp = _pc.SetLocalDescription(ref offer); while (!setLocalOp.IsDone) await Task.Yield();
-        if (setLocalOp.IsError) throw new Exception("SetLocalDescription failed: " + setLocalOp.Error.message);
+        Debug.Log($"[PCStreamClient] 📤 Setting local description...");
+        var setLocalOp = _pc.SetLocalDescription(ref offer); 
+        while (!setLocalOp.IsDone) await Task.Yield();
         
-        Debug.Log($"[PCStreamClient] SetLocalDescription completed successfully");
+        if (setLocalOp.IsError) 
+        {
+            string errorMsg = $"SetLocalDescription failed: {setLocalOp.Error.message}";
+            Debug.LogError($"[PCStreamClient] ❌ {errorMsg}");
+            throw new Exception(errorMsg);
+        }
+        
+        Debug.Log($"[PCStreamClient] ✅ SetLocalDescription completed successfully");
+        Debug.Log($"[PCStreamClient] 📡 Signaling state: {_pc.SignalingState}");
 
-        await _ws.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes("offer:" + offer.sdp)),
-                            WebSocketMessageType.Text, true, _cts.Token);
-
-        foreach (var c in _pendingLocalCands)
-            await _ws.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(c)),
+        Debug.Log($"[PCStreamClient] 📤 Sending offer to server...");
+        try
+        {
+            string offerMessage = "offer:" + offer.sdp;
+            await _ws.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(offerMessage)),
                                 WebSocketMessageType.Text, true, _cts.Token);
-        _pendingLocalCands.Clear();
+            Debug.Log($"[PCStreamClient] ✅ Offer sent successfully (size: {offerMessage.Length} bytes)");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[PCStreamClient] ❌ Failed to send offer: {ex.Message}");
+            throw;
+        }
+
+        // Send any queued ICE candidates
+        if (_pendingLocalCands.Count > 0)
+        {
+            Debug.Log($"[PCStreamClient] 📤 Sending {_pendingLocalCands.Count} queued ICE candidates...");
+            foreach (var c in _pendingLocalCands)
+            {
+                await _ws.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(c)),
+                                    WebSocketMessageType.Text, true, _cts.Token);
+            }
+            _pendingLocalCands.Clear();
+            Debug.Log($"[PCStreamClient] ✅ All queued ICE candidates sent");
+        }
+        else
+        {
+            Debug.Log($"[PCStreamClient] 📦 No queued ICE candidates to send");
+        }
+
+        // Start ping keepalive mechanism (similar to webrtc_test.html)
+        Debug.Log($"[PCStreamClient] 🔄 Starting ping keepalive...");
+        StartCoroutine(PingKeepalive());
+        
+        // Start connection monitoring
+        Debug.Log($"[PCStreamClient] 📊 Starting connection monitoring...");
+        StartCoroutine(MonitorConnection());
 
         var buf = new byte[256 * 1024];
         var pendingRemoteCandidates = new List<string>(); // Queue ICE until answer is set
@@ -697,6 +941,13 @@ public class PCStreamClient : MonoBehaviour
                     continue;
                 }
 
+                // For LAN connections, prioritize host candidates
+                bool isHostCandidate = raw.Contains(" typ host ", StringComparison.OrdinalIgnoreCase);
+                if (isHostCandidate)
+                {
+                    Debug.Log($"[PCStreamClient] 📡 HOST candidate (LAN): {raw.Substring(0, Math.Min(60, raw.Length))}...");
+                }
+
                 // Full format (most compatible): candidate:<...>
                 var fullCandidate = "candidate:" + raw;
                 bool added = false;
@@ -759,6 +1010,24 @@ public class PCStreamClient : MonoBehaviour
             else if (text.StartsWith("end-of-candidates", StringComparison.OrdinalIgnoreCase))
             {
                 Debug.Log("[PCStreamClient] remote end-of-candidates");
+            }
+            else if (text.Trim().Equals("pong", StringComparison.OrdinalIgnoreCase))
+            {
+                Debug.Log("[PCStreamClient] received pong from server");
+            }
+            else if (text.StartsWith("{"))
+            {
+                // Try to parse JSON data (frame timing, etc.)
+                try
+                {
+                    // Simple JSON parsing for frame timing data
+                    Debug.Log($"[PCStreamClient] JSON message: {text.Substring(0, Math.Min(100, text.Length))}...");
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[PCStreamClient] JSON parsing failed: {ex.Message}");
+                    Debug.Log("[PCStreamClient] WS msg: " + text);
+                }
             }
             else
             {
