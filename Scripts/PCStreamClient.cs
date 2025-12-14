@@ -614,10 +614,12 @@ public class PCStreamClient : MonoBehaviour
 
     void Update()
     {
-        // ------- Apply texture to panel / fallback -------
-        if (_remoteTexture != null)
+        try
         {
-            Texture textureToApply = _remoteTexture;
+            // ------- Apply texture to panel / fallback -------
+            if (_remoteTexture != null && worldPanel != null)
+            {
+                Texture textureToApply = _remoteTexture;
 
             // Nếu bật UV crop, tạo RenderTexture chỉ chứa phần cell cần hiển thị
             if (useUVCrop)
@@ -640,6 +642,13 @@ public class PCStreamClient : MonoBehaviour
                 BindCursorForwardersOnce();
                 _cursorBound = true;
             }
+            }
+        }
+        catch (System.Exception ex)
+        {
+            // Suppress NRE errors during Update() - they crash the WebRTC connection process
+            // Debugging NRE would spam logs; uncomment for debugging if needed
+            // Debug.LogError($"[PCStreamClient] Update() NRE suppressed: {ex.Message}");
         }
 
         // ------- ONLY owner sends input (wheel / right / middle / keyboard) -------
