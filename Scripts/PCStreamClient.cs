@@ -253,6 +253,32 @@ public class PCStreamClient : MonoBehaviour
             sdp = sdp.Replace("IP4 0.0.0.0", "IP4 127.0.0.1");
         }
         
+        // 3. CRITICAL FIX: Strip a=candidate: lines from SDP
+        // Unity WebRTC's SetRemoteDescription() fails with "Invalid SDP line" when
+        // ICE candidates are embedded in the SDP (which server sends for non-trickle mode).
+        // Browsers handle this gracefully, but Unity WebRTC does not.
+        // We receive candidates via trickle ICE anyway, so safe to strip these.
+        if (sdp.Contains("a=candidate:"))
+        {
+            var lines = sdp.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            var filtered = new List<string>();
+            int stripped = 0;
+            foreach (var line in lines)
+            {
+                if (line.TrimStart().StartsWith("a=candidate:", StringComparison.OrdinalIgnoreCase))
+                {
+                    stripped++;
+                    continue; // Skip candidate lines
+                }
+                filtered.Add(line);
+            }
+            if (stripped > 0)
+            {
+                Debug.Log($"[PCStreamClient] Stripped {stripped} embedded a=candidate: lines from SDP (Unity WebRTC compatibility fix)");
+                sdp = string.Join("\r\n", filtered);
+            }
+        }
+        
         return sdp;
     }
 
