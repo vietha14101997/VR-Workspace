@@ -237,6 +237,23 @@ public class PCStreamClient : MonoBehaviour
         }
     }
 
+    private static string FixSdp(string sdp)
+    {
+        if (string.IsNullOrEmpty(sdp)) return sdp;
+        
+        // 1. Ensure SAVPF
+        sdp = EnsureSavpf(sdp);
+        
+        // 2. Fix 0.0.0.0 in connection line (some parsers dislike it)
+        if (sdp.Contains("c=IN IP4 0.0.0.0"))
+        {
+            Debug.Log("[PCStreamClient] Fixing SDP: Replacing 0.0.0.0 with 127.0.0.1");
+            sdp = sdp.Replace("c=IN IP4 0.0.0.0", "c=IN IP4 127.0.0.1");
+        }
+        
+        return sdp;
+    }
+
     private System.Collections.IEnumerator CheckICEConnectionAfterDelay(float delay)
     {
         yield return new WaitForSeconds(delay);
@@ -925,9 +942,11 @@ public class PCStreamClient : MonoBehaviour
                 var sdp = text.Substring("answer:".Length).Trim();
                 // Server sometimes replies with UDP/TLS/RTP/SAVP (without F). Browser test fixes this.
                 // Do the same to avoid SetRemoteDescription failures/hangs.
-                sdp = EnsureSavpf(sdp);
+                // Also fix 0.0.0.0 and other potential issues
+                sdp = FixSdp(sdp);
+                
                 Debug.Log($"[PCStreamClient] Received Answer SDP with length: {sdp.Length}");
-                Debug.Log($"[PCStreamClient] Answer SDP sample (first 200 chars): {sdp.Substring(0, Math.Min(200, sdp.Length))}...");
+                Debug.Log($"[PCStreamClient] FULL ANSWER SDP:\n{sdp}");
                 
                 try
                 {
