@@ -18,7 +18,7 @@ using UnityEngine.InputSystem;
 public class PCStreamClient : MonoBehaviour
 {
     [Header("Signal")]
-    public string signalUrl = "ws://192.168.1.9:8288/signal?mode=cluster&monitors=2&resW=1920&resH=1080&kbps=8000&fps=30&client=unity";
+    public string signalUrl = "ws://192.168.1.9:8288/signal?mode=cluster&monitors=2&resW=1920&resH=1080&kbps=8000&fps=30&client=unity&relaxed=1";
     
     [Header("LAN Optimization")]
     [Tooltip("Auto-detect LAN connection and add &lan=1 parameter for better ICE candidate filtering on private networks")]
@@ -457,6 +457,7 @@ public class PCStreamClient : MonoBehaviour
         Debug.Log($"[PCStreamClient] ===== EXPECTED BEHAVIOR =====");
         Debug.Log($"[PCStreamClient] • Unity will only send UDP candidates (matching browser)");
         Debug.Log($"[PCStreamClient] • Unity will only accept UDP candidates from server");
+        Debug.Log($"[PCStreamClient] • Using RELAXED ICE filtering (host+srflx+relay accepted)");
         Debug.Log($"[PCStreamClient] Creating RTCPeerConnection...");
         
         _pc = new RTCPeerConnection(ref cfg);
@@ -1009,9 +1010,15 @@ public class PCStreamClient : MonoBehaviour
 
                 // For LAN connections, prioritize host candidates
                 bool isHostCandidate = raw.Contains(" typ host ", StringComparison.OrdinalIgnoreCase);
+                bool isSrflxCandidate = raw.Contains(" typ srflx ", StringComparison.OrdinalIgnoreCase);
                 if (isHostCandidate)
                 {
                     Debug.Log($"[PCStreamClient] 📡 HOST candidate (LAN): {raw.Substring(0, Math.Min(60, raw.Length))}...");
+                }
+                
+                if (isSrflxCandidate)
+                {
+                    Debug.Log($"[PCStreamClient] 📡 SRFLX candidate (STUN): {raw.Substring(0, Math.Min(60, raw.Length))}...");
                 }
 
                 // Full format (most compatible): candidate:<...>
