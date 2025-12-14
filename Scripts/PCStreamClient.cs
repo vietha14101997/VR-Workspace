@@ -78,6 +78,7 @@ public class PCStreamClient : MonoBehaviour
     private float _lastFrameChangeTime = 0;
     private int _frameReceiveCount = 0;
     private int _lastFrameReceiveCount = 0;
+    private System.IntPtr _lastTexturePtr = System.IntPtr.Zero; // Track native texture changes
     private const float STALL_CHECK_INTERVAL = 0.5f; // Check every 0.5 seconds
     private bool _videoWatchdogRunning = false;
 
@@ -821,6 +822,25 @@ public class PCStreamClient : MonoBehaviour
 
     void Update()
     {
+        // ------- WORKAROUND: Poll VideoStreamTrack.Texture directly -------
+        // Unity WebRTC Android bug: OnVideoReceived callback stops firing after first frame
+        // Solution: Poll the Texture property directly every frame
+        if (_remoteVideoTrack != null && _lastPcState == RTCPeerConnectionState.Connected)
+        {
+            try
+            {
+                var tex = _remoteVideoTrack.Texture;
+                if (tex != null && tex.width > 0 && tex.height > 0)
+                {
+                    // Always update texture reference - decoder updates content internally
+                    _remoteTexture = tex;
+                    // Increment frame count to signal video is active
+                    _frameReceiveCount++;
+                }
+            }
+            catch (System.Exception) { /* Ignore errors during texture polling */ }
+        }
+
         // ------- Apply texture to panel / fallback -------
         if (_remoteTexture != null)
         {
@@ -1376,6 +1396,7 @@ public class PCStreamClient : MonoBehaviour
         _frameStallCount = 0;
         _frameReceiveCount = 0;
         _lastFrameReceiveCount = 0;
+        _lastTexturePtr = System.IntPtr.Zero;
         
         try
         {
