@@ -72,6 +72,15 @@ public class PCStreamClient : MonoBehaviour
     // ---- UV Crop ----
     private RenderTexture _croppedRT;
 
+    // ---- Video Watchdog (detect and recover from video freeze) ----
+    private Texture _lastCheckedTexture = null;
+    private int _frameStallCount = 0;
+    private float _lastFrameChangeTime = 0;
+    private int _frameReceiveCount = 0;
+    private int _lastFrameReceiveCount = 0;
+    private const float STALL_CHECK_INTERVAL = 0.5f; // Check every 0.5 seconds
+    private bool _videoWatchdogRunning = false;
+
     static bool SdpContainsH264(string sdp)
         => !string.IsNullOrEmpty(sdp) && sdp.IndexOf("H264", StringComparison.OrdinalIgnoreCase) >= 0;
 
@@ -476,6 +485,116 @@ public class PCStreamClient : MonoBehaviour
         Debug.Log("[PCStreamClient] Connection monitoring stopped");
     }
 
+    // =========================== VIDEO WATCHDOG ===========================
+    System.Collections.IEnumerator VideoWatchdog()
+    {
+        _videoWatchdogRunning = true;
+        _lastFrameChangeTime = Time.time;
+        Debug.Log("[PCStreamClient] 🐕 Video watchdog started");
+        
+        yield return new WaitForSeconds(3.0f); // Wait for initial video to start
+        
+        while (_pc != null && !_cts.Token.IsCancellationRequested && _videoWatchdogRunning)
+        {
+            try
+            {
+                if (_remoteTexture != null && _lastPcState == RTCPeerConnectionState.Connected)
+                {
+                    // Check if frames are being received by comparing frame count
+                    if (_frameReceiveCount == _lastFrameReceiveCount)
+                    {
+                        _frameStallCount++;
+                        
+                        if (_frameStallCount >= 6) // ~3 seconds of stall (6 * 0.5s)
+                        {
+                            float stallDuration = Time.time - _lastFrameChangeTime;
+                            Debug.LogWarning($"[PCStreamClient] ⚠️ Video stall detected! No new frames for {stallDuration:F1}s (received={_frameReceiveCount})");
+                            
+                            // Try to recover by requesting PLI (Picture Loss Indication)
+                            if (_frameStallCount == 6)
+                            {
+                                Debug.Log("[PCStreamClient] 🔄 Requesting keyframe (PLI) to recover...");
+                                RequestPLI();
+                            }
+                            
+                            // If still stalled after 10 seconds, try more aggressive recovery
+                            if (_frameStallCount >= 20) // ~10 seconds
+                            {
+                                Debug.LogWarning("[PCStreamClient] 🔧 Extended stall - attempting track rebind...");
+                                TryRebindVideoTrack();
+                                _frameStallCount = 0; // Reset after recovery attempt
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Frames are being received - reset stall counter
+                        if (_frameStallCount > 0)
+                        {
+                            Debug.Log($"[PCStreamClient] ✅ Video resumed after {_frameStallCount} stall checks");
+                        }
+                        _frameStallCount = 0;
+                        _lastFrameChangeTime = Time.time;
+                        _lastFrameReceiveCount = _frameReceiveCount;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[PCStreamClient] Video watchdog error: {ex.Message}");
+            }
+            
+            yield return new WaitForSeconds(STALL_CHECK_INTERVAL);
+        }
+        
+        _videoWatchdogRunning = false;
+        Debug.Log("[PCStreamClient] 🐕 Video watchdog stopped");
+    }
+
+    void RequestPLI()
+    {
+        // Send PLI request to server via WebSocket
+        if (_ws != null && _ws.State == WebSocketState.Open)
+        {
+            try
+            {
+                var pliMsg = "{\"type\":\"pli\"}";
+                _ = _ws.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(pliMsg)),
+                                 WebSocketMessageType.Text, true, _cts.Token);
+                Debug.Log("[PCStreamClient] 📤 Sent PLI request to server");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[PCStreamClient] Failed to send PLI: {ex.Message}");
+            }
+        }
+    }
+
+    void TryRebindVideoTrack()
+    {
+        if (_remoteVideoTrack != null)
+        {
+            try
+            {
+                // Unbind and rebind the video callback to force refresh
+                _remoteVideoTrack.OnVideoReceived -= _onVideoReceived;
+                _onVideoReceived = tex => { 
+                    _remoteTexture = tex; 
+                    _frameReceiveCount++;
+                };
+                _remoteVideoTrack.OnVideoReceived += _onVideoReceived;
+                Debug.Log("[PCStreamClient] 🔄 Rebound video track callback");
+                
+                // Also try to trigger a new keyframe
+                RequestPLI();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[PCStreamClient] Track rebind failed: {ex.Message}");
+            }
+        }
+    }
+
     // =========================== LIFECYCLE ===========================
     void OnEnable()
     {
@@ -673,7 +792,10 @@ public class PCStreamClient : MonoBehaviour
             if (e.Track is VideoStreamTrack v)
             {
                 _remoteVideoTrack = v;
-                _onVideoReceived = tex => { _remoteTexture = tex; };
+                _onVideoReceived = tex => { 
+                    _remoteTexture = tex; 
+                    _frameReceiveCount++; // Track frame reception for watchdog
+                };
                 _remoteVideoTrack.OnVideoReceived += _onVideoReceived;
                 Debug.Log("[PCStreamClient] 🎥 Video track received and bound successfully");
                 
@@ -681,6 +803,12 @@ public class PCStreamClient : MonoBehaviour
                 Debug.Log($"[PCStreamClient] Video track ID: {v.Id}");
                 Debug.Log($"[PCStreamClient] Video track enabled: {v.Enabled}");
                 Debug.Log($"[PCStreamClient] Video track ready state: {v.ReadyState}");
+                
+                // Start video watchdog to detect and recover from freezes
+                if (!_videoWatchdogRunning)
+                {
+                    StartCoroutine(VideoWatchdog());
+                }
             }
             else
             {
@@ -1243,6 +1371,12 @@ public class PCStreamClient : MonoBehaviour
 
     void Cleanup()
     {
+        // Stop video watchdog
+        _videoWatchdogRunning = false;
+        _frameStallCount = 0;
+        _frameReceiveCount = 0;
+        _lastFrameReceiveCount = 0;
+        
         try
         {
             if (_remoteVideoTrack != null && _onVideoReceived != null)
