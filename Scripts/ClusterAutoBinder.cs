@@ -6,15 +6,28 @@ using System.Collections.Generic;
 /// - Server ghép N màn hình thành 1 frame lớn (side-by-side)
 /// - Client tự động kết nối tới signal URL với cấu hình cố định
 /// - Tạo đúng số panel tương ứng và bind UV crop cho từng panel
+/// 
+/// Multi-Track mode (NEW - recommended for Android):
+/// - Server sends N separate video tracks (one per monitor)
+/// - Each panel receives its own 1920x1080 stream
+/// - Fixes Android MediaCodec issues with ultra-wide resolutions
 /// </summary>
 public class ClusterAutoBinder : MonoBehaviour
 {
     public string serverBase = "http://192.168.1.9:8288";
     public WorldPanelClusterRig rig;
 
+    [Header("Stream Mode")]
+    [Tooltip("Use multi-track mode (N separate streams) instead of combined frame. RECOMMENDED for Android.")]
+    public bool useMultiTrackMode = true;
+
     [Header("Signal URL Path (appended to serverBase)")]
     [Tooltip("Signal path with query params. Example: signal?mode=cluster&monitors=2&resW=1920&resH=1080&kbps=8000&fps=30")]
     public string signalPath = "signal?mode=cluster&monitors=2&resW=1920&resH=1080&kbps=8000&fps=30";
+
+    [Header("Multi-Track Signal Path")]
+    [Tooltip("Signal path for multi-track mode. Example: signal?mode=multitrack&monitors=2&resW=1920&resH=1080&kbps=4000&fps=30")]
+    public string multiTrackSignalPath = "signal?mode=multitrack&monitors=2&resW=1920&resH=1080&kbps=4000&fps=30";
 
     [Header("Layout Info (fixed defaults)")]
     [SerializeField] private int monitorCount = 2;
@@ -25,6 +38,7 @@ public class ClusterAutoBinder : MonoBehaviour
     [SerializeField] private int gapPixels = 0;
 
     private PCStreamClient _masterClient;
+    private MultiTrackStreamClient _multiTrackClient;
     private List<UVCropReceiver> _cropReceivers = new List<UVCropReceiver>();
 
     void Start()
@@ -32,13 +46,44 @@ public class ClusterAutoBinder : MonoBehaviour
         if (!rig) rig = GetComponent<WorldPanelClusterRig>();
         if (!rig) return;
 
-        Debug.Log($"[ClusterAutoBinder] Using fixed config: {monitorCount} monitors, frame={frameWidth}x{frameHeight}, cell={cellWidth}x{cellHeight}");
+        Debug.Log($"[ClusterAutoBinder] Mode: {(useMultiTrackMode ? "MULTI-TRACK (N streams)" : "COMBINED (1 stream)")}");
+        Debug.Log($"[ClusterAutoBinder] Config: {monitorCount} monitors, cell={cellWidth}x{cellHeight}");
 
         // Build rig with correct number of panels
         rig.BuildWithPanelCount(monitorCount);
 
-        // Bind panels to stream
-        BindPanelsToStream();
+        // Bind panels to stream based on mode
+        if (useMultiTrackMode)
+        {
+            BindPanelsMultiTrack();
+        }
+        else
+        {
+            BindPanelsToStream();
+        }
+    }
+
+    void BindPanelsMultiTrack()
+    {
+        var panels = rig.panels;
+        if (panels == null || panels.Count == 0)
+        {
+            Debug.LogError("[ClusterAutoBinder] No panels found in rig!");
+            return;
+        }
+
+        // Create single MultiTrackStreamClient with all panels
+        var centerPanel = panels[panels.Count / 2];
+        _multiTrackClient = centerPanel.gameObject.AddComponent<MultiTrackStreamClient>();
+
+        var wsBase = serverBase.Replace("http://", "ws://").Replace("https://", "wss://");
+        _multiTrackClient.signalUrl = $"{wsBase}/{multiTrackSignalPath}";
+
+        // Assign all panels to the multi-track client
+        _multiTrackClient.panels = panels.ToArray();
+
+        Debug.Log($"[ClusterAutoBinder] Multi-track client created, url={_multiTrackClient.signalUrl}");
+        Debug.Log($"[ClusterAutoBinder] Bound {panels.Count} panels to {panels.Count} video tracks");
     }
 
     void BindPanelsToStream()
@@ -115,6 +160,7 @@ public class ClusterAutoBinder : MonoBehaviour
     void OnDestroy()
     {
         if (_masterClient) Destroy(_masterClient);
+        if (_multiTrackClient) Destroy(_multiTrackClient);
         foreach (var r in _cropReceivers)
             if (r) Destroy(r);
         _cropReceivers.Clear();
