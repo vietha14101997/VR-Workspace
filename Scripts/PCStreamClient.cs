@@ -614,41 +614,67 @@ public class PCStreamClient : MonoBehaviour
 
     void Update()
     {
-        try
+        // ------- Apply texture to panel / fallback -------
+        if (_remoteTexture != null)
         {
-            // ------- Apply texture to panel / fallback -------
-            if (_remoteTexture != null && worldPanel != null)
-            {
-                Texture textureToApply = _remoteTexture;
+            Texture textureToApply = _remoteTexture;
 
             // Nếu bật UV crop, tạo RenderTexture chỉ chứa phần cell cần hiển thị
             if (useUVCrop)
             {
-                textureToApply = GetCroppedTexture(_remoteTexture);
+                try
+                {
+                    textureToApply = GetCroppedTexture(_remoteTexture);
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError($"[PCStreamClient] GetCroppedTexture failed: {ex.Message}");
+                    textureToApply = _remoteTexture; // Fallback to original texture
+                }
             }
 
+            // Apply to worldPanel if available
             if (worldPanel != null && !ReferenceEquals(_appliedTexture, _remoteTexture))
             {
-                worldPanel.contentTexture = textureToApply;
-                worldPanel.Apply();
-                _appliedTexture = _remoteTexture;
+                try
+                {
+                    worldPanel.contentTexture = textureToApply;
+                    worldPanel.Apply();
+                    _appliedTexture = _remoteTexture;
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError($"[PCStreamClient] Failed to apply texture to worldPanel: {ex.Message}");
+                }
             }
-            if (fallbackRawImage != null) fallbackRawImage.texture = textureToApply;
+            
+            // Apply to fallback RawImage if available
+            if (fallbackRawImage != null)
+            {
+                try
+                {
+                    fallbackRawImage.texture = textureToApply;
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError($"[PCStreamClient] Failed to apply texture to fallbackRawImage: {ex.Message}");
+                }
+            }
 
             // Bind cursor + forwarders đúng 1 lần (chỉ owner mới bind để gửi input trái)
             if (_isInputOwner && worldPanel != null && worldPanel.cursor != null && !_cursorBound)
             {
-                worldPanel.cursor.SetVisible(true);
-                BindCursorForwardersOnce();
-                _cursorBound = true;
+                try
+                {
+                    worldPanel.cursor.SetVisible(true);
+                    BindCursorForwardersOnce();
+                    _cursorBound = true;
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError($"[PCStreamClient] Failed to bind cursor: {ex.Message}");
+                }
             }
-            }
-        }
-        catch (System.Exception ex)
-        {
-            // Suppress NRE errors during Update() - they crash the WebRTC connection process
-            // Debugging NRE would spam logs; uncomment for debugging if needed
-            // Debug.LogError($"[PCStreamClient] Update() NRE suppressed: {ex.Message}");
         }
 
         // ------- ONLY owner sends input (wheel / right / middle / keyboard) -------
@@ -658,35 +684,51 @@ public class PCStreamClient : MonoBehaviour
             // Wheel + Right/Middle
             if (Mouse.current != null)
             {
-                var s = Mouse.current.scroll.ReadValue(); // x = horizontal, y = vertical
-                int v = (int)Mathf.Round(s.y); if (v != 0) SendWheel(v, false);
-                int h = (int)Mathf.Round(s.x); if (h != 0) SendWheel(h, true);
-
-                if (worldPanel != null && worldPanel.cursor != null && worldPanel.cursor.gameObject.activeInHierarchy)
+                try
                 {
-                    if (Mouse.current.rightButton.wasPressedThisFrame) SendMouseDown("right");
-                    if (Mouse.current.rightButton.wasReleasedThisFrame) SendMouseUp("right");
-                    if (Mouse.current.middleButton.wasPressedThisFrame) SendMouseDown("middle");
-                    if (Mouse.current.middleButton.wasReleasedThisFrame) SendMouseUp("middle");
+                    var s = Mouse.current.scroll.ReadValue(); // x = horizontal, y = vertical
+                    int v = (int)Mathf.Round(s.y); if (v != 0) SendWheel(v, false);
+                    int h = (int)Mathf.Round(s.x); if (h != 0) SendWheel(h, true);
+
+                    if (worldPanel != null && worldPanel.cursor != null && worldPanel.cursor.gameObject != null && worldPanel.cursor.gameObject.activeInHierarchy)
+                    {
+                        if (Mouse.current.rightButton != null && Mouse.current.rightButton.wasPressedThisFrame) SendMouseDown("right");
+                        if (Mouse.current.rightButton != null && Mouse.current.rightButton.wasReleasedThisFrame) SendMouseUp("right");
+                        if (Mouse.current.middleButton != null && Mouse.current.middleButton.wasPressedThisFrame) SendMouseDown("middle");
+                        if (Mouse.current.middleButton != null && Mouse.current.middleButton.wasReleasedThisFrame) SendMouseUp("middle");
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError($"[PCStreamClient] Mouse input error: {ex.Message}");
                 }
             }
 
             // Keyboard: debounce
             if (Keyboard.current != null)
             {
-                foreach (var kc in Keyboard.current.allKeys)
+                try
                 {
-                    int vk = KeyToVK_NewInput(kc.keyCode);
-                    if (vk < 0) continue;
+                    foreach (var kc in Keyboard.current.allKeys)
+                    {
+                        if (kc == null) continue;
+                        
+                        int vk = KeyToVK_NewInput(kc.keyCode);
+                        if (vk < 0) continue;
 
-                    if (kc.wasPressedThisFrame)
-                    {
-                        if (_keysHeldVK.Add(vk)) SendKey(vk, true);
+                        if (kc.wasPressedThisFrame)
+                        {
+                            if (_keysHeldVK.Add(vk)) SendKey(vk, true);
+                        }
+                        if (kc.wasReleasedThisFrame)
+                        {
+                            if (_keysHeldVK.Remove(vk)) SendKey(vk, false);
+                        }
                     }
-                    if (kc.wasReleasedThisFrame)
-                    {
-                        if (_keysHeldVK.Remove(vk)) SendKey(vk, false);
-                    }
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError($"[PCStreamClient] Keyboard input error: {ex.Message}");
                 }
             }
 #endif
