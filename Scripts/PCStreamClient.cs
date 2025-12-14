@@ -244,11 +244,13 @@ public class PCStreamClient : MonoBehaviour
         // 1. Ensure SAVPF
         sdp = EnsureSavpf(sdp);
         
-        // 2. Fix 0.0.0.0 in connection line (some parsers dislike it)
-        if (sdp.Contains("c=IN IP4 0.0.0.0"))
+        // 2. Fix 0.0.0.0 in connection line AND rtcp attribute (some parsers dislike it)
+        // Replaces "c=IN IP4 0.0.0.0" -> "c=IN IP4 127.0.0.1"
+        // Replaces "a=rtcp:9 IN IP4 0.0.0.0" -> "a=rtcp:9 IN IP4 127.0.0.1"
+        if (sdp.Contains("IP4 0.0.0.0"))
         {
-            Debug.Log("[PCStreamClient] Fixing SDP: Replacing 0.0.0.0 with 127.0.0.1");
-            sdp = sdp.Replace("c=IN IP4 0.0.0.0", "c=IN IP4 127.0.0.1");
+            Debug.Log("[PCStreamClient] Fixing SDP: Replacing all 'IP4 0.0.0.0' with 'IP4 127.0.0.1'");
+            sdp = sdp.Replace("IP4 0.0.0.0", "IP4 127.0.0.1");
         }
         
         return sdp;
