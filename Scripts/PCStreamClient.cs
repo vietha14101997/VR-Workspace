@@ -245,38 +245,69 @@ public class PCStreamClient : MonoBehaviour
         sdp = EnsureSavpf(sdp);
         
         // 2. Fix 0.0.0.0 in connection line AND rtcp attribute (some parsers dislike it)
-        // Replaces "c=IN IP4 0.0.0.0" -> "c=IN IP4 127.0.0.1"
-        // Replaces "a=rtcp:9 IN IP4 0.0.0.0" -> "a=rtcp:9 IN IP4 127.0.0.1"
         if (sdp.Contains("IP4 0.0.0.0"))
         {
             Debug.Log("[PCStreamClient] Fixing SDP: Replacing all 'IP4 0.0.0.0' with 'IP4 127.0.0.1'");
             sdp = sdp.Replace("IP4 0.0.0.0", "IP4 127.0.0.1");
         }
         
-        // 3. CRITICAL FIX: Strip a=candidate: lines from SDP
-        // Unity WebRTC's SetRemoteDescription() fails with "Invalid SDP line" when
-        // ICE candidates are embedded in the SDP (which server sends for non-trickle mode).
-        // Browsers handle this gracefully, but Unity WebRTC does not.
-        // We receive candidates via trickle ICE anyway, so safe to strip these.
-        if (sdp.Contains("a=candidate:"))
+        // 3. COMPREHENSIVE SDP CLEANUP for Unity WebRTC compatibility
+        // Split and process each line
+        var lines = sdp.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+        var filtered = new List<string>();
+        int stripped = 0;
+        int modified = 0;
+        
+        foreach (var rawLine in lines)
         {
-            var lines = sdp.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
-            var filtered = new List<string>();
-            int stripped = 0;
-            foreach (var line in lines)
+            var line = rawLine.Trim(); // Remove leading/trailing whitespace
+            
+            // Skip empty lines
+            if (string.IsNullOrWhiteSpace(line))
+                continue;
+            
+            // Skip candidate lines (Unity WebRTC can't parse them in SDP body)
+            if (line.StartsWith("a=candidate:", StringComparison.OrdinalIgnoreCase))
             {
-                if (line.TrimStart().StartsWith("a=candidate:", StringComparison.OrdinalIgnoreCase))
+                stripped++;
+                continue;
+            }
+            
+            // Fix ice-options: remove 'ice2' option which Unity may not support
+            // Change "a=ice-options:ice2,trickle" -> "a=ice-options:trickle"
+            if (line.StartsWith("a=ice-options:", StringComparison.OrdinalIgnoreCase))
+            {
+                if (line.Contains("ice2"))
                 {
-                    stripped++;
-                    continue; // Skip candidate lines
+                    var newLine = line.Replace("ice2,", "").Replace(",ice2", "").Replace("ice2", "trickle");
+                    if (newLine != line)
+                    {
+                        Debug.Log($"[PCStreamClient] Fixed ice-options: '{line}' -> '{newLine}'");
+                        line = newLine;
+                        modified++;
+                    }
                 }
-                filtered.Add(line);
             }
-            if (stripped > 0)
-            {
-                Debug.Log($"[PCStreamClient] Stripped {stripped} embedded a=candidate: lines from SDP (Unity WebRTC compatibility fix)");
-                sdp = string.Join("\r\n", filtered);
-            }
+            
+            filtered.Add(line);
+        }
+        
+        if (stripped > 0)
+        {
+            Debug.Log($"[PCStreamClient] Stripped {stripped} embedded a=candidate: lines from SDP");
+        }
+        if (modified > 0)
+        {
+            Debug.Log($"[PCStreamClient] Modified {modified} SDP lines for Unity compatibility");
+        }
+        
+        // Join with CRLF (standard SDP line ending)
+        sdp = string.Join("\r\n", filtered);
+        
+        // Ensure SDP ends with a newline
+        if (!sdp.EndsWith("\r\n"))
+        {
+            sdp += "\r\n";
         }
         
         return sdp;
