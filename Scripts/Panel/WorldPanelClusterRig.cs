@@ -17,12 +17,10 @@ public class WorldPanelClusterRig : MonoBehaviour
     public float verticalOffset = 0f;
 
     [Header("Angle Adjustment")]
-    [Tooltip("Extra angle multiplier for fewer panels (1-2 panels get wider spread)")]
-    [Range(1f, 3f)] public float fewPanelsAngleMultiplier = 1.0f;
-    [Tooltip("Minimum angle between panels in degrees")]
-    [Range(0f, 30f)] public float minAngleDeg = 0f;  // No minimum, use calculated angle
-    [Tooltip("Max inward tilt of side panels (0=flat facing forward, 90=face camera directly)")]
-    [Range(0f, 45f)] public float maxPanelTiltDeg = 10f;
+    [Tooltip("Extra gap in meters between panel edges (0 = edges touch)")]
+    [Range(0f, 0.1f)] public float edgeGapMeters = 0.01f;
+    [Tooltip("Whether panels should face directly toward camera (true) or have limited tilt (false)")]
+    public bool panelsFaceCamera = true;
 
     [Header("Visibility in cluster")]
     public bool hideTrayAndDock = true;
@@ -89,30 +87,20 @@ public class WorldPanelClusterRig : MonoBehaviour
         }
 
         Vector3 clusterCenter = cam.transform.position + camFwd * distanceFromCamera + camUp * verticalOffset;
-        transform.SetPositionAndRotation(clusterCenter, Quaternion.LookRotation(-camFwd, camUp));
+        transform.SetPositionAndRotation(clusterCenter, Quaternion.LookRotation(camFwd, camUp));
 
-        // Calculate angle between panels
-        float angleDeg;
-        var refPanel = _panels[_panels.Count / 2]; // center panel for reference
-        if (autoAngleFromGap && refPanel)
-        {
-            float w = refPanel.width;
-            float gap = gapFromTrayHoverExtra ? Mathf.Max(0f, refPanel.trayHoverExtra) : Mathf.Max(0f, sideGapMeters);
-            float halfA = Mathf.Rad2Deg * Mathf.Atan((w * 0.5f) / distanceFromCamera);
-            float gapA = Mathf.Rad2Deg * Mathf.Atan(gap / distanceFromCamera);
-            angleDeg = (halfA * 2f) + gapA;
-        }
-        else
-        {
-            angleDeg = sideYawDeg;
-        }
-
-        // Apply minimum angle and multiplier for few panels
-        angleDeg = Mathf.Max(angleDeg, minAngleDeg);
-        if (_panels.Count <= 2)
-        {
-            angleDeg *= fewPanelsAngleMultiplier;
-        }
+        // Calculate angle that each panel subtends at the camera
+        // For panel edges to meet on an arc: angleDeg = 2 * atan(panelWidth / 2 / distance)
+        var refPanel = _panels[_panels.Count / 2];
+        float panelWidth = refPanel ? refPanel.width : 1f;
+        
+        // Angle subtended by panel width at the arc radius
+        float panelAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(panelWidth / 2f / distanceFromCamera);
+        // Small gap angle for edge separation
+        float gapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(edgeGapMeters / 2f / distanceFromCamera);
+        
+        // Total angle step between panel centers (panel angle + tiny gap)
+        float angleDeg = autoAngleFromGap ? (panelAngleDeg + gapAngleDeg) : sideYawDeg;
 
         // Place panels symmetrically around center view (0 degrees)
         // Odd count: center panel at 0°, others spread evenly
@@ -123,25 +111,34 @@ public class WorldPanelClusterRig : MonoBehaviour
             // Offset from center: for count=3 → [-1, 0, +1], for count=4 → [-1.5, -0.5, +0.5, +1.5]
             float offset = i - (count - 1) / 2f;
             float yawDeg = offset * angleDeg;
-            PlacePanel(_panels[i], yawDeg, cam, camFwd, camUp);
+            PlacePanelOnArc(_panels[i], yawDeg, cam, camFwd, camUp);
         }
     }
 
-    void PlacePanel(WorldPanelPlus p, float yawDeg, Camera cam, Vector3 camFwd, Vector3 camUp)
+    void PlacePanelOnArc(WorldPanelPlus p, float yawDeg, Camera cam, Vector3 camFwd, Vector3 camUp)
     {
         if (!p) return;
 
+        // Position panel on an arc at distanceFromCamera from camera
+        // The panel center is at angle yawDeg from camera forward
         Quaternion yaw = Quaternion.AngleAxis(yawDeg, camUp);
         Vector3 dir = yaw * camFwd;
         Vector3 pos = cam.transform.position + dir * distanceFromCamera + camUp * verticalOffset;
 
-        // Limit panel tilt: instead of facing camera directly, only tilt by maxPanelTiltDeg
-        // yawDeg is panel position angle, tiltDeg is how much panel rotates inward
-        float tiltDeg = Mathf.Sign(yawDeg) * Mathf.Min(Mathf.Abs(yawDeg), maxPanelTiltDeg);
-        Quaternion tiltRot = Quaternion.AngleAxis(tiltDeg, camUp);
-        Vector3 faceDir = tiltRot * camFwd;
+        // Panel rotation: face toward camera so edges of adjacent panels meet
+        // Panel's -Z (front/display) should face camera, so +Z points away from camera
+        Quaternion rot;
+        if (panelsFaceCamera)
+        {
+            // Panel faces directly toward camera (perpendicular to arc)
+            rot = Quaternion.LookRotation(dir, camUp);
+        }
+        else
+        {
+            // Panel faces forward with yaw rotation (flat arrangement)
+            rot = Quaternion.LookRotation(-camFwd, camUp);
+        }
 
-        Quaternion rot = Quaternion.LookRotation(faceDir, camUp);
         p.transform.SetPositionAndRotation(pos, rot);
         p.EnforceNoRoll();
 

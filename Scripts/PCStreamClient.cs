@@ -73,7 +73,7 @@ public class PCStreamClient : MonoBehaviour
     private RenderTexture _croppedRT;
 
     // ---- Video Watchdog (detect and recover from video freeze) ----
-    private Texture _lastCheckedTexture = null;
+    // private Texture _lastCheckedTexture = null;
     private int _frameStallCount = 0;
     private float _lastFrameChangeTime = 0;
     private int _frameReceiveCount = 0;

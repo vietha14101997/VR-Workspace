@@ -3,7 +3,7 @@ using System;
 
 public class AndroidCursorHider : MonoBehaviour
 {
-    AndroidJavaObject _prevIcon = null;
+    AndroidJavaObject _prevIcon;
 
     void OnEnable()
     {

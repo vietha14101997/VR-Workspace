@@ -2,42 +2,38 @@ using UnityEngine;
 using System.Collections.Generic;
 
 /// <summary>
-/// Dynamic Combined Stream approach:
-/// - Server ghép N màn hình thành 1 frame lớn (side-by-side)
-/// - Client tự động kết nối tới signal URL với cấu hình cố định
-/// - Tạo đúng số panel tương ứng và bind UV crop cho từng panel
-/// 
-/// Multi-Track mode (NEW - recommended for Android):
+/// Multi-Track mode only implementation:
 /// - Server sends N separate video tracks (one per monitor)
-/// - Each panel receives its own 1920x1080 stream
+/// - Each panel receives its own stream (1920x1080)
 /// - Fixes Android MediaCodec issues with ultra-wide resolutions
+/// - Signal path is auto-generated from Stream Configuration
 /// </summary>
 public class ClusterAutoBinder : MonoBehaviour
 {
     public string serverBase = "http://192.168.1.9:8288";
     public WorldPanelClusterRig rig;
+    
+    // Signal path is auto-generated from configuration
+    private string signalPath;
 
-    [Header("Stream Mode")]
-    [Tooltip("Use multi-track mode (N separate streams) instead of combined frame. RECOMMENDED for Android.")]
-    public bool useMultiTrackMode = true;
+    [Header("Stream Configuration")]
+    [Tooltip("Number of monitors")]
+    public int monitorCount = 2;
+    [Tooltip("Resolution width")]
+    public int resolutionWidth = 1920;
+    [Tooltip("Resolution height")]
+    public int resolutionHeight = 1080;
+    [Tooltip("Total bitrate in kbps (will be distributed per monitor in multi-track mode)")]
+    public int bitrateKbps = 8000;
+    [Tooltip("Frames per second")]
+    public int fps = 30;
 
-    [Header("Signal URL Path (appended to serverBase)")]
-    [Tooltip("Signal path with query params. Example: signal?mode=cluster&monitors=2&resW=1920&resH=1080&kbps=8000&fps=30")]
-    public string signalPath = "signal?mode=cluster&monitors=2&resW=1920&resH=1080&kbps=8000&fps=30";
+    [Header("Layout Info (auto-calculated, not shown)")]
+    private int frameWidth = 3840;
+    private int frameHeight = 1080;
+    private int cellWidth = 1920;
+    private int cellHeight = 1080;
 
-    [Header("Multi-Track Signal Path")]
-    [Tooltip("Signal path for multi-track mode. Example: signal?mode=multitrack&monitors=2&resW=1920&resH=1080&kbps=4000&fps=30")]
-    public string multiTrackSignalPath = "signal?mode=multitrack&monitors=2&resW=1920&resH=1080&kbps=4000&fps=30";
-
-    [Header("Layout Info (fixed defaults)")]
-    [SerializeField] private int monitorCount = 2;
-    [SerializeField] private int frameWidth = 3840;
-    [SerializeField] private int frameHeight = 1080;
-    [SerializeField] private int cellWidth = 1920;
-    [SerializeField] private int cellHeight = 1080;
-    [SerializeField] private int gapPixels = 0;
-
-    private PCStreamClient _masterClient;
     private MultiPCStreamClient _multiPCClient;  // Option B: N separate PeerConnections
     private List<UVCropReceiver> _cropReceivers = new List<UVCropReceiver>();
 
@@ -45,22 +41,22 @@ public class ClusterAutoBinder : MonoBehaviour
     {
         if (!rig) rig = GetComponent<WorldPanelClusterRig>();
         if (!rig) return;
+        
+        // Generate signal path from configuration
+        GenerateSignalPath();
+        
+        // Calculate layout based on configuration
+        CalculateLayoutInfo();
 
-        Debug.Log($"[ClusterAutoBinder] Mode: {(useMultiTrackMode ? "MULTI-TRACK (N streams)" : "COMBINED (1 stream)")}");
-        Debug.Log($"[ClusterAutoBinder] Config: {monitorCount} monitors, cell={cellWidth}x{cellHeight}");
+        Debug.Log($"[ClusterAutoBinder] MULTI-TRACK mode: {monitorCount} monitors, {resolutionWidth}x{resolutionHeight}, {bitrateKbps}kbps, {fps}fps");
+        Debug.Log($"[ClusterAutoBinder] Signal: {signalPath}");
+        Debug.Log($"[ClusterAutoBinder] Layout: frame={frameWidth}x{frameHeight}, cell={cellWidth}x{cellHeight}");
 
-        // Build rig with correct number of panels
+        // Build panels based on monitor count before binding
         rig.BuildWithPanelCount(monitorCount);
 
-        // Bind panels to stream based on mode
-        if (useMultiTrackMode)
-        {
-            BindPanelsMultiTrack();
-        }
-        else
-        {
-            BindPanelsToStream();
-        }
+        // Multi-track mode is now default and only option
+        BindPanelsMultiTrack();
     }
 
     void BindPanelsMultiTrack()
@@ -77,92 +73,49 @@ public class ClusterAutoBinder : MonoBehaviour
         _multiPCClient = centerPanel.gameObject.AddComponent<MultiPCStreamClient>();
 
         var wsBase = serverBase.Replace("http://", "ws://").Replace("https://", "wss://");
-        _multiPCClient.signalUrl = $"{wsBase}/{multiTrackSignalPath}";
+        _multiPCClient.signalUrl = $"{wsBase}/{signalPath}";
 
         // Assign all panels to the multi-PC client
         _multiPCClient.panels = panels.ToArray();
 
-        Debug.Log($"[ClusterAutoBinder] MultiPC client created (Option B), url={_multiPCClient.signalUrl}");
+        Debug.Log($"[ClusterAutoBinder] MultiPC client created, url={_multiPCClient.signalUrl}");
         Debug.Log($"[ClusterAutoBinder] Bound {panels.Count} panels to {panels.Count} PeerConnections");
-    }
-
-    void BindPanelsToStream()
-    {
-        var panels = rig.panels;
-        if (panels == null || panels.Count == 0)
-        {
-            Debug.LogError("[ClusterAutoBinder] No panels found in rig!");
-            return;
-        }
-
-        // Find center panel index (middle of the array)
-        int centerIdx = panels.Count / 2;
-        
-        // Create master client on center panel
-        _masterClient = CreateMasterClient(panels[centerIdx], centerIdx);
-
-        // Create crop receivers for other panels
-        for (int i = 0; i < panels.Count; i++)
-        {
-            if (i == centerIdx) continue; // Skip center (already has master client)
-            CreateCropReceiver(panels[i], i);
-        }
-
-        Debug.Log($"[ClusterAutoBinder] Bound {panels.Count} panels to combined stream");
-    }
-
-    PCStreamClient CreateMasterClient(WorldPanelPlus panel, int col)
-    {
-        if (!panel) return null;
-
-        var client = panel.gameObject.AddComponent<PCStreamClient>();
-        client.worldPanel = panel;
-
-        var wsBase = serverBase.Replace("http://", "ws://").Replace("https://", "wss://");
-        client.signalUrl = $"{wsBase}/{signalPath}";
-
-        client.useUVCrop = true;
-        client.gridCol = col;
-        client.gridRow = 0;
-        client.gridCols = monitorCount;
-        client.gridRows = 1;
-        client.frameWidth = frameWidth;
-        client.frameHeight = frameHeight;
-        client.cellWidth = cellWidth;
-        client.cellHeight = cellHeight;
-        client.gapPixels = gapPixels;
-
-        Debug.Log($"[ClusterAutoBinder] Master client on panel[{col}], url={client.signalUrl}");
-        return client;
-    }
-
-    void CreateCropReceiver(WorldPanelPlus panel, int col)
-    {
-        if (!panel || _masterClient == null) return;
-
-        var receiver = panel.gameObject.AddComponent<UVCropReceiver>();
-        receiver.sourceClient = _masterClient;
-        receiver.worldPanel = panel;
-        receiver.gridCol = col;
-        receiver.gridRow = 0;
-        receiver.gridCols = monitorCount;
-        receiver.gridRows = 1;
-        receiver.frameWidth = frameWidth;
-        receiver.frameHeight = frameHeight;
-        receiver.cellWidth = cellWidth;
-        receiver.cellHeight = cellHeight;
-        receiver.gapPixels = gapPixels;
-
-        _cropReceivers.Add(receiver);
-        Debug.Log($"[ClusterAutoBinder] CropReceiver on panel[{col}]");
     }
 
     void OnDestroy()
     {
-        if (_masterClient) Destroy(_masterClient);
         if (_multiPCClient) Destroy(_multiPCClient);
         foreach (var r in _cropReceivers)
             if (r) Destroy(r);
         _cropReceivers.Clear();
+    }
+
+    void GenerateSignalPath()
+    {
+        // Calculate bitrate per monitor for multi-track mode
+        int bitratePerMonitor = bitrateKbps;
+        if (monitorCount > 1)
+        {
+            bitratePerMonitor = bitrateKbps / monitorCount;
+            // Ensure minimum bitrate per monitor
+            bitratePerMonitor = Mathf.Max(bitratePerMonitor, 2000);
+        }
+        
+        // Generate signal path for multi-track mode
+        signalPath = $"signal?mode=multitrack&monitors={monitorCount}&resW={resolutionWidth}&resH={resolutionHeight}&kbps={bitratePerMonitor}&fps={fps}";
+    }
+
+    void CalculateLayoutInfo()
+    {
+        // Calculate layout based on monitor count and resolution
+        // For side-by-side layout (horizontal arrangement):
+        
+        // Each monitor (cell) has the original resolution
+        cellWidth = resolutionWidth;
+        cellHeight = resolutionHeight;
+        
+        // Frame is the combined width of all monitors side-by-side
+        frameWidth = resolutionWidth * monitorCount;
+        frameHeight = resolutionHeight;
     }
 }
