@@ -311,7 +311,96 @@ public class MultiPCStreamClient : MonoBehaviour
             }
 
             if (text.Equals("pong", StringComparison.OrdinalIgnoreCase)) continue;
+
+            // reconnect:N - Server requests re-offer for monitor N (abnormal close recovery)
+            if (text.StartsWith("reconnect:", StringComparison.OrdinalIgnoreCase))
+            {
+                var rest = text.Substring(10);
+                if (int.TryParse(rest.Trim(), out int monIdx) && monIdx >= 0 && monIdx < _pcs.Count)
+                {
+                    Debug.Log($"[MultiPC] Server requested reconnect for PC{monIdx}");
+                    await ReconnectMonitor(monIdx);
+                }
+                continue;
+            }
         }
+    }
+
+    /// <summary>
+    /// Reconnect a specific monitor by recreating PeerConnection and sending new offer
+    /// </summary>
+    async Task ReconnectMonitor(int monitorIndex)
+    {
+        if (monitorIndex < 0 || monitorIndex >= _pcs.Count) return;
+        
+        var oldWrapper = _pcs[monitorIndex];
+        Debug.Log($"[MultiPC] Reconnecting PC{monitorIndex}...");
+        
+        // Close old PC
+        try { oldWrapper.PC?.Close(); oldWrapper.PC?.Dispose(); } catch { }
+        
+        // Create new PeerConnection
+        var cfg = new RTCConfiguration { iceServers = Array.Empty<RTCIceServer>() };
+        var pc = new RTCPeerConnection(ref cfg);
+        var wrapper = new PCWrapper { Index = monitorIndex, PC = pc };
+        
+        int idx = monitorIndex;
+        
+        // Add video transceiver
+        var trans = pc.AddTransceiver(TrackKind.Video, new RTCRtpTransceiverInit { direction = RTCRtpTransceiverDirection.RecvOnly });
+        var caps = RTCRtpReceiver.GetCapabilities(TrackKind.Video);
+        var h264 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("H264", StringComparison.OrdinalIgnoreCase)).ToArray();
+        trans.SetCodecPreferences(h264.Concat(caps.codecs.Except(h264)).ToArray());
+
+        pc.OnIceConnectionChange = s => Debug.Log($"[MultiPC] PC{idx} ICE: {s}");
+        pc.OnConnectionStateChange = s => Debug.Log($"[MultiPC] PC{idx} State: {s}");
+
+        // ICE candidates
+        pc.OnIceCandidate = cand =>
+        {
+            if (string.IsNullOrEmpty(cand.Candidate)) return;
+            
+            string msg = cand.Candidate;
+            if (skipTcpIceCandidates && (msg.Contains(" tcp ", StringComparison.OrdinalIgnoreCase) || msg.Contains("tcptype", StringComparison.OrdinalIgnoreCase)))
+                return;
+            
+            if (!msg.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase))
+                msg = "candidate:" + msg;
+            if (msg.StartsWith("candidate:candidate:", StringComparison.OrdinalIgnoreCase))
+                msg = msg.Substring("candidate:".Length);
+            
+            string rawCandidate = msg.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase) 
+                ? msg.Substring("candidate:".Length) : msg;
+            
+            SendWs($"candidate:{idx}:{rawCandidate}");
+        };
+
+        // Track received
+        pc.OnTrack = e =>
+        {
+            if (e.Track is VideoStreamTrack v)
+            {
+                wrapper.VideoTrack = v;
+                v.OnVideoReceived += tex => wrapper.Texture = tex;
+                Debug.Log($"[MultiPC] PC{idx} received video track (reconnected)");
+            }
+        };
+        
+        // Replace wrapper
+        _pcs[monitorIndex] = wrapper;
+        
+        // Create and send new offer
+        var offerOp = pc.CreateOffer();
+        while (!offerOp.IsDone) await Task.Yield();
+        if (offerOp.IsError) { Debug.LogError($"[MultiPC] PC{idx} CreateOffer failed on reconnect"); return; }
+
+        var offer = offerOp.Desc;
+        var setLocalOp = pc.SetLocalDescription(ref offer);
+        while (!setLocalOp.IsDone) await Task.Yield();
+        if (setLocalOp.IsError) { Debug.LogError($"[MultiPC] PC{idx} SetLocal failed on reconnect"); return; }
+
+        SendWs($"offer:{idx}:{offer.sdp}");
+        Debug.Log($"[MultiPC] PC{idx} reconnect offer sent");
     }
 
     void AddIce(PCWrapper wrapper, string candStr)
