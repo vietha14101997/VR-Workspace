@@ -40,7 +40,13 @@ public class WorldPanelCursor : MonoBehaviour
         if (_mf.sharedMesh == null)
         {
             var m = new Mesh();
-            m.vertices = new[] { new Vector3(-.5f, -.5f, 0), new Vector3(.5f, -.5f, 0), new Vector3(.5f, .5f, 0), new Vector3(-.5f, .5f, 0) };
+            // Shifted so top-left (Tip) matches origin (0,0)
+            m.vertices = new[] { 
+                new Vector3(0f, -1f, 0),   // BL
+                new Vector3(1f, -1f, 0),   // BR
+                new Vector3(1f, 0f, 0),    // TR
+                new Vector3(0f, 0f, 0)     // TL (Tip)
+            };
             m.uv = new[] { new Vector2(0, 0), new Vector2(1, 0), new Vector2(1, 1), new Vector2(0, 1) };
             m.triangles = new[] { 0, 1, 2, 0, 2, 3 };
             m.RecalculateBounds();

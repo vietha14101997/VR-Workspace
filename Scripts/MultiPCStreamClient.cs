@@ -95,9 +95,10 @@ public class MultiPCStreamClient : MonoBehaviour
 
     async void Start()
     {
+        Application.runInBackground = true; // Prevent throttling when not focused (critical for same-machine testing)
         StartCoroutine(WebRTC.Update());
         QualitySettings.vSyncCount = 0;
-        Application.targetFrameRate = 60;
+        Application.targetFrameRate = 120; // Cap at 120 to prevent GPU starvation (vs unlimited) on single-device setup
         _cts = new CancellationTokenSource();
 
         int monitors = GetExpectedMonitors();
@@ -167,6 +168,19 @@ public class MultiPCStreamClient : MonoBehaviour
                     wrapper.VideoTrack = v;
                     v.OnVideoReceived += tex => wrapper.Texture = tex;
                     Debug.Log($"[MultiPC] PC{idx} received video track");
+
+                    // Jitter Buffer Control for Low Latency
+                    // Find the receiver for this track and set delay hint
+                    foreach (var receiver in pc.GetReceivers())
+                    {
+                        if (receiver.Track != null && receiver.Track.Id == v.Id)
+                        {
+                            // Error CS1061: JitterBufferDelayHint not available in this Unity WebRTC version.
+                            // receiver.JitterBufferDelayHint = 0.05; // 50ms target delay
+                            // Debug.Log($"[MultiPC] PC{idx} Set JitterBufferDelayHint=0.05s for track {v.Id}");
+                            break;
+                        }
+                    }
                 }
             };
         }

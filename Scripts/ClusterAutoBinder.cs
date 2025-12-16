@@ -102,7 +102,7 @@ public class ClusterAutoBinder : MonoBehaviour
         }
         
         // Generate signal path for multi-track mode
-        signalPath = $"signal?mode=multitrack&monitors={monitorCount}&resW={resolutionWidth}&resH={resolutionHeight}&kbps={bitratePerMonitor}&fps={fps}";
+        signalPath = $"signal?mode=multitrack&monitors={monitorCount}&resW={resolutionWidth}&resH={resolutionHeight}&kbps={bitratePerMonitor}&fps={fps}&zerolat=1&lan=1";
     }
 
     void CalculateLayoutInfo()
