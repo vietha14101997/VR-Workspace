@@ -121,7 +121,19 @@ public class MultiPCStreamClient : MonoBehaviour
             trans.SetCodecPreferences(h264.Concat(caps.codecs.Except(h264)).ToArray());
 
             pc.OnIceConnectionChange = s => Debug.Log($"[MultiPC] PC{idx} ICE: {s}");
-            pc.OnConnectionStateChange = s => Debug.Log($"[MultiPC] PC{idx} State: {s}");
+            pc.OnConnectionStateChange = s => 
+            {
+                Debug.Log($"[MultiPC] PC{idx} State: {s}");
+                
+                // Stop if we are shutting down intentionally
+                if (_cts.IsCancellationRequested) return;
+
+                if (s == RTCPeerConnectionState.Failed || s == RTCPeerConnectionState.Disconnected)
+                {
+                    Debug.Log($"[MultiPC] PC{idx} connection lost ({s}). Triggering client-side auto-reconnect...");
+                    _ = ReconnectMonitor(idx);
+                }
+            };
 
             // ICE candidates - send with index prefix (matching PCStreamClient format)
             pc.OnIceCandidate = cand =>
@@ -345,6 +357,9 @@ public class MultiPCStreamClient : MonoBehaviour
     /// </summary>
     async Task ReconnectMonitor(int monitorIndex)
     {
+        // Don't reconnect if application is quoting/disconnecting
+        if (_cts == null || _cts.IsCancellationRequested) return;
+
         if (monitorIndex < 0 || monitorIndex >= _pcs.Count) return;
         
         var oldWrapper = _pcs[monitorIndex];
