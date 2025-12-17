@@ -444,8 +444,8 @@ public class VRMainMenu : MonoBehaviour
         
         // --- ADD BOX COLLIDER FOR GAZE RAYCAST ---
         BoxCollider col = btnHitObj.AddComponent<BoxCollider>();
-        // Add thickness (Z=10) to ensure raycast enters easily even at angles
-        col.size = new Vector3(size.x, size.y, 10f); 
+        // Fix Z size: Canvas Z scale is 1, so we use small value here (0.1f = 10cm)
+        col.size = new Vector3(size.x, size.y, 0.1f); 
         // -----------------------------------------
         
         // 3. VISUAL ROOT (Animated Layer)
