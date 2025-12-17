@@ -133,11 +133,19 @@ public class RemotePlayMainMenu : MonoBehaviour
             var voObj = GameObject.Find("VirtualObjects");
             if (voObj == null) voObj = new GameObject("VirtualObjects");
             virtualObjectsRoot = voObj.transform;
+
+            // --- FIX LAYER: Ensure Root has VirtualObjects layer ---
+            int layerVO = LayerMask.NameToLayer("VirtualObjects");
+            if (layerVO != -1) voObj.layer = layerVO;
         }
 
         // 3. Create Cluster Rig
         GameObject rigGO = new GameObject("RemotePlay_ClusterRig");
         rigGO.transform.SetParent(virtualObjectsRoot, false);
+
+        // --- FIX LAYER: Rig inherits layer ---
+        int layerIndex = LayerMask.NameToLayer("VirtualObjects");
+        if (layerIndex != -1) rigGO.layer = layerIndex;
         
         var rig = rigGO.AddComponent<WorldPanelClusterRig>();
         rig.panelPrefab = monitorPanelPrefab != null ? monitorPanelPrefab : _menuPanel; // Fallback to menu panel visual if monitor prefab missing

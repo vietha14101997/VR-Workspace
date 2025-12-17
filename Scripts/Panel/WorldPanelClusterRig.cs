@@ -201,7 +201,22 @@ public class WorldPanelClusterRig : MonoBehaviour
         p.dockHardHidden = hideTrayAndDock;
         p.Apply();
         p.SetHandlesCenterOnly(hideTrayAndDock);
+
+        // --- FIX LAYER: Propagate layer from Rig to new Panel ---
+        SetLayerRecursively(p.gameObject, gameObject.layer);
+
         return p;
+    }
+
+    void SetLayerRecursively(GameObject obj, int newLayer)
+    {
+        if (obj == null) return;
+        obj.layer = newLayer;
+        foreach (Transform child in obj.transform)
+        {
+            if (child == null) continue;
+            SetLayerRecursively(child.gameObject, newLayer);
+        }
     }
 
     void LinkNeighbors()

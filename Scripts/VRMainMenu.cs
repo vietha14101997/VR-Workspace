@@ -237,6 +237,21 @@ public class VRMainMenu : MonoBehaviour
             fitter.SetLayoutHorizontal();
             fitter.SetLayoutVertical();
         }
+
+        // --- FIX LAYER: Ensure UI has VirtualObjects layer ---
+        int layerVO = LayerMask.NameToLayer("VirtualObjects");
+        if (layerVO != -1) SetLayerRecursively(canvasGO, layerVO);
+    }
+
+    void SetLayerRecursively(GameObject obj, int newLayer)
+    {
+        if (obj == null) return;
+        obj.layer = newLayer;
+        foreach (Transform child in obj.transform)
+        {
+            if (child == null) continue;
+            SetLayerRecursively(child.gameObject, newLayer);
+        }
     }
     
     void CreateGlassPanel(Transform parent, float w, float h)
