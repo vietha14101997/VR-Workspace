@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro; 
-using System.Collections.Generic;
+using System.Collections.Generic; 
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -11,23 +11,23 @@ public class VRMainMenu : MonoBehaviour
     [Header("Configuration")]
     public float panelWidth = 1.6f;
     public float panelHeight = 0.9f;
-    public WorldPanelPlus menuPanelPrefab; 
     public RemotePlayMainMenu remotePlayLogic; 
 
-    [Header("Visual Style")]
-    public Color glassColor = new Color(0.0f, 0.05f, 0.15f, 0.6f); // Darker Blue Glass
+    [Header("Cyberpunk Visual Style")]
+    // Glassmorphism: Dark semi-transparent tint + Blur simulation via opacity layering
+    public Color glassColor = new Color(0.1f, 0.15f, 0.2f, 0.85f); 
+    public Color panelBorderColor = new Color(0.0f, 0.8f, 1.0f, 0.8f); 
     
-    // Improved Neon Palette
+    // Cyberpunk Neon Palette
     public Color[] buttonColors = new Color[] {
-        new Color(0.0f, 0.9f, 1.0f, 1.0f), // Cyan Neon
-        new Color(0.7f, 0.2f, 1.0f, 1.0f), // Purple Neon
-        new Color(1.0f, 0.2f, 0.6f, 1.0f), // Pink Neon
-        new Color(0.2f, 1.0f, 0.4f, 1.0f), // Green Neon
-        new Color(1.0f, 0.6f, 0.0f, 1.0f), // Orange Neon
-        new Color(1.0f, 0.2f, 0.2f, 1.0f)  // Red Neon
+        new Color(0.0f, 1.0f, 1.0f, 1.0f), // #1 Cyan Neon (Main)
+        new Color(0.8f, 0.0f, 1.0f, 1.0f), // #2 Purple Neon
+        new Color(0.0f, 0.6f, 1.0f, 1.0f), // #3 Electric Blue
+        new Color(1.0f, 0.0f, 0.5f, 1.0f), // #4 Hot Pink
+        new Color(0.0f, 1.0f, 0.5f, 1.0f), // #5 Matrix Green
+        new Color(1.0f, 0.5f, 0.0f, 1.0f)  // #6 Neon Orange
     };
     
-    public Color buttonBorderColor = new Color(0.0f, 0.8f, 1.0f, 0.8f); // Default Neon Cyan
     public int fontSize = 32;
 
     [Header("Typography")]
@@ -41,10 +41,13 @@ public class VRMainMenu : MonoBehaviour
     public Sprite iconSettings;
     public Sprite iconQuit;
 
-    private WorldPanelPlus _panel;
     private Canvas _canvas;
     private GameObject _gridContainer;
     private Sprite _roundedSprite;
+    private Sprite _pixelSprite;
+    
+    // Cache separate border sprites by thickness
+    private Dictionary<int, Sprite> _borderSprites = new Dictionary<int, Sprite>();
 
     [ContextMenu("Rebuild UI")]
     public void ManualRebuild()
@@ -57,9 +60,7 @@ public class VRMainMenu : MonoBehaviour
         if (_gridContainer) DestroyImmediate(_gridContainer);
         var existingCanvas = transform.Find("MenuCanvas");
         if (existingCanvas) DestroyImmediate(existingCanvas.gameObject);
-        if (_panel && _panel.transform.Find("MenuCanvas")) 
-            DestroyImmediate(_panel.transform.Find("MenuCanvas").gameObject);
-
+        
         BuildInterface();
     }
 
@@ -74,19 +75,19 @@ public class VRMainMenu : MonoBehaviour
     {
         string[] iconNames = { 
             "icon_remote", "icon_browser", "icon_media", 
-            "icon_files", "icon_settings", "icon_quit",
-            "icon_extra_1", "icon_extra_2", "icon_extra_3"
+            "icon_files", "icon_settings", "icon_quit"
         };
         foreach (var name in iconNames)
         {
-            string path = $"Assets/VR-Workspace/Resources/MainMenu/{name}.png";
-            TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
-            if (importer != null && importer.textureType != TextureImporterType.Sprite)
-            {
-                Debug.Log($"[VRMainMenu] Auto-fixing texture import for {name}...");
-                importer.textureType = TextureImporterType.Sprite;
-                importer.SaveAndReimport();
-            }
+            try {
+                string path = $"Assets/VR-Workspace/Resources/MainMenu/{name}.png";
+                TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                if (importer != null && importer.textureType != TextureImporterType.Sprite)
+                {
+                    importer.textureType = TextureImporterType.Sprite;
+                    importer.SaveAndReimport();
+                }
+            } catch {}
         }
     }
 #endif
@@ -104,9 +105,8 @@ public class VRMainMenu : MonoBehaviour
     Sprite GetRoundedSprite()
     {
         if (_roundedSprite != null) return _roundedSprite;
-
-        int size = 128; 
-        int radius = 35; 
+        int size = 512; 
+        int radius = 80; 
         Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
         Color[] colors = new Color[size * size];
 
@@ -114,34 +114,17 @@ public class VRMainMenu : MonoBehaviour
         {
             for (int x = 0; x < size; x++)
             {
-                bool inCorner = false;
-                float dist = 0f;
-
-                if (x < radius && y < radius) { 
-                    dist = Vector2.Distance(new Vector2(x, y), new Vector2(radius, radius));
-                    inCorner = true;
-                }
-                else if (x > size - radius && y < radius) { 
-                    dist = Vector2.Distance(new Vector2(x, y), new Vector2(size - radius, radius));
-                    inCorner = true;
-                }
-                else if (x < radius && y > size - radius) { 
-                    dist = Vector2.Distance(new Vector2(x, y), new Vector2(radius, size - radius));
-                    inCorner = true;
-                }
-                else if (x > size - radius && y > size - radius) { 
-                    dist = Vector2.Distance(new Vector2(x, y), new Vector2(size - radius, size - radius));
-                    inCorner = true;
-                }
+                bool inCorner = (x < radius && y < radius) || (x > size - radius && y < radius) ||
+                                (x < radius && y > size - radius) || (x > size - radius && y > size - radius);
 
                 if (inCorner)
                 {
-                    if (dist > radius) colors[y * size + x] = Color.clear;
-                    else if (dist > radius - 1f) {
-                        float alpha = 1f - (dist - (radius - 1f));
-                        colors[y * size + x] = new Color(1, 1, 1, alpha);
-                    }
-                    else colors[y * size + x] = Color.white;
+                    float cx = (x < size / 2) ? radius : size - radius - 1;
+                    float cy = (y < size / 2) ? radius : size - radius - 1;
+                    float d = Vector2.Distance(new Vector2(x, y), new Vector2(cx, cy));
+                    
+                    float alpha = Mathf.Clamp01((radius + 0.5f) - d);
+                    colors[y * size + x] = new Color(1, 1, 1, alpha);
                 }
                 else
                 {
@@ -155,32 +138,77 @@ public class VRMainMenu : MonoBehaviour
         _roundedSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100, 0, SpriteMeshType.FullRect, new Vector4(radius, radius, radius, radius));
         return _roundedSprite;
     }
+    
+    Sprite GetBorderSprite(int thickness)
+    {
+        if (_borderSprites.ContainsKey(thickness) && _borderSprites[thickness] != null) 
+            return _borderSprites[thickness];
+            
+        int size = 512;
+        int radius = 80;
+
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        Color[] colors = new Color[size * size];
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                bool inCorner = (x < radius && y < radius) || (x > size - radius && y < radius) ||
+                                (x < radius && y > size - radius) || (x > size - radius && y > size - radius);
+
+                float alpha = 0f;
+
+                if (inCorner)
+                {
+                    float cx = (x < size / 2) ? radius : size - radius - 1;
+                    float cy = (y < size / 2) ? radius : size - radius - 1;
+                    float d = Vector2.Distance(new Vector2(x, y), new Vector2(cx, cy));
+                    
+                    float outerAlpha = Mathf.Clamp01((radius + 0.5f) - d);
+                    float innerEdge = radius - thickness;
+                    float innerAlpha = Mathf.Clamp01(d - (innerEdge - 0.5f));
+                    
+                    alpha = outerAlpha * innerAlpha;
+                }
+                else
+                {
+                    float dx = Mathf.Min(x, size - 1 - x);
+                    float dy = Mathf.Min(y, size - 1 - y);
+                    float minDist = Mathf.Min(dx, dy); 
+                    
+                    if (minDist < thickness + 1)
+                    {
+                         float innerAlpha = Mathf.Clamp01((thickness + 0.5f) - minDist);
+                         alpha = innerAlpha;
+                    }
+                }
+                colors[y * size + x] = new Color(1, 1, 1, alpha);
+            }
+        }
+        tex.SetPixels(colors);
+        tex.Apply();
+        Sprite s = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100, 0, SpriteMeshType.FullRect, new Vector4(radius, radius, radius, radius));
+        _borderSprites[thickness] = s;
+        return s;
+    }
+
+    Sprite GetPixelSprite()
+    {
+        if (_pixelSprite) return _pixelSprite;
+        Texture2D tex = new Texture2D(2, 2);
+        tex.SetPixels(new Color[] { Color.white, Color.white, Color.white, Color.white });
+        tex.Apply();
+        _pixelSprite = Sprite.Create(tex, new Rect(0, 0, 2, 2), Vector2.one * 0.5f);
+        return _pixelSprite;
+    }
 
     void BuildInterface()
     {
-        Debug.Log("[VRMainMenu] Building Polished Neon Grid...");
-
-        if (menuPanelPrefab != null)
-        {
-            var go = Instantiate(menuPanelPrefab.gameObject, transform);
-            _panel = go.GetComponent<WorldPanelPlus>();
-        }
-        else
-        {
-            _panel = GetComponent<WorldPanelPlus>();
-            if (_panel == null)
-            {
-                var go = new GameObject("MainMenu_Panel");
-                go.transform.SetParent(transform, false);
-                _panel = go.AddComponent<WorldPanelPlus>();
-            }
-            _panel.width = panelWidth;
-            _panel.height = panelHeight;
-            _panel.Rebuild();
-        }
+        Debug.Log("[VRMainMenu] Building Cyberpunk Interface V16 High Glow...");
 
         GameObject canvasGO = new GameObject("MenuCanvas");
-        canvasGO.transform.SetParent(_panel.transform, false);
+        canvasGO.transform.SetParent(transform, false); 
 
         float logicalWidth = 1920f;
         float logicalHeight = (logicalWidth / panelWidth) * panelHeight;
@@ -192,14 +220,23 @@ public class VRMainMenu : MonoBehaviour
         canvasRT.sizeDelta = new Vector2(logicalWidth, logicalHeight);
         float scaleFactor = panelWidth / logicalWidth;
         canvasRT.localScale = new Vector3(scaleFactor, scaleFactor, 1f);
-        canvasRT.localPosition = new Vector3(0, 0, -0.05f); 
-
+        canvasRT.localPosition = new Vector3(0, 0, 0); 
         _canvas.gameObject.AddComponent<GraphicRaycaster>();
         
-         CreateGlassPanel(canvasGO.transform, logicalWidth, logicalHeight);
-        CreateText(canvasGO.transform, "VR WORKSPACE", new Vector2(0, logicalHeight/2 - 80), 60, Color.cyan, true); // Update Title to Cyan
+        CreateGlassPanel(canvasGO.transform, logicalWidth, logicalHeight);
+        
+        // No Title
 
         CreateUniformGrid(canvasGO.transform, logicalWidth, logicalHeight);
+        
+        Canvas.ForceUpdateCanvases();
+        var fitter = _gridContainer.GetComponent<GridLayoutGroup>();
+        if(fitter) {
+            fitter.CalculateLayoutInputHorizontal();
+            fitter.CalculateLayoutInputVertical();
+            fitter.SetLayoutHorizontal();
+            fitter.SetLayoutVertical();
+        }
     }
     
     void CreateGlassPanel(Transform parent, float w, float h)
@@ -207,23 +244,86 @@ public class VRMainMenu : MonoBehaviour
         GameObject bgObj = new GameObject("GlassBackground");
         bgObj.transform.SetParent(parent, false);
         Image img = bgObj.AddComponent<Image>();
-        img.color = glassColor;
+        
         img.type = Image.Type.Sliced;
         img.sprite = GetRoundedSprite();
+        
+        // Apply Custom Blur Shader
+        Shader blurShader = Shader.Find("Custom/UIBlurBackground");
+        if (blurShader != null)
+        {
+            Material blurMat = new Material(blurShader);
+            blurMat.SetFloat("_Radius", 2.0f); // Radius = 2.0
+            img.material = blurMat;
+            img.color = glassColor; // User Config Variable
+        }
+        else
+        {
+            img.color = glassColor;
+        }
         
         RectTransform rt = bgObj.GetComponent<RectTransform>();
         rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one; 
         rt.sizeDelta = Vector2.zero; rt.localScale = Vector3.one;
         rt.localPosition = Vector3.zero;
+        rt.SetAsFirstSibling();
         
-        // Neon Cyan/Purple Outline for Main Panel
-        var outline = bgObj.AddComponent<UnityEngine.UI.Outline>();
-        outline.effectColor = new Color(0.0f, 0.8f, 1.0f, 0.6f); // Neon Cyan
-        outline.effectDistance = new Vector2(3, -3);
+        // PANEL BORDER - Keep thick (16)
+        GameObject borderObj = new GameObject("PanelBorder");
+        borderObj.transform.SetParent(bgObj.transform, false);
+        RectTransform borderRT = borderObj.AddComponent<RectTransform>();
+        borderRT.anchorMin = Vector2.zero; borderRT.anchorMax = Vector2.one;
+        borderRT.sizeDelta = Vector2.zero;
         
+        Image borderImg = borderObj.AddComponent<Image>();
+        borderImg.sprite = GetBorderSprite(16); // Normal thickness for Main Panel
+        borderImg.type = Image.Type.Sliced;
+        borderImg.color = panelBorderColor; 
+        borderImg.raycastTarget = false;
+
+        // Glow (Outer)
         var shadow = bgObj.AddComponent<UnityEngine.UI.Shadow>();
-        shadow.effectColor = new Color(0.5f, 0.0f, 1.0f, 0.4f); // Subtle Purple Glow
-        shadow.effectDistance = new Vector2(5, -5);
+        shadow.effectColor = new Color(0.0f, 0.6f, 1.0f, 0.4f); 
+        shadow.effectDistance = new Vector2(0, -8);
+        
+        CreateFloatingDataEffects(bgObj.transform, w, h);
+    }
+
+    void CreateFloatingDataEffects(Transform parent, float w, float h)
+    {
+        GameObject fxContainer = new GameObject("FX_DataStream");
+        fxContainer.transform.SetParent(parent, false);
+        RectTransform rt = fxContainer.AddComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+        rt.sizeDelta = Vector2.zero;
+        
+        fxContainer.AddComponent<RectMask2D>();
+
+        int particleCount = 20;
+        for (int i = 0; i < particleCount; i++)
+        {
+            GameObject p = new GameObject($"Bit_{i}");
+            p.transform.SetParent(fxContainer.transform, false);
+            
+            Image pImg = p.AddComponent<Image>();
+            pImg.sprite = GetPixelSprite(); 
+            
+            bool cyanOrPurple = Random.value > 0.5f;
+            Color baseCol = cyanOrPurple ? Color.cyan : new Color(0.8f, 0f, 1f); 
+            pImg.color = new Color(baseCol.r, baseCol.g, baseCol.b, Random.Range(0.1f, 0.4f));
+
+            RectTransform pRT = p.GetComponent<RectTransform>();
+            float size = Random.Range(10f, 60f);
+            pRT.sizeDelta = new Vector2(size, size * Random.Range(0.2f, 1.0f)); 
+            
+            float startX = Random.Range(-w/2f, w/2f);
+            float startY = Random.Range(-h/2f, h/2f);
+            pRT.anchoredPosition = new Vector2(startX, startY);
+
+            var anim = p.AddComponent<FloatingDataAnim>();
+            anim.speed = Random.Range(10f, 40f);
+            anim.range = new Vector2(w, h);
+        }
     }
 
     void CreateUniformGrid(Transform parent, float w, float h)
@@ -232,17 +332,54 @@ public class VRMainMenu : MonoBehaviour
         _gridContainer.transform.SetParent(parent, false);
 
         RectTransform rt = _gridContainer.AddComponent<RectTransform>();
-        rt.anchorMin = new Vector2(0.05f, 0.15f); 
-        rt.anchorMax = new Vector2(0.95f, 0.85f); 
-        rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
+        
+        // 1. Equal Margins (e.g., 100px from all sides)
+        float marginPX = 100f; 
+        float xMin = marginPX / w;
+        float xMax = 1f - xMin;
+        float yMin = marginPX / h;
+        float yMax = 1f - yMin;
+
+        rt.anchorMin = new Vector2(xMin, yMin); 
+        rt.anchorMax = new Vector2(xMax, yMax); 
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = Vector2.zero;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
         rt.localScale = Vector3.one;
 
         GridLayoutGroup grid = _gridContainer.AddComponent<GridLayoutGroup>();
         
-        // Slightly larger than 320 to fill space better
-        float side = 330; 
-        grid.cellSize = new Vector2(side, side);
-        grid.spacing = new Vector2(40, 40);
+        float containerW = w * (xMax - xMin);
+        float containerH = h * (yMax - yMin);
+        
+        int cols = 3;
+        int rows = 2;
+        
+        // 2. Equal Spacing (100px)
+        float spacingPX = 100f;
+
+        float totalSpacingW = spacingPX * (cols - 1);
+        float totalSpacingH = spacingPX * (rows - 1);
+
+        // Max possible dimensions
+        float maxW = (containerW - totalSpacingW) / cols;
+        float maxH = (containerH - totalSpacingH) / rows;
+
+        // 3. Constrain to Square-ish Aspect Ratio
+        float targetAspect = 1.15f; 
+        
+        float finalH = maxH;
+        float finalW = finalH * targetAspect;
+
+        if (finalW > maxW)
+        {
+            finalW = maxW;
+            finalH = finalW / targetAspect;
+        }
+
+        grid.cellSize = new Vector2(finalW, finalH);
+        grid.spacing = new Vector2(spacingPX, spacingPX);
         grid.startCorner = GridLayoutGroup.Corner.UpperLeft;
         grid.startAxis = GridLayoutGroup.Axis.Horizontal;
         grid.childAlignment = TextAnchor.MiddleCenter;
@@ -259,75 +396,127 @@ public class VRMainMenu : MonoBehaviour
 
     void CreateGridButton(string label, Sprite icon, Color btnColor, UnityEngine.Events.UnityAction onClick)
     {
-        GameObject btnObj = new GameObject("Btn_" + label);
-        btnObj.transform.SetParent(_gridContainer.transform, false);
+        // 1. Wrapper
+        GameObject wrapper = new GameObject("Cell_" + label);
+        wrapper.transform.SetParent(_gridContainer.transform, false);
+        RectTransform wrt = wrapper.AddComponent<RectTransform>();
+        wrt.localScale = Vector3.one;
+        
+        // 2. Button Root
+        GameObject btnObj = new GameObject("Btn_AnimRoot");
+        btnObj.transform.SetParent(wrapper.transform, false);
+        
+        RectTransform btnRT = btnObj.AddComponent<RectTransform>();
+        btnRT.anchorMin = Vector2.zero; btnRT.anchorMax = Vector2.one;
+        btnRT.sizeDelta = Vector2.zero; 
+        btnRT.localScale = Vector3.one;
 
-        // 1. Background (Glassy, nearly transparent)
+        // Background
         Image bg = btnObj.AddComponent<Image>();
         bg.sprite = GetRoundedSprite();
         bg.type = Image.Type.Sliced;
-        // Low alpha for the "inside" of the button to look like glass
-        bg.color = new Color(btnColor.r, btnColor.g, btnColor.b, 0.15f);
+        
+        Color baseTint = Color.Lerp(btnColor, Color.white, 0.2f);
+        baseTint.a = 0.4f;
+
+        // Apply Blur Shader if found
+        Shader blurShader = Shader.Find("Custom/UIBlurBackground");
+        if (blurShader != null)
+        {
+            Material blurMat = new Material(blurShader);
+            blurMat.SetFloat("_Radius", 1.5f); 
+            bg.material = blurMat;
+            bg.color = baseTint;
+        }
+        else
+        {
+             bg.color = baseTint; 
+        }
 
         Button btn = btnObj.AddComponent<Button>();
         btn.targetGraphic = bg;
         btn.onClick.AddListener(onClick);
         
-        // Remove default ColorBlock transitions to let our custom script handle it, 
-        // or set them to be subtle. Let's just use ColorTint for the BG slightly.
         ColorBlock cb = btn.colors;
-        cb.normalColor = new Color(btnColor.r, btnColor.g, btnColor.b, 0.15f);
-        cb.highlightedColor = new Color(btnColor.r, btnColor.g, btnColor.b, 0.3f); // Slightly brighter gloss on hover
-        cb.pressedColor = new Color(btnColor.r, btnColor.g, btnColor.b, 0.5f);
-        cb.colorMultiplier = 1f;
+        cb.normalColor = baseTint;
+        cb.highlightedColor = new Color(btnColor.r, btnColor.g, btnColor.b, 0.6f);
+        cb.pressedColor = new Color(btnColor.r, btnColor.g, btnColor.b, 0.8f);
+        cb.colorMultiplier = 1f; 
+        cb.fadeDuration = 0.1f;
         btn.colors = cb;
         
-        // 2. Neon Boarder (Outline)
-        var outline = btnObj.AddComponent<UnityEngine.UI.Outline>();
-        outline.effectColor = btnColor; // The neon color
-        outline.effectDistance = new Vector2(3, -3); // Thicker neon rim
+        // BORDER OBJECT - SUPER GLOW
+        GameObject borderObj = new GameObject("Border");
+        borderObj.transform.SetParent(btnObj.transform, false);
+        RectTransform borderRT = borderObj.AddComponent<RectTransform>();
+        borderRT.anchorMin = Vector2.zero; borderRT.anchorMax = Vector2.one;
+        borderRT.sizeDelta = Vector2.zero;
+        
+        Image borderImg = borderObj.AddComponent<Image>();
+        borderImg.sprite = GetBorderSprite(8); 
+        borderImg.type = Image.Type.Sliced;
+        // Brighter Border (Whiter)
+        borderImg.color = Color.Lerp(btnColor, Color.white, 0.8f); 
+        borderImg.raycastTarget = false;
+        
+        // Shadow 1 (Inner glowish)
+        var glow = borderObj.AddComponent<UnityEngine.UI.Shadow>();
+        glow.effectColor = new Color(btnColor.r, btnColor.g, btnColor.b, 1.0f); 
+        glow.effectDistance = new Vector2(0, -2);
+        
+        // Shadow 2 (Outer diffuse)
+        var glow2 = borderObj.AddComponent<UnityEngine.UI.Shadow>();
+        glow2.effectColor = new Color(btnColor.r, btnColor.g, btnColor.b, 0.8f); 
+        glow2.effectDistance = new Vector2(0, 3);
+        
+        // Shadow 3 (Spread)
+        var glow3 = borderObj.AddComponent<UnityEngine.UI.Shadow>();
+        glow3.effectColor = new Color(btnColor.r, btnColor.g, btnColor.b, 0.4f); 
+        glow3.effectDistance = new Vector2(3, -3);
 
-        // 3. Glow (Shadow) - Subtle matching glow
-        var glow = btnObj.AddComponent<UnityEngine.UI.Shadow>();
-        glow.effectColor = new Color(btnColor.r, btnColor.g, btnColor.b, 0.6f);
-        glow.effectDistance = new Vector2(0, -6);
-
-        // Content Container
+        // Content
         GameObject content = new GameObject("Content");
         content.transform.SetParent(btnObj.transform, false);
         RectTransform cRT = content.AddComponent<RectTransform>();
         cRT.anchorMin = Vector2.zero; cRT.anchorMax = Vector2.one;
         cRT.sizeDelta = Vector2.zero;
 
-        // 4. Icon (Same color as border but whiter)
+        // Icon - GLOWING
         GameObject iconObj = new GameObject("Icon");
         iconObj.transform.SetParent(content.transform, false);
         Image iconImg = iconObj.AddComponent<Image>();
         iconImg.sprite = icon;
-        // Lerp towards white for the "Whiter" look
-        iconImg.color = Color.Lerp(btnColor, Color.white, 0.75f);
+        // Whiter Icon
+        iconImg.color = Color.white; 
         
+        // Add Shadow to Icon for Glow
+        var iconGlow = iconObj.AddComponent<UnityEngine.UI.Shadow>();
+        iconGlow.effectColor = btnColor;
+        iconGlow.effectDistance = new Vector2(2, -2);
+
         RectTransform iconRT = iconObj.GetComponent<RectTransform>();
-        // Icon Size
-        iconRT.anchorMin = new Vector2(0.25f, 0.35f);
-        iconRT.anchorMax = new Vector2(0.75f, 0.85f);
+        iconRT.anchorMin = new Vector2(0.32f, 0.40f); 
+        iconRT.anchorMax = new Vector2(0.68f, 0.75f);
         iconRT.offsetMin = Vector2.zero; iconRT.offsetMax = Vector2.zero;
         iconImg.preserveAspect = true;
 
-        // 5. Text
-        CreateText(content.transform, label, Vector2.zero, fontSize, Color.white);
-        var txtRT = content.transform.Find("TextTMP").GetComponent<RectTransform>();
-        txtRT.anchorMin = new Vector2(0, 0.05f);
-        txtRT.anchorMax = new Vector2(1, 0.25f);
+        // Text - GLOWING
+        GameObject txtObj = CreateText(content.transform, label, Vector2.zero, fontSize, Color.white); // Whiter Text
+        
+        // Add Shadow to Text for Glow
+        var txtGlow = txtObj.AddComponent<UnityEngine.UI.Shadow>();
+        txtGlow.effectColor = btnColor;
+        txtGlow.effectDistance = new Vector2(1.5f, -1.5f);
 
-        // 6. Interactive Animation (Hover Pop & Border White)
+        var txtRT = txtObj.GetComponent<RectTransform>();
+        txtRT.anchorMin = new Vector2(0, 0.08f);
+        txtRT.anchorMax = new Vector2(1, 0.3f); 
+
+        // Animation
         var anim = btnObj.AddComponent<VRButtonAnimation>();
-        anim.outline = outline;
-        anim.normalBorderColor = btnColor;
-        anim.highlightBorderColor = Color.white;
-        anim.popAmount = 15f; // Pop out by 15 units (local Z or just scale/position)
+        anim.popAmount = 40f; 
     }
-
+    
     GameObject CreateText(Transform parent, string content, Vector2 pos, int size, Color c, bool bold = false)
     {
         var go = new GameObject("TextTMP");
@@ -346,10 +535,12 @@ public class VRMainMenu : MonoBehaviour
         RectTransform rt = go.GetComponent<RectTransform>();
         rt.anchoredPosition = pos;
         rt.localScale = Vector3.one;
-        rt.localPosition = new Vector3(rt.localPosition.x, rt.localPosition.y, 0f);
+        rt.localPosition = new Vector3(rt.localPosition.x, rt.localPosition.y, 0f); 
         
-        if (parent.GetComponent<LayoutElement>() == null && parent.GetComponent<Button>() == null && parent.name != "Content")
-             rt.sizeDelta = new Vector2(600, 100);
+        if (parent.name == "MenuCanvas")
+            rt.sizeDelta = new Vector2(800, 150);
+        else 
+            rt.sizeDelta = new Vector2(400, 100);
         
         return go;
     }
@@ -357,7 +548,7 @@ public class VRMainMenu : MonoBehaviour
     void OpenRemoteDesktop()
     {
         if (_canvas) _canvas.gameObject.SetActive(false);
-        if (_panel) _panel.boardVisible = false;
+        
         if (remotePlayLogic) remotePlayLogic.gameObject.SetActive(true);
         else 
         {
@@ -367,44 +558,68 @@ public class VRMainMenu : MonoBehaviour
     }
 }
 
-// Helper class for the hover animations
 public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointerEnterHandler, UnityEngine.EventSystems.IPointerExitHandler
 {
     public UnityEngine.UI.Outline outline;
     public Color normalBorderColor;
     public Color highlightBorderColor;
-    public float popAmount = 20f; // Distance to pop out on Z axis
+    public float popAmount = 40f;
 
-    private Vector3 _startPos;
     private bool _isHovered = false;
+    private float _currentPop = 0f;
+    private float _currentValidScale = 1.0f;
 
-    void Start()
+    void Update()
     {
-        _startPos = transform.localPosition;
+        float targetZ = _isHovered ? -popAmount : 0f;
+        _currentPop = Mathf.Lerp(_currentPop, targetZ, Time.unscaledDeltaTime * 15f);
+        
+        float targetScale = _isHovered ? 1.05f : 1.0f;
+        _currentValidScale = Mathf.Lerp(_currentValidScale, targetScale, Time.unscaledDeltaTime * 15f);
+
+        transform.localPosition = new Vector3(0, 0, _currentPop);
+        transform.localScale = new Vector3(_currentValidScale, _currentValidScale, 1f);
     }
 
     public void OnPointerEnter(UnityEngine.EventSystems.PointerEventData eventData)
     {
-        if (_isHovered) return;
         _isHovered = true;
-        
-        // Change Outline to White
         if (outline) outline.effectColor = highlightBorderColor;
-        
-        // Pop Out (Negative Z is usually "out" towards camera in this WorldSpace setup)
-        // Check Canvas scale to ensure we move enough visible amount
-        transform.localPosition = new Vector3(_startPos.x, _startPos.y, _startPos.z - popAmount);
     }
 
     public void OnPointerExit(UnityEngine.EventSystems.PointerEventData eventData)
     {
-        if (!_isHovered) return;
         _isHovered = false;
-        
-        // Revert Outline
         if (outline) outline.effectColor = normalBorderColor;
+    }
+}
+
+public class FloatingDataAnim : MonoBehaviour
+{
+    public float speed;
+    public Vector2 range; 
+    private RectTransform _rt;
+    private Vector2 _dir;
+
+    void Start()
+    {
+        _rt = GetComponent<RectTransform>();
+        _dir = new Vector2(Random.Range(-0.1f, 0.1f), Random.Range(0.2f, 0.8f)).normalized; 
+        if (Random.value > 0.5f) _dir.y *= -1; 
+    }
+
+    void Update()
+    {
+        if (_rt == null) return;
+        _rt.anchoredPosition += _dir * speed * Time.deltaTime;
+
+        float halfW = range.x / 2f + 50f;
+        float halfH = range.y / 2f + 50f;
+
+        if (_rt.anchoredPosition.y > halfH) _rt.anchoredPosition = new Vector2(Random.Range(-halfW, halfW), -halfH);
+        else if (_rt.anchoredPosition.y < -halfH) _rt.anchoredPosition = new Vector2(Random.Range(-halfW, halfW), halfH);
         
-        // Revert Position
-        transform.localPosition = _startPos;
+        if (_rt.anchoredPosition.x > halfW) _rt.anchoredPosition = new Vector2(-halfW, Random.Range(-halfH, halfH));
+        else if (_rt.anchoredPosition.x < -halfW) _rt.anchoredPosition = new Vector2(halfW, Random.Range(-halfH, halfH));
     }
 }
