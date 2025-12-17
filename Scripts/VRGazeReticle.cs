@@ -10,21 +10,30 @@ public class VRGazeReticle : MonoBehaviour
     [Tooltip("Kích thước visual (ảo) của chấm tại khoảng cách 1m.")]
     public float reticleSize = 0.01f; 
     
-    [Tooltip("Khoảng cách đặt Reticle (mét). 1.0 là tối ưu cho VR để tránh mỏi mắt.")]
-    public float distance = 1.0f;
-
-    public Color colorIdle = new Color(1f, 1f, 1f, 0.9f);
     public Color colorInteract = new Color(1f, 0f, 0f, 1f);
 
     private Image _reticleImage;
     private Camera _cam;
-    private float _baseScale; 
+    private RectTransform _canvasRT;
+    private int _layerMask;
 
     void Start()
     {
         _cam = GetComponent<Camera>();
         if (_cam == null) _cam = Camera.main;
         
+        // Tìm Layer "VirtualObjects"
+        int layerIndex = LayerMask.NameToLayer("VirtualObjects");
+        if (layerIndex != -1)
+        {
+            _layerMask = 1 << layerIndex;
+        }
+        else
+        {
+            Debug.LogWarning("[VRGazeReticle] Layer 'VirtualObjects' not found! Reticle won't work correctly.");
+            _layerMask = 0;
+        }
+
         CreateReticle();
     }
 
@@ -39,6 +48,13 @@ public class VRGazeReticle : MonoBehaviour
         c.renderMode = RenderMode.WorldSpace;
         c.sortingOrder = 30000;
 
+        // Lưu RectTransform để di chuyển depth
+        _canvasRT = canvasObj.GetComponent<RectTransform>();
+        _canvasRT.sizeDelta = Vector2.zero; 
+        _canvasRT.localScale = Vector3.one; 
+        _canvasRT.localPosition = Vector3.zero;
+        _canvasRT.localRotation = Quaternion.identity;
+
         // 2. Tạo Chấm
         GameObject imgObj = new GameObject("Dot");
         imgObj.transform.SetParent(canvasObj.transform, false);
@@ -46,35 +62,21 @@ public class VRGazeReticle : MonoBehaviour
         
         _reticleImage = imgObj.AddComponent<Image>();
         _reticleImage.sprite = GetCircleSprite();
-        _reticleImage.color = colorIdle;
+        _reticleImage.color = colorInteract;
         _reticleImage.raycastTarget = false; 
+        
+        // Mặc định ẩn
+        _reticleImage.enabled = false;
 
-        // --- FIX VISUAL: ZTest Always ---
-        // Tạo material đặc biệt để Reticle luôn vẽ đè lên mọi vật thể (kể cả tường chắn phía trước)
-        // Điều này cho phép ta đặt Reticle ở xa (1m) để tránh lác mắt mà vẫn không bị wall che khuất.
+        // Giữ ZTest Always để không bị xuyên tường (khi ở đúng vị trí bề mặt)
         Material zTestMat = new Material(Shader.Find("UI/Default"));
         zTestMat.SetInt("unity_GUIZTestMode", (int)UnityEngine.Rendering.CompareFunction.Always);
         _reticleImage.material = zTestMat;
 
         RectTransform imgRT = imgObj.GetComponent<RectTransform>();
         imgRT.sizeDelta = new Vector2(100, 100); 
+        imgRT.localScale = Vector3.one;
         imgRT.anchoredPosition = Vector3.zero;
-
-        // 3. LOGIC VỊ TRÍ: Đặt tại 1.0m
-        // Reticle ở 0.05m (rất gần) gây ra hiện tượng "lác mắt" (double vision) do hai mắt hội tụ sai lệch.
-        // Đặt ở 1m giải quyết vấn đề này, kết hợp với ZTest Always ở trên để đảm bảo luôn nhìn thấy.
-        float zDepth = distance;
-
-        RectTransform canvasRT = canvasObj.GetComponent<RectTransform>();
-        canvasRT.sizeDelta = new Vector2(0, 0); 
-        canvasRT.localScale = Vector3.one; 
-        canvasRT.localPosition = new Vector3(0, 0, zDepth);
-        canvasRT.localRotation = Quaternion.identity;
-
-        // 4. Scale
-        // Tính toán sao cho kích thước hiển thị vẫn đúng như reticleSize mong muốn
-        _baseScale = (reticleSize / 100f) * zDepth; 
-        imgRT.localScale = Vector3.one * _baseScale;
     }
 
     void Update()
@@ -87,36 +89,28 @@ public class VRGazeReticle : MonoBehaviour
         Ray ray = new Ray(_cam.transform.position, _cam.transform.forward);
         RaycastHit hit;
 
-        if (Physics.Raycast(ray, out hit, 100f))
+        // Chỉ raycast vào layer VirtualObjects
+        if (_layerMask != 0 && Physics.Raycast(ray, out hit, 100.0f, _layerMask))
         {
-            // --- FIX LOGIC: Chỉ tương tác với Button UI ---
-            // Loại bỏ check BoxCollider chung chung vì nó bắt dính cả tường/sàn nhà (BoxCollider).
-            // Button và Toggle là đủ để nhận diện UI.
-            bool isInteractable = hit.collider.GetComponent<Button>() != null 
-                               || hit.collider.GetComponent<Toggle>() != null;
+            if (!_reticleImage.enabled) _reticleImage.enabled = true;
 
-            SetState(isInteractable);
+            // Di chuyển Reticle tới đúng khoảng cách va chạm
+            // Điều này giải quyết vấn đề "lác mắt" (convergence conflict)
+            float dist = hit.distance;
+            // Đảm bảo không quá gần camera (near clip)
+            if (dist < _cam.nearClipPlane) dist = _cam.nearClipPlane + 0.05f;
+
+            _canvasRT.localPosition = new Vector3(0, 0, dist);
+
+            // Tính scale để giữ kích thước hiển thị ổn định (perspective compensation)
+            // Scale tỉ lệ thuận với distance
+            float scale = (reticleSize / 100f) * dist;
+            _reticleImage.rectTransform.localScale = new Vector3(scale, scale, 1f);
         }
         else
         {
-            SetState(false);
-        }
-    }
-
-    void SetState(bool active)
-    {
-        if (_reticleImage)
-        {
-            Color targetCol = active ? colorInteract : colorIdle;
-            _reticleImage.color = Color.Lerp(_reticleImage.color, targetCol, Time.deltaTime * 20f);
-            
-            float scaleMult = active ? 1.8f : 1.0f;
-            float targetScale = _baseScale * scaleMult;
-            
-            float currentScale = _reticleImage.rectTransform.localScale.x;
-            float newScale = Mathf.Lerp(currentScale, targetScale, Time.deltaTime * 20f);
-            
-            _reticleImage.rectTransform.localScale = new Vector3(newScale, newScale, 1f);
+            // Không va chạm với VirtualObjects -> Ẩn
+            if (_reticleImage.enabled) _reticleImage.enabled = false;
         }
     }
 
