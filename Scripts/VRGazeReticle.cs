@@ -30,13 +30,18 @@ public class VRGazeReticle : MonoBehaviour
         GameObject canvasObj = new GameObject("GazeReticleCanvas");
         canvasObj.transform.SetParent(_cam.transform, false);
         
+        // QUAN TRỌNG: Đồng bộ Layer với Camera (ví dụ "UI" hoặc "Default")
+        // Nếu Camera culling mask lọc bỏ layer "Default" mà Reticle lại nằm ở đó -> sẽ bị tàng hình.
+        canvasObj.layer = _cam.gameObject.layer;
+        
         Canvas c = canvasObj.AddComponent<Canvas>();
         c.renderMode = RenderMode.WorldSpace;
-        c.sortingOrder = 32767; // Vẽ đè lên tất cả các UI khác
+        c.sortingOrder = 30000; // Giảm xuống một chút cho an toàn trên Mobile
 
         // 2. Tạo Chấm Trắng
         GameObject imgObj = new GameObject("Dot");
         imgObj.transform.SetParent(canvasObj.transform, false);
+        imgObj.layer = _cam.gameObject.layer; // Đồng bộ Layer
         
         _reticleImage = imgObj.AddComponent<Image>();
         _reticleImage.sprite = GetCircleSprite();
@@ -47,20 +52,20 @@ public class VRGazeReticle : MonoBehaviour
         imgRT.sizeDelta = new Vector2(100, 100); 
         imgRT.anchoredPosition = Vector3.zero;
 
-        // 3. LOGIC "DÍNH VÀO CAMERA": Đặt tại NearClipPlane + 0.01
-        // Vị trí này đảm bảo Reticle luôn nằm giữa Camera và bất kỳ vật thể nào khác (vì vật thể gần hơn sẽ bị Clip)
-        float zDepth = _cam.nearClipPlane + 0.01f;
+        // 3. LOGIC VỊ TRÍ & FIX Z-BUFFER
+        // Tăng khoảng cách an toàn lên +0.05f (thay vì 0.01f)
+        // Lý do: Độ chính xác Z-Buffer trên GPU điện thoại thấp hơn PC. 
+        // Nếu để 0.01f (1cm), Reticle rất dễ "đánh nhau" (Z-Fighting) với mặt phẳng cắt NearClip và bị ẩn mất.
+        float zDepth = _cam.nearClipPlane + 0.05f;
 
         RectTransform canvasRT = canvasObj.GetComponent<RectTransform>();
         canvasRT.sizeDelta = new Vector2(0, 0); 
         canvasRT.localScale = Vector3.one; 
-        canvasRT.localPosition = new Vector3(0, 0, zDepth); // Gần như bằng 0 (so với world scale)
+        canvasRT.localPosition = new Vector3(0, 0, zDepth);
         canvasRT.localRotation = Quaternion.identity;
 
-        // 4. Tính toán Scale để chấm không bị "to quá khổ" khi để quá gần
-        // Công thức: scale theo tỷ lệ độ sâu
+        // 4. Scale lại theo độ sâu mới
         _baseScale = (reticleSize / 100f) * zDepth; 
-        
         imgRT.localScale = Vector3.one * _baseScale;
     }
 
@@ -71,13 +76,12 @@ public class VRGazeReticle : MonoBehaviour
 
     void CheckGaze()
     {
-        // Ray bắn thẳng từ tâm Camera
         Ray ray = new Ray(_cam.transform.position, _cam.transform.forward);
         RaycastHit hit;
 
         if (Physics.Raycast(ray, out hit, 100f))
         {
-            // Tương tác nếu vật có Button, Toggle, hoặc BoxCollider (nút VR)
+            // Kiểm tra tương tác với các thành phần UI hoặc Collider
             bool isInteractable = hit.collider.GetComponent<Button>() != null 
                                || hit.collider.GetComponent<Toggle>() != null 
                                || hit.collider.GetComponent<BoxCollider>() != null;
@@ -94,11 +98,9 @@ public class VRGazeReticle : MonoBehaviour
     {
         if (_reticleImage)
         {
-            // Màu
             Color targetCol = active ? colorInteract : colorIdle;
             _reticleImage.color = Color.Lerp(_reticleImage.color, targetCol, Time.deltaTime * 20f);
             
-            // Phình to nhẹ (1.8x)
             float scaleMult = active ? 1.8f : 1.0f;
             float targetScale = _baseScale * scaleMult;
             
