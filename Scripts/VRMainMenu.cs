@@ -276,6 +276,11 @@ public class VRMainMenu : MonoBehaviour
         {
             img.color = glassColor;
         }
+
+        // --- FIX: Add BoxCollider for Gaze Reticle detection ---
+        BoxCollider bgCol = bgObj.AddComponent<BoxCollider>();
+        bgCol.size = new Vector3(w, h, 0.1f);
+        // -------------------------------------------------------
         
         RectTransform rt = bgObj.GetComponent<RectTransform>();
         rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one; 

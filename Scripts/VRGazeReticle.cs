@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -16,6 +17,10 @@ public class VRGazeReticle : MonoBehaviour
     private Camera _cam;
     private RectTransform _canvasRT;
     private int _layerMask;
+
+    // State tracking for Hover events
+    private GameObject _currentHitObj;
+    private PointerEventData _pointerData;
 
     void Start()
     {
@@ -35,6 +40,7 @@ public class VRGazeReticle : MonoBehaviour
         }
 
         CreateReticle();
+        _pointerData = new PointerEventData(EventSystem.current);
     }
 
     void CreateReticle()
@@ -95,23 +101,53 @@ public class VRGazeReticle : MonoBehaviour
             if (!_reticleImage.enabled) _reticleImage.enabled = true;
 
             // Di chuyển Reticle tới đúng khoảng cách va chạm
-            // Điều này giải quyết vấn đề "lác mắt" (convergence conflict)
             float dist = hit.distance;
-            // Đảm bảo không quá gần camera (near clip)
             if (dist < _cam.nearClipPlane) dist = _cam.nearClipPlane + 0.05f;
-
             _canvasRT.localPosition = new Vector3(0, 0, dist);
 
-            // Tính scale để giữ kích thước hiển thị ổn định (perspective compensation)
-            // Scale tỉ lệ thuận với distance
+            // Scale bù trừ
             float scale = (reticleSize / 100f) * dist;
             _reticleImage.rectTransform.localScale = new Vector3(scale, scale, 1f);
+
+            // --- XỬ LÝ HOVER EVENT ---
+            GameObject hitObj = hit.collider.gameObject;
+            if (_currentHitObj != hitObj)
+            {
+                HandlePointerExit(_currentHitObj);
+                HandlePointerEnter(hitObj);
+                _currentHitObj = hitObj;
+            }
         }
         else
         {
-            // Không va chạm với VirtualObjects -> Ẩn
+            // Không va chạm -> Reset
             if (_reticleImage.enabled) _reticleImage.enabled = false;
+            
+            if (_currentHitObj != null)
+            {
+                HandlePointerExit(_currentHitObj);
+                _currentHitObj = null;
+            }
         }
+    }
+
+    void HandlePointerEnter(GameObject obj)
+    {
+        if (obj == null) return;
+        ExecuteEvents.Execute(obj, _pointerData, ExecuteEvents.pointerEnterHandler);
+        
+        // Force highlight for Button (nếu button nằm trên cùng object hoặc parent)
+        Selectable selectable = obj.GetComponentInParent<Selectable>();
+        if (selectable) selectable.OnPointerEnter(_pointerData);
+    }
+
+    void HandlePointerExit(GameObject obj)
+    {
+        if (obj == null) return;
+        ExecuteEvents.Execute(obj, _pointerData, ExecuteEvents.pointerExitHandler);
+
+        Selectable selectable = obj.GetComponentInParent<Selectable>();
+        if (selectable) selectable.OnPointerExit(_pointerData);
     }
 
     Sprite GetCircleSprite()
