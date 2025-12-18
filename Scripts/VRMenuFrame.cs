@@ -224,98 +224,7 @@ public class VRMenuFrame : MonoBehaviour
         }
     }
 
-    void CreateStatusBar(Transform parent, float w, float h, float height)
-    {
-        GameObject barObj = new GameObject("StatusBar");
-        barObj.transform.SetParent(parent, false);
-        RectTransform rt = barObj.AddComponent<RectTransform>();
-        
-        rt.anchorMin = new Vector2(0, 1); 
-        rt.anchorMax = new Vector2(1, 1);
-        rt.pivot = new Vector2(0.5f, 1f);
-        rt.sizeDelta = new Vector2(0, height);
-        rt.anchoredPosition = Vector2.zero;
-        
-        // --- CLOCK ---
-        GameObject timeObj = CreateText(barObj.transform, "12:00", Vector2.zero, 42, new Color(1f, 1f, 1f, 0.9f), true);
-        RectTransform timeRT = timeObj.GetComponent<RectTransform>();
-        timeRT.anchorMin = new Vector2(0, 0); 
-        timeRT.anchorMax = new Vector2(0.5f, 1);
-        timeRT.pivot = new Vector2(0, 0.5f);
-        timeRT.offsetMin = new Vector2(sidePadding, 0);
-        timeRT.offsetMax = new Vector2(0, 0);
-        timeRT.GetComponent<TextMeshProUGUI>().alignment = TextAlignmentOptions.MidlineLeft;
-        _clockText = timeRT.GetComponent<TextMeshProUGUI>();
 
-        // --- STATUS GROUP ---
-        GameObject statusGroup = new GameObject("StatusGroup");
-        statusGroup.transform.SetParent(barObj.transform, false);
-        RectTransform groupRT = statusGroup.AddComponent<RectTransform>();
-        groupRT.anchorMin = new Vector2(1, 0); 
-        groupRT.anchorMax = new Vector2(1, 1);
-        groupRT.pivot = new Vector2(1, 0.5f);
-        groupRT.sizeDelta = new Vector2(400, 0); 
-        groupRT.anchoredPosition = new Vector2(-sidePadding, 0);
-
-        HorizontalLayoutGroup layout = statusGroup.AddComponent<HorizontalLayoutGroup>();
-        layout.childAlignment = TextAnchor.MiddleRight;
-        layout.spacing = -175f; // Matches user request
-        layout.childControlWidth = false;
-        layout.childControlHeight = false;
-
-        // 1. Network Icon
-        GameObject netObj = new GameObject("NetworkIcon");
-        netObj.transform.SetParent(statusGroup.transform, false);
-        _networkIcon = netObj.AddComponent<Image>();
-        _networkIcon.sprite = iconWifi; 
-        _networkIcon.preserveAspect = true;
-        RectTransform netRT = netObj.GetComponent<RectTransform>();
-        netRT.sizeDelta = new Vector2(60, 60);
-
-        // 2. Battery Container
-        GameObject battContainer = new GameObject("BatteryContainer");
-        battContainer.transform.SetParent(statusGroup.transform, false);
-        RectTransform battRT = battContainer.AddComponent<RectTransform>();
-        battRT.sizeDelta = new Vector2(100, 50); 
-        
-        Sprite batSprite = GetBatterySprite(); 
-
-        // Bg
-        GameObject bgObj = new GameObject("Bg");
-        bgObj.transform.SetParent(battContainer.transform, false);
-        Image bgImg = bgObj.AddComponent<Image>();
-        bgImg.sprite = batSprite; 
-        bgImg.color = new Color(0.8f, 0.8f, 0.8f, 0.5f); 
-        bgImg.preserveAspect = true;
-        RectTransform bgRT = bgObj.GetComponent<RectTransform>();
-        bgRT.anchorMin = Vector2.zero; bgRT.anchorMax = Vector2.one;
-        bgRT.sizeDelta = Vector2.zero;
-
-        // Fill
-        GameObject fillObj = new GameObject("Fill");
-        fillObj.transform.SetParent(battContainer.transform, false);
-        _batteryFillImage = fillObj.AddComponent<Image>();
-        _batteryFillImage.sprite = batSprite; 
-        _batteryFillImage.color = Color.white;
-        _batteryFillImage.type = Image.Type.Filled;
-        _batteryFillImage.fillMethod = Image.FillMethod.Horizontal;
-        _batteryFillImage.fillOrigin = (int)Image.OriginHorizontal.Left;
-        _batteryFillImage.preserveAspect = true;
-        RectTransform fillRT = fillObj.GetComponent<RectTransform>();
-        fillRT.anchorMin = Vector2.zero; fillRT.anchorMax = Vector2.one;
-        fillRT.sizeDelta = Vector2.zero;
-
-        // Text
-        GameObject battTxtObj = CreateText(battContainer.transform, "100", Vector2.zero, 28, new Color(0.1f, 0.15f, 0.2f, 1f), true);
-        RectTransform btRT = battTxtObj.GetComponent<RectTransform>();
-        btRT.anchorMin = Vector2.zero; btRT.anchorMax = Vector2.one;
-        btRT.sizeDelta = Vector2.zero;
-        btRT.offsetMin = new Vector2(0,0); btRT.offsetMax = new Vector2(-8, 0); 
-        
-        _batteryText = battTxtObj.GetComponent<TextMeshProUGUI>();
-        _batteryText.alignment = TextAlignmentOptions.Center;
-        _batteryText.fontStyle = FontStyles.Bold;
-    }
 
     // --- ASSET LOADERS ---
     
@@ -514,6 +423,367 @@ public class VRMenuFrame : MonoBehaviour
         rt.localScale = Vector3.one;
         rt.sizeDelta = new Vector2(400, 100);
         return go;
+    }
+
+    Sprite _recenterSprite;
+    Sprite GetRecenterSprite()
+    {
+        if (_recenterSprite != null) return _recenterSprite;
+        string resPath = "MainMenu/recenter_icon";
+        _recenterSprite = Resources.Load<Sprite>(resPath);
+        
+#if UNITY_EDITOR
+        if (_recenterSprite == null)
+        {
+            // Attempt to auto-fix import settings
+            string fullPath = "Assets/VR-Workspace/Resources/MainMenu/recenter_icon.png";
+            var importer = UnityEditor.AssetImporter.GetAtPath(fullPath) as UnityEditor.TextureImporter;
+            if (importer != null)
+            {
+                bool changed = false;
+                if (importer.textureType != UnityEditor.TextureImporterType.Sprite)
+                {
+                    importer.textureType = UnityEditor.TextureImporterType.Sprite;
+                    changed = true;
+                }
+                
+                if (changed)
+                {
+                    importer.SaveAndReimport();
+                    _recenterSprite = Resources.Load<Sprite>(resPath);
+                    Debug.Log($"[VRMenuFrame] Auto-fixed Texture settings for {fullPath}");
+                }
+            }
+        }
+#endif
+        
+        if (_recenterSprite == null)
+        {
+             Debug.LogWarning($"Could not find '{resPath}' in Resources. Ensure file exists and is set to Sprite.");
+        }
+        return _recenterSprite;
+    }
+
+    void CreateStatusBar(Transform parent, float w, float h, float height)
+    {
+        GameObject barObj = new GameObject("StatusBar");
+        barObj.transform.SetParent(parent, false);
+        RectTransform rt = barObj.AddComponent<RectTransform>();
+        
+        rt.anchorMin = new Vector2(0, 1); 
+        rt.anchorMax = new Vector2(1, 1);
+        rt.pivot = new Vector2(0.5f, 1f);
+        rt.sizeDelta = new Vector2(0, height);
+        rt.anchoredPosition = Vector2.zero;
+        
+        // --- LEFT GROUP (Clock + Recenter) ---
+        GameObject leftGroup = new GameObject("LeftGroup");
+        leftGroup.transform.SetParent(barObj.transform, false);
+        RectTransform leftRT = leftGroup.AddComponent<RectTransform>();
+        leftRT.anchorMin = new Vector2(0, 0); 
+        leftRT.anchorMax = new Vector2(0.5f, 1);
+        leftRT.pivot = new Vector2(0, 0.5f);
+        leftRT.offsetMin = new Vector2(sidePadding, 0); // Left padding
+        leftRT.offsetMax = new Vector2(0, 0);
+        
+        HorizontalLayoutGroup lLayout = leftGroup.AddComponent<HorizontalLayoutGroup>();
+        lLayout.childAlignment = TextAnchor.MiddleLeft;
+        lLayout.spacing = -650f;
+        lLayout.childControlWidth = false;
+        lLayout.childControlHeight = false;
+
+        // 1. CLOCK
+        GameObject timeObj = CreateText(leftGroup.transform, "12:00", Vector2.zero, 42, new Color(1f, 1f, 1f, 0.9f), true);
+        RectTransform timeRT = timeObj.GetComponent<RectTransform>();
+        ContentSizeFitter fitter = timeObj.AddComponent<ContentSizeFitter>();
+        fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+        fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
+        
+        _clockText = timeObj.GetComponent<TextMeshProUGUI>();
+        _clockText.alignment = TextAlignmentOptions.MidlineLeft;
+
+        // 2. RECENTER BUTTON (Hit Area)
+        GameObject recenterBtn = new GameObject("RecenterBtn");
+        recenterBtn.transform.SetParent(leftGroup.transform, false);
+        RectTransform rRT = recenterBtn.AddComponent<RectTransform>();
+        rRT.sizeDelta = new Vector2(75, 75); 
+
+        // 3. VISUAL ROOT (Animated)
+        GameObject visualRoot = new GameObject("Visuals");
+        visualRoot.transform.SetParent(recenterBtn.transform, false);
+        RectTransform visRT = visualRoot.AddComponent<RectTransform>();
+        visRT.anchorMin = Vector2.zero; visRT.anchorMax = Vector2.one;
+        visRT.sizeDelta = Vector2.zero;
+
+        // A. Background (Glass) -> On VisualRoot
+        Image recenterBg = visualRoot.AddComponent<Image>();
+        recenterBg.sprite = GetSmallRoundedSprite(); 
+        recenterBg.type = Image.Type.Sliced;
+        recenterBg.color = new Color(0f, 1f, 1f, 0.15f); 
+
+        // B. Border -> Child of VisualRoot
+        GameObject borderObj = new GameObject("Border");
+        borderObj.transform.SetParent(visualRoot.transform, false);
+        RectTransform borderRT = borderObj.AddComponent<RectTransform>();
+        borderRT.anchorMin = Vector2.zero; borderRT.anchorMax = Vector2.one;
+        borderRT.sizeDelta = Vector2.zero;
+        
+        Image borderImg = borderObj.AddComponent<Image>();
+        borderImg.sprite = GetSmallBorderSprite(); 
+        borderImg.type = Image.Type.Sliced;
+        borderImg.color = Color.cyan; 
+        borderImg.raycastTarget = false;
+        
+        Shadow borderShadow = borderObj.AddComponent<Shadow>();
+        borderShadow.effectColor = new Color(0f, 1f, 1f, 0.6f);
+        borderShadow.effectDistance = new Vector2(1, -1);
+
+        // C. Icon -> Child of VisualRoot
+        GameObject iconObj = new GameObject("Icon");
+        iconObj.transform.SetParent(visualRoot.transform, false);
+        RectTransform iconRT = iconObj.AddComponent<RectTransform>();
+        iconRT.anchorMin = Vector2.zero; iconRT.anchorMax = Vector2.one;
+        iconRT.sizeDelta = new Vector2(-37, -37); 
+        
+        Image iconImg = iconObj.AddComponent<Image>();
+        iconImg.sprite = GetRecenterSprite();
+        iconImg.preserveAspect = true;
+        iconImg.color = Color.white;
+        iconImg.raycastTarget = false;
+
+        // D. Logic & Physics (On Hit Area)
+        Button btn = recenterBtn.AddComponent<Button>();
+        btn.targetGraphic = recenterBg; 
+        btn.onClick.AddListener(RecenterObject);
+        
+        BoxCollider col = recenterBtn.AddComponent<BoxCollider>();
+        col.size = new Vector3(75, 75, 0.1f);
+
+        // E. Animation
+        VRButtonAnimation anim = recenterBtn.AddComponent<VRButtonAnimation>();
+        anim.targetVisuals = visualRoot.transform;
+        anim.popAmount = 0.02f;
+
+        // --- STATUS GROUP (Right) ---
+        GameObject statusGroup = new GameObject("StatusGroup");
+        statusGroup.transform.SetParent(barObj.transform, false);
+        RectTransform groupRT = statusGroup.AddComponent<RectTransform>();
+        groupRT.anchorMin = new Vector2(1, 0); 
+        groupRT.anchorMax = new Vector2(1, 1);
+        groupRT.pivot = new Vector2(1, 0.5f);
+        groupRT.sizeDelta = new Vector2(400, 0); 
+        groupRT.anchoredPosition = new Vector2(-sidePadding, 0);
+
+        HorizontalLayoutGroup layout = statusGroup.AddComponent<HorizontalLayoutGroup>();
+        layout.childAlignment = TextAnchor.MiddleRight;
+        layout.spacing = -175f;
+        layout.childControlWidth = false;
+        layout.childControlHeight = false;
+
+        // 1. Network Icon
+        GameObject netObj = new GameObject("NetworkIcon");
+        netObj.transform.SetParent(statusGroup.transform, false);
+        _networkIcon = netObj.AddComponent<Image>();
+        _networkIcon.sprite = iconWifi; 
+        _networkIcon.preserveAspect = true;
+        RectTransform netRT = netObj.GetComponent<RectTransform>();
+        netRT.sizeDelta = new Vector2(60, 60);
+
+        // 2. Battery Container
+        GameObject battContainer = new GameObject("BatteryContainer");
+        battContainer.transform.SetParent(statusGroup.transform, false);
+        RectTransform battRT = battContainer.AddComponent<RectTransform>();
+        battRT.sizeDelta = new Vector2(100, 50); 
+        
+        Sprite batSprite = GetBatterySprite(); 
+
+        // Bg
+        GameObject bgObj = new GameObject("Bg");
+        bgObj.transform.SetParent(battContainer.transform, false);
+        Image bgImg = bgObj.AddComponent<Image>();
+        bgImg.sprite = batSprite; 
+        bgImg.color = new Color(0.8f, 0.8f, 0.8f, 0.5f); 
+        bgImg.preserveAspect = true;
+        RectTransform bgRT = bgObj.GetComponent<RectTransform>();
+        bgRT.anchorMin = Vector2.zero; bgRT.anchorMax = Vector2.one;
+        bgRT.sizeDelta = Vector2.zero;
+
+        // Fill
+        GameObject fillObj = new GameObject("Fill");
+        fillObj.transform.SetParent(battContainer.transform, false);
+        _batteryFillImage = fillObj.AddComponent<Image>();
+        _batteryFillImage.sprite = batSprite; 
+        _batteryFillImage.color = Color.white;
+        _batteryFillImage.type = Image.Type.Filled;
+        _batteryFillImage.fillMethod = Image.FillMethod.Horizontal;
+        _batteryFillImage.fillOrigin = (int)Image.OriginHorizontal.Left;
+        _batteryFillImage.preserveAspect = true;
+        RectTransform fillRT = fillObj.GetComponent<RectTransform>();
+        fillRT.anchorMin = Vector2.zero; fillRT.anchorMax = Vector2.one;
+        fillRT.sizeDelta = Vector2.zero;
+
+        // Text
+        GameObject battTxtObj = CreateText(battContainer.transform, "100", Vector2.zero, 28, new Color(0.1f, 0.15f, 0.2f, 1f), true);
+        RectTransform btRT = battTxtObj.GetComponent<RectTransform>();
+        btRT.anchorMin = Vector2.zero; btRT.anchorMax = Vector2.one;
+        btRT.sizeDelta = Vector2.zero;
+        btRT.offsetMin = new Vector2(0,0); btRT.offsetMax = new Vector2(-8, 0); 
+        
+        _batteryText = battTxtObj.GetComponent<TextMeshProUGUI>();
+        _batteryText.alignment = TextAlignmentOptions.Center;
+        _batteryText.fontStyle = FontStyles.Bold;
+    }
+
+    // --- SPRITE GENERATORS ---
+
+    Sprite _smallRoundedSprite;
+    Sprite GetSmallRoundedSprite()
+    {
+        if (_smallRoundedSprite != null) return _smallRoundedSprite;
+        int size = 128; 
+        int radius = 20; // Adjusted to ~15% of size (matches Main Menu 80/512 ratio)
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        Color[] colors = new Color[size * size];
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                bool inCorner = (x < radius && y < radius) || (x > size - radius && y < radius) ||
+                                (x < radius && y > size - radius) || (x > size - radius && y > size - radius);
+
+                if (inCorner)
+                {
+                    float cx = (x < size / 2) ? radius : size - radius - 1;
+                    float cy = (y < size / 2) ? radius : size - radius - 1;
+                    float d = Vector2.Distance(new Vector2(x, y), new Vector2(cx, cy));
+                    float alpha = Mathf.Clamp01((radius + 0.5f) - d);
+                    colors[y * size + x] = new Color(1, 1, 1, alpha);
+                }
+                else colors[y * size + x] = Color.white;
+            }
+        }
+        tex.SetPixels(colors);
+        tex.Apply();
+        _smallRoundedSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100, 0, SpriteMeshType.FullRect, new Vector4(radius, radius, radius, radius));
+        return _smallRoundedSprite;
+    }
+
+    Sprite _smallBorderSprite;
+    Sprite GetSmallBorderSprite()
+    {
+        if (_smallBorderSprite != null) return _smallBorderSprite;
+        int size = 128;
+        int radius = 20; // Matches rounded sprite radius
+        int thickness = 3;
+
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        Color[] colors = new Color[size * size];
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                bool inCorner = (x < radius && y < radius) || (x > size - radius && y < radius) ||
+                                (x < radius && y > size - radius) || (x > size - radius && y > size - radius);
+
+                float alpha = 0f;
+                if (inCorner)
+                {
+                    float cx = (x < size / 2) ? radius : size - radius - 1;
+                    float cy = (y < size / 2) ? radius : size - radius - 1;
+                    float d = Vector2.Distance(new Vector2(x, y), new Vector2(cx, cy));
+                    
+                    float outerAlpha = Mathf.Clamp01((radius + 0.5f) - d);
+                    float innerEdge = radius - thickness;
+                    float innerAlpha = Mathf.Clamp01(d - (innerEdge - 0.5f));
+                    alpha = outerAlpha * innerAlpha;
+                }
+                else
+                {
+                    float dx = Mathf.Min(x, size - 1 - x);
+                    float dy = Mathf.Min(y, size - 1 - y);
+                    float minDist = Mathf.Min(dx, dy); 
+                    if (minDist < thickness + 1) alpha = Mathf.Clamp01((thickness + 0.5f) - minDist);
+                }
+                colors[y * size + x] = new Color(1, 1, 1, alpha);
+            }
+        }
+        tex.SetPixels(colors);
+        tex.Apply();
+        _smallBorderSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100, 0, SpriteMeshType.FullRect, new Vector4(radius, radius, radius, radius));
+        return _smallBorderSprite;
+    }
+
+    
+    public void RecenterObject()
+    {
+        StartCoroutine(RecenterRoutine());
+    }
+
+    System.Collections.IEnumerator RecenterRoutine()
+    {
+        // 1. Get Reticle
+        VRGazeReticle reticle = VRGazeReticle.Instance; 
+        if (reticle == null) reticle = FindObjectOfType<VRGazeReticle>();
+
+        // 2. Start Animation
+        if (reticle != null)
+        {
+            reticle.EnterRecenterMode(GetRecenterSprite());
+        }
+
+        // 3. Countdown 2s
+        float duration = 2.0f;
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float p = Mathf.Clamp01(elapsed / duration);
+            
+            if (reticle != null) reticle.UpdateRecenterProgress(p);
+            
+            yield return null;
+        }
+
+        // 4. Perform Action
+        Camera cam = Camera.main;
+        if (cam != null)
+        {
+            PerformRecenterLogic(cam);
+        }
+
+        // 5. Restore Reticle
+        if (reticle != null)
+        {
+            reticle.ExitRecenterMode();
+        }
+    }
+
+    void PerformRecenterLogic(Camera cam)
+    {
+        // Calculate horizontal forward vector of camera
+        Vector3 camForward = cam.transform.forward;
+        camForward.y = 0;
+        if (camForward.sqrMagnitude < 0.001f) camForward = Vector3.forward;
+        camForward.Normalize();
+
+        // Get current horizontal distance
+        Vector3 currentPos = transform.position;
+        Vector3 camPos = cam.transform.position;
+        float hDist = Vector2.Distance(new Vector2(currentPos.x, currentPos.z), new Vector2(camPos.x, camPos.z));
+
+        // Calculate new position
+        // "Move on sphere": Maintain distance
+        // "No height change": Maintain Y
+        Vector3 newPos = camPos + camForward * hDist;
+        newPos.y = currentPos.y; 
+
+        transform.position = newPos;
+        transform.rotation = Quaternion.LookRotation(camForward);
+        
+        Debug.Log("[VRMenuFrame] Recenter complete.");
     }
 }
 
