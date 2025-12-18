@@ -13,11 +13,8 @@ public class VRMainMenu : MonoBehaviour
     [Header("Configuration")]
     public float panelWidth = 1.6f;
     public float panelHeight = 0.9f;
-    public RemotePlayMainMenu remotePlayLogic; 
 
-    [Header("Cyberpunk Visual Style")]
-    public Color glassColor = new Color(1.0f, 1.0f, 1.0f, 0.09803921568f); 
-    public Color panelBorderColor = new Color(1.0f, 1.0f, 1.0f, 0.39215686274f); 
+ 
     
     // Cyberpunk Neon Palette
     public Color[] buttonColors = new Color[] {
@@ -42,10 +39,7 @@ public class VRMainMenu : MonoBehaviour
     public Sprite iconSettings;
     public Sprite iconQuit;
     
-    [Header("Status Icons")]
-    public Sprite iconSignal; // 4G / Mobile
-    public Sprite iconWifi;   // Wifi
-    public Sprite iconBattery;
+
 
 
 
@@ -56,13 +50,7 @@ public class VRMainMenu : MonoBehaviour
     
     // Cache separate border sprites by thickness
     private Dictionary<int, Sprite> _borderSprites = new Dictionary<int, Sprite>();
-    private Sprite _signalSprite; // Procedural fallback
 
-    // Status Bar References
-    private TextMeshProUGUI _clockText;
-    private TextMeshProUGUI _batteryText;
-    private Image _networkIcon;
-    private Image _batteryFillImage; // Reference to control fill amount
 
 
 
@@ -93,54 +81,8 @@ public class VRMainMenu : MonoBehaviour
     }
 
 
-    void Update()
-    {
-        if (_clockText != null)
-        {
-            _clockText.text = DateTime.Now.ToString("HH:mm");
-        }
+    // Update removed (handled by VRMenuFrame)
 
-        if (_networkIcon != null)
-        {
-            if (Application.internetReachability == NetworkReachability.ReachableViaLocalAreaNetwork)
-            {
-                _networkIcon.sprite = iconWifi;
-                _networkIcon.color = Color.white;
-            }
-            else if (Application.internetReachability == NetworkReachability.ReachableViaCarrierDataNetwork)
-            {
-                _networkIcon.sprite = iconSignal;
-                _networkIcon.color = Color.white;
-            }
-            else
-            {
-                _networkIcon.sprite = iconWifi; // Fallback or use a 'disconnected' icon
-                _networkIcon.color = new Color(1, 1, 1, 0.3f);
-            }
-        }
-
-        if (_batteryText != null)
-        {
-            float battLevel = SystemInfo.batteryLevel;
-            // Handle PC case (-1)
-            float displayLevel = (battLevel < 0) ? 1.0f : battLevel;
-            
-            // 1. Update Text: Only number, no '%'
-            string battStr = Mathf.FloorToInt(displayLevel * 100).ToString();
-            _batteryText.text = battStr;
-
-            // 2. Update Fill Amount
-            if (_batteryFillImage != null)
-            {
-                _batteryFillImage.fillAmount = displayLevel;
-                
-                // Color logic: White when high, Red when low (< 20%)
-                // Since text is dark on top, we might need to adjust logic if fill gets too low?
-                // For now, keep fill white/red.
-                 _batteryFillImage.color = (displayLevel < 0.2f) ? new Color(1f, 0.3f, 0.3f) : Color.white;
-            }
-        }
-    }
 
 
 
@@ -150,8 +92,7 @@ public class VRMainMenu : MonoBehaviour
     {
         string[] iconNames = { 
             "icon_remote", "icon_browser", "icon_media", 
-            "icon_files", "icon_settings", "icon_quit",
-            "icon_wifi", "icon_signal", "icon_battery"
+            "icon_files", "icon_settings", "icon_quit"
         };
 
         foreach (var name in iconNames)
@@ -169,38 +110,7 @@ public class VRMainMenu : MonoBehaviour
     }
 #endif
 
-    // Procedural Signal Icon Generator
-    Sprite GetSignalSprite()
-    {
-        if (iconSignal != null) return iconSignal;
-        if (_signalSprite != null) return _signalSprite;
-        
-        int w = 64; int h = 64;
-        Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
-        Color[] fill = new Color[w*h];
-        for(int i=0; i<fill.Length; i++) fill[i] = Color.clear;
-        
-        // Draw 4 bars
-        for (int i = 0; i < 4; i++)
-        {
-            int barH = (int)((i + 1) / 4f * h);
-            int barW = 10;
-            int xOffset = 4 + i * 14;
-            
-            for (int y = 0; y < barH; y++)
-            {
-                for (int x = 0; x < barW; x++)
-                {
-                    fill[y * w + (x + xOffset)] = Color.white;
-                }
-            }
-        }
-        
-        tex.SetPixels(fill);
-        tex.Apply();
-        _signalSprite = Sprite.Create(tex, new Rect(0,0,w,h), Vector2.one * 0.5f);
-        return _signalSprite;
-    }
+
 
 
     void LoadIcons()
@@ -211,9 +121,7 @@ public class VRMainMenu : MonoBehaviour
         if (iconFiles == null) iconFiles = Resources.Load<Sprite>("MainMenu/icon_files");
         if (iconSettings == null) iconSettings = Resources.Load<Sprite>("MainMenu/icon_settings");
         if (iconQuit == null) iconQuit = Resources.Load<Sprite>("MainMenu/icon_quit");
-        if (iconSignal == null) iconSignal = Resources.Load<Sprite>("MainMenu/icon_signal");
-        if (iconWifi == null) iconWifi = Resources.Load<Sprite>("MainMenu/icon_wifi");
-        if (iconBattery == null) iconBattery = Resources.Load<Sprite>("MainMenu/icon_battery");
+
     }
 
 
@@ -318,84 +226,11 @@ public class VRMainMenu : MonoBehaviour
         return _pixelSprite;
     }
 
-    Sprite _batterySprite;
-    Sprite GetBatterySprite()
-    {
-        if (_batterySprite != null) return _batterySprite;
-        int w = 128; int h = 64; 
-        Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
-        Color[] colors = new Color[w * h];
-
-        int bodyW = 114; // Main body width
-        int radius = 12; // Body corner radius
-        int nubW = 10;   // Nub width
-        int nubH = 28;   // Nub height
-        int nubY = (h - nubH) / 2;
-
-        for (int y = 0; y < h; y++)
-        {
-            for (int x = 0; x < w; x++)
-            {
-                colors[y * w + x] = Color.clear;
-
-                // 1. Main Body
-                if (x < bodyW)
-                {
-                    bool inCorner = (x < radius && y < radius) || 
-                                    (x > bodyW - radius - 1 && y < radius) ||
-                                    (x < radius && y > h - radius - 1) || 
-                                    (x > bodyW - radius - 1 && y > h - radius - 1);
-                    if (inCorner)
-                    {
-                        float cx = (x < bodyW/2) ? radius : bodyW - radius - 1;
-                        float cy = (y < h/2) ? radius : h - radius - 1;
-                        float d = Vector2.Distance(new Vector2(x, y), new Vector2(cx, cy));
-                        float alpha = Mathf.Clamp01((radius + 0.5f) - d);
-                        colors[y*w+x] = new Color(1,1,1,alpha);
-                    }
-                    else if (y >= 0 && y < h && x >= 0) // Inside body
-                    {
-                        colors[y*w+x] = Color.white;
-                    }
-                }
-                
-                // 2. Nub (Right Side)
-                if (x >= bodyW && x < bodyW + nubW)
-                {
-                    if (y >= nubY && y < nubY + nubH)
-                    {
-                        // Round the right corners of the nub
-                        int nr = 4;
-                        bool inNubCorner = (x > bodyW + nubW - nr - 1 && y < nubY + nr) ||
-                                           (x > bodyW + nubW - nr - 1 && y > nubY + nubH - nr - 1);
-                        
-                        if (inNubCorner)
-                        {
-                            float cx = bodyW + nubW - nr - 1;
-                            float cy = (y < h/2) ? nubY + nr : nubY + nubH - nr - 1;
-                            float d = Vector2.Distance(new Vector2(x, y), new Vector2(cx, cy));
-                            float alpha = Mathf.Clamp01((nr + 0.5f) - d);
-                            colors[y*w+x] = new Color(1,1,1,alpha);
-                        }
-                        else
-                        {
-                            colors[y*w+x] = Color.white;
-                        }
-                    }
-                }
-            }
-        }
-        tex.SetPixels(colors);
-        tex.Apply();
-        // Pivot center
-        _batterySprite = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100, 0, SpriteMeshType.FullRect, new Vector4(radius, radius, radius, radius));
-        return _batterySprite;
-    }
-
+    // Battery Sprite Helper Removed
 
     void BuildInterface()
     {
-        Debug.Log("[VRMainMenu] Building Cyberpunk Interface V24 BoxCollider Added...");
+        Debug.Log("[VRMainMenu] Building Cyberpunk Interface V24 via VRMenuFrame...");
 
         GameObject canvasGO = new GameObject("MenuCanvas");
         canvasGO.transform.SetParent(transform, false); 
@@ -413,25 +248,31 @@ public class VRMainMenu : MonoBehaviour
         canvasRT.localPosition = new Vector3(0, 0, 0); 
         _canvas.gameObject.AddComponent<GraphicRaycaster>();
         
-        CreateGlassPanel(canvasGO.transform, logicalWidth, logicalHeight);
+        // --- ADD FRAME ---
+        VRMenuFrame frame = canvasGO.AddComponent<VRMenuFrame>();
+        // Pass any manual overrides if needed, primarily fonts or specific assets if not Auto-loaded
+        frame.customFont = customFont;
         
-        // No Title
-
-        // Status Bar
-        float statusBarHeight = 150f;
-        CreateStatusBar(canvasGO.transform, logicalWidth, logicalHeight, statusBarHeight);
-
-        // Buttons Grid (Push down by increasing top margin)
-        CreateUniformGrid(canvasGO.transform, logicalWidth, logicalHeight, statusBarHeight + 50f);
+        frame.Build(logicalWidth, logicalHeight);
+        
+        // --- ADD CONTENT ---
+        // Calculate the height of the specialized content area
+        float contentHeight = logicalHeight - frame.topMargin;
+        
+        // Buttons Grid (Parent to Frame ContentContainer)
+        // usage: w, h (of the container), topPadding (visual padding inside container)
+        CreateUniformGrid(frame.ContentContainer, logicalWidth, contentHeight, 50f);
 
         
         Canvas.ForceUpdateCanvases();
-        var fitter = _gridContainer.GetComponent<GridLayoutGroup>();
-        if(fitter) {
-            fitter.CalculateLayoutInputHorizontal();
-            fitter.CalculateLayoutInputVertical();
-            fitter.SetLayoutHorizontal();
-            fitter.SetLayoutVertical();
+        if (_gridContainer) {
+            var fitter = _gridContainer.GetComponent<GridLayoutGroup>();
+            if(fitter) {
+                fitter.CalculateLayoutInputHorizontal();
+                fitter.CalculateLayoutInputVertical();
+                fitter.SetLayoutHorizontal();
+                fitter.SetLayoutVertical();
+            }
         }
 
         // --- FIX LAYER: Ensure UI has VirtualObjects layer ---
@@ -450,215 +291,8 @@ public class VRMainMenu : MonoBehaviour
         }
     }
     
-    void CreateGlassPanel(Transform parent, float w, float h)
-    {
-        GameObject bgObj = new GameObject("GlassBackground");
-        bgObj.transform.SetParent(parent, false);
-        Image img = bgObj.AddComponent<Image>();
-        
-        img.type = Image.Type.Sliced;
-        img.sprite = GetRoundedSprite();
-        
-        // Apply Custom Blur Shader
-        Shader blurShader = Shader.Find("Custom/UIBlurBackground");
-        if (blurShader != null)
-        {
-            Material blurMat = new Material(blurShader);
-            blurMat.SetFloat("_Radius", 4.0f); 
-            img.material = blurMat;
-            img.color = glassColor; 
-        }
-        else
-        {
-            img.color = glassColor;
-        }
+    // CreateGlassPanel, CreateFloatingDataEffects, CreateStatusBar removed (moved to VRMenuFrame)
 
-        // --- FIX: Add BoxCollider for Gaze Reticle detection ---
-        BoxCollider bgCol = bgObj.AddComponent<BoxCollider>();
-        bgCol.size = new Vector3(w, h, 0.1f);
-        // -------------------------------------------------------
-        
-        RectTransform rt = bgObj.GetComponent<RectTransform>();
-        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one; 
-        rt.sizeDelta = Vector2.zero; rt.localScale = Vector3.one;
-        rt.localPosition = Vector3.zero;
-        rt.SetAsFirstSibling();
-        
-        // ETHEREAL DEPTH BORDER
-        GameObject borderObj = new GameObject("PanelBorder_Core");
-        borderObj.transform.SetParent(bgObj.transform, false);
-        RectTransform borderRT = borderObj.AddComponent<RectTransform>();
-        borderRT.anchorMin = Vector2.zero; borderRT.anchorMax = Vector2.one;
-        borderRT.sizeDelta = Vector2.zero;
-        
-        Image borderImg = borderObj.AddComponent<Image>();
-        borderImg.sprite = GetBorderSprite(12); 
-        borderImg.type = Image.Type.Sliced;
-        borderImg.color = new Color(0.6f, 0.9f, 1.0f, 0.9f); 
-        borderImg.raycastTarget = false;
-
-        GameObject depthObj = new GameObject("PanelBorder_Depth");
-        depthObj.transform.SetParent(bgObj.transform, false);
-        depthObj.transform.SetAsFirstSibling();
-        RectTransform depthRT = depthObj.AddComponent<RectTransform>();
-        depthRT.anchorMin = Vector2.zero; depthRT.anchorMax = Vector2.one;
-        depthRT.offsetMin = new Vector2(-6, -6); 
-        depthRT.offsetMax = new Vector2(6, 6);
-        
-        Image depthImg = depthObj.AddComponent<Image>();
-        depthImg.sprite = GetBorderSprite(24); 
-        depthImg.type = Image.Type.Sliced;
-        depthImg.color = new Color(0.0f, 0.5f, 1.0f, 0.15f); 
-        depthImg.raycastTarget = false;
-        
-        var coreGlow = borderObj.AddComponent<UnityEngine.UI.Shadow>();
-        coreGlow.effectColor = new Color(0f, 0.8f, 1f, 0.6f);
-        coreGlow.effectDistance = new Vector2(0, 0); 
-        
-        var depthGlow = depthObj.AddComponent<UnityEngine.UI.Shadow>();
-        depthGlow.effectColor = new Color(0f, 0.5f, 1f, 0.5f);
-        depthGlow.effectDistance = new Vector2(0, -4);
-
-        CreateFloatingDataEffects(bgObj.transform, w, h);
-    }
-
-    void CreateFloatingDataEffects(Transform parent, float w, float h)
-    {
-        GameObject fxContainer = new GameObject("FX_DataStream");
-        fxContainer.transform.SetParent(parent, false);
-        RectTransform rt = fxContainer.AddComponent<RectTransform>();
-        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
-        rt.sizeDelta = Vector2.zero;
-        
-        fxContainer.AddComponent<RectMask2D>();
-
-        int particleCount = 20;
-        for (int i = 0; i < particleCount; i++)
-        {
-            GameObject p = new GameObject($"Bit_{i}");
-            p.transform.SetParent(fxContainer.transform, false);
-            
-            Image pImg = p.AddComponent<Image>();
-            pImg.sprite = GetPixelSprite(); 
-            
-            bool cyanOrPurple = Random.value > 0.5f;
-            Color baseCol = cyanOrPurple ? Color.cyan : new Color(0.8f, 0f, 1f); 
-            pImg.color = new Color(baseCol.r, baseCol.g, baseCol.b, Random.Range(0.1f, 0.4f));
-
-            RectTransform pRT = p.GetComponent<RectTransform>();
-            float size = Random.Range(10f, 60f);
-            pRT.sizeDelta = new Vector2(size, size * Random.Range(0.2f, 1.0f)); 
-            
-            float startX = Random.Range(-w/2f, w/2f);
-            float startY = Random.Range(-h/2f, h/2f);
-            pRT.anchoredPosition = new Vector2(startX, startY);
-
-            var anim = p.AddComponent<FloatingDataAnim>();
-            anim.speed = Random.Range(10f, 40f);
-            anim.range = new Vector2(w, h);
-        }
-    }
-
-    void CreateStatusBar(Transform parent, float w, float h, float height)
-    {
-        GameObject barObj = new GameObject("StatusBar");
-        barObj.transform.SetParent(parent, false);
-        RectTransform rt = barObj.AddComponent<RectTransform>();
-        
-        rt.anchorMin = new Vector2(0, 1); 
-        rt.anchorMax = new Vector2(1, 1);
-        rt.pivot = new Vector2(0.5f, 1f);
-        rt.sizeDelta = new Vector2(0, height);
-        rt.anchoredPosition = Vector2.zero;
-
-        float sidePadding = 80f;
-        
-        // --- CLOCK (Left) ---
-        GameObject timeObj = CreateText(barObj.transform, "12:00", Vector2.zero, 42, new Color(1f, 1f, 1f, 0.9f), true);
-        RectTransform timeRT = timeObj.GetComponent<RectTransform>();
-        timeRT.anchorMin = new Vector2(0, 0); 
-        timeRT.anchorMax = new Vector2(0.5f, 1);
-        timeRT.pivot = new Vector2(0, 0.5f);
-        timeRT.offsetMin = new Vector2(sidePadding, 0);
-        timeRT.offsetMax = new Vector2(0, 0);
-        timeRT.GetComponent<TextMeshProUGUI>().alignment = TextAlignmentOptions.MidlineLeft;
-        _clockText = timeRT.GetComponent<TextMeshProUGUI>();
-
-        // --- STATUS CLUSTER (Right) ---
-        GameObject statusGroup = new GameObject("StatusGroup");
-        statusGroup.transform.SetParent(barObj.transform, false);
-        RectTransform groupRT = statusGroup.AddComponent<RectTransform>();
-        groupRT.anchorMin = new Vector2(1, 0); 
-        groupRT.anchorMax = new Vector2(1, 1);
-        groupRT.pivot = new Vector2(1, 0.5f);
-        groupRT.sizeDelta = new Vector2(400, 0); // Logic width for layout
-        groupRT.anchoredPosition = new Vector2(-sidePadding, 0);
-
-        HorizontalLayoutGroup layout = statusGroup.AddComponent<HorizontalLayoutGroup>();
-        layout.childAlignment = TextAnchor.MiddleRight;
-        layout.spacing = -175f; // Aggressive negative spacing to overlap transparent padding so visible icons touch
-        layout.childControlWidth = false;
-        layout.childControlHeight = false;
-
-
-        // 1. Wifi/Signal Icon
-        GameObject netObj = new GameObject("NetworkIcon");
-        netObj.transform.SetParent(statusGroup.transform, false);
-        _networkIcon = netObj.AddComponent<Image>();
-        _networkIcon.sprite = iconWifi; 
-        _networkIcon.preserveAspect = true;
-        RectTransform netRT = netObj.GetComponent<RectTransform>();
-        netRT.sizeDelta = new Vector2(60, 60);
-
-        // 2. Battery Icon Container
-        GameObject battContainer = new GameObject("BatteryContainer");
-        battContainer.transform.SetParent(statusGroup.transform, false);
-        RectTransform battRT = battContainer.AddComponent<RectTransform>();
-        battRT.sizeDelta = new Vector2(100, 50); // Slightly larger
-        
-        // Force Procedural Sprite (Solid Shape) to ensure the "Fill and Reveal" effect works correctly
-        Sprite batSprite = GetBatterySprite(); 
-
-        // --- LAYER 1: BACKGROUND (Empty State - Gray) ---
-        GameObject bgObj = new GameObject("Bg");
-        bgObj.transform.SetParent(battContainer.transform, false);
-        Image bgImg = bgObj.AddComponent<Image>();
-        bgImg.sprite = batSprite; 
-        // Light Gray so dark text is still readable on it
-        bgImg.color = new Color(0.8f, 0.8f, 0.8f, 0.5f); 
-        bgImg.preserveAspect = true;
-        RectTransform bgRT = bgObj.GetComponent<RectTransform>();
-        bgRT.anchorMin = Vector2.zero; bgRT.anchorMax = Vector2.one;
-        bgRT.sizeDelta = Vector2.zero;
-
-        // --- LAYER 2: FILL (Charged State - White) ---
-        GameObject fillObj = new GameObject("Fill");
-        fillObj.transform.SetParent(battContainer.transform, false);
-        _batteryFillImage = fillObj.AddComponent<Image>();
-        _batteryFillImage.sprite = batSprite; 
-        _batteryFillImage.color = Color.white;
-        _batteryFillImage.type = Image.Type.Filled;
-        _batteryFillImage.fillMethod = Image.FillMethod.Horizontal;
-        _batteryFillImage.fillOrigin = (int)Image.OriginHorizontal.Left;
-        _batteryFillImage.preserveAspect = true;
-        
-        RectTransform fillRT = fillObj.GetComponent<RectTransform>();
-        fillRT.anchorMin = Vector2.zero; fillRT.anchorMax = Vector2.one;
-        fillRT.sizeDelta = Vector2.zero;
-
-        // --- TEXT (Overlay) ---
-        // Dark text for contrast against White/LightGray
-        GameObject battTxtObj = CreateText(battContainer.transform, "100", Vector2.zero, 28, new Color(0.1f, 0.15f, 0.2f, 1f), true);
-        RectTransform btRT = battTxtObj.GetComponent<RectTransform>();
-        btRT.anchorMin = Vector2.zero; btRT.anchorMax = Vector2.one;
-        btRT.sizeDelta = Vector2.zero;
-        // Offset slightly left to avoid overlapping the nub too much visually
-        btRT.offsetMin = new Vector2(0,0); btRT.offsetMax = new Vector2(-8, 0); 
-        
-        _batteryText = battTxtObj.GetComponent<TextMeshProUGUI>();
-        _batteryText.alignment = TextAlignmentOptions.Center;
-        _batteryText.fontStyle = FontStyles.Bold; // Make it bolder like the reference
-    }
 
 
 
@@ -897,13 +531,6 @@ public class VRMainMenu : MonoBehaviour
     void OpenRemoteDesktop()
     {
         if (_canvas) _canvas.gameObject.SetActive(false);
-        
-        if (remotePlayLogic) remotePlayLogic.gameObject.SetActive(true);
-        else 
-        {
-            var rp = FindObjectOfType<RemotePlayMainMenu>(true);
-            if (rp) rp.gameObject.SetActive(true);
-        }
     }
 }
 
@@ -942,32 +569,5 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
     }
 }
 
-public class FloatingDataAnim : MonoBehaviour
-{
-    public float speed;
-    public Vector2 range; 
-    private RectTransform _rt;
-    private Vector2 _dir;
+// FloatingDataAnim class moved to VRMenuFrame.cs
 
-    void Start()
-    {
-        _rt = GetComponent<RectTransform>();
-        _dir = new Vector2(Random.Range(-0.1f, 0.1f), Random.Range(0.2f, 0.8f)).normalized; 
-        if (Random.value > 0.5f) _dir.y *= -1; 
-    }
-
-    void Update()
-    {
-        if (_rt == null) return;
-        _rt.anchoredPosition += _dir * speed * Time.deltaTime;
-
-        float halfW = range.x / 2f + 50f;
-        float halfH = range.y / 2f + 50f;
-
-        if (_rt.anchoredPosition.y > halfH) _rt.anchoredPosition = new Vector2(Random.Range(-halfW, halfW), -halfH);
-        else if (_rt.anchoredPosition.y < -halfH) _rt.anchoredPosition = new Vector2(Random.Range(-halfW, halfW), halfH);
-        
-        if (_rt.anchoredPosition.x > halfW) _rt.anchoredPosition = new Vector2(-halfW, Random.Range(-halfH, halfH));
-        else if (_rt.anchoredPosition.x < -halfW) _rt.anchoredPosition = new Vector2(halfW, Random.Range(-halfH, halfH));
-    }
-}
