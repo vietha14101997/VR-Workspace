@@ -242,84 +242,103 @@ public class VRMainMenu : MonoBehaviour
     {
         _gridContainer = new GameObject("MenuLayout");
         _gridContainer.transform.SetParent(parent, false);
-        
+
         RectTransform rt = _gridContainer.AddComponent<RectTransform>();
-        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
-        rt.offsetMin = new Vector2(100f, 50f); // Side/Bottom padding
-        rt.offsetMax = new Vector2(-100f, -topMargin); // Side/Top padding
         
-        // Vertical Layout
-        VerticalLayoutGroup vLayout = _gridContainer.AddComponent<VerticalLayoutGroup>();
-        vLayout.spacing = 60f; // Increased spacing
-        vLayout.childAlignment = TextAnchor.MiddleCenter; // Center rows vertically
-        vLayout.childControlHeight = true;
-        vLayout.childControlWidth = true;
-        
-        // --- ROW 1: APPS (Remote, Browser, Media) ---
-        GameObject row1 = CreateRow(_gridContainer.transform, "Row_Apps", 1.0f);
-        CreateButtonInRow(row1.transform, "Remote Desktop", iconRemote, buttonColors[0], () => OpenRemoteDesktop());
-        CreateButtonInRow(row1.transform, "Browser", iconBrowser, buttonColors[1], () => Debug.Log("Browser"));
-        CreateButtonInRow(row1.transform, "Media", iconMedia, buttonColors[2], () => Debug.Log("Media"));
+        // Exact logic from VRMainMenu_old.cs
+        float marginPX = 40f; 
+        float xMin = marginPX / w;
+        float xMax = 1f - xMin;
+        float yMin = marginPX / h;
+        float yMax = 1f - (topMargin / h); 
 
-        // --- ROW 2: TOOLS (Files, Resolution, FPS) ---
-        // Equal height weighting (1.0f) for uniform grid look
-        GameObject row2 = CreateRow(_gridContainer.transform, "Row_Tools", 1.0f); 
-        
-        // Files (Standard)
-        CreateButtonInRow(row2.transform, "Files", iconFiles, buttonColors[3], () => Debug.Log("Files"), true);
-        
-        // Resolution (Custom Logic placeholder) - Using Settings Icon for now
-        CreateButtonInRow(row2.transform, "Resolution\n1280 - 720", iconSettings, buttonColors[4], () => Debug.Log("Resolution"), true);
-        
-        // FPS (Custom Logic placeholder) - Using Settings Icon for now
-        CreateButtonInRow(row2.transform, "FPS\n60", iconSettings, buttonColors[4], () => Debug.Log("FPS"), true);
+        rt.anchorMin = new Vector2(xMin, yMin); 
+        rt.anchorMax = new Vector2(xMax, yMax); 
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = Vector2.zero;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+        rt.localScale = Vector3.one;
 
-        // --- ROW 3 REMOVED (Connect Button) ---
-    }
+        GridLayoutGroup grid = _gridContainer.AddComponent<GridLayoutGroup>();
+        
+        float containerW = w * (xMax - xMin);
+        float containerH = h * (yMax - yMin);
+        
+        int cols = 3;
+        int rows = 2;
+        
+        float spacingPX = 100f;
+        float totalSpacingW = spacingPX * (cols - 1);
+        float totalSpacingH = spacingPX * (rows - 1);
 
-    GameObject CreateRow(Transform parent, string name, float flexibleHeight)
-    {
-        GameObject row = new GameObject(name);
-        row.transform.SetParent(parent, false);
-        RectTransform rt = row.AddComponent<RectTransform>();
+        float maxW = (containerW - totalSpacingW) / cols;
+        float maxH = (containerH - totalSpacingH) / rows;
+
+        float targetAspect = 1.15f; 
+        float finalH = maxH;
+        float finalW = finalH * targetAspect;
+
+        if (finalW > maxW)
+        {
+            finalW = maxW;
+            finalH = finalW / targetAspect;
+        }
+
+        grid.cellSize = new Vector2(finalW, finalH);
+        grid.spacing = new Vector2(spacingPX, spacingPX);
+        grid.startCorner = GridLayoutGroup.Corner.UpperLeft;
+        grid.startAxis = GridLayoutGroup.Axis.Horizontal;
+        grid.childAlignment = TextAnchor.MiddleCenter;
+        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        grid.constraintCount = 3; 
         
-        HorizontalLayoutGroup hg = row.AddComponent<HorizontalLayoutGroup>();
-        hg.spacing = 60f; // Increased spacing
-        hg.childAlignment = TextAnchor.MiddleCenter;
-        hg.childControlWidth = true;
-        hg.childControlHeight = true;
-        
-        LayoutElement le = row.AddComponent<LayoutElement>();
-        le.flexibleHeight = flexibleHeight; // Weight
-        le.flexibleWidth = 1f;
-        
-        return row;
+        // Pass calculated size for Collider/Glow
+        Vector2 btnSize = new Vector2(finalW, finalH);
+
+        // --- ROW 1: APPS ---
+        CreateGridButton("Remote Desktop", iconRemote, buttonColors[0], btnSize, () => OpenRemoteDesktop());
+        CreateGridButton("Browser", iconBrowser, buttonColors[1], btnSize, () => Debug.Log("Browser"));
+        CreateGridButton("Media", iconMedia, buttonColors[2], btnSize, () => Debug.Log("Media"));
+
+        // --- ROW 2: TOOLS ---
+        // Using "Files", "Resolution", "FPS" as per new Requirement (Image 2 style content)
+        // But using "Size and Spacing" from Old Requirement.
+        CreateGridButton("Files", iconFiles, buttonColors[3], btnSize, () => Debug.Log("Files"), true);
+        CreateGridButton("Settings", iconSettings, buttonColors[4], btnSize, () => Debug.Log("Settings"), true);
+        CreateGridButton("Quit", iconQuit, buttonColors[5], btnSize, () => Debug.Log("Quit"), true);
     }
     
-    // Wrapper to adapt the old CreateGridButton logic to the new Layout system
-    void CreateButtonInRow(Transform parent, string label, Sprite icon, Color btnColor, UnityEngine.Events.UnityAction action, bool showDropdown = false, bool isWideAction = false)
+    // Adapted CreateGridButton from VRMainMenu_old.cs but using NEW Visual Style (CreateFlexibleButton internals)
+    // We mix them: Use the sizing/structure from Old, but Visuals from New.
+    void CreateGridButton(string label, Sprite icon, Color btnColor, Vector2 size, UnityEngine.Events.UnityAction onClick, bool showDropdown = false)
     {
-        // 1. Layout Element (Cell)
+         // 1. Structural Wrapper (Grid Cell)
         GameObject wrapper = new GameObject("Btn_" + label);
-        wrapper.transform.SetParent(parent, false);
+        wrapper.transform.SetParent(_gridContainer.transform, false);
+        // GridLayoutGroup controls this RT, but we add one for safety
         RectTransform wrapperRT = wrapper.AddComponent<RectTransform>();
         
-        // Layout Config
-        LayoutElement le = wrapper.AddComponent<LayoutElement>();
-        le.flexibleWidth = 0f; // Disable flexible
-        le.flexibleHeight = 0f; // Disable flexible
-        le.preferredWidth = 400f; // Fixed size
-        le.preferredHeight = 320f; // Fixed size
+        // 2. Reuse CreateFlexibleButton logic but we need to ensure it fills the cell
+        // The CreateFlexibleButton assumes it is inside a LayoutElement. 
+        // Here we are inside a GridLayoutGroup cell.
         
-        // If it's the "Connect" button, we might want different visual properties
-        // For now, we reuse the inner logic. 
+        // We can just call CreateFlexibleButton(wrapper...) 
+        // AND we must ensure the Collider size matches 'size'.
         
-        // 2. We skip the rigid size calculation from before and rely on RectTransform stretching
-        // generated by the Horizontal layout.
+        CreateFlexibleButton(wrapper, label, icon, btnColor, onClick, showDropdown, false);
         
-        CreateFlexibleButton(wrapper, label, icon, btnColor, action, showDropdown, isWideAction);
+        // Fix Collider Size (The CreateFlexibleButton sets 200,100 default)
+        // We find the HitArea/BoxCollider and update it.
+        Transform hitArea = wrapper.transform.Find("HitArea");
+        if (hitArea)
+        {
+            BoxCollider col = hitArea.GetComponent<BoxCollider>();
+            if (col) col.size = new Vector3(size.x, size.y, 0.1f);
+        }
     }
 
+    // Helper to generate the internal visual structure (Kept from New Implementation)
     void CreateFlexibleButton(GameObject parent, string label, Sprite icon, Color btnColor, UnityEngine.Events.UnityAction onClick, bool showDropdown, bool isWideAction)
     {
         // Parent is the Wrapper from LayoutGroup
@@ -334,23 +353,19 @@ public class VRMainMenu : MonoBehaviour
         Image hitImg = btnHitObj.AddComponent<Image>();
         hitImg.color = Color.clear;
         
-        // Collider - We need to wait for layout or use a fixed approximation?
-        // Since we are flexible, BoxCollider size is tricky.
-        // SOLUTION: We add a component that updates Collider size on RectTransform change?
-        // For now, we set a default substantial size.
+        // Collider - Default size (will be overridden by CreateGridButton)
         BoxCollider col = btnHitObj.AddComponent<BoxCollider>();
-        col.size = new Vector3(200, 100, 0.1f); // Needs dynamic update ideally
-        
-        // Keep checking size in Update or similar if critical. 
-        // Or assume the button is roughly X by Y.
+        col.size = new Vector3(200, 100, 0.1f); 
         
         // 2. Visual Root
         GameObject visualRoot = new GameObject("Visuals");
         visualRoot.transform.SetParent(btnHitObj.transform, false);
         RectTransform visRT = visualRoot.AddComponent<RectTransform>();
         
-        // Expansion for Glow/Border
-        float expansion = isWideAction ? 0.05f : 0.08f; 
+        // Expansion using Old Logic (VRMainMenu_old uses CreateGridButton visuals)
+        // New Logic uses shaders which need padding.
+        
+        float expansion = 0.08f; 
         visRT.anchorMin = new Vector2(-expansion, -expansion);
         visRT.anchorMax = new Vector2(1f + expansion, 1f + expansion);
         visRT.offsetMin = Vector2.zero; visRT.offsetMax = Vector2.zero;
@@ -369,19 +384,16 @@ public class VRMainMenu : MonoBehaviour
         if (glassShader != null)
         {
             Material glassMat = new Material(glassShader);
-            glassMat.SetFloat("_CornerRadius", isWideAction ? 0.2f : 0.12f);
+            glassMat.SetFloat("_CornerRadius", 0.12f);
             glassMat.SetFloat("_EdgePadding", 0.04f);
-            
-            // We can't know accurate aspect ratio here easily without layout rebuild.
-            // We'll set a default and maybe update it via script if needed.
-            glassMat.SetFloat("_Aspect", isWideAction ? 4.0f : 1.4f); 
+            glassMat.SetFloat("_Aspect", 1.15f); // Use fixed aspect from Old Logic
             
             glassMat.SetColor("_ColorA", new Color(btnColor.r, btnColor.g, btnColor.b, 0.15f));
             glassMat.SetColor("_ColorB", new Color(0f, 0.5f, 1f, 0.1f));
             glassMat.SetFloat("_GlassAlpha", 0.1f);
             
-             bg.material = glassMat;
-             bg.color = Color.white;
+            bg.material = glassMat;
+            bg.color = Color.white;
         }
         else
         {
@@ -415,17 +427,16 @@ public class VRMainMenu : MonoBehaviour
         if (glowShader != null)
         {
             Material glowMat = new Material(glowShader);
-            glowMat.SetFloat("_Aspect", isWideAction ? 4.0f : 1.4f);
+            glowMat.SetFloat("_Aspect", 1.15f); // Match above
             glowMat.SetFloat("_EdgePadding", 0.04f);
             glowMat.SetColor("_GlowColor", btnColor);
             
             // THINNER LOOK as requested
-            glowMat.SetFloat("_BorderWidth", 0.02f); // Thin
-            glowMat.SetFloat("_GlowWidth", 0.06f);   // Sharp
+            glowMat.SetFloat("_BorderWidth", 0.02f);
+            glowMat.SetFloat("_GlowWidth", 0.06f);
             glowMat.SetFloat("_GlowIntensity", 1.8f);
-            glowMat.SetFloat("_CornerRadius", isWideAction ? 0.2f : 0.12f);
-            
-            glowMat.SetFloat("_PulseEnabled", 0f); // Static for cleaner look usually
+            glowMat.SetFloat("_CornerRadius", 0.12f);
+            glowMat.SetFloat("_PulseEnabled", 0f);
              
             borderImg.material = glowMat;
             borderImg.sprite = GetPixelSprite();
@@ -441,7 +452,7 @@ public class VRMainMenu : MonoBehaviour
         cRT.anchorMin = Vector2.zero; cRT.anchorMax = Vector2.one;
         cRT.sizeDelta = Vector2.zero;
         
-        // Icon (If Present)
+        // Icon
         if (icon != null)
         {
             GameObject iconObj = new GameObject("Icon");
@@ -459,30 +470,15 @@ public class VRMainMenu : MonoBehaviour
         }
         
         // Text
-        // If Wide Button (Connect), text is center big
-        // Else text is bottom small
+        GameObject tObj = CreateText(content.transform, label, Vector2.zero, 32, Color.white, false);
+        RectTransform tRT = tObj.GetComponent<RectTransform>();
+        tRT.anchorMin = new Vector2(0f, 0.1f); tRT.anchorMax = new Vector2(1f, 0.4f);
+        tRT.offsetMin = Vector2.zero; tRT.offsetMax = Vector2.zero;
         
-        if (isWideAction)
-        {
-             GameObject tObj = CreateText(content.transform, label, Vector2.zero, 48, Color.white, true);
-             RectTransform tRT = tObj.GetComponent<RectTransform>();
-             tRT.anchorMin = Vector2.zero; tRT.anchorMax = Vector2.one;
-             tRT.offsetMin = Vector2.zero; tRT.offsetMax = Vector2.zero;
-        }
-        else
-        {
-             GameObject tObj = CreateText(content.transform, label, Vector2.zero, 32, Color.white, false);
-             RectTransform tRT = tObj.GetComponent<RectTransform>();
-             tRT.anchorMin = new Vector2(0f, 0.1f); tRT.anchorMax = new Vector2(1f, 0.4f);
-             tRT.offsetMin = Vector2.zero; tRT.offsetMax = Vector2.zero;
-        }
-
-        // Dropdown Arrow (If requested - Image 2 style)
+        // Dropdown Arrow
         if (showDropdown)
         {
-             // Add small arrow indicator at bottom right
-             // For now just a simple text "v" or similar if we lack sprite
-             CreateText(content.transform, "▼", new Vector2(0,0), 20, new Color(1,1,1,0.5f)).GetComponent<RectTransform>().anchorMin = new Vector2(0.85f, 0.1f);
+            CreateText(content.transform, "▼", new Vector2(0,0), 20, new Color(1,1,1,0.5f)).GetComponent<RectTransform>().anchorMin = new Vector2(0.85f, 0.1f);
         }
 
         // Animation
@@ -490,6 +486,9 @@ public class VRMainMenu : MonoBehaviour
         anim.targetVisuals = visualRoot.transform;
         anim.popAmount = 0.05f;
     }
+
+
+
 
 
     
