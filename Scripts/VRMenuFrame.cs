@@ -24,10 +24,10 @@ public class VRMenuFrame : MonoBehaviour
     public Color glowColorA = new Color(0f, 1.5f, 2f, 1f); // Cyan HDR
     [ColorUsage(true, true)]
     public Color glowColorB = new Color(1.2f, 0.3f, 2f, 1f); // Purple HDR
-    public float glowIntensity = 1.5f;
-    public float borderThickness = 8f;
+    public float glowIntensity = 1.2f; // Slightly reduced
+    public float borderThickness = 3f; // Reduced from 8f to 3f for thinner look
     public float edgePadding = 0.04f; // Added padding property
-    public float glowSpread = 60f;
+    public float glowSpread = 40f; // Reduced spread for sharper look
     public float shimmerSpeed = 0.4f;
     public float hdrBoost = 1.8f;
 
@@ -242,14 +242,14 @@ public class VRMenuFrame : MonoBehaviour
             glowMat.SetFloat("_Aspect", aspect);
             
             // Multi-layer glow - STRONG values for visible layers
-            glowMat.SetFloat("_Layer1Width", 0.025f);
-            glowMat.SetFloat("_Layer1Alpha", 1.5f);   // Very bright inner
-            glowMat.SetFloat("_Layer2Width", 0.055f);
-            glowMat.SetFloat("_Layer2Alpha", 1.0f);   // Bright mid glow
-            glowMat.SetFloat("_Layer3Width", 0.1f);
-            glowMat.SetFloat("_Layer3Alpha", 0.6f);   // Visible outer
-            glowMat.SetFloat("_Layer4Width", 0.16f);
-            glowMat.SetFloat("_Layer4Alpha", 0.3f);   // Subtle ambient
+            glowMat.SetFloat("_Layer1Width", 0.008f); // Very thin inner core
+            glowMat.SetFloat("_Layer1Alpha", 1.5f);   
+            glowMat.SetFloat("_Layer2Width", 0.018f); // Thin mid glow
+            glowMat.SetFloat("_Layer2Alpha", 1.0f);   
+            glowMat.SetFloat("_Layer3Width", 0.04f); // Reduced outer
+            glowMat.SetFloat("_Layer3Alpha", 0.6f);   
+            glowMat.SetFloat("_Layer4Width", 0.08f); // Reduced ambient
+            glowMat.SetFloat("_Layer4Alpha", 0.3f);
             
             // Gradient colors - BRIGHT Cyan to Purple
             Color cyanColor = new Color(0.3f, 1f, 1f, 1f);    // Bright cyan

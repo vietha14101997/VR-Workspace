@@ -45,11 +45,9 @@ public class VRMainMenu : MonoBehaviour
 
     private Canvas _canvas;
     private GameObject _gridContainer;
-    private Sprite _roundedSprite;
     private Sprite _pixelSprite;
     
-    // Cache separate border sprites by thickness
-    private Dictionary<int, Sprite> _borderSprites = new Dictionary<int, Sprite>();
+    // Status References and other cache removed as they are now in VRMenuFrame or unused
     private VRMenuFrame _menuFrame;
 
 
@@ -126,96 +124,7 @@ public class VRMainMenu : MonoBehaviour
     }
 
 
-    Sprite GetRoundedSprite()
-    {
-        if (_roundedSprite != null) return _roundedSprite;
-        int size = 512; 
-        int radius = 80; 
-        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
-        Color[] colors = new Color[size * size];
 
-        for (int y = 0; y < size; y++)
-        {
-            for (int x = 0; x < size; x++)
-            {
-                bool inCorner = (x < radius && y < radius) || (x > size - radius && y < radius) ||
-                                (x < radius && y > size - radius) || (x > size - radius && y > size - radius);
-
-                if (inCorner)
-                {
-                    float cx = (x < size / 2) ? radius : size - radius - 1;
-                    float cy = (y < size / 2) ? radius : size - radius - 1;
-                    float d = Vector2.Distance(new Vector2(x, y), new Vector2(cx, cy));
-                    
-                    float alpha = Mathf.Clamp01((radius + 0.5f) - d);
-                    colors[y * size + x] = new Color(1, 1, 1, alpha);
-                }
-                else
-                {
-                    colors[y * size + x] = Color.white;
-                }
-            }
-        }
-        
-        tex.SetPixels(colors);
-        tex.Apply();
-        _roundedSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100, 0, SpriteMeshType.FullRect, new Vector4(radius, radius, radius, radius));
-        return _roundedSprite;
-    }
-    
-    Sprite GetBorderSprite(int thickness)
-    {
-        if (_borderSprites.ContainsKey(thickness) && _borderSprites[thickness] != null) 
-            return _borderSprites[thickness];
-            
-        int size = 512;
-        int radius = 80;
-
-        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
-        Color[] colors = new Color[size * size];
-
-        for (int y = 0; y < size; y++)
-        {
-            for (int x = 0; x < size; x++)
-            {
-                bool inCorner = (x < radius && y < radius) || (x > size - radius && y < radius) ||
-                                (x < radius && y > size - radius) || (x > size - radius && y > size - radius);
-
-                float alpha = 0f;
-
-                if (inCorner)
-                {
-                    float cx = (x < size / 2) ? radius : size - radius - 1;
-                    float cy = (y < size / 2) ? radius : size - radius - 1;
-                    float d = Vector2.Distance(new Vector2(x, y), new Vector2(cx, cy));
-                    
-                    float outerAlpha = Mathf.Clamp01((radius + 0.5f) - d);
-                    float innerEdge = radius - thickness;
-                    float innerAlpha = Mathf.Clamp01(d - (innerEdge - 0.5f));
-                    
-                    alpha = outerAlpha * innerAlpha;
-                }
-                else
-                {
-                    float dx = Mathf.Min(x, size - 1 - x);
-                    float dy = Mathf.Min(y, size - 1 - y);
-                    float minDist = Mathf.Min(dx, dy); 
-                    
-                    if (minDist < thickness + 1)
-                    {
-                         float innerAlpha = Mathf.Clamp01((thickness + 0.5f) - minDist);
-                         alpha = innerAlpha;
-                    }
-                }
-                colors[y * size + x] = new Color(1, 1, 1, alpha);
-            }
-        }
-        tex.SetPixels(colors);
-        tex.Apply();
-        Sprite s = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100, 0, SpriteMeshType.FullRect, new Vector4(radius, radius, radius, radius));
-        _borderSprites[thickness] = s;
-        return s;
-    }
 
     Sprite GetPixelSprite()
     {
@@ -290,7 +199,8 @@ public class VRMainMenu : MonoBehaviour
         float logicalHeight = (logicalWidth / panelWidth) * panelHeight;
         float contentHeight = logicalHeight - _menuFrame.topMargin;
         
-        CreateUniformGrid(_menuFrame.ContentContainer, logicalWidth, contentHeight, 50f);
+        
+        BuildMenuLayout(_menuFrame.ContentContainer, logicalWidth, contentHeight, 50f);
         
         Canvas.ForceUpdateCanvases();
         if (_gridContainer) {
@@ -328,277 +238,260 @@ public class VRMainMenu : MonoBehaviour
         ShowMainMenu();
     }
 
-    void CreateUniformGrid(Transform parent, float w, float h, float topMargin)
+    void BuildMenuLayout(Transform parent, float w, float h, float topMargin)
     {
-
-        _gridContainer = new GameObject("ButtonGrid");
+        _gridContainer = new GameObject("MenuLayout");
         _gridContainer.transform.SetParent(parent, false);
-
+        
         RectTransform rt = _gridContainer.AddComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+        rt.offsetMin = new Vector2(100f, 50f); // Side/Bottom padding
+        rt.offsetMax = new Vector2(-100f, -topMargin); // Side/Top padding
         
-        float marginPX = 100f; 
-        float xMin = marginPX / w;
-        float xMax = 1f - xMin;
-        float yMin = marginPX / h;
-        float yMax = 1f - (topMargin / h); // Use custom top margin
-
-
-        rt.anchorMin = new Vector2(xMin, yMin); 
-        rt.anchorMax = new Vector2(xMax, yMax); 
-        rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.sizeDelta = Vector2.zero;
-        rt.offsetMin = Vector2.zero;
-        rt.offsetMax = Vector2.zero;
-        rt.localScale = Vector3.one;
-
-        GridLayoutGroup grid = _gridContainer.AddComponent<GridLayoutGroup>();
+        // Vertical Layout
+        VerticalLayoutGroup vLayout = _gridContainer.AddComponent<VerticalLayoutGroup>();
+        vLayout.spacing = 60f; // Increased spacing
+        vLayout.childAlignment = TextAnchor.MiddleCenter; // Center rows vertically
+        vLayout.childControlHeight = true;
+        vLayout.childControlWidth = true;
         
-        float containerW = w * (xMax - xMin);
-        float containerH = h * (yMax - yMin);
+        // --- ROW 1: APPS (Remote, Browser, Media) ---
+        GameObject row1 = CreateRow(_gridContainer.transform, "Row_Apps", 1.0f);
+        CreateButtonInRow(row1.transform, "Remote Desktop", iconRemote, buttonColors[0], () => OpenRemoteDesktop());
+        CreateButtonInRow(row1.transform, "Browser", iconBrowser, buttonColors[1], () => Debug.Log("Browser"));
+        CreateButtonInRow(row1.transform, "Media", iconMedia, buttonColors[2], () => Debug.Log("Media"));
+
+        // --- ROW 2: TOOLS (Files, Resolution, FPS) ---
+        // Equal height weighting (1.0f) for uniform grid look
+        GameObject row2 = CreateRow(_gridContainer.transform, "Row_Tools", 1.0f); 
         
-        int cols = 3;
-        int rows = 2;
+        // Files (Standard)
+        CreateButtonInRow(row2.transform, "Files", iconFiles, buttonColors[3], () => Debug.Log("Files"), true);
         
-        float spacingPX = 100f;
-        float totalSpacingW = spacingPX * (cols - 1);
-        float totalSpacingH = spacingPX * (rows - 1);
-
-        float maxW = (containerW - totalSpacingW) / cols;
-        float maxH = (containerH - totalSpacingH) / rows;
-
-        float targetAspect = 1.15f; 
-        float finalH = maxH;
-        float finalW = finalH * targetAspect;
-
-        if (finalW > maxW)
-        {
-            finalW = maxW;
-            finalH = finalW / targetAspect;
-        }
-
-        grid.cellSize = new Vector2(finalW, finalH);
-        grid.spacing = new Vector2(spacingPX, spacingPX);
-        grid.startCorner = GridLayoutGroup.Corner.UpperLeft;
-        grid.startAxis = GridLayoutGroup.Axis.Horizontal;
-        grid.childAlignment = TextAnchor.MiddleCenter;
-        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-        grid.constraintCount = 3; 
+        // Resolution (Custom Logic placeholder) - Using Settings Icon for now
+        CreateButtonInRow(row2.transform, "Resolution\n1280 - 720", iconSettings, buttonColors[4], () => Debug.Log("Resolution"), true);
         
-        // Pass calculated size
-        Vector2 btnSize = new Vector2(finalW, finalH);
+        // FPS (Custom Logic placeholder) - Using Settings Icon for now
+        CreateButtonInRow(row2.transform, "FPS\n60", iconSettings, buttonColors[4], () => Debug.Log("FPS"), true);
 
-        CreateGridButton("Remote Desktop", iconRemote, buttonColors[0], btnSize, () => OpenRemoteDesktop());
-        CreateGridButton("Browser", iconBrowser, buttonColors[1], btnSize, () => Debug.Log("Browser"));
-        CreateGridButton("Media", iconMedia, buttonColors[2], btnSize, () => Debug.Log("Media"));
-        CreateGridButton("Files", iconFiles, buttonColors[3], btnSize, () => Debug.Log("Files"));
-        CreateGridButton("Settings", iconSettings, buttonColors[4], btnSize, () => Debug.Log("Settings"));
-        CreateGridButton("Quit", iconQuit, buttonColors[5], btnSize, () => Application.Quit());
+        // --- ROW 3 REMOVED (Connect Button) ---
     }
 
-    void CreateGridButton(string label, Sprite icon, Color btnColor, Vector2 size, UnityEngine.Events.UnityAction onClick)
+    GameObject CreateRow(Transform parent, string name, float flexibleHeight)
     {
-        // 1. Structural Wrapper (Layout Cell)
-        GameObject wrapper = new GameObject("Cell_" + label);
-        wrapper.transform.SetParent(_gridContainer.transform, false);
-        RectTransform wrt = wrapper.AddComponent<RectTransform>();
-        wrt.localScale = Vector3.one;
+        GameObject row = new GameObject(name);
+        row.transform.SetParent(parent, false);
+        RectTransform rt = row.AddComponent<RectTransform>();
         
-        // 2. HIT AREA (Static Interaction Layer)
-        // This object stays still to catch raycasts stably
-        GameObject btnHitObj = new GameObject("Btn_HitArea");
-        btnHitObj.transform.SetParent(wrapper.transform, false);
+        HorizontalLayoutGroup hg = row.AddComponent<HorizontalLayoutGroup>();
+        hg.spacing = 60f; // Increased spacing
+        hg.childAlignment = TextAnchor.MiddleCenter;
+        hg.childControlWidth = true;
+        hg.childControlHeight = true;
+        
+        LayoutElement le = row.AddComponent<LayoutElement>();
+        le.flexibleHeight = flexibleHeight; // Weight
+        le.flexibleWidth = 1f;
+        
+        return row;
+    }
+    
+    // Wrapper to adapt the old CreateGridButton logic to the new Layout system
+    void CreateButtonInRow(Transform parent, string label, Sprite icon, Color btnColor, UnityEngine.Events.UnityAction action, bool showDropdown = false, bool isWideAction = false)
+    {
+        // 1. Layout Element (Cell)
+        GameObject wrapper = new GameObject("Btn_" + label);
+        wrapper.transform.SetParent(parent, false);
+        RectTransform wrapperRT = wrapper.AddComponent<RectTransform>();
+        
+        // Layout Config
+        LayoutElement le = wrapper.AddComponent<LayoutElement>();
+        le.flexibleWidth = 0f; // Disable flexible
+        le.flexibleHeight = 0f; // Disable flexible
+        le.preferredWidth = 400f; // Fixed size
+        le.preferredHeight = 320f; // Fixed size
+        
+        // If it's the "Connect" button, we might want different visual properties
+        // For now, we reuse the inner logic. 
+        
+        // 2. We skip the rigid size calculation from before and rely on RectTransform stretching
+        // generated by the Horizontal layout.
+        
+        CreateFlexibleButton(wrapper, label, icon, btnColor, action, showDropdown, isWideAction);
+    }
+
+    void CreateFlexibleButton(GameObject parent, string label, Sprite icon, Color btnColor, UnityEngine.Events.UnityAction onClick, bool showDropdown, bool isWideAction)
+    {
+        // Parent is the Wrapper from LayoutGroup
+        
+        // 1. Hit Area 
+        GameObject btnHitObj = new GameObject("HitArea");
+        btnHitObj.transform.SetParent(parent.transform, false);
         RectTransform hitRT = btnHitObj.AddComponent<RectTransform>();
         hitRT.anchorMin = Vector2.zero; hitRT.anchorMax = Vector2.one;
-        hitRT.sizeDelta = Vector2.zero;
+        hitRT.offsetMin = Vector2.zero; hitRT.offsetMax = Vector2.zero;
         
         Image hitImg = btnHitObj.AddComponent<Image>();
-        hitImg.color = Color.clear; 
+        hitImg.color = Color.clear;
         
-        // --- ADD BOX COLLIDER FOR GAZE RAYCAST ---
+        // Collider - We need to wait for layout or use a fixed approximation?
+        // Since we are flexible, BoxCollider size is tricky.
+        // SOLUTION: We add a component that updates Collider size on RectTransform change?
+        // For now, we set a default substantial size.
         BoxCollider col = btnHitObj.AddComponent<BoxCollider>();
-        // Fix Z size: Canvas Z scale is 1, so we use small value here (0.1f = 10cm)
-        col.size = new Vector3(size.x, size.y, 0.1f); 
-        // -----------------------------------------
+        col.size = new Vector3(200, 100, 0.1f); // Needs dynamic update ideally
         
-        // 3. VISUAL ROOT (Animated Layer)
+        // Keep checking size in Update or similar if critical. 
+        // Or assume the button is roughly X by Y.
+        
+        // 2. Visual Root
         GameObject visualRoot = new GameObject("Visuals");
         visualRoot.transform.SetParent(btnHitObj.transform, false);
         RectTransform visRT = visualRoot.AddComponent<RectTransform>();
         
-        // EXPANSION LOGIC for Button Padding
-        // We need to account for the Glow Width (0.12) + Border (0.05).
-        // Setting visual edge to be significantly outside logical edge.
-        float btnPad = 0.09f; 
-        float glowWidth = 0.12f;
-        float effectivePad = btnPad + glowWidth; // Align Inner Glow Edge roughly with Logical Edge
+        // Expansion for Glow/Border
+        float expansion = isWideAction ? 0.05f : 0.08f; 
+        visRT.anchorMin = new Vector2(-expansion, -expansion);
+        visRT.anchorMax = new Vector2(1f + expansion, 1f + expansion);
+        visRT.offsetMin = Vector2.zero; visRT.offsetMax = Vector2.zero;
         
-        float funcExpansion = effectivePad / (1f - 2f * effectivePad);
-        
-        visRT.anchorMin = new Vector2(-funcExpansion, -funcExpansion); 
-        visRT.anchorMax = new Vector2(1f + funcExpansion, 1f + funcExpansion);
-        visRT.sizeDelta = Vector2.zero;
-
-        // Background (on Visual Root) - Use simple pixel sprite, shader handles corners
+        // Background
         Image bg = visualRoot.AddComponent<Image>();
         bg.sprite = GetPixelSprite();
         bg.type = Image.Type.Simple;
-        bg.raycastTarget = false; 
+        bg.raycastTarget = false;
         
-        Color baseTint = Color.Lerp(btnColor, Color.white, 0.15f);
-        baseTint.a = 0.35f;
+        Color baseTint = Color.Lerp(btnColor, Color.white, 0.1f);
+        baseTint.a = 0.2f;
 
-        // Aspect Ratio Correction (Calculate once for both shaders)
-        float aspect = (size.y > 0) ? (size.x / size.y) : 1.0f;
-
-        // Use GlassGradientBackground shader for rounded corners
+        // Custom Shader Material 
         Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
         if (glassShader != null)
         {
             Material glassMat = new Material(glassShader);
-            glassMat.SetFloat("_CornerRadius", 0.15f); // Match border corner
-            glassMat.SetFloat("_EdgePadding", 0.05f); // Set padding
-            glassMat.SetFloat("_Aspect", aspect);
+            glassMat.SetFloat("_CornerRadius", isWideAction ? 0.2f : 0.12f);
+            glassMat.SetFloat("_EdgePadding", 0.04f);
             
-            // Button-specific gradient (subtle)
-            Color btnGlassA = new Color(btnColor.r, btnColor.g, btnColor.b, 0.1f);
-            Color btnGlassB = new Color(btnColor.r * 0.8f, btnColor.g * 0.8f, btnColor.b * 0.9f, 0.15f);
-            glassMat.SetColor("_ColorA", btnGlassA);
-            glassMat.SetColor("_ColorB", btnGlassB);
-            glassMat.SetFloat("_GlassAlpha", 0.08f);
-            glassMat.SetFloat("_CyanRatio", 0.6f);
-            glassMat.SetFloat("_GradientAngle", -5f);
+            // We can't know accurate aspect ratio here easily without layout rebuild.
+            // We'll set a default and maybe update it via script if needed.
+            glassMat.SetFloat("_Aspect", isWideAction ? 4.0f : 1.4f); 
             
-            bg.material = glassMat;
-            bg.color = Color.white;
+            glassMat.SetColor("_ColorA", new Color(btnColor.r, btnColor.g, btnColor.b, 0.15f));
+            glassMat.SetColor("_ColorB", new Color(0f, 0.5f, 1f, 0.1f));
+            glassMat.SetFloat("_GlassAlpha", 0.1f);
+            
+             bg.material = glassMat;
+             bg.color = Color.white;
         }
         else
         {
-             bg.color = baseTint; 
+            bg.color = baseTint;
         }
-
-        // Button Component (on Hit Area)
+        
+        // Interaction
         Button btn = btnHitObj.AddComponent<Button>();
-        btn.targetGraphic = bg; 
+        btn.targetGraphic = bg;
         btn.onClick.AddListener(onClick);
         
+        // Colors
         ColorBlock cb = btn.colors;
         cb.normalColor = baseTint;
-        cb.highlightedColor = new Color(btnColor.r, btnColor.g, btnColor.b, 0.6f);
-        cb.pressedColor = new Color(btnColor.r, btnColor.g, btnColor.b, 0.8f);
-        cb.colorMultiplier = 1f; 
+        cb.highlightedColor = new Color(btnColor.r, btnColor.g, btnColor.b, 0.5f);
+        cb.pressedColor = new Color(btnColor.r, btnColor.g, btnColor.b, 0.7f);
         cb.fadeDuration = 0.1f;
         btn.colors = cb;
         
-        // BORDER OBJECT (Using new Glowing Shader)
+        // --- BORDER ---
         GameObject borderObj = new GameObject("Border");
         borderObj.transform.SetParent(visualRoot.transform, false);
         RectTransform borderRT = borderObj.AddComponent<RectTransform>();
         borderRT.anchorMin = Vector2.zero; borderRT.anchorMax = Vector2.one;
-        // Match parent size exactly
-        borderRT.offsetMin = Vector2.zero;
-        borderRT.offsetMax = Vector2.zero;
+        borderRT.offsetMin = Vector2.zero; borderRT.offsetMax = Vector2.zero;
         
         Image borderImg = borderObj.AddComponent<Image>();
         borderImg.raycastTarget = false;
         
-        // Try to use GlowingElementBorder shader
         Shader glowShader = Shader.Find("Custom/GlowingElementBorder");
         if (glowShader != null)
         {
             Material glowMat = new Material(glowShader);
-            
-            // Aspect Ratio (reuse variable from above)
-            glowMat.SetFloat("_Aspect", aspect);
-            glowMat.SetFloat("_EdgePadding", 0.05f); // Set padding
-            
-            // UV-based settings - STRONG glow to match concept
+            glowMat.SetFloat("_Aspect", isWideAction ? 4.0f : 1.4f);
+            glowMat.SetFloat("_EdgePadding", 0.04f);
             glowMat.SetColor("_GlowColor", btnColor);
-            glowMat.SetFloat("_GlowIntensity", 1.5f);
-            glowMat.SetFloat("_BorderWidth", 0.05f);
-            glowMat.SetFloat("_GlowWidth", 0.12f);
-            glowMat.SetFloat("_CornerRadius", 0.15f);
             
-            // Background - Disable in border shader, use separate VisualRoot background instead
-            glowMat.SetFloat("_BackgroundAlpha", 0f); // Set to 0 to avoid double background
-            glowMat.SetColor("_BackgroundColor", Color.clear);
+            // THINNER LOOK as requested
+            glowMat.SetFloat("_BorderWidth", 0.02f); // Thin
+            glowMat.SetFloat("_GlowWidth", 0.06f);   // Sharp
+            glowMat.SetFloat("_GlowIntensity", 1.8f);
+            glowMat.SetFloat("_CornerRadius", isWideAction ? 0.2f : 0.12f);
             
-            // Pulse animation
-            glowMat.SetFloat("_PulseEnabled", 1f);
-            glowMat.SetFloat("_PulseSpeed", 2f);
-            glowMat.SetFloat("_PulseIntensity", 0.12f);
-            
-            // Ripple
-            glowMat.SetFloat("_RippleProgress", 0f);
-            glowMat.SetFloat("_RippleIntensity", 0.6f);
-            
+            glowMat.SetFloat("_PulseEnabled", 0f); // Static for cleaner look usually
+             
             borderImg.material = glowMat;
-            borderImg.color = Color.white;
             borderImg.sprite = GetPixelSprite();
             
-            // Store material reference for ripple animation
             borderObj.AddComponent<VRButtonRipple>().Initialize(glowMat, borderImg);
         }
-        else
-        {
-            // Fallback to old style
-            borderImg.sprite = GetBorderSprite(4); 
-            borderImg.type = Image.Type.Sliced;
-            borderImg.color = Color.Lerp(btnColor, Color.white, 0.8f); 
-            
-            var glow = borderObj.AddComponent<UnityEngine.UI.Shadow>();
-            glow.effectColor = new Color(btnColor.r, btnColor.g, btnColor.b, 1.0f); 
-            glow.effectDistance = new Vector2(0, -2);
-            
-            var glow2 = borderObj.AddComponent<UnityEngine.UI.Shadow>();
-            glow2.effectColor = new Color(btnColor.r, btnColor.g, btnColor.b, 0.8f); 
-            glow2.effectDistance = new Vector2(0, 3);
-            
-            var glow3 = borderObj.AddComponent<UnityEngine.UI.Shadow>();
-            glow3.effectColor = new Color(btnColor.r, btnColor.g, btnColor.b, 0.4f); 
-            glow3.effectDistance = new Vector2(3, -3);
-        }
-
-        // Content
+        
+        // --- TEXT & ICON ---
+        // Content Container
         GameObject content = new GameObject("Content");
         content.transform.SetParent(visualRoot.transform, false);
         RectTransform cRT = content.AddComponent<RectTransform>();
         cRT.anchorMin = Vector2.zero; cRT.anchorMax = Vector2.one;
         cRT.sizeDelta = Vector2.zero;
-
-        // Icon
-        GameObject iconObj = new GameObject("Icon");
-        iconObj.transform.SetParent(content.transform, false);
-        Image iconImg = iconObj.AddComponent<Image>();
-        iconImg.sprite = icon;
-        iconImg.color = Color.white; 
-        iconImg.raycastTarget = false;
         
-        var iconGlow = iconObj.AddComponent<UnityEngine.UI.Shadow>();
-        iconGlow.effectColor = btnColor;
-        iconGlow.effectDistance = new Vector2(2, -2);
-
-        RectTransform iconRT = iconObj.GetComponent<RectTransform>();
-        iconRT.anchorMin = new Vector2(0.32f, 0.40f); 
-        iconRT.anchorMax = new Vector2(0.68f, 0.75f);
-        iconRT.offsetMin = Vector2.zero; iconRT.offsetMax = Vector2.zero;
-        iconImg.preserveAspect = true;
-
+        // Icon (If Present)
+        if (icon != null)
+        {
+            GameObject iconObj = new GameObject("Icon");
+            iconObj.transform.SetParent(content.transform, false);
+            Image iconImg = iconObj.AddComponent<Image>();
+            iconImg.sprite = icon;
+            iconImg.preserveAspect = true;
+            iconImg.raycastTarget = false;
+            
+            RectTransform iRT = iconObj.GetComponent<RectTransform>();
+            // Centered above text
+            iRT.anchorMin = new Vector2(0.35f, 0.45f);
+            iRT.anchorMax = new Vector2(0.65f, 0.8f);
+            iRT.offsetMin = Vector2.zero; iRT.offsetMax = Vector2.zero;
+        }
+        
         // Text
-        GameObject txtObj = CreateText(content.transform, label, Vector2.zero, fontSize, Color.white, true); 
+        // If Wide Button (Connect), text is center big
+        // Else text is bottom small
         
-        var txtGlow = txtObj.AddComponent<UnityEngine.UI.Shadow>();
-        txtGlow.effectColor = btnColor;
-        txtGlow.effectDistance = new Vector2(1.5f, -1.5f);
+        if (isWideAction)
+        {
+             GameObject tObj = CreateText(content.transform, label, Vector2.zero, 48, Color.white, true);
+             RectTransform tRT = tObj.GetComponent<RectTransform>();
+             tRT.anchorMin = Vector2.zero; tRT.anchorMax = Vector2.one;
+             tRT.offsetMin = Vector2.zero; tRT.offsetMax = Vector2.zero;
+        }
+        else
+        {
+             GameObject tObj = CreateText(content.transform, label, Vector2.zero, 32, Color.white, false);
+             RectTransform tRT = tObj.GetComponent<RectTransform>();
+             tRT.anchorMin = new Vector2(0f, 0.1f); tRT.anchorMax = new Vector2(1f, 0.4f);
+             tRT.offsetMin = Vector2.zero; tRT.offsetMax = Vector2.zero;
+        }
 
-        var txtRT = txtObj.GetComponent<RectTransform>();
-        txtRT.anchorMin = new Vector2(0, 0.12f);
-        txtRT.anchorMax = new Vector2(1, 0.35f); 
+        // Dropdown Arrow (If requested - Image 2 style)
+        if (showDropdown)
+        {
+             // Add small arrow indicator at bottom right
+             // For now just a simple text "v" or similar if we lack sprite
+             CreateText(content.transform, "▼", new Vector2(0,0), 20, new Color(1,1,1,0.5f)).GetComponent<RectTransform>().anchorMin = new Vector2(0.85f, 0.1f);
+        }
 
-        // Animation Logic
+        // Animation
         var anim = btnHitObj.AddComponent<VRButtonAnimation>();
-        anim.targetVisuals = visualRoot.transform; 
-        anim.popAmount = 0.1f; 
+        anim.targetVisuals = visualRoot.transform;
+        anim.popAmount = 0.05f;
     }
+
+
     
     GameObject CreateText(Transform parent, string content, Vector2 pos, int size, Color c, bool bold = false)
     {
