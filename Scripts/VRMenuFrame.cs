@@ -12,7 +12,8 @@ using UnityEditor;
 public class VRMenuFrame : MonoBehaviour
 {
     [Header("Frame Configuration")]
-    public float topMargin = 0f; // StatusBar Area
+    public float topMargin = 35f; // StatusBar Area (minimal height, very close to top edge)
+    public float separatorOffset = 80f; // Distance from top edge to separator line
     public float sidePadding = 0f;
 
     [Header("Visual Config")]
@@ -71,19 +72,22 @@ public class VRMenuFrame : MonoBehaviour
         CreateGlassPanel(transform, width, height);
 
         // 2. Create Status Bar
-        CreateStatusBar(transform, width, height, topMargin);
+        CreateStatusBar(transform, width, height, topMargin, separatorOffset);
 
         // 3. Create Content Container
         GameObject contentObj = new GameObject("ContentContainer");
         contentObj.transform.SetParent(transform, false);
         ContentContainer = contentObj.AddComponent<RectTransform>();
-        
-        // Fill the space below status bar
+
+        // Fill the space BELOW separator line
+        // Anchor to bottom-left (0,0) to top-right (1,1)
         ContentContainer.anchorMin = Vector2.zero;
         ContentContainer.anchorMax = Vector2.one;
+        // offsetMin controls BOTTOM edge - no offset from bottom
+        // offsetMax controls TOP edge - push down by separatorOffset pixels
         ContentContainer.offsetMin = Vector2.zero;
-        ContentContainer.offsetMax = new Vector2(0, -topMargin); // Push down by topMargin
-        
+        ContentContainer.offsetMax = new Vector2(0, -separatorOffset);
+
         // Add a layer for Raycasting/Interaction if needed, or leave empty
     }
 
@@ -162,8 +166,8 @@ public class VRMenuFrame : MonoBehaviour
         {
             Material glassMat = new Material(glassShader);
             
-            // Corner radius - MUST match border shader
-            glassMat.SetFloat("_CornerRadius", 0.08f);
+            // Corner radius - MUST match border shader (increased for smoother curves)
+            glassMat.SetFloat("_CornerRadius", 0.12f);
             glassMat.SetFloat("_EdgePadding", p); // Set padding
             
             // Fix Aspect Ratio for rounded corners
@@ -234,7 +238,7 @@ public class VRMenuFrame : MonoBehaviour
             
             // UV-based border settings - Match glass panel corner EXACTLY
             glowMat.SetFloat("_BorderWidth", 0.02f);
-            glowMat.SetFloat("_CornerRadius", 0.08f);  // MUST match GlassGradientBackground
+            glowMat.SetFloat("_CornerRadius", 0.12f);  // MUST match GlassGradientBackground
             glowMat.SetFloat("_EdgePadding", edgePadding); // Set padding
             
             // Aspect Ratio Correction
@@ -642,13 +646,13 @@ public class VRMenuFrame : MonoBehaviour
         return _recenterSprite;
     }
 
-    void CreateStatusBar(Transform parent, float w, float h, float height)
+    void CreateStatusBar(Transform parent, float w, float h, float height, float separatorY)
     {
         GameObject barObj = new GameObject("StatusBar");
         barObj.transform.SetParent(parent, false);
         RectTransform rt = barObj.AddComponent<RectTransform>();
-        
-        rt.anchorMin = new Vector2(0, 1); 
+
+        rt.anchorMin = new Vector2(0, 1);
         rt.anchorMax = new Vector2(1, 1);
         rt.pivot = new Vector2(0.5f, 1f);
         rt.sizeDelta = new Vector2(0, height);
@@ -665,10 +669,12 @@ public class VRMenuFrame : MonoBehaviour
         leftRT.offsetMax = new Vector2(0, 0);
         
         HorizontalLayoutGroup lLayout = leftGroup.AddComponent<HorizontalLayoutGroup>();
-        lLayout.childAlignment = TextAnchor.MiddleLeft;
+        lLayout.childAlignment = TextAnchor.MiddleLeft; // Changed to MiddleLeft for vertical center alignment
         lLayout.spacing = -680f;
         lLayout.childControlWidth = false;
         lLayout.childControlHeight = false;
+        lLayout.childForceExpandHeight = false;
+        lLayout.padding = new RectOffset(0, 0, 5, 5); // Add small top/bottom padding for center alignment
 
         // 1. CLOCK
         GameObject timeObj = CreateText(leftGroup.transform, "12:00", Vector2.zero, 42, new Color(1f, 1f, 1f, 0.9f), true);
@@ -802,7 +808,7 @@ public class VRMenuFrame : MonoBehaviour
         // E. Animation
         VRButtonAnimation anim = recenterBtn.AddComponent<VRButtonAnimation>();
         anim.targetVisuals = visualRoot.transform;
-        anim.popAmount = 0.05f;
+        anim.popAmount = 0.025f;
 
         // --- STATUS GROUP (Right) ---
         GameObject statusGroup = new GameObject("StatusGroup");
@@ -815,10 +821,12 @@ public class VRMenuFrame : MonoBehaviour
         groupRT.anchoredPosition = new Vector2(-sidePadding, 0);
 
         HorizontalLayoutGroup layout = statusGroup.AddComponent<HorizontalLayoutGroup>();
-        layout.childAlignment = TextAnchor.MiddleRight;
+        layout.childAlignment = TextAnchor.MiddleRight; // Changed to MiddleRight for vertical center alignment
         layout.spacing = -175f;
         layout.childControlWidth = false;
         layout.childControlHeight = false;
+        layout.childForceExpandHeight = false;
+        layout.padding = new RectOffset(0, 0, 5, 5); // Add small top/bottom padding for center alignment
 
         // 1. Network Icon
         GameObject netObj = new GameObject("NetworkIcon");
@@ -874,8 +882,8 @@ public class VRMenuFrame : MonoBehaviour
         _batteryText.fontStyle = FontStyles.Bold;
 
         // --- SEPARATOR LINE ---
-        // Restore offset to 85f to be closer to the icons/text
-        CreateSeparator(barObj.transform, w, 85f);
+        // Position at the bottom of status bar (use parent transform to position at frame top, not inside statusbar)
+        CreateSeparator(parent, w, separatorY);
     }
 
     void CreateSeparator(Transform parent, float w, float yPos)
@@ -883,21 +891,22 @@ public class VRMenuFrame : MonoBehaviour
         GameObject lineObj = new GameObject("SeparatorLine");
         lineObj.transform.SetParent(parent, false);
         RectTransform rt = lineObj.AddComponent<RectTransform>();
-        
-        // Use 30f padding to extend further
-        float linePadding = 30f;
-        float lineWidth = (w - (2 * linePadding)) * 1.1f;
-        
+
+        // Calculate separator width based on menu width
+        // Using ratio slightly wider than menu for visual effect
+        float lineWidth = w * 1.1f;
+
+        // Anchor to top edge of frame
         rt.anchorMin = new Vector2(0.5f, 1f);
         rt.anchorMax = new Vector2(0.5f, 1f);
-        rt.pivot = new Vector2(0.5f, 1f); // Pivot top-center
+        rt.pivot = new Vector2(0.5f, 1f); // Pivot at top so line draws downward from StatusBar bottom edge
         rt.sizeDelta = new Vector2(lineWidth, 2); // 2px height
-        rt.anchoredPosition = new Vector2(0, -yPos); // Position at bottom of status bar
-        
+        rt.anchoredPosition = new Vector2(0, -yPos); // Position based on separatorOffset variable
+
         Image img = lineObj.AddComponent<Image>();
         img.sprite = GetGradientLineSprite();
         img.raycastTarget = false;
-        
+
         // Add a subtle glow/shadow
         Shadow s = lineObj.AddComponent<Shadow>();
         s.effectColor = new Color(0.5f, 0f, 1f, 0.5f);
