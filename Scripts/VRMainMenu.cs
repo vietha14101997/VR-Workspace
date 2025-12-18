@@ -2,6 +2,8 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro; 
 using System.Collections.Generic; 
+using System; 
+using Random = UnityEngine.Random; 
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -14,21 +16,20 @@ public class VRMainMenu : MonoBehaviour
     public RemotePlayMainMenu remotePlayLogic; 
 
     [Header("Cyberpunk Visual Style")]
-    // Glassmorphism: Dark semi-transparent tint + Blur simulation via opacity layering
-    public Color glassColor = new Color(0.1f, 0.15f, 0.2f, 0.85f); 
-    public Color panelBorderColor = new Color(0.0f, 0.8f, 1.0f, 0.8f); 
+    public Color glassColor = new Color(1.0f, 1.0f, 1.0f, 0.09803921568f); 
+    public Color panelBorderColor = new Color(1.0f, 1.0f, 1.0f, 0.39215686274f); 
     
     // Cyberpunk Neon Palette
     public Color[] buttonColors = new Color[] {
-        new Color(0.0f, 1.0f, 1.0f, 1.0f), // #1 Cyan Neon (Main)
-        new Color(0.8f, 0.0f, 1.0f, 1.0f), // #2 Purple Neon
-        new Color(0.0f, 0.6f, 1.0f, 1.0f), // #3 Electric Blue
-        new Color(1.0f, 0.0f, 0.5f, 1.0f), // #4 Hot Pink
-        new Color(0.0f, 1.0f, 0.5f, 1.0f), // #5 Matrix Green
-        new Color(1.0f, 0.5f, 0.0f, 1.0f)  // #6 Neon Orange
+        new Color(0.0f, 0.9019607843137255f, 1.0f, 1.0f),
+        new Color(0.0f, 0.9019607843137255f, 1.0f, 1.0f),
+        new Color(0.7568627450980392f, 0.3568627450980392f, 1.0f, 1.0f), 
+        new Color(0.0f, 0.9019607843137255f, 1.0f, 1.0f),
+        new Color(0.7568627450980392f, 0.3568627450980392f, 1.0f, 1.0f), 
+        new Color(0.0f, 0.9019607843137255f, 1.0f, 1.0f),
     };
     
-    public int fontSize = 32;
+    public int fontSize = 36;
 
     [Header("Typography")]
     public TMP_FontAsset customFont;
@@ -40,6 +41,13 @@ public class VRMainMenu : MonoBehaviour
     public Sprite iconFiles;
     public Sprite iconSettings;
     public Sprite iconQuit;
+    
+    [Header("Status Icons")]
+    public Sprite iconSignal; // 4G / Mobile
+    public Sprite iconWifi;   // Wifi
+    public Sprite iconBattery;
+
+
 
     private Canvas _canvas;
     private GameObject _gridContainer;
@@ -48,6 +56,17 @@ public class VRMainMenu : MonoBehaviour
     
     // Cache separate border sprites by thickness
     private Dictionary<int, Sprite> _borderSprites = new Dictionary<int, Sprite>();
+    private Sprite _signalSprite; // Procedural fallback
+
+    // Status Bar References
+    private TextMeshProUGUI _clockText;
+    private TextMeshProUGUI _batteryText;
+    private Image _networkIcon;
+    private Image _batteryFillImage; // Reference to control fill amount
+
+
+
+
 
     [ContextMenu("Rebuild UI")]
     public void ManualRebuild()
@@ -66,17 +85,75 @@ public class VRMainMenu : MonoBehaviour
 
     void Start()
     {
+#if UNITY_EDITOR
+        FixIconImportSettings(); // Auto-fix on Start in Editor
+#endif
         LoadIcons();
         BuildInterface();
     }
+
+
+    void Update()
+    {
+        if (_clockText != null)
+        {
+            _clockText.text = DateTime.Now.ToString("HH:mm");
+        }
+
+        if (_networkIcon != null)
+        {
+            if (Application.internetReachability == NetworkReachability.ReachableViaLocalAreaNetwork)
+            {
+                _networkIcon.sprite = iconWifi;
+                _networkIcon.color = Color.white;
+            }
+            else if (Application.internetReachability == NetworkReachability.ReachableViaCarrierDataNetwork)
+            {
+                _networkIcon.sprite = iconSignal;
+                _networkIcon.color = Color.white;
+            }
+            else
+            {
+                _networkIcon.sprite = iconWifi; // Fallback or use a 'disconnected' icon
+                _networkIcon.color = new Color(1, 1, 1, 0.3f);
+            }
+        }
+
+        if (_batteryText != null)
+        {
+            float battLevel = SystemInfo.batteryLevel;
+            // Handle PC case (-1)
+            float displayLevel = (battLevel < 0) ? 1.0f : battLevel;
+            
+            // 1. Update Text: Only number, no '%'
+            string battStr = Mathf.FloorToInt(displayLevel * 100).ToString();
+            _batteryText.text = battStr;
+
+            // 2. Update Fill Amount
+            if (_batteryFillImage != null)
+            {
+                _batteryFillImage.fillAmount = displayLevel;
+                
+                // Color logic: White when high, Red when low (< 20%)
+                // Since text is dark on top, we might need to adjust logic if fill gets too low?
+                // For now, keep fill white/red.
+                 _batteryFillImage.color = (displayLevel < 0.2f) ? new Color(1f, 0.3f, 0.3f) : Color.white;
+            }
+        }
+    }
+
+
+
 
 #if UNITY_EDITOR
     void FixIconImportSettings()
     {
         string[] iconNames = { 
             "icon_remote", "icon_browser", "icon_media", 
-            "icon_files", "icon_settings", "icon_quit"
+            "icon_files", "icon_settings", "icon_quit",
+            "icon_wifi", "icon_signal", "icon_battery"
         };
+
         foreach (var name in iconNames)
         {
             try {
@@ -92,6 +169,40 @@ public class VRMainMenu : MonoBehaviour
     }
 #endif
 
+    // Procedural Signal Icon Generator
+    Sprite GetSignalSprite()
+    {
+        if (iconSignal != null) return iconSignal;
+        if (_signalSprite != null) return _signalSprite;
+        
+        int w = 64; int h = 64;
+        Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+        Color[] fill = new Color[w*h];
+        for(int i=0; i<fill.Length; i++) fill[i] = Color.clear;
+        
+        // Draw 4 bars
+        for (int i = 0; i < 4; i++)
+        {
+            int barH = (int)((i + 1) / 4f * h);
+            int barW = 10;
+            int xOffset = 4 + i * 14;
+            
+            for (int y = 0; y < barH; y++)
+            {
+                for (int x = 0; x < barW; x++)
+                {
+                    fill[y * w + (x + xOffset)] = Color.white;
+                }
+            }
+        }
+        
+        tex.SetPixels(fill);
+        tex.Apply();
+        _signalSprite = Sprite.Create(tex, new Rect(0,0,w,h), Vector2.one * 0.5f);
+        return _signalSprite;
+    }
+
+
     void LoadIcons()
     {
         if (iconRemote == null) iconRemote = Resources.Load<Sprite>("MainMenu/icon_remote");
@@ -100,7 +211,11 @@ public class VRMainMenu : MonoBehaviour
         if (iconFiles == null) iconFiles = Resources.Load<Sprite>("MainMenu/icon_files");
         if (iconSettings == null) iconSettings = Resources.Load<Sprite>("MainMenu/icon_settings");
         if (iconQuit == null) iconQuit = Resources.Load<Sprite>("MainMenu/icon_quit");
+        if (iconSignal == null) iconSignal = Resources.Load<Sprite>("MainMenu/icon_signal");
+        if (iconWifi == null) iconWifi = Resources.Load<Sprite>("MainMenu/icon_wifi");
+        if (iconBattery == null) iconBattery = Resources.Load<Sprite>("MainMenu/icon_battery");
     }
+
 
     Sprite GetRoundedSprite()
     {
@@ -203,6 +318,81 @@ public class VRMainMenu : MonoBehaviour
         return _pixelSprite;
     }
 
+    Sprite _batterySprite;
+    Sprite GetBatterySprite()
+    {
+        if (_batterySprite != null) return _batterySprite;
+        int w = 128; int h = 64; 
+        Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+        Color[] colors = new Color[w * h];
+
+        int bodyW = 114; // Main body width
+        int radius = 12; // Body corner radius
+        int nubW = 10;   // Nub width
+        int nubH = 28;   // Nub height
+        int nubY = (h - nubH) / 2;
+
+        for (int y = 0; y < h; y++)
+        {
+            for (int x = 0; x < w; x++)
+            {
+                colors[y * w + x] = Color.clear;
+
+                // 1. Main Body
+                if (x < bodyW)
+                {
+                    bool inCorner = (x < radius && y < radius) || 
+                                    (x > bodyW - radius - 1 && y < radius) ||
+                                    (x < radius && y > h - radius - 1) || 
+                                    (x > bodyW - radius - 1 && y > h - radius - 1);
+                    if (inCorner)
+                    {
+                        float cx = (x < bodyW/2) ? radius : bodyW - radius - 1;
+                        float cy = (y < h/2) ? radius : h - radius - 1;
+                        float d = Vector2.Distance(new Vector2(x, y), new Vector2(cx, cy));
+                        float alpha = Mathf.Clamp01((radius + 0.5f) - d);
+                        colors[y*w+x] = new Color(1,1,1,alpha);
+                    }
+                    else if (y >= 0 && y < h && x >= 0) // Inside body
+                    {
+                        colors[y*w+x] = Color.white;
+                    }
+                }
+                
+                // 2. Nub (Right Side)
+                if (x >= bodyW && x < bodyW + nubW)
+                {
+                    if (y >= nubY && y < nubY + nubH)
+                    {
+                        // Round the right corners of the nub
+                        int nr = 4;
+                        bool inNubCorner = (x > bodyW + nubW - nr - 1 && y < nubY + nr) ||
+                                           (x > bodyW + nubW - nr - 1 && y > nubY + nubH - nr - 1);
+                        
+                        if (inNubCorner)
+                        {
+                            float cx = bodyW + nubW - nr - 1;
+                            float cy = (y < h/2) ? nubY + nr : nubY + nubH - nr - 1;
+                            float d = Vector2.Distance(new Vector2(x, y), new Vector2(cx, cy));
+                            float alpha = Mathf.Clamp01((nr + 0.5f) - d);
+                            colors[y*w+x] = new Color(1,1,1,alpha);
+                        }
+                        else
+                        {
+                            colors[y*w+x] = Color.white;
+                        }
+                    }
+                }
+            }
+        }
+        tex.SetPixels(colors);
+        tex.Apply();
+        // Pivot center
+        _batterySprite = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100, 0, SpriteMeshType.FullRect, new Vector4(radius, radius, radius, radius));
+        return _batterySprite;
+    }
+
+
     void BuildInterface()
     {
         Debug.Log("[VRMainMenu] Building Cyberpunk Interface V24 BoxCollider Added...");
@@ -227,7 +417,13 @@ public class VRMainMenu : MonoBehaviour
         
         // No Title
 
-        CreateUniformGrid(canvasGO.transform, logicalWidth, logicalHeight);
+        // Status Bar
+        float statusBarHeight = 150f;
+        CreateStatusBar(canvasGO.transform, logicalWidth, logicalHeight, statusBarHeight);
+
+        // Buttons Grid (Push down by increasing top margin)
+        CreateUniformGrid(canvasGO.transform, logicalWidth, logicalHeight, statusBarHeight + 50f);
+
         
         Canvas.ForceUpdateCanvases();
         var fitter = _gridContainer.GetComponent<GridLayoutGroup>();
@@ -363,8 +559,114 @@ public class VRMainMenu : MonoBehaviour
         }
     }
 
-    void CreateUniformGrid(Transform parent, float w, float h)
+    void CreateStatusBar(Transform parent, float w, float h, float height)
     {
+        GameObject barObj = new GameObject("StatusBar");
+        barObj.transform.SetParent(parent, false);
+        RectTransform rt = barObj.AddComponent<RectTransform>();
+        
+        rt.anchorMin = new Vector2(0, 1); 
+        rt.anchorMax = new Vector2(1, 1);
+        rt.pivot = new Vector2(0.5f, 1f);
+        rt.sizeDelta = new Vector2(0, height);
+        rt.anchoredPosition = Vector2.zero;
+
+        float sidePadding = 80f;
+        
+        // --- CLOCK (Left) ---
+        GameObject timeObj = CreateText(barObj.transform, "12:00", Vector2.zero, 42, new Color(1f, 1f, 1f, 0.9f), true);
+        RectTransform timeRT = timeObj.GetComponent<RectTransform>();
+        timeRT.anchorMin = new Vector2(0, 0); 
+        timeRT.anchorMax = new Vector2(0.5f, 1);
+        timeRT.pivot = new Vector2(0, 0.5f);
+        timeRT.offsetMin = new Vector2(sidePadding, 0);
+        timeRT.offsetMax = new Vector2(0, 0);
+        timeRT.GetComponent<TextMeshProUGUI>().alignment = TextAlignmentOptions.MidlineLeft;
+        _clockText = timeRT.GetComponent<TextMeshProUGUI>();
+
+        // --- STATUS CLUSTER (Right) ---
+        GameObject statusGroup = new GameObject("StatusGroup");
+        statusGroup.transform.SetParent(barObj.transform, false);
+        RectTransform groupRT = statusGroup.AddComponent<RectTransform>();
+        groupRT.anchorMin = new Vector2(1, 0); 
+        groupRT.anchorMax = new Vector2(1, 1);
+        groupRT.pivot = new Vector2(1, 0.5f);
+        groupRT.sizeDelta = new Vector2(400, 0); // Logic width for layout
+        groupRT.anchoredPosition = new Vector2(-sidePadding, 0);
+
+        HorizontalLayoutGroup layout = statusGroup.AddComponent<HorizontalLayoutGroup>();
+        layout.childAlignment = TextAnchor.MiddleRight;
+        layout.spacing = -175f; // Aggressive negative spacing to overlap transparent padding so visible icons touch
+        layout.childControlWidth = false;
+        layout.childControlHeight = false;
+
+
+        // 1. Wifi/Signal Icon
+        GameObject netObj = new GameObject("NetworkIcon");
+        netObj.transform.SetParent(statusGroup.transform, false);
+        _networkIcon = netObj.AddComponent<Image>();
+        _networkIcon.sprite = iconWifi; 
+        _networkIcon.preserveAspect = true;
+        RectTransform netRT = netObj.GetComponent<RectTransform>();
+        netRT.sizeDelta = new Vector2(60, 60);
+
+        // 2. Battery Icon Container
+        GameObject battContainer = new GameObject("BatteryContainer");
+        battContainer.transform.SetParent(statusGroup.transform, false);
+        RectTransform battRT = battContainer.AddComponent<RectTransform>();
+        battRT.sizeDelta = new Vector2(100, 50); // Slightly larger
+        
+        // Force Procedural Sprite (Solid Shape) to ensure the "Fill and Reveal" effect works correctly
+        Sprite batSprite = GetBatterySprite(); 
+
+        // --- LAYER 1: BACKGROUND (Empty State - Gray) ---
+        GameObject bgObj = new GameObject("Bg");
+        bgObj.transform.SetParent(battContainer.transform, false);
+        Image bgImg = bgObj.AddComponent<Image>();
+        bgImg.sprite = batSprite; 
+        // Light Gray so dark text is still readable on it
+        bgImg.color = new Color(0.8f, 0.8f, 0.8f, 0.5f); 
+        bgImg.preserveAspect = true;
+        RectTransform bgRT = bgObj.GetComponent<RectTransform>();
+        bgRT.anchorMin = Vector2.zero; bgRT.anchorMax = Vector2.one;
+        bgRT.sizeDelta = Vector2.zero;
+
+        // --- LAYER 2: FILL (Charged State - White) ---
+        GameObject fillObj = new GameObject("Fill");
+        fillObj.transform.SetParent(battContainer.transform, false);
+        _batteryFillImage = fillObj.AddComponent<Image>();
+        _batteryFillImage.sprite = batSprite; 
+        _batteryFillImage.color = Color.white;
+        _batteryFillImage.type = Image.Type.Filled;
+        _batteryFillImage.fillMethod = Image.FillMethod.Horizontal;
+        _batteryFillImage.fillOrigin = (int)Image.OriginHorizontal.Left;
+        _batteryFillImage.preserveAspect = true;
+        
+        RectTransform fillRT = fillObj.GetComponent<RectTransform>();
+        fillRT.anchorMin = Vector2.zero; fillRT.anchorMax = Vector2.one;
+        fillRT.sizeDelta = Vector2.zero;
+
+        // --- TEXT (Overlay) ---
+        // Dark text for contrast against White/LightGray
+        GameObject battTxtObj = CreateText(battContainer.transform, "100", Vector2.zero, 28, new Color(0.1f, 0.15f, 0.2f, 1f), true);
+        RectTransform btRT = battTxtObj.GetComponent<RectTransform>();
+        btRT.anchorMin = Vector2.zero; btRT.anchorMax = Vector2.one;
+        btRT.sizeDelta = Vector2.zero;
+        // Offset slightly left to avoid overlapping the nub too much visually
+        btRT.offsetMin = new Vector2(0,0); btRT.offsetMax = new Vector2(-8, 0); 
+        
+        _batteryText = battTxtObj.GetComponent<TextMeshProUGUI>();
+        _batteryText.alignment = TextAlignmentOptions.Center;
+        _batteryText.fontStyle = FontStyles.Bold; // Make it bolder like the reference
+    }
+
+
+
+
+
+    void CreateUniformGrid(Transform parent, float w, float h, float topMargin)
+    {
+
         _gridContainer = new GameObject("ButtonGrid");
         _gridContainer.transform.SetParent(parent, false);
 
@@ -374,7 +676,8 @@ public class VRMainMenu : MonoBehaviour
         float xMin = marginPX / w;
         float xMax = 1f - xMin;
         float yMin = marginPX / h;
-        float yMax = 1f - yMin;
+        float yMax = 1f - (topMargin / h); // Use custom top margin
+
 
         rt.anchorMin = new Vector2(xMin, yMin); 
         rt.anchorMax = new Vector2(xMax, yMax); 
