@@ -12,8 +12,8 @@ using UnityEditor;
 public class VRMenuFrame : MonoBehaviour
 {
     [Header("Frame Configuration")]
-    public float topMargin = 150f; // StatusBar Area
-    public float sidePadding = 80f;
+    public float topMargin = 0f; // StatusBar Area
+    public float sidePadding = 0f;
 
     [Header("Visual Config")]
     public Color glassColor = new Color(1.0f, 1.0f, 1.0f, 0.09803921568f);
@@ -352,7 +352,11 @@ public class VRMenuFrame : MonoBehaviour
     void LoadIcons()
     {
         if (iconSignal == null) iconSignal = Resources.Load<Sprite>("MainMenu/icon_signal");
+        if (iconSignal == null) iconSignal = GetSignalSprite(); // Fallback
+
         if (iconWifi == null) iconWifi = Resources.Load<Sprite>("MainMenu/icon_wifi");
+        if (iconWifi == null) iconWifi = GetWifiSprite(); // Fallback
+
         if (iconBattery == null) iconBattery = Resources.Load<Sprite>("MainMenu/icon_battery");
     }
 
@@ -451,57 +455,60 @@ public class VRMenuFrame : MonoBehaviour
         int w = 128; int h = 64; 
         Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
         Color[] colors = new Color[w * h];
+        for (int i = 0; i < colors.Length; i++) colors[i] = Color.clear;
 
-        int bodyW = 114; 
-        int radius = 12; 
-        int nubW = 10;   
-        int nubH = 28;   
+        int bodyW = 110; 
+        int radius = 16;  // Smoother corners as requested
+        int nubW = 8;    
+        int nubH = 24;    
+        int nubRadius = 4; // Rounded nub corners
         int nubY = (h - nubH) / 2;
 
         for (int y = 0; y < h; y++)
         {
-            for (int x = 0; x < w; x++)
+            for (int x = 0; x < bodyW + nubW; x++)
             {
-                colors[y * w + x] = Color.clear;
+                float alpha = 0f;
+                // Draw Body
                 if (x < bodyW)
                 {
-                    bool inCorner = (x < radius && y < radius) || 
-                                    (x > bodyW - radius - 1 && y < radius) ||
-                                    (x < radius && y > h - radius - 1) || 
-                                    (x > bodyW - radius - 1 && y > h - radius - 1);
-                    if (inCorner)
+                    float dx = Mathf.Min(x, bodyW - 1 - x);
+                    float dy = Mathf.Min(y, h - 1 - y);
+                    
+                    if (dx < radius && dy < radius)
                     {
-                        float cx = (x < bodyW/2) ? radius : bodyW - radius - 1;
-                        float cy = (y < h/2) ? radius : h - radius - 1;
-                        float d = Vector2.Distance(new Vector2(x, y), new Vector2(cx, cy));
-                        float alpha = Mathf.Clamp01((radius + 0.5f) - d);
-                        colors[y*w+x] = new Color(1,1,1,alpha);
+                        float d = Vector2.Distance(new Vector2(dx, dy), new Vector2(radius, radius));
+                        alpha = Mathf.Clamp01((radius + 0.5f) - d);
                     }
-                    else if (y >= 0 && y < h && x >= 0) colors[y*w+x] = Color.white;
+                    else alpha = 1.0f;
                 }
-                if (x >= bodyW && x < bodyW + nubW)
+                // Draw Nub
+                else if (x >= bodyW && x < bodyW + nubW)
                 {
                     if (y >= nubY && y < nubY + nubH)
                     {
-                        int nr = 4;
-                        bool inNubCorner = (x > bodyW + nubW - nr - 1 && y < nubY + nr) ||
-                                           (x > bodyW + nubW - nr - 1 && y > nubY + nubH - nr - 1);
-                        if (inNubCorner)
+                        float nx = x - bodyW;
+                        float ny = y - nubY;
+                        
+                        float dx = Mathf.Min(nx, nubW - 1 - nx); // Though only right side is really visible
+                        float dy = Mathf.Min(ny, nubH - 1 - ny);
+                        
+                        // Round right-side corners of nub
+                        if (nx > nubW - nubRadius - 1 && dy < nubRadius)
                         {
-                            float cx = bodyW + nubW - nr - 1;
-                            float cy = (y < h/2) ? nubY + nr : nubY + nubH - nr - 1;
-                            float d = Vector2.Distance(new Vector2(x, y), new Vector2(cx, cy));
-                            float alpha = Mathf.Clamp01((nr + 0.5f) - d);
-                            colors[y*w+x] = new Color(1,1,1,alpha);
+                            float d = Vector2.Distance(new Vector2(nx, dy), new Vector2(nubW - nubRadius - 1, nubRadius));
+                            alpha = Mathf.Clamp01((nubRadius + 0.5f) - d);
                         }
-                        else colors[y*w+x] = Color.white;
+                        else alpha = 1.0f;
                     }
                 }
+                
+                if (alpha > 0) colors[y * w + x] = new Color(1, 1, 1, alpha);
             }
         }
         tex.SetPixels(colors);
         tex.Apply();
-        _batterySprite = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100, 0, SpriteMeshType.FullRect, new Vector4(radius, radius, radius, radius));
+        _batterySprite = Sprite.Create(tex, new Rect(0, 0, bodyW + nubW, h), new Vector2(0.5f, 0.5f), 100, 1, SpriteMeshType.Tight);
         return _batterySprite;
     }
     
@@ -526,6 +533,56 @@ public class VRMenuFrame : MonoBehaviour
         _signalSprite = Sprite.Create(tex, new Rect(0,0,w,h), Vector2.one * 0.5f);
         return _signalSprite;
     }
+
+    Sprite _wifiSprite;
+    Sprite GetWifiSprite()
+    {
+        if (_wifiSprite != null) return _wifiSprite;
+        int size = 64;
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        Color[] colors = new Color[size * size];
+
+        Vector2 center = new Vector2(size/2, 4); // Bottom center, slightly raised
+        float maxRadius = size * 0.85f;
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float d = Vector2.Distance(new Vector2(x, y), center);
+                bool colored = false;
+
+                // Dot
+                if (d < size * 0.12f) colored = true;
+                
+                // Arcs
+                // Draw 3 arcs
+                for (int i = 1; i <= 3; i++)
+                {
+                    float r = maxRadius * (i / 3.0f);
+                    float thickness = size * 0.08f; // Thicker lines
+                    
+                    if (Mathf.Abs(d - r) < thickness)
+                    {
+                        // Angle check for cone (approx 90 degrees)
+                        Vector2 dir = (new Vector2(x, y) - center).normalized;
+                        // dir.y is sin(angle). 0.707 is 45 deg from horizontal. 
+                        // We want 45 to 135 deg.
+                        if (dir.y > 0.6f) colored = true; 
+                    }
+                }
+
+                colors[y * size + x] = colored ? Color.white : Color.clear;
+            }
+        }
+        tex.SetPixels(colors);
+        tex.Apply();
+        _wifiSprite = Sprite.Create(tex, new Rect(0,0,size,size), Vector2.one * 0.5f);
+        return _wifiSprite;
+    }
+
+
+
 
     GameObject CreateText(Transform parent, string content, Vector2 pos, int size, Color c, bool bold = false)
     {
@@ -609,7 +666,7 @@ public class VRMenuFrame : MonoBehaviour
         
         HorizontalLayoutGroup lLayout = leftGroup.AddComponent<HorizontalLayoutGroup>();
         lLayout.childAlignment = TextAnchor.MiddleLeft;
-        lLayout.spacing = -650f;
+        lLayout.spacing = -680f;
         lLayout.childControlWidth = false;
         lLayout.childControlHeight = false;
 
@@ -627,7 +684,7 @@ public class VRMenuFrame : MonoBehaviour
         GameObject recenterBtn = new GameObject("RecenterBtn");
         recenterBtn.transform.SetParent(leftGroup.transform, false);
         RectTransform rRT = recenterBtn.AddComponent<RectTransform>();
-        rRT.sizeDelta = new Vector2(75, 75); 
+        rRT.sizeDelta = new Vector2(73, 73); 
 
         // 3. VISUAL ROOT (Animated)
         GameObject visualRoot = new GameObject("Visuals");
@@ -636,41 +693,103 @@ public class VRMenuFrame : MonoBehaviour
         visRT.anchorMin = Vector2.zero; visRT.anchorMax = Vector2.one;
         visRT.sizeDelta = Vector2.zero;
 
-        // A. Background (Glass) -> On VisualRoot
+        // A. Background (Glass)
         Image recenterBg = visualRoot.AddComponent<Image>();
-        recenterBg.sprite = GetSmallRoundedSprite(); 
-        recenterBg.type = Image.Type.Sliced;
-        recenterBg.color = new Color(0f, 1f, 1f, 0.15f); 
+        recenterBg.sprite = GetPixelSprite(); // Use pixel sprite for shader
+        
+        // Oversize expansion to hide edge artifacts
+        float expansion = 0.12f; 
+        visRT.anchorMin = new Vector2(-expansion, -expansion);
+        visRT.anchorMax = new Vector2(1f + expansion, 1f + expansion);
+        visRT.offsetMin = Vector2.zero; visRT.offsetMax = Vector2.zero;
 
-        // B. Border -> Child of VisualRoot
+        Color btnColor = Color.cyan;
+        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
+        if (glassShader != null)
+        {
+            Material glassMat = new Material(glassShader);
+            glassMat.SetFloat("_CornerRadius", 0.15f); 
+            glassMat.SetFloat("_EdgePadding", 0.12f); 
+            glassMat.SetFloat("_Aspect", 1.0f); // Square button
+            
+            glassMat.SetColor("_ColorA", new Color(btnColor.r, btnColor.g, btnColor.b, 0.12f)); 
+            glassMat.SetColor("_ColorB", new Color(btnColor.r, btnColor.g, btnColor.b, 0.04f)); 
+            glassMat.SetFloat("_GlassAlpha", 0.075f); 
+            
+            recenterBg.material = glassMat;
+            recenterBg.color = Color.white;
+        }
+        else
+        {
+            recenterBg.color = new Color(0f, 1f, 1f, 0.15f);
+        }
+
+        // B. Border
         GameObject borderObj = new GameObject("Border");
         borderObj.transform.SetParent(visualRoot.transform, false);
         RectTransform borderRT = borderObj.AddComponent<RectTransform>();
         borderRT.anchorMin = Vector2.zero; borderRT.anchorMax = Vector2.one;
-        borderRT.sizeDelta = Vector2.zero;
+        borderRT.offsetMin = Vector2.zero; borderRT.offsetMax = Vector2.zero;
         
         Image borderImg = borderObj.AddComponent<Image>();
-        borderImg.sprite = GetSmallBorderSprite(); 
-        borderImg.type = Image.Type.Sliced;
-        borderImg.color = Color.cyan; 
         borderImg.raycastTarget = false;
         
-        Shadow borderShadow = borderObj.AddComponent<Shadow>();
-        borderShadow.effectColor = new Color(0f, 1f, 1f, 0.6f);
-        borderShadow.effectDistance = new Vector2(1, -1);
+        Shader glowShader = Shader.Find("Custom/GlowingElementBorder");
+        if (glowShader != null)
+        {
+            Material glowMat = new Material(glowShader);
+            glowMat.SetFloat("_Aspect", 1.0f); 
+            glowMat.SetFloat("_EdgePadding", 0.12f); 
+            
+            Color borderGlowCol = Color.Lerp(btnColor, Color.white, 0.75f);
+            glowMat.SetColor("_GlowColor", borderGlowCol);
+            
+            glowMat.SetFloat("_BorderWidth", 0.05f); 
+            glowMat.SetFloat("_GlowWidth", 0.04f); 
+            glowMat.SetFloat("_GlowIntensity", 2.5f); 
+            glowMat.SetFloat("_CornerRadius", 0.15f); 
+            glowMat.SetFloat("_PulseEnabled", 0f);
+             
+            borderImg.material = glowMat;
+            borderImg.sprite = GetPixelSprite();
+            
+            borderObj.AddComponent<VRButtonRipple>().Initialize(glowMat, borderImg);
+        }
 
         // C. Icon -> Child of VisualRoot
         GameObject iconObj = new GameObject("Icon");
         iconObj.transform.SetParent(visualRoot.transform, false);
         RectTransform iconRT = iconObj.AddComponent<RectTransform>();
         iconRT.anchorMin = Vector2.zero; iconRT.anchorMax = Vector2.one;
-        iconRT.sizeDelta = new Vector2(-37, -37); 
+        iconRT.sizeDelta = new Vector2(-52, -52); 
         
         Image iconImg = iconObj.AddComponent<Image>();
         iconImg.sprite = GetRecenterSprite();
         iconImg.preserveAspect = true;
-        iconImg.color = Color.white;
         iconImg.raycastTarget = false;
+
+        // Icon Glow & Whiteness (Sync with main buttons)
+        iconImg.color = Color.Lerp(btnColor, Color.white, 0.9f);
+        
+        Color iconGlowCol = Color.Lerp(btnColor, Color.white, 0.7f);
+        iconGlowCol.a = 0.4f;
+        Shadow iGlow1 = iconObj.AddComponent<Shadow>();
+        iGlow1.effectColor = iconGlowCol;
+        iGlow1.effectDistance = new Vector2(2f, -2f);
+
+        Shadow iGlow2 = iconObj.AddComponent<Shadow>();
+        iGlow2.effectColor = iconGlowCol;
+        iGlow2.effectDistance = new Vector2(-2f, 2f);
+
+        Color iBloomCol = Color.Lerp(btnColor, Color.white, 0.8f);
+        iBloomCol.a = 0.15f;
+        Shadow iBloom1 = iconObj.AddComponent<Shadow>();
+        iBloom1.effectColor = iBloomCol;
+        iBloom1.effectDistance = new Vector2(4f, -4f);
+
+        Shadow iBloom2 = iconObj.AddComponent<Shadow>();
+        iBloom2.effectColor = iBloomCol;
+        iBloom2.effectDistance = new Vector2(-4f, 4f);
 
         // D. Logic & Physics (On Hit Area)
         Button btn = recenterBtn.AddComponent<Button>();
@@ -678,12 +797,12 @@ public class VRMenuFrame : MonoBehaviour
         btn.onClick.AddListener(RecenterObject);
         
         BoxCollider col = recenterBtn.AddComponent<BoxCollider>();
-        col.size = new Vector3(75, 75, 0.1f);
+        col.size = new Vector3(73, 73, 0.1f);
 
         // E. Animation
         VRButtonAnimation anim = recenterBtn.AddComponent<VRButtonAnimation>();
         anim.targetVisuals = visualRoot.transform;
-        anim.popAmount = 0.02f;
+        anim.popAmount = 0.05f;
 
         // --- STATUS GROUP (Right) ---
         GameObject statusGroup = new GameObject("StatusGroup");
@@ -753,6 +872,79 @@ public class VRMenuFrame : MonoBehaviour
         _batteryText = battTxtObj.GetComponent<TextMeshProUGUI>();
         _batteryText.alignment = TextAlignmentOptions.Center;
         _batteryText.fontStyle = FontStyles.Bold;
+
+        // --- SEPARATOR LINE ---
+        // Restore offset to 85f to be closer to the icons/text
+        CreateSeparator(barObj.transform, w, 85f);
+    }
+
+    void CreateSeparator(Transform parent, float w, float yPos)
+    {
+        GameObject lineObj = new GameObject("SeparatorLine");
+        lineObj.transform.SetParent(parent, false);
+        RectTransform rt = lineObj.AddComponent<RectTransform>();
+        
+        // Use 30f padding to extend further
+        float linePadding = 30f;
+        float lineWidth = (w - (2 * linePadding)) * 1.1f;
+        
+        rt.anchorMin = new Vector2(0.5f, 1f);
+        rt.anchorMax = new Vector2(0.5f, 1f);
+        rt.pivot = new Vector2(0.5f, 1f); // Pivot top-center
+        rt.sizeDelta = new Vector2(lineWidth, 2); // 2px height
+        rt.anchoredPosition = new Vector2(0, -yPos); // Position at bottom of status bar
+        
+        Image img = lineObj.AddComponent<Image>();
+        img.sprite = GetGradientLineSprite();
+        img.raycastTarget = false;
+        
+        // Add a subtle glow/shadow
+        Shadow s = lineObj.AddComponent<Shadow>();
+        s.effectColor = new Color(0.5f, 0f, 1f, 0.5f);
+        s.effectDistance = new Vector2(0, -1);
+    }
+
+    Sprite _gradientLineSprite;
+    Sprite GetGradientLineSprite()
+    {
+        if (_gradientLineSprite != null) return _gradientLineSprite;
+        
+        int w = 256;
+        int h = 2;
+        Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+        Color[] fill = new Color[w * h];
+        
+        Color c1 = Color.cyan;
+        Color c2 = new Color(0.8f, 0f, 1f); // Purple
+
+        for (int x = 0; x < w; x++)
+        {
+            float t = (float)x / (w - 1);
+            
+            // 1. Bias towards Cyan (0) using Cubic ease in
+            Color col = Color.Lerp(c1, c2, Mathf.Pow(t, 3.0f));
+            
+            // 2. Alpha based on Sine wave for fade out at ends
+            // Sin(0) = 0, Sin(PI/2) = 1, Sin(PI) = 0
+            float alpha = Mathf.Sin(t * Mathf.PI);
+            
+            // Sharpen the ends slightly so it's not too faint in middle
+            alpha = Mathf.Pow(alpha, 0.5f); 
+
+            col.a = alpha;
+
+            for (int y = 0; y < h; y++)
+            {
+                fill[y * w + x] = col;
+            }
+        }
+        
+        tex.SetPixels(fill);
+        tex.Apply();
+        tex.wrapMode = TextureWrapMode.Clamp;
+        
+        _gradientLineSprite = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f));
+        return _gradientLineSprite;
     }
 
     // --- SPRITE GENERATORS ---

@@ -91,7 +91,7 @@ public class VRMainMenu : MonoBehaviour
     {
         string[] iconNames = { 
             "icon_remote", "icon_browser", "icon_media", 
-            "icon_files", "icon_settings", "icon_quit"
+            "icon_files", "icon_settings", "icon_quit", "icon_wifi", "icon_signal"
         };
 
         foreach (var name in iconNames)
@@ -99,10 +99,28 @@ public class VRMainMenu : MonoBehaviour
             try {
                 string path = $"Assets/VR-Workspace/Resources/MainMenu/{name}.png";
                 TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
-                if (importer != null && importer.textureType != TextureImporterType.Sprite)
+                if (importer != null)
                 {
-                    importer.textureType = TextureImporterType.Sprite;
-                    importer.SaveAndReimport();
+                    bool changed = false;
+                    if (importer.textureType != TextureImporterType.Sprite)
+                    {
+                        importer.textureType = TextureImporterType.Sprite;
+                        changed = true;
+                    }
+                    // Disable mipmaps for sharper UI icons
+                    if (importer.mipmapEnabled)
+                    {
+                        importer.mipmapEnabled = false;
+                        changed = true;
+                    }
+                    // Use uncompressed for best quality
+                    if (importer.textureCompression != TextureImporterCompression.Uncompressed)
+                    {
+                        importer.textureCompression = TextureImporterCompression.Uncompressed;
+                        changed = true;
+                    }
+
+                    if (changed) importer.SaveAndReimport();
                 }
             } catch {}
         }
@@ -200,7 +218,7 @@ public class VRMainMenu : MonoBehaviour
         float contentHeight = logicalHeight - _menuFrame.topMargin;
         
         
-        BuildMenuLayout(_menuFrame.ContentContainer, logicalWidth, contentHeight, 50f);
+        BuildMenuLayout(_menuFrame.ContentContainer, logicalWidth, contentHeight, 200f);
         
         Canvas.ForceUpdateCanvases();
         if (_gridContainer) {
@@ -268,14 +286,15 @@ public class VRMainMenu : MonoBehaviour
         int cols = 3;
         int rows = 2;
         
-        float spacingPX = 100f;
-        float totalSpacingW = spacingPX * (cols - 1);
-        float totalSpacingH = spacingPX * (rows - 1);
+        float spacingX = 130f; // Increased by 30%
+        float spacingY = 100f;
+        float totalSpacingW = spacingX * (cols - 1);
+        float totalSpacingH = spacingY * (rows - 1);
 
         float maxW = (containerW - totalSpacingW) / cols;
         float maxH = (containerH - totalSpacingH) / rows;
 
-        float targetAspect = 1.15f; 
+        float targetAspect = 1.32f; // Increased by 15% (1.15 * 1.15)
         float finalH = maxH;
         float finalW = finalH * targetAspect;
 
@@ -286,7 +305,7 @@ public class VRMainMenu : MonoBehaviour
         }
 
         grid.cellSize = new Vector2(finalW, finalH);
-        grid.spacing = new Vector2(spacingPX, spacingPX);
+        grid.spacing = new Vector2(spacingX, spacingY);
         grid.startCorner = GridLayoutGroup.Corner.UpperLeft;
         grid.startAxis = GridLayoutGroup.Axis.Horizontal;
         grid.childAlignment = TextAnchor.MiddleCenter;
@@ -362,10 +381,8 @@ public class VRMainMenu : MonoBehaviour
         visualRoot.transform.SetParent(btnHitObj.transform, false);
         RectTransform visRT = visualRoot.AddComponent<RectTransform>();
         
-        // Expansion using Old Logic (VRMainMenu_old uses CreateGridButton visuals)
-        // New Logic uses shaders which need padding.
-        
-        float expansion = 0.08f; 
+        // Increase expansion and padding further to ensure quad edges are invisible
+        float expansion = 0.12f; 
         visRT.anchorMin = new Vector2(-expansion, -expansion);
         visRT.anchorMax = new Vector2(1f + expansion, 1f + expansion);
         visRT.offsetMin = Vector2.zero; visRT.offsetMax = Vector2.zero;
@@ -376,21 +393,20 @@ public class VRMainMenu : MonoBehaviour
         bg.type = Image.Type.Simple;
         bg.raycastTarget = false;
         
-        Color baseTint = Color.Lerp(btnColor, Color.white, 0.1f);
-        baseTint.a = 0.2f;
+        Color baseTint = new Color(btnColor.r, btnColor.g, btnColor.b, 0.08f); 
 
         // Custom Shader Material 
         Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
         if (glassShader != null)
         {
             Material glassMat = new Material(glassShader);
-            glassMat.SetFloat("_CornerRadius", 0.12f);
-            glassMat.SetFloat("_EdgePadding", 0.04f);
-            glassMat.SetFloat("_Aspect", 1.15f); // Use fixed aspect from Old Logic
+            glassMat.SetFloat("_CornerRadius", 0.12f); 
+            glassMat.SetFloat("_EdgePadding", 0.12f); 
+            glassMat.SetFloat("_Aspect", 1.15f); 
             
-            glassMat.SetColor("_ColorA", new Color(btnColor.r, btnColor.g, btnColor.b, 0.15f));
-            glassMat.SetColor("_ColorB", new Color(0f, 0.5f, 1f, 0.1f));
-            glassMat.SetFloat("_GlassAlpha", 0.1f);
+            glassMat.SetColor("_ColorA", new Color(btnColor.r, btnColor.g, btnColor.b, 0.12f)); 
+            glassMat.SetColor("_ColorB", new Color(btnColor.r, btnColor.g, btnColor.b, 0.04f)); 
+            glassMat.SetFloat("_GlassAlpha", 0.075f); 
             
             bg.material = glassMat;
             bg.color = Color.white;
@@ -407,7 +423,7 @@ public class VRMainMenu : MonoBehaviour
         
         // Colors
         ColorBlock cb = btn.colors;
-        cb.normalColor = baseTint;
+        cb.normalColor = Color.white; 
         cb.highlightedColor = new Color(btnColor.r, btnColor.g, btnColor.b, 0.5f);
         cb.pressedColor = new Color(btnColor.r, btnColor.g, btnColor.b, 0.7f);
         cb.fadeDuration = 0.1f;
@@ -427,15 +443,17 @@ public class VRMainMenu : MonoBehaviour
         if (glowShader != null)
         {
             Material glowMat = new Material(glowShader);
-            glowMat.SetFloat("_Aspect", 1.15f); // Match above
-            glowMat.SetFloat("_EdgePadding", 0.04f);
-            glowMat.SetColor("_GlowColor", btnColor);
+            glowMat.SetFloat("_Aspect", 1.15f); 
+            glowMat.SetFloat("_EdgePadding", 0.12f); 
             
-            // THINNER LOOK as requested
-            glowMat.SetFloat("_BorderWidth", 0.02f);
-            glowMat.SetFloat("_GlowWidth", 0.06f);
-            glowMat.SetFloat("_GlowIntensity", 1.8f);
-            glowMat.SetFloat("_CornerRadius", 0.12f);
+            // TIGHTER AND SHARPER LOOK
+            Color borderGlowCol = Color.Lerp(btnColor, Color.white, 0.75f);
+            glowMat.SetColor("_GlowColor", borderGlowCol);
+            
+            glowMat.SetFloat("_BorderWidth", 0.005f); // Thinner line
+            glowMat.SetFloat("_GlowWidth", 0.03f); // Tight glow
+            glowMat.SetFloat("_GlowIntensity", 2.5f); // Balanced bloom
+            glowMat.SetFloat("_CornerRadius", 0.12f); 
             glowMat.SetFloat("_PulseEnabled", 0f);
              
             borderImg.material = glowMat;
@@ -462,25 +480,44 @@ public class VRMainMenu : MonoBehaviour
             iconImg.preserveAspect = true;
             iconImg.raycastTarget = false;
             
+            // Tint icon with button color (leaned more towards white for higher clarity)
+            iconImg.color = Color.Lerp(btnColor, Color.white, 0.9f);
+            
+            // Softened Whiter Glow Layer 1 (Sharp Inner halo)
+            Color glowCol = Color.Lerp(btnColor, Color.white, 0.7f);
+            glowCol.a = 0.4f; // Reduced intensity
+            float s1 = 2f;
+            
+            iconObj.AddComponent<Shadow>().effectColor = glowCol;
+            iconObj.GetComponent<Shadow>().effectDistance = new Vector2(s1, -s1);
+            
+            iconObj.AddComponent<Shadow>().effectColor = glowCol;
+            iconObj.GetComponents<Shadow>()[1].effectDistance = new Vector2(-s1, s1);
+
+            // Soft Bloom (Outer halo)
+            Color bloomCol = Color.Lerp(btnColor, Color.white, 0.8f);
+            bloomCol.a = 0.15f; // Very subtle
+            float s2 = 5f;
+            
+            iconObj.AddComponent<Shadow>().effectColor = bloomCol;
+            iconObj.GetComponents<Shadow>()[2].effectDistance = new Vector2(s2, -s2);
+
+            iconObj.AddComponent<Shadow>().effectColor = bloomCol;
+            iconObj.GetComponents<Shadow>()[3].effectDistance = new Vector2(-s2, s2);
+            
             RectTransform iRT = iconObj.GetComponent<RectTransform>();
             // Centered above text
-            iRT.anchorMin = new Vector2(0.35f, 0.45f);
-            iRT.anchorMax = new Vector2(0.65f, 0.8f);
+            iRT.anchorMin = new Vector2(0.35f, 0.42f);
+            iRT.anchorMax = new Vector2(0.65f, 0.72f);
             iRT.offsetMin = Vector2.zero; iRT.offsetMax = Vector2.zero;
         }
         
         // Text
-        GameObject tObj = CreateText(content.transform, label, Vector2.zero, 32, Color.white, false);
+        GameObject tObj = CreateText(content.transform, label, Vector2.zero, 42, Color.white, true);
         RectTransform tRT = tObj.GetComponent<RectTransform>();
-        tRT.anchorMin = new Vector2(0f, 0.1f); tRT.anchorMax = new Vector2(1f, 0.4f);
+        tRT.anchorMin = new Vector2(0f, 0.18f); tRT.anchorMax = new Vector2(1f, 0.42f);
         tRT.offsetMin = Vector2.zero; tRT.offsetMax = Vector2.zero;
         
-        // Dropdown Arrow
-        if (showDropdown)
-        {
-            CreateText(content.transform, "▼", new Vector2(0,0), 20, new Color(1,1,1,0.5f)).GetComponent<RectTransform>().anchorMin = new Vector2(0.85f, 0.1f);
-        }
-
         // Animation
         var anim = btnHitObj.AddComponent<VRButtonAnimation>();
         anim.targetVisuals = visualRoot.transform;
