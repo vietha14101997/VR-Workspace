@@ -424,26 +424,52 @@ public class VRMainMenu : MonoBehaviour
         GameObject visualRoot = new GameObject("Visuals");
         visualRoot.transform.SetParent(btnHitObj.transform, false);
         RectTransform visRT = visualRoot.AddComponent<RectTransform>();
-        visRT.anchorMin = Vector2.zero; visRT.anchorMax = Vector2.one;
+        
+        // EXPANSION LOGIC for Button Padding
+        // We need to account for the Glow Width (0.12) + Border (0.05).
+        // Setting visual edge to be significantly outside logical edge.
+        float btnPad = 0.09f; 
+        float glowWidth = 0.12f;
+        float effectivePad = btnPad + glowWidth; // Align Inner Glow Edge roughly with Logical Edge
+        
+        float funcExpansion = effectivePad / (1f - 2f * effectivePad);
+        
+        visRT.anchorMin = new Vector2(-funcExpansion, -funcExpansion); 
+        visRT.anchorMax = new Vector2(1f + funcExpansion, 1f + funcExpansion);
         visRT.sizeDelta = Vector2.zero;
 
-        // Background (on Visual Root)
+        // Background (on Visual Root) - Use simple pixel sprite, shader handles corners
         Image bg = visualRoot.AddComponent<Image>();
-        bg.sprite = GetRoundedSprite();
-        bg.type = Image.Type.Sliced;
+        bg.sprite = GetPixelSprite();
+        bg.type = Image.Type.Simple;
         bg.raycastTarget = false; 
         
-        Color baseTint = Color.Lerp(btnColor, Color.white, 0.2f);
-        baseTint.a = 0.4f;
+        Color baseTint = Color.Lerp(btnColor, Color.white, 0.15f);
+        baseTint.a = 0.35f;
 
-        // Apply Blur Shader if found
-        Shader blurShader = Shader.Find("Custom/UIBlurBackground");
-        if (blurShader != null)
+        // Aspect Ratio Correction (Calculate once for both shaders)
+        float aspect = (size.y > 0) ? (size.x / size.y) : 1.0f;
+
+        // Use GlassGradientBackground shader for rounded corners
+        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
+        if (glassShader != null)
         {
-            Material blurMat = new Material(blurShader);
-            blurMat.SetFloat("_Radius", 3.0f); 
-            bg.material = blurMat;
-            bg.color = baseTint;
+            Material glassMat = new Material(glassShader);
+            glassMat.SetFloat("_CornerRadius", 0.15f); // Match border corner
+            glassMat.SetFloat("_EdgePadding", 0.05f); // Set padding
+            glassMat.SetFloat("_Aspect", aspect);
+            
+            // Button-specific gradient (subtle)
+            Color btnGlassA = new Color(btnColor.r, btnColor.g, btnColor.b, 0.1f);
+            Color btnGlassB = new Color(btnColor.r * 0.8f, btnColor.g * 0.8f, btnColor.b * 0.9f, 0.15f);
+            glassMat.SetColor("_ColorA", btnGlassA);
+            glassMat.SetColor("_ColorB", btnGlassB);
+            glassMat.SetFloat("_GlassAlpha", 0.08f);
+            glassMat.SetFloat("_CyanRatio", 0.6f);
+            glassMat.SetFloat("_GradientAngle", -5f);
+            
+            bg.material = glassMat;
+            bg.color = Color.white;
         }
         else
         {
@@ -463,30 +489,74 @@ public class VRMainMenu : MonoBehaviour
         cb.fadeDuration = 0.1f;
         btn.colors = cb;
         
-        // BORDER OBJECT
+        // BORDER OBJECT (Using new Glowing Shader)
         GameObject borderObj = new GameObject("Border");
         borderObj.transform.SetParent(visualRoot.transform, false);
         RectTransform borderRT = borderObj.AddComponent<RectTransform>();
         borderRT.anchorMin = Vector2.zero; borderRT.anchorMax = Vector2.one;
-        borderRT.sizeDelta = Vector2.zero;
+        // Match parent size exactly
+        borderRT.offsetMin = Vector2.zero;
+        borderRT.offsetMax = Vector2.zero;
         
         Image borderImg = borderObj.AddComponent<Image>();
-        borderImg.sprite = GetBorderSprite(4); 
-        borderImg.type = Image.Type.Sliced;
-        borderImg.color = Color.Lerp(btnColor, Color.white, 0.8f); 
         borderImg.raycastTarget = false;
         
-        var glow = borderObj.AddComponent<UnityEngine.UI.Shadow>();
-        glow.effectColor = new Color(btnColor.r, btnColor.g, btnColor.b, 1.0f); 
-        glow.effectDistance = new Vector2(0, -2);
-        
-        var glow2 = borderObj.AddComponent<UnityEngine.UI.Shadow>();
-        glow2.effectColor = new Color(btnColor.r, btnColor.g, btnColor.b, 0.8f); 
-        glow2.effectDistance = new Vector2(0, 3);
-        
-        var glow3 = borderObj.AddComponent<UnityEngine.UI.Shadow>();
-        glow3.effectColor = new Color(btnColor.r, btnColor.g, btnColor.b, 0.4f); 
-        glow3.effectDistance = new Vector2(3, -3);
+        // Try to use GlowingElementBorder shader
+        Shader glowShader = Shader.Find("Custom/GlowingElementBorder");
+        if (glowShader != null)
+        {
+            Material glowMat = new Material(glowShader);
+            
+            // Aspect Ratio (reuse variable from above)
+            glowMat.SetFloat("_Aspect", aspect);
+            glowMat.SetFloat("_EdgePadding", 0.05f); // Set padding
+            
+            // UV-based settings - STRONG glow to match concept
+            glowMat.SetColor("_GlowColor", btnColor);
+            glowMat.SetFloat("_GlowIntensity", 1.5f);
+            glowMat.SetFloat("_BorderWidth", 0.05f);
+            glowMat.SetFloat("_GlowWidth", 0.12f);
+            glowMat.SetFloat("_CornerRadius", 0.15f);
+            
+            // Background - Disable in border shader, use separate VisualRoot background instead
+            glowMat.SetFloat("_BackgroundAlpha", 0f); // Set to 0 to avoid double background
+            glowMat.SetColor("_BackgroundColor", Color.clear);
+            
+            // Pulse animation
+            glowMat.SetFloat("_PulseEnabled", 1f);
+            glowMat.SetFloat("_PulseSpeed", 2f);
+            glowMat.SetFloat("_PulseIntensity", 0.12f);
+            
+            // Ripple
+            glowMat.SetFloat("_RippleProgress", 0f);
+            glowMat.SetFloat("_RippleIntensity", 0.6f);
+            
+            borderImg.material = glowMat;
+            borderImg.color = Color.white;
+            borderImg.sprite = GetPixelSprite();
+            
+            // Store material reference for ripple animation
+            borderObj.AddComponent<VRButtonRipple>().Initialize(glowMat, borderImg);
+        }
+        else
+        {
+            // Fallback to old style
+            borderImg.sprite = GetBorderSprite(4); 
+            borderImg.type = Image.Type.Sliced;
+            borderImg.color = Color.Lerp(btnColor, Color.white, 0.8f); 
+            
+            var glow = borderObj.AddComponent<UnityEngine.UI.Shadow>();
+            glow.effectColor = new Color(btnColor.r, btnColor.g, btnColor.b, 1.0f); 
+            glow.effectDistance = new Vector2(0, -2);
+            
+            var glow2 = borderObj.AddComponent<UnityEngine.UI.Shadow>();
+            glow2.effectColor = new Color(btnColor.r, btnColor.g, btnColor.b, 0.8f); 
+            glow2.effectDistance = new Vector2(0, 3);
+            
+            var glow3 = borderObj.AddComponent<UnityEngine.UI.Shadow>();
+            glow3.effectColor = new Color(btnColor.r, btnColor.g, btnColor.b, 0.4f); 
+            glow3.effectDistance = new Vector2(3, -3);
+        }
 
         // Content
         GameObject content = new GameObject("Content");
@@ -564,7 +634,7 @@ public class VRMainMenu : MonoBehaviour
     }
 }
 
-public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointerEnterHandler, UnityEngine.EventSystems.IPointerExitHandler
+public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointerEnterHandler, UnityEngine.EventSystems.IPointerExitHandler, UnityEngine.EventSystems.IPointerClickHandler
 {
     public Transform targetVisuals; // Target to animate
     public float popAmount = 0.1f;  // Set Default to 0.1
@@ -572,6 +642,23 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
     private bool _isHovered = false;
     private float _currentPop = 0f;
     private float _currentValidScale = 1.0f;
+    
+    // Shader material reference for hover state
+    private Material _glowMaterial;
+    
+    void Start()
+    {
+        // Try to find glow material in children
+        var borderObj = targetVisuals?.Find("Border");
+        if (borderObj != null)
+        {
+            var img = borderObj.GetComponent<Image>();
+            if (img != null && img.material != null)
+            {
+                _glowMaterial = img.material;
+            }
+        }
+    }
 
     void Update()
     {
@@ -586,6 +673,15 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
             targetVisuals.localPosition = new Vector3(0, 0, _currentPop);
             targetVisuals.localScale = new Vector3(_currentValidScale, _currentValidScale, 1f);
         }
+        
+        // Update shader hover amount
+        if (_glowMaterial != null)
+        {
+            float currentHover = _glowMaterial.GetFloat("_HoverAmount");
+            float targetHover = _isHovered ? 1f : 0f;
+            float newHover = Mathf.Lerp(currentHover, targetHover, Time.unscaledDeltaTime * 8f);
+            _glowMaterial.SetFloat("_HoverAmount", newHover);
+        }
     }
 
     public void OnPointerEnter(UnityEngine.EventSystems.PointerEventData eventData)
@@ -596,5 +692,69 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
     public void OnPointerExit(UnityEngine.EventSystems.PointerEventData eventData)
     {
         _isHovered = false;
+    }
+    
+    public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData)
+    {
+        // Trigger ripple effect
+        var ripple = GetComponentInChildren<VRButtonRipple>();
+        if (ripple != null)
+        {
+            // Calculate click position in normalized coordinates
+            RectTransform rt = targetVisuals?.GetComponent<RectTransform>();
+            if (rt != null)
+            {
+                Vector2 localPoint;
+                RectTransformUtility.ScreenPointToLocalPointInRectangle(rt, eventData.position, eventData.pressEventCamera, out localPoint);
+                Vector2 normalizedPos = new Vector2(
+                    (localPoint.x / rt.rect.width) + 0.5f,
+                    (localPoint.y / rt.rect.height) + 0.5f
+                );
+                ripple.TriggerRipple(normalizedPos);
+            }
+            else
+            {
+                ripple.TriggerRipple(new Vector2(0.5f, 0.5f));
+            }
+        }
+    }
+}
+
+public class VRButtonRipple : MonoBehaviour
+{
+    private Material _material;
+    private Image _image;
+    private bool _isAnimating = false;
+    private float _rippleProgress = 0f;
+    private float _rippleDuration = 0.5f;
+    
+    public void Initialize(Material mat, Image img)
+    {
+        _material = mat;
+        _image = img;
+    }
+    
+    public void TriggerRipple(Vector2 normalizedPosition)
+    {
+        if (_material == null) return;
+        
+        _material.SetVector("_RippleCenter", new Vector4(normalizedPosition.x, normalizedPosition.y, 0, 0));
+        _rippleProgress = 0f;
+        _isAnimating = true;
+    }
+    
+    void Update()
+    {
+        if (!_isAnimating || _material == null) return;
+        
+        _rippleProgress += Time.unscaledDeltaTime / _rippleDuration;
+        
+        if (_rippleProgress >= 1f)
+        {
+            _rippleProgress = 0f;
+            _isAnimating = false;
+        }
+        
+        _material.SetFloat("_RippleProgress", _rippleProgress);
     }
 }

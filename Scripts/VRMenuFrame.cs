@@ -19,6 +19,18 @@ public class VRMenuFrame : MonoBehaviour
     public Color glassColor = new Color(1.0f, 1.0f, 1.0f, 0.09803921568f);
     public Color panelBorderColor = new Color(1.0f, 1.0f, 1.0f, 0.39215686274f);
 
+    [Header("Glowing Border Config")]
+    [ColorUsage(true, true)]
+    public Color glowColorA = new Color(0f, 1.5f, 2f, 1f); // Cyan HDR
+    [ColorUsage(true, true)]
+    public Color glowColorB = new Color(1.2f, 0.3f, 2f, 1f); // Purple HDR
+    public float glowIntensity = 1.5f;
+    public float borderThickness = 8f;
+    public float edgePadding = 0.04f; // Added padding property
+    public float glowSpread = 60f;
+    public float shimmerSpeed = 0.4f;
+    public float hdrBoost = 1.8f;
+
     [Header("Style Resources")]
     public TMP_FontAsset customFont;
     public Sprite iconSignal;
@@ -129,41 +141,150 @@ public class VRMenuFrame : MonoBehaviour
 
     void CreateGlassPanel(Transform parent, float w, float h)
     {
+        // 1. Glass Background Layer with Gradient
         GameObject bgObj = new GameObject("GlassBackground");
         bgObj.transform.SetParent(parent, false);
         Image img = bgObj.AddComponent<Image>();
         
-        img.type = Image.Type.Sliced;
-        img.sprite = GetRoundedSprite();
+        img.type = Image.Type.Simple;
+        img.sprite = GetPixelSprite(); // Use pixel sprite, shader handles corners
         
-        Shader blurShader = Shader.Find("Custom/UIBlurBackground");
-        if (blurShader != null)
+        // Calculate Expansion to compensate for Shader Padding AND Inner Glow overlap
+        // We add an extra buffer to push the visual border completely outside the logical area
+        float p = edgePadding;
+        float safeZone = 0.06f; // Increased buffer for safety
+        float effectiveP = p + safeZone;
+        float expansion = effectiveP / (1f - 2f * effectiveP);
+        
+        // Use new GlassGradientBackground shader with rounded corners
+        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
+        if (glassShader != null)
         {
-            Material blurMat = new Material(blurShader);
-            blurMat.SetFloat("_Radius", 4.0f); 
-            img.material = blurMat;
-            img.color = glassColor; 
+            Material glassMat = new Material(glassShader);
+            
+            // Corner radius - MUST match border shader
+            glassMat.SetFloat("_CornerRadius", 0.08f);
+            glassMat.SetFloat("_EdgePadding", p); // Set padding
+            
+            // Fix Aspect Ratio for rounded corners
+            float aspect = (h > 0) ? (w / h) : 1.0f;
+            glassMat.SetFloat("_Aspect", aspect);
+            
+            // Gradient: Cyan left (70%), Purple right (30%), angled
+            Color cyanGlass = new Color(0.35f, 0.9f, 1f, 0.15f);
+            Color purpleGlass = new Color(0.75f, 0.45f, 1f, 0.22f);
+            glassMat.SetColor("_ColorA", cyanGlass);
+            glassMat.SetColor("_ColorB", purpleGlass);
+            glassMat.SetFloat("_GradientOffset", 0f);
+            glassMat.SetFloat("_GradientAngle", -10f);
+            glassMat.SetFloat("_CyanRatio", 0.7f);
+            
+            // Glass effect + center glow
+            glassMat.SetFloat("_GlassAlpha", 0.08f);
+            glassMat.SetFloat("_FresnelPower", 2.2f);
+            glassMat.SetFloat("_FresnelStrength", 0.12f);
+            
+            img.material = glassMat;
+            img.color = Color.white;
         }
         else
         {
+            // Fallback to simple color
             img.color = glassColor;
+            expansion = 0;
         }
 
         BoxCollider bgCol = bgObj.AddComponent<BoxCollider>();
         bgCol.size = new Vector3(w, h, 0.1f);
         
         RectTransform rt = bgObj.GetComponent<RectTransform>();
-        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one; 
-        rt.sizeDelta = Vector2.zero; rt.localScale = Vector3.one;
+        rt.anchorMin = new Vector2(-expansion, -expansion); 
+        rt.anchorMax = new Vector2(1f + expansion, 1f + expansion); 
+        rt.sizeDelta = Vector2.zero; 
+        rt.localScale = Vector3.one;
         rt.localPosition = Vector3.zero;
         rt.SetAsFirstSibling();
         
-        // Borders
-        CreateBorder(bgObj.transform, 12, new Color(0.6f, 0.9f, 1.0f, 0.9f), 0);
-        CreateBorder(bgObj.transform, 24, new Color(0.0f, 0.5f, 1.0f, 0.15f), 1, new Vector2(-6, -6), new Vector2(6, 6));
-
-        // FX
+        // 2. Glowing Border Layer (using new shader)
+        CreateGlowingBorder(bgObj.transform, w, h);
+        
+        // 3. FX
         CreateFloatingDataEffects(bgObj.transform, w, h);
+    }
+
+    void CreateGlowingBorder(Transform parent, float w, float h)
+    {
+        GameObject borderObj = new GameObject("GlowingBorder");
+        borderObj.transform.SetParent(parent, false);
+        
+        RectTransform rt = borderObj.AddComponent<RectTransform>();
+        // Match exactly the parent size - shader will handle the glow overflow
+        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+        
+        Image borderImg = borderObj.AddComponent<Image>();
+        borderImg.raycastTarget = false;
+        
+        // Try to use Glowing Glass Border shader
+        Shader glowShader = Shader.Find("Custom/GlowingGlassBorder");
+        if (glowShader != null)
+        {
+            Material glowMat = new Material(glowShader);
+            
+            // UV-based border settings - Match glass panel corner EXACTLY
+            glowMat.SetFloat("_BorderWidth", 0.02f);
+            glowMat.SetFloat("_CornerRadius", 0.08f);  // MUST match GlassGradientBackground
+            glowMat.SetFloat("_EdgePadding", edgePadding); // Set padding
+            
+            // Aspect Ratio Correction
+            float aspect = (h > 0) ? (w / h) : 1.0f;
+            glowMat.SetFloat("_Aspect", aspect);
+            
+            // Multi-layer glow - STRONG values for visible layers
+            glowMat.SetFloat("_Layer1Width", 0.025f);
+            glowMat.SetFloat("_Layer1Alpha", 1.5f);   // Very bright inner
+            glowMat.SetFloat("_Layer2Width", 0.055f);
+            glowMat.SetFloat("_Layer2Alpha", 1.0f);   // Bright mid glow
+            glowMat.SetFloat("_Layer3Width", 0.1f);
+            glowMat.SetFloat("_Layer3Alpha", 0.6f);   // Visible outer
+            glowMat.SetFloat("_Layer4Width", 0.16f);
+            glowMat.SetFloat("_Layer4Alpha", 0.3f);   // Subtle ambient
+            
+            // Gradient colors - BRIGHT Cyan to Purple
+            Color cyanColor = new Color(0.3f, 1f, 1f, 1f);    // Bright cyan
+            Color purpleColor = new Color(1f, 0.4f, 1f, 1f);  // Bright purple
+            glowMat.SetColor("_ColorA", cyanColor);
+            glowMat.SetColor("_ColorB", purpleColor);
+            glowMat.SetFloat("_GradientMode", 2f); // Diagonal
+            glowMat.SetFloat("_GradientAngle", -10f); // Match glass background
+            
+            // Glass background
+            glowMat.SetFloat("_GlassAlpha", 0.02f);
+            glowMat.SetColor("_GlassTint", new Color(0.9f, 0.95f, 1f, 1f));
+            
+            // Animation
+            glowMat.SetFloat("_ShimmerSpeed", shimmerSpeed);
+            glowMat.SetFloat("_ShimmerIntensity", 0.15f);
+            
+            borderImg.material = glowMat;
+            borderImg.color = Color.white;
+            borderImg.sprite = GetPixelSprite();
+        }
+        else
+        {
+            Debug.LogWarning("[VRMenuFrame] GlowingGlassBorder shader not found, using fallback.");
+            CreateBorderFallback(parent);
+        }
+        
+        borderObj.transform.SetAsLastSibling();
+    }
+
+    void CreateBorderFallback(Transform parent)
+    {
+        // Original border style as fallback
+        CreateBorder(parent, 12, new Color(0.6f, 0.9f, 1.0f, 0.9f), 0);
+        CreateBorder(parent, 24, new Color(0.0f, 0.5f, 1.0f, 0.15f), 1, new Vector2(-6, -6), new Vector2(6, 6));
     }
 
     void CreateBorder(Transform parent, int thickness, Color col, int siblingIndex, Vector2 offMin = default, Vector2 offMax = default)

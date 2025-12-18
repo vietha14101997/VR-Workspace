@@ -18,6 +18,7 @@ public class VRRemoteMenu : MonoBehaviour
     private TMP_Dropdown _fpsDropdown;
 
     private VRMainMenu _mainMenu; // To go back
+    private Sprite _pixelSprite;
 
     public void BuildUI(Transform parent, VRMainMenu mainMenu)
     {
@@ -40,6 +41,44 @@ public class VRRemoteMenu : MonoBehaviour
 
         // 3. Footer (Connect)
         CreateFooter(container.transform);
+    }
+
+    Sprite GetPixelSprite()
+    {
+        if (_pixelSprite != null) return _pixelSprite;
+        Texture2D tex = new Texture2D(2, 2);
+        tex.SetPixels(new Color[] { Color.white, Color.white, Color.white, Color.white });
+        tex.Apply();
+        _pixelSprite = Sprite.Create(tex, new Rect(0, 0, 2, 2), Vector2.one * 0.5f);
+        return _pixelSprite;
+    }
+
+    Material CreateGlowingMaterial(Color glowColor, float intensity = 1.0f, float borderWidth = 0.04f, float glowWidth = 0.06f, float cornerRadius = 0.12f, float bgAlpha = 0.08f)
+    {
+        Shader glowShader = Shader.Find("Custom/GlowingElementBorder");
+        if (glowShader != null)
+        {
+            Material mat = new Material(glowShader);
+            
+            // UV-based settings (works for any size!)
+            mat.SetColor("_GlowColor", glowColor);
+            mat.SetFloat("_GlowIntensity", intensity);
+            mat.SetFloat("_BorderWidth", borderWidth);
+            mat.SetFloat("_GlowWidth", glowWidth);
+            mat.SetFloat("_CornerRadius", cornerRadius);
+            
+            // Background
+            mat.SetFloat("_BackgroundAlpha", bgAlpha);
+            mat.SetColor("_BackgroundColor", new Color(glowColor.r * 0.3f, glowColor.g * 0.3f, glowColor.b * 0.3f, 1f));
+            
+            // Animation
+            mat.SetFloat("_PulseEnabled", 1f);
+            mat.SetFloat("_PulseSpeed", 2f);
+            mat.SetFloat("_PulseIntensity", 0.1f);
+            
+            return mat;
+        }
+        return null;
     }
 
     void CreateHeader(Transform parent)
@@ -144,13 +183,26 @@ public class VRRemoteMenu : MonoBehaviour
         hlg.childAlignment = TextAnchor.MiddleLeft;
 
         // Label
-        CreateText(container.transform, labelText, 24, Color.white, 200);
+        CreateText(container.transform, labelText, 24, themeColor, 200);
 
-        // InputField Background
+        // InputField Background with Glowing Border
         GameObject inputBg = new GameObject("InputBg");
         inputBg.transform.SetParent(container.transform, false);
         Image bg = inputBg.AddComponent<Image>();
-        bg.color = new Color(1, 1, 1, 0.1f);
+        
+        // Apply glowing material (UV-based, works for any size)
+        Material glowMat = CreateGlowingMaterial(themeColor, 0.9f, 0.03f, 0.05f, 0.1f, 0.06f);
+        if (glowMat != null)
+        {
+            bg.material = glowMat;
+            bg.sprite = GetPixelSprite();
+            bg.color = Color.white;
+        }
+        else
+        {
+            bg.color = new Color(1, 1, 1, 0.1f);
+        }
+        
         LayoutElement le = inputBg.AddComponent<LayoutElement>();
         le.preferredWidth = 400;
         le.preferredHeight = 50;
@@ -163,17 +215,19 @@ public class VRRemoteMenu : MonoBehaviour
         textArea.transform.SetParent(inputBg.transform, false);
         RectTransform taRT = textArea.AddComponent<RectTransform>();
         taRT.anchorMin = Vector2.zero; taRT.anchorMax = Vector2.one;
-        taRT.offsetMin = new Vector2(10, 0); taRT.offsetMax = new Vector2(-10, 0);
+        taRT.offsetMin = new Vector2(15, 0); taRT.offsetMax = new Vector2(-15, 0);
 
         // Text Component
         GameObject textObj = new GameObject("Text");
         textObj.transform.SetParent(textArea.transform, false);
         RectTransform tRT = textObj.AddComponent<RectTransform>();
         tRT.anchorMin = Vector2.zero; tRT.anchorMax = Vector2.one;
+        tRT.offsetMin = Vector2.zero; tRT.offsetMax = Vector2.zero;
         TextMeshProUGUI text = textObj.AddComponent<TextMeshProUGUI>();
         text.fontSize = 24;
         text.color = Color.white;
         text.alignment = TextAlignmentOptions.Left;
+        if (customFont != null) text.font = customFont;
         
         input.textComponent = text;
         input.textViewport = taRT;
@@ -183,12 +237,14 @@ public class VRRemoteMenu : MonoBehaviour
         placeObj.transform.SetParent(textArea.transform, false);
         RectTransform pRT = placeObj.AddComponent<RectTransform>();
         pRT.anchorMin = Vector2.zero; pRT.anchorMax = Vector2.one;
+        pRT.offsetMin = Vector2.zero; pRT.offsetMax = Vector2.zero;
         TextMeshProUGUI placeText = placeObj.AddComponent<TextMeshProUGUI>();
         placeText.fontSize = 24;
-        placeText.color = new Color(1,1,1,0.5f);
+        placeText.color = new Color(themeColor.r, themeColor.g, themeColor.b, 0.5f);
         placeText.text = placeholder;
         placeText.fontStyle = FontStyles.Italic;
         placeText.alignment = TextAlignmentOptions.Left;
+        if (customFont != null) placeText.font = customFont;
 
         input.placeholder = placeText;
 
@@ -201,21 +257,43 @@ public class VRRemoteMenu : MonoBehaviour
         GameObject container = new GameObject($"Drop_{labelText}");
         container.transform.SetParent(parent, false);
         RectTransform rt = container.AddComponent<RectTransform>();
-        rt.sizeDelta = new Vector2(0, 60);
+        rt.sizeDelta = new Vector2(0, 80); // Slightly taller
 
         VerticalLayoutGroup vlg = container.AddComponent<VerticalLayoutGroup>();
-        vlg.spacing = 5;
+        vlg.spacing = 8;
+        vlg.childControlHeight = false;
+        vlg.childForceExpandHeight = false;
         
-        // Label
-        CreateText(container.transform, labelText, 20, Color.cyan, 0);
+        // Label - Use theme color
+        GameObject labelContainer = new GameObject("LabelContainer");
+        labelContainer.transform.SetParent(container.transform, false);
+        LayoutElement labelLE = labelContainer.AddComponent<LayoutElement>();
+        labelLE.preferredHeight = 25;
+        CreateText(labelContainer.transform, labelText, 20, themeColor, 0);
 
-        // Dropdown
+        // Dropdown with Glowing Border
         GameObject dropObj = new GameObject("Dropdown");
         dropObj.transform.SetParent(container.transform, false);
+        LayoutElement dropLE = dropObj.AddComponent<LayoutElement>();
+        dropLE.preferredHeight = 45;
+        dropLE.flexibleWidth = 1;
+        
         Image bg = dropObj.AddComponent<Image>();
-        bg.color = new Color(0, 0, 0, 0.5f); // Dark bg
+        
+        // Apply glowing material (UV-based)
+        Material glowMat = CreateGlowingMaterial(themeColor, 0.9f, 0.035f, 0.055f, 0.12f, 0.1f);
+        if (glowMat != null)
+        {
+            bg.material = glowMat;
+            bg.sprite = GetPixelSprite();
+            bg.color = Color.white;
+        }
+        else
+        {
+            bg.color = new Color(0, 0, 0, 0.5f);
+        }
+        
         RectTransform dropRT = dropObj.GetComponent<RectTransform>();
-        dropRT.sizeDelta = new Vector2(0, 40); // Height
 
         TMP_Dropdown dropdown = dropObj.AddComponent<TMP_Dropdown>();
 
@@ -224,27 +302,26 @@ public class VRRemoteMenu : MonoBehaviour
         labelObj.transform.SetParent(dropObj.transform, false);
         RectTransform lRT = labelObj.AddComponent<RectTransform>();
         lRT.anchorMin = Vector2.zero; lRT.anchorMax = Vector2.one;
-        lRT.offsetMin = new Vector2(10,0); lRT.offsetMax = new Vector2(-20,0);
+        lRT.offsetMin = new Vector2(15, 0); lRT.offsetMax = new Vector2(-35, 0);
         TextMeshProUGUI labelTmp = labelObj.AddComponent<TextMeshProUGUI>();
         labelTmp.text = options.Count > 0 ? options[0] : "";
         labelTmp.fontSize = 20;
         labelTmp.alignment = TextAlignmentOptions.Left;
         labelTmp.color = Color.white;
+        if (customFont != null) labelTmp.font = customFont;
         dropdown.captionText = labelTmp;
 
-        // Arrow
+        // Arrow (Dropdown indicator)
         GameObject arrowObj = new GameObject("Arrow");
         arrowObj.transform.SetParent(dropObj.transform, false);
         RectTransform aRT = arrowObj.AddComponent<RectTransform>();
         aRT.anchorMin = new Vector2(1, 0.5f); aRT.anchorMax = new Vector2(1, 0.5f);
-        aRT.sizeDelta = new Vector2(20, 20);
-        aRT.anchoredPosition = new Vector2(-15, 0);
+        aRT.sizeDelta = new Vector2(18, 10);
+        aRT.anchoredPosition = new Vector2(-18, 0);
         Image arrowImg = arrowObj.AddComponent<Image>(); 
-        arrowImg.color = Color.cyan; // Placeholder arrow
+        arrowImg.color = themeColor;
 
-        // Template (The open list) - simplified
-        // Proper dropdown setup in code is complex, keeping it minimal for sketch (it won't open without Template setup)
-        // Set basic template structure...
+        // Template (The open list)
         GameObject template = new GameObject("Template");
         template.transform.SetParent(dropObj.transform, false);
         template.SetActive(false);
@@ -255,11 +332,21 @@ public class VRRemoteMenu : MonoBehaviour
         tRT.sizeDelta = new Vector2(0, 150);
         
         Image tImg = template.AddComponent<Image>();
-        tImg.color = new Color(0.1f, 0.1f, 0.1f, 0.9f);
+        // Glowing template background (UV-based)
+        Material templateMat = CreateGlowingMaterial(themeColor, 0.8f, 0.03f, 0.05f, 0.1f, 0.2f);
+        if (templateMat != null)
+        {
+            tImg.material = templateMat;
+            tImg.sprite = GetPixelSprite();
+            tImg.color = Color.white;
+        }
+        else
+        {
+            tImg.color = new Color(0.1f, 0.1f, 0.1f, 0.95f);
+        }
+        
         ScrollRect sr = template.AddComponent<ScrollRect>();
-        sr.content = null; // Needs viewport setup... 
-        // For Draft: We just register options. The dropdown might not visually expand correctly without full template hierarchy
-        // but the data will be there.
+        sr.content = null;
         
         dropdown.AddOptions(options);
         
@@ -279,20 +366,58 @@ public class VRRemoteMenu : MonoBehaviour
         rt.sizeDelta = size;
         rt.anchoredPosition = anchoredPos;
 
-        // Visuals
+        // Visuals - Use glowing material
         Image img = btnObj.AddComponent<Image>();
-        img.color = prominent ? themeColor : new Color(1, 1, 1, 0.1f);
-        if(!prominent)
+        
+        if (prominent)
         {
-            // Add outline or something
+            // Prominent button (Connect) - Strong glow
+            Material glowMat = CreateGlowingMaterial(themeColor, 1.2f, 0.05f, 0.1f, 0.15f, 0.15f);
+            if (glowMat != null)
+            {
+                // Create gradient by blending with purple
+                Color purpleAccent = new Color(0.75f, 0.35f, 1f, 1f);
+                glowMat.SetColor("_GlowColor", Color.Lerp(themeColor, purpleAccent, 0.3f));
+                glowMat.SetFloat("_PulseIntensity", 0.15f);
+                img.material = glowMat;
+                img.sprite = GetPixelSprite();
+                img.color = Color.white;
+            }
+            else
+            {
+                img.color = themeColor;
+            }
+        }
+        else
+        {
+            // Normal button - Subtle glow
+            Material glowMat = CreateGlowingMaterial(themeColor, 0.9f, 0.035f, 0.06f, 0.12f, 0.08f);
+            if (glowMat != null)
+            {
+                img.material = glowMat;
+                img.sprite = GetPixelSprite();
+                img.color = Color.white;
+            }
+            else
+            {
+                img.color = new Color(1, 1, 1, 0.1f);
+            }
         }
 
         Button btn = btnObj.AddComponent<Button>();
         btn.targetGraphic = img;
         btn.onClick.AddListener(onClick);
+        
+        // Configure hover effect
+        ColorBlock cb = btn.colors;
+        cb.normalColor = Color.white;
+        cb.highlightedColor = new Color(1.1f, 1.1f, 1.1f, 1f);
+        cb.pressedColor = new Color(0.9f, 0.9f, 0.9f, 1f);
+        cb.fadeDuration = 0.1f;
+        btn.colors = cb;
 
         // Text
-        CreateText(btnObj.transform, text, 24, prominent ? Color.black : Color.white, 0);
+        CreateText(btnObj.transform, text, 24, prominent ? new Color(0.1f, 0.1f, 0.15f, 1f) : Color.white, 0);
         
         // Collider for VR
         BoxCollider col = btnObj.AddComponent<BoxCollider>();
