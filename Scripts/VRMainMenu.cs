@@ -50,6 +50,7 @@ public class VRMainMenu : MonoBehaviour
     
     // Cache separate border sprites by thickness
     private Dictionary<int, Sprite> _borderSprites = new Dictionary<int, Sprite>();
+    private VRMenuFrame _menuFrame;
 
 
 
@@ -249,31 +250,14 @@ public class VRMainMenu : MonoBehaviour
         _canvas.gameObject.AddComponent<GraphicRaycaster>();
         
         // --- ADD FRAME ---
-        VRMenuFrame frame = canvasGO.AddComponent<VRMenuFrame>();
+        _menuFrame = canvasGO.AddComponent<VRMenuFrame>();
         // Pass any manual overrides if needed, primarily fonts or specific assets if not Auto-loaded
-        frame.customFont = customFont;
+        _menuFrame.customFont = customFont;
         
-        frame.Build(logicalWidth, logicalHeight);
+        _menuFrame.Build(logicalWidth, logicalHeight);
         
         // --- ADD CONTENT ---
-        // Calculate the height of the specialized content area
-        float contentHeight = logicalHeight - frame.topMargin;
-        
-        // Buttons Grid (Parent to Frame ContentContainer)
-        // usage: w, h (of the container), topPadding (visual padding inside container)
-        CreateUniformGrid(frame.ContentContainer, logicalWidth, contentHeight, 50f);
-
-        
-        Canvas.ForceUpdateCanvases();
-        if (_gridContainer) {
-            var fitter = _gridContainer.GetComponent<GridLayoutGroup>();
-            if(fitter) {
-                fitter.CalculateLayoutInputHorizontal();
-                fitter.CalculateLayoutInputVertical();
-                fitter.SetLayoutHorizontal();
-                fitter.SetLayoutVertical();
-            }
-        }
+        ShowMainMenu();
 
         // --- FIX LAYER: Ensure UI has VirtualObjects layer ---
         int layerVO = LayerMask.NameToLayer("VirtualObjects");
@@ -293,10 +277,56 @@ public class VRMainMenu : MonoBehaviour
     
     // CreateGlassPanel, CreateFloatingDataEffects, CreateStatusBar removed (moved to VRMenuFrame)
 
+    public void ShowMainMenu()
+    {
+        // Clear Content
+        foreach (Transform child in _menuFrame.ContentContainer)
+        {
+            Destroy(child.gameObject);
+        }
+        _gridContainer = null;
 
+        float logicalWidth = 1920f; 
+        float logicalHeight = (logicalWidth / panelWidth) * panelHeight;
+        float contentHeight = logicalHeight - _menuFrame.topMargin;
+        
+        CreateUniformGrid(_menuFrame.ContentContainer, logicalWidth, contentHeight, 50f);
+        
+        Canvas.ForceUpdateCanvases();
+        if (_gridContainer) {
+            var fitter = _gridContainer.GetComponent<GridLayoutGroup>();
+            if(fitter) {
+                fitter.CalculateLayoutInputHorizontal();
+                fitter.CalculateLayoutInputVertical();
+                fitter.SetLayoutHorizontal();
+                fitter.SetLayoutVertical();
+            }
+        }
+    }
+    
+    public void SwitchToRemoteMenu()
+    {
+        // Clear Content
+        foreach (Transform child in _menuFrame.ContentContainer)
+        {
+            Destroy(child.gameObject);
+        }
+        _gridContainer = null; 
 
+        // Create Remote Menu
+        GameObject remoteObj = new GameObject("VRRemoteMenu_Logic");
+        remoteObj.transform.SetParent(_menuFrame.ContentContainer, false);
+        VRRemoteMenu remoteMenu = remoteObj.AddComponent<VRRemoteMenu>();
+        remoteMenu.customFont = customFont; 
+        remoteMenu.themeColor = buttonColors[0]; 
 
+        remoteMenu.BuildUI(_menuFrame.ContentContainer, this);
+    }
 
+    public void ReturnToMainMenu()
+    {
+        ShowMainMenu();
+    }
 
     void CreateUniformGrid(Transform parent, float w, float h, float topMargin)
     {
@@ -530,7 +560,7 @@ public class VRMainMenu : MonoBehaviour
 
     void OpenRemoteDesktop()
     {
-        if (_canvas) _canvas.gameObject.SetActive(false);
+        SwitchToRemoteMenu();
     }
 }
 
@@ -568,6 +598,3 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
         _isHovered = false;
     }
 }
-
-// FloatingDataAnim class moved to VRMenuFrame.cs
-
