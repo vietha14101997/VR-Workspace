@@ -50,6 +50,6 @@ Material:
     m_Colors:
     - _BackgroundColor: {r: 0, g: 0.29999998, b: 0.5, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
-    - _GlowColor: {r: 0.75, g: 1, b: 1, a: 1}
+    - _GlowColor: {r: 1.05, g: 0.825, b: 1.25, a: 1}
     - _RippleCenter: {r: 0.5, g: 0.5, b: 0, a: 0}
   m_BuildTextureStacks: []

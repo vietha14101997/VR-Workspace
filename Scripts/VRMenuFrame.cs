@@ -186,9 +186,115 @@ public class VRMenuFrame : MonoBehaviour
         // Setup status bar references
         SetupStatusBarReferences(transform);
 
+        // Re-apply runtime sprites (they don't serialize in prefabs)
+        ReapplyRuntimeSprites();
+
+        // Re-initialize floating data animations
+        ReinitializeFloatingDataEffects();
+
         if (ContentContainer != null)
         {
             Debug.Log("[VRMenuFrame] Initialized from existing content");
+        }
+    }
+
+    /// <summary>
+    /// Re-apply sprites that are generated at runtime (not serialized in prefabs)
+    /// </summary>
+    void ReapplyRuntimeSprites()
+    {
+        // Re-apply GlassBackground and GlowingBorder sprites (must be before early returns)
+        Transform glassBg = transform.Find("GlassBackground");
+        if (glassBg != null)
+        {
+            // Re-apply GlassBackground sprite
+            var glassBgImg = glassBg.GetComponent<Image>();
+            if (glassBgImg != null && glassBgImg.sprite == null)
+            {
+                glassBgImg.sprite = GetPixelSprite();
+            }
+
+            // Re-apply GlowingBorder sprite
+            Transform glowBorder = glassBg.Find("GlowingBorder");
+            if (glowBorder != null)
+            {
+                var borderImg = glowBorder.GetComponent<Image>();
+                if (borderImg != null && borderImg.sprite == null)
+                {
+                    borderImg.sprite = GetPixelSprite();
+                }
+            }
+        }
+
+        Transform statusBar = transform.Find("StatusBar");
+        if (statusBar == null) return;
+
+        // Re-apply separator line gradient sprite
+        Transform separatorLine = statusBar.Find("SeparatorLine");
+        if (separatorLine != null)
+        {
+            var lineImg = separatorLine.GetComponent<Image>();
+            if (lineImg != null)
+            {
+                lineImg.sprite = GetGradientLineSprite();
+            }
+        }
+
+        Transform statusGroup = statusBar.Find("StatusGroup");
+        if (statusGroup == null) return;
+
+        // Re-apply battery sprite
+        Transform battContainer = statusGroup.Find("BatteryContainer");
+        if (battContainer != null)
+        {
+            Sprite batSprite = GetBatterySprite();
+
+            Transform bg = battContainer.Find("Bg");
+            if (bg != null)
+            {
+                var bgImg = bg.GetComponent<Image>();
+                if (bgImg != null) bgImg.sprite = batSprite;
+            }
+
+            Transform fill = battContainer.Find("Fill");
+            if (fill != null)
+            {
+                var fillImg = fill.GetComponent<Image>();
+                if (fillImg != null) fillImg.sprite = batSprite;
+            }
+        }
+
+        // Re-apply network icon sprite
+        Transform netIcon = statusGroup.Find("NetworkIcon");
+        if (netIcon != null)
+        {
+            var netImg = netIcon.GetComponent<Image>();
+            if (netImg != null)
+            {
+                netImg.sprite = iconWifi ?? GetWifiSprite();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Re-initialize floating data animations when loading from prefab
+    /// </summary>
+    void ReinitializeFloatingDataEffects()
+    {
+        Transform glassBg = transform.Find("GlassBackground");
+        if (glassBg == null) return;
+
+        Transform fxContainer = glassBg.Find("FX_DataStream");
+        if (fxContainer == null) return;
+
+        float w = logicalWidth;
+        float h = LogicalHeight;
+
+        var anims = fxContainer.GetComponentsInChildren<FloatingDataAnim>();
+        foreach (var anim in anims)
+        {
+            anim.range = new Vector2(w, h);
+            anim.ForceReinitialize();
         }
     }
 
@@ -608,8 +714,10 @@ public class VRMenuFrame : MonoBehaviour
             glowMat.SetFloat("_GradientAngle", -10f);
             glowMat.SetFloat("_GlassAlpha", 0.02f);
             glowMat.SetColor("_GlassTint", new Color(0.9f, 0.95f, 1f, 1f));
-            glowMat.SetFloat("_ShimmerSpeed", shimmerSpeed);
-            glowMat.SetFloat("_ShimmerIntensity", 0.15f);
+            glowMat.SetFloat("_ShimmerSpeed", 0.15f);  // Slow, constant speed
+            glowMat.SetFloat("_ShimmerIntensity", 0.4f);
+            glowMat.SetFloat("_LightSize", 0.01f);   // Same as border width
+            glowMat.SetFloat("_LightGlow", 0.008f);
 
             borderImg.material = glowMat;
             borderImg.color = Color.white;
@@ -1342,35 +1450,5 @@ public class VRMenuFrame : MonoBehaviour
         transform.rotation = Quaternion.LookRotation(camForward);
 
         Debug.Log("[VRMenuFrame] Recenter complete.");
-    }
-}
-
-public class FloatingDataAnim : MonoBehaviour
-{
-    public float speed;
-    public Vector2 range;
-    private RectTransform _rt;
-    private Vector2 _dir;
-
-    void Start()
-    {
-        _rt = GetComponent<RectTransform>();
-        _dir = new Vector2(Random.Range(-0.1f, 0.1f), Random.Range(0.2f, 0.8f)).normalized;
-        if (Random.value > 0.5f) _dir.y *= -1;
-    }
-
-    void Update()
-    {
-        if (_rt == null) return;
-        _rt.anchoredPosition += _dir * speed * Time.deltaTime;
-
-        float halfW = range.x / 2f + 50f;
-        float halfH = range.y / 2f + 50f;
-
-        if (_rt.anchoredPosition.y > halfH) _rt.anchoredPosition = new Vector2(Random.Range(-halfW, halfW), -halfH);
-        else if (_rt.anchoredPosition.y < -halfH) _rt.anchoredPosition = new Vector2(Random.Range(-halfW, halfW), halfH);
-
-        if (_rt.anchoredPosition.x > halfW) _rt.anchoredPosition = new Vector2(-halfW, Random.Range(-halfH, halfH));
-        else if (_rt.anchoredPosition.x < -halfW) _rt.anchoredPosition = new Vector2(halfW, Random.Range(-halfH, halfH));
     }
 }
