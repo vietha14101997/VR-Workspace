@@ -714,13 +714,13 @@ public class VRMenuFrame : MonoBehaviour
             glowMat.SetFloat("_GradientAngle", -10f);
             glowMat.SetFloat("_GlassAlpha", 0.02f);
             glowMat.SetColor("_GlassTint", new Color(0.9f, 0.95f, 1f, 1f));
-            glowMat.SetFloat("_ShimmerSpeed", 0.15f);  // Slow, constant speed
-            glowMat.SetFloat("_ShimmerIntensity", 0.4f);
-            glowMat.SetFloat("_LightSize", 0.01f);   // Same as border width
+            glowMat.SetFloat("_ShimmerSpeed", 0.1f);  // Slow, constant speed
+            glowMat.SetFloat("_ShimmerIntensity", 0.2f);
+            glowMat.SetFloat("_LightSize", 0.008f);   // Same as border width
             glowMat.SetFloat("_LightGlow", 0.008f);
 
             borderImg.material = glowMat;
-            borderImg.color = Color.white;
+            // borderImg.color = Color.white;
             borderImg.sprite = GetPixelSprite();
         }
         else

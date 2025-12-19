@@ -276,12 +276,12 @@ Shader "Custom/GlowingGlassBorder"
                     float lightPos = frac(-timeVal + startOffset);
 
                     // Calculate distance to the light (with wrap-around)
-                    float dist = abs(perimPos - lightPos);
-                    dist = min(dist, 1.0 - dist);
+                    float shimmerDist = abs(perimPos - lightPos);
+                    shimmerDist = min(shimmerDist, 1.0 - shimmerDist);
 
                     // Create soft glow
-                    float glow = 1.0 - saturate(dist / _LightSize);
-                    glow = pow(glow, 2.0);
+                    float glow = 1.0 - saturate(shimmerDist / _LightSize);
+                    glow = pow(glow, 2.5); // Tighter shimmer core
 
                     // Get color at light's position based on the gradient
                     float2 lightUV = getBorderUV(lightPos, aspect, _EdgePadding);
@@ -293,11 +293,14 @@ Shader "Custom/GlowingGlassBorder"
                     tLight = pow(tLight, 1.0 / _CyanRatio);
                     fixed3 lightColor = lerp(_ColorA.rgb, _ColorB.rgb, tLight);
 
+                    // Boost saturation of shimmer color
+                    lightColor = saturate(lightColor * 1.4);
+
                     runningLightColor = lightColor * glow;
                     runningLightAlpha = glow;
 
                     // Mask to border area only
-                    float borderMask = saturate(layer2 + layer3);
+                    float borderMask = saturate(layer1 * 2.0 + layer2 + layer3);
                     runningLightColor *= borderMask * _ShimmerIntensity;
                     runningLightAlpha *= borderMask;
                 }
@@ -322,11 +325,15 @@ Shader "Custom/GlowingGlassBorder"
                 
                 // Bright Core
                 fixed3 whiteCore = fixed3(1,1,1);
-                finalColor.rgb = lerp(finalColor.rgb, whiteCore, layer1 * _Layer1Alpha * 0.5); // mix white
+                // Suppress white core where shimmer is active to let shimmer color shine through
+                float shimmerFactor = runningLightAlpha * _ShimmerIntensity;
+                float coreMix = layer1 * _Layer1Alpha * (0.5 * (1.0 - shimmerFactor));
+                
+                finalColor.rgb = lerp(finalColor.rgb, whiteCore, coreMix); 
                 finalColor.a = max(finalColor.a, layer1 * _Layer1Alpha);
 
-                // Add Running Lights (colored based on position)
-                finalColor.rgb += runningLightColor * 1.5;
+                // Add Running Lights (positioned over the suppressed core)
+                finalColor.rgb += runningLightColor * 2.5; 
                 finalColor.a = max(finalColor.a, runningLightAlpha * _ShimmerIntensity);
                 
                 finalColor *= i.color;
