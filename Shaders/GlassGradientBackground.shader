@@ -145,8 +145,8 @@ Shader "Custom/GlassGradientBackground"
                 // The border shader handles the glow. This shader handles the fill.
                 // So if dist > 0, we can basically clip or fade out very quickly.
                 
-                float alphaMask = 1.0 - smoothstep(-0.005, 0.005, dist);
-                if (alphaMask <= 0.01) clip(-1);
+                float alphaMask = 1.0 - smoothstep(-0.01, 0.0, dist);
+                if (alphaMask <= 0.001) clip(-1);
                 
                 // === GRADIENT ===
                 float t = uv.x; 

@@ -89,41 +89,57 @@ public class VRMainMenu : MonoBehaviour
 #if UNITY_EDITOR
     void FixIconImportSettings()
     {
-        string[] iconNames = { 
-            "icon_remote", "icon_browser", "icon_media", 
+        // MainMenu icons
+        string[] mainMenuIcons = {
+            "icon_remote", "icon_browser", "icon_media",
             "icon_files", "icon_settings", "icon_quit", "icon_wifi", "icon_signal"
         };
 
-        foreach (var name in iconNames)
+        foreach (var name in mainMenuIcons)
         {
-            try {
-                string path = $"Assets/VR-Workspace/Resources/MainMenu/{name}.png";
-                TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
-                if (importer != null)
-                {
-                    bool changed = false;
-                    if (importer.textureType != TextureImporterType.Sprite)
-                    {
-                        importer.textureType = TextureImporterType.Sprite;
-                        changed = true;
-                    }
-                    // Disable mipmaps for sharper UI icons
-                    if (importer.mipmapEnabled)
-                    {
-                        importer.mipmapEnabled = false;
-                        changed = true;
-                    }
-                    // Use uncompressed for best quality
-                    if (importer.textureCompression != TextureImporterCompression.Uncompressed)
-                    {
-                        importer.textureCompression = TextureImporterCompression.Uncompressed;
-                        changed = true;
-                    }
-
-                    if (changed) importer.SaveAndReimport();
-                }
-            } catch {}
+            FixSingleIconImport($"Assets/VR-Workspace/Resources/MainMenu/{name}.png");
         }
+
+        // RemoteMenu icons
+        string[] remoteMenuIcons = {
+            "icon_monitor", "icon_resolution", "icon_bitrate", "icon_fps",
+            "icon_back", "icon_qr"
+        };
+
+        foreach (var name in remoteMenuIcons)
+        {
+            FixSingleIconImport($"Assets/VR-Workspace/Resources/RemoteMenu/{name}.png");
+        }
+    }
+
+    void FixSingleIconImport(string path)
+    {
+        try {
+            TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+            if (importer != null)
+            {
+                bool changed = false;
+                if (importer.textureType != TextureImporterType.Sprite)
+                {
+                    importer.textureType = TextureImporterType.Sprite;
+                    changed = true;
+                }
+                // Disable mipmaps for sharper UI icons
+                if (importer.mipmapEnabled)
+                {
+                    importer.mipmapEnabled = false;
+                    changed = true;
+                }
+                // Use uncompressed for best quality
+                if (importer.textureCompression != TextureImporterCompression.Uncompressed)
+                {
+                    importer.textureCompression = TextureImporterCompression.Uncompressed;
+                    changed = true;
+                }
+
+                if (changed) importer.SaveAndReimport();
+            }
+        } catch {}
     }
 #endif
 

@@ -5,879 +5,637 @@ using System.Collections.Generic;
 
 public class VRRemoteMenu : MonoBehaviour
 {
-    // --- CONFIGURATION ---
-    public Color themeColor = new Color(0.0f, 0.9f, 1.0f); // Cyan
-    public Color accentColor = new Color(0.8f, 0.4f, 1.0f); // Purple
+    public Color themeColor = new Color(0.0f, 0.9f, 1.0f);
+    public Color accentColor = new Color(0.8f, 0.4f, 1.0f);
     public TMP_FontAsset customFont;
 
     private VRMainMenu _mainMenu;
     private Sprite _pixelSprite;
-    private Dictionary<string, Sprite> _cachedIcons = new Dictionary<string, Sprite>();
+    private Dictionary<string, Sprite> _iconCache = new Dictionary<string, Sprite>();
 
     public void BuildUI(Transform parent, VRMainMenu mainMenu)
     {
         _mainMenu = mainMenu;
 
-        // Parent = ContentContainer (already below separator line at 80px from top)
-        // ContentContainer height = 1080 - 80 = 1000px
-        // We'll use ABSOLUTE positioning for clarity
+        // Canvas area: 1920 x 1080, content below status bar (~1000)
+        float W = 1920f;
+        float H = 1000f;
+        float padX = 0f;
+        float padY = 40f;
 
-        float totalWidth = 1920f;
-        float totalHeight = 1000f; // Adjusted for separatorOffset (80px): 1080 - 80 = 1000
+        float contentW = W - padX * 2;  // 1760
 
-        float padding = 60f;
-        float topPadding = 30f; // Extra spacing from separator line
-        float contentWidth = totalWidth - (padding * 2); // 1800px
+        // Điều chỉnh theo thiết kế - grid chiếm nhiều không gian hơn
+        float headerH = 100f;
+        float inputH = 130f;   // Host/Port row
+        float gridH = 520f;    // 2 rows dropdown - tăng lên để match thiết kế
+        float footerH = 100f;
+        float gap = 30f;
 
-        // === HEADER (Top: 0-80px) ===
-        CreateHeaderSimple(parent, padding, totalHeight - 80f - topPadding, contentWidth, 80f);
+        float y = H - padY;
 
-        // === INPUT ROW (Top: 100-230px) ===
-        CreateInputRowSimple(parent, padding, totalHeight - 230f - topPadding, contentWidth, 130f);
+        // Header
+        y -= headerH;
+        CreateHeader(parent, padX, y, contentW, headerH);
 
-        // === GRID 2x2 (Top: 255-555px) ===
-        CreateGridSimple(parent, padding, totalHeight - 580f - topPadding, contentWidth, 300f);
+        // Input Row (Host / Port)
+        y -= gap + inputH;
+        CreateInputRow(parent, padX, y, contentW, inputH);
 
-        // === FOOTER (Bottom: 0-100px) ===
-        CreateFooterSimple(parent, padding, 40f, contentWidth, 100f);
+        // Grid 2x2 (Monitors, Resolution, Bitrate, FPS)
+        y -= gap + gridH;
+        CreateGrid(parent, padX, y, contentW, gridH);
+
+        // Footer (Connect button)
+        y -= gap + footerH;
+        CreateFooter(parent, padX, y, contentW, footerH);
     }
 
-    void CreateHeaderSimple(Transform parent, float x, float y, float w, float h)
+    void CreateHeader(Transform parent, float x, float y, float w, float h)
     {
-        GameObject header = new GameObject("Header");
-        header.transform.SetParent(parent, false);
-        RectTransform rt = header.AddComponent<RectTransform>();
-        rt.anchorMin = new Vector2(0, 0);
-        rt.anchorMax = new Vector2(0, 0);
-        rt.pivot = new Vector2(0, 0);
-        rt.anchoredPosition = new Vector2(x, y);
-        rt.sizeDelta = new Vector2(w, h);
+        var header = CreateContainer(parent, "Header", x, y, w, h);
 
-        // Back button (left)
-        CreateStyledButton(header.transform, 0, 5, 200, 70, "Back", GetIcon("back"), themeColor,
-            () => _mainMenu.ReturnToMainMenu(), true);
+        // Back button
+        float backW = 240f;
+        CreateButton(header.transform, 0, 0, backW, h, "Back", LoadIcon("back"), themeColor,
+            () => _mainMenu.ReturnToMainMenu());
 
-        // Title (center)
-        CreateSimpleText(header.transform, w/2 - 250, 10, 500, 60, "VR Remote Menu", 52, Color.white, true);
+        // Title - font lớn hơn
+        float titleX = backW + 35f;
+        CreateLabel(header.transform, titleX, 0, w - titleX - 110f, h, "VR Remote Menu", 48, Color.white, true, TextAlignmentOptions.Left);
 
-        // QR button (right)
-        CreateStyledButton(header.transform, w - 90, 5, 90, 70, "", GetIcon("qr"), accentColor,
-            () => Debug.Log("QR"), false);
+        // QR button
+        float qrSize = 100f;
+        CreateButton(header.transform, w - qrSize, (h - qrSize) / 2f, qrSize, qrSize, "", LoadIcon("qr"), accentColor,
+            () => Debug.Log("QR"));
     }
 
-    void CreateInputRowSimple(Transform parent, float x, float y, float w, float h)
+    void CreateInputRow(Transform parent, float x, float y, float w, float h)
     {
-        GameObject row = new GameObject("InputRow");
-        row.transform.SetParent(parent, false);
-        RectTransform rt = row.AddComponent<RectTransform>();
-        rt.anchorMin = new Vector2(0, 0);
-        rt.anchorMax = new Vector2(0, 0);
-        rt.pivot = new Vector2(0, 0);
-        rt.anchoredPosition = new Vector2(x, y);
-        rt.sizeDelta = new Vector2(w, h);
+        var row = CreateContainer(parent, "InputRow", x, y, w, h);
 
-        float hostW = w * 0.58f;
-        float portW = w * 0.38f;
-        float gap = w - hostW - portW;
+        // Concept: Host ~60%, gap ~5%, Port ~35%
+        float gapX = 40f;
+        float hostW = (w - gapX) * 0.62f;
+        float portW = (w - gapX) * 0.38f;
 
-        // Host input
-        CreateStyledInputBox(row.transform, 0, 0, hostW, h, "Host", "192.168.1.10", themeColor);
-
-        // Port input
-        CreateStyledInputBox(row.transform, hostW + gap, 0, portW, h, "Port", "9000", accentColor);
+        CreateInputField(row.transform, 0, 0, hostW, h, "Host", "192.168.1.10", themeColor);
+        CreateInputField(row.transform, hostW + gapX, 0, portW, h, "Port", "9000", accentColor);
     }
 
-    void CreateGridSimple(Transform parent, float x, float y, float w, float h)
+    void CreateGrid(Transform parent, float x, float y, float w, float h)
     {
-        GameObject grid = new GameObject("Grid");
-        grid.transform.SetParent(parent, false);
-        RectTransform rt = grid.AddComponent<RectTransform>();
-        rt.anchorMin = new Vector2(0, 0);
-        rt.anchorMax = new Vector2(0, 0);
-        rt.pivot = new Vector2(0, 0);
-        rt.anchoredPosition = new Vector2(x, y);
-        rt.sizeDelta = new Vector2(w, h);
+        var grid = CreateContainer(parent, "Grid", x, y, w, h);
 
-        float cellW = (w - 50f) / 2f; // 2 columns, 50px gap
-        float cellH = (h - 50f) / 2f; // 2 rows, 50px gap
-        float gapX = 50f;
-        float gapY = 50f;
+        // 2x2 grid with equal cells - tăng gap để match thiết kế
+        float gapX = 40f;
+        float gapY = 30f;
+        float cellW = (w - gapX) / 2f;
+        float cellH = (h - gapY) / 2f;
 
-        // Row 1
-        CreateStyledGridItem(grid.transform, 0, cellH + gapY, cellW, cellH,
-            "Monitor", "Monitor 1", GetIcon("monitor"), themeColor, true);
-        CreateStyledGridItem(grid.transform, cellW + gapX, cellH + gapY, cellW, cellH,
-            "Resolution", "1920 x 1080", GetIcon("resolution"), accentColor, false);
+        // Row 1 (top) - Monitors và Resolution
+        float row1Y = cellH + gapY;
+        CreateDropdownBox(grid.transform, 0, row1Y, cellW, cellH,
+            "Monitors", "Monitor 1", LoadIcon("monitor"), themeColor, false);
+        CreateDropdownBox(grid.transform, cellW + gapX, row1Y, cellW, cellH,
+            "Resolution", "1920 x 1080", LoadIcon("resolution"), accentColor, false);
 
-        // Row 2
-        CreateStyledGridItem(grid.transform, 0, 0, cellW, cellH,
-            "Bitrate", "10 Mbps", GetIcon("bitrate"), themeColor, false);
-        CreateStyledGridItem(grid.transform, cellW + gapX, 0, cellW, cellH,
-            "FPS", "60 FPS", GetIcon("fps"), accentColor, false);
+        // Row 2 (bottom) - Bitrate và FPS
+        CreateDropdownBox(grid.transform, 0, 0, cellW, cellH,
+            "Bitrate", "10 Mbps", LoadIcon("bitrate"), themeColor, false);
+        CreateDropdownBox(grid.transform, cellW + gapX, 0, cellW, cellH,
+            "FPS", "60 FPS", LoadIcon("fps"), accentColor, false);
     }
 
-    void CreateFooterSimple(Transform parent, float x, float y, float w, float h)
+    void CreateFooter(Transform parent, float x, float y, float w, float h)
     {
-        GameObject footer = new GameObject("Footer");
-        footer.transform.SetParent(parent, false);
-        RectTransform rt = footer.AddComponent<RectTransform>();
-        rt.anchorMin = new Vector2(0, 0);
-        rt.anchorMax = new Vector2(0, 0);
-        rt.pivot = new Vector2(0, 0);
-        rt.anchoredPosition = new Vector2(x, y);
-        rt.sizeDelta = new Vector2(w, h);
+        var footer = CreateContainer(parent, "Footer", x, y, w, h);
 
-        // CONNECT button (centered)
-        float btnW = 560f;
-        float btnX = (w - btnW) / 2f;
-        CreateConnectButton(footer.transform, btnX, 0, btnW, 90f);
+        // Nút CONNECT - chiều rộng vừa phải, căn giữa
+        float btnW = 650f;
+        CreateConnectButton(footer.transform, (w - btnW) / 2f, 0, btnW, h);
     }
 
-    // === HELPERS ===
+    // ==================== UI COMPONENTS ====================
 
-    void CreateStyledButton(Transform parent, float x, float y, float w, float h, string label, Sprite icon, Color col, UnityEngine.Events.UnityAction onClick, bool hasLabel)
+    GameObject CreateContainer(Transform parent, string name, float x, float y, float w, float h)
     {
-        GameObject btn = new GameObject("Btn_" + (string.IsNullOrEmpty(label) ? "Icon" : label));
-        btn.transform.SetParent(parent, false);
-        RectTransform rt = btn.AddComponent<RectTransform>();
-        rt.anchorMin = Vector2.zero;
-        rt.anchorMax = Vector2.zero;
+        var go = new GameObject(name);
+        go.transform.SetParent(parent, false);
+        var rt = go.AddComponent<RectTransform>();
+        rt.anchorMin = rt.anchorMax = Vector2.zero;
         rt.pivot = Vector2.zero;
         rt.anchoredPosition = new Vector2(x, y);
         rt.sizeDelta = new Vector2(w, h);
+        return go;
+    }
 
-        // Visual root with expansion for shader effects
-        GameObject visualRoot = new GameObject("Visuals");
-        visualRoot.transform.SetParent(btn.transform, false);
-        RectTransform visRT = visualRoot.AddComponent<RectTransform>();
-        float expansion = 0.12f;
+    void CreateButton(Transform parent, float x, float y, float w, float h,
+        string text, Sprite icon, Color col, UnityEngine.Events.UnityAction onClick)
+    {
+        var btn = CreateContainer(parent, "Btn_" + text, x, y, w, h);
+
+        // Hit Area với BoxCollider cho VR interaction
+        var hitArea = new GameObject("HitArea");
+        hitArea.transform.SetParent(btn.transform, false);
+        var hitRT = hitArea.AddComponent<RectTransform>();
+        hitRT.anchorMin = Vector2.zero;
+        hitRT.anchorMax = Vector2.one;
+        hitRT.offsetMin = hitRT.offsetMax = Vector2.zero;
+
+        var hitImg = hitArea.AddComponent<Image>();
+        hitImg.color = Color.clear;
+
+        // BoxCollider cho VR raycast
+        var collider = hitArea.AddComponent<BoxCollider>();
+        collider.size = new Vector3(w, h, 0.1f);
+
+        // Visual Root
+        var visualRoot = new GameObject("Visuals");
+        visualRoot.transform.SetParent(hitArea.transform, false);
+        var visRT = visualRoot.AddComponent<RectTransform>();
+        float expansion = -0.02f;
         visRT.anchorMin = new Vector2(-expansion, -expansion);
         visRT.anchorMax = new Vector2(1f + expansion, 1f + expansion);
-        visRT.offsetMin = Vector2.zero;
-        visRT.offsetMax = Vector2.zero;
+        visRT.offsetMin = visRT.offsetMax = Vector2.zero;
 
-        // Background with shader
-        Image bg = visualRoot.AddComponent<Image>();
-        bg.sprite = GetPixelSprite();
-        bg.raycastTarget = false;
+        // Background - match border radius and padding
+        var bg = CreateBackground(visualRoot.transform, w, h, col, 0.28f, 0.12f, 0.12f);
 
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
-        if (glassShader != null)
+        // Border với VRButtonRipple - viền dày gấp đôi cho button
+        var borderImg = CreateBorderWithRipple(visualRoot.transform, w, h, col, false, 0.03f);
+
+        // Content - điều chỉnh vị trí để bù cho expansion của visualRoot
+        bool hasText = !string.IsNullOrEmpty(text);
+        bool hasIcon = icon != null;
+
+        // Offset để căn giữa trong HitArea (bù cho expansion)
+        float offsetX = w * expansion;
+        float offsetY = h * expansion;
+
+        if (hasIcon && hasText)
         {
-            Material glassMat = new Material(glassShader);
-            glassMat.SetFloat("_CornerRadius", 0.12f);
-            glassMat.SetFloat("_EdgePadding", 0.12f);
-            glassMat.SetFloat("_Aspect", w / h);
-            glassMat.SetColor("_ColorA", new Color(col.r, col.g, col.b, 0.12f));
-            glassMat.SetColor("_ColorB", new Color(col.r, col.g, col.b, 0.04f));
-            glassMat.SetFloat("_GlassAlpha", 0.075f);
-            bg.material = glassMat;
-            bg.color = Color.white;
+            float iconSize = 44f;
+            float iconX = offsetX + 28f + iconSize / 2f;
+            float centerY = h / 2f + offsetY;
+            CreateIconWithGlow(visualRoot.transform, iconX, centerY, iconSize, icon, col);
+            CreateLabel(visualRoot.transform, iconX + iconSize/2f + 18f, offsetY, w - iconX - iconSize - 24f + offsetX, h, text, 40, Color.white, true, TextAlignmentOptions.Left);
         }
-        else
+        else if (hasIcon)
         {
-            bg.color = new Color(col.r, col.g, col.b, 0.12f);
+            // Icon only - căn giữa chính xác
+            float centerX = w / 2f + offsetX;
+            float centerY = h / 2f + offsetY;
+            CreateIconWithGlow(visualRoot.transform, centerX, centerY, 72, icon, col);
         }
-
-        // Border with glow
-        GameObject borderObj = new GameObject("Border");
-        borderObj.transform.SetParent(visualRoot.transform, false);
-        RectTransform borderRT = borderObj.AddComponent<RectTransform>();
-        borderRT.anchorMin = Vector2.zero;
-        borderRT.anchorMax = Vector2.one;
-        borderRT.offsetMin = Vector2.zero;
-        borderRT.offsetMax = Vector2.zero;
-
-        Image borderImg = borderObj.AddComponent<Image>();
-        borderImg.raycastTarget = false;
-
-        Shader glowShader = Shader.Find("Custom/GlowingElementBorder");
-        if (glowShader != null)
+        else if (hasText)
         {
-            Material glowMat = new Material(glowShader);
-            glowMat.SetFloat("_Aspect", w / h);
-            glowMat.SetFloat("_EdgePadding", 0.12f);
-            Color borderGlowCol = Color.Lerp(col, Color.white, 0.75f);
-            glowMat.SetColor("_GlowColor", borderGlowCol);
-            glowMat.SetFloat("_BorderWidth", 0.005f);
-            glowMat.SetFloat("_GlowWidth", 0.03f);
-            glowMat.SetFloat("_GlowIntensity", 2.5f);
-            glowMat.SetFloat("_CornerRadius", 0.12f);
-            glowMat.SetFloat("_PulseEnabled", 0f);
-            borderImg.material = glowMat;
-            borderImg.sprite = GetPixelSprite();
-        }
-
-        // Icon with glow
-        if (icon != null)
-        {
-            GameObject iconObj = new GameObject("Icon");
-            iconObj.transform.SetParent(visualRoot.transform, false);
-            RectTransform iRT = iconObj.AddComponent<RectTransform>();
-
-            if (hasLabel)
-            {
-                iRT.anchorMin = new Vector2(0.12f, 0.5f);
-                iRT.anchorMax = new Vector2(0.12f, 0.5f);
-                iRT.pivot = new Vector2(0.5f, 0.5f);
-                iRT.sizeDelta = new Vector2(42, 42);
-            }
-            else
-            {
-                iRT.anchorMin = new Vector2(0.5f, 0.5f);
-                iRT.anchorMax = new Vector2(0.5f, 0.5f);
-                iRT.pivot = new Vector2(0.5f, 0.5f);
-                iRT.sizeDelta = new Vector2(48, 48);
-            }
-
-            Image iImg = iconObj.AddComponent<Image>();
-            iImg.sprite = icon;
-            iImg.preserveAspect = true;
-            iImg.raycastTarget = false;
-            iImg.color = Color.Lerp(col, Color.white, 0.9f);
-
-            // Glow effects
-            Color glowCol = Color.Lerp(col, Color.white, 0.7f);
-            glowCol.a = 0.4f;
-            float s1 = 2f;
-
-            iconObj.AddComponent<Shadow>().effectColor = glowCol;
-            iconObj.GetComponent<Shadow>().effectDistance = new Vector2(s1, -s1);
-
-            iconObj.AddComponent<Shadow>().effectColor = glowCol;
-            iconObj.GetComponents<Shadow>()[1].effectDistance = new Vector2(-s1, s1);
-
-            Color bloomCol = Color.Lerp(col, Color.white, 0.8f);
-            bloomCol.a = 0.15f;
-            float s2 = 5f;
-
-            iconObj.AddComponent<Shadow>().effectColor = bloomCol;
-            iconObj.GetComponents<Shadow>()[2].effectDistance = new Vector2(s2, -s2);
-
-            iconObj.AddComponent<Shadow>().effectColor = bloomCol;
-            iconObj.GetComponents<Shadow>()[3].effectDistance = new Vector2(-s2, s2);
-        }
-
-        // Label text
-        if (!string.IsNullOrEmpty(label) && hasLabel)
-        {
-            GameObject txtObj = new GameObject("Text");
-            txtObj.transform.SetParent(visualRoot.transform, false);
-            RectTransform tRT = txtObj.AddComponent<RectTransform>();
-            tRT.anchorMin = new Vector2(0.25f, 0f);
-            tRT.anchorMax = new Vector2(1f, 1f);
-            tRT.offsetMin = Vector2.zero;
-            tRT.offsetMax = Vector2.zero;
-            TextMeshProUGUI txt = txtObj.AddComponent<TextMeshProUGUI>();
-            txt.text = label;
-            txt.fontSize = 32;
-            txt.color = Color.white;
-            txt.alignment = TextAlignmentOptions.Left;
-            txt.verticalAlignment = VerticalAlignmentOptions.Middle;
-            txt.fontStyle = FontStyles.Bold;
-            txt.raycastTarget = false;
-            if (customFont) txt.font = customFont;
+            CreateLabel(visualRoot.transform, offsetX, offsetY, w, h, text, 40, Color.white, true);
         }
 
         // Button component
-        Button b = btn.AddComponent<Button>();
-        b.targetGraphic = bg;
-        b.onClick.AddListener(onClick);
+        var button = hitArea.AddComponent<Button>();
+        button.targetGraphic = bg;
+        button.onClick.AddListener(onClick);
 
-        ColorBlock cb = b.colors;
+        var cb = button.colors;
         cb.normalColor = Color.white;
         cb.highlightedColor = new Color(col.r, col.g, col.b, 0.5f);
         cb.pressedColor = new Color(col.r, col.g, col.b, 0.7f);
         cb.fadeDuration = 0.1f;
-        b.colors = cb;
+        button.colors = cb;
+
+        // VRButtonAnimation cho hiệu ứng pop
+        var anim = hitArea.AddComponent<VRButtonAnimation>();
+        anim.targetVisuals = visualRoot.transform;
+        anim.popAmount = 0.0125f;
     }
 
-    void CreateSimpleText(Transform parent, float x, float y, float w, float h, string text, int size, Color col, bool bold)
+    void CreateInputField(Transform parent, float x, float y, float w, float h,
+        string label, string value, Color col)
     {
-        GameObject txtObj = new GameObject("Text");
-        txtObj.transform.SetParent(parent, false);
-        RectTransform rt = txtObj.AddComponent<RectTransform>();
-        rt.anchorMin = Vector2.zero;
-        rt.anchorMax = Vector2.zero;
-        rt.pivot = Vector2.zero;
-        rt.anchoredPosition = new Vector2(x, y);
-        rt.sizeDelta = new Vector2(w, h);
+        var container = CreateContainer(parent, "Input_" + label, x, y, w, h);
 
-        TextMeshProUGUI txt = txtObj.AddComponent<TextMeshProUGUI>();
-        txt.text = text;
-        txt.fontSize = size;
-        txt.color = col;
-        txt.alignment = TextAlignmentOptions.Center;
-        txt.fontStyle = bold ? FontStyles.Bold : FontStyles.Normal;
-        if (customFont) txt.font = customFont;
-    }
-
-    void CreateStyledInputBox(Transform parent, float x, float y, float w, float h, string label, string value, Color col)
-    {
-        GameObject container = new GameObject("Input_" + label);
-        container.transform.SetParent(parent, false);
-        RectTransform rt = container.AddComponent<RectTransform>();
-        rt.anchorMin = Vector2.zero;
-        rt.anchorMax = Vector2.zero;
-        rt.pivot = Vector2.zero;
-        rt.anchoredPosition = new Vector2(x, y);
-        rt.sizeDelta = new Vector2(w, h);
-
-        // Label
-        CreateSimpleText(container.transform, 0, h - 40, w, 35, label, 28, new Color(1, 1, 1, 0.8f), false);
+        // Label above box
+        float labelH = 32f;
+        CreateLabel(container.transform, 10, h - labelH, w, labelH, label, 28, new Color(1,1,1,0.7f), false, TextAlignmentOptions.Left);
 
         // Input box
-        GameObject box = new GameObject("Box");
-        box.transform.SetParent(container.transform, false);
-        RectTransform boxRT = box.AddComponent<RectTransform>();
-        boxRT.anchorMin = Vector2.zero;
-        boxRT.anchorMax = Vector2.zero;
-        boxRT.pivot = Vector2.zero;
-        boxRT.anchoredPosition = new Vector2(0, 0);
-        boxRT.sizeDelta = new Vector2(w, 85);
+        float boxH = h - labelH - 8f;
+        var box = CreateContainer(container.transform, "Box", 0, 0, w, boxH);
 
-        // Visual root with expansion
-        GameObject visualRoot = new GameObject("Visuals");
-        visualRoot.transform.SetParent(box.transform, false);
-        RectTransform visRT = visualRoot.AddComponent<RectTransform>();
-        float expansion = 0.08f;
-        visRT.anchorMin = new Vector2(-expansion, -expansion);
-        visRT.anchorMax = new Vector2(1f + expansion, 1f + expansion);
-        visRT.offsetMin = Vector2.zero;
-        visRT.offsetMax = Vector2.zero;
+        CreateBackground(box.transform, w, boxH, col, 0.32f);
+        CreateBorder(box.transform, w, boxH, col);
 
-        // Background with shader
-        Image bg = visualRoot.AddComponent<Image>();
-        bg.sprite = GetPixelSprite();
-        bg.raycastTarget = false;
+        // Value text - căn giữa theo chiều dọc
+        CreateLabel(box.transform, 30, 0, w - 90, boxH, value, 42, Color.white, true, TextAlignmentOptions.Left);
 
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
-        if (glassShader != null)
-        {
-            Material glassMat = new Material(glassShader);
-            glassMat.SetFloat("_CornerRadius", 0.15f);
-            glassMat.SetFloat("_EdgePadding", 0.08f);
-            glassMat.SetFloat("_Aspect", w / 85);
-            glassMat.SetColor("_ColorA", new Color(col.r, col.g, col.b, 0.15f));
-            glassMat.SetColor("_ColorB", new Color(col.r, col.g, col.b, 0.05f));
-            glassMat.SetFloat("_GlassAlpha", 0.08f);
-            bg.material = glassMat;
-            bg.color = Color.white;
-        }
-        else
-        {
-            bg.color = new Color(col.r, col.g, col.b, 0.15f);
-        }
+        // Dropdown arrow
+        CreateIcon(box.transform, w - 45f, boxH/2f, 26, CreateArrowSprite(), col);
 
-        // Border with glow
-        GameObject borderObj = new GameObject("Border");
-        borderObj.transform.SetParent(visualRoot.transform, false);
-        RectTransform borderRT = borderObj.AddComponent<RectTransform>();
-        borderRT.anchorMin = Vector2.zero;
-        borderRT.anchorMax = Vector2.one;
-        borderRT.offsetMin = Vector2.zero;
-        borderRT.offsetMax = Vector2.zero;
-
-        Image borderImg = borderObj.AddComponent<Image>();
-        borderImg.raycastTarget = false;
-
-        Shader glowShader = Shader.Find("Custom/GlowingElementBorder");
-        if (glowShader != null)
-        {
-            Material glowMat = new Material(glowShader);
-            glowMat.SetFloat("_Aspect", w / 85);
-            glowMat.SetFloat("_EdgePadding", 0.08f);
-            Color borderGlowCol = Color.Lerp(col, Color.white, 0.75f);
-            glowMat.SetColor("_GlowColor", borderGlowCol);
-            glowMat.SetFloat("_BorderWidth", 0.004f);
-            glowMat.SetFloat("_GlowWidth", 0.025f);
-            glowMat.SetFloat("_GlowIntensity", 2.0f);
-            glowMat.SetFloat("_CornerRadius", 0.15f);
-            glowMat.SetFloat("_PulseEnabled", 0f);
-            borderImg.material = glowMat;
-            borderImg.sprite = GetPixelSprite();
-        }
-
-        // Dropdown icon
-        GameObject dropIcon = new GameObject("DropdownIcon");
-        dropIcon.transform.SetParent(visualRoot.transform, false);
-        RectTransform dropRT = dropIcon.AddComponent<RectTransform>();
-        dropRT.anchorMin = new Vector2(1f, 0.5f);
-        dropRT.anchorMax = new Vector2(1f, 0.5f);
-        dropRT.pivot = new Vector2(1f, 0.5f);
-        dropRT.anchoredPosition = new Vector2(-20, 0);
-        dropRT.sizeDelta = new Vector2(24, 24);
-
-        Image dropImg = dropIcon.AddComponent<Image>();
-        dropImg.sprite = GetIcon("arrow_down");
-        dropImg.preserveAspect = true;
-        dropImg.raycastTarget = false;
-        dropImg.color = Color.Lerp(col, Color.white, 0.85f);
-
-        // Value text
-        GameObject txtObj = new GameObject("Text");
-        txtObj.transform.SetParent(visualRoot.transform, false);
-        RectTransform txtRT = txtObj.AddComponent<RectTransform>();
-        txtRT.anchorMin = Vector2.zero;
-        txtRT.anchorMax = Vector2.one;
-        txtRT.offsetMin = new Vector2(25, 0);
-        txtRT.offsetMax = new Vector2(-60, 0);
-
-        TextMeshProUGUI txt = txtObj.AddComponent<TextMeshProUGUI>();
-        txt.text = value;
-        txt.fontSize = 34;
-        txt.color = Color.white;
-        txt.alignment = TextAlignmentOptions.Left;
-        txt.verticalAlignment = VerticalAlignmentOptions.Middle;
-        txt.fontStyle = FontStyles.Bold;
-        txt.raycastTarget = false;
-        if (customFont) txt.font = customFont;
+        AddButton(box, box.GetComponentInChildren<Image>(), col, () => Debug.Log("Input: " + label));
     }
 
-    void CreateStyledGridItem(Transform parent, float x, float y, float w, float h, string label, string value, Sprite icon, Color col, bool selected)
+    void CreateDropdownBox(Transform parent, float x, float y, float w, float h,
+        string label, string value, Sprite icon, Color col, bool selected)
     {
-        GameObject item = new GameObject("Item_" + label);
-        item.transform.SetParent(parent, false);
-        RectTransform rt = item.AddComponent<RectTransform>();
-        rt.anchorMin = Vector2.zero;
-        rt.anchorMax = Vector2.zero;
-        rt.pivot = Vector2.zero;
-        rt.anchoredPosition = new Vector2(x, y);
-        rt.sizeDelta = new Vector2(w, h);
+        var box = CreateContainer(parent, "Dropdown_" + label, x, y, w, h);
 
-        // Visual root with expansion
-        GameObject visualRoot = new GameObject("Visuals");
-        visualRoot.transform.SetParent(item.transform, false);
-        RectTransform visRT = visualRoot.AddComponent<RectTransform>();
-        float expansion = 0.1f;
-        visRT.anchorMin = new Vector2(-expansion, -expansion);
-        visRT.anchorMax = new Vector2(1f + expansion, 1f + expansion);
-        visRT.offsetMin = Vector2.zero;
-        visRT.offsetMax = Vector2.zero;
+        // Background
+        var bg = CreateBackground(box.transform, w, h, col, 0.38f);
 
-        // Background with shader
-        Image bg = visualRoot.AddComponent<Image>();
-        bg.sprite = GetPixelSprite();
-        bg.raycastTarget = false;
+        // Border
+        CreateBorder(box.transform, w, h, col);
 
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
-        if (glassShader != null)
-        {
-            Material glassMat = new Material(glassShader);
-            glassMat.SetFloat("_CornerRadius", 0.15f);
-            glassMat.SetFloat("_EdgePadding", 0.1f);
-            glassMat.SetFloat("_Aspect", w / h);
-            glassMat.SetColor("_ColorA", new Color(col.r, col.g, col.b, 0.15f));
-            glassMat.SetColor("_ColorB", new Color(col.r, col.g, col.b, 0.05f));
-            glassMat.SetFloat("_GlassAlpha", 0.08f);
-            bg.material = glassMat;
-            bg.color = Color.white;
-        }
-        else
-        {
-            bg.color = new Color(col.r, col.g, col.b, 0.15f);
-        }
+        // Layout theo thiết kế: Icon bên trái, text bên phải
+        float paddingLeft = 30f;
+        float iconSize = 80f;
+        float iconCenterX = paddingLeft + iconSize / 2f;
+        float iconCenterY = h / 2f;
 
-        // Border with glow
-        GameObject borderObj = new GameObject("Border");
-        borderObj.transform.SetParent(visualRoot.transform, false);
-        RectTransform borderRT = borderObj.AddComponent<RectTransform>();
-        borderRT.anchorMin = Vector2.zero;
-        borderRT.anchorMax = Vector2.one;
-        borderRT.offsetMin = Vector2.zero;
-        borderRT.offsetMax = Vector2.zero;
-
-        Image borderImg = borderObj.AddComponent<Image>();
-        borderImg.raycastTarget = false;
-
-        Shader glowShader = Shader.Find("Custom/GlowingElementBorder");
-        if (glowShader != null)
-        {
-            Material glowMat = new Material(glowShader);
-            glowMat.SetFloat("_Aspect", w / h);
-            glowMat.SetFloat("_EdgePadding", 0.1f);
-            Color borderGlowCol = Color.Lerp(col, Color.white, 0.75f);
-            glowMat.SetColor("_GlowColor", borderGlowCol);
-            glowMat.SetFloat("_BorderWidth", 0.005f);
-            glowMat.SetFloat("_GlowWidth", 0.03f);
-            glowMat.SetFloat("_GlowIntensity", 2.2f);
-            glowMat.SetFloat("_CornerRadius", 0.15f);
-            glowMat.SetFloat("_PulseEnabled", 0f);
-            borderImg.material = glowMat;
-            borderImg.sprite = GetPixelSprite();
-        }
-
-        // Icon with glow
+        // Icon (căn giữa theo chiều dọc)
         if (icon != null)
         {
-            GameObject iconObj = new GameObject("Icon");
-            iconObj.transform.SetParent(visualRoot.transform, false);
-            RectTransform iRT = iconObj.AddComponent<RectTransform>();
-            iRT.anchorMin = new Vector2(0, 0.5f);
-            iRT.anchorMax = new Vector2(0, 0.5f);
-            iRT.pivot = new Vector2(0, 0.5f);
-            iRT.anchoredPosition = new Vector2(35, 0);
-            iRT.sizeDelta = new Vector2(60, 60);
-
-            Image iImg = iconObj.AddComponent<Image>();
-            iImg.sprite = icon;
-            iImg.preserveAspect = true;
-            iImg.raycastTarget = false;
-            iImg.color = Color.Lerp(col, Color.white, 0.9f);
-
-            // Glow effects
-            Color glowCol = Color.Lerp(col, Color.white, 0.7f);
-            glowCol.a = 0.4f;
-            float s1 = 2f;
-
-            iconObj.AddComponent<Shadow>().effectColor = glowCol;
-            iconObj.GetComponent<Shadow>().effectDistance = new Vector2(s1, -s1);
-
-            iconObj.AddComponent<Shadow>().effectColor = glowCol;
-            iconObj.GetComponents<Shadow>()[1].effectDistance = new Vector2(-s1, s1);
-
-            Color bloomCol = Color.Lerp(col, Color.white, 0.8f);
-            bloomCol.a = 0.15f;
-            float s2 = 5f;
-
-            iconObj.AddComponent<Shadow>().effectColor = bloomCol;
-            iconObj.GetComponents<Shadow>()[2].effectDistance = new Vector2(s2, -s2);
-
-            iconObj.AddComponent<Shadow>().effectColor = bloomCol;
-            iconObj.GetComponents<Shadow>()[3].effectDistance = new Vector2(-s2, s2);
+            CreateIcon(box.transform, iconCenterX, iconCenterY, iconSize, icon, col);
         }
 
-        // Label
-        GameObject labelObj = new GameObject("Label");
-        labelObj.transform.SetParent(visualRoot.transform, false);
-        RectTransform labelRT = labelObj.AddComponent<RectTransform>();
-        labelRT.anchorMin = new Vector2(0, 0.5f);
-        labelRT.anchorMax = new Vector2(1, 0.5f);
-        labelRT.pivot = new Vector2(0, 0.5f);
-        labelRT.anchoredPosition = new Vector2(110, 10);
-        labelRT.sizeDelta = new Vector2(-150, 30);
+        // Text area
+        float textX = paddingLeft + iconSize + 25f;
+        float textW = w - textX - 60f;
 
-        TextMeshProUGUI labelTxt = labelObj.AddComponent<TextMeshProUGUI>();
-        labelTxt.text = label;
-        labelTxt.fontSize = 24;
-        labelTxt.color = new Color(1, 1, 1, 0.7f);
-        labelTxt.alignment = TextAlignmentOptions.Left;
-        labelTxt.verticalAlignment = VerticalAlignmentOptions.Middle;
-        labelTxt.raycastTarget = false;
-        if (customFont) labelTxt.font = customFont;
+        // Label và Value căn giữa theo chiều dọc
+        float labelH = 36f;
+        float valueH = 50f;
+        float textGap = 8f;
+        float totalTextH = labelH + textGap + valueH;
+        float textStartY = (h - totalTextH) / 2f;
 
-        // Value
-        GameObject valueObj = new GameObject("Value");
-        valueObj.transform.SetParent(visualRoot.transform, false);
-        RectTransform valueRT = valueObj.AddComponent<RectTransform>();
-        valueRT.anchorMin = new Vector2(0, 0.5f);
-        valueRT.anchorMax = new Vector2(1, 0.5f);
-        valueRT.pivot = new Vector2(0, 0.5f);
-        valueRT.anchoredPosition = new Vector2(110, -20);
-        valueRT.sizeDelta = new Vector2(-180, 40);
+        // Label (phía trên)
+        CreateLabel(box.transform, textX, textStartY + valueH + textGap, textW, labelH, label, 30,
+            new Color(1,1,1,0.75f), false, TextAlignmentOptions.Left);
 
-        TextMeshProUGUI valueTxt = valueObj.AddComponent<TextMeshProUGUI>();
-        valueTxt.text = value;
-        valueTxt.fontSize = 36;
-        valueTxt.color = Color.white;
-        valueTxt.alignment = TextAlignmentOptions.Left;
-        valueTxt.verticalAlignment = VerticalAlignmentOptions.Middle;
-        valueTxt.fontStyle = FontStyles.Bold;
-        valueTxt.raycastTarget = false;
-        if (customFont) valueTxt.font = customFont;
+        // Value (phía dưới)
+        CreateLabel(box.transform, textX, textStartY, textW, valueH, value, 42,
+            Color.white, true, TextAlignmentOptions.Left);
 
-        // Dropdown icon
-        GameObject dropIcon = new GameObject("DropdownIcon");
-        dropIcon.transform.SetParent(visualRoot.transform, false);
-        RectTransform dropRT = dropIcon.AddComponent<RectTransform>();
-        dropRT.anchorMin = new Vector2(1f, 0.5f);
-        dropRT.anchorMax = new Vector2(1f, 0.5f);
-        dropRT.pivot = new Vector2(1f, 0.5f);
-        dropRT.anchoredPosition = new Vector2(-25, 0);
-        dropRT.sizeDelta = new Vector2(28, 28);
+        // Dropdown arrow (góc phải, căn giữa)
+        CreateIcon(box.transform, w - 40f, h / 2f, 28, CreateArrowSprite(), new Color(1,1,1,0.85f));
 
-        Image dropImg = dropIcon.AddComponent<Image>();
-        dropImg.sprite = GetIcon("arrow_down");
-        dropImg.preserveAspect = true;
-        dropImg.raycastTarget = false;
-        dropImg.color = Color.Lerp(col, Color.white, 0.85f);
-
-        // Checkmark
+        // Checkmark (top-left corner)
         if (selected)
         {
-            GameObject check = new GameObject("Check");
-            check.transform.SetParent(visualRoot.transform, false);
-            RectTransform cRT = check.AddComponent<RectTransform>();
-            cRT.anchorMin = new Vector2(0, 1);
-            cRT.anchorMax = new Vector2(0, 1);
-            cRT.pivot = new Vector2(0, 1);
-            cRT.anchoredPosition = new Vector2(15, -15);
-            cRT.sizeDelta = new Vector2(36, 36);
-
-            Image cImg = check.AddComponent<Image>();
-            cImg.sprite = GetIcon("check");
-            cImg.preserveAspect = true;
-            cImg.raycastTarget = false;
-            cImg.color = Color.Lerp(col, Color.white, 0.95f);
-
-            // Glow for checkmark
-            Color checkGlow = Color.Lerp(col, Color.white, 0.8f);
-            checkGlow.a = 0.5f;
-
-            check.AddComponent<Shadow>().effectColor = checkGlow;
-            check.GetComponent<Shadow>().effectDistance = new Vector2(2, -2);
-
-            check.AddComponent<Shadow>().effectColor = checkGlow;
-            check.GetComponents<Shadow>()[1].effectDistance = new Vector2(-2, 2);
+            CreateIcon(box.transform, 22f, h - 22f, 24, CreateCheckSprite(), col);
         }
 
-        // Button component
-        Button btn = item.AddComponent<Button>();
-        btn.targetGraphic = bg;
-        btn.onClick.AddListener(() => Debug.Log("Clicked " + label));
-
-        ColorBlock cb = btn.colors;
-        cb.normalColor = Color.white;
-        cb.highlightedColor = new Color(col.r, col.g, col.b, 0.5f);
-        cb.pressedColor = new Color(col.r, col.g, col.b, 0.7f);
-        cb.fadeDuration = 0.1f;
-        btn.colors = cb;
+        AddButton(box, bg, col, () => Debug.Log("Dropdown: " + label));
     }
 
     void CreateConnectButton(Transform parent, float x, float y, float w, float h)
     {
-        GameObject btn = new GameObject("Btn_Connect");
-        btn.transform.SetParent(parent, false);
-        RectTransform rt = btn.AddComponent<RectTransform>();
-        rt.anchorMin = Vector2.zero;
-        rt.anchorMax = Vector2.zero;
+        var btn = CreateContainer(parent, "Btn_Connect", x, y, w, h);
+
+        // Gradient từ themeColor (xanh) sang accentColor (tím)
+        Color gradCol = Color.Lerp(themeColor, accentColor, 0.45f);
+
+        // Background - đậm hơn để nổi bật
+        var bg = CreateBackground(btn.transform, w, h, gradCol, 0.50f);
+
+        // Border với pulse effect mạnh hơn
+        CreateBorder(btn.transform, w, h, gradCol, true);
+
+        // Text với glow mạnh - font lớn hơn
+        var txt = CreateLabel(btn.transform, 0, 0, w, h, "CONNECT", 58, Color.white, true);
+        AddGlow(txt, gradCol);
+
+        AddButton(btn, bg, gradCol, () => Debug.Log("Connect"));
+    }
+
+    // ==================== PRIMITIVES ====================
+
+        Image CreateBackground(Transform parent, float w, float h, Color col, float alpha, float radius = 0.12f, float padding = 0.12f)
+    {
+        var go = new GameObject("Background");
+        go.transform.SetParent(parent, false);
+        var rt = go.AddComponent<RectTransform>();
+
+        float exp = 0.12f;
+        rt.anchorMin = new Vector2(-exp, -exp);
+        rt.anchorMax = new Vector2(1+exp, 1+exp);
+        rt.offsetMin = rt.offsetMax = Vector2.zero;
+
+        var img = go.AddComponent<Image>();
+        img.sprite = GetPixelSprite();
+        img.raycastTarget = false;
+
+        var shader = Shader.Find("Custom/GlassGradientBackground");
+        if (shader != null)
+        {
+            var mat = new Material(shader);
+            mat.SetFloat("_CornerRadius", radius);
+            mat.SetFloat("_EdgePadding", padding);
+            mat.SetFloat("_Aspect", w / h);
+            // Gradient đậm hơn để rõ ràng
+            mat.SetColor("_ColorA", new Color(col.r, col.g, col.b, alpha * 1.1f));
+            mat.SetColor("_ColorB", new Color(col.r, col.g, col.b, alpha * 0.5f));
+            mat.SetFloat("_GlassAlpha", alpha * 0.9f);
+            img.material = mat;
+            img.color = Color.white;
+        }
+        else
+        {
+            img.color = new Color(col.r, col.g, col.b, alpha);
+        }
+
+        return img;
+    }
+
+    void CreateBorder(Transform parent, float w, float h, Color col, bool pulse = false)
+    {
+        var go = new GameObject("Border");
+        go.transform.SetParent(parent, false);
+        var rt = go.AddComponent<RectTransform>();
+
+        float exp = 0.12f;
+        rt.anchorMin = new Vector2(-exp, -exp);
+        rt.anchorMax = new Vector2(1+exp, 1+exp);
+        rt.offsetMin = rt.offsetMax = Vector2.zero;
+
+        var img = go.AddComponent<Image>();
+        img.sprite = GetPixelSprite();
+        img.raycastTarget = false;
+
+        var shader = Shader.Find("Custom/GlowingElementBorder");
+        if (shader != null)
+        {
+            var mat = new Material(shader);
+            mat.SetFloat("_Aspect", w / h);
+            mat.SetFloat("_EdgePadding", 0.12f);
+            mat.SetColor("_GlowColor", Color.Lerp(col, Color.white, 0.85f));
+            mat.SetFloat("_BorderWidth", 0.008f);
+            mat.SetFloat("_GlowWidth", 0.035f);
+            mat.SetFloat("_GlowIntensity", pulse ? 5.0f : 3.5f);
+            mat.SetFloat("_CornerRadius", 0.12f);
+            mat.SetFloat("_PulseEnabled", pulse ? 1f : 0f);
+            if (pulse)
+            {
+                mat.SetFloat("_PulseSpeed", 1.8f);
+                mat.SetFloat("_PulseMin", 0.8f);
+                mat.SetFloat("_PulseMax", 1.4f);
+            }
+            img.material = mat;
+        }
+    }
+
+    Image CreateBorderWithRipple(Transform parent, float w, float h, Color col, bool pulse = false, float borderWidth = 0.005f)
+    {
+        var go = new GameObject("Border");
+        go.transform.SetParent(parent, false);
+        var rt = go.AddComponent<RectTransform>();
+
+        float exp = 0.12f;
+        rt.anchorMin = new Vector2(-exp, -exp);
+        rt.anchorMax = new Vector2(1+exp, 1+exp);
+        rt.offsetMin = rt.offsetMax = Vector2.zero;
+
+        var img = go.AddComponent<Image>();
+        img.sprite = GetPixelSprite();
+        img.raycastTarget = false;
+
+        var shader = Shader.Find("Custom/GlowingElementBorder");
+        if (shader != null)
+        {
+            var mat = new Material(shader);
+            mat.SetFloat("_Aspect", w / h);
+            mat.SetFloat("_EdgePadding", 0.12f);
+
+            Color borderGlowCol = Color.Lerp(col, Color.white, 0.75f);
+            mat.SetColor("_GlowColor", borderGlowCol);
+
+            mat.SetFloat("_BorderWidth", borderWidth);
+            mat.SetFloat("_GlowWidth", 0.03f);
+            mat.SetFloat("_GlowIntensity", pulse ? 5.0f : 2.5f);
+            mat.SetFloat("_CornerRadius", 0.12f);
+            mat.SetFloat("_PulseEnabled", pulse ? 1f : 0f);
+            if (pulse)
+            {
+                mat.SetFloat("_PulseSpeed", 1.8f);
+                mat.SetFloat("_PulseMin", 0.8f);
+                mat.SetFloat("_PulseMax", 1.4f);
+            }
+            img.material = mat;
+
+            // Thêm VRButtonRipple cho hiệu ứng ripple
+            go.AddComponent<VRButtonRipple>().Initialize(mat, img);
+        }
+
+        return img;
+    }
+
+    void CreateIconWithGlow(Transform parent, float x, float y, float size, Sprite sprite, Color col)
+    {
+        var go = new GameObject("Icon");
+        go.transform.SetParent(parent, false);
+        var rt = go.AddComponent<RectTransform>();
+        rt.anchorMin = rt.anchorMax = Vector2.zero;
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = new Vector2(x, y);
+        rt.sizeDelta = new Vector2(size, size);
+
+        var img = go.AddComponent<Image>();
+        img.sprite = sprite;
+        img.preserveAspect = true;
+        img.raycastTarget = false;
+        img.color = Color.Lerp(col, Color.white, 0.9f);
+
+        // Glow Layer 1 - Sharp inner halo
+        Color glowCol = Color.Lerp(col, Color.white, 0.7f);
+        glowCol.a = 0.4f;
+        float s1 = 2f;
+
+        var shadow1 = go.AddComponent<Shadow>();
+        shadow1.effectColor = glowCol;
+        shadow1.effectDistance = new Vector2(s1, -s1);
+
+        var shadow2 = go.AddComponent<Shadow>();
+        shadow2.effectColor = glowCol;
+        shadow2.effectDistance = new Vector2(-s1, s1);
+
+        // Glow Layer 2 - Soft outer bloom
+        Color bloomCol = Color.Lerp(col, Color.white, 0.8f);
+        bloomCol.a = 0.15f;
+        float s2 = 5f;
+
+        var shadow3 = go.AddComponent<Shadow>();
+        shadow3.effectColor = bloomCol;
+        shadow3.effectDistance = new Vector2(s2, -s2);
+
+        var shadow4 = go.AddComponent<Shadow>();
+        shadow4.effectColor = bloomCol;
+        shadow4.effectDistance = new Vector2(-s2, s2);
+    }
+
+    void CreateIcon(Transform parent, float x, float y, float size, Sprite sprite, Color col)
+    {
+        var go = new GameObject("Icon");
+        go.transform.SetParent(parent, false);
+        var rt = go.AddComponent<RectTransform>();
+        rt.anchorMin = rt.anchorMax = Vector2.zero;
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = new Vector2(x, y);
+        rt.sizeDelta = new Vector2(size, size);
+
+        var img = go.AddComponent<Image>();
+        img.sprite = sprite;
+        img.preserveAspect = true;
+        img.raycastTarget = false;
+        // Icon màu sáng hơn để dễ nhìn
+        img.color = Color.Lerp(col, Color.white, 0.95f);
+
+        AddGlow(go, col);
+    }
+
+    GameObject CreateLabel(Transform parent, float x, float y, float w, float h,
+        string text, int fontSize, Color col, bool bold,
+        TextAlignmentOptions align = TextAlignmentOptions.Center)
+    {
+        var go = new GameObject("Label_" + text);
+        go.transform.SetParent(parent, false);
+        var rt = go.AddComponent<RectTransform>();
+        rt.anchorMin = rt.anchorMax = Vector2.zero;
         rt.pivot = Vector2.zero;
         rt.anchoredPosition = new Vector2(x, y);
         rt.sizeDelta = new Vector2(w, h);
 
-        // Visual root with expansion
-        GameObject visualRoot = new GameObject("Visuals");
-        visualRoot.transform.SetParent(btn.transform, false);
-        RectTransform visRT = visualRoot.AddComponent<RectTransform>();
-        float expansion = 0.08f;
-        visRT.anchorMin = new Vector2(-expansion, -expansion);
-        visRT.anchorMax = new Vector2(1f + expansion, 1f + expansion);
-        visRT.offsetMin = Vector2.zero;
-        visRT.offsetMax = Vector2.zero;
-
-        // Background with gradient shader
-        Image bg = visualRoot.AddComponent<Image>();
-        bg.sprite = GetPixelSprite();
-        bg.raycastTarget = false;
-
-        Color gradCol = Color.Lerp(themeColor, accentColor, 0.5f);
-
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
-        if (glassShader != null)
-        {
-            Material glassMat = new Material(glassShader);
-            glassMat.SetFloat("_CornerRadius", 0.15f);
-            glassMat.SetFloat("_EdgePadding", 0.08f);
-            glassMat.SetFloat("_Aspect", w / h);
-            glassMat.SetColor("_ColorA", new Color(gradCol.r, gradCol.g, gradCol.b, 0.25f));
-            glassMat.SetColor("_ColorB", new Color(gradCol.r, gradCol.g, gradCol.b, 0.1f));
-            glassMat.SetFloat("_GlassAlpha", 0.15f);
-            bg.material = glassMat;
-            bg.color = Color.white;
-        }
-        else
-        {
-            bg.color = new Color(gradCol.r, gradCol.g, gradCol.b, 0.25f);
-        }
-
-        // Border with glow
-        GameObject borderObj = new GameObject("Border");
-        borderObj.transform.SetParent(visualRoot.transform, false);
-        RectTransform borderRT = borderObj.AddComponent<RectTransform>();
-        borderRT.anchorMin = Vector2.zero;
-        borderRT.anchorMax = Vector2.one;
-        borderRT.offsetMin = Vector2.zero;
-        borderRT.offsetMax = Vector2.zero;
-
-        Image borderImg = borderObj.AddComponent<Image>();
-        borderImg.raycastTarget = false;
-
-        Shader glowShader = Shader.Find("Custom/GlowingElementBorder");
-        if (glowShader != null)
-        {
-            Material glowMat = new Material(glowShader);
-            glowMat.SetFloat("_Aspect", w / h);
-            glowMat.SetFloat("_EdgePadding", 0.08f);
-            Color borderGlowCol = Color.Lerp(gradCol, Color.white, 0.7f);
-            glowMat.SetColor("_GlowColor", borderGlowCol);
-            glowMat.SetFloat("_BorderWidth", 0.006f);
-            glowMat.SetFloat("_GlowWidth", 0.04f);
-            glowMat.SetFloat("_GlowIntensity", 3.0f);
-            glowMat.SetFloat("_CornerRadius", 0.15f);
-            glowMat.SetFloat("_PulseEnabled", 1f);
-            glowMat.SetFloat("_PulseSpeed", 1.5f);
-            glowMat.SetFloat("_PulseMin", 0.7f);
-            glowMat.SetFloat("_PulseMax", 1.2f);
-            borderImg.material = glowMat;
-            borderImg.sprite = GetPixelSprite();
-        }
-
-        // Text
-        GameObject txtObj = new GameObject("Text");
-        txtObj.transform.SetParent(visualRoot.transform, false);
-        RectTransform txtRT = txtObj.AddComponent<RectTransform>();
-        txtRT.anchorMin = Vector2.zero;
-        txtRT.anchorMax = Vector2.one;
-        txtRT.offsetMin = Vector2.zero;
-        txtRT.offsetMax = Vector2.zero;
-
-        TextMeshProUGUI txt = txtObj.AddComponent<TextMeshProUGUI>();
-        txt.text = "CONNECT";
-        txt.fontSize = 48;
-        txt.color = Color.white;
-        txt.fontStyle = FontStyles.Bold;
-        txt.alignment = TextAlignmentOptions.Center;
-        txt.verticalAlignment = VerticalAlignmentOptions.Middle;
+        var txt = go.AddComponent<TextMeshProUGUI>();
+        txt.text = text;
+        txt.fontSize = fontSize;
+        txt.color = col;
+        txt.alignment = align;
+        txt.fontStyle = bold ? FontStyles.Bold : FontStyles.Normal;
         txt.raycastTarget = false;
+        txt.enableWordWrapping = false;
+        txt.overflowMode = TextOverflowModes.Ellipsis;
         if (customFont) txt.font = customFont;
 
-        // Text glow
-        Color textGlow = Color.Lerp(gradCol, Color.white, 0.8f);
-        textGlow.a = 0.3f;
-
-        txtObj.AddComponent<Shadow>().effectColor = textGlow;
-        txtObj.GetComponent<Shadow>().effectDistance = new Vector2(2, -2);
-
-        txtObj.AddComponent<Shadow>().effectColor = textGlow;
-        txtObj.GetComponents<Shadow>()[1].effectDistance = new Vector2(-2, 2);
-
-        // Button component
-        Button b = btn.AddComponent<Button>();
-        b.targetGraphic = bg;
-        b.onClick.AddListener(() => Debug.Log("Connect"));
-
-        ColorBlock cb = b.colors;
-        cb.normalColor = Color.white;
-        cb.highlightedColor = new Color(gradCol.r, gradCol.g, gradCol.b, 0.6f);
-        cb.pressedColor = new Color(gradCol.r, gradCol.g, gradCol.b, 0.8f);
-        cb.fadeDuration = 0.15f;
-        b.colors = cb;
+        return go;
     }
 
-    // Icons (copy from original)
-    Sprite GetIcon(string name)
+    void AddGlow(GameObject go, Color col)
     {
-        if (_cachedIcons.ContainsKey(name)) return _cachedIcons[name];
-        int w = 64; int h = 64;
-        Texture2D tex = new Texture2D(w, h);
-        Color[] fill = new Color[w*h];
-        for(int k=0; k<fill.Length; k++) fill[k] = Color.clear;
+        // Glow màu sáng hơn và đậm hơn
+        Color glow = Color.Lerp(col, Color.white, 0.8f);
+        glow.a = 0.55f;
 
-        if (name == "arrow_down") DrawArrow(fill, w, h);
-        else if (name == "monitor") DrawMonitor(fill, w, h);
-        else if (name == "resolution") DrawGrid(fill, w, h);
-        else if (name == "bitrate") DrawGauge(fill, w, h);
-        else if (name == "fps") DrawFPS(fill, w, h);
-        else if (name == "check") DrawCheck(fill, w, h);
-        else if (name == "back") DrawBackArrow(fill, w, h);
-        else if (name == "qr") DrawQR(fill, w, h);
+        var s1 = go.AddComponent<Shadow>();
+        s1.effectColor = glow;
+        s1.effectDistance = new Vector2(3, -3);
 
-        tex.SetPixels(fill);
+        var s2 = go.AddComponent<Shadow>();
+        s2.effectColor = glow;
+        s2.effectDistance = new Vector2(-3, 3);
+
+        // Thêm layer glow thứ 3 để rõ hơn
+        var s3 = go.AddComponent<Shadow>();
+        s3.effectColor = new Color(glow.r, glow.g, glow.b, 0.3f);
+        s3.effectDistance = new Vector2(0, 0);
+    }
+
+    void AddButton(GameObject go, Image targetGraphic, Color col, UnityEngine.Events.UnityAction onClick)
+    {
+        // Hit area
+        var hit = new GameObject("HitArea");
+        hit.transform.SetParent(go.transform, false);
+        var hitRT = hit.AddComponent<RectTransform>();
+        hitRT.anchorMin = Vector2.zero;
+        hitRT.anchorMax = Vector2.one;
+        hitRT.offsetMin = hitRT.offsetMax = Vector2.zero;
+
+        var hitImg = hit.AddComponent<Image>();
+        hitImg.color = Color.clear;
+
+        var btn = hit.AddComponent<Button>();
+        btn.targetGraphic = hitImg;
+        btn.onClick.AddListener(onClick);
+
+        var cb = btn.colors;
+        cb.normalColor = Color.clear;
+        cb.highlightedColor = new Color(col.r, col.g, col.b, 0.2f);
+        cb.pressedColor = new Color(col.r, col.g, col.b, 0.35f);
+        cb.fadeDuration = 0.1f;
+        btn.colors = cb;
+    }
+
+    // ==================== SPRITES ====================
+
+    Sprite LoadIcon(string name)
+    {
+        if (_iconCache.ContainsKey(name)) return _iconCache[name];
+
+        var sprite = Resources.Load<Sprite>($"RemoteMenu/icon_{name}");
+        if (sprite != null)
+        {
+            _iconCache[name] = sprite;
+            return sprite;
+        }
+
+        return null;
+    }
+
+    Sprite CreateArrowSprite()
+    {
+        if (_iconCache.ContainsKey("arrow")) return _iconCache["arrow"];
+
+        var tex = new Texture2D(32, 32);
+        var pixels = new Color[32 * 32];
+        for (int i = 0; i < pixels.Length; i++) pixels[i] = Color.clear;
+
+        for (int y = 8; y < 24; y++)
+        {
+            int half = (y - 8) / 2;
+            for (int x = 16 - half; x <= 16 + half; x++)
+                if (x >= 0 && x < 32) pixels[y * 32 + x] = Color.white;
+        }
+
+        tex.SetPixels(pixels);
         tex.Apply();
-        Sprite s = Sprite.Create(tex, new Rect(0,0,w,h), new Vector2(0.5f, 0.5f));
-        _cachedIcons[name] = s;
-        return s;
+        var sprite = Sprite.Create(tex, new Rect(0, 0, 32, 32), Vector2.one * 0.5f);
+        _iconCache["arrow"] = sprite;
+        return sprite;
     }
 
-    void DrawMonitor(Color[] p, int w, int h) {
-        FillRect(p, w, 10, 16, 44, 28);
-        FillRect(p, w, 13, 19, 38, 22);
-        FillRect(p, w, 28, 8, 8, 10);
-        FillRect(p, w, 20, 4, 24, 5);
-    }
-    void DrawGrid(Color[] p, int w, int h) {
-        FillRect(p, w, 8, 12, 48, 40);
-        for(int y=15; y<49; y++) for(int x=11; x<53; x++) p[y*w+x] = Color.clear;
-        for(int x=20; x<50; x+=14) FillRect(p, w, x, 15, 2, 34);
-        for(int y=23; y<50; y+=13) FillRect(p, w, 11, y, 42, 2);
-    }
-    void DrawGauge(Color[] p, int w, int h) {
-        Vector2 center = new Vector2(32, 16);
-        for(int y=0; y<h; y++) {
-            for(int x=0; x<w; x++) {
-                float d = Vector2.Distance(new Vector2(x,y), center);
-                if (d > 18 && d < 22 && y > 16) p[y*w+x] = Color.white;
-                if (d > 12 && d < 15 && y > 16 && x > 20 && x < 44) p[y*w+x] = Color.white;
-            }
+    Sprite CreateCheckSprite()
+    {
+        if (_iconCache.ContainsKey("check")) return _iconCache["check"];
+
+        var tex = new Texture2D(32, 32);
+        var pixels = new Color[32 * 32];
+        for (int i = 0; i < pixels.Length; i++) pixels[i] = Color.clear;
+
+        // Simple checkmark
+        for (int i = 0; i < 8; i++)
+        {
+            int px = 8 + i; int py = 16 + i;
+            if (px < 32 && py < 32) pixels[py * 32 + px] = Color.white;
+            pixels[(py-1) * 32 + px] = Color.white;
         }
-        for(int i=0; i<15; i++) {
-            int nx = 32 + i; int ny = 16 + i;
-            if (nx < w && ny < h) FillRect(p, w, nx, ny, 2, 2);
+        for (int i = 0; i < 12; i++)
+        {
+            int px = 16 + i; int py = 24 - i;
+            if (px < 32 && py >= 0) pixels[py * 32 + px] = Color.white;
+            if (py > 0) pixels[(py-1) * 32 + px] = Color.white;
         }
-    }
-    void DrawFPS(Color[] p, int w, int h) {
-        DrawGauge(p, w, h);
-        for(int i=0; i<5; i++) {
-            float angle = (i * 30f - 60f) * Mathf.Deg2Rad;
-            int tx = (int)(32 + Mathf.Cos(angle) * 20);
-            int ty = (int)(16 + Mathf.Sin(angle) * 20);
-            if (tx >= 0 && tx < w && ty >= 0 && ty < h) FillRect(p, w, tx, ty, 2, 4);
-        }
-    }
-    void DrawArrow(Color[] p, int w, int h) {
-        for(int y=20; y<44; y++) {
-            int halfW = (y - 20) / 2;
-            int startX = 32 - halfW;
-            int endX = 32 + halfW;
-            for(int x=startX; x<=endX && x<w; x++) {
-                if (x >= 0) p[y*w+x] = Color.white;
-            }
-        }
-    }
-    void DrawCheck(Color[] p, int w, int h) {
-        for(int i=0; i<12; i++) {
-            int x = 18 + i/2; int y = 28 + i;
-            if (x < w && y < h) FillRect(p, w, x, y, 3, 3);
-        }
-        for(int i=0; i<18; i++) {
-            int x = 24 + i/2; int y = 40 - i;
-            if (x < w && y >= 0 && y < h) FillRect(p, w, x, y, 3, 3);
-        }
-    }
-    void DrawBackArrow(Color[] p, int w, int h) {
-        FillRect(p, w, 16, 28, 36, 8);
-        for(int i=0; i<10; i++) {
-            FillRect(p, w, 16-i, 32-i, 4, 2);
-            FillRect(p, w, 16-i, 32+i, 4, 2);
-        }
-    }
-    void DrawQR(Color[] p, int w, int h) {
-        int[][] corners = new int[][] {
-            new int[] {8, 8}, new int[] {44, 8}, new int[] {8, 44}
-        };
-        foreach(int[] c in corners) {
-            FillRect(p, w, c[0], c[1], 12, 12);
-            FillRect(p, w, c[0]+3, c[1]+3, 6, 6);
-            for(int y=c[1]+3; y<c[1]+9; y++)
-                for(int x=c[0]+3; x<c[0]+9; x++)
-                    p[y*w+x] = Color.clear;
-        }
-        for(int y=24; y<54; y+=4) {
-            for(int x=24; x<54; x+=4) {
-                if ((x+y)%7 < 3) FillRect(p, w, x, y, 3, 3);
-            }
-        }
-    }
-    void FillRect(Color[] p, int w, int x, int y, int rw, int rh) {
-        for(int j=y; j<y+rh && j<w; j++) for(int i=x; i<x+rw && i<w; i++) {
-            if (i>=0 && j>=0) p[j*w+i] = Color.white;
-        }
+
+        tex.SetPixels(pixels);
+        tex.Apply();
+        var sprite = Sprite.Create(tex, new Rect(0, 0, 32, 32), Vector2.one * 0.5f);
+        _iconCache["check"] = sprite;
+        return sprite;
     }
 
     Sprite GetPixelSprite()
     {
-        if (_pixelSprite) return _pixelSprite;
-        Texture2D tex = new Texture2D(2, 2);
+        if (_pixelSprite != null) return _pixelSprite;
+        var tex = new Texture2D(2, 2);
         tex.SetPixels(new Color[] { Color.white, Color.white, Color.white, Color.white });
         tex.Apply();
         _pixelSprite = Sprite.Create(tex, new Rect(0, 0, 2, 2), Vector2.one * 0.5f);
