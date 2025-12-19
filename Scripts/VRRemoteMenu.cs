@@ -224,16 +224,57 @@ public class VRRemoteMenu : MonoBehaviour
         float boxH = h - labelH - 8f;
         var box = CreateContainer(container.transform, "Box", 0, 0, w, boxH);
 
-        CreateBackground(box.transform, w, boxH, col, 0.32f);
-        CreateBorder(box.transform, w, boxH, col);
+        // Hit Area với BoxCollider cho VR interaction (giống Button)
+        var hitArea = new GameObject("HitArea");
+        hitArea.transform.SetParent(box.transform, false);
+        var hitRT = hitArea.AddComponent<RectTransform>();
+        hitRT.anchorMin = Vector2.zero;
+        hitRT.anchorMax = Vector2.one;
+        hitRT.offsetMin = hitRT.offsetMax = Vector2.zero;
+
+        var hitImg = hitArea.AddComponent<Image>();
+        hitImg.color = Color.clear;
+
+        // BoxCollider cho VR raycast
+        var collider = hitArea.AddComponent<BoxCollider>();
+        collider.size = new Vector3(w, boxH, 0.1f);
+
+        // Visual Root (giống Button)
+        var visualRoot = new GameObject("Visuals");
+        visualRoot.transform.SetParent(hitArea.transform, false);
+        var visRT = visualRoot.AddComponent<RectTransform>();
+        float expansion = -0.02f;
+        visRT.anchorMin = new Vector2(-expansion, -expansion);
+        visRT.anchorMax = new Vector2(1f + expansion, 1f + expansion);
+        visRT.offsetMin = visRT.offsetMax = Vector2.zero;
+
+        // Background - match border radius and padding
+        var bg = CreateBackground(visualRoot.transform, w, boxH, col, 0.32f, 0.12f, 0.12f);
+
+        // Border với VRButtonRipple (giống Button)
+        CreateBorderWithRipple(visualRoot.transform, w, boxH, col, false, 0.008f);
+
+        // Offset để căn giữa trong HitArea (bù cho expansion)
+        float offsetX = w * expansion;
+        float offsetY = boxH * expansion;
 
         // Value text - căn giữa theo chiều dọc
-        CreateLabel(box.transform, 30, 0, w - 90, boxH, value, 42, Color.white, true, TextAlignmentOptions.Left);
+        CreateLabel(visualRoot.transform, 30 + offsetX, offsetY, w - 90, boxH, value, 42, Color.white, true, TextAlignmentOptions.Left);
 
         // Dropdown arrow
-        CreateIcon(box.transform, w - 45f, boxH/2f, 26, CreateArrowSprite(), col);
+        CreateIcon(visualRoot.transform, w - 45f + offsetX, boxH/2f + offsetY, 26, CreateArrowSprite(), col);
 
-        AddButton(box, box.GetComponentInChildren<Image>(), col, () => Debug.Log("Input: " + label));
+        // Button component (giống Button nhưng không có VRButtonAnimation)
+        var button = hitArea.AddComponent<Button>();
+        button.targetGraphic = bg;
+        button.onClick.AddListener(() => Debug.Log("Input: " + label));
+
+        var cb = button.colors;
+        cb.normalColor = Color.white;
+        cb.highlightedColor = new Color(col.r, col.g, col.b, 0.5f);
+        cb.pressedColor = new Color(col.r, col.g, col.b, 0.7f);
+        cb.fadeDuration = 0.1f;
+        button.colors = cb;
     }
 
     void CreateDropdownBox(Transform parent, float x, float y, float w, float h,
@@ -241,53 +282,91 @@ public class VRRemoteMenu : MonoBehaviour
     {
         var box = CreateContainer(parent, "Dropdown_" + label, x, y, w, h);
 
-        // Background
-        var bg = CreateBackground(box.transform, w, h, col, 0.38f);
+        // Hit Area với BoxCollider cho VR interaction (giống Button)
+        var hitArea = new GameObject("HitArea");
+        hitArea.transform.SetParent(box.transform, false);
+        var hitRT = hitArea.AddComponent<RectTransform>();
+        hitRT.anchorMin = Vector2.zero;
+        hitRT.anchorMax = Vector2.one;
+        hitRT.offsetMin = hitRT.offsetMax = Vector2.zero;
 
-        // Border
-        CreateBorder(box.transform, w, h, col);
+        var hitImg = hitArea.AddComponent<Image>();
+        hitImg.color = Color.clear;
+
+        // BoxCollider cho VR raycast
+        var collider = hitArea.AddComponent<BoxCollider>();
+        collider.size = new Vector3(w, h, 0.1f);
+
+        // Visual Root (giống Button)
+        var visualRoot = new GameObject("Visuals");
+        visualRoot.transform.SetParent(hitArea.transform, false);
+        var visRT = visualRoot.AddComponent<RectTransform>();
+        float expansion = -0.02f;
+        visRT.anchorMin = new Vector2(-expansion, -expansion);
+        visRT.anchorMax = new Vector2(1f + expansion, 1f + expansion);
+        visRT.offsetMin = visRT.offsetMax = Vector2.zero;
+
+        // Background - match border radius and padding
+        var bg = CreateBackground(visualRoot.transform, w, h, col, 0.38f, 0.12f, 0.12f);
+
+        // Border với VRButtonRipple (giống Button)
+        CreateBorderWithRipple(visualRoot.transform, w, h, col, false, 0.008f);
+
+        // Offset để căn giữa trong HitArea (bù cho expansion)
+        float offsetX = w * expansion;
+        float offsetY = h * expansion;
 
         // Layout theo thiết kế: Icon bên trái, text bên phải
         float paddingLeft = 30f;
         float iconSize = 80f;
-        float iconCenterX = paddingLeft + iconSize / 2f;
-        float iconCenterY = h / 2f;
+        float iconCenterX = paddingLeft + iconSize / 2f + offsetX;
+        float iconCenterY = h / 2f + offsetY;
 
         // Icon (căn giữa theo chiều dọc)
         if (icon != null)
         {
-            CreateIcon(box.transform, iconCenterX, iconCenterY, iconSize, icon, col);
+            CreateIcon(visualRoot.transform, iconCenterX, iconCenterY, iconSize, icon, col);
         }
 
         // Text area
-        float textX = paddingLeft + iconSize + 25f;
-        float textW = w - textX - 60f;
+        float textX = paddingLeft + iconSize + 25f + offsetX;
+        float textW = w - textX - 60f + offsetX;
 
         // Label và Value căn giữa theo chiều dọc
         float labelH = 36f;
         float valueH = 50f;
         float textGap = 8f;
         float totalTextH = labelH + textGap + valueH;
-        float textStartY = (h - totalTextH) / 2f;
+        float textStartY = (h - totalTextH) / 2f + offsetY;
 
         // Label (phía trên)
-        CreateLabel(box.transform, textX, textStartY + valueH + textGap, textW, labelH, label, 30,
+        CreateLabel(visualRoot.transform, textX, textStartY + valueH + textGap, textW, labelH, label, 30,
             new Color(1,1,1,0.75f), false, TextAlignmentOptions.Left);
 
         // Value (phía dưới)
-        CreateLabel(box.transform, textX, textStartY, textW, valueH, value, 42,
+        CreateLabel(visualRoot.transform, textX, textStartY, textW, valueH, value, 42,
             Color.white, true, TextAlignmentOptions.Left);
 
         // Dropdown arrow (góc phải, căn giữa)
-        CreateIcon(box.transform, w - 40f, h / 2f, 28, CreateArrowSprite(), new Color(1,1,1,0.85f));
+        CreateIcon(visualRoot.transform, w - 40f + offsetX, h / 2f + offsetY, 28, CreateArrowSprite(), new Color(1,1,1,0.85f));
 
         // Checkmark (top-left corner)
         if (selected)
         {
-            CreateIcon(box.transform, 22f, h - 22f, 24, CreateCheckSprite(), col);
+            CreateIcon(visualRoot.transform, 22f + offsetX, h - 22f + offsetY, 24, CreateCheckSprite(), col);
         }
 
-        AddButton(box, bg, col, () => Debug.Log("Dropdown: " + label));
+        // Button component (giống Button nhưng không có VRButtonAnimation)
+        var button = hitArea.AddComponent<Button>();
+        button.targetGraphic = bg;
+        button.onClick.AddListener(() => Debug.Log("Dropdown: " + label));
+
+        var cb = button.colors;
+        cb.normalColor = Color.white;
+        cb.highlightedColor = new Color(col.r, col.g, col.b, 0.5f);
+        cb.pressedColor = new Color(col.r, col.g, col.b, 0.7f);
+        cb.fadeDuration = 0.1f;
+        button.colors = cb;
     }
 
     void CreateConnectButton(Transform parent, float x, float y, float w, float h)

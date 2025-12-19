@@ -361,7 +361,7 @@ public class VRMainMenu : MonoBehaviour
         // We can just call CreateFlexibleButton(wrapper...) 
         // AND we must ensure the Collider size matches 'size'.
         
-        CreateFlexibleButton(wrapper, label, icon, btnColor, onClick, showDropdown, false);
+        CreateFlexibleButton(wrapper, label, icon, btnColor, onClick, showDropdown, false, size);
         
         // Fix Collider Size (The CreateFlexibleButton sets 200,100 default)
         // We find the HitArea/BoxCollider and update it.
@@ -374,7 +374,7 @@ public class VRMainMenu : MonoBehaviour
     }
 
     // Helper to generate the internal visual structure (Kept from New Implementation)
-    void CreateFlexibleButton(GameObject parent, string label, Sprite icon, Color btnColor, UnityEngine.Events.UnityAction onClick, bool showDropdown, bool isWideAction)
+    void CreateFlexibleButton(GameObject parent, string label, Sprite icon, Color btnColor, UnityEngine.Events.UnityAction onClick, bool showDropdown, bool isWideAction, Vector2 size)
     {
         // Parent is the Wrapper from LayoutGroup
         
@@ -418,7 +418,7 @@ public class VRMainMenu : MonoBehaviour
             Material glassMat = new Material(glassShader);
             glassMat.SetFloat("_CornerRadius", 0.12f); 
             glassMat.SetFloat("_EdgePadding", 0.12f); 
-            glassMat.SetFloat("_Aspect", 1.15f); 
+            glassMat.SetFloat("_Aspect", size.x / size.y); 
             
             glassMat.SetColor("_ColorA", new Color(btnColor.r, btnColor.g, btnColor.b, 0.12f)); 
             glassMat.SetColor("_ColorB", new Color(btnColor.r, btnColor.g, btnColor.b, 0.04f)); 
@@ -459,7 +459,7 @@ public class VRMainMenu : MonoBehaviour
         if (glowShader != null)
         {
             Material glowMat = new Material(glowShader);
-            glowMat.SetFloat("_Aspect", 1.15f); 
+            glowMat.SetFloat("_Aspect", size.x / size.y); 
             glowMat.SetFloat("_EdgePadding", 0.12f); 
             
             // TIGHTER AND SHARPER LOOK
