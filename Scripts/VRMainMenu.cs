@@ -183,7 +183,6 @@ public class VRMainMenu : MonoBehaviour
 
         // VRMenuFrame creates: MenuCanvas > GlassBackground > StatusBar > SeparatorLine > ContentContainer
         _menuFrame = gameObject.AddComponent<VRMenuFrame>();
-        _menuFrame.autoBuild = false; // VRMainMenu controls the build
         _menuFrame.customFont = customFont;
         _menuFrame.panelWidth = panelWidth;
         _menuFrame.panelHeight = panelHeight;

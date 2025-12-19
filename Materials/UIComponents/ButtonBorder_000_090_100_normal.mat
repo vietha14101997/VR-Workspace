@@ -36,7 +36,7 @@ Material:
     - _EdgePadding: 0.12
     - _GlowIntensity: 2.5
     - _GlowWidth: 0.03
-    - _HoverAmount: 0
+    - _HoverAmount: 0.00050118245
     - _PulseEnabled: 0
     - _PulseIntensity: 0.1
     - _PulseSpeed: 2
