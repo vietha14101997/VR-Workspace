@@ -43,11 +43,10 @@ public class VRMainMenu : MonoBehaviour
 
 
 
-    private Canvas _canvas;
     private GameObject _gridContainer;
     private Sprite _pixelSprite;
-    
-    // Status References and other cache removed as they are now in VRMenuFrame or unused
+
+    // VRMenuFrame handles: MenuCanvas > GlassBackground > StatusBar > SeparatorLine > ContentContainer
     private VRMenuFrame _menuFrame;
 
 
@@ -62,11 +61,17 @@ public class VRMainMenu : MonoBehaviour
 #if UNITY_EDITOR
         FixIconImportSettings();
 #endif
-        if (_canvas) DestroyImmediate(_canvas.gameObject);
+        // Clean up existing frame
+        if (_menuFrame != null)
+        {
+            if (_menuFrame.Canvas != null) DestroyImmediate(_menuFrame.Canvas.gameObject);
+            DestroyImmediate(_menuFrame);
+        }
         if (_gridContainer) DestroyImmediate(_gridContainer);
+
         var existingCanvas = transform.Find("MenuCanvas");
         if (existingCanvas) DestroyImmediate(existingCanvas.gameObject);
-        
+
         BuildInterface();
     }
 
@@ -174,37 +179,26 @@ public class VRMainMenu : MonoBehaviour
 
     void BuildInterface()
     {
-        Debug.Log("[VRMainMenu] Building Cyberpunk Interface V24 via VRMenuFrame...");
+        Debug.Log("[VRMainMenu] Building Cyberpunk Interface via VRMenuFrame...");
 
-        GameObject canvasGO = new GameObject("MenuCanvas");
-        canvasGO.transform.SetParent(transform, false); 
-
-        float logicalWidth = 1920f;
-        float logicalHeight = (logicalWidth / panelWidth) * panelHeight;
-
-        _canvas = canvasGO.AddComponent<Canvas>();
-        _canvas.renderMode = RenderMode.WorldSpace;
-        
-        RectTransform canvasRT = canvasGO.GetComponent<RectTransform>();
-        canvasRT.sizeDelta = new Vector2(logicalWidth, logicalHeight);
-        float scaleFactor = panelWidth / logicalWidth;
-        canvasRT.localScale = new Vector3(scaleFactor, scaleFactor, 1f);
-        canvasRT.localPosition = new Vector3(0, 0, 0); 
-        _canvas.gameObject.AddComponent<GraphicRaycaster>();
-        
-        // --- ADD FRAME ---
-        _menuFrame = canvasGO.AddComponent<VRMenuFrame>();
-        // Pass any manual overrides if needed, primarily fonts or specific assets if not Auto-loaded
+        // VRMenuFrame creates: MenuCanvas > GlassBackground > StatusBar > SeparatorLine > ContentContainer
+        _menuFrame = gameObject.AddComponent<VRMenuFrame>();
+        _menuFrame.autoBuild = false; // VRMainMenu controls the build
         _menuFrame.customFont = customFont;
-        
-        _menuFrame.Build(logicalWidth, logicalHeight);
-        
-        // --- ADD CONTENT ---
+        _menuFrame.panelWidth = panelWidth;
+        _menuFrame.panelHeight = panelHeight;
+
+        _menuFrame.Build();
+
+        // Add content to the frame
         ShowMainMenu();
 
-        // --- FIX LAYER: Ensure UI has VirtualObjects layer ---
+        // Fix layer: Ensure UI has VirtualObjects layer
         int layerVO = LayerMask.NameToLayer("VirtualObjects");
-        if (layerVO != -1) SetLayerRecursively(canvasGO, layerVO);
+        if (layerVO != -1 && _menuFrame.Canvas != null)
+        {
+            SetLayerRecursively(_menuFrame.Canvas.gameObject, layerVO);
+        }
     }
 
     void SetLayerRecursively(GameObject obj, int newLayer)
@@ -229,17 +223,19 @@ public class VRMainMenu : MonoBehaviour
         }
         _gridContainer = null;
 
-        float logicalWidth = 1920f;
-        float logicalHeight = (logicalWidth / panelWidth) * panelHeight;
-        float contentHeight = logicalHeight - _menuFrame.topMargin;
-
+        // Get dimensions from VRMenuFrame
+        float logicalWidth = _menuFrame.CanvasRect.sizeDelta.x;
+        float logicalHeight = _menuFrame.CanvasRect.sizeDelta.y;
+        float contentHeight = logicalHeight;
 
         BuildMenuLayout(_menuFrame.ContentContainer, logicalWidth, contentHeight, 40f);
-        
+
         Canvas.ForceUpdateCanvases();
-        if (_gridContainer) {
+        if (_gridContainer)
+        {
             var fitter = _gridContainer.GetComponent<GridLayoutGroup>();
-            if(fitter) {
+            if (fitter)
+            {
                 fitter.CalculateLayoutInputHorizontal();
                 fitter.CalculateLayoutInputVertical();
                 fitter.SetLayoutHorizontal();

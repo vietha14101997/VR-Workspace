@@ -9,10 +9,19 @@ using Random = UnityEngine.Random;
 using UnityEditor;
 #endif
 
+[ExecuteAlways]
 public class VRMenuFrame : MonoBehaviour
 {
+    [Header("Panel Size")]
+    public float panelWidth = 1.6f;
+    public float panelHeight = 0.9f;
+    public float logicalWidth = 1920f;
+
+    [Header("Auto Build")]
+    [Tooltip("Automatically build frame on Start()")]
+    public bool autoBuild = true;
+
     [Header("Frame Configuration")]
-    public float topMargin = 35f; // StatusBar Area (minimal height, very close to top edge)
     public float separatorOffset = 80f; // Distance from top edge to separator line
     public float sidePadding = 0f;
 
@@ -53,10 +62,193 @@ public class VRMenuFrame : MonoBehaviour
 
     // Public Access
     public RectTransform ContentContainer { get; private set; }
+    public Canvas Canvas { get; private set; }
+    public RectTransform CanvasRect { get; private set; }
+
+#if UNITY_EDITOR
+    void OnEnable()
+    {
+        // Update materials in Editor mode when component is enabled
+        if (!Application.isPlaying)
+        {
+            UpdateMaterialAspectRatiosEditor();
+        }
+    }
+    void OnValidate()
+    {
+        // Update materials when properties change in Editor
+        if (!Application.isPlaying)
+        {
+            // Delay to avoid issues during serialization
+            UnityEditor.EditorApplication.delayCall += () =>
+            {
+                if (this != null)
+                {
+                    UpdateMaterialAspectRatiosEditor();
+                }
+            };
+        }
+    }
+
+    /// <summary>
+    /// Update materials in Editor mode (modifies asset directly)
+    /// </summary>
+    void UpdateMaterialAspectRatiosEditor()
+    {
+        float logicalHeight = (logicalWidth / panelWidth) * panelHeight;
+        float aspect = logicalWidth / logicalHeight;
+
+        var glassBg = transform.Find("MenuCanvas/GlassBackground");
+        if (glassBg != null)
+        {
+            var img = glassBg.GetComponent<Image>();
+            if (img != null && img.material != null)
+            {
+                img.material.SetFloat("_Aspect", aspect);
+                EditorUtility.SetDirty(img.material);
+            }
+
+            var glowBorder = glassBg.Find("GlowingBorder");
+            if (glowBorder != null)
+            {
+                var borderImg = glowBorder.GetComponent<Image>();
+                if (borderImg != null && borderImg.material != null)
+                {
+                    borderImg.material.SetFloat("_Aspect", aspect);
+                    EditorUtility.SetDirty(borderImg.material);
+                }
+            }
+        }
+    }
+#endif
 
     void Start()
     {
         LoadIcons();
+
+        // Check for existing MenuCanvas from Editor/Prefab
+        if (Canvas == null)
+        {
+            TryInitializeExistingCanvas();
+        }
+
+        // If still no canvas and autoBuild is enabled, create new one
+        if (autoBuild && Canvas == null)
+        {
+            Build();
+        }
+    }
+
+    /// <summary>
+    /// Initialize references from existing MenuCanvas (from prefab/editor).
+    /// Also updates material aspect ratios to fix distortion issues.
+    /// </summary>
+    void TryInitializeExistingCanvas()
+    {
+        Transform existingCanvas = transform.Find("MenuCanvas");
+        if (existingCanvas == null) return;
+
+        Canvas = existingCanvas.GetComponent<Canvas>();
+        if (Canvas == null) return;
+
+        CanvasRect = existingCanvas.GetComponent<RectTransform>();
+
+        // Find ContentContainer
+        Transform contentTransform = existingCanvas.Find("ContentContainer");
+        if (contentTransform != null)
+        {
+            ContentContainer = contentTransform.GetComponent<RectTransform>();
+        }
+
+        // Update material aspect ratios to fix border distortion
+        UpdateMaterialAspectRatios();
+
+        // Setup status bar references
+        SetupStatusBarReferences(existingCanvas);
+
+        Debug.Log("[VRMenuFrame] Initialized from existing MenuCanvas");
+    }
+
+    /// <summary>
+    /// Update aspect ratio in materials to match current panel dimensions.
+    /// This fixes border distortion when using prefab-saved materials.
+    /// </summary>
+    void UpdateMaterialAspectRatios()
+    {
+        float logicalHeight = (logicalWidth / panelWidth) * panelHeight;
+        float aspect = logicalWidth / logicalHeight;
+
+        // Update GlassBackground material
+        var glassBg = transform.Find("MenuCanvas/GlassBackground");
+        if (glassBg != null)
+        {
+            var img = glassBg.GetComponent<Image>();
+            if (img != null && img.material != null)
+            {
+                // Clone material to avoid modifying shared asset
+                img.material = new Material(img.material);
+                img.material.SetFloat("_Aspect", aspect);
+            }
+
+            // Update GlowingBorder material
+            var glowBorder = glassBg.Find("GlowingBorder");
+            if (glowBorder != null)
+            {
+                var borderImg = glowBorder.GetComponent<Image>();
+                if (borderImg != null && borderImg.material != null)
+                {
+                    borderImg.material = new Material(borderImg.material);
+                    borderImg.material.SetFloat("_Aspect", aspect);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Setup references to status bar elements for runtime updates
+    /// </summary>
+    void SetupStatusBarReferences(Transform canvasTransform)
+    {
+        Transform statusBar = canvasTransform.Find("StatusBar");
+        if (statusBar == null) return;
+
+        // Find clock text in LeftGroup
+        Transform leftGroup = statusBar.Find("LeftGroup");
+        if (leftGroup != null)
+        {
+            TextMeshProUGUI[] texts = leftGroup.GetComponentsInChildren<TextMeshProUGUI>();
+            if (texts.Length > 0)
+            {
+                _clockText = texts[0];
+            }
+        }
+
+        // Find network icon and battery in StatusGroup
+        Transform statusGroup = statusBar.Find("StatusGroup");
+        if (statusGroup != null)
+        {
+            Transform netIcon = statusGroup.Find("NetworkIcon");
+            if (netIcon != null)
+            {
+                _networkIcon = netIcon.GetComponent<Image>();
+            }
+
+            Transform battContainer = statusGroup.Find("BatteryContainer");
+            if (battContainer != null)
+            {
+                Transform fill = battContainer.Find("Fill");
+                if (fill != null)
+                {
+                    _batteryFillImage = fill.GetComponent<Image>();
+                }
+
+                TextMeshProUGUI[] battTexts = battContainer.GetComponentsInChildren<TextMeshProUGUI>();
+                if (battTexts.Length > 0)
+                {
+                    _batteryText = battTexts[0];
+                }
+            }
+        }
     }
 
     void Update()
@@ -66,29 +258,230 @@ public class VRMenuFrame : MonoBehaviour
         UpdateBattery();
     }
 
-    public void Build(float width, float height)
+    [ContextMenu("Rebuild Frame")]
+    public void Rebuild()
     {
-        // 1. Create Glass Background & Borders
-        CreateGlassPanel(transform, width, height);
+        // Clean up existing
+        if (Canvas != null)
+        {
+            if (Application.isPlaying)
+                Destroy(Canvas.gameObject);
+            else
+                DestroyImmediate(Canvas.gameObject);
+        }
 
-        // 2. Create Status Bar
-        CreateStatusBar(transform, width, height, topMargin, separatorOffset);
+        var existingCanvas = transform.Find("MenuCanvas");
+        if (existingCanvas)
+        {
+            if (Application.isPlaying)
+                Destroy(existingCanvas.gameObject);
+            else
+                DestroyImmediate(existingCanvas.gameObject);
+        }
 
-        // 3. Create Content Container
+        Build();
+    }
+
+#if UNITY_EDITOR
+    [ContextMenu("Build And Save As Prefab")]
+    public void BuildAndSaveAsPrefab()
+    {
+        // 1. Clean up existing
+        var existingCanvas = transform.Find("MenuCanvas");
+        if (existingCanvas)
+        {
+            DestroyImmediate(existingCanvas.gameObject);
+        }
+        Canvas = null;
+
+        // 2. Build
+        LoadIcons();
+        Build();
+
+        // 3. Save materials as assets and replace runtime materials
+        SaveMaterialsAsAssets();
+
+        // 4. Save as prefab
+        string prefabDir = "Assets/VR-Workspace/Prefabs/UI";
+        if (!AssetDatabase.IsValidFolder(prefabDir))
+        {
+            AssetDatabase.CreateFolder("Assets/VR-Workspace/Prefabs", "UI");
+        }
+
+        string prefabPath = $"{prefabDir}/VRMenuFrame.prefab";
+
+        // Unpack if this is already a prefab instance
+        if (UnityEditor.PrefabUtility.IsPartOfPrefabInstance(gameObject))
+        {
+            UnityEditor.PrefabUtility.UnpackPrefabInstance(gameObject, UnityEditor.PrefabUnpackMode.Completely, UnityEditor.InteractionMode.AutomatedAction);
+        }
+
+        UnityEditor.PrefabUtility.SaveAsPrefabAssetAndConnect(gameObject, prefabPath, UnityEditor.InteractionMode.UserAction);
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+
+        Debug.Log($"[VRMenuFrame] Prefab saved to: {prefabPath}");
+    }
+
+    void SaveMaterialsAsAssets()
+    {
+        string matDir = "Assets/VR-Workspace/Materials/UIComponents";
+        if (!AssetDatabase.IsValidFolder("Assets/VR-Workspace/Materials"))
+            AssetDatabase.CreateFolder("Assets/VR-Workspace", "Materials");
+        if (!AssetDatabase.IsValidFolder(matDir))
+            AssetDatabase.CreateFolder("Assets/VR-Workspace/Materials", "UIComponents");
+
+        float logicalHeight = (logicalWidth / panelWidth) * panelHeight;
+        float w = logicalWidth;
+        float h = logicalHeight;
+
+        // Find and save GlassBackground material
+        var glassBg = transform.Find("MenuCanvas/GlassBackground");
+        if (glassBg != null)
+        {
+            var img = glassBg.GetComponent<Image>();
+            if (img != null && img.material != null)
+            {
+                var savedMat = SaveOrGetMaterial(img.material, "FrameGlassBackground", matDir);
+                if (savedMat != null)
+                {
+                    // Update aspect ratio in case dimensions changed
+                    savedMat.SetFloat("_Aspect", w / h);
+                    EditorUtility.SetDirty(savedMat);
+                    img.material = savedMat;
+                }
+            }
+
+            // Find and save GlowingBorder material
+            var glowBorder = glassBg.Find("GlowingBorder");
+            if (glowBorder != null)
+            {
+                var borderImg = glowBorder.GetComponent<Image>();
+                if (borderImg != null && borderImg.material != null)
+                {
+                    var savedMat = SaveOrGetMaterial(borderImg.material, "FrameGlowingBorder", matDir);
+                    if (savedMat != null)
+                    {
+                        savedMat.SetFloat("_Aspect", w / h);
+                        EditorUtility.SetDirty(savedMat);
+                        borderImg.material = savedMat;
+                    }
+                }
+            }
+        }
+
+        // Find and save RecenterBtn materials
+        var recenterBtn = transform.Find("MenuCanvas/StatusBar/LeftGroup/RecenterBtn");
+        if (recenterBtn != null)
+        {
+            var visuals = recenterBtn.Find("Visuals");
+            if (visuals != null)
+            {
+                // Background
+                var bgImg = visuals.GetComponent<Image>();
+                if (bgImg != null && bgImg.material != null)
+                {
+                    var savedMat = SaveOrGetMaterial(bgImg.material, "RecenterButtonBg", matDir);
+                    if (savedMat != null) bgImg.material = savedMat;
+                }
+
+                // Border
+                var border = visuals.Find("Border");
+                if (border != null)
+                {
+                    var borderImg = border.GetComponent<Image>();
+                    if (borderImg != null && borderImg.material != null)
+                    {
+                        var savedMat = SaveOrGetMaterial(borderImg.material, "RecenterButtonBorder", matDir);
+                        if (savedMat != null)
+                        {
+                            borderImg.material = savedMat;
+                            // Update VRButtonRipple reference
+                            var ripple = border.GetComponent<VRButtonRipple>();
+                            if (ripple != null) ripple.Initialize(savedMat, borderImg);
+                        }
+                    }
+                }
+            }
+        }
+
+        AssetDatabase.SaveAssets();
+    }
+
+    Material SaveOrGetMaterial(Material runtimeMat, string name, string dir)
+    {
+        string path = $"{dir}/{name}.mat";
+
+        // Check if already exists
+        var existingMat = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (existingMat != null)
+        {
+            // Copy properties from runtime material to existing asset
+            existingMat.CopyPropertiesFromMaterial(runtimeMat);
+            EditorUtility.SetDirty(existingMat);
+            return existingMat;
+        }
+
+        // Create new asset from runtime material
+        var newMat = new Material(runtimeMat);
+        AssetDatabase.CreateAsset(newMat, path);
+        return AssetDatabase.LoadAssetAtPath<Material>(path);
+    }
+#endif
+
+    /// <summary>
+    /// Build the complete menu frame hierarchy using configured panel size.
+    /// MenuCanvas > GlassBackground > StatusBar > SeparatorLine > ContentContainer
+    /// </summary>
+    public void Build()
+    {
+        Build(panelWidth, panelHeight, logicalWidth);
+    }
+
+    /// <summary>
+    /// Build the complete menu frame hierarchy with custom dimensions.
+    /// MenuCanvas > GlassBackground > StatusBar > SeparatorLine > ContentContainer
+    /// </summary>
+    public void Build(float width, float height, float logicWidth = 1920f)
+    {
+        // Store dimensions
+        panelWidth = width;
+        panelHeight = height;
+        logicalWidth = logicWidth;
+
+        float logicalHeight = (logicalWidth / panelWidth) * panelHeight;
+
+        // 1. Create MenuCanvas
+        GameObject canvasGO = new GameObject("MenuCanvas");
+        canvasGO.transform.SetParent(transform, false);
+
+        Canvas = canvasGO.AddComponent<Canvas>();
+        Canvas.renderMode = RenderMode.WorldSpace;
+
+        CanvasRect = canvasGO.GetComponent<RectTransform>();
+        CanvasRect.sizeDelta = new Vector2(logicalWidth, logicalHeight);
+        float scaleFactor = panelWidth / logicalWidth;
+        CanvasRect.localScale = new Vector3(scaleFactor, scaleFactor, 1f);
+        CanvasRect.localPosition = Vector3.zero;
+
+        canvasGO.AddComponent<GraphicRaycaster>();
+
+        // 2. Create Glass Background & Borders
+        CreateGlassPanel(CanvasRect, logicalWidth, logicalHeight);
+
+        // 3. Create Status Bar
+        CreateStatusBar(CanvasRect, logicalWidth, logicalHeight, separatorOffset);
+
+        // 4. Create Content Container
         GameObject contentObj = new GameObject("ContentContainer");
-        contentObj.transform.SetParent(transform, false);
+        contentObj.transform.SetParent(CanvasRect, false);
         ContentContainer = contentObj.AddComponent<RectTransform>();
 
         // Fill the space BELOW separator line
-        // Anchor to bottom-left (0,0) to top-right (1,1)
         ContentContainer.anchorMin = Vector2.zero;
         ContentContainer.anchorMax = Vector2.one;
-        // offsetMin controls BOTTOM edge - no offset from bottom
-        // offsetMax controls TOP edge - push down by separatorOffset pixels
         ContentContainer.offsetMin = Vector2.zero;
         ContentContainer.offsetMax = new Vector2(0, -separatorOffset);
-
-        // Add a layer for Raycasting/Interaction if needed, or leave empty
     }
 
     // --- LOGIC ---
@@ -646,7 +1039,7 @@ public class VRMenuFrame : MonoBehaviour
         return _recenterSprite;
     }
 
-    void CreateStatusBar(Transform parent, float w, float h, float height, float separatorY)
+    void CreateStatusBar(Transform parent, float w, float h, float separatorY)
     {
         GameObject barObj = new GameObject("StatusBar");
         barObj.transform.SetParent(parent, false);
@@ -654,8 +1047,7 @@ public class VRMenuFrame : MonoBehaviour
 
         rt.anchorMin = new Vector2(0, 1);
         rt.anchorMax = new Vector2(1, 1);
-        rt.pivot = new Vector2(0.5f, 1f);
-        rt.sizeDelta = new Vector2(0, height);
+        rt.pivot = new Vector2(0, 0.5f);
         rt.anchoredPosition = Vector2.zero;
         
         // --- LEFT GROUP (Clock + Recenter) ---
