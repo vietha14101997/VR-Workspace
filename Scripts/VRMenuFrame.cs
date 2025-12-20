@@ -1276,7 +1276,7 @@ public class VRMenuFrame : MonoBehaviour
             width = size,
             height = size,
             iconOnly = true,
-            iconSize = size * 0.52f, // Tăng 15% (0.45 -> 0.52)
+            iconSize = size * 0.45f,
             borderWidth = 0.025f,
             cornerRadius = 0.15f,
             popAmount = 0.0125f
@@ -1290,7 +1290,7 @@ public class VRMenuFrame : MonoBehaviour
         rt.anchorMin = new Vector2(0, 0.5f);
         rt.anchorMax = new Vector2(0, 0.5f);
         rt.pivot = new Vector2(0, 0.5f);
-        rt.anchoredPosition = new Vector2(clockWidth + size / 2f + 30f, 0);
+        rt.anchoredPosition = new Vector2(clockWidth + 30f, 0);
     }
 
     float CreateBatteryIndicator(Transform parent)
@@ -1359,12 +1359,10 @@ public class VRMenuFrame : MonoBehaviour
         lineObj.transform.SetParent(parent, false);
         RectTransform rt = lineObj.AddComponent<RectTransform>();
 
-        float lineWidth = w * 1.05f;
-
         rt.anchorMin = new Vector2(0.5f, 0);
         rt.anchorMax = new Vector2(0.5f, 0);
         rt.pivot = new Vector2(0.5f, 1f);
-        rt.sizeDelta = new Vector2(lineWidth, 2f);
+        rt.sizeDelta = new Vector2(w, parent.GetComponent<RectTransform>().sizeDelta.y * 0.03f);
         rt.anchoredPosition = new Vector2(0, 0);
 
         Image img = lineObj.AddComponent<Image>();

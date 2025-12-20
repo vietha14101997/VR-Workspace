@@ -195,7 +195,7 @@ public class VRRemoteMenu : MonoBehaviour
             iconOnly = hasIcon && !hasText,
             textOnly = hasText && !hasIcon,
             horizontalLayout = hasIcon && hasText, // Icon trái, Text phải cho buttons như Back
-            iconSize = hasIcon && !hasText ? 72f : 44f,
+            iconSize = hasIcon && !hasText ? 44f : 44f,
             iconPadding = hasIcon && hasText ? 64f : 28f, // Padding lớn hơn cho horizontal layout
             backgroundAlpha = 0.28f,
             borderWidth = 0.04f,

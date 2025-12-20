@@ -323,8 +323,10 @@ public static class VRButtonFactory
 
         if (config.iconOnly && config.icon != null)
         {
-            // Icon only - căn giữa
-            CreateIconWithGlow(content.transform, 0.5f, 0.5f, config.iconSize, config.icon, config.themeColor, true);
+            // Icon only - căn giữa, tính anchor spread dựa trên iconSize và button size
+            float anchorHalfW = (config.iconSize / 2f) / config.width;
+            float anchorHalfH = (config.iconSize / 2f) / config.height;
+            CreateIconWithGlow(content.transform, 0.5f, 0.5f, anchorHalfW, anchorHalfH, config.icon, config.themeColor, true);
         }
         else if (config.textOnly)
         {
@@ -338,11 +340,8 @@ public static class VRButtonFactory
         }
         else if (hasIcon && hasText)
         {
-            // Vertical layout: Icon trên, Text dưới (default)
-            float iconCenterX = config.iconPadding + config.iconSize / 2f;
-            float iconAnchorX = iconCenterX / config.width;
-
-            CreateIconWithGlow(content.transform, iconAnchorX, 0.57f, config.iconSize, config.icon, config.themeColor, false);
+            // Vertical layout: Icon trên, Text dưới (default) - dùng fixed anchors
+            CreateIconWithGlow(content.transform, 0.5f, 0.57f, 0f, 0f, config.icon, config.themeColor, false);
             CreateTextBelow(content.transform, config.label, config.fontSize, config.font, 0.18f, 0.42f);
         }
         else if (hasText)
@@ -353,7 +352,7 @@ public static class VRButtonFactory
     }
 
     private static void CreateIconWithGlow(Transform parent, float anchorX, float anchorY,
-        float size, Sprite sprite, Color col, bool useAnchorCenter)
+        float anchorHalfW, float anchorHalfH, Sprite sprite, Color col, bool useAnchorCenter)
     {
         GameObject iconObj = new GameObject("Icon");
         iconObj.transform.SetParent(parent, false);
@@ -361,13 +360,15 @@ public static class VRButtonFactory
 
         if (useAnchorCenter)
         {
-            rt.anchorMin = new Vector2(anchorX - 0.15f, anchorY - 0.15f);
-            rt.anchorMax = new Vector2(anchorX + 0.15f, anchorY + 0.15f);
+            // Icon-only buttons: sử dụng anchor spread được tính toán
+            rt.anchorMin = new Vector2(anchorX - anchorHalfW, anchorY - anchorHalfH);
+            rt.anchorMax = new Vector2(anchorX + anchorHalfW, anchorY + anchorHalfH);
             rt.offsetMin = Vector2.zero;
             rt.offsetMax = Vector2.zero;
         }
         else
         {
+            // Vertical layout (icon trên, text dưới): dùng fixed anchors
             rt.anchorMin = new Vector2(0.35f, 0.42f);
             rt.anchorMax = new Vector2(0.65f, 0.72f);
             rt.offsetMin = Vector2.zero;
