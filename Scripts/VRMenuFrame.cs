@@ -192,10 +192,40 @@ public class VRMenuFrame : MonoBehaviour
         // Re-initialize floating data animations
         ReinitializeFloatingDataEffects();
 
+        // Re-register recenter button click event
+        SetupRecenterButtonListener();
+
         if (ContentContainer != null)
         {
             Debug.Log("[VRMenuFrame] Initialized from existing content");
         }
+    }
+
+    /// <summary>
+    /// Re-register the recenter button click listener when loading from prefab
+    /// </summary>
+    void SetupRecenterButtonListener()
+    {
+        Transform recenterBtn = transform.Find("StatusBar/LeftGroup/RecenterBtn");
+        if (recenterBtn == null) return;
+
+        Button btn = recenterBtn.GetComponent<Button>();
+        if (btn == null)
+        {
+            btn = recenterBtn.gameObject.AddComponent<Button>();
+
+            // Set target graphic
+            Transform visuals = recenterBtn.Find("Visuals");
+            if (visuals != null)
+            {
+                Image bgImg = visuals.GetComponent<Image>();
+                if (bgImg != null) btn.targetGraphic = bgImg;
+            }
+        }
+
+        // Remove old listeners and add fresh one
+        btn.onClick.RemoveAllListeners();
+        btn.onClick.AddListener(RecenterObject);
     }
 
     /// <summary>

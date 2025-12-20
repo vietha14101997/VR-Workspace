@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections.Generic;
+using System;
 
 public class VRRemoteMenu : MonoBehaviour
 {
@@ -9,13 +10,25 @@ public class VRRemoteMenu : MonoBehaviour
     public Color accentColor = new Color(0.8f, 0.4f, 1.0f);
     public TMP_FontAsset customFont;
 
-    private VRMainMenu _mainMenu;
     private Sprite _pixelSprite;
     private Dictionary<string, Sprite> _iconCache = new Dictionary<string, Sprite>();
+
+    // Event callbacks
+    public event Action OnBackClicked;
+    public event Action OnConnectClicked;
+    public event Action OnQRClicked;
+
+    private VRMainMenu _mainMenu;
 
     public void BuildUI(Transform parent, VRMainMenu mainMenu)
     {
         _mainMenu = mainMenu;
+        OnBackClicked += () => _mainMenu?.ReturnToMainMenu();
+        BuildUI(parent);
+    }
+
+    public void BuildUI(Transform parent)
+    {
 
         // Canvas area: 1920 x 1080, content below status bar (~1000)
         float W = 1920f;
@@ -58,7 +71,7 @@ public class VRRemoteMenu : MonoBehaviour
         // Back button
         float backW = 240f;
         CreateButton(header.transform, 0, 0, backW, h, "Back", LoadIcon("back"), themeColor,
-            () => _mainMenu.ReturnToMainMenu());
+            () => OnBackClicked?.Invoke());
 
         // Title - font lớn hơn
         float titleX = backW + 35f;
@@ -67,7 +80,7 @@ public class VRRemoteMenu : MonoBehaviour
         // QR button
         float qrSize = 100f;
         CreateButton(header.transform, w - qrSize, (h - qrSize) / 2f, qrSize, qrSize, "", LoadIcon("qr"), accentColor,
-            () => Debug.Log("QR"));
+            () => OnQRClicked?.Invoke());
     }
 
     void CreateInputRow(Transform parent, float x, float y, float w, float h)
@@ -386,7 +399,7 @@ public class VRRemoteMenu : MonoBehaviour
         var txt = CreateLabel(btn.transform, 0, 0, w, h, "CONNECT", 58, Color.white, true);
         AddGlow(txt, gradCol);
 
-        AddButton(btn, bg, gradCol, () => Debug.Log("Connect"));
+        AddButton(btn, bg, gradCol, () => OnConnectClicked?.Invoke());
     }
 
     // ==================== PRIMITIVES ====================

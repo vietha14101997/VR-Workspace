@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: ButtonBorder_000_090_100_normal
+  m_Name: MainMenuBtn4_Border
   m_Shader: {fileID: 4800000, guid: 94679d25754ac2c47b62149a46822afe, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -36,7 +36,7 @@ Material:
     - _EdgePadding: 0.12
     - _GlowIntensity: 2.5
     - _GlowWidth: 0.03
-    - _HoverAmount: 3e-45
+    - _HoverAmount: 0
     - _PulseEnabled: 0
     - _PulseIntensity: 0.1
     - _PulseSpeed: 2
@@ -50,6 +50,6 @@ Material:
     m_Colors:
     - _BackgroundColor: {r: 0, g: 0.29999998, b: 0.5, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
-    - _GlowColor: {r: 0.75, g: 0.975, b: 1, a: 1}
+    - _GlowColor: {r: 0.93921566, g: 0.8392157, b: 1, a: 1}
     - _RippleCenter: {r: 0.5, g: 0.5, b: 0, a: 0}
   m_BuildTextureStacks: []
