@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using System.Collections;
 using System.Collections.Generic;
 using System;
 using Random = UnityEngine.Random;
@@ -50,7 +49,6 @@ public class VRMainMenu : MonoBehaviour
     // Internal
     private VRMenuFrame _menuFrame;
     private GridLayoutGroup _gridLayout;
-    private Sprite _pixelSprite;
     private bool _isBuilt = false;
     private Vector2 _currentCellSize;
 
@@ -136,7 +134,7 @@ public class VRMainMenu : MonoBehaviour
         if (!AssetDatabase.IsValidFolder(matDir))
             AssetDatabase.CreateFolder("Assets/VR-Workspace/Materials", "UIComponents");
 
-        // Save button materials
+        // Save button materials (VRButtonFactory structure: Wrapper/HitArea/Visuals/Background, Border)
         int btnIndex = 0;
         foreach (Transform child in transform)
         {
@@ -148,12 +146,16 @@ public class VRMainMenu : MonoBehaviour
             Transform visuals = hitArea.Find("Visuals");
             if (visuals == null) continue;
 
-            // Background material
-            var bgImg = visuals.GetComponent<Image>();
-            if (bgImg != null && bgImg.material != null)
+            // Background material (VRButtonFactory creates Background as child of Visuals)
+            Transform background = visuals.Find("Background");
+            if (background != null)
             {
-                var savedMat = SaveOrGetMaterial(bgImg.material, $"MainMenuBtn{btnIndex}_Bg", matDir);
-                if (savedMat != null) bgImg.material = savedMat;
+                var bgImg = background.GetComponent<Image>();
+                if (bgImg != null && bgImg.material != null)
+                {
+                    var savedMat = SaveOrGetMaterial(bgImg.material, $"MainMenuBtn{btnIndex}_Bg", matDir);
+                    if (savedMat != null) bgImg.material = savedMat;
+                }
             }
 
             // Border material
@@ -314,7 +316,9 @@ public class VRMainMenu : MonoBehaviour
 
     void ReapplyRuntimeSprites()
     {
-        // Re-apply pixel sprites that don't serialize
+        // Re-apply pixel sprites that don't serialize (VRButtonFactory structure)
+        Sprite pixelSprite = null;
+
         foreach (Transform child in transform)
         {
             if (!child.name.StartsWith("Btn_")) continue;
@@ -325,11 +329,24 @@ public class VRMainMenu : MonoBehaviour
             Transform visuals = hitArea.Find("Visuals");
             if (visuals == null) continue;
 
-            // Background
-            var bgImg = visuals.GetComponent<Image>();
-            if (bgImg != null && bgImg.sprite == null)
+            // Lazy create pixel sprite
+            if (pixelSprite == null)
             {
-                bgImg.sprite = GetPixelSprite();
+                Texture2D tex = new Texture2D(2, 2);
+                tex.SetPixels(new Color[] { Color.white, Color.white, Color.white, Color.white });
+                tex.Apply();
+                pixelSprite = Sprite.Create(tex, new Rect(0, 0, 2, 2), Vector2.one * 0.5f);
+            }
+
+            // Background (VRButtonFactory creates Background as child of Visuals)
+            Transform background = visuals.Find("Background");
+            if (background != null)
+            {
+                var bgImg = background.GetComponent<Image>();
+                if (bgImg != null && bgImg.sprite == null)
+                {
+                    bgImg.sprite = pixelSprite;
+                }
             }
 
             // Border
@@ -339,7 +356,7 @@ public class VRMainMenu : MonoBehaviour
                 var borderImg = border.GetComponent<Image>();
                 if (borderImg != null && borderImg.sprite == null)
                 {
-                    borderImg.sprite = GetPixelSprite();
+                    borderImg.sprite = pixelSprite;
                 }
             }
         }
@@ -403,7 +420,7 @@ public class VRMainMenu : MonoBehaviour
 
             btn.onClick.RemoveAllListeners();
             int index = i;
-            btn.onClick.AddListener(() => StartCoroutine(DelayedAction(actions[index], 0.25f)));
+            btn.onClick.AddListener(actions[index]);
         }
     }
 
@@ -429,16 +446,6 @@ public class VRMainMenu : MonoBehaviour
         if (iconFiles == null) iconFiles = Resources.Load<Sprite>("MainMenu/icon_files");
         if (iconSettings == null) iconSettings = Resources.Load<Sprite>("MainMenu/icon_settings");
         if (iconQuit == null) iconQuit = Resources.Load<Sprite>("MainMenu/icon_quit");
-    }
-
-    Sprite GetPixelSprite()
-    {
-        if (_pixelSprite) return _pixelSprite;
-        Texture2D tex = new Texture2D(2, 2);
-        tex.SetPixels(new Color[] { Color.white, Color.white, Color.white, Color.white });
-        tex.Apply();
-        _pixelSprite = Sprite.Create(tex, new Rect(0, 0, 2, 2), Vector2.one * 0.5f);
-        return _pixelSprite;
     }
 
     // --- MAIN BUILD ---
@@ -599,214 +606,23 @@ public class VRMainMenu : MonoBehaviour
         _gridLayout.cellSize = new Vector2(finalW, finalH);
     }
 
-    // --- BUTTON CREATION ---
+    // --- BUTTON CREATION (using VRButtonFactory) ---
 
     void CreateGridButton(string label, Sprite icon, Color btnColor, Vector2 size, UnityEngine.Events.UnityAction onClick)
     {
-        GameObject wrapper = new GameObject("Btn_" + label);
-        wrapper.transform.SetParent(transform, false);
-        RectTransform wrapperRT = wrapper.AddComponent<RectTransform>();
-
-        CreateButtonVisuals(wrapper, label, icon, btnColor, onClick, size);
-    }
-
-    void CreateButtonVisuals(GameObject parent, string label, Sprite icon, Color btnColor, UnityEngine.Events.UnityAction onClick, Vector2 size)
-    {
-        // 1. Hit Area
-        GameObject btnHitObj = new GameObject("HitArea");
-        btnHitObj.transform.SetParent(parent.transform, false);
-        RectTransform hitRT = btnHitObj.AddComponent<RectTransform>();
-        hitRT.anchorMin = Vector2.zero;
-        hitRT.anchorMax = Vector2.one;
-        hitRT.offsetMin = Vector2.zero;
-        hitRT.offsetMax = Vector2.zero;
-
-        Image hitImg = btnHitObj.AddComponent<Image>();
-        hitImg.color = Color.clear;
-
-        // Collider - use logical pixels, very thin
-        BoxCollider col = btnHitObj.AddComponent<BoxCollider>();
-        col.size = new Vector3(size.x, size.y, 0.1f);
-        col.center = new Vector3(0, 0, -0.1f); // Slightly forward so buttons are in front of background
-
-        // Set layer to VirtualObjects for VRGazeReticle raycast
-        int vrLayer = LayerMask.NameToLayer("VirtualObjects");
-        if (vrLayer != -1) btnHitObj.layer = vrLayer;
-
-        // 2. Visual Root
-        GameObject visualRoot = new GameObject("Visuals");
-        visualRoot.transform.SetParent(btnHitObj.transform, false);
-        RectTransform visRT = visualRoot.AddComponent<RectTransform>();
-
-        float expansion = 0.12f;
-        visRT.anchorMin = new Vector2(-expansion, -expansion);
-        visRT.anchorMax = new Vector2(1f + expansion, 1f + expansion);
-        visRT.offsetMin = Vector2.zero;
-        visRT.offsetMax = Vector2.zero;
-
-        // Background
-        Image bg = visualRoot.AddComponent<Image>();
-        bg.sprite = GetPixelSprite();
-        bg.type = Image.Type.Simple;
-        bg.raycastTarget = false;
-
-        Color baseTint = new Color(btnColor.r, btnColor.g, btnColor.b, 0.08f);
-
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
-        if (glassShader != null)
+        var config = new VRButtonFactory.ButtonConfig
         {
-            Material glassMat = new Material(glassShader);
-            glassMat.SetFloat("_CornerRadius", 0.12f);
-            glassMat.SetFloat("_EdgePadding", 0.12f);
-            glassMat.SetFloat("_Aspect", size.x / size.y);
+            label = label,
+            icon = icon,
+            themeColor = btnColor,
+            width = size.x,
+            height = size.y,
+            fontSize = fontSize,
+            font = customFont,
+            popAmount = 0.05f
+        };
 
-            glassMat.SetColor("_ColorA", new Color(btnColor.r, btnColor.g, btnColor.b, 0.12f));
-            glassMat.SetColor("_ColorB", new Color(btnColor.r, btnColor.g, btnColor.b, 0.04f));
-            glassMat.SetFloat("_GlassAlpha", 0.075f);
-
-            bg.material = glassMat;
-            bg.color = Color.white;
-        }
-        else
-        {
-            bg.color = baseTint;
-        }
-
-        // Button Interaction
-        Button btn = btnHitObj.AddComponent<Button>();
-        btn.targetGraphic = bg;
-        btn.transition = Selectable.Transition.None; // Disable flash effect on click
-        if (Application.isPlaying)
-        {
-            btn.onClick.AddListener(() => StartCoroutine(DelayedAction(onClick, 0.25f)));
-        }
-
-        // --- BORDER ---
-        GameObject borderObj = new GameObject("Border");
-        borderObj.transform.SetParent(visualRoot.transform, false);
-        RectTransform borderRT = borderObj.AddComponent<RectTransform>();
-        borderRT.anchorMin = Vector2.zero;
-        borderRT.anchorMax = Vector2.one;
-        borderRT.offsetMin = Vector2.zero;
-        borderRT.offsetMax = Vector2.zero;
-
-        Image borderImg = borderObj.AddComponent<Image>();
-        borderImg.raycastTarget = false;
-
-        Shader glowShader = Shader.Find("Custom/GlowingElementBorder");
-        if (glowShader != null)
-        {
-            Material glowMat = new Material(glowShader);
-            glowMat.SetFloat("_Aspect", size.x / size.y);
-            glowMat.SetFloat("_EdgePadding", 0.12f);
-
-            Color borderGlowCol = Color.Lerp(btnColor, Color.white, 0.75f);
-            glowMat.SetColor("_GlowColor", borderGlowCol);
-
-            glowMat.SetFloat("_BorderWidth", 0.005f);
-            glowMat.SetFloat("_GlowWidth", 0.03f);
-            glowMat.SetFloat("_GlowIntensity", 2.5f);
-            glowMat.SetFloat("_CornerRadius", 0.12f);
-            glowMat.SetFloat("_PulseEnabled", 0f);
-
-            borderImg.material = glowMat;
-            borderImg.sprite = GetPixelSprite();
-
-            borderObj.AddComponent<VRButtonRipple>().Initialize(glowMat, borderImg);
-        }
-
-        // --- CONTENT ---
-        GameObject content = new GameObject("Content");
-        content.transform.SetParent(visualRoot.transform, false);
-        RectTransform cRT = content.AddComponent<RectTransform>();
-        cRT.anchorMin = Vector2.zero;
-        cRT.anchorMax = Vector2.one;
-        cRT.sizeDelta = Vector2.zero;
-
-        // Icon
-        if (icon != null)
-        {
-            GameObject iconObj = new GameObject("Icon");
-            iconObj.transform.SetParent(content.transform, false);
-            Image iconImg = iconObj.AddComponent<Image>();
-            iconImg.sprite = icon;
-            iconImg.preserveAspect = true;
-            iconImg.raycastTarget = false;
-
-            iconImg.color = Color.Lerp(btnColor, Color.white, 0.9f);
-
-            // Glow effects
-            Color glowCol = Color.Lerp(btnColor, Color.white, 0.7f);
-            glowCol.a = 0.4f;
-            float s1 = 2f;
-
-            iconObj.AddComponent<Shadow>().effectColor = glowCol;
-            iconObj.GetComponent<Shadow>().effectDistance = new Vector2(s1, -s1);
-
-            iconObj.AddComponent<Shadow>().effectColor = glowCol;
-            iconObj.GetComponents<Shadow>()[1].effectDistance = new Vector2(-s1, s1);
-
-            Color bloomCol = Color.Lerp(btnColor, Color.white, 0.8f);
-            bloomCol.a = 0.15f;
-            float s2 = 5f;
-
-            iconObj.AddComponent<Shadow>().effectColor = bloomCol;
-            iconObj.GetComponents<Shadow>()[2].effectDistance = new Vector2(s2, -s2);
-
-            iconObj.AddComponent<Shadow>().effectColor = bloomCol;
-            iconObj.GetComponents<Shadow>()[3].effectDistance = new Vector2(-s2, s2);
-
-            RectTransform iRT = iconObj.GetComponent<RectTransform>();
-            iRT.anchorMin = new Vector2(0.35f, 0.42f);
-            iRT.anchorMax = new Vector2(0.65f, 0.72f);
-            iRT.offsetMin = Vector2.zero;
-            iRT.offsetMax = Vector2.zero;
-        }
-
-        // Text
-        GameObject tObj = CreateText(content.transform, label, Vector2.zero, fontSize, Color.white, true);
-        RectTransform tRT = tObj.GetComponent<RectTransform>();
-        tRT.anchorMin = new Vector2(0f, 0.18f);
-        tRT.anchorMax = new Vector2(1f, 0.42f);
-        tRT.offsetMin = Vector2.zero;
-        tRT.offsetMax = Vector2.zero;
-
-        // Animation
-        var anim = btnHitObj.AddComponent<VRButtonAnimation>();
-        anim.targetVisuals = visualRoot.transform;
-        anim.popAmount = 0.05f;
-    }
-
-    GameObject CreateText(Transform parent, string content, Vector2 pos, int size, Color c, bool bold = false)
-    {
-        var go = new GameObject("TextTMP");
-        go.transform.SetParent(parent, false);
-
-        var txt = go.AddComponent<TextMeshProUGUI>();
-        if (customFont != null) txt.font = customFont;
-
-        txt.text = content;
-        txt.fontSize = size;
-        txt.color = c;
-        txt.alignment = TextAlignmentOptions.Center;
-        txt.fontStyle = bold ? FontStyles.Bold : FontStyles.Normal;
-        txt.raycastTarget = false;
-
-        RectTransform rt = go.GetComponent<RectTransform>();
-        rt.anchoredPosition = pos;
-        rt.localScale = Vector3.one;
-        rt.localPosition = new Vector3(rt.localPosition.x, rt.localPosition.y, 0f);
-        rt.sizeDelta = new Vector2(400, 100);
-
-        return go;
-    }
-
-    // --- DELAYED ACTION ---
-
-    IEnumerator DelayedAction(UnityEngine.Events.UnityAction action, float delay)
-    {
-        yield return new WaitForSeconds(delay);
-        action?.Invoke();
+        VRButtonFactory.CreateButton(transform, config, onClick);
     }
 
     // --- MENU ACTIONS ---
@@ -818,17 +634,35 @@ public class VRMainMenu : MonoBehaviour
 
     public void SwitchToRemoteMenu()
     {
-        // Clear current grid
-        ClearGrid();
+        // Get ContentContainer from VRMenuFrame
+        Transform contentContainer = _menuFrame.ContentContainer;
+        if (contentContainer == null)
+        {
+            Debug.LogError("[VRMainMenu] ContentContainer not found!");
+            return;
+        }
 
-        // Create Remote Menu
-        GameObject remoteObj = new GameObject("VRRemoteMenu_Logic");
-        remoteObj.transform.SetParent(transform, false);
+        // Create VRRemoteMenu as sibling in ContentContainer
+        GameObject remoteObj = new GameObject("VRRemoteMenu");
+        remoteObj.transform.SetParent(contentContainer, false);
+
+        // Setup RectTransform to fill ContentContainer
+        RectTransform remoteRT = remoteObj.AddComponent<RectTransform>();
+        remoteRT.anchorMin = Vector2.zero;
+        remoteRT.anchorMax = Vector2.one;
+        remoteRT.offsetMin = Vector2.zero;
+        remoteRT.offsetMax = Vector2.zero;
+
         VRRemoteMenu remoteMenu = remoteObj.AddComponent<VRRemoteMenu>();
         remoteMenu.customFont = customFont;
         remoteMenu.themeColor = buttonColors[0];
 
-        remoteMenu.BuildUI(transform, this);
+        // Pass ContentContainer's actual size
+        Rect containerRect = contentContainer.GetComponent<RectTransform>().rect;
+        remoteMenu.BuildUI(remoteObj.transform, this, containerRect.width, containerRect.height);
+
+        // Destroy this VRMainMenu
+        Destroy(gameObject);
     }
 
     public void ReturnToMainMenu()

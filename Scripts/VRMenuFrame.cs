@@ -265,17 +265,25 @@ public class VRMenuFrame : MonoBehaviour
         Transform recenterBtn = transform.Find("StatusBar/LeftGroup/RecenterBtn");
         if (recenterBtn == null) return;
 
-        Button btn = recenterBtn.GetComponent<Button>();
+        // VRButtonFactory structure: RecenterBtn/HitArea has Button component
+        Transform hitArea = recenterBtn.Find("HitArea");
+        if (hitArea == null) return;
+
+        Button btn = hitArea.GetComponent<Button>();
         if (btn == null)
         {
-            btn = recenterBtn.gameObject.AddComponent<Button>();
+            btn = hitArea.gameObject.AddComponent<Button>();
 
-            // Set target graphic
-            Transform visuals = recenterBtn.Find("Visuals");
+            // Set target graphic (VRButtonFactory: Visuals/Background)
+            Transform visuals = hitArea.Find("Visuals");
             if (visuals != null)
             {
-                Image bgImg = visuals.GetComponent<Image>();
-                if (bgImg != null) btn.targetGraphic = bgImg;
+                Transform background = visuals.Find("Background");
+                if (background != null)
+                {
+                    Image bgImg = background.GetComponent<Image>();
+                    if (bgImg != null) btn.targetGraphic = bgImg;
+                }
             }
         }
 
@@ -549,31 +557,40 @@ public class VRMenuFrame : MonoBehaviour
             }
         }
 
+        // VRButtonFactory structure: RecenterBtn/HitArea/Visuals/Background, Border
         var recenterBtn = transform.Find("StatusBar/LeftGroup/RecenterBtn");
         if (recenterBtn != null)
         {
-            var visuals = recenterBtn.Find("Visuals");
-            if (visuals != null)
+            var hitArea = recenterBtn.Find("HitArea");
+            if (hitArea != null)
             {
-                var bgImg = visuals.GetComponent<Image>();
-                if (bgImg != null && bgImg.material != null)
+                var visuals = hitArea.Find("Visuals");
+                if (visuals != null)
                 {
-                    var savedMat = SaveOrGetMaterial(bgImg.material, "RecenterButtonBg", matDir);
-                    if (savedMat != null) bgImg.material = savedMat;
-                }
-
-                var border = visuals.Find("Border");
-                if (border != null)
-                {
-                    var borderImg = border.GetComponent<Image>();
-                    if (borderImg != null && borderImg.material != null)
+                    var background = visuals.Find("Background");
+                    if (background != null)
                     {
-                        var savedMat = SaveOrGetMaterial(borderImg.material, "RecenterButtonBorder", matDir);
-                        if (savedMat != null)
+                        var bgImg = background.GetComponent<Image>();
+                        if (bgImg != null && bgImg.material != null)
                         {
-                            borderImg.material = savedMat;
-                            var ripple = border.GetComponent<VRButtonRipple>();
-                            if (ripple != null) ripple.Initialize(savedMat, borderImg);
+                            var savedMat = SaveOrGetMaterial(bgImg.material, "RecenterButtonBg", matDir);
+                            if (savedMat != null) bgImg.material = savedMat;
+                        }
+                    }
+
+                    var border = visuals.Find("Border");
+                    if (border != null)
+                    {
+                        var borderImg = border.GetComponent<Image>();
+                        if (borderImg != null && borderImg.material != null)
+                        {
+                            var savedMat = SaveOrGetMaterial(borderImg.material, "RecenterButtonBorder", matDir);
+                            if (savedMat != null)
+                            {
+                                borderImg.material = savedMat;
+                                var ripple = border.GetComponent<VRButtonRipple>();
+                                if (ripple != null) ripple.Initialize(savedMat, borderImg);
+                            }
                         }
                     }
                 }
@@ -1250,127 +1267,30 @@ public class VRMenuFrame : MonoBehaviour
 
     void CreateRecenterButton(Transform parent, float size, float clockWidth)
     {
-        GameObject recenterBtn = new GameObject("RecenterBtn");
-        recenterBtn.transform.SetParent(parent, false);
-        RectTransform rRT = recenterBtn.AddComponent<RectTransform>();
-        rRT.sizeDelta = new Vector2(size, size);
-        rRT.anchorMin = new Vector2(0, 0.5f);
-        rRT.anchorMax = new Vector2(0, 0.5f);
-        rRT.pivot = new Vector2(0, 0.5f);
-        rRT.anchoredPosition = new Vector2(clockWidth + size / 2f + 30f, 0);
-
-        // Visual Root
-        GameObject visualRoot = new GameObject("Visuals");
-        visualRoot.transform.SetParent(recenterBtn.transform, false);
-        RectTransform visRT = visualRoot.AddComponent<RectTransform>();
-        visRT.anchorMin = new Vector2(0.5f, 0.5f);
-        visRT.anchorMax = new Vector2(0.5f, 0.5f);
-        visRT.pivot = new Vector2(0.5f, 0.5f);
-        visRT.sizeDelta = new Vector2(size, size);
-        visRT.anchoredPosition = Vector2.zero;
-
-        // Background
-        Image recenterBg = visualRoot.AddComponent<Image>();
-        recenterBg.sprite = GetPixelSprite();
-
-        Color btnColor = glowColorB;
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
-        if (glassShader != null)
+        // Use VRButtonFactory to create icon button
+        var config = new VRButtonFactory.ButtonConfig
         {
-            Material glassMat = new Material(glassShader);
-            glassMat.SetFloat("_CornerRadius", 0.15f);
-            glassMat.SetFloat("_EdgePadding", 0.12f);
-            glassMat.SetFloat("_Aspect", 1.0f);
+            label = "Recenter",
+            icon = GetRecenterSprite(),
+            themeColor = glowColorB,
+            width = size,
+            height = size,
+            iconOnly = true,
+            iconSize = size * 0.52f, // Tăng 15% (0.45 -> 0.52)
+            borderWidth = 0.025f,
+            cornerRadius = 0.15f,
+            popAmount = 0.0125f
+        };
 
-            glassMat.SetColor("_ColorA", new Color(btnColor.r, btnColor.g, btnColor.b, 0.12f));
-            glassMat.SetColor("_ColorB", new Color(btnColor.r, btnColor.g, btnColor.b, 0.04f));
-            glassMat.SetFloat("_GlassAlpha", 0.075f);
+        GameObject btn = VRButtonFactory.CreateButton(parent, config, RecenterObject);
 
-            recenterBg.material = glassMat;
-            recenterBg.color = Color.white;
-        }
-        else
-        {
-            recenterBg.color = new Color(0f, 1f, 1f, 0.15f);
-        }
-
-        // Border
-        GameObject borderObj = new GameObject("Border");
-        borderObj.transform.SetParent(visualRoot.transform, false);
-        RectTransform borderRT = borderObj.AddComponent<RectTransform>();
-        borderRT.anchorMin = Vector2.zero;
-        borderRT.anchorMax = Vector2.one;
-        borderRT.offsetMin = Vector2.zero;
-        borderRT.offsetMax = Vector2.zero;
-
-        Image borderImg = borderObj.AddComponent<Image>();
-        borderImg.raycastTarget = false;
-
-        Shader glowShader = Shader.Find("Custom/GlowingElementBorder");
-        if (glowShader != null)
-        {
-            Material glowMat = new Material(glowShader);
-            glowMat.SetFloat("_Aspect", 1.0f);
-            glowMat.SetFloat("_EdgePadding", 0.12f);
-
-            Color borderGlowCol = Color.Lerp(btnColor, Color.white, 0.75f);
-            glowMat.SetColor("_GlowColor", borderGlowCol);
-
-            glowMat.SetFloat("_BorderWidth", 0.05f);
-            glowMat.SetFloat("_GlowWidth", 0.04f);
-            glowMat.SetFloat("_GlowIntensity", 2.5f);
-            glowMat.SetFloat("_CornerRadius", 0.15f);
-            glowMat.SetFloat("_PulseEnabled", 0f);
-
-            borderImg.material = glowMat;
-            borderImg.sprite = GetPixelSprite();
-
-            borderObj.AddComponent<VRButtonRipple>().Initialize(glowMat, borderImg);
-        }
-
-        // Icon
-        float iconPadding = size * 0.55f;
-        GameObject iconObj = new GameObject("Icon");
-        iconObj.transform.SetParent(visualRoot.transform, false);
-        RectTransform iconRT = iconObj.AddComponent<RectTransform>();
-        iconRT.anchorMin = Vector2.zero;
-        iconRT.anchorMax = Vector2.one;
-        iconRT.sizeDelta = new Vector2(-iconPadding, -iconPadding);
-
-        Image iconImg = iconObj.AddComponent<Image>();
-        iconImg.sprite = GetRecenterSprite();
-        iconImg.preserveAspect = true;
-        iconImg.raycastTarget = false;
-        iconImg.color = Color.Lerp(btnColor, Color.white, 0.85f);
-
-        Color iconGlowCol = Color.Lerp(btnColor, Color.white, 0.7f);
-        iconGlowCol.a = 0.4f;
-        Shadow iGlow1 = iconObj.AddComponent<Shadow>();
-        iGlow1.effectColor = iconGlowCol;
-        iGlow1.effectDistance = new Vector2(2f, -2f);
-
-        Shadow iGlow2 = iconObj.AddComponent<Shadow>();
-        iGlow2.effectColor = iconGlowCol;
-        iGlow2.effectDistance = new Vector2(-2f, 2f);
-
-        // Button & Collider (collider uses logical pixels, scaled by Canvas)
-        Button btn = recenterBtn.AddComponent<Button>();
-        btn.targetGraphic = recenterBg;
-        btn.transition = Selectable.Transition.None; // Disable flash effect on click
-        btn.onClick.AddListener(RecenterObject);
-
-        BoxCollider col = recenterBtn.AddComponent<BoxCollider>();
-        col.size = new Vector3(size, size, 0.1f); // thin collider in logical pixels
-        col.center = new Vector3(0, 0, -0.1f); // slightly forward (towards camera)
-
-        // Set layer to VirtualObjects for VRGazeReticle raycast
-        int vrLayer = LayerMask.NameToLayer("VirtualObjects");
-        if (vrLayer != -1) recenterBtn.layer = vrLayer;
-
-        // Animation
-        VRButtonAnimation anim = recenterBtn.AddComponent<VRButtonAnimation>();
-        anim.targetVisuals = visualRoot.transform;
-        anim.popAmount = 0.0125f;
+        // Rename and position
+        btn.name = "RecenterBtn";
+        RectTransform rt = btn.GetComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0, 0.5f);
+        rt.anchorMax = new Vector2(0, 0.5f);
+        rt.pivot = new Vector2(0, 0.5f);
+        rt.anchoredPosition = new Vector2(clockWidth + size / 2f + 30f, 0);
     }
 
     float CreateBatteryIndicator(Transform parent)

@@ -41,6 +41,7 @@ public static class VRButtonFactory
         // Layout
         public bool iconOnly = false;
         public bool textOnly = false;
+        public bool horizontalLayout = false; // Icon trái, Text phải (như nút Back)
         public float iconSize = 44f;
         public float iconPadding = 28f;
 
@@ -196,6 +197,32 @@ public static class VRButtonFactory
         return CreateButton(parent, config, onClick);
     }
 
+    /// <summary>
+    /// Tạo Button hình chữ nhật với Icon bên trái, Text bên phải (như nút Back)
+    /// </summary>
+    public static GameObject CreateHorizontalIconTextButton(Transform parent, float width, float height,
+        string label, Sprite icon, Color color, UnityEngine.Events.UnityAction onClick,
+        int fontSize = 40, TMP_FontAsset font = null, float iconSize = 44f)
+    {
+        var config = new ButtonConfig
+        {
+            label = label,
+            icon = icon,
+            themeColor = color,
+            width = width,
+            height = height,
+            fontSize = fontSize,
+            font = font,
+            horizontalLayout = true,
+            iconSize = iconSize,
+            iconPadding = 28f,
+            backgroundAlpha = 0.28f,
+            borderWidth = 0.03f,
+            popAmount = 0.0125f
+        };
+        return CreateButton(parent, config, onClick);
+    }
+
     // ==================== INTERNAL HELPERS ====================
 
     private static Image CreateBackground(Transform parent, ButtonConfig config)
@@ -304,9 +331,14 @@ public static class VRButtonFactory
             // Text only - căn giữa
             CreateText(content.transform, config.label, config.fontSize, config.font, config.themeColor, true);
         }
+        else if (config.horizontalLayout && hasIcon && hasText)
+        {
+            // Horizontal layout: Icon trái, Text phải (như nút Back)
+            CreateHorizontalIconText(content.transform, config);
+        }
         else if (hasIcon && hasText)
         {
-            // Icon + Text layout
+            // Vertical layout: Icon trên, Text dưới (default)
             float iconCenterX = config.iconPadding + config.iconSize / 2f;
             float iconAnchorX = iconCenterX / config.width;
 
@@ -428,6 +460,80 @@ public static class VRButtonFactory
         txt.fontStyle = FontStyles.Bold;
         txt.raycastTarget = false;
         if (font != null) txt.font = font;
+    }
+
+    /// <summary>
+    /// Tạo layout ngang: Icon bên trái, Text bên phải
+    /// </summary>
+    private static void CreateHorizontalIconText(Transform parent, ButtonConfig config)
+    {
+        Color col = config.themeColor;
+
+        // Icon ở bên trái
+        GameObject iconObj = new GameObject("Icon");
+        iconObj.transform.SetParent(parent, false);
+        RectTransform iconRT = iconObj.AddComponent<RectTransform>();
+
+        float iconCenterX = config.iconPadding + config.iconSize / 2f;
+        float iconAnchorX = iconCenterX / config.width;
+        float iconHalfSize = (config.iconSize / 2f) / config.height;
+
+        iconRT.anchorMin = new Vector2(iconAnchorX - iconHalfSize * (config.height / config.width), 0.5f - iconHalfSize);
+        iconRT.anchorMax = new Vector2(iconAnchorX + iconHalfSize * (config.height / config.width), 0.5f + iconHalfSize);
+        iconRT.offsetMin = Vector2.zero;
+        iconRT.offsetMax = Vector2.zero;
+
+        Image iconImg = iconObj.AddComponent<Image>();
+        iconImg.sprite = config.icon;
+        iconImg.preserveAspect = true;
+        iconImg.raycastTarget = false;
+        iconImg.color = Color.Lerp(col, Color.white, 0.9f);
+
+        // Icon glow effects
+        Color glowCol = Color.Lerp(col, Color.white, 0.7f);
+        glowCol.a = 0.4f;
+        float s1 = 2f;
+
+        Shadow shadow1 = iconObj.AddComponent<Shadow>();
+        shadow1.effectColor = glowCol;
+        shadow1.effectDistance = new Vector2(s1, -s1);
+
+        Shadow shadow2 = iconObj.AddComponent<Shadow>();
+        shadow2.effectColor = glowCol;
+        shadow2.effectDistance = new Vector2(-s1, s1);
+
+        Color bloomCol = Color.Lerp(col, Color.white, 0.8f);
+        bloomCol.a = 0.15f;
+        float s2 = 5f;
+
+        Shadow shadow3 = iconObj.AddComponent<Shadow>();
+        shadow3.effectColor = bloomCol;
+        shadow3.effectDistance = new Vector2(s2, -s2);
+
+        Shadow shadow4 = iconObj.AddComponent<Shadow>();
+        shadow4.effectColor = bloomCol;
+        shadow4.effectDistance = new Vector2(-s2, s2);
+
+        // Text ở bên phải icon
+        GameObject txtObj = new GameObject("TextTMP");
+        txtObj.transform.SetParent(parent, false);
+        RectTransform txtRT = txtObj.AddComponent<RectTransform>();
+
+        float textStartX = (iconCenterX + config.iconSize / 2f + 18f) / config.width;
+        txtRT.anchorMin = new Vector2(textStartX, 0f);
+        txtRT.anchorMax = new Vector2(1f, 1f);
+        txtRT.offsetMin = Vector2.zero;
+        txtRT.offsetMax = Vector2.zero;
+
+        TextMeshProUGUI txt = txtObj.AddComponent<TextMeshProUGUI>();
+        txt.text = config.label;
+        txt.fontSize = config.fontSize;
+        txt.color = Color.white;
+        txt.alignment = TextAlignmentOptions.Left;
+        txt.verticalAlignment = VerticalAlignmentOptions.Middle;
+        txt.fontStyle = FontStyles.Bold;
+        txt.raycastTarget = false;
+        if (config.font != null) txt.font = config.font;
     }
 
     private static Sprite GetPixelSprite()

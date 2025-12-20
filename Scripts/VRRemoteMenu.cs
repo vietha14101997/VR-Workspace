@@ -19,49 +19,82 @@ public class VRRemoteMenu : MonoBehaviour
     public event Action OnQRClicked;
 
     private VRMainMenu _mainMenu;
+    private VRMenuFrame _menuFrame;
+    private float _containerWidth;
+    private float _containerHeight;
 
-    public void BuildUI(Transform parent, VRMainMenu mainMenu)
+    public void BuildUI(Transform parent, VRMainMenu mainMenu, float containerWidth, float containerHeight)
     {
         _mainMenu = mainMenu;
-        OnBackClicked += () => _mainMenu?.ReturnToMainMenu();
-        BuildUI(parent);
+        _menuFrame = GetComponentInParent<VRMenuFrame>();
+        _containerWidth = containerWidth;
+        _containerHeight = containerHeight;
+        OnBackClicked += ReturnToMainMenu;
+        BuildUI(parent, containerWidth, containerHeight);
     }
 
     public void BuildUI(Transform parent)
     {
+        BuildUI(parent, 1920f, 1000f);
+    }
 
-        // Canvas area: 1920 x 1080, content below status bar (~1000)
-        float W = 1920f;
-        float H = 1000f;
-        float padX = 0f;
-        float padY = 40f;
+    public void BuildUI(Transform parent, float containerWidth, float containerHeight)
+    {
+        // Use container size directly - no padding
+        float W = containerWidth;
+        float H = containerHeight;
 
-        float contentW = W - padX * 2;  // 1760
+        float contentW = W;  // Full width, no padding
 
-        // Điều chỉnh theo thiết kế - grid chiếm nhiều không gian hơn
+        // Layout heights
         float headerH = 100f;
         float inputH = 130f;   // Host/Port row
-        float gridH = 520f;    // 2 rows dropdown - tăng lên để match thiết kế
+        float gridH = 520f;    // 2 rows dropdown
         float footerH = 100f;
         float gap = 30f;
 
-        float y = H - padY;
+        float y = H;  // Start from top, no padding
 
         // Header
         y -= headerH;
-        CreateHeader(parent, padX, y, contentW, headerH);
+        CreateHeader(parent, 0, y, contentW, headerH);
 
         // Input Row (Host / Port)
         y -= gap + inputH;
-        CreateInputRow(parent, padX, y, contentW, inputH);
+        CreateInputRow(parent, 0, y, contentW, inputH);
 
         // Grid 2x2 (Monitors, Resolution, Bitrate, FPS)
         y -= gap + gridH;
-        CreateGrid(parent, padX, y, contentW, gridH);
+        CreateGrid(parent, 0, y, contentW, gridH);
 
         // Footer (Connect button)
         y -= gap + footerH;
-        CreateFooter(parent, padX, y, contentW, footerH);
+        CreateFooter(parent, 0, y, contentW, footerH);
+    }
+
+    void ReturnToMainMenu()
+    {
+        if (_menuFrame == null) return;
+
+        Transform contentContainer = _menuFrame.ContentContainer;
+        if (contentContainer == null) return;
+
+        // Create new VRMainMenu in ContentContainer
+        GameObject mainMenuObj = new GameObject("VRMainMenu");
+        mainMenuObj.transform.SetParent(contentContainer, false);
+
+        // Setup RectTransform to fill ContentContainer
+        RectTransform mainMenuRT = mainMenuObj.AddComponent<RectTransform>();
+        mainMenuRT.anchorMin = Vector2.zero;
+        mainMenuRT.anchorMax = Vector2.one;
+        mainMenuRT.offsetMin = Vector2.zero;
+        mainMenuRT.offsetMax = Vector2.zero;
+
+        VRMainMenu mainMenu = mainMenuObj.AddComponent<VRMainMenu>();
+        mainMenu.customFont = customFont;
+
+        // Destroy this VRRemoteMenu
+        Destroy(gameObject);
     }
 
     void CreateHeader(Transform parent, float x, float y, float w, float h)
@@ -69,7 +102,7 @@ public class VRRemoteMenu : MonoBehaviour
         var header = CreateContainer(parent, "Header", x, y, w, h);
 
         // Back button
-        float backW = 240f;
+        float backW = 280f;
         CreateButton(header.transform, 0, 0, backW, h, "Back", LoadIcon("back"), themeColor,
             () => OnBackClicked?.Invoke());
 
@@ -146,82 +179,36 @@ public class VRRemoteMenu : MonoBehaviour
     void CreateButton(Transform parent, float x, float y, float w, float h,
         string text, Sprite icon, Color col, UnityEngine.Events.UnityAction onClick)
     {
-        var btn = CreateContainer(parent, "Btn_" + text, x, y, w, h);
-
-        // Hit Area với BoxCollider cho VR interaction
-        var hitArea = new GameObject("HitArea");
-        hitArea.transform.SetParent(btn.transform, false);
-        var hitRT = hitArea.AddComponent<RectTransform>();
-        hitRT.anchorMin = Vector2.zero;
-        hitRT.anchorMax = Vector2.one;
-        hitRT.offsetMin = hitRT.offsetMax = Vector2.zero;
-
-        var hitImg = hitArea.AddComponent<Image>();
-        hitImg.color = Color.clear;
-
-        // BoxCollider cho VR raycast
-        var collider = hitArea.AddComponent<BoxCollider>();
-        collider.size = new Vector3(w, h, 0.1f);
-
-        // Visual Root
-        var visualRoot = new GameObject("Visuals");
-        visualRoot.transform.SetParent(hitArea.transform, false);
-        var visRT = visualRoot.AddComponent<RectTransform>();
-        float expansion = -0.02f;
-        visRT.anchorMin = new Vector2(-expansion, -expansion);
-        visRT.anchorMax = new Vector2(1f + expansion, 1f + expansion);
-        visRT.offsetMin = visRT.offsetMax = Vector2.zero;
-
-        // Background - match border radius and padding
-        var bg = CreateBackground(visualRoot.transform, w, h, col, 0.28f, 0.12f, 0.12f);
-
-        // Border với VRButtonRipple - viền dày gấp đôi cho button
-        var borderImg = CreateBorderWithRipple(visualRoot.transform, w, h, col, false, 0.03f);
-
-        // Content - điều chỉnh vị trí để bù cho expansion của visualRoot
+        // Use VRButtonFactory to create button
         bool hasText = !string.IsNullOrEmpty(text);
         bool hasIcon = icon != null;
 
-        // Offset để căn giữa trong HitArea (bù cho expansion)
-        float offsetX = w * expansion;
-        float offsetY = h * expansion;
-
-        if (hasIcon && hasText)
+        var config = new VRButtonFactory.ButtonConfig
         {
-            float iconSize = 44f;
-            float iconX = offsetX + 28f + iconSize / 2f;
-            float centerY = h / 2f + offsetY;
-            CreateIconWithGlow(visualRoot.transform, iconX, centerY, iconSize, icon, col);
-            CreateLabel(visualRoot.transform, iconX + iconSize/2f + 18f, offsetY, w - iconX - iconSize - 24f + offsetX, h, text, 40, Color.white, true, TextAlignmentOptions.Left);
-        }
-        else if (hasIcon)
-        {
-            // Icon only - căn giữa chính xác
-            float centerX = w / 2f + offsetX;
-            float centerY = h / 2f + offsetY;
-            CreateIconWithGlow(visualRoot.transform, centerX, centerY, 72, icon, col);
-        }
-        else if (hasText)
-        {
-            CreateLabel(visualRoot.transform, offsetX, offsetY, w, h, text, 40, Color.white, true);
-        }
+            label = hasText ? text : (icon != null ? icon.name : "Button"),
+            icon = icon,
+            themeColor = col,
+            width = w,
+            height = h,
+            fontSize = 40,
+            font = customFont,
+            iconOnly = hasIcon && !hasText,
+            textOnly = hasText && !hasIcon,
+            horizontalLayout = hasIcon && hasText, // Icon trái, Text phải cho buttons như Back
+            iconSize = hasIcon && !hasText ? 72f : 44f,
+            iconPadding = hasIcon && hasText ? 64f : 28f, // Padding lớn hơn cho horizontal layout
+            backgroundAlpha = 0.28f,
+            borderWidth = 0.04f,
+            popAmount = 0.0125f
+        };
 
-        // Button component
-        var button = hitArea.AddComponent<Button>();
-        button.targetGraphic = bg;
-        button.onClick.AddListener(onClick);
+        var btn = VRButtonFactory.CreateButton(parent, config, onClick);
 
-        var cb = button.colors;
-        cb.normalColor = Color.white;
-        cb.highlightedColor = new Color(col.r, col.g, col.b, 0.5f);
-        cb.pressedColor = new Color(col.r, col.g, col.b, 0.7f);
-        cb.fadeDuration = 0.1f;
-        button.colors = cb;
-
-        // VRButtonAnimation cho hiệu ứng pop
-        var anim = hitArea.AddComponent<VRButtonAnimation>();
-        anim.targetVisuals = visualRoot.transform;
-        anim.popAmount = 0.0125f;
+        // Position the button
+        RectTransform rt = btn.GetComponent<RectTransform>();
+        rt.anchorMin = rt.anchorMax = Vector2.zero;
+        rt.pivot = Vector2.zero;
+        rt.anchoredPosition = new Vector2(x, y);
     }
 
     void CreateInputField(Transform parent, float x, float y, float w, float h,
@@ -384,22 +371,33 @@ public class VRRemoteMenu : MonoBehaviour
 
     void CreateConnectButton(Transform parent, float x, float y, float w, float h)
     {
-        var btn = CreateContainer(parent, "Btn_Connect", x, y, w, h);
-
         // Gradient từ themeColor (xanh) sang accentColor (tím)
         Color gradCol = Color.Lerp(themeColor, accentColor, 0.45f);
 
-        // Background - đậm hơn để nổi bật
-        var bg = CreateBackground(btn.transform, w, h, gradCol, 0.50f);
+        // Use VRButtonFactory to create text button with pulse
+        var config = new VRButtonFactory.ButtonConfig
+        {
+            label = "CONNECT",
+            themeColor = gradCol,
+            width = w,
+            height = h,
+            fontSize = 58,
+            font = customFont,
+            textOnly = true,
+            backgroundAlpha = 0.50f,
+            glowIntensity = 5f,
+            enablePulse = true,
+            pulseSpeed = 1.8f,
+            popAmount = 0.05f
+        };
 
-        // Border với pulse effect mạnh hơn
-        CreateBorder(btn.transform, w, h, gradCol, true);
+        var btn = VRButtonFactory.CreateButton(parent, config, () => OnConnectClicked?.Invoke());
 
-        // Text với glow mạnh - font lớn hơn
-        var txt = CreateLabel(btn.transform, 0, 0, w, h, "CONNECT", 58, Color.white, true);
-        AddGlow(txt, gradCol);
-
-        AddButton(btn, bg, gradCol, () => OnConnectClicked?.Invoke());
+        // Position the button
+        RectTransform rt = btn.GetComponent<RectTransform>();
+        rt.anchorMin = rt.anchorMax = Vector2.zero;
+        rt.pivot = Vector2.zero;
+        rt.anchoredPosition = new Vector2(x, y);
     }
 
     // ==================== PRIMITIVES ====================
@@ -439,43 +437,6 @@ public class VRRemoteMenu : MonoBehaviour
         }
 
         return img;
-    }
-
-    void CreateBorder(Transform parent, float w, float h, Color col, bool pulse = false)
-    {
-        var go = new GameObject("Border");
-        go.transform.SetParent(parent, false);
-        var rt = go.AddComponent<RectTransform>();
-
-        float exp = 0.12f;
-        rt.anchorMin = new Vector2(-exp, -exp);
-        rt.anchorMax = new Vector2(1+exp, 1+exp);
-        rt.offsetMin = rt.offsetMax = Vector2.zero;
-
-        var img = go.AddComponent<Image>();
-        img.sprite = GetPixelSprite();
-        img.raycastTarget = false;
-
-        var shader = Shader.Find("Custom/GlowingElementBorder");
-        if (shader != null)
-        {
-            var mat = new Material(shader);
-            mat.SetFloat("_Aspect", w / h);
-            mat.SetFloat("_EdgePadding", 0.12f);
-            mat.SetColor("_GlowColor", Color.Lerp(col, Color.white, 0.85f));
-            mat.SetFloat("_BorderWidth", 0.008f);
-            mat.SetFloat("_GlowWidth", 0.035f);
-            mat.SetFloat("_GlowIntensity", pulse ? 5.0f : 3.5f);
-            mat.SetFloat("_CornerRadius", 0.12f);
-            mat.SetFloat("_PulseEnabled", pulse ? 1f : 0f);
-            if (pulse)
-            {
-                mat.SetFloat("_PulseSpeed", 1.8f);
-                mat.SetFloat("_PulseMin", 0.8f);
-                mat.SetFloat("_PulseMax", 1.4f);
-            }
-            img.material = mat;
-        }
     }
 
     Image CreateBorderWithRipple(Transform parent, float w, float h, Color col, bool pulse = false, float borderWidth = 0.005f)
@@ -521,49 +482,6 @@ public class VRRemoteMenu : MonoBehaviour
         }
 
         return img;
-    }
-
-    void CreateIconWithGlow(Transform parent, float x, float y, float size, Sprite sprite, Color col)
-    {
-        var go = new GameObject("Icon");
-        go.transform.SetParent(parent, false);
-        var rt = go.AddComponent<RectTransform>();
-        rt.anchorMin = rt.anchorMax = Vector2.zero;
-        rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.anchoredPosition = new Vector2(x, y);
-        rt.sizeDelta = new Vector2(size, size);
-
-        var img = go.AddComponent<Image>();
-        img.sprite = sprite;
-        img.preserveAspect = true;
-        img.raycastTarget = false;
-        img.color = Color.Lerp(col, Color.white, 0.9f);
-
-        // Glow Layer 1 - Sharp inner halo
-        Color glowCol = Color.Lerp(col, Color.white, 0.7f);
-        glowCol.a = 0.4f;
-        float s1 = 2f;
-
-        var shadow1 = go.AddComponent<Shadow>();
-        shadow1.effectColor = glowCol;
-        shadow1.effectDistance = new Vector2(s1, -s1);
-
-        var shadow2 = go.AddComponent<Shadow>();
-        shadow2.effectColor = glowCol;
-        shadow2.effectDistance = new Vector2(-s1, s1);
-
-        // Glow Layer 2 - Soft outer bloom
-        Color bloomCol = Color.Lerp(col, Color.white, 0.8f);
-        bloomCol.a = 0.15f;
-        float s2 = 5f;
-
-        var shadow3 = go.AddComponent<Shadow>();
-        shadow3.effectColor = bloomCol;
-        shadow3.effectDistance = new Vector2(s2, -s2);
-
-        var shadow4 = go.AddComponent<Shadow>();
-        shadow4.effectColor = bloomCol;
-        shadow4.effectDistance = new Vector2(-s2, s2);
     }
 
     void CreateIcon(Transform parent, float x, float y, float size, Sprite sprite, Color col)
@@ -630,31 +548,6 @@ public class VRRemoteMenu : MonoBehaviour
         var s3 = go.AddComponent<Shadow>();
         s3.effectColor = new Color(glow.r, glow.g, glow.b, 0.3f);
         s3.effectDistance = new Vector2(0, 0);
-    }
-
-    void AddButton(GameObject go, Image targetGraphic, Color col, UnityEngine.Events.UnityAction onClick)
-    {
-        // Hit area
-        var hit = new GameObject("HitArea");
-        hit.transform.SetParent(go.transform, false);
-        var hitRT = hit.AddComponent<RectTransform>();
-        hitRT.anchorMin = Vector2.zero;
-        hitRT.anchorMax = Vector2.one;
-        hitRT.offsetMin = hitRT.offsetMax = Vector2.zero;
-
-        var hitImg = hit.AddComponent<Image>();
-        hitImg.color = Color.clear;
-
-        var btn = hit.AddComponent<Button>();
-        btn.targetGraphic = hitImg;
-        btn.onClick.AddListener(onClick);
-
-        var cb = btn.colors;
-        cb.normalColor = Color.clear;
-        cb.highlightedColor = new Color(col.r, col.g, col.b, 0.2f);
-        cb.pressedColor = new Color(col.r, col.g, col.b, 0.35f);
-        cb.fadeDuration = 0.1f;
-        btn.colors = cb;
     }
 
     // ==================== SPRITES ====================
