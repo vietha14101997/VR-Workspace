@@ -304,6 +304,7 @@ public class VRMainMenu : MonoBehaviour
             _isBuilt = true;
             ReapplyRuntimeSprites();
             SetupButtonListeners();
+            SetupButtonColliders();
             Debug.Log("[VRMainMenu] Initialized from existing prefab content");
             return true;
         }
@@ -339,6 +340,38 @@ public class VRMainMenu : MonoBehaviour
                 if (borderImg != null && borderImg.sprite == null)
                 {
                     borderImg.sprite = GetPixelSprite();
+                }
+            }
+        }
+    }
+
+    void SetupButtonColliders()
+    {
+        // Fix collider size and layer for VRGazeReticle when loading from prefab
+        int vrLayer = LayerMask.NameToLayer("VirtualObjects");
+
+        foreach (Transform child in transform)
+        {
+            if (!child.name.StartsWith("Btn_")) continue;
+
+            Transform hitArea = child.Find("HitArea");
+            if (hitArea == null) continue;
+
+            BoxCollider col = hitArea.GetComponent<BoxCollider>();
+            if (col == null) continue;
+
+            // Set layer
+            if (vrLayer != -1) hitArea.gameObject.layer = vrLayer;
+
+            // Fix collider size if it's wrong
+            RectTransform parentRT = child.GetComponent<RectTransform>();
+            if (parentRT != null)
+            {
+                Vector2 size = parentRT.rect.size;
+                if (size.x > 0 && size.y > 0 && (col.size.x < 100f || col.size.z > 1f))
+                {
+                    col.size = new Vector3(size.x, size.y, 0.1f);
+                    col.center = new Vector3(0, 0, -0.1f);
                 }
             }
         }
@@ -575,18 +608,6 @@ public class VRMainMenu : MonoBehaviour
         RectTransform wrapperRT = wrapper.AddComponent<RectTransform>();
 
         CreateButtonVisuals(wrapper, label, icon, btnColor, onClick, size);
-
-        // Fix Collider Size
-        Transform hitArea = wrapper.transform.Find("HitArea");
-        if (hitArea)
-        {
-            BoxCollider col = hitArea.GetComponent<BoxCollider>();
-            if (col)
-            {
-                float scaleFactor = _menuFrame.panelWidth / _menuFrame.logicalWidth;
-                col.size = new Vector3(size.x * scaleFactor, size.y * scaleFactor, 0.1f);
-            }
-        }
     }
 
     void CreateButtonVisuals(GameObject parent, string label, Sprite icon, Color btnColor, UnityEngine.Events.UnityAction onClick, Vector2 size)
@@ -603,10 +624,14 @@ public class VRMainMenu : MonoBehaviour
         Image hitImg = btnHitObj.AddComponent<Image>();
         hitImg.color = Color.clear;
 
-        // Collider
+        // Collider - use logical pixels, very thin
         BoxCollider col = btnHitObj.AddComponent<BoxCollider>();
-        float scaleFactor = _menuFrame.panelWidth / _menuFrame.logicalWidth;
-        col.size = new Vector3(size.x * scaleFactor, size.y * scaleFactor, 0.1f);
+        col.size = new Vector3(size.x, size.y, 0.1f);
+        col.center = new Vector3(0, 0, -0.1f); // Slightly forward so buttons are in front of background
+
+        // Set layer to VirtualObjects for VRGazeReticle raycast
+        int vrLayer = LayerMask.NameToLayer("VirtualObjects");
+        if (vrLayer != -1) btnHitObj.layer = vrLayer;
 
         // 2. Visual Root
         GameObject visualRoot = new GameObject("Visuals");

@@ -229,10 +229,10 @@ public class VRMenuFrame : MonoBehaviour
                 // Fix collider size if it's wrong
                 float expandedW = logicalWidth * (1f + 2f * expansion);
                 float expandedH = h * (1f + 2f * expansion);
-                if (Mathf.Abs(bgCol.size.x - expandedW) > 1f || bgCol.size.z > 5f)
+                if (Mathf.Abs(bgCol.size.x - expandedW) > 1f || bgCol.size.z > 0.1f)
                 {
-                    bgCol.size = new Vector3(expandedW, expandedH, 1f);
-                    bgCol.center = new Vector3(0, 0, 0.5f);
+                    bgCol.size = new Vector3(expandedW, expandedH, 0.01f);
+                    bgCol.center = Vector3.zero;
                 }
             }
         }
@@ -248,10 +248,10 @@ public class VRMenuFrame : MonoBehaviour
 
                 // Fix collider size if it's wrong
                 float btnSize = 72f;
-                if (Mathf.Abs(btnCol.size.x - btnSize) > 1f || btnCol.size.z > 10f)
+                if (Mathf.Abs(btnCol.size.x - btnSize) > 1f || btnCol.size.z > 0.2f)
                 {
-                    btnCol.size = new Vector3(btnSize, btnSize, 5f);
-                    btnCol.center = new Vector3(0, 0, -3f);
+                    btnCol.size = new Vector3(btnSize, btnSize, 0.1f);
+                    btnCol.center = new Vector3(0, 0, -0.1f);
                 }
             }
         }
@@ -1356,8 +1356,8 @@ public class VRMenuFrame : MonoBehaviour
         btn.onClick.AddListener(RecenterObject);
 
         BoxCollider col = recenterBtn.AddComponent<BoxCollider>();
-        col.size = new Vector3(size, size, 0.01f); // size in logical pixels
-        col.center = Vector3.zero;
+        col.size = new Vector3(size, size, 0.1f); // thin collider in logical pixels
+        col.center = new Vector3(0, 0, -0.1f); // slightly forward (towards camera)
 
         // Set layer to VirtualObjects for VRGazeReticle raycast
         int vrLayer = LayerMask.NameToLayer("VirtualObjects");
