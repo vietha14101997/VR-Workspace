@@ -279,6 +279,9 @@ public class VRMenuFrame : MonoBehaviour
             }
         }
 
+        // Disable flash effect on click
+        btn.transition = Selectable.Transition.None;
+
         // Remove old listeners and add fresh one
         btn.onClick.RemoveAllListeners();
         btn.onClick.AddListener(RecenterObject);
@@ -1082,7 +1085,7 @@ public class VRMenuFrame : MonoBehaviour
     Sprite GetWifiSprite()
     {
         if (_wifiSprite != null) return _wifiSprite;
-        int size = 64;
+        int size = 72;
         Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
         Color[] colors = new Color[size * size];
 
@@ -1353,6 +1356,7 @@ public class VRMenuFrame : MonoBehaviour
         // Button & Collider (collider uses logical pixels, scaled by Canvas)
         Button btn = recenterBtn.AddComponent<Button>();
         btn.targetGraphic = recenterBg;
+        btn.transition = Selectable.Transition.None; // Disable flash effect on click
         btn.onClick.AddListener(RecenterObject);
 
         BoxCollider col = recenterBtn.AddComponent<BoxCollider>();

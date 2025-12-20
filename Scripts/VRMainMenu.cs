@@ -33,7 +33,7 @@ public class VRMainMenu : MonoBehaviour
     [Header("Grid Layout")]
     public int columns = 3;
     public int rows = 2;
-    public Vector2 spacing = new Vector2(180f, 150f);
+    public Vector2 spacing = new Vector2(100f, 100f);
     public float targetAspect = 1.4f;
 
     [Header("Typography")]
@@ -675,17 +675,11 @@ public class VRMainMenu : MonoBehaviour
         // Button Interaction
         Button btn = btnHitObj.AddComponent<Button>();
         btn.targetGraphic = bg;
+        btn.transition = Selectable.Transition.None; // Disable flash effect on click
         if (Application.isPlaying)
         {
             btn.onClick.AddListener(() => StartCoroutine(DelayedAction(onClick, 0.25f)));
         }
-
-        ColorBlock cb = btn.colors;
-        cb.normalColor = Color.white;
-        cb.highlightedColor = new Color(btnColor.r, btnColor.g, btnColor.b, 0.5f);
-        cb.pressedColor = new Color(btnColor.r, btnColor.g, btnColor.b, 0.7f);
-        cb.fadeDuration = 0.1f;
-        btn.colors = cb;
 
         // --- BORDER ---
         GameObject borderObj = new GameObject("Border");

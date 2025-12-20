@@ -412,19 +412,83 @@ public class VRGazeReticle : MonoBehaviour
 
     Vector2 CalculateNormalizedHitPoint(RaycastHit hit)
     {
-        // Tính vị trí hit point trong local space của collider
+        // Sử dụng ray từ camera để tính điểm giao với mặt phẳng của button
+        // Điều này chính xác hơn hit.point vì hit.point có thể ở trên bề mặt z của collider
+
+        Transform buttonTransform = hit.transform;
+
+        // Tìm Visuals để lấy RectTransform chính xác
+        Transform visuals = buttonTransform.Find("Visuals");
+        RectTransform rectTransform = null;
+
+        if (visuals != null)
+        {
+            rectTransform = visuals.GetComponent<RectTransform>();
+        }
+
+        if (rectTransform == null)
+        {
+            rectTransform = buttonTransform.GetComponent<RectTransform>();
+        }
+
+        if (rectTransform != null)
+        {
+            // Tạo ray từ camera
+            Ray gazeRay = new Ray(_cam.transform.position, _cam.transform.forward);
+
+            // Tạo plane từ RectTransform
+            // Sử dụng -forward (hướng về phía camera) để đảm bảo raycast hoạt động
+            // với buttons ở mọi hướng (kể cả buttons bên lề)
+            Vector3 planeNormal = -rectTransform.forward;
+            Plane buttonPlane = new Plane(planeNormal, rectTransform.position);
+
+            float distance;
+            if (buttonPlane.Raycast(gazeRay, out distance))
+            {
+                // Điểm giao trên mặt phẳng
+                Vector3 worldPoint = gazeRay.GetPoint(distance);
+
+                // Convert sang local space của RectTransform
+                Vector3 localPoint = rectTransform.InverseTransformPoint(worldPoint);
+
+                // Lấy rect bounds
+                Rect rect = rectTransform.rect;
+
+                // Tính normalized position (0-1)
+                float normalizedX = (localPoint.x - rect.x) / rect.width;
+                float normalizedY = (localPoint.y - rect.y) / rect.height;
+
+                return new Vector2(
+                    Mathf.Clamp01(normalizedX),
+                    Mathf.Clamp01(normalizedY)
+                );
+            }
+            else
+            {
+                // Fallback: nếu plane raycast thất bại, sử dụng hit.point trực tiếp
+                Vector3 localPoint = rectTransform.InverseTransformPoint(hit.point);
+                Rect rect = rectTransform.rect;
+
+                float normalizedX = (localPoint.x - rect.x) / rect.width;
+                float normalizedY = (localPoint.y - rect.y) / rect.height;
+
+                return new Vector2(
+                    Mathf.Clamp01(normalizedX),
+                    Mathf.Clamp01(normalizedY)
+                );
+            }
+        }
+
+        // Fallback với BoxCollider - sử dụng x, y từ hit point
         BoxCollider boxCol = hit.collider as BoxCollider;
         if (boxCol != null)
         {
-            // Chuyển hit point sang local space
             Vector3 localHitPoint = hit.transform.InverseTransformPoint(hit.point);
-
-            // Tính normalized position (0-1) dựa trên kích thước collider
             Vector3 size = boxCol.size;
-            Vector3 center = boxCol.center;
 
-            float normalizedX = (localHitPoint.x - center.x + size.x / 2f) / size.x;
-            float normalizedY = (localHitPoint.y - center.y + size.y / 2f) / size.y;
+            // Tính normalized dựa trên x, y (bỏ qua z)
+            float normalizedX = (localHitPoint.x + size.x / 2f) / size.x;
+            float normalizedY = (localHitPoint.y + size.y / 2f) / size.y;
 
             return new Vector2(
                 Mathf.Clamp01(normalizedX),
@@ -493,40 +557,50 @@ public class VRGazeReticle : MonoBehaviour
     {
         if (obj == null) return;
 
-        // Trigger ripple effect trực tiếp (không dựa vào PointerEventData)
-        TriggerRippleEffect(obj, normalizedHitPoint);
-
-        // Trigger click event thông qua ExecuteEvents
-        ExecuteEvents.Execute(obj, _pointerData, ExecuteEvents.pointerClickHandler);
-
-        // Nếu là Button, gọi onClick trực tiếp
+        // Tìm Button để trigger click
         Button btn = obj.GetComponentInParent<Button>();
-        if (btn != null && btn.interactable)
-        {
-            btn.onClick.Invoke();
-        }
+        GameObject target = btn != null ? btn.gameObject : obj;
+
+        // ExecuteEvents.Execute với pointerClickHandler sẽ:
+        // 1. Gọi VRButtonAnimation.OnPointerClick -> TriggerFlash
+        // 2. Gọi Button.OnPointerClick -> Press() -> onClick.Invoke()
+        // Nên không cần gọi btn.onClick.Invoke() riêng nữa
+        ExecuteEvents.Execute(target, _pointerData, ExecuteEvents.pointerClickHandler);
     }
 
     void TriggerRippleEffect(GameObject obj, Vector2 normalizedHitPoint)
     {
         if (obj == null) return;
 
-        // Tìm VRButtonRipple trong object hoặc children
-        VRButtonRipple ripple = obj.GetComponentInChildren<VRButtonRipple>();
-        if (ripple == null)
+        // Tìm tất cả VRButtonRipple trong hierarchy của button
+        VRButtonRipple[] ripples = null;
+
+        // Strategy 1: Tìm từ parent gốc của button (bao gồm tất cả children)
+        Transform buttonRoot = obj.transform;
+
+        // Đi lên để tìm root của button (thường là object có Button component)
+        Button btn = obj.GetComponentInParent<Button>();
+        if (btn != null)
         {
-            // Tìm trong parent (trường hợp collider ở parent của Visuals)
-            Transform parent = obj.transform.parent;
-            while (parent != null && ripple == null)
-            {
-                ripple = parent.GetComponentInChildren<VRButtonRipple>();
-                parent = parent.parent;
-            }
+            buttonRoot = btn.transform;
         }
 
-        if (ripple != null)
+        // Lấy tất cả VRButtonRipple trong button
+        ripples = buttonRoot.GetComponentsInChildren<VRButtonRipple>(true);
+
+        if (ripples != null && ripples.Length > 0)
         {
-            ripple.TriggerRipple(normalizedHitPoint);
+            Debug.Log($"[VRGazeReticle] Found {ripples.Length} VRButtonRipple(s) on {buttonRoot.name}");
+            // Trigger tất cả ripple effects
+            foreach (var ripple in ripples)
+            {
+                Debug.Log($"[VRGazeReticle] Triggering flash on {ripple.gameObject.name}");
+                ripple.TriggerRipple(normalizedHitPoint);
+            }
+        }
+        else
+        {
+            Debug.LogWarning($"[VRGazeReticle] No VRButtonRipple found for {obj.name}, buttonRoot: {buttonRoot.name}");
         }
     }
 

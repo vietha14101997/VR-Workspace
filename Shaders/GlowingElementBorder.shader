@@ -167,8 +167,11 @@ Shader "Custom/GlowingElementBorder"
                 }
                 
                 // === HOVER ===
-                float intensity = _GlowIntensity * (1.0 + _HoverAmount * 0.3) * pulse;
-                
+                // Tăng cường hiệu ứng hover: intensity tăng 60%, glow width tăng 30%
+                float hoverIntensityBoost = 1.0 + _HoverAmount * 0.6;
+                float hoverGlowBoost = 1.0 + _HoverAmount * 0.3;
+                float intensity = _GlowIntensity * hoverIntensityBoost * pulse;
+
                 // === BACKGROUND ===
                 // Inside box
                 float insideMask = saturate(-dist / 0.01);
@@ -177,13 +180,14 @@ Shader "Custom/GlowingElementBorder"
                 
                 // === GLOW LAYERS ===
                 float distAbs = abs(dist);
-                
-                float outerGlow = 1.0 - saturate(distAbs / _GlowWidth);
+                float effectiveGlowWidth = _GlowWidth * hoverGlowBoost;
+
+                float outerGlow = 1.0 - saturate(distAbs / effectiveGlowWidth);
                 outerGlow = pow(outerGlow, 2.0);
-                
-                float midGlow = 1.0 - saturate(distAbs / (_GlowWidth * 0.5));
+
+                float midGlow = 1.0 - saturate(distAbs / (effectiveGlowWidth * 0.5));
                 midGlow = pow(midGlow, 1.5);
-                
+
                 float borderMask = 1.0 - saturate(distAbs / _BorderWidth);
                 borderMask = pow(borderMask, 0.8);
                 
