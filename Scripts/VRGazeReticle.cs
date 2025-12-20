@@ -51,6 +51,7 @@ public class VRGazeReticle : MonoBehaviour
     private bool _dwellClickTriggered = false;
     private Image _dwellRing;
     private GameObject _dwellableTarget;
+    private RaycastHit _lastHit;
     
     // Singleton access helper (optional, or use FindObjectOfType)
     public static VRGazeReticle Instance { get; private set; }
@@ -313,10 +314,13 @@ public class VRGazeReticle : MonoBehaviour
                 ResetDwellState(); // Reset khi đổi target
             }
 
+            // Lưu hit info để sử dụng khi click
+            _lastHit = hit;
+
             // Xử lý Dwell Click
             if (dwellClickEnabled && _currentHitObj != null)
             {
-                ProcessDwellClick(currentGazeDir, hitObj);
+                ProcessDwellClick(currentGazeDir, hitObj, hit);
             }
         }
         else
@@ -334,7 +338,7 @@ public class VRGazeReticle : MonoBehaviour
         _lastGazeDirection = currentGazeDir;
     }
 
-    void ProcessDwellClick(Vector3 currentGazeDir, GameObject target)
+    void ProcessDwellClick(Vector3 currentGazeDir, GameObject target, RaycastHit hit)
     {
         // Kiểm tra xem target có thể click được không (có IPointerClickHandler hoặc Button)
         if (!IsDwellable(target))
@@ -393,7 +397,9 @@ public class VRGazeReticle : MonoBehaviour
         // Phase 3: Click khi đủ thời gian
         if (_dwellProgress >= 1f)
         {
-            HandlePointerClick(target);
+            // Tính normalized hit point trên collider
+            Vector2 normalizedHitPoint = CalculateNormalizedHitPoint(hit);
+            HandlePointerClick(target, normalizedHitPoint);
             _dwellClickTriggered = true;
 
             // Visual feedback - đổi màu ring khi click thành công
@@ -402,6 +408,32 @@ public class VRGazeReticle : MonoBehaviour
                 _dwellRing.color = new Color(0f, 0.8f, 1f, 0.9f); // Cyan khi click
             }
         }
+    }
+
+    Vector2 CalculateNormalizedHitPoint(RaycastHit hit)
+    {
+        // Tính vị trí hit point trong local space của collider
+        BoxCollider boxCol = hit.collider as BoxCollider;
+        if (boxCol != null)
+        {
+            // Chuyển hit point sang local space
+            Vector3 localHitPoint = hit.transform.InverseTransformPoint(hit.point);
+
+            // Tính normalized position (0-1) dựa trên kích thước collider
+            Vector3 size = boxCol.size;
+            Vector3 center = boxCol.center;
+
+            float normalizedX = (localHitPoint.x - center.x + size.x / 2f) / size.x;
+            float normalizedY = (localHitPoint.y - center.y + size.y / 2f) / size.y;
+
+            return new Vector2(
+                Mathf.Clamp01(normalizedX),
+                Mathf.Clamp01(normalizedY)
+            );
+        }
+
+        // Fallback: trả về trung tâm
+        return new Vector2(0.5f, 0.5f);
     }
 
     bool IsDwellable(GameObject obj)
@@ -454,7 +486,15 @@ public class VRGazeReticle : MonoBehaviour
 
     void HandlePointerClick(GameObject obj)
     {
+        HandlePointerClick(obj, new Vector2(0.5f, 0.5f));
+    }
+
+    void HandlePointerClick(GameObject obj, Vector2 normalizedHitPoint)
+    {
         if (obj == null) return;
+
+        // Trigger ripple effect trực tiếp (không dựa vào PointerEventData)
+        TriggerRippleEffect(obj, normalizedHitPoint);
 
         // Trigger click event thông qua ExecuteEvents
         ExecuteEvents.Execute(obj, _pointerData, ExecuteEvents.pointerClickHandler);
@@ -464,6 +504,29 @@ public class VRGazeReticle : MonoBehaviour
         if (btn != null && btn.interactable)
         {
             btn.onClick.Invoke();
+        }
+    }
+
+    void TriggerRippleEffect(GameObject obj, Vector2 normalizedHitPoint)
+    {
+        if (obj == null) return;
+
+        // Tìm VRButtonRipple trong object hoặc children
+        VRButtonRipple ripple = obj.GetComponentInChildren<VRButtonRipple>();
+        if (ripple == null)
+        {
+            // Tìm trong parent (trường hợp collider ở parent của Visuals)
+            Transform parent = obj.transform.parent;
+            while (parent != null && ripple == null)
+            {
+                ripple = parent.GetComponentInChildren<VRButtonRipple>();
+                parent = parent.parent;
+            }
+        }
+
+        if (ripple != null)
+        {
+            ripple.TriggerRipple(normalizedHitPoint);
         }
     }
 
