@@ -9,9 +9,22 @@ public class VRGazeReticle : MonoBehaviour
 {
     [Header("Configuration")]
     [Tooltip("Kích thước visual (ảo) của chấm tại khoảng cách 1m.")]
-    public float reticleSize = 0.01f; 
-    
+    public float reticleSize = 0.01f;
+
     public Color colorInteract = new Color(1f, 0f, 0f, 1f);
+
+    [Header("Dwell Click Settings")]
+    [Tooltip("Thời gian phải giữ yên reticle trước khi bắt đầu đếm click (giây)")]
+    public float dwellStartDelay = 0.5f;
+
+    [Tooltip("Thời gian đếm ngược để click sau khi bắt đầu dwell (giây)")]
+    public float dwellClickTime = 1.0f;
+
+    [Tooltip("Ngưỡng di chuyển tối đa (góc độ) để coi là đứng yên")]
+    public float dwellMovementThreshold = 2.0f;
+
+    [Tooltip("Bật/tắt tính năng Dwell Click")]
+    public bool dwellClickEnabled = true;
 
     private Image _reticleImage;
     private Camera _cam;
@@ -29,6 +42,15 @@ public class VRGazeReticle : MonoBehaviour
     // State tracking for Hover events
     private GameObject _currentHitObj;
     private PointerEventData _pointerData;
+
+    // Dwell Click State
+    private Vector3 _lastGazeDirection;
+    private float _stableTime = 0f;
+    private float _dwellProgress = 0f;
+    private bool _isDwelling = false;
+    private bool _dwellClickTriggered = false;
+    private Image _dwellRing;
+    private GameObject _dwellableTarget;
     
     // Singleton access helper (optional, or use FindObjectOfType)
     public static VRGazeReticle Instance { get; private set; }
@@ -57,6 +79,7 @@ public class VRGazeReticle : MonoBehaviour
 
         CreateReticle();
         _pointerData = new PointerEventData(EventSystem.current);
+        _lastGazeDirection = _cam.transform.forward;
     }
 
     void CreateReticle()
@@ -96,12 +119,40 @@ public class VRGazeReticle : MonoBehaviour
         _reticleImage.material = zTestMat;
 
         RectTransform imgRT = imgObj.GetComponent<RectTransform>();
-        imgRT.sizeDelta = new Vector2(100, 100); 
+        imgRT.sizeDelta = new Vector2(100, 100);
         imgRT.localScale = Vector3.one;
         imgRT.anchoredPosition = Vector3.zero;
 
-        // 3. Tạo Recenter UI (Hidden by default)
+        // 3. Tạo Dwell Progress Ring (around the reticle dot)
+        CreateDwellRing(canvasObj, zTestMat);
+
+        // 4. Tạo Recenter UI (Hidden by default)
         CreateRecenterUI(canvasObj, zTestMat);
+    }
+
+    void CreateDwellRing(GameObject parentCanvas, Material overlayMat)
+    {
+        GameObject ringObj = new GameObject("DwellRing");
+        ringObj.transform.SetParent(parentCanvas.transform, false);
+        ringObj.layer = parentCanvas.layer;
+
+        _dwellRing = ringObj.AddComponent<Image>();
+        _dwellRing.sprite = GetRingSprite();
+        _dwellRing.type = Image.Type.Filled;
+        _dwellRing.fillMethod = Image.FillMethod.Radial360;
+        _dwellRing.fillOrigin = (int)Image.Origin360.Top;
+        _dwellRing.fillClockwise = true;
+        _dwellRing.color = new Color(0f, 1f, 0.5f, 0.9f); // Green color for dwell
+        _dwellRing.fillAmount = 0f;
+        _dwellRing.material = overlayMat;
+        _dwellRing.raycastTarget = false;
+
+        RectTransform ringRT = ringObj.GetComponent<RectTransform>();
+        ringRT.sizeDelta = new Vector2(200, 200); // Larger than the dot
+        ringRT.localScale = Vector3.one;
+        ringRT.anchoredPosition = Vector3.zero;
+
+        _dwellRing.enabled = false;
     }
 
     void CreateRecenterUI(GameObject parentCanvas, Material overlayMat)
@@ -234,6 +285,7 @@ public class VRGazeReticle : MonoBehaviour
 
         Ray ray = new Ray(_cam.transform.position, _cam.transform.forward);
         RaycastHit hit;
+        Vector3 currentGazeDir = _cam.transform.forward;
 
         if (_layerMask != 0 && Physics.Raycast(ray, out hit, 100.0f, _layerMask))
         {
@@ -246,23 +298,139 @@ public class VRGazeReticle : MonoBehaviour
             float scale = (reticleSize / 100f) * dist;
             _reticleImage.rectTransform.localScale = new Vector3(scale, scale, 1f);
 
+            // Scale dwell ring theo khoảng cách
+            if (_dwellRing != null)
+            {
+                _dwellRing.rectTransform.localScale = new Vector3(scale, scale, 1f);
+            }
+
             GameObject hitObj = hit.collider.gameObject;
             if (_currentHitObj != hitObj)
             {
                 HandlePointerExit(_currentHitObj);
                 HandlePointerEnter(hitObj);
                 _currentHitObj = hitObj;
+                ResetDwellState(); // Reset khi đổi target
+            }
+
+            // Xử lý Dwell Click
+            if (dwellClickEnabled && _currentHitObj != null)
+            {
+                ProcessDwellClick(currentGazeDir, hitObj);
             }
         }
         else
         {
             if (_reticleImage.enabled) _reticleImage.enabled = false;
-            
+
             if (_currentHitObj != null)
             {
                 HandlePointerExit(_currentHitObj);
                 _currentHitObj = null;
             }
+            ResetDwellState();
+        }
+
+        _lastGazeDirection = currentGazeDir;
+    }
+
+    void ProcessDwellClick(Vector3 currentGazeDir, GameObject target)
+    {
+        // Kiểm tra xem target có thể click được không (có IPointerClickHandler hoặc Button)
+        if (!IsDwellable(target))
+        {
+            ResetDwellState();
+            return;
+        }
+
+        // Tính góc di chuyển từ frame trước
+        float angleMoved = Vector3.Angle(_lastGazeDirection, currentGazeDir);
+
+        // Nếu di chuyển quá nhiều, reset
+        if (angleMoved > dwellMovementThreshold * Time.deltaTime * 10f)
+        {
+            ResetDwellState();
+            return;
+        }
+
+        // Đã click rồi thì không click lại cho đến khi rời target
+        if (_dwellClickTriggered)
+        {
+            return;
+        }
+
+        // Tích lũy thời gian đứng yên
+        _stableTime += Time.deltaTime;
+
+        // Phase 1: Chờ đủ thời gian delay trước khi bắt đầu hiển thị progress
+        if (_stableTime < dwellStartDelay)
+        {
+            return;
+        }
+
+        // Phase 2: Bắt đầu hiển thị progress ring
+        if (!_isDwelling)
+        {
+            _isDwelling = true;
+            _dwellableTarget = target;
+            if (_dwellRing != null)
+            {
+                _dwellRing.enabled = true;
+                _dwellRing.fillAmount = 0f;
+            }
+        }
+
+        // Tính progress (từ 0 đến 1)
+        float dwellElapsed = _stableTime - dwellStartDelay;
+        _dwellProgress = Mathf.Clamp01(dwellElapsed / dwellClickTime);
+
+        // Cập nhật visual
+        if (_dwellRing != null)
+        {
+            _dwellRing.fillAmount = _dwellProgress;
+        }
+
+        // Phase 3: Click khi đủ thời gian
+        if (_dwellProgress >= 1f)
+        {
+            HandlePointerClick(target);
+            _dwellClickTriggered = true;
+
+            // Visual feedback - đổi màu ring khi click thành công
+            if (_dwellRing != null)
+            {
+                _dwellRing.color = new Color(0f, 0.8f, 1f, 0.9f); // Cyan khi click
+            }
+        }
+    }
+
+    bool IsDwellable(GameObject obj)
+    {
+        if (obj == null) return false;
+
+        // Kiểm tra có Button hoặc IPointerClickHandler không
+        Button btn = obj.GetComponentInParent<Button>();
+        if (btn != null && btn.interactable) return true;
+
+        IPointerClickHandler clickHandler = obj.GetComponentInParent<IPointerClickHandler>();
+        if (clickHandler != null) return true;
+
+        return false;
+    }
+
+    void ResetDwellState()
+    {
+        _stableTime = 0f;
+        _dwellProgress = 0f;
+        _isDwelling = false;
+        _dwellClickTriggered = false;
+        _dwellableTarget = null;
+
+        if (_dwellRing != null)
+        {
+            _dwellRing.enabled = false;
+            _dwellRing.fillAmount = 0f;
+            _dwellRing.color = new Color(0f, 1f, 0.5f, 0.9f); // Reset về màu xanh lá
         }
     }
 
@@ -282,6 +450,21 @@ public class VRGazeReticle : MonoBehaviour
 
         Selectable selectable = obj.GetComponentInParent<Selectable>();
         if (selectable) selectable.OnPointerExit(_pointerData);
+    }
+
+    void HandlePointerClick(GameObject obj)
+    {
+        if (obj == null) return;
+
+        // Trigger click event thông qua ExecuteEvents
+        ExecuteEvents.Execute(obj, _pointerData, ExecuteEvents.pointerClickHandler);
+
+        // Nếu là Button, gọi onClick trực tiếp
+        Button btn = obj.GetComponentInParent<Button>();
+        if (btn != null && btn.interactable)
+        {
+            btn.onClick.Invoke();
+        }
     }
 
     Sprite GetCircleSprite()

@@ -195,9 +195,65 @@ public class VRMenuFrame : MonoBehaviour
         // Re-register recenter button click event
         SetupRecenterButtonListener();
 
+        // Ensure layers are set for VRGazeReticle raycast
+        SetupVRLayers();
+
         if (ContentContainer != null)
         {
             Debug.Log("[VRMenuFrame] Initialized from existing content");
+        }
+    }
+
+    void SetupVRLayers()
+    {
+        int vrLayer = LayerMask.NameToLayer("VirtualObjects");
+        if (vrLayer == -1) return;
+
+        float h = LogicalHeight;
+
+        // GlassBackground - fix collider size in logical pixels
+        Transform glassBg = transform.Find("GlassBackground");
+        if (glassBg != null)
+        {
+            BoxCollider bgCol = glassBg.GetComponent<BoxCollider>();
+            if (bgCol != null)
+            {
+                glassBg.gameObject.layer = vrLayer;
+
+                // Recalculate expansion
+                float p = edgePadding;
+                float safeZone = 0.06f;
+                float effectiveP = p + safeZone;
+                float expansion = effectiveP / (1f - 2f * effectiveP);
+
+                // Fix collider size if it's wrong
+                float expandedW = logicalWidth * (1f + 2f * expansion);
+                float expandedH = h * (1f + 2f * expansion);
+                if (Mathf.Abs(bgCol.size.x - expandedW) > 1f || bgCol.size.z > 5f)
+                {
+                    bgCol.size = new Vector3(expandedW, expandedH, 1f);
+                    bgCol.center = new Vector3(0, 0, 0.5f);
+                }
+            }
+        }
+
+        // RecenterBtn - ensure collider uses logical pixels
+        Transform recenterBtn = transform.Find("StatusBar/LeftGroup/RecenterBtn");
+        if (recenterBtn != null)
+        {
+            BoxCollider btnCol = recenterBtn.GetComponent<BoxCollider>();
+            if (btnCol != null)
+            {
+                recenterBtn.gameObject.layer = vrLayer;
+
+                // Fix collider size if it's wrong
+                float btnSize = 72f;
+                if (Mathf.Abs(btnCol.size.x - btnSize) > 1f || btnCol.size.z > 10f)
+                {
+                    btnCol.size = new Vector3(btnSize, btnSize, 5f);
+                    btnCol.center = new Vector3(0, 0, -3f);
+                }
+            }
         }
     }
 
@@ -685,10 +741,6 @@ public class VRMenuFrame : MonoBehaviour
             expansion = 0;
         }
 
-        // Collider uses physical meters
-        BoxCollider bgCol = bgObj.AddComponent<BoxCollider>();
-        bgCol.size = new Vector3(panelWidth, panelHeight, 0.01f);
-
         RectTransform rt = bgObj.GetComponent<RectTransform>();
         rt.anchorMin = new Vector2(-expansion, -expansion);
         rt.anchorMax = new Vector2(1f + expansion, 1f + expansion);
@@ -696,6 +748,17 @@ public class VRMenuFrame : MonoBehaviour
         rt.localScale = Vector3.one;
         rt.localPosition = Vector3.zero;
         rt.SetAsFirstSibling();
+
+        // Collider uses logical pixels (will be scaled by Canvas localScale to match physical size)
+        float expandedW = w * (1f + expansion);
+        float expandedH = h * (1f + expansion);
+        BoxCollider bgCol = bgObj.AddComponent<BoxCollider>();
+        bgCol.size = new Vector3(expandedW, expandedH, 0.01f); // thin collider
+        bgCol.center = new Vector3(0, 0, -0.01f);
+
+        // Set layer to VirtualObjects for VRGazeReticle raycast
+        int vrLayer = LayerMask.NameToLayer("VirtualObjects");
+        if (vrLayer != -1) bgObj.layer = vrLayer;
 
         CreateGlowingBorder(bgObj.transform, w, h);
         CreateFloatingDataEffects(bgObj.transform, w, h);
@@ -1287,14 +1350,18 @@ public class VRMenuFrame : MonoBehaviour
         iGlow2.effectColor = iconGlowCol;
         iGlow2.effectDistance = new Vector2(-2f, 2f);
 
-        // Button & Collider (collider uses physical size)
+        // Button & Collider (collider uses logical pixels, scaled by Canvas)
         Button btn = recenterBtn.AddComponent<Button>();
         btn.targetGraphic = recenterBg;
         btn.onClick.AddListener(RecenterObject);
 
-        float physicalSize = size * ScaleFactor;
         BoxCollider col = recenterBtn.AddComponent<BoxCollider>();
-        col.size = new Vector3(physicalSize, physicalSize, 0.01f);
+        col.size = new Vector3(size, size, 0.01f); // size in logical pixels
+        col.center = Vector3.zero;
+
+        // Set layer to VirtualObjects for VRGazeReticle raycast
+        int vrLayer = LayerMask.NameToLayer("VirtualObjects");
+        if (vrLayer != -1) recenterBtn.layer = vrLayer;
 
         // Animation
         VRButtonAnimation anim = recenterBtn.AddComponent<VRButtonAnimation>();
