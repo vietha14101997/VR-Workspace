@@ -1705,6 +1705,8 @@ public class VRTaskbar : MonoBehaviour
         if (glowShader != null)
         {
             Material glowMat = new Material(glowShader);
+            
+            glowMat.SetFloat("_StrokeEnabled", 0);
 
             glowMat.SetFloat("_BorderWidth", 0.06f); // 50% thicker
             glowMat.SetFloat("_CornerRadius", 0.24f);

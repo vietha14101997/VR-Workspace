@@ -660,6 +660,8 @@ public class VRMenuFrame : MonoBehaviour
         {
             Material glowMat = new Material(glowShader);
 
+            glowMat.SetFloat("_StrokeEnabled", 0);
+
             glowMat.SetFloat("_BorderWidth", 0.02f);
             glowMat.SetFloat("_CornerRadius", 0.12f);
             glowMat.SetFloat("_EdgePadding", edgePad);

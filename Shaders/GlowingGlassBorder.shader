@@ -33,7 +33,7 @@ Shader "Custom/GlowingGlassBorder"
         [Header(Glowing Stroke)]
         _StrokeEnabled ("Enable Stroke", Range(0, 1)) = 1
         _StrokeSpeed ("Stroke Speed", Range(0, 1)) = 0.2
-        _StrokeLength ("Stroke Length", Range(0.1, 0.8)) = 0.5
+        _StrokeLength ("Stroke Length", Range(0.02, 0.2)) = 0.125
         _StrokeIntensity ("Stroke Intensity", Range(0, 2)) = 1.0
         _StrokeGlow ("Stroke Glow Width", Range(0.01, 0.1)) = 0.03
 
@@ -222,34 +222,59 @@ Shader "Custom/GlowingGlassBorder"
                 return t;
             }
 
-            // Calculate glowing stroke intensity
-            float getStrokeIntensity(float2 uv, float aspect, float padding, float borderMask)
+            // Calculate glowing stroke intensity for dual strokes
+            // Returns float2: x = stroke1 intensity, y = stroke2 intensity
+            // Two strokes running opposite directions (offset by 0.5)
+            // Alpha fades smoothly from center to both ends
+            float2 getStrokeIntensity(float2 uv, float aspect, float padding, float borderMask)
             {
-                if (_StrokeEnabled < 0.5) return 0.0;
+                if (_StrokeEnabled < 0.5) return float2(0, 0);
 
                 // Get current pixel's position along the perimeter (0-1)
                 float perimPos = getPerimeterPosition(uv, aspect, padding);
 
-                // Animate stroke position
+                // Animate - both strokes run full perimeter cycle
                 float time = _Time.y * _StrokeSpeed;
-                float strokeCenter = frac(time);
 
-                // Calculate distance to stroke center (with wrap-around)
-                float distToStroke = abs(perimPos - strokeCenter);
-                distToStroke = min(distToStroke, 1.0 - distToStroke);
+                // Stroke positions (opposite sides, offset by 0.5)
+                float stroke1Pos = frac(time);
+                float stroke2Pos = frac(time + 0.5);
 
-                // Stroke length covers half perimeter (width + height equivalent)
+                // Stroke length for fade
                 float halfLength = _StrokeLength * 0.5;
 
-                // Smooth fade from center to both ends (no hard core)
-                float intensity = 1.0 - saturate(distToStroke / halfLength);
-                // Smooth cubic falloff for natural fade
-                intensity = intensity * intensity * (3.0 - 2.0 * intensity);
+                // === STROKE 1 ===
+                // Calculate signed distance from stroke center (-halfLength to +halfLength)
+                float signedDist1 = perimPos - stroke1Pos;
+                // Handle wrap-around
+                if (signedDist1 > 0.5) signedDist1 -= 1.0;
+                if (signedDist1 < -0.5) signedDist1 += 1.0;
 
-                // Mask to border only
-                intensity *= borderMask;
+                // Normalize to -1 to 1 range within stroke length
+                float normalizedDist1 = signedDist1 / halfLength;
+                // Alpha gradient: 1.0 at center, 0.0 at edges (using smooth cosine curve)
+                float intensity1 = 0.0;
+                if (abs(normalizedDist1) < 1.0)
+                {
+                    // Cosine falloff: smooth from center to edges
+                    intensity1 = 0.5 + 0.5 * cos(normalizedDist1 * 3.14159);
+                }
+                intensity1 *= borderMask;
 
-                return intensity;
+                // === STROKE 2 ===
+                float signedDist2 = perimPos - stroke2Pos;
+                if (signedDist2 > 0.5) signedDist2 -= 1.0;
+                if (signedDist2 < -0.5) signedDist2 += 1.0;
+
+                float normalizedDist2 = signedDist2 / halfLength;
+                float intensity2 = 0.0;
+                if (abs(normalizedDist2) < 1.0)
+                {
+                    intensity2 = 0.5 + 0.5 * cos(normalizedDist2 * 3.14159);
+                }
+                intensity2 *= borderMask;
+
+                return float2(intensity1, intensity2);
             }
 
             // Calculate separator intensity at a given UV position
@@ -418,29 +443,31 @@ Shader "Custom/GlowingGlassBorder"
                 finalColor.rgb = lerp(finalColor.rgb, whiteCore, coreMix);
                 finalColor.a = max(finalColor.a, layer1 * _Layer1Alpha);
 
-                // === GLOWING STROKE (smooth fade, white tinted with shadow) ===
+                // === DUAL GLOWING STROKES (smooth fade, white tinted with shadow) ===
                 float strokeBorderMask = saturate(layer1 * 2.0 + layer2 + layer3 * 0.5);
-                float strokeIntensity = getStrokeIntensity(uv, aspect, _EdgePadding, strokeBorderMask);
+                float2 strokeIntensities = getStrokeIntensity(uv, aspect, _EdgePadding, strokeBorderMask);
+                float strokeIntensity = max(strokeIntensities.x, strokeIntensities.y);
+
                 if (strokeIntensity > 0.001)
                 {
                     float glowStrength = strokeIntensity * _StrokeIntensity;
 
-                    // Layer 1: Outer white shadow/glow (widest, softest)
+                    // Layer 1: Outer shadow/glow (widest, softest) - 30% border color
                     float shadowIntensity = pow(strokeIntensity, 0.5);
-                    fixed3 shadowCol = fixed3(1, 1, 1);
+                    fixed3 shadowCol = lerp(borderColor.rgb, fixed3(1, 1, 0.5), 0.5);
                     finalColor.rgb += shadowCol * shadowIntensity * _StrokeIntensity * 0.25;
-                    finalColor.a = max(finalColor.a, shadowIntensity * 0.3);
+                    // finalColor.a = max(finalColor.a, shadowIntensity * 0.3);
 
-                    // Layer 2: Mid glow (white tinted border color)
+                    // Layer 2: Mid glow - 50% border color
                     float midGlow = pow(strokeIntensity, 0.8);
-                    fixed3 midCol = lerp(borderColor.rgb, fixed3(1, 1, 1), 0.5);
+                    fixed3 midCol = lerp(borderColor.rgb, fixed3(1, 1, 0.25), 0.25);
                     finalColor.rgb += midCol * midGlow * _StrokeIntensity * 0.5;
-                    finalColor.a = max(finalColor.a, midGlow * 0.5);
+                    // finalColor.a = max(finalColor.a, midGlow * 0.5);
 
-                    // Layer 3: Core glow (brighter, more color)
-                    fixed3 coreCol = lerp(borderColor.rgb, fixed3(1, 1, 1), 0.3);
+                    // Layer 3: Core glow - 60% border color
+                    fixed3 coreCol = lerp(borderColor.rgb, fixed3(1, 1, 0.125), 0.125);
                     finalColor.rgb += coreCol * glowStrength * 0.8;
-                    finalColor.a = max(finalColor.a, glowStrength * 0.7);
+                    // finalColor.a = max(finalColor.a, glowStrength * 0.7);
                 }
 
                 // === VERTICAL SEPARATORS (multi-layer glow matching border) ===
