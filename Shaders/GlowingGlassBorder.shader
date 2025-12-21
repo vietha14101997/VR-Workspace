@@ -30,6 +30,22 @@ Shader "Custom/GlowingGlassBorder"
         _GlassAlpha ("Glass Alpha", Range(0, 0.2)) = 0.02
         _GlassTint ("Glass Tint", Color) = (0.9, 0.95, 1, 1)
         
+        [Header(Glowing Stroke)]
+        _StrokeEnabled ("Enable Stroke", Range(0, 1)) = 1
+        _StrokeSpeed ("Stroke Speed", Range(0, 1)) = 0.2
+        _StrokeLength ("Stroke Length", Range(0.1, 0.8)) = 0.5
+        _StrokeIntensity ("Stroke Intensity", Range(0, 2)) = 1.0
+        _StrokeGlow ("Stroke Glow Width", Range(0.01, 0.1)) = 0.03
+
+        [Header(Hologram Effect)]
+        _HoloEnabled ("Enable Hologram", Range(0, 1)) = 0
+        _ScanlineIntensity ("Scanline Intensity", Range(0, 1)) = 0.15
+        _ScanlineCount ("Scanline Count", Range(50, 500)) = 150
+        _ScanlineSpeed ("Scanline Speed", Range(0, 2)) = 0.3
+        _ChromaticAberration ("Chromatic Aberration", Range(0, 0.01)) = 0.002
+        _HoloFlicker ("Flicker Intensity", Range(0, 0.3)) = 0.05
+        _HoloNoise ("Noise Intensity", Range(0, 0.2)) = 0.03
+
         [Header(Vertical Separators)]
         _SeparatorCount ("Separator Count", Range(0, 4)) = 0
         _SeparatorPositions ("Separator X Positions (UV)", Vector) = (0, 0, 0, 0)
@@ -125,6 +141,22 @@ Shader "Custom/GlowingGlassBorder"
             float _GlassAlpha;
             fixed4 _GlassTint;
 
+            // Glowing Stroke properties
+            float _StrokeEnabled;
+            float _StrokeSpeed;
+            float _StrokeLength;
+            float _StrokeIntensity;
+            float _StrokeGlow;
+
+            // Hologram properties
+            float _HoloEnabled;
+            float _ScanlineIntensity;
+            float _ScanlineCount;
+            float _ScanlineSpeed;
+            float _ChromaticAberration;
+            float _HoloFlicker;
+            float _HoloNoise;
+
             // Separator properties
             float _SeparatorCount;
             float4 _SeparatorPositions;
@@ -133,6 +165,92 @@ Shader "Custom/GlowingGlassBorder"
             float _SeparatorAlpha;
 
             float _Aspect; // Aspect Ratio
+
+            // Hash function for noise generation
+            float hash(float2 p)
+            {
+                float3 p3 = frac(float3(p.xyx) * 0.1031);
+                p3 += dot(p3, p3.yzx + 33.33);
+                return frac((p3.x + p3.y) * p3.z);
+            }
+
+            // Hologram effect function
+            float3 applyHologramEffect(float3 color, float2 uv, float borderMask)
+            {
+                if (_HoloEnabled < 0.5) return color;
+
+                float time = _Time.y;
+
+                // === SCANLINES ===
+                float scanline = sin((uv.y + time * _ScanlineSpeed) * _ScanlineCount * 3.14159) * 0.5 + 0.5;
+                scanline = pow(scanline, 0.8);
+                float scanlineEffect = 1.0 - (scanline * _ScanlineIntensity * borderMask);
+
+                // === CHROMATIC ABERRATION ===
+                float caOffset = _ChromaticAberration * borderMask;
+                // Shift red and blue channels slightly
+                float3 caColor = color;
+                caColor.r = color.r * (1.0 + caOffset * 2.0);
+                caColor.b = color.b * (1.0 - caOffset);
+
+                // === FLICKER ===
+                float flicker = 1.0 - (hash(float2(floor(time * 15.0), 0.0)) * _HoloFlicker * borderMask);
+
+                // === NOISE ===
+                float noise = hash(uv * 500.0 + time * 10.0);
+                noise = (noise - 0.5) * _HoloNoise * borderMask;
+
+                // Combine effects
+                float3 result = caColor * scanlineEffect * flicker;
+                result += noise;
+
+                return result;
+            }
+
+            // Calculate perimeter position (0-1) for glowing stroke
+            float getPerimeterPosition(float2 uv, float aspect, float padding)
+            {
+                float2 center = float2(0.5, 0.5);
+                float2 pos = uv - center;
+
+                // Calculate angle from center
+                float angle = atan2(pos.y, pos.x * (1.0 / aspect));
+
+                // Normalize to 0-1 range (starting from right, going counter-clockwise)
+                float t = (angle + 3.14159) / (2.0 * 3.14159);
+
+                return t;
+            }
+
+            // Calculate glowing stroke intensity
+            float getStrokeIntensity(float2 uv, float aspect, float padding, float borderMask)
+            {
+                if (_StrokeEnabled < 0.5) return 0.0;
+
+                // Get current pixel's position along the perimeter (0-1)
+                float perimPos = getPerimeterPosition(uv, aspect, padding);
+
+                // Animate stroke position
+                float time = _Time.y * _StrokeSpeed;
+                float strokeCenter = frac(time);
+
+                // Calculate distance to stroke center (with wrap-around)
+                float distToStroke = abs(perimPos - strokeCenter);
+                distToStroke = min(distToStroke, 1.0 - distToStroke);
+
+                // Stroke length covers half perimeter (width + height equivalent)
+                float halfLength = _StrokeLength * 0.5;
+
+                // Smooth fade from center to both ends (no hard core)
+                float intensity = 1.0 - saturate(distToStroke / halfLength);
+                // Smooth cubic falloff for natural fade
+                intensity = intensity * intensity * (3.0 - 2.0 * intensity);
+
+                // Mask to border only
+                intensity *= borderMask;
+
+                return intensity;
+            }
 
             // Calculate separator intensity at a given UV position
             // Returns float4: x = layer1 (core), y = layer2, z = layer3, w = layer4 (ambient)
@@ -300,6 +418,31 @@ Shader "Custom/GlowingGlassBorder"
                 finalColor.rgb = lerp(finalColor.rgb, whiteCore, coreMix);
                 finalColor.a = max(finalColor.a, layer1 * _Layer1Alpha);
 
+                // === GLOWING STROKE (smooth fade, white tinted with shadow) ===
+                float strokeBorderMask = saturate(layer1 * 2.0 + layer2 + layer3 * 0.5);
+                float strokeIntensity = getStrokeIntensity(uv, aspect, _EdgePadding, strokeBorderMask);
+                if (strokeIntensity > 0.001)
+                {
+                    float glowStrength = strokeIntensity * _StrokeIntensity;
+
+                    // Layer 1: Outer white shadow/glow (widest, softest)
+                    float shadowIntensity = pow(strokeIntensity, 0.5);
+                    fixed3 shadowCol = fixed3(1, 1, 1);
+                    finalColor.rgb += shadowCol * shadowIntensity * _StrokeIntensity * 0.25;
+                    finalColor.a = max(finalColor.a, shadowIntensity * 0.3);
+
+                    // Layer 2: Mid glow (white tinted border color)
+                    float midGlow = pow(strokeIntensity, 0.8);
+                    fixed3 midCol = lerp(borderColor.rgb, fixed3(1, 1, 1), 0.5);
+                    finalColor.rgb += midCol * midGlow * _StrokeIntensity * 0.5;
+                    finalColor.a = max(finalColor.a, midGlow * 0.5);
+
+                    // Layer 3: Core glow (brighter, more color)
+                    fixed3 coreCol = lerp(borderColor.rgb, fixed3(1, 1, 1), 0.3);
+                    finalColor.rgb += coreCol * glowStrength * 0.8;
+                    finalColor.a = max(finalColor.a, glowStrength * 0.7);
+                }
+
                 // === VERTICAL SEPARATORS (multi-layer glow matching border) ===
                 float4 sepLayers = getSeparatorIntensity(uv, aspect, _EdgePadding, dist);
                 if (sepLayers.x > 0.0 || sepLayers.w > 0.0)
@@ -325,13 +468,13 @@ Shader "Custom/GlowingGlassBorder"
                     finalColor.a = max(finalColor.a, sepLayers.x * _Layer1Alpha * _SeparatorAlpha);
                 }
 
+                // === HOLOGRAM EFFECT ===
+                // Calculate border mask for hologram (stronger effect on border areas)
+                float borderMask = saturate(layer1 + layer2 * 0.8 + layer3 * 0.5 + layer4 * 0.3);
+                finalColor.rgb = applyHologramEffect(finalColor.rgb, uv, borderMask);
+
                 finalColor *= i.color;
-                
-                // Clipping: if visual alpha is too low, we might want to clip or not.
-                // Since we rely on transparency, we just return finalColor.
-                // However, if we wanted to be super efficient regarding fillrate we could clip, 
-                // but for soft glow, better to just let it fade.
-                 
+
                 return finalColor;
             }
             ENDCG
