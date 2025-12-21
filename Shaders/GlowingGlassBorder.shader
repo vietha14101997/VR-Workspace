@@ -30,12 +30,6 @@ Shader "Custom/GlowingGlassBorder"
         _GlassAlpha ("Glass Alpha", Range(0, 0.2)) = 0.02
         _GlassTint ("Glass Tint", Color) = (0.9, 0.95, 1, 1)
         
-        [Header(Running Light)]
-        _ShimmerSpeed ("Light Speed", Range(0, 1)) = 0.15
-        _ShimmerIntensity ("Light Intensity", Range(0, 1)) = 0.8
-        _LightSize ("Light Size", Range(0.01, 0.1)) = 0.018
-        _LightGlow ("Light Glow Spread", Range(0.005, 0.05)) = 0.012
-
         [Header(Vertical Separators)]
         _SeparatorCount ("Separator Count", Range(0, 4)) = 0
         _SeparatorPositions ("Separator X Positions (UV)", Vector) = (0, 0, 0, 0)
@@ -130,11 +124,6 @@ Shader "Custom/GlowingGlassBorder"
             
             float _GlassAlpha;
             fixed4 _GlassTint;
-            
-            float _ShimmerSpeed;
-            float _ShimmerIntensity;
-            float _LightSize;
-            float _LightGlow;
 
             // Separator properties
             float _SeparatorCount;
@@ -196,46 +185,6 @@ Shader "Custom/GlowingGlassBorder"
                 }
 
                 return totalLayers;
-            }
-
-            // Calculate perimeter position (0-1) for a point on or near the rounded rect border
-            float getPerimeterPosition(float2 uv, float aspect, float padding)
-            {
-                float2 center = float2(0.5, 0.5);
-                float2 pos = uv - center;
-
-                // Get the effective box dimensions
-                float halfW = 0.5 - padding;
-                float halfH = 0.5 - padding;
-
-                // Calculate angle from center
-                float angle = atan2(pos.y, pos.x * (1.0 / aspect));
-
-                // Normalize to 0-1 range (starting from right, going counter-clockwise)
-                float t = (angle + 3.14159) / (2.0 * 3.14159);
-
-                return t;
-            }
-
-            // Get the UV position on the border for a given perimeter t (0-1)
-            float2 getBorderUV(float t, float aspect, float padding)
-            {
-                float halfW = 0.5 - padding;
-                float halfH = 0.5 - padding;
-
-                // Convert t to angle
-                float angle = t * 2.0 * 3.14159 - 3.14159;
-
-                // Calculate direction
-                float2 dir = float2(cos(angle) * aspect, sin(angle));
-                dir = normalize(dir);
-
-                // Scale to hit the box edge (approximate for rounded rect)
-                float scaleX = halfW / max(abs(dir.x), 0.001);
-                float scaleY = halfH / max(abs(dir.y), 0.001);
-                float scale = min(scaleX, scaleY);
-
-                return float2(0.5, 0.5) + dir * scale * 0.95;
             }
 
             // SDF for rounded box with Aspect Ratio correction
@@ -326,52 +275,6 @@ Shader "Custom/GlowingGlassBorder"
                 float layer1 = 1.0 - saturate(absDist / _Layer1Width);
                 layer1 = pow(layer1, 0.5); // Sharper falloff
                 
-                // === RUNNING LIGHT (single dot running along border) ===
-                fixed3 runningLightColor = fixed3(0, 0, 0);
-                float runningLightAlpha = 0.0;
-
-                if (_ShimmerSpeed > 0.01)
-                {
-                    // Get current pixel's position along the perimeter (0-1)
-                    float perimPos = getPerimeterPosition(uv, aspect, _EdgePadding);
-
-                    // Start from top-left corner (offset ~0.625 in perimeter space)
-                    float startOffset = 0.625;
-
-                    // Single light moving counter-clockwise from top-left
-                    float timeVal = _Time.y * _ShimmerSpeed;
-                    float lightPos = frac(-timeVal + startOffset);
-
-                    // Calculate distance to the light (with wrap-around)
-                    float shimmerDist = abs(perimPos - lightPos);
-                    shimmerDist = min(shimmerDist, 1.0 - shimmerDist);
-
-                    // Create soft glow
-                    float glow = 1.0 - saturate(shimmerDist / _LightSize);
-                    glow = pow(glow, 2.5); // Tighter shimmer core
-
-                    // Get color at light's position based on the gradient
-                    float2 lightUV = getBorderUV(lightPos, aspect, _EdgePadding);
-                    float2 centered = lightUV - 0.5;
-                    float2 rotated;
-                    rotated.x = centered.x * cos(angleRad) - centered.y * sin(angleRad);
-                    rotated.y = centered.x * sin(angleRad) + centered.y * cos(angleRad);
-                    float tLight = saturate(rotated.x + 0.5);
-                    tLight = pow(tLight, 1.0 / _CyanRatio);
-                    fixed3 lightColor = lerp(_ColorA.rgb, _ColorB.rgb, tLight);
-
-                    // Boost saturation of shimmer color
-                    lightColor = saturate(lightColor * 1.4);
-
-                    runningLightColor = lightColor * glow;
-                    runningLightAlpha = glow;
-
-                    // Mask to border area only
-                    float borderMask = saturate(layer1 * 2.0 + layer2 + layer3);
-                    runningLightColor *= borderMask * _ShimmerIntensity;
-                    runningLightAlpha *= borderMask;
-                }
-                
                 // === COMPOSITE ===
                 fixed4 finalColor = glassColor;
                 
@@ -392,16 +295,10 @@ Shader "Custom/GlowingGlassBorder"
                 
                 // Bright Core
                 fixed3 whiteCore = fixed3(1,1,1);
-                // Suppress white core where shimmer is active to let shimmer color shine through
-                float shimmerFactor = runningLightAlpha * _ShimmerIntensity;
-                float coreMix = layer1 * _Layer1Alpha * (0.5 * (1.0 - shimmerFactor));
-                
-                finalColor.rgb = lerp(finalColor.rgb, whiteCore, coreMix); 
-                finalColor.a = max(finalColor.a, layer1 * _Layer1Alpha);
+                float coreMix = layer1 * _Layer1Alpha * 0.5;
 
-                // Add Running Lights (positioned over the suppressed core)
-                finalColor.rgb += runningLightColor * 2.5;
-                finalColor.a = max(finalColor.a, runningLightAlpha * _ShimmerIntensity);
+                finalColor.rgb = lerp(finalColor.rgb, whiteCore, coreMix);
+                finalColor.a = max(finalColor.a, layer1 * _Layer1Alpha);
 
                 // === VERTICAL SEPARATORS (multi-layer glow matching border) ===
                 float4 sepLayers = getSeparatorIntensity(uv, aspect, _EdgePadding, dist);

@@ -14,6 +14,12 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
     private Material _borderMaterial;
     private Material _backgroundMaterial;
 
+    // Border shader swap for hover effect
+    private Image _borderImage;
+    private RectTransform _borderRectTransform;
+    private Shader _originalBorderShader;
+    private Shader _hoverBorderShader;
+
     void Start()
     {
         if (targetVisuals == null) return;
@@ -25,7 +31,18 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
             var img = borderObj.GetComponent<Image>();
             if (img != null && img.material != null)
             {
-                _borderMaterial = img.material;
+                // Create material instance to avoid affecting other buttons
+                _borderMaterial = new Material(img.material);
+                img.material = _borderMaterial;
+                _borderImage = img;
+                _borderRectTransform = borderObj.GetComponent<RectTransform>();
+
+                // Save original shader and find hover shader
+                _originalBorderShader = _borderMaterial.shader;
+                _hoverBorderShader = Shader.Find("Custom/GlowingGlassBorder");
+
+                // Set aspect ratio for correct border rendering
+                UpdateBorderAspect();
             }
         }
 
@@ -86,11 +103,25 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
     public void OnPointerEnter(UnityEngine.EventSystems.PointerEventData eventData)
     {
         _isHovered = true;
+
+        // Swap border shader to hover shader
+        if (_borderMaterial != null && _hoverBorderShader != null)
+        {
+            _borderMaterial.shader = _hoverBorderShader;
+            UpdateBorderAspect();
+        }
     }
 
     public void OnPointerExit(UnityEngine.EventSystems.PointerEventData eventData)
     {
         _isHovered = false;
+
+        // Restore original border shader
+        if (_borderMaterial != null && _originalBorderShader != null)
+        {
+            _borderMaterial.shader = _originalBorderShader;
+            UpdateBorderAspect();
+        }
     }
     
     public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData)
@@ -115,6 +146,28 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
             {
                 ripple.TriggerRipple(new Vector2(0.5f, 0.5f));
             }
+        }
+    }
+
+    private void UpdateBorderAspect()
+    {
+        if (_borderMaterial == null || _borderRectTransform == null) return;
+
+        float width = _borderRectTransform.rect.width;
+        float height = _borderRectTransform.rect.height;
+        if (height > 0.001f)
+        {
+            float aspect = width / height;
+            _borderMaterial.SetFloat("_Aspect", aspect);
+        }
+    }
+
+    void OnDestroy()
+    {
+        // Cleanup material instance to avoid memory leak
+        if (_borderMaterial != null)
+        {
+            Destroy(_borderMaterial);
         }
     }
 }
