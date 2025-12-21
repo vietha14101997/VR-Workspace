@@ -95,7 +95,6 @@ public class VRTaskbar : MonoBehaviour
     private RectTransform _section1;
     private RectTransform _section2;
     private RectTransform _section3;
-    private RectTransform _appButtonsContainer;
     private List<GameObject> _appButtons = new List<GameObject>();
 
     // Components
@@ -362,7 +361,7 @@ public class VRTaskbar : MonoBehaviour
         // Find all buttons in Section1, Section2
         foreach (Transform section in new[] {
             transform.Find("ContentContainer/Section1_Left"),
-            transform.Find("ContentContainer/Section2_Apps/AppButtonsContainer")
+            transform.Find("ContentContainer/Section2_Apps")
         })
         {
             if (section == null) continue;
@@ -441,7 +440,7 @@ public class VRTaskbar : MonoBehaviour
         }
 
         // Section 2 - Home button
-        Transform appContainer = transform.Find("ContentContainer/Section2_Apps/AppButtonsContainer");
+        Transform appContainer = transform.Find("ContentContainer/Section2_Apps");
         if (appContainer != null)
         {
             foreach (Transform child in appContainer)
@@ -466,7 +465,7 @@ public class VRTaskbar : MonoBehaviour
     void FindAppButtonReferences()
     {
         _appButtons.Clear();
-        Transform appContainer = transform.Find("ContentContainer/Section2_Apps/AppButtonsContainer");
+        Transform appContainer = transform.Find("ContentContainer/Section2_Apps");
         if (appContainer == null) return;
 
         foreach (Transform child in appContainer)
@@ -958,17 +957,8 @@ public class VRTaskbar : MonoBehaviour
         _section2.sizeDelta = new Vector2(width, 0);
         _section2.anchoredPosition = new Vector2(xPos, 0);
 
-        // App buttons container with HorizontalLayoutGroup (like Section 1)
-        GameObject buttonsContainer = new GameObject("AppButtonsContainer");
-        buttonsContainer.transform.SetParent(section.transform, false);
-        _appButtonsContainer = buttonsContainer.AddComponent<RectTransform>();
-        _appButtonsContainer.anchorMin = Vector2.zero;
-        _appButtonsContainer.anchorMax = Vector2.one;
-        _appButtonsContainer.offsetMin = Vector2.zero;
-        _appButtonsContainer.offsetMax = Vector2.zero;
-
-        // Horizontal layout for buttons (same style as Section 1)
-        HorizontalLayoutGroup layout = buttonsContainer.AddComponent<HorizontalLayoutGroup>();
+        // Horizontal layout for buttons directly on Section2_Apps (like Section 1)
+        HorizontalLayoutGroup layout = section.AddComponent<HorizontalLayoutGroup>();
         layout.spacing = buttonSpacing;
         layout.childAlignment = TextAnchor.MiddleCenter;
         layout.childControlWidth = false;
@@ -987,7 +977,7 @@ public class VRTaskbar : MonoBehaviour
             string slotName = (i == 0) ? "Home" : $"AppSlot_{i}";
             bool isPlaceholder = (i != 0);
 
-            var btn = CreateAppButtonSlot(_appButtonsContainer, slotIcon, slotName, cyanColor, isPlaceholder);
+            var btn = CreateAppButtonSlot(_section2, slotIcon, slotName, cyanColor, isPlaceholder);
             _appButtons.Add(btn);
         }
     }
