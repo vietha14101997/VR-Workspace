@@ -9,26 +9,45 @@ using Random = UnityEngine.Random;
 using UnityEditor;
 #endif
 
+/// <summary>
+/// VR Menu Frame - World Space UI panel with glass effect and status bar.
+/// Canvas is directly on this GameObject (merged, no child MenuCanvas).
+/// Uses logicalWidth for pixel-perfect UI scaling.
+/// </summary>
+[ExecuteAlways]
+[RequireComponent(typeof(Canvas))]
+[RequireComponent(typeof(RectTransform))]
+[RequireComponent(typeof(GraphicRaycaster))]
 public class VRMenuFrame : MonoBehaviour
 {
+    [Header("Panel Size (meters)")]
+    [Tooltip("Physical width of the panel in meters")]
+    public float panelWidth = 1.6f;
+    [Tooltip("Physical height of the panel in meters")]
+    public float panelHeight = 0.9f;
+
+    [Header("Logical Size (pixels)")]
+    [Tooltip("Logical width in pixels for UI layout calculations")]
+    public float logicalWidth = 1920f;
+
     [Header("Frame Configuration")]
-    public float topMargin = 35f; // StatusBar Area (minimal height, very close to top edge)
-    public float separatorOffset = 80f; // Distance from top edge to separator line
+    [Tooltip("Distance from top edge to separator line in logical pixels")]
+    public float separatorOffset = 80f;
     public float sidePadding = 0f;
 
     [Header("Visual Config")]
-    public Color glassColor = new Color(1.0f, 1.0f, 1.0f, 0.09803921568f);
-    public Color panelBorderColor = new Color(1.0f, 1.0f, 1.0f, 0.39215686274f);
+    public Color glassColor = new Color(1.0f, 1.0f, 1.0f, 0.098f);
+    public Color panelBorderColor = new Color(1.0f, 1.0f, 1.0f, 0.392f);
 
     [Header("Glowing Border Config")]
     [ColorUsage(true, true)]
-    public Color glowColorA = new Color(0f, 1.5f, 2f, 1f); // Cyan HDR
+    public Color glowColorA = new Color(0f, 1.5f, 2f, 1f);
     [ColorUsage(true, true)]
-    public Color glowColorB = new Color(1.2f, 0.3f, 2f, 1f); // Purple HDR
-    public float glowIntensity = 1.2f; // Slightly reduced
-    public float borderThickness = 3f; // Reduced from 8f to 3f for thinner look
-    public float edgePadding = 0.04f; // Added padding property
-    public float glowSpread = 40f; // Reduced spread for sharper look
+    public Color glowColorB = new Color(1.2f, 0.3f, 2f, 1f);
+    public float glowIntensity = 1.2f;
+    public float borderThickness = 3f;
+    public float edgePadding = 0.04f;
+    public float glowSpread = 40f;
     public float shimmerSpeed = 0.4f;
     public float hdrBoost = 1.8f;
 
@@ -51,12 +70,398 @@ public class VRMenuFrame : MonoBehaviour
     private Image _networkIcon;
     private Image _batteryFillImage;
 
-    // Public Access
+    // Components (on this GameObject)
+    public Canvas Canvas { get; private set; }
+    public RectTransform CanvasRect { get; private set; }
     public RectTransform ContentContainer { get; private set; }
+
+    // Calculated values
+    private float LogicalHeight => (logicalWidth / panelWidth) * panelHeight;
+    private float ScaleFactor => panelWidth / logicalWidth;
+    private float Aspect => panelWidth / panelHeight;
+
+#if UNITY_EDITOR
+    void OnEnable()
+    {
+        if (!Application.isPlaying)
+        {
+            UpdateMaterialAspectRatiosEditor();
+        }
+    }
+
+    void OnValidate()
+    {
+        if (!Application.isPlaying)
+        {
+            EditorApplication.delayCall += () =>
+            {
+                if (this != null)
+                {
+                    // Update RectTransform when dimensions change
+                    var rt = GetComponent<RectTransform>();
+                    if (rt != null)
+                    {
+                        rt.sizeDelta = new Vector2(logicalWidth, LogicalHeight);
+                        rt.localScale = new Vector3(ScaleFactor, ScaleFactor, 1f);
+                    }
+                    UpdateMaterialAspectRatiosEditor();
+                }
+            };
+        }
+    }
+
+    void UpdateMaterialAspectRatiosEditor()
+    {
+        float aspect = Aspect;
+
+        var glassBg = transform.Find("GlassBackground");
+        if (glassBg != null)
+        {
+            var img = glassBg.GetComponent<Image>();
+            if (img != null && img.material != null)
+            {
+                img.material.SetFloat("_Aspect", aspect);
+                EditorUtility.SetDirty(img.material);
+            }
+
+            var glowBorder = glassBg.Find("GlowingBorder");
+            if (glowBorder != null)
+            {
+                var borderImg = glowBorder.GetComponent<Image>();
+                if (borderImg != null && borderImg.material != null)
+                {
+                    borderImg.material.SetFloat("_Aspect", aspect);
+                    EditorUtility.SetDirty(borderImg.material);
+                }
+            }
+        }
+    }
+#endif
 
     void Start()
     {
         LoadIcons();
+
+        // Get/Setup Canvas on this GameObject
+        Canvas = GetComponent<Canvas>();
+        CanvasRect = GetComponent<RectTransform>();
+
+        if (Canvas == null)
+        {
+            Canvas = gameObject.AddComponent<Canvas>();
+        }
+        Canvas.renderMode = RenderMode.WorldSpace;
+
+        // Ensure GraphicRaycaster exists
+        if (GetComponent<GraphicRaycaster>() == null)
+        {
+            gameObject.AddComponent<GraphicRaycaster>();
+        }
+
+        // Check for existing content from prefab
+        if (ContentContainer == null)
+        {
+            TryInitializeExisting();
+        }
+
+        // Build if needed
+        if (ContentContainer == null)
+        {
+            Build();
+        }
+    }
+
+    void TryInitializeExisting()
+    {
+        // Find ContentContainer
+        Transform contentTransform = transform.Find("ContentContainer");
+        if (contentTransform != null)
+        {
+            ContentContainer = contentTransform.GetComponent<RectTransform>();
+        }
+
+        // Update materials
+        UpdateMaterialAspectRatios();
+
+        // Setup status bar references
+        SetupStatusBarReferences(transform);
+
+        // Re-apply runtime sprites (they don't serialize in prefabs)
+        ReapplyRuntimeSprites();
+
+        // Re-initialize floating data animations
+        ReinitializeFloatingDataEffects();
+
+        // Re-register recenter button click event
+        SetupRecenterButtonListener();
+
+        // Ensure layers are set for VRGazeReticle raycast
+        SetupVRLayers();
+
+        if (ContentContainer != null)
+        {
+            Debug.Log("[VRMenuFrame] Initialized from existing content");
+        }
+    }
+
+    void SetupVRLayers()
+    {
+        int vrLayer = LayerMask.NameToLayer("VirtualObjects");
+        if (vrLayer == -1) return;
+
+        float h = LogicalHeight;
+
+        // GlassBackground - fix collider size in logical pixels
+        Transform glassBg = transform.Find("GlassBackground");
+        if (glassBg != null)
+        {
+            BoxCollider bgCol = glassBg.GetComponent<BoxCollider>();
+            if (bgCol != null)
+            {
+                glassBg.gameObject.layer = vrLayer;
+
+                // Recalculate expansion
+                float p = edgePadding;
+                float safeZone = 0.06f;
+                float effectiveP = p + safeZone;
+                float expansion = effectiveP / (1f - 2f * effectiveP);
+
+                // Fix collider size if it's wrong
+                float expandedW = logicalWidth * (1f + 2f * expansion);
+                float expandedH = h * (1f + 2f * expansion);
+                if (Mathf.Abs(bgCol.size.x - expandedW) > 1f || bgCol.size.z > 0.1f)
+                {
+                    bgCol.size = new Vector3(expandedW, expandedH, 0.01f);
+                    bgCol.center = Vector3.zero;
+                }
+            }
+        }
+
+        // RecenterBtn - ensure collider uses logical pixels
+        Transform recenterBtn = transform.Find("StatusBar/LeftGroup/RecenterBtn");
+        if (recenterBtn != null)
+        {
+            BoxCollider btnCol = recenterBtn.GetComponent<BoxCollider>();
+            if (btnCol != null)
+            {
+                recenterBtn.gameObject.layer = vrLayer;
+
+                // Fix collider size if it's wrong
+                float btnSize = 72f;
+                if (Mathf.Abs(btnCol.size.x - btnSize) > 1f || btnCol.size.z > 0.2f)
+                {
+                    btnCol.size = new Vector3(btnSize, btnSize, 0.1f);
+                    btnCol.center = new Vector3(0, 0, -0.1f);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Re-register the recenter button click listener when loading from prefab
+    /// </summary>
+    void SetupRecenterButtonListener()
+    {
+        Transform recenterBtn = transform.Find("StatusBar/LeftGroup/RecenterBtn");
+        if (recenterBtn == null) return;
+
+        // VRButtonFactory structure: RecenterBtn/HitArea has Button component
+        Transform hitArea = recenterBtn.Find("HitArea");
+        if (hitArea == null) return;
+
+        Button btn = hitArea.GetComponent<Button>();
+        if (btn == null)
+        {
+            btn = hitArea.gameObject.AddComponent<Button>();
+
+            // Set target graphic (VRButtonFactory: Visuals/Background)
+            Transform visuals = hitArea.Find("Visuals");
+            if (visuals != null)
+            {
+                Transform background = visuals.Find("Background");
+                if (background != null)
+                {
+                    Image bgImg = background.GetComponent<Image>();
+                    if (bgImg != null) btn.targetGraphic = bgImg;
+                }
+            }
+        }
+
+        // Disable flash effect on click
+        btn.transition = Selectable.Transition.None;
+
+        // Remove old listeners and add fresh one
+        btn.onClick.RemoveAllListeners();
+        btn.onClick.AddListener(RecenterObject);
+    }
+
+    /// <summary>
+    /// Re-apply sprites that are generated at runtime (not serialized in prefabs)
+    /// </summary>
+    void ReapplyRuntimeSprites()
+    {
+        // Re-apply GlassBackground and GlowingBorder sprites (must be before early returns)
+        Transform glassBg = transform.Find("GlassBackground");
+        if (glassBg != null)
+        {
+            // Re-apply GlassBackground sprite
+            var glassBgImg = glassBg.GetComponent<Image>();
+            if (glassBgImg != null && glassBgImg.sprite == null)
+            {
+                glassBgImg.sprite = GetPixelSprite();
+            }
+
+            // Re-apply GlowingBorder sprite
+            Transform glowBorder = glassBg.Find("GlowingBorder");
+            if (glowBorder != null)
+            {
+                var borderImg = glowBorder.GetComponent<Image>();
+                if (borderImg != null && borderImg.sprite == null)
+                {
+                    borderImg.sprite = GetPixelSprite();
+                }
+            }
+        }
+
+        Transform statusBar = transform.Find("StatusBar");
+        if (statusBar == null) return;
+
+        // Re-apply separator line gradient sprite
+        Transform separatorLine = statusBar.Find("SeparatorLine");
+        if (separatorLine != null)
+        {
+            var lineImg = separatorLine.GetComponent<Image>();
+            if (lineImg != null)
+            {
+                lineImg.sprite = GetGradientLineSprite();
+            }
+        }
+
+        Transform statusGroup = statusBar.Find("StatusGroup");
+        if (statusGroup == null) return;
+
+        // Re-apply battery sprite
+        Transform battContainer = statusGroup.Find("BatteryContainer");
+        if (battContainer != null)
+        {
+            Sprite batSprite = GetBatterySprite();
+
+            Transform bg = battContainer.Find("Bg");
+            if (bg != null)
+            {
+                var bgImg = bg.GetComponent<Image>();
+                if (bgImg != null) bgImg.sprite = batSprite;
+            }
+
+            Transform fill = battContainer.Find("Fill");
+            if (fill != null)
+            {
+                var fillImg = fill.GetComponent<Image>();
+                if (fillImg != null) fillImg.sprite = batSprite;
+            }
+        }
+
+        // Re-apply network icon sprite
+        Transform netIcon = statusGroup.Find("NetworkIcon");
+        if (netIcon != null)
+        {
+            var netImg = netIcon.GetComponent<Image>();
+            if (netImg != null)
+            {
+                netImg.sprite = iconWifi ?? GetWifiSprite();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Re-initialize floating data animations when loading from prefab
+    /// </summary>
+    void ReinitializeFloatingDataEffects()
+    {
+        Transform glassBg = transform.Find("GlassBackground");
+        if (glassBg == null) return;
+
+        Transform fxContainer = glassBg.Find("FX_DataStream");
+        if (fxContainer == null) return;
+
+        float w = logicalWidth;
+        float h = LogicalHeight;
+
+        var anims = fxContainer.GetComponentsInChildren<FloatingDataAnim>();
+        foreach (var anim in anims)
+        {
+            anim.range = new Vector2(w, h);
+            anim.ForceReinitialize();
+        }
+    }
+
+    void UpdateMaterialAspectRatios()
+    {
+        float aspect = Aspect;
+
+        var glassBg = transform.Find("GlassBackground");
+        if (glassBg != null)
+        {
+            var img = glassBg.GetComponent<Image>();
+            if (img != null && img.material != null)
+            {
+                img.material = new Material(img.material);
+                img.material.SetFloat("_Aspect", aspect);
+            }
+
+            var glowBorder = glassBg.Find("GlowingBorder");
+            if (glowBorder != null)
+            {
+                var borderImg = glowBorder.GetComponent<Image>();
+                if (borderImg != null && borderImg.material != null)
+                {
+                    borderImg.material = new Material(borderImg.material);
+                    borderImg.material.SetFloat("_Aspect", aspect);
+                }
+            }
+        }
+    }
+
+    void SetupStatusBarReferences(Transform root)
+    {
+        Transform statusBar = root.Find("StatusBar");
+        if (statusBar == null) return;
+
+        Transform leftGroup = statusBar.Find("LeftGroup");
+        if (leftGroup != null)
+        {
+            TextMeshProUGUI[] texts = leftGroup.GetComponentsInChildren<TextMeshProUGUI>();
+            if (texts.Length > 0)
+            {
+                _clockText = texts[0];
+            }
+        }
+
+        Transform statusGroup = statusBar.Find("StatusGroup");
+        if (statusGroup != null)
+        {
+            Transform netIcon = statusGroup.Find("NetworkIcon");
+            if (netIcon != null)
+            {
+                _networkIcon = netIcon.GetComponent<Image>();
+            }
+
+            Transform battContainer = statusGroup.Find("BatteryContainer");
+            if (battContainer != null)
+            {
+                Transform fill = battContainer.Find("Fill");
+                if (fill != null)
+                {
+                    _batteryFillImage = fill.GetComponent<Image>();
+                }
+
+                TextMeshProUGUI[] battTexts = battContainer.GetComponentsInChildren<TextMeshProUGUI>();
+                if (battTexts.Length > 0)
+                {
+                    _batteryText = battTexts[0];
+                }
+            }
+        }
     }
 
     void Update()
@@ -66,29 +471,199 @@ public class VRMenuFrame : MonoBehaviour
         UpdateBattery();
     }
 
-    public void Build(float width, float height)
+    [ContextMenu("Rebuild Frame")]
+    public void Rebuild()
     {
-        // 1. Create Glass Background & Borders
-        CreateGlassPanel(transform, width, height);
+        // Clean up existing children
+        for (int i = transform.childCount - 1; i >= 0; i--)
+        {
+            var child = transform.GetChild(i);
+            if (Application.isPlaying)
+                Destroy(child.gameObject);
+            else
+                DestroyImmediate(child.gameObject);
+        }
 
-        // 2. Create Status Bar
-        CreateStatusBar(transform, width, height, topMargin, separatorOffset);
+        ContentContainer = null;
+        Build();
+    }
 
-        // 3. Create Content Container
+#if UNITY_EDITOR
+    [ContextMenu("Build And Save As Prefab")]
+    public void BuildAndSaveAsPrefab()
+    {
+        Rebuild();
+        SaveMaterialsAsAssets();
+
+        string prefabDir = "Assets/VR-Workspace/Prefabs/UI";
+        if (!AssetDatabase.IsValidFolder("Assets/VR-Workspace/Prefabs"))
+            AssetDatabase.CreateFolder("Assets/VR-Workspace", "Prefabs");
+        if (!AssetDatabase.IsValidFolder(prefabDir))
+            AssetDatabase.CreateFolder("Assets/VR-Workspace/Prefabs", "UI");
+
+        string prefabPath = $"{prefabDir}/VRMenuFrame.prefab";
+
+        if (PrefabUtility.IsPartOfPrefabInstance(gameObject))
+        {
+            PrefabUtility.UnpackPrefabInstance(gameObject, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+        }
+
+        PrefabUtility.SaveAsPrefabAssetAndConnect(gameObject, prefabPath, InteractionMode.UserAction);
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+
+        Debug.Log($"[VRMenuFrame] Prefab saved to: {prefabPath}");
+    }
+
+    void SaveMaterialsAsAssets()
+    {
+        string matDir = "Assets/VR-Workspace/Materials/UIComponents";
+        if (!AssetDatabase.IsValidFolder("Assets/VR-Workspace/Materials"))
+            AssetDatabase.CreateFolder("Assets/VR-Workspace", "Materials");
+        if (!AssetDatabase.IsValidFolder(matDir))
+            AssetDatabase.CreateFolder("Assets/VR-Workspace/Materials", "UIComponents");
+
+        float aspect = Aspect;
+
+        var glassBg = transform.Find("GlassBackground");
+        if (glassBg != null)
+        {
+            var img = glassBg.GetComponent<Image>();
+            if (img != null && img.material != null)
+            {
+                var savedMat = SaveOrGetMaterial(img.material, "FrameGlassBackground", matDir);
+                if (savedMat != null)
+                {
+                    savedMat.SetFloat("_Aspect", aspect);
+                    EditorUtility.SetDirty(savedMat);
+                    img.material = savedMat;
+                }
+            }
+
+            var glowBorder = glassBg.Find("GlowingBorder");
+            if (glowBorder != null)
+            {
+                var borderImg = glowBorder.GetComponent<Image>();
+                if (borderImg != null && borderImg.material != null)
+                {
+                    var savedMat = SaveOrGetMaterial(borderImg.material, "FrameGlowingBorder", matDir);
+                    if (savedMat != null)
+                    {
+                        savedMat.SetFloat("_Aspect", aspect);
+                        EditorUtility.SetDirty(savedMat);
+                        borderImg.material = savedMat;
+                    }
+                }
+            }
+        }
+
+        // VRButtonFactory structure: RecenterBtn/HitArea/Visuals/Background, Border
+        var recenterBtn = transform.Find("StatusBar/LeftGroup/RecenterBtn");
+        if (recenterBtn != null)
+        {
+            var hitArea = recenterBtn.Find("HitArea");
+            if (hitArea != null)
+            {
+                var visuals = hitArea.Find("Visuals");
+                if (visuals != null)
+                {
+                    var background = visuals.Find("Background");
+                    if (background != null)
+                    {
+                        var bgImg = background.GetComponent<Image>();
+                        if (bgImg != null && bgImg.material != null)
+                        {
+                            var savedMat = SaveOrGetMaterial(bgImg.material, "RecenterButtonBg", matDir);
+                            if (savedMat != null) bgImg.material = savedMat;
+                        }
+                    }
+
+                    var border = visuals.Find("Border");
+                    if (border != null)
+                    {
+                        var borderImg = border.GetComponent<Image>();
+                        if (borderImg != null && borderImg.material != null)
+                        {
+                            var savedMat = SaveOrGetMaterial(borderImg.material, "RecenterButtonBorder", matDir);
+                            if (savedMat != null)
+                            {
+                                borderImg.material = savedMat;
+                                var ripple = border.GetComponent<VRButtonRipple>();
+                                if (ripple != null) ripple.Initialize(savedMat, borderImg);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        AssetDatabase.SaveAssets();
+    }
+
+    Material SaveOrGetMaterial(Material runtimeMat, string name, string dir)
+    {
+        string path = $"{dir}/{name}.mat";
+
+        var existingMat = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (existingMat != null)
+        {
+            existingMat.CopyPropertiesFromMaterial(runtimeMat);
+            EditorUtility.SetDirty(existingMat);
+            return existingMat;
+        }
+
+        var newMat = new Material(runtimeMat);
+        AssetDatabase.CreateAsset(newMat, path);
+        return AssetDatabase.LoadAssetAtPath<Material>(path);
+    }
+#endif
+
+    /// <summary>
+    /// Build the complete menu frame hierarchy using configured dimensions.
+    /// </summary>
+    public void Build()
+    {
+        Build(panelWidth, panelHeight, logicalWidth);
+    }
+
+    /// <summary>
+    /// Build the complete menu frame hierarchy with custom dimensions.
+    /// </summary>
+    public void Build(float width, float height, float logicWidth = 1920f)
+    {
+        // Store dimensions
+        panelWidth = width;
+        panelHeight = height;
+        logicalWidth = logicWidth;
+
+        float logicalHeight = LogicalHeight;
+        float scaleFactor = ScaleFactor;
+
+        // Setup this GameObject's RectTransform
+        CanvasRect = GetComponent<RectTransform>();
+        CanvasRect.sizeDelta = new Vector2(logicalWidth, logicalHeight);
+        CanvasRect.localScale = new Vector3(scaleFactor, scaleFactor, 1f);
+        CanvasRect.localPosition = Vector3.zero;
+
+        float w = logicalWidth;
+        float h = logicalHeight;
+
+        // 1. Glass Background & Borders
+        CreateGlassPanel(transform, w, h);
+
+        // 2. Status Bar
+        float statusBarHeight = h * 0.125f;
+        CreateStatusBar(transform, w, h, statusBarHeight);
+
+        // 3. Content Container
         GameObject contentObj = new GameObject("ContentContainer");
         contentObj.transform.SetParent(transform, false);
         ContentContainer = contentObj.AddComponent<RectTransform>();
 
-        // Fill the space BELOW separator line
-        // Anchor to bottom-left (0,0) to top-right (1,1)
         ContentContainer.anchorMin = Vector2.zero;
         ContentContainer.anchorMax = Vector2.one;
-        // offsetMin controls BOTTOM edge - no offset from bottom
-        // offsetMax controls TOP edge - push down by separatorOffset pixels
         ContentContainer.offsetMin = Vector2.zero;
-        ContentContainer.offsetMax = new Vector2(0, -separatorOffset);
-
-        // Add a layer for Raycasting/Interaction if needed, or leave empty
+        ContentContainer.offsetMax = new Vector2(0, -statusBarHeight);
     }
 
     // --- LOGIC ---
@@ -127,54 +702,45 @@ public class VRMenuFrame : MonoBehaviour
         {
             float battLevel = SystemInfo.batteryLevel;
             float displayLevel = (battLevel < 0) ? 1.0f : battLevel;
-            
+
             string battStr = Mathf.FloorToInt(displayLevel * 100).ToString();
             _batteryText.text = battStr;
 
             if (_batteryFillImage != null)
             {
                 _batteryFillImage.fillAmount = displayLevel;
-                // _batteryFillImage.color = (displayLevel < 0.2f) ? new Color(1f, 0.3f, 0.3f) : Color.white; 
-                // Keeping it white as per design request
                 _batteryFillImage.color = Color.white;
             }
         }
     }
 
-    // --- CREATION HELPERS ---
+    // --- CREATION HELPERS (logical pixels) ---
 
     void CreateGlassPanel(Transform parent, float w, float h)
     {
-        // 1. Glass Background Layer with Gradient
         GameObject bgObj = new GameObject("GlassBackground");
         bgObj.transform.SetParent(parent, false);
         Image img = bgObj.AddComponent<Image>();
-        
+
         img.type = Image.Type.Simple;
-        img.sprite = GetPixelSprite(); // Use pixel sprite, shader handles corners
-        
-        // Calculate Expansion to compensate for Shader Padding AND Inner Glow overlap
-        // We add an extra buffer to push the visual border completely outside the logical area
+        img.sprite = GetPixelSprite();
+
         float p = edgePadding;
-        float safeZone = 0.06f; // Increased buffer for safety
+        float safeZone = 0.06f;
         float effectiveP = p + safeZone;
         float expansion = effectiveP / (1f - 2f * effectiveP);
-        
-        // Use new GlassGradientBackground shader with rounded corners
+
+        float aspect = w / h;
+
         Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
         if (glassShader != null)
         {
             Material glassMat = new Material(glassShader);
-            
-            // Corner radius - MUST match border shader (increased for smoother curves)
+
             glassMat.SetFloat("_CornerRadius", 0.12f);
-            glassMat.SetFloat("_EdgePadding", p); // Set padding
-            
-            // Fix Aspect Ratio for rounded corners
-            float aspect = (h > 0) ? (w / h) : 1.0f;
+            glassMat.SetFloat("_EdgePadding", p);
             glassMat.SetFloat("_Aspect", aspect);
-            
-            // Gradient: Cyan left (70%), Purple right (30%), angled
+
             Color cyanGlass = new Color(0.35f, 0.9f, 1f, 0.15f);
             Color purpleGlass = new Color(0.75f, 0.45f, 1f, 0.22f);
             glassMat.SetColor("_ColorA", cyanGlass);
@@ -182,37 +748,39 @@ public class VRMenuFrame : MonoBehaviour
             glassMat.SetFloat("_GradientOffset", 0f);
             glassMat.SetFloat("_GradientAngle", -10f);
             glassMat.SetFloat("_CyanRatio", 0.7f);
-            
-            // Glass effect + center glow
             glassMat.SetFloat("_GlassAlpha", 0.08f);
             glassMat.SetFloat("_FresnelPower", 2.2f);
             glassMat.SetFloat("_FresnelStrength", 0.12f);
-            
+
             img.material = glassMat;
             img.color = Color.white;
         }
         else
         {
-            // Fallback to simple color
             img.color = glassColor;
             expansion = 0;
         }
 
-        BoxCollider bgCol = bgObj.AddComponent<BoxCollider>();
-        bgCol.size = new Vector3(w, h, 0.1f);
-        
         RectTransform rt = bgObj.GetComponent<RectTransform>();
-        rt.anchorMin = new Vector2(-expansion, -expansion); 
-        rt.anchorMax = new Vector2(1f + expansion, 1f + expansion); 
-        rt.sizeDelta = Vector2.zero; 
+        rt.anchorMin = new Vector2(-expansion, -expansion);
+        rt.anchorMax = new Vector2(1f + expansion, 1f + expansion);
+        rt.sizeDelta = Vector2.zero;
         rt.localScale = Vector3.one;
         rt.localPosition = Vector3.zero;
         rt.SetAsFirstSibling();
-        
-        // 2. Glowing Border Layer (using new shader)
+
+        // Collider uses logical pixels (will be scaled by Canvas localScale to match physical size)
+        float expandedW = w * (1f + expansion);
+        float expandedH = h * (1f + expansion);
+        BoxCollider bgCol = bgObj.AddComponent<BoxCollider>();
+        bgCol.size = new Vector3(expandedW, expandedH, 0.01f); // thin collider
+        bgCol.center = new Vector3(0, 0, -0.01f);
+
+        // Set layer to VirtualObjects for VRGazeReticle raycast
+        int vrLayer = LayerMask.NameToLayer("VirtualObjects");
+        if (vrLayer != -1) bgObj.layer = vrLayer;
+
         CreateGlowingBorder(bgObj.transform, w, h);
-        
-        // 3. FX
         CreateFloatingDataEffects(bgObj.transform, w, h);
     }
 
@@ -220,59 +788,52 @@ public class VRMenuFrame : MonoBehaviour
     {
         GameObject borderObj = new GameObject("GlowingBorder");
         borderObj.transform.SetParent(parent, false);
-        
+
         RectTransform rt = borderObj.AddComponent<RectTransform>();
-        // Match exactly the parent size - shader will handle the glow overflow
-        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
         rt.offsetMin = Vector2.zero;
         rt.offsetMax = Vector2.zero;
-        
+
         Image borderImg = borderObj.AddComponent<Image>();
         borderImg.raycastTarget = false;
-        
-        // Try to use Glowing Glass Border shader
+
+        float aspect = w / h;
+
         Shader glowShader = Shader.Find("Custom/GlowingGlassBorder");
         if (glowShader != null)
         {
             Material glowMat = new Material(glowShader);
-            
-            // UV-based border settings - Match glass panel corner EXACTLY
+
             glowMat.SetFloat("_BorderWidth", 0.02f);
-            glowMat.SetFloat("_CornerRadius", 0.12f);  // MUST match GlassGradientBackground
-            glowMat.SetFloat("_EdgePadding", edgePadding); // Set padding
-            
-            // Aspect Ratio Correction
-            float aspect = (h > 0) ? (w / h) : 1.0f;
+            glowMat.SetFloat("_CornerRadius", 0.12f);
+            glowMat.SetFloat("_EdgePadding", edgePadding);
             glowMat.SetFloat("_Aspect", aspect);
-            
-            // Multi-layer glow - STRONG values for visible layers
-            glowMat.SetFloat("_Layer1Width", 0.008f); // Very thin inner core
-            glowMat.SetFloat("_Layer1Alpha", 1.5f);   
-            glowMat.SetFloat("_Layer2Width", 0.018f); // Thin mid glow
-            glowMat.SetFloat("_Layer2Alpha", 1.0f);   
-            glowMat.SetFloat("_Layer3Width", 0.04f); // Reduced outer
-            glowMat.SetFloat("_Layer3Alpha", 0.6f);   
-            glowMat.SetFloat("_Layer4Width", 0.08f); // Reduced ambient
+
+            glowMat.SetFloat("_Layer1Width", 0.008f);
+            glowMat.SetFloat("_Layer1Alpha", 1.5f);
+            glowMat.SetFloat("_Layer2Width", 0.018f);
+            glowMat.SetFloat("_Layer2Alpha", 1.0f);
+            glowMat.SetFloat("_Layer3Width", 0.04f);
+            glowMat.SetFloat("_Layer3Alpha", 0.6f);
+            glowMat.SetFloat("_Layer4Width", 0.08f);
             glowMat.SetFloat("_Layer4Alpha", 0.3f);
-            
-            // Gradient colors - BRIGHT Cyan to Purple
-            Color cyanColor = new Color(0.3f, 1f, 1f, 1f);    // Bright cyan
-            Color purpleColor = new Color(1f, 0.4f, 1f, 1f);  // Bright purple
+
+            Color cyanColor = new Color(0.3f, 1f, 1f, 1f);
+            Color purpleColor = new Color(1f, 0.4f, 1f, 1f);
             glowMat.SetColor("_ColorA", cyanColor);
             glowMat.SetColor("_ColorB", purpleColor);
-            glowMat.SetFloat("_GradientMode", 2f); // Diagonal
-            glowMat.SetFloat("_GradientAngle", -10f); // Match glass background
-            
-            // Glass background
+            glowMat.SetFloat("_GradientMode", 2f);
+            glowMat.SetFloat("_GradientAngle", -10f);
             glowMat.SetFloat("_GlassAlpha", 0.02f);
             glowMat.SetColor("_GlassTint", new Color(0.9f, 0.95f, 1f, 1f));
-            
-            // Animation
-            glowMat.SetFloat("_ShimmerSpeed", shimmerSpeed);
-            glowMat.SetFloat("_ShimmerIntensity", 0.15f);
-            
+            glowMat.SetFloat("_ShimmerSpeed", 0.1f);  // Slow, constant speed
+            glowMat.SetFloat("_ShimmerIntensity", 0.2f);
+            glowMat.SetFloat("_LightSize", 0.008f);   // Same as border width
+            glowMat.SetFloat("_LightGlow", 0.008f);
+
             borderImg.material = glowMat;
-            borderImg.color = Color.white;
+            // borderImg.color = Color.white;
             borderImg.sprite = GetPixelSprite();
         }
         else
@@ -280,13 +841,12 @@ public class VRMenuFrame : MonoBehaviour
             Debug.LogWarning("[VRMenuFrame] GlowingGlassBorder shader not found, using fallback.");
             CreateBorderFallback(parent);
         }
-        
+
         borderObj.transform.SetAsLastSibling();
     }
 
     void CreateBorderFallback(Transform parent)
     {
-        // Original border style as fallback
         CreateBorder(parent, 12, new Color(0.6f, 0.9f, 1.0f, 0.9f), 0);
         CreateBorder(parent, 24, new Color(0.0f, 0.5f, 1.0f, 0.15f), 1, new Vector2(-6, -6), new Vector2(6, 6));
     }
@@ -295,18 +855,20 @@ public class VRMenuFrame : MonoBehaviour
     {
         GameObject borderObj = new GameObject($"PanelBorder_{thickness}");
         borderObj.transform.SetParent(parent, false);
-        if(siblingIndex >= 0) borderObj.transform.SetSiblingIndex(siblingIndex);
-        
+        if (siblingIndex >= 0) borderObj.transform.SetSiblingIndex(siblingIndex);
+
         RectTransform rt = borderObj.AddComponent<RectTransform>();
-        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
-        rt.offsetMin = offMin; rt.offsetMax = offMax;
-        
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.offsetMin = offMin;
+        rt.offsetMax = offMax;
+
         Image img = borderObj.AddComponent<Image>();
         img.sprite = GetBorderSprite(thickness);
         img.type = Image.Type.Sliced;
         img.color = col;
         img.raycastTarget = false;
-        
+
         var glow = borderObj.AddComponent<Shadow>();
         glow.effectColor = new Color(col.r, col.g, col.b, 0.6f);
         glow.effectDistance = Vector2.zero;
@@ -317,9 +879,10 @@ public class VRMenuFrame : MonoBehaviour
         GameObject fxContainer = new GameObject("FX_DataStream");
         fxContainer.transform.SetParent(parent, false);
         RectTransform rt = fxContainer.AddComponent<RectTransform>();
-        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
         rt.sizeDelta = Vector2.zero;
-        
+
         fxContainer.AddComponent<RectMask2D>();
 
         int particleCount = 20;
@@ -327,39 +890,37 @@ public class VRMenuFrame : MonoBehaviour
         {
             GameObject p = new GameObject($"Bit_{i}");
             p.transform.SetParent(fxContainer.transform, false);
-            
+
             Image pImg = p.AddComponent<Image>();
-            pImg.sprite = GetPixelSprite(); 
-            
+            pImg.sprite = GetPixelSprite();
+
             bool cyanOrPurple = Random.value > 0.5f;
-            Color baseCol = cyanOrPurple ? Color.cyan : new Color(0.8f, 0f, 1f); 
+            Color baseCol = cyanOrPurple ? Color.cyan : new Color(0.8f, 0f, 1f);
             pImg.color = new Color(baseCol.r, baseCol.g, baseCol.b, Random.Range(0.1f, 0.4f));
 
             RectTransform pRT = p.GetComponent<RectTransform>();
-            float size = Random.Range(10f, 60f);
-            pRT.sizeDelta = new Vector2(size, size * Random.Range(0.2f, 1.0f)); 
-            
-            float startX = Random.Range(-w/2f, w/2f);
-            float startY = Random.Range(-h/2f, h/2f);
+            float size = Random.Range(10f, 60f); // logical pixels
+            pRT.sizeDelta = new Vector2(size, size * Random.Range(0.2f, 1.0f));
+
+            float startX = Random.Range(-w / 2f, w / 2f);
+            float startY = Random.Range(-h / 2f, h / 2f);
             pRT.anchoredPosition = new Vector2(startX, startY);
 
             var anim = p.AddComponent<FloatingDataAnim>();
-            anim.speed = Random.Range(10f, 40f);
+            anim.speed = Random.Range(10f, 40f); // logical pixels/second
             anim.range = new Vector2(w, h);
         }
     }
 
-
-
     // --- ASSET LOADERS ---
-    
+
     void LoadIcons()
     {
         if (iconSignal == null) iconSignal = Resources.Load<Sprite>("MainMenu/icon_signal");
-        if (iconSignal == null) iconSignal = GetSignalSprite(); // Fallback
+        if (iconSignal == null) iconSignal = GetSignalSprite();
 
         if (iconWifi == null) iconWifi = Resources.Load<Sprite>("MainMenu/icon_wifi");
-        if (iconWifi == null) iconWifi = GetWifiSprite(); // Fallback
+        if (iconWifi == null) iconWifi = GetWifiSprite();
 
         if (iconBattery == null) iconBattery = Resources.Load<Sprite>("MainMenu/icon_battery");
     }
@@ -367,8 +928,8 @@ public class VRMenuFrame : MonoBehaviour
     Sprite GetRoundedSprite()
     {
         if (_roundedSprite != null) return _roundedSprite;
-        int size = 512; 
-        int radius = 80; 
+        int size = 512;
+        int radius = 80;
         Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
         Color[] colors = new Color[size * size];
 
@@ -398,9 +959,9 @@ public class VRMenuFrame : MonoBehaviour
 
     Sprite GetBorderSprite(int thickness)
     {
-        if (_borderSprites.ContainsKey(thickness) && _borderSprites[thickness] != null) 
+        if (_borderSprites.ContainsKey(thickness) && _borderSprites[thickness] != null)
             return _borderSprites[thickness];
-            
+
         int size = 512;
         int radius = 80;
 
@@ -420,7 +981,7 @@ public class VRMenuFrame : MonoBehaviour
                     float cx = (x < size / 2) ? radius : size - radius - 1;
                     float cy = (y < size / 2) ? radius : size - radius - 1;
                     float d = Vector2.Distance(new Vector2(x, y), new Vector2(cx, cy));
-                    
+
                     float outerAlpha = Mathf.Clamp01((radius + 0.5f) - d);
                     float innerEdge = radius - thickness;
                     float innerAlpha = Mathf.Clamp01(d - (innerEdge - 0.5f));
@@ -430,7 +991,7 @@ public class VRMenuFrame : MonoBehaviour
                 {
                     float dx = Mathf.Min(x, size - 1 - x);
                     float dy = Mathf.Min(y, size - 1 - y);
-                    float minDist = Mathf.Min(dx, dy); 
+                    float minDist = Mathf.Min(dx, dy);
                     if (minDist < thickness + 1) alpha = Mathf.Clamp01((thickness + 0.5f) - minDist);
                 }
                 colors[y * size + x] = new Color(1, 1, 1, alpha);
@@ -442,7 +1003,7 @@ public class VRMenuFrame : MonoBehaviour
         _borderSprites[thickness] = s;
         return s;
     }
-    
+
     Sprite GetPixelSprite()
     {
         if (_pixelSprite) return _pixelSprite;
@@ -456,16 +1017,17 @@ public class VRMenuFrame : MonoBehaviour
     Sprite GetBatterySprite()
     {
         if (_batterySprite != null) return _batterySprite;
-        int w = 128; int h = 64; 
+        int w = 128;
+        int h = 64;
         Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
         Color[] colors = new Color[w * h];
         for (int i = 0; i < colors.Length; i++) colors[i] = Color.clear;
 
-        int bodyW = 110; 
-        int radius = 16;  // Smoother corners as requested
-        int nubW = 8;    
-        int nubH = 24;    
-        int nubRadius = 4; // Rounded nub corners
+        int bodyW = 110;
+        int radius = 16;
+        int nubW = 8;
+        int nubH = 24;
+        int nubRadius = 4;
         int nubY = (h - nubH) / 2;
 
         for (int y = 0; y < h; y++)
@@ -473,12 +1035,11 @@ public class VRMenuFrame : MonoBehaviour
             for (int x = 0; x < bodyW + nubW; x++)
             {
                 float alpha = 0f;
-                // Draw Body
                 if (x < bodyW)
                 {
                     float dx = Mathf.Min(x, bodyW - 1 - x);
                     float dy = Mathf.Min(y, h - 1 - y);
-                    
+
                     if (dx < radius && dy < radius)
                     {
                         float d = Vector2.Distance(new Vector2(dx, dy), new Vector2(radius, radius));
@@ -486,18 +1047,16 @@ public class VRMenuFrame : MonoBehaviour
                     }
                     else alpha = 1.0f;
                 }
-                // Draw Nub
                 else if (x >= bodyW && x < bodyW + nubW)
                 {
                     if (y >= nubY && y < nubY + nubH)
                     {
                         float nx = x - bodyW;
                         float ny = y - nubY;
-                        
-                        float dx = Mathf.Min(nx, nubW - 1 - nx); // Though only right side is really visible
+
+                        float dx = Mathf.Min(nx, nubW - 1 - nx);
                         float dy = Mathf.Min(ny, nubH - 1 - ny);
-                        
-                        // Round right-side corners of nub
+
                         if (nx > nubW - nubRadius - 1 && dy < nubRadius)
                         {
                             float d = Vector2.Distance(new Vector2(nx, dy), new Vector2(nubW - nubRadius - 1, nubRadius));
@@ -506,7 +1065,7 @@ public class VRMenuFrame : MonoBehaviour
                         else alpha = 1.0f;
                     }
                 }
-                
+
                 if (alpha > 0) colors[y * w + x] = new Color(1, 1, 1, alpha);
             }
         }
@@ -515,14 +1074,15 @@ public class VRMenuFrame : MonoBehaviour
         _batterySprite = Sprite.Create(tex, new Rect(0, 0, bodyW + nubW, h), new Vector2(0.5f, 0.5f), 100, 1, SpriteMeshType.Tight);
         return _batterySprite;
     }
-    
+
     Sprite GetSignalSprite()
     {
         if (_signalSprite != null) return _signalSprite;
-        int w = 64; int h = 64;
+        int w = 64;
+        int h = 64;
         Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
-        Color[] fill = new Color[w*h];
-        for(int i=0; i<fill.Length; i++) fill[i] = Color.clear;
+        Color[] fill = new Color[w * h];
+        for (int i = 0; i < fill.Length; i++) fill[i] = Color.clear;
         for (int i = 0; i < 4; i++)
         {
             int barH = (int)((i + 1) / 4f * h);
@@ -534,7 +1094,7 @@ public class VRMenuFrame : MonoBehaviour
         }
         tex.SetPixels(fill);
         tex.Apply();
-        _signalSprite = Sprite.Create(tex, new Rect(0,0,w,h), Vector2.one * 0.5f);
+        _signalSprite = Sprite.Create(tex, new Rect(0, 0, w, h), Vector2.one * 0.5f);
         return _signalSprite;
     }
 
@@ -542,11 +1102,11 @@ public class VRMenuFrame : MonoBehaviour
     Sprite GetWifiSprite()
     {
         if (_wifiSprite != null) return _wifiSprite;
-        int size = 64;
+        int size = 72;
         Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
         Color[] colors = new Color[size * size];
 
-        Vector2 center = new Vector2(size/2, 4); // Bottom center, slightly raised
+        Vector2 center = new Vector2(size / 2, 4);
         float maxRadius = size * 0.85f;
 
         for (int y = 0; y < size; y++)
@@ -556,23 +1116,17 @@ public class VRMenuFrame : MonoBehaviour
                 float d = Vector2.Distance(new Vector2(x, y), center);
                 bool colored = false;
 
-                // Dot
                 if (d < size * 0.12f) colored = true;
-                
-                // Arcs
-                // Draw 3 arcs
+
                 for (int i = 1; i <= 3; i++)
                 {
                     float r = maxRadius * (i / 3.0f);
-                    float thickness = size * 0.08f; // Thicker lines
-                    
+                    float thickness = size * 0.08f;
+
                     if (Mathf.Abs(d - r) < thickness)
                     {
-                        // Angle check for cone (approx 90 degrees)
                         Vector2 dir = (new Vector2(x, y) - center).normalized;
-                        // dir.y is sin(angle). 0.707 is 45 deg from horizontal. 
-                        // We want 45 to 135 deg.
-                        if (dir.y > 0.6f) colored = true; 
+                        if (dir.y > 0.6f) colored = true;
                     }
                 }
 
@@ -581,21 +1135,18 @@ public class VRMenuFrame : MonoBehaviour
         }
         tex.SetPixels(colors);
         tex.Apply();
-        _wifiSprite = Sprite.Create(tex, new Rect(0,0,size,size), Vector2.one * 0.5f);
+        _wifiSprite = Sprite.Create(tex, new Rect(0, 0, size, size), Vector2.one * 0.5f);
         return _wifiSprite;
     }
 
-
-
-
-    GameObject CreateText(Transform parent, string content, Vector2 pos, int size, Color c, bool bold = false)
+    GameObject CreateText(Transform parent, string content, Vector2 pos, float fontSize, Color c, bool bold = false)
     {
         var go = new GameObject("TextTMP");
         go.transform.SetParent(parent, false);
         var txt = go.AddComponent<TextMeshProUGUI>();
         if (customFont != null) txt.font = customFont;
         txt.text = content;
-        txt.fontSize = size;
+        txt.fontSize = fontSize;
         txt.color = c;
         txt.alignment = TextAlignmentOptions.Center;
         txt.fontStyle = bold ? FontStyles.Bold : FontStyles.Normal;
@@ -603,7 +1154,7 @@ public class VRMenuFrame : MonoBehaviour
         RectTransform rt = go.GetComponent<RectTransform>();
         rt.anchoredPosition = pos;
         rt.localScale = Vector3.one;
-        rt.sizeDelta = new Vector2(400, 100);
+        rt.sizeDelta = new Vector2(400f, 100f); // logical pixels
         return go;
     }
 
@@ -613,22 +1164,21 @@ public class VRMenuFrame : MonoBehaviour
         if (_recenterSprite != null) return _recenterSprite;
         string resPath = "MainMenu/recenter_icon";
         _recenterSprite = Resources.Load<Sprite>(resPath);
-        
+
 #if UNITY_EDITOR
         if (_recenterSprite == null)
         {
-            // Attempt to auto-fix import settings
             string fullPath = "Assets/VR-Workspace/Resources/MainMenu/recenter_icon.png";
-            var importer = UnityEditor.AssetImporter.GetAtPath(fullPath) as UnityEditor.TextureImporter;
+            var importer = AssetImporter.GetAtPath(fullPath) as TextureImporter;
             if (importer != null)
             {
                 bool changed = false;
-                if (importer.textureType != UnityEditor.TextureImporterType.Sprite)
+                if (importer.textureType != TextureImporterType.Sprite)
                 {
-                    importer.textureType = UnityEditor.TextureImporterType.Sprite;
+                    importer.textureType = TextureImporterType.Sprite;
                     changed = true;
                 }
-                
+
                 if (changed)
                 {
                     importer.SaveAndReimport();
@@ -638,15 +1188,15 @@ public class VRMenuFrame : MonoBehaviour
             }
         }
 #endif
-        
+
         if (_recenterSprite == null)
         {
-             Debug.LogWarning($"Could not find '{resPath}' in Resources. Ensure file exists and is set to Sprite.");
+            Debug.LogWarning($"Could not find '{resPath}' in Resources. Ensure file exists and is set to Sprite.");
         }
         return _recenterSprite;
     }
 
-    void CreateStatusBar(Transform parent, float w, float h, float height, float separatorY)
+    void CreateStatusBar(Transform parent, float w, float h, float statusBarHeight)
     {
         GameObject barObj = new GameObject("StatusBar");
         barObj.transform.SetParent(parent, false);
@@ -654,236 +1204,153 @@ public class VRMenuFrame : MonoBehaviour
 
         rt.anchorMin = new Vector2(0, 1);
         rt.anchorMax = new Vector2(1, 1);
-        rt.pivot = new Vector2(0.5f, 1f);
-        rt.sizeDelta = new Vector2(0, height);
-        rt.anchoredPosition = Vector2.zero;
-        
+        rt.pivot = new Vector2(0, 0);
+        rt.sizeDelta = new Vector2(0, statusBarHeight);
+        rt.anchoredPosition = new Vector2(0, -statusBarHeight / 2f);
+
         // --- LEFT GROUP (Clock + Recenter) ---
         GameObject leftGroup = new GameObject("LeftGroup");
         leftGroup.transform.SetParent(barObj.transform, false);
         RectTransform leftRT = leftGroup.AddComponent<RectTransform>();
-        leftRT.anchorMin = new Vector2(0, 0); 
+        leftRT.anchorMin = new Vector2(0, 0);
         leftRT.anchorMax = new Vector2(0.5f, 1);
         leftRT.pivot = new Vector2(0, 0.5f);
-        leftRT.offsetMin = new Vector2(sidePadding, 0); // Left padding
+        leftRT.offsetMin = new Vector2(sidePadding, 0);
         leftRT.offsetMax = new Vector2(0, 0);
-        
-        HorizontalLayoutGroup lLayout = leftGroup.AddComponent<HorizontalLayoutGroup>();
-        lLayout.childAlignment = TextAnchor.MiddleLeft; // Changed to MiddleLeft for vertical center alignment
-        lLayout.spacing = -680f;
-        lLayout.childControlWidth = false;
-        lLayout.childControlHeight = false;
-        lLayout.childForceExpandHeight = false;
-        lLayout.padding = new RectOffset(0, 0, 5, 5); // Add small top/bottom padding for center alignment
 
-        // 1. CLOCK
-        GameObject timeObj = CreateText(leftGroup.transform, "12:00", Vector2.zero, 42, new Color(1f, 1f, 1f, 0.9f), true);
+        // Clock
+        float clockFontSize = 42f;
+        GameObject timeObj = CreateText(leftGroup.transform, "12:00", Vector2.zero, clockFontSize, new Color(1f, 1f, 1f, 0.9f), true);
         RectTransform timeRT = timeObj.GetComponent<RectTransform>();
-        ContentSizeFitter fitter = timeObj.AddComponent<ContentSizeFitter>();
-        fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-        fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
-        
+        timeRT.sizeDelta = new Vector2(120f, statusBarHeight);
+        timeRT.anchorMin = new Vector2(0, 0.5f);
+        timeRT.anchorMax = new Vector2(0, 0.5f);
+        timeRT.pivot = new Vector2(0, 0.5f);
+        timeRT.anchoredPosition = Vector2.zero;
+
         _clockText = timeObj.GetComponent<TextMeshProUGUI>();
         _clockText.alignment = TextAlignmentOptions.MidlineLeft;
 
-        // 2. RECENTER BUTTON (Hit Area)
-        GameObject recenterBtn = new GameObject("RecenterBtn");
-        recenterBtn.transform.SetParent(leftGroup.transform, false);
-        RectTransform rRT = recenterBtn.AddComponent<RectTransform>();
-        rRT.sizeDelta = new Vector2(73, 73); 
-
-        // 3. VISUAL ROOT (Animated)
-        GameObject visualRoot = new GameObject("Visuals");
-        visualRoot.transform.SetParent(recenterBtn.transform, false);
-        RectTransform visRT = visualRoot.AddComponent<RectTransform>();
-        visRT.anchorMin = Vector2.zero; visRT.anchorMax = Vector2.one;
-        visRT.sizeDelta = Vector2.zero;
-
-        // A. Background (Glass)
-        Image recenterBg = visualRoot.AddComponent<Image>();
-        recenterBg.sprite = GetPixelSprite(); // Use pixel sprite for shader
-        
-        // Oversize expansion to hide edge artifacts
-        float expansion = 0.12f; 
-        visRT.anchorMin = new Vector2(-expansion, -expansion);
-        visRT.anchorMax = new Vector2(1f + expansion, 1f + expansion);
-        visRT.offsetMin = Vector2.zero; visRT.offsetMax = Vector2.zero;
-
-        Color btnColor = Color.cyan;
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
-        if (glassShader != null)
-        {
-            Material glassMat = new Material(glassShader);
-            glassMat.SetFloat("_CornerRadius", 0.15f); 
-            glassMat.SetFloat("_EdgePadding", 0.12f); 
-            glassMat.SetFloat("_Aspect", 1.0f); // Square button
-            
-            glassMat.SetColor("_ColorA", new Color(btnColor.r, btnColor.g, btnColor.b, 0.12f)); 
-            glassMat.SetColor("_ColorB", new Color(btnColor.r, btnColor.g, btnColor.b, 0.04f)); 
-            glassMat.SetFloat("_GlassAlpha", 0.075f); 
-            
-            recenterBg.material = glassMat;
-            recenterBg.color = Color.white;
-        }
-        else
-        {
-            recenterBg.color = new Color(0f, 1f, 1f, 0.15f);
-        }
-
-        // B. Border
-        GameObject borderObj = new GameObject("Border");
-        borderObj.transform.SetParent(visualRoot.transform, false);
-        RectTransform borderRT = borderObj.AddComponent<RectTransform>();
-        borderRT.anchorMin = Vector2.zero; borderRT.anchorMax = Vector2.one;
-        borderRT.offsetMin = Vector2.zero; borderRT.offsetMax = Vector2.zero;
-        
-        Image borderImg = borderObj.AddComponent<Image>();
-        borderImg.raycastTarget = false;
-        
-        Shader glowShader = Shader.Find("Custom/GlowingElementBorder");
-        if (glowShader != null)
-        {
-            Material glowMat = new Material(glowShader);
-            glowMat.SetFloat("_Aspect", 1.0f); 
-            glowMat.SetFloat("_EdgePadding", 0.12f); 
-            
-            Color borderGlowCol = Color.Lerp(btnColor, Color.white, 0.75f);
-            glowMat.SetColor("_GlowColor", borderGlowCol);
-            
-            glowMat.SetFloat("_BorderWidth", 0.05f); 
-            glowMat.SetFloat("_GlowWidth", 0.04f); 
-            glowMat.SetFloat("_GlowIntensity", 2.5f); 
-            glowMat.SetFloat("_CornerRadius", 0.15f); 
-            glowMat.SetFloat("_PulseEnabled", 0f);
-             
-            borderImg.material = glowMat;
-            borderImg.sprite = GetPixelSprite();
-            
-            borderObj.AddComponent<VRButtonRipple>().Initialize(glowMat, borderImg);
-        }
-
-        // C. Icon -> Child of VisualRoot
-        GameObject iconObj = new GameObject("Icon");
-        iconObj.transform.SetParent(visualRoot.transform, false);
-        RectTransform iconRT = iconObj.AddComponent<RectTransform>();
-        iconRT.anchorMin = Vector2.zero; iconRT.anchorMax = Vector2.one;
-        iconRT.sizeDelta = new Vector2(-52, -52); 
-        
-        Image iconImg = iconObj.AddComponent<Image>();
-        iconImg.sprite = GetRecenterSprite();
-        iconImg.preserveAspect = true;
-        iconImg.raycastTarget = false;
-
-        // Icon Glow & Whiteness (Sync with main buttons)
-        iconImg.color = Color.Lerp(btnColor, Color.white, 0.9f);
-        
-        Color iconGlowCol = Color.Lerp(btnColor, Color.white, 0.7f);
-        iconGlowCol.a = 0.4f;
-        Shadow iGlow1 = iconObj.AddComponent<Shadow>();
-        iGlow1.effectColor = iconGlowCol;
-        iGlow1.effectDistance = new Vector2(2f, -2f);
-
-        Shadow iGlow2 = iconObj.AddComponent<Shadow>();
-        iGlow2.effectColor = iconGlowCol;
-        iGlow2.effectDistance = new Vector2(-2f, 2f);
-
-        Color iBloomCol = Color.Lerp(btnColor, Color.white, 0.8f);
-        iBloomCol.a = 0.15f;
-        Shadow iBloom1 = iconObj.AddComponent<Shadow>();
-        iBloom1.effectColor = iBloomCol;
-        iBloom1.effectDistance = new Vector2(4f, -4f);
-
-        Shadow iBloom2 = iconObj.AddComponent<Shadow>();
-        iBloom2.effectColor = iBloomCol;
-        iBloom2.effectDistance = new Vector2(-4f, 4f);
-
-        // D. Logic & Physics (On Hit Area)
-        Button btn = recenterBtn.AddComponent<Button>();
-        btn.targetGraphic = recenterBg; 
-        btn.onClick.AddListener(RecenterObject);
-        
-        BoxCollider col = recenterBtn.AddComponent<BoxCollider>();
-        col.size = new Vector3(73, 73, 0.1f);
-
-        // E. Animation
-        VRButtonAnimation anim = recenterBtn.AddComponent<VRButtonAnimation>();
-        anim.targetVisuals = visualRoot.transform;
-        anim.popAmount = 0.025f;
+        // Recenter Button
+        float btnSize = 72f;
+        CreateRecenterButton(leftGroup.transform, btnSize, timeRT.rect.width);
 
         // --- STATUS GROUP (Right) ---
         GameObject statusGroup = new GameObject("StatusGroup");
         statusGroup.transform.SetParent(barObj.transform, false);
         RectTransform groupRT = statusGroup.AddComponent<RectTransform>();
-        groupRT.anchorMin = new Vector2(1, 0); 
+        groupRT.anchorMin = new Vector2(1, 0);
         groupRT.anchorMax = new Vector2(1, 1);
         groupRT.pivot = new Vector2(1, 0.5f);
-        groupRT.sizeDelta = new Vector2(400, 0); 
-        groupRT.anchoredPosition = new Vector2(-sidePadding, 0);
+        groupRT.sizeDelta = new Vector2(300f, 0);
+        groupRT.anchoredPosition = new Vector2(0, 0);
 
-        HorizontalLayoutGroup layout = statusGroup.AddComponent<HorizontalLayoutGroup>();
-        layout.childAlignment = TextAnchor.MiddleRight; // Changed to MiddleRight for vertical center alignment
-        layout.spacing = -175f;
-        layout.childControlWidth = false;
-        layout.childControlHeight = false;
-        layout.childForceExpandHeight = false;
-        layout.padding = new RectOffset(0, 0, 5, 5); // Add small top/bottom padding for center alignment
+        // Battery Container
+        float battWidth = CreateBatteryIndicator(statusGroup.transform);
 
-        // 1. Network Icon
+        // Network Icon
         GameObject netObj = new GameObject("NetworkIcon");
         netObj.transform.SetParent(statusGroup.transform, false);
         _networkIcon = netObj.AddComponent<Image>();
-        _networkIcon.sprite = iconWifi; 
+        _networkIcon.sprite = iconWifi;
         _networkIcon.preserveAspect = true;
         RectTransform netRT = netObj.GetComponent<RectTransform>();
-        netRT.sizeDelta = new Vector2(60, 60);
+        netRT.anchorMin = new Vector2(1, 0.5f);
+        netRT.anchorMax = new Vector2(1, 0.5f);
+        netRT.pivot = new Vector2(1, 0.5f);
+        netRT.sizeDelta = new Vector2(60f, 60f);
+        netRT.anchoredPosition = new Vector2(-battWidth - 30f, 0);
 
-        // 2. Battery Container
+        // --- SEPARATOR LINE ---
+        CreateSeparator(barObj.transform, w, statusBarHeight);
+    }
+
+    void CreateRecenterButton(Transform parent, float size, float clockWidth)
+    {
+        // Use VRButtonFactory to create icon button
+        var config = new VRButtonFactory.ButtonConfig
+        {
+            label = "Recenter",
+            icon = GetRecenterSprite(),
+            themeColor = glowColorB,
+            width = size,
+            height = size,
+            iconOnly = true,
+            iconSize = size * 0.45f,
+            borderWidth = 0.025f,
+            cornerRadius = 0.15f,
+            popAmount = 0.0125f
+        };
+
+        GameObject btn = VRButtonFactory.CreateButton(parent, config, RecenterObject);
+
+        // Rename and position
+        btn.name = "RecenterBtn";
+        RectTransform rt = btn.GetComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0, 0.5f);
+        rt.anchorMax = new Vector2(0, 0.5f);
+        rt.pivot = new Vector2(0, 0.5f);
+        rt.anchoredPosition = new Vector2(clockWidth + 30f, 0);
+    }
+
+    float CreateBatteryIndicator(Transform parent)
+    {
+        float battWidth = 100f;
+        float battHeight = 50f;
+
         GameObject battContainer = new GameObject("BatteryContainer");
-        battContainer.transform.SetParent(statusGroup.transform, false);
+        battContainer.transform.SetParent(parent, false);
         RectTransform battRT = battContainer.AddComponent<RectTransform>();
-        battRT.sizeDelta = new Vector2(100, 50); 
-        
-        Sprite batSprite = GetBatterySprite(); 
+        battRT.anchorMin = new Vector2(1, 0.5f);
+        battRT.anchorMax = new Vector2(1, 0.5f);
+        battRT.pivot = new Vector2(1, 0.5f);
+        battRT.sizeDelta = new Vector2(battWidth, battHeight);
+        battRT.anchoredPosition = new Vector2(0, 0);
+
+        Sprite batSprite = GetBatterySprite();
 
         // Bg
         GameObject bgObj = new GameObject("Bg");
         bgObj.transform.SetParent(battContainer.transform, false);
         Image bgImg = bgObj.AddComponent<Image>();
-        bgImg.sprite = batSprite; 
-        bgImg.color = new Color(0.8f, 0.8f, 0.8f, 0.5f); 
+        bgImg.sprite = batSprite;
+        bgImg.color = new Color(0.8f, 0.8f, 0.8f, 0.5f);
         bgImg.preserveAspect = true;
         RectTransform bgRT = bgObj.GetComponent<RectTransform>();
-        bgRT.anchorMin = Vector2.zero; bgRT.anchorMax = Vector2.one;
+        bgRT.anchorMin = Vector2.zero;
+        bgRT.anchorMax = Vector2.one;
         bgRT.sizeDelta = Vector2.zero;
 
         // Fill
         GameObject fillObj = new GameObject("Fill");
         fillObj.transform.SetParent(battContainer.transform, false);
         _batteryFillImage = fillObj.AddComponent<Image>();
-        _batteryFillImage.sprite = batSprite; 
+        _batteryFillImage.sprite = batSprite;
         _batteryFillImage.color = Color.white;
         _batteryFillImage.type = Image.Type.Filled;
         _batteryFillImage.fillMethod = Image.FillMethod.Horizontal;
         _batteryFillImage.fillOrigin = (int)Image.OriginHorizontal.Left;
         _batteryFillImage.preserveAspect = true;
         RectTransform fillRT = fillObj.GetComponent<RectTransform>();
-        fillRT.anchorMin = Vector2.zero; fillRT.anchorMax = Vector2.one;
+        fillRT.anchorMin = Vector2.zero;
+        fillRT.anchorMax = Vector2.one;
         fillRT.sizeDelta = Vector2.zero;
 
         // Text
-        GameObject battTxtObj = CreateText(battContainer.transform, "100", Vector2.zero, 28, new Color(0.1f, 0.15f, 0.2f, 1f), true);
+        float battFontSize = 30f;
+        GameObject battTxtObj = CreateText(battContainer.transform, "100", Vector2.zero, battFontSize, new Color(0.1f, 0.15f, 0.2f, 1f), true);
         RectTransform btRT = battTxtObj.GetComponent<RectTransform>();
-        btRT.anchorMin = Vector2.zero; btRT.anchorMax = Vector2.one;
+        btRT.anchorMin = Vector2.zero;
+        btRT.anchorMax = Vector2.one;
         btRT.sizeDelta = Vector2.zero;
-        btRT.offsetMin = new Vector2(0,0); btRT.offsetMax = new Vector2(-8, 0); 
-        
+        btRT.offsetMin = new Vector2(0, 0);
+        btRT.offsetMax = new Vector2(-8f, 0);
+
         _batteryText = battTxtObj.GetComponent<TextMeshProUGUI>();
         _batteryText.alignment = TextAlignmentOptions.Center;
         _batteryText.fontStyle = FontStyles.Bold;
 
-        // --- SEPARATOR LINE ---
-        // Position at the bottom of status bar (use parent transform to position at frame top, not inside statusbar)
-        CreateSeparator(parent, w, separatorY);
+        return battRT.rect.width;
     }
 
     void CreateSeparator(Transform parent, float w, float yPos)
@@ -892,54 +1359,40 @@ public class VRMenuFrame : MonoBehaviour
         lineObj.transform.SetParent(parent, false);
         RectTransform rt = lineObj.AddComponent<RectTransform>();
 
-        // Calculate separator width based on menu width
-        // Using ratio slightly wider than menu for visual effect
-        float lineWidth = w * 1.1f;
-
-        // Anchor to top edge of frame
-        rt.anchorMin = new Vector2(0.5f, 1f);
-        rt.anchorMax = new Vector2(0.5f, 1f);
-        rt.pivot = new Vector2(0.5f, 1f); // Pivot at top so line draws downward from StatusBar bottom edge
-        rt.sizeDelta = new Vector2(lineWidth, 2); // 2px height
-        rt.anchoredPosition = new Vector2(0, -yPos); // Position based on separatorOffset variable
+        rt.anchorMin = new Vector2(0.5f, 0);
+        rt.anchorMax = new Vector2(0.5f, 0);
+        rt.pivot = new Vector2(0.5f, 1f);
+        rt.sizeDelta = new Vector2(w, parent.GetComponent<RectTransform>().sizeDelta.y * 0.05f);
+        rt.anchoredPosition = new Vector2(0, 0);
 
         Image img = lineObj.AddComponent<Image>();
         img.sprite = GetGradientLineSprite();
         img.raycastTarget = false;
 
-        // Add a subtle glow/shadow
         Shadow s = lineObj.AddComponent<Shadow>();
         s.effectColor = new Color(0.5f, 0f, 1f, 0.5f);
-        s.effectDistance = new Vector2(0, -1);
+        s.effectDistance = new Vector2(0, -1f);
     }
 
     Sprite _gradientLineSprite;
     Sprite GetGradientLineSprite()
     {
         if (_gradientLineSprite != null) return _gradientLineSprite;
-        
+
         int w = 256;
         int h = 2;
         Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
         Color[] fill = new Color[w * h];
-        
+
         Color c1 = Color.cyan;
-        Color c2 = new Color(0.8f, 0f, 1f); // Purple
+        Color c2 = new Color(0.8f, 0f, 1f);
 
         for (int x = 0; x < w; x++)
         {
             float t = (float)x / (w - 1);
-            
-            // 1. Bias towards Cyan (0) using Cubic ease in
             Color col = Color.Lerp(c1, c2, Mathf.Pow(t, 3.0f));
-            
-            // 2. Alpha based on Sine wave for fade out at ends
-            // Sin(0) = 0, Sin(PI/2) = 1, Sin(PI) = 0
             float alpha = Mathf.Sin(t * Mathf.PI);
-            
-            // Sharpen the ends slightly so it's not too faint in middle
-            alpha = Mathf.Pow(alpha, 0.5f); 
-
+            alpha = Mathf.Pow(alpha, 0.5f);
             col.a = alpha;
 
             for (int y = 0; y < h; y++)
@@ -947,97 +1400,17 @@ public class VRMenuFrame : MonoBehaviour
                 fill[y * w + x] = col;
             }
         }
-        
+
         tex.SetPixels(fill);
         tex.Apply();
         tex.wrapMode = TextureWrapMode.Clamp;
-        
+
         _gradientLineSprite = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f));
         return _gradientLineSprite;
     }
 
-    // --- SPRITE GENERATORS ---
+    // --- RECENTER ---
 
-    Sprite _smallRoundedSprite;
-    Sprite GetSmallRoundedSprite()
-    {
-        if (_smallRoundedSprite != null) return _smallRoundedSprite;
-        int size = 128; 
-        int radius = 20; // Adjusted to ~15% of size (matches Main Menu 80/512 ratio)
-        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
-        Color[] colors = new Color[size * size];
-
-        for (int y = 0; y < size; y++)
-        {
-            for (int x = 0; x < size; x++)
-            {
-                bool inCorner = (x < radius && y < radius) || (x > size - radius && y < radius) ||
-                                (x < radius && y > size - radius) || (x > size - radius && y > size - radius);
-
-                if (inCorner)
-                {
-                    float cx = (x < size / 2) ? radius : size - radius - 1;
-                    float cy = (y < size / 2) ? radius : size - radius - 1;
-                    float d = Vector2.Distance(new Vector2(x, y), new Vector2(cx, cy));
-                    float alpha = Mathf.Clamp01((radius + 0.5f) - d);
-                    colors[y * size + x] = new Color(1, 1, 1, alpha);
-                }
-                else colors[y * size + x] = Color.white;
-            }
-        }
-        tex.SetPixels(colors);
-        tex.Apply();
-        _smallRoundedSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100, 0, SpriteMeshType.FullRect, new Vector4(radius, radius, radius, radius));
-        return _smallRoundedSprite;
-    }
-
-    Sprite _smallBorderSprite;
-    Sprite GetSmallBorderSprite()
-    {
-        if (_smallBorderSprite != null) return _smallBorderSprite;
-        int size = 128;
-        int radius = 20; // Matches rounded sprite radius
-        int thickness = 3;
-
-        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
-        Color[] colors = new Color[size * size];
-
-        for (int y = 0; y < size; y++)
-        {
-            for (int x = 0; x < size; x++)
-            {
-                bool inCorner = (x < radius && y < radius) || (x > size - radius && y < radius) ||
-                                (x < radius && y > size - radius) || (x > size - radius && y > size - radius);
-
-                float alpha = 0f;
-                if (inCorner)
-                {
-                    float cx = (x < size / 2) ? radius : size - radius - 1;
-                    float cy = (y < size / 2) ? radius : size - radius - 1;
-                    float d = Vector2.Distance(new Vector2(x, y), new Vector2(cx, cy));
-                    
-                    float outerAlpha = Mathf.Clamp01((radius + 0.5f) - d);
-                    float innerEdge = radius - thickness;
-                    float innerAlpha = Mathf.Clamp01(d - (innerEdge - 0.5f));
-                    alpha = outerAlpha * innerAlpha;
-                }
-                else
-                {
-                    float dx = Mathf.Min(x, size - 1 - x);
-                    float dy = Mathf.Min(y, size - 1 - y);
-                    float minDist = Mathf.Min(dx, dy); 
-                    if (minDist < thickness + 1) alpha = Mathf.Clamp01((thickness + 0.5f) - minDist);
-                }
-                colors[y * size + x] = new Color(1, 1, 1, alpha);
-            }
-        }
-        tex.SetPixels(colors);
-        tex.Apply();
-        _smallBorderSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100, 0, SpriteMeshType.FullRect, new Vector4(radius, radius, radius, radius));
-        return _smallBorderSprite;
-    }
-
-    
     public void RecenterObject()
     {
         StartCoroutine(RecenterRoutine());
@@ -1045,17 +1418,14 @@ public class VRMenuFrame : MonoBehaviour
 
     System.Collections.IEnumerator RecenterRoutine()
     {
-        // 1. Get Reticle
-        VRGazeReticle reticle = VRGazeReticle.Instance; 
+        VRGazeReticle reticle = VRGazeReticle.Instance;
         if (reticle == null) reticle = FindObjectOfType<VRGazeReticle>();
 
-        // 2. Start Animation
         if (reticle != null)
         {
             reticle.EnterRecenterMode(GetRecenterSprite());
         }
 
-        // 3. Countdown 2s
         float duration = 2.0f;
         float elapsed = 0f;
 
@@ -1063,20 +1433,18 @@ public class VRMenuFrame : MonoBehaviour
         {
             elapsed += Time.deltaTime;
             float p = Mathf.Clamp01(elapsed / duration);
-            
+
             if (reticle != null) reticle.UpdateRecenterProgress(p);
-            
+
             yield return null;
         }
 
-        // 4. Perform Action
         Camera cam = Camera.main;
         if (cam != null)
         {
             PerformRecenterLogic(cam);
         }
 
-        // 5. Restore Reticle
         if (reticle != null)
         {
             reticle.ExitRecenterMode();
@@ -1085,56 +1453,21 @@ public class VRMenuFrame : MonoBehaviour
 
     void PerformRecenterLogic(Camera cam)
     {
-        // Calculate horizontal forward vector of camera
         Vector3 camForward = cam.transform.forward;
         camForward.y = 0;
         if (camForward.sqrMagnitude < 0.001f) camForward = Vector3.forward;
         camForward.Normalize();
 
-        // Get current horizontal distance
         Vector3 currentPos = transform.position;
         Vector3 camPos = cam.transform.position;
         float hDist = Vector2.Distance(new Vector2(currentPos.x, currentPos.z), new Vector2(camPos.x, camPos.z));
 
-        // Calculate new position
-        // "Move on sphere": Maintain distance
-        // "No height change": Maintain Y
         Vector3 newPos = camPos + camForward * hDist;
-        newPos.y = currentPos.y; 
+        newPos.y = currentPos.y;
 
         transform.position = newPos;
         transform.rotation = Quaternion.LookRotation(camForward);
-        
+
         Debug.Log("[VRMenuFrame] Recenter complete.");
-    }
-}
-
-public class FloatingDataAnim : MonoBehaviour
-{
-    public float speed;
-    public Vector2 range; 
-    private RectTransform _rt;
-    private Vector2 _dir;
-
-    void Start()
-    {
-        _rt = GetComponent<RectTransform>();
-        _dir = new Vector2(Random.Range(-0.1f, 0.1f), Random.Range(0.2f, 0.8f)).normalized; 
-        if (Random.value > 0.5f) _dir.y *= -1; 
-    }
-
-    void Update()
-    {
-        if (_rt == null) return;
-        _rt.anchoredPosition += _dir * speed * Time.deltaTime;
-
-        float halfW = range.x / 2f + 50f;
-        float halfH = range.y / 2f + 50f;
-
-        if (_rt.anchoredPosition.y > halfH) _rt.anchoredPosition = new Vector2(Random.Range(-halfW, halfW), -halfH);
-        else if (_rt.anchoredPosition.y < -halfH) _rt.anchoredPosition = new Vector2(Random.Range(-halfW, halfW), halfH);
-        
-        if (_rt.anchoredPosition.x > halfW) _rt.anchoredPosition = new Vector2(-halfW, Random.Range(-halfH, halfH));
-        else if (_rt.anchoredPosition.x < -halfW) _rt.anchoredPosition = new Vector2(halfW, Random.Range(-halfH, halfH));
     }
 }

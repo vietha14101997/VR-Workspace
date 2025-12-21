@@ -20,7 +20,10 @@ Shader "Custom/GlassGradientBackground"
         _GlassAlpha ("Base Alpha", Range(0, 0.5)) = 0.1
         _FresnelPower ("Fresnel Power", Range(1, 5)) = 2.5
         _FresnelStrength ("Fresnel Strength", Range(0, 0.3)) = 0.1
-        
+
+        [Header(Hover State)]
+        _HoverAmount ("Hover Amount", Range(0, 1)) = 0
+
         // UI Masking
         _StencilComp ("Stencil Comparison", Float) = 8
         _Stencil ("Stencil ID", Float) = 0
@@ -98,7 +101,8 @@ Shader "Custom/GlassGradientBackground"
             float _GlassAlpha;
             float _FresnelPower;
             float _FresnelStrength;
-            
+            float _HoverAmount;
+
             float _Aspect; // Aspect Ratio (Width/Height)
 
             // SDF for rounded box with Aspect Ratio correction
@@ -168,14 +172,20 @@ Shader "Custom/GlassGradientBackground"
                 float fresnel = pow(edgeFactor, _FresnelPower);
                 fresnel *= _FresnelStrength;
                 
+                // === HOVER GLOW ===
+                // Increase brightness and alpha when hovered
+                float hoverBrightness = 1.0 + _HoverAmount * 0.4; // 40% brighter when fully hovered
+                float hoverAlphaBoost = _HoverAmount * 0.08; // Add extra alpha when hovered
+
                 // Combine
                 fixed4 finalColor = gradColor;
-                finalColor.a = _GlassAlpha + gradColor.a * 0.5;
-                finalColor.a *= alphaMask; 
+                finalColor.a = _GlassAlpha + gradColor.a * 0.5 + hoverAlphaBoost;
+                finalColor.a *= alphaMask;
                 finalColor.rgb += fresnel + centerGlow;
-                
+                finalColor.rgb *= hoverBrightness;
+
                 finalColor *= i.color;
-                
+
                 return finalColor;
             }
             ENDCG

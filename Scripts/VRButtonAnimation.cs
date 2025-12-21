@@ -9,29 +9,54 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
     private bool _isHovered = false;
     private float _currentPop = 0f;
     private float _currentValidScale = 1.0f;
-    
-    // Shader material reference for hover state
-    private Material _glowMaterial;
-    
+
+    // Shader material references for hover state
+    private Material _borderMaterial;
+    private Material _backgroundMaterial;
+
     void Start()
     {
-        // Try to find glow material in children
-        var borderObj = targetVisuals?.Find("Border");
+        if (targetVisuals == null) return;
+
+        // Try to find border material
+        var borderObj = targetVisuals.Find("Border");
         if (borderObj != null)
         {
             var img = borderObj.GetComponent<Image>();
             if (img != null && img.material != null)
             {
-                _glowMaterial = img.material;
+                _borderMaterial = img.material;
+            }
+        }
+
+        // Try to find background material (direct child with Image or named "Background")
+        var bgImg = targetVisuals.GetComponent<Image>();
+        if (bgImg != null && bgImg.material != null && bgImg.material.HasProperty("_HoverAmount"))
+        {
+            _backgroundMaterial = bgImg.material;
+        }
+        else
+        {
+            // Try finding Background child
+            var bgObj = targetVisuals.Find("Background");
+            if (bgObj != null)
+            {
+                bgImg = bgObj.GetComponent<Image>();
+                if (bgImg != null && bgImg.material != null && bgImg.material.HasProperty("_HoverAmount"))
+                {
+                    _backgroundMaterial = bgImg.material;
+                }
             }
         }
     }
+
+    private float _currentHoverAmount = 0f;
 
     void Update()
     {
         float targetZ = _isHovered ? -popAmount : 0f;
         _currentPop = Mathf.Lerp(_currentPop, targetZ, Time.unscaledDeltaTime * 10f);
-        
+
         float targetScale = _isHovered ? 1.05f : 1.0f;
         _currentValidScale = Mathf.Lerp(_currentValidScale, targetScale, Time.unscaledDeltaTime * 10f);
 
@@ -40,17 +65,21 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
             targetVisuals.localPosition = new Vector3(0, 0, _currentPop);
             targetVisuals.localScale = new Vector3(_currentValidScale, _currentValidScale, 1f);
         }
-        
-        // Update shader hover amount
-        if (_glowMaterial != null)
+
+        // Smooth hover amount transition
+        float targetHover = _isHovered ? 1f : 0f;
+        _currentHoverAmount = Mathf.Lerp(_currentHoverAmount, targetHover, Time.unscaledDeltaTime * 8f);
+
+        // Update border material hover amount (viền sáng lên)
+        if (_borderMaterial != null && _borderMaterial.HasProperty("_HoverAmount"))
         {
-            if (_glowMaterial.HasProperty("_HoverAmount"))
-            {
-                float currentHover = _glowMaterial.GetFloat("_HoverAmount");
-                float targetHover = _isHovered ? 1f : 0f;
-                float newHover = Mathf.Lerp(currentHover, targetHover, Time.unscaledDeltaTime * 8f);
-                _glowMaterial.SetFloat("_HoverAmount", newHover);
-            }
+            _borderMaterial.SetFloat("_HoverAmount", _currentHoverAmount);
+        }
+
+        // Update background material hover amount (nền sáng lên)
+        if (_backgroundMaterial != null && _backgroundMaterial.HasProperty("_HoverAmount"))
+        {
+            _backgroundMaterial.SetFloat("_HoverAmount", _currentHoverAmount);
         }
     }
 
