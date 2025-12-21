@@ -35,7 +35,14 @@ Shader "Custom/GlowingGlassBorder"
         _ShimmerIntensity ("Light Intensity", Range(0, 1)) = 0.8
         _LightSize ("Light Size", Range(0.01, 0.1)) = 0.018
         _LightGlow ("Light Glow Spread", Range(0.005, 0.05)) = 0.012
-        
+
+        [Header(Vertical Separators)]
+        _SeparatorCount ("Separator Count", Range(0, 4)) = 0
+        _SeparatorPositions ("Separator X Positions (UV)", Vector) = (0, 0, 0, 0)
+        _SeparatorWidth ("Separator Width", Range(0.001, 0.02)) = 0.004
+        _SeparatorGlowWidth ("Separator Glow Width", Range(0.001, 0.05)) = 0.015
+        _SeparatorAlpha ("Separator Alpha", Range(0, 1)) = 0.8
+
         // UI Masking
         _StencilComp ("Stencil Comparison", Float) = 8
         _Stencil ("Stencil ID", Float) = 0
@@ -129,7 +136,67 @@ Shader "Custom/GlowingGlassBorder"
             float _LightSize;
             float _LightGlow;
 
+            // Separator properties
+            float _SeparatorCount;
+            float4 _SeparatorPositions;
+            float _SeparatorWidth;
+            float _SeparatorGlowWidth;
+            float _SeparatorAlpha;
+
             float _Aspect; // Aspect Ratio
+
+            // Calculate separator intensity at a given UV position
+            // Returns float4: x = layer1 (core), y = layer2, z = layer3, w = layer4 (ambient)
+            float4 getSeparatorIntensity(float2 uv, float aspect, float padding, float dist)
+            {
+                // Only draw inside the rounded rect
+                if (dist > 0.0) return float4(0, 0, 0, 0);
+
+                // Check if separator count is 0
+                if (_SeparatorCount < 0.5) return float4(0, 0, 0, 0);
+
+                float4 totalLayers = float4(0, 0, 0, 0);
+
+                // Check each separator
+                for (int i = 0; i < 4; i++)
+                {
+                    if (i >= (int)_SeparatorCount) break;
+
+                    // Get separator position from vector component
+                    float sepPos = 0.0;
+                    if (i == 0) sepPos = _SeparatorPositions.x;
+                    else if (i == 1) sepPos = _SeparatorPositions.y;
+                    else if (i == 2) sepPos = _SeparatorPositions.z;
+                    else sepPos = _SeparatorPositions.w;
+
+                    // Skip if position is 0 (unset)
+                    if (sepPos < 0.01) continue;
+
+                    // Calculate distance to separator
+                    float distToSep = abs(uv.x - sepPos);
+
+                    // Multi-layer glow matching border style
+                    // Layer 1 (Core) - sharpest
+                    float l1 = 1.0 - saturate(distToSep / _SeparatorWidth);
+                    l1 = pow(l1, 0.5);
+
+                    // Layer 2 (Mid glow)
+                    float l2 = 1.0 - saturate(distToSep / (_SeparatorWidth * 2.0));
+                    l2 = pow(l2, 1.5);
+
+                    // Layer 3 (Outer glow)
+                    float l3 = 1.0 - saturate(distToSep / _SeparatorGlowWidth);
+                    l3 = pow(l3, 2.0);
+
+                    // Layer 4 (Ambient)
+                    float l4 = 1.0 - saturate(distToSep / (_SeparatorGlowWidth * 2.0));
+                    l4 = pow(l4, 2.0);
+
+                    totalLayers = max(totalLayers, float4(l1, l2, l3, l4));
+                }
+
+                return totalLayers;
+            }
 
             // Calculate perimeter position (0-1) for a point on or near the rounded rect border
             float getPerimeterPosition(float2 uv, float aspect, float padding)
@@ -333,9 +400,34 @@ Shader "Custom/GlowingGlassBorder"
                 finalColor.a = max(finalColor.a, layer1 * _Layer1Alpha);
 
                 // Add Running Lights (positioned over the suppressed core)
-                finalColor.rgb += runningLightColor * 2.5; 
+                finalColor.rgb += runningLightColor * 2.5;
                 finalColor.a = max(finalColor.a, runningLightAlpha * _ShimmerIntensity);
-                
+
+                // === VERTICAL SEPARATORS (multi-layer glow matching border) ===
+                float4 sepLayers = getSeparatorIntensity(uv, aspect, _EdgePadding, dist);
+                if (sepLayers.x > 0.0 || sepLayers.w > 0.0)
+                {
+                    // Use gradient color at separator position
+                    fixed3 sepColor = borderColor.rgb;
+
+                    // Layer 4 (Ambient) - widest, softest
+                    finalColor.rgb += sepColor * sepLayers.w * _Layer4Alpha * _SeparatorAlpha * 0.5;
+                    finalColor.a = max(finalColor.a, sepLayers.w * _Layer4Alpha * _SeparatorAlpha * 0.3);
+
+                    // Layer 3 (Outer glow)
+                    finalColor.rgb += sepColor * sepLayers.z * _Layer3Alpha * _SeparatorAlpha;
+                    finalColor.a = max(finalColor.a, sepLayers.z * _Layer3Alpha * _SeparatorAlpha * 0.5);
+
+                    // Layer 2 (Mid glow)
+                    finalColor.rgb = lerp(finalColor.rgb, sepColor * 1.2, sepLayers.y * _Layer2Alpha * _SeparatorAlpha);
+                    finalColor.a = max(finalColor.a, sepLayers.y * _Layer2Alpha * _SeparatorAlpha);
+
+                    // Layer 1 (Core) - brightest center
+                    fixed3 sepWhiteCore = fixed3(1, 1, 1);
+                    finalColor.rgb = lerp(finalColor.rgb, sepWhiteCore, sepLayers.x * _Layer1Alpha * _SeparatorAlpha * 0.5);
+                    finalColor.a = max(finalColor.a, sepLayers.x * _Layer1Alpha * _SeparatorAlpha);
+                }
+
                 finalColor *= i.color;
                 
                 // Clipping: if visual alpha is too low, we might want to clip or not.
