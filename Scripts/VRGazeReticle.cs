@@ -196,7 +196,7 @@ public class VRGazeReticle : MonoBehaviour
         GameObject ringObj = new GameObject("Ring");
         ringObj.transform.SetParent(_recenterGroup.transform, false);
         _recenterRing = ringObj.AddComponent<Image>();
-        _recenterRing.sprite = GetRingSprite();
+        _recenterRing.sprite = GetRingSprite(4.2f); // Mỏng hơn 1/5 so với dwellRing
         _recenterRing.type = Image.Type.Filled;
         _recenterRing.fillMethod = Image.FillMethod.Radial360;
         _recenterRing.fillOrigin = (int)Image.Origin360.Top;
@@ -627,13 +627,12 @@ public class VRGazeReticle : MonoBehaviour
         return Sprite.Create(tex, new Rect(0,0,res,res), new Vector2(0.5f,0.5f));
     }
     
-    Sprite GetRingSprite()
+    Sprite GetRingSprite(float thickness = 21f)
     {
         int res = 128;
         Texture2D tex = new Texture2D(res, res, TextureFormat.RGBA32, false);
         Color[] c = new Color[res*res];
-        float radius = res / 2f;
-        float thickness = 21f; // Độ dày bằng với kích thước reticle (100/300 * 64) 
+        float radius = res / 2f; 
         Vector2 center = new Vector2(radius, radius);
 
         for(int y=0; y<res; y++)

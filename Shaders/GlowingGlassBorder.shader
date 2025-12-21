@@ -443,31 +443,63 @@ Shader "Custom/GlowingGlassBorder"
                 finalColor.rgb = lerp(finalColor.rgb, whiteCore, coreMix);
                 finalColor.a = max(finalColor.a, layer1 * _Layer1Alpha);
 
-                // === DUAL GLOWING STROKES (smooth fade, white tinted with shadow) ===
+                // === ANAMORPHIC LENS FLARE STROKE ===
+                // Stroke runs along border, with perpendicular glow spreading inward/outward
                 float strokeBorderMask = saturate(layer1 * 2.0 + layer2 + layer3 * 0.5);
                 float2 strokeIntensities = getStrokeIntensity(uv, aspect, _EdgePadding, strokeBorderMask);
                 float strokeIntensity = max(strokeIntensities.x, strokeIntensities.y);
 
                 if (strokeIntensity > 0.001)
                 {
-                    float glowStrength = strokeIntensity * _StrokeIntensity;
+                    // Perpendicular glow: use distance from border (dist) for spread
+                    // absDist is already calculated above
+                    float perpGlowWidth = _StrokeGlow;
 
-                    // Layer 1: Outer shadow/glow (widest, softest) - 30% border color
-                    float shadowIntensity = pow(strokeIntensity, 0.5);
-                    fixed3 shadowCol = lerp(borderColor.rgb, fixed3(1, 1, 0.5), 0.5);
-                    finalColor.rgb += shadowCol * shadowIntensity * _StrokeIntensity * 0.25;
-                    // finalColor.a = max(finalColor.a, shadowIntensity * 0.3);
+                    // Multiple glow layers spreading perpendicular to border
+                    // Layer 5: Ultra-wide ambient glow
+                    float perpLayer5 = 1.0 - saturate(absDist / (perpGlowWidth * 5.0));
+                    perpLayer5 = pow(perpLayer5, 3.0);
 
-                    // Layer 2: Mid glow - 50% border color
-                    float midGlow = pow(strokeIntensity, 0.8);
-                    fixed3 midCol = lerp(borderColor.rgb, fixed3(1, 1, 0.25), 0.25);
-                    finalColor.rgb += midCol * midGlow * _StrokeIntensity * 0.5;
-                    // finalColor.a = max(finalColor.a, midGlow * 0.5);
+                    // Layer 4: Wide soft glow
+                    float perpLayer4 = 1.0 - saturate(absDist / (perpGlowWidth * 3.0));
+                    perpLayer4 = pow(perpLayer4, 2.5);
 
-                    // Layer 3: Core glow - 60% border color
-                    fixed3 coreCol = lerp(borderColor.rgb, fixed3(1, 1, 0.125), 0.125);
-                    finalColor.rgb += coreCol * glowStrength * 0.8;
-                    // finalColor.a = max(finalColor.a, glowStrength * 0.7);
+                    // Layer 3: Medium glow
+                    float perpLayer3 = 1.0 - saturate(absDist / (perpGlowWidth * 1.5));
+                    perpLayer3 = pow(perpLayer3, 2.0);
+
+                    // Layer 2: Inner glow
+                    float perpLayer2 = 1.0 - saturate(absDist / perpGlowWidth);
+                    perpLayer2 = pow(perpLayer2, 1.5);
+
+                    // Layer 1: Sharp core
+                    float perpLayer1 = 1.0 - saturate(absDist / (perpGlowWidth * 0.3));
+                    perpLayer1 = pow(perpLayer1, 0.8);
+
+                    // Combine stroke intensity with perpendicular layers
+                    float intensity = strokeIntensity * _StrokeIntensity;
+
+                    // Layer 5: Ultra ambient - gradient color, very soft
+                    finalColor.rgb += borderColor.rgb * perpLayer5 * intensity * 0.15;
+                    finalColor.a = max(finalColor.a, perpLayer5 * intensity * 0.1);
+
+                    // Layer 4: Wide glow - gradient color
+                    finalColor.rgb += borderColor.rgb * perpLayer4 * intensity * 0.3;
+                    finalColor.a = max(finalColor.a, perpLayer4 * intensity * 0.2);
+
+                    // Layer 3: Medium glow - slightly brighter gradient
+                    finalColor.rgb += borderColor.rgb * 1.2 * perpLayer3 * intensity * 0.5;
+                    finalColor.a = max(finalColor.a, perpLayer3 * intensity * 0.4);
+
+                    // Layer 2: Inner glow - bright gradient with white mix
+                    fixed3 innerCol = lerp(borderColor.rgb * 1.5, fixed3(1, 1, 1), 0.3);
+                    finalColor.rgb += innerCol * perpLayer2 * intensity * 0.8;
+                    finalColor.a = max(finalColor.a, perpLayer2 * intensity * 0.6);
+
+                    // Layer 1: Sharp white-hot core
+                    fixed3 coreCol = lerp(borderColor.rgb * 2.0, fixed3(1, 1, 1), 0.7);
+                    finalColor.rgb += coreCol * perpLayer1 * intensity * 1.2;
+                    finalColor.a = max(finalColor.a, perpLayer1 * intensity * 0.9);
                 }
 
                 // === VERTICAL SEPARATORS (multi-layer glow matching border) ===
