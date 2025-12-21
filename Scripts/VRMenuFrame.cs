@@ -1362,7 +1362,7 @@ public class VRMenuFrame : MonoBehaviour
         rt.anchorMin = new Vector2(0.5f, 0);
         rt.anchorMax = new Vector2(0.5f, 0);
         rt.pivot = new Vector2(0.5f, 1f);
-        rt.sizeDelta = new Vector2(w, parent.GetComponent<RectTransform>().sizeDelta.y * 0.03f);
+        rt.sizeDelta = new Vector2(w, parent.GetComponent<RectTransform>().sizeDelta.y * 0.05f);
         rt.anchoredPosition = new Vector2(0, 0);
 
         Image img = lineObj.AddComponent<Image>();
