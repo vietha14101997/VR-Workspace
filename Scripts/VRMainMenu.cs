@@ -79,8 +79,8 @@ public class VRMainMenu : MonoBehaviour
         {
             if (this != null)
             {
+                VRTaskbar.FixAllIconImportSettings();
                 LoadIcons();
-                FixIconImportSettings();
                 BuildGrid();
             }
         };
@@ -197,58 +197,6 @@ public class VRMainMenu : MonoBehaviour
         AssetDatabase.CreateAsset(newMat, path);
         return AssetDatabase.LoadAssetAtPath<Material>(path);
     }
-
-    void FixIconImportSettings()
-    {
-        string[] mainMenuIcons = {
-            "icon_remote", "icon_browser", "icon_media",
-            "icon_files", "icon_settings", "icon_quit", "icon_wifi", "icon_signal"
-        };
-
-        foreach (var name in mainMenuIcons)
-        {
-            FixSingleIconImport($"Assets/VR-Workspace/Resources/MainMenu/{name}.png");
-        }
-
-        string[] remoteMenuIcons = {
-            "icon_monitor", "icon_resolution", "icon_bitrate", "icon_fps",
-            "icon_back", "icon_qr"
-        };
-
-        foreach (var name in remoteMenuIcons)
-        {
-            FixSingleIconImport($"Assets/VR-Workspace/Resources/RemoteMenu/{name}.png");
-        }
-    }
-
-    void FixSingleIconImport(string path)
-    {
-        try
-        {
-            TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
-            if (importer != null)
-            {
-                bool changed = false;
-                if (importer.textureType != TextureImporterType.Sprite)
-                {
-                    importer.textureType = TextureImporterType.Sprite;
-                    changed = true;
-                }
-                if (importer.mipmapEnabled)
-                {
-                    importer.mipmapEnabled = false;
-                    changed = true;
-                }
-                if (importer.textureCompression != TextureImporterCompression.Uncompressed)
-                {
-                    importer.textureCompression = TextureImporterCompression.Uncompressed;
-                    changed = true;
-                }
-                if (changed) importer.SaveAndReimport();
-            }
-        }
-        catch { }
-    }
 #endif
 
     bool ValidateParent()
@@ -284,7 +232,7 @@ public class VRMainMenu : MonoBehaviour
 
         LoadIcons();
 #if UNITY_EDITOR
-        FixIconImportSettings();
+        VRTaskbar.FixAllIconImportSettings();
 #endif
         BuildGrid();
     }
@@ -440,12 +388,12 @@ public class VRMainMenu : MonoBehaviour
 
     void LoadIcons()
     {
-        if (iconRemote == null) iconRemote = Resources.Load<Sprite>("MainMenu/icon_remote");
-        if (iconBrowser == null) iconBrowser = Resources.Load<Sprite>("MainMenu/icon_browser");
-        if (iconMedia == null) iconMedia = Resources.Load<Sprite>("MainMenu/icon_media");
-        if (iconFiles == null) iconFiles = Resources.Load<Sprite>("MainMenu/icon_files");
-        if (iconSettings == null) iconSettings = Resources.Load<Sprite>("MainMenu/icon_settings");
-        if (iconQuit == null) iconQuit = Resources.Load<Sprite>("MainMenu/icon_quit");
+        if (iconRemote == null) iconRemote = VRTaskbar.LoadIcon("remote");
+        if (iconBrowser == null) iconBrowser = VRTaskbar.LoadIcon("browser");
+        if (iconMedia == null) iconMedia = VRTaskbar.LoadIcon("media");
+        if (iconFiles == null) iconFiles = VRTaskbar.LoadIcon("files");
+        if (iconSettings == null) iconSettings = VRTaskbar.LoadIcon("settings");
+        if (iconQuit == null) iconQuit = VRTaskbar.LoadIcon("quit");
     }
 
     // --- MAIN BUILD ---
@@ -490,41 +438,40 @@ public class VRMainMenu : MonoBehaviour
         // Clear existing
         ClearGrid();
 
-        // Setup RectTransform
+        // Setup RectTransform to stretch fill parent (ContentContainer)
         RectTransform rt = GetComponent<RectTransform>();
-
-        // Get container size from VRMenuFrame
-        float containerWidth = _menuFrame.logicalWidth;
-        float containerHeight = (_menuFrame.logicalWidth / _menuFrame.panelWidth) * _menuFrame.panelHeight;
-
-        // Account for status bar
-        float statusBarHeight = containerHeight * 0.125f;
-        float contentHeight = containerHeight - statusBarHeight;
-
-        float w = containerWidth;
-        float h = contentHeight;
-
-        // Margins
-        float marginPX = 40f;
-        float topMargin = 40f;
-        float xMin = marginPX / w;
-        float xMax = 1f - xMin;
-        float yMin = marginPX / h;
-        float yMax = 1f - (topMargin / h);
-
-        // Setup anchors with margins
-        rt.anchorMin = new Vector2(xMin, yMin);
-        rt.anchorMax = new Vector2(xMax, yMax);
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
         rt.offsetMin = Vector2.zero;
         rt.offsetMax = Vector2.zero;
         rt.pivot = new Vector2(0.5f, 0.5f);
         rt.localScale = Vector3.one;
 
+        // Force layout rebuild to get actual rect size
+        Canvas.ForceUpdateCanvases();
+        LayoutRebuilder.ForceRebuildLayoutImmediate(rt);
+
+        // Get actual container size from parent RectTransform
+        RectTransform parentRT = transform.parent?.GetComponent<RectTransform>();
+        float containerW, containerH;
+
+        if (parentRT != null && parentRT.rect.width > 0 && parentRT.rect.height > 0)
+        {
+            containerW = parentRT.rect.width;
+            containerH = parentRT.rect.height;
+        }
+        else
+        {
+            // Fallback to VRMenuFrame dimensions if parent rect not ready
+            float frameWidth = _menuFrame.logicalWidth;
+            float frameHeight = (frameWidth / _menuFrame.panelWidth) * _menuFrame.panelHeight;
+            float statusBarHeight = frameHeight * 0.125f;
+            containerW = frameWidth - _menuFrame.contentMarginLeft - _menuFrame.contentMarginRight;
+            containerH = frameHeight - statusBarHeight - _menuFrame.contentMarginTop - _menuFrame.contentMarginBottom;
+        }
+
         // Add GridLayoutGroup to this GameObject
         _gridLayout = gameObject.AddComponent<GridLayoutGroup>();
-
-        float containerW = w * (xMax - xMin);
-        float containerH = h * (yMax - yMin);
 
         float totalSpacingW = spacing.x * (columns - 1);
         float totalSpacingH = spacing.y * (rows - 1);
@@ -571,22 +518,24 @@ public class VRMainMenu : MonoBehaviour
         _gridLayout.spacing = spacing;
         _gridLayout.constraintCount = columns;
 
-        // Recalculate cell size
-        float containerWidth = _menuFrame.logicalWidth;
-        float containerHeight = (_menuFrame.logicalWidth / _menuFrame.panelWidth) * _menuFrame.panelHeight;
-        float statusBarHeight = containerHeight * 0.125f;
-        float h = containerHeight - statusBarHeight;
-        float w = containerWidth;
+        // Get actual container size from parent RectTransform
+        RectTransform parentRT = transform.parent?.GetComponent<RectTransform>();
+        float containerW, containerH;
 
-        float marginPX = 40f;
-        float topMargin = 40f;
-        float xMin = marginPX / w;
-        float xMax = 1f - xMin;
-        float yMin = marginPX / h;
-        float yMax = 1f - (topMargin / h);
-
-        float containerW = w * (xMax - xMin);
-        float containerH = h * (yMax - yMin);
+        if (parentRT != null && parentRT.rect.width > 0 && parentRT.rect.height > 0)
+        {
+            containerW = parentRT.rect.width;
+            containerH = parentRT.rect.height;
+        }
+        else
+        {
+            // Fallback to VRMenuFrame dimensions
+            float frameWidth = _menuFrame.logicalWidth;
+            float frameHeight = (frameWidth / _menuFrame.panelWidth) * _menuFrame.panelHeight;
+            float statusBarHeight = frameHeight * 0.125f;
+            containerW = frameWidth - _menuFrame.contentMarginLeft - _menuFrame.contentMarginRight;
+            containerH = frameHeight - statusBarHeight - _menuFrame.contentMarginTop - _menuFrame.contentMarginBottom;
+        }
 
         float totalSpacingW = spacing.x * (columns - 1);
         float totalSpacingH = spacing.y * (rows - 1);

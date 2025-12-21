@@ -10,12 +10,20 @@ using TMPro;
 /// - VRButtonAnimation cho hover (scale, z-pop, shader _HoverAmount)
 /// - BoxCollider cho VR raycast
 ///
+/// Các loại Button:
+/// - CreateButton: Full button với config tùy chỉnh
+/// - CreateIconButton: Icon vuông với khung
+/// - CreateBareIconButton: Chỉ icon, không khung/text (frameless)
+/// - CreateLabelButton: Icon + Text dọc
+/// - CreateTextButton: Chỉ text
+/// - CreateHorizontalIconTextButton: Icon trái + Text phải
+///
 /// Cấu trúc tạo ra:
 /// - Wrapper (Btn_[label])
 ///   - HitArea (Image clear, BoxCollider, Button, VRButtonAnimation)
-///     - Visuals (expansion để border không bị cắt)
-///       - Background (GlassGradientBackground shader)
-///       - Border (GlowingElementBorder shader + VRButtonRipple)
+///     - Visuals (expansion để border không bị cắt, hoặc full size nếu frameless)
+///       - Background (GlassGradientBackground shader) - bỏ qua nếu frameless
+///       - Border (GlowingElementBorder shader + VRButtonRipple) - bỏ qua nếu frameless
 ///       - Content
 ///         - Icon (với Shadow glow)
 ///         - TextTMP
@@ -57,6 +65,9 @@ public static class VRButtonFactory
         public float popAmount = 0.05f;
         public bool enablePulse = false;
         public float pulseSpeed = 2f;
+
+        // Frameless mode (chỉ có icon, không có background và border)
+        public bool frameless = false;
 
         // Layer
         public string layerName = "VirtualObjects";
@@ -100,20 +111,41 @@ public static class VRButtonFactory
         visuals.transform.SetParent(hitArea.transform, false);
         RectTransform visRT = visuals.AddComponent<RectTransform>();
 
-        float expansion = config.edgePadding;
-        visRT.anchorMin = new Vector2(-expansion, -expansion);
-        visRT.anchorMax = new Vector2(1f + expansion, 1f + expansion);
-        visRT.offsetMin = Vector2.zero;
-        visRT.offsetMax = Vector2.zero;
+        Image bgImg = null;
 
-        // 4. Background
-        Image bgImg = CreateBackground(visuals.transform, config);
+        if (config.frameless)
+        {
+            // Frameless mode: không cần expansion, không có background/border
+            visRT.anchorMin = Vector2.zero;
+            visRT.anchorMax = Vector2.one;
+            visRT.offsetMin = Vector2.zero;
+            visRT.offsetMax = Vector2.zero;
 
-        // 5. Border với ripple effect
-        CreateBorder(visuals.transform, config);
+            // Chỉ tạo Content (Icon)
+            CreateContent(visuals.transform, config);
 
-        // 6. Content (Icon + Text)
-        CreateContent(visuals.transform, config);
+            // Tạo transparent image cho button target graphic
+            bgImg = visuals.AddComponent<Image>();
+            bgImg.color = Color.clear;
+            bgImg.raycastTarget = false;
+        }
+        else
+        {
+            float expansion = config.edgePadding;
+            visRT.anchorMin = new Vector2(-expansion, -expansion);
+            visRT.anchorMax = new Vector2(1f + expansion, 1f + expansion);
+            visRT.offsetMin = Vector2.zero;
+            visRT.offsetMax = Vector2.zero;
+
+            // 4. Background
+            bgImg = CreateBackground(visuals.transform, config);
+
+            // 5. Border với ripple effect
+            CreateBorder(visuals.transform, config);
+
+            // 6. Content (Icon + Text)
+            CreateContent(visuals.transform, config);
+        }
 
         // 7. Button component
         Button btn = hitArea.AddComponent<Button>();
@@ -148,6 +180,28 @@ public static class VRButtonFactory
             iconOnly = true,
             iconSize = size * 0.55f,
             cornerRadius = 0.15f,
+            popAmount = popAmount
+        };
+        return CreateButton(parent, config, onClick);
+    }
+
+    /// <summary>
+    /// Tạo Button chỉ có icon, không có khung (background/border) và text
+    /// Icon có glow effect và hover animation
+    /// </summary>
+    public static GameObject CreateBareIconButton(Transform parent, float size, Sprite icon, Color color,
+        UnityEngine.Events.UnityAction onClick, float popAmount = 0.005f, float iconScale = 0.7f)
+    {
+        var config = new ButtonConfig
+        {
+            label = icon != null ? icon.name : "BareIconBtn",
+            icon = icon,
+            themeColor = color,
+            width = size,
+            height = size,
+            iconOnly = true,
+            iconSize = size * iconScale,
+            frameless = true,
             popAmount = popAmount
         };
         return CreateButton(parent, config, onClick);

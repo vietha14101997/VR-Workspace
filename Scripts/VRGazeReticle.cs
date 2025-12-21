@@ -143,13 +143,13 @@ public class VRGazeReticle : MonoBehaviour
         _dwellRing.fillMethod = Image.FillMethod.Radial360;
         _dwellRing.fillOrigin = (int)Image.Origin360.Top;
         _dwellRing.fillClockwise = true;
-        _dwellRing.color = new Color(0f, 1f, 0.5f, 0.9f); // Green color for dwell
+        _dwellRing.color = colorInteract; // Cùng màu với reticle khi va chạm
         _dwellRing.fillAmount = 0f;
         _dwellRing.material = overlayMat;
         _dwellRing.raycastTarget = false;
 
         RectTransform ringRT = ringObj.GetComponent<RectTransform>();
-        ringRT.sizeDelta = new Vector2(200, 200); // Larger than the dot
+        ringRT.sizeDelta = new Vector2(300, 300); // Larger than the dot
         ringRT.localScale = Vector3.one;
         ringRT.anchoredPosition = Vector3.zero;
 
@@ -402,10 +402,10 @@ public class VRGazeReticle : MonoBehaviour
             HandlePointerClick(target, normalizedHitPoint);
             _dwellClickTriggered = true;
 
-            // Visual feedback - đổi màu ring khi click thành công
+            // Ẩn ring ngay sau khi click
             if (_dwellRing != null)
             {
-                _dwellRing.color = new Color(0f, 0.8f, 1f, 0.9f); // Cyan khi click
+                _dwellRing.enabled = false;
             }
         }
     }
@@ -526,7 +526,7 @@ public class VRGazeReticle : MonoBehaviour
         {
             _dwellRing.enabled = false;
             _dwellRing.fillAmount = 0f;
-            _dwellRing.color = new Color(0f, 1f, 0.5f, 0.9f); // Reset về màu xanh lá
+            _dwellRing.color = colorInteract; // Reset về màu reticle
         }
     }
 
@@ -633,7 +633,7 @@ public class VRGazeReticle : MonoBehaviour
         Texture2D tex = new Texture2D(res, res, TextureFormat.RGBA32, false);
         Color[] c = new Color[res*res];
         float radius = res / 2f;
-        float thickness = 10f; 
+        float thickness = 21f; // Độ dày bằng với kích thước reticle (100/300 * 64) 
         Vector2 center = new Vector2(radius, radius);
 
         for(int y=0; y<res; y++)

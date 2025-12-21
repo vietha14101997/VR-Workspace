@@ -1,16 +1,14 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using System.Collections.Generic;
 using System;
+using System.Collections.Generic;
 
 public class VRRemoteMenu : MonoBehaviour
 {
     public Color themeColor = new Color(0.0f, 0.9f, 1.0f);
     public Color accentColor = new Color(0.8f, 0.4f, 1.0f);
     public TMP_FontAsset customFont;
-
-    private Dictionary<string, Sprite> _iconCache = new Dictionary<string, Sprite>();
 
     // Event callbacks
     public event Action OnBackClicked;
@@ -336,17 +334,8 @@ public class VRRemoteMenu : MonoBehaviour
 
     // ==================== SPRITES ====================
 
-    Sprite LoadIcon(string name)
-    {
-        if (_iconCache.ContainsKey(name)) return _iconCache[name];
-
-        var sprite = Resources.Load<Sprite>($"RemoteMenu/icon_{name}");
-        if (sprite != null)
-        {
-            _iconCache[name] = sprite;
-            return sprite;
-        }
-
-        return null;
-    }
+    /// <summary>
+    /// Load icon from Resources folder by name (delegates to VRTaskbar.LoadIcon)
+    /// </summary>
+    Sprite LoadIcon(string name) => VRTaskbar.LoadIcon(name);
 }
