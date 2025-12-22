@@ -2,8 +2,8 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Component giữ lại để tương thích ngược.
-/// Hiệu ứng click đã được vô hiệu hóa - chỉ giữ hiệu ứng hover của Button.
+/// Stub component for backward compatibility.
+/// Shimmer effect is handled by VRButtonAnimation via _HoverAmount.
 /// </summary>
 public class VRButtonRipple : MonoBehaviour
 {

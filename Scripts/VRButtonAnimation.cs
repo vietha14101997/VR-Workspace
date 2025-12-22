@@ -46,7 +46,7 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
             }
         }
 
-        // Try to find background material (direct child with Image or named "Background")
+        // Try to find background material (direct child with Image or named "Background" or "ConnectBackground")
         var bgImg = targetVisuals.GetComponent<Image>();
         if (bgImg != null && bgImg.material != null && bgImg.material.HasProperty("_HoverAmount"))
         {
@@ -54,14 +54,19 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
         }
         else
         {
-            // Try finding Background child
-            var bgObj = targetVisuals.Find("Background");
-            if (bgObj != null)
+            // Try finding Background or ConnectBackground child
+            string[] bgNames = { "Background", "ConnectBackground" };
+            foreach (var bgName in bgNames)
             {
-                bgImg = bgObj.GetComponent<Image>();
-                if (bgImg != null && bgImg.material != null && bgImg.material.HasProperty("_HoverAmount"))
+                var bgObj = targetVisuals.Find(bgName);
+                if (bgObj != null)
                 {
-                    _backgroundMaterial = bgImg.material;
+                    bgImg = bgObj.GetComponent<Image>();
+                    if (bgImg != null && bgImg.material != null && bgImg.material.HasProperty("_HoverAmount"))
+                    {
+                        _backgroundMaterial = bgImg.material;
+                        break;
+                    }
                 }
             }
         }

@@ -717,6 +717,21 @@ public class VRMenuFrame : MonoBehaviour
     /// <param name="length">Horizontal length (0-1), 1 = full width, centered at x=0.5</param>
     public void SetHorizontalSeparators(int count, Vector4 positions, float width = 0.004f, float glowWidth = 0.015f, float alpha = 0.8f, float length = 1.0f)
     {
+        // Uniform length for all separators
+        SetHorizontalSeparators(count, positions, width, glowWidth, alpha, new Vector4(length, length, length, length));
+    }
+
+    /// <summary>
+    /// Set horizontal separators with individual lengths for each separator.
+    /// </summary>
+    /// <param name="count">Number of separators (0-4)</param>
+    /// <param name="positions">Y positions in UV space (x=sep1, y=sep2, z=sep3, w=sep4)</param>
+    /// <param name="width">Core width of separator</param>
+    /// <param name="glowWidth">Glow width of separator</param>
+    /// <param name="alpha">Alpha/intensity of separator</param>
+    /// <param name="lengths">Individual lengths for each separator (x=sep1, y=sep2, z=sep3, w=sep4)</param>
+    public void SetHorizontalSeparators(int count, Vector4 positions, float width, float glowWidth, float alpha, Vector4 lengths)
+    {
         if (_borderMaterial == null)
         {
             // Try to find material from GlowingBorder
@@ -740,7 +755,12 @@ public class VRMenuFrame : MonoBehaviour
             _borderMaterial.SetFloat("_HSeparatorWidth", width);
             _borderMaterial.SetFloat("_HSeparatorGlowWidth", glowWidth);
             _borderMaterial.SetFloat("_HSeparatorAlpha", alpha);
-            _borderMaterial.SetFloat("_HSeparatorLength", Mathf.Clamp01(length));
+            _borderMaterial.SetVector("_HSeparatorLengths", new Vector4(
+                Mathf.Clamp01(lengths.x),
+                Mathf.Clamp01(lengths.y),
+                Mathf.Clamp01(lengths.z),
+                Mathf.Clamp01(lengths.w)
+            ));
         }
     }
 

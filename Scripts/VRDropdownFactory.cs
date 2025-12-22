@@ -21,6 +21,7 @@ public static class VRDropdownFactory
 {
     private static Sprite _pixelSprite;
     private static Sprite _arrowSprite;
+    private static Sprite _checkmarkSprite;
 
     // Hằng số layout
     private const float FONT_TO_BOX_RATIO = 4.2f;      // Tỷ lệ font size -> box height (tăng từ 3.5)
@@ -28,6 +29,8 @@ public static class VRDropdownFactory
     private const float ICON_ZONE_RATIO = 0.28f;       // 28% cho icon zone (giảm để icon to hơn trong zone)
     private const float CONTENT_PADDING = 12f;          // Padding cho content zone
     private const float ARROW_WIDTH = 70f;              // Chiều rộng arrow
+    private const float CONTENT_LEFT_OFFSET = 0.05f;    // 5% lùi content sang phải
+    private const float ARROW_RIGHT_OFFSET = 0.05f;     // 5% lùi arrow sang trái
 
     /// <summary>
     /// Cấu hình cho Dropdown
@@ -37,7 +40,7 @@ public static class VRDropdownFactory
     {
         public string label = "Label";
         public Sprite icon;
-        public Color themeColor = new Color(0f, 0.9f, 1f);
+        public Color themeColor = new Color(0.2627451f, 0.4901961f, 0.7529413f);
         public float width = 300f;
         public int labelFontSize = 32;
         public int valueFontSize = 36;
@@ -49,11 +52,11 @@ public static class VRDropdownFactory
         public int defaultIndex = 0;
 
         // Visual settings
-        public float cornerRadius = 0.25f;
-        public float edgePadding = 0.15f;
-        public float backgroundAlpha = 0.15f;
-        public float borderWidth = 0.1f;
-        public float glowWidth = 0.075f;
+        public float cornerRadius = 0.12f;
+        public float edgePadding = 0.12f;
+        public float backgroundAlpha = 0.08f;
+        public float borderWidth = 0.04f;
+        public float glowWidth = 0.04f;
         public float glowIntensity = 2.5f;
 
         // Animation
@@ -69,7 +72,7 @@ public static class VRDropdownFactory
         public float BoxHeight => valueFontSize * FONT_TO_BOX_RATIO;
 
         // Tính icon size từ font size
-        public float IconSize => valueFontSize * FONT_TO_ICON_RATIO;
+        public float IconSize => valueFontSize * FONT_TO_ICON_RATIO * 0.95f;
 
         // Tính chiều cao option từ font size
         public float OptionHeight => valueFontSize * 2f;
@@ -115,12 +118,13 @@ public static class VRDropdownFactory
         int vrLayer = LayerMask.NameToLayer(config.layerName);
         if (vrLayer != -1) hitArea.layer = vrLayer;
 
-        // 3. Visuals - container cho visual elements (bằng kích thước HitArea)
+        // 3. Visuals - container cho visual elements với expansion (giống VRButtonFactory)
         GameObject visuals = new GameObject("Visuals");
         visuals.transform.SetParent(hitArea.transform, false);
         RectTransform visRT = visuals.AddComponent<RectTransform>();
-        visRT.anchorMin = Vector2.zero;
-        visRT.anchorMax = Vector2.one;
+        float expansion = config.edgePadding;
+        visRT.anchorMin = new Vector2(-expansion, -expansion);
+        visRT.anchorMax = new Vector2(1f + expansion, 1f + expansion);
         visRT.offsetMin = Vector2.zero;
         visRT.offsetMax = Vector2.zero;
 
@@ -181,6 +185,31 @@ public static class VRDropdownFactory
             valueFontSize = valueFontSize,
             font = font,
             options = options,
+            defaultIndex = defaultIndex
+        };
+        return CreateDropdown(parent, config, onValueChanged);
+    }
+
+    /// <summary>
+    /// Tạo Dropdown với icon và optionIcons riêng cho từng option
+    /// Chiều cao tự động tính từ font size
+    /// </summary>
+    public static GameObject CreateIconDropdownWithOptionIcons(Transform parent, float width,
+        string label, Sprite icon, Color color, List<string> options, List<Sprite> optionIcons, int defaultIndex,
+        System.Action<int, string> onValueChanged = null,
+        int labelFontSize = 24, int valueFontSize = 36, TMP_FontAsset font = null)
+    {
+        var config = new DropdownConfig
+        {
+            label = label,
+            icon = icon,
+            themeColor = color,
+            width = width,
+            labelFontSize = labelFontSize,
+            valueFontSize = valueFontSize,
+            font = font,
+            options = options,
+            optionIcons = optionIcons,
             defaultIndex = defaultIndex
         };
         return CreateDropdown(parent, config, onValueChanged);
@@ -280,7 +309,7 @@ public static class VRDropdownFactory
         {
             Material mat = new Material(glassShader);
             mat.SetFloat("_CornerRadius", config.cornerRadius);
-            mat.SetFloat("_EdgePadding", 0f);
+            mat.SetFloat("_EdgePadding", config.edgePadding);
             mat.SetFloat("_Aspect", aspect);
             mat.SetColor("_ColorA", new Color(col.r, col.g, col.b, config.backgroundAlpha * 1.5f));
             mat.SetColor("_ColorB", new Color(col.r, col.g, col.b, config.backgroundAlpha * 0.5f));
@@ -318,7 +347,7 @@ public static class VRDropdownFactory
         {
             Material mat = new Material(glowShader);
             mat.SetFloat("_Aspect", aspect);
-            mat.SetFloat("_EdgePadding", 0f);
+            mat.SetFloat("_EdgePadding", config.edgePadding);
             mat.SetFloat("_CornerRadius", config.cornerRadius);
 
             Color borderGlowCol = Color.Lerp(col, Color.white, 0.75f);
@@ -341,8 +370,14 @@ public static class VRDropdownFactory
         GameObject content = new GameObject("Content");
         content.transform.SetParent(parent, false);
         RectTransform cRT = content.AddComponent<RectTransform>();
-        cRT.anchorMin = Vector2.zero;
-        cRT.anchorMax = Vector2.one;
+
+        // Compensate for Visuals expansion để Content nằm đúng vị trí HitArea gốc
+        float e = config.edgePadding;
+        float totalSize = 1f + 2f * e; // Visuals size ratio
+        float normalizedMin = e / totalSize;
+        float normalizedMax = (1f + e) / totalSize;
+        cRT.anchorMin = new Vector2(normalizedMin, normalizedMin);
+        cRT.anchorMax = new Vector2(normalizedMax, normalizedMax);
         cRT.offsetMin = Vector2.zero;
         cRT.offsetMax = Vector2.zero;
 
@@ -355,12 +390,12 @@ public static class VRDropdownFactory
         // ==================== KHU VỰC ICON (1/3 bên trái) ====================
         if (hasIcon)
         {
-            // Icon zone container
+            // Icon zone container - lùi sang phải 10%
             GameObject iconZone = new GameObject("IconZone");
             iconZone.transform.SetParent(content.transform, false);
             RectTransform iconZoneRT = iconZone.AddComponent<RectTransform>();
-            iconZoneRT.anchorMin = Vector2.zero;
-            iconZoneRT.anchorMax = new Vector2(iconZoneRatio, 1f);
+            iconZoneRT.anchorMin = new Vector2(CONTENT_LEFT_OFFSET, 0f);
+            iconZoneRT.anchorMax = new Vector2(iconZoneRatio + CONTENT_LEFT_OFFSET, 1f);
             iconZoneRT.offsetMin = Vector2.zero;
             iconZoneRT.offsetMax = Vector2.zero;
 
@@ -371,7 +406,7 @@ public static class VRDropdownFactory
             iconRT.anchorMin = new Vector2(0.5f, 0.5f);
             iconRT.anchorMax = new Vector2(0.5f, 0.5f);
             iconRT.pivot = new Vector2(0.5f, 0.5f);
-            iconRT.anchoredPosition = new Vector2(0, iconSize * 0.12f);
+            iconRT.anchoredPosition = new Vector2(0, iconSize * 0.06f);
             iconRT.sizeDelta = new Vector2(iconSize, iconSize);
 
             Image iconImg = iconObj.AddComponent<Image>();
@@ -406,12 +441,12 @@ public static class VRDropdownFactory
             shadow4.effectDistance = new Vector2(-s2, s2);
         }
 
-        // ==================== KHU VỰC CONTENT (2/3 bên phải) ====================
+        // ==================== KHU VỰC CONTENT (2/3 bên phải) - lùi sang phải 10% ====================
         GameObject contentZone = new GameObject("ContentZone");
         contentZone.transform.SetParent(content.transform, false);
         RectTransform contentZoneRT = contentZone.AddComponent<RectTransform>();
-        contentZoneRT.anchorMin = new Vector2(iconZoneRatio, 0f);
-        contentZoneRT.anchorMax = Vector2.one;
+        contentZoneRT.anchorMin = new Vector2(iconZoneRatio + CONTENT_LEFT_OFFSET, 0f);
+        contentZoneRT.anchorMax = new Vector2(1f - ARROW_RIGHT_OFFSET, 1f);
         contentZoneRT.offsetMin = new Vector2(CONTENT_PADDING, 0f);
         contentZoneRT.offsetMax = new Vector2(-CONTENT_PADDING, 0f);
 
@@ -541,35 +576,24 @@ public static class VRDropdownFactory
         panelRT.anchoredPosition = new Vector2(0, -5f);
         panelRT.sizeDelta = new Vector2(0, panelHeight);
 
-        // Panel background
+        // Add Canvas FIRST to handle sorting without breaking VR raycast
+        Canvas panelCanvas = panel.AddComponent<Canvas>();
+        panelCanvas.overrideSorting = true;
+        panelCanvas.sortingOrder = 100;
+        // Add GraphicRaycaster for UI events (works alongside BoxCollider for VR)
+        GraphicRaycaster raycaster = panel.AddComponent<GraphicRaycaster>();
+        raycaster.blockingObjects = GraphicRaycaster.BlockingObjects.None;
+
+        // Panel background (after Canvas for proper rendering)
         Image panelBg = panel.AddComponent<Image>();
         panelBg.sprite = GetPixelSprite();
-
-        float aspect = config.width / panelHeight;
         Color col = config.themeColor;
-
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
-        if (glassShader != null)
-        {
-            Material mat = new Material(glassShader);
-            mat.SetFloat("_CornerRadius", 0.06f);
-            mat.SetFloat("_EdgePadding", 0.04f);
-            mat.SetFloat("_Aspect", aspect);
-            mat.SetColor("_ColorA", new Color(col.r * 0.3f, col.g * 0.3f, col.b * 0.3f, 0.95f));
-            mat.SetColor("_ColorB", new Color(col.r * 0.1f, col.g * 0.1f, col.b * 0.1f, 0.9f));
-            mat.SetFloat("_GlassAlpha", 0.9f);
-            panelBg.material = mat;
-            panelBg.color = Color.white;
-        }
-        else
-        {
-            panelBg.color = new Color(0.1f, 0.1f, 0.15f, 0.95f);
-        }
+        panelBg.color = new Color(col.r * 0.15f, col.g * 0.15f, col.b * 0.2f, 0.95f);
 
         // BoxCollider cho VR raycast
         BoxCollider panelCol = panel.AddComponent<BoxCollider>();
         panelCol.size = new Vector3(config.width, panelHeight, 0.1f);
-        panelCol.center = new Vector3(0, -panelHeight / 2f, -0.1f);
+        panelCol.center = new Vector3(0, -panelHeight / 2f, -0.05f);
 
         int vrLayer = LayerMask.NameToLayer(config.layerName);
         if (vrLayer != -1) panel.layer = vrLayer;
@@ -577,20 +601,21 @@ public static class VRDropdownFactory
         // Scroll View
         GameObject viewport = new GameObject("Viewport");
         viewport.transform.SetParent(panel.transform, false);
+        if (vrLayer != -1) viewport.layer = vrLayer;
         RectTransform viewportRT = viewport.AddComponent<RectTransform>();
         viewportRT.anchorMin = Vector2.zero;
         viewportRT.anchorMax = Vector2.one;
         viewportRT.offsetMin = new Vector2(10, 10);
         viewportRT.offsetMax = new Vector2(-10, -10);
 
-        Image viewportImg = viewport.AddComponent<Image>();
-        viewportImg.color = Color.clear;
-        Mask mask = viewport.AddComponent<Mask>();
-        mask.showMaskGraphic = false;
+        // Use RectMask2D instead of Mask for better VR compatibility
+        RectMask2D rectMask = viewport.AddComponent<RectMask2D>();
+        rectMask.padding = Vector4.zero;
 
         // Options container
         GameObject optionsContainer = new GameObject("Options");
         optionsContainer.transform.SetParent(viewport.transform, false);
+        if (vrLayer != -1) optionsContainer.layer = vrLayer;
         RectTransform optionsRT = optionsContainer.AddComponent<RectTransform>();
         optionsRT.anchorMin = new Vector2(0, 1);
         optionsRT.anchorMax = new Vector2(1, 1);
@@ -602,8 +627,14 @@ public static class VRDropdownFactory
         vlg.childForceExpandWidth = true;
         vlg.childForceExpandHeight = false;
         vlg.childControlWidth = true;
-        vlg.childControlHeight = false;
+        vlg.childControlHeight = true;
         vlg.spacing = 2;
+        vlg.padding = new RectOffset(0, 0, 0, 0);
+
+        // Add ContentSizeFitter to ensure proper sizing
+        ContentSizeFitter fitter = optionsContainer.AddComponent<ContentSizeFitter>();
+        fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
         // Tạo options
         VRDropdown dropdownComp = parent.GetComponentInParent<VRDropdown>();
@@ -645,6 +676,12 @@ public static class VRDropdownFactory
         RectTransform optRT = option.AddComponent<RectTransform>();
         optRT.sizeDelta = new Vector2(0, optionHeight);
 
+        // Add LayoutElement for proper sizing in VerticalLayoutGroup
+        LayoutElement layoutElement = option.AddComponent<LayoutElement>();
+        layoutElement.minHeight = optionHeight;
+        layoutElement.preferredHeight = optionHeight;
+        layoutElement.flexibleWidth = 1f;
+
         // Background for hover effect
         Image optBg = option.AddComponent<Image>();
         optBg.color = isSelected ? new Color(config.themeColor.r, config.themeColor.g, config.themeColor.b, 0.2f) : Color.clear;
@@ -669,27 +706,36 @@ public static class VRDropdownFactory
         if (vrLayer != -1) option.layer = vrLayer;
 
         // Layout: Checkmark | Icon | Text
-        float checkmarkWidth = 40f;
+        float checkmarkWidth = 50f;
         float iconWidth = optionIcon != null ? optionIconSize + 15f : 0f;
         float textStartX = checkmarkWidth + iconWidth;
 
-        // Checkmark
+        // Checkmark - sử dụng Image với checkmark sprite
+        float checkSize = config.valueFontSize * 0.7f;
         GameObject checkObj = new GameObject("Checkmark");
         checkObj.transform.SetParent(option.transform, false);
         RectTransform checkRT = checkObj.AddComponent<RectTransform>();
-        checkRT.anchorMin = new Vector2(0f, 0f);
-        checkRT.anchorMax = new Vector2(0f, 1f);
-        checkRT.pivot = new Vector2(0f, 0.5f);
-        checkRT.anchoredPosition = new Vector2(10f, 0f);
-        checkRT.sizeDelta = new Vector2(24f, 24f);
+        checkRT.anchorMin = new Vector2(0f, 0.5f);
+        checkRT.anchorMax = new Vector2(0f, 0.5f);
+        checkRT.pivot = new Vector2(0.5f, 0.5f);
+        checkRT.anchoredPosition = new Vector2(checkmarkWidth / 2f, 0f);
+        checkRT.sizeDelta = new Vector2(checkSize, checkSize);
 
-        TextMeshProUGUI checkTxt = checkObj.AddComponent<TextMeshProUGUI>();
-        checkTxt.text = "✓";
-        checkTxt.fontSize = config.valueFontSize * 0.8f;
-        checkTxt.color = isSelected ? config.themeColor : Color.clear;
-        checkTxt.alignment = TextAlignmentOptions.Center;
-        checkTxt.raycastTarget = false;
-        if (config.font != null) checkTxt.font = config.font;
+        Image checkImg = checkObj.AddComponent<Image>();
+        checkImg.sprite = GetCheckmarkSprite();
+        checkImg.preserveAspect = true;
+        checkImg.raycastTarget = false;
+        checkImg.color = isSelected ? Color.Lerp(config.themeColor, Color.white, 0.8f) : Color.clear;
+
+        // Glow effect for checkmark when selected
+        if (isSelected)
+        {
+            Color glowCol = Color.Lerp(config.themeColor, Color.white, 0.6f);
+            glowCol.a = 0.5f;
+            Shadow checkShadow = checkObj.AddComponent<Shadow>();
+            checkShadow.effectColor = glowCol;
+            checkShadow.effectDistance = new Vector2(2f, -2f);
+        }
 
         // Icon
         if (optionIcon != null)
@@ -746,7 +792,7 @@ public static class VRDropdownFactory
         // Register option
         if (dropdownComponent != null)
         {
-            dropdownComponent.RegisterOption(index, optBg, checkTxt, config.themeColor);
+            dropdownComponent.RegisterOption(index, optBg, checkImg, config.themeColor);
         }
     }
 
@@ -846,6 +892,56 @@ public static class VRDropdownFactory
         Vector2 closest = a + t * ab;
         return Vector2.Distance(p, closest);
     }
+
+    /// <summary>
+    /// Tạo sprite checkmark màu trắng để có thể tint với bất kỳ màu nào
+    /// </summary>
+    private static Sprite GetCheckmarkSprite()
+    {
+        if (_checkmarkSprite != null) return _checkmarkSprite;
+
+        int size = 64;
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        Color[] colors = new Color[size * size];
+
+        // Khởi tạo transparent
+        for (int i = 0; i < colors.Length; i++)
+            colors[i] = Color.clear;
+
+        // Vẽ checkmark với 2 đường thẳng tạo thành hình chữ V
+        // Điểm bắt đầu (trái trên), điểm giữa (dưới), điểm kết thúc (phải trên)
+        Vector2 start = new Vector2(8, size - 24);      // Góc trái trên
+        Vector2 mid = new Vector2(24, 12);               // Điểm giữa (đáy)
+        Vector2 end = new Vector2(size - 8, size - 12);  // Góc phải trên
+
+        float lineWidth = 7f;
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                Vector2 p = new Vector2(x + 0.5f, y + 0.5f);
+
+                // Khoảng cách đến 2 đường thẳng của checkmark
+                float dist1 = DistanceToLine(p, start, mid);
+                float dist2 = DistanceToLine(p, mid, end);
+                float minDist = Mathf.Min(dist1, dist2);
+
+                // Anti-aliased line
+                if (minDist < lineWidth)
+                {
+                    float alpha = Mathf.Clamp01(1f - (minDist - lineWidth + 1.5f) / 1.5f);
+                    colors[y * size + x] = new Color(1f, 1f, 1f, alpha);
+                }
+            }
+        }
+
+        tex.SetPixels(colors);
+        tex.Apply();
+        tex.filterMode = FilterMode.Bilinear;
+        _checkmarkSprite = Sprite.Create(tex, new Rect(0, 0, size, size), Vector2.one * 0.5f);
+        return _checkmarkSprite;
+    }
 }
 
 /// <summary>
@@ -862,7 +958,7 @@ public class VRDropdown : MonoBehaviour
     private class OptionRef
     {
         public Image background;
-        public TextMeshProUGUI checkmark;
+        public Image checkmark;
         public Color themeColor;
     }
     private Dictionary<int, OptionRef> _optionRefs = new Dictionary<int, OptionRef>();
@@ -881,7 +977,7 @@ public class VRDropdown : MonoBehaviour
         _onValueChanged = onValueChanged;
     }
 
-    public void RegisterOption(int index, Image background, TextMeshProUGUI checkmark, Color themeColor)
+    public void RegisterOption(int index, Image background, Image checkmark, Color themeColor)
     {
         _optionRefs[index] = new OptionRef
         {
@@ -929,7 +1025,8 @@ public class VRDropdown : MonoBehaviour
             }
             if (optRef.checkmark != null)
             {
-                optRef.checkmark.color = optRef.themeColor;
+                // Checkmark với màu sáng (lerp với white)
+                optRef.checkmark.color = Color.Lerp(optRef.themeColor, Color.white, 0.8f);
             }
         }
     }

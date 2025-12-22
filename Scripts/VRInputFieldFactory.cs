@@ -22,7 +22,7 @@ public static class VRInputFieldFactory
     // Hằng số layout
     private const float FONT_TO_BOX_RATIO = 2.2f;      // Tỷ lệ font size -> box height
     private const float LABEL_HEIGHT = 32f;            // Chiều cao label cố định
-    private const float HORIZONTAL_PADDING = 40f;      // Padding trái/phải cho text
+    private const float HORIZONTAL_PADDING = 60f;      // Padding trái/phải cho text
     private const float VERTICAL_PADDING = 8f;         // Padding trên/dưới cho text
 
     /// <summary>
@@ -45,11 +45,11 @@ public static class VRInputFieldFactory
         public int characterLimit = 0;
 
         // Visual settings
-        public float cornerRadius = 0.25f;
-        public float edgePadding = 0.15f;
-        public float backgroundAlpha = 0.15f;
-        public float borderWidth = 0.1f;
-        public float glowWidth = 0.075f;
+        public float cornerRadius = 0.126f;
+        public float edgePadding = 0.12f;
+        public float backgroundAlpha = 0.08f;
+        public float borderWidth = 0.09f;
+        public float glowWidth = 0.04f;
         public float glowIntensity = 2.5f;
 
         // Animation
@@ -92,7 +92,7 @@ public static class VRInputFieldFactory
             labelRT.anchorMin = new Vector2(0f, 1f);
             labelRT.anchorMax = new Vector2(1f, 1f);
             labelRT.pivot = new Vector2(0f, 1f);
-            labelRT.anchoredPosition = new Vector2(15f, -LABEL_HEIGHT * 0.5f);
+            labelRT.anchoredPosition = new Vector2(HORIZONTAL_PADDING / 2f, -LABEL_HEIGHT * 0.5f);
             labelRT.sizeDelta = new Vector2(-10f, LABEL_HEIGHT);
 
             TextMeshProUGUI labelTxt = labelObj.AddComponent<TextMeshProUGUI>();
@@ -137,12 +137,13 @@ public static class VRInputFieldFactory
         int vrLayer = LayerMask.NameToLayer(config.layerName);
         if (vrLayer != -1) hitArea.layer = vrLayer;
 
-        // 5. Visuals - container cho visual elements (bằng kích thước HitArea)
+        // 5. Visuals - container cho visual elements với expansion (giống VRButtonFactory)
         GameObject visuals = new GameObject("Visuals");
         visuals.transform.SetParent(hitArea.transform, false);
         RectTransform visRT = visuals.AddComponent<RectTransform>();
-        visRT.anchorMin = Vector2.zero;
-        visRT.anchorMax = Vector2.one;
+        float expansion = config.edgePadding;
+        visRT.anchorMin = new Vector2(-expansion, -expansion);
+        visRT.anchorMax = new Vector2(1f + expansion, 1f + expansion);
         visRT.offsetMin = Vector2.zero;
         visRT.offsetMax = Vector2.zero;
 
@@ -279,7 +280,7 @@ public static class VRInputFieldFactory
         {
             Material mat = new Material(glassShader);
             mat.SetFloat("_CornerRadius", config.cornerRadius);
-            mat.SetFloat("_EdgePadding", 0f);
+            mat.SetFloat("_EdgePadding", config.edgePadding);
             mat.SetFloat("_Aspect", aspect);
             mat.SetColor("_ColorA", new Color(col.r, col.g, col.b, config.backgroundAlpha * 1.5f));
             mat.SetColor("_ColorB", new Color(col.r, col.g, col.b, config.backgroundAlpha * 0.5f));
@@ -315,7 +316,7 @@ public static class VRInputFieldFactory
         {
             Material mat = new Material(glowShader);
             mat.SetFloat("_Aspect", aspect);
-            mat.SetFloat("_EdgePadding", 0f);
+            mat.SetFloat("_EdgePadding", config.edgePadding);
             mat.SetFloat("_CornerRadius", config.cornerRadius);
 
             Color borderGlowCol = Color.Lerp(col, Color.white, 0.75f);
@@ -338,8 +339,14 @@ public static class VRInputFieldFactory
         GameObject content = new GameObject("Content");
         content.transform.SetParent(parent, false);
         RectTransform cRT = content.AddComponent<RectTransform>();
-        cRT.anchorMin = Vector2.zero;
-        cRT.anchorMax = Vector2.one;
+
+        // Compensate for Visuals expansion để Content nằm đúng vị trí HitArea gốc
+        float e = config.edgePadding;
+        float totalSize = 1f + 2f * e; // Visuals size ratio
+        float normalizedMin = e / totalSize;
+        float normalizedMax = (1f + e) / totalSize;
+        cRT.anchorMin = new Vector2(normalizedMin, normalizedMin);
+        cRT.anchorMax = new Vector2(normalizedMax, normalizedMax);
         cRT.offsetMin = Vector2.zero;
         cRT.offsetMax = Vector2.zero;
 

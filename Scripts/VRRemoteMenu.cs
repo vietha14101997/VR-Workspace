@@ -68,6 +68,7 @@ public class VRRemoteMenu : MonoBehaviour
 
         // Layout heights
         float headerH = containerHeight * 0.1f;
+        float connectButtonH = containerHeight * 0.125f;
         float gap = containerHeight * 0.04f;
         float gridH = dropdownH * 2 + gap;
 
@@ -78,10 +79,10 @@ public class VRRemoteMenu : MonoBehaviour
         CreateHeader(parent, 0, y, containerWidth, headerH);
 
         // Separator 1 position (between Header and InputRow)
-        float sep1Y = y - gap * 1.5f;
+        float sep1Y = y - gap * 1.25f;
 
         float bodyContainerHeight = containerHeight - 2f * headerH;
-        y -= 2.5f * gap + bodyContainerHeight;
+        y -= 2.25f * gap + bodyContainerHeight;
         var bodyContainer = CreateContainer(parent, "BodyContainer", 0, y, containerWidth, bodyContainerHeight);
 
         // Input Row (Host / Port) - chiều cao tự động
@@ -93,11 +94,11 @@ public class VRRemoteMenu : MonoBehaviour
         float sep2Y = y + bodyY - gap * 1.5f;
 
         // Grid 2x2 (Monitors, Resolution, Bitrate, FPS)
-        bodyY -= gap * 3f + gridH;
-        CreateGrid(bodyContainer.transform, 0, bodyY, contentW, 0.04f * contentW, dropdownH, gap * 1.5f, gap * 1.25f);
+        bodyY -= gap * 2.5f + gridH;
+        CreateGrid(bodyContainer.transform, 0, bodyY, contentW, 0.04f * contentW, dropdownH, gap * 1.5f, gap);
 
         // Button Connect
-        CreateConnectButton(parent, contentW * 0.375f, headerH);
+        CreateConnectButton(parent, contentW * 0.625f, connectButtonH);
 
         // Configure horizontal separators via shader (using VRMenuFrame)
         // Separator 2 length = contentW / containerWidth (content area ratio)
@@ -105,7 +106,7 @@ public class VRRemoteMenu : MonoBehaviour
         ConfigureHorizontalSeparators(containerHeight, sep1Y, sep2Y, separatorLength);
     }
 
-    void ConfigureHorizontalSeparators(float containerHeight, float sep1Y, float sep2Y, float length = 1f)
+    void ConfigureHorizontalSeparators(float containerHeight, float sep1Y, float sep2Y, float sep2Length = 1f)
     {
         if (_menuFrame == null) return;
 
@@ -126,9 +127,12 @@ public class VRRemoteMenu : MonoBehaviour
         float sep1UV = sep1FrameY / frameLogicalHeight;
         float sep2UV = sep2FrameY / frameLogicalHeight;
 
-        // Set horizontal separators in shader
+        // Set horizontal separators in shader with different lengths
+        // Separator 1: full width (1f)
+        // Separator 2: custom length (sep2Length)
         Vector4 positions = new Vector4(sep1UV, sep2UV, 0, 0);
-        _menuFrame.SetHorizontalSeparators(2, positions, 0.003f, 0.012f, 0.9f, length);
+        Vector4 lengths = new Vector4(1f, sep2Length, 1f, 1f);
+        _menuFrame.SetHorizontalSeparators(2, positions, 0.003f, 0.012f, 0.9f, lengths);
     }
 
     void DisableHorizontalSeparators()
@@ -171,9 +175,8 @@ public class VRRemoteMenu : MonoBehaviour
         CreateButton(header.transform, 0, 0, backW, h, "Back", LoadIcon("back"), themeColor,
             () => OnBackClicked?.Invoke());
 
-        // Title
-        float titleX = backW + 35f;
-        CreateLabel(header.transform, titleX, 0, w - titleX - 110f, h, "VR Remote Menu", 48, Color.white, true, TextAlignmentOptions.Left);
+        // Title - căn giữa tuyệt đối trong header
+        CreateLabel(header.transform, 0, 0, w, h, "Remote Desktop", 48, Color.white, true, TextAlignmentOptions.Center);
 
         // QR button
         float qrSize = 100f;
@@ -192,7 +195,7 @@ public class VRRemoteMenu : MonoBehaviour
         // Host Input - chiều cao tự động từ font size
         _hostInput = VRInputFieldFactory.CreateLabeledInputField(
             row.transform, hostW,
-            "Host", "192.168.1.10", themeColor,
+            "Host", "192.168.1.10", accentColor,
             onEndEdit: (value) => Debug.Log("Host: " + value),
             labelFontSize: LABEL_FONT_SIZE, inputFontSize: INPUT_FONT_SIZE, font: customFont);
         PositionElement(_hostInput, 0, 0);
@@ -200,7 +203,7 @@ public class VRRemoteMenu : MonoBehaviour
         // Port Input - chiều cao tự động từ font size
         _portInput = VRInputFieldFactory.CreateLabeledInputField(
             row.transform, portW,
-            "Port", "9000", accentColor,
+            "Port", "9000", themeColor,
             onEndEdit: (value) => Debug.Log("Port: " + value),
             labelFontSize: LABEL_FONT_SIZE, inputFontSize: INPUT_FONT_SIZE, font: customFont,
             contentType: TMPro.TMP_InputField.ContentType.IntegerNumber);
@@ -215,7 +218,8 @@ public class VRRemoteMenu : MonoBehaviour
         float cellW = (w - gapX) / 2f;
 
         // Dropdown options
-        var monitorOptions = new List<string> { "1 Monitor", "2 Monitors", "3 Monitors", "4 Monitors" };
+        var monitorOptions = new List<string> { "1 Monitor", "2 Monitors", "All" };
+        var monitorIcons = new List<Sprite> { LoadIcon("monitor"), LoadIcon("monitor"), LoadIcon("extra_1") };
         var resolutionOptions = new List<string> { "1920 x 1080", "2560 x 1440", "3840 x 2160", "1280 x 720" };
         var bitrateOptions = new List<string> { "5 Mbps", "10 Mbps", "20 Mbps", "30 Mbps", "50 Mbps" };
         var fpsOptions = new List<string> { "30 FPS", "45 FPS", "60 FPS", "75 FPS", "90 FPS", "120 FPS", "144 FPS" };
@@ -223,10 +227,10 @@ public class VRRemoteMenu : MonoBehaviour
         // Row 1 (top) - Monitors và Resolution
         float row1Y = dropdownH + gapY;
 
-        _monitorsDropdown = VRDropdownFactory.CreateIconDropdown(
+        _monitorsDropdown = VRDropdownFactory.CreateIconDropdownWithOptionIcons(
             grid.transform, cellW,
             "Monitors", LoadIcon("monitor"), themeColor,
-            monitorOptions, 0,
+            monitorOptions, monitorIcons, 0,
             onValueChanged: (index, value) => Debug.Log("Monitor: " + value),
             labelFontSize: DROPDOWN_LABEL_FONT_SIZE, valueFontSize: DROPDOWN_VALUE_FONT_SIZE, font: customFont);
         PositionElement(_monitorsDropdown, 0, row1Y);
@@ -242,7 +246,7 @@ public class VRRemoteMenu : MonoBehaviour
         // Row 2 (bottom) - Bitrate và FPS
         _bitrateDropdown = VRDropdownFactory.CreateIconDropdown(
             grid.transform, cellW,
-            "Bitrate", LoadIcon("bitrate"), themeColor,
+            "Bitrate", LoadIcon("bitrate"), accentColor,
             bitrateOptions, 1,
             onValueChanged: (index, value) => Debug.Log("Bitrate: " + value),
             labelFontSize: DROPDOWN_LABEL_FONT_SIZE, valueFontSize: DROPDOWN_VALUE_FONT_SIZE, font: customFont);
@@ -250,7 +254,7 @@ public class VRRemoteMenu : MonoBehaviour
 
         _fpsDropdown = VRDropdownFactory.CreateIconDropdown(
             grid.transform, cellW,
-            "FPS", LoadIcon("fps"), accentColor,
+            "FPS", LoadIcon("fps"), themeColor,
             fpsOptions, 1,
             onValueChanged: (index, value) => Debug.Log("FPS: " + value),
             labelFontSize: DROPDOWN_LABEL_FONT_SIZE, valueFontSize: DROPDOWN_VALUE_FONT_SIZE, font: customFont);
@@ -300,7 +304,7 @@ public class VRRemoteMenu : MonoBehaviour
             horizontalLayout = hasIcon && hasText,
             iconSize = hasIcon && !hasText ? 44f : 44f,
             iconPadding = hasIcon && hasText ? 64f : 28f,
-            backgroundAlpha = 0.28f,
+            backgroundAlpha = 0.08f,
             borderWidth = 0.04f,
             popAmount = 0.0125f
         };
@@ -315,22 +319,27 @@ public class VRRemoteMenu : MonoBehaviour
 
     void CreateConnectButton(Transform parent, float w, float h)
     {
-        Color gradCol = Color.Lerp(themeColor, accentColor, 0.45f);
-
         var config = new VRButtonFactory.ButtonConfig
         {
             label = "CONNECT",
-            themeColor = gradCol,
+            themeColor = themeColor,
             width = w,
             height = h,
-            fontSize = 58,
+            fontSize = 48,
             font = customFont,
             textOnly = true,
-            backgroundAlpha = 0.50f,
-            glowIntensity = 5f,
+            backgroundAlpha = 0.85f,
+            cornerRadius = 0.15f,
+            edgePadding = 0.08f,
             enablePulse = true,
             pulseSpeed = 1.8f,
-            popAmount = 0.05f
+            popAmount = 0.05f,
+            // Sử dụng shader đặc biệt cho Connect Button
+            // Gradient 3 màu: Cyan -> Deep Sea Blue -> Purple
+            useConnectButtonShader = true,
+            connectColorA = themeColor,  // Cyan
+            connectColorB = new Color(0.1f, 0.5f, 0.85f), // Deep Sea Blue
+            connectColorC = accentColor  // Purple
         };
 
         var btn = VRButtonFactory.CreateButton(parent, config, () => OnConnectClicked?.Invoke());

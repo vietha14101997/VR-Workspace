@@ -69,6 +69,12 @@ public static class VRButtonFactory
         // Frameless mode (chỉ có icon, không có background và border)
         public bool frameless = false;
 
+        // Special Connect Button shader (all-in-one gradient + glow + shimmer)
+        public bool useConnectButtonShader = false;
+        public Color connectColorA = new Color(0.2f, 0.9f, 1f);  // Cyan
+        public Color connectColorB = new Color(0.1f, 0.4f, 0.8f); // Deep Sea Blue
+        public Color connectColorC = new Color(0.7f, 0.3f, 1f);  // Purple
+
         // Layer
         public string layerName = "VirtualObjects";
     }
@@ -128,6 +134,21 @@ public static class VRButtonFactory
             bgImg = visuals.AddComponent<Image>();
             bgImg.color = Color.clear;
             bgImg.raycastTarget = false;
+        }
+        else if (config.useConnectButtonShader)
+        {
+            // Special Connect Button: all-in-one shader with gradient + glow + shimmer
+            float expansion = config.edgePadding;
+            visRT.anchorMin = new Vector2(-expansion, -expansion);
+            visRT.anchorMax = new Vector2(1f + expansion, 1f + expansion);
+            visRT.offsetMin = Vector2.zero;
+            visRT.offsetMax = Vector2.zero;
+
+            // Single layer with Connect Button shader (combines background + border)
+            bgImg = CreateConnectButtonBackground(visuals.transform, config);
+
+            // Content (Text)
+            CreateContent(visuals.transform, config);
         }
         else
         {
@@ -312,6 +333,104 @@ public static class VRButtonFactory
         else
         {
             img.color = new Color(col.r, col.g, col.b, config.backgroundAlpha);
+        }
+
+        return img;
+    }
+
+    /// <summary>
+    /// Tạo background cho Connect Button với shader đặc biệt (gradient + glow + shimmer)
+    /// </summary>
+    private static Image CreateConnectButtonBackground(Transform parent, ButtonConfig config)
+    {
+        GameObject bgObj = new GameObject("ConnectBackground");
+        bgObj.transform.SetParent(parent, false);
+        RectTransform rt = bgObj.AddComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+
+        Image img = bgObj.AddComponent<Image>();
+        img.sprite = GetPixelSprite();
+        img.raycastTarget = false;
+
+        float aspect = config.width / config.height;
+
+        // Try to find the shader first
+        Shader connectShader = Shader.Find("Custom/GlowingConnectButton");
+
+        // Load base material from Resources and clone it
+        Material baseMat = Resources.Load<Material>("GlowingConnectButton");
+
+        // Create material - prefer from shader directly for reliability
+        Material mat = null;
+        if (connectShader != null)
+        {
+            mat = new Material(connectShader);
+        }
+        else if (baseMat != null && baseMat.shader != null && baseMat.shader.name != "Hidden/InternalErrorShader")
+        {
+            mat = new Material(baseMat);
+        }
+
+        if (mat != null)
+        {
+
+            // Border settings
+            mat.SetFloat("_EdgePadding", config.edgePadding);
+            mat.SetFloat("_BorderWidth", 0.02f);
+            mat.SetFloat("_CornerRadius", config.cornerRadius);
+            mat.SetFloat("_Aspect", aspect);
+
+            // Gradient colors (3-color: 35% Cyan -> 35% Deep Sea Blue -> 30% Purple)
+            mat.SetColor("_ColorA", config.connectColorA);
+            mat.SetColor("_ColorB", config.connectColorB);
+            mat.SetColor("_ColorC", config.connectColorC);
+            mat.SetFloat("_GradientAngle", 0f);
+            mat.SetFloat("_MidPoint1", 0.35f);  // Cyan zone ends at 35%
+            mat.SetFloat("_MidPoint2", 0.70f);  // Blue zone ends at 70% (35%+35%)
+
+            // Background
+            mat.SetFloat("_BgAlpha", config.backgroundAlpha);
+            mat.SetFloat("_BgGradientStrength", 1.0f);
+
+            // Glow layers
+            mat.SetFloat("_Layer1Alpha", 1.5f);
+            mat.SetFloat("_Layer2Alpha", 1.0f);
+            mat.SetFloat("_Layer3Alpha", 0.5f);
+            mat.SetFloat("_Layer4Alpha", 0.25f);
+
+            // Pulse animation
+            mat.SetFloat("_PulseEnabled", config.enablePulse ? 1f : 0f);
+            mat.SetFloat("_PulseSpeed", config.pulseSpeed);
+            mat.SetFloat("_PulseIntensity", 0.2f);
+
+            // Shimmer effect
+            mat.SetFloat("_ShimmerEnabled", 1f);
+            mat.SetFloat("_ShimmerSpeed", 0.5f);
+            mat.SetFloat("_ShimmerWidth", 0.15f);
+            mat.SetFloat("_ShimmerIntensity", 1.0f);
+
+            // Inner glow
+            mat.SetFloat("_InnerGlowEnabled", 1f);
+            mat.SetFloat("_InnerGlowWidth", 0.08f);
+            mat.SetFloat("_InnerGlowAlpha", 0.3f);
+
+            img.material = mat;
+            img.color = Color.white;
+
+            // Add ripple effect
+            bgObj.AddComponent<VRButtonRipple>().Initialize(mat, img);
+        }
+        else
+        {
+            // Fallback nếu không tìm thấy shader hoặc material
+            Debug.LogError("[VRButtonFactory] GlowingConnectButton shader/material not found! Shader.Find returned: " +
+                (connectShader != null ? connectShader.name : "null"));
+            Color fallbackColor = Color.Lerp(config.connectColorA, config.connectColorB, 0.5f);
+            fallbackColor.a = config.backgroundAlpha;
+            img.color = fallbackColor;
         }
 
         return img;

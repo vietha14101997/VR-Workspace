@@ -59,7 +59,8 @@ Shader "Custom/GlowingGlassBorder"
         _HSeparatorWidth ("H Separator Width", Range(0.001, 0.02)) = 0.004
         _HSeparatorGlowWidth ("H Separator Glow Width", Range(0.001, 0.05)) = 0.015
         _HSeparatorAlpha ("H Separator Alpha", Range(0, 1)) = 0.8
-        _HSeparatorLength ("H Separator Length", Range(0, 1)) = 1.0
+        _HSeparatorLength ("H Separator Length (deprecated)", Range(0, 1)) = 1.0
+        _HSeparatorLengths ("H Separator Lengths (per separator)", Vector) = (1, 1, 1, 1)
 
         // UI Masking
         _StencilComp ("Stencil Comparison", Float) = 8
@@ -178,7 +179,8 @@ Shader "Custom/GlowingGlassBorder"
             float _HSeparatorWidth;
             float _HSeparatorGlowWidth;
             float _HSeparatorAlpha;
-            float _HSeparatorLength;
+            float _HSeparatorLength; // deprecated, use _HSeparatorLengths
+            float4 _HSeparatorLengths; // Individual lengths per separator
 
             float _Aspect; // Aspect Ratio
 
@@ -356,20 +358,9 @@ Shader "Custom/GlowingGlassBorder"
                 // Check if separator count is 0
                 if (_HSeparatorCount < 0.5) return float4(0, 0, 0, 0);
 
-                // Calculate separator extent based on length (0-1)
-                // length = 1 means full width, length = 0.5 means half width, centered at x = 0.5
                 float centerX = 0.5;
                 float fullHalfWidth = centerX - padding; // Full half-width of content area
-                float sepHalfWidth = fullHalfWidth * _HSeparatorLength; // Actual separator half-width
                 float distFromCenter = abs(uv.x - centerX);
-
-                // Check if outside separator extent
-                if (distFromCenter > sepHalfWidth) return float4(0, 0, 0, 0);
-
-                // Horizontal edge fade: alpha = 1 at center, smoothly fading to 0 at edges
-                // Smooth fade from center (1.0) to edge (0.0)
-                float normalizedDist = saturate(distFromCenter / sepHalfWidth);
-                float hEdgeFade = 1.0 - pow(normalizedDist, 2.0); // Quadratic falloff
 
                 float4 totalLayers = float4(0, 0, 0, 0);
 
@@ -378,15 +369,27 @@ Shader "Custom/GlowingGlassBorder"
                 {
                     if (i >= (int)_HSeparatorCount) break;
 
-                    // Get separator position from vector component
+                    // Get separator position and length from vector components
                     float sepPos = 0.0;
-                    if (i == 0) sepPos = _HSeparatorPositions.x;
-                    else if (i == 1) sepPos = _HSeparatorPositions.y;
-                    else if (i == 2) sepPos = _HSeparatorPositions.z;
-                    else sepPos = _HSeparatorPositions.w;
+                    float sepLength = 1.0;
+                    if (i == 0) { sepPos = _HSeparatorPositions.x; sepLength = _HSeparatorLengths.x; }
+                    else if (i == 1) { sepPos = _HSeparatorPositions.y; sepLength = _HSeparatorLengths.y; }
+                    else if (i == 2) { sepPos = _HSeparatorPositions.z; sepLength = _HSeparatorLengths.z; }
+                    else { sepPos = _HSeparatorPositions.w; sepLength = _HSeparatorLengths.w; }
 
                     // Skip if position is 0 (unset)
                     if (sepPos < 0.01) continue;
+
+                    // Calculate separator extent based on individual length (0-1)
+                    // length = 1 means full width, length = 0.5 means half width, centered at x = 0.5
+                    float sepHalfWidth = fullHalfWidth * sepLength;
+
+                    // Check if outside this separator's extent
+                    if (distFromCenter > sepHalfWidth) continue;
+
+                    // Horizontal edge fade: alpha = 1 at center, smoothly fading to 0 at edges
+                    float normalizedDist = saturate(distFromCenter / sepHalfWidth);
+                    float hEdgeFade = 1.0 - pow(normalizedDist, 2.0); // Quadratic falloff
 
                     // Calculate distance to separator (Y axis for horizontal line)
                     float distToSep = abs(uv.y - sepPos);
