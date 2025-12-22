@@ -59,10 +59,10 @@ public static class VRDropdownFactory
         public float glowWidth = 0.04f;
         public float glowIntensity = 2.5f;
 
-        // Glassmorphism settings (like VRMenuFrame)
+        // Glassmorphism settings (uses GlassGradientBackgroundOverlay with higher Queue)
         public bool enableGlassmorphism = true;
-        public float blurIntensity = 2f;
-        public int blurQuality = 3;
+        public float blurIntensity = 6;
+        public int blurQuality = 4;
         public float glassOpacity = 0f;
         public float tintStrength = 0.1f;
         public float innerGlow = 0f;
@@ -336,14 +336,14 @@ public static class VRDropdownFactory
             mat.SetFloat("_FresnelStrength", 0.12f);
 
             // Glassmorphism settings (like VRMenuFrame)
-            mat.SetFloat("_BlurEnabled", config.enableGlassmorphism ? 1f : 0f);
-            mat.SetFloat("_BlurRadius", config.blurIntensity);
-            mat.SetFloat("_BlurIterations", config.blurQuality);
-            mat.SetFloat("_GlassOpacity", config.glassOpacity);
-            mat.SetFloat("_TintStrength", config.tintStrength);
-            mat.SetFloat("_InnerGlow", config.innerGlow);
-            mat.SetFloat("_Brightness", config.brightness);
-            mat.SetFloat("_Saturation", config.saturation);
+            mat.SetFloat("_BlurEnabled", 0f);
+            // mat.SetFloat("_BlurRadius", config.blurIntensity);
+            // mat.SetFloat("_BlurIterations", config.blurQuality);
+            // mat.SetFloat("_GlassOpacity", config.glassOpacity);
+            // mat.SetFloat("_TintStrength", config.tintStrength);
+            // mat.SetFloat("_InnerGlow", config.innerGlow);
+            // mat.SetFloat("_Brightness", config.brightness);
+            // mat.SetFloat("_Saturation", config.saturation);
 
             img.material = mat;
             img.color = Color.white;
@@ -655,6 +655,7 @@ public static class VRDropdownFactory
         CreateViewportBorder(viewportVisuals.transform, config, panelHeight);
 
         // Content container (inside Viewport, compensated for Visuals expansion)
+        // Uses nested Canvas with higher sorting order so content renders AFTER glassmorphism background
         GameObject viewportContent = new GameObject("Content");
         viewportContent.transform.SetParent(viewport.transform, false);
         RectTransform viewportContentRT = viewportContent.AddComponent<RectTransform>();
@@ -662,6 +663,12 @@ public static class VRDropdownFactory
         viewportContentRT.anchorMax = Vector2.one;
         viewportContentRT.offsetMin = new Vector2(10, 10);
         viewportContentRT.offsetMax = new Vector2(-10, -10);
+
+        // Nested Canvas to ensure content renders AFTER the glassmorphism GrabPass
+        Canvas contentCanvas = viewportContent.AddComponent<Canvas>();
+        contentCanvas.overrideSorting = true;
+        contentCanvas.sortingOrder = 110; // Higher than panel's 100, after Overlay shader Queue
+        viewportContent.AddComponent<GraphicRaycaster>();
 
         // Use RectMask2D on Content instead of Viewport for better VR compatibility
         RectMask2D rectMask = viewportContent.AddComponent<RectMask2D>();
@@ -739,16 +746,17 @@ public static class VRDropdownFactory
         float adjustedCornerRadius = config.cornerRadius * heightRatio;
         float adjustedEdgePadding = config.edgePadding * heightRatio;
 
-        // Use GlassGradientBackground with Glassmorphism (like VRMenuFrame)
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
-        if (glassShader != null)
+        // Use GlassGradientBackgroundOverlay for dropdown panel (higher render queue)
+        // This ensures GrabPass captures VRMenuFrame and other UI behind it
+        Shader overlayShader = Shader.Find("Custom/GlassGradientBackgroundOverlay");
+        if (overlayShader != null)
         {
-            Material mat = new Material(glassShader);
+            Material mat = new Material(overlayShader);
             mat.SetFloat("_CornerRadius", adjustedCornerRadius);
             mat.SetFloat("_EdgePadding", adjustedEdgePadding);
             mat.SetFloat("_Aspect", aspect);
 
-            // Gradient colors based on theme color (slightly more opaque for panel)
+            // Gradient colors based on theme color
             Color colorA = new Color(col.r * 0.8f, col.g * 0.9f, col.b, config.backgroundAlpha * 1.8f);
             Color colorB = new Color(col.r, col.g * 0.7f, col.b * 0.9f, config.backgroundAlpha * 1.5f);
             mat.SetColor("_ColorA", colorA);
@@ -760,7 +768,7 @@ public static class VRDropdownFactory
             mat.SetFloat("_FresnelPower", 2.2f);
             mat.SetFloat("_FresnelStrength", 0.12f);
 
-            // Glassmorphism settings (like VRMenuFrame)
+            // Glassmorphism settings
             mat.SetFloat("_BlurEnabled", config.enableGlassmorphism ? 1f : 0f);
             mat.SetFloat("_BlurRadius", config.blurIntensity);
             mat.SetFloat("_BlurIterations", config.blurQuality);
@@ -775,7 +783,25 @@ public static class VRDropdownFactory
         }
         else
         {
-            img.color = new Color(col.r, col.g, col.b, config.backgroundAlpha);
+            // Fallback to regular shader
+            Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
+            if (glassShader != null)
+            {
+                Material mat = new Material(glassShader);
+                mat.SetFloat("_CornerRadius", adjustedCornerRadius);
+                mat.SetFloat("_EdgePadding", adjustedEdgePadding);
+                mat.SetFloat("_Aspect", aspect);
+                mat.SetColor("_ColorA", new Color(col.r, col.g, col.b, config.backgroundAlpha * 1.5f));
+                mat.SetColor("_ColorB", new Color(col.r, col.g, col.b, config.backgroundAlpha));
+                mat.SetFloat("_GlassAlpha", config.backgroundAlpha);
+                mat.SetFloat("_BlurEnabled", 0f);
+                img.material = mat;
+                img.color = Color.white;
+            }
+            else
+            {
+                img.color = new Color(col.r, col.g, col.b, config.backgroundAlpha);
+            }
         }
     }
 
@@ -894,16 +920,21 @@ public static class VRDropdownFactory
         checkImg.sprite = GetCheckmarkSprite();
         checkImg.preserveAspect = true;
         checkImg.raycastTarget = false;
-        checkImg.color = isSelected ? Color.Lerp(config.themeColor, Color.white, 0.8f) : Color.clear;
+        checkImg.color = isSelected ? Color.white : Color.clear; // Full white when selected
 
         // Glow effect for checkmark when selected
         if (isSelected)
         {
-            Color glowCol = Color.Lerp(config.themeColor, Color.white, 0.6f);
-            glowCol.a = 0.5f;
+            Color glowCol = Color.Lerp(config.themeColor, Color.white, 0.8f);
+            glowCol.a = 0.7f;
             Shadow checkShadow = checkObj.AddComponent<Shadow>();
             checkShadow.effectColor = glowCol;
             checkShadow.effectDistance = new Vector2(2f, -2f);
+
+            // Second shadow for stronger glow
+            Shadow checkShadow2 = checkObj.AddComponent<Shadow>();
+            checkShadow2.effectColor = new Color(glowCol.r, glowCol.g, glowCol.b, 0.4f);
+            checkShadow2.effectDistance = new Vector2(-1.5f, 1.5f);
         }
 
         // Icon
@@ -922,7 +953,14 @@ public static class VRDropdownFactory
             iconImg.sprite = optionIcon;
             iconImg.preserveAspect = true;
             iconImg.raycastTarget = false;
-            iconImg.color = Color.Lerp(config.themeColor, Color.white, 0.85f);
+            iconImg.color = Color.white; // Full white for maximum visibility
+
+            // Glow effect for icon visibility
+            Color iconGlowCol = Color.Lerp(config.themeColor, Color.white, 0.7f);
+            iconGlowCol.a = 0.6f;
+            Shadow iconShadow = iconObj.AddComponent<Shadow>();
+            iconShadow.effectColor = iconGlowCol;
+            iconShadow.effectDistance = new Vector2(1.5f, -1.5f);
         }
 
         // Text
@@ -936,12 +974,18 @@ public static class VRDropdownFactory
 
         TextMeshProUGUI txt = txtObj.AddComponent<TextMeshProUGUI>();
         txt.text = optionText;
-        txt.fontSize = config.valueFontSize * 0.8f;
+        txt.fontSize = config.valueFontSize * 0.85f;
         txt.color = Color.white;
+        txt.fontStyle = FontStyles.Bold; // Bold for better visibility
         txt.alignment = TextAlignmentOptions.Left;
         txt.verticalAlignment = VerticalAlignmentOptions.Middle;
         txt.raycastTarget = false;
         if (config.font != null) txt.font = config.font;
+
+        // Text glow for contrast against blurred background
+        Shadow txtShadow = txtObj.AddComponent<Shadow>();
+        txtShadow.effectColor = new Color(0f, 0f, 0f, 0.5f);
+        txtShadow.effectDistance = new Vector2(1f, -1f);
 
         // Click handler
         int capturedIndex = index;
@@ -1210,8 +1254,8 @@ public class VRDropdown : MonoBehaviour
             }
             if (optRef.checkmark != null)
             {
-                // Checkmark với màu sáng (lerp với white)
-                optRef.checkmark.color = Color.Lerp(optRef.themeColor, Color.white, 0.8f);
+                // Full white for maximum visibility
+                optRef.checkmark.color = Color.white;
             }
         }
     }
