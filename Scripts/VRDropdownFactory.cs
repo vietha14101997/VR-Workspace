@@ -59,6 +59,16 @@ public static class VRDropdownFactory
         public float glowWidth = 0.04f;
         public float glowIntensity = 2.5f;
 
+        // Glassmorphism settings (like VRMenuFrame)
+        public bool enableGlassmorphism = true;
+        public float blurIntensity = 2f;
+        public int blurQuality = 3;
+        public float glassOpacity = 0f;
+        public float tintStrength = 0.1f;
+        public float innerGlow = 0f;
+        public float brightness = 1f;
+        public float saturation = 1f;
+
         // Animation
         public float popAmount = 0.005f;
 
@@ -304,52 +314,43 @@ public static class VRDropdownFactory
         float aspect = config.width / config.BoxHeight;
         Color col = config.themeColor;
 
-        // Try new GlassNoiseBackground shader first, fallback to GlassGradientBackground
-        Shader noiseShader = Shader.Find("Custom/GlassNoiseBackground");
-        if (noiseShader != null)
+        // Use GlassGradientBackground with Glassmorphism (like VRMenuFrame)
+        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
+        if (glassShader != null)
         {
-            Material mat = new Material(noiseShader);
+            Material mat = new Material(glassShader);
             mat.SetFloat("_CornerRadius", config.cornerRadius);
             mat.SetFloat("_EdgePadding", config.edgePadding);
             mat.SetFloat("_Aspect", aspect);
-            mat.SetColor("_ThemeColor", col);
-            mat.SetFloat("_BaseAlpha", config.backgroundAlpha * 2f);
-            mat.SetFloat("_Darkness", 0.75f); // Overall darkness
-            // Center dark spread - tối ở tâm lan ra
-            mat.SetFloat("_CenterDarkness", 0.5f);
-            mat.SetFloat("_CenterSpread", 0.7f);
-            mat.SetFloat("_CenterPower", 1.2f);
-            // Subtle noise
-            mat.SetFloat("_NoiseScale", 4f);
-            mat.SetFloat("_NoiseStrength", 0.08f);
-            // Edge glow - sáng nhẹ ở viền
-            mat.SetFloat("_EdgeGlowWidth", 0.12f);
-            mat.SetFloat("_EdgeGlowIntensity", 0.15f);
-            // Corner highlights
-            mat.SetFloat("_CornerHighlight", 0.1f);
+
+            // Gradient colors based on theme color
+            Color colorA = new Color(col.r * 0.8f, col.g * 0.9f, col.b, config.backgroundAlpha * 1.5f);
+            Color colorB = new Color(col.r, col.g * 0.7f, col.b * 0.9f, config.backgroundAlpha * 1.2f);
+            mat.SetColor("_ColorA", colorA);
+            mat.SetColor("_ColorB", colorB);
+            mat.SetFloat("_GradientOffset", 0f);
+            mat.SetFloat("_GradientAngle", -10f);
+            mat.SetFloat("_CyanRatio", 0.7f);
+            mat.SetFloat("_GlassAlpha", config.backgroundAlpha);
+            mat.SetFloat("_FresnelPower", 2.2f);
+            mat.SetFloat("_FresnelStrength", 0.12f);
+
+            // Glassmorphism settings (like VRMenuFrame)
+            mat.SetFloat("_BlurEnabled", config.enableGlassmorphism ? 1f : 0f);
+            mat.SetFloat("_BlurRadius", config.blurIntensity);
+            mat.SetFloat("_BlurIterations", config.blurQuality);
+            mat.SetFloat("_GlassOpacity", config.glassOpacity);
+            mat.SetFloat("_TintStrength", config.tintStrength);
+            mat.SetFloat("_InnerGlow", config.innerGlow);
+            mat.SetFloat("_Brightness", config.brightness);
+            mat.SetFloat("_Saturation", config.saturation);
+
             img.material = mat;
             img.color = Color.white;
         }
         else
         {
-            // Fallback to old shader
-            Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
-            if (glassShader != null)
-            {
-                Material mat = new Material(glassShader);
-                mat.SetFloat("_CornerRadius", config.cornerRadius);
-                mat.SetFloat("_EdgePadding", config.edgePadding);
-                mat.SetFloat("_Aspect", aspect);
-                mat.SetColor("_ColorA", new Color(col.r, col.g, col.b, config.backgroundAlpha * 1.5f));
-                mat.SetColor("_ColorB", new Color(col.r, col.g, col.b, config.backgroundAlpha * 0.5f));
-                mat.SetFloat("_GlassAlpha", config.backgroundAlpha);
-                img.material = mat;
-                img.color = Color.white;
-            }
-            else
-            {
-                img.color = new Color(col.r, col.g, col.b, config.backgroundAlpha);
-            }
+            img.color = new Color(col.r, col.g, col.b, config.backgroundAlpha);
         }
 
         return img;
@@ -738,52 +739,43 @@ public static class VRDropdownFactory
         float adjustedCornerRadius = config.cornerRadius * heightRatio;
         float adjustedEdgePadding = config.edgePadding * heightRatio;
 
-        // Try new GlassNoiseBackground shader first, fallback to GlassGradientBackground
-        Shader noiseShader = Shader.Find("Custom/GlassNoiseBackground");
-        if (noiseShader != null)
+        // Use GlassGradientBackground with Glassmorphism (like VRMenuFrame)
+        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
+        if (glassShader != null)
         {
-            Material mat = new Material(noiseShader);
+            Material mat = new Material(glassShader);
             mat.SetFloat("_CornerRadius", adjustedCornerRadius);
             mat.SetFloat("_EdgePadding", adjustedEdgePadding);
             mat.SetFloat("_Aspect", aspect);
-            mat.SetColor("_ThemeColor", col);
-            mat.SetFloat("_BaseAlpha", config.backgroundAlpha * 2.5f); // More opaque for panel
-            mat.SetFloat("_Darkness", 0.7f);
-            // Center dark spread
-            mat.SetFloat("_CenterDarkness", 0.45f);
-            mat.SetFloat("_CenterSpread", 0.6f);
-            mat.SetFloat("_CenterPower", 1.3f);
-            // Subtle noise
-            mat.SetFloat("_NoiseScale", 3f);
-            mat.SetFloat("_NoiseStrength", 0.06f);
-            // Edge glow
-            mat.SetFloat("_EdgeGlowWidth", 0.1f);
-            mat.SetFloat("_EdgeGlowIntensity", 0.12f);
-            // Corner highlights
-            mat.SetFloat("_CornerHighlight", 0.08f);
+
+            // Gradient colors based on theme color (slightly more opaque for panel)
+            Color colorA = new Color(col.r * 0.8f, col.g * 0.9f, col.b, config.backgroundAlpha * 1.8f);
+            Color colorB = new Color(col.r, col.g * 0.7f, col.b * 0.9f, config.backgroundAlpha * 1.5f);
+            mat.SetColor("_ColorA", colorA);
+            mat.SetColor("_ColorB", colorB);
+            mat.SetFloat("_GradientOffset", 0f);
+            mat.SetFloat("_GradientAngle", -10f);
+            mat.SetFloat("_CyanRatio", 0.7f);
+            mat.SetFloat("_GlassAlpha", config.backgroundAlpha * 1.2f);
+            mat.SetFloat("_FresnelPower", 2.2f);
+            mat.SetFloat("_FresnelStrength", 0.12f);
+
+            // Glassmorphism settings (like VRMenuFrame)
+            mat.SetFloat("_BlurEnabled", config.enableGlassmorphism ? 1f : 0f);
+            mat.SetFloat("_BlurRadius", config.blurIntensity);
+            mat.SetFloat("_BlurIterations", config.blurQuality);
+            mat.SetFloat("_GlassOpacity", config.glassOpacity);
+            mat.SetFloat("_TintStrength", config.tintStrength);
+            mat.SetFloat("_InnerGlow", config.innerGlow);
+            mat.SetFloat("_Brightness", config.brightness);
+            mat.SetFloat("_Saturation", config.saturation);
+
             img.material = mat;
             img.color = Color.white;
         }
         else
         {
-            // Fallback to old shader
-            Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
-            if (glassShader != null)
-            {
-                Material mat = new Material(glassShader);
-                mat.SetFloat("_CornerRadius", adjustedCornerRadius);
-                mat.SetFloat("_EdgePadding", adjustedEdgePadding);
-                mat.SetFloat("_Aspect", aspect);
-                mat.SetColor("_ColorA", new Color(col.r, col.g, col.b, config.backgroundAlpha * 1.5f));
-                mat.SetColor("_ColorB", new Color(col.r, col.g, col.b, config.backgroundAlpha * 0.5f));
-                mat.SetFloat("_GlassAlpha", config.backgroundAlpha);
-                img.material = mat;
-                img.color = Color.white;
-            }
-            else
-            {
-                img.color = new Color(col.r, col.g, col.b, config.backgroundAlpha);
-            }
+            img.color = new Color(col.r, col.g, col.b, config.backgroundAlpha);
         }
     }
 

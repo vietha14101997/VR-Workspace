@@ -5,6 +5,11 @@ Shader "Custom/GlassNoiseBackground"
         [PerRendererData] _MainTex ("Sprite Texture", 2D) = "white" {}
         _Color ("Tint", Color) = (1,1,1,1)
 
+        [Header(Blur Effect)]
+        _BlurRadius ("Blur Radius", Range(0, 50)) = 25
+        _BlurIterations ("Blur Iterations", Range(1, 8)) = 4
+        _BlurAmount ("Blur Strength", Range(0, 1)) = 1.0
+
         [Header(Rounded Corners)]
         _CornerRadius ("Corner Radius (UV)", Range(0.01, 0.2)) = 0.07
         _EdgePadding ("Edge Padding (UV)", Range(0, 0.2)) = 0.05
@@ -69,6 +74,12 @@ Shader "Custom/GlassNoiseBackground"
         Blend SrcAlpha OneMinusSrcAlpha
         ColorMask [_ColorMask]
 
+        // GrabPass để capture background cho blur effect
+        GrabPass
+        {
+            "_GlassGrabTexture"
+        }
+
         Pass
         {
             Name "GlassNoiseBackground"
@@ -93,12 +104,20 @@ Shader "Custom/GlassNoiseBackground"
                 float4 vertex : SV_POSITION;
                 fixed4 color : COLOR;
                 float2 uv : TEXCOORD0;
+                float4 grabPos : TEXCOORD1;
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
             sampler2D _MainTex;
             float4 _MainTex_ST;
             fixed4 _Color;
+
+            // Blur variables
+            sampler2D _GlassGrabTexture;
+            float4 _GlassGrabTexture_TexelSize;
+            float _BlurRadius;
+            float _BlurIterations;
+            float _BlurAmount;
 
             float _CornerRadius;
             float _EdgePadding;
@@ -165,8 +184,69 @@ Shader "Custom/GlassNoiseBackground"
                 o.vertex = UnityObjectToClipPos(v.vertex);
                 o.uv = TRANSFORM_TEX(v.texcoord, _MainTex);
                 o.color = v.color * _Color;
+                o.grabPos = ComputeGrabScreenPos(o.vertex);
 
                 return o;
+            }
+
+            // ========== EXTREME BLUR FUNCTION ==========
+            // Dual Kawase blur - extremely efficient and strong blur
+            half4 KawaseBlurSample(float4 grabPos, float2 texelSize, float offset)
+            {
+                half4 col = half4(0, 0, 0, 0);
+
+                // Sample center
+                col += tex2Dproj(_GlassGrabTexture, grabPos);
+
+                // Sample 4 diagonal corners with offset
+                col += tex2Dproj(_GlassGrabTexture, grabPos + float4(texelSize.x * offset, texelSize.y * offset, 0, 0));
+                col += tex2Dproj(_GlassGrabTexture, grabPos + float4(-texelSize.x * offset, texelSize.y * offset, 0, 0));
+                col += tex2Dproj(_GlassGrabTexture, grabPos + float4(texelSize.x * offset, -texelSize.y * offset, 0, 0));
+                col += tex2Dproj(_GlassGrabTexture, grabPos + float4(-texelSize.x * offset, -texelSize.y * offset, 0, 0));
+
+                return col / 5.0;
+            }
+
+            // Multi-pass extreme blur
+            half4 ExtremeBlur(float4 grabPos)
+            {
+                float2 texelSize = _GlassGrabTexture_TexelSize.xy * _BlurRadius;
+                half4 blurColor = half4(0, 0, 0, 0);
+                float totalWeight = 0;
+
+                // Gaussian-like weights for smooth blur
+                float weights[8] = {1.0, 0.9, 0.8, 0.65, 0.5, 0.35, 0.2, 0.1};
+
+                int iterations = (int)_BlurIterations;
+
+                // Multi-ring sampling for extreme blur
+                for (int ring = 0; ring < iterations; ring++)
+                {
+                    float offset = (ring + 1) * 1.5;
+                    float weight = weights[ring];
+
+                    // 8 samples per ring (cardinal + diagonal)
+                    // Cardinals
+                    blurColor += tex2Dproj(_GlassGrabTexture, grabPos + float4(texelSize.x * offset, 0, 0, 0)) * weight;
+                    blurColor += tex2Dproj(_GlassGrabTexture, grabPos + float4(-texelSize.x * offset, 0, 0, 0)) * weight;
+                    blurColor += tex2Dproj(_GlassGrabTexture, grabPos + float4(0, texelSize.y * offset, 0, 0)) * weight;
+                    blurColor += tex2Dproj(_GlassGrabTexture, grabPos + float4(0, -texelSize.y * offset, 0, 0)) * weight;
+
+                    // Diagonals
+                    float diagOffset = offset * 0.707; // sqrt(2)/2
+                    blurColor += tex2Dproj(_GlassGrabTexture, grabPos + float4(texelSize.x * diagOffset, texelSize.y * diagOffset, 0, 0)) * weight;
+                    blurColor += tex2Dproj(_GlassGrabTexture, grabPos + float4(-texelSize.x * diagOffset, texelSize.y * diagOffset, 0, 0)) * weight;
+                    blurColor += tex2Dproj(_GlassGrabTexture, grabPos + float4(texelSize.x * diagOffset, -texelSize.y * diagOffset, 0, 0)) * weight;
+                    blurColor += tex2Dproj(_GlassGrabTexture, grabPos + float4(-texelSize.x * diagOffset, -texelSize.y * diagOffset, 0, 0)) * weight;
+
+                    totalWeight += weight * 8;
+                }
+
+                // Add center sample
+                blurColor += tex2Dproj(_GlassGrabTexture, grabPos) * 1.0;
+                totalWeight += 1.0;
+
+                return blurColor / totalWeight;
             }
 
             fixed4 frag(v2f i) : SV_Target
@@ -180,6 +260,9 @@ Shader "Custom/GlassNoiseBackground"
                 // Alpha mask
                 float alphaMask = 1.0 - smoothstep(-0.01, 0.0, dist);
                 if (alphaMask <= 0.001) clip(-1);
+
+                // ========== EXTREME BLUR BACKGROUND ==========
+                half4 blurredBg = ExtremeBlur(i.grabPos);
 
                 // ========== CENTER DARKNESS ==========
                 // Distance from center (accounting for aspect ratio)
@@ -234,15 +317,22 @@ Shader "Custom/GlassNoiseBackground"
                 brightness = saturate(brightness);
 
                 // Apply to theme color
-                float3 finalColor = _ThemeColor.rgb * brightness;
+                float3 themeColor = _ThemeColor.rgb * brightness;
 
-                // Alpha
-                float alpha = _BaseAlpha;
-                alpha += _HoverAmount * 0.05;
-                alpha *= alphaMask;
+                // ========== BLEND BLUR WITH THEME ==========
+                // Mix blurred background với theme color overlay
+                // Blur làm nền, theme color phủ lên với độ trong suốt
+                float3 finalColor = lerp(blurredBg.rgb, themeColor, _BaseAlpha * _BlurAmount);
+
+                // Thêm một lớp tint màu nhẹ
+                finalColor = lerp(finalColor, blurredBg.rgb * _ThemeColor.rgb, 0.3);
+
+                // Alpha - giữ shape rõ ràng
+                float alpha = alphaMask;
+                alpha *= i.color.a;
 
                 fixed4 result = fixed4(finalColor, alpha);
-                result *= i.color;
+                result.rgb *= i.color.rgb;
 
                 return result;
             }

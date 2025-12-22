@@ -28,6 +28,31 @@ public class VRTaskbar : MonoBehaviour
     [Header("Visual Config")]
     public Color glassColor = new Color(1.0f, 1.0f, 1.0f, 0.098f);
 
+    [Header("Glassmorphism")]
+    [Tooltip("Enable glassmorphism blur effect")]
+    public bool enableGlassmorphism = true;
+    [Range(0, 40)]
+    [Tooltip("Blur intensity - higher = more blur")]
+    public float blurIntensity = 2f;
+    [Range(1, 8)]
+    [Tooltip("Blur quality - higher = smoother")]
+    public int blurQuality = 3;
+    [Range(0, 1)]
+    [Tooltip("Glass opacity - how opaque the glass overlay is")]
+    public float glassOpacity = 0f;
+    [Range(0, 1)]
+    [Tooltip("Tint strength - how much color tint to apply")]
+    public float tintStrength = 0.1f;
+    [Range(0, 0.5f)]
+    [Tooltip("Inner glow at edges")]
+    public float innerGlow = 0f;
+    [Range(0.9f, 1.3f)]
+    [Tooltip("Overall brightness")]
+    public float brightness = 1f;
+    [Range(0.5f, 1f)]
+    [Tooltip("Color saturation")]
+    public float saturation = 1f;
+
     [Header("Glowing Border Config")]
     [ColorUsage(true, true)]
     public Color glowColorA = new Color(0f, 1.5f, 2f, 1f);
@@ -1638,6 +1663,16 @@ public class VRTaskbar : MonoBehaviour
             glassMat.SetFloat("_GlassAlpha", 0.08f);
             glassMat.SetFloat("_FresnelPower", 2.2f);
             glassMat.SetFloat("_FresnelStrength", 0.12f);
+
+            // Glassmorphism settings
+            glassMat.SetFloat("_BlurEnabled", enableGlassmorphism ? 1f : 0f);
+            glassMat.SetFloat("_BlurRadius", blurIntensity);
+            glassMat.SetFloat("_BlurIterations", blurQuality);
+            glassMat.SetFloat("_GlassOpacity", glassOpacity);
+            glassMat.SetFloat("_TintStrength", tintStrength);
+            glassMat.SetFloat("_InnerGlow", innerGlow);
+            glassMat.SetFloat("_Brightness", brightness);
+            glassMat.SetFloat("_Saturation", saturation);
 
             img.material = glassMat;
             img.color = Color.white;
