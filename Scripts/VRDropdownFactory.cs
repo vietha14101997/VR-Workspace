@@ -20,13 +20,14 @@ using System.Collections.Generic;
 public static class VRDropdownFactory
 {
     private static Sprite _pixelSprite;
+    private static Sprite _arrowSprite;
 
     // Hằng số layout
     private const float FONT_TO_BOX_RATIO = 4.2f;      // Tỷ lệ font size -> box height (tăng từ 3.5)
-    private const float FONT_TO_ICON_RATIO = 2.0f;     // Tỷ lệ font size -> icon size (tăng từ 1.5)
+    private const float FONT_TO_ICON_RATIO = 2.5f;     // Tỷ lệ font size -> icon size (tăng từ 1.5)
     private const float ICON_ZONE_RATIO = 0.28f;       // 28% cho icon zone (giảm để icon to hơn trong zone)
     private const float CONTENT_PADDING = 12f;          // Padding cho content zone
-    private const float ARROW_WIDTH = 35f;              // Chiều rộng arrow
+    private const float ARROW_WIDTH = 70f;              // Chiều rộng arrow
 
     /// <summary>
     /// Cấu hình cho Dropdown
@@ -38,7 +39,7 @@ public static class VRDropdownFactory
         public Sprite icon;
         public Color themeColor = new Color(0f, 0.9f, 1f);
         public float width = 300f;
-        public int labelFontSize = 24;
+        public int labelFontSize = 32;
         public int valueFontSize = 36;
         public TMP_FontAsset font;
 
@@ -47,20 +48,13 @@ public static class VRDropdownFactory
         public List<Sprite> optionIcons = new List<Sprite>();
         public int defaultIndex = 0;
 
-        // Visual settings - giá trị chuẩn cho reference height 150px
-        private const float REFERENCE_HEIGHT = 150f;
-        public float cornerRadius = 0.12f;
-        public float edgePadding = 0.12f;
+        // Visual settings
+        public float cornerRadius = 0.25f;
+        public float edgePadding = 0.15f;
         public float backgroundAlpha = 0.15f;
-        public float borderWidth = 0.015f;
-        public float glowWidth = 0.03f;
+        public float borderWidth = 0.1f;
+        public float glowWidth = 0.075f;
         public float glowIntensity = 2.5f;
-
-        // Tính các giá trị visual được scale theo kích thước thực tế
-        public float ScaledCornerRadius => cornerRadius * (REFERENCE_HEIGHT / BoxHeight);
-        public float ScaledEdgePadding => edgePadding * (REFERENCE_HEIGHT / BoxHeight);
-        public float ScaledBorderWidth => borderWidth * (REFERENCE_HEIGHT / BoxHeight);
-        public float ScaledGlowWidth => glowWidth * (REFERENCE_HEIGHT / BoxHeight);
 
         // Animation
         public float popAmount = 0.005f;
@@ -285,7 +279,7 @@ public static class VRDropdownFactory
         if (glassShader != null)
         {
             Material mat = new Material(glassShader);
-            mat.SetFloat("_CornerRadius", config.ScaledCornerRadius);
+            mat.SetFloat("_CornerRadius", config.cornerRadius);
             mat.SetFloat("_EdgePadding", 0f);
             mat.SetFloat("_Aspect", aspect);
             mat.SetColor("_ColorA", new Color(col.r, col.g, col.b, config.backgroundAlpha * 1.5f));
@@ -325,13 +319,13 @@ public static class VRDropdownFactory
             Material mat = new Material(glowShader);
             mat.SetFloat("_Aspect", aspect);
             mat.SetFloat("_EdgePadding", 0f);
-            mat.SetFloat("_CornerRadius", config.ScaledCornerRadius);
+            mat.SetFloat("_CornerRadius", config.cornerRadius);
 
             Color borderGlowCol = Color.Lerp(col, Color.white, 0.75f);
             mat.SetColor("_GlowColor", borderGlowCol);
 
-            mat.SetFloat("_BorderWidth", config.ScaledBorderWidth);
-            mat.SetFloat("_GlowWidth", config.ScaledGlowWidth);
+            mat.SetFloat("_BorderWidth", config.borderWidth);
+            mat.SetFloat("_GlowWidth", config.glowWidth);
             mat.SetFloat("_GlowIntensity", config.glowIntensity);
             mat.SetFloat("_PulseEnabled", 0f);
 
@@ -377,7 +371,7 @@ public static class VRDropdownFactory
             iconRT.anchorMin = new Vector2(0.5f, 0.5f);
             iconRT.anchorMax = new Vector2(0.5f, 0.5f);
             iconRT.pivot = new Vector2(0.5f, 0.5f);
-            iconRT.anchoredPosition = Vector2.zero;
+            iconRT.anchoredPosition = new Vector2(0, iconSize * 0.12f);
             iconRT.sizeDelta = new Vector2(iconSize, iconSize);
 
             Image iconImg = iconObj.AddComponent<Image>();
@@ -421,34 +415,35 @@ public static class VRDropdownFactory
         contentZoneRT.offsetMin = new Vector2(CONTENT_PADDING, 0f);
         contentZoneRT.offsetMax = new Vector2(-CONTENT_PADDING, 0f);
 
-        // Nửa trên: Title (Label)
+        // Nửa trên: Title (Label) - đẩy lên trên để cách xa value
         GameObject labelObj = new GameObject("Label");
         labelObj.transform.SetParent(contentZone.transform, false);
         RectTransform labelRT = labelObj.AddComponent<RectTransform>();
-        labelRT.anchorMin = new Vector2(0f, 0.5f);
+        labelRT.anchorMin = new Vector2(0f, 0.55f);
         labelRT.anchorMax = new Vector2(1f, 1f);
-        labelRT.offsetMin = new Vector2(0f, 5f);
-        labelRT.offsetMax = new Vector2(0f, -10f);
+        labelRT.offsetMin = new Vector2(0f, 0f);
+        labelRT.offsetMax = new Vector2(0f, -8f);
 
         TextMeshProUGUI labelTxt = labelObj.AddComponent<TextMeshProUGUI>();
         labelTxt.text = config.label;
         labelTxt.fontSize = config.labelFontSize;
-        labelTxt.color = new Color(1f, 1f, 1f, 0.6f);
+        labelTxt.color = new Color(1f, 1f, 1f, 1f);
         labelTxt.alignment = TextAlignmentOptions.BottomLeft;
         labelTxt.verticalAlignment = VerticalAlignmentOptions.Bottom;
+        labelTxt.fontStyle = FontStyles.Bold;
         labelTxt.raycastTarget = false;
         labelTxt.enableWordWrapping = false;
         labelTxt.overflowMode = TextOverflowModes.Ellipsis;
         if (config.font != null) labelTxt.font = config.font;
 
-        // Nửa dưới: Container cho Value + Arrow
+        // Nửa dưới: Container cho Value + Arrow - đẩy xuống để cách xa label
         GameObject bottomRow = new GameObject("BottomRow");
         bottomRow.transform.SetParent(contentZone.transform, false);
         RectTransform bottomRowRT = bottomRow.AddComponent<RectTransform>();
         bottomRowRT.anchorMin = Vector2.zero;
-        bottomRowRT.anchorMax = new Vector2(1f, 0.5f);
-        bottomRowRT.offsetMin = new Vector2(0f, 10f);
-        bottomRowRT.offsetMax = new Vector2(0f, -5f);
+        bottomRowRT.anchorMax = new Vector2(1f, 0.45f);
+        bottomRowRT.offsetMin = new Vector2(0f, 8f);
+        bottomRowRT.offsetMax = new Vector2(0f, 0f);
 
         // Value text - chiếm hầu hết nửa dưới, chừa chỗ cho arrow
         GameObject valueObj = new GameObject("Value");
@@ -464,7 +459,7 @@ public static class VRDropdownFactory
         valueTxt.text = defaultValue;
         valueTxt.fontSize = config.valueFontSize;
         valueTxt.color = Color.white;
-        valueTxt.fontStyle = FontStyles.Bold;
+        // valueTxt.fontStyle = FontStyles.Bold;
         valueTxt.alignment = TextAlignmentOptions.Left;
         valueTxt.verticalAlignment = VerticalAlignmentOptions.Top;
         valueTxt.raycastTarget = false;
@@ -472,24 +467,57 @@ public static class VRDropdownFactory
         valueTxt.overflowMode = TextOverflowModes.Ellipsis;
         if (config.font != null) valueTxt.font = config.font;
 
-        // Arrow indicator - cố định ở cạnh phải
+        // Arrow indicator - cố định ở cạnh phải, sát cạnh trên của BottomRow
         GameObject arrowObj = new GameObject("Arrow");
         arrowObj.transform.SetParent(bottomRow.transform, false);
         RectTransform arrowRT = arrowObj.AddComponent<RectTransform>();
-        arrowRT.anchorMin = new Vector2(1f, 0f);
+        arrowRT.anchorMin = new Vector2(1f, 1f);
         arrowRT.anchorMax = new Vector2(1f, 1f);
-        arrowRT.pivot = new Vector2(1f, 0.5f);
+        arrowRT.pivot = new Vector2(1f, 1f);
         arrowRT.anchoredPosition = Vector2.zero;
         arrowRT.sizeDelta = new Vector2(ARROW_WIDTH, 0f);
 
-        TextMeshProUGUI arrowTxt = arrowObj.AddComponent<TextMeshProUGUI>();
-        arrowTxt.text = "▼";
-        arrowTxt.fontSize = config.valueFontSize * 0.6f;
-        arrowTxt.color = new Color(1f, 1f, 1f, 0.6f);
-        arrowTxt.alignment = TextAlignmentOptions.Center;
-        arrowTxt.verticalAlignment = VerticalAlignmentOptions.Middle;
-        arrowTxt.raycastTarget = false;
-        if (config.font != null) arrowTxt.font = config.font;
+        // Sử dụng arrow sprite màu trắng được generate để có thể tint hoàn toàn
+        float arrowSize = config.valueFontSize;
+
+        Image arrowImg = arrowObj.AddComponent<Image>();
+        arrowImg.sprite = GetArrowSprite();
+        arrowImg.preserveAspect = true;
+        arrowImg.raycastTarget = false;
+
+        // Màu arrow = màu border (theme color lerp với white để sáng và nổi bật)
+        Color arrowColor = Color.Lerp(config.themeColor, Color.white, 0.85f);
+        arrowImg.color = arrowColor;
+
+        // Set kích thước và vị trí arrow (pivot ở góc trên phải)
+        arrowRT.sizeDelta = new Vector2(arrowSize, arrowSize);
+        arrowRT.anchoredPosition = new Vector2(-ARROW_WIDTH / 2f + arrowSize / 2f, 0f);
+
+        // Glow effect để nổi bật khỏi nền
+        Color arrowGlowCol = Color.Lerp(config.themeColor, Color.white, 0.6f);
+        arrowGlowCol.a = 0.4f;
+        float arrowGlowDist = 2f;
+
+        Shadow arrowShadow1 = arrowObj.AddComponent<Shadow>();
+        arrowShadow1.effectColor = arrowGlowCol;
+        arrowShadow1.effectDistance = new Vector2(arrowGlowDist, -arrowGlowDist);
+
+        Shadow arrowShadow2 = arrowObj.AddComponent<Shadow>();
+        arrowShadow2.effectColor = arrowGlowCol;
+        arrowShadow2.effectDistance = new Vector2(-arrowGlowDist, arrowGlowDist);
+
+        // Bloom layer để thêm độ sáng
+        Color arrowBloomCol = config.themeColor;
+        arrowBloomCol.a = 0.2f;
+        float arrowBloomDist = 4f;
+
+        Shadow arrowShadow3 = arrowObj.AddComponent<Shadow>();
+        arrowShadow3.effectColor = arrowBloomCol;
+        arrowShadow3.effectDistance = new Vector2(arrowBloomDist, -arrowBloomDist);
+
+        Shadow arrowShadow4 = arrowObj.AddComponent<Shadow>();
+        arrowShadow4.effectColor = arrowBloomCol;
+        arrowShadow4.effectDistance = new Vector2(-arrowBloomDist, arrowBloomDist);
 
         return valueTxt;
     }
@@ -730,6 +758,93 @@ public static class VRDropdownFactory
         tex.Apply();
         _pixelSprite = Sprite.Create(tex, new Rect(0, 0, 2, 2), Vector2.one * 0.5f);
         return _pixelSprite;
+    }
+
+    /// <summary>
+    /// Tạo sprite mũi tên xuống màu trắng để có thể tint với bất kỳ màu nào
+    /// </summary>
+    private static Sprite GetArrowSprite()
+    {
+        if (_arrowSprite != null) return _arrowSprite;
+
+        int size = 64;
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        Color[] colors = new Color[size * size];
+
+        // Khởi tạo transparent
+        for (int i = 0; i < colors.Length; i++)
+            colors[i] = Color.clear;
+
+        // Vẽ tam giác mũi tên xuống với anti-aliasing
+        Vector2 top1 = new Vector2(8, size - 16);      // Góc trái trên
+        Vector2 top2 = new Vector2(size - 8, size - 16); // Góc phải trên
+        Vector2 bottom = new Vector2(size / 2f, 12);    // Đỉnh dưới
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                Vector2 p = new Vector2(x + 0.5f, y + 0.5f);
+                float alpha = PointInTriangle(p, top1, top2, bottom);
+                if (alpha > 0)
+                {
+                    colors[y * size + x] = new Color(1f, 1f, 1f, alpha);
+                }
+            }
+        }
+
+        tex.SetPixels(colors);
+        tex.Apply();
+        tex.filterMode = FilterMode.Bilinear;
+        _arrowSprite = Sprite.Create(tex, new Rect(0, 0, size, size), Vector2.one * 0.5f);
+        return _arrowSprite;
+    }
+
+    /// <summary>
+    /// Tính alpha cho điểm trong tam giác với anti-aliasing
+    /// </summary>
+    private static float PointInTriangle(Vector2 p, Vector2 v1, Vector2 v2, Vector2 v3)
+    {
+        // Signed area method
+        float d1 = Sign(p, v1, v2);
+        float d2 = Sign(p, v2, v3);
+        float d3 = Sign(p, v3, v1);
+
+        bool hasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+        bool hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+
+        if (!(hasNeg && hasPos))
+        {
+            // Inside triangle
+            return 1f;
+        }
+
+        // Anti-aliasing: check distance to edges
+        float edgeDist = Mathf.Min(
+            DistanceToLine(p, v1, v2),
+            Mathf.Min(DistanceToLine(p, v2, v3), DistanceToLine(p, v3, v1))
+        );
+
+        if (edgeDist < 1.5f)
+        {
+            return Mathf.Clamp01(1.5f - edgeDist);
+        }
+
+        return 0f;
+    }
+
+    private static float Sign(Vector2 p1, Vector2 p2, Vector2 p3)
+    {
+        return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
+    }
+
+    private static float DistanceToLine(Vector2 p, Vector2 a, Vector2 b)
+    {
+        Vector2 ab = b - a;
+        Vector2 ap = p - a;
+        float t = Mathf.Clamp01(Vector2.Dot(ap, ab) / Vector2.Dot(ab, ab));
+        Vector2 closest = a + t * ab;
+        return Vector2.Distance(p, closest);
     }
 }
 

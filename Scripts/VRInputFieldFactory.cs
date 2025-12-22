@@ -44,13 +44,12 @@ public static class VRInputFieldFactory
         public TMP_InputField.ContentType contentType = TMP_InputField.ContentType.Standard;
         public int characterLimit = 0;
 
-        // Visual settings - giá trị chuẩn cho reference height 80px
-        private const float REFERENCE_HEIGHT = 80f;
-        public float cornerRadius = 0.12f;
-        public float edgePadding = 0.12f;
+        // Visual settings
+        public float cornerRadius = 0.25f;
+        public float edgePadding = 0.15f;
         public float backgroundAlpha = 0.15f;
-        public float borderWidth = 0.015f;
-        public float glowWidth = 0.03f;
+        public float borderWidth = 0.1f;
+        public float glowWidth = 0.075f;
         public float glowIntensity = 2.5f;
 
         // Animation
@@ -62,14 +61,8 @@ public static class VRInputFieldFactory
         // Tính chiều cao box từ font size
         public float BoxHeight => inputFontSize * FONT_TO_BOX_RATIO;
 
-        // Tính các giá trị visual được scale theo kích thước thực tế
-        public float ScaledCornerRadius => cornerRadius * (REFERENCE_HEIGHT / BoxHeight);
-        public float ScaledEdgePadding => edgePadding * (REFERENCE_HEIGHT / BoxHeight);
-        public float ScaledBorderWidth => borderWidth * (REFERENCE_HEIGHT / BoxHeight);
-        public float ScaledGlowWidth => glowWidth * (REFERENCE_HEIGHT / BoxHeight);
-
         // Tính tổng chiều cao (bao gồm label nếu có)
-        public float TotalHeight => BoxHeight + (string.IsNullOrEmpty(label) ? 0f : LABEL_HEIGHT);
+        public float TotalHeight => BoxHeight + (string.IsNullOrEmpty(label) ? 0f : LABEL_HEIGHT) + 24f;
     }
 
     /// <summary>
@@ -99,13 +92,14 @@ public static class VRInputFieldFactory
             labelRT.anchorMin = new Vector2(0f, 1f);
             labelRT.anchorMax = new Vector2(1f, 1f);
             labelRT.pivot = new Vector2(0f, 1f);
-            labelRT.anchoredPosition = new Vector2(10f, 0f);
+            labelRT.anchoredPosition = new Vector2(15f, -LABEL_HEIGHT * 0.5f);
             labelRT.sizeDelta = new Vector2(-10f, LABEL_HEIGHT);
 
             TextMeshProUGUI labelTxt = labelObj.AddComponent<TextMeshProUGUI>();
             labelTxt.text = config.label;
             labelTxt.fontSize = config.labelFontSize;
-            labelTxt.color = new Color(1f, 1f, 1f, 0.7f);
+            labelTxt.fontStyle = FontStyles.Bold;
+            labelTxt.color = Color.white;
             labelTxt.alignment = TextAlignmentOptions.BottomLeft;
             labelTxt.raycastTarget = false;
             if (config.font != null) labelTxt.font = config.font;
@@ -284,7 +278,7 @@ public static class VRInputFieldFactory
         if (glassShader != null)
         {
             Material mat = new Material(glassShader);
-            mat.SetFloat("_CornerRadius", config.ScaledCornerRadius);
+            mat.SetFloat("_CornerRadius", config.cornerRadius);
             mat.SetFloat("_EdgePadding", 0f);
             mat.SetFloat("_Aspect", aspect);
             mat.SetColor("_ColorA", new Color(col.r, col.g, col.b, config.backgroundAlpha * 1.5f));
@@ -322,13 +316,13 @@ public static class VRInputFieldFactory
             Material mat = new Material(glowShader);
             mat.SetFloat("_Aspect", aspect);
             mat.SetFloat("_EdgePadding", 0f);
-            mat.SetFloat("_CornerRadius", config.ScaledCornerRadius);
+            mat.SetFloat("_CornerRadius", config.cornerRadius);
 
             Color borderGlowCol = Color.Lerp(col, Color.white, 0.75f);
             mat.SetColor("_GlowColor", borderGlowCol);
 
-            mat.SetFloat("_BorderWidth", config.ScaledBorderWidth);
-            mat.SetFloat("_GlowWidth", config.ScaledGlowWidth);
+            mat.SetFloat("_BorderWidth", config.borderWidth);
+            mat.SetFloat("_GlowWidth", config.glowWidth);
             mat.SetFloat("_GlowIntensity", config.glowIntensity);
             mat.SetFloat("_PulseEnabled", 0f);
 

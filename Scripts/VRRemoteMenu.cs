@@ -29,10 +29,10 @@ public class VRRemoteMenu : MonoBehaviour
     private GameObject _fpsDropdown;
 
     // Font sizes cho InputField và Dropdown
-    private const int LABEL_FONT_SIZE = 26;
-    private const int INPUT_FONT_SIZE = 38;
-    private const int DROPDOWN_LABEL_FONT_SIZE = 30;   // Tăng từ 26
-    private const int DROPDOWN_VALUE_FONT_SIZE = 40;   // Tăng từ 38
+    private const int LABEL_FONT_SIZE = 40;
+    private const int INPUT_FONT_SIZE = 42;
+    private const int DROPDOWN_LABEL_FONT_SIZE = 40;
+    private const int DROPDOWN_VALUE_FONT_SIZE = 42;
 
     // ==================== PUBLIC ACCESSORS ====================
 
@@ -60,42 +60,89 @@ public class VRRemoteMenu : MonoBehaviour
 
     public void BuildUI(Transform parent, float containerWidth, float containerHeight)
     {
-        float W = containerWidth;
-        float H = containerHeight;
-        float contentW = W;
+        float contentW = containerWidth * 0.875f;
 
         // Tính chiều cao tự động từ font size
         float inputH = VRInputFieldFactory.CalculateHeight(INPUT_FONT_SIZE, true);
         float dropdownH = VRDropdownFactory.CalculateHeight(DROPDOWN_VALUE_FONT_SIZE);
 
         // Layout heights
-        float headerH = 100f;
-        float gridH = dropdownH * 2 + 25f; // 2 rows dropdown + gap
-        float footerH = 100f;
-        float gap = 25f;
+        float headerH = containerHeight * 0.1f;
+        float gap = containerHeight * 0.04f;
+        float gridH = dropdownH * 2 + gap;
 
-        float y = H;
+        float y = containerHeight;
 
         // Header
         y -= headerH;
-        CreateHeader(parent, 0, y, contentW, headerH);
+        CreateHeader(parent, 0, y, containerWidth, headerH);
+
+        // Separator 1 position (between Header and InputRow)
+        float sep1Y = y - gap * 1.5f;
+
+        float bodyContainerHeight = containerHeight - 2f * headerH;
+        y -= 2.5f * gap + bodyContainerHeight;
+        var bodyContainer = CreateContainer(parent, "BodyContainer", 0, y, containerWidth, bodyContainerHeight);
 
         // Input Row (Host / Port) - chiều cao tự động
-        y -= gap + inputH;
-        CreateInputRow(parent, 0, y, contentW, inputH);
+        float bodyY = bodyContainerHeight;
+        bodyY -= inputH;
+        CreateInputRow(bodyContainer.transform, 0, bodyY, contentW, inputH, gap * 1.5f);
+
+        // Separator 2 position (between InputRow and Grid)
+        float sep2Y = y + bodyY - gap * 1.5f;
 
         // Grid 2x2 (Monitors, Resolution, Bitrate, FPS)
-        y -= gap + gridH;
-        CreateGrid(parent, 0, y, contentW, gridH, dropdownH);
+        bodyY -= gap * 3f + gridH;
+        CreateGrid(bodyContainer.transform, 0, bodyY, contentW, 0.04f * contentW, dropdownH, gap * 1.5f, gap * 1.25f);
 
-        // Footer (Connect button)
-        y -= gap + footerH;
-        CreateFooter(parent, 0, y, contentW, footerH);
+        // Button Connect
+        CreateConnectButton(parent, contentW * 0.375f, headerH);
+
+        // Configure horizontal separators via shader (using VRMenuFrame)
+        // Separator 2 length = contentW / containerWidth (content area ratio)
+        float separatorLength = contentW / containerWidth;
+        ConfigureHorizontalSeparators(containerHeight, sep1Y, sep2Y, separatorLength);
+    }
+
+    void ConfigureHorizontalSeparators(float containerHeight, float sep1Y, float sep2Y, float length = 1f)
+    {
+        if (_menuFrame == null) return;
+
+        // Convert content-area Y positions to frame UV coordinates
+        // UV.y = 0 is bottom, UV.y = 1 is top
+        // Need to account for content margins
+
+        float frameLogicalHeight = _menuFrame.logicalWidth * (_menuFrame.panelHeight / _menuFrame.panelWidth);
+        float marginBottom = _menuFrame.contentMarginBottom;
+        float marginTop = _menuFrame.contentMarginTop;
+        float contentHeight = frameLogicalHeight - marginTop - marginBottom;
+
+        // Calculate UV positions (frame coordinates)
+        // Content area starts at marginBottom from frame bottom
+        float sep1FrameY = marginBottom + sep1Y;
+        float sep2FrameY = marginBottom + sep2Y;
+
+        float sep1UV = sep1FrameY / frameLogicalHeight;
+        float sep2UV = sep2FrameY / frameLogicalHeight;
+
+        // Set horizontal separators in shader
+        Vector4 positions = new Vector4(sep1UV, sep2UV, 0, 0);
+        _menuFrame.SetHorizontalSeparators(2, positions, 0.003f, 0.012f, 0.9f, length);
+    }
+
+    void DisableHorizontalSeparators()
+    {
+        if (_menuFrame == null) return;
+        _menuFrame.SetHorizontalSeparators(0, Vector4.zero);
     }
 
     void ReturnToMainMenu()
     {
         if (_menuFrame == null) return;
+
+        // Disable horizontal separators when leaving this menu
+        DisableHorizontalSeparators();
 
         Transform contentContainer = _menuFrame.ContentContainer;
         if (contentContainer == null) return;
@@ -134,14 +181,13 @@ public class VRRemoteMenu : MonoBehaviour
             () => OnQRClicked?.Invoke());
     }
 
-    void CreateInputRow(Transform parent, float x, float y, float w, float h)
+    void CreateInputRow(Transform parent, float x, float y, float w, float h, float gapX)
     {
         var row = CreateContainer(parent, "InputRow", x, y, w, h);
 
         // Concept: Host ~60%, gap ~5%, Port ~35%
-        float gapX = 40f;
-        float hostW = (w - gapX) * 0.62f;
-        float portW = (w - gapX) * 0.38f;
+        float hostW = (w - gapX) * 0.5f;
+        float portW = (w - gapX) * 0.5f;
 
         // Host Input - chiều cao tự động từ font size
         _hostInput = VRInputFieldFactory.CreateLabeledInputField(
@@ -161,20 +207,18 @@ public class VRRemoteMenu : MonoBehaviour
         PositionElement(_portInput, hostW + gapX, 0);
     }
 
-    void CreateGrid(Transform parent, float x, float y, float w, float h, float dropdownH)
+    void CreateGrid(Transform parent, float x, float y, float w, float h, float dropdownH, float gapX, float gapY)
     {
         var grid = CreateContainer(parent, "Grid", x, y, w, h);
 
         // 2x2 grid with equal cells
-        float gapX = 40f;
-        float gapY = 25f;
         float cellW = (w - gapX) / 2f;
 
         // Dropdown options
-        var monitorOptions = new List<string> { "Monitor 1", "Monitor 2", "All" };
+        var monitorOptions = new List<string> { "1 Monitor", "2 Monitors", "3 Monitors", "4 Monitors" };
         var resolutionOptions = new List<string> { "1920 x 1080", "2560 x 1440", "3840 x 2160", "1280 x 720" };
         var bitrateOptions = new List<string> { "5 Mbps", "10 Mbps", "20 Mbps", "30 Mbps", "50 Mbps" };
-        var fpsOptions = new List<string> { "30 FPS", "60 FPS", "90 FPS", "120 FPS" };
+        var fpsOptions = new List<string> { "30 FPS", "45 FPS", "60 FPS", "75 FPS", "90 FPS", "120 FPS", "144 FPS" };
 
         // Row 1 (top) - Monitors và Resolution
         float row1Y = dropdownH + gapY;
@@ -213,14 +257,6 @@ public class VRRemoteMenu : MonoBehaviour
         PositionElement(_fpsDropdown, cellW + gapX, 0);
     }
 
-    void CreateFooter(Transform parent, float x, float y, float w, float h)
-    {
-        var footer = CreateContainer(parent, "Footer", x, y, w, h);
-
-        float btnW = 650f;
-        CreateConnectButton(footer.transform, (w - btnW) / 2f, 0, btnW, h);
-    }
-
     // ==================== UI COMPONENTS ====================
 
     GameObject CreateContainer(Transform parent, string name, float x, float y, float w, float h)
@@ -228,9 +264,10 @@ public class VRRemoteMenu : MonoBehaviour
         var go = new GameObject(name);
         go.transform.SetParent(parent, false);
         var rt = go.AddComponent<RectTransform>();
-        rt.anchorMin = rt.anchorMax = Vector2.zero;
+        rt.anchorMin = new Vector2(0.5f, 0);
+        rt.anchorMax = new Vector2(0.5f, 0);
         rt.pivot = Vector2.zero;
-        rt.anchoredPosition = new Vector2(x, y);
+        rt.anchoredPosition = new Vector2(-w / 2f, y);
         rt.sizeDelta = new Vector2(w, h);
         return go;
     }
@@ -276,7 +313,7 @@ public class VRRemoteMenu : MonoBehaviour
         rt.anchoredPosition = new Vector2(x, y);
     }
 
-    void CreateConnectButton(Transform parent, float x, float y, float w, float h)
+    void CreateConnectButton(Transform parent, float w, float h)
     {
         Color gradCol = Color.Lerp(themeColor, accentColor, 0.45f);
 
@@ -299,9 +336,10 @@ public class VRRemoteMenu : MonoBehaviour
         var btn = VRButtonFactory.CreateButton(parent, config, () => OnConnectClicked?.Invoke());
 
         RectTransform rt = btn.GetComponent<RectTransform>();
-        rt.anchorMin = rt.anchorMax = Vector2.zero;
-        rt.pivot = Vector2.zero;
-        rt.anchoredPosition = new Vector2(x, y);
+        rt.anchorMin = new Vector2(0.5f, 0);
+        rt.anchorMax = new Vector2(0.5f, 0);
+        rt.pivot = new Vector2(0.5f, 0);
+        rt.anchoredPosition = Vector2.zero;
     }
 
     // ==================== PRIMITIVES ====================

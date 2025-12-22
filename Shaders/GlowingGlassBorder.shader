@@ -53,6 +53,14 @@ Shader "Custom/GlowingGlassBorder"
         _SeparatorGlowWidth ("Separator Glow Width", Range(0.001, 0.05)) = 0.015
         _SeparatorAlpha ("Separator Alpha", Range(0, 1)) = 0.8
 
+        [Header(Horizontal Separators)]
+        _HSeparatorCount ("H Separator Count", Range(0, 4)) = 0
+        _HSeparatorPositions ("H Separator Y Positions (UV)", Vector) = (0, 0, 0, 0)
+        _HSeparatorWidth ("H Separator Width", Range(0.001, 0.02)) = 0.004
+        _HSeparatorGlowWidth ("H Separator Glow Width", Range(0.001, 0.05)) = 0.015
+        _HSeparatorAlpha ("H Separator Alpha", Range(0, 1)) = 0.8
+        _HSeparatorLength ("H Separator Length", Range(0, 1)) = 1.0
+
         // UI Masking
         _StencilComp ("Stencil Comparison", Float) = 8
         _Stencil ("Stencil ID", Float) = 0
@@ -157,12 +165,20 @@ Shader "Custom/GlowingGlassBorder"
             float _HoloFlicker;
             float _HoloNoise;
 
-            // Separator properties
+            // Vertical Separator properties
             float _SeparatorCount;
             float4 _SeparatorPositions;
             float _SeparatorWidth;
             float _SeparatorGlowWidth;
             float _SeparatorAlpha;
+
+            // Horizontal Separator properties
+            float _HSeparatorCount;
+            float4 _HSeparatorPositions;
+            float _HSeparatorWidth;
+            float _HSeparatorGlowWidth;
+            float _HSeparatorAlpha;
+            float _HSeparatorLength;
 
             float _Aspect; // Aspect Ratio
 
@@ -325,6 +341,75 @@ Shader "Custom/GlowingGlassBorder"
                     l4 = pow(l4, 2.0);
 
                     totalLayers = max(totalLayers, float4(l1, l2, l3, l4));
+                }
+
+                return totalLayers;
+            }
+
+            // Calculate horizontal separator intensity at a given UV position
+            // Returns float4: x = layer1 (core), y = layer2, z = layer3, w = layer4 (ambient)
+            float4 getHSeparatorIntensity(float2 uv, float aspect, float padding, float dist)
+            {
+                // Only draw inside the rounded rect
+                if (dist > 0.0) return float4(0, 0, 0, 0);
+
+                // Check if separator count is 0
+                if (_HSeparatorCount < 0.5) return float4(0, 0, 0, 0);
+
+                // Calculate separator extent based on length (0-1)
+                // length = 1 means full width, length = 0.5 means half width, centered at x = 0.5
+                float centerX = 0.5;
+                float fullHalfWidth = centerX - padding; // Full half-width of content area
+                float sepHalfWidth = fullHalfWidth * _HSeparatorLength; // Actual separator half-width
+                float distFromCenter = abs(uv.x - centerX);
+
+                // Check if outside separator extent
+                if (distFromCenter > sepHalfWidth) return float4(0, 0, 0, 0);
+
+                // Horizontal edge fade: alpha = 1 at center, smoothly fading to 0 at edges
+                // Smooth fade from center (1.0) to edge (0.0)
+                float normalizedDist = saturate(distFromCenter / sepHalfWidth);
+                float hEdgeFade = 1.0 - pow(normalizedDist, 2.0); // Quadratic falloff
+
+                float4 totalLayers = float4(0, 0, 0, 0);
+
+                // Check each horizontal separator
+                for (int i = 0; i < 4; i++)
+                {
+                    if (i >= (int)_HSeparatorCount) break;
+
+                    // Get separator position from vector component
+                    float sepPos = 0.0;
+                    if (i == 0) sepPos = _HSeparatorPositions.x;
+                    else if (i == 1) sepPos = _HSeparatorPositions.y;
+                    else if (i == 2) sepPos = _HSeparatorPositions.z;
+                    else sepPos = _HSeparatorPositions.w;
+
+                    // Skip if position is 0 (unset)
+                    if (sepPos < 0.01) continue;
+
+                    // Calculate distance to separator (Y axis for horizontal line)
+                    float distToSep = abs(uv.y - sepPos);
+
+                    // Multi-layer glow matching border style
+                    // Layer 1 (Core) - sharpest
+                    float l1 = 1.0 - saturate(distToSep / _HSeparatorWidth);
+                    l1 = pow(l1, 0.5);
+
+                    // Layer 2 (Mid glow)
+                    float l2 = 1.0 - saturate(distToSep / (_HSeparatorWidth * 2.0));
+                    l2 = pow(l2, 1.5);
+
+                    // Layer 3 (Outer glow)
+                    float l3 = 1.0 - saturate(distToSep / _HSeparatorGlowWidth);
+                    l3 = pow(l3, 2.0);
+
+                    // Layer 4 (Ambient)
+                    float l4 = 1.0 - saturate(distToSep / (_HSeparatorGlowWidth * 2.0));
+                    l4 = pow(l4, 2.0);
+
+                    // Apply horizontal edge fade to all layers
+                    totalLayers = max(totalLayers, float4(l1, l2, l3, l4) * hEdgeFade);
                 }
 
                 return totalLayers;
@@ -525,6 +610,31 @@ Shader "Custom/GlowingGlassBorder"
                     fixed3 sepWhiteCore = fixed3(1, 1, 1);
                     finalColor.rgb = lerp(finalColor.rgb, sepWhiteCore, sepLayers.x * _Layer1Alpha * _SeparatorAlpha * 0.5);
                     finalColor.a = max(finalColor.a, sepLayers.x * _Layer1Alpha * _SeparatorAlpha);
+                }
+
+                // === HORIZONTAL SEPARATORS (multi-layer glow matching border) ===
+                float4 hSepLayers = getHSeparatorIntensity(uv, aspect, _EdgePadding, dist);
+                if (hSepLayers.x > 0.0 || hSepLayers.w > 0.0)
+                {
+                    // Use gradient color at separator position
+                    fixed3 hSepColor = borderColor.rgb;
+
+                    // Layer 4 (Ambient) - widest, softest
+                    finalColor.rgb += hSepColor * hSepLayers.w * _Layer4Alpha * _HSeparatorAlpha * 0.5;
+                    finalColor.a = max(finalColor.a, hSepLayers.w * _Layer4Alpha * _HSeparatorAlpha * 0.3);
+
+                    // Layer 3 (Outer glow)
+                    finalColor.rgb += hSepColor * hSepLayers.z * _Layer3Alpha * _HSeparatorAlpha;
+                    finalColor.a = max(finalColor.a, hSepLayers.z * _Layer3Alpha * _HSeparatorAlpha * 0.5);
+
+                    // Layer 2 (Mid glow)
+                    finalColor.rgb = lerp(finalColor.rgb, hSepColor * 1.2, hSepLayers.y * _Layer2Alpha * _HSeparatorAlpha);
+                    finalColor.a = max(finalColor.a, hSepLayers.y * _Layer2Alpha * _HSeparatorAlpha);
+
+                    // Layer 1 (Core) - brightest center
+                    fixed3 hSepWhiteCore = fixed3(1, 1, 1);
+                    finalColor.rgb = lerp(finalColor.rgb, hSepWhiteCore, hSepLayers.x * _Layer1Alpha * _HSeparatorAlpha * 0.5);
+                    finalColor.a = max(finalColor.a, hSepLayers.x * _Layer1Alpha * _HSeparatorAlpha);
                 }
 
                 // === HOLOGRAM EFFECT ===

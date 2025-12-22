@@ -871,26 +871,16 @@ public class VRTaskbar : MonoBehaviour
         // Section2 (middle): App buttons
         // Section3 (right): Network, Battery, Clock (status)
 
-        float xPos = 0;
-
         // Section 1 (Left) - Control buttons
         CreateSection1(ContentContainer, contentHeight);
-        xPos += section1Width;
 
-        // Spacing 1 with VerticalSeparator
-        CreateSpacingWithSeparator(ContentContainer, xPos, contentHeight, "Spacing1");
-        xPos += sectionSpacing;
+        // Section 2 (Middle - App buttons) - positioned after Section1 + spacing
+        float section2XPos = section1Width + sectionSpacing;
+        CreateSection2(ContentContainer, section2XPos, section2Width, contentHeight);
 
-        // Section 2 (Middle - App buttons)
-        CreateSection2(ContentContainer, xPos, section2Width, contentHeight);
-        xPos += section2Width;
-
-        // Spacing 2 with VerticalSeparator
-        CreateSpacingWithSeparator(ContentContainer, xPos, contentHeight, "Spacing2");
-        xPos += sectionSpacing / 2;
-
-        // Section 3 (Right - Status)
-        CreateSection3(ContentContainer, xPos, contentHeight);
+        // Section 3 (Right - Status) - positioned after Section2 + spacing
+        float section3XPos = section2XPos + section2Width + sectionSpacing / 2;
+        CreateSection3(ContentContainer, section3XPos, contentHeight);
         // Home button is pre-created in CreateSection2
     }
 
@@ -1238,23 +1228,6 @@ public class VRTaskbar : MonoBehaviour
         clockRT.anchorMax = Vector2.one;
         clockRT.offsetMin = Vector2.zero;
         clockRT.offsetMax = Vector2.zero;
-    }
-
-    /// <summary>
-    /// Tạo Spacing object rộng sectionSpacing (separator được vẽ bởi GlowingBorder shader)
-    /// </summary>
-    void CreateSpacingWithSeparator(RectTransform parent, float xPos, float height, string name)
-    {
-        // Spacing container (separator visuals are now drawn by GlowingBorder shader)
-        GameObject spacing = new GameObject(name);
-        spacing.transform.SetParent(parent, false);
-        RectTransform spacingRT = spacing.AddComponent<RectTransform>();
-
-        spacingRT.anchorMin = new Vector2(0, 0);
-        spacingRT.anchorMax = new Vector2(0, 1);
-        spacingRT.pivot = new Vector2(0, 0.5f);
-        spacingRT.sizeDelta = new Vector2(sectionSpacing, 0);
-        spacingRT.anchoredPosition = new Vector2(xPos, 0);
     }
 
     /// <summary>

@@ -75,8 +75,8 @@ public class VRMenuFrame : MonoBehaviour
     [Tooltip("Margin to shrink ContentContainer relative to parent")]
     public float contentMarginLeft = 75f;
     public float contentMarginRight = 75f;
-    public float contentMarginTop = 75f;
-    public float contentMarginBottom = 75f;
+    public float contentMarginTop = 50f;
+    public float contentMarginBottom = 50f;
 
     [Header("Style Resources")]
     public TMP_FontAsset customFont;
@@ -86,6 +86,7 @@ public class VRMenuFrame : MonoBehaviour
     private Sprite _pixelSprite;
     private Sprite _roundedMaskSprite;
     private Dictionary<int, Sprite> _borderSprites = new Dictionary<int, Sprite>();
+    private Material _borderMaterial;
 
     // Components (on this GameObject)
     public Canvas Canvas { get; private set; }
@@ -691,6 +692,7 @@ public class VRMenuFrame : MonoBehaviour
             glowMat.SetFloat("_LightGlow", 0.008f);
 
             borderImg.material = glowMat;
+            _borderMaterial = glowMat; // Cache reference for separator settings
             // borderImg.color = Color.white;
             borderImg.sprite = GetPixelSprite();
         }
@@ -701,6 +703,76 @@ public class VRMenuFrame : MonoBehaviour
         }
 
         borderObj.transform.SetAsLastSibling();
+    }
+
+    /// <summary>
+    /// Set horizontal separators for the glowing border.
+    /// Positions are in UV space (0-1), where 0 is bottom and 1 is top.
+    /// </summary>
+    /// <param name="count">Number of separators (0-4)</param>
+    /// <param name="positions">Y positions in UV space (x=sep1, y=sep2, z=sep3, w=sep4)</param>
+    /// <param name="width">Core width of separator</param>
+    /// <param name="glowWidth">Glow width of separator</param>
+    /// <param name="alpha">Alpha/intensity of separator</param>
+    /// <param name="length">Horizontal length (0-1), 1 = full width, centered at x=0.5</param>
+    public void SetHorizontalSeparators(int count, Vector4 positions, float width = 0.004f, float glowWidth = 0.015f, float alpha = 0.8f, float length = 1.0f)
+    {
+        if (_borderMaterial == null)
+        {
+            // Try to find material from GlowingBorder
+            var glassBg = transform.Find("GlassBackground");
+            if (glassBg != null)
+            {
+                var glowBorder = glassBg.Find("GlowingBorder");
+                if (glowBorder != null)
+                {
+                    var borderImg = glowBorder.GetComponent<Image>();
+                    if (borderImg != null)
+                        _borderMaterial = borderImg.material;
+                }
+            }
+        }
+
+        if (_borderMaterial != null)
+        {
+            _borderMaterial.SetFloat("_HSeparatorCount", count);
+            _borderMaterial.SetVector("_HSeparatorPositions", positions);
+            _borderMaterial.SetFloat("_HSeparatorWidth", width);
+            _borderMaterial.SetFloat("_HSeparatorGlowWidth", glowWidth);
+            _borderMaterial.SetFloat("_HSeparatorAlpha", alpha);
+            _borderMaterial.SetFloat("_HSeparatorLength", Mathf.Clamp01(length));
+        }
+    }
+
+    /// <summary>
+    /// Set vertical separators for the glowing border.
+    /// Positions are in UV space (0-1), where 0 is left and 1 is right.
+    /// </summary>
+    public void SetVerticalSeparators(int count, Vector4 positions, float width = 0.004f, float glowWidth = 0.015f, float alpha = 0.8f)
+    {
+        if (_borderMaterial == null)
+        {
+            var glassBg = transform.Find("GlassBackground");
+            if (glassBg != null)
+            {
+                var glowBorder = glassBg.Find("GlowingBorder");
+                if (glowBorder != null)
+                {
+                    var borderImg = glowBorder.GetComponent<Image>();
+                    if (borderImg != null)
+                        _borderMaterial = borderImg.material;
+                }
+            }
+        }
+
+        if (_borderMaterial != null)
+        {
+            _borderMaterial.SetFloat("_SeparatorCount", count);
+            _borderMaterial.SetVector("_SeparatorPositions", positions);
+            _borderMaterial.SetFloat("_SeparatorWidth", width);
+            _borderMaterial.SetFloat("_SeparatorGlowWidth", glowWidth);
+            _borderMaterial.SetFloat("_SeparatorAlpha", alpha);
+        }
     }
 
     void CreateBorderFallback(Transform parent)
