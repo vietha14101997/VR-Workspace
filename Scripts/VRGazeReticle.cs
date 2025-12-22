@@ -340,8 +340,13 @@ public class VRGazeReticle : MonoBehaviour
 
     void ProcessDwellClick(Vector3 currentGazeDir, GameObject target, RaycastHit hit)
     {
-        // Kiểm tra xem target có thể click được không (có IPointerClickHandler hoặc Button)
-        if (!IsDwellable(target))
+        // Check if dropdown is open - allow dwell on ANY object to close it
+        bool hasOpenDropdown = VRDropdown.CurrentlyOpenDropdown != null;
+        bool isDropdownOption = hasOpenDropdown && VRDropdown.CurrentlyOpenDropdown.IsPartOfDropdownPanel(target);
+        bool isDwellableTarget = IsDwellable(target);
+
+        // If no dropdown open and target is not dwellable, skip
+        if (!hasOpenDropdown && !isDwellableTarget)
         {
             ResetDwellState();
             return;
@@ -397,15 +402,34 @@ public class VRGazeReticle : MonoBehaviour
         // Phase 3: Click khi đủ thời gian
         if (_dwellProgress >= 1f)
         {
-            // Tính normalized hit point trên collider
-            Vector2 normalizedHitPoint = CalculateNormalizedHitPoint(hit);
-            HandlePointerClick(target, normalizedHitPoint);
             _dwellClickTriggered = true;
 
             // Ẩn ring ngay sau khi click
             if (_dwellRing != null)
             {
                 _dwellRing.enabled = false;
+            }
+
+            // Check if there's an open dropdown
+            if (hasOpenDropdown)
+            {
+                if (isDropdownOption)
+                {
+                    // Target is a dropdown option - perform normal click
+                    Vector2 normalizedHitPoint = CalculateNormalizedHitPoint(hit);
+                    HandlePointerClick(target, normalizedHitPoint);
+                }
+                else
+                {
+                    // Target is NOT part of the dropdown - close dropdown instead of clicking
+                    VRDropdown.CurrentlyOpenDropdown.CloseDropdown();
+                }
+            }
+            else if (isDwellableTarget)
+            {
+                // No dropdown open and target is dwellable - perform normal click
+                Vector2 normalizedHitPoint = CalculateNormalizedHitPoint(hit);
+                HandlePointerClick(target, normalizedHitPoint);
             }
         }
     }

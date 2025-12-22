@@ -157,10 +157,10 @@ public static class VRDropdownFactory
         // 11. Initialize dropdown component
         dropdown.Initialize(config.options, config.defaultIndex, valueTxt, dropdownPanel, onValueChanged);
 
-        // 12. Toggle dropdown on click
+        // 12. Toggle dropdown on click (use ToggleDropdown to handle force hover)
         btn.onClick.AddListener(() =>
         {
-            dropdownPanel.SetActive(!dropdownPanel.activeSelf);
+            dropdown.ToggleDropdown();
         });
 
         return wrapper;
@@ -562,7 +562,7 @@ public static class VRDropdownFactory
     {
         float optionHeight = config.OptionHeight;
 
-        // Panel container
+        // Panel container - NO background here, background goes to Viewport
         GameObject panel = new GameObject("DropdownPanel");
         panel.transform.SetParent(parent, false);
         RectTransform panelRT = panel.AddComponent<RectTransform>();
@@ -573,7 +573,7 @@ public static class VRDropdownFactory
         panelRT.anchorMin = new Vector2(0f, 0f);
         panelRT.anchorMax = new Vector2(1f, 0f);
         panelRT.pivot = new Vector2(0.5f, 1f);
-        panelRT.anchoredPosition = new Vector2(0, -5f);
+        panelRT.anchoredPosition = new Vector2(0, -25f);
         panelRT.sizeDelta = new Vector2(0, panelHeight);
 
         // Add Canvas FIRST to handle sorting without breaking VR raycast
@@ -584,11 +584,7 @@ public static class VRDropdownFactory
         GraphicRaycaster raycaster = panel.AddComponent<GraphicRaycaster>();
         raycaster.blockingObjects = GraphicRaycaster.BlockingObjects.None;
 
-        // Panel background (after Canvas for proper rendering)
-        Image panelBg = panel.AddComponent<Image>();
-        panelBg.sprite = GetPixelSprite();
-        Color col = config.themeColor;
-        panelBg.color = new Color(col.r * 0.15f, col.g * 0.15f, col.b * 0.2f, 0.95f);
+        // NO Image on panel - background is now on Viewport
 
         // BoxCollider cho VR raycast
         BoxCollider panelCol = panel.AddComponent<BoxCollider>();
@@ -598,23 +594,51 @@ public static class VRDropdownFactory
         int vrLayer = LayerMask.NameToLayer(config.layerName);
         if (vrLayer != -1) panel.layer = vrLayer;
 
-        // Scroll View
+        // Viewport - now has Visuals with Background and Border like the main Dropdown
         GameObject viewport = new GameObject("Viewport");
         viewport.transform.SetParent(panel.transform, false);
         if (vrLayer != -1) viewport.layer = vrLayer;
         RectTransform viewportRT = viewport.AddComponent<RectTransform>();
         viewportRT.anchorMin = Vector2.zero;
         viewportRT.anchorMax = Vector2.one;
-        viewportRT.offsetMin = new Vector2(10, 10);
-        viewportRT.offsetMax = new Vector2(-10, -10);
+        viewportRT.offsetMin = Vector2.zero;
+        viewportRT.offsetMax = Vector2.zero;
 
-        // Use RectMask2D instead of Mask for better VR compatibility
-        RectMask2D rectMask = viewport.AddComponent<RectMask2D>();
+        // Visuals container for Viewport (like the main Dropdown's Visuals)
+        // Scale expansion based on height ratio to maintain visual consistency
+        float heightRatio = config.BoxHeight / panelHeight;
+        float adjustedExpansion = config.edgePadding * heightRatio;
+
+        GameObject viewportVisuals = new GameObject("Visuals");
+        viewportVisuals.transform.SetParent(viewport.transform, false);
+        RectTransform viewportVisualsRT = viewportVisuals.AddComponent<RectTransform>();
+        viewportVisualsRT.anchorMin = new Vector2(-adjustedExpansion, -adjustedExpansion);
+        viewportVisualsRT.anchorMax = new Vector2(1f + adjustedExpansion, 1f + adjustedExpansion);
+        viewportVisualsRT.offsetMin = Vector2.zero;
+        viewportVisualsRT.offsetMax = Vector2.zero;
+
+        // Background for Viewport (same style as Dropdown)
+        CreateViewportBackground(viewportVisuals.transform, config, panelHeight);
+
+        // Border for Viewport (same style as Dropdown)
+        CreateViewportBorder(viewportVisuals.transform, config, panelHeight);
+
+        // Content container (inside Viewport, compensated for Visuals expansion)
+        GameObject viewportContent = new GameObject("Content");
+        viewportContent.transform.SetParent(viewport.transform, false);
+        RectTransform viewportContentRT = viewportContent.AddComponent<RectTransform>();
+        viewportContentRT.anchorMin = Vector2.zero;
+        viewportContentRT.anchorMax = Vector2.one;
+        viewportContentRT.offsetMin = new Vector2(10, 10);
+        viewportContentRT.offsetMax = new Vector2(-10, -10);
+
+        // Use RectMask2D on Content instead of Viewport for better VR compatibility
+        RectMask2D rectMask = viewportContent.AddComponent<RectMask2D>();
         rectMask.padding = Vector4.zero;
 
-        // Options container
+        // Options container - now inside viewportContent
         GameObject optionsContainer = new GameObject("Options");
-        optionsContainer.transform.SetParent(viewport.transform, false);
+        optionsContainer.transform.SetParent(viewportContent.transform, false);
         if (vrLayer != -1) optionsContainer.layer = vrLayer;
         RectTransform optionsRT = optionsContainer.AddComponent<RectTransform>();
         optionsRT.anchorMin = new Vector2(0, 1);
@@ -648,7 +672,7 @@ public static class VRDropdownFactory
         {
             ScrollRect scrollRect = panel.AddComponent<ScrollRect>();
             scrollRect.content = optionsRT;
-            scrollRect.viewport = viewportRT;
+            scrollRect.viewport = viewportContentRT;  // Use viewportContent as scroll viewport
             scrollRect.horizontal = false;
             scrollRect.vertical = true;
             scrollRect.movementType = ScrollRect.MovementType.Clamped;
@@ -656,6 +680,99 @@ public static class VRDropdownFactory
         }
 
         return panel;
+    }
+
+    /// <summary>
+    /// Tạo background cho Viewport giống với Dropdown
+    /// Điều chỉnh cornerRadius và edgePadding theo tỷ lệ chiều cao để visual giống nhau
+    /// </summary>
+    private static void CreateViewportBackground(Transform parent, DropdownConfig config, float panelHeight)
+    {
+        GameObject bgObj = new GameObject("Background");
+        bgObj.transform.SetParent(parent, false);
+        RectTransform rt = bgObj.AddComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+
+        Image img = bgObj.AddComponent<Image>();
+        img.sprite = GetPixelSprite();
+        img.raycastTarget = false;
+
+        float aspect = config.width / panelHeight;
+        Color col = config.themeColor;
+
+        // Scale parameters based on height ratio to maintain visual consistency
+        float heightRatio = config.BoxHeight / panelHeight;
+        float adjustedCornerRadius = config.cornerRadius * heightRatio;
+        float adjustedEdgePadding = config.edgePadding * heightRatio;
+
+        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
+        if (glassShader != null)
+        {
+            Material mat = new Material(glassShader);
+            mat.SetFloat("_CornerRadius", adjustedCornerRadius);
+            mat.SetFloat("_EdgePadding", adjustedEdgePadding);
+            mat.SetFloat("_Aspect", aspect);
+            mat.SetColor("_ColorA", new Color(col.r, col.g, col.b, config.backgroundAlpha * 1.5f));
+            mat.SetColor("_ColorB", new Color(col.r, col.g, col.b, config.backgroundAlpha * 0.5f));
+            mat.SetFloat("_GlassAlpha", config.backgroundAlpha);
+            img.material = mat;
+            img.color = Color.white;
+        }
+        else
+        {
+            img.color = new Color(col.r, col.g, col.b, config.backgroundAlpha);
+        }
+    }
+
+    /// <summary>
+    /// Tạo border cho Viewport giống với Dropdown
+    /// Điều chỉnh cornerRadius, borderWidth, glowWidth theo tỷ lệ chiều cao để visual giống nhau
+    /// </summary>
+    private static void CreateViewportBorder(Transform parent, DropdownConfig config, float panelHeight)
+    {
+        GameObject borderObj = new GameObject("Border");
+        borderObj.transform.SetParent(parent, false);
+        RectTransform rt = borderObj.AddComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+
+        Image img = borderObj.AddComponent<Image>();
+        img.sprite = GetPixelSprite();
+        img.raycastTarget = false;
+
+        float aspect = config.width / panelHeight;
+        Color col = config.themeColor;
+
+        // Scale parameters based on height ratio to maintain visual consistency
+        float heightRatio = config.BoxHeight / panelHeight;
+        float adjustedCornerRadius = config.cornerRadius * heightRatio;
+        float adjustedEdgePadding = config.edgePadding * heightRatio;
+        float adjustedBorderWidth = config.borderWidth * heightRatio;
+        float adjustedGlowWidth = config.glowWidth * heightRatio;
+
+        Shader glowShader = Shader.Find("Custom/GlowingElementBorder");
+        if (glowShader != null)
+        {
+            Material mat = new Material(glowShader);
+            mat.SetFloat("_Aspect", aspect);
+            mat.SetFloat("_EdgePadding", adjustedEdgePadding);
+            mat.SetFloat("_CornerRadius", adjustedCornerRadius);
+
+            Color borderGlowCol = Color.Lerp(col, Color.white, 0.75f);
+            mat.SetColor("_GlowColor", borderGlowCol);
+
+            mat.SetFloat("_BorderWidth", adjustedBorderWidth);
+            mat.SetFloat("_GlowWidth", adjustedGlowWidth);
+            mat.SetFloat("_GlowIntensity", config.glowIntensity);
+            mat.SetFloat("_PulseEnabled", 0f);
+
+            img.material = mat;
+        }
     }
 
     private static void CreateOptionItem(Transform parent, DropdownConfig config, int index,
@@ -779,11 +896,15 @@ public static class VRDropdownFactory
         optBtn.onClick.AddListener(() =>
         {
             valueTxt.text = optionText;
-            panel.SetActive(false);
 
             if (dropdownComponent != null)
             {
                 dropdownComponent.UpdateSelection(capturedIndex);
+                dropdownComponent.CloseDropdown();  // Use CloseDropdown to release force hover
+            }
+            else
+            {
+                panel.SetActive(false);
             }
 
             onValueChanged?.Invoke(capturedIndex, optionText);
@@ -954,6 +1075,10 @@ public class VRDropdown : MonoBehaviour
     private TextMeshProUGUI _valueTxt;
     private GameObject _dropdownPanel;
     private System.Action<int, string> _onValueChanged;
+    private VRButtonAnimation _buttonAnimation;  // Reference to button animation for hover state
+
+    // Static reference to currently open dropdown (for VRGazeReticle to check)
+    public static VRDropdown CurrentlyOpenDropdown { get; private set; }
 
     private class OptionRef
     {
@@ -964,6 +1089,7 @@ public class VRDropdown : MonoBehaviour
     private Dictionary<int, OptionRef> _optionRefs = new Dictionary<int, OptionRef>();
 
     public int SelectedIndex => _selectedIndex;
+    public GameObject DropdownPanel => _dropdownPanel;
     public string SelectedValue => _options != null && _selectedIndex >= 0 && _selectedIndex < _options.Count
         ? _options[_selectedIndex] : "";
 
@@ -975,6 +1101,13 @@ public class VRDropdown : MonoBehaviour
         _valueTxt = valueTxt;
         _dropdownPanel = dropdownPanel;
         _onValueChanged = onValueChanged;
+
+        // Find VRButtonAnimation in HitArea child
+        var hitArea = transform.Find("HitArea");
+        if (hitArea != null)
+        {
+            _buttonAnimation = hitArea.GetComponent<VRButtonAnimation>();
+        }
     }
 
     public void RegisterOption(int index, Image background, Image checkmark, Color themeColor)
@@ -1055,22 +1188,73 @@ public class VRDropdown : MonoBehaviour
         {
             _dropdownPanel.SetActive(false);
         }
+        // Release force hover when panel closes
+        if (_buttonAnimation != null)
+        {
+            _buttonAnimation.SetForceHover(false);
+        }
+        // Clear static reference
+        if (CurrentlyOpenDropdown == this)
+        {
+            CurrentlyOpenDropdown = null;
+        }
     }
 
     public void OpenDropdown()
     {
+        // Close any other open dropdown first
+        if (CurrentlyOpenDropdown != null && CurrentlyOpenDropdown != this)
+        {
+            CurrentlyOpenDropdown.CloseDropdown();
+        }
+
         if (_dropdownPanel != null)
         {
             _dropdownPanel.SetActive(true);
         }
+        // Force hover when panel opens
+        if (_buttonAnimation != null)
+        {
+            _buttonAnimation.SetForceHover(true);
+        }
+        // Set static reference
+        CurrentlyOpenDropdown = this;
     }
 
     public void ToggleDropdown()
     {
         if (_dropdownPanel != null)
         {
-            _dropdownPanel.SetActive(!_dropdownPanel.activeSelf);
+            bool willBeActive = !_dropdownPanel.activeSelf;
+            if (willBeActive)
+            {
+                OpenDropdown();
+            }
+            else
+            {
+                CloseDropdown();
+            }
         }
+    }
+
+    /// <summary>
+    /// Check if a GameObject is part of this dropdown's panel (option items)
+    /// </summary>
+    public bool IsPartOfDropdownPanel(GameObject obj)
+    {
+        if (_dropdownPanel == null || obj == null) return false;
+
+        // Check if obj is a child of the dropdown panel
+        Transform current = obj.transform;
+        while (current != null)
+        {
+            if (current.gameObject == _dropdownPanel)
+            {
+                return true;
+            }
+            current = current.parent;
+        }
+        return false;
     }
 
     private void OnDisable()

@@ -5,8 +5,10 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
 {
     public Transform targetVisuals; // Target to animate
     public float popAmount = 0.1f;  // Set Default to 0.1
+    public float hoverBorderMultiplier = 1f; // Border width multiplier when hovering (default 1 = no change)
 
     private bool _isHovered = false;
+    private bool _forceHover = false;  // Force hover state (e.g., when dropdown panel is open)
     private float _currentPop = 0f;
     private float _currentValidScale = 1.0f;
 
@@ -19,6 +21,20 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
     private RectTransform _borderRectTransform;
     private Shader _originalBorderShader;
     private Shader _hoverBorderShader;
+
+    // Saved border properties to restore after shader swap
+    private float _savedBorderWidth;
+    private float _savedGlowWidth;
+    private float _savedCornerRadius;
+    private float _savedEdgePadding;
+    private float _savedGlowIntensity;
+    private Color _savedGlowColor;
+
+    // Saved layer properties for GlowingGlassBorder shader
+    private float _savedLayer1Width;
+    private float _savedLayer2Width;
+    private float _savedLayer3Width;
+    private float _savedLayer4Width;
 
     void Start()
     {
@@ -41,8 +57,11 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
                 _originalBorderShader = _borderMaterial.shader;
                 _hoverBorderShader = Shader.Find("Custom/GlowingGlassBorder");
 
+                // Save border properties for restoration after shader swap
+                SaveBorderProperties();
+
                 // Set aspect ratio for correct border rendering
-                UpdateBorderAspect();
+                UpdateBorderProperties();
             }
         }
 
@@ -76,10 +95,12 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
 
     void Update()
     {
-        float targetZ = _isHovered ? -popAmount : 0f;
+        bool effectiveHover = _isHovered || _forceHover;
+
+        float targetZ = effectiveHover ? -popAmount : 0f;
         _currentPop = Mathf.Lerp(_currentPop, targetZ, Time.unscaledDeltaTime * 10f);
 
-        float targetScale = _isHovered ? 1.05f : 1.0f;
+        float targetScale = effectiveHover ? 1.05f : 1.0f;
         _currentValidScale = Mathf.Lerp(_currentValidScale, targetScale, Time.unscaledDeltaTime * 10f);
 
         if (targetVisuals != null)
@@ -89,7 +110,7 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
         }
 
         // Smooth hover amount transition
-        float targetHover = _isHovered ? 1f : 0f;
+        float targetHover = effectiveHover ? 1f : 0f;
         _currentHoverAmount = Mathf.Lerp(_currentHoverAmount, targetHover, Time.unscaledDeltaTime * 8f);
 
         // Update border material hover amount (viền sáng lên)
@@ -113,7 +134,7 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
         if (_borderMaterial != null && _hoverBorderShader != null)
         {
             _borderMaterial.shader = _hoverBorderShader;
-            UpdateBorderAspect();
+            UpdateBorderProperties();
         }
     }
 
@@ -121,11 +142,34 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
     {
         _isHovered = false;
 
-        // Restore original border shader
-        if (_borderMaterial != null && _originalBorderShader != null)
+        // Only restore original shader if not force hovering
+        if (!_forceHover && _borderMaterial != null && _originalBorderShader != null)
         {
             _borderMaterial.shader = _originalBorderShader;
-            UpdateBorderAspect();
+            UpdateBorderProperties();
+        }
+    }
+
+    /// <summary>
+    /// Force hover state on/off (used when dropdown panel is open)
+    /// </summary>
+    public void SetForceHover(bool force)
+    {
+        _forceHover = force;
+
+        // Update border shader based on force hover state
+        if (_borderMaterial != null)
+        {
+            if (force && _hoverBorderShader != null)
+            {
+                _borderMaterial.shader = _hoverBorderShader;
+                UpdateBorderProperties();
+            }
+            else if (!force && !_isHovered && _originalBorderShader != null)
+            {
+                _borderMaterial.shader = _originalBorderShader;
+                UpdateBorderProperties();
+            }
         }
     }
     
@@ -154,10 +198,45 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
         }
     }
 
-    private void UpdateBorderAspect()
+    /// <summary>
+    /// Save border material properties before shader swap
+    /// </summary>
+    private void SaveBorderProperties()
+    {
+        if (_borderMaterial == null) return;
+
+        if (_borderMaterial.HasProperty("_BorderWidth"))
+            _savedBorderWidth = _borderMaterial.GetFloat("_BorderWidth");
+        if (_borderMaterial.HasProperty("_GlowWidth"))
+            _savedGlowWidth = _borderMaterial.GetFloat("_GlowWidth");
+        if (_borderMaterial.HasProperty("_CornerRadius"))
+            _savedCornerRadius = _borderMaterial.GetFloat("_CornerRadius");
+        if (_borderMaterial.HasProperty("_EdgePadding"))
+            _savedEdgePadding = _borderMaterial.GetFloat("_EdgePadding");
+        if (_borderMaterial.HasProperty("_GlowIntensity"))
+            _savedGlowIntensity = _borderMaterial.GetFloat("_GlowIntensity");
+        if (_borderMaterial.HasProperty("_GlowColor"))
+            _savedGlowColor = _borderMaterial.GetColor("_GlowColor");
+
+        // Save default layer widths for GlowingGlassBorder shader (used when hovering)
+        // These are the default values from the shader
+        _savedLayer1Width = 0.015f;
+        _savedLayer2Width = 0.04f;
+        _savedLayer3Width = 0.08f;
+        _savedLayer4Width = 0.15f;
+    }
+
+    /// <summary>
+    /// Update border properties after shader swap (restore saved values)
+    /// Apply 4x border width multiplier when hovering
+    /// </summary>
+    private void UpdateBorderProperties()
     {
         if (_borderMaterial == null || _borderRectTransform == null) return;
 
+        bool effectiveHover = _isHovered || _forceHover;
+
+        // Update aspect ratio
         float width = _borderRectTransform.rect.width;
         float height = _borderRectTransform.rect.height;
         if (height > 0.001f)
@@ -165,6 +244,32 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
             float aspect = width / height;
             _borderMaterial.SetFloat("_Aspect", aspect);
         }
+
+        // Restore saved properties after shader swap
+        // Apply hoverBorderMultiplier to border width when hovering
+        float borderMultiplier = effectiveHover ? hoverBorderMultiplier : 1f;
+        if (_borderMaterial.HasProperty("_BorderWidth"))
+            _borderMaterial.SetFloat("_BorderWidth", _savedBorderWidth * borderMultiplier);
+        if (_borderMaterial.HasProperty("_GlowWidth"))
+            _borderMaterial.SetFloat("_GlowWidth", _savedGlowWidth);
+        if (_borderMaterial.HasProperty("_CornerRadius"))
+            _borderMaterial.SetFloat("_CornerRadius", _savedCornerRadius);
+        if (_borderMaterial.HasProperty("_EdgePadding"))
+            _borderMaterial.SetFloat("_EdgePadding", _savedEdgePadding);
+        if (_borderMaterial.HasProperty("_GlowIntensity"))
+            _borderMaterial.SetFloat("_GlowIntensity", _savedGlowIntensity);
+        if (_borderMaterial.HasProperty("_GlowColor"))
+            _borderMaterial.SetColor("_GlowColor", _savedGlowColor);
+
+        // Apply multiplier to layer widths for GlowingGlassBorder shader when hovering
+        if (_borderMaterial.HasProperty("_Layer1Width"))
+            _borderMaterial.SetFloat("_Layer1Width", _savedLayer1Width * borderMultiplier);
+        if (_borderMaterial.HasProperty("_Layer2Width"))
+            _borderMaterial.SetFloat("_Layer2Width", _savedLayer2Width * borderMultiplier);
+        if (_borderMaterial.HasProperty("_Layer3Width"))
+            _borderMaterial.SetFloat("_Layer3Width", _savedLayer3Width * borderMultiplier);
+        if (_borderMaterial.HasProperty("_Layer4Width"))
+            _borderMaterial.SetFloat("_Layer4Width", _savedLayer4Width * borderMultiplier);
     }
 
     void OnDestroy()

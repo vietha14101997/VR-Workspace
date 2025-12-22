@@ -160,6 +160,7 @@ public static class VRInputFieldFactory
         VRButtonAnimation anim = hitArea.AddComponent<VRButtonAnimation>();
         anim.targetVisuals = visuals.transform;
         anim.popAmount = config.popAmount;
+        anim.hoverBorderMultiplier = 2f; // Input fields have thicker border when hovering
 
         // 10. Setup callbacks
         if (onValueChanged != null)
