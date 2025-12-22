@@ -73,10 +73,10 @@ public class VRMenuFrame : MonoBehaviour
 
     [Header("Content Margin (pixels)")]
     [Tooltip("Margin to shrink ContentContainer relative to parent")]
-    public float contentMarginLeft = 20f;
-    public float contentMarginRight = 20f;
-    public float contentMarginTop = 10f;
-    public float contentMarginBottom = 20f;
+    public float contentMarginLeft = 75f;
+    public float contentMarginRight = 75f;
+    public float contentMarginTop = 75f;
+    public float contentMarginBottom = 75f;
 
     [Header("Style Resources")]
     public TMP_FontAsset customFont;
@@ -84,6 +84,7 @@ public class VRMenuFrame : MonoBehaviour
     // Internal Resources
     private Sprite _roundedSprite;
     private Sprite _pixelSprite;
+    private Sprite _roundedMaskSprite;
     private Dictionary<int, Sprite> _borderSprites = new Dictionary<int, Sprite>();
 
     // Components (on this GameObject)
@@ -752,7 +753,15 @@ public class VRMenuFrame : MonoBehaviour
             -(expansionPxH + contentMarginTop)
         );
 
-        fxContainer.AddComponent<RectMask2D>();
+        // Use Mask with rounded sprite instead of RectMask2D for rounded corner clipping
+        Image maskImage = fxContainer.AddComponent<Image>();
+        maskImage.sprite = GetRoundedMaskSprite();
+        maskImage.type = Image.Type.Sliced;
+        maskImage.color = Color.white;
+        maskImage.raycastTarget = false;
+
+        Mask mask = fxContainer.AddComponent<Mask>();
+        mask.showMaskGraphic = false; // Hide the mask image, only use for clipping
 
         int particleCount = 20;
         for (int i = 0; i < particleCount; i++)
@@ -860,6 +869,46 @@ public class VRMenuFrame : MonoBehaviour
         Sprite s = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100, 0, SpriteMeshType.FullRect, new Vector4(radius, radius, radius, radius));
         _borderSprites[thickness] = s;
         return s;
+    }
+
+    Sprite GetRoundedMaskSprite()
+    {
+        if (_roundedMaskSprite != null) return _roundedMaskSprite;
+
+        int size = 128;
+        int radius = 24; // Match border corner radius ratio
+        int border = radius; // Border for 9-slice
+
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        Color[] colors = new Color[size * size];
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float alpha = 1f;
+
+                // Check if in corner region
+                int cornerX = -1, cornerY = -1;
+                if (x < radius && y < radius) { cornerX = radius; cornerY = radius; }
+                else if (x >= size - radius && y < radius) { cornerX = size - radius - 1; cornerY = radius; }
+                else if (x < radius && y >= size - radius) { cornerX = radius; cornerY = size - radius - 1; }
+                else if (x >= size - radius && y >= size - radius) { cornerX = size - radius - 1; cornerY = size - radius - 1; }
+
+                if (cornerX >= 0)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), new Vector2(cornerX, cornerY));
+                    alpha = Mathf.Clamp01(radius + 0.5f - dist);
+                }
+
+                colors[y * size + x] = new Color(1, 1, 1, alpha);
+            }
+        }
+
+        tex.SetPixels(colors);
+        tex.Apply();
+        _roundedMaskSprite = Sprite.Create(tex, new Rect(0, 0, size, size), Vector2.one * 0.5f, 100, 0, SpriteMeshType.FullRect, new Vector4(border, border, border, border));
+        return _roundedMaskSprite;
     }
 
     Sprite GetPixelSprite()

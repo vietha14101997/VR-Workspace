@@ -84,6 +84,7 @@ public class VRTaskbar : MonoBehaviour
     private Sprite _pixelSprite;
     private Sprite _batterySprite;
     private Sprite _wifiSprite;
+    private Sprite _roundedMaskSprite;
 
     // Status References
     private TextMeshProUGUI _clockText;
@@ -572,6 +573,33 @@ public class VRTaskbar : MonoBehaviour
                 if (borderImg != null && borderImg.sprite == null)
                 {
                     borderImg.sprite = GetPixelSprite();
+                }
+            }
+        }
+
+        // Reapply battery sprite (runtime-generated, not saved in prefab)
+        Transform batteryContainer = FindDeepChild(transform, "BatteryContainer");
+        if (batteryContainer != null)
+        {
+            Sprite batSprite = GetBatterySprite();
+
+            Transform bgTransform = batteryContainer.Find("Bg");
+            if (bgTransform != null)
+            {
+                var bgImg = bgTransform.GetComponent<Image>();
+                if (bgImg != null && bgImg.sprite == null)
+                {
+                    bgImg.sprite = batSprite;
+                }
+            }
+
+            Transform fillTransform = batteryContainer.Find("Fill");
+            if (fillTransform != null)
+            {
+                var fillImg = fillTransform.GetComponent<Image>();
+                if (fillImg != null && fillImg.sprite == null)
+                {
+                    fillImg.sprite = batSprite;
                 }
             }
         }
@@ -1773,7 +1801,15 @@ public class VRTaskbar : MonoBehaviour
             -(expansionPxH + contentMarginTop)
         );
 
-        fxContainer.AddComponent<RectMask2D>();
+        // Use Mask with rounded sprite instead of RectMask2D for rounded corner clipping
+        Image maskImage = fxContainer.AddComponent<Image>();
+        maskImage.sprite = GetRoundedMaskSprite();
+        maskImage.type = Image.Type.Sliced;
+        maskImage.color = Color.white;
+        maskImage.raycastTarget = false;
+
+        Mask mask = fxContainer.AddComponent<Mask>();
+        mask.showMaskGraphic = false; // Hide the mask image, only use for clipping
 
         // Fewer particles for smaller taskbar
         int particleCount = 8;
@@ -1931,6 +1967,46 @@ public class VRTaskbar : MonoBehaviour
         tex.Apply();
         _wifiSprite = Sprite.Create(tex, new Rect(0, 0, size, size), Vector2.one * 0.5f);
         return _wifiSprite;
+    }
+
+    Sprite GetRoundedMaskSprite()
+    {
+        if (_roundedMaskSprite != null) return _roundedMaskSprite;
+
+        int size = 128;
+        int radius = 32; // ~25% corner radius to match border
+        int border = radius; // Border for 9-slice
+
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        Color[] colors = new Color[size * size];
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float alpha = 1f;
+
+                // Check if in corner region
+                int cornerX = -1, cornerY = -1;
+                if (x < radius && y < radius) { cornerX = radius; cornerY = radius; }
+                else if (x >= size - radius && y < radius) { cornerX = size - radius - 1; cornerY = radius; }
+                else if (x < radius && y >= size - radius) { cornerX = radius; cornerY = size - radius - 1; }
+                else if (x >= size - radius && y >= size - radius) { cornerX = size - radius - 1; cornerY = size - radius - 1; }
+
+                if (cornerX >= 0)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), new Vector2(cornerX, cornerY));
+                    alpha = Mathf.Clamp01(radius + 0.5f - dist);
+                }
+
+                colors[y * size + x] = new Color(1, 1, 1, alpha);
+            }
+        }
+
+        tex.SetPixels(colors);
+        tex.Apply();
+        _roundedMaskSprite = Sprite.Create(tex, new Rect(0, 0, size, size), Vector2.one * 0.5f, 100, 0, SpriteMeshType.FullRect, new Vector4(border, border, border, border));
+        return _roundedMaskSprite;
     }
 
 }
