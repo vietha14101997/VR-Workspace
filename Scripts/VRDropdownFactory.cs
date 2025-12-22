@@ -304,22 +304,52 @@ public static class VRDropdownFactory
         float aspect = config.width / config.BoxHeight;
         Color col = config.themeColor;
 
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
-        if (glassShader != null)
+        // Try new GlassNoiseBackground shader first, fallback to GlassGradientBackground
+        Shader noiseShader = Shader.Find("Custom/GlassNoiseBackground");
+        if (noiseShader != null)
         {
-            Material mat = new Material(glassShader);
+            Material mat = new Material(noiseShader);
             mat.SetFloat("_CornerRadius", config.cornerRadius);
             mat.SetFloat("_EdgePadding", config.edgePadding);
             mat.SetFloat("_Aspect", aspect);
-            mat.SetColor("_ColorA", new Color(col.r, col.g, col.b, config.backgroundAlpha * 1.5f));
-            mat.SetColor("_ColorB", new Color(col.r, col.g, col.b, config.backgroundAlpha * 0.5f));
-            mat.SetFloat("_GlassAlpha", config.backgroundAlpha);
+            mat.SetColor("_ThemeColor", col);
+            mat.SetFloat("_BaseAlpha", config.backgroundAlpha * 2f);
+            mat.SetFloat("_Darkness", 0.75f); // Overall darkness
+            // Center dark spread - tối ở tâm lan ra
+            mat.SetFloat("_CenterDarkness", 0.5f);
+            mat.SetFloat("_CenterSpread", 0.7f);
+            mat.SetFloat("_CenterPower", 1.2f);
+            // Subtle noise
+            mat.SetFloat("_NoiseScale", 4f);
+            mat.SetFloat("_NoiseStrength", 0.08f);
+            // Edge glow - sáng nhẹ ở viền
+            mat.SetFloat("_EdgeGlowWidth", 0.12f);
+            mat.SetFloat("_EdgeGlowIntensity", 0.15f);
+            // Corner highlights
+            mat.SetFloat("_CornerHighlight", 0.1f);
             img.material = mat;
             img.color = Color.white;
         }
         else
         {
-            img.color = new Color(col.r, col.g, col.b, config.backgroundAlpha);
+            // Fallback to old shader
+            Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
+            if (glassShader != null)
+            {
+                Material mat = new Material(glassShader);
+                mat.SetFloat("_CornerRadius", config.cornerRadius);
+                mat.SetFloat("_EdgePadding", config.edgePadding);
+                mat.SetFloat("_Aspect", aspect);
+                mat.SetColor("_ColorA", new Color(col.r, col.g, col.b, config.backgroundAlpha * 1.5f));
+                mat.SetColor("_ColorB", new Color(col.r, col.g, col.b, config.backgroundAlpha * 0.5f));
+                mat.SetFloat("_GlassAlpha", config.backgroundAlpha);
+                img.material = mat;
+                img.color = Color.white;
+            }
+            else
+            {
+                img.color = new Color(col.r, col.g, col.b, config.backgroundAlpha);
+            }
         }
 
         return img;
@@ -708,22 +738,52 @@ public static class VRDropdownFactory
         float adjustedCornerRadius = config.cornerRadius * heightRatio;
         float adjustedEdgePadding = config.edgePadding * heightRatio;
 
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
-        if (glassShader != null)
+        // Try new GlassNoiseBackground shader first, fallback to GlassGradientBackground
+        Shader noiseShader = Shader.Find("Custom/GlassNoiseBackground");
+        if (noiseShader != null)
         {
-            Material mat = new Material(glassShader);
+            Material mat = new Material(noiseShader);
             mat.SetFloat("_CornerRadius", adjustedCornerRadius);
             mat.SetFloat("_EdgePadding", adjustedEdgePadding);
             mat.SetFloat("_Aspect", aspect);
-            mat.SetColor("_ColorA", new Color(col.r, col.g, col.b, config.backgroundAlpha * 1.5f));
-            mat.SetColor("_ColorB", new Color(col.r, col.g, col.b, config.backgroundAlpha * 0.5f));
-            mat.SetFloat("_GlassAlpha", config.backgroundAlpha);
+            mat.SetColor("_ThemeColor", col);
+            mat.SetFloat("_BaseAlpha", config.backgroundAlpha * 2.5f); // More opaque for panel
+            mat.SetFloat("_Darkness", 0.7f);
+            // Center dark spread
+            mat.SetFloat("_CenterDarkness", 0.45f);
+            mat.SetFloat("_CenterSpread", 0.6f);
+            mat.SetFloat("_CenterPower", 1.3f);
+            // Subtle noise
+            mat.SetFloat("_NoiseScale", 3f);
+            mat.SetFloat("_NoiseStrength", 0.06f);
+            // Edge glow
+            mat.SetFloat("_EdgeGlowWidth", 0.1f);
+            mat.SetFloat("_EdgeGlowIntensity", 0.12f);
+            // Corner highlights
+            mat.SetFloat("_CornerHighlight", 0.08f);
             img.material = mat;
             img.color = Color.white;
         }
         else
         {
-            img.color = new Color(col.r, col.g, col.b, config.backgroundAlpha);
+            // Fallback to old shader
+            Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
+            if (glassShader != null)
+            {
+                Material mat = new Material(glassShader);
+                mat.SetFloat("_CornerRadius", adjustedCornerRadius);
+                mat.SetFloat("_EdgePadding", adjustedEdgePadding);
+                mat.SetFloat("_Aspect", aspect);
+                mat.SetColor("_ColorA", new Color(col.r, col.g, col.b, config.backgroundAlpha * 1.5f));
+                mat.SetColor("_ColorB", new Color(col.r, col.g, col.b, config.backgroundAlpha * 0.5f));
+                mat.SetFloat("_GlassAlpha", config.backgroundAlpha);
+                img.material = mat;
+                img.color = Color.white;
+            }
+            else
+            {
+                img.color = new Color(col.r, col.g, col.b, config.backgroundAlpha);
+            }
         }
     }
 
