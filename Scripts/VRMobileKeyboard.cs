@@ -39,6 +39,8 @@ public class VRMobileKeyboard : MonoBehaviour
     [Tooltip("Key height to width ratio (1.2 = 20% taller than wide)")]
     [Range(0.8f, 1.5f)]
     public float keyHeightRatio = 1.2f;
+    [Tooltip("Font size for all keyboard keys")]
+    public int keyFontSize = 36;
 
     [Header("Settings")]
     public bool showPreview = true;
@@ -416,32 +418,49 @@ public class VRMobileKeyboard : MonoBehaviour
         // Content width = 10 keys + 9 gaps
         float contentWidth = 10f * keyWidth + 9f * keySpacing;
 
-        // Content height = 5 rows + gaps + preview
-        int numRows = 5;
+        // Content height = 5 rows + gaps + preview (this is the fixed reference)
+        int numRows5 = 5;
         float previewHeight = showPreview ? keyHeight * 0.6f + keySpacing : 0f;
-        float contentHeight = numRows * keyHeight + (numRows - 1) * keySpacing + previewHeight;
+        float contentHeight5Rows = numRows5 * keyHeight + (numRows5 - 1) * keySpacing;
 
         // Start Y at top of content, accounting for preview
-        float startY = contentHeight / 2f - keyHeight / 2f;
+        float startY = (contentHeight5Rows + previewHeight) / 2f - keyHeight / 2f;
         if (showPreview)
         {
             startY -= keyHeight * 0.6f + keySpacing;
         }
 
-        // Fixed bottom row Y position (same for all layouts)
+        // Fixed bottom row Y position (same for all layouts - based on 5-row layout)
         float bottomRowY = startY - 4 * (keyHeight + keySpacing);
 
         if (_currentLayout == KeyboardLayout.Letters)
         {
+            // 5-row layout uses normal spacing and key heights
             BuildLettersLayout(_keyboardContainer.transform, startY, unit, contentWidth, bottomRowY);
-        }
-        else if (_currentLayout == KeyboardLayout.Symbols)
-        {
-            BuildSymbolsLayout(_keyboardContainer.transform, startY, unit, contentWidth, bottomRowY);
         }
         else
         {
-            BuildMoreSymbolsLayout(_keyboardContainer.transform, startY, unit, contentWidth, bottomRowY);
+            // 4-row layout calculations:
+            // - Top of row 1 and bottom of bottom row are fixed reference points
+            // - Increase spacing by 3x between rows
+            // - Remaining space goes to top 3 rows (bottom row stays same height)
+
+            float increasedSpacing = keySpacing * 3f;
+            // Total vertical space for keys (excluding preview): 5*keyHeight + 4*keySpacing
+            // For 4 rows: bottomRowHeight + 3*topRowHeight + 3*increasedSpacing = totalSpace
+            // bottomRowHeight = keyHeight (fixed)
+            // 3*topRowHeight = totalSpace - keyHeight - 9*keySpacing
+            // topRowHeight = (4*keyHeight - 5*keySpacing) / 3
+            float topRowsHeight = (4f * keyHeight - 5f * keySpacing) / 3f;
+
+            if (_currentLayout == KeyboardLayout.Symbols)
+            {
+                BuildSymbolsLayout(_keyboardContainer.transform, startY, unit, contentWidth, bottomRowY, increasedSpacing, topRowsHeight);
+            }
+            else
+            {
+                BuildMoreSymbolsLayout(_keyboardContainer.transform, startY, unit, contentWidth, bottomRowY, increasedSpacing, topRowsHeight);
+            }
         }
     }
 
@@ -531,17 +550,18 @@ public class VRMobileKeyboard : MonoBehaviour
         CreateKeyRow(parent, row0, startX, numbersRowY, unit, false);
     }
 
-    void BuildSymbolsLayout(Transform parent, float startY, float unit, float contentWidth, float bottomRowY)
+    void BuildSymbolsLayout(Transform parent, float startY, float unit, float contentWidth, float bottomRowY, float rowSpacing, float topRowKeyHeight)
     {
         // startX = center of first key (no extra margin, margins handled by container)
         float startX = -contentWidth / 2f + keyWidth / 2f;
-        float rowUnit = keyHeight + keySpacing;
 
-        // Build from bottom up - 4 rows with same key size
-        // bottomRowY is passed in to ensure consistent position across layouts
-        float symbolsRowY = bottomRowY + rowUnit;
-        float row1Y = symbolsRowY + rowUnit;
-        float topRowY = row1Y + rowUnit;
+        // Build from bottom up - 4 rows
+        // Bottom row uses standard keyHeight, top 3 rows use topRowKeyHeight
+        // rowSpacing is doubled compared to 5-row layout
+        // Calculate Y positions from bottom up
+        float symbolsRowY = bottomRowY + keyHeight / 2f + rowSpacing + topRowKeyHeight / 2f;
+        float row1Y = symbolsRowY + topRowKeyHeight / 2f + rowSpacing + topRowKeyHeight / 2f;
+        float topRowY = row1Y + topRowKeyHeight / 2f + rowSpacing + topRowKeyHeight / 2f;
 
         // === ROW 4 (Bottom): ABC , [spacebar] . Enter ===
         // Mirroring shift row: ABC=Shift(1.5), ,=Z(1), spacebar=xcvbn(5), .=M(1), Enter=Back(1.5)
@@ -581,9 +601,10 @@ public class VRMobileKeyboard : MonoBehaviour
         // === ROW 3: =\< *"':;!? Back ===
         // Same structure as shift row: =\<=Shift(1.5), symbols(7), Back(1.5)
         x = startX;
+        float sideKeyHeightTop = topRowKeyHeight;  // Side keys in top rows also use topRowKeyHeight
 
         // =\< key (same width as Shift/ABC)
-        _symbolSwitchKey = CreatePillKey(parent, "=\\<", x + (sideKeyWidth - keyWidth) / 2f, symbolsRowY, sideKeyWidth, keyHeight,
+        _symbolSwitchKey = CreatePillKey(parent, "=\\<", x + (sideKeyWidth - keyWidth) / 2f, symbolsRowY, sideKeyWidth, sideKeyHeightTop,
             specialKeyColor, () => SwitchToLayout(KeyboardLayout.MoreSymbols));
         _allKeys.Add(_symbolSwitchKey);
         x += sideKeyWidth + keySpacing;
@@ -591,34 +612,34 @@ public class VRMobileKeyboard : MonoBehaviour
         // Symbol keys
         foreach (string key in SYMBOLS_ROW_2)
         {
-            var keyObj = CreateKey(parent, key, x, symbolsRowY, keyWidth, keyHeight, keyColor, key);
+            var keyObj = CreateKey(parent, key, x, symbolsRowY, keyWidth, topRowKeyHeight, keyColor, key);
             _allKeys.Add(keyObj);
             x += unit;
         }
 
         // Backspace (same width as Back/Enter)
-        var backKey = CreateSpecialKey(parent, "Back", x + (sideKeyWidth - keyWidth) / 2f, symbolsRowY, sideKeyWidth, keyHeight,
+        var backKey = CreateSpecialKey(parent, "Back", x + (sideKeyWidth - keyWidth) / 2f, symbolsRowY, sideKeyWidth, sideKeyHeightTop,
             specialKeyColor, () => OnBackspace());
         _allKeys.Add(backKey);
 
         // === ROW 2: @#₫_&-+()/ ===
-        CreateKeyRow(parent, SYMBOLS_ROW_1, startX, row1Y, unit, false);
+        CreateKeyRowWithHeight(parent, SYMBOLS_ROW_1, startX, row1Y, unit, false, topRowKeyHeight);
 
         // === ROW 1 (Top): 1234567890 ===
-        CreateKeyRow(parent, SYMBOLS_ROW_0, startX, topRowY, unit, false);
+        CreateKeyRowWithHeight(parent, SYMBOLS_ROW_0, startX, topRowY, unit, false, topRowKeyHeight);
     }
 
-    void BuildMoreSymbolsLayout(Transform parent, float startY, float unit, float contentWidth, float bottomRowY)
+    void BuildMoreSymbolsLayout(Transform parent, float startY, float unit, float contentWidth, float bottomRowY, float rowSpacing, float topRowKeyHeight)
     {
         // startX = center of first key (no extra margin, margins handled by container)
         float startX = -contentWidth / 2f + keyWidth / 2f;
-        float rowUnit = keyHeight + keySpacing;
 
-        // Build from bottom up - 4 rows with same key size
-        // bottomRowY is passed in to ensure consistent position across layouts
-        float symbolsRowY = bottomRowY + rowUnit;
-        float currencyRowY = symbolsRowY + rowUnit;
-        float topRowY = currencyRowY + rowUnit;
+        // Build from bottom up - 4 rows
+        // Bottom row uses standard keyHeight, top 3 rows use topRowKeyHeight
+        // rowSpacing is doubled compared to 5-row layout
+        float symbolsRowY = bottomRowY + keyHeight / 2f + rowSpacing + topRowKeyHeight / 2f;
+        float currencyRowY = symbolsRowY + topRowKeyHeight / 2f + rowSpacing + topRowKeyHeight / 2f;
+        float topRowY = currencyRowY + topRowKeyHeight / 2f + rowSpacing + topRowKeyHeight / 2f;
 
         // === ROW 4 (Bottom): ABC < [spacebar] > Enter ===
         // Mirroring shift row: ABC=Shift(1.5), <=Z(1), spacebar=xcvbn(5), >=M(1), Enter=Back(1.5)
@@ -658,9 +679,10 @@ public class VRMobileKeyboard : MonoBehaviour
         // === ROW 3: ?123 % © ® ™ ✓ [ ] Back ===
         // Same structure as shift row: ?123=Shift(1.5), symbols(7), Back(1.5)
         x = startX;
+        float sideKeyHeightTop = topRowKeyHeight;  // Side keys in top rows also use topRowKeyHeight
 
         // ?123 key (same width as Shift/ABC)
-        _symbolSwitchKey = CreatePillKey(parent, "?123", x + (sideKeyWidth - keyWidth) / 2f, symbolsRowY, sideKeyWidth, keyHeight,
+        _symbolSwitchKey = CreatePillKey(parent, "?123", x + (sideKeyWidth - keyWidth) / 2f, symbolsRowY, sideKeyWidth, sideKeyHeightTop,
             specialKeyColor, () => SwitchToLayout(KeyboardLayout.Symbols));
         _allKeys.Add(_symbolSwitchKey);
         x += sideKeyWidth + keySpacing;
@@ -668,21 +690,21 @@ public class VRMobileKeyboard : MonoBehaviour
         // Symbol keys: % © ® ™ ✓ [ ]
         foreach (string key in MORE_SYMBOLS_ROW_2)
         {
-            var keyObj = CreateKey(parent, key, x, symbolsRowY, keyWidth, keyHeight, keyColor, key);
+            var keyObj = CreateKey(parent, key, x, symbolsRowY, keyWidth, topRowKeyHeight, keyColor, key);
             _allKeys.Add(keyObj);
             x += unit;
         }
 
         // Backspace (same width as Back/Enter)
-        var backKey = CreateSpecialKey(parent, "Back", x + (sideKeyWidth - keyWidth) / 2f, symbolsRowY, sideKeyWidth, keyHeight,
+        var backKey = CreateSpecialKey(parent, "Back", x + (sideKeyWidth - keyWidth) / 2f, symbolsRowY, sideKeyWidth, sideKeyHeightTop,
             specialKeyColor, () => OnBackspace());
         _allKeys.Add(backKey);
 
         // === ROW 2: £€$¢^°={} \ ===
-        CreateKeyRow(parent, MORE_SYMBOLS_ROW_1, startX, currencyRowY, unit, false);
+        CreateKeyRowWithHeight(parent, MORE_SYMBOLS_ROW_1, startX, currencyRowY, unit, false, topRowKeyHeight);
 
         // === ROW 1 (Top): ~`|•√π÷×§△ ===
-        CreateKeyRow(parent, MORE_SYMBOLS_ROW_0, startX, topRowY, unit, false);
+        CreateKeyRowWithHeight(parent, MORE_SYMBOLS_ROW_0, startX, topRowY, unit, false, topRowKeyHeight);
     }
 
     void CreateKeyRow(Transform parent, string[] keys, float startX, float y, float unit, bool isLetter)
@@ -696,6 +718,22 @@ public class VRMobileKeyboard : MonoBehaviour
                 displayKey = key.ToUpper();
             }
             var keyObj = CreateKey(parent, displayKey, x, y, keyWidth, keyHeight, keyColor, key);
+            _allKeys.Add(keyObj);
+            x += unit;
+        }
+    }
+
+    void CreateKeyRowWithHeight(Transform parent, string[] keys, float startX, float y, float unit, bool isLetter, float height)
+    {
+        float x = startX;
+        foreach (string key in keys)
+        {
+            string displayKey = key;
+            if (isLetter && (_isShiftActive || _isCapsLock))
+            {
+                displayKey = key.ToUpper();
+            }
+            var keyObj = CreateKey(parent, displayKey, x, y, keyWidth, height, keyColor, key);
             _allKeys.Add(keyObj);
             x += unit;
         }
@@ -982,7 +1020,7 @@ public class VRMobileKeyboard : MonoBehaviour
             themeColor = color,
             width = width,
             height = height,
-            fontSize = 32,
+            fontSize = keyFontSize,
             font = customFont,
             textOnly = true,
             backgroundAlpha = 0.9f,
@@ -1012,7 +1050,7 @@ public class VRMobileKeyboard : MonoBehaviour
             themeColor = color,
             width = width,
             height = height,
-            fontSize = label.Contains("\n") ? 20 : 26,
+            fontSize = keyFontSize,
             font = customFont,
             textOnly = true,
             backgroundAlpha = 0.9f,
@@ -1044,8 +1082,8 @@ public class VRMobileKeyboard : MonoBehaviour
             label = label,
             themeColor = color,
             width = width,
-            height = height, // Same height as other keys
-            fontSize = label.Length > 3 ? 22 : 26,
+            height = height,
+            fontSize = keyFontSize,
             font = customFont,
             textOnly = true,
             backgroundAlpha = 0.9f,
