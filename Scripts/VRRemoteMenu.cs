@@ -220,7 +220,7 @@ public class VRRemoteMenu : MonoBehaviour
         // Dropdown options
         var monitorOptions = new List<string> {"1 Monitor", "2 Monitors", "3 Monitors"};
         var monitorIcons = new List<Sprite> { LoadIcon("1_monitor"), LoadIcon("2_monitors"), LoadIcon("3_monitors")};
-        var monitorIconMultipliers = new List<float> { 1f, 2.2f, 3.3f }; // 1x, 2x, 3x size for each option
+        var monitorIconMultipliers = new List<float> { 1f, 1.5f, 2.25f }; // 1x, 2x, 3x size for each option
         var resolutionOptions = new List<string> {"1920 x 1080", "1600 x 900", "1366 x 768", "1280 x 720"};
         var bitrateOptions = new List<string> {"5 Mbps", "10 Mbps", "20 Mbps", "30 Mbps", "50 Mbps"};
         var fpsOptions = new List<string> {"30 FPS", "45 FPS", "60 FPS"};
@@ -228,13 +228,12 @@ public class VRRemoteMenu : MonoBehaviour
         // Row 1 (top) - Monitors và Resolution
         float row1Y = dropdownH + gapY;
 
-        _monitorsDropdown = VRDropdownFactory.CreateIconDropdownWithOptionIcons(
+        _monitorsDropdown = VRDropdownFactory.CreateIconDropdown( // CreateIconDropdownWithOptionIcons
             grid.transform, cellW,
             "Monitors", LoadIcon("monitor"), themeColor,
-            monitorOptions, monitorIcons, 0,
+            monitorOptions, 0,
             onValueChanged: (index, value) => Debug.Log("Monitor: " + value),
-            labelFontSize: DROPDOWN_LABEL_FONT_SIZE, valueFontSize: DROPDOWN_VALUE_FONT_SIZE, font: customFont,
-            optionIconSizeMultipliers: monitorIconMultipliers);
+            labelFontSize: DROPDOWN_LABEL_FONT_SIZE, valueFontSize: DROPDOWN_VALUE_FONT_SIZE, font: customFont);
         PositionElement(_monitorsDropdown, 0, row1Y);
 
         _resolutionDropdown = VRDropdownFactory.CreateIconDropdown(

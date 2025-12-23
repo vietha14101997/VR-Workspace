@@ -85,11 +85,11 @@ public static class VRDropdownFactory
         // Tính icon size từ font size
         public float IconSize => valueFontSize * FONT_TO_ICON_RATIO * 0.95f;
 
-        // Tính chiều cao option từ font size
-        public float OptionHeight => valueFontSize * 2f;
+        // Tính chiều cao option = 0.75 chiều cao dropdown
+        public float OptionHeight => BoxHeight * 0.75f;
 
-        // Tính icon size trong option từ font size
-        public float OptionIconSize => valueFontSize * 1f;
+        // Tính icon size trong option (tương ứng với chiều cao option)
+        public float OptionIconSize => OptionHeight * 0.5f;
     }
 
     /// <summary>
@@ -989,7 +989,7 @@ public static class VRDropdownFactory
 
         // Layout: Checkmark | Icon | Text
         // Checkmark size first (needed for icon position calculation)
-        float checkSize = config.valueFontSize * 0.7f;
+        float checkSize = optionHeight * 0.35f; // Proportional to option height
 
         // Calculate positions based on percentage of option width
         float checkmarkX = config.width * 0.05f;  // 5% from left
@@ -1075,7 +1075,7 @@ public static class VRDropdownFactory
 
         TextMeshProUGUI txt = txtObj.AddComponent<TextMeshProUGUI>();
         txt.text = optionText;
-        txt.fontSize = config.valueFontSize * 0.85f;
+        txt.fontSize = config.valueFontSize; // Same as main value text
         txt.color = Color.white;
         txt.fontStyle = FontStyles.Bold; // Bold for better visibility
         txt.alignment = TextAlignmentOptions.Left;

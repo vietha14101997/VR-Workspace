@@ -3,11 +3,16 @@ using UnityEngine.UI;
 using TMPro;
 using System;
 using System.Collections.Generic;
+using Random = UnityEngine.Random;
 
 /// <summary>
 /// Mobile-style Virtual Keyboard for VR environment.
 /// Displays a compact mobile keyboard with multiple layouts (letters, symbols).
+/// Positions relative to primary VRMenuFrame with VRMenuFrame-style glass background.
 /// </summary>
+[RequireComponent(typeof(Canvas))]
+[RequireComponent(typeof(RectTransform))]
+[RequireComponent(typeof(GraphicRaycaster))]
 public class VRMobileKeyboard : MonoBehaviour
 {
     public enum KeyboardLayout
@@ -26,13 +31,64 @@ public class VRMobileKeyboard : MonoBehaviour
     public TMP_FontAsset customFont;
 
     [Header("Layout")]
-    public float keyWidth = 90f;
-    public float keyHeight = 90f;
-    public float keySpacing = 8f;
+    [Tooltip("Content margin inside keyboard frame (pixels)")]
+    public float contentMargin = 40f;
+    [Tooltip("Spacing between keys as ratio of key width (0.1 = 10%)")]
+    [Range(0.05f, 0.2f)]
+    public float keySpacingRatio = 0.1f;
+    [Tooltip("Key height to width ratio (1.2 = 20% taller than wide)")]
+    [Range(0.8f, 1.5f)]
+    public float keyHeightRatio = 1.2f;
 
     [Header("Settings")]
     public bool showPreview = true;
     public float keyboardScale = 1f;
+
+    [Header("Position Tracking")]
+    [Tooltip("If true, keyboard will auto-position relative to the primary VRMenuFrame")]
+    public bool followPrimaryFrame = true;
+    [Tooltip("Multiplier for spacing below taskbar (1.5 = 150% of keyboard height)")]
+    public float spacingMultiplier = 1.5f;
+    [Tooltip("Width ratio relative to VRMenuFrame (0.667 = 2/3)")]
+    public float widthRatioToFrame = 0.667f;
+
+    [Header("Initial Orientation")]
+    [Tooltip("If true, keyboard will face the camera on show (like VRTaskbar)")]
+    public bool faceOnInit = true;
+    [Tooltip("How much closer to camera (0 = same as taskbar, 1 = at camera)")]
+    [Range(0f, 0.5f)]
+    public float cameraProximity = 0.15f;
+
+    [Header("Glassmorphism")]
+    [Tooltip("Enable glassmorphism blur effect")]
+    public bool enableGlassmorphism = true;
+    [Range(0, 40)]
+    public float blurIntensity = 2f;
+    [Range(1, 8)]
+    public int blurQuality = 3;
+    [Range(0, 1)]
+    public float glassOpacity = 0f;
+    [Range(0, 1)]
+    public float tintStrength = 0.1f;
+    [Range(0, 0.5f)]
+    public float innerGlow = 0f;
+    [Range(0.9f, 1.3f)]
+    public float brightness = 1f;
+    [Range(0.5f, 1f)]
+    public float saturation = 1f;
+    [Range(0f, 0.1f)]
+    public float glowExpansion = 0.02f;
+
+    // Scale factor: matches VRMenuFrame pixel density (1.6m / 1920px)
+    private const float PixelToMeter = 1.6f / 1920f;
+
+    // Internal sprites
+    private Sprite _pixelSprite;
+    private Sprite _roundedMaskSprite;
+
+    // Canvas components
+    public Canvas Canvas { get; private set; }
+    public RectTransform CanvasRect { get; private set; }
 
     // Events
     public event Action<string> OnKeyPressed;
@@ -84,6 +140,17 @@ public class VRMobileKeyboard : MonoBehaviour
     public static VRMobileKeyboard Instance => _instance;
 
     private bool _isBuilt = false;
+    private bool _isKeyboardVisibleOnStart = false;
+    private bool _hasInitializedOrientation = false;
+
+    // Calculated logical dimensions
+    private float _logicalWidth;
+    private float _logicalHeight;
+
+    // Calculated key dimensions (based on container size)
+    private float keyWidth;
+    private float keyHeight;
+    private float keySpacing;
 
     void Awake()
     {
@@ -97,14 +164,27 @@ public class VRMobileKeyboard : MonoBehaviour
 
     void Start()
     {
+        // Setup Canvas
+        Canvas = GetComponent<Canvas>();
+        CanvasRect = GetComponent<RectTransform>();
+
+        if (Canvas == null)
+        {
+            Canvas = gameObject.AddComponent<Canvas>();
+        }
+        Canvas.renderMode = RenderMode.WorldSpace;
+
+        if (GetComponent<GraphicRaycaster>() == null)
+        {
+            gameObject.AddComponent<GraphicRaycaster>();
+        }
+
         EnsureBuilt();
         if (!_isKeyboardVisibleOnStart)
         {
             gameObject.SetActive(false);
         }
     }
-
-    private bool _isKeyboardVisibleOnStart = false;
 
     private void EnsureBuilt()
     {
@@ -133,6 +213,89 @@ public class VRMobileKeyboard : MonoBehaviour
         }
     }
 
+    void LateUpdate()
+    {
+        if (gameObject.activeSelf)
+        {
+            UpdatePositionRelativeToPrimary();
+        }
+    }
+
+    /// <summary>
+    /// Orient keyboard to face the camera (like VRTaskbar).
+    /// </summary>
+    void OrientTowardsCamera()
+    {
+        var cam = Camera.main;
+        if (cam == null) return;
+
+        Vector3 toCamera = cam.transform.position - transform.position;
+        if (toCamera.sqrMagnitude < 1e-6f) return;
+
+        transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
+        _hasInitializedOrientation = true;
+    }
+
+    /// <summary>
+    /// Updates keyboard position to overlap VRTaskbar and slightly overlap VRMenuFrame bottom.
+    /// Keyboard is parallel to taskbar/frame but closer to camera.
+    /// </summary>
+    void UpdatePositionRelativeToPrimary()
+    {
+        if (!followPrimaryFrame) return;
+
+        VRMenuFrame primary = VRMenuFrame.PrimaryInstance;
+        if (primary == null) return;
+
+        var cam = Camera.main;
+        if (cam == null) return;
+
+        VRTaskbar taskbar = FindObjectOfType<VRTaskbar>();
+
+        Vector3 cameraPos = cam.transform.position;
+        float keyboardHalfHeight = (_logicalHeight * PixelToMeter) / 2f;
+
+        Vector3 targetPos;
+        Quaternion targetRotation;
+
+        // Get primary frame bottom position
+        Vector3 primaryPos = primary.transform.position;
+        float primaryHalfHeight = primary.panelHeight / 2f;
+        float frameBottomY = primaryPos.y - primaryHalfHeight;
+
+        // Keyboard top edge should slightly overlap frame bottom (by ~5% of keyboard height)
+        float overlapAmount = keyboardHalfHeight * 0.1f;
+        float keyboardCenterY = frameBottomY - keyboardHalfHeight + overlapAmount;
+
+        if (taskbar != null && taskbar.gameObject.activeInHierarchy)
+        {
+            Vector3 taskbarPos = taskbar.transform.position;
+
+            // Use taskbar X and Z, but calculated Y for overlap
+            Vector3 targetPlanePoint = new Vector3(taskbarPos.x, keyboardCenterY, taskbarPos.z);
+
+            // Move closer to camera
+            Vector3 dirToTarget = targetPlanePoint - cameraPos;
+            float distToTarget = dirToTarget.magnitude;
+            targetPos = cameraPos + dirToTarget.normalized * (distToTarget * (1f - cameraProximity));
+
+            targetRotation = taskbar.transform.rotation;
+        }
+        else
+        {
+            Vector3 targetPlanePoint = new Vector3(primaryPos.x, keyboardCenterY, primaryPos.z);
+
+            Vector3 dirToTarget = targetPlanePoint - cameraPos;
+            float distToTarget = dirToTarget.magnitude;
+            targetPos = cameraPos + dirToTarget.normalized * (distToTarget * (1f - cameraProximity));
+
+            targetRotation = primary.transform.rotation;
+        }
+
+        transform.position = targetPos;
+        transform.rotation = targetRotation;
+    }
+
     public void Show(TMP_InputField inputField)
     {
         _targetInputField = inputField;
@@ -153,7 +316,9 @@ public class VRMobileKeyboard : MonoBehaviour
 
         ResetCursorBlink();
         UpdatePreview();
-        PositionKeyboardNearInput(inputField);
+
+        // Position relative to VRMenuFrame/VRTaskbar (also sets rotation parallel to taskbar)
+        UpdatePositionRelativeToPrimary();
     }
 
     public void Hide()
@@ -167,68 +332,62 @@ public class VRMobileKeyboard : MonoBehaviour
     public bool IsVisible => gameObject.activeSelf;
     public TMP_InputField TargetInputField => _targetInputField;
 
-    void PositionKeyboardNearInput(TMP_InputField inputField)
-    {
-        if (inputField == null) return;
-
-        RectTransform inputRT = inputField.GetComponent<RectTransform>();
-        RectTransform keyboardRT = GetComponent<RectTransform>();
-
-        if (inputRT == null || keyboardRT == null) return;
-
-        Canvas inputCanvas = inputField.GetComponentInParent<Canvas>();
-        if (inputCanvas == null) return;
-
-        Vector3 inputWorldPos = inputRT.position;
-        float keyboardHeight = keyboardRT.rect.height * keyboardRT.lossyScale.y;
-
-        Vector3 keyboardPos = inputWorldPos;
-        keyboardPos.y -= inputRT.rect.height * inputRT.lossyScale.y / 2f + keyboardHeight / 2f + 50f;
-
-        transform.position = keyboardPos;
-    }
-
     void BuildKeyboard()
     {
-        // Calculate total keyboard size - Mobile layout (10 keys wide)
-        float unit = keyWidth + keySpacing;
+        // Calculate dimensions based on VRMenuFrame (2/3 width)
+        VRMenuFrame primary = VRMenuFrame.PrimaryInstance;
+        float frameLogicalWidth = primary != null ? primary.logicalWidth : 1920f;
 
-        // 10 keys wide for main rows
-        float totalWidth = 10f * unit + keySpacing;
+        // Keyboard logical width = 2/3 of VRMenuFrame
+        _logicalWidth = frameLogicalWidth * widthRatioToFrame;
 
-        // 5 rows: numbers, qwerty, asdf, shift row, bottom row
-        float totalHeight = 5 * (keyHeight + keySpacing) + keySpacing;
+        // Calculate content area (inside margins)
+        float contentWidth = _logicalWidth - 2 * contentMargin;
 
-        if (showPreview)
-        {
-            totalHeight += keyHeight * 0.6f + keySpacing;
-        }
+        // Calculate key dimensions based on content area
+        // 10 keys + 9 gaps in a row: contentWidth = 10*keyWidth + 9*keySpacing
+        // keySpacing = keyWidth * keySpacingRatio
+        // contentWidth = 10*keyWidth + 9*keyWidth*keySpacingRatio = keyWidth * (10 + 9*keySpacingRatio)
+        keyWidth = contentWidth / (10f + 9f * keySpacingRatio);
+        keySpacing = keyWidth * keySpacingRatio;
+        keyHeight = keyWidth * keyHeightRatio;
 
-        // Setup RectTransform
-        RectTransform rt = gameObject.GetComponent<RectTransform>();
-        if (rt == null)
-            rt = gameObject.AddComponent<RectTransform>();
+        // Calculate number of rows and total content height
+        int numRows = 5; // numbers, qwerty, asdf, shift, bottom
+        float previewHeight = showPreview ? keyHeight * 0.6f + keySpacing : 0f;
+        float contentHeight = numRows * keyHeight + (numRows - 1) * keySpacing + previewHeight;
 
-        rt.sizeDelta = new Vector2(totalWidth, totalHeight) * keyboardScale;
+        // Total keyboard dimensions (content + margins)
+        _logicalHeight = contentHeight + 2 * contentMargin;
 
-        // Add background
-        CreateBackground(totalWidth, totalHeight);
+        // Setup RectTransform with VRMenuFrame-style scale
+        CanvasRect = GetComponent<RectTransform>();
+        if (CanvasRect == null)
+            CanvasRect = gameObject.AddComponent<RectTransform>();
 
-        // Create container for keys
+        CanvasRect.sizeDelta = new Vector2(_logicalWidth, _logicalHeight);
+        CanvasRect.localScale = new Vector3(PixelToMeter, PixelToMeter, 1f);
+        CanvasRect.localPosition = Vector3.zero;
+
+        // Add VRMenuFrame-style glass background
+        CreateGlassPanel(transform, _logicalWidth, _logicalHeight);
+
+        // Create container for keys with margins
         _keyboardContainer = new GameObject("KeyContainer");
         _keyboardContainer.transform.SetParent(transform, false);
         RectTransform containerRT = _keyboardContainer.AddComponent<RectTransform>();
         containerRT.anchorMin = Vector2.zero;
         containerRT.anchorMax = Vector2.one;
-        containerRT.offsetMin = Vector2.zero;
-        containerRT.offsetMax = Vector2.zero;
+        containerRT.offsetMin = new Vector2(contentMargin, contentMargin);
+        containerRT.offsetMax = new Vector2(-contentMargin, -contentMargin);
 
-        float currentY = totalHeight / 2f - keySpacing - keyHeight / 2f;
+        // Calculate starting Y position for keys (top of content area)
+        float currentY = contentHeight / 2f - keyHeight / 2f;
 
         // Preview text row (optional)
         if (showPreview)
         {
-            CreatePreviewRow(_keyboardContainer.transform, currentY, totalWidth);
+            CreatePreviewRow(_keyboardContainer.transform, currentY, contentWidth);
             currentY -= keyHeight * 0.6f + keySpacing;
         }
 
@@ -254,274 +413,276 @@ public class VRMobileKeyboard : MonoBehaviour
         ClearKeys();
 
         float unit = keyWidth + keySpacing;
-        float totalWidth = 10f * unit + keySpacing;
-        float totalHeight = 5 * (keyHeight + keySpacing) + keySpacing;
+        // Content width = 10 keys + 9 gaps
+        float contentWidth = 10f * keyWidth + 9f * keySpacing;
 
-        if (showPreview)
-        {
-            totalHeight += keyHeight * 0.6f + keySpacing;
-        }
+        // Content height = 5 rows + gaps + preview
+        int numRows = 5;
+        float previewHeight = showPreview ? keyHeight * 0.6f + keySpacing : 0f;
+        float contentHeight = numRows * keyHeight + (numRows - 1) * keySpacing + previewHeight;
 
-        float startY = totalHeight / 2f - keySpacing - keyHeight / 2f;
-
+        // Start Y at top of content, accounting for preview
+        float startY = contentHeight / 2f - keyHeight / 2f;
         if (showPreview)
         {
             startY -= keyHeight * 0.6f + keySpacing;
         }
 
-        float currentY = startY;
+        // Fixed bottom row Y position (same for all layouts)
+        float bottomRowY = startY - 4 * (keyHeight + keySpacing);
 
         if (_currentLayout == KeyboardLayout.Letters)
         {
-            BuildLettersLayout(_keyboardContainer.transform, currentY, unit, totalWidth);
+            BuildLettersLayout(_keyboardContainer.transform, startY, unit, contentWidth, bottomRowY);
         }
         else if (_currentLayout == KeyboardLayout.Symbols)
         {
-            BuildSymbolsLayout(_keyboardContainer.transform, currentY, unit, totalWidth);
+            BuildSymbolsLayout(_keyboardContainer.transform, startY, unit, contentWidth, bottomRowY);
         }
         else
         {
-            BuildMoreSymbolsLayout(_keyboardContainer.transform, currentY, unit, totalWidth);
+            BuildMoreSymbolsLayout(_keyboardContainer.transform, startY, unit, contentWidth, bottomRowY);
         }
     }
 
-    void BuildLettersLayout(Transform parent, float startY, float unit, float totalWidth)
+    void BuildLettersLayout(Transform parent, float startY, float unit, float contentWidth, float bottomRowY)
     {
-        float currentY = startY;
-        float startX = -totalWidth / 2f + keySpacing + keyWidth / 2f;
+        // startX = center of first key (no extra margin, margins handled by container)
+        float startX = -contentWidth / 2f + keyWidth / 2f;
 
-        // Row 0: Numbers (or shifted symbols)
-        string[] row0 = _isShiftActive ? SHIFTED_ROW_0 : LETTERS_ROW_0;
-        CreateKeyRow(parent, row0, startX, currentY, unit, false);
-        currentY -= keyHeight + keySpacing;
+        // Build from bottom up - calculate positions
+        // 5 rows: bottom, shift, asdf, qwerty, numbers
+        // bottomRowY is passed in to ensure consistent position across layouts
+        float shiftRowY = bottomRowY + (keyHeight + keySpacing);
+        float asdfRowY = shiftRowY + (keyHeight + keySpacing);
+        float qwertyRowY = asdfRowY + (keyHeight + keySpacing);
+        float numbersRowY = qwertyRowY + (keyHeight + keySpacing);
 
-        // Row 1: QWERTY
-        CreateKeyRow(parent, LETTERS_ROW_1, startX, currentY, unit, true);
-        currentY -= keyHeight + keySpacing;
+        // === ROW 5 (Bottom): ?123 / [spacebar] . Enter ===
+        // Mirroring shift row: ?123=Shift(1.5), /=Z(1), spacebar=xcvbn(5), .=M(1), Enter=Back(1.5)
+        float sideKeyWidth = keyWidth * 1.5f;  // Same as Shift/Back
 
-        // Row 2: ASDF (9 keys, slightly offset)
-        float row2Offset = unit * 0.5f;
-        CreateKeyRow(parent, LETTERS_ROW_2, startX + row2Offset, currentY, unit, true);
-        currentY -= keyHeight + keySpacing;
-
-        // Row 3: Shift + ZXCV + Backspace
-        float shiftWidth = keyWidth * 1.4f;
         float x = startX;
 
-        // Shift key
-        _shiftKey = CreateSpecialKey(parent, "⇧", x + (shiftWidth - keyWidth) / 2f, currentY, shiftWidth, keyHeight,
+        // ?123 key (same position as Shift)
+        _layoutSwitchKey = CreatePillKey(parent, "?123", x + (sideKeyWidth - keyWidth) / 2f, bottomRowY, sideKeyWidth, keyHeight,
+            specialKeyColor, () => SwitchToLayout(KeyboardLayout.Symbols));
+        _allKeys.Add(_layoutSwitchKey);
+        x += sideKeyWidth + keySpacing;
+
+        // Slash key (aligned with Z - position 0 of letter keys)
+        var slashKey = CreateKey(parent, "/", x, bottomRowY, keyWidth, keyHeight, specialKeyColor, "/");
+        _allKeys.Add(slashKey);
+        x += unit;
+
+        // Spacebar center (spans positions 1-5: x,c,v,b,n)
+        // Spacebar width = 5 keys + 4 gaps
+        float spaceWidth = 5 * keyWidth + 4 * keySpacing;
+        float spaceCenterX = x + 2 * unit; // Center of 5 keys
+        var spaceKey = CreateSpecialKey(parent, "", spaceCenterX, bottomRowY, spaceWidth, keyHeight,
+            keyColor, () => OnKeyPress(" "));
+        _allKeys.Add(spaceKey);
+        x += 5 * unit;
+
+        // Period key (aligned with M - position 6 of letter keys)
+        var periodKey = CreateKey(parent, ".", x, bottomRowY, keyWidth, keyHeight, specialKeyColor, ".");
+        _allKeys.Add(periodKey);
+        x += unit;
+
+        // Enter key (same position as Back)
+        var enterKey = CreatePillKey(parent, "Enter", x + (sideKeyWidth - keyWidth) / 2f, bottomRowY, sideKeyWidth, keyHeight,
+            accentColor, () => OnEnter());
+        _allKeys.Add(enterKey);
+
+        // === ROW 4 (Shift row): Shift zxcvbnm Back ===
+        x = startX;
+        float shiftWidth = keyWidth * 1.5f;
+
+        // Shift key (wider, rounded square)
+        _shiftKey = CreateSpecialKey(parent, "Shift", x + (shiftWidth - keyWidth) / 2f, shiftRowY, shiftWidth, keyHeight,
             _isShiftActive ? accentColor : specialKeyColor, () => ToggleShift());
         _allKeys.Add(_shiftKey);
         x += shiftWidth + keySpacing;
 
-        // Letter keys
+        // Letter keys z-m
         foreach (string key in LETTERS_ROW_3)
         {
             string displayKey = (_isShiftActive || _isCapsLock) ? key.ToUpper() : key;
-            var keyObj = CreateKey(parent, displayKey, x, currentY, keyWidth, keyHeight, keyColor, key);
+            var keyObj = CreateKey(parent, displayKey, x, shiftRowY, keyWidth, keyHeight, keyColor, key);
             _allKeys.Add(keyObj);
             x += unit;
         }
 
-        // Backspace
-        float backspaceWidth = keyWidth * 1.4f;
-        var backKey = CreateSpecialKey(parent, "⌫", x + (backspaceWidth - keyWidth) / 2f, currentY, backspaceWidth, keyHeight,
+        // Backspace (wider, rounded square)
+        float backspaceWidth = keyWidth * 1.5f;
+        var backKey = CreateSpecialKey(parent, "Back", x + (backspaceWidth - keyWidth) / 2f, shiftRowY, backspaceWidth, keyHeight,
             specialKeyColor, () => OnBackspace());
         _allKeys.Add(backKey);
 
-        currentY -= keyHeight + keySpacing;
+        // === ROW 3 (ASDF): asdfghjkl (9 keys, centered) ===
+        float row3Offset = unit * 0.5f;
+        CreateKeyRow(parent, LETTERS_ROW_2, startX + row3Offset, asdfRowY, unit, true);
 
-        // Bottom row: ?123 / emoji [spacebar] . Enter
-        x = startX;
-        float modKeyWidth = keyWidth * 1.2f;
+        // === ROW 2 (QWERTY): qwertyuiop ===
+        CreateKeyRow(parent, LETTERS_ROW_1, startX, qwertyRowY, unit, true);
 
-        // ?123 key (switch to symbols)
-        _layoutSwitchKey = CreateSpecialKey(parent, "?123", x + (modKeyWidth - keyWidth) / 2f, currentY, modKeyWidth, keyHeight,
-            specialKeyColor, () => SwitchToLayout(KeyboardLayout.Symbols));
+        // === ROW 1 (Numbers): 1234567890 ===
+        string[] row0 = _isShiftActive ? SHIFTED_ROW_0 : LETTERS_ROW_0;
+        CreateKeyRow(parent, row0, startX, numbersRowY, unit, false);
+    }
+
+    void BuildSymbolsLayout(Transform parent, float startY, float unit, float contentWidth, float bottomRowY)
+    {
+        // startX = center of first key (no extra margin, margins handled by container)
+        float startX = -contentWidth / 2f + keyWidth / 2f;
+        float rowUnit = keyHeight + keySpacing;
+
+        // Build from bottom up - 4 rows with same key size
+        // bottomRowY is passed in to ensure consistent position across layouts
+        float symbolsRowY = bottomRowY + rowUnit;
+        float row1Y = symbolsRowY + rowUnit;
+        float topRowY = row1Y + rowUnit;
+
+        // === ROW 4 (Bottom): ABC , [spacebar] . Enter ===
+        // Mirroring shift row: ABC=Shift(1.5), ,=Z(1), spacebar=xcvbn(5), .=M(1), Enter=Back(1.5)
+        float sideKeyWidth = keyWidth * 1.5f;  // Same as Shift/Back
+
+        float x = startX;
+
+        // ABC key (same position as Shift)
+        _layoutSwitchKey = CreatePillKey(parent, "ABC", x + (sideKeyWidth - keyWidth) / 2f, bottomRowY, sideKeyWidth, keyHeight,
+            specialKeyColor, () => SwitchToLayout(KeyboardLayout.Letters));
         _allKeys.Add(_layoutSwitchKey);
-        x += modKeyWidth + keySpacing;
+        x += sideKeyWidth + keySpacing;
 
-        // Slash key
-        var slashKey = CreateKey(parent, "/", x, currentY, keyWidth, keyHeight, specialKeyColor, "/");
-        _allKeys.Add(slashKey);
+        // Comma key (aligned with Z - position 0)
+        var commaKey = CreateKey(parent, ",", x, bottomRowY, keyWidth, keyHeight, specialKeyColor, ",");
+        _allKeys.Add(commaKey);
         x += unit;
 
-        // Emoji key (placeholder - shows smiley)
-        var emojiKey = CreateSpecialKey(parent, "☺", x, currentY, keyWidth, keyHeight, specialKeyColor, null);
-        _allKeys.Add(emojiKey);
-        x += unit;
-
-        // Spacebar
-        float spaceWidth = keyWidth * 4f;
-        var spaceKey = CreateSpecialKey(parent, "", x + (spaceWidth - keyWidth) / 2f, currentY, spaceWidth, keyHeight,
+        // Spacebar (spans positions 1-5: x,c,v,b,n)
+        float spaceWidth = 5 * keyWidth + 4 * keySpacing;
+        float spaceCenterX = x + 2 * unit;
+        var spaceKey = CreateSpecialKey(parent, "", spaceCenterX, bottomRowY, spaceWidth, keyHeight,
             keyColor, () => OnKeyPress(" "));
         _allKeys.Add(spaceKey);
-        x += spaceWidth + keySpacing;
+        x += 5 * unit;
 
-        // Period key
-        var periodKey = CreateKey(parent, ".", x, currentY, keyWidth, keyHeight, specialKeyColor, ".");
+        // Period key (aligned with M - position 6)
+        var periodKey = CreateKey(parent, ".", x, bottomRowY, keyWidth, keyHeight, specialKeyColor, ".");
         _allKeys.Add(periodKey);
         x += unit;
 
-        // Enter key
-        float enterWidth = keyWidth * 1.3f;
-        var enterKey = CreateSpecialKey(parent, "→", x + (enterWidth - keyWidth) / 2f, currentY, enterWidth, keyHeight,
+        // Enter key (same position as Back)
+        var enterKey = CreatePillKey(parent, "Enter", x + (sideKeyWidth - keyWidth) / 2f, bottomRowY, sideKeyWidth, keyHeight,
             accentColor, () => OnEnter());
         _allKeys.Add(enterKey);
-    }
 
-    void BuildSymbolsLayout(Transform parent, float startY, float unit, float totalWidth)
-    {
-        float currentY = startY;
-        float startX = -totalWidth / 2f + keySpacing + keyWidth / 2f;
+        // === ROW 3: =\< *"':;!? Back ===
+        // Same structure as shift row: =\<=Shift(1.5), symbols(7), Back(1.5)
+        x = startX;
 
-        // 4 rows instead of 5, so make keys taller (5/4 = 1.25)
-        float tallKeyHeight = keyHeight * 1.25f;
-        float tallUnit = tallKeyHeight + keySpacing;
-
-        // Row 0: Numbers
-        CreateKeyRowWithHeight(parent, SYMBOLS_ROW_0, startX, currentY, unit, tallKeyHeight);
-        currentY -= tallUnit;
-
-        // Row 1: Symbols @#₫_&-+()/
-        CreateKeyRowWithHeight(parent, SYMBOLS_ROW_1, startX, currentY, unit, tallKeyHeight);
-        currentY -= tallUnit;
-
-        // Row 2: =\< + symbols + backspace
-        float switchWidth = keyWidth * 1.4f;
-        float x = startX;
-
-        // =\< key (switch to more symbols)
-        _symbolSwitchKey = CreateSpecialKey(parent, "=\\<", x + (switchWidth - keyWidth) / 2f, currentY, switchWidth, tallKeyHeight,
+        // =\< key (same width as Shift/ABC)
+        _symbolSwitchKey = CreatePillKey(parent, "=\\<", x + (sideKeyWidth - keyWidth) / 2f, symbolsRowY, sideKeyWidth, keyHeight,
             specialKeyColor, () => SwitchToLayout(KeyboardLayout.MoreSymbols));
         _allKeys.Add(_symbolSwitchKey);
-        x += switchWidth + keySpacing;
+        x += sideKeyWidth + keySpacing;
 
         // Symbol keys
         foreach (string key in SYMBOLS_ROW_2)
         {
-            var keyObj = CreateKeyWithHeight(parent, key, x, currentY, keyWidth, tallKeyHeight, keyColor, key);
+            var keyObj = CreateKey(parent, key, x, symbolsRowY, keyWidth, keyHeight, keyColor, key);
             _allKeys.Add(keyObj);
             x += unit;
         }
 
-        // Backspace
-        float backspaceWidth = keyWidth * 1.4f;
-        var backKey = CreateSpecialKey(parent, "⌫", x + (backspaceWidth - keyWidth) / 2f, currentY, backspaceWidth, tallKeyHeight,
+        // Backspace (same width as Back/Enter)
+        var backKey = CreateSpecialKey(parent, "Back", x + (sideKeyWidth - keyWidth) / 2f, symbolsRowY, sideKeyWidth, keyHeight,
             specialKeyColor, () => OnBackspace());
         _allKeys.Add(backKey);
 
-        currentY -= tallUnit;
+        // === ROW 2: @#₫_&-+()/ ===
+        CreateKeyRow(parent, SYMBOLS_ROW_1, startX, row1Y, unit, false);
 
-        // Bottom row: ABC , [spacebar] . Enter
-        x = startX;
-        float modKeyWidth = keyWidth * 1.2f;
-
-        // ABC key (switch to letters)
-        _layoutSwitchKey = CreateSpecialKey(parent, "ABC", x + (modKeyWidth - keyWidth) / 2f, currentY, modKeyWidth, tallKeyHeight,
-            specialKeyColor, () => SwitchToLayout(KeyboardLayout.Letters));
-        _allKeys.Add(_layoutSwitchKey);
-        x += modKeyWidth + keySpacing;
-
-        // Comma key
-        var commaKey = CreateKeyWithHeight(parent, ",", x, currentY, keyWidth, tallKeyHeight, specialKeyColor, ",");
-        _allKeys.Add(commaKey);
-        x += unit;
-
-        // Spacebar (extended - 5 units instead of 4)
-        float spaceWidth = keyWidth * 5f;
-        var spaceKey = CreateSpecialKey(parent, "", x + (spaceWidth - keyWidth) / 2f, currentY, spaceWidth, tallKeyHeight,
-            keyColor, () => OnKeyPress(" "));
-        _allKeys.Add(spaceKey);
-        x += spaceWidth + keySpacing;
-
-        // Period key
-        var periodKey = CreateKeyWithHeight(parent, ".", x, currentY, keyWidth, tallKeyHeight, specialKeyColor, ".");
-        _allKeys.Add(periodKey);
-        x += unit;
-
-        // Enter key
-        float enterWidth = keyWidth * 1.3f;
-        var enterKey = CreateSpecialKey(parent, "→", x + (enterWidth - keyWidth) / 2f, currentY, enterWidth, tallKeyHeight,
-            accentColor, () => OnEnter());
-        _allKeys.Add(enterKey);
+        // === ROW 1 (Top): 1234567890 ===
+        CreateKeyRow(parent, SYMBOLS_ROW_0, startX, topRowY, unit, false);
     }
 
-    void BuildMoreSymbolsLayout(Transform parent, float startY, float unit, float totalWidth)
+    void BuildMoreSymbolsLayout(Transform parent, float startY, float unit, float contentWidth, float bottomRowY)
     {
-        float currentY = startY;
-        float startX = -totalWidth / 2f + keySpacing + keyWidth / 2f;
+        // startX = center of first key (no extra margin, margins handled by container)
+        float startX = -contentWidth / 2f + keyWidth / 2f;
+        float rowUnit = keyHeight + keySpacing;
 
-        // 4 rows instead of 5, so make keys taller (5/4 = 1.25)
-        float tallKeyHeight = keyHeight * 1.25f;
-        float tallUnit = tallKeyHeight + keySpacing;
+        // Build from bottom up - 4 rows with same key size
+        // bottomRowY is passed in to ensure consistent position across layouts
+        float symbolsRowY = bottomRowY + rowUnit;
+        float currencyRowY = symbolsRowY + rowUnit;
+        float topRowY = currencyRowY + rowUnit;
 
-        // Row 0: More symbols ~`|•√π÷×§△
-        CreateKeyRowWithHeight(parent, MORE_SYMBOLS_ROW_0, startX, currentY, unit, tallKeyHeight);
-        currentY -= tallUnit;
+        // === ROW 4 (Bottom): ABC < [spacebar] > Enter ===
+        // Mirroring shift row: ABC=Shift(1.5), <=Z(1), spacebar=xcvbn(5), >=M(1), Enter=Back(1.5)
+        float sideKeyWidth = keyWidth * 1.5f;  // Same as Shift/Back
 
-        // Row 1: Currency and symbols £€$¢^°={}\
-        CreateKeyRowWithHeight(parent, MORE_SYMBOLS_ROW_1, startX, currentY, unit, tallKeyHeight);
-        currentY -= tallUnit;
-
-        // Row 2: ?123 + more symbols + backspace
-        float switchWidth = keyWidth * 1.4f;
         float x = startX;
 
-        // ?123 key (switch to symbols)
-        _symbolSwitchKey = CreateSpecialKey(parent, "?123", x + (switchWidth - keyWidth) / 2f, currentY, switchWidth, tallKeyHeight,
-            specialKeyColor, () => SwitchToLayout(KeyboardLayout.Symbols));
-        _allKeys.Add(_symbolSwitchKey);
-        x += switchWidth + keySpacing;
-
-        // Symbol keys
-        foreach (string key in MORE_SYMBOLS_ROW_2)
-        {
-            var keyObj = CreateKeyWithHeight(parent, key, x, currentY, keyWidth, tallKeyHeight, keyColor, key);
-            _allKeys.Add(keyObj);
-            x += unit;
-        }
-
-        // Backspace
-        float backspaceWidth = keyWidth * 1.4f;
-        var backKey = CreateSpecialKey(parent, "⌫", x + (backspaceWidth - keyWidth) / 2f, currentY, backspaceWidth, tallKeyHeight,
-            specialKeyColor, () => OnBackspace());
-        _allKeys.Add(backKey);
-
-        currentY -= tallUnit;
-
-        // Bottom row: ABC < [spacebar] > Enter
-        x = startX;
-        float modKeyWidth = keyWidth * 1.2f;
-
-        // ABC key (switch to letters)
-        _layoutSwitchKey = CreateSpecialKey(parent, "ABC", x + (modKeyWidth - keyWidth) / 2f, currentY, modKeyWidth, tallKeyHeight,
+        // ABC key (same position as Shift)
+        _layoutSwitchKey = CreatePillKey(parent, "ABC", x + (sideKeyWidth - keyWidth) / 2f, bottomRowY, sideKeyWidth, keyHeight,
             specialKeyColor, () => SwitchToLayout(KeyboardLayout.Letters));
         _allKeys.Add(_layoutSwitchKey);
-        x += modKeyWidth + keySpacing;
+        x += sideKeyWidth + keySpacing;
 
-        // < key
-        var ltKey = CreateKeyWithHeight(parent, "<", x, currentY, keyWidth, tallKeyHeight, specialKeyColor, "<");
+        // < key (aligned with Z - position 0)
+        var ltKey = CreateKey(parent, "<", x, bottomRowY, keyWidth, keyHeight, specialKeyColor, "<");
         _allKeys.Add(ltKey);
         x += unit;
 
-        // Spacebar (extended - 5 units instead of 4)
-        float spaceWidth = keyWidth * 5f;
-        var spaceKey = CreateSpecialKey(parent, "", x + (spaceWidth - keyWidth) / 2f, currentY, spaceWidth, tallKeyHeight,
+        // Spacebar (spans positions 1-5: x,c,v,b,n)
+        float spaceWidth = 5 * keyWidth + 4 * keySpacing;
+        float spaceCenterX = x + 2 * unit;
+        var spaceKey = CreateSpecialKey(parent, "", spaceCenterX, bottomRowY, spaceWidth, keyHeight,
             keyColor, () => OnKeyPress(" "));
         _allKeys.Add(spaceKey);
-        x += spaceWidth + keySpacing;
+        x += 5 * unit;
 
-        // > key
-        var gtKey = CreateKeyWithHeight(parent, ">", x, currentY, keyWidth, tallKeyHeight, specialKeyColor, ">");
+        // > key (aligned with M - position 6)
+        var gtKey = CreateKey(parent, ">", x, bottomRowY, keyWidth, keyHeight, specialKeyColor, ">");
         _allKeys.Add(gtKey);
         x += unit;
 
-        // Enter key
-        float enterWidth = keyWidth * 1.3f;
-        var enterKey = CreateSpecialKey(parent, "→", x + (enterWidth - keyWidth) / 2f, currentY, enterWidth, tallKeyHeight,
+        // Enter key (same position as Back)
+        var enterKey = CreatePillKey(parent, "Enter", x + (sideKeyWidth - keyWidth) / 2f, bottomRowY, sideKeyWidth, keyHeight,
             accentColor, () => OnEnter());
         _allKeys.Add(enterKey);
+
+        // === ROW 3: ?123 % © ® ™ ✓ [ ] Back ===
+        // Same structure as shift row: ?123=Shift(1.5), symbols(7), Back(1.5)
+        x = startX;
+
+        // ?123 key (same width as Shift/ABC)
+        _symbolSwitchKey = CreatePillKey(parent, "?123", x + (sideKeyWidth - keyWidth) / 2f, symbolsRowY, sideKeyWidth, keyHeight,
+            specialKeyColor, () => SwitchToLayout(KeyboardLayout.Symbols));
+        _allKeys.Add(_symbolSwitchKey);
+        x += sideKeyWidth + keySpacing;
+
+        // Symbol keys: % © ® ™ ✓ [ ]
+        foreach (string key in MORE_SYMBOLS_ROW_2)
+        {
+            var keyObj = CreateKey(parent, key, x, symbolsRowY, keyWidth, keyHeight, keyColor, key);
+            _allKeys.Add(keyObj);
+            x += unit;
+        }
+
+        // Backspace (same width as Back/Enter)
+        var backKey = CreateSpecialKey(parent, "Back", x + (sideKeyWidth - keyWidth) / 2f, symbolsRowY, sideKeyWidth, keyHeight,
+            specialKeyColor, () => OnBackspace());
+        _allKeys.Add(backKey);
+
+        // === ROW 2: £€$¢^°={} \ ===
+        CreateKeyRow(parent, MORE_SYMBOLS_ROW_1, startX, currencyRowY, unit, false);
+
+        // === ROW 1 (Top): ~`|•√π÷×§△ ===
+        CreateKeyRow(parent, MORE_SYMBOLS_ROW_0, startX, topRowY, unit, false);
     }
 
     void CreateKeyRow(Transform parent, string[] keys, float startX, float y, float unit, bool isLetter)
@@ -540,87 +701,246 @@ public class VRMobileKeyboard : MonoBehaviour
         }
     }
 
-    void CreateKeyRowWithHeight(Transform parent, string[] keys, float startX, float y, float unit, float height)
+    /// <summary>
+    /// Create VRMenuFrame-style glass panel with glowing border
+    /// </summary>
+    void CreateGlassPanel(Transform parent, float w, float h)
     {
-        float x = startX;
-        foreach (string key in keys)
-        {
-            var keyObj = CreateKeyWithHeight(parent, key, x, y, keyWidth, height, keyColor, key);
-            _allKeys.Add(keyObj);
-            x += unit;
-        }
-    }
+        GameObject bgObj = new GameObject("GlassBackground");
+        bgObj.transform.SetParent(parent, false);
+        Image img = bgObj.AddComponent<Image>();
 
-    GameObject CreateKeyWithHeight(Transform parent, string displayKey, float x, float y, float width, float height, Color color, string outputKey)
-    {
-        var config = new VRButtonFactory.ButtonConfig
-        {
-            label = displayKey,
-            themeColor = color,
-            width = width,
-            height = height,
-            fontSize = 32,
-            font = customFont,
-            textOnly = true,
-            backgroundAlpha = 0.9f,
-            cornerRadius = 0.12f,
-            borderWidth = 0.0f,
-            popAmount = 0.015f
-        };
+        img.type = Image.Type.Simple;
+        img.sprite = GetPixelSprite();
 
-        string keyValue = outputKey;
-        GameObject btn = VRButtonFactory.CreateButton(parent, config, () => OnKeyPress(keyValue));
-
-        RectTransform rt = btn.GetComponent<RectTransform>();
-        rt.anchorMin = new Vector2(0.5f, 0.5f);
-        rt.anchorMax = new Vector2(0.5f, 0.5f);
-        rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.anchoredPosition = new Vector2(x, y);
-
-        return btn;
-    }
-
-    void CreateBackground(float width, float height)
-    {
-        GameObject bg = new GameObject("Background");
-        bg.transform.SetParent(transform, false);
-        RectTransform rt = bg.AddComponent<RectTransform>();
-        rt.anchorMin = Vector2.zero;
-        rt.anchorMax = Vector2.one;
-        rt.offsetMin = new Vector2(-15, -15);
-        rt.offsetMax = new Vector2(15, 15);
-
-        Image img = bg.AddComponent<Image>();
-        img.raycastTarget = true;
+        float expansion = glowExpansion;
+        float edgePad = glowExpansion > 0 ? glowExpansion / (1f + 2f * glowExpansion) : 0f;
+        float aspect = w / h;
 
         Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
         if (glassShader != null)
         {
-            Material mat = new Material(glassShader);
-            float aspect = width / height;
-            mat.SetFloat("_CornerRadius", 0.04f);
-            mat.SetFloat("_EdgePadding", 0.02f);
-            mat.SetFloat("_Aspect", aspect);
-            mat.SetColor("_ColorA", backgroundColor);
-            mat.SetColor("_ColorB", new Color(backgroundColor.r * 0.7f, backgroundColor.g * 0.7f, backgroundColor.b * 0.7f, backgroundColor.a));
-            mat.SetFloat("_GlassAlpha", 0.98f);
-            img.material = mat;
+            Material glassMat = new Material(glassShader);
+
+            glassMat.SetFloat("_CornerRadius", 0.12f);
+            glassMat.SetFloat("_EdgePadding", edgePad);
+            glassMat.SetFloat("_Aspect", aspect);
+
+            Color cyanGlass = new Color(0.35f, 0.9f, 1f, 0.15f);
+            Color purpleGlass = new Color(0.75f, 0.45f, 1f, 0.22f);
+            glassMat.SetColor("_ColorA", cyanGlass);
+            glassMat.SetColor("_ColorB", purpleGlass);
+            glassMat.SetFloat("_GradientOffset", 0f);
+            glassMat.SetFloat("_GradientAngle", -10f);
+            glassMat.SetFloat("_CyanRatio", 0.7f);
+            glassMat.SetFloat("_GlassAlpha", 0.08f);
+            glassMat.SetFloat("_FresnelPower", 2.2f);
+            glassMat.SetFloat("_FresnelStrength", 0.12f);
+
+            // Glassmorphism settings
+            glassMat.SetFloat("_BlurEnabled", enableGlassmorphism ? 1f : 0f);
+            glassMat.SetFloat("_BlurRadius", blurIntensity);
+            glassMat.SetFloat("_BlurIterations", blurQuality);
+            glassMat.SetFloat("_GlassOpacity", glassOpacity);
+            glassMat.SetFloat("_TintStrength", tintStrength);
+            glassMat.SetFloat("_InnerGlow", innerGlow);
+            glassMat.SetFloat("_Brightness", brightness);
+            glassMat.SetFloat("_Saturation", saturation);
+
+            img.material = glassMat;
             img.color = Color.white;
         }
         else
         {
-            img.color = backgroundColor;
+            img.color = new Color(0.1f, 0.1f, 0.15f, 0.95f);
+            expansion = 0;
         }
 
-        BoxCollider col = bg.AddComponent<BoxCollider>();
-        col.size = new Vector3(width + 30, height + 30, 0.1f);
-        col.center = new Vector3(0, 0, -0.05f);
+        RectTransform rt = bgObj.GetComponent<RectTransform>();
+        rt.anchorMin = new Vector2(-expansion, -expansion);
+        rt.anchorMax = new Vector2(1f + expansion, 1f + expansion);
+        rt.sizeDelta = Vector2.zero;
+        rt.localScale = Vector3.one;
+        rt.localPosition = Vector3.zero;
+        rt.SetAsFirstSibling();
+
+        // Collider
+        float expandedW = w * (1f + 2f * expansion);
+        float expandedH = h * (1f + 2f * expansion);
+        BoxCollider bgCol = bgObj.AddComponent<BoxCollider>();
+        bgCol.size = new Vector3(expandedW, expandedH, 0.01f);
+        bgCol.center = new Vector3(0, 0, 0.05f);
 
         int vrLayer = LayerMask.NameToLayer("VirtualObjects");
-        if (vrLayer != -1) bg.layer = vrLayer;
+        if (vrLayer != -1) bgObj.layer = vrLayer;
+
+        CreateGlowingBorder(bgObj.transform, w, h, edgePad);
+        CreateFloatingDataEffects(bgObj.transform, w, h);
     }
 
-    void CreatePreviewRow(Transform parent, float y, float totalWidth)
+    /// <summary>
+    /// Create VRMenuFrame-style glowing border
+    /// </summary>
+    void CreateGlowingBorder(Transform parent, float w, float h, float edgePad)
+    {
+        GameObject borderObj = new GameObject("GlowingBorder");
+        borderObj.transform.SetParent(parent, false);
+
+        RectTransform rt = borderObj.AddComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+
+        Image borderImg = borderObj.AddComponent<Image>();
+        borderImg.raycastTarget = false;
+
+        float aspect = w / h;
+
+        Shader glowShader = Shader.Find("Custom/GlowingGlassBorder");
+        if (glowShader != null)
+        {
+            Material glowMat = new Material(glowShader);
+
+            glowMat.SetFloat("_StrokeEnabled", 0);
+            glowMat.SetFloat("_BorderWidth", 0.02f);
+            glowMat.SetFloat("_CornerRadius", 0.12f);
+            glowMat.SetFloat("_EdgePadding", edgePad);
+            glowMat.SetFloat("_Aspect", aspect);
+
+            glowMat.SetFloat("_Layer1Width", 0.008f);
+            glowMat.SetFloat("_Layer1Alpha", 1.5f);
+            glowMat.SetFloat("_Layer2Width", 0.018f);
+            glowMat.SetFloat("_Layer2Alpha", 1.0f);
+            glowMat.SetFloat("_Layer3Width", 0.04f);
+            glowMat.SetFloat("_Layer3Alpha", 0.6f);
+            glowMat.SetFloat("_Layer4Width", 0.08f);
+            glowMat.SetFloat("_Layer4Alpha", 0.3f);
+
+            Color cyanColor = new Color(0.3f, 1f, 1f, 1f);
+            Color purpleColor = new Color(1f, 0.4f, 1f, 1f);
+            glowMat.SetColor("_ColorA", cyanColor);
+            glowMat.SetColor("_ColorB", purpleColor);
+            glowMat.SetFloat("_GradientMode", 2f);
+            glowMat.SetFloat("_GradientAngle", -10f);
+            glowMat.SetFloat("_GlassAlpha", 0.02f);
+            glowMat.SetColor("_GlassTint", new Color(0.9f, 0.95f, 1f, 1f));
+            glowMat.SetFloat("_ShimmerSpeed", 0.1f);
+            glowMat.SetFloat("_ShimmerIntensity", 0.2f);
+            glowMat.SetFloat("_LightSize", 0.008f);
+            glowMat.SetFloat("_LightGlow", 0.008f);
+
+            borderImg.material = glowMat;
+            borderImg.sprite = GetPixelSprite();
+        }
+
+        borderObj.transform.SetAsLastSibling();
+    }
+
+    /// <summary>
+    /// Create floating data effects (like VRMenuFrame)
+    /// </summary>
+    void CreateFloatingDataEffects(Transform parent, float w, float h)
+    {
+        GameObject fxContainer = new GameObject("FX_DataStream");
+        fxContainer.transform.SetParent(parent, false);
+        RectTransform rt = fxContainer.AddComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+
+        float expansionPxW = w * glowExpansion;
+        float expansionPxH = h * glowExpansion;
+        float margin = 20f;
+
+        rt.offsetMin = new Vector2(expansionPxW + margin, expansionPxH + margin);
+        rt.offsetMax = new Vector2(-(expansionPxW + margin), -(expansionPxH + margin));
+
+        Image maskImage = fxContainer.AddComponent<Image>();
+        maskImage.sprite = GetRoundedMaskSprite();
+        maskImage.type = Image.Type.Sliced;
+        maskImage.color = Color.white;
+        maskImage.raycastTarget = false;
+
+        Mask mask = fxContainer.AddComponent<Mask>();
+        mask.showMaskGraphic = false;
+
+        int particleCount = 15;
+        for (int i = 0; i < particleCount; i++)
+        {
+            GameObject p = new GameObject($"Bit_{i}");
+            p.transform.SetParent(fxContainer.transform, false);
+
+            Image pImg = p.AddComponent<Image>();
+            pImg.sprite = GetPixelSprite();
+
+            bool cyanOrPurple = Random.value > 0.5f;
+            Color baseCol = cyanOrPurple ? Color.cyan : new Color(0.8f, 0f, 1f);
+            pImg.color = new Color(baseCol.r, baseCol.g, baseCol.b, Random.Range(0.1f, 0.4f));
+
+            RectTransform pRT = p.GetComponent<RectTransform>();
+            float size = Random.Range(8f, 50f);
+            pRT.sizeDelta = new Vector2(size, size * Random.Range(0.2f, 1.0f));
+
+            float startX = Random.Range(-w / 2f, w / 2f);
+            float startY = Random.Range(-h / 2f, h / 2f);
+            pRT.anchoredPosition = new Vector2(startX, startY);
+
+            var anim = p.AddComponent<FloatingDataAnim>();
+            anim.speed = Random.Range(8f, 30f);
+            anim.range = new Vector2(w, h);
+        }
+    }
+
+    Sprite GetPixelSprite()
+    {
+        if (_pixelSprite) return _pixelSprite;
+        Texture2D tex = new Texture2D(2, 2);
+        tex.SetPixels(new Color[] { Color.white, Color.white, Color.white, Color.white });
+        tex.Apply();
+        _pixelSprite = Sprite.Create(tex, new Rect(0, 0, 2, 2), Vector2.one * 0.5f);
+        return _pixelSprite;
+    }
+
+    Sprite GetRoundedMaskSprite()
+    {
+        if (_roundedMaskSprite != null) return _roundedMaskSprite;
+
+        int size = 128;
+        int radius = 24;
+        int border = radius;
+
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        Color[] colors = new Color[size * size];
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float alpha = 1f;
+
+                int cornerX = -1, cornerY = -1;
+                if (x < radius && y < radius) { cornerX = radius; cornerY = radius; }
+                else if (x >= size - radius && y < radius) { cornerX = size - radius - 1; cornerY = radius; }
+                else if (x < radius && y >= size - radius) { cornerX = radius; cornerY = size - radius - 1; }
+                else if (x >= size - radius && y >= size - radius) { cornerX = size - radius - 1; cornerY = size - radius - 1; }
+
+                if (cornerX >= 0)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), new Vector2(cornerX, cornerY));
+                    alpha = Mathf.Clamp01(radius + 0.5f - dist);
+                }
+
+                colors[y * size + x] = new Color(1, 1, 1, alpha);
+            }
+        }
+
+        tex.SetPixels(colors);
+        tex.Apply();
+        _roundedMaskSprite = Sprite.Create(tex, new Rect(0, 0, size, size), Vector2.one * 0.5f, 100, 0, SpriteMeshType.FullRect, new Vector4(border, border, border, border));
+        return _roundedMaskSprite;
+    }
+
+    void CreatePreviewRow(Transform parent, float y, float contentWidth)
     {
         _previewText = new GameObject("PreviewText");
         _previewText.transform.SetParent(parent, false);
@@ -630,7 +950,7 @@ public class VRMobileKeyboard : MonoBehaviour
         rt.anchorMax = new Vector2(0.5f, 0.5f);
         rt.pivot = new Vector2(0.5f, 0.5f);
         rt.anchoredPosition = new Vector2(0, y);
-        rt.sizeDelta = new Vector2(totalWidth - 30, keyHeight * 0.5f);
+        rt.sizeDelta = new Vector2(contentWidth, keyHeight * 0.5f);
 
         Image bgImg = _previewText.AddComponent<Image>();
         bgImg.color = new Color(0.18f, 0.19f, 0.22f, 0.6f);
@@ -697,6 +1017,39 @@ public class VRMobileKeyboard : MonoBehaviour
             textOnly = true,
             backgroundAlpha = 0.9f,
             cornerRadius = 0.12f,
+            borderWidth = 0.0f,
+            popAmount = 0.015f
+        };
+
+        GameObject btn = VRButtonFactory.CreateButton(parent, config, () => onClick?.Invoke());
+
+        RectTransform rt = btn.GetComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 0.5f);
+        rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = new Vector2(x, y);
+
+        return btn;
+    }
+
+    /// <summary>
+    /// Create horizontal rectangular key (was pill-shaped, now rectangle)
+    /// Uses exact width/height passed in (no multipliers)
+    /// </summary>
+    GameObject CreatePillKey(Transform parent, string label, float x, float y, float width, float height,
+        Color color, Action onClick)
+    {
+        var config = new VRButtonFactory.ButtonConfig
+        {
+            label = label,
+            themeColor = color,
+            width = width,
+            height = height, // Same height as other keys
+            fontSize = label.Length > 3 ? 22 : 26,
+            font = customFont,
+            textOnly = true,
+            backgroundAlpha = 0.9f,
+            cornerRadius = 0.15f, // Rectangular with slight rounding
             borderWidth = 0.0f,
             popAmount = 0.015f
         };
@@ -844,23 +1197,10 @@ public class VRMobileKeyboard : MonoBehaviour
     {
         if (_instance == null)
         {
+            // Create keyboard at root level - it's a World Space Canvas
+            // and must not be parented to another Canvas
             GameObject keyboardObj = new GameObject("VRMobileKeyboard");
-
-            if (keyboardParent != null)
-            {
-                keyboardObj.transform.SetParent(keyboardParent, false);
-            }
-
-            Canvas canvas = keyboardObj.GetComponentInParent<Canvas>();
-            if (canvas == null && keyboardParent != null)
-            {
-                canvas = keyboardParent.GetComponentInParent<Canvas>();
-            }
-
-            if (canvas != null)
-            {
-                keyboardObj.transform.SetParent(canvas.transform, false);
-            }
+            // No SetParent - keyboard stays at root for correct world positioning
 
             _instance = keyboardObj.AddComponent<VRMobileKeyboard>();
 

@@ -3,12 +3,17 @@ using UnityEngine.UI;
 using TMPro;
 using System;
 using System.Collections.Generic;
+using Random = UnityEngine.Random;
 
 /// <summary>
 /// Virtual Keyboard for VR environment.
 /// Displays a floating keyboard that can be used to input text into TMP_InputField.
 /// Uses VRButtonFactory for consistent styling with other VR UI components.
+/// Positions relative to primary VRMenuFrame with VRMenuFrame-style glass background.
 /// </summary>
+[RequireComponent(typeof(Canvas))]
+[RequireComponent(typeof(RectTransform))]
+[RequireComponent(typeof(GraphicRaycaster))]
 public class VRKeyboard : MonoBehaviour
 {
     [Header("Theme")]
@@ -27,6 +32,49 @@ public class VRKeyboard : MonoBehaviour
     [Header("Settings")]
     public bool showPreview = true;
     public float keyboardScale = 1f;
+
+    [Header("Position Tracking")]
+    [Tooltip("If true, keyboard will auto-position relative to the primary VRMenuFrame")]
+    public bool followPrimaryFrame = true;
+    [Tooltip("Multiplier for spacing below taskbar (1.5 = 150% of keyboard height)")]
+    public float spacingMultiplier = 1.5f;
+    [Tooltip("Width ratio relative to VRMenuFrame (0.667 = 2/3)")]
+    public float widthRatioToFrame = 0.667f;
+
+    [Header("Initial Orientation")]
+    [Tooltip("If true, keyboard will face the camera on show (like VRTaskbar)")]
+    public bool faceOnInit = true;
+
+    [Header("Glassmorphism")]
+    [Tooltip("Enable glassmorphism blur effect")]
+    public bool enableGlassmorphism = true;
+    [Range(0, 40)]
+    public float blurIntensity = 2f;
+    [Range(1, 8)]
+    public int blurQuality = 3;
+    [Range(0, 1)]
+    public float glassOpacity = 0f;
+    [Range(0, 1)]
+    public float tintStrength = 0.1f;
+    [Range(0, 0.5f)]
+    public float innerGlow = 0f;
+    [Range(0.9f, 1.3f)]
+    public float brightness = 1f;
+    [Range(0.5f, 1f)]
+    public float saturation = 1f;
+    [Range(0f, 0.1f)]
+    public float glowExpansion = 0.02f;
+
+    // Scale factor: matches VRMenuFrame pixel density (1.6m / 1920px)
+    private const float PixelToMeter = 1.6f / 1920f;
+
+    // Internal sprites
+    private Sprite _pixelSprite;
+    private Sprite _roundedMaskSprite;
+
+    // Canvas components
+    public Canvas Canvas { get; private set; }
+    public RectTransform CanvasRect { get; private set; }
 
     // Events
     public event Action<string> OnKeyPressed;
@@ -72,6 +120,12 @@ public class VRKeyboard : MonoBehaviour
     public static VRKeyboard Instance => _instance;
 
     private bool _isBuilt = false;
+    private bool _isKeyboardVisibleOnStart = false;
+    private bool _hasInitializedOrientation = false;
+
+    // Calculated logical dimensions
+    private float _logicalWidth;
+    private float _logicalHeight;
 
     void Awake()
     {
@@ -85,14 +139,27 @@ public class VRKeyboard : MonoBehaviour
 
     void Start()
     {
+        // Setup Canvas
+        Canvas = GetComponent<Canvas>();
+        CanvasRect = GetComponent<RectTransform>();
+
+        if (Canvas == null)
+        {
+            Canvas = gameObject.AddComponent<Canvas>();
+        }
+        Canvas.renderMode = RenderMode.WorldSpace;
+
+        if (GetComponent<GraphicRaycaster>() == null)
+        {
+            gameObject.AddComponent<GraphicRaycaster>();
+        }
+
         EnsureBuilt();
         if (!_isKeyboardVisibleOnStart)
         {
             gameObject.SetActive(false); // Hidden by default
         }
     }
-
-    private bool _isKeyboardVisibleOnStart = false;
 
     /// <summary>
     /// Ensure keyboard is built (can be called before Start)
@@ -125,6 +192,79 @@ public class VRKeyboard : MonoBehaviour
         }
     }
 
+    void LateUpdate()
+    {
+        if (gameObject.activeSelf)
+        {
+            UpdatePositionRelativeToPrimary();
+        }
+    }
+
+    /// <summary>
+    /// Orient keyboard to face the camera (like VRTaskbar).
+    /// </summary>
+    void OrientTowardsCamera()
+    {
+        var cam = Camera.main;
+        if (cam == null) return;
+
+        Vector3 toCamera = cam.transform.position - transform.position;
+        if (toCamera.sqrMagnitude < 1e-6f) return;
+
+        transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
+        _hasInitializedOrientation = true;
+    }
+
+    /// <summary>
+    /// Updates keyboard position to stay below VRTaskbar (which is below VRMenuFrame).
+    /// posX = VRMenuFrame.posX (centered)
+    /// </summary>
+    void UpdatePositionRelativeToPrimary()
+    {
+        if (!followPrimaryFrame) return;
+
+        VRMenuFrame primary = VRMenuFrame.PrimaryInstance;
+        if (primary == null) return;
+
+        // Find VRTaskbar to position below it
+        VRTaskbar taskbar = FindObjectOfType<VRTaskbar>();
+
+        Vector3 primaryPos = primary.transform.position;
+        float primaryHalfHeight = primary.panelHeight / 2f;
+        float keyboardHalfHeight = (_logicalHeight * PixelToMeter) / 2f;
+
+        Vector3 newPos = transform.position;
+        newPos.x = primaryPos.x; // Center X with primary frame
+
+        if (taskbar != null && taskbar.gameObject.activeInHierarchy)
+        {
+            // Use taskbar's actual world position
+            Vector3 taskbarPos = taskbar.transform.position;
+            float taskbarHalfHeight = (taskbar.logicalHeight * PixelToMeter) / 2f;
+            float taskbarBottomY = taskbarPos.y - taskbarHalfHeight;
+
+            // Position keyboard below taskbar with small gap
+            float gap = spacingMultiplier * 0.02f; // spacingMultiplier as gap in meters (1.5 = 3cm gap)
+            newPos.y = taskbarBottomY - keyboardHalfHeight - gap;
+            newPos.z = taskbarPos.z;
+        }
+        else
+        {
+            // Position below primary frame directly with small gap
+            float gap = spacingMultiplier * 0.02f;
+            newPos.y = primaryPos.y - primaryHalfHeight - keyboardHalfHeight - gap;
+            newPos.z = primaryPos.z;
+        }
+
+        transform.position = newPos;
+
+        // Match rotation with primary if faceOnInit is disabled
+        if (!faceOnInit)
+        {
+            transform.rotation = primary.transform.rotation;
+        }
+    }
+
     /// <summary>
     /// Show keyboard and attach to an input field
     /// </summary>
@@ -153,8 +293,14 @@ public class VRKeyboard : MonoBehaviour
         ResetCursorBlink();
         UpdatePreview();
 
-        // Position keyboard below the input field
-        PositionKeyboardNearInput(inputField);
+        // Position relative to VRMenuFrame/VRTaskbar
+        UpdatePositionRelativeToPrimary();
+
+        // Orient towards camera on show (like VRTaskbar)
+        if (faceOnInit)
+        {
+            OrientTowardsCamera();
+        }
     }
 
     /// <summary>
@@ -177,32 +323,15 @@ public class VRKeyboard : MonoBehaviour
     /// </summary>
     public TMP_InputField TargetInputField => _targetInputField;
 
-    void PositionKeyboardNearInput(TMP_InputField inputField)
-    {
-        if (inputField == null) return;
-
-        RectTransform inputRT = inputField.GetComponent<RectTransform>();
-        RectTransform keyboardRT = GetComponent<RectTransform>();
-
-        if (inputRT == null || keyboardRT == null) return;
-
-        // Get the canvas for the input field
-        Canvas inputCanvas = inputField.GetComponentInParent<Canvas>();
-        if (inputCanvas == null) return;
-
-        // Position keyboard below input field
-        Vector3 inputWorldPos = inputRT.position;
-        float keyboardHeight = keyboardRT.rect.height * keyboardRT.lossyScale.y;
-
-        // Position below input with some padding
-        Vector3 keyboardPos = inputWorldPos;
-        keyboardPos.y -= inputRT.rect.height * inputRT.lossyScale.y / 2f + keyboardHeight / 2f + 50f;
-
-        transform.position = keyboardPos;
-    }
-
     void BuildKeyboard()
     {
+        // Calculate dimensions based on VRMenuFrame (2/3 width)
+        VRMenuFrame primary = VRMenuFrame.PrimaryInstance;
+        float frameLogicalWidth = primary != null ? primary.logicalWidth : 1920f;
+
+        // Keyboard logical width = 2/3 of VRMenuFrame
+        _logicalWidth = frameLogicalWidth * widthRatioToFrame;
+
         // Calculate total keyboard size - Full keyboard layout
         // Standard key unit = keyWidth
         float unit = keyWidth + keySpacing;
@@ -210,11 +339,9 @@ public class VRKeyboard : MonoBehaviour
 
         // Main keyboard: 15 units wide (including backspace 2u)
         // Nav column: 1.2 units
-        // Arrow cluster: 3 units wide, 2 rows high
         float mainKeysWidth = 15f * unit;
         float navGap = keySpacing * 2;
         float navWidth = keyWidth * 1.2f;
-        float arrowClusterWidth = 3f * unit;
 
         float totalWidth = mainKeysWidth + navGap + navWidth;
         float totalHeight = functionKeyHeight + keySpacing + 5 * (keyHeight + keySpacing);
@@ -224,15 +351,39 @@ public class VRKeyboard : MonoBehaviour
             totalHeight += keyHeight * 0.6f + keySpacing;
         }
 
-        // Setup RectTransform
-        RectTransform rt = gameObject.GetComponent<RectTransform>();
-        if (rt == null)
-            rt = gameObject.AddComponent<RectTransform>();
+        // Scale keys to fit within logical width
+        float scaleToFit = _logicalWidth / totalWidth;
+        keyWidth *= scaleToFit;
+        keyHeight *= scaleToFit;
+        keySpacing *= scaleToFit;
 
-        rt.sizeDelta = new Vector2(totalWidth, totalHeight) * keyboardScale;
+        // Recalculate with scaled dimensions
+        unit = keyWidth + keySpacing;
+        functionKeyHeight = keyHeight * 0.7f;
+        mainKeysWidth = 15f * unit;
+        navGap = keySpacing * 2;
+        navWidth = keyWidth * 1.2f;
+        totalWidth = mainKeysWidth + navGap + navWidth;
+        totalHeight = functionKeyHeight + keySpacing + 5 * (keyHeight + keySpacing);
+        if (showPreview)
+        {
+            totalHeight += keyHeight * 0.6f + keySpacing;
+        }
 
-        // Add background
-        CreateBackground(totalWidth, totalHeight);
+        _logicalWidth = totalWidth;
+        _logicalHeight = totalHeight;
+
+        // Setup RectTransform with VRMenuFrame-style scale
+        CanvasRect = GetComponent<RectTransform>();
+        if (CanvasRect == null)
+            CanvasRect = gameObject.AddComponent<RectTransform>();
+
+        CanvasRect.sizeDelta = new Vector2(_logicalWidth, _logicalHeight);
+        CanvasRect.localScale = new Vector3(PixelToMeter, PixelToMeter, 1f);
+        CanvasRect.localPosition = Vector3.zero;
+
+        // Add VRMenuFrame-style glass background
+        CreateGlassPanel(transform, _logicalWidth, _logicalHeight);
 
         // Create container for keys
         _keyboardContainer = new GameObject("KeyContainer");
@@ -308,46 +459,243 @@ public class VRKeyboard : MonoBehaviour
         CreateSpecialKey(parent, label, x, y, keyWidth, keyHeight, accentColor, onClick);
     }
 
-    void CreateBackground(float width, float height)
+    /// <summary>
+    /// Create VRMenuFrame-style glass panel with glowing border
+    /// </summary>
+    void CreateGlassPanel(Transform parent, float w, float h)
     {
-        GameObject bg = new GameObject("Background");
-        bg.transform.SetParent(transform, false);
-        RectTransform rt = bg.AddComponent<RectTransform>();
-        rt.anchorMin = Vector2.zero;
-        rt.anchorMax = Vector2.one;
-        rt.offsetMin = new Vector2(-20, -20);
-        rt.offsetMax = new Vector2(20, 20);
+        GameObject bgObj = new GameObject("GlassBackground");
+        bgObj.transform.SetParent(parent, false);
+        Image img = bgObj.AddComponent<Image>();
 
-        Image img = bg.AddComponent<Image>();
-        img.raycastTarget = true;
+        img.type = Image.Type.Simple;
+        img.sprite = GetPixelSprite();
 
-        // Use glass shader if available
+        float expansion = glowExpansion;
+        float edgePad = glowExpansion > 0 ? glowExpansion / (1f + 2f * glowExpansion) : 0f;
+        float aspect = w / h;
+
         Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
         if (glassShader != null)
         {
-            Material mat = new Material(glassShader);
-            float aspect = width / height;
-            mat.SetFloat("_CornerRadius", 0.05f);
-            mat.SetFloat("_EdgePadding", 0.02f);
-            mat.SetFloat("_Aspect", aspect);
-            mat.SetColor("_ColorA", new Color(0.1f, 0.1f, 0.15f, 0.95f));
-            mat.SetColor("_ColorB", new Color(0.05f, 0.05f, 0.08f, 0.95f));
-            mat.SetFloat("_GlassAlpha", 0.95f);
-            img.material = mat;
+            Material glassMat = new Material(glassShader);
+
+            glassMat.SetFloat("_CornerRadius", 0.12f);
+            glassMat.SetFloat("_EdgePadding", edgePad);
+            glassMat.SetFloat("_Aspect", aspect);
+
+            Color cyanGlass = new Color(0.35f, 0.9f, 1f, 0.15f);
+            Color purpleGlass = new Color(0.75f, 0.45f, 1f, 0.22f);
+            glassMat.SetColor("_ColorA", cyanGlass);
+            glassMat.SetColor("_ColorB", purpleGlass);
+            glassMat.SetFloat("_GradientOffset", 0f);
+            glassMat.SetFloat("_GradientAngle", -10f);
+            glassMat.SetFloat("_CyanRatio", 0.7f);
+            glassMat.SetFloat("_GlassAlpha", 0.08f);
+            glassMat.SetFloat("_FresnelPower", 2.2f);
+            glassMat.SetFloat("_FresnelStrength", 0.12f);
+
+            // Glassmorphism settings
+            glassMat.SetFloat("_BlurEnabled", enableGlassmorphism ? 1f : 0f);
+            glassMat.SetFloat("_BlurRadius", blurIntensity);
+            glassMat.SetFloat("_BlurIterations", blurQuality);
+            glassMat.SetFloat("_GlassOpacity", glassOpacity);
+            glassMat.SetFloat("_TintStrength", tintStrength);
+            glassMat.SetFloat("_InnerGlow", innerGlow);
+            glassMat.SetFloat("_Brightness", brightness);
+            glassMat.SetFloat("_Saturation", saturation);
+
+            img.material = glassMat;
             img.color = Color.white;
         }
         else
         {
             img.color = new Color(0.1f, 0.1f, 0.15f, 0.95f);
+            expansion = 0;
         }
 
-        // Add collider for VR interaction
-        BoxCollider col = bg.AddComponent<BoxCollider>();
-        col.size = new Vector3(width + 40, height + 40, 0.1f);
-        col.center = new Vector3(0, 0, -0.05f);
+        RectTransform rt = bgObj.GetComponent<RectTransform>();
+        rt.anchorMin = new Vector2(-expansion, -expansion);
+        rt.anchorMax = new Vector2(1f + expansion, 1f + expansion);
+        rt.sizeDelta = Vector2.zero;
+        rt.localScale = Vector3.one;
+        rt.localPosition = Vector3.zero;
+        rt.SetAsFirstSibling();
+
+        // Collider
+        float expandedW = w * (1f + 2f * expansion);
+        float expandedH = h * (1f + 2f * expansion);
+        BoxCollider bgCol = bgObj.AddComponent<BoxCollider>();
+        bgCol.size = new Vector3(expandedW, expandedH, 0.01f);
+        bgCol.center = new Vector3(0, 0, 0.05f);
 
         int vrLayer = LayerMask.NameToLayer("VirtualObjects");
-        if (vrLayer != -1) bg.layer = vrLayer;
+        if (vrLayer != -1) bgObj.layer = vrLayer;
+
+        CreateGlowingBorder(bgObj.transform, w, h, edgePad);
+        CreateFloatingDataEffects(bgObj.transform, w, h);
+    }
+
+    /// <summary>
+    /// Create VRMenuFrame-style glowing border
+    /// </summary>
+    void CreateGlowingBorder(Transform parent, float w, float h, float edgePad)
+    {
+        GameObject borderObj = new GameObject("GlowingBorder");
+        borderObj.transform.SetParent(parent, false);
+
+        RectTransform rt = borderObj.AddComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+
+        Image borderImg = borderObj.AddComponent<Image>();
+        borderImg.raycastTarget = false;
+
+        float aspect = w / h;
+
+        Shader glowShader = Shader.Find("Custom/GlowingGlassBorder");
+        if (glowShader != null)
+        {
+            Material glowMat = new Material(glowShader);
+
+            glowMat.SetFloat("_StrokeEnabled", 0);
+            glowMat.SetFloat("_BorderWidth", 0.02f);
+            glowMat.SetFloat("_CornerRadius", 0.12f);
+            glowMat.SetFloat("_EdgePadding", edgePad);
+            glowMat.SetFloat("_Aspect", aspect);
+
+            glowMat.SetFloat("_Layer1Width", 0.008f);
+            glowMat.SetFloat("_Layer1Alpha", 1.5f);
+            glowMat.SetFloat("_Layer2Width", 0.018f);
+            glowMat.SetFloat("_Layer2Alpha", 1.0f);
+            glowMat.SetFloat("_Layer3Width", 0.04f);
+            glowMat.SetFloat("_Layer3Alpha", 0.6f);
+            glowMat.SetFloat("_Layer4Width", 0.08f);
+            glowMat.SetFloat("_Layer4Alpha", 0.3f);
+
+            Color cyanColor = new Color(0.3f, 1f, 1f, 1f);
+            Color purpleColor = new Color(1f, 0.4f, 1f, 1f);
+            glowMat.SetColor("_ColorA", cyanColor);
+            glowMat.SetColor("_ColorB", purpleColor);
+            glowMat.SetFloat("_GradientMode", 2f);
+            glowMat.SetFloat("_GradientAngle", -10f);
+            glowMat.SetFloat("_GlassAlpha", 0.02f);
+            glowMat.SetColor("_GlassTint", new Color(0.9f, 0.95f, 1f, 1f));
+            glowMat.SetFloat("_ShimmerSpeed", 0.1f);
+            glowMat.SetFloat("_ShimmerIntensity", 0.2f);
+            glowMat.SetFloat("_LightSize", 0.008f);
+            glowMat.SetFloat("_LightGlow", 0.008f);
+
+            borderImg.material = glowMat;
+            borderImg.sprite = GetPixelSprite();
+        }
+
+        borderObj.transform.SetAsLastSibling();
+    }
+
+    /// <summary>
+    /// Create floating data effects (like VRMenuFrame)
+    /// </summary>
+    void CreateFloatingDataEffects(Transform parent, float w, float h)
+    {
+        GameObject fxContainer = new GameObject("FX_DataStream");
+        fxContainer.transform.SetParent(parent, false);
+        RectTransform rt = fxContainer.AddComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+
+        float expansionPxW = w * glowExpansion;
+        float expansionPxH = h * glowExpansion;
+        float margin = 20f;
+
+        rt.offsetMin = new Vector2(expansionPxW + margin, expansionPxH + margin);
+        rt.offsetMax = new Vector2(-(expansionPxW + margin), -(expansionPxH + margin));
+
+        Image maskImage = fxContainer.AddComponent<Image>();
+        maskImage.sprite = GetRoundedMaskSprite();
+        maskImage.type = Image.Type.Sliced;
+        maskImage.color = Color.white;
+        maskImage.raycastTarget = false;
+
+        Mask mask = fxContainer.AddComponent<Mask>();
+        mask.showMaskGraphic = false;
+
+        int particleCount = 15;
+        for (int i = 0; i < particleCount; i++)
+        {
+            GameObject p = new GameObject($"Bit_{i}");
+            p.transform.SetParent(fxContainer.transform, false);
+
+            Image pImg = p.AddComponent<Image>();
+            pImg.sprite = GetPixelSprite();
+
+            bool cyanOrPurple = Random.value > 0.5f;
+            Color baseCol = cyanOrPurple ? Color.cyan : new Color(0.8f, 0f, 1f);
+            pImg.color = new Color(baseCol.r, baseCol.g, baseCol.b, Random.Range(0.1f, 0.4f));
+
+            RectTransform pRT = p.GetComponent<RectTransform>();
+            float size = Random.Range(8f, 50f);
+            pRT.sizeDelta = new Vector2(size, size * Random.Range(0.2f, 1.0f));
+
+            float startX = Random.Range(-w / 2f, w / 2f);
+            float startY = Random.Range(-h / 2f, h / 2f);
+            pRT.anchoredPosition = new Vector2(startX, startY);
+
+            var anim = p.AddComponent<FloatingDataAnim>();
+            anim.speed = Random.Range(8f, 30f);
+            anim.range = new Vector2(w, h);
+        }
+    }
+
+    Sprite GetPixelSprite()
+    {
+        if (_pixelSprite) return _pixelSprite;
+        Texture2D tex = new Texture2D(2, 2);
+        tex.SetPixels(new Color[] { Color.white, Color.white, Color.white, Color.white });
+        tex.Apply();
+        _pixelSprite = Sprite.Create(tex, new Rect(0, 0, 2, 2), Vector2.one * 0.5f);
+        return _pixelSprite;
+    }
+
+    Sprite GetRoundedMaskSprite()
+    {
+        if (_roundedMaskSprite != null) return _roundedMaskSprite;
+
+        int size = 128;
+        int radius = 24;
+        int border = radius;
+
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        Color[] colors = new Color[size * size];
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float alpha = 1f;
+
+                int cornerX = -1, cornerY = -1;
+                if (x < radius && y < radius) { cornerX = radius; cornerY = radius; }
+                else if (x >= size - radius && y < radius) { cornerX = size - radius - 1; cornerY = radius; }
+                else if (x < radius && y >= size - radius) { cornerX = radius; cornerY = size - radius - 1; }
+                else if (x >= size - radius && y >= size - radius) { cornerX = size - radius - 1; cornerY = size - radius - 1; }
+
+                if (cornerX >= 0)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), new Vector2(cornerX, cornerY));
+                    alpha = Mathf.Clamp01(radius + 0.5f - dist);
+                }
+
+                colors[y * size + x] = new Color(1, 1, 1, alpha);
+            }
+        }
+
+        tex.SetPixels(colors);
+        tex.Apply();
+        _roundedMaskSprite = Sprite.Create(tex, new Rect(0, 0, size, size), Vector2.one * 0.5f, 100, 0, SpriteMeshType.FullRect, new Vector4(border, border, border, border));
+        return _roundedMaskSprite;
     }
 
     void CreatePreviewRow(Transform parent, float y, float totalWidth)
@@ -815,24 +1163,10 @@ public class VRKeyboard : MonoBehaviour
     {
         if (_instance == null)
         {
-            // Create keyboard instance
+            // Create keyboard at root level - it's a World Space Canvas
+            // and must not be parented to another Canvas
             GameObject keyboardObj = new GameObject("VRKeyboard");
-
-            if (keyboardParent != null)
-            {
-                keyboardObj.transform.SetParent(keyboardParent, false);
-            }
-
-            Canvas canvas = keyboardObj.GetComponentInParent<Canvas>();
-            if (canvas == null && keyboardParent != null)
-            {
-                canvas = keyboardParent.GetComponentInParent<Canvas>();
-            }
-
-            if (canvas != null)
-            {
-                keyboardObj.transform.SetParent(canvas.transform, false);
-            }
+            // No SetParent - keyboard stays at root for correct world positioning
 
             _instance = keyboardObj.AddComponent<VRKeyboard>();
 
