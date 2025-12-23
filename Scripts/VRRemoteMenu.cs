@@ -218,11 +218,11 @@ public class VRRemoteMenu : MonoBehaviour
         float cellW = (w - gapX) / 2f;
 
         // Dropdown options
-        var monitorOptions = new List<string> { "1 Monitor", "2 Monitors", "3 Monitors" };
-        var monitorIcons = new List<Sprite> { LoadIcon("monitor"), LoadIcon("monitor"), LoadIcon("monitor") };
-        var resolutionOptions = new List<string> { "1920 x 1080", "2560 x 1440", "3840 x 2160", "1280 x 720" };
-        var bitrateOptions = new List<string> { "5 Mbps", "10 Mbps", "20 Mbps", "30 Mbps", "50 Mbps" };
-        var fpsOptions = new List<string> { "30 FPS", "45 FPS", "60 FPS", "75 FPS", "90 FPS", "120 FPS", "144 FPS" };
+        var monitorOptions = new List<string> {"1 Monitor", "2 Monitors", "3 Monitors"};
+        var monitorIcons = new List<Sprite> { LoadIcon("icon_1_monitor"), LoadIcon("icon_2_monitors"), LoadIcon("icon_3_monitors")};
+        var resolutionOptions = new List<string> {"1920 x 1080", "1600 x 900", "1366 x 768", "1280 x 720"};
+        var bitrateOptions = new List<string> {"5 Mbps", "10 Mbps", "20 Mbps", "30 Mbps", "50 Mbps"};
+        var fpsOptions = new List<string> {"30 FPS", "45 FPS", "60 FPS"};
 
         // Row 1 (top) - Monitors và Resolution
         float row1Y = dropdownH + gapY;

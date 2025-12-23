@@ -917,6 +917,10 @@ public static class VRDropdownFactory
         float optionWidth = config.width;
         float borderHeight = borderWidth * optionHeight / optionWidth;
 
+        // First option needs extra 5px on top to align with panel border
+        float firstOptionExtraTop = (index == 0) ? 5f : 0f;
+        float adjustedBorderHeight = borderHeight + firstOptionExtraTop;
+
         GameObject borderObj = new GameObject("HoverBorder");
         borderObj.transform.SetParent(option.transform, false);
         RectTransform borderRT = borderObj.AddComponent<RectTransform>();
@@ -926,14 +930,11 @@ public static class VRDropdownFactory
         borderRT.anchorMin = new Vector2(0.5f, 0.5f);
         borderRT.anchorMax = new Vector2(0.5f, 0.5f);
         borderRT.pivot = new Vector2(0.5f, 0.5f);
-        borderRT.sizeDelta = new Vector2(borderWidth, borderHeight);
+        borderRT.sizeDelta = new Vector2(borderWidth, adjustedBorderHeight);
 
-        // Calculate offset to align border center with Visuals center
-        // Option is inside Content which is offset 10px from Viewport
-        // Visuals is centered on Viewport
-        // So Option center should already be at Visuals center (symmetric padding)
-        // But LayoutGroup might shift it, so we don't add offset for now
-        borderRT.anchoredPosition = Vector2.zero;
+        // Shift border up by half of extra height so the extra is on top
+        float yOffset = firstOptionExtraTop / 2f;
+        borderRT.anchoredPosition = new Vector2(0f, yOffset);
 
         // Border image with GlowingGlassBorder shader
         Image borderImg = borderObj.AddComponent<Image>();
