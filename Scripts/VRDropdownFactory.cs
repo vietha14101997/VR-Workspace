@@ -905,12 +905,17 @@ public static class VRDropdownFactory
         // Visuals width = config.width * (1 + 2*adjustedExpansion)
         // We use center anchor and set fixed size to match Visuals exactly
 
-        // Border dimensions should exactly match Visuals dimensions
+        // Border dimensions should exactly match Visuals dimensions horizontally
         // Visuals width = config.width * (1 + 2*adjustedExpansion)
         float visualsWidth = config.width * (1f + 2f * adjustedExpansion);
-        // No extra buffer - border should match Visuals exactly
         float borderWidth = visualsWidth;
-        float borderHeight = optionHeight;
+
+        // Calculate border height based on option's aspect ratio
+        // Option width is approximately config.width (fills Content container)
+        // Border height should maintain the same width:height ratio expansion
+        // borderHeight / optionHeight = borderWidth / optionWidth
+        float optionWidth = config.width;
+        float borderHeight = borderWidth * optionHeight / optionWidth;
 
         GameObject borderObj = new GameObject("HoverBorder");
         borderObj.transform.SetParent(option.transform, false);
