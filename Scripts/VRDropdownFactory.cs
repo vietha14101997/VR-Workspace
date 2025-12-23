@@ -40,7 +40,7 @@ public static class VRDropdownFactory
     {
         public string label = "Label";
         public Sprite icon;
-        public Color themeColor = new Color(0.2627451f, 0.4901961f, 0.7529413f);
+        public Color themeColor = new Color(0.0f, 0.9f, 1.0f);
         public float width = 300f;
         public int labelFontSize = 32;
         public int valueFontSize = 36;

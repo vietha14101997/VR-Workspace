@@ -431,12 +431,24 @@ public class VRMainMenu : MonoBehaviour
         _isBuilt = false;
     }
 
+    void UpdateSpacingFromMenuFrame()
+    {
+        if (_menuFrame == null && !ValidateParent()) return;
+        if (_menuFrame == null) return;
+
+        spacing.x = (_menuFrame.contentMarginLeft + _menuFrame.contentMarginRight) / 2f - 25f;
+        spacing.y = (_menuFrame.contentMarginTop + _menuFrame.contentMarginBottom) / 2f + 25f;
+    }
+
     void BuildGrid()
     {
         if (!ValidateParent()) return;
 
         // Clear existing
         ClearGrid();
+
+        // Update spacing from VRMenuFrame's content margins
+        UpdateSpacingFromMenuFrame();
 
         // Setup RectTransform to stretch fill parent (ContentContainer)
         RectTransform rt = GetComponent<RectTransform>();
@@ -515,6 +527,9 @@ public class VRMainMenu : MonoBehaviour
         if (_gridLayout == null) return;
         if (_menuFrame == null && !ValidateParent()) return;
 
+        // Update spacing from VRMenuFrame's content margins
+        UpdateSpacingFromMenuFrame();
+
         _gridLayout.spacing = spacing;
         _gridLayout.constraintCount = columns;
 
@@ -568,7 +583,7 @@ public class VRMainMenu : MonoBehaviour
             height = size.y,
             fontSize = fontSize,
             font = customFont,
-            popAmount = 0.05f
+            popAmount = 0.025f
         };
 
         VRButtonFactory.CreateButton(transform, config, onClick);
