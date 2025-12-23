@@ -988,9 +988,13 @@ public static class VRDropdownFactory
         if (vrLayer != -1) option.layer = vrLayer;
 
         // Layout: Checkmark | Icon | Text
+        // Calculate textStartX to align with main dropdown's value text position
+        // Main value text starts at: (ICON_ZONE_RATIO + CONTENT_LEFT_OFFSET) * width + CONTENT_PADDING
+        // But option is inside Content which has ~10px left padding from panel edge
         float checkmarkWidth = 50f;
-        float iconWidth = optionIcon != null ? optionIconSize + 15f : 0f;
-        float textStartX = checkmarkWidth + iconWidth;
+        float mainValueTextX = config.width * (ICON_ZONE_RATIO + CONTENT_LEFT_OFFSET) + CONTENT_PADDING;
+        float contentLeftPadding = 10f; // Content has 10px padding from panel edge
+        float textStartX = mainValueTextX - contentLeftPadding;
 
         // Checkmark - sử dụng Image với checkmark sprite
         float checkSize = config.valueFontSize * 0.7f;
@@ -1069,7 +1073,7 @@ public static class VRDropdownFactory
         txt.fontSize = config.valueFontSize * 0.85f;
         txt.color = Color.white;
         txt.fontStyle = FontStyles.Bold; // Bold for better visibility
-        txt.alignment = TextAlignmentOptions.Center;
+        txt.alignment = TextAlignmentOptions.Left;
         txt.verticalAlignment = VerticalAlignmentOptions.Middle;
         txt.raycastTarget = false;
         if (config.font != null) txt.font = config.font;
