@@ -63,7 +63,7 @@ public static class VRDropdownFactory
         // Glassmorphism settings (uses GlassGradientBackgroundOverlay with higher Queue)
         public bool enableGlassmorphism = true;
         public float blurIntensity = 6;
-        public int blurQuality = 4;
+        public int blurQuality = 8;
         public float glassOpacity = 0f;
         public float tintStrength = 0.1f;
         public float innerGlow = 0f;

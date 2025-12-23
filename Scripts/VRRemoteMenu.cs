@@ -220,7 +220,7 @@ public class VRRemoteMenu : MonoBehaviour
         // Dropdown options
         var monitorOptions = new List<string> {"1 Monitor", "2 Monitors", "3 Monitors"};
         var monitorIcons = new List<Sprite> { LoadIcon("1_monitor"), LoadIcon("2_monitors"), LoadIcon("3_monitors")};
-        var monitorIconMultipliers = new List<float> { 1f, 2f, 3f }; // 1x, 2x, 3x size for each option
+        var monitorIconMultipliers = new List<float> { 1f, 2.2f, 3.3f }; // 1x, 2x, 3x size for each option
         var resolutionOptions = new List<string> {"1920 x 1080", "1600 x 900", "1366 x 768", "1280 x 720"};
         var bitrateOptions = new List<string> {"5 Mbps", "10 Mbps", "20 Mbps", "30 Mbps", "50 Mbps"};
         var fpsOptions = new List<string> {"30 FPS", "45 FPS", "60 FPS"};
@@ -249,7 +249,7 @@ public class VRRemoteMenu : MonoBehaviour
         _bitrateDropdown = VRDropdownFactory.CreateIconDropdown(
             grid.transform, cellW,
             "Bitrate", LoadIcon("bitrate"), accentColor,
-            bitrateOptions, 1,
+            bitrateOptions, 2,
             onValueChanged: (index, value) => Debug.Log("Bitrate: " + value),
             labelFontSize: DROPDOWN_LABEL_FONT_SIZE, valueFontSize: DROPDOWN_VALUE_FONT_SIZE, font: customFont);
         PositionElement(_bitrateDropdown, 0, 0);
@@ -257,7 +257,7 @@ public class VRRemoteMenu : MonoBehaviour
         _fpsDropdown = VRDropdownFactory.CreateIconDropdown(
             grid.transform, cellW,
             "FPS", LoadIcon("fps"), themeColor,
-            fpsOptions, 1,
+            fpsOptions, 2,
             onValueChanged: (index, value) => Debug.Log("FPS: " + value),
             labelFontSize: DROPDOWN_LABEL_FONT_SIZE, valueFontSize: DROPDOWN_VALUE_FONT_SIZE, font: customFont);
         PositionElement(_fpsDropdown, cellW + gapX, 0);
