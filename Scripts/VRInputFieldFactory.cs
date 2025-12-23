@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using TMPro;
 
 /// <summary>
@@ -10,6 +11,7 @@ using TMPro;
 /// - Input text bên trong box
 /// - VRButtonAnimation cho hover effects
 /// - BoxCollider cho VR raycast
+/// - VRKeyboard integration cho virtual keyboard trong VR
 ///
 /// Chiều cao tự động tính từ font size:
 /// - Box height = inputFontSize * 2.2
@@ -172,6 +174,10 @@ public static class VRInputFieldFactory
             inputField.onEndEdit.AddListener((value) => onEndEdit(value));
         }
 
+        // 11. Setup VR Keyboard integration
+        // Add click handler to show VR keyboard when input field is clicked
+        SetupVRKeyboardIntegration(hitArea, inputField);
+
         return wrapper;
     }
 
@@ -255,6 +261,19 @@ public static class VRInputFieldFactory
         {
             inputField.text = value;
         }
+    }
+
+    // ==================== VR KEYBOARD INTEGRATION ====================
+
+    /// <summary>
+    /// Setup VR keyboard integration for an input field.
+    /// When the input field is clicked, the VR keyboard will appear.
+    /// </summary>
+    private static void SetupVRKeyboardIntegration(GameObject hitArea, TMP_InputField inputField)
+    {
+        // Add VRInputFieldTrigger component to handle click events
+        VRInputFieldTrigger trigger = hitArea.AddComponent<VRInputFieldTrigger>();
+        trigger.Initialize(inputField);
     }
 
     // ==================== INTERNAL HELPERS ====================
