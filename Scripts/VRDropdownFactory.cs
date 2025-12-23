@@ -49,6 +49,7 @@ public static class VRDropdownFactory
         // Options
         public List<string> options = new List<string>();
         public List<Sprite> optionIcons = new List<Sprite>();
+        public List<float> optionIconSizeMultipliers = new List<float>(); // Multiplier for each option's icon size
         public int defaultIndex = 0;
 
         // Visual settings
@@ -207,7 +208,8 @@ public static class VRDropdownFactory
     public static GameObject CreateIconDropdownWithOptionIcons(Transform parent, float width,
         string label, Sprite icon, Color color, List<string> options, List<Sprite> optionIcons, int defaultIndex,
         System.Action<int, string> onValueChanged = null,
-        int labelFontSize = 24, int valueFontSize = 36, TMP_FontAsset font = null)
+        int labelFontSize = 24, int valueFontSize = 36, TMP_FontAsset font = null,
+        List<float> optionIconSizeMultipliers = null)
     {
         var config = new DropdownConfig
         {
@@ -220,6 +222,7 @@ public static class VRDropdownFactory
             font = font,
             options = options,
             optionIcons = optionIcons,
+            optionIconSizeMultipliers = optionIconSizeMultipliers ?? new List<float>(),
             defaultIndex = defaultIndex
         };
         return CreateDropdown(parent, config, onValueChanged);
@@ -1024,6 +1027,11 @@ public static class VRDropdownFactory
         // Icon
         if (optionIcon != null)
         {
+            // Get size multiplier for this option (default 1.0)
+            float iconSizeMultiplier = (config.optionIconSizeMultipliers != null && index < config.optionIconSizeMultipliers.Count)
+                ? config.optionIconSizeMultipliers[index] : 1f;
+            float actualIconSize = optionIconSize * iconSizeMultiplier;
+
             GameObject iconObj = new GameObject("Icon");
             iconObj.transform.SetParent(option.transform, false);
             RectTransform iconRT = iconObj.AddComponent<RectTransform>();
@@ -1031,7 +1039,7 @@ public static class VRDropdownFactory
             iconRT.anchorMax = new Vector2(0f, 0.5f);
             iconRT.pivot = new Vector2(0f, 0.5f);
             iconRT.anchoredPosition = new Vector2(checkmarkWidth, 0f);
-            iconRT.sizeDelta = new Vector2(optionIconSize, optionIconSize);
+            iconRT.sizeDelta = new Vector2(actualIconSize, actualIconSize);
 
             Image iconImg = iconObj.AddComponent<Image>();
             iconImg.sprite = optionIcon;
@@ -1061,7 +1069,7 @@ public static class VRDropdownFactory
         txt.fontSize = config.valueFontSize * 0.85f;
         txt.color = Color.white;
         txt.fontStyle = FontStyles.Bold; // Bold for better visibility
-        txt.alignment = TextAlignmentOptions.Left;
+        txt.alignment = TextAlignmentOptions.Center;
         txt.verticalAlignment = VerticalAlignmentOptions.Middle;
         txt.raycastTarget = false;
         if (config.font != null) txt.font = config.font;
