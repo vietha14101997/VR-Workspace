@@ -145,6 +145,14 @@ public class VRTaskbar : MonoBehaviour
     private float Aspect => logicalWidth / logicalHeight;
 
 #if UNITY_EDITOR
+    void OnEnable()
+    {
+        if (!Application.isPlaying)
+        {
+            UpdateMaterialAspectRatiosEditor();
+        }
+    }
+
     void OnValidate()
     {
         if (!Application.isPlaying)
@@ -208,43 +216,6 @@ public class VRTaskbar : MonoBehaviour
         }
     }
 #endif
-
-    void OnEnable()
-    {
-#if UNITY_EDITOR
-        // Editor-only: update material aspect ratios in edit mode
-        if (!Application.isPlaying)
-        {
-            UpdateMaterialAspectRatiosEditor();
-            return;
-        }
-#endif
-        // Runtime: Subscribe to ModeController events
-        ModeController.OnModeChanged += HandleModeChanged;
-    }
-
-    void OnDisable()
-    {
-#if UNITY_EDITOR
-        if (!Application.isPlaying) return;
-#endif
-        // Runtime: Unsubscribe from ModeController events
-        ModeController.OnModeChanged -= HandleModeChanged;
-    }
-
-    /// <summary>
-    /// Handle mode change events from ModeController.
-    /// </summary>
-    void HandleModeChanged(ViewMode newMode)
-    {
-        bool shouldBeOn = (newMode == ViewMode.RealWorld);
-        if (_isPassthroughOn != shouldBeOn)
-        {
-            _isPassthroughOn = shouldBeOn;
-            UpdatePassthroughButtonColor();
-            Debug.Log($"[VRTaskbar] Mode changed to {newMode}, passthrough = {_isPassthroughOn}");
-        }
-    }
 
     void Start()
     {
