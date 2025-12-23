@@ -702,7 +702,7 @@ public static class VRDropdownFactory
         VRDropdown dropdownComp = parent.GetComponentInParent<VRDropdown>();
         for (int i = 0; i < config.options.Count; i++)
         {
-            CreateOptionItem(optionsContainer.transform, config, i, valueTxt, panel, onValueChanged, dropdownComp);
+            CreateOptionItem(optionsContainer.transform, config, i, valueTxt, panel, onValueChanged, dropdownComp, panelHeight, adjustedExpansion);
         }
 
         // ScrollRect (nếu nhiều options)
@@ -855,7 +855,7 @@ public static class VRDropdownFactory
 
     private static void CreateOptionItem(Transform parent, DropdownConfig config, int index,
         TextMeshProUGUI valueTxt, GameObject panel, System.Action<int, string> onValueChanged,
-        VRDropdown dropdownComponent)
+        VRDropdown dropdownComponent, float panelHeight, float adjustedExpansion)
     {
         string optionText = config.options[index];
         bool isSelected = index == config.defaultIndex;
@@ -877,20 +877,97 @@ public static class VRDropdownFactory
         layoutElement.preferredHeight = optionHeight;
         layoutElement.flexibleWidth = 1f;
 
-        // Background for hover effect
+        // Background for hover effect (now more subtle, border handles hover visual)
         Image optBg = option.AddComponent<Image>();
-        optBg.color = isSelected ? new Color(config.themeColor.r, config.themeColor.g, config.themeColor.b, 0.2f) : Color.clear;
+        optBg.color = isSelected ? new Color(config.themeColor.r, config.themeColor.g, config.themeColor.b, 0.15f) : Color.clear;
 
         // Button
         Button optBtn = option.AddComponent<Button>();
         optBtn.targetGraphic = optBg;
 
+        // More subtle color transitions since we have glowing border
         ColorBlock colors = optBtn.colors;
-        colors.normalColor = isSelected ? new Color(config.themeColor.r, config.themeColor.g, config.themeColor.b, 0.2f) : Color.clear;
-        colors.highlightedColor = new Color(config.themeColor.r, config.themeColor.g, config.themeColor.b, 0.35f);
-        colors.pressedColor = new Color(config.themeColor.r, config.themeColor.g, config.themeColor.b, 0.5f);
+        colors.normalColor = isSelected ? new Color(config.themeColor.r, config.themeColor.g, config.themeColor.b, 0.15f) : Color.clear;
+        colors.highlightedColor = new Color(config.themeColor.r, config.themeColor.g, config.themeColor.b, 0.25f);
+        colors.pressedColor = new Color(config.themeColor.r, config.themeColor.g, config.themeColor.b, 0.4f);
         colors.selectedColor = colors.highlightedColor;
         optBtn.colors = colors;
+
+        // === GLOWING BORDER for hover effect ===
+        // Create border container that matches panel border edges exactly
+        //
+        // Layout hierarchy: Panel > Viewport > Visuals (expanded) > Content (10px padding) > Options > Option
+        // Border needs to span the full Visuals width regardless of Option size
+        //
+        // Visuals width = config.width * (1 + 2*adjustedExpansion)
+        // We use center anchor and set fixed size to match Visuals exactly
+
+        float visualsExpansionPixels = adjustedExpansion * config.width;
+        float verticalExpansionPixels = adjustedExpansion * panelHeight;
+
+        // Border dimensions = Visuals dimensions
+        // Add edgePadding buffer to ensure border reaches panel edges visually
+        // Use 1.25x edgePadding for precise alignment
+        float edgePaddingBuffer = config.edgePadding * config.width * 1.25f;
+        float borderWidth = config.width + 2f * visualsExpansionPixels + 2f * edgePaddingBuffer;
+        float borderHeight = optionHeight + 2f * verticalExpansionPixels;
+
+        GameObject borderObj = new GameObject("HoverBorder");
+        borderObj.transform.SetParent(option.transform, false);
+        RectTransform borderRT = borderObj.AddComponent<RectTransform>();
+
+        // Use center anchor with fixed size matching Visuals
+        // Position at center of Option (which should align with center of panel)
+        borderRT.anchorMin = new Vector2(0.5f, 0.5f);
+        borderRT.anchorMax = new Vector2(0.5f, 0.5f);
+        borderRT.pivot = new Vector2(0.5f, 0.5f);
+        borderRT.sizeDelta = new Vector2(borderWidth, borderHeight);
+
+        // Calculate offset to align border center with Visuals center
+        // Option is inside Content which is offset 10px from Viewport
+        // Visuals is centered on Viewport
+        // So Option center should already be at Visuals center (symmetric padding)
+        // But LayoutGroup might shift it, so we don't add offset for now
+        borderRT.anchoredPosition = Vector2.zero;
+
+        // Border image with GlowingGlassBorder shader
+        Image borderImg = borderObj.AddComponent<Image>();
+        borderImg.sprite = GetPixelSprite();
+        borderImg.raycastTarget = false;
+        borderImg.color = Color.clear; // Start invisible, VROptionHoverEffect will control alpha
+
+        // Add VROptionHoverEffect component for hover animation
+        // Pass config values for consistent border styling with panel
+        VROptionHoverEffect hoverEffect = option.AddComponent<VROptionHoverEffect>();
+        hoverEffect.borderImage = borderImg;
+        hoverEffect.glowColor = config.themeColor;
+
+        // Calculate corner radius and edge padding to match panel border visually
+        // Use the borderWidth and borderHeight we calculated above
+        float optionBorderWidth = borderWidth;
+        float optionBorderHeight = borderHeight;
+
+        // Use same absolute corner radius as panel (in pixels), converted to UV ratio
+        // Panel uses: adjustedCornerRadius = config.cornerRadius * heightRatio
+        // Panel corner in pixels ≈ adjustedCornerRadius * panelHeight
+        float heightRatio = config.BoxHeight / panelHeight;
+        float adjustedCornerRadius = config.cornerRadius * heightRatio;
+        float adjustedEdgePadding = config.edgePadding * heightRatio;
+        float adjustedBorderWidth = config.borderWidth * heightRatio;
+        float adjustedGlowWidth = config.glowWidth * heightRatio;
+
+        // Convert to option border UV space (same visual size)
+        hoverEffect.cornerRadius = adjustedCornerRadius * panelHeight / optionBorderHeight;
+        hoverEffect.edgePadding = adjustedEdgePadding * panelHeight / optionBorderHeight;
+        hoverEffect.borderWidth = adjustedBorderWidth * panelHeight / optionBorderHeight;
+        hoverEffect.glowWidth = adjustedGlowWidth * panelHeight / optionBorderHeight;
+        hoverEffect.glowIntensity = config.glowIntensity;
+
+        // If selected, show subtle border
+        if (isSelected)
+        {
+            hoverEffect.SetSelected(true);
+        }
 
         // BoxCollider cho VR raycast
         BoxCollider optCol = option.AddComponent<BoxCollider>();
@@ -1006,10 +1083,10 @@ public static class VRDropdownFactory
             onValueChanged?.Invoke(capturedIndex, optionText);
         });
 
-        // Register option
+        // Register option with hover effect
         if (dropdownComponent != null)
         {
-            dropdownComponent.RegisterOption(index, optBg, checkImg, config.themeColor);
+            dropdownComponent.RegisterOption(index, optBg, checkImg, config.themeColor, hoverEffect);
         }
     }
 
@@ -1181,6 +1258,7 @@ public class VRDropdown : MonoBehaviour
         public Image background;
         public Image checkmark;
         public Color themeColor;
+        public VROptionHoverEffect hoverEffect;
     }
     private Dictionary<int, OptionRef> _optionRefs = new Dictionary<int, OptionRef>();
 
@@ -1206,13 +1284,14 @@ public class VRDropdown : MonoBehaviour
         }
     }
 
-    public void RegisterOption(int index, Image background, Image checkmark, Color themeColor)
+    public void RegisterOption(int index, Image background, Image checkmark, Color themeColor, VROptionHoverEffect hoverEffect = null)
     {
         _optionRefs[index] = new OptionRef
         {
             background = background,
             checkmark = checkmark,
-            themeColor = themeColor
+            themeColor = themeColor,
+            hoverEffect = hoverEffect
         };
     }
 
@@ -1235,12 +1314,17 @@ public class VRDropdown : MonoBehaviour
             {
                 kvp.Value.checkmark.color = Color.clear;
             }
+            // Clear selected state for hover effect
+            if (kvp.Value.hoverEffect != null)
+            {
+                kvp.Value.hoverEffect.SetSelected(false);
+            }
         }
 
         _selectedIndex = newIndex;
         if (_optionRefs.TryGetValue(newIndex, out var optRef))
         {
-            Color selectedBgColor = new Color(optRef.themeColor.r, optRef.themeColor.g, optRef.themeColor.b, 0.2f);
+            Color selectedBgColor = new Color(optRef.themeColor.r, optRef.themeColor.g, optRef.themeColor.b, 0.15f);
             if (optRef.background != null)
             {
                 optRef.background.color = selectedBgColor;
@@ -1256,6 +1340,11 @@ public class VRDropdown : MonoBehaviour
             {
                 // Full white for maximum visibility
                 optRef.checkmark.color = Color.white;
+            }
+            // Set selected state for hover effect
+            if (optRef.hoverEffect != null)
+            {
+                optRef.hoverEffect.SetSelected(true);
             }
         }
     }
