@@ -1,7 +1,9 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using TMPro;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Random = UnityEngine.Random;
 
@@ -41,6 +43,14 @@ public class VRMobileKeyboard : MonoBehaviour
     public float keyHeightRatio = 1.2f;
     [Tooltip("Font size for all keyboard keys")]
     public int keyFontSize = 36;
+
+    [Header("Key Animation")]
+    [Tooltip("Scale when key is pressed down")]
+    [Range(0.8f, 1.0f)]
+    public float keyDownScale = 0.92f;
+    [Tooltip("Animation duration in seconds")]
+    [Range(0.01f, 0.2f)]
+    public float keyAnimDuration = 0.08f;
 
     [Header("Settings")]
     public bool showPreview = true;
@@ -113,6 +123,9 @@ public class VRMobileKeyboard : MonoBehaviour
     private GameObject _layoutSwitchKey;
     private GameObject _symbolSwitchKey;
 
+    // Key mapping for physical keyboard visual feedback
+    private Dictionary<string, GameObject> _keyMap = new Dictionary<string, GameObject>();
+
     // Cursor blinking
     private bool _cursorVisible = true;
     private float _cursorBlinkTimer = 0f;
@@ -176,6 +189,10 @@ public class VRMobileKeyboard : MonoBehaviour
         }
         Canvas.renderMode = RenderMode.WorldSpace;
 
+        // Set lower sortingOrder so DropdownPanel (sortingOrder=100) renders in front
+        Canvas.overrideSorting = true;
+        Canvas.sortingOrder = 150;
+
         if (GetComponent<GraphicRaycaster>() == null)
         {
             gameObject.AddComponent<GraphicRaycaster>();
@@ -205,6 +222,7 @@ public class VRMobileKeyboard : MonoBehaviour
     {
         if (_targetInputField != null && gameObject.activeSelf)
         {
+            // Cursor blinking
             _cursorBlinkTimer += Time.deltaTime;
             if (_cursorBlinkTimer >= CURSOR_BLINK_RATE)
             {
@@ -212,7 +230,189 @@ public class VRMobileKeyboard : MonoBehaviour
                 _cursorVisible = !_cursorVisible;
                 UpdatePreview();
             }
+
+            // Handle physical keyboard input
+            HandlePhysicalKeyboardInput();
         }
+    }
+
+    /// <summary>
+    /// Process input from physical keyboard
+    /// </summary>
+    void HandlePhysicalKeyboardInput()
+    {
+        // Handle character input
+        if (!string.IsNullOrEmpty(Input.inputString))
+        {
+            foreach (char c in Input.inputString)
+            {
+                if (c == '\b') // Backspace
+                {
+                    TriggerKeyVisualFeedback("Back");
+                    OnBackspace();
+                }
+                else if (c == '\n' || c == '\r') // Enter
+                {
+                    TriggerKeyVisualFeedback("Enter");
+                    OnEnter();
+                }
+                else if (!char.IsControl(c)) // Regular character
+                {
+                    TriggerKeyVisualFeedback(c.ToString());
+                    OnKeyPress(c.ToString());
+                }
+            }
+        }
+
+        // Handle special keys not in inputString
+        if (Input.GetKeyDown(KeyCode.Delete))
+        {
+            // Delete character after cursor
+            if (_targetInputField != null)
+            {
+                int caretPos = _targetInputField.caretPosition;
+                string text = _targetInputField.text;
+                if (caretPos < text.Length)
+                {
+                    _targetInputField.text = text.Remove(caretPos, 1);
+                    ResetCursorBlink();
+                    UpdatePreview();
+                }
+            }
+        }
+
+        // Arrow keys for cursor movement
+        if (Input.GetKeyDown(KeyCode.LeftArrow))
+        {
+            if (_targetInputField != null && _targetInputField.caretPosition > 0)
+            {
+                _targetInputField.caretPosition--;
+                ResetCursorBlink();
+                UpdatePreview();
+            }
+        }
+        if (Input.GetKeyDown(KeyCode.RightArrow))
+        {
+            if (_targetInputField != null && _targetInputField.caretPosition < _targetInputField.text.Length)
+            {
+                _targetInputField.caretPosition++;
+                ResetCursorBlink();
+                UpdatePreview();
+            }
+        }
+        if (Input.GetKeyDown(KeyCode.Home))
+        {
+            if (_targetInputField != null)
+            {
+                _targetInputField.caretPosition = 0;
+                ResetCursorBlink();
+                UpdatePreview();
+            }
+        }
+        if (Input.GetKeyDown(KeyCode.End))
+        {
+            if (_targetInputField != null)
+            {
+                _targetInputField.caretPosition = _targetInputField.text.Length;
+                ResetCursorBlink();
+                UpdatePreview();
+            }
+        }
+
+        // Escape to close keyboard
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            Hide();
+        }
+    }
+
+    /// <summary>
+    /// Trigger visual feedback (press animation) on a virtual key when physical key is pressed
+    /// </summary>
+    void TriggerKeyVisualFeedback(string key)
+    {
+        GameObject keyObj = null;
+
+        // Try exact match first
+        if (_keyMap.TryGetValue(key, out keyObj))
+        {
+            TriggerKeyAnimation(keyObj);
+            return;
+        }
+
+        // Try lowercase/uppercase match
+        if (_keyMap.TryGetValue(key.ToLower(), out keyObj))
+        {
+            TriggerKeyAnimation(keyObj);
+            return;
+        }
+
+        // Handle space bar
+        if (key == " " && _keyMap.TryGetValue("Space", out keyObj))
+        {
+            TriggerKeyAnimation(keyObj);
+        }
+    }
+
+    /// <summary>
+    /// Trigger press animation on a key GameObject
+    /// </summary>
+    void TriggerKeyAnimation(GameObject keyWrapper)
+    {
+        if (keyWrapper == null) return;
+
+        // Find HitArea and Visuals like in AddKeyPressAnimation
+        Transform hitArea = keyWrapper.transform.Find("HitArea");
+        if (hitArea == null)
+        {
+            Button button = keyWrapper.GetComponentInChildren<Button>();
+            if (button != null)
+                hitArea = button.transform;
+            else
+                hitArea = keyWrapper.transform;
+        }
+
+        Transform visuals = hitArea.Find("Visuals");
+        Transform animTarget = visuals != null ? visuals : hitArea;
+
+        // Trigger down then up animation
+        StartCoroutine(AnimateKeyPressFromPhysical(animTarget));
+    }
+
+    /// <summary>
+    /// Animate key press triggered by physical keyboard
+    /// </summary>
+    IEnumerator AnimateKeyPressFromPhysical(Transform keyTransform)
+    {
+        // Animate down
+        Vector3 startScale = Vector3.one;
+        Vector3 downScale = Vector3.one * keyDownScale;
+        float elapsed = 0f;
+
+        while (elapsed < keyAnimDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / keyAnimDuration;
+            t = t * t * (3f - 2f * t); // Smoothstep
+            keyTransform.localScale = Vector3.Lerp(startScale, downScale, t);
+            yield return null;
+        }
+        keyTransform.localScale = downScale;
+
+        // Brief hold
+        yield return new WaitForSeconds(0.03f);
+
+        // Animate up
+        elapsed = 0f;
+        while (elapsed < keyAnimDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / keyAnimDuration;
+            t = t * t * (3f - 2f * t); // Smoothstep
+            keyTransform.localScale = Vector3.Lerp(downScale, startScale, t);
+            yield return null;
+        }
+        keyTransform.localScale = startScale;
     }
 
     void LateUpdate()
@@ -309,11 +509,10 @@ public class VRMobileKeyboard : MonoBehaviour
 
         if (_targetInputField != null)
         {
-            _targetInputField.ActivateInputField();
-            _targetInputField.Select();
+            // Don't activate input field - we handle all input ourselves
+            // This prevents TMP_InputField from intercepting keyboard input
+            _targetInputField.DeactivateInputField();
             _targetInputField.caretPosition = _targetInputField.text.Length;
-            _targetInputField.selectionAnchorPosition = _targetInputField.text.Length;
-            _targetInputField.selectionFocusPosition = _targetInputField.text.Length;
         }
 
         ResetCursorBlink();
@@ -383,6 +582,12 @@ public class VRMobileKeyboard : MonoBehaviour
         containerRT.offsetMin = new Vector2(contentMargin, contentMargin);
         containerRT.offsetMax = new Vector2(-contentMargin, -contentMargin);
 
+        // Add nested Canvas with higher sortingOrder so keys render AFTER glassmorphism GrabPass
+        Canvas keyCanvas = _keyboardContainer.AddComponent<Canvas>();
+        keyCanvas.overrideSorting = true;
+        keyCanvas.sortingOrder = 160; // Higher than keyboard's 150, after Overlay shader Queue
+        _keyboardContainer.AddComponent<GraphicRaycaster>();
+
         // Calculate starting Y position for keys (top of content area)
         float currentY = contentHeight / 2f - keyHeight / 2f;
 
@@ -405,6 +610,7 @@ public class VRMobileKeyboard : MonoBehaviour
                 Destroy(key);
         }
         _allKeys.Clear();
+        _keyMap.Clear();
         _shiftKey = null;
         _layoutSwitchKey = null;
         _symbolSwitchKey = null;
@@ -755,10 +961,11 @@ public class VRMobileKeyboard : MonoBehaviour
         float edgePad = glowExpansion > 0 ? glowExpansion / (1f + 2f * glowExpansion) : 0f;
         float aspect = w / h;
 
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
-        if (glassShader != null)
+        // Use GlassGradientBackgroundOverlay for GrabPass to capture content behind keyboard
+        Shader overlayShader = Shader.Find("Custom/GlassGradientBackgroundOverlay");
+        if (overlayShader != null)
         {
-            Material glassMat = new Material(glassShader);
+            Material glassMat = new Material(overlayShader);
 
             glassMat.SetFloat("_CornerRadius", 0.12f);
             glassMat.SetFloat("_EdgePadding", edgePad);
@@ -775,7 +982,7 @@ public class VRMobileKeyboard : MonoBehaviour
             glassMat.SetFloat("_FresnelPower", 2.2f);
             glassMat.SetFloat("_FresnelStrength", 0.12f);
 
-            // Glassmorphism settings
+            // Glassmorphism settings - enable blur to see through
             glassMat.SetFloat("_BlurEnabled", enableGlassmorphism ? 1f : 0f);
             glassMat.SetFloat("_BlurRadius", blurIntensity);
             glassMat.SetFloat("_BlurIterations", blurQuality);
@@ -790,8 +997,26 @@ public class VRMobileKeyboard : MonoBehaviour
         }
         else
         {
-            img.color = new Color(0.1f, 0.1f, 0.15f, 0.95f);
-            expansion = 0;
+            // Fallback to regular shader
+            Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
+            if (glassShader != null)
+            {
+                Material glassMat = new Material(glassShader);
+                glassMat.SetFloat("_CornerRadius", 0.12f);
+                glassMat.SetFloat("_EdgePadding", edgePad);
+                glassMat.SetFloat("_Aspect", aspect);
+                glassMat.SetColor("_ColorA", new Color(0.35f, 0.9f, 1f, 0.15f));
+                glassMat.SetColor("_ColorB", new Color(0.75f, 0.45f, 1f, 0.22f));
+                glassMat.SetFloat("_GlassAlpha", 0.08f);
+                glassMat.SetFloat("_BlurEnabled", 0f);
+                img.material = glassMat;
+                img.color = Color.white;
+            }
+            else
+            {
+                img.color = new Color(0.1f, 0.1f, 0.15f, 0.95f);
+                expansion = 0;
+            }
         }
 
         RectTransform rt = bgObj.GetComponent<RectTransform>();
@@ -1038,6 +1263,15 @@ public class VRMobileKeyboard : MonoBehaviour
         rt.pivot = new Vector2(0.5f, 0.5f);
         rt.anchoredPosition = new Vector2(x, y);
 
+        AddKeyPressAnimation(btn);
+
+        // Register key in map for physical keyboard visual feedback
+        // Register both lowercase and uppercase for letter keys
+        string keyLower = outputKey.ToLower();
+        string keyUpper = outputKey.ToUpper();
+        if (!_keyMap.ContainsKey(keyLower)) _keyMap[keyLower] = btn;
+        if (!_keyMap.ContainsKey(keyUpper)) _keyMap[keyUpper] = btn;
+
         return btn;
     }
 
@@ -1066,6 +1300,20 @@ public class VRMobileKeyboard : MonoBehaviour
         rt.anchorMax = new Vector2(0.5f, 0.5f);
         rt.pivot = new Vector2(0.5f, 0.5f);
         rt.anchoredPosition = new Vector2(x, y);
+
+        AddKeyPressAnimation(btn);
+
+        // Register special keys in keyMap for physical keyboard visual feedback
+        if (!string.IsNullOrEmpty(label) && !_keyMap.ContainsKey(label))
+        {
+            _keyMap[label] = btn;
+        }
+        // Register space bar with " " key
+        if (string.IsNullOrEmpty(label))
+        {
+            _keyMap[" "] = btn;
+            _keyMap["Space"] = btn;
+        }
 
         return btn;
     }
@@ -1100,7 +1348,95 @@ public class VRMobileKeyboard : MonoBehaviour
         rt.pivot = new Vector2(0.5f, 0.5f);
         rt.anchoredPosition = new Vector2(x, y);
 
+        AddKeyPressAnimation(btn);
+
+        // Register pill keys (Enter, layout switches) for physical keyboard visual feedback
+        if (!string.IsNullOrEmpty(label) && !_keyMap.ContainsKey(label))
+        {
+            _keyMap[label] = btn;
+        }
+
         return btn;
+    }
+
+    /// <summary>
+    /// Add KeyDown/KeyUp animation events to a button
+    /// VRButtonFactory structure: Wrapper -> HitArea (has Button) -> Visuals
+    /// EventTrigger needs to be on HitArea, animation targets Visuals
+    /// </summary>
+    void AddKeyPressAnimation(GameObject btnWrapper)
+    {
+        // Find HitArea (child of wrapper, has Button component)
+        Transform hitArea = btnWrapper.transform.Find("HitArea");
+        if (hitArea == null)
+        {
+            // Fallback: try to find Button component in children
+            Button button = btnWrapper.GetComponentInChildren<Button>();
+            if (button != null)
+                hitArea = button.transform;
+            else
+                hitArea = btnWrapper.transform;
+        }
+
+        // Find Visuals (the transform to animate)
+        Transform visuals = hitArea.Find("Visuals");
+        Transform animTarget = visuals != null ? visuals : hitArea;
+
+        EventTrigger trigger = hitArea.GetComponent<EventTrigger>();
+        if (trigger == null)
+            trigger = hitArea.gameObject.AddComponent<EventTrigger>();
+
+        // PointerDown - scale down
+        EventTrigger.Entry pointerDown = new EventTrigger.Entry();
+        pointerDown.eventID = EventTriggerType.PointerDown;
+        pointerDown.callback.AddListener((data) => StartCoroutine(AnimateKeyDown(animTarget)));
+        trigger.triggers.Add(pointerDown);
+
+        // PointerUp - scale back
+        EventTrigger.Entry pointerUp = new EventTrigger.Entry();
+        pointerUp.eventID = EventTriggerType.PointerUp;
+        pointerUp.callback.AddListener((data) => StartCoroutine(AnimateKeyUp(animTarget)));
+        trigger.triggers.Add(pointerUp);
+
+        // PointerExit - also scale back (in case pointer leaves while pressed)
+        EventTrigger.Entry pointerExit = new EventTrigger.Entry();
+        pointerExit.eventID = EventTriggerType.PointerExit;
+        pointerExit.callback.AddListener((data) => StartCoroutine(AnimateKeyUp(animTarget)));
+        trigger.triggers.Add(pointerExit);
+    }
+
+    IEnumerator AnimateKeyDown(Transform keyTransform)
+    {
+        Vector3 startScale = Vector3.one;
+        Vector3 targetScale = Vector3.one * keyDownScale;
+        float elapsed = 0f;
+
+        while (elapsed < keyAnimDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / keyAnimDuration;
+            t = t * t * (3f - 2f * t); // Smoothstep easing
+            keyTransform.localScale = Vector3.Lerp(startScale, targetScale, t);
+            yield return null;
+        }
+        keyTransform.localScale = targetScale;
+    }
+
+    IEnumerator AnimateKeyUp(Transform keyTransform)
+    {
+        Vector3 startScale = keyTransform.localScale;
+        Vector3 targetScale = Vector3.one;
+        float elapsed = 0f;
+
+        while (elapsed < keyAnimDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / keyAnimDuration;
+            t = t * t * (3f - 2f * t); // Smoothstep easing
+            keyTransform.localScale = Vector3.Lerp(startScale, targetScale, t);
+            yield return null;
+        }
+        keyTransform.localScale = targetScale;
     }
 
     void OnKeyPress(string key)

@@ -585,11 +585,17 @@ public class VRGazeReticle : MonoBehaviour
         Button btn = obj.GetComponentInParent<Button>();
         GameObject target = btn != null ? btn.gameObject : obj;
 
+        // Fire PointerDown first (for EventTrigger animations like keyboard keys)
+        ExecuteEvents.Execute(target, _pointerData, ExecuteEvents.pointerDownHandler);
+
         // ExecuteEvents.Execute với pointerClickHandler sẽ:
         // 1. Gọi VRButtonAnimation.OnPointerClick -> TriggerFlash
         // 2. Gọi Button.OnPointerClick -> Press() -> onClick.Invoke()
         // Nên không cần gọi btn.onClick.Invoke() riêng nữa
         ExecuteEvents.Execute(target, _pointerData, ExecuteEvents.pointerClickHandler);
+
+        // Fire PointerUp after click (for EventTrigger animations)
+        ExecuteEvents.Execute(target, _pointerData, ExecuteEvents.pointerUpHandler);
     }
 
     void TriggerRippleEffect(GameObject obj, Vector2 normalizedHitPoint)
