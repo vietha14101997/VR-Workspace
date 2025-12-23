@@ -9,6 +9,7 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
 
     private bool _isHovered = false;
     private bool _forceHover = false;  // Force hover state (e.g., when dropdown panel is open)
+    public bool IsForceHover => _forceHover;  // Public accessor for force hover state
     private float _currentPop = 0f;
     private float _currentValidScale = 1.0f;
 
@@ -89,6 +90,39 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
                 }
             }
         }
+
+        // If force hover was set before Start(), apply hover state now that materials are ready
+        if (_forceHover)
+        {
+            // Initialize animation values to hover state immediately (no animation)
+            _currentHoverAmount = 1f;
+            _currentValidScale = 1.05f;
+            _currentPop = -popAmount;
+
+            // Apply hover shader
+            if (_borderMaterial != null && _hoverBorderShader != null)
+            {
+                _borderMaterial.shader = _hoverBorderShader;
+                UpdateBorderProperties();
+            }
+
+            // Apply hover amount to materials
+            if (_borderMaterial != null && _borderMaterial.HasProperty("_HoverAmount"))
+            {
+                _borderMaterial.SetFloat("_HoverAmount", 1f);
+            }
+            if (_backgroundMaterial != null && _backgroundMaterial.HasProperty("_HoverAmount"))
+            {
+                _backgroundMaterial.SetFloat("_HoverAmount", 1f);
+            }
+
+            // Apply visual transform
+            if (targetVisuals != null)
+            {
+                targetVisuals.localPosition = new Vector3(0, 0, _currentPop);
+                targetVisuals.localScale = new Vector3(_currentValidScale, _currentValidScale, 1f);
+            }
+        }
     }
 
     private float _currentHoverAmount = 0f;
@@ -130,8 +164,8 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
     {
         _isHovered = true;
 
-        // Swap border shader to hover shader
-        if (_borderMaterial != null && _hoverBorderShader != null)
+        // Only swap border shader if not already in force hover state (avoid double hover)
+        if (!_forceHover && _borderMaterial != null && _hoverBorderShader != null)
         {
             _borderMaterial.shader = _hoverBorderShader;
             UpdateBorderProperties();

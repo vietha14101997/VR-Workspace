@@ -33,8 +33,11 @@ public class VRMobileKeyboard : MonoBehaviour
     public TMP_FontAsset customFont;
 
     [Header("Layout")]
-    [Tooltip("Content margin inside keyboard frame (pixels)")]
-    public float contentMargin = 40f;
+    [Tooltip("Content margins inside keyboard frame (pixels)")]
+    public float marginLeft = 40f;
+    public float marginRight = 40f;
+    public float marginTop = 30f;
+    public float marginBottom = 50f;
     [Tooltip("Spacing between keys as ratio of key width (0.1 = 10%)")]
     [Range(0.05f, 0.2f)]
     public float keySpacingRatio = 0.1f;
@@ -120,6 +123,7 @@ public class VRMobileKeyboard : MonoBehaviour
     private TextMeshProUGUI _previewTMP;
     private List<GameObject> _allKeys = new List<GameObject>();
     private GameObject _shiftKey;
+    private VRButtonAnimation _shiftKeyAnimation;
     private GameObject _layoutSwitchKey;
     private GameObject _symbolSwitchKey;
 
@@ -199,9 +203,25 @@ public class VRMobileKeyboard : MonoBehaviour
         }
 
         EnsureBuilt();
+
+        // Set VirtualObjects layer for keyboard and all children (after building)
+        SetLayerRecursive(gameObject, "VirtualObjects");
+
         if (!_isKeyboardVisibleOnStart)
         {
             gameObject.SetActive(false);
+        }
+    }
+
+    void SetLayerRecursive(GameObject obj, string layerName)
+    {
+        int layer = LayerMask.NameToLayer(layerName);
+        if (layer == -1) return;
+
+        obj.layer = layer;
+        foreach (Transform child in obj.transform)
+        {
+            SetLayerRecursive(child.gameObject, layerName);
         }
     }
 
@@ -467,7 +487,9 @@ public class VRMobileKeyboard : MonoBehaviour
 
         // Keyboard top edge should slightly overlap frame bottom (by ~5% of keyboard height)
         float overlapAmount = keyboardHalfHeight * 0.1f;
-        float keyboardCenterY = frameBottomY - keyboardHalfHeight + overlapAmount;
+        // Offset to compensate for asymmetric margins (shift down by marginBottom - marginTop)
+        float marginOffset = (marginBottom - marginTop) * 1.5f * PixelToMeter / 2f;
+        float keyboardCenterY = frameBottomY - keyboardHalfHeight + overlapAmount - marginOffset;
 
         if (taskbar != null && taskbar.gameObject.activeInHierarchy)
         {
@@ -543,7 +565,7 @@ public class VRMobileKeyboard : MonoBehaviour
         _logicalWidth = frameLogicalWidth * widthRatioToFrame;
 
         // Calculate content area (inside margins)
-        float contentWidth = _logicalWidth - 2 * contentMargin;
+        float contentWidth = _logicalWidth - marginLeft - marginRight;
 
         // Calculate key dimensions based on content area
         // 10 keys + 9 gaps in a row: contentWidth = 10*keyWidth + 9*keySpacing
@@ -559,7 +581,7 @@ public class VRMobileKeyboard : MonoBehaviour
         float contentHeight = numRows * keyHeight + (numRows - 1) * keySpacing + previewHeight;
 
         // Total keyboard dimensions (content + margins)
-        _logicalHeight = contentHeight + 2 * contentMargin;
+        _logicalHeight = contentHeight + marginTop + marginBottom;
 
         // Setup RectTransform with VRMenuFrame-style scale
         CanvasRect = GetComponent<RectTransform>();
@@ -579,8 +601,8 @@ public class VRMobileKeyboard : MonoBehaviour
         RectTransform containerRT = _keyboardContainer.AddComponent<RectTransform>();
         containerRT.anchorMin = Vector2.zero;
         containerRT.anchorMax = Vector2.one;
-        containerRT.offsetMin = new Vector2(contentMargin, contentMargin);
-        containerRT.offsetMax = new Vector2(-contentMargin, -contentMargin);
+        containerRT.offsetMin = new Vector2(marginLeft, marginBottom);
+        containerRT.offsetMax = new Vector2(-marginRight, -marginTop);
 
         // Add nested Canvas with higher sortingOrder so keys render AFTER glassmorphism GrabPass
         Canvas keyCanvas = _keyboardContainer.AddComponent<Canvas>();
@@ -612,6 +634,7 @@ public class VRMobileKeyboard : MonoBehaviour
         _allKeys.Clear();
         _keyMap.Clear();
         _shiftKey = null;
+        _shiftKeyAnimation = null;
         _layoutSwitchKey = null;
         _symbolSwitchKey = null;
     }
@@ -668,6 +691,9 @@ public class VRMobileKeyboard : MonoBehaviour
                 BuildMoreSymbolsLayout(_keyboardContainer.transform, startY, unit, contentWidth, bottomRowY, increasedSpacing, topRowsHeight);
             }
         }
+
+        // Ensure all newly created keys are in VirtualObjects layer
+        SetLayerRecursive(_keyboardContainer, "VirtualObjects");
     }
 
     void BuildLettersLayout(Transform parent, float startY, float unit, float contentWidth, float bottomRowY)
@@ -716,7 +742,7 @@ public class VRMobileKeyboard : MonoBehaviour
 
         // Enter key (same position as Back)
         var enterKey = CreatePillKey(parent, "Enter", x + (sideKeyWidth - keyWidth) / 2f, bottomRowY, sideKeyWidth, keyHeight,
-            accentColor, () => OnEnter());
+            keyColor, () => OnEnter());
         _allKeys.Add(enterKey);
 
         // === ROW 4 (Shift row): Shift zxcvbnm Back ===
@@ -724,9 +750,18 @@ public class VRMobileKeyboard : MonoBehaviour
         float shiftWidth = keyWidth * 1.5f;
 
         // Shift key (wider, rounded square)
-        _shiftKey = CreateSpecialKey(parent, "Shift", x + (shiftWidth - keyWidth) / 2f, shiftRowY, shiftWidth, keyHeight,
-            _isShiftActive ? accentColor : specialKeyColor, () => ToggleShift());
+        // Show "SHIFT" in caps lock state, "Shift" otherwise
+        string shiftLabel = _isCapsLock ? "SHIFT" : "Shift";
+        _shiftKey = CreateSpecialKey(parent, shiftLabel, x + (shiftWidth - keyWidth) / 2f, shiftRowY, shiftWidth, keyHeight,
+            specialKeyColor, () => ToggleShift());
         _allKeys.Add(_shiftKey);
+
+        // Get VRButtonAnimation and set force hover when shift is active (state 2 or 3)
+        _shiftKeyAnimation = _shiftKey.GetComponentInChildren<VRButtonAnimation>();
+        if (_shiftKeyAnimation != null && (_isShiftActive || _isCapsLock))
+        {
+            _shiftKeyAnimation.SetForceHover(true);
+        }
         x += shiftWidth + keySpacing;
 
         // Letter keys z-m
@@ -801,7 +836,7 @@ public class VRMobileKeyboard : MonoBehaviour
 
         // Enter key (same position as Back)
         var enterKey = CreatePillKey(parent, "Enter", x + (sideKeyWidth - keyWidth) / 2f, bottomRowY, sideKeyWidth, keyHeight,
-            accentColor, () => OnEnter());
+            keyColor, () => OnEnter());
         _allKeys.Add(enterKey);
 
         // === ROW 3: =\< *"':;!? Back ===
@@ -879,7 +914,7 @@ public class VRMobileKeyboard : MonoBehaviour
 
         // Enter key (same position as Back)
         var enterKey = CreatePillKey(parent, "Enter", x + (sideKeyWidth - keyWidth) / 2f, bottomRowY, sideKeyWidth, keyHeight,
-            accentColor, () => OnEnter());
+            keyColor, () => OnEnter());
         _allKeys.Add(enterKey);
 
         // === ROW 3: ?123 % © ® ™ ✓ [ ] Back ===
@@ -1212,13 +1247,10 @@ public class VRMobileKeyboard : MonoBehaviour
         rt.anchorMin = new Vector2(0.5f, 0.5f);
         rt.anchorMax = new Vector2(0.5f, 0.5f);
         rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.anchoredPosition = new Vector2(0, y);
+        rt.anchoredPosition = new Vector2(0, y + keyHeight * 0.235f);
         rt.sizeDelta = new Vector2(contentWidth, keyHeight * 0.5f);
 
-        Image bgImg = _previewText.AddComponent<Image>();
-        bgImg.color = new Color(0.18f, 0.19f, 0.22f, 0.6f);
-        bgImg.raycastTarget = false;
-
+        // Text object
         GameObject textObj = new GameObject("Text");
         textObj.transform.SetParent(_previewText.transform, false);
         RectTransform textRT = textObj.AddComponent<RectTransform>();
@@ -1228,13 +1260,74 @@ public class VRMobileKeyboard : MonoBehaviour
         textRT.offsetMax = new Vector2(-15, 0);
 
         _previewTMP = textObj.AddComponent<TextMeshProUGUI>();
-        _previewTMP.fontSize = 28;
+        _previewTMP.fontSize = 42;
         _previewTMP.color = Color.white;
-        _previewTMP.alignment = TextAlignmentOptions.Left;
+        _previewTMP.alignment = TextAlignmentOptions.Center;
         _previewTMP.verticalAlignment = VerticalAlignmentOptions.Middle;
         _previewTMP.raycastTarget = false;
         _previewTMP.overflowMode = TextOverflowModes.Ellipsis;
         if (customFont != null) _previewTMP.font = customFont;
+
+        // Set Text Style to "Title" from TMP Style Sheet
+        if (TMP_Settings.defaultStyleSheet != null)
+        {
+            TMP_Style titleStyle = TMP_Settings.defaultStyleSheet.GetStyle("Title");
+            if (titleStyle != null)
+            {
+                _previewTMP.textStyle = titleStyle;
+            }
+        }
+
+        // Glowing underline (like horizontal separator)
+        CreatePreviewUnderline(_previewText.transform, contentWidth);
+    }
+
+    void CreatePreviewUnderline(Transform parent, float width)
+    {
+        GameObject underlineObj = new GameObject("Underline");
+        underlineObj.transform.SetParent(parent, false);
+
+        RectTransform rt = underlineObj.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 0f);
+        rt.anchorMax = new Vector2(0.5f, 0f);
+        rt.offsetMin = new Vector2(15, 0);
+        rt.offsetMax = new Vector2(-15, 0);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = new Vector2(0, 0);
+        rt.sizeDelta = new Vector2(width, keyHeight * 0.5f); // Height for glow effect
+
+        Image lineImg = underlineObj.AddComponent<Image>();
+        lineImg.raycastTarget = false;
+        lineImg.color = Color.white; // Important for shader to work
+
+        Shader glowShader = Shader.Find("Custom/GlowingHorizontalLine");
+        if (glowShader != null)
+        {
+            Material glowMat = new Material(glowShader);
+
+            // Line settings
+            glowMat.SetFloat("_LineWidth", 0.12f);
+            glowMat.SetFloat("_GlowWidth", 0.4f);
+
+            // Gradient colors: Deep Sea Blue to Purple
+            glowMat.SetColor("_ColorA", new Color(0.0f, 0.8f, 1f, 1f));   // Deep Sea Blue
+            glowMat.SetColor("_ColorB", new Color(0.8f, 0.2f, 1f, 1f));   // Purple
+
+            // Intensity
+            glowMat.SetFloat("_Layer1Alpha", 1f);
+            glowMat.SetFloat("_Layer2Alpha", 0.6f);
+
+            // Edge fade enabled (alpha fades to 30% at last 20% of both ends)
+            glowMat.SetFloat("_EdgeFade", 1f);
+
+            lineImg.material = glowMat;
+            lineImg.sprite = GetPixelSprite();
+        }
+        else
+        {
+            // Fallback: simple gradient line
+            lineImg.color = new Color(0.3f, 0.9f, 1f, 0.5f);
+        }
     }
 
     GameObject CreateKey(Transform parent, string displayKey, float x, float y, float width, float height, Color color, string outputKey)
@@ -1250,7 +1343,7 @@ public class VRMobileKeyboard : MonoBehaviour
             textOnly = true,
             backgroundAlpha = 0.9f,
             cornerRadius = 0.12f,
-            borderWidth = 0.0f,
+            borderWidth = 0.015f,
             popAmount = 0.015f
         };
 
@@ -1289,7 +1382,7 @@ public class VRMobileKeyboard : MonoBehaviour
             textOnly = true,
             backgroundAlpha = 0.9f,
             cornerRadius = 0.12f,
-            borderWidth = 0.0f,
+            borderWidth = 0.015f,
             popAmount = 0.015f
         };
 
@@ -1336,7 +1429,7 @@ public class VRMobileKeyboard : MonoBehaviour
             textOnly = true,
             backgroundAlpha = 0.9f,
             cornerRadius = 0.15f, // Rectangular with slight rounding
-            borderWidth = 0.0f,
+            borderWidth = 0.015f,
             popAmount = 0.015f
         };
 
@@ -1382,6 +1475,9 @@ public class VRMobileKeyboard : MonoBehaviour
         Transform visuals = hitArea.Find("Visuals");
         Transform animTarget = visuals != null ? visuals : hitArea;
 
+        // Get VRButtonAnimation to check force hover state
+        VRButtonAnimation btnAnim = hitArea.GetComponent<VRButtonAnimation>();
+
         EventTrigger trigger = hitArea.GetComponent<EventTrigger>();
         if (trigger == null)
             trigger = hitArea.gameObject.AddComponent<EventTrigger>();
@@ -1392,16 +1488,22 @@ public class VRMobileKeyboard : MonoBehaviour
         pointerDown.callback.AddListener((data) => StartCoroutine(AnimateKeyDown(animTarget)));
         trigger.triggers.Add(pointerDown);
 
-        // PointerUp - scale back
+        // PointerUp - scale back (only if not in force hover state)
         EventTrigger.Entry pointerUp = new EventTrigger.Entry();
         pointerUp.eventID = EventTriggerType.PointerUp;
-        pointerUp.callback.AddListener((data) => StartCoroutine(AnimateKeyUp(animTarget)));
+        pointerUp.callback.AddListener((data) => {
+            if (btnAnim == null || !btnAnim.IsForceHover)
+                StartCoroutine(AnimateKeyUp(animTarget));
+        });
         trigger.triggers.Add(pointerUp);
 
-        // PointerExit - also scale back (in case pointer leaves while pressed)
+        // PointerExit - also scale back (only if not in force hover state)
         EventTrigger.Entry pointerExit = new EventTrigger.Entry();
         pointerExit.eventID = EventTriggerType.PointerExit;
-        pointerExit.callback.AddListener((data) => StartCoroutine(AnimateKeyUp(animTarget)));
+        pointerExit.callback.AddListener((data) => {
+            if (btnAnim == null || !btnAnim.IsForceHover)
+                StartCoroutine(AnimateKeyUp(animTarget));
+        });
         trigger.triggers.Add(pointerExit);
     }
 
@@ -1493,6 +1595,17 @@ public class VRMobileKeyboard : MonoBehaviour
         OnBackspacePressed?.Invoke();
     }
 
+    void OnClear()
+    {
+        if (_targetInputField != null)
+        {
+            _targetInputField.text = "";
+            _targetInputField.caretPosition = 0;
+            ResetCursorBlink();
+            UpdatePreview();
+        }
+    }
+
     void OnEnter()
     {
         if (_targetInputField != null)
@@ -1506,19 +1619,28 @@ public class VRMobileKeyboard : MonoBehaviour
 
     void ToggleShift()
     {
-        // Double-tap for caps lock
-        if (_isShiftActive && !_isCapsLock)
+        // 3 states:
+        // State 1: default (_isShiftActive=false, _isCapsLock=false)
+        // State 2: shift active, label "Shift", auto-release after pressing another key
+        // State 3: caps lock, label "SHIFT", stays until clicked again
+
+        if (!_isShiftActive && !_isCapsLock)
         {
-            _isCapsLock = true;
-        }
-        else if (_isCapsLock)
-        {
+            // State 1 -> State 2: Enable shift
+            _isShiftActive = true;
             _isCapsLock = false;
-            _isShiftActive = false;
+        }
+        else if (_isShiftActive && !_isCapsLock)
+        {
+            // State 2 -> State 3: Enable caps lock
+            _isShiftActive = true;
+            _isCapsLock = true;
         }
         else
         {
-            _isShiftActive = true;
+            // State 3 -> State 1: Disable all
+            _isShiftActive = false;
+            _isCapsLock = false;
         }
 
         RebuildKeys();
@@ -1542,19 +1664,7 @@ public class VRMobileKeyboard : MonoBehaviour
     {
         if (_previewTMP != null && _targetInputField != null)
         {
-            string text = _targetInputField.text;
-            int caretPos = _targetInputField.caretPosition;
-
-            string cursor = _cursorVisible ? "|" : " ";
-
-            if (caretPos >= text.Length)
-            {
-                _previewTMP.text = text + cursor;
-            }
-            else
-            {
-                _previewTMP.text = text.Substring(0, caretPos) + cursor + text.Substring(caretPos);
-            }
+            _previewTMP.text = _targetInputField.text;
         }
     }
 
@@ -1571,10 +1681,15 @@ public class VRMobileKeyboard : MonoBehaviour
     {
         if (_instance == null)
         {
-            // Create keyboard at root level - it's a World Space Canvas
-            // and must not be parented to another Canvas
+            // Create keyboard under VirtualObjects parent for organization
             GameObject keyboardObj = new GameObject("VRMobileKeyboard");
-            // No SetParent - keyboard stays at root for correct world positioning
+
+            // Find VirtualObjects parent in scene
+            GameObject virtualObjectsParent = GameObject.Find("VirtualObjects");
+            if (virtualObjectsParent != null)
+            {
+                keyboardObj.transform.SetParent(virtualObjectsParent.transform, false);
+            }
 
             _instance = keyboardObj.AddComponent<VRMobileKeyboard>();
 
