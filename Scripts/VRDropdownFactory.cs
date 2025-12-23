@@ -625,7 +625,7 @@ public static class VRDropdownFactory
         int vrLayer = LayerMask.NameToLayer(config.layerName);
         if (vrLayer != -1) panel.layer = vrLayer;
 
-        // Viewport - now has Visuals with Background and Border like the main Dropdown
+        // Viewport - contains everything
         GameObject viewport = new GameObject("Viewport");
         viewport.transform.SetParent(panel.transform, false);
         if (vrLayer != -1) viewport.layer = vrLayer;
@@ -635,7 +635,7 @@ public static class VRDropdownFactory
         viewportRT.offsetMin = Vector2.zero;
         viewportRT.offsetMax = Vector2.zero;
 
-        // Visuals container for Viewport (like the main Dropdown's Visuals)
+        // Visuals container - expanded beyond Viewport for border effect
         // Scale expansion based on height ratio to maintain visual consistency
         float heightRatio = config.BoxHeight / panelHeight;
         float adjustedExpansion = config.edgePadding * heightRatio;
@@ -648,21 +648,24 @@ public static class VRDropdownFactory
         viewportVisualsRT.offsetMin = Vector2.zero;
         viewportVisualsRT.offsetMax = Vector2.zero;
 
-        // Background for Viewport (same style as Dropdown)
+        // Background for Visuals
         CreateViewportBackground(viewportVisuals.transform, config, panelHeight);
 
-        // Border for Viewport (same style as Dropdown)
+        // Border for Visuals
         CreateViewportBorder(viewportVisuals.transform, config, panelHeight);
 
-        // Content container (inside Viewport, compensated for Visuals expansion)
+        // Content container - NOW INSIDE VISUALS for easier HoverBorder calculation
         // Uses nested Canvas with higher sorting order so content renders AFTER glassmorphism background
         GameObject viewportContent = new GameObject("Content");
-        viewportContent.transform.SetParent(viewport.transform, false);
+        viewportContent.transform.SetParent(viewportVisuals.transform, false);
         RectTransform viewportContentRT = viewportContent.AddComponent<RectTransform>();
         viewportContentRT.anchorMin = Vector2.zero;
         viewportContentRT.anchorMax = Vector2.one;
-        viewportContentRT.offsetMin = new Vector2(10, 10);
-        viewportContentRT.offsetMax = new Vector2(-10, -10);
+        // Padding compensates for expansion so content stays within original Viewport area
+        float expansionPixelsX = adjustedExpansion * config.width;
+        float expansionPixelsY = adjustedExpansion * panelHeight;
+        viewportContentRT.offsetMin = new Vector2(expansionPixelsX + 10, expansionPixelsY + 10);
+        viewportContentRT.offsetMax = new Vector2(-expansionPixelsX - 10, -expansionPixelsY - 10);
 
         // Nested Canvas to ensure content renders AFTER the glassmorphism GrabPass
         Canvas contentCanvas = viewportContent.AddComponent<Canvas>();
@@ -670,11 +673,11 @@ public static class VRDropdownFactory
         contentCanvas.sortingOrder = 110; // Higher than panel's 100, after Overlay shader Queue
         viewportContent.AddComponent<GraphicRaycaster>();
 
-        // Use RectMask2D on Content instead of Viewport for better VR compatibility
+        // Use RectMask2D on Content for scrolling
         RectMask2D rectMask = viewportContent.AddComponent<RectMask2D>();
         rectMask.padding = Vector4.zero;
 
-        // Options container - now inside viewportContent
+        // Options container - inside Content (which is inside Visuals)
         GameObject optionsContainer = new GameObject("Options");
         optionsContainer.transform.SetParent(viewportContent.transform, false);
         if (vrLayer != -1) optionsContainer.layer = vrLayer;
@@ -902,15 +905,12 @@ public static class VRDropdownFactory
         // Visuals width = config.width * (1 + 2*adjustedExpansion)
         // We use center anchor and set fixed size to match Visuals exactly
 
-        float visualsExpansionPixels = adjustedExpansion * config.width;
-        float verticalExpansionPixels = adjustedExpansion * panelHeight;
-
-        // Border dimensions = Visuals dimensions
-        // Add edgePadding buffer to ensure border reaches panel edges visually
-        // Use 1.25x edgePadding for precise alignment
-        float edgePaddingBuffer = config.edgePadding * config.width * 1.25f;
-        float borderWidth = config.width + 2f * visualsExpansionPixels + 2f * edgePaddingBuffer;
-        float borderHeight = optionHeight + 2f * verticalExpansionPixels;
+        // Border dimensions should exactly match Visuals dimensions
+        // Visuals width = config.width * (1 + 2*adjustedExpansion)
+        float visualsWidth = config.width * (1f + 2f * adjustedExpansion);
+        // No extra buffer - border should match Visuals exactly
+        float borderWidth = visualsWidth;
+        float borderHeight = optionHeight;
 
         GameObject borderObj = new GameObject("HoverBorder");
         borderObj.transform.SetParent(option.transform, false);
@@ -942,26 +942,27 @@ public static class VRDropdownFactory
         hoverEffect.borderImage = borderImg;
         hoverEffect.glowColor = config.themeColor;
 
-        // Calculate corner radius and edge padding to match panel border visually
-        // Use the borderWidth and borderHeight we calculated above
-        float optionBorderWidth = borderWidth;
-        float optionBorderHeight = borderHeight;
-
-        // Use same absolute corner radius as panel (in pixels), converted to UV ratio
-        // Panel uses: adjustedCornerRadius = config.cornerRadius * heightRatio
-        // Panel corner in pixels ≈ adjustedCornerRadius * panelHeight
+        // Calculate shader parameters to match panel border visually
+        // Panel border uses parameters scaled by heightRatio
         float heightRatio = config.BoxHeight / panelHeight;
-        float adjustedCornerRadius = config.cornerRadius * heightRatio;
         float adjustedEdgePadding = config.edgePadding * heightRatio;
-        float adjustedBorderWidth = config.borderWidth * heightRatio;
-        float adjustedGlowWidth = config.glowWidth * heightRatio;
 
-        // Convert to option border UV space (same visual size)
-        hoverEffect.cornerRadius = adjustedCornerRadius * panelHeight / optionBorderHeight;
-        hoverEffect.edgePadding = adjustedEdgePadding * panelHeight / optionBorderHeight;
-        hoverEffect.borderWidth = adjustedBorderWidth * panelHeight / optionBorderHeight;
-        hoverEffect.glowWidth = adjustedGlowWidth * panelHeight / optionBorderHeight;
+        // CRITICAL: Use SAME edgePadding as panel for horizontal alignment
+        // In shader, edge position = 0.5 - padding (independent of aspect)
+        // So same edgePadding = same horizontal edge position
+        hoverEffect.edgePadding = adjustedEdgePadding;
+
+        // For cornerRadius, borderWidth, glowWidth - scale based on height ratio
+        // to maintain proportional appearance for the shorter option height
+        float optionHeightRatio = optionHeight / panelHeight;
+        hoverEffect.cornerRadius = config.cornerRadius * heightRatio / optionHeightRatio;
+        hoverEffect.borderWidth = config.borderWidth * heightRatio / optionHeightRatio;
+        hoverEffect.glowWidth = config.glowWidth * heightRatio / optionHeightRatio;
         hoverEffect.glowIntensity = config.glowIntensity;
+
+        // Clamp cornerRadius to prevent visual issues with short options
+        float maxCornerRadius = 0.4f; // Max 40% of height
+        hoverEffect.cornerRadius = Mathf.Min(hoverEffect.cornerRadius, maxCornerRadius);
 
         // If selected, show subtle border
         if (isSelected)
