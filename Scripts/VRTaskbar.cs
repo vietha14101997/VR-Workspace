@@ -21,7 +21,7 @@ public class VRTaskbar : MonoBehaviour
 {
     [Header("Logical Size (pixels)")]
     [Tooltip("Logical width in pixels for UI layout calculations")]
-    public float logicalWidth = 960f;
+    public float logicalWidth = 1060f;
     [Tooltip("Logical height in pixels for UI layout calculations")]
     public float logicalHeight = 128f;
 
@@ -71,7 +71,7 @@ public class VRTaskbar : MonoBehaviour
 
     [Header("Section Layout")]
     [Tooltip("Fixed width of Section 1 (left) in pixels")]
-    public float section1Width = 297f;
+    public float section1Width = 400f;
     [Tooltip("Fixed width of Section 2 (middle - status) in pixels")]
     public float section2Width = 398f;
     [Tooltip("Fixed width of Section 3 (right - app buttons) in pixels")]
@@ -89,6 +89,7 @@ public class VRTaskbar : MonoBehaviour
     public TMP_FontAsset customFont;
     public Sprite iconQuit;
     public Sprite iconSettings;
+    public Sprite iconPassthrough;
     public Sprite iconRecenter;
     public Sprite iconHome;
     public Sprite iconWifi;
@@ -122,6 +123,14 @@ public class VRTaskbar : MonoBehaviour
     private RectTransform _section2;
     private RectTransform _section3;
     private List<GameObject> _appButtons = new List<GameObject>();
+
+    // Passthrough Toggle State (controls ModeController)
+    private GameObject _passthroughButton;
+    private bool _isPassthroughOn = false;
+    private ModeController _modeController;
+
+    // Section 2 App Buttons - Radio button behavior (only one active at a time)
+    private int _activeAppButtonIndex = 0; // Default: Home (index 0) is active
 
     // Components
     public Canvas Canvas { get; private set; }
@@ -367,6 +376,7 @@ public class VRTaskbar : MonoBehaviour
         SetupButtonListeners();
         FindStatusReferences();
         FindAppButtonReferences();
+        SyncPassthroughWithModeController();
 
         if (ContentContainer != null)
         {
@@ -458,6 +468,11 @@ public class VRTaskbar : MonoBehaviour
                 {
                     btn.onClick.AddListener(() => Debug.Log("[VRTaskbar] Settings clicked"));
                 }
+                else if (btnName.Contains("passthrough"))
+                {
+                    _passthroughButton = child.gameObject;
+                    btn.onClick.AddListener(TogglePassthrough);
+                }
                 else if (btnName.Contains("recenter"))
                 {
                     btn.onClick.AddListener(RecenterObject);
@@ -465,23 +480,29 @@ public class VRTaskbar : MonoBehaviour
             }
         }
 
-        // Section 2 - Home button
+        // Section 2 - App buttons (radio button behavior)
         Transform appContainer = transform.Find("ContentContainer/Section2_Apps");
         if (appContainer != null)
         {
+            int index = 0;
             foreach (Transform child in appContainer)
             {
-                if (!child.name.Contains("Home")) continue;
+                if (!child.name.StartsWith("AppBtn_")) continue;
 
                 Transform hitArea = child.Find("HitArea");
-                if (hitArea == null) continue;
+                if (hitArea == null) { index++; continue; }
 
                 Button btn = hitArea.GetComponent<Button>();
-                if (btn == null) continue;
+                if (btn == null) { index++; continue; }
 
                 btn.onClick.RemoveAllListeners();
-                btn.onClick.AddListener(() => Debug.Log("[VRTaskbar] Home clicked"));
+                int capturedIndex = index; // Capture for closure
+                btn.onClick.AddListener(() => SelectAppButton(capturedIndex));
+                index++;
             }
+
+            // Apply initial active state colors
+            UpdateAllAppButtonColors();
         }
     }
 
@@ -906,13 +927,16 @@ public class VRTaskbar : MonoBehaviour
         // Section 3 (Right - Status) - positioned after Section2 + spacing
         float section3XPos = section2XPos + section2Width + sectionSpacing / 2;
         CreateSection3(ContentContainer, section3XPos, contentHeight);
-        // Home button is pre-created in CreateSection2
+
+        // Sync passthrough button with ModeController
+        SyncPassthroughWithModeController();
     }
 
     void LoadIcons()
     {
         if (iconQuit == null) iconQuit = LoadIcon("quit");
         if (iconSettings == null) iconSettings = LoadIcon("settings");
+        if (iconPassthrough == null) iconPassthrough = LoadIcon("passthrough");
         if (iconRecenter == null) iconRecenter = LoadIcon("recenter");
         if (iconHome == null) iconHome = LoadIcon("home");
         if (iconWifi == null) iconWifi = LoadIcon("wifi");
@@ -953,7 +977,7 @@ public class VRTaskbar : MonoBehaviour
         layout.childForceExpandHeight = false;
         layout.padding = new RectOffset(8, 8, 0, 0);
 
-        // Create 3 BareIconButtons
+        // Create 4 BareIconButtons
         Color cyanColor = new Color(0f, 0.9f, 1f);
         Color purpleColor = new Color(0.9f, 0.3f, 1f);
 
@@ -975,6 +999,13 @@ public class VRTaskbar : MonoBehaviour
             section.transform, buttonSize, iconSettings, cyanColor,
             () => Debug.Log("[VRTaskbar] Settings clicked"), 0.05f, 0.6f
         );
+
+        // Passthrough button (toggle on/off)
+        var passthroughBtn = VRButtonFactory.CreateBareIconButton(
+            section.transform, buttonSize, iconPassthrough, cyanColor,
+            TogglePassthrough, 0.05f, 0.6f
+        );
+        _passthroughButton = passthroughBtn;
 
         // Recenter button
         var recenterBtn = VRButtonFactory.CreateBareIconButton(
@@ -1013,14 +1044,19 @@ public class VRTaskbar : MonoBehaviour
         // Pre-create all 4 button slots
         _appButtons.Clear();
         Color cyanColor = new Color(0f, 0.9f, 1f);
+        Color purpleColor = new Color(0.9f, 0.3f, 1f);
 
         for (int i = 0; i < maxAppButtons; i++)
         {
             Sprite slotIcon = (i == 0) ? iconHome : null; // Only Home has icon initially
             string slotName = (i == 0) ? "Home" : $"AppSlot_{i}";
             bool isPlaceholder = (i != 0);
+            bool isActive = (i == _activeAppButtonIndex); // Home (index 0) is active by default
 
-            var btn = CreateAppButtonSlot(_section2, slotIcon, slotName, cyanColor, isPlaceholder);
+            // Active button is purple, inactive is cyan
+            Color btnColor = isActive ? purpleColor : cyanColor;
+            int capturedIndex = i; // Capture for closure
+            var btn = CreateAppButtonSlot(_section2, slotIcon, slotName, btnColor, isPlaceholder, capturedIndex);
             _appButtons.Add(btn);
         }
     }
@@ -1028,7 +1064,7 @@ public class VRTaskbar : MonoBehaviour
     /// <summary>
     /// Create a button slot for Section 2
     /// </summary>
-    GameObject CreateAppButtonSlot(RectTransform parent, Sprite icon, string name, Color glowColor, bool isPlaceholder)
+    GameObject CreateAppButtonSlot(RectTransform parent, Sprite icon, string name, Color glowColor, bool isPlaceholder, int buttonIndex)
     {
         GameObject btn;
 
@@ -1064,10 +1100,10 @@ public class VRTaskbar : MonoBehaviour
         }
         else
         {
-            // Create actual button with icon (Home button)
+            // Create actual button with icon - radio button behavior
             btn = VRButtonFactory.CreateBareIconButton(
                 parent, buttonSize, icon, glowColor,
-                () => Debug.Log($"[VRTaskbar] {name} clicked"), 0.05f, 0.65f
+                () => SelectAppButton(buttonIndex), 0.05f, 0.65f
             );
             btn.name = $"AppBtn_{name}";
         }
@@ -1439,6 +1475,217 @@ public class VRTaskbar : MonoBehaviour
             float expandedH = logicalHeight * (1f + 2f * expansion);
             bgCol.size = new Vector3(expandedW, expandedH, 0.01f);
         }
+    }
+
+    // --- PASSTHROUGH TOGGLE (Controls ModeController) ---
+
+    /// <summary>
+    /// Toggle passthrough mode on/off.
+    /// ON = RealWorld mode, OFF = VirtualSpace mode.
+    /// Changes button icon color between cyan (off) and purple (on).
+    /// </summary>
+    public void TogglePassthrough()
+    {
+        _isPassthroughOn = !_isPassthroughOn;
+        UpdatePassthroughButtonColor();
+        ApplyPassthroughMode();
+        Debug.Log($"[VRTaskbar] Passthrough {(_isPassthroughOn ? "ON (RealWorld)" : "OFF (VirtualSpace)")}");
+    }
+
+    /// <summary>
+    /// Apply passthrough mode to ModeController.
+    /// ON = RealWorld, OFF = VirtualSpace.
+    /// </summary>
+    void ApplyPassthroughMode()
+    {
+        // Find ModeController if not cached
+        if (_modeController == null)
+        {
+            _modeController = FindObjectOfType<ModeController>();
+        }
+
+        if (_modeController != null)
+        {
+            ViewMode targetMode = _isPassthroughOn ? ViewMode.RealWorld : ViewMode.VirtualSpace;
+            _modeController.SetMode(targetMode);
+        }
+    }
+
+    /// <summary>
+    /// Sync passthrough button state with ModeController on initialization.
+    /// </summary>
+    void SyncPassthroughWithModeController()
+    {
+        if (_modeController == null)
+        {
+            _modeController = FindObjectOfType<ModeController>();
+        }
+
+        if (_modeController != null)
+        {
+            // Sync: RealWorld = ON, VirtualSpace = OFF
+            _isPassthroughOn = (_modeController.mode == ViewMode.RealWorld);
+            UpdatePassthroughButtonColor();
+        }
+    }
+
+    /// <summary>
+    /// Update passthrough button icon color based on current state.
+    /// </summary>
+    void UpdatePassthroughButtonColor()
+    {
+        if (_passthroughButton == null) return;
+
+        Color cyanColor = new Color(0f, 0.9f, 1f);
+        Color purpleColor = new Color(0.9f, 0.3f, 1f);
+        Color targetColor = _isPassthroughOn ? purpleColor : cyanColor;
+
+        // Find Icon image in the button hierarchy
+        Transform iconTransform = _passthroughButton.transform.Find("HitArea/Visuals/Content/Icon");
+        if (iconTransform != null)
+        {
+            Image iconImg = iconTransform.GetComponent<Image>();
+            if (iconImg != null)
+            {
+                iconImg.color = Color.Lerp(targetColor, Color.white, 0.9f);
+
+                // Update shadow glow colors
+                Shadow[] shadows = iconTransform.GetComponents<Shadow>();
+                if (shadows.Length >= 4)
+                {
+                    // Layer 1 - Sharp inner halo
+                    Color glowCol = Color.Lerp(targetColor, Color.white, 0.7f);
+                    glowCol.a = 0.4f;
+                    shadows[0].effectColor = glowCol;
+                    shadows[1].effectColor = glowCol;
+
+                    // Layer 2 - Soft outer bloom
+                    Color bloomCol = Color.Lerp(targetColor, Color.white, 0.8f);
+                    bloomCol.a = 0.15f;
+                    shadows[2].effectColor = bloomCol;
+                    shadows[3].effectColor = bloomCol;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Get current passthrough state
+    /// </summary>
+    public bool IsPassthroughOn => _isPassthroughOn;
+
+    /// <summary>
+    /// Set passthrough state directly (without toggling)
+    /// </summary>
+    public void SetPassthrough(bool on)
+    {
+        if (_isPassthroughOn != on)
+        {
+            _isPassthroughOn = on;
+            UpdatePassthroughButtonColor();
+            Debug.Log($"[VRTaskbar] Passthrough set to {(_isPassthroughOn ? "ON" : "OFF")}");
+        }
+    }
+
+    // --- APP BUTTON SELECTION (Radio Button Behavior) ---
+
+    /// <summary>
+    /// Select an app button by index (radio button behavior).
+    /// Only one button can be active at a time.
+    /// If the button is already active, do nothing.
+    /// </summary>
+    public void SelectAppButton(int index)
+    {
+        // If already active, do nothing (can't click active button)
+        if (index == _activeAppButtonIndex) return;
+
+        // Validate index
+        if (index < 0 || index >= _appButtons.Count) return;
+
+        // Check if button is visible (not a placeholder)
+        CanvasGroup cg = _appButtons[index].GetComponent<CanvasGroup>();
+        if (cg != null && cg.alpha < 0.5f) return; // Skip invisible placeholders
+
+        int previousIndex = _activeAppButtonIndex;
+        _activeAppButtonIndex = index;
+        UpdateAllAppButtonColors();
+
+        string buttonName = _appButtons[index].name.Replace("AppBtn_", "");
+        Debug.Log($"[VRTaskbar] App button selected: {buttonName} (index {index})");
+    }
+
+    /// <summary>
+    /// Update all app button colors based on active state.
+    /// Active button is purple, inactive buttons are cyan.
+    /// </summary>
+    void UpdateAllAppButtonColors()
+    {
+        Color cyanColor = new Color(0f, 0.9f, 1f);
+        Color purpleColor = new Color(0.9f, 0.3f, 1f);
+
+        for (int i = 0; i < _appButtons.Count; i++)
+        {
+            if (_appButtons[i] == null) continue;
+
+            bool isActive = (i == _activeAppButtonIndex);
+            Color targetColor = isActive ? purpleColor : cyanColor;
+
+            UpdateSingleAppButtonColor(_appButtons[i], targetColor);
+        }
+    }
+
+    /// <summary>
+    /// Update a single app button's icon color and glow.
+    /// </summary>
+    void UpdateSingleAppButtonColor(GameObject button, Color targetColor)
+    {
+        if (button == null) return;
+
+        // Find Icon image in the button hierarchy
+        Transform iconTransform = button.transform.Find("HitArea/Visuals/Content/Icon");
+        if (iconTransform != null)
+        {
+            Image iconImg = iconTransform.GetComponent<Image>();
+            if (iconImg != null)
+            {
+                iconImg.color = Color.Lerp(targetColor, Color.white, 0.9f);
+
+                // Update shadow glow colors
+                Shadow[] shadows = iconTransform.GetComponents<Shadow>();
+                if (shadows.Length >= 4)
+                {
+                    // Layer 1 - Sharp inner halo
+                    Color glowCol = Color.Lerp(targetColor, Color.white, 0.7f);
+                    glowCol.a = 0.4f;
+                    shadows[0].effectColor = glowCol;
+                    shadows[1].effectColor = glowCol;
+
+                    // Layer 2 - Soft outer bloom
+                    Color bloomCol = Color.Lerp(targetColor, Color.white, 0.8f);
+                    bloomCol.a = 0.15f;
+                    shadows[2].effectColor = bloomCol;
+                    shadows[3].effectColor = bloomCol;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Get the currently active app button index.
+    /// </summary>
+    public int ActiveAppButtonIndex => _activeAppButtonIndex;
+
+    /// <summary>
+    /// Check if Home button is currently active.
+    /// </summary>
+    public bool IsHomeActive => _activeAppButtonIndex == 0;
+
+    /// <summary>
+    /// Select Home button (convenience method).
+    /// </summary>
+    public void SelectHome()
+    {
+        SelectAppButton(0);
     }
 
     // --- RECENTER ---

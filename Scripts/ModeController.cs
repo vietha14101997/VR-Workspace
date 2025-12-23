@@ -42,6 +42,18 @@ public class ModeController : MonoBehaviour
         Apply();
     }
 
+    /// <summary>
+    /// Set mode directly (used by VRTaskbar passthrough button).
+    /// </summary>
+    public void SetMode(ViewMode newMode)
+    {
+        if (mode != newMode)
+        {
+            mode = newMode;
+            Apply();
+        }
+    }
+
     System.Collections.IEnumerator TransitionRoutine(bool toRealWorld)
     {
         if (isTransitioning) yield break;
