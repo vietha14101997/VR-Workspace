@@ -988,23 +988,28 @@ public static class VRDropdownFactory
         if (vrLayer != -1) option.layer = vrLayer;
 
         // Layout: Checkmark | Icon | Text
+        // Checkmark size first (needed for icon position calculation)
+        float checkSize = config.valueFontSize * 0.7f;
+
+        // Calculate positions based on percentage of option width
+        float checkmarkX = config.width * 0.05f;  // 5% from left
+        float iconX = checkmarkX + config.width * 0.025f + checkSize / 2f;  // Checkmark + 2.5% gap + half checkmark width
+
         // Calculate textStartX to align with main dropdown's value text position
         // Main value text starts at: (ICON_ZONE_RATIO + CONTENT_LEFT_OFFSET) * width + CONTENT_PADDING
         // But option is inside Content which has ~10px left padding from panel edge
-        float checkmarkWidth = 50f;
         float mainValueTextX = config.width * (ICON_ZONE_RATIO + CONTENT_LEFT_OFFSET) + CONTENT_PADDING;
         float contentLeftPadding = 10f; // Content has 10px padding from panel edge
         float textStartX = mainValueTextX - contentLeftPadding;
 
         // Checkmark - sử dụng Image với checkmark sprite
-        float checkSize = config.valueFontSize * 0.7f;
         GameObject checkObj = new GameObject("Checkmark");
         checkObj.transform.SetParent(option.transform, false);
         RectTransform checkRT = checkObj.AddComponent<RectTransform>();
         checkRT.anchorMin = new Vector2(0f, 0.5f);
         checkRT.anchorMax = new Vector2(0f, 0.5f);
         checkRT.pivot = new Vector2(0.5f, 0.5f);
-        checkRT.anchoredPosition = new Vector2(checkmarkWidth / 2f, 0f);
+        checkRT.anchoredPosition = new Vector2(checkmarkX, 0f);
         checkRT.sizeDelta = new Vector2(checkSize, checkSize);
 
         Image checkImg = checkObj.AddComponent<Image>();
@@ -1042,7 +1047,7 @@ public static class VRDropdownFactory
             iconRT.anchorMin = new Vector2(0f, 0.5f);
             iconRT.anchorMax = new Vector2(0f, 0.5f);
             iconRT.pivot = new Vector2(0f, 0.5f);
-            iconRT.anchoredPosition = new Vector2(checkmarkWidth, 0f);
+            iconRT.anchoredPosition = new Vector2(iconX, 0f);
             iconRT.sizeDelta = new Vector2(actualIconSize, actualIconSize);
 
             Image iconImg = iconObj.AddComponent<Image>();

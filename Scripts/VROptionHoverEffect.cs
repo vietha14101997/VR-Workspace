@@ -21,8 +21,12 @@ public class VROptionHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointer
     private Material _borderMaterial;
     private RectTransform _rectTransform;
     private bool _isHovered = false;
+    private bool _isSelected = false;
     private float _currentAlpha = 0f;
     private float _targetAlpha = 0f;
+
+    // Static reference to track currently hovered option across all instances
+    private static VROptionHoverEffect _currentlyHoveredOption = null;
 
     // Animation speed
     private const float FADE_SPEED = 12f;
@@ -108,16 +112,69 @@ public class VROptionHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointer
     public void OnPointerEnter(PointerEventData eventData)
     {
         _isHovered = true;
+        _currentlyHoveredOption = this;
         _targetAlpha = 1f;
 
         // Update aspect ratio in case size changed
         ConfigureBorderMaterial();
+
+        // Notify all selected options to update their state
+        NotifySelectedOptionsToUpdate();
     }
 
     public void OnPointerExit(PointerEventData eventData)
     {
         _isHovered = false;
-        _targetAlpha = 0f;
+
+        // Clear static reference if this was the hovered option
+        if (_currentlyHoveredOption == this)
+        {
+            _currentlyHoveredOption = null;
+        }
+
+        // Update target alpha based on selection state
+        UpdateTargetAlpha();
+
+        // Notify all selected options to update their state
+        NotifySelectedOptionsToUpdate();
+    }
+
+    /// <summary>
+    /// Update target alpha based on current hover and selection state
+    /// </summary>
+    private void UpdateTargetAlpha()
+    {
+        if (_isHovered)
+        {
+            _targetAlpha = 1f;
+        }
+        else if (_isSelected)
+        {
+            // Selected option shows full hover if no other option is being hovered
+            bool noOtherHover = (_currentlyHoveredOption == null || _currentlyHoveredOption == this);
+            _targetAlpha = noOtherHover ? 1f : 0f;
+        }
+        else
+        {
+            _targetAlpha = 0f;
+        }
+    }
+
+    /// <summary>
+    /// Notify all selected options to update their visual state
+    /// Called when hover state changes
+    /// </summary>
+    private static void NotifySelectedOptionsToUpdate()
+    {
+        // Find all VROptionHoverEffect instances and update selected ones
+        var allEffects = FindObjectsOfType<VROptionHoverEffect>();
+        foreach (var effect in allEffects)
+        {
+            if (effect._isSelected && !effect._isHovered)
+            {
+                effect.UpdateTargetAlpha();
+            }
+        }
     }
 
     /// <summary>
@@ -125,15 +182,8 @@ public class VROptionHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointer
     /// </summary>
     public void SetSelected(bool selected)
     {
-        if (selected)
-        {
-            // Show a subtle border for selected state
-            _targetAlpha = 0.5f;
-        }
-        else if (!_isHovered)
-        {
-            _targetAlpha = 0f;
-        }
+        _isSelected = selected;
+        UpdateTargetAlpha();
     }
 
     /// <summary>
@@ -156,8 +206,24 @@ public class VROptionHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointer
         SetBorderAlpha(0f);
     }
 
+    void OnDisable()
+    {
+        // Clear static reference if this was the hovered option
+        if (_currentlyHoveredOption == this)
+        {
+            _currentlyHoveredOption = null;
+            NotifySelectedOptionsToUpdate();
+        }
+    }
+
     void OnDestroy()
     {
+        // Clear static reference if this was the hovered option
+        if (_currentlyHoveredOption == this)
+        {
+            _currentlyHoveredOption = null;
+        }
+
         // Clean up material instance
         if (_borderMaterial != null)
         {
