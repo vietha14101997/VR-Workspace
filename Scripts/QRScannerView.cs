@@ -109,7 +109,7 @@ public class QRScannerView : MonoBehaviour
         CreateScanOverlay(maskObj.transform, width, height);
 
         // Status Text
-        CreateStatusText(maskObj.transform, width);
+        // CreateStatusText(maskObj.transform, width);
     }
 
     /// <summary>
