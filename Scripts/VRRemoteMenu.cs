@@ -29,6 +29,7 @@ public class VRRemoteMenu : MonoBehaviour
     private GameObject _fpsDropdown;
     private GameObject _bodyContainer;
     private QRScannerView _qrScannerView;
+    private QRScannerManager _qrScannerManager;
 
     // Font sizes cho InputField và Dropdown
     private const int LABEL_FONT_SIZE = 40;
@@ -394,59 +395,33 @@ public class VRRemoteMenu : MonoBehaviour
 
     /// <summary>
     /// Toggle QR Scanner view - bấm lần 1 mở, bấm lần 2 đóng
+    /// Sử dụng QRScannerManager để tạo full-screen QR scan mode
     /// </summary>
     void ShowQRScanner()
     {
-        if (_bodyContainer == null) return;
-
         // Nếu đang hiển thị scanner -> đóng nó
-        if (_qrScannerView != null)
+        if (_qrScannerManager != null)
         {
             CloseQRScanner();
             return;
         }
 
-        // Ẩn BodyContainer (giữ data)
-        _bodyContainer.SetActive(false);
+        // Tìm VRTaskbar
+        VRTaskbar taskbar = FindObjectOfType<VRTaskbar>();
 
-        // Disable horizontal separators
-        DisableHorizontalSeparators();
-
-        // Tạo QRScannerView - đặt cùng vị trí với BodyContainer
-        GameObject scannerObj = new GameObject("QRScannerView");
-        scannerObj.transform.SetParent(transform, false);
-
-        // Tính vị trí và kích thước scanner
-        // Cạnh trên thấp hơn header một khoảng bằng contentMarginTop
-        RectTransform bodyRT = _bodyContainer.GetComponent<RectTransform>();
-        float marginTop = _menuFrame != null ? _menuFrame.contentMarginTop : 50f;
-
-        // Tính chiều cao: từ vị trí body đến header (có margin)
-        float headerH = _containerHeight * 0.1f;
-        float gap = _containerHeight * 0.04f;
-        float topY = _containerHeight - headerH - marginTop;  // Dưới header + margin
-        float bottomY = bodyRT.anchoredPosition.y;  // Đáy của body container
-        float scannerHeight = topY - bottomY;
-
-        RectTransform scannerRT = scannerObj.AddComponent<RectTransform>();
-        scannerRT.anchorMin = new Vector2(0.5f, 0);
-        scannerRT.anchorMax = new Vector2(0.5f, 0);
-        scannerRT.pivot = Vector2.zero;
-        scannerRT.anchoredPosition = new Vector2(-bodyRT.sizeDelta.x / 2f, bottomY);
-        scannerRT.sizeDelta = new Vector2(bodyRT.sizeDelta.x, scannerHeight);
-
-        _qrScannerView = scannerObj.AddComponent<QRScannerView>();
-        _qrScannerView.themeColor = themeColor;
-        _qrScannerView.accentColor = accentColor;
-        _qrScannerView.customFont = customFont;
+        // Tạo QRScannerManager
+        GameObject managerObj = new GameObject("QRScannerManager");
+        _qrScannerManager = managerObj.AddComponent<QRScannerManager>();
+        _qrScannerManager.themeColor = themeColor;
+        _qrScannerManager.accentColor = accentColor;
+        _qrScannerManager.customFont = customFont;
 
         // Subscribe events
-        _qrScannerView.OnQRScanned += OnQRCodeScanned;
+        _qrScannerManager.OnQRScanned += OnQRCodeScanned;
+        _qrScannerManager.OnCancelled += OnQRScanCancelled;
 
-        // Build UI với kích thước đã tăng
-        float bodyWidth = scannerRT.sizeDelta.x;
-        float bodyHeight = scannerRT.sizeDelta.y;
-        _qrScannerView.BuildUI(scannerObj.transform, bodyWidth, bodyHeight);
+        // Start scanning - this will hide VRMenuFrame and VRTaskbar
+        _qrScannerManager.StartScanning(_menuFrame, taskbar);
     }
 
     /// <summary>
@@ -454,22 +429,30 @@ public class VRRemoteMenu : MonoBehaviour
     /// </summary>
     void CloseQRScanner()
     {
-        // Destroy QRScannerView
+        // Destroy QRScannerManager
+        if (_qrScannerManager != null)
+        {
+            _qrScannerManager.StopScanning();
+            Destroy(_qrScannerManager.gameObject);
+            _qrScannerManager = null;
+        }
+
+        // Legacy: also clean up old QRScannerView if exists
         if (_qrScannerView != null)
         {
             _qrScannerView.StopScanning();
             Destroy(_qrScannerView.gameObject);
             _qrScannerView = null;
         }
+    }
 
-        // Show lại BodyContainer
-        if (_bodyContainer != null)
-        {
-            _bodyContainer.SetActive(true);
-        }
-
-        // Re-enable horizontal separators
-        RestoreHorizontalSeparators();
+    /// <summary>
+    /// Called when QR scan is cancelled via cancel button
+    /// </summary>
+    void OnQRScanCancelled()
+    {
+        _qrScannerManager = null;
+        // VRMenuFrame and VRTaskbar are already restored by StopScanning
     }
 
     /// <summary>
@@ -479,33 +462,11 @@ public class VRRemoteMenu : MonoBehaviour
     {
         Debug.Log($"QR Scanned: {config}");
 
-        // Đóng scanner và quay lại form
-        CloseQRScanner();
+        // Clean up manager reference (already stopped by manager)
+        _qrScannerManager = null;
 
         // Fill data vào các input fields
         FillConfigData(config);
-    }
-
-    /// <summary>
-    /// Khôi phục horizontal separators
-    /// </summary>
-    void RestoreHorizontalSeparators()
-    {
-        float contentW = _containerWidth * 0.875f;
-        float separatorLength = contentW / _containerWidth;
-        float headerH = _containerHeight * 0.1f;
-        float gap = _containerHeight * 0.04f;
-        float inputH = VRInputFieldFactory.CalculateHeight(INPUT_FONT_SIZE, true);
-        float dropdownH = VRDropdownFactory.CalculateHeight(DROPDOWN_VALUE_FONT_SIZE);
-        float bodyContainerHeight = _containerHeight - 2f * headerH;
-
-        float y = _containerHeight - headerH;
-        float sep1Y = y - gap * 1.25f;
-        y -= 2.25f * gap + bodyContainerHeight;
-        float bodyY = bodyContainerHeight - inputH;
-        float sep2Y = y + bodyY - gap * 1.5f;
-
-        ConfigureHorizontalSeparators(_containerHeight, sep1Y, sep2Y, separatorLength);
     }
 
     /// <summary>
