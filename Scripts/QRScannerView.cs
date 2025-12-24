@@ -23,14 +23,13 @@ public class QRScannerView : MonoBehaviour
 
     // Events
     public event Action<QRScannerConfig> OnQRScanned;
-    public event Action OnCancelClicked;
 
     // UI References
     private RawImage _cameraPreview;
+    private Material _previewMaterial;
     private RectTransform _scanFrame;
     private TextMeshProUGUI _statusText;
     private ScanLineAnimator _scanLineAnimator;
-    private GameObject _cancelButton;
     private CanvasGroup _canvasGroup;
 
     // Camera
@@ -53,13 +52,8 @@ public class QRScannerView : MonoBehaviour
         // Add CanvasGroup for fade animation
         _canvasGroup = gameObject.AddComponent<CanvasGroup>();
 
-        // Create camera container (full size)
+        // Create camera container (full size - fill toàn bộ BodyContainer)
         CreateCameraContainer(parent, containerWidth, containerHeight);
-
-        // Create cancel button at bottom
-        float buttonW = containerWidth * 0.4f;
-        float buttonH = containerHeight * 0.1f;
-        CreateCancelButton(parent, buttonW, buttonH);
 
         // Start camera
         StartCoroutine(StartCamera());
@@ -74,12 +68,33 @@ public class QRScannerView : MonoBehaviour
         RectTransform containerRT = containerObj.AddComponent<RectTransform>();
         containerRT.anchorMin = Vector2.zero;
         containerRT.anchorMax = Vector2.one;
-        containerRT.offsetMin = new Vector2(0, height * 0.15f);  // Leave space for button
+        containerRT.offsetMin = Vector2.zero;
         containerRT.offsetMax = Vector2.zero;
 
-        // Camera Preview (RawImage)
+        // Tạo mask với rounded corners sprite
+        GameObject maskObj = new GameObject("RoundedMask");
+        maskObj.transform.SetParent(containerObj.transform, false);
+
+        RectTransform maskRT = maskObj.AddComponent<RectTransform>();
+        maskRT.anchorMin = Vector2.zero;
+        maskRT.anchorMax = Vector2.one;
+        maskRT.offsetMin = Vector2.zero;
+        maskRT.offsetMax = Vector2.zero;
+
+        // Tạo sprite rounded rect runtime
+        Image maskImg = maskObj.AddComponent<Image>();
+        maskImg.sprite = CreateRoundedRectSprite((int)width, (int)height, 0.1f);
+        maskImg.type = Image.Type.Simple;
+        maskImg.color = Color.white;  // Mask cần màu trắng để alpha hoạt động đúng
+        maskImg.raycastTarget = false;
+
+        // Thêm Mask để clip children theo alpha của sprite
+        Mask mask = maskObj.AddComponent<Mask>();
+        mask.showMaskGraphic = false;  // Ẩn mask graphic, chỉ dùng để clip
+
+        // Camera Preview (RawImage) - nằm trong mask
         GameObject previewObj = new GameObject("CameraPreview");
-        previewObj.transform.SetParent(containerObj.transform, false);
+        previewObj.transform.SetParent(maskObj.transform, false);
 
         RectTransform previewRT = previewObj.AddComponent<RectTransform>();
         previewRT.anchorMin = Vector2.zero;
@@ -88,13 +103,96 @@ public class QRScannerView : MonoBehaviour
         previewRT.offsetMax = Vector2.zero;
 
         _cameraPreview = previewObj.AddComponent<RawImage>();
-        _cameraPreview.color = new Color(0.1f, 0.1f, 0.1f);  // Dark background until camera starts
+        _cameraPreview.color = Color.white;
 
-        // Scan Overlay (semi-transparent dark with center cutout effect)
-        CreateScanOverlay(containerObj.transform, width, height * 0.85f);
+        // Scan Overlay
+        CreateScanOverlay(maskObj.transform, width, height);
 
         // Status Text
-        CreateStatusText(containerObj.transform, width);
+        CreateStatusText(maskObj.transform, width);
+    }
+
+    /// <summary>
+    /// Tạo sprite hình chữ nhật bo góc runtime với anti-aliasing
+    /// </summary>
+    Sprite CreateRoundedRectSprite(int width, int height, float radiusRatio)
+    {
+        // Giữ nguyên tỷ lệ aspect ratio của vùng hiển thị
+        float aspect = (float)width / height;
+        int texWidth, texHeight;
+
+        if (aspect >= 1f)
+        {
+            // Wider than tall
+            texWidth = 1024;
+            texHeight = Mathf.RoundToInt(1024f / aspect);
+        }
+        else
+        {
+            // Taller than wide
+            texHeight = 1024;
+            texWidth = Mathf.RoundToInt(1024f * aspect);
+        }
+
+        // Đảm bảo kích thước tối thiểu
+        texWidth = Mathf.Max(texWidth, 256);
+        texHeight = Mathf.Max(texHeight, 256);
+
+        Texture2D tex = new Texture2D(texWidth, texHeight, TextureFormat.RGBA32, false);
+        tex.filterMode = FilterMode.Bilinear;
+        tex.wrapMode = TextureWrapMode.Clamp;
+
+        // Tính radius - dùng chiều nhỏ hơn để bo góc đều và tròn
+        float minDim = Mathf.Min(texWidth, texHeight);
+        float radius = minDim * radiusRatio;
+
+        Color32[] pixels = new Color32[texWidth * texHeight];
+
+        for (int y = 0; y < texHeight; y++)
+        {
+            for (int x = 0; x < texWidth; x++)
+            {
+                float alpha = GetRoundedRectAlphaSmooth(x, y, texWidth, texHeight, radius);
+                byte a = (byte)(alpha * 255);
+                pixels[y * texWidth + x] = new Color32(255, 255, 255, a);
+            }
+        }
+
+        tex.SetPixels32(pixels);
+        tex.Apply();
+
+        return Sprite.Create(tex, new Rect(0, 0, texWidth, texHeight), new Vector2(0.5f, 0.5f), 100f);
+    }
+
+    /// <summary>
+    /// Tính alpha sử dụng Signed Distance Function (SDF) cho rounded rectangle
+    /// Đảm bảo chuyển tiếp mượt giữa góc cong và cạnh thẳng
+    /// </summary>
+    float GetRoundedRectAlphaSmooth(int x, int y, int width, int height, float radius)
+    {
+        // Chuyển về tọa độ centered (tâm = 0,0)
+        float px = x - width * 0.5f;
+        float py = y - height * 0.5f;
+
+        // Half size trừ radius (vùng không bo góc)
+        float hx = width * 0.5f - radius;
+        float hy = height * 0.5f - radius;
+
+        // Tính khoảng cách đến cạnh rounded rect (SDF)
+        float dx = Mathf.Max(Mathf.Abs(px) - hx, 0f);
+        float dy = Mathf.Max(Mathf.Abs(py) - hy, 0f);
+        float dist = Mathf.Sqrt(dx * dx + dy * dy) - radius;
+
+        // Anti-aliasing với smoothstep (transition ~2 pixel)
+        float edge0 = -1.5f;
+        float edge1 = 0.5f;
+
+        if (dist <= edge0) return 1f;  // Fully inside
+        if (dist >= edge1) return 0f;  // Fully outside
+
+        // Smoothstep interpolation
+        float t = (dist - edge0) / (edge1 - edge0);
+        return 1f - (t * t * (3f - 2f * t));
     }
 
     void CreateScanOverlay(Transform parent, float width, float height)
@@ -147,7 +245,7 @@ public class QRScannerView : MonoBehaviour
     {
         float bracketLength = frameSize * 0.15f;
         float bracketWidth = 6f;
-        Color bracketColor = accentColor;
+        Color bracketColor = Color.white;
 
         // Helper to create a bracket line
         void CreateBracketLine(string name, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 sizeDelta, Vector2 anchoredPos)
@@ -212,12 +310,12 @@ public class QRScannerView : MonoBehaviour
         lineRT.sizeDelta = new Vector2(0, 4f);
 
         Image lineImg = lineObj.AddComponent<Image>();
-        lineImg.color = accentColor;
+        lineImg.color = Color.white;
         lineImg.raycastTarget = false;
 
         // Add glow
         Shadow glow = lineObj.AddComponent<Shadow>();
-        glow.effectColor = new Color(accentColor.r, accentColor.g, accentColor.b, 0.7f);
+        glow.effectColor = new Color(1f, 1f, 1f, 0.7f);
         glow.effectDistance = new Vector2(0, 3);
 
         // Add animator
@@ -247,34 +345,6 @@ public class QRScannerView : MonoBehaviour
         _statusText.fontStyle = FontStyles.Bold;
         _statusText.raycastTarget = false;
         if (customFont != null) _statusText.font = customFont;
-    }
-
-    void CreateCancelButton(Transform parent, float width, float height)
-    {
-        var config = new VRButtonFactory.ButtonConfig
-        {
-            label = "HỦY",
-            themeColor = new Color(1f, 0.3f, 0.3f),  // Red-ish
-            width = width,
-            height = height,
-            fontSize = 42,
-            font = customFont,
-            textOnly = true,
-            backgroundAlpha = 0.15f,
-            cornerRadius = 0.12f,
-            popAmount = 0.03f
-        };
-
-        _cancelButton = VRButtonFactory.CreateButton(parent, config, () => {
-            StopScanning();
-            OnCancelClicked?.Invoke();
-        });
-
-        RectTransform rt = _cancelButton.GetComponent<RectTransform>();
-        rt.anchorMin = new Vector2(0.5f, 0);
-        rt.anchorMax = new Vector2(0.5f, 0);
-        rt.pivot = new Vector2(0.5f, 0);
-        rt.anchoredPosition = new Vector2(0, 20f);
     }
 
     IEnumerator StartCamera()
@@ -352,7 +422,7 @@ public class QRScannerView : MonoBehaviour
         if (_webCamTexture == null || _cameraPreview == null) return;
 
         float videoAspect = (float)_webCamTexture.width / _webCamTexture.height;
-        float previewAspect = _containerWidth / (_containerHeight * 0.85f);
+        float previewAspect = _containerWidth / _containerHeight;
 
         RectTransform rt = _cameraPreview.GetComponent<RectTransform>();
 
