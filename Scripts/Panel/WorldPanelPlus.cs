@@ -252,9 +252,6 @@ public class WorldPanelPlus : MonoBehaviour
         bc.size = new Vector3(1, 1, 0.02f);
         bc.center = new Vector3(0, 0, 0.01f);
 
-        var brc = board.gameObject.AddComponent<WorldPanelPlusBoardRaycatcher>();
-        brc.panel = this;
-
         Apply();
         EnsureCursor();
     }

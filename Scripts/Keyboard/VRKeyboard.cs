@@ -121,7 +121,6 @@ public class VRKeyboard : MonoBehaviour
 
     private bool _isBuilt = false;
     private bool _isKeyboardVisibleOnStart = false;
-    private bool _hasInitializedOrientation = false;
 
     // Calculated logical dimensions
     private float _logicalWidth;
@@ -212,7 +211,6 @@ public class VRKeyboard : MonoBehaviour
         if (toCamera.sqrMagnitude < 1e-6f) return;
 
         transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
-        _hasInitializedOrientation = true;
     }
 
     /// <summary>

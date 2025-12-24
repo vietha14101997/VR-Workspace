@@ -34,8 +34,7 @@ public class ClusterAutoBinder : MonoBehaviour
     private int cellWidth = 1920;
     private int cellHeight = 1080;
 
-    private MultiPCStreamClient _multiPCClient;  // Option B: N separate PeerConnections
-    private List<UVCropReceiver> _cropReceivers = new List<UVCropReceiver>();
+    private MultiPCStreamClient _multiPCClient;  // N separate PeerConnections for multi-track mode
 
     void Start()
     {
@@ -85,9 +84,6 @@ public class ClusterAutoBinder : MonoBehaviour
     void OnDestroy()
     {
         if (_multiPCClient) Destroy(_multiPCClient);
-        foreach (var r in _cropReceivers)
-            if (r) Destroy(r);
-        _cropReceivers.Clear();
     }
 
     void GenerateSignalPath()

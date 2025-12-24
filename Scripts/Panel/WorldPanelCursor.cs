@@ -136,7 +136,7 @@ public class WorldPanelCursor : MonoBehaviour
             if (Vector3.Dot(n, toCam) < 0f) n = -n;
         }
 
-        // 5) Đặt vị trí thế giới và xoay “ốp” theo mặt Board
+        // 5) Đặt vị trí thế giới và xoay "ốp" theo mặt Board
         float zWorldOffset = Mathf.Max(1e-4f, zOffset); // mét
         transform.position = worldPoint + n * zWorldOffset;
         transform.rotation = _board.rotation;  // cùng hướng với mặt Board

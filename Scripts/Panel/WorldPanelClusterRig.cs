@@ -1,58 +1,33 @@
 using UnityEngine;
 using System.Collections.Generic;
 
+/// <summary>
+/// Manages a cluster of WorldPanelPlus panels arranged in an arc.
+/// Handles dynamic panel creation, positioning, and neighbor linking.
+/// </summary>
 [ExecuteAlways]
 public class WorldPanelClusterRig : MonoBehaviour
 {
     [Header("Source")]
     public WorldPanelPlus panelPrefab;
-    public Texture centerTexture, leftTexture, rightTexture;
 
     [Header("Layout")]
     public float distanceFromCamera = 2.0f;
-    public float sideGapMeters = 0.05f;
-    public bool autoAngleFromGap = true;
-    [Range(0f, 45f)] public float sideYawDeg = 18f;
-    public float verticalOffset = 0f;
-
-    [Header("Angle Adjustment")]
     [Tooltip("Extra gap in meters between panel edges (0 = edges touch)")]
     [Range(0f, 0.1f)] public float edgeGapMeters = 0.01f;
     [Tooltip("Whether panels should face directly toward camera (true) or have limited tilt (false)")]
     public bool panelsFaceCamera = true;
-
-    [Header("Visibility")]
+    public float verticalOffset = 0f;
     public bool faceCameraYawOnly = true;
-
-    [Header("Glowing Border")]
-    public bool enableGlowBorder = true;
-    [ColorUsage(true, true)]
-    public Color glowColorA = new Color(0.3f, 1f, 1f, 1f);
-    [ColorUsage(true, true)]
-    public Color glowColorB = new Color(1f, 0.4f, 1f, 1f);
-    [Range(0.005f, 0.05f)]
-    public float borderWidth = 0.015f;
-    [Range(0.01f, 0.1f)]
-    public float glowSpread = 0.05f;
-    [Range(0f, 0.1f)]
-    public float cornerRadius = 0.03f;
-
-    [SerializeField, HideInInspector]
-    private ClusterGlowBorder _glowBorder;
 
     [Header("Dynamic Panels")]
     [SerializeField] private List<WorldPanelPlus> _panels = new List<WorldPanelPlus>();
     public List<WorldPanelPlus> panels => _panels;
 
-    // Legacy compatibility - map to panels list
-    public WorldPanelPlus left => _panels.Count >= 2 ? _panels[0] : null;
-    public WorldPanelPlus center => _panels.Count >= 1 ? _panels[_panels.Count / 2] : null;
-    public WorldPanelPlus right => _panels.Count >= 3 ? _panels[_panels.Count - 1] : null;
-
     Camera Cam => Application.isPlaying ? Camera.main : FindObjectOfType<Camera>();
 
     /// <summary>
-    /// Build cluster with specified number of panels (called by ClusterAutoBinder)
+    /// Build cluster with specified number of panels
     /// </summary>
     public void BuildWithPanelCount(int count)
     {
@@ -64,9 +39,6 @@ public class WorldPanelClusterRig : MonoBehaviour
         LinkNeighbors();
         LayoutFromCamera();
 
-        EnsureGlowBorder();
-        UpdateGlowBorder();
-
         Debug.Log($"[WorldPanelClusterRig] Built {count} panels");
     }
 
@@ -74,7 +46,6 @@ public class WorldPanelClusterRig : MonoBehaviour
     public void BuildOrRebuild()
     {
         BuildWithPanelCount(3);
-        ApplyTextures();
     }
 
     void Update()
@@ -105,7 +76,7 @@ public class WorldPanelClusterRig : MonoBehaviour
         float panelAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(panelWidth / 2f / distanceFromCamera);
         float gapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(edgeGapMeters / 2f / distanceFromCamera);
 
-        float angleDeg = autoAngleFromGap ? (panelAngleDeg + gapAngleDeg) : sideYawDeg;
+        float angleDeg = panelAngleDeg + gapAngleDeg;
 
         int count = _panels.Count;
         for (int i = 0; i < count; i++)
@@ -114,9 +85,6 @@ public class WorldPanelClusterRig : MonoBehaviour
             float yawDeg = offset * angleDeg;
             PlacePanelOnArc(_panels[i], yawDeg, cam, camFwd, camUp);
         }
-
-        // Update glow border after panels are positioned
-        UpdateGlowBorder();
     }
 
     void PlacePanelOnArc(WorldPanelPlus p, float yawDeg, Camera cam, Vector3 camFwd, Vector3 camUp)
@@ -205,21 +173,9 @@ public class WorldPanelClusterRig : MonoBehaviour
             var p = _panels[i];
             p.neighborLeft = (i > 0) ? _panels[i - 1] : null;
             p.neighborRight = (i < _panels.Count - 1) ? _panels[i + 1] : null;
+            p.neighborUp = null;
+            p.neighborDown = null;
         }
-    }
-
-    void ApplyTextures()
-    {
-        // Legacy 3-panel texture support
-        if (_panels.Count >= 1 && centerTexture)
-            _panels[_panels.Count / 2].contentTexture = centerTexture;
-        if (_panels.Count >= 2 && leftTexture)
-            _panels[0].contentTexture = leftTexture;
-        if (_panels.Count >= 3 && rightTexture)
-            _panels[_panels.Count - 1].contentTexture = rightTexture;
-
-        foreach (var p in _panels)
-            p.Apply();
     }
 
     void KillChildren()
@@ -232,61 +188,6 @@ public class WorldPanelClusterRig : MonoBehaviour
             Destroy(transform.GetChild(i).gameObject);
 #endif
         _panels.Clear();
-        _glowBorder = null;
-    }
-
-    void EnsureGlowBorder()
-    {
-        if (!enableGlowBorder)
-        {
-            if (_glowBorder != null)
-            {
-#if UNITY_EDITOR
-                DestroyImmediate(_glowBorder.gameObject);
-#else
-                Destroy(_glowBorder.gameObject);
-#endif
-                _glowBorder = null;
-            }
-            return;
-        }
-
-        if (_glowBorder == null)
-        {
-            // Check if one already exists as child
-            _glowBorder = GetComponentInChildren<ClusterGlowBorder>();
-
-            if (_glowBorder == null)
-            {
-                var go = new GameObject("GlowBorder");
-                go.transform.SetParent(transform, false);
-                go.transform.localPosition = Vector3.zero;
-                go.transform.localRotation = Quaternion.identity;
-                _glowBorder = go.AddComponent<ClusterGlowBorder>();
-            }
-        }
-
-        // Sync properties
-        _glowBorder.colorA = glowColorA;
-        _glowBorder.colorB = glowColorB;
-        _glowBorder.borderWidth = borderWidth;
-        _glowBorder.glowSpread = glowSpread;
-        _glowBorder.cornerRadius = cornerRadius;
-    }
-
-    void UpdateGlowBorder()
-    {
-        if (!enableGlowBorder || _glowBorder == null) return;
-
-        // Sync properties in case they changed
-        _glowBorder.colorA = glowColorA;
-        _glowBorder.colorB = glowColorB;
-        _glowBorder.borderWidth = borderWidth;
-        _glowBorder.glowSpread = glowSpread;
-        _glowBorder.cornerRadius = cornerRadius;
-
-        // Update the border mesh
-        _glowBorder.UpdateBorder(_panels);
     }
 
 #if UNITY_EDITOR
@@ -295,15 +196,6 @@ public class WorldPanelClusterRig : MonoBehaviour
         if (_panels.Count > 0)
         {
             LayoutFromCamera();
-            // Ensure glow border is created/destroyed based on toggle
-            UnityEditor.EditorApplication.delayCall += () =>
-            {
-                if (this != null)
-                {
-                    EnsureGlowBorder();
-                    UpdateGlowBorder();
-                }
-            };
         }
     }
 #endif

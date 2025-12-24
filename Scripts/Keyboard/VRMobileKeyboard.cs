@@ -163,7 +163,6 @@ public class VRMobileKeyboard : MonoBehaviour
 
     private bool _isBuilt = false;
     private bool _isKeyboardVisibleOnStart = false;
-    private bool _hasInitializedOrientation = false;
 
     // Calculated logical dimensions
     private float _logicalWidth;
@@ -444,21 +443,6 @@ public class VRMobileKeyboard : MonoBehaviour
         {
             UpdatePositionRelativeToPrimary();
         }
-    }
-
-    /// <summary>
-    /// Orient keyboard to face the camera (like VRTaskbar).
-    /// </summary>
-    void OrientTowardsCamera()
-    {
-        var cam = Camera.main;
-        if (cam == null) return;
-
-        Vector3 toCamera = cam.transform.position - transform.position;
-        if (toCamera.sqrMagnitude < 1e-6f) return;
-
-        transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
-        _hasInitializedOrientation = true;
     }
 
     /// <summary>
@@ -838,7 +822,9 @@ public class VRMobileKeyboard : MonoBehaviour
         CreateKeyRow(parent, LETTERS_ROW_1, startX, qwertyRowY, unit, true);
 
         // === ROW 1 (Numbers): 1234567890 ===
-        string[] row0 = _isShiftActive ? SHIFTED_ROW_0 : LETTERS_ROW_0;
+        // Only show shifted symbols when shift is active (not caps lock)
+        // Caps lock only affects letters, not numbers
+        string[] row0 = (_isShiftActive && !_isCapsLock) ? SHIFTED_ROW_0 : LETTERS_ROW_0;
         CreateKeyRow(parent, row0, startX, numbersRowY, unit, false);
     }
 
@@ -1291,8 +1277,8 @@ public class VRMobileKeyboard : MonoBehaviour
 
     void CreatePreviewRow(Transform parent, float y, float contentWidth)
     {
-        // Calculate clear button size
-        float clearButtonSize = keyHeight * 0.65f;
+        // Calculate button size (same for both close and clear buttons)
+        float buttonSize = keyHeight * 0.65f;
         float buttonPadding = 10f;
 
         _previewText = new GameObject("PreviewText");
@@ -1305,14 +1291,14 @@ public class VRMobileKeyboard : MonoBehaviour
         rt.anchoredPosition = new Vector2(0, y + keyHeight * 0.235f);
         rt.sizeDelta = new Vector2(contentWidth, keyHeight * 0.5f);
 
-        // Text object - shortened on the right to make room for clear button
+        // Text object - shortened on both sides to make room for close and clear buttons
         GameObject textObj = new GameObject("Text");
         textObj.transform.SetParent(_previewText.transform, false);
         RectTransform textRT = textObj.AddComponent<RectTransform>();
         textRT.anchorMin = Vector2.zero;
         textRT.anchorMax = Vector2.one;
-        textRT.offsetMin = new Vector2(15, 0);
-        textRT.offsetMax = new Vector2(-(clearButtonSize + buttonPadding), 0);
+        textRT.offsetMin = new Vector2(buttonSize + buttonPadding, 0);
+        textRT.offsetMax = new Vector2(-(buttonSize + buttonPadding), 0);
 
         _previewTMP = textObj.AddComponent<TextMeshProUGUI>();
         _previewTMP.fontSize = 42;
@@ -1336,11 +1322,28 @@ public class VRMobileKeyboard : MonoBehaviour
         // Glowing underline (full width)
         CreatePreviewUnderline(_previewText.transform, contentWidth);
 
+        // Create Close button (BareIconButton) inside PreviewText, on the left, above underline
+        Sprite closeIcon = VRTaskbar.LoadIcon("icon_close");
+        GameObject closeBtn = VRButtonFactory.CreateBareIconButton(
+            _previewText.transform,
+            buttonSize,
+            closeIcon,
+            new Color(0.8f, 0.4f, 1.0f),
+            () => OnClosePressed?.Invoke(),
+            0.01f,
+            0.6f
+        );
+        RectTransform closeRT = closeBtn.GetComponent<RectTransform>();
+        closeRT.anchorMin = new Vector2(0f, 0.5f);
+        closeRT.anchorMax = new Vector2(0f, 0.5f);
+        closeRT.pivot = new Vector2(0f, 0.5f);
+        closeRT.anchoredPosition = new Vector2(buttonPadding * 1.5f, keyHeight * 0.04f); // Slightly above underline
+
         // Create Clear button (BareIconButton) inside PreviewText, on the right, above underline
         Sprite clearIcon = VRTaskbar.LoadIcon("clear");
         GameObject clearBtn = VRButtonFactory.CreateBareIconButton(
             _previewText.transform,
-            clearButtonSize,
+            buttonSize,
             clearIcon,
             new Color(0.8f, 0.4f, 1.0f),
             () => OnClear(),
