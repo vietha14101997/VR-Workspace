@@ -158,6 +158,9 @@ public class VRMobileKeyboard : MonoBehaviour
     private static VRMobileKeyboard _instance;
     public static VRMobileKeyboard Instance => _instance;
 
+    // Static reference to currently open keyboard (for VRGazeReticle to check)
+    public static VRMobileKeyboard CurrentlyOpenKeyboard { get; private set; }
+
     private bool _isBuilt = false;
     private bool _isKeyboardVisibleOnStart = false;
     private bool _hasInitializedOrientation = false;
@@ -542,6 +545,9 @@ public class VRMobileKeyboard : MonoBehaviour
 
         // Position relative to VRMenuFrame/VRTaskbar (also sets rotation parallel to taskbar)
         UpdatePositionRelativeToPrimary();
+
+        // Set static reference
+        CurrentlyOpenKeyboard = this;
     }
 
     public void Hide()
@@ -550,6 +556,51 @@ public class VRMobileKeyboard : MonoBehaviour
         gameObject.SetActive(false);
         ResetShift();
         _currentLayout = KeyboardLayout.Letters;
+
+        // Clear static reference
+        if (CurrentlyOpenKeyboard == this)
+        {
+            CurrentlyOpenKeyboard = null;
+        }
+    }
+
+    /// <summary>
+    /// Switch keyboard target to a different InputField without closing
+    /// </summary>
+    public void SwitchToInputField(TMP_InputField newInputField)
+    {
+        if (newInputField == null || newInputField == _targetInputField) return;
+
+        _targetInputField = newInputField;
+
+        if (_targetInputField != null)
+        {
+            _targetInputField.DeactivateInputField();
+            _targetInputField.caretPosition = _targetInputField.text.Length;
+        }
+
+        ResetCursorBlink();
+        UpdatePreview();
+    }
+
+    /// <summary>
+    /// Check if a GameObject is part of this keyboard (for click-outside detection)
+    /// </summary>
+    public bool IsPartOfKeyboard(GameObject obj)
+    {
+        if (obj == null) return false;
+
+        // Check if obj is this keyboard or a child of it
+        Transform current = obj.transform;
+        while (current != null)
+        {
+            if (current.gameObject == gameObject)
+            {
+                return true;
+            }
+            current = current.parent;
+        }
+        return false;
     }
 
     public bool IsVisible => gameObject.activeSelf;
@@ -1240,6 +1291,10 @@ public class VRMobileKeyboard : MonoBehaviour
 
     void CreatePreviewRow(Transform parent, float y, float contentWidth)
     {
+        // Calculate clear button size
+        float clearButtonSize = keyHeight * 0.65f;
+        float buttonPadding = 10f;
+
         _previewText = new GameObject("PreviewText");
         _previewText.transform.SetParent(parent, false);
 
@@ -1250,14 +1305,14 @@ public class VRMobileKeyboard : MonoBehaviour
         rt.anchoredPosition = new Vector2(0, y + keyHeight * 0.235f);
         rt.sizeDelta = new Vector2(contentWidth, keyHeight * 0.5f);
 
-        // Text object
+        // Text object - shortened on the right to make room for clear button
         GameObject textObj = new GameObject("Text");
         textObj.transform.SetParent(_previewText.transform, false);
         RectTransform textRT = textObj.AddComponent<RectTransform>();
         textRT.anchorMin = Vector2.zero;
         textRT.anchorMax = Vector2.one;
         textRT.offsetMin = new Vector2(15, 0);
-        textRT.offsetMax = new Vector2(-15, 0);
+        textRT.offsetMax = new Vector2(-(clearButtonSize + buttonPadding), 0);
 
         _previewTMP = textObj.AddComponent<TextMeshProUGUI>();
         _previewTMP.fontSize = 42;
@@ -1278,8 +1333,25 @@ public class VRMobileKeyboard : MonoBehaviour
             }
         }
 
-        // Glowing underline (like horizontal separator)
+        // Glowing underline (full width)
         CreatePreviewUnderline(_previewText.transform, contentWidth);
+
+        // Create Clear button (BareIconButton) inside PreviewText, on the right, above underline
+        Sprite clearIcon = VRTaskbar.LoadIcon("clear");
+        GameObject clearBtn = VRButtonFactory.CreateBareIconButton(
+            _previewText.transform,
+            clearButtonSize,
+            clearIcon,
+            new Color(0.8f, 0.4f, 1.0f),
+            () => OnClear(),
+            0.01f,
+            0.6f
+        );
+        RectTransform clearRT = clearBtn.GetComponent<RectTransform>();
+        clearRT.anchorMin = new Vector2(1f, 0.5f);
+        clearRT.anchorMax = new Vector2(1f, 0.5f);
+        clearRT.pivot = new Vector2(1f, 0.5f);
+        clearRT.anchoredPosition = new Vector2(-buttonPadding * 1.5f, keyHeight * 0.04f); // Slightly above underline
     }
 
     void CreatePreviewUnderline(Transform parent, float width)
@@ -1294,7 +1366,7 @@ public class VRMobileKeyboard : MonoBehaviour
         rt.offsetMax = new Vector2(-15, 0);
         rt.pivot = new Vector2(0.5f, 0.5f);
         rt.anchoredPosition = new Vector2(0, 0);
-        rt.sizeDelta = new Vector2(width, keyHeight * 0.5f); // Height for glow effect
+        rt.sizeDelta = new Vector2(width * 0.975f, keyHeight * 0.5f); // Height for glow effect
 
         Image lineImg = underlineObj.AddComponent<Image>();
         lineImg.raycastTarget = false;

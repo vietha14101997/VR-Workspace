@@ -343,10 +343,30 @@ public class VRGazeReticle : MonoBehaviour
         // Check if dropdown is open - allow dwell on ANY object to close it
         bool hasOpenDropdown = VRDropdown.CurrentlyOpenDropdown != null;
         bool isDropdownOption = hasOpenDropdown && VRDropdown.CurrentlyOpenDropdown.IsPartOfDropdownPanel(target);
+
+        // Check if keyboard is open
+        bool hasOpenKeyboard = VRMobileKeyboard.CurrentlyOpenKeyboard != null;
+        bool isKeyboardPart = hasOpenKeyboard && VRMobileKeyboard.CurrentlyOpenKeyboard.IsPartOfKeyboard(target);
+
+        // Check if target is an InputField
+        VRInputFieldTrigger inputFieldTrigger = target.GetComponent<VRInputFieldTrigger>();
+        if (inputFieldTrigger == null) inputFieldTrigger = target.GetComponentInParent<VRInputFieldTrigger>();
+
+        // Check if target is a Dropdown
+        VRDropdown targetDropdown = target.GetComponent<VRDropdown>();
+        if (targetDropdown == null) targetDropdown = target.GetComponentInParent<VRDropdown>();
+
         bool isDwellableTarget = IsDwellable(target);
 
-        // If no dropdown open and target is not dwellable, skip
-        if (!hasOpenDropdown && !isDwellableTarget)
+        // If no dropdown/keyboard open and target is not dwellable, skip
+        if (!hasOpenDropdown && !hasOpenKeyboard && !isDwellableTarget)
+        {
+            ResetDwellState();
+            return;
+        }
+
+        // If keyboard is open and target is keyboard background (not a button), skip dwell
+        if (hasOpenKeyboard && isKeyboardPart && !isDwellableTarget)
         {
             ResetDwellState();
             return;
@@ -410,25 +430,56 @@ public class VRGazeReticle : MonoBehaviour
                 _dwellRing.enabled = false;
             }
 
-            // Check if there's an open dropdown
+            Vector2 normalizedHitPoint = CalculateNormalizedHitPoint(hit);
+
+            // Priority 1: Handle keyboard click-outside
+            if (hasOpenKeyboard && !isKeyboardPart)
+            {
+                // Clicking outside keyboard
+                if (inputFieldTrigger != null && inputFieldTrigger.InputField != null)
+                {
+                    // Clicking another InputField - switch keyboard target
+                    VRMobileKeyboard.CurrentlyOpenKeyboard.SwitchToInputField(inputFieldTrigger.InputField);
+                }
+                else if (targetDropdown != null)
+                {
+                    // Clicking a dropdown - close keyboard and open dropdown
+                    VRMobileKeyboard.CurrentlyOpenKeyboard.Hide();
+                    targetDropdown.OpenDropdown();
+                }
+                else
+                {
+                    // Clicking elsewhere - close keyboard
+                    VRMobileKeyboard.CurrentlyOpenKeyboard.Hide();
+                }
+                return;
+            }
+
+            // Priority 2: Handle dropdown click-outside
             if (hasOpenDropdown)
             {
                 if (isDropdownOption)
                 {
                     // Target is a dropdown option - perform normal click
-                    Vector2 normalizedHitPoint = CalculateNormalizedHitPoint(hit);
                     HandlePointerClick(target, normalizedHitPoint);
+                }
+                else if (targetDropdown != null && targetDropdown != VRDropdown.CurrentlyOpenDropdown)
+                {
+                    // Clicking another dropdown - close current and open new one
+                    VRDropdown.CurrentlyOpenDropdown.CloseDropdown();
+                    targetDropdown.OpenDropdown();
                 }
                 else
                 {
                     // Target is NOT part of the dropdown - close dropdown instead of clicking
                     VRDropdown.CurrentlyOpenDropdown.CloseDropdown();
                 }
+                return;
             }
-            else if (isDwellableTarget)
+
+            // No popup open - perform normal click
+            if (isDwellableTarget)
             {
-                // No dropdown open and target is dwellable - perform normal click
-                Vector2 normalizedHitPoint = CalculateNormalizedHitPoint(hit);
                 HandlePointerClick(target, normalizedHitPoint);
             }
         }
