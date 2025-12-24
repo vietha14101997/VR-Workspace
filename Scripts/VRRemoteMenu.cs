@@ -27,6 +27,8 @@ public class VRRemoteMenu : MonoBehaviour
     private GameObject _resolutionDropdown;
     private GameObject _bitrateDropdown;
     private GameObject _fpsDropdown;
+    private GameObject _bodyContainer;
+    private QRScannerView _qrScannerView;
 
     // Font sizes cho InputField và Dropdown
     private const int LABEL_FONT_SIZE = 40;
@@ -50,6 +52,7 @@ public class VRRemoteMenu : MonoBehaviour
         _containerWidth = containerWidth;
         _containerHeight = containerHeight;
         OnBackClicked += ReturnToMainMenu;
+        OnQRClicked += ShowQRScanner;
         BuildUI(parent, containerWidth, containerHeight);
     }
 
@@ -83,22 +86,22 @@ public class VRRemoteMenu : MonoBehaviour
 
         float bodyContainerHeight = containerHeight - 2f * headerH;
         y -= 2.25f * gap + bodyContainerHeight;
-        var bodyContainer = CreateContainer(parent, "BodyContainer", 0, y, containerWidth, bodyContainerHeight);
+        _bodyContainer = CreateContainer(parent, "BodyContainer", 0, y, containerWidth, bodyContainerHeight);
 
         // Input Row (Host / Port) - chiều cao tự động
         float bodyY = bodyContainerHeight;
         bodyY -= inputH;
-        CreateInputRow(bodyContainer.transform, 0, bodyY, contentW, inputH, gap * 1.5f);
+        CreateInputRow(_bodyContainer.transform, 0, bodyY, contentW, inputH, gap * 1.5f);
 
         // Separator 2 position (between InputRow and Grid)
         float sep2Y = y + bodyY - gap * 1.5f;
 
         // Grid 2x2 (Monitors, Resolution, Bitrate, FPS)
         bodyY -= gap * 2.5f + gridH;
-        CreateGrid(bodyContainer.transform, 0, bodyY, contentW, 0.04f * contentW, dropdownH, gap * 1.5f, gap);
+        CreateGrid(_bodyContainer.transform, 0, bodyY, contentW, 0.04f * contentW, dropdownH, gap * 1.5f, gap);
 
         // Button Connect - lồng vào trong BodyContainer
-        CreateConnectButton(bodyContainer.transform, contentW * 0.625f, connectButtonH);
+        CreateConnectButton(_bodyContainer.transform, contentW * 0.625f, connectButtonH);
 
         // Configure horizontal separators via shader (using VRMenuFrame)
         // Separator 2 length = contentW / containerWidth (content area ratio)
@@ -386,4 +389,223 @@ public class VRRemoteMenu : MonoBehaviour
     /// Load icon from Resources folder by name (delegates to VRTaskbar.LoadIcon)
     /// </summary>
     Sprite LoadIcon(string name) => VRTaskbar.LoadIcon(name);
+
+    // ==================== QR SCANNER ====================
+
+    /// <summary>
+    /// Hiển thị QR Scanner view, ẩn BodyContainer
+    /// </summary>
+    void ShowQRScanner()
+    {
+        if (_bodyContainer == null) return;
+
+        // Ẩn BodyContainer (giữ data)
+        _bodyContainer.SetActive(false);
+
+        // Disable horizontal separators
+        DisableHorizontalSeparators();
+
+        // Tạo QRScannerView
+        GameObject scannerObj = new GameObject("QRScannerView");
+        scannerObj.transform.SetParent(transform, false);
+
+        RectTransform scannerRT = scannerObj.AddComponent<RectTransform>();
+        scannerRT.anchorMin = Vector2.zero;
+        scannerRT.anchorMax = Vector2.one;
+        scannerRT.offsetMin = Vector2.zero;
+        scannerRT.offsetMax = Vector2.zero;
+
+        _qrScannerView = scannerObj.AddComponent<QRScannerView>();
+        _qrScannerView.themeColor = themeColor;
+        _qrScannerView.accentColor = accentColor;
+        _qrScannerView.customFont = customFont;
+
+        // Subscribe events
+        _qrScannerView.OnQRScanned += OnQRCodeScanned;
+        _qrScannerView.OnCancelClicked += OnQRScannerCancelled;
+
+        // Build UI
+        RectTransform bodyRT = _bodyContainer.GetComponent<RectTransform>();
+        float bodyWidth = bodyRT.sizeDelta.x;
+        float bodyHeight = bodyRT.sizeDelta.y;
+        _qrScannerView.BuildUI(scannerObj.transform, bodyWidth, bodyHeight);
+    }
+
+    /// <summary>
+    /// Xử lý khi quét QR thành công
+    /// </summary>
+    void OnQRCodeScanned(QRScannerConfig config)
+    {
+        Debug.Log($"QR Scanned: {config}");
+
+        // Destroy QRScannerView
+        if (_qrScannerView != null)
+        {
+            Destroy(_qrScannerView.gameObject);
+            _qrScannerView = null;
+        }
+
+        // Show lại BodyContainer
+        if (_bodyContainer != null)
+        {
+            _bodyContainer.SetActive(true);
+        }
+
+        // Re-enable horizontal separators
+        float contentW = _containerWidth * 0.875f;
+        float separatorLength = contentW / _containerWidth;
+        float headerH = _containerHeight * 0.1f;
+        float gap = _containerHeight * 0.04f;
+        float inputH = VRInputFieldFactory.CalculateHeight(INPUT_FONT_SIZE, true);
+        float dropdownH = VRDropdownFactory.CalculateHeight(DROPDOWN_VALUE_FONT_SIZE);
+        float gridH = dropdownH * 2 + gap;
+        float bodyContainerHeight = _containerHeight - 2f * headerH;
+
+        float y = _containerHeight - headerH;
+        float sep1Y = y - gap * 1.25f;
+        y -= 2.25f * gap + bodyContainerHeight;
+        float bodyY = bodyContainerHeight - inputH;
+        float sep2Y = y + bodyY - gap * 1.5f;
+
+        ConfigureHorizontalSeparators(_containerHeight, sep1Y, sep2Y, separatorLength);
+
+        // Fill data vào các input fields
+        FillConfigData(config);
+    }
+
+    /// <summary>
+    /// Xử lý khi người dùng hủy QR Scanner
+    /// </summary>
+    void OnQRScannerCancelled()
+    {
+        // Destroy QRScannerView
+        if (_qrScannerView != null)
+        {
+            Destroy(_qrScannerView.gameObject);
+            _qrScannerView = null;
+        }
+
+        // Show lại BodyContainer
+        if (_bodyContainer != null)
+        {
+            _bodyContainer.SetActive(true);
+        }
+
+        // Re-enable horizontal separators
+        float contentW = _containerWidth * 0.875f;
+        float separatorLength = contentW / _containerWidth;
+        float headerH = _containerHeight * 0.1f;
+        float gap = _containerHeight * 0.04f;
+        float inputH = VRInputFieldFactory.CalculateHeight(INPUT_FONT_SIZE, true);
+        float dropdownH = VRDropdownFactory.CalculateHeight(DROPDOWN_VALUE_FONT_SIZE);
+        float gridH = dropdownH * 2 + gap;
+        float bodyContainerHeight = _containerHeight - 2f * headerH;
+
+        float y = _containerHeight - headerH;
+        float sep1Y = y - gap * 1.25f;
+        y -= 2.25f * gap + bodyContainerHeight;
+        float bodyY = bodyContainerHeight - inputH;
+        float sep2Y = y + bodyY - gap * 1.5f;
+
+        ConfigureHorizontalSeparators(_containerHeight, sep1Y, sep2Y, separatorLength);
+    }
+
+    /// <summary>
+    /// Điền dữ liệu từ QR config vào các input fields và dropdowns
+    /// </summary>
+    void FillConfigData(QRScannerConfig config)
+    {
+        if (config == null) return;
+
+        // Host & Port
+        if (!string.IsNullOrEmpty(config.host))
+            VRInputFieldFactory.SetValue(_hostInput, config.host);
+
+        if (!string.IsNullOrEmpty(config.port))
+            VRInputFieldFactory.SetValue(_portInput, config.port);
+
+        // Resolution dropdown - tìm index phù hợp
+        if (!string.IsNullOrEmpty(config.resolution))
+        {
+            int resIndex = FindResolutionIndex(config.resolution);
+            if (resIndex >= 0)
+                VRDropdownFactory.SetSelectedIndex(_resolutionDropdown, resIndex);
+        }
+
+        // Bitrate dropdown
+        if (!string.IsNullOrEmpty(config.bitrate))
+        {
+            int bitrateIndex = FindBitrateIndex(config.bitrate);
+            if (bitrateIndex >= 0)
+                VRDropdownFactory.SetSelectedIndex(_bitrateDropdown, bitrateIndex);
+        }
+
+        // FPS dropdown
+        if (!string.IsNullOrEmpty(config.fps))
+        {
+            int fpsIndex = FindFPSIndex(config.fps);
+            if (fpsIndex >= 0)
+                VRDropdownFactory.SetSelectedIndex(_fpsDropdown, fpsIndex);
+        }
+
+        // Monitors dropdown (index = monitors - 1)
+        if (config.monitors >= 1 && config.monitors <= 3)
+        {
+            VRDropdownFactory.SetSelectedIndex(_monitorsDropdown, config.monitors - 1);
+        }
+    }
+
+    /// <summary>
+    /// Tìm index của resolution trong dropdown
+    /// </summary>
+    int FindResolutionIndex(string resolution)
+    {
+        // Chuẩn hóa format: "1920x1080" -> "1920 x 1080"
+        string normalized = resolution.Replace("x", " x ").Replace("  ", " ");
+
+        var options = new List<string> { "1920 x 1080", "1600 x 900", "1366 x 768", "1280 x 720" };
+        for (int i = 0; i < options.Count; i++)
+        {
+            if (options[i].Equals(normalized, StringComparison.OrdinalIgnoreCase) ||
+                options[i].Replace(" ", "").Equals(resolution.Replace(" ", ""), StringComparison.OrdinalIgnoreCase))
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /// <summary>
+    /// Tìm index của bitrate trong dropdown
+    /// </summary>
+    int FindBitrateIndex(string bitrate)
+    {
+        var options = new List<string> { "5 Mbps", "10 Mbps", "20 Mbps", "30 Mbps", "50 Mbps" };
+        for (int i = 0; i < options.Count; i++)
+        {
+            if (options[i].Equals(bitrate, StringComparison.OrdinalIgnoreCase) ||
+                options[i].Replace(" ", "").Equals(bitrate.Replace(" ", ""), StringComparison.OrdinalIgnoreCase))
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /// <summary>
+    /// Tìm index của FPS trong dropdown
+    /// </summary>
+    int FindFPSIndex(string fps)
+    {
+        var options = new List<string> { "30 FPS", "45 FPS", "60 FPS" };
+        for (int i = 0; i < options.Count; i++)
+        {
+            if (options[i].Equals(fps, StringComparison.OrdinalIgnoreCase) ||
+                options[i].Replace(" ", "").Equals(fps.Replace(" ", ""), StringComparison.OrdinalIgnoreCase))
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
 }
