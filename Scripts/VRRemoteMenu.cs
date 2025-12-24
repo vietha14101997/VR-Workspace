@@ -97,8 +97,8 @@ public class VRRemoteMenu : MonoBehaviour
         bodyY -= gap * 2.5f + gridH;
         CreateGrid(bodyContainer.transform, 0, bodyY, contentW, 0.04f * contentW, dropdownH, gap * 1.5f, gap);
 
-        // Button Connect
-        CreateConnectButton(parent, contentW * 0.625f, connectButtonH);
+        // Button Connect - lồng vào trong BodyContainer
+        CreateConnectButton(bodyContainer.transform, contentW * 0.625f, connectButtonH);
 
         // Configure horizontal separators via shader (using VRMenuFrame)
         // Separator 2 length = contentW / containerWidth (content area ratio)
