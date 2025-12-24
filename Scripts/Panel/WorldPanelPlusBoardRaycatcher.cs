@@ -2,23 +2,13 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 
 /// <summary>
-/// Catches pointer enter/exit on the content quad to toggle the tray fade.
-/// Requires EventSystem + PhysicsRaycaster on the camera.
+/// Marker component on Board quad to identify which panel it belongs to.
+/// Used by WorldPanelGazeBridge to detect panel under gaze.
 /// </summary>
 public class WorldPanelPlusBoardRaycatcher : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 {
     public WorldPanelPlus panel;
 
-    public void OnPointerEnter() { /* no-op or forward */ }
-    public void OnPointerExit() { /* no-op or forward */ }
-
-    public void OnPointerEnter(PointerEventData eventData)
-    {
-        if (panel) panel.OnHover(true, null);
-    }
-
-    public void OnPointerExit(PointerEventData eventData)
-    {
-        if (panel) panel.OnHover(false, null);
-    }
+    public void OnPointerEnter(PointerEventData eventData) { }
+    public void OnPointerExit(PointerEventData eventData) { }
 }
