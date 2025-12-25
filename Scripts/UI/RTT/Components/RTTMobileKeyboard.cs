@@ -651,10 +651,17 @@ public class RTTMobileKeyboard : RTTCanvasBase
         CreateKey(rightGroup.transform, "Enter", specialKeyWidth, _keyHeight, true, OnEnter);
 
         // Space bar - centered between left and right groups with padding expansion
-        float gap = _keySpacing + _keyWidth * _edgePadding;
-        float baseWidth = contentWidth - leftGroupWidth - rightGroupWidth - 2 * gap;
-        float spaceWidth = baseWidth * (1 + 2 * _edgePadding);
-        float spaceLeft = leftGroupWidth + gap - baseWidth * _edgePadding;
+        // float gap = _keySpacing + _keyWidth * _edgePadding;
+        // float baseWidth = contentWidth - leftGroupWidth - rightGroupWidth - 2 * gap;
+        // float spaceWidth = baseWidth * (1 + 2 * _edgePadding);
+        // float spaceLeft = leftGroupWidth + gap - baseWidth * _edgePadding;
+
+        float spaceLeft = leftGroupWidth + _keySpacing + _keyWidth * _edgePadding;
+        float spaceRight = contentWidth - rightGroupWidth - _keySpacing - _keyWidth * _edgePadding;
+        float spaceWidth = spaceRight - spaceLeft;
+        spaceLeft -= spaceWidth * _edgePadding;
+        spaceRight += spaceWidth * _edgePadding;
+        spaceWidth = spaceRight - spaceLeft;
 
         GameObject spaceKey = new GameObject("Key_Space");
         spaceKey.transform.SetParent(row.transform, false);
@@ -765,10 +772,17 @@ public class RTTMobileKeyboard : RTTCanvasBase
         CreateKey(rightGroup.transform, "Enter", specialKeyWidth, _keyHeight, true, OnEnter);
 
         // Space bar - centered between left and right groups with padding expansion
-        float gap = _keySpacing + _keyWidth * _edgePadding;
-        float baseWidth = contentWidth - leftGroupWidth - rightGroupWidth - 2 * gap;
-        float spaceWidth = baseWidth * (1 + 2 * _edgePadding);
-        float spaceLeft = leftGroupWidth + gap - baseWidth * _edgePadding;
+        // float gap = _keySpacing + _keyWidth * _edgePadding;
+        // float baseWidth = contentWidth - leftGroupWidth - rightGroupWidth - 2 * gap;
+        // float spaceWidth = baseWidth * (1 + 2 * _edgePadding);
+        // float spaceLeft = leftGroupWidth + gap - baseWidth * _edgePadding;
+
+        float spaceLeft = leftGroupWidth + _keySpacing + _keyWidth * _edgePadding;
+        float spaceRight = contentWidth - rightGroupWidth - _keySpacing - _keyWidth * _edgePadding;
+        float spaceWidth = spaceRight - spaceLeft;
+        spaceLeft -= spaceWidth * _edgePadding;
+        spaceRight += spaceWidth * _edgePadding;
+        spaceWidth = spaceRight - spaceLeft;
 
         GameObject spaceKey = new GameObject("Key_Space");
         spaceKey.transform.SetParent(row.transform, false);
@@ -903,10 +917,17 @@ public class RTTMobileKeyboard : RTTCanvasBase
         CreateKey(rightGroup.transform, "Enter", specialKeyWidth, _keyHeight, true, OnEnter);
 
         // Space bar - centered between left and right groups with padding expansion
-        float gap = _keySpacing + _keyWidth * _edgePadding;
-        float baseWidth = contentWidth - leftGroupWidth - rightGroupWidth - 2 * gap;
-        float spaceWidth = baseWidth * (1 + 2 * _edgePadding);
-        float spaceLeft = leftGroupWidth + gap - baseWidth * _edgePadding;
+        // float gap = _keySpacing + _keyWidth * _edgePadding;
+        // float baseWidth = contentWidth - leftGroupWidth - rightGroupWidth - 2 * gap;
+        // float spaceWidth = baseWidth * (1 + 2 * _edgePadding);
+        // float spaceLeft = leftGroupWidth + gap - baseWidth * _edgePadding;
+
+        float spaceLeft = leftGroupWidth + _keySpacing + _keyWidth * _edgePadding; // _edgePadding của phím thường
+        float spaceRight = contentWidth - rightGroupWidth - _keySpacing - _keyWidth * _edgePadding; // _edgePadding của phím Enter
+        float spaceWidth = spaceRight - spaceLeft;
+        spaceLeft -= spaceWidth * _edgePadding; // _edgePadding của phím Space
+        spaceRight += spaceWidth * _edgePadding; // _edgePadding của phím Space
+        spaceWidth = spaceRight - spaceLeft;
 
         GameObject spaceKey = new GameObject("Key_Space");
         spaceKey.transform.SetParent(row.transform, false);
