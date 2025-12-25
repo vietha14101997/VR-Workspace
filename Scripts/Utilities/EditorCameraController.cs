@@ -1,0 +1,147 @@
+using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
+
+/// <summary>
+/// Editor-only camera controller that allows mouse look rotation.
+/// Uses New Input System.
+/// - Move mouse to rotate camera
+/// - Mouse cursor is hidden while active
+/// - Press Alt or Escape to toggle mouse look mode
+/// </summary>
+public class EditorCameraController : MonoBehaviour
+{
+#if UNITY_EDITOR
+    [Header("Mouse Look Settings")]
+    [SerializeField] private float mouseSensitivity = 0.15f;
+    [SerializeField] private float verticalClampAngle = 80f;
+    
+    [Header("State")]
+    [SerializeField] private bool isMouseLookActive = true;
+    
+    private float rotationX = 0f;
+    private float rotationY = 0f;
+    
+    // Input references
+    private Mouse mouse;
+    private Keyboard keyboard;
+    
+    private void Start()
+    {
+        // Get input devices
+        mouse = Mouse.current;
+        keyboard = Keyboard.current;
+        
+        if (mouse == null)
+        {
+            Debug.LogError("[EditorCameraController] No mouse detected!");
+            enabled = false;
+            return;
+        }
+        
+        if (keyboard == null)
+        {
+            Debug.LogError("[EditorCameraController] No keyboard detected!");
+            enabled = false;
+            return;
+        }
+        
+        // Initialize rotation from current camera rotation
+        Vector3 currentRotation = transform.eulerAngles;
+        rotationX = currentRotation.y;
+        rotationY = currentRotation.x;
+        
+        // Normalize rotationY to be within -180 to 180 range
+        if (rotationY > 180f)
+            rotationY -= 360f;
+        
+        // Start with mouse look active
+        SetMouseLookActive(true);
+        Debug.Log("[EditorCameraController] Started with New Input System. Initial rotation: " + currentRotation);
+    }
+    
+    private void Update()
+    {
+        if (keyboard == null || mouse == null) return;
+        
+        // Toggle mouse look with Alt or Escape key
+        bool togglePressed = keyboard.leftAltKey.wasPressedThisFrame || 
+                            keyboard.rightAltKey.wasPressedThisFrame ||
+                            keyboard.escapeKey.wasPressedThisFrame;
+        
+        if (togglePressed)
+        {
+            SetMouseLookActive(!isMouseLookActive);
+        }
+        
+        // Handle mouse look rotation
+        if (isMouseLookActive)
+        {
+            HandleMouseLook();
+        }
+    }
+    
+    private void HandleMouseLook()
+    {
+        // Get mouse delta using New Input System
+        Vector2 mouseDelta = mouse.delta.ReadValue();
+        
+        float mouseX = mouseDelta.x * mouseSensitivity;
+        float mouseY = mouseDelta.y * mouseSensitivity;
+        
+        // Calculate rotation
+        rotationX += mouseX;
+        rotationY -= mouseY;
+        
+        // Clamp vertical rotation
+        rotationY = Mathf.Clamp(rotationY, -verticalClampAngle, verticalClampAngle);
+        
+        // Apply rotation to camera
+        transform.rotation = Quaternion.Euler(rotationY, rotationX, 0f);
+    }
+    
+    private void SetMouseLookActive(bool active)
+    {
+        isMouseLookActive = active;
+        
+        if (active)
+        {
+            // Hide and lock cursor
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+            Debug.Log("[EditorCameraController] Mouse Look ENABLED - Press Alt or Escape to exit");
+        }
+        else
+        {
+            // Show and unlock cursor
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+            Debug.Log("[EditorCameraController] Mouse Look DISABLED - Press Alt or Escape to enable");
+        }
+    }
+    
+    private void OnDisable()
+    {
+        // Ensure cursor is visible when script is disabled
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+    }
+    
+    private void OnApplicationFocus(bool hasFocus)
+    {
+        // Re-apply cursor state when application regains focus
+        if (hasFocus && isMouseLookActive)
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
+    }
+    
+    // Reset cursor when play mode stops
+    private void OnApplicationQuit()
+    {
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+    }
+#endif
+}
