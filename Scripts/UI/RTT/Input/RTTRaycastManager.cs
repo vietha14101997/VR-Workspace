@@ -556,6 +556,18 @@ public class RTTRaycastManager : MonoBehaviour
             keyHover = target.GetComponentInParent<KeyHoverEffect>();
             keyHover?.OnPointerEnter(null);
         }
+
+        // Also trigger PreviewTextInteraction if present (for text cursor in preview)
+        var previewInteraction = target.GetComponent<PreviewTextInteraction>();
+        if (previewInteraction != null)
+        {
+            previewInteraction.OnPointerEnter(null);
+        }
+        else
+        {
+            previewInteraction = target.GetComponentInParent<PreviewTextInteraction>();
+            previewInteraction?.OnPointerEnter(null);
+        }
     }
 
     /// <summary>
@@ -589,6 +601,18 @@ public class RTTRaycastManager : MonoBehaviour
         {
             keyHover = target.GetComponentInParent<KeyHoverEffect>();
             keyHover?.OnPointerExit(null);
+        }
+
+        // Also trigger PreviewTextInteraction if present (for text cursor in preview)
+        var previewInteraction = target.GetComponent<PreviewTextInteraction>();
+        if (previewInteraction != null)
+        {
+            previewInteraction.OnPointerExit(null);
+        }
+        else
+        {
+            previewInteraction = target.GetComponentInParent<PreviewTextInteraction>();
+            previewInteraction?.OnPointerExit(null);
         }
     }
 

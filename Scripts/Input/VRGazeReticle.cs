@@ -35,6 +35,10 @@ public class VRGazeReticle : MonoBehaviour
     private RectTransform _canvasRT;
     private int _layerMask;
 
+    // Custom cursor support
+    private Sprite _defaultSprite;
+    private Sprite _currentCustomSprite;
+
     // Recenter State
     private bool _isRecentering = false;
     private GameObject _recenterGroup;
@@ -116,7 +120,8 @@ public class VRGazeReticle : MonoBehaviour
         imgObj.layer = _cam.gameObject.layer;
         
         _reticleImage = imgObj.AddComponent<Image>();
-        _reticleImage.sprite = GetCircleSprite();
+        _defaultSprite = GetCircleSprite();
+        _reticleImage.sprite = _defaultSprite;
         _reticleImage.color = colorInteract;
         _reticleImage.raycastTarget = false; 
         
@@ -857,7 +862,7 @@ public class VRGazeReticle : MonoBehaviour
         int res = 128;
         Texture2D tex = new Texture2D(res, res, TextureFormat.RGBA32, false);
         Color[] c = new Color[res*res];
-        float radius = res / 2f; 
+        float radius = res / 2f;
         Vector2 center = new Vector2(radius, radius);
 
         for(int y=0; y<res; y++)
@@ -866,13 +871,13 @@ public class VRGazeReticle : MonoBehaviour
             {
                 float d = Vector2.Distance(new Vector2(x,y), center);
                 if (d > radius) { c[y*res+x] = Color.clear; continue; }
-                
-                float edgeAlpha = Mathf.Clamp01     (radius - d); 
-                float innerAlpha = Mathf.Clamp01(d - (radius - thickness)); 
-                
+
+                float edgeAlpha = Mathf.Clamp01     (radius - d);
+                float innerAlpha = Mathf.Clamp01(d - (radius - thickness));
+
                 float alpha = edgeAlpha * innerAlpha;
                 alpha = Mathf.Pow(alpha, 0.5f);
-                
+
                 c[y*res+x] = new Color(1,1,1, alpha);
             }
         }
@@ -880,4 +885,61 @@ public class VRGazeReticle : MonoBehaviour
         tex.Apply();
         return Sprite.Create(tex, new Rect(0,0,res,res), new Vector2(0.5f,0.5f));
     }
+
+    #region Custom Cursor API
+    /// <summary>
+    /// Set a custom sprite for the reticle cursor.
+    /// Call ResetCursorSprite() to restore the default circle.
+    /// </summary>
+    public void SetCursorSprite(Sprite sprite)
+    {
+        if (sprite == null) return;
+        _currentCustomSprite = sprite;
+        if (_reticleImage != null)
+        {
+            _reticleImage.sprite = sprite;
+            _reticleImage.preserveAspect = true;
+        }
+    }
+
+    /// <summary>
+    /// Set cursor sprite by loading from Resources folder.
+    /// </summary>
+    public void SetCursorSprite(string resourceName)
+    {
+        Sprite sprite = Resources.Load<Sprite>(resourceName);
+        if (sprite != null)
+        {
+            SetCursorSprite(sprite);
+        }
+        else
+        {
+            // Try loading as Texture2D and convert to Sprite
+            Texture2D tex = Resources.Load<Texture2D>(resourceName);
+            if (tex != null)
+            {
+                sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+                SetCursorSprite(sprite);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reset cursor to default circle sprite.
+    /// </summary>
+    public void ResetCursorSprite()
+    {
+        _currentCustomSprite = null;
+        if (_reticleImage != null && _defaultSprite != null)
+        {
+            _reticleImage.sprite = _defaultSprite;
+            _reticleImage.preserveAspect = false;
+        }
+    }
+
+    /// <summary>
+    /// Check if currently using a custom cursor sprite.
+    /// </summary>
+    public bool IsUsingCustomCursor => _currentCustomSprite != null;
+    #endregion
 }

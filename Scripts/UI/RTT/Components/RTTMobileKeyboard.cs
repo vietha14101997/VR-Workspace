@@ -75,6 +75,15 @@ public class RTTMobileKeyboard : RTTCanvasBase
     private TextMeshProUGUI _previewText;
     private List<GameObject> _allKeys = new List<GameObject>();
     private Dictionary<string, GameObject> _keyMap = new Dictionary<string, GameObject>();
+    private Dictionary<string, TextMeshProUGUI> _letterLabels = new Dictionary<string, TextMeshProUGUI>();
+    private GameObject _shiftKey;
+
+    // Caret (blinking cursor) support
+    private int _caretPosition = 0;
+    private bool _caretVisible = true;
+    private float _caretBlinkTimer = 0f;
+    private const float CARET_BLINK_RATE = 0.5f;
+    private const string CARET_CHAR = "|";
 
     private float _logicalWidth;
     private float _logicalHeight;
@@ -162,6 +171,19 @@ public class RTTMobileKeyboard : RTTCanvasBase
         if (_targetInputField != null && gameObject.activeSelf)
         {
             UpdatePositionRelativeToTaskbar();
+            UpdateCaretBlink();
+        }
+    }
+
+    private void UpdateCaretBlink()
+    {
+        _caretBlinkTimer += Time.deltaTime;
+        if (_caretBlinkTimer >= CARET_BLINK_RATE)
+        {
+            _caretBlinkTimer = 0f;
+            _caretVisible = !_caretVisible;
+            UpdatePreviewDisplay();
+            MarkDirty();
         }
     }
     #endregion
@@ -361,6 +383,25 @@ public class RTTMobileKeyboard : RTTCanvasBase
         textRT.offsetMin = new Vector2(buttonSize + buttonPadding * 2f, 8f);
         textRT.offsetMax = new Vector2(-(buttonSize + buttonPadding * 2f), 0);
 
+        // Create invisible overlay for raycast (separate from text to avoid conflict)
+        GameObject overlayObj = new GameObject("PreviewOverlay");
+        overlayObj.transform.SetParent(previewRow.transform, false);
+
+        RectTransform overlayRT = overlayObj.AddComponent<RectTransform>();
+        overlayRT.anchorMin = Vector2.zero;
+        overlayRT.anchorMax = Vector2.one;
+        overlayRT.offsetMin = new Vector2(buttonSize + buttonPadding * 2f, 8f);
+        overlayRT.offsetMax = new Vector2(-(buttonSize + buttonPadding * 2f), 0);
+
+        // Add invisible image for raycast
+        Image overlayImage = overlayObj.AddComponent<Image>();
+        overlayImage.color = Color.clear;
+        overlayImage.raycastTarget = true;
+
+        // Add interaction component
+        var interaction = overlayObj.AddComponent<PreviewTextInteraction>();
+        interaction.Initialize(this, _previewText);
+
         // Glowing underline
         CreatePreviewUnderline(previewRow.transform);
 
@@ -456,6 +497,8 @@ public class RTTMobileKeyboard : RTTCanvasBase
     {
         _allKeys.Clear();
         _keyMap.Clear();
+        _letterLabels.Clear();
+        _shiftKey = null;
 
         // Update VerticalLayoutGroup spacing based on layout type
         VerticalLayoutGroup vlg = _contentContainer?.GetComponent<VerticalLayoutGroup>();
@@ -484,11 +527,11 @@ public class RTTMobileKeyboard : RTTCanvasBase
         // Row 0 - Numbers
         CreateKeyRow(LETTERS_ROW_0, 0);
 
-        // Row 1 - QWERTY
-        CreateKeyRow(LETTERS_ROW_1, 1);
+        // Row 1 - QWERTY (letter row)
+        CreateKeyRow(LETTERS_ROW_1, 1, 0, true);
 
-        // Row 2 - ASDF (with offset)
-        CreateKeyRow(LETTERS_ROW_2, 2, _keyWidth * 0.5f);
+        // Row 2 - ASDF (with offset, letter row)
+        CreateKeyRow(LETTERS_ROW_2, 2, _keyWidth * 0.5f, true);
 
         // Row 3 - ZXCV (with shift and backspace)
         CreateBottomLetterRow();
@@ -788,7 +831,7 @@ public class RTTMobileKeyboard : RTTCanvasBase
         CreateSpaceKeyVisuals(spaceKey, spaceWidth, _keyHeight, () => OnKeyPress(" "));
     }
 
-    private void CreateKeyRow(string[] keys, int rowIndex, float offset = 0)
+    private void CreateKeyRow(string[] keys, int rowIndex, float offset = 0, bool isLetterRow = false)
     {
         GameObject row = new GameObject($"Row_{rowIndex}");
         row.transform.SetParent(_contentContainer, false);
@@ -814,7 +857,7 @@ public class RTTMobileKeyboard : RTTCanvasBase
 
         foreach (string key in keys)
         {
-            CreateKey(row.transform, key, _keyWidth, _keyHeight, false);
+            CreateKey(row.transform, key, _keyWidth, _keyHeight, false, null, isLetterRow);
         }
     }
 
@@ -836,13 +879,14 @@ public class RTTMobileKeyboard : RTTCanvasBase
         layout.childControlHeight = false;
 
         // Shift key - use text label like VRMobileKeyboard
-        string shiftLabel = _isCapsLock ? "SHIFT" : "Shift";
+        string shiftLabel = _isCapsLock ? "SHIFT" : (_isShiftActive ? "SHIFT" : "Shift");
         CreateKey(row.transform, shiftLabel, _keyWidth * 1.5f, _keyHeight, true, OnShiftPress);
+        _shiftKey = _allKeys[_allKeys.Count - 1]; // Store reference to Shift key
 
         // Letter keys
         foreach (string key in LETTERS_ROW_3)
         {
-            CreateKey(row.transform, key, _keyWidth, _keyHeight, false);
+            CreateKey(row.transform, key, _keyWidth, _keyHeight, false, null, true); // true = isLetter
         }
 
         // Backspace - use text label like VRMobileKeyboard
@@ -1270,7 +1314,7 @@ public class RTTMobileKeyboard : RTTCanvasBase
         AddHoverEffect(keyObj, baseColor);
     }
 
-    private void CreateKey(Transform parent, string label, float width, float height, bool isSpecial, Action onClick = null)
+    private void CreateKey(Transform parent, string label, float width, float height, bool isSpecial, Action onClick = null, bool isLetter = false)
     {
         GameObject keyObj = new GameObject($"Key_{label}");
         keyObj.transform.SetParent(parent, false);
@@ -1371,7 +1415,13 @@ public class RTTMobileKeyboard : RTTCanvasBase
         labelObj.transform.SetParent(keyObj.transform, false);
 
         TextMeshProUGUI tmp = labelObj.AddComponent<TextMeshProUGUI>();
-        tmp.text = label == " " ? "space" : label;
+        // Show uppercase if shift is active and this is a letter key
+        string displayLabel = label;
+        if (isLetter && (_isShiftActive || _isCapsLock))
+        {
+            displayLabel = label.ToUpper();
+        }
+        tmp.text = displayLabel == " " ? "space" : displayLabel;
         tmp.fontSize = keyFontSize;
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.color = Color.white;
@@ -1389,6 +1439,12 @@ public class RTTMobileKeyboard : RTTCanvasBase
             _keyMap[label.ToLower()] = keyObj;
         }
 
+        // Track letter keys for shift updates
+        if (isLetter && label.Length == 1)
+        {
+            _letterLabels[label.ToLower()] = tmp;
+        }
+
         // Add hover effect
         AddHoverEffect(keyObj, baseColor);
     }
@@ -1400,6 +1456,7 @@ public class RTTMobileKeyboard : RTTCanvasBase
         if (_targetInputField == null) return;
 
         string insertKey = key;
+        bool wasShiftActive = _isShiftActive;
         if (_isShiftActive || _isCapsLock)
         {
             insertKey = key.ToUpper();
@@ -1409,9 +1466,17 @@ public class RTTMobileKeyboard : RTTCanvasBase
             }
         }
 
-        int caretPos = _targetInputField.caretPosition;
+        // Insert at current caret position (not necessarily at end)
+        int caretPos = _caretPosition;
         _targetInputField.text = _targetInputField.text.Insert(caretPos, insertKey);
-        _targetInputField.caretPosition = caretPos + insertKey.Length;
+        _caretPosition = caretPos + insertKey.Length;
+        _targetInputField.caretPosition = _caretPosition;
+
+        // Update visuals if shift was just deactivated
+        if (wasShiftActive && !_isShiftActive)
+        {
+            UpdateShiftVisuals();
+        }
 
         OnKeyPressed?.Invoke(insertKey);
         UpdatePreview();
@@ -1422,11 +1487,13 @@ public class RTTMobileKeyboard : RTTCanvasBase
     {
         if (_targetInputField == null) return;
 
-        int caretPos = _targetInputField.caretPosition;
+        // Delete character before current caret position
+        int caretPos = _caretPosition;
         if (caretPos > 0)
         {
             _targetInputField.text = _targetInputField.text.Remove(caretPos - 1, 1);
-            _targetInputField.caretPosition = caretPos - 1;
+            _caretPosition = caretPos - 1;
+            _targetInputField.caretPosition = _caretPosition;
         }
 
         OnBackspacePressed?.Invoke();
@@ -1443,7 +1510,32 @@ public class RTTMobileKeyboard : RTTCanvasBase
     private void OnShiftPress()
     {
         _isShiftActive = !_isShiftActive;
+        UpdateShiftVisuals();
         MarkDirty();
+    }
+
+    private void UpdateShiftVisuals()
+    {
+        bool isUpper = _isShiftActive || _isCapsLock;
+
+        // Update all letter key labels
+        foreach (var kvp in _letterLabels)
+        {
+            if (kvp.Value != null)
+            {
+                kvp.Value.text = isUpper ? kvp.Key.ToUpper() : kvp.Key.ToLower();
+            }
+        }
+
+        // Update Shift key label
+        if (_shiftKey != null)
+        {
+            var shiftLabel = _shiftKey.GetComponentInChildren<TextMeshProUGUI>();
+            if (shiftLabel != null)
+            {
+                shiftLabel.text = isUpper ? "SHIFT" : "Shift";
+            }
+        }
     }
 
     private void OnLayoutToggle()
@@ -1493,12 +1585,56 @@ public class RTTMobileKeyboard : RTTCanvasBase
     {
         if (_previewText == null || _targetInputField == null) return;
 
-        // Just show text without blinking cursor
-        _previewText.text = _targetInputField.text;
+        // Sync caret position from input field
+        _caretPosition = _targetInputField.caretPosition;
 
-        // Always keep caret at end
-        _targetInputField.caretPosition = _targetInputField.text.Length;
+        // Reset blink timer when typing
+        _caretBlinkTimer = 0f;
+        _caretVisible = true;
+
+        UpdatePreviewDisplay();
     }
+
+    private void UpdatePreviewDisplay()
+    {
+        if (_previewText == null || _targetInputField == null) return;
+
+        string text = _targetInputField.text;
+        int pos = Mathf.Clamp(_caretPosition, 0, text.Length);
+
+        if (_caretVisible)
+        {
+            // Insert caret character at position
+            _previewText.text = text.Insert(pos, CARET_CHAR);
+        }
+        else
+        {
+            _previewText.text = text;
+        }
+    }
+
+    /// <summary>
+    /// Move caret to specific position in text
+    /// </summary>
+    public void SetCaretPosition(int position)
+    {
+        if (_targetInputField == null) return;
+
+        _caretPosition = Mathf.Clamp(position, 0, _targetInputField.text.Length);
+        _targetInputField.caretPosition = _caretPosition;
+
+        // Reset blink to show caret immediately
+        _caretBlinkTimer = 0f;
+        _caretVisible = true;
+
+        UpdatePreviewDisplay();
+        MarkDirty();
+    }
+
+    /// <summary>
+    /// Get current caret position
+    /// </summary>
+    public int GetCaretPosition() => _caretPosition;
     #endregion
 
     #region Position
@@ -1582,6 +1718,14 @@ public class RTTMobileKeyboard : RTTCanvasBase
 
         // Position relative to RTTMenuFrame
         UpdatePositionRelativeToTaskbar();
+
+        // Set caret to end of text when opening keyboard
+        _caretPosition = _targetInputField.text.Length;
+        _targetInputField.caretPosition = _caretPosition;
+
+        // Reset caret blink
+        _caretBlinkTimer = 0f;
+        _caretVisible = true;
 
         UpdatePreview();
         MarkDirty();
@@ -1859,5 +2003,205 @@ public class SpaceKeyHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointer
     {
         if (_borderMaterial != null)
             Destroy(_borderMaterial);
+    }
+}
+
+/// <summary>
+/// Handles hover and click interactions on the preview text area.
+/// - Changes reticle to text cursor icon on hover
+/// - Moves caret position on DwellClick
+/// </summary>
+public class PreviewTextInteraction : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
+{
+    private RTTMobileKeyboard _keyboard;
+    private TextMeshProUGUI _previewText;
+    private Sprite _textCursorSprite;
+
+    public void Initialize(RTTMobileKeyboard keyboard, TextMeshProUGUI previewText)
+    {
+        _keyboard = keyboard;
+        _previewText = previewText;
+
+        // Load text cursor icon from Resources
+        _textCursorSprite = Resources.Load<Sprite>("icon_text_cursor");
+        if (_textCursorSprite == null)
+        {
+            // Try loading as Texture2D
+            Texture2D tex = Resources.Load<Texture2D>("icon_text_cursor");
+            if (tex != null)
+            {
+                _textCursorSprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+            }
+        }
+        // Note: Image component for raycast is added by caller (CreatePreviewRow)
+    }
+
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        // Change reticle to text cursor icon
+        if (VRGazeReticle.Instance != null && _textCursorSprite != null)
+        {
+            VRGazeReticle.Instance.SetCursorSprite(_textCursorSprite);
+        }
+        _keyboard?.MarkDirty();
+    }
+
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        // Reset reticle to default
+        if (VRGazeReticle.Instance != null)
+        {
+            VRGazeReticle.Instance.ResetCursorSprite();
+        }
+        _keyboard?.MarkDirty();
+    }
+
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        if (_keyboard == null || _previewText == null) return;
+
+        // Calculate character index from click position
+        int charIndex = GetCharacterIndexFromPosition(eventData.position);
+        _keyboard.SetCaretPosition(charIndex);
+    }
+
+    /// <summary>
+    /// Calculate the character index in the original text (without caret) from screen position
+    /// </summary>
+    private int GetCharacterIndexFromPosition(Vector2 screenPosition)
+    {
+        if (_previewText == null) return 0;
+
+        // Get the text without the caret character for proper index calculation
+        string displayText = _previewText.text;
+        string originalText = displayText.Replace("|", ""); // Remove caret char
+
+        if (string.IsNullOrEmpty(originalText)) return 0;
+
+        // Convert screen position to local position in the text rect
+        RectTransform rectTransform = _previewText.rectTransform;
+        Vector2 localPoint;
+
+        // Try to get the correct camera
+        Camera cam = null;
+        Canvas canvas = _previewText.canvas;
+        if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+        {
+            cam = canvas.worldCamera;
+        }
+
+        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(rectTransform, screenPosition, cam, out localPoint))
+        {
+            return originalText.Length;
+        }
+
+        // Use TMP's built-in function to find nearest character
+        int nearestCharIndex = TMP_TextUtilities.FindNearestCharacterOnLine(
+            _previewText,
+            new Vector3(localPoint.x, localPoint.y, 0f),
+            FindNearestLine(localPoint),
+            cam,
+            false
+        );
+
+        // Fallback: use simple approach based on x position
+        if (nearestCharIndex < 0)
+        {
+            return GetCharacterIndexSimple(localPoint, originalText);
+        }
+
+        // Adjust index if it's after the caret position in display text
+        int caretPosInDisplay = displayText.IndexOf('|');
+        if (caretPosInDisplay >= 0 && nearestCharIndex > caretPosInDisplay)
+        {
+            nearestCharIndex--;
+        }
+
+        return Mathf.Clamp(nearestCharIndex, 0, originalText.Length);
+    }
+
+    private int FindNearestLine(Vector2 localPoint)
+    {
+        if (_previewText.textInfo.lineCount == 0) return 0;
+
+        float minDistance = float.MaxValue;
+        int nearestLine = 0;
+
+        for (int i = 0; i < _previewText.textInfo.lineCount; i++)
+        {
+            var lineInfo = _previewText.textInfo.lineInfo[i];
+            float lineY = (lineInfo.ascender + lineInfo.descender) / 2f;
+            float distance = Mathf.Abs(localPoint.y - lineY);
+
+            if (distance < minDistance)
+            {
+                minDistance = distance;
+                nearestLine = i;
+            }
+        }
+
+        return nearestLine;
+    }
+
+    /// <summary>
+    /// Simple fallback method to calculate character index based on x position
+    /// </summary>
+    private int GetCharacterIndexSimple(Vector2 localPoint, string originalText)
+    {
+        if (string.IsNullOrEmpty(originalText)) return 0;
+
+        // Force text update to get accurate metrics
+        _previewText.ForceMeshUpdate();
+
+        var textInfo = _previewText.textInfo;
+        if (textInfo.characterCount == 0) return 0;
+
+        // Get text bounds
+        Rect textRect = _previewText.rectTransform.rect;
+        float textWidth = _previewText.preferredWidth;
+
+        // Calculate offset based on alignment
+        float startX = 0f;
+        switch (_previewText.alignment)
+        {
+            case TextAlignmentOptions.Center:
+            case TextAlignmentOptions.Midline:
+                startX = -textWidth / 2f;
+                break;
+            case TextAlignmentOptions.Left:
+            case TextAlignmentOptions.TopLeft:
+            case TextAlignmentOptions.BottomLeft:
+                startX = textRect.xMin;
+                break;
+            case TextAlignmentOptions.Right:
+            case TextAlignmentOptions.TopRight:
+            case TextAlignmentOptions.BottomRight:
+                startX = textRect.xMax - textWidth;
+                break;
+        }
+
+        // Find character by comparing x positions
+        string displayText = _previewText.text;
+        int caretOffset = 0;
+
+        for (int i = 0; i < textInfo.characterCount && i < displayText.Length; i++)
+        {
+            // Skip the caret character in calculation
+            if (i < displayText.Length && displayText[i] == '|')
+            {
+                caretOffset = 1;
+                continue;
+            }
+
+            var charInfo = textInfo.characterInfo[i];
+            float charCenterX = (charInfo.bottomLeft.x + charInfo.bottomRight.x) / 2f;
+
+            if (localPoint.x < charCenterX)
+            {
+                return Mathf.Max(0, i - caretOffset);
+            }
+        }
+
+        return originalText.Length;
     }
 }
