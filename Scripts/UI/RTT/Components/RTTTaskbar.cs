@@ -248,21 +248,23 @@ public class RTTTaskbar : RTTCanvasBase
             _glassMaterial.SetFloat("_EdgePadding", edgePad);
             _glassMaterial.SetFloat("_Aspect", aspect);
 
-            Color cyanGlass = new Color(0.35f, 0.9f, 1f, 0.15f);
-            Color purpleGlass = new Color(0.75f, 0.45f, 1f, 0.22f);
-            _glassMaterial.SetColor("_ColorA", cyanGlass);
-            _glassMaterial.SetColor("_ColorB", purpleGlass);
+            // Match RTTMobileKeyboard colors for consistent glass effect
+            Color cyanDeepSeaBlue = new Color(0.0f, 0.55f, 0.65f, 0.35f);
+            Color deepSeaBluePurple = new Color(0.30f, 0.12f, 0.50f, 0.32f);
+            _glassMaterial.SetColor("_ColorA", cyanDeepSeaBlue);
+            _glassMaterial.SetColor("_ColorB", deepSeaBluePurple);
             _glassMaterial.SetFloat("_GradientOffset", 0f);
             _glassMaterial.SetFloat("_GradientAngle", -10f);
             _glassMaterial.SetFloat("_CyanRatio", 0.7f);
-            _glassMaterial.SetFloat("_GlassAlpha", 0.08f);
+            _glassMaterial.SetFloat("_GlassAlpha", 0.38f);
             _glassMaterial.SetFloat("_FresnelPower", 2.2f);
             _glassMaterial.SetFloat("_FresnelStrength", 0.12f);
 
-            _glassMaterial.SetFloat("_BlurEnabled", enableGlassmorphism ? 1f : 0f);
+            // RTT mode: Disable blur because GrabPass can't capture world background
+            _glassMaterial.SetFloat("_BlurEnabled", 0f);
             _glassMaterial.SetFloat("_BlurRadius", blurIntensity);
             _glassMaterial.SetFloat("_BlurIterations", blurQuality);
-            _glassMaterial.SetFloat("_GlassOpacity", glassOpacity);
+            // Don't override _GlassOpacity - use shader default (0.25)
             _glassMaterial.SetFloat("_TintStrength", tintStrength);
             _glassMaterial.SetFloat("_InnerGlow", innerGlow);
             _glassMaterial.SetFloat("_Brightness", brightness);

@@ -27,10 +27,10 @@ public class RTTMobileKeyboard : RTTCanvasBase
     [SerializeField] private TMP_FontAsset customFont;
 
     [Header("Layout")]
-    [SerializeField] private float marginLeft = 40f;
-    [SerializeField] private float marginRight = 40f;
-    [SerializeField] private float marginTop = 20f;
-    [SerializeField] private float marginBottom = 50f;
+    [SerializeField] private float marginLeft = 50f;
+    [SerializeField] private float marginRight = 50f;
+    [SerializeField] private float marginTop = 40f;
+    [SerializeField] private float marginBottom = 75f;
     [SerializeField] [Range(0.05f, 0.2f)] private float keySpacingRatio = 0.1f;
     [SerializeField] [Range(0.8f, 1.5f)] private float keyHeightRatio = 1.2f;
     [SerializeField] private int keyFontSize = 36;
@@ -38,7 +38,7 @@ public class RTTMobileKeyboard : RTTCanvasBase
     [Header("Position")]
     [SerializeField] private bool followTaskbar = true;
     [SerializeField] private float spacingMultiplier = 1.5f;
-    [SerializeField] private float widthRatioToFrame = 0.667f;
+    [SerializeField] private float widthRatioToFrame = 0.7f;
     #endregion
 
     #region Constants
@@ -251,7 +251,7 @@ public class RTTMobileKeyboard : RTTCanvasBase
         // Calculate total height (preview row + 5 key rows)
         // Row 1: Numbers, Row 2: QWERTY, Row 3: ASDF, Row 4: Shift+letters, Row 5: Bottom row
         int numRows = 5;
-        float previewHeight = 100f;
+        float previewHeight = 120f;
         float rowSpacing = _keySpacing;
         float totalRowsHeight = previewHeight + (_keyHeight * numRows) + (rowSpacing * numRows);
         _logicalHeight = marginTop + totalRowsHeight + marginBottom;
@@ -269,38 +269,45 @@ public class RTTMobileKeyboard : RTTCanvasBase
         img.raycastTarget = true;
 
         float aspect = _logicalWidth / _logicalHeight;
-        float expansion = 0.07f;  // 7% expansion (2% original + 5% extra)
+        float expansion = 0.02f;  // Small expansion for border glow only
         float edgePad = expansion / (1f + 2f * expansion);
+        // Background needs LARGER corner radius to stay INSIDE the border
+        float bgCornerRadius = 0.12f;
+        float borderCornerRadius = 0.10f;
 
         Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
         if (glassShader != null)
         {
             _glassMaterial = new Material(glassShader);
-            _glassMaterial.SetFloat("_CornerRadius", 0.08f);
+            _glassMaterial.SetFloat("_CornerRadius", bgCornerRadius);
             _glassMaterial.SetFloat("_EdgePadding", edgePad);
             _glassMaterial.SetFloat("_Aspect", aspect);
-            _glassMaterial.SetColor("_ColorA", new Color(0.2f, 0.22f, 0.28f, 0.95f));
-            _glassMaterial.SetColor("_ColorB", new Color(0.15f, 0.17f, 0.22f, 0.95f));
-            _glassMaterial.SetFloat("_GlassAlpha", 0.95f);
+            // Transparent gradient: 32% Cyan, 42% Deep Sea Blue, 26% Purple with frosted glass effect
+            // ColorA: Cyan blended with Deep Sea Blue (top area)
+            _glassMaterial.SetColor("_ColorA", new Color(0.0f, 0.55f, 0.65f, 0.35f));
+            // ColorB: Deep Sea Blue blended with Purple (bottom area)
+            _glassMaterial.SetColor("_ColorB", new Color(0.30f, 0.12f, 0.50f, 0.32f));
+            _glassMaterial.SetFloat("_GlassAlpha", 0.38f);
             img.material = _glassMaterial;
             img.color = Color.white;
         }
         else
         {
-            img.color = new Color(0.12f, 0.13f, 0.16f, 0.98f);
+            img.color = new Color(0.0f, 0.4f, 0.5f, 0.35f);
         }
 
         RectTransform rt = bgObj.GetComponent<RectTransform>();
-        rt.anchorMin = new Vector2(-expansion, -expansion);
-        rt.anchorMax = new Vector2(1f + expansion, 1f + expansion);
+        // Background stays within canvas bounds - border handles the glow expansion
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
         rt.sizeDelta = Vector2.zero;
         rt.SetAsFirstSibling();
 
         // Border
-        CreateGlowingBorder(bgObj.transform, edgePad, aspect);
+        CreateGlowingBorder(bgObj.transform, edgePad, aspect, borderCornerRadius);
     }
 
-    private void CreateGlowingBorder(Transform parent, float edgePad, float aspect)
+    private void CreateGlowingBorder(Transform parent, float edgePad, float aspect, float cornerRadius)
     {
         GameObject borderObj = new GameObject("GlowingBorder");
         borderObj.transform.SetParent(parent, false);
@@ -319,7 +326,7 @@ public class RTTMobileKeyboard : RTTCanvasBase
         if (glowShader != null)
         {
             _borderMaterial = new Material(glowShader);
-            _borderMaterial.SetFloat("_CornerRadius", 0.08f);
+            _borderMaterial.SetFloat("_CornerRadius", cornerRadius);
             _borderMaterial.SetFloat("_EdgePadding", edgePad);
             _borderMaterial.SetFloat("_Aspect", aspect);
             _borderMaterial.SetColor("_ColorA", themeColor);
@@ -352,9 +359,9 @@ public class RTTMobileKeyboard : RTTCanvasBase
 
     private void CreatePreviewRow()
     {
-        float previewHeight = 100f;
-        float buttonSize = _keyHeight * 0.5f;
-        float buttonPadding = 10f;
+        float previewHeight = 120f;
+        float buttonSize = _keyHeight * 0.75f;
+        float buttonPadding = 25;
 
         GameObject previewRow = new GameObject("PreviewRow");
         previewRow.transform.SetParent(_contentContainer, false);
@@ -461,8 +468,8 @@ public class RTTMobileKeyboard : RTTCanvasBase
         rt.anchorMin = new Vector2(0f, 0f);
         rt.anchorMax = new Vector2(1f, 0f);
         rt.pivot = new Vector2(0.5f, 0f);
-        rt.anchoredPosition = new Vector2(0, 0);
-        rt.sizeDelta = new Vector2(0, _keyHeight * 0.4f);
+        rt.anchoredPosition = new Vector2(0, 5f);
+        rt.sizeDelta = new Vector2(0, _keyHeight * 0.25f);
 
         Image lineImg = underlineObj.AddComponent<Image>();
         lineImg.raycastTarget = false;
