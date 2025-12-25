@@ -68,26 +68,78 @@ public class VRInputFieldTrigger : MonoBehaviour, IPointerClickHandler, IPointer
     }
 
     /// <summary>
-    /// Show the VR keyboard for this input field
+    /// Show the VR keyboard for this input field.
+    /// Uses RTTMobileKeyboard if RTTFeatureToggle.UseRTT is enabled.
     /// </summary>
     public void ShowKeyboard()
     {
         if (!_isInitialized || _inputField == null) return;
 
-        // Find parent canvas for keyboard positioning
-        Canvas canvas = GetComponentInParent<Canvas>();
-        Transform keyboardParent = canvas != null ? canvas.transform : null;
-
-        // Show mobile keyboard
+        // Use VRKeyboardManager if available (it handles RTT vs legacy internally)
         if (VRKeyboardManager.Instance != null)
         {
             VRKeyboardManager.Instance.ShowKeyboardForInput(_inputField);
         }
         else
         {
-            // Fallback to static method - use mobile keyboard
-            VRMobileKeyboard.ShowForInput(_inputField, keyboardParent);
+            // Fallback based on RTT feature toggle
+            if (RTTFeatureToggle.UseRTT)
+            {
+                // Use RTT keyboard
+                RTTMobileKeyboard rttKeyboard = RTTMobileKeyboard.Instance;
+                if (rttKeyboard == null)
+                {
+                    // Auto-spawn RTTMobileKeyboard if not found
+                    rttKeyboard = SpawnRTTMobileKeyboard();
+                }
+
+                if (rttKeyboard != null)
+                {
+                    rttKeyboard.Show(_inputField);
+                }
+                else
+                {
+                    Debug.LogWarning("[VRInputFieldTrigger] Failed to create RTTMobileKeyboard.");
+                }
+            }
+            else
+            {
+                // Fallback to legacy mobile keyboard
+                Canvas canvas = GetComponentInParent<Canvas>();
+                Transform keyboardParent = canvas != null ? canvas.transform : null;
+                VRMobileKeyboard.ShowForInput(_inputField, keyboardParent);
+            }
         }
+    }
+
+    /// <summary>
+    /// Spawn RTTMobileKeyboard if it doesn't exist in the scene.
+    /// </summary>
+    private RTTMobileKeyboard SpawnRTTMobileKeyboard()
+    {
+        // Find VirtualObjects parent in scene
+        GameObject virtualObjectsParent = GameObject.Find("VirtualObjects");
+
+        // Create a new GameObject with RTTMobileKeyboard
+        GameObject keyboardObj = new GameObject("RTTMobileKeyboard");
+
+        if (virtualObjectsParent != null)
+        {
+            keyboardObj.transform.SetParent(virtualObjectsParent.transform, false);
+        }
+
+        // Set VirtualObjects layer
+        int virtualObjectsLayer = LayerMask.NameToLayer("VirtualObjects");
+        if (virtualObjectsLayer != -1)
+        {
+            keyboardObj.layer = virtualObjectsLayer;
+        }
+
+        RTTMobileKeyboard keyboard = keyboardObj.AddComponent<RTTMobileKeyboard>();
+
+        // Position will be set by RTTMobileKeyboard.Show() via UpdatePositionRelativeToTaskbar()
+        Debug.Log("[VRInputFieldTrigger] Auto-spawned RTTMobileKeyboard");
+        return keyboard;
     }
 
     /// <summary>
@@ -101,7 +153,19 @@ public class VRInputFieldTrigger : MonoBehaviour, IPointerClickHandler, IPointer
         }
         else
         {
-            VRMobileKeyboard.HideKeyboard();
+            // Hide based on RTT feature toggle
+            if (RTTFeatureToggle.UseRTT)
+            {
+                RTTMobileKeyboard rttKeyboard = RTTMobileKeyboard.Instance;
+                if (rttKeyboard != null)
+                {
+                    rttKeyboard.Hide();
+                }
+            }
+            else
+            {
+                VRMobileKeyboard.HideKeyboard();
+            }
         }
     }
 

@@ -13,6 +13,10 @@ public class VRGazeReticle : MonoBehaviour
 
     public Color colorInteract = new Color(1f, 0f, 0f, 1f);
 
+    [Header("RTT Integration")]
+    [Tooltip("Enable RTT (Render-to-Texture) raycast for RTT panels")]
+    public bool useRTTRaycast = true;
+
     [Header("Dwell Click Settings")]
     [Tooltip("Thời gian phải giữ yên reticle trước khi bắt đầu đếm click (giây)")]
     public float dwellStartDelay = 0.5f;
@@ -52,7 +56,11 @@ public class VRGazeReticle : MonoBehaviour
     private Image _dwellRing;
     private GameObject _dwellableTarget;
     private RaycastHit _lastHit;
-    
+
+    // RTT State
+    private RTTHitResult _lastRTTHit;
+    private bool _isHoveringRTT = false;
+
     // Singleton access helper (optional, or use FindObjectOfType)
     public static VRGazeReticle Instance { get; private set; }
 
@@ -285,8 +293,58 @@ public class VRGazeReticle : MonoBehaviour
         if (_canvasRT.localScale != Vector3.one) _canvasRT.localScale = Vector3.one;
 
         Ray ray = new Ray(_cam.transform.position, _cam.transform.forward);
-        RaycastHit hit;
         Vector3 currentGazeDir = _cam.transform.forward;
+
+        // Try RTT raycast first if enabled
+        if (useRTTRaycast && RTTRaycastManager.Instance != null)
+        {
+            _lastRTTHit = RTTRaycastManager.Instance.Raycast(ray);
+
+            if (_lastRTTHit.isValid)
+            {
+                _isHoveringRTT = true;
+
+                if (!_reticleImage.enabled) _reticleImage.enabled = true;
+
+                float dist = _lastRTTHit.distance;
+                if (dist < _cam.nearClipPlane) dist = _cam.nearClipPlane + 0.05f;
+                _canvasRT.localPosition = new Vector3(0, 0, dist);
+
+                float scale = (reticleSize / 100f) * dist;
+                _reticleImage.rectTransform.localScale = new Vector3(scale, scale, 1f);
+
+                if (_dwellRing != null)
+                {
+                    _dwellRing.rectTransform.localScale = new Vector3(scale, scale, 1f);
+                }
+
+                // Handle hover state changes for RTT
+                GameObject hitObj = _lastRTTHit.hitUIElement;
+                if (_currentHitObj != hitObj)
+                {
+                    // Exit old non-RTT object if any
+                    if (_currentHitObj != null && !_isHoveringRTT)
+                    {
+                        HandlePointerExit(_currentHitObj);
+                    }
+                    _currentHitObj = hitObj;
+                    ResetDwellState();
+                }
+
+                // Process dwell click for RTT
+                if (dwellClickEnabled && hitObj != null)
+                {
+                    ProcessDwellClickRTT(currentGazeDir);
+                }
+
+                _lastGazeDirection = currentGazeDir;
+                return;
+            }
+        }
+
+        // Fallback to standard physics raycast
+        _isHoveringRTT = false;
+        RaycastHit hit;
 
         if (_layerMask != 0 && Physics.Raycast(ray, out hit, 100.0f, _layerMask))
         {
@@ -336,6 +394,92 @@ public class VRGazeReticle : MonoBehaviour
         }
 
         _lastGazeDirection = currentGazeDir;
+    }
+
+    /// <summary>
+    /// Process dwell click for RTT panels
+    /// </summary>
+    void ProcessDwellClickRTT(Vector3 currentGazeDir)
+    {
+        if (!_lastRTTHit.isValid || _lastRTTHit.hitUIElement == null)
+        {
+            ResetDwellState();
+            return;
+        }
+
+        GameObject target = _lastRTTHit.hitUIElement;
+
+        // Check if target is dwellable
+        bool isDwellableTarget = IsDwellable(target);
+        if (!isDwellableTarget)
+        {
+            ResetDwellState();
+            return;
+        }
+
+        // Calculate angle moved
+        float angleMoved = Vector3.Angle(_lastGazeDirection, currentGazeDir);
+
+        // Reset if moved too much
+        if (angleMoved > dwellMovementThreshold * Time.deltaTime * 10f)
+        {
+            ResetDwellState();
+            return;
+        }
+
+        // Already clicked
+        if (_dwellClickTriggered)
+        {
+            return;
+        }
+
+        // Accumulate stable time
+        _stableTime += Time.deltaTime;
+
+        // Phase 1: Wait for delay
+        if (_stableTime < dwellStartDelay)
+        {
+            return;
+        }
+
+        // Phase 2: Show progress ring
+        if (!_isDwelling)
+        {
+            _isDwelling = true;
+            _dwellableTarget = target;
+            if (_dwellRing != null)
+            {
+                _dwellRing.enabled = true;
+                _dwellRing.fillAmount = 0f;
+            }
+        }
+
+        // Calculate progress
+        float dwellElapsed = _stableTime - dwellStartDelay;
+        _dwellProgress = Mathf.Clamp01(dwellElapsed / dwellClickTime);
+
+        // Update visual
+        if (_dwellRing != null)
+        {
+            _dwellRing.fillAmount = _dwellProgress;
+        }
+
+        // Phase 3: Click when done
+        if (_dwellProgress >= 1f)
+        {
+            _dwellClickTriggered = true;
+
+            if (_dwellRing != null)
+            {
+                _dwellRing.enabled = false;
+            }
+
+            // Use RTTRaycastManager to send click
+            if (RTTRaycastManager.Instance != null)
+            {
+                RTTRaycastManager.Instance.SendClick();
+            }
+        }
     }
 
     void ProcessDwellClick(Vector3 currentGazeDir, GameObject target, RaycastHit hit)

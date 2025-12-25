@@ -6,6 +6,7 @@ using System.Collections.Generic;
 /// <summary>
 /// Manages VR Mobile Keyboard visibility and handles input field focus in VR environment.
 /// Blocks system keyboard input and redirects to VR virtual keyboard (mobile style).
+/// Supports both VRMobileKeyboard (legacy) and RTTMobileKeyboard (RTT-based).
 /// Attach this to a persistent object in the scene.
 /// </summary>
 public class VRKeyboardManager : MonoBehaviour
@@ -24,6 +25,10 @@ public class VRKeyboardManager : MonoBehaviour
     [Tooltip("Custom keyboard prefab. If null, will create default keyboard.")]
     public VRMobileKeyboard keyboardPrefab;
 
+    [Header("RTT Keyboard Prefab (Optional)")]
+    [Tooltip("Custom RTT keyboard prefab. If null, will use RTTMobileKeyboard.Instance.")]
+    public RTTMobileKeyboard rttKeyboardPrefab;
+
     [Header("Theme")]
     public Color themeColor = new Color(0.0f, 0.9f, 1.0f);
     public Color accentColor = new Color(0.4f, 0.5f, 0.7f);
@@ -32,7 +37,9 @@ public class VRKeyboardManager : MonoBehaviour
     // Current state
     private TMP_InputField _currentInputField;
     private VRMobileKeyboard _keyboard;
+    private RTTMobileKeyboard _rttKeyboard;
     private bool _isKeyboardVisible;
+    private bool _usingRTTKeyboard = false;
 
     // Track all managed input fields
     private HashSet<TMP_InputField> _managedInputFields = new HashSet<TMP_InputField>();
@@ -162,7 +169,9 @@ public class VRKeyboardManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Show keyboard for a specific input field
+    /// Show keyboard for a specific input field.
+    /// Uses RTTMobileKeyboard if RTTFeatureToggle.UseRTT is enabled,
+    /// otherwise falls back to VRMobileKeyboard.
     /// </summary>
     public void ShowKeyboardForInput(TMP_InputField inputField)
     {
@@ -170,16 +179,58 @@ public class VRKeyboardManager : MonoBehaviour
 
         _currentInputField = inputField;
 
-        // Create keyboard if needed
-        if (_keyboard == null)
-        {
-            CreateKeyboard();
-        }
+        // Determine which keyboard to use based on RTTFeatureToggle
+        _usingRTTKeyboard = RTTFeatureToggle.UseRTT;
 
-        if (_keyboard != null)
+        if (_usingRTTKeyboard)
         {
-            _keyboard.Show(inputField);
-            _isKeyboardVisible = true;
+            // Use RTT keyboard
+            if (_rttKeyboard == null)
+            {
+                _rttKeyboard = RTTMobileKeyboard.Instance;
+                if (_rttKeyboard == null && rttKeyboardPrefab != null)
+                {
+                    GameObject keyboardObj = Instantiate(rttKeyboardPrefab.gameObject);
+                    _rttKeyboard = keyboardObj.GetComponent<RTTMobileKeyboard>();
+                }
+                // Auto-spawn if still null
+                if (_rttKeyboard == null)
+                {
+                    _rttKeyboard = SpawnRTTMobileKeyboard();
+                }
+            }
+
+            if (_rttKeyboard != null)
+            {
+                // Unsubscribe first to avoid duplicate listeners
+                _rttKeyboard.OnClosePressed -= OnRTTKeyboardClosed;
+                _rttKeyboard.OnEnterPressed -= OnRTTKeyboardEnterPressed;
+
+                // Subscribe to events
+                _rttKeyboard.OnClosePressed += OnRTTKeyboardClosed;
+                _rttKeyboard.OnEnterPressed += OnRTTKeyboardEnterPressed;
+
+                _rttKeyboard.Show(inputField);
+                _isKeyboardVisible = true;
+            }
+            else
+            {
+                Debug.LogWarning("[VRKeyboardManager] Failed to create RTTMobileKeyboard.");
+            }
+        }
+        else
+        {
+            // Use legacy keyboard
+            if (_keyboard == null)
+            {
+                CreateKeyboard();
+            }
+
+            if (_keyboard != null)
+            {
+                _keyboard.Show(inputField);
+                _isKeyboardVisible = true;
+            }
         }
     }
 
@@ -188,9 +239,17 @@ public class VRKeyboardManager : MonoBehaviour
     /// </summary>
     public void HideKeyboard()
     {
-        if (_keyboard != null && _isKeyboardVisible)
+        if (_isKeyboardVisible)
         {
-            _keyboard.Hide();
+            if (_usingRTTKeyboard && _rttKeyboard != null)
+            {
+                _rttKeyboard.Hide();
+            }
+            else if (_keyboard != null)
+            {
+                _keyboard.Hide();
+            }
+
             _isKeyboardVisible = false;
             _currentInputField = null;
 
@@ -200,6 +259,48 @@ public class VRKeyboardManager : MonoBehaviour
                 EventSystem.current.SetSelectedGameObject(null);
             }
         }
+    }
+
+    void OnRTTKeyboardClosed()
+    {
+        _isKeyboardVisible = false;
+        _currentInputField = null;
+    }
+
+    void OnRTTKeyboardEnterPressed()
+    {
+        _isKeyboardVisible = false;
+        _currentInputField = null;
+    }
+
+    /// <summary>
+    /// Spawn RTTMobileKeyboard if it doesn't exist in the scene.
+    /// </summary>
+    RTTMobileKeyboard SpawnRTTMobileKeyboard()
+    {
+        // Find VirtualObjects parent in scene
+        GameObject virtualObjectsParent = GameObject.Find("VirtualObjects");
+
+        // Create a new GameObject with RTTMobileKeyboard
+        GameObject keyboardObj = new GameObject("RTTMobileKeyboard");
+
+        if (virtualObjectsParent != null)
+        {
+            keyboardObj.transform.SetParent(virtualObjectsParent.transform, false);
+        }
+
+        // Set VirtualObjects layer
+        int virtualObjectsLayer = LayerMask.NameToLayer("VirtualObjects");
+        if (virtualObjectsLayer != -1)
+        {
+            keyboardObj.layer = virtualObjectsLayer;
+        }
+
+        RTTMobileKeyboard keyboard = keyboardObj.AddComponent<RTTMobileKeyboard>();
+
+        // Position will be set by RTTMobileKeyboard.Show() via UpdatePositionRelativeToTaskbar()
+        Debug.Log("[VRKeyboardManager] Auto-spawned RTTMobileKeyboard");
+        return keyboard;
     }
 
     void CreateKeyboard()

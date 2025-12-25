@@ -63,6 +63,7 @@ public static class VRButtonFactory
 
         // Animation
         public float popAmount = 0.05f;
+        public float hoverScaleAmount = 0.05f; // Scale increase when hovering (0.05 = 5%, 0.15 = 15%)
         public bool enablePulse = false;
         public float pulseSpeed = 2f;
 
@@ -181,6 +182,7 @@ public static class VRButtonFactory
         VRButtonAnimation anim = hitArea.AddComponent<VRButtonAnimation>();
         anim.targetVisuals = visuals.transform;
         anim.popAmount = config.popAmount;
+        anim.hoverScaleAmount = config.hoverScaleAmount;
 
         return wrapper;
     }
@@ -210,8 +212,9 @@ public static class VRButtonFactory
     /// Tạo Button chỉ có icon, không có khung (background/border) và text
     /// Icon có glow effect và hover animation
     /// </summary>
+    /// <param name="hoverScaleAmount">Scale increase on hover (0.05=5%, 0.15=15%). Use higher values for RTT panels where Z-pop doesn't work.</param>
     public static GameObject CreateBareIconButton(Transform parent, float size, Sprite icon, Color color,
-        UnityEngine.Events.UnityAction onClick, float popAmount = 0.005f, float iconScale = 0.7f)
+        UnityEngine.Events.UnityAction onClick, float popAmount = 0.005f, float iconScale = 0.7f, float hoverScaleAmount = 0.15f)
     {
         var config = new ButtonConfig
         {
@@ -223,7 +226,8 @@ public static class VRButtonFactory
             iconOnly = true,
             iconSize = size * iconScale,
             frameless = true,
-            popAmount = popAmount
+            popAmount = popAmount,
+            hoverScaleAmount = hoverScaleAmount
         };
         return CreateButton(parent, config, onClick);
     }

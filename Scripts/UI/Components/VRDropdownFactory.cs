@@ -614,9 +614,8 @@ public static class VRDropdownFactory
         Canvas panelCanvas = panel.AddComponent<Canvas>();
         panelCanvas.overrideSorting = true;
         panelCanvas.sortingOrder = 100;
-        // Add GraphicRaycaster for UI events (works alongside BoxCollider for VR)
-        GraphicRaycaster raycaster = panel.AddComponent<GraphicRaycaster>();
-        raycaster.blockingObjects = GraphicRaycaster.BlockingObjects.None;
+        // NOTE: Do NOT add GraphicRaycaster here - parent Canvas's raycaster will handle it
+        // Adding separate GraphicRaycaster causes parent raycaster to skip this Canvas's children
 
         // NO Image on panel - background is now on Viewport
 
@@ -674,7 +673,7 @@ public static class VRDropdownFactory
         Canvas contentCanvas = viewportContent.AddComponent<Canvas>();
         contentCanvas.overrideSorting = true;
         contentCanvas.sortingOrder = 110; // Higher than panel's 100, after Overlay shader Queue
-        viewportContent.AddComponent<GraphicRaycaster>();
+        // NOTE: Do NOT add GraphicRaycaster - parent's raycaster handles all children
 
         // Use RectMask2D on Content for scrolling
         RectMask2D rectMask = viewportContent.AddComponent<RectMask2D>();
