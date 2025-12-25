@@ -557,6 +557,18 @@ public class RTTRaycastManager : MonoBehaviour
             keyHover?.OnPointerEnter(null);
         }
 
+        // Also trigger SpaceKeyHoverEffect if present (for Space key in RTTMobileKeyboard)
+        var spaceHover = target.GetComponent<SpaceKeyHoverEffect>();
+        if (spaceHover != null)
+        {
+            spaceHover.OnPointerEnter(null);
+        }
+        else
+        {
+            spaceHover = target.GetComponentInParent<SpaceKeyHoverEffect>();
+            spaceHover?.OnPointerEnter(null);
+        }
+
         // Also trigger PreviewTextInteraction if present (for text cursor in preview)
         var previewInteraction = target.GetComponent<PreviewTextInteraction>();
         if (previewInteraction != null)
@@ -601,6 +613,18 @@ public class RTTRaycastManager : MonoBehaviour
         {
             keyHover = target.GetComponentInParent<KeyHoverEffect>();
             keyHover?.OnPointerExit(null);
+        }
+
+        // Also trigger SpaceKeyHoverEffect if present (for Space key in RTTMobileKeyboard)
+        var spaceHover = target.GetComponent<SpaceKeyHoverEffect>();
+        if (spaceHover != null)
+        {
+            spaceHover.OnPointerExit(null);
+        }
+        else
+        {
+            spaceHover = target.GetComponentInParent<SpaceKeyHoverEffect>();
+            spaceHover?.OnPointerExit(null);
         }
 
         // Also trigger PreviewTextInteraction if present (for text cursor in preview)

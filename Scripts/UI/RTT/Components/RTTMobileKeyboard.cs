@@ -1509,7 +1509,30 @@ public class RTTMobileKeyboard : RTTCanvasBase
 
     private void OnShiftPress()
     {
-        _isShiftActive = !_isShiftActive;
+        // 3 states cycle:
+        // State 1: default (_isShiftActive=false, _isCapsLock=false) → click → State 2
+        // State 2: shift active (_isShiftActive=true, _isCapsLock=false) → click → State 3
+        // State 3: caps lock (_isShiftActive=false, _isCapsLock=true) → click → State 1
+
+        if (!_isShiftActive && !_isCapsLock)
+        {
+            // State 1 → State 2: Enable shift
+            _isShiftActive = true;
+            _isCapsLock = false;
+        }
+        else if (_isShiftActive && !_isCapsLock)
+        {
+            // State 2 → State 3: Enable caps lock
+            _isShiftActive = false;
+            _isCapsLock = true;
+        }
+        else if (_isCapsLock)
+        {
+            // State 3 → State 1: Disable all
+            _isShiftActive = false;
+            _isCapsLock = false;
+        }
+
         UpdateShiftVisuals();
         MarkDirty();
     }
@@ -1527,13 +1550,16 @@ public class RTTMobileKeyboard : RTTCanvasBase
             }
         }
 
-        // Update Shift key label
+        // Update Shift key label based on state:
+        // State 1 (default): "Shift"
+        // State 2 (shift active, auto-release): "Shift" (same visual but active)
+        // State 3 (caps lock): "SHIFT"
         if (_shiftKey != null)
         {
             var shiftLabel = _shiftKey.GetComponentInChildren<TextMeshProUGUI>();
             if (shiftLabel != null)
             {
-                shiftLabel.text = isUpper ? "SHIFT" : "Shift";
+                shiftLabel.text = _isCapsLock ? "SHIFT" : "Shift";
             }
         }
     }
@@ -2060,140 +2086,65 @@ public class PreviewTextInteraction : MonoBehaviour, IPointerEnterHandler, IPoin
     {
         if (_keyboard == null || _previewText == null) return;
 
+        // In RTT context, use screen position from RTTRaycastManager
+        Vector2 screenPos = eventData.position;
+        if (RTTRaycastManager.Instance != null && RTTRaycastManager.Instance.CurrentHit.isValid)
+        {
+            screenPos = RTTRaycastManager.Instance.CurrentHit.screenPosition;
+        }
+
         // Calculate character index from click position
-        int charIndex = GetCharacterIndexFromPosition(eventData.position);
+        int charIndex = GetCharacterIndexFromScreenPosition(screenPos);
         _keyboard.SetCaretPosition(charIndex);
     }
 
     /// <summary>
-    /// Calculate the character index in the original text (without caret) from screen position
+    /// Calculate the character index from screen position in RTT context
     /// </summary>
-    private int GetCharacterIndexFromPosition(Vector2 screenPosition)
+    private int GetCharacterIndexFromScreenPosition(Vector2 screenPosition)
     {
         if (_previewText == null) return 0;
 
-        // Get the text without the caret character for proper index calculation
+        // Get the text without the caret character
         string displayText = _previewText.text;
-        string originalText = displayText.Replace("|", ""); // Remove caret char
+        string originalText = displayText.Replace("|", "");
 
         if (string.IsNullOrEmpty(originalText)) return 0;
 
-        // Convert screen position to local position in the text rect
-        RectTransform rectTransform = _previewText.rectTransform;
-        Vector2 localPoint;
-
-        // Try to get the correct camera
-        Camera cam = null;
-        Canvas canvas = _previewText.canvas;
-        if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
-        {
-            cam = canvas.worldCamera;
-        }
-
-        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(rectTransform, screenPosition, cam, out localPoint))
-        {
-            return originalText.Length;
-        }
-
-        // Use TMP's built-in function to find nearest character
-        int nearestCharIndex = TMP_TextUtilities.FindNearestCharacterOnLine(
-            _previewText,
-            new Vector3(localPoint.x, localPoint.y, 0f),
-            FindNearestLine(localPoint),
-            cam,
-            false
-        );
-
-        // Fallback: use simple approach based on x position
-        if (nearestCharIndex < 0)
-        {
-            return GetCharacterIndexSimple(localPoint, originalText);
-        }
-
-        // Adjust index if it's after the caret position in display text
-        int caretPosInDisplay = displayText.IndexOf('|');
-        if (caretPosInDisplay >= 0 && nearestCharIndex > caretPosInDisplay)
-        {
-            nearestCharIndex--;
-        }
-
-        return Mathf.Clamp(nearestCharIndex, 0, originalText.Length);
-    }
-
-    private int FindNearestLine(Vector2 localPoint)
-    {
-        if (_previewText.textInfo.lineCount == 0) return 0;
-
-        float minDistance = float.MaxValue;
-        int nearestLine = 0;
-
-        for (int i = 0; i < _previewText.textInfo.lineCount; i++)
-        {
-            var lineInfo = _previewText.textInfo.lineInfo[i];
-            float lineY = (lineInfo.ascender + lineInfo.descender) / 2f;
-            float distance = Mathf.Abs(localPoint.y - lineY);
-
-            if (distance < minDistance)
-            {
-                minDistance = distance;
-                nearestLine = i;
-            }
-        }
-
-        return nearestLine;
-    }
-
-    /// <summary>
-    /// Simple fallback method to calculate character index based on x position
-    /// </summary>
-    private int GetCharacterIndexSimple(Vector2 localPoint, string originalText)
-    {
-        if (string.IsNullOrEmpty(originalText)) return 0;
-
-        // Force text update to get accurate metrics
+        // Force mesh update to get accurate character info
         _previewText.ForceMeshUpdate();
 
         var textInfo = _previewText.textInfo;
         if (textInfo.characterCount == 0) return 0;
 
-        // Get text bounds
-        Rect textRect = _previewText.rectTransform.rect;
-        float textWidth = _previewText.preferredWidth;
+        // Get canvas and camera for coordinate conversion
+        Canvas canvas = _previewText.canvas;
+        Camera cam = canvas?.worldCamera;
 
-        // Calculate offset based on alignment
-        float startX = 0f;
-        switch (_previewText.alignment)
+        // Convert screen position to local position in text rect
+        RectTransform rectTransform = _previewText.rectTransform;
+        Vector2 localPoint;
+
+        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(rectTransform, screenPosition, cam, out localPoint))
         {
-            case TextAlignmentOptions.Center:
-            case TextAlignmentOptions.Midline:
-                startX = -textWidth / 2f;
-                break;
-            case TextAlignmentOptions.Left:
-            case TextAlignmentOptions.TopLeft:
-            case TextAlignmentOptions.BottomLeft:
-                startX = textRect.xMin;
-                break;
-            case TextAlignmentOptions.Right:
-            case TextAlignmentOptions.TopRight:
-            case TextAlignmentOptions.BottomRight:
-                startX = textRect.xMax - textWidth;
-                break;
+            // If conversion fails, estimate based on normalized x position
+            return EstimateCharacterIndex(screenPosition, originalText);
         }
 
-        // Find character by comparing x positions
-        string displayText = _previewText.text;
+        // Find character by comparing x positions with character bounds
         int caretOffset = 0;
-
         for (int i = 0; i < textInfo.characterCount && i < displayText.Length; i++)
         {
-            // Skip the caret character in calculation
-            if (i < displayText.Length && displayText[i] == '|')
+            // Track caret character offset
+            if (displayText[i] == '|')
             {
                 caretOffset = 1;
                 continue;
             }
 
             var charInfo = textInfo.characterInfo[i];
+            if (!charInfo.isVisible) continue;
+
             float charCenterX = (charInfo.bottomLeft.x + charInfo.bottomRight.x) / 2f;
 
             if (localPoint.x < charCenterX)
@@ -2203,5 +2154,62 @@ public class PreviewTextInteraction : MonoBehaviour, IPointerEnterHandler, IPoin
         }
 
         return originalText.Length;
+    }
+
+    /// <summary>
+    /// Estimate character index based on relative x position when coordinate conversion fails
+    /// </summary>
+    private int EstimateCharacterIndex(Vector2 screenPosition, string originalText)
+    {
+        if (string.IsNullOrEmpty(originalText)) return 0;
+
+        // Get the rect of the preview text area from the overlay (this object)
+        RectTransform overlayRect = GetComponent<RectTransform>();
+        if (overlayRect == null) return originalText.Length;
+
+        // Get canvas for reference
+        Canvas canvas = _previewText.canvas;
+        if (canvas == null) return originalText.Length;
+
+        // Get render texture dimensions
+        var rt = canvas.worldCamera?.targetTexture;
+        if (rt == null) return originalText.Length;
+
+        // Calculate relative X position (0-1) within the text area
+        // screenPosition is in RenderTexture coordinates
+        Rect overlayWorldRect = GetWorldRect(overlayRect);
+
+        // Convert screen position to normalized position within overlay
+        float normalizedX = (screenPosition.x - overlayWorldRect.xMin) / overlayWorldRect.width;
+        normalizedX = Mathf.Clamp01(normalizedX);
+
+        // Map to character index
+        int estimatedIndex = Mathf.RoundToInt(normalizedX * originalText.Length);
+        return Mathf.Clamp(estimatedIndex, 0, originalText.Length);
+    }
+
+    private Rect GetWorldRect(RectTransform rectTransform)
+    {
+        Vector3[] corners = new Vector3[4];
+        rectTransform.GetWorldCorners(corners);
+
+        // Get canvas for conversion
+        Canvas canvas = rectTransform.GetComponentInParent<Canvas>();
+        Camera cam = canvas?.worldCamera;
+
+        if (cam != null)
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                corners[i] = cam.WorldToScreenPoint(corners[i]);
+            }
+        }
+
+        float xMin = Mathf.Min(corners[0].x, corners[1].x, corners[2].x, corners[3].x);
+        float xMax = Mathf.Max(corners[0].x, corners[1].x, corners[2].x, corners[3].x);
+        float yMin = Mathf.Min(corners[0].y, corners[1].y, corners[2].y, corners[3].y);
+        float yMax = Mathf.Max(corners[0].y, corners[1].y, corners[2].y, corners[3].y);
+
+        return new Rect(xMin, yMin, xMax - xMin, yMax - yMin);
     }
 }

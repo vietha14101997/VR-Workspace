@@ -316,7 +316,8 @@ public class VRGazeReticle : MonoBehaviour
                 _canvasRT.localPosition = new Vector3(0, 0, dist);
 
                 float scale = (reticleSize / 100f) * dist;
-                _reticleImage.rectTransform.localScale = new Vector3(scale, scale, 1f);
+                float finalScale = scale * _customCursorScaleMultiplier;
+                _reticleImage.rectTransform.localScale = new Vector3(finalScale, finalScale, 1f);
 
                 if (_dwellRing != null)
                 {
@@ -360,7 +361,8 @@ public class VRGazeReticle : MonoBehaviour
             _canvasRT.localPosition = new Vector3(0, 0, dist);
 
             float scale = (reticleSize / 100f) * dist;
-            _reticleImage.rectTransform.localScale = new Vector3(scale, scale, 1f);
+            float finalScale = scale * _customCursorScaleMultiplier;
+            _reticleImage.rectTransform.localScale = new Vector3(finalScale, finalScale, 1f);
 
             // Scale dwell ring theo khoảng cách
             if (_dwellRing != null)
@@ -887,6 +889,10 @@ public class VRGazeReticle : MonoBehaviour
     }
 
     #region Custom Cursor API
+    private Color _defaultColor;
+    private float _customCursorScaleMultiplier = 1f;
+    private const float CUSTOM_CURSOR_SCALE = 3f; // Scale multiplier for custom cursors
+
     /// <summary>
     /// Set a custom sprite for the reticle cursor.
     /// Call ResetCursorSprite() to restore the default circle.
@@ -897,8 +903,16 @@ public class VRGazeReticle : MonoBehaviour
         _currentCustomSprite = sprite;
         if (_reticleImage != null)
         {
+            // Save defaults on first custom cursor
+            if (_defaultColor == default)
+                _defaultColor = _reticleImage.color;
+
             _reticleImage.sprite = sprite;
             _reticleImage.preserveAspect = true;
+            _reticleImage.color = Color.white; // White color for custom cursors
+
+            // Set scale multiplier (will be applied in CheckGaze)
+            _customCursorScaleMultiplier = CUSTOM_CURSOR_SCALE;
         }
     }
 
@@ -930,10 +944,18 @@ public class VRGazeReticle : MonoBehaviour
     public void ResetCursorSprite()
     {
         _currentCustomSprite = null;
+        _customCursorScaleMultiplier = 1f; // Reset scale multiplier
+
         if (_reticleImage != null && _defaultSprite != null)
         {
             _reticleImage.sprite = _defaultSprite;
             _reticleImage.preserveAspect = false;
+
+            // Restore default color
+            if (_defaultColor != default)
+                _reticleImage.color = _defaultColor;
+            else
+                _reticleImage.color = colorInteract;
         }
     }
 
