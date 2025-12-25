@@ -98,6 +98,9 @@ public class RTTMobileKeyboard : RTTCanvasBase
     #region Private Fields
     private float _cornerRadius = 0.12f;
     private float _edgePadding = 0.06f;
+
+    // Reference aspect ratio for normal keys (used to calculate aspect-adjusted parameters for wide keys)
+    private float _normalKeyAspect => _keyWidth / _keyHeight;
     #endregion
 
     #region Lifecycle
@@ -650,18 +653,11 @@ public class RTTMobileKeyboard : RTTCanvasBase
         CreateKey(rightGroup.transform, ".", _keyWidth, _keyHeight, true);
         CreateKey(rightGroup.transform, "Enter", specialKeyWidth, _keyHeight, true, OnEnter);
 
-        // Space bar - centered between left and right groups with padding expansion
-        // float gap = _keySpacing + _keyWidth * _edgePadding;
-        // float baseWidth = contentWidth - leftGroupWidth - rightGroupWidth - 2 * gap;
-        // float spaceWidth = baseWidth * (1 + 2 * _edgePadding);
-        // float spaceLeft = leftGroupWidth + gap - baseWidth * _edgePadding;
-
+        // Space bar - fills space between left and right groups
         float spaceLeft = leftGroupWidth + _keySpacing + _keyWidth * _edgePadding;
         float spaceRight = contentWidth - rightGroupWidth - _keySpacing - _keyWidth * _edgePadding;
         float spaceWidth = spaceRight - spaceLeft;
-        spaceLeft -= spaceWidth * _edgePadding;
-        spaceRight += spaceWidth * _edgePadding;
-        spaceWidth = spaceRight - spaceLeft;
+        float spaceCenterX = (spaceLeft + spaceRight) / 2f;
 
         GameObject spaceKey = new GameObject("Key_Space");
         spaceKey.transform.SetParent(row.transform, false);
@@ -669,11 +665,12 @@ public class RTTMobileKeyboard : RTTCanvasBase
         RectTransform spaceRT = spaceKey.AddComponent<RectTransform>();
         spaceRT.anchorMin = new Vector2(0, 0.5f);
         spaceRT.anchorMax = new Vector2(0, 0.5f);
-        spaceRT.pivot = new Vector2(0, 0.5f);
-        spaceRT.anchoredPosition = new Vector2(spaceLeft, 0);
+        spaceRT.pivot = new Vector2(0.5f, 0.5f);
+        spaceRT.anchoredPosition = new Vector2(spaceCenterX, 0);
         spaceRT.sizeDelta = new Vector2(spaceWidth, _keyHeight);
 
-        CreateKeyVisuals(spaceKey, " ", spaceWidth, _keyHeight, false, () => OnKeyPress(" "));
+        // Create space key visuals with aspect-adjusted edge padding for wide key
+        CreateSpaceKeyVisuals(spaceKey, spaceWidth, _keyHeight, () => OnKeyPress(" "));
     }
 
     private void CreateMoreSymbolRow2()
@@ -771,18 +768,11 @@ public class RTTMobileKeyboard : RTTCanvasBase
         CreateKey(rightGroup.transform, ">", _keyWidth, _keyHeight, true);
         CreateKey(rightGroup.transform, "Enter", specialKeyWidth, _keyHeight, true, OnEnter);
 
-        // Space bar - centered between left and right groups with padding expansion
-        // float gap = _keySpacing + _keyWidth * _edgePadding;
-        // float baseWidth = contentWidth - leftGroupWidth - rightGroupWidth - 2 * gap;
-        // float spaceWidth = baseWidth * (1 + 2 * _edgePadding);
-        // float spaceLeft = leftGroupWidth + gap - baseWidth * _edgePadding;
-
+        // Space bar - fills space between left and right groups
         float spaceLeft = leftGroupWidth + _keySpacing + _keyWidth * _edgePadding;
         float spaceRight = contentWidth - rightGroupWidth - _keySpacing - _keyWidth * _edgePadding;
         float spaceWidth = spaceRight - spaceLeft;
-        spaceLeft -= spaceWidth * _edgePadding;
-        spaceRight += spaceWidth * _edgePadding;
-        spaceWidth = spaceRight - spaceLeft;
+        float spaceCenterX = (spaceLeft + spaceRight) / 2f;
 
         GameObject spaceKey = new GameObject("Key_Space");
         spaceKey.transform.SetParent(row.transform, false);
@@ -790,11 +780,12 @@ public class RTTMobileKeyboard : RTTCanvasBase
         RectTransform spaceRT = spaceKey.AddComponent<RectTransform>();
         spaceRT.anchorMin = new Vector2(0, 0.5f);
         spaceRT.anchorMax = new Vector2(0, 0.5f);
-        spaceRT.pivot = new Vector2(0, 0.5f);
-        spaceRT.anchoredPosition = new Vector2(spaceLeft, 0);
+        spaceRT.pivot = new Vector2(0.5f, 0.5f);
+        spaceRT.anchoredPosition = new Vector2(spaceCenterX, 0);
         spaceRT.sizeDelta = new Vector2(spaceWidth, _keyHeight);
 
-        CreateKeyVisuals(spaceKey, " ", spaceWidth, _keyHeight, false, () => OnKeyPress(" "));
+        // Create space key visuals with aspect-adjusted edge padding for wide key
+        CreateSpaceKeyVisuals(spaceKey, spaceWidth, _keyHeight, () => OnKeyPress(" "));
     }
 
     private void CreateKeyRow(string[] keys, int rowIndex, float offset = 0)
@@ -916,18 +907,11 @@ public class RTTMobileKeyboard : RTTCanvasBase
         CreateKey(rightGroup.transform, ".", _keyWidth, _keyHeight, true);
         CreateKey(rightGroup.transform, "Enter", specialKeyWidth, _keyHeight, true, OnEnter);
 
-        // Space bar - centered between left and right groups with padding expansion
-        // float gap = _keySpacing + _keyWidth * _edgePadding;
-        // float baseWidth = contentWidth - leftGroupWidth - rightGroupWidth - 2 * gap;
-        // float spaceWidth = baseWidth * (1 + 2 * _edgePadding);
-        // float spaceLeft = leftGroupWidth + gap - baseWidth * _edgePadding;
-
-        float spaceLeft = leftGroupWidth + _keySpacing + _keyWidth * _edgePadding; // _edgePadding của phím thường
-        float spaceRight = contentWidth - rightGroupWidth - _keySpacing - _keyWidth * _edgePadding; // _edgePadding của phím Enter
+        // Space bar - fills space between left and right groups
+        float spaceLeft = leftGroupWidth + _keySpacing + _keyWidth * _edgePadding;
+        float spaceRight = contentWidth - rightGroupWidth - _keySpacing - _keyWidth * _edgePadding;
         float spaceWidth = spaceRight - spaceLeft;
-        spaceLeft -= spaceWidth * _edgePadding; // _edgePadding của phím Space
-        spaceRight += spaceWidth * _edgePadding; // _edgePadding của phím Space
-        spaceWidth = spaceRight - spaceLeft;
+        float spaceCenterX = (spaceLeft + spaceRight) / 2f;
 
         GameObject spaceKey = new GameObject("Key_Space");
         spaceKey.transform.SetParent(row.transform, false);
@@ -935,12 +919,120 @@ public class RTTMobileKeyboard : RTTCanvasBase
         RectTransform spaceRT = spaceKey.AddComponent<RectTransform>();
         spaceRT.anchorMin = new Vector2(0, 0.5f);
         spaceRT.anchorMax = new Vector2(0, 0.5f);
-        spaceRT.pivot = new Vector2(0, 0.5f);
-        spaceRT.anchoredPosition = new Vector2(spaceLeft, 0);
+        spaceRT.pivot = new Vector2(0.5f, 0.5f);
+        spaceRT.anchoredPosition = new Vector2(spaceCenterX, 0);
         spaceRT.sizeDelta = new Vector2(spaceWidth, _keyHeight);
 
-        // Create space key visuals
-        CreateKeyVisuals(spaceKey, " ", spaceWidth, _keyHeight, false, () => OnKeyPress(" "));
+        // Create space key visuals with aspect-adjusted edge padding for wide key
+        CreateSpaceKeyVisuals(spaceKey, spaceWidth, _keyHeight, () => OnKeyPress(" "));
+    }
+
+    /// <summary>
+    /// Creates Space key visuals using dedicated wide element shaders.
+    /// These shaders handle aspect ratio correctly for wide buttons.
+    /// </summary>
+    private void CreateSpaceKeyVisuals(GameObject keyObj, float width, float height, Action onClick)
+    {
+        Color baseColor = keyColor;  // Space uses normal key color
+        float aspect = width / height;
+
+        // Background with rounded corners and glass effect - using WIDE shader
+        Image bg = keyObj.AddComponent<Image>();
+        bg.sprite = GetPixelSprite();
+        bg.raycastTarget = true;
+
+        Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
+        if (glassShader != null)
+        {
+            Material glassMat = new Material(glassShader);
+            glassMat.SetFloat("_CornerRadius", _cornerRadius);
+            glassMat.SetFloat("_EdgePadding", _edgePadding);  // Use normal edgePadding - shader handles aspect correctly
+            glassMat.SetFloat("_Aspect", aspect);
+
+            Color colorA = new Color(baseColor.r * 1.2f, baseColor.g * 1.2f, baseColor.b * 1.2f, 0.95f);
+            Color colorB = new Color(baseColor.r * 0.8f, baseColor.g * 0.8f, baseColor.b * 0.8f, 0.95f);
+            glassMat.SetColor("_ColorA", colorA);
+            glassMat.SetColor("_ColorB", colorB);
+            glassMat.SetFloat("_GradientOffset", 0f);
+            glassMat.SetFloat("_GradientAngle", -15f);
+            glassMat.SetFloat("_GlassAlpha", 0.95f);
+            glassMat.SetFloat("_BlurEnabled", 0f);
+
+            bg.material = glassMat;
+            bg.color = Color.white;
+        }
+        else
+        {
+            bg.color = baseColor;
+        }
+
+        // Border with glow effect - using WIDE shader
+        GameObject borderObj = new GameObject("Border");
+        borderObj.transform.SetParent(keyObj.transform, false);
+        RectTransform borderRT = borderObj.AddComponent<RectTransform>();
+        borderRT.anchorMin = Vector2.zero;
+        borderRT.anchorMax = Vector2.one;
+        borderRT.offsetMin = Vector2.zero;
+        borderRT.offsetMax = Vector2.zero;
+
+        Image borderImg = borderObj.AddComponent<Image>();
+        borderImg.sprite = GetPixelSprite();
+        borderImg.raycastTarget = false;
+
+        Shader borderShader = Shader.Find("Custom/GlowingWideElementBorder");
+        if (borderShader != null)
+        {
+            Material borderMat = new Material(borderShader);
+            borderMat.SetFloat("_Aspect", aspect);
+            borderMat.SetFloat("_EdgePadding", _edgePadding);  // Use normal edgePadding - shader handles aspect correctly
+            borderMat.SetFloat("_CornerRadius", _cornerRadius);
+
+            Color borderGlowCol = Color.Lerp(baseColor, Color.white, 0.5f);
+            borderMat.SetColor("_GlowColor", borderGlowCol);
+
+            borderMat.SetFloat("_BorderWidth", 0.04f);
+            borderMat.SetFloat("_GlowWidth", 0.03f);
+            borderMat.SetFloat("_GlowIntensity", 1.5f);
+            borderMat.SetFloat("_PulseEnabled", 0f);
+
+            borderImg.material = borderMat;
+        }
+
+        // Button
+        Button btn = keyObj.AddComponent<Button>();
+        ColorBlock colors = btn.colors;
+        colors.normalColor = Color.white;
+        colors.highlightedColor = new Color(1f, 1f, 1f, 1.2f);
+        colors.pressedColor = new Color(0.8f, 0.8f, 0.8f, 1f);
+        btn.colors = colors;
+
+        btn.onClick.AddListener(() =>
+        {
+            onClick?.Invoke();
+            MarkDirty();
+        });
+
+        // Label
+        GameObject labelObj = new GameObject("Label");
+        labelObj.transform.SetParent(keyObj.transform, false);
+
+        TextMeshProUGUI tmp = labelObj.AddComponent<TextMeshProUGUI>();
+        tmp.text = "Space";
+        tmp.fontSize = keyFontSize;
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.color = Color.white;
+        if (customFont != null) tmp.font = customFont;
+
+        RectTransform labelRT = labelObj.GetComponent<RectTransform>();
+        labelRT.anchorMin = Vector2.zero;
+        labelRT.anchorMax = Vector2.one;
+        labelRT.offsetMin = Vector2.zero;
+        labelRT.offsetMax = Vector2.zero;
+
+        _allKeys.Add(keyObj);
+
+        // Add hover effect with wide shader support
+        AddSpaceHoverEffect(keyObj, baseColor, _edgePadding, aspect);
     }
 
     /// <summary>
@@ -1542,6 +1634,13 @@ public class RTTMobileKeyboard : RTTCanvasBase
         var hover = keyObj.AddComponent<KeyHoverEffect>();
         hover.Initialize(themeColor, this);
     }
+
+    private void AddSpaceHoverEffect(GameObject keyObj, Color baseColor, float edgePadding, float aspect)
+    {
+        // Use SpaceKeyHoverEffect with aspect-adjusted parameters
+        var hover = keyObj.AddComponent<SpaceKeyHoverEffect>();
+        hover.Initialize(themeColor, this, edgePadding, aspect);
+    }
     #endregion
 }
 
@@ -1641,6 +1740,97 @@ public class KeyHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointerExitH
         _borderMaterial.SetFloat("_GlowIntensity", _savedGlowIntensity);
         _borderMaterial.SetFloat("_GlowWidth", _savedGlowWidth);
         _borderMaterial.SetFloat("_BorderWidth", _savedBorderWidth);
+
+        _keyboard?.MarkDirty();
+    }
+
+    private void OnDestroy()
+    {
+        if (_borderMaterial != null)
+            Destroy(_borderMaterial);
+    }
+}
+
+/// <summary>
+/// Hover effect for Space key using wide element shader.
+/// Uses GlowingWideElementBorder which handles aspect ratio correctly.
+/// Now uses multi-layer gradient glow on hover (matching GlowingGlassBorder style).
+/// </summary>
+public class SpaceKeyHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
+{
+    private Material _borderMaterial;
+    private Color _hoverGlowColor;
+    private RTTMobileKeyboard _keyboard;
+    private float _spaceEdgePadding;
+    private float _spaceAspect;
+
+    // Saved properties
+    private float _savedCornerRadius;
+    private float _savedBorderWidth;
+    private float _savedGlowWidth;
+    private float _savedGlowIntensity;
+    private Color _savedGlowColor;
+
+    public void Initialize(Color themeColor, RTTMobileKeyboard keyboard, float edgePadding, float aspect)
+    {
+        _keyboard = keyboard;
+        _hoverGlowColor = themeColor;
+        _spaceEdgePadding = edgePadding;
+        _spaceAspect = aspect;
+
+        // Find border child
+        Transform borderTransform = transform.Find("Border");
+        if (borderTransform != null)
+        {
+            var borderImage = borderTransform.GetComponent<Image>();
+            if (borderImage != null && borderImage.material != null)
+            {
+                // Create material instance
+                _borderMaterial = new Material(borderImage.material);
+                borderImage.material = _borderMaterial;
+
+                // Save original properties
+                if (_borderMaterial.HasProperty("_CornerRadius"))
+                    _savedCornerRadius = _borderMaterial.GetFloat("_CornerRadius");
+                if (_borderMaterial.HasProperty("_BorderWidth"))
+                    _savedBorderWidth = _borderMaterial.GetFloat("_BorderWidth");
+                if (_borderMaterial.HasProperty("_GlowWidth"))
+                    _savedGlowWidth = _borderMaterial.GetFloat("_GlowWidth");
+                if (_borderMaterial.HasProperty("_GlowIntensity"))
+                    _savedGlowIntensity = _borderMaterial.GetFloat("_GlowIntensity");
+                if (_borderMaterial.HasProperty("_GlowColor"))
+                    _savedGlowColor = _borderMaterial.GetColor("_GlowColor");
+
+                // Set hover gradient colors (matching GlowingGlassBorder defaults)
+                // Cyan to Purple gradient
+                if (_borderMaterial.HasProperty("_HoverColorA"))
+                    _borderMaterial.SetColor("_HoverColorA", new Color(0.3f, 1f, 1f, 1f));  // Cyan
+                if (_borderMaterial.HasProperty("_HoverColorB"))
+                    _borderMaterial.SetColor("_HoverColorB", new Color(1f, 0.4f, 1f, 1f)); // Purple
+
+                // IMPORTANT: Initialize hover amount to 0 (normal mode)
+                if (_borderMaterial.HasProperty("_HoverAmount"))
+                    _borderMaterial.SetFloat("_HoverAmount", 0f);
+            }
+        }
+    }
+
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        if (_borderMaterial == null) return;
+
+        // Set hover amount - shader will use multi-layer gradient glow
+        _borderMaterial.SetFloat("_HoverAmount", 1f);
+
+        _keyboard?.MarkDirty();
+    }
+
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        if (_borderMaterial == null) return;
+
+        // Turn off hover mode - shader returns to normal simple glow
+        _borderMaterial.SetFloat("_HoverAmount", 0f);
 
         _keyboard?.MarkDirty();
     }
