@@ -29,7 +29,7 @@ public class RTTMobileKeyboard : RTTCanvasBase
     [Header("Layout")]
     [SerializeField] private float marginLeft = 40f;
     [SerializeField] private float marginRight = 40f;
-    [SerializeField] private float marginTop = 30f;
+    [SerializeField] private float marginTop = 20f;
     [SerializeField] private float marginBottom = 50f;
     [SerializeField] [Range(0.05f, 0.2f)] private float keySpacingRatio = 0.1f;
     [SerializeField] [Range(0.8f, 1.5f)] private float keyHeightRatio = 1.2f;
@@ -251,7 +251,7 @@ public class RTTMobileKeyboard : RTTCanvasBase
         // Calculate total height (preview row + 5 key rows)
         // Row 1: Numbers, Row 2: QWERTY, Row 3: ASDF, Row 4: Shift+letters, Row 5: Bottom row
         int numRows = 5;
-        float previewHeight = 60f;
+        float previewHeight = 100f;
         float rowSpacing = _keySpacing;
         float totalRowsHeight = previewHeight + (_keyHeight * numRows) + (rowSpacing * numRows);
         _logicalHeight = marginTop + totalRowsHeight + marginBottom;
@@ -352,7 +352,7 @@ public class RTTMobileKeyboard : RTTCanvasBase
 
     private void CreatePreviewRow()
     {
-        float previewHeight = 60f;
+        float previewHeight = 100f;
         float buttonSize = _keyHeight * 0.5f;
         float buttonPadding = 10f;
 
@@ -371,11 +371,21 @@ public class RTTMobileKeyboard : RTTCanvasBase
 
         _previewText = textObj.AddComponent<TextMeshProUGUI>();
         _previewText.text = "";
-        _previewText.fontSize = 32f;
+        _previewText.fontSize = 36f;
         _previewText.alignment = TextAlignmentOptions.Center;
         _previewText.color = Color.white;
         _previewText.overflowMode = TextOverflowModes.Ellipsis;
         if (customFont != null) _previewText.font = customFont;
+
+        // Set Text Style to "Title" from TMP Style Sheet
+        if (TMP_Settings.defaultStyleSheet != null)
+        {
+            TMP_Style titleStyle = TMP_Settings.defaultStyleSheet.GetStyle("Title");
+            if (titleStyle != null)
+            {
+                _previewText.textStyle = titleStyle;
+            }
+        }
 
         RectTransform textRT = textObj.GetComponent<RectTransform>();
         textRT.anchorMin = Vector2.zero;
@@ -409,7 +419,7 @@ public class RTTMobileKeyboard : RTTCanvasBase
         Sprite closeIcon = VRTaskbar.LoadIcon("close");
         GameObject closeBtn = VRButtonFactory.CreateBareIconButton(
             previewRow.transform,
-            buttonSize,
+            buttonSize * 0.75f,
             closeIcon,
             new Color(0.8f, 0.4f, 1.0f),
             () => OnClose(),
@@ -463,7 +473,7 @@ public class RTTMobileKeyboard : RTTCanvasBase
         if (glowShader != null)
         {
             Material glowMat = new Material(glowShader);
-            glowMat.SetFloat("_LineWidth", 0.12f);
+            glowMat.SetFloat("_LineWidth", 0.08f);
             glowMat.SetFloat("_GlowWidth", 0.4f);
             glowMat.SetColor("_ColorA", new Color(0.0f, 0.8f, 1f, 1f));   // Deep Sea Blue
             glowMat.SetColor("_ColorB", new Color(0.8f, 0.2f, 1f, 1f));   // Purple

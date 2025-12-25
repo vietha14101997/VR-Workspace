@@ -319,9 +319,10 @@ public class VRGazeReticle : MonoBehaviour
                 float finalScale = scale * _customCursorScaleMultiplier;
                 _reticleImage.rectTransform.localScale = new Vector3(finalScale, finalScale, 1f);
 
+                // Dwell ring scales with cursor (stays proportional to cursor size)
                 if (_dwellRing != null)
                 {
-                    _dwellRing.rectTransform.localScale = new Vector3(scale, scale, 1f);
+                    _dwellRing.rectTransform.localScale = new Vector3(finalScale, finalScale, 1f);
                 }
 
                 // Handle hover state changes for RTT
@@ -364,10 +365,10 @@ public class VRGazeReticle : MonoBehaviour
             float finalScale = scale * _customCursorScaleMultiplier;
             _reticleImage.rectTransform.localScale = new Vector3(finalScale, finalScale, 1f);
 
-            // Scale dwell ring theo khoảng cách
+            // Dwell ring scales with cursor (stays proportional to cursor size)
             if (_dwellRing != null)
             {
-                _dwellRing.rectTransform.localScale = new Vector3(scale, scale, 1f);
+                _dwellRing.rectTransform.localScale = new Vector3(finalScale, finalScale, 1f);
             }
 
             GameObject hitObj = hit.collider.gameObject;

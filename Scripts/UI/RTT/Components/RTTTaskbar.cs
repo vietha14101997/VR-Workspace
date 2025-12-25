@@ -87,6 +87,7 @@ public class RTTTaskbar : RTTCanvasBase
     private Material _borderMaterial;
     private Sprite _pixelSprite;
     private Sprite _batterySprite;
+    private Sprite _batteryFillSprite;  // Separate fill sprite without tip
     private Sprite _wifiSprite;
 
     // Status references
@@ -624,8 +625,9 @@ public class RTTTaskbar : RTTCanvasBase
         rt.sizeDelta = new Vector2(battWidth, battHeight);
 
         Sprite batSprite = GetBatterySprite();
+        Sprite fillSprite = GetBatteryFillSprite();
 
-        // Battery icon background
+        // Battery icon background (with tip)
         GameObject bgObj = new GameObject("Bg");
         bgObj.transform.SetParent(container.transform, false);
 
@@ -642,12 +644,12 @@ public class RTTTaskbar : RTTCanvasBase
         bgRT.offsetMin = Vector2.zero;
         bgRT.offsetMax = Vector2.zero;
 
-        // Battery fill
+        // Battery fill (without tip - uses separate sprite)
         GameObject fillObj = new GameObject("Fill");
         fillObj.transform.SetParent(container.transform, false);
 
         _batteryFillImage = fillObj.AddComponent<Image>();
-        _batteryFillImage.sprite = batSprite;
+        _batteryFillImage.sprite = fillSprite;  // Use fill-only sprite (no tip)
         _batteryFillImage.type = Image.Type.Filled;
         _batteryFillImage.fillMethod = Image.FillMethod.Horizontal;
         _batteryFillImage.fillOrigin = (int)Image.OriginHorizontal.Left;
@@ -1211,6 +1213,64 @@ public class RTTTaskbar : RTTCanvasBase
         _batterySprite = Sprite.Create(tex, new Rect(0, 0, w, h), Vector2.one * 0.5f, 100, 0,
             SpriteMeshType.FullRect, new Vector4(radius, radius, radius + tipWidth, radius));
         return _batterySprite;
+    }
+
+    /// <summary>
+    /// Creates battery fill sprite WITHOUT the tip (positive terminal).
+    /// This prevents the "extra vertical line" when using Type.Filled.
+    /// </summary>
+    private Sprite GetBatteryFillSprite()
+    {
+        if (_batteryFillSprite != null) return _batteryFillSprite;
+
+        int w = 64, h = 32;
+        int radius = 4;
+        int tipWidth = 4;  // Same as main sprite, but we won't draw the tip
+
+        Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+        Color[] colors = new Color[w * h];
+
+        for (int y = 0; y < h; y++)
+        {
+            for (int x = 0; x < w; x++)
+            {
+                float alpha = 0f;
+
+                // Main body only (no tip) - body ends at w - tipWidth
+                int bodyWidth = w - tipWidth;
+                if (x < bodyWidth)
+                {
+                    int bx = x, by = y;
+                    bool inCorner = false;
+                    int cx = 0, cy = 0;
+
+                    if (bx < radius && by < radius) { inCorner = true; cx = radius; cy = radius; }
+                    else if (bx >= bodyWidth - radius && by < radius) { inCorner = true; cx = bodyWidth - radius - 1; cy = radius; }
+                    else if (bx < radius && by >= h - radius) { inCorner = true; cx = radius; cy = h - radius - 1; }
+                    else if (bx >= bodyWidth - radius && by >= h - radius) { inCorner = true; cx = bodyWidth - radius - 1; cy = h - radius - 1; }
+
+                    if (inCorner)
+                    {
+                        float dist = Vector2.Distance(new Vector2(bx, by), new Vector2(cx, cy));
+                        alpha = Mathf.Clamp01(radius + 0.5f - dist);
+                    }
+                    else if (bx >= 0 && bx < bodyWidth && by >= 0 && by < h)
+                    {
+                        alpha = 1f;
+                    }
+                }
+
+                // NO TIP - that's the key difference from GetBatterySprite()
+
+                colors[y * w + x] = new Color(1, 1, 1, alpha);
+            }
+        }
+
+        tex.SetPixels(colors);
+        tex.Apply();
+        _batteryFillSprite = Sprite.Create(tex, new Rect(0, 0, w, h), Vector2.one * 0.5f, 100, 0,
+            SpriteMeshType.FullRect, new Vector4(radius, radius, radius, radius));
+        return _batteryFillSprite;
     }
 
     private Sprite GetWifiSprite()
