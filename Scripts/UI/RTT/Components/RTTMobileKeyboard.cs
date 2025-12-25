@@ -1753,7 +1753,7 @@ public class KeyHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointerExitH
 
 /// <summary>
 /// Hover effect for Space key using wide element shader.
-/// Uses same approach as KeyHoverEffect - directly modifying material properties.
+/// Switches to GlowingGlassBorder on hover like KeyHoverEffect does.
 /// </summary>
 public class SpaceKeyHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 {
@@ -1762,9 +1762,13 @@ public class SpaceKeyHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointer
     private RTTMobileKeyboard _keyboard;
     private float _spaceEdgePadding;
     private float _spaceAspect;
+    private Shader _originalShader;
+    private Shader _hoverShader;
 
     // Saved properties
+    private float _savedAspect;
     private float _savedCornerRadius;
+    private float _savedEdgePadding;
     private float _savedBorderWidth;
     private float _savedGlowWidth;
     private float _savedGlowIntensity;
@@ -1776,6 +1780,7 @@ public class SpaceKeyHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointer
         _hoverGlowColor = themeColor;
         _spaceEdgePadding = edgePadding;
         _spaceAspect = aspect;
+        _hoverShader = Shader.Find("Custom/GlowingGlassBorderWide");
 
         // Find border child
         Transform borderTransform = transform.Find("Border");
@@ -1787,10 +1792,15 @@ public class SpaceKeyHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointer
                 // Create material instance
                 _borderMaterial = new Material(borderImage.material);
                 borderImage.material = _borderMaterial;
+                _originalShader = _borderMaterial.shader;
 
-                // Save original properties
+                // Save ALL original properties
+                if (_borderMaterial.HasProperty("_Aspect"))
+                    _savedAspect = _borderMaterial.GetFloat("_Aspect");
                 if (_borderMaterial.HasProperty("_CornerRadius"))
                     _savedCornerRadius = _borderMaterial.GetFloat("_CornerRadius");
+                if (_borderMaterial.HasProperty("_EdgePadding"))
+                    _savedEdgePadding = _borderMaterial.GetFloat("_EdgePadding");
                 if (_borderMaterial.HasProperty("_BorderWidth"))
                     _savedBorderWidth = _borderMaterial.GetFloat("_BorderWidth");
                 if (_borderMaterial.HasProperty("_GlowWidth"))
@@ -1807,7 +1817,16 @@ public class SpaceKeyHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointer
     {
         if (_borderMaterial == null) return;
 
-        // Apply hover effect - same as KeyHoverEffect
+        // Switch to hover shader for better glow effect (same as KeyHoverEffect)
+        if (_hoverShader != null)
+            _borderMaterial.shader = _hoverShader;
+
+        // Restore geometry properties after shader change
+        _borderMaterial.SetFloat("_Aspect", _savedAspect);
+        _borderMaterial.SetFloat("_CornerRadius", _savedCornerRadius);
+        _borderMaterial.SetFloat("_EdgePadding", _savedEdgePadding);
+
+        // Apply hover effect
         _borderMaterial.SetColor("_GlowColor", _hoverGlowColor);
         _borderMaterial.SetFloat("_GlowIntensity", _savedGlowIntensity * 2f);
         _borderMaterial.SetFloat("_GlowWidth", _savedGlowWidth * 2f);
@@ -1820,7 +1839,14 @@ public class SpaceKeyHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointer
     {
         if (_borderMaterial == null) return;
 
-        // Restore original properties
+        // Restore original shader
+        if (_originalShader != null)
+            _borderMaterial.shader = _originalShader;
+
+        // Restore ALL properties
+        _borderMaterial.SetFloat("_Aspect", _savedAspect);
+        _borderMaterial.SetFloat("_CornerRadius", _savedCornerRadius);
+        _borderMaterial.SetFloat("_EdgePadding", _savedEdgePadding);
         _borderMaterial.SetColor("_GlowColor", _savedGlowColor);
         _borderMaterial.SetFloat("_GlowIntensity", _savedGlowIntensity);
         _borderMaterial.SetFloat("_GlowWidth", _savedGlowWidth);
