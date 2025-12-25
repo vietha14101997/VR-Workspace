@@ -39,6 +39,7 @@ public class RTTMobileKeyboard : RTTCanvasBase
     [SerializeField] private bool followTaskbar = true;
     [SerializeField] private float spacingMultiplier = 1.5f;
     [SerializeField] private float widthRatioToFrame = 0.7f;
+    [SerializeField] private float verticalOffset = -0.05f; // Offset to move keyboard down (negative = lower)
     #endregion
 
     #region Constants
@@ -459,40 +460,33 @@ public class RTTMobileKeyboard : RTTCanvasBase
 
     private void CreatePreviewUnderline(Transform parent)
     {
+        // Configure horizontal separator on the border instead of creating a separate object
+        if (_borderMaterial == null) return;
+
+        // Calculate the Y position of the separator
+        // Preview row is at the top of content container
+        // Preview row height = 120f, underline offset from bottom = 2.5f
+        float previewHeight = 100f;
+        float underlineOffset = 0f;
+
+        // Preview row bottom edge in canvas space
+        float previewRowBottom = (_logicalHeight - marginTop) - previewHeight;
+        // Underline Y position
+        float underlineY = previewRowBottom + underlineOffset;
+        // Convert to UV (0 = bottom, 1 = top)
+        float separatorUV = underlineY / _logicalHeight;
+
+        // Calculate separator length (content width ratio)
         float contentWidth = _logicalWidth - marginLeft - marginRight;
+        float separatorLength = contentWidth / _logicalWidth;
 
-        GameObject underlineObj = new GameObject("Underline");
-        underlineObj.transform.SetParent(parent, false);
-
-        RectTransform rt = underlineObj.AddComponent<RectTransform>();
-        rt.anchorMin = new Vector2(0f, 0f);
-        rt.anchorMax = new Vector2(1f, 0f);
-        rt.pivot = new Vector2(0.5f, 0f);
-        rt.anchoredPosition = new Vector2(0, 5f);
-        rt.sizeDelta = new Vector2(0, _keyHeight * 0.25f);
-
-        Image lineImg = underlineObj.AddComponent<Image>();
-        lineImg.raycastTarget = false;
-        lineImg.sprite = GetPixelSprite();
-        lineImg.color = Color.white;
-
-        Shader glowShader = Shader.Find("Custom/GlowingHorizontalLine");
-        if (glowShader != null)
-        {
-            Material glowMat = new Material(glowShader);
-            glowMat.SetFloat("_LineWidth", 0.08f);
-            glowMat.SetFloat("_GlowWidth", 0.4f);
-            glowMat.SetColor("_ColorA", new Color(0.0f, 0.8f, 1f, 1f));   // Deep Sea Blue
-            glowMat.SetColor("_ColorB", new Color(0.8f, 0.2f, 1f, 1f));   // Purple
-            glowMat.SetFloat("_Layer1Alpha", 1f);
-            glowMat.SetFloat("_Layer2Alpha", 0.6f);
-            glowMat.SetFloat("_EdgeFade", 1f);
-            lineImg.material = glowMat;
-        }
-        else
-        {
-            lineImg.color = new Color(0.3f, 0.9f, 1f, 0.5f);
-        }
+        // Set horizontal separator on border material
+        _borderMaterial.SetFloat("_HSeparatorCount", 1);
+        _borderMaterial.SetVector("_HSeparatorPositions", new Vector4(separatorUV, 0, 0, 0));
+        _borderMaterial.SetFloat("_HSeparatorWidth", 0.004f);
+        _borderMaterial.SetFloat("_HSeparatorGlowWidth", 0.015f);
+        _borderMaterial.SetFloat("_HSeparatorAlpha", 1f);
+        _borderMaterial.SetVector("_HSeparatorLengths", new Vector4(separatorLength, 1f, 1f, 1f));
     }
 
     private void OnClose()
@@ -1711,10 +1705,10 @@ public class RTTMobileKeyboard : RTTCanvasBase
         float primaryHalfHeight = primary.PanelHeight / 2f;
         float frameBottomY = primaryPos.y - primaryHalfHeight;
 
-        // Keyboard top edge should slightly overlap frame bottom
+        // Keyboard top edge position relative to frame bottom
         float overlapAmount = keyboardHalfHeight * 0.1f;
         float marginOffset = (marginBottom - marginTop) * 1.5f * PixelToMeter / 2f;
-        float keyboardCenterY = frameBottomY - keyboardHalfHeight + overlapAmount - marginOffset;
+        float keyboardCenterY = frameBottomY - keyboardHalfHeight + overlapAmount - marginOffset + verticalOffset;
 
         if (taskbar != null && taskbar.gameObject.activeInHierarchy)
         {

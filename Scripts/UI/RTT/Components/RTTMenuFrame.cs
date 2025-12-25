@@ -338,7 +338,7 @@ public class RTTMenuFrame : RTTCanvasBase
         rt.SetAsFirstSibling();
 
         // Create glowing border
-        CreateGlowingBorder(bgObj.transform, w, h, edgePad);
+        CreateGlowingBorder(bgObj.transform, w, h, edgePad * 1.175f);
 
         // Create floating data effects
         if (enableFloatingData)

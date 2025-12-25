@@ -237,6 +237,7 @@ public class RTTTaskbar : RTTCanvasBase
 
         float expansion = glowExpansion;
         float edgePad = glowExpansion > 0 ? glowExpansion / (1f + 2f * glowExpansion) : 0f;
+        edgePad *= 1.175f;
         float aspect = Aspect;
 
         Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
@@ -244,7 +245,7 @@ public class RTTTaskbar : RTTCanvasBase
         {
             _glassMaterial = new Material(glassShader);
 
-            _glassMaterial.SetFloat("_CornerRadius", 0.12f);
+            _glassMaterial.SetFloat("_CornerRadius", 0.18f);  // Match VRTaskbar
             _glassMaterial.SetFloat("_EdgePadding", edgePad);
             _glassMaterial.SetFloat("_Aspect", aspect);
 
@@ -309,28 +310,40 @@ public class RTTTaskbar : RTTCanvasBase
             _borderMaterial = new Material(glowShader);
 
             _borderMaterial.SetFloat("_StrokeEnabled", 0);
-            _borderMaterial.SetFloat("_BorderWidth", 0.02f);
-            _borderMaterial.SetFloat("_CornerRadius", 0.12f);
+
+            // Border settings matching VRTaskbar
+            _borderMaterial.SetFloat("_BorderWidth", 0.06f);  // 50% thicker
+            _borderMaterial.SetFloat("_CornerRadius", 0.24f);
             _borderMaterial.SetFloat("_EdgePadding", edgePad);
             _borderMaterial.SetFloat("_Aspect", Aspect);
 
-            _borderMaterial.SetFloat("_Layer1Width", 0.008f);
+            // Glow layer widths matching VRTaskbar
+            _borderMaterial.SetFloat("_Layer1Width", 0.03f);
             _borderMaterial.SetFloat("_Layer1Alpha", 1.5f);
-            _borderMaterial.SetFloat("_Layer2Width", 0.018f);
+            _borderMaterial.SetFloat("_Layer2Width", 0.06f);
             _borderMaterial.SetFloat("_Layer2Alpha", 1.0f);
-            _borderMaterial.SetFloat("_Layer3Width", 0.04f);
+            _borderMaterial.SetFloat("_Layer3Width", 0.1275f);
             _borderMaterial.SetFloat("_Layer3Alpha", 0.6f);
-            _borderMaterial.SetFloat("_Layer4Width", 0.08f);
+            _borderMaterial.SetFloat("_Layer4Width", 0.27f);
             _borderMaterial.SetFloat("_Layer4Alpha", 0.3f);
 
+            // Colors matching VRTaskbar
             Color cyanColor = new Color(0.3f, 1f, 1f, 1f);
             Color purpleColor = new Color(1f, 0.4f, 1f, 1f);
             _borderMaterial.SetColor("_ColorA", cyanColor);
             _borderMaterial.SetColor("_ColorB", purpleColor);
             _borderMaterial.SetFloat("_GradientMode", 2f);
             _borderMaterial.SetFloat("_GradientAngle", -10f);
-            _borderMaterial.SetFloat("_ShimmerSpeed", shimmerSpeed);
+
+            // Glass effect matching VRTaskbar
+            _borderMaterial.SetFloat("_GlassAlpha", 0.02f);
+            _borderMaterial.SetColor("_GlassTint", new Color(0.9f, 0.95f, 1f, 1f));
+
+            // Shimmer and light effects matching VRTaskbar
+            _borderMaterial.SetFloat("_ShimmerSpeed", 0.1f);
             _borderMaterial.SetFloat("_ShimmerIntensity", 0.2f);
+            _borderMaterial.SetFloat("_LightSize", 0.008f);
+            _borderMaterial.SetFloat("_LightGlow", 0.008f);
 
             // Separator settings (vertical lines between sections)
             int separatorCount = 0;
