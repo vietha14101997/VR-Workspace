@@ -1753,8 +1753,7 @@ public class KeyHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointerExitH
 
 /// <summary>
 /// Hover effect for Space key using wide element shader.
-/// Uses GlowingWideElementBorder which handles aspect ratio correctly.
-/// Now uses multi-layer gradient glow on hover (matching GlowingGlassBorder style).
+/// Uses same approach as KeyHoverEffect - directly modifying material properties.
 /// </summary>
 public class SpaceKeyHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 {
@@ -1800,17 +1799,6 @@ public class SpaceKeyHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointer
                     _savedGlowIntensity = _borderMaterial.GetFloat("_GlowIntensity");
                 if (_borderMaterial.HasProperty("_GlowColor"))
                     _savedGlowColor = _borderMaterial.GetColor("_GlowColor");
-
-                // Set hover gradient colors (matching GlowingGlassBorder defaults)
-                // Cyan to Purple gradient
-                if (_borderMaterial.HasProperty("_HoverColorA"))
-                    _borderMaterial.SetColor("_HoverColorA", new Color(0.3f, 1f, 1f, 1f));  // Cyan
-                if (_borderMaterial.HasProperty("_HoverColorB"))
-                    _borderMaterial.SetColor("_HoverColorB", new Color(1f, 0.4f, 1f, 1f)); // Purple
-
-                // IMPORTANT: Initialize hover amount to 0 (normal mode)
-                if (_borderMaterial.HasProperty("_HoverAmount"))
-                    _borderMaterial.SetFloat("_HoverAmount", 0f);
             }
         }
     }
@@ -1819,8 +1807,11 @@ public class SpaceKeyHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointer
     {
         if (_borderMaterial == null) return;
 
-        // Set hover amount - shader will use multi-layer gradient glow
-        _borderMaterial.SetFloat("_HoverAmount", 1f);
+        // Apply hover effect - same as KeyHoverEffect
+        _borderMaterial.SetColor("_GlowColor", _hoverGlowColor);
+        _borderMaterial.SetFloat("_GlowIntensity", _savedGlowIntensity * 2f);
+        _borderMaterial.SetFloat("_GlowWidth", _savedGlowWidth * 2f);
+        _borderMaterial.SetFloat("_BorderWidth", _savedBorderWidth * 1.5f);
 
         _keyboard?.MarkDirty();
     }
@@ -1829,8 +1820,11 @@ public class SpaceKeyHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointer
     {
         if (_borderMaterial == null) return;
 
-        // Turn off hover mode - shader returns to normal simple glow
-        _borderMaterial.SetFloat("_HoverAmount", 0f);
+        // Restore original properties
+        _borderMaterial.SetColor("_GlowColor", _savedGlowColor);
+        _borderMaterial.SetFloat("_GlowIntensity", _savedGlowIntensity);
+        _borderMaterial.SetFloat("_GlowWidth", _savedGlowWidth);
+        _borderMaterial.SetFloat("_BorderWidth", _savedBorderWidth);
 
         _keyboard?.MarkDirty();
     }
