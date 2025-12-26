@@ -225,7 +225,8 @@ public class RTTTaskbar : RTTCanvasBase
         edgePad *= 1.175f;
         float aspect = Aspect;
 
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
+        // Use Wide shader for very wide aspect ratios (taskbar is ~8:1)
+        Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
         if (glassShader != null)
         {
             _glassMaterial = new Material(glassShader);

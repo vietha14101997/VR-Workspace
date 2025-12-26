@@ -9,6 +9,7 @@ Shader "Custom/GlowingElementBorder"
         _EdgePadding ("Edge Padding (UV)", Range(0, 0.2)) = 0.05
         _BorderWidth ("Border Width (UV)", Range(0.01, 0.1)) = 0.045
         _CornerRadius ("Corner Radius (UV)", Range(0.02, 0.3)) = 0.15
+        _Aspect ("Aspect Ratio", Float) = 1.0
         
         [Header(Glow Settings)]
         _GlowColor ("Glow Color", Color) = (0.3, 1, 1, 1)
@@ -74,7 +75,7 @@ Shader "Custom/GlowingElementBorder"
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-            #pragma target 3.0
+            #pragma target 2.0
             
             #include "UnityCG.cginc"
             #include "UnityUI.cginc"

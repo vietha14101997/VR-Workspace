@@ -9,6 +9,7 @@ Shader "Custom/GlowingConnectButton"
         _EdgePadding ("Edge Padding (UV)", Range(0, 0.2)) = 0.02
         _BorderWidth ("Border Width (UV)", Range(0.005, 0.08)) = 0.02
         _CornerRadius ("Corner Radius (UV)", Range(0.01, 0.4)) = 0.15
+        _Aspect ("Aspect Ratio", Float) = 1.0
 
         [Header(Glow Layers)]
         _Layer1Width ("Layer 1 (Inner)", Range(0.005, 0.05)) = 0.015
@@ -93,7 +94,7 @@ Shader "Custom/GlowingConnectButton"
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-            #pragma target 3.0
+            #pragma target 2.0
 
             #include "UnityCG.cginc"
             #include "UnityUI.cginc"

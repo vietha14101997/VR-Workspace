@@ -62,6 +62,9 @@ Shader "Custom/GlowingGlassBorder"
         _HSeparatorLength ("H Separator Length (deprecated)", Range(0, 1)) = 1.0
         _HSeparatorLengths ("H Separator Lengths (per separator)", Vector) = (1, 1, 1, 1)
 
+        [Header(Aspect Ratio)]
+        _Aspect ("Aspect Ratio", Float) = 1.0
+
         // UI Masking
         _StencilComp ("Stencil Comparison", Float) = 8
         _Stencil ("Stencil ID", Float) = 0
@@ -104,7 +107,7 @@ Shader "Custom/GlowingGlassBorder"
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-            #pragma target 3.0
+            #pragma target 2.0
             
             #include "UnityCG.cginc"
             #include "UnityUI.cginc"
