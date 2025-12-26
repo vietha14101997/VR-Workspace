@@ -112,6 +112,7 @@ public class RTTMenuFrame : RTTCanvasBase
     private Material _borderMaterial;
     private Sprite _pixelSprite;
     private Sprite _roundedMaskSprite;
+    private RTTBlurBackgroundCapture _blurCapture;
 
     // Menu navigation state
     private enum MenuState { MainMenu, RemoteMenu }
@@ -155,6 +156,30 @@ public class RTTMenuFrame : RTTCanvasBase
         {
             SetAsPrimary();
         }
+
+        // Setup RTT blur capture after initialization
+        if (enableGlassmorphism && _isInitialized)
+        {
+            SetupBlurCapture();
+        }
+    }
+
+    private void SetupBlurCapture()
+    {
+        if (_displayQuad == null || _glassMaterial == null) return;
+
+        _blurCapture = gameObject.AddComponent<RTTBlurBackgroundCapture>();
+        _blurCapture.BlurRadius = blurIntensity * 0.3f; // Scale down for blur shader
+        _blurCapture.BlurIterations = Mathf.Clamp(blurQuality / 2, 1, 4);
+        _blurCapture.Initialize(this, _displayQuad);
+
+        // Apply blurred texture to glass material
+        _blurCapture.ApplyToMaterial(_glassMaterial);
+
+        // Disable procedural fallback since we have real capture
+        _glassMaterial.SetFloat("_UseProcedural", 0f);
+
+        Debug.Log("[RTTMenuFrame] RTT Blur Capture initialized");
     }
 
     protected override void OnDestroy()
@@ -170,6 +195,17 @@ public class RTTMenuFrame : RTTCanvasBase
         }
 
         base.OnDestroy();
+    }
+
+    public override void MarkDirty()
+    {
+        base.MarkDirty();
+
+        // Also mark blur capture as dirty
+        if (_blurCapture != null)
+        {
+            _blurCapture.MarkDirty();
+        }
     }
     #endregion
 
@@ -310,8 +346,6 @@ public class RTTMenuFrame : RTTCanvasBase
             _glassMaterial.SetFloat("_FresnelStrength", 0.12f);
 
             // Glassmorphism settings
-            // RTT mode: Disable blur because GrabPass can't capture world background
-            _glassMaterial.SetFloat("_BlurEnabled", 0f);
             _glassMaterial.SetFloat("_BlurRadius", blurIntensity);
             _glassMaterial.SetFloat("_BlurIterations", blurQuality);
             // Don't override _GlassOpacity - use shader default (0.25)
@@ -319,6 +353,20 @@ public class RTTMenuFrame : RTTCanvasBase
             _glassMaterial.SetFloat("_InnerGlow", innerGlow);
             _glassMaterial.SetFloat("_Brightness", brightness);
             _glassMaterial.SetFloat("_Saturation", saturation);
+
+            // RTT Blur Mode: Enable blur with background capture
+            if (enableGlassmorphism)
+            {
+                _glassMaterial.SetFloat("_BlurEnabled", 1f);
+                _glassMaterial.SetFloat("_UseExternalBlur", 1f);
+                // Procedural fallback enabled by default
+                _glassMaterial.SetFloat("_UseProcedural", 1f);
+                _glassMaterial.SetColor("_ProceduralBaseColor", new Color(0.15f, 0.25f, 0.35f, 1f));
+            }
+            else
+            {
+                _glassMaterial.SetFloat("_BlurEnabled", 0f);
+            }
 
             img.material = _glassMaterial;
             img.color = Color.white;

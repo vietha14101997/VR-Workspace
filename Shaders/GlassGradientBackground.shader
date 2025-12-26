@@ -34,6 +34,12 @@ Shader "Custom/GlassGradientBackground"
         [Header(Hover State)]
         _HoverAmount ("Hover Amount", Range(0, 1)) = 0
 
+        [Header(RTT Blur Mode)]
+        _UseExternalBlur ("Use External Blur (RTT)", Range(0, 1)) = 0
+        _BlurredBackgroundTex ("Blurred Background", 2D) = "gray" {}
+        _UseProcedural ("Use Procedural Fallback", Range(0, 1)) = 0
+        _ProceduralBaseColor ("Procedural Base Color", Color) = (0.2, 0.3, 0.4, 1)
+
         // UI Masking
         _StencilComp ("Stencil Comparison", Float) = 8
         _Stencil ("Stencil ID", Float) = 0
@@ -132,6 +138,12 @@ Shader "Custom/GlassGradientBackground"
             float _FresnelStrength;
             float _HoverAmount;
 
+            // RTT Blur Mode
+            float _UseExternalBlur;
+            sampler2D _BlurredBackgroundTex;
+            float _UseProcedural;
+            fixed4 _ProceduralBaseColor;
+
             float _Aspect; // Aspect Ratio (Width/Height)
 
             // SDF for rounded box with Aspect Ratio correction
@@ -211,6 +223,36 @@ Shader "Custom/GlassGradientBackground"
                 return result;
             }
 
+            // ========== PROCEDURAL FROSTED GLASS ==========
+            // Fallback when background capture is not available
+            half4 ProceduralFrostedGlass(float2 uv, float2 screenUV)
+            {
+                // Noise-based frosted effect
+                float noise = frac(sin(dot(screenUV * 50, float2(12.9898, 78.233))) * 43758.5453);
+                noise = lerp(0.85, 1.15, noise);
+
+                // Secondary noise for variation
+                float noise2 = frac(sin(dot(screenUV * 30 + 0.5, float2(78.233, 12.9898))) * 43758.5453);
+                noise = lerp(noise, noise2, 0.3);
+
+                // Gradient from top to bottom (simulate sky/ground)
+                half3 topColor = _ProceduralBaseColor.rgb * 1.4;
+                half3 bottomColor = _ProceduralBaseColor.rgb * 0.6;
+                half3 baseColor = lerp(bottomColor, topColor, uv.y);
+
+                // Add subtle color variation
+                baseColor *= noise;
+
+                // Brightness adjustment
+                baseColor *= _Brightness;
+
+                // Saturation adjustment
+                float lum = dot(baseColor, float3(0.299, 0.587, 0.114));
+                baseColor = lerp(float3(lum, lum, lum), baseColor, _Saturation);
+
+                return half4(baseColor, 1);
+            }
+
             fixed4 frag(v2f i) : SV_Target
             {
                 float2 uv = i.uv;
@@ -243,7 +285,27 @@ Shader "Custom/GlassGradientBackground"
                 if (_BlurEnabled > 0.5)
                 {
                     // ========== GLASSMORPHISM MODE ==========
-                    half4 blurredBg = GlassmorphismBlur(i.grabPos);
+                    half4 blurredBg;
+
+                    if (_UseExternalBlur > 0.5)
+                    {
+                        // RTT mode: sample from pre-blurred texture
+                        float2 bgUV = i.uv;
+                        blurredBg = tex2D(_BlurredBackgroundTex, bgUV);
+
+                        // Check if texture is empty/black - fallback to procedural
+                        float texBrightness = dot(blurredBg.rgb, float3(1,1,1));
+                        if (_UseProcedural > 0.5 || texBrightness < 0.03)
+                        {
+                            float2 screenUV = i.grabPos.xy / i.grabPos.w;
+                            blurredBg = ProceduralFrostedGlass(i.uv, screenUV);
+                        }
+                    }
+                    else
+                    {
+                        // Legacy mode: GrabPass (for non-RTT usage)
+                        blurredBg = GlassmorphismBlur(i.grabPos);
+                    }
 
                     // Base: blurred background
                     float3 glassColor = blurredBg.rgb;
