@@ -39,7 +39,7 @@ public class RTTMobileKeyboard : RTTCanvasBase
     [SerializeField] private bool followTaskbar = true;
     [SerializeField] private float spacingMultiplier = 1.5f;
     [SerializeField] private float widthRatioToFrame = 0.7f;
-    [SerializeField] private float verticalOffset = -0.05f; // Offset to move keyboard down (negative = lower)
+    [SerializeField] private float verticalOffset = -0.075f; // Offset to move keyboard down (negative = lower)
     #endregion
 
     #region Constants
