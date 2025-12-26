@@ -283,13 +283,14 @@ public class RTTMobileKeyboard : RTTCanvasBase
         img.raycastTarget = true;
 
         float aspect = _logicalWidth / _logicalHeight;
-        float expansion = 0.02f;  // Small expansion for border glow only
-        float edgePad = expansion / (1f + 2f * expansion);
-        // Background needs LARGER corner radius to stay INSIDE the border
+        // Use larger edge padding for better Android GPU compatibility (matches Space key values)
+        float edgePad = 0.06f;
+        // Corner radius - same as Space key for consistency
         float bgCornerRadius = 0.12f;
         float borderCornerRadius = 0.10f;
 
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
+        // Use Wide shader for better Android compatibility (Space key uses this and works)
+        Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
         if (glassShader != null)
         {
             _glassMaterial = new Material(glassShader);
@@ -1136,7 +1137,8 @@ public class RTTMobileKeyboard : RTTCanvasBase
         bg.sprite = GetPixelSprite();
         bg.raycastTarget = true;
 
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
+        // Use Wide shader for better Android GPU compatibility
+        Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
         if (glassShader != null)
         {
             Material glassMat = new Material(glassShader);
@@ -1254,7 +1256,8 @@ public class RTTMobileKeyboard : RTTCanvasBase
         bg.sprite = GetPixelSprite();
         bg.raycastTarget = true;
 
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
+        // Use Wide shader for better Android GPU compatibility
+        Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
         if (glassShader != null)
         {
             Material glassMat = new Material(glassShader);
@@ -1376,7 +1379,8 @@ public class RTTMobileKeyboard : RTTCanvasBase
         bg.sprite = GetPixelSprite();
         bg.raycastTarget = true;
 
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
+        // Use Wide shader for better Android GPU compatibility
+        Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
         if (glassShader != null)
         {
             Material glassMat = new Material(glassShader);

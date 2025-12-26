@@ -221,8 +221,8 @@ public class RTTTaskbar : RTTCanvasBase
         img.raycastTarget = true;
 
         float expansion = glowExpansion;
-        float edgePad = glowExpansion > 0 ? glowExpansion / (1f + 2f * glowExpansion) : 0f;
-        edgePad *= 1.175f;
+        // Use larger edge padding for better Android GPU compatibility (matches Space key values)
+        float edgePad = 0.06f;
         float aspect = Aspect;
 
         // Use Wide shader for very wide aspect ratios (taskbar is ~8:1)
@@ -231,7 +231,7 @@ public class RTTTaskbar : RTTCanvasBase
         {
             _glassMaterial = new Material(glassShader);
 
-            _glassMaterial.SetFloat("_CornerRadius", 0.18f);  // Match VRTaskbar
+            _glassMaterial.SetFloat("_CornerRadius", 0.12f);  // Match Space key for consistency
             _glassMaterial.SetFloat("_EdgePadding", edgePad);
             _glassMaterial.SetFloat("_Aspect", aspect);
 

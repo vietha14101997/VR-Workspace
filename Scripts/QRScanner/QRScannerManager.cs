@@ -306,7 +306,8 @@ public class QRScannerManager : MonoBehaviour
         img.type = Image.Type.Simple;
         img.sprite = CreatePixelSprite();
 
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
+        // Use Wide shader for better Android GPU compatibility
+        Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
         if (glassShader != null)
         {
             Material glassMat = new Material(glassShader);
@@ -727,7 +728,8 @@ public class QRScannerManager : MonoBehaviour
         img.type = Image.Type.Simple;
         img.sprite = CreatePixelSprite();
 
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
+        // Use Wide shader for better Android GPU compatibility
+        Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
         if (glassShader != null)
         {
             Material glassMat = new Material(glassShader);

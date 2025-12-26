@@ -321,7 +321,8 @@ public static class VRButtonFactory
         float aspect = config.width / config.height;
         Color col = config.themeColor;
 
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
+        // Use Wide shader for better Android GPU compatibility
+        Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
         if (glassShader != null)
         {
             Material mat = new Material(glassShader);

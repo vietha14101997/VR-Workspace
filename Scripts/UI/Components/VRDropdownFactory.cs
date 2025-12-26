@@ -307,8 +307,8 @@ public static class VRDropdownFactory
         float aspect = config.width / config.BoxHeight;
         Color col = config.themeColor;
 
-        // Use GlassGradientBackground shader
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
+        // Use Wide shader for better Android GPU compatibility
+        Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
         if (glassShader != null)
         {
             Material mat = new Material(glassShader);
@@ -769,8 +769,8 @@ public static class VRDropdownFactory
         }
         else
         {
-            // Fallback to regular shader
-            Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
+            // Fallback to Wide shader for better Android GPU compatibility
+            Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
             if (glassShader != null)
             {
                 Material mat = new Material(glassShader);

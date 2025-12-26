@@ -267,13 +267,14 @@ public class RTTMenuFrame : RTTCanvasBase
         img.raycastTarget = true;
 
         float expansion = glowExpansion;
-        float edgePad = glowExpansion > 0 ? glowExpansion / (1f + 2f * glowExpansion) : 0f;
+        // Use larger edge padding for better Android GPU compatibility (matches Space key values)
+        float edgePad = 0.06f;
         float aspect = Aspect;
-        // Background needs LARGER corner radius to stay INSIDE the border
-        float bgCornerRadius = 0.14f;
+        // Background corner radius
+        float bgCornerRadius = 0.12f;
 
-        // Try glass shader
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
+        // Use Wide shader for better Android compatibility (Space key uses this and works)
+        Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
         if (glassShader != null)
         {
             _glassMaterial = new Material(glassShader);
