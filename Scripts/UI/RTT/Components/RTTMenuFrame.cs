@@ -33,25 +33,6 @@ public class RTTMenuFrame : RTTCanvasBase
     [Header("Visual Config")]
     [SerializeField] private Color glassColor = new Color(1f, 1f, 1f, 0.098f);
 
-    [Header("Glassmorphism")]
-    [SerializeField] private bool enableGlassmorphism = true;
-    [Range(0, 40)]
-    [SerializeField] private float blurIntensity = 2f;
-    [Range(1, 8)]
-    [SerializeField] private int blurQuality = 3;
-#pragma warning disable 0414 // Reserved for future glassmorphism implementation
-    [Range(0, 1)]
-    [SerializeField] private float glassOpacity = 0f;
-#pragma warning restore 0414
-    [Range(0, 1)]
-    [SerializeField] private float tintStrength = 0.1f;
-    [Range(0, 0.5f)]
-    [SerializeField] private float innerGlow = 0f;
-    [Range(0.9f, 1.3f)]
-    [SerializeField] private float brightness = 1f;
-    [Range(0.5f, 1f)]
-    [SerializeField] private float saturation = 1f;
-
     [Header("Glowing Border")]
     [ColorUsage(true, true)]
     [SerializeField] private Color glowColorA = new Color(0f, 1.5f, 2f, 1f);
@@ -116,7 +97,6 @@ public class RTTMenuFrame : RTTCanvasBase
     private Material _borderMaterial;
     private Sprite _pixelSprite;
     private Sprite _roundedMaskSprite;
-    private RTTBlurBackgroundCapture _blurCapture;
 
     // Menu navigation state
     private enum MenuState { MainMenu, RemoteMenu }
@@ -160,38 +140,6 @@ public class RTTMenuFrame : RTTCanvasBase
         {
             SetAsPrimary();
         }
-
-        // Setup RTT blur capture after initialization
-        if (enableGlassmorphism && _isInitialized)
-        {
-            SetupBlurCapture();
-        }
-    }
-
-    private void SetupBlurCapture()
-    {
-        if (_displayQuad == null || _glassMaterial == null) return;
-
-        _blurCapture = gameObject.AddComponent<RTTBlurBackgroundCapture>();
-        _blurCapture.BlurRadius = blurIntensity * 0.3f; // Scale down for blur shader
-        _blurCapture.BlurIterations = Mathf.Clamp(blurQuality / 2, 1, 4);
-        _blurCapture.Initialize(this, _displayQuad);
-
-        // Check if blur capture initialized successfully
-        if (_blurCapture.IsReady)
-        {
-            // Apply blurred texture to glass material
-            _blurCapture.ApplyToMaterial(_glassMaterial);
-            // Disable procedural fallback since we have real capture
-            _glassMaterial.SetFloat("_UseProcedural", 0f);
-            Debug.Log("[RTTMenuFrame] RTT Blur Capture initialized successfully");
-        }
-        else
-        {
-            // Blur capture failed - keep procedural fallback enabled
-            _glassMaterial.SetFloat("_UseProcedural", 1f);
-            Debug.Log("[RTTMenuFrame] RTT Blur Capture failed - using procedural fallback");
-        }
     }
 
     protected override void OnDestroy()
@@ -207,17 +155,6 @@ public class RTTMenuFrame : RTTCanvasBase
         }
 
         base.OnDestroy();
-    }
-
-    public override void MarkDirty()
-    {
-        base.MarkDirty();
-
-        // Also mark blur capture as dirty
-        if (_blurCapture != null)
-        {
-            _blurCapture.MarkDirty();
-        }
     }
     #endregion
 
@@ -356,29 +293,6 @@ public class RTTMenuFrame : RTTCanvasBase
             _glassMaterial.SetFloat("_GlassAlpha", 0.38f);
             _glassMaterial.SetFloat("_FresnelPower", 2.2f);
             _glassMaterial.SetFloat("_FresnelStrength", 0.12f);
-
-            // Glassmorphism settings
-            _glassMaterial.SetFloat("_BlurRadius", blurIntensity);
-            _glassMaterial.SetFloat("_BlurIterations", blurQuality);
-            // Don't override _GlassOpacity - use shader default (0.25)
-            _glassMaterial.SetFloat("_TintStrength", tintStrength);
-            _glassMaterial.SetFloat("_InnerGlow", innerGlow);
-            _glassMaterial.SetFloat("_Brightness", brightness);
-            _glassMaterial.SetFloat("_Saturation", saturation);
-
-            // RTT Blur Mode: Enable blur with background capture
-            if (enableGlassmorphism)
-            {
-                _glassMaterial.SetFloat("_BlurEnabled", 1f);
-                _glassMaterial.SetFloat("_UseExternalBlur", 1f);
-                // Procedural fallback enabled by default
-                _glassMaterial.SetFloat("_UseProcedural", 1f);
-                _glassMaterial.SetColor("_ProceduralBaseColor", new Color(0.15f, 0.25f, 0.35f, 1f));
-            }
-            else
-            {
-                _glassMaterial.SetFloat("_BlurEnabled", 0f);
-            }
 
             img.material = _glassMaterial;
             img.color = Color.white;

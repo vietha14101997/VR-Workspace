@@ -9,16 +9,6 @@ Shader "Custom/GlassGradientBackgroundWide"
         [PerRendererData] _MainTex ("Sprite Texture", 2D) = "white" {}
         _Color ("Tint", Color) = (1,1,1,1)
 
-        [Header(Glassmorphism)]
-        _BlurEnabled ("Enable Glassmorphism", Range(0, 1)) = 0
-        _BlurRadius ("Blur Intensity", Range(0, 40)) = 15
-        _BlurIterations ("Blur Quality", Range(1, 8)) = 4
-        _GlassOpacity ("Glass Opacity", Range(0, 1)) = 0.25
-        _TintStrength ("Tint Strength", Range(0, 1)) = 0.1
-        _InnerGlow ("Inner Glow", Range(0, 0.5)) = 0.15
-        _Brightness ("Brightness", Range(0.9, 1.3)) = 1.05
-        _Saturation ("Saturation", Range(0.5, 1)) = 0.85
-
         [Header(Rounded Corners)]
         _CornerRadius ("Corner Radius (UV)", Range(0.01, 0.2)) = 0.07
         _EdgePadding ("Edge Padding (UV)", Range(0, 0.2)) = 0.05
@@ -75,12 +65,6 @@ Shader "Custom/GlassGradientBackgroundWide"
         Blend SrcAlpha OneMinusSrcAlpha
         ColorMask [_ColorMask]
 
-        // GrabPass for blur effect
-        GrabPass
-        {
-            "_GlassGradientWideGrabTexture"
-        }
-
         Pass
         {
             Name "GlassGradientBackgroundWide"
@@ -105,25 +89,12 @@ Shader "Custom/GlassGradientBackgroundWide"
                 float4 vertex : SV_POSITION;
                 fixed4 color : COLOR;
                 float2 uv : TEXCOORD0;
-                float4 grabPos : TEXCOORD1;
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
             sampler2D _MainTex;
             float4 _MainTex_ST;
             fixed4 _Color;
-
-            // Glassmorphism variables
-            sampler2D _GlassGradientWideGrabTexture;
-            float4 _GlassGradientWideGrabTexture_TexelSize;
-            float _BlurEnabled;
-            float _BlurRadius;
-            float _BlurIterations;
-            float _GlassOpacity;
-            float _TintStrength;
-            float _InnerGlow;
-            float _Brightness;
-            float _Saturation;
 
             float _CornerRadius;
             float _EdgePadding;
@@ -172,51 +143,8 @@ Shader "Custom/GlassGradientBackgroundWide"
                 o.vertex = UnityObjectToClipPos(v.vertex);
                 o.uv = TRANSFORM_TEX(v.texcoord, _MainTex);
                 o.color = v.color * _Color;
-                o.grabPos = ComputeGrabScreenPos(o.vertex);
 
                 return o;
-            }
-
-            // Glassmorphism blur
-            half4 GlassmorphismBlur(float4 grabPos)
-            {
-                float2 texelSize = _GlassGradientWideGrabTexture_TexelSize.xy * _BlurRadius;
-                half4 blurColor = half4(0, 0, 0, 0);
-                float totalWeight = 0;
-
-                int iterations = (int)_BlurIterations;
-
-                float weights[8] = {1.0, 0.9, 0.75, 0.6, 0.45, 0.3, 0.18, 0.08};
-
-                for (int ring = 0; ring < iterations; ring++)
-                {
-                    float offset = (ring + 1) * 1.2;
-                    float weight = weights[ring];
-
-                    blurColor += tex2Dproj(_GlassGradientWideGrabTexture, grabPos + float4(texelSize.x * offset, 0, 0, 0)) * weight;
-                    blurColor += tex2Dproj(_GlassGradientWideGrabTexture, grabPos + float4(-texelSize.x * offset, 0, 0, 0)) * weight;
-                    blurColor += tex2Dproj(_GlassGradientWideGrabTexture, grabPos + float4(0, texelSize.y * offset, 0, 0)) * weight;
-                    blurColor += tex2Dproj(_GlassGradientWideGrabTexture, grabPos + float4(0, -texelSize.y * offset, 0, 0)) * weight;
-
-                    float diag = offset * 0.707;
-                    blurColor += tex2Dproj(_GlassGradientWideGrabTexture, grabPos + float4(texelSize.x * diag, texelSize.y * diag, 0, 0)) * weight;
-                    blurColor += tex2Dproj(_GlassGradientWideGrabTexture, grabPos + float4(-texelSize.x * diag, texelSize.y * diag, 0, 0)) * weight;
-                    blurColor += tex2Dproj(_GlassGradientWideGrabTexture, grabPos + float4(texelSize.x * diag, -texelSize.y * diag, 0, 0)) * weight;
-                    blurColor += tex2Dproj(_GlassGradientWideGrabTexture, grabPos + float4(-texelSize.x * diag, -texelSize.y * diag, 0, 0)) * weight;
-
-                    totalWeight += weight * 8;
-                }
-
-                blurColor += tex2Dproj(_GlassGradientWideGrabTexture, grabPos) * 1.5;
-                totalWeight += 1.5;
-
-                half4 result = blurColor / totalWeight;
-                result.rgb *= _Brightness;
-
-                float lum = dot(result.rgb, float3(0.299, 0.587, 0.114));
-                result.rgb = lerp(float3(lum, lum, lum), result.rgb, _Saturation);
-
-                return result;
             }
 
             fixed4 frag(v2f i) : SV_Target
@@ -244,47 +172,19 @@ Shader "Custom/GlassGradientBackgroundWide"
                 float hoverBrightness = 1.0 + _HoverAmount * 0.3;
                 float hoverAlphaBoost = _HoverAmount * 0.1;
 
-                // ========== COMBINE ==========
-                fixed4 finalColor;
+                // ========== GLASS EFFECT ==========
+                float2 centerDist = abs(uv - 0.5);
+                float centerGlow = 1.0 - saturate(length(centerDist) / 0.5);
+                centerGlow = pow(centerGlow, 1.5) * 0.15;
 
-                if (_BlurEnabled > 0.5)
-                {
-                    half4 blurredBg = GlassmorphismBlur(i.grabPos);
-                    float3 glassColor = blurredBg.rgb;
+                float edgeFactor = 1.0 - saturate(abs(dist) / 0.2);
+                float fresnel = pow(edgeFactor, _FresnelPower) * _FresnelStrength;
 
-                    float3 tint = lerp(float3(1,1,1), gradColor.rgb * 1.5, _TintStrength);
-                    glassColor *= tint;
-
-                    float edgeDist = saturate(-dist / 0.15);
-                    float innerGlow = pow(edgeDist, 2.0) * _InnerGlow;
-                    glassColor += float3(1, 1, 1) * innerGlow;
-
-                    float fresnelEdge = pow(edgeDist, _FresnelPower) * _FresnelStrength * 0.5;
-                    glassColor += gradColor.rgb * fresnelEdge;
-
-                    glassColor *= hoverBrightness;
-
-                    float3 glassOverlay = gradColor.rgb * 0.3;
-                    glassColor = lerp(glassColor, glassColor + glassOverlay, _GlassOpacity);
-
-                    finalColor.rgb = glassColor;
-                    finalColor.a = alphaMask;
-                }
-                else
-                {
-                    float2 centerDist = abs(uv - 0.5);
-                    float centerGlow = 1.0 - saturate(length(centerDist) / 0.5);
-                    centerGlow = pow(centerGlow, 1.5) * 0.15;
-
-                    float edgeFactor = 1.0 - saturate(abs(dist) / 0.2);
-                    float fresnel = pow(edgeFactor, _FresnelPower) * _FresnelStrength;
-
-                    finalColor = gradColor;
-                    finalColor.a = _GlassAlpha + gradColor.a * 0.5 + hoverAlphaBoost;
-                    finalColor.a *= alphaMask;
-                    finalColor.rgb += fresnel + centerGlow;
-                    finalColor.rgb *= hoverBrightness;
-                }
+                fixed4 finalColor = gradColor;
+                finalColor.a = _GlassAlpha + gradColor.a * 0.5 + hoverAlphaBoost;
+                finalColor.a *= alphaMask;
+                finalColor.rgb += fresnel + centerGlow;
+                finalColor.rgb *= hoverBrightness;
 
                 finalColor *= i.color;
 

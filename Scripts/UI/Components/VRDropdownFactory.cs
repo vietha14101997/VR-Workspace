@@ -60,16 +60,6 @@ public static class VRDropdownFactory
         public float glowWidth = 0.04f;
         public float glowIntensity = 2.5f;
 
-        // Glassmorphism settings (uses GlassGradientBackgroundOverlay with higher Queue)
-        public bool enableGlassmorphism = true;
-        public float blurIntensity = 6;
-        public int blurQuality = 8;
-        public float glassOpacity = 0f;
-        public float tintStrength = 0.1f;
-        public float innerGlow = 0f;
-        public float brightness = 1f;
-        public float saturation = 1f;
-
         // Animation
         public float popAmount = 0.005f;
 
@@ -317,7 +307,7 @@ public static class VRDropdownFactory
         float aspect = config.width / config.BoxHeight;
         Color col = config.themeColor;
 
-        // Use GlassGradientBackground with Glassmorphism (like VRMenuFrame)
+        // Use GlassGradientBackground shader
         Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
         if (glassShader != null)
         {
@@ -337,16 +327,6 @@ public static class VRDropdownFactory
             mat.SetFloat("_GlassAlpha", config.backgroundAlpha);
             mat.SetFloat("_FresnelPower", 2.2f);
             mat.SetFloat("_FresnelStrength", 0.12f);
-
-            // Glassmorphism settings (like VRMenuFrame)
-            mat.SetFloat("_BlurEnabled", 0f);
-            // mat.SetFloat("_BlurRadius", config.blurIntensity);
-            // mat.SetFloat("_BlurIterations", config.blurQuality);
-            // mat.SetFloat("_GlassOpacity", config.glassOpacity);
-            // mat.SetFloat("_TintStrength", config.tintStrength);
-            // mat.SetFloat("_InnerGlow", config.innerGlow);
-            // mat.SetFloat("_Brightness", config.brightness);
-            // mat.SetFloat("_Saturation", config.saturation);
 
             img.material = mat;
             img.color = Color.white;
@@ -665,7 +645,7 @@ public static class VRDropdownFactory
         CreateViewportBorder(viewportVisuals.transform, config, panelHeight);
 
         // Content container - NOW INSIDE VISUALS for easier HoverBorder calculation
-        // Uses nested Canvas with higher sorting order so content renders AFTER glassmorphism background
+        // Uses nested Canvas with higher sorting order so content renders AFTER background
         GameObject viewportContent = new GameObject("Content");
         viewportContent.transform.SetParent(viewportVisuals.transform, false);
         viewportContent.layer = renderLayer;
@@ -678,7 +658,7 @@ public static class VRDropdownFactory
         viewportContentRT.offsetMin = new Vector2(expansionPixelsX + 10, expansionPixelsY + 10);
         viewportContentRT.offsetMax = new Vector2(-expansionPixelsX - 10, -expansionPixelsY - 10);
 
-        // Nested Canvas to ensure content renders AFTER the glassmorphism GrabPass
+        // Nested Canvas to ensure content renders AFTER background
         Canvas contentCanvas = viewportContent.AddComponent<Canvas>();
         contentCanvas.overrideSorting = true;
         contentCanvas.sortingOrder = 110; // Higher than panel's 100, after Overlay shader Queue
@@ -784,16 +764,6 @@ public static class VRDropdownFactory
             mat.SetFloat("_FresnelPower", 2.2f);
             mat.SetFloat("_FresnelStrength", 0.12f);
 
-            // Glassmorphism settings
-            mat.SetFloat("_BlurEnabled", config.enableGlassmorphism ? 1f : 0f);
-            mat.SetFloat("_BlurRadius", config.blurIntensity);
-            mat.SetFloat("_BlurIterations", config.blurQuality);
-            mat.SetFloat("_GlassOpacity", config.glassOpacity);
-            mat.SetFloat("_TintStrength", config.tintStrength);
-            mat.SetFloat("_InnerGlow", config.innerGlow);
-            mat.SetFloat("_Brightness", config.brightness);
-            mat.SetFloat("_Saturation", config.saturation);
-
             img.material = mat;
             img.color = Color.white;
         }
@@ -810,7 +780,6 @@ public static class VRDropdownFactory
                 mat.SetColor("_ColorA", new Color(col.r, col.g, col.b, config.backgroundAlpha * 1.5f));
                 mat.SetColor("_ColorB", new Color(col.r, col.g, col.b, config.backgroundAlpha));
                 mat.SetFloat("_GlassAlpha", config.backgroundAlpha);
-                mat.SetFloat("_BlurEnabled", 0f);
                 img.material = mat;
                 img.color = Color.white;
             }
