@@ -177,13 +177,21 @@ public class RTTMenuFrame : RTTCanvasBase
         _blurCapture.BlurIterations = Mathf.Clamp(blurQuality / 2, 1, 4);
         _blurCapture.Initialize(this, _displayQuad);
 
-        // Apply blurred texture to glass material
-        _blurCapture.ApplyToMaterial(_glassMaterial);
-
-        // Disable procedural fallback since we have real capture
-        _glassMaterial.SetFloat("_UseProcedural", 0f);
-
-        Debug.Log("[RTTMenuFrame] RTT Blur Capture initialized");
+        // Check if blur capture initialized successfully
+        if (_blurCapture.IsReady)
+        {
+            // Apply blurred texture to glass material
+            _blurCapture.ApplyToMaterial(_glassMaterial);
+            // Disable procedural fallback since we have real capture
+            _glassMaterial.SetFloat("_UseProcedural", 0f);
+            Debug.Log("[RTTMenuFrame] RTT Blur Capture initialized successfully");
+        }
+        else
+        {
+            // Blur capture failed - keep procedural fallback enabled
+            _glassMaterial.SetFloat("_UseProcedural", 1f);
+            Debug.Log("[RTTMenuFrame] RTT Blur Capture failed - using procedural fallback");
+        }
     }
 
     protected override void OnDestroy()

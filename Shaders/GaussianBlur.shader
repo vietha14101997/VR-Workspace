@@ -43,38 +43,29 @@ Shader "Hidden/RTT/GaussianBlur"
             return o;
         }
 
-        // 9-tap Gaussian weights (sigma ~= 2.5)
-        static const half weights[5] = {
-            0.227027, // center
-            0.194594, // offset 1
-            0.121622, // offset 2
-            0.054054, // offset 3
-            0.016216  // offset 4
-        };
-
-        // Optimized Gaussian blur using linear sampling
-        // Samples at offset positions to get 2 texels with 1 sample
-        static const half offsets[5] = {
-            0.0,
-            1.3846153846,
-            3.2307692308,
-            5.0769230769,
-            6.9230769231
-        };
-
+        // Mobile-compatible 5-tap blur (unrolled, no arrays)
         half4 GaussianBlurHorizontal(float2 uv)
         {
             half2 texelSize = _MainTex_TexelSize.xy * _BlurRadius;
-            half4 color = tex2D(_MainTex, uv) * weights[0];
 
-            // Horizontal samples
-            [unroll]
-            for (int i = 1; i < 5; i++)
-            {
-                float2 offset = float2(texelSize.x * offsets[i], 0);
-                color += tex2D(_MainTex, uv + offset) * weights[i];
-                color += tex2D(_MainTex, uv - offset) * weights[i];
-            }
+            // Center sample (weight 0.227027)
+            half4 color = tex2D(_MainTex, uv) * 0.227027;
+
+            // Offset 1 (weight 0.194594, offset 1.385)
+            color += tex2D(_MainTex, uv + float2(texelSize.x * 1.385, 0)) * 0.194594;
+            color += tex2D(_MainTex, uv - float2(texelSize.x * 1.385, 0)) * 0.194594;
+
+            // Offset 2 (weight 0.121622, offset 3.231)
+            color += tex2D(_MainTex, uv + float2(texelSize.x * 3.231, 0)) * 0.121622;
+            color += tex2D(_MainTex, uv - float2(texelSize.x * 3.231, 0)) * 0.121622;
+
+            // Offset 3 (weight 0.054054, offset 5.077)
+            color += tex2D(_MainTex, uv + float2(texelSize.x * 5.077, 0)) * 0.054054;
+            color += tex2D(_MainTex, uv - float2(texelSize.x * 5.077, 0)) * 0.054054;
+
+            // Offset 4 (weight 0.016216, offset 6.923)
+            color += tex2D(_MainTex, uv + float2(texelSize.x * 6.923, 0)) * 0.016216;
+            color += tex2D(_MainTex, uv - float2(texelSize.x * 6.923, 0)) * 0.016216;
 
             return color;
         }
@@ -82,16 +73,25 @@ Shader "Hidden/RTT/GaussianBlur"
         half4 GaussianBlurVertical(float2 uv)
         {
             half2 texelSize = _MainTex_TexelSize.xy * _BlurRadius;
-            half4 color = tex2D(_MainTex, uv) * weights[0];
 
-            // Vertical samples
-            [unroll]
-            for (int i = 1; i < 5; i++)
-            {
-                float2 offset = float2(0, texelSize.y * offsets[i]);
-                color += tex2D(_MainTex, uv + offset) * weights[i];
-                color += tex2D(_MainTex, uv - offset) * weights[i];
-            }
+            // Center sample (weight 0.227027)
+            half4 color = tex2D(_MainTex, uv) * 0.227027;
+
+            // Offset 1 (weight 0.194594, offset 1.385)
+            color += tex2D(_MainTex, uv + float2(0, texelSize.y * 1.385)) * 0.194594;
+            color += tex2D(_MainTex, uv - float2(0, texelSize.y * 1.385)) * 0.194594;
+
+            // Offset 2 (weight 0.121622, offset 3.231)
+            color += tex2D(_MainTex, uv + float2(0, texelSize.y * 3.231)) * 0.121622;
+            color += tex2D(_MainTex, uv - float2(0, texelSize.y * 3.231)) * 0.121622;
+
+            // Offset 3 (weight 0.054054, offset 5.077)
+            color += tex2D(_MainTex, uv + float2(0, texelSize.y * 5.077)) * 0.054054;
+            color += tex2D(_MainTex, uv - float2(0, texelSize.y * 5.077)) * 0.054054;
+
+            // Offset 4 (weight 0.016216, offset 6.923)
+            color += tex2D(_MainTex, uv + float2(0, texelSize.y * 6.923)) * 0.016216;
+            color += tex2D(_MainTex, uv - float2(0, texelSize.y * 6.923)) * 0.016216;
 
             return color;
         }
@@ -105,7 +105,7 @@ Shader "Hidden/RTT/GaussianBlur"
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-            #pragma target 3.0
+            #pragma target 2.0
 
             half4 frag(v2f i) : SV_Target
             {
@@ -122,7 +122,7 @@ Shader "Hidden/RTT/GaussianBlur"
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-            #pragma target 3.0
+            #pragma target 2.0
 
             half4 frag(v2f i) : SV_Target
             {
@@ -139,7 +139,7 @@ Shader "Hidden/RTT/GaussianBlur"
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-            #pragma target 3.0
+            #pragma target 2.0
 
             half4 frag(v2f i) : SV_Target
             {

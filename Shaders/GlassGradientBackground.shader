@@ -443,6 +443,15 @@ Shader "Custom/GlassGradientBackground"
             float _Saturation;
             fixed4 _ProceduralBaseColor;
 
+            // RTT Blur Mode (Mobile)
+            float _BlurEnabled;
+            float _UseExternalBlur;
+            sampler2D _BlurredBackgroundTex;
+            float _UseProcedural;
+            float _TintStrength;
+            float _InnerGlow;
+            float _GlassOpacity;
+
             // SDF for rounded box with Aspect Ratio correction
             float sdRoundedBoxAspect(float2 uv, float aspect, float radius, float padding)
             {
@@ -454,6 +463,35 @@ Shader "Custom/GlassGradientBackground"
 
                 float2 d = abs(pos) - halfSize + radius;
                 return min(max(d.x, d.y), 0.0) + length(max(d, 0.0)) - radius;
+            }
+
+            // Procedural frosted glass for mobile
+            half4 ProceduralFrostedGlass_Mobile(float2 uv, float2 screenUV)
+            {
+                // Noise-based frosted effect
+                float noise = frac(sin(dot(screenUV * 50, float2(12.9898, 78.233))) * 43758.5453);
+                noise = lerp(0.85, 1.15, noise);
+
+                // Secondary noise for variation
+                float noise2 = frac(sin(dot(screenUV * 30 + 0.5, float2(78.233, 12.9898))) * 43758.5453);
+                noise = lerp(noise, noise2, 0.3);
+
+                // Gradient from top to bottom (simulate sky/ground)
+                half3 topColor = _ProceduralBaseColor.rgb * 1.4;
+                half3 bottomColor = _ProceduralBaseColor.rgb * 0.6;
+                half3 baseColor = lerp(bottomColor, topColor, uv.y);
+
+                // Add subtle color variation
+                baseColor *= noise;
+
+                // Brightness adjustment
+                baseColor *= _Brightness;
+
+                // Saturation adjustment
+                float lum = dot(baseColor, float3(0.299, 0.587, 0.114));
+                baseColor = lerp(float3(lum, lum, lum), baseColor, _Saturation);
+
+                return half4(baseColor, 1);
             }
 
             v2f vert(appdata v)
@@ -496,19 +534,75 @@ Shader "Custom/GlassGradientBackground"
                 float hoverBrightness = 1.0 + _HoverAmount * 0.3;
                 float hoverAlphaBoost = _HoverAmount * 0.1;
 
-                // ========== MOBILE MODE (simplified, no blur) ==========
-                float2 centerDist = abs(uv - 0.5);
-                float centerGlow = 1.0 - saturate(length(centerDist) / 0.5);
-                centerGlow = pow(centerGlow, 1.5) * 0.15;
+                fixed4 finalColor;
 
-                float edgeFactor = 1.0 - saturate(abs(dist) / 0.2);
-                float fresnel = pow(edgeFactor, _FresnelPower) * _FresnelStrength;
+                if (_BlurEnabled > 0.5)
+                {
+                    // ========== MOBILE GLASSMORPHISM MODE ==========
+                    half4 blurredBg;
 
-                fixed4 finalColor = gradColor;
-                finalColor.a = _GlassAlpha + gradColor.a * 0.5 + hoverAlphaBoost;
-                finalColor.a *= alphaMask;
-                finalColor.rgb += fresnel + centerGlow;
-                finalColor.rgb *= hoverBrightness;
+                    if (_UseExternalBlur > 0.5)
+                    {
+                        // RTT mode: sample from pre-blurred texture
+                        blurredBg = tex2D(_BlurredBackgroundTex, uv);
+
+                        // Check if texture is empty/black - fallback to procedural
+                        float texBrightness = dot(blurredBg.rgb, float3(1,1,1));
+                        if (_UseProcedural > 0.5 || texBrightness < 0.03)
+                        {
+                            float2 screenUV = i.screenPos.xy / i.screenPos.w;
+                            blurredBg = ProceduralFrostedGlass_Mobile(uv, screenUV);
+                        }
+                    }
+                    else
+                    {
+                        // No GrabPass on mobile - use procedural
+                        float2 screenUV = i.screenPos.xy / i.screenPos.w;
+                        blurredBg = ProceduralFrostedGlass_Mobile(uv, screenUV);
+                    }
+
+                    // Base: blurred background
+                    float3 glassColor = blurredBg.rgb;
+
+                    // Subtle color tint
+                    float3 tint = lerp(float3(1,1,1), gradColor.rgb * 1.5, _TintStrength);
+                    glassColor *= tint;
+
+                    // Inner glow at edges
+                    float edgeDist = saturate(-dist / 0.15);
+                    float innerGlow = pow(edgeDist, 2.0) * _InnerGlow;
+                    glassColor += float3(1, 1, 1) * innerGlow;
+
+                    // Fresnel highlight
+                    float fresnelEdge = pow(edgeDist, _FresnelPower) * _FresnelStrength * 0.5;
+                    glassColor += gradColor.rgb * fresnelEdge;
+
+                    // Apply hover
+                    glassColor *= hoverBrightness;
+
+                    // Glass overlay
+                    float3 glassOverlay = gradColor.rgb * 0.3;
+                    glassColor = lerp(glassColor, glassColor + glassOverlay, _GlassOpacity);
+
+                    finalColor.rgb = glassColor;
+                    finalColor.a = alphaMask;
+                }
+                else
+                {
+                    // ========== ORIGINAL MODE (no blur) ==========
+                    float2 centerDist = abs(uv - 0.5);
+                    float centerGlow = 1.0 - saturate(length(centerDist) / 0.5);
+                    centerGlow = pow(centerGlow, 1.5) * 0.15;
+
+                    float edgeFactor = 1.0 - saturate(abs(dist) / 0.2);
+                    float fresnel = pow(edgeFactor, _FresnelPower) * _FresnelStrength;
+
+                    finalColor = gradColor;
+                    finalColor.a = _GlassAlpha + gradColor.a * 0.5 + hoverAlphaBoost;
+                    finalColor.a *= alphaMask;
+                    finalColor.rgb += fresnel + centerGlow;
+                    finalColor.rgb *= hoverBrightness;
+                }
 
                 finalColor *= i.color;
 

@@ -37,6 +37,7 @@ public class RTTBlurBackgroundCapture : MonoBehaviour
     private Shader _blurShader;
 
     private bool _isInitialized = false;
+    private bool _initFailed = false;
     private bool _isDirty = true;
     private int _framesSinceLastCapture = 0;
 
@@ -80,6 +81,7 @@ public class RTTBlurBackgroundCapture : MonoBehaviour
         if (_rttCanvas == null || _displayQuad == null)
         {
             Debug.LogError("[RTTBlurCapture] Invalid initialization: rttCanvas or displayQuad is null");
+            _initFailed = true;
             return;
         }
 
@@ -87,24 +89,41 @@ public class RTTBlurBackgroundCapture : MonoBehaviour
         _blurShader = Shader.Find("Hidden/RTT/GaussianBlur");
         if (_blurShader == null)
         {
-            Debug.LogError("[RTTBlurCapture] Failed to find GaussianBlur shader");
+            Debug.LogWarning("[RTTBlurCapture] GaussianBlur shader not found - falling back to procedural blur");
+            _initFailed = true;
             return;
         }
 
-        _blurMaterial = new Material(_blurShader);
-        _blurMaterial.hideFlags = HideFlags.HideAndDontSave;
+        try
+        {
+            _blurMaterial = new Material(_blurShader);
+            _blurMaterial.hideFlags = HideFlags.HideAndDontSave;
 
-        CreateRenderTextures();
-        SetupCaptureCamera();
+            if (!CreateRenderTextures())
+            {
+                Debug.LogWarning("[RTTBlurCapture] Failed to create RenderTextures - falling back to procedural blur");
+                _initFailed = true;
+                Cleanup();
+                return;
+            }
 
-        _isInitialized = true;
-        MarkDirty();
+            SetupCaptureCamera();
 
-        if (showDebugInfo)
+            _isInitialized = true;
+            _initFailed = false;
+            MarkDirty();
+
             Debug.Log($"[RTTBlurCapture] Initialized for {rttCanvas.GetType().Name}");
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[RTTBlurCapture] Initialization failed: {e.Message} - falling back to procedural blur");
+            _initFailed = true;
+            Cleanup();
+        }
     }
 
-    private void CreateRenderTextures()
+    private bool CreateRenderTextures()
     {
         var panelResolution = _rttCanvas.CurrentResolution;
         if (panelResolution.x == 0 || panelResolution.y == 0)
@@ -115,26 +134,73 @@ public class RTTBlurBackgroundCapture : MonoBehaviour
         int captureWidth = Mathf.Max(64, Mathf.RoundToInt(panelResolution.x * downsampleFactor));
         int captureHeight = Mathf.Max(64, Mathf.RoundToInt(panelResolution.y * downsampleFactor));
 
-        // Captured scene texture
-        _capturedRT = new RenderTexture(captureWidth, captureHeight, 16, RenderTextureFormat.ARGB32);
-        _capturedRT.name = "RTTBlur_Captured";
-        _capturedRT.filterMode = FilterMode.Bilinear;
-        _capturedRT.Create();
+        // Get mobile-compatible format
+        RenderTextureFormat format = GetMobileCompatibleFormat();
+        int depthBits = GetMobileCompatibleDepthBits();
 
-        // Temporary blur texture
-        _blurTempRT = new RenderTexture(captureWidth, captureHeight, 0, RenderTextureFormat.ARGB32);
-        _blurTempRT.name = "RTTBlur_Temp";
-        _blurTempRT.filterMode = FilterMode.Bilinear;
-        _blurTempRT.Create();
+        try
+        {
+            // Captured scene texture
+            _capturedRT = new RenderTexture(captureWidth, captureHeight, depthBits, format);
+            _capturedRT.name = "RTTBlur_Captured";
+            _capturedRT.filterMode = FilterMode.Bilinear;
+            _capturedRT.antiAliasing = 1; // No MSAA for mobile compatibility
+            if (!_capturedRT.Create())
+            {
+                Debug.LogError("[RTTBlurCapture] Failed to create _capturedRT");
+                return false;
+            }
 
-        // Final blurred output
-        _blurredOutputRT = new RenderTexture(captureWidth, captureHeight, 0, RenderTextureFormat.ARGB32);
-        _blurredOutputRT.name = "RTTBlur_Output";
-        _blurredOutputRT.filterMode = FilterMode.Bilinear;
-        _blurredOutputRT.Create();
+            // Temporary blur texture
+            _blurTempRT = new RenderTexture(captureWidth, captureHeight, 0, format);
+            _blurTempRT.name = "RTTBlur_Temp";
+            _blurTempRT.filterMode = FilterMode.Bilinear;
+            _blurTempRT.antiAliasing = 1;
+            if (!_blurTempRT.Create())
+            {
+                Debug.LogError("[RTTBlurCapture] Failed to create _blurTempRT");
+                return false;
+            }
 
-        if (showDebugInfo)
-            Debug.Log($"[RTTBlurCapture] Created RTs: {captureWidth}x{captureHeight}");
+            // Final blurred output
+            _blurredOutputRT = new RenderTexture(captureWidth, captureHeight, 0, format);
+            _blurredOutputRT.name = "RTTBlur_Output";
+            _blurredOutputRT.filterMode = FilterMode.Bilinear;
+            _blurredOutputRT.antiAliasing = 1;
+            if (!_blurredOutputRT.Create())
+            {
+                Debug.LogError("[RTTBlurCapture] Failed to create _blurredOutputRT");
+                return false;
+            }
+
+            Debug.Log($"[RTTBlurCapture] Created RTs: {captureWidth}x{captureHeight}, format={format}");
+            return true;
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"[RTTBlurCapture] RenderTexture creation failed: {e.Message}");
+            return false;
+        }
+    }
+
+    private RenderTextureFormat GetMobileCompatibleFormat()
+    {
+#if UNITY_ANDROID || UNITY_IOS
+        // Use ARGB32 which is universally supported on mobile
+        return RenderTextureFormat.ARGB32;
+#else
+        return RenderTextureFormat.ARGB32;
+#endif
+    }
+
+    private int GetMobileCompatibleDepthBits()
+    {
+#if UNITY_ANDROID || UNITY_IOS
+        // Use 16-bit depth on mobile for better compatibility
+        return 16;
+#else
+        return 16;
+#endif
     }
 
     private void SetupCaptureCamera()
