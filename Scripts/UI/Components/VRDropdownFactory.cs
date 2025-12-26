@@ -897,9 +897,18 @@ public static class VRDropdownFactory
         float optionWidth = config.width;
         float borderHeight = borderWidth * optionHeight / optionWidth;
 
-        // First option needs extra 5px on top to align with panel border
-        float firstOptionExtraTop = (index == 0) ? 5f : 0f;
-        float adjustedBorderHeight = borderHeight + firstOptionExtraTop;
+        float firstOptionExtraTop = 0f;
+        float lastOptionExtraBottom = 0f;
+        if (index == 0)
+        {
+            firstOptionExtraTop = 5f;
+        }
+        else if (index == config.options.Count - 1)
+        {
+            lastOptionExtraBottom = 10f;
+        }
+
+        float adjustedBorderHeight = borderHeight + firstOptionExtraTop + lastOptionExtraBottom;
 
         GameObject borderObj = new GameObject("HoverBorder");
         borderObj.transform.SetParent(option.transform, false);
@@ -910,10 +919,14 @@ public static class VRDropdownFactory
         borderRT.anchorMin = new Vector2(0.5f, 0.5f);
         borderRT.anchorMax = new Vector2(0.5f, 0.5f);
         borderRT.pivot = new Vector2(0.5f, 0.5f);
-        borderRT.sizeDelta = new Vector2(borderWidth, adjustedBorderHeight);
+        borderRT.sizeDelta = new Vector2(borderWidth, adjustedBorderHeight + 10f);
 
         // Shift border up by half of extra height so the extra is on top
-        float yOffset = firstOptionExtraTop / 2f;
+        float yOffset = (firstOptionExtraTop + 10f) / 2f;
+        if (index == config.options.Count - 1)
+        {
+            yOffset = lastOptionExtraBottom / 4f;
+        }
         borderRT.anchoredPosition = new Vector2(0f, yOffset);
 
         // Border image with GlowingGlassBorder shader
@@ -931,12 +944,11 @@ public static class VRDropdownFactory
         // Calculate shader parameters to match panel border visually
         // Panel border uses parameters scaled by heightRatio
         float heightRatio = config.BoxHeight / panelHeight;
-        float adjustedEdgePadding = config.edgePadding * heightRatio;
-
+        
         // CRITICAL: Use SAME edgePadding as panel for horizontal alignment
         // In shader, edge position = 0.5 - padding (independent of aspect)
         // So same edgePadding = same horizontal edge position
-        hoverEffect.edgePadding = adjustedEdgePadding;
+        hoverEffect.edgePadding = config.edgePadding * 3.5f / 3f;
 
         // For cornerRadius, borderWidth, glowWidth - scale based on height ratio
         // to maintain proportional appearance for the shorter option height
