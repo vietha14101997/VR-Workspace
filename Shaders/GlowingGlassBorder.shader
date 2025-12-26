@@ -71,10 +71,8 @@ Shader "Custom/GlowingGlassBorder"
         _ColorMask ("Color Mask", Float) = 15
     }
 
-    // Desktop SubShader (LOD 300) - full features
     SubShader
     {
-        LOD 300
         Tags
         {
             "Queue"="Transparent"
@@ -107,7 +105,6 @@ Shader "Custom/GlowingGlassBorder"
             #pragma vertex vert
             #pragma fragment frag
             #pragma target 3.0
-            #pragma exclude_renderers gles gles3
             
             #include "UnityCG.cginc"
             #include "UnityUI.cginc"
@@ -647,184 +644,6 @@ Shader "Custom/GlowingGlassBorder"
                 // Calculate border mask for hologram (stronger effect on border areas)
                 float borderMask = saturate(layer1 + layer2 * 0.8 + layer3 * 0.5 + layer4 * 0.3);
                 finalColor.rgb = applyHologramEffect(finalColor.rgb, uv, borderMask);
-
-                finalColor *= i.color;
-
-                return finalColor;
-            }
-            ENDCG
-        }
-    }
-    
-    // ==================== MOBILE SUBSHADER ====================
-    // Simplified version without animated stroke and hologram effects
-    // For Android/iOS/Quest
-    SubShader
-    {
-        LOD 100
-        Tags
-        {
-            "Queue"="Transparent"
-            "IgnoreProjector"="True"
-            "RenderType"="Transparent"
-            "PreviewType"="Plane"
-            "CanUseSpriteAtlas"="True"
-        }
-
-        Stencil
-        {
-            Ref [_Stencil]
-            Comp [_StencilComp]
-            Pass [_StencilOp]
-            ReadMask [_StencilReadMask]
-            WriteMask [_StencilWriteMask]
-        }
-
-        Cull Off
-        Lighting Off
-        ZWrite Off
-        ZTest [unity_GUIZTestMode]
-        Blend SrcAlpha OneMinusSrcAlpha
-        ColorMask [_ColorMask]
-
-        Pass
-        {
-            Name "GlowingGlassBorder_Mobile"
-            CGPROGRAM
-            #pragma vertex vert
-            #pragma fragment frag
-            #pragma target 2.0
-            #pragma only_renderers gles gles3 vulkan
-
-            #include "UnityCG.cginc"
-            #include "UnityUI.cginc"
-
-            struct appdata
-            {
-                float4 vertex : POSITION;
-                float4 color : COLOR;
-                float2 texcoord : TEXCOORD0;
-                UNITY_VERTEX_INPUT_INSTANCE_ID
-            };
-
-            struct v2f
-            {
-                float4 vertex : SV_POSITION;
-                fixed4 color : COLOR;
-                float2 uv : TEXCOORD0;
-                UNITY_VERTEX_OUTPUT_STEREO
-            };
-
-            sampler2D _MainTex;
-            float4 _MainTex_ST;
-            fixed4 _Color;
-
-            float _EdgePadding;
-            float _BorderWidth;
-            float _CornerRadius;
-
-            float _Layer1Width;
-            float _Layer1Alpha;
-            float _Layer2Width;
-            float _Layer2Alpha;
-            float _Layer3Width;
-            float _Layer3Alpha;
-            float _Layer4Width;
-            float _Layer4Alpha;
-
-            fixed4 _ColorA;
-            fixed4 _ColorB;
-            float _GradientAngle;
-            float _CyanRatio;
-
-            float _GlassAlpha;
-            fixed4 _GlassTint;
-            float _Aspect;
-
-            // Simplified SDF for rounded box
-            float sdRoundedBoxAspect(float2 uv, float aspect, float radius, float padding)
-            {
-                float2 center = float2(0.5, 0.5);
-                float2 pos = (uv - center);
-                pos.x *= aspect;
-
-                float2 halfSize = float2(0.5 * aspect - padding * aspect, 0.5 - padding);
-
-                float2 d = abs(pos) - halfSize + radius;
-                return min(max(d.x, d.y), 0.0) + length(max(d, 0.0)) - radius;
-            }
-
-            v2f vert(appdata v)
-            {
-                v2f o;
-                UNITY_SETUP_INSTANCE_ID(v);
-                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
-
-                o.vertex = UnityObjectToClipPos(v.vertex);
-                o.uv = TRANSFORM_TEX(v.texcoord, _MainTex);
-                o.color = v.color * _Color;
-
-                return o;
-            }
-
-            fixed4 frag(v2f i) : SV_Target
-            {
-                float2 uv = i.uv;
-
-                float aspect = (_Aspect > 0.0) ? _Aspect : 1.0;
-
-                float dist = sdRoundedBoxAspect(uv, aspect, _CornerRadius, _EdgePadding);
-
-                // === GRADIENT ===
-                float angleRad = _GradientAngle * 3.14159 / 180.0;
-                float2 centeredUV = uv - 0.5;
-                float2 rotatedUV;
-                rotatedUV.x = centeredUV.x * cos(angleRad) - centeredUV.y * sin(angleRad);
-                rotatedUV.y = centeredUV.x * sin(angleRad) + centeredUV.y * cos(angleRad);
-
-                float t = saturate((rotatedUV.x + 0.5));
-                t = pow(t, 1.0 / _CyanRatio);
-
-                fixed4 borderColor = lerp(_ColorA, _ColorB, t);
-
-                // === GLASS BACKGROUND ===
-                float insideMask = saturate(-dist / 0.005);
-                fixed4 glassColor = _GlassTint;
-                glassColor.a = _GlassAlpha * insideMask;
-
-                // === SIMPLIFIED MULTI-LAYER BORDER ===
-                float absDist = abs(dist);
-
-                // Layer 3 (Outer Glow)
-                float layer3 = 1.0 - saturate(absDist / _Layer3Width);
-                layer3 = pow(layer3, 2.0);
-
-                // Layer 2 (Mid Glow)
-                float layer2 = 1.0 - saturate(absDist / _Layer2Width);
-                layer2 = pow(layer2, 1.5);
-
-                // Layer 1 (Core Line)
-                float layer1 = 1.0 - saturate(absDist / _Layer1Width);
-                layer1 = pow(layer1, 0.5);
-
-                // === COMPOSITE ===
-                fixed4 finalColor = glassColor;
-
-                fixed3 glowColor = borderColor.rgb;
-
-                // Main Highlight
-                finalColor.rgb += glowColor * layer3 * _Layer3Alpha;
-                finalColor.a = max(finalColor.a, layer3 * _Layer3Alpha * 0.5);
-
-                // Core Definition
-                finalColor.rgb = lerp(finalColor.rgb, glowColor * 1.2, layer2 * _Layer2Alpha);
-                finalColor.a = max(finalColor.a, layer2 * _Layer2Alpha);
-
-                // Bright Core
-                fixed3 whiteCore = fixed3(1,1,1);
-                float coreMix = layer1 * _Layer1Alpha * 0.5;
-                finalColor.rgb = lerp(finalColor.rgb, whiteCore, coreMix);
-                finalColor.a = max(finalColor.a, layer1 * _Layer1Alpha);
 
                 finalColor *= i.color;
 
