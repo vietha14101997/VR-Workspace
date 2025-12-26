@@ -37,7 +37,9 @@ public class RTTMobileKeyboard : RTTCanvasBase
 
     [Header("Position")]
     [SerializeField] private bool followTaskbar = true;
+#pragma warning disable 0414 // Reserved for future use
     [SerializeField] private float spacingMultiplier = 1.5f;
+#pragma warning restore 0414
     [SerializeField] private float widthRatioToFrame = 0.7f;
     [SerializeField] private float verticalOffset = -0.075f; // Offset to move keyboard down (negative = lower)
     #endregion
@@ -103,7 +105,9 @@ public class RTTMobileKeyboard : RTTCanvasBase
 
     // Track if Show() was called before Start() completes
     private bool _showRequested = false;
+#pragma warning disable 0414 // Reserved for future use
     private bool _startCompleted = false;
+#pragma warning restore 0414
 
     // Store original text for cancel/restore functionality
     private string _originalText = "";

@@ -633,9 +633,9 @@ public class VRGazeReticle : MonoBehaviour
         bool hasOpenDropdown = VRDropdown.CurrentlyOpenDropdown != null;
         bool isDropdownOption = hasOpenDropdown && VRDropdown.CurrentlyOpenDropdown.IsPartOfDropdownPanel(target);
 
-        // Check if keyboard is open
-        bool hasOpenKeyboard = VRMobileKeyboard.CurrentlyOpenKeyboard != null;
-        bool isKeyboardPart = hasOpenKeyboard && VRMobileKeyboard.CurrentlyOpenKeyboard.IsPartOfKeyboard(target);
+        // Check if keyboard is open (RTTMobileKeyboard only)
+        bool hasOpenKeyboard = RTTMobileKeyboard.CurrentlyOpenKeyboard != null;
+        bool isKeyboardPart = hasOpenKeyboard && RTTMobileKeyboard.CurrentlyOpenKeyboard.IsPartOfKeyboard(target);
 
         // Check if target is an InputField
         VRInputFieldTrigger inputFieldTrigger = target.GetComponent<VRInputFieldTrigger>();
@@ -728,18 +728,18 @@ public class VRGazeReticle : MonoBehaviour
                 if (inputFieldTrigger != null && inputFieldTrigger.InputField != null)
                 {
                     // Clicking another InputField - switch keyboard target
-                    VRMobileKeyboard.CurrentlyOpenKeyboard.SwitchToInputField(inputFieldTrigger.InputField);
+                    RTTMobileKeyboard.CurrentlyOpenKeyboard.SwitchToInputField(inputFieldTrigger.InputField);
                 }
                 else if (targetDropdown != null)
                 {
                     // Clicking a dropdown - close keyboard and open dropdown
-                    VRMobileKeyboard.CurrentlyOpenKeyboard.Hide();
+                    RTTMobileKeyboard.CurrentlyOpenKeyboard.Hide();
                     targetDropdown.OpenDropdown();
                 }
                 else
                 {
                     // Clicking elsewhere - close keyboard
-                    VRMobileKeyboard.CurrentlyOpenKeyboard.Hide();
+                    RTTMobileKeyboard.CurrentlyOpenKeyboard.Hide();
                 }
                 return;
             }

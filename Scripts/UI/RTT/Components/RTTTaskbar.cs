@@ -22,13 +22,17 @@ public class RTTTaskbar : RTTCanvasBase
     [SerializeField] private float logicalHeight = 128f;
 
     [Header("Glassmorphism")]
+#pragma warning disable 0414 // Reserved for future glassmorphism implementation
     [SerializeField] private bool enableGlassmorphism = true;
+#pragma warning restore 0414
     [Range(0, 40)]
     [SerializeField] private float blurIntensity = 2f;
     [Range(1, 8)]
     [SerializeField] private int blurQuality = 3;
+#pragma warning disable 0414 // Reserved for future glassmorphism implementation
     [Range(0, 1)]
     [SerializeField] private float glassOpacity = 0f;
+#pragma warning restore 0414
     [Range(0, 1)]
     [SerializeField] private float tintStrength = 0.1f;
     [Range(0, 0.5f)]
@@ -45,7 +49,9 @@ public class RTTTaskbar : RTTCanvasBase
     [SerializeField] private Color glowColorB = new Color(1.2f, 0.3f, 2f, 1f);
     [Range(0f, 0.1f)]
     [SerializeField] private float glowExpansion = 0.02f;
+#pragma warning disable 0414 // Reserved for shader customization
     [SerializeField] private float shimmerSpeed = 0.4f;
+#pragma warning restore 0414
 
     [Header("Content Margin (pixels)")]
     [SerializeField] private float contentMarginLeft = 0f;

@@ -39,8 +39,10 @@ public class RTTMenuFrame : RTTCanvasBase
     [SerializeField] private float blurIntensity = 2f;
     [Range(1, 8)]
     [SerializeField] private int blurQuality = 3;
+#pragma warning disable 0414 // Reserved for future glassmorphism implementation
     [Range(0, 1)]
     [SerializeField] private float glassOpacity = 0f;
+#pragma warning restore 0414
     [Range(0, 1)]
     [SerializeField] private float tintStrength = 0.1f;
     [Range(0, 0.5f)]
@@ -83,7 +85,9 @@ public class RTTMenuFrame : RTTCanvasBase
     [Tooltip("Automatically create Main Menu content on init")]
     [SerializeField] private bool initMainMenu = true;
     [SerializeField] private int menuColumns = 3;
+#pragma warning disable 0414 // Reserved for future menu layout customization
     [SerializeField] private int menuRows = 2;
+#pragma warning restore 0414
     [SerializeField] private Vector2 menuSpacing = new Vector2(50f, 75f);
     [SerializeField] private float menuButtonAspect = 1.4f;
     [SerializeField] private int menuFontSize = 42;
