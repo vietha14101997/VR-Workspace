@@ -190,7 +190,7 @@ public class RTTRemoteMenu : MonoBehaviour
 
         // Dropdown options
         var monitorOptions = new List<string> { "1 Monitor", "2 Monitors", "3 Monitors" };
-        var resolutionOptions = new List<string> { "1920 x 1080", "1600 x 900", "1366 x 768", "1280 x 720" };
+        var resolutionOptions = new List<string> { "1280 x 720", "1366 x 768", "1600 x 900", "1920 x 1080" };
         var bitrateOptions = new List<string> { "5 Mbps", "10 Mbps", "20 Mbps", "30 Mbps", "50 Mbps" };
         var fpsOptions = new List<string> { "30 FPS", "45 FPS", "60 FPS" };
 
@@ -200,7 +200,7 @@ public class RTTRemoteMenu : MonoBehaviour
         _monitorsDropdown = VRDropdownFactory.CreateIconDropdown(
             grid.transform, cellW,
             "Monitors", LoadIcon("monitor"), themeColor,
-            monitorOptions, 0,
+            monitorOptions, 1,
             onValueChanged: (index, value) => Debug.Log("Monitor: " + value),
             labelFontSize: DROPDOWN_LABEL_FONT_SIZE, valueFontSize: DROPDOWN_VALUE_FONT_SIZE, font: customFont);
         PositionElement(_monitorsDropdown, 0, row1Y);
@@ -208,7 +208,7 @@ public class RTTRemoteMenu : MonoBehaviour
         _resolutionDropdown = VRDropdownFactory.CreateIconDropdown(
             grid.transform, cellW,
             "Resolution", LoadIcon("resolution"), accentColor,
-            resolutionOptions, 0,
+            resolutionOptions, 3,
             onValueChanged: (index, value) => Debug.Log("Resolution: " + value),
             labelFontSize: DROPDOWN_LABEL_FONT_SIZE, valueFontSize: DROPDOWN_VALUE_FONT_SIZE, font: customFont);
         PositionElement(_resolutionDropdown, cellW + gapX, row1Y);
