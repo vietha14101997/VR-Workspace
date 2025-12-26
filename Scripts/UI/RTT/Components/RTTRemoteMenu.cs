@@ -165,7 +165,7 @@ public class RTTRemoteMenu : MonoBehaviour
         // Host Input
         _hostInput = VRInputFieldFactory.CreateLabeledInputField(
             row.transform, hostW,
-            "Host", "192.168.1.10", accentColor,
+            "Host", "192.168.1.12", accentColor,
             onEndEdit: (value) => Debug.Log("Host: " + value),
             labelFontSize: LABEL_FONT_SIZE, inputFontSize: INPUT_FONT_SIZE, font: customFont);
         PositionElement(_hostInput, 0, 0);
@@ -173,7 +173,7 @@ public class RTTRemoteMenu : MonoBehaviour
         // Port Input
         _portInput = VRInputFieldFactory.CreateLabeledInputField(
             row.transform, portW,
-            "Port", "9000", themeColor,
+            "Port", "8288", themeColor,
             onEndEdit: (value) => Debug.Log("Port: " + value),
             labelFontSize: LABEL_FONT_SIZE, inputFontSize: INPUT_FONT_SIZE, font: customFont,
             contentType: TMP_InputField.ContentType.IntegerNumber);
