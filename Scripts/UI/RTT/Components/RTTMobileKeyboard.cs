@@ -84,7 +84,8 @@ public class RTTMobileKeyboard : RTTCanvasBase
     private bool _caretVisible = true;
     private float _caretBlinkTimer = 0f;
     private const float CARET_BLINK_RATE = 0.5f;
-    private const string CARET_CHAR = "|";
+    private RectTransform _caretRect;
+    private Image _caretImage;
 
     private float _logicalWidth;
     private float _logicalHeight;
@@ -382,7 +383,7 @@ public class RTTMobileKeyboard : RTTCanvasBase
 
         _previewText = textObj.AddComponent<TextMeshProUGUI>();
         _previewText.text = "";
-        _previewText.fontSize = 36f;
+        _previewText.fontSize = keyFontSize;
         _previewText.alignment = TextAlignmentOptions.Center;
         _previewText.color = Color.white;
         _previewText.overflowMode = TextOverflowModes.Ellipsis;
@@ -403,6 +404,23 @@ public class RTTMobileKeyboard : RTTCanvasBase
         textRT.anchorMax = Vector2.one;
         textRT.offsetMin = new Vector2(buttonSize + buttonPadding * 2f, 8f);
         textRT.offsetMax = new Vector2(-(buttonSize + buttonPadding * 2f), 0);
+
+        // Create caret visual element (thin vertical line)
+        GameObject caretObj = new GameObject("Caret");
+        caretObj.transform.SetParent(textObj.transform, false);
+
+        _caretRect = caretObj.AddComponent<RectTransform>();
+        // Use center anchor (0.5) to match TextMeshPro's coordinate system (centered text)
+        _caretRect.anchorMin = new Vector2(0.5f, 0.5f);
+        _caretRect.anchorMax = new Vector2(0.5f, 0.5f);
+        _caretRect.pivot = new Vector2(0.5f, 0.5f);
+        float caretHeight = keyFontSize * 1.5f;
+        float caretWidth = keyFontSize * 0.15f;
+        _caretRect.sizeDelta = new Vector2(caretWidth, caretHeight);
+
+        _caretImage = caretObj.AddComponent<Image>();
+        _caretImage.color = Color.white;
+        _caretImage.raycastTarget = false;
 
         // Create invisible overlay for raycast (separate from text to avoid conflict)
         GameObject overlayObj = new GameObject("PreviewOverlay");
@@ -467,10 +485,8 @@ public class RTTMobileKeyboard : RTTCanvasBase
         if (_borderMaterial == null) return;
 
         // Calculate the Y position of the separator
-        // Preview row is at the top of content container
-        // Preview row height = 120f, underline offset from bottom = 2.5f
         float previewHeight = 100f;
-        float underlineOffset = 0f;
+        float underlineOffset = 9f;
 
         // Preview row bottom edge in canvas space
         float previewRowBottom = (_logicalHeight - marginTop) - previewHeight;
@@ -1645,17 +1661,59 @@ public class RTTMobileKeyboard : RTTCanvasBase
         if (_previewText == null || _targetInputField == null) return;
 
         string text = _targetInputField.text;
+        _previewText.text = text; // Always show original text without caret character
+
+        // Update caret visual position and visibility
+        if (_caretImage != null)
+        {
+            _caretImage.enabled = _caretVisible;
+        }
+
+        if (_caretRect != null)
+        {
+            UpdateCaretPosition();
+        }
+    }
+
+    private void UpdateCaretPosition()
+    {
+        if (_previewText == null || _caretRect == null) return;
+
+        string text = _previewText.text;
         int pos = Mathf.Clamp(_caretPosition, 0, text.Length);
 
-        if (_caretVisible)
+        // Force mesh update to get accurate character positions
+        _previewText.ForceMeshUpdate();
+
+        float caretX = 0f;
+        var textInfo = _previewText.textInfo;
+
+        if (textInfo.characterCount > 0 && text.Length > 0)
         {
-            // Insert caret character at position
-            _previewText.text = text.Insert(pos, CARET_CHAR);
+            if (pos == 0)
+            {
+                // Caret at beginning - use left edge of first character
+                var firstChar = textInfo.characterInfo[0];
+                caretX = firstChar.bottomLeft.x;
+            }
+            else if (pos >= text.Length)
+            {
+                // Caret at end - use right edge of last character
+                int lastIndex = Mathf.Min(textInfo.characterCount - 1, text.Length - 1);
+                var lastChar = textInfo.characterInfo[lastIndex];
+                caretX = lastChar.bottomRight.x;
+            }
+            else
+            {
+                // Caret in middle - use left edge of character at position
+                int charIndex = Mathf.Min(pos, textInfo.characterCount - 1);
+                var charAtPos = textInfo.characterInfo[charIndex];
+                caretX = charAtPos.bottomLeft.x;
+            }
         }
-        else
-        {
-            _previewText.text = text;
-        }
+
+        // Position caret relative to text's local space
+        _caretRect.anchoredPosition = new Vector2(caretX, 0);
     }
 
     /// <summary>
@@ -2139,11 +2197,8 @@ public class PreviewTextInteraction : MonoBehaviour, IPointerEnterHandler, IPoin
     {
         if (_previewText == null) return 0;
 
-        // Get the text without the caret character
-        string displayText = _previewText.text;
-        string originalText = displayText.Replace("|", "");
-
-        if (string.IsNullOrEmpty(originalText)) return 0;
+        string text = _previewText.text;
+        if (string.IsNullOrEmpty(text)) return 0;
 
         // Force mesh update to get accurate character info
         _previewText.ForceMeshUpdate();
@@ -2162,20 +2217,12 @@ public class PreviewTextInteraction : MonoBehaviour, IPointerEnterHandler, IPoin
         if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(rectTransform, screenPosition, cam, out localPoint))
         {
             // If conversion fails, estimate based on normalized x position
-            return EstimateCharacterIndex(screenPosition, originalText);
+            return EstimateCharacterIndex(screenPosition, text);
         }
 
         // Find character by comparing x positions with character bounds
-        int caretOffset = 0;
-        for (int i = 0; i < textInfo.characterCount && i < displayText.Length; i++)
+        for (int i = 0; i < textInfo.characterCount && i < text.Length; i++)
         {
-            // Track caret character offset
-            if (displayText[i] == '|')
-            {
-                caretOffset = 1;
-                continue;
-            }
-
             var charInfo = textInfo.characterInfo[i];
             if (!charInfo.isVisible) continue;
 
@@ -2183,11 +2230,11 @@ public class PreviewTextInteraction : MonoBehaviour, IPointerEnterHandler, IPoin
 
             if (localPoint.x < charCenterX)
             {
-                return Mathf.Max(0, i - caretOffset);
+                return i;
             }
         }
 
-        return originalText.Length;
+        return text.Length;
     }
 
     /// <summary>
