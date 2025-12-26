@@ -415,17 +415,18 @@ public class RTTRemoteMenu : MonoBehaviour
         _qrScannerManager.OnQRScanned += OnQRCodeScanned;
         _qrScannerManager.OnCancelled += OnQRScanCancelled;
 
-        // Start scanning - needs to find VRMenuFrame for legacy compatibility
-        VRMenuFrame vrMenuFrame = FindObjectOfType<VRMenuFrame>();
-        if (vrMenuFrame != null)
+        // Start scanning - prefer RTTMenuFrame, fallback to legacy VRMenuFrame
+        if (_menuFrame != null)
         {
-            _qrScannerManager.StartScanning(vrMenuFrame, taskbar);
+            _qrScannerManager.StartScanning(_menuFrame, taskbar);
         }
-        else if (_menuFrame != null)
+        else
         {
-            // Hide RTTMenuFrame during scanning
-            _menuFrame.Hide();
-            if (taskbar != null) taskbar.gameObject.SetActive(false);
+            VRMenuFrame vrMenuFrame = FindObjectOfType<VRMenuFrame>();
+            if (vrMenuFrame != null)
+            {
+                _qrScannerManager.StartScanning(vrMenuFrame, taskbar);
+            }
         }
     }
 
@@ -433,15 +434,9 @@ public class RTTRemoteMenu : MonoBehaviour
     {
         if (_qrScannerManager != null)
         {
-            _qrScannerManager.StopScanning();
+            _qrScannerManager.StopScanning(); // This also calls ShowOriginalUI()
             Destroy(_qrScannerManager.gameObject);
             _qrScannerManager = null;
-        }
-
-        // Restore RTTMenuFrame
-        if (_menuFrame != null)
-        {
-            _menuFrame.Show();
         }
     }
 

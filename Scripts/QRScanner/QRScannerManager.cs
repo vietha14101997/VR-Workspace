@@ -36,7 +36,9 @@ public class QRScannerManager : MonoBehaviour
 
     // References to hide/show
     private VRMenuFrame _menuFrame;
+    private RTTMenuFrame _rttMenuFrame;
     private VRTaskbar _taskbar;
+    private RTTTaskbar _rttTaskbar;
 
     // Created objects
     private GameObject _passthroughFrame;
@@ -98,28 +100,62 @@ public class QRScannerManager : MonoBehaviour
             }
         }
 
-        // Calculate cancel button fixed world Y and horizontal distance
-        if (_taskbar != null)
+        StartScanningInternal(taskbar);
+    }
+
+    /// <summary>
+    /// Start QR scanning mode with RTTMenuFrame
+    /// </summary>
+    public void StartScanning(RTTMenuFrame rttMenuFrame, VRTaskbar taskbar)
+    {
+        _menuFrame = null; // Not using legacy VRMenuFrame
+        _rttMenuFrame = rttMenuFrame;
+        _taskbar = taskbar;
+        _mainCamera = Camera.main;
+
+        // Store initial positions and dimensions from RTTMenuFrame
+        if (_rttMenuFrame != null)
+        {
+            _initialFramePosition = _rttMenuFrame.transform.position;
+            _initialFrameRotation = _rttMenuFrame.transform.rotation;
+            _frameWidth = _rttMenuFrame.PanelWidth;
+            _frameHeight = _rttMenuFrame.PanelHeight;
+            _logicalWidth = _rttMenuFrame.LogicalWidthValue;
+
+            // Calculate frameDistance from actual RTTMenuFrame position
+            if (_mainCamera != null)
+            {
+                Vector3 toFrame = _initialFramePosition - _mainCamera.transform.position;
+                frameDistance = toFrame.magnitude;
+            }
+        }
+
+        StartScanningInternal(taskbar);
+    }
+
+    private void StartScanningInternal(VRTaskbar taskbar)
+    {
+        // Find RTTTaskbar if exists
+        _rttTaskbar = FindObjectOfType<RTTTaskbar>();
+
+        // Calculate cancel button position
+        _cancelButtonDistance = frameDistance;
+
+        // Use RTTTaskbar Y position if available, otherwise VRTaskbar, otherwise calculate
+        if (_rttTaskbar != null)
+        {
+            _cancelButtonWorldY = _rttTaskbar.transform.position.y;
+        }
+        else if (_taskbar != null)
         {
             _cancelButtonWorldY = _taskbar.transform.position.y;
-            // Horizontal distance from camera to taskbar
-            Vector3 camPos = _mainCamera.transform.position;
-            Vector3 taskbarPos = _taskbar.transform.position;
-            _cancelButtonDistance = Vector2.Distance(
-                new Vector2(camPos.x, camPos.z),
-                new Vector2(taskbarPos.x, taskbarPos.z)
-            );
-        }
-        else if (_menuFrame != null)
-        {
-            // Default: below frame
-            _cancelButtonWorldY = _initialFramePosition.y - (_frameHeight / 2f + 0.15f);
-            _cancelButtonDistance = frameDistance;
         }
         else
         {
-            _cancelButtonWorldY = _mainCamera.transform.position.y - 0.5f;
-            _cancelButtonDistance = 1.4f;
+            // Fallback: position below the QR frame
+            Vector3 cancelWorldPos = _mainCamera.transform.position + _mainCamera.transform.forward * frameDistance
+                                     - _mainCamera.transform.up * (_frameHeight / 2f + 0.15f);
+            _cancelButtonWorldY = cancelWorldPos.y;
         }
 
         // Hide original UI
@@ -178,8 +214,14 @@ public class QRScannerManager : MonoBehaviour
         if (_menuFrame != null)
             _menuFrame.gameObject.SetActive(false);
 
+        if (_rttMenuFrame != null)
+            _rttMenuFrame.Hide();
+
         if (_taskbar != null)
             _taskbar.gameObject.SetActive(false);
+
+        if (_rttTaskbar != null)
+            _rttTaskbar.Hide();
     }
 
     void ShowOriginalUI()
@@ -187,8 +229,14 @@ public class QRScannerManager : MonoBehaviour
         if (_menuFrame != null)
             _menuFrame.gameObject.SetActive(true);
 
+        if (_rttMenuFrame != null)
+            _rttMenuFrame.Show();
+
         if (_taskbar != null)
             _taskbar.gameObject.SetActive(true);
+
+        if (_rttTaskbar != null)
+            _rttTaskbar.Show();
     }
 
     void CreatePassthroughFrame()
@@ -199,16 +247,8 @@ public class QRScannerManager : MonoBehaviour
         _passthroughFrame = new GameObject("QRPassthroughFrame");
         _passthroughFrame.transform.SetParent(_mainCamera.transform, false);
 
-        // Calculate Y offset in camera local space from original frame position
-        float localY = 0f;
-        if (_menuFrame != null)
-        {
-            Vector3 frameLocalPos = _mainCamera.transform.InverseTransformPoint(_initialFramePosition);
-            localY = frameLocalPos.y;
-        }
-
-        // Set local position in front of camera at same Y as original frame
-        _passthroughFrame.transform.localPosition = new Vector3(0, localY, frameDistance);
+        // Set local position in front of camera, centered on reticle (camera forward)
+        _passthroughFrame.transform.localPosition = new Vector3(0, 0, frameDistance);
         _passthroughFrame.transform.localRotation = Quaternion.identity;
 
         // Add Canvas - lower sorting order so Reticle shows on top
