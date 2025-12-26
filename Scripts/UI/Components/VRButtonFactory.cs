@@ -55,7 +55,7 @@ public static class VRButtonFactory
 
         // Visual settings
         public float cornerRadius = 0.12f;
-        public float edgePadding = 0.12f;
+        public float edgePadding = 0.06f;  // Match Space key value for Android compatibility
         public float backgroundAlpha = 0.08f;
         public float borderWidth = 0.005f;
         public float glowWidth = 0.03f;
@@ -139,9 +139,9 @@ public static class VRButtonFactory
         else if (config.useConnectButtonShader)
         {
             // Special Connect Button: all-in-one shader with gradient + glow + shimmer
-            float expansion = config.edgePadding;
-            visRT.anchorMin = new Vector2(-expansion, -expansion);
-            visRT.anchorMax = new Vector2(1f + expansion, 1f + expansion);
+            // Keep within bounds - edge padding in shader handles visual margin
+            visRT.anchorMin = Vector2.zero;
+            visRT.anchorMax = Vector2.one;
             visRT.offsetMin = Vector2.zero;
             visRT.offsetMax = Vector2.zero;
 
@@ -153,9 +153,9 @@ public static class VRButtonFactory
         }
         else
         {
-            float expansion = config.edgePadding;
-            visRT.anchorMin = new Vector2(-expansion, -expansion);
-            visRT.anchorMax = new Vector2(1f + expansion, 1f + expansion);
+            // Keep within bounds - edge padding in shader handles visual margin
+            visRT.anchorMin = Vector2.zero;
+            visRT.anchorMax = Vector2.one;
             visRT.offsetMin = Vector2.zero;
             visRT.offsetMax = Vector2.zero;
 

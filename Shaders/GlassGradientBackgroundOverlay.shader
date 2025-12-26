@@ -106,13 +106,15 @@ Shader "Custom/GlassGradientBackgroundOverlay"
             float _FresnelStrength;
             float _HoverAmount;
 
+            // SDF with Wide formula: padding NOT scaled by aspect for Android compatibility
             float sdRoundedBoxAspect(float2 uv, float aspect, float radius, float padding)
             {
                 float2 center = float2(0.5, 0.5);
                 float2 pos = (uv - center);
                 pos.x *= aspect;
 
-                float2 halfSize = float2(0.5 * aspect - padding * aspect, 0.5 - padding);
+                // Wide formula: padding is uniform in scaled space
+                float2 halfSize = float2(0.5 * aspect - padding, 0.5 - padding);
 
                 float2 d = abs(pos) - halfSize + radius;
                 return min(max(d.x, d.y), 0.0) + length(max(d, 0.0)) - radius;

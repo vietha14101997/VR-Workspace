@@ -27,10 +27,10 @@ public class RTTMobileKeyboard : RTTCanvasBase
     [SerializeField] private TMP_FontAsset customFont;
 
     [Header("Layout")]
-    [SerializeField] private float marginLeft = 80f;
-    [SerializeField] private float marginRight = 80f;
-    [SerializeField] private float marginTop = 40f;
-    [SerializeField] private float marginBottom = 75f;
+    [SerializeField] private float marginLeft = 60f;
+    [SerializeField] private float marginRight = 60f;
+    [SerializeField] private float marginTop = 20f;
+    [SerializeField] private float marginBottom = 60f;
     [SerializeField] [Range(0.05f, 0.2f)] private float keySpacingRatio = 0.1f;
     [SerializeField] [Range(0.8f, 1.5f)] private float keyHeightRatio = 1.2f;
     [SerializeField] private int keyFontSize = 36;
@@ -283,11 +283,11 @@ public class RTTMobileKeyboard : RTTCanvasBase
         img.raycastTarget = true;
 
         float aspect = _logicalWidth / _logicalHeight;
-        // Use larger edge padding for better Android GPU compatibility (matches Space key values)
-        float edgePad = 0.06f;
-        // Corner radius - same as Space key for consistency
-        float bgCornerRadius = 0.12f;
-        float borderCornerRadius = 0.10f;
+        // Edge padding - matches MenuFrame for consistent UI
+        float edgePad = 0.0075f;
+        // Corner radius - matches MenuFrame for consistent UI
+        float bgCornerRadius = 0.04f;
+        float borderCornerRadius = 0.04f;
 
         // Use Wide shader for better Android compatibility (Space key uses this and works)
         Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
@@ -302,7 +302,7 @@ public class RTTMobileKeyboard : RTTCanvasBase
             _glassMaterial.SetColor("_ColorA", new Color(0.0f, 0.55f, 0.65f, 0.35f));
             // ColorB: Deep Sea Blue blended with Purple (bottom area)
             _glassMaterial.SetColor("_ColorB", new Color(0.30f, 0.12f, 0.50f, 0.32f));
-            _glassMaterial.SetFloat("_GlassAlpha", 0.38f);
+            _glassMaterial.SetFloat("_GlassAlpha", 0.65f);
 
             img.material = _glassMaterial;
             img.color = Color.white;
@@ -342,13 +342,22 @@ public class RTTMobileKeyboard : RTTCanvasBase
         if (glowShader != null)
         {
             _borderMaterial = new Material(glowShader);
+            _borderMaterial.SetFloat("_StrokeEnabled", 0);  // Disable stroke to avoid square corners
+            _borderMaterial.SetFloat("_BorderWidth", 0.025f);  // Match MenuFrame
             _borderMaterial.SetFloat("_CornerRadius", cornerRadius);
             _borderMaterial.SetFloat("_EdgePadding", edgePad);
             _borderMaterial.SetFloat("_Aspect", aspect);
             _borderMaterial.SetColor("_ColorA", themeColor);
             _borderMaterial.SetColor("_ColorB", new Color(0.9f, 0.3f, 1f));
-            _borderMaterial.SetFloat("_Layer1Width", 0.006f);
-            _borderMaterial.SetFloat("_Layer1Alpha", 1.2f);
+            // Glow layers - match MenuFrame style
+            _borderMaterial.SetFloat("_Layer1Width", 0.01f);
+            _borderMaterial.SetFloat("_Layer1Alpha", 1.5f);
+            _borderMaterial.SetFloat("_Layer2Width", 0.02f);
+            _borderMaterial.SetFloat("_Layer2Alpha", 1.0f);
+            _borderMaterial.SetFloat("_Layer3Width", 0.045f);
+            _borderMaterial.SetFloat("_Layer3Alpha", 0.6f);
+            _borderMaterial.SetFloat("_Layer4Width", 0.09f);
+            _borderMaterial.SetFloat("_Layer4Alpha", 0.3f);
             borderImg.material = _borderMaterial;
         }
     }

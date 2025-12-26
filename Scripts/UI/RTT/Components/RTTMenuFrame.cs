@@ -267,11 +267,11 @@ public class RTTMenuFrame : RTTCanvasBase
         img.raycastTarget = true;
 
         float expansion = glowExpansion;
-        // Use larger edge padding for better Android GPU compatibility (matches Space key values)
-        float edgePad = 0.06f;
+        // Small edge padding to fill more of the canvas
+        float edgePad = 0.0075f;
         float aspect = Aspect;
-        // Background corner radius
-        float bgCornerRadius = 0.12f;
+        // Background corner radius - smaller than taskbar due to different aspect ratio
+        float bgCornerRadius = 0.04f;
 
         // Use Wide shader for better Android compatibility (Space key uses this and works)
         Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
@@ -305,8 +305,9 @@ public class RTTMenuFrame : RTTCanvasBase
         }
 
         RectTransform rt = bgObj.GetComponent<RectTransform>();
-        rt.anchorMin = new Vector2(-expansion, -expansion);
-        rt.anchorMax = new Vector2(1f + expansion, 1f + expansion);
+        // Keep background within canvas bounds - edge padding in shader handles visual margin
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
         rt.sizeDelta = Vector2.zero;
         rt.localScale = Vector3.one;
         rt.localPosition = Vector3.zero;
@@ -345,18 +346,20 @@ public class RTTMenuFrame : RTTCanvasBase
             _borderMaterial = new Material(glowShader);
 
             _borderMaterial.SetFloat("_StrokeEnabled", 0);
-            _borderMaterial.SetFloat("_BorderWidth", 0.02f);
-            _borderMaterial.SetFloat("_CornerRadius", 0.12f);
+            // Border settings - thinner for MenuFrame's squarer aspect ratio
+            _borderMaterial.SetFloat("_BorderWidth", 0.025f);
+            _borderMaterial.SetFloat("_CornerRadius", 0.04f);  // Match background
             _borderMaterial.SetFloat("_EdgePadding", edgePad);
             _borderMaterial.SetFloat("_Aspect", aspect);
 
-            _borderMaterial.SetFloat("_Layer1Width", 0.008f);
+            // Glow layer widths - scaled down for MenuFrame
+            _borderMaterial.SetFloat("_Layer1Width", 0.01f);
             _borderMaterial.SetFloat("_Layer1Alpha", 1.5f);
-            _borderMaterial.SetFloat("_Layer2Width", 0.018f);
+            _borderMaterial.SetFloat("_Layer2Width", 0.02f);
             _borderMaterial.SetFloat("_Layer2Alpha", 1.0f);
-            _borderMaterial.SetFloat("_Layer3Width", 0.04f);
+            _borderMaterial.SetFloat("_Layer3Width", 0.045f);
             _borderMaterial.SetFloat("_Layer3Alpha", 0.6f);
-            _borderMaterial.SetFloat("_Layer4Width", 0.08f);
+            _borderMaterial.SetFloat("_Layer4Width", 0.09f);
             _borderMaterial.SetFloat("_Layer4Alpha", 0.3f);
 
             Color cyanColor = new Color(0.3f, 1f, 1f, 1f);

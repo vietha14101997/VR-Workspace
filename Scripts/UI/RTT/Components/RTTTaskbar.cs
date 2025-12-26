@@ -221,7 +221,7 @@ public class RTTTaskbar : RTTCanvasBase
         img.raycastTarget = true;
 
         float expansion = glowExpansion;
-        // Use larger edge padding for better Android GPU compatibility (matches Space key values)
+        // Main container fills entire canvas - no edge padding needed
         float edgePad = 0.06f;
         float aspect = Aspect;
 
@@ -252,8 +252,9 @@ public class RTTTaskbar : RTTCanvasBase
         }
 
         RectTransform rt = bgObj.GetComponent<RectTransform>();
-        rt.anchorMin = new Vector2(-expansion, -expansion);
-        rt.anchorMax = new Vector2(1f + expansion, 1f + expansion);
+        // Keep background within canvas bounds - edge padding in shader handles visual margin
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
         rt.sizeDelta = Vector2.zero;
         rt.SetAsFirstSibling();
 
@@ -287,9 +288,9 @@ public class RTTTaskbar : RTTCanvasBase
 
             _borderMaterial.SetFloat("_StrokeEnabled", 0);
 
-            // Border settings matching VRTaskbar
-            _borderMaterial.SetFloat("_BorderWidth", 0.06f);  // 50% thicker
-            _borderMaterial.SetFloat("_CornerRadius", 0.24f);
+            // Border settings - corner radius matches background for alignment
+            _borderMaterial.SetFloat("_BorderWidth", 0.06f);
+            _borderMaterial.SetFloat("_CornerRadius", 0.12f);  // Match background corner radius
             _borderMaterial.SetFloat("_EdgePadding", edgePad);
             _borderMaterial.SetFloat("_Aspect", Aspect);
 
@@ -715,6 +716,7 @@ public class RTTTaskbar : RTTCanvasBase
         textRT.anchorMax = Vector2.one;
         textRT.offsetMin = Vector2.zero;
         textRT.offsetMax = Vector2.zero;
+        textRT.anchoredPosition = new Vector2(0, 7.5f);
     }
     #endregion
 

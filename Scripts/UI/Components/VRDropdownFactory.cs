@@ -54,7 +54,7 @@ public static class VRDropdownFactory
 
         // Visual settings
         public float cornerRadius = 0.12f;
-        public float edgePadding = 0.12f;
+        public float edgePadding = 0.06f;  // Match Space key value for Android compatibility
         public float backgroundAlpha = 0.08f;
         public float borderWidth = 0.04f;
         public float glowWidth = 0.04f;
@@ -119,13 +119,13 @@ public static class VRDropdownFactory
         int vrLayer = LayerMask.NameToLayer(config.layerName);
         if (vrLayer != -1) hitArea.layer = vrLayer;
 
-        // 3. Visuals - container cho visual elements với expansion (giống VRButtonFactory)
+        // 3. Visuals - container cho visual elements
+        // Keep within bounds - edge padding in shader handles visual margin
         GameObject visuals = new GameObject("Visuals");
         visuals.transform.SetParent(hitArea.transform, false);
         RectTransform visRT = visuals.AddComponent<RectTransform>();
-        float expansion = config.edgePadding;
-        visRT.anchorMin = new Vector2(-expansion, -expansion);
-        visRT.anchorMax = new Vector2(1f + expansion, 1f + expansion);
+        visRT.anchorMin = Vector2.zero;
+        visRT.anchorMax = Vector2.one;
         visRT.offsetMin = Vector2.zero;
         visRT.offsetMax = Vector2.zero;
 
@@ -385,13 +385,9 @@ public static class VRDropdownFactory
         content.transform.SetParent(parent, false);
         RectTransform cRT = content.AddComponent<RectTransform>();
 
-        // Compensate for Visuals expansion để Content nằm đúng vị trí HitArea gốc
-        float e = config.edgePadding;
-        float totalSize = 1f + 2f * e; // Visuals size ratio
-        float normalizedMin = e / totalSize;
-        float normalizedMax = (1f + e) / totalSize;
-        cRT.anchorMin = new Vector2(normalizedMin, normalizedMin);
-        cRT.anchorMax = new Vector2(normalizedMax, normalizedMax);
+        // Content fills Visuals (no expansion compensation needed)
+        cRT.anchorMin = Vector2.zero;
+        cRT.anchorMax = Vector2.one;
         cRT.offsetMin = Vector2.zero;
         cRT.offsetMax = Vector2.zero;
 
