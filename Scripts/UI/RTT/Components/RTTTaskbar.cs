@@ -1147,7 +1147,7 @@ public class RTTTaskbar : RTTCanvasBase
         Debug.Log($"[RTTTaskbar] Icons loaded - Quit:{iconQuit != null}, Settings:{iconSettings != null}, Passthrough:{iconPassthrough != null}, Recenter:{iconRecenter != null}, Home:{iconHome != null}");
     }
 
-    private static Sprite LoadIcon(string name)
+    public static Sprite LoadIcon(string name)
     {
         var sprite = Resources.Load<Sprite>($"icon_{name}");
         if (sprite == null)

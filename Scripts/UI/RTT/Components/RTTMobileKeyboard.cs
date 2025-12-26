@@ -445,7 +445,7 @@ public class RTTMobileKeyboard : RTTCanvasBase
         CreatePreviewUnderline(previewRow.transform);
 
         // Close button (left side) - using BareIconButton
-        Sprite closeIcon = VRTaskbar.LoadIcon("close");
+        Sprite closeIcon = RTTTaskbar.LoadIcon("close");
         GameObject closeBtn = VRButtonFactory.CreateBareIconButton(
             previewRow.transform,
             buttonSize * 0.75f,
@@ -462,7 +462,7 @@ public class RTTMobileKeyboard : RTTCanvasBase
         closeRT.anchoredPosition = new Vector2(buttonPadding, 4f);
 
         // Clear button (right side) - using BareIconButton
-        Sprite clearIcon = VRTaskbar.LoadIcon("clear");
+        Sprite clearIcon = RTTTaskbar.LoadIcon("clear");
         GameObject clearBtn = VRButtonFactory.CreateBareIconButton(
             previewRow.transform,
             buttonSize,

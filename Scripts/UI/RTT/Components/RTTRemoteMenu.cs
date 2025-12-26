@@ -401,8 +401,8 @@ public class RTTRemoteMenu : MonoBehaviour
             return;
         }
 
-        // Find VRTaskbar
-        VRTaskbar taskbar = FindObjectOfType<VRTaskbar>();
+        // Find RTTTaskbar
+        RTTTaskbar taskbar = FindObjectOfType<RTTTaskbar>();
 
         // Create QRScannerManager
         GameObject managerObj = new GameObject("QRScannerManager");
@@ -415,18 +415,10 @@ public class RTTRemoteMenu : MonoBehaviour
         _qrScannerManager.OnQRScanned += OnQRCodeScanned;
         _qrScannerManager.OnCancelled += OnQRScanCancelled;
 
-        // Start scanning - prefer RTTMenuFrame, fallback to legacy VRMenuFrame
+        // Start scanning with RTTMenuFrame
         if (_menuFrame != null)
         {
             _qrScannerManager.StartScanning(_menuFrame, taskbar);
-        }
-        else
-        {
-            VRMenuFrame vrMenuFrame = FindObjectOfType<VRMenuFrame>();
-            if (vrMenuFrame != null)
-            {
-                _qrScannerManager.StartScanning(vrMenuFrame, taskbar);
-            }
         }
     }
 

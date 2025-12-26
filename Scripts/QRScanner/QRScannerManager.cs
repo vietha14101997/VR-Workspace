@@ -35,9 +35,7 @@ public class QRScannerManager : MonoBehaviour
     public event Action OnCancelled;
 
     // References to hide/show
-    private VRMenuFrame _menuFrame;
     private RTTMenuFrame _rttMenuFrame;
-    private VRTaskbar _taskbar;
     private RTTTaskbar _rttTaskbar;
 
     // Created objects
@@ -54,7 +52,8 @@ public class QRScannerManager : MonoBehaviour
 
     // Scan UI elements
     private RectTransform _scanFrame;
-    private ScanLineAnimator _scanLineAnimator;
+    private RectTransform _scanLineRT;
+    private Coroutine _scanLineCoroutine;
     private TextMeshProUGUI _statusText;
 
     // Position tracking
@@ -76,42 +75,12 @@ public class QRScannerManager : MonoBehaviour
     private float ScaleFactor => _frameWidth / _logicalWidth;
 
     /// <summary>
-    /// Start QR scanning mode
+    /// Start QR scanning mode with RTTMenuFrame and RTTTaskbar
     /// </summary>
-    public void StartScanning(VRMenuFrame menuFrame, VRTaskbar taskbar)
+    public void StartScanning(RTTMenuFrame rttMenuFrame, RTTTaskbar rttTaskbar)
     {
-        _menuFrame = menuFrame;
-        _taskbar = taskbar;
-        _mainCamera = Camera.main;
-
-        // Store initial positions and dimensions from VRMenuFrame
-        if (_menuFrame != null)
-        {
-            _initialFramePosition = _menuFrame.transform.position;
-            _initialFrameRotation = _menuFrame.transform.rotation;
-            _frameWidth = _menuFrame.panelWidth;
-            _frameHeight = _menuFrame.panelHeight;
-            _logicalWidth = _menuFrame.logicalWidth;
-
-            // Calculate frameDistance from actual VRMenuFrame position
-            if (_mainCamera != null)
-            {
-                Vector3 toFrame = _initialFramePosition - _mainCamera.transform.position;
-                frameDistance = toFrame.magnitude;
-            }
-        }
-
-        StartScanningInternal(taskbar);
-    }
-
-    /// <summary>
-    /// Start QR scanning mode with RTTMenuFrame
-    /// </summary>
-    public void StartScanning(RTTMenuFrame rttMenuFrame, VRTaskbar taskbar)
-    {
-        _menuFrame = null; // Not using legacy VRMenuFrame
         _rttMenuFrame = rttMenuFrame;
-        _taskbar = taskbar;
+        _rttTaskbar = rttTaskbar;
         _mainCamera = Camera.main;
 
         // Store initial positions and dimensions from RTTMenuFrame
@@ -131,25 +100,22 @@ public class QRScannerManager : MonoBehaviour
             }
         }
 
-        StartScanningInternal(taskbar);
+        StartScanningInternal();
     }
 
-    private void StartScanningInternal(VRTaskbar taskbar)
+    private void StartScanningInternal()
     {
-        // Find RTTTaskbar if exists
-        _rttTaskbar = FindObjectOfType<RTTTaskbar>();
+        // Find RTTTaskbar if not set
+        if (_rttTaskbar == null)
+            _rttTaskbar = FindObjectOfType<RTTTaskbar>();
 
         // Calculate cancel button position
         _cancelButtonDistance = frameDistance;
 
-        // Use RTTTaskbar Y position if available, otherwise VRTaskbar, otherwise calculate
+        // Use RTTTaskbar Y position if available, otherwise calculate
         if (_rttTaskbar != null)
         {
             _cancelButtonWorldY = _rttTaskbar.transform.position.y;
-        }
-        else if (_taskbar != null)
-        {
-            _cancelButtonWorldY = _taskbar.transform.position.y;
         }
         else
         {
@@ -212,14 +178,8 @@ public class QRScannerManager : MonoBehaviour
 
     void HideOriginalUI()
     {
-        if (_menuFrame != null)
-            _menuFrame.gameObject.SetActive(false);
-
         if (_rttMenuFrame != null)
             _rttMenuFrame.Hide();
-
-        if (_taskbar != null)
-            _taskbar.gameObject.SetActive(false);
 
         if (_rttTaskbar != null)
             _rttTaskbar.Hide();
@@ -227,14 +187,8 @@ public class QRScannerManager : MonoBehaviour
 
     void ShowOriginalUI()
     {
-        if (_menuFrame != null)
-            _menuFrame.gameObject.SetActive(true);
-
         if (_rttMenuFrame != null)
             _rttMenuFrame.Show();
-
-        if (_taskbar != null)
-            _taskbar.gameObject.SetActive(true);
 
         if (_rttTaskbar != null)
             _rttTaskbar.Show();
@@ -628,11 +582,11 @@ public class QRScannerManager : MonoBehaviour
         GameObject lineObj = new GameObject("ScanLine");
         lineObj.transform.SetParent(parent, false);
 
-        RectTransform lineRT = lineObj.AddComponent<RectTransform>();
-        lineRT.anchorMin = new Vector2(0.1f, 0.5f);
-        lineRT.anchorMax = new Vector2(0.9f, 0.5f);
-        lineRT.pivot = new Vector2(0.5f, 0.5f);
-        lineRT.sizeDelta = new Vector2(0, 4f);
+        _scanLineRT = lineObj.AddComponent<RectTransform>();
+        _scanLineRT.anchorMin = new Vector2(0.1f, 0.9f);
+        _scanLineRT.anchorMax = new Vector2(0.9f, 0.9f);
+        _scanLineRT.pivot = new Vector2(0.5f, 0.5f);
+        _scanLineRT.sizeDelta = new Vector2(0, 4f);
 
         Image lineImg = lineObj.AddComponent<Image>();
         lineImg.color = themeColor;
@@ -642,10 +596,41 @@ public class QRScannerManager : MonoBehaviour
         glow.effectColor = new Color(themeColor.r, themeColor.g, themeColor.b, 0.7f);
         glow.effectDistance = new Vector2(0, 3);
 
-        _scanLineAnimator = lineObj.AddComponent<ScanLineAnimator>();
-        _scanLineAnimator.duration = 2f;
-        _scanLineAnimator.startY = 0.9f;
-        _scanLineAnimator.endY = 0.1f;
+        // Start scan line animation
+        _scanLineCoroutine = StartCoroutine(ScanLineAnimation());
+    }
+
+    IEnumerator ScanLineAnimation()
+    {
+        float duration = 2f;
+        float startY = 0.9f;
+        float endY = 0.1f;
+
+        while (true)
+        {
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                float y = Mathf.Lerp(startY, endY, t);
+                if (_scanLineRT != null)
+                {
+                    _scanLineRT.anchorMin = new Vector2(0.1f, y);
+                    _scanLineRT.anchorMax = new Vector2(0.9f, y);
+                }
+                yield return null;
+            }
+        }
+    }
+
+    void StopScanLineAnimation()
+    {
+        if (_scanLineCoroutine != null)
+        {
+            StopCoroutine(_scanLineCoroutine);
+            _scanLineCoroutine = null;
+        }
     }
 
     void CreateCancelButton()
@@ -698,7 +683,7 @@ public class QRScannerManager : MonoBehaviour
     void CreateMiniTaskbarPanel(Transform parent, float width, float height)
     {
         // Create button with same config as QR button in VRRemoteMenu
-        Sprite closeIcon = VRTaskbar.LoadIcon("close") ?? VRTaskbar.LoadIcon("clear") ?? VRTaskbar.LoadIcon("quit");
+        Sprite closeIcon = RTTTaskbar.LoadIcon("close") ?? RTTTaskbar.LoadIcon("clear") ?? RTTTaskbar.LoadIcon("quit");
 
         var config = new VRButtonFactory.ButtonConfig
         {
@@ -1004,7 +989,7 @@ public class QRScannerManager : MonoBehaviour
 
             if (config != null && config.IsValid())
             {
-                if (_scanLineAnimator != null) _scanLineAnimator.Stop();
+                StopScanLineAnimation();
 
                 #if UNITY_ANDROID && !UNITY_EDITOR
                 Handheld.Vibrate();

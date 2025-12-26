@@ -30,7 +30,6 @@ public static class VRUIComponentsPrefabBuilder
     {
         LoadShaders();
         EnsureDirectoryExists();
-        CreateVRMenuFrame();
         CreateVRButton_Text_Icon();
         CreateVRButton_Text_Icon_Mini();
         CreateVRButton_Icon_Only();
@@ -41,50 +40,8 @@ public static class VRUIComponentsPrefabBuilder
         Debug.Log("[VRUIComponentsPrefabBuilder] All prefabs created successfully!");
     }
 
-    [MenuItem("Tools/VR UI Components/VRMenuFrame")]
-    public static void CreateVRMenuFrame()
-    {
-        LoadShaders();
-        EnsureDirectoryExists();
-
-        // Frame size matching VRMainMenu (from VRMainMenu.cs BuildInterface)
-        float panelWidth = 1.6f;
-        float panelHeight = 0.9f;
-        float logicalWidth = 1920f;
-        float logicalHeight = (logicalWidth / panelWidth) * panelHeight;
-
-        // Root object
-        var go = new GameObject("VRMenuFrame");
-
-        // Canvas for World Space UI (following VRMainMenu.cs pattern exactly)
-        var canvasGO = new GameObject("MenuCanvas");
-        canvasGO.transform.SetParent(go.transform, false);
-
-        var canvas = canvasGO.AddComponent<Canvas>();
-        canvas.renderMode = RenderMode.WorldSpace;
-
-        var canvasRT = canvasGO.GetComponent<RectTransform>();
-        canvasRT.sizeDelta = new Vector2(logicalWidth, logicalHeight);
-
-        // Scale canvas to world size
-        float scaleFactor = panelWidth / logicalWidth;
-        canvasRT.localScale = new Vector3(scaleFactor, scaleFactor, 1f);
-        canvasRT.localPosition = Vector3.zero;
-
-        canvasGO.AddComponent<UnityEngine.UI.GraphicRaycaster>();
-
-        // Add VRMenuFrame component to canvas and call Build() - same as VRMainMenu.cs
-        var menuFrame = canvasGO.AddComponent<VRMenuFrame>();
-        menuFrame.Build(logicalWidth, logicalHeight);
-
-        // Replace all runtime materials with saved asset materials
-        ReplaceRuntimeMaterialsWithAssets(canvasGO, logicalWidth, logicalHeight);
-
-        SavePrefab(go, "VRMenuFrame");
-    }
-
     /// <summary>
-    /// Replace runtime materials created by VRMenuFrame.Build() with saved asset materials
+    /// Replace runtime materials with saved asset materials (for prefab building)
     /// </summary>
     private static void ReplaceRuntimeMaterialsWithAssets(GameObject root, float w, float h)
     {

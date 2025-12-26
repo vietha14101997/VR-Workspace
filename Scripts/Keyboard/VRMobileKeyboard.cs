@@ -453,13 +453,13 @@ public class VRMobileKeyboard : MonoBehaviour
     {
         if (!followPrimaryFrame) return;
 
-        VRMenuFrame primary = VRMenuFrame.PrimaryInstance;
+        RTTMenuFrame primary = RTTMenuFrame.PrimaryInstance;
         if (primary == null) return;
 
         var cam = Camera.main;
         if (cam == null) return;
 
-        VRTaskbar taskbar = FindObjectOfType<VRTaskbar>();
+        RTTTaskbar taskbar = FindObjectOfType<RTTTaskbar>();
 
         Vector3 cameraPos = cam.transform.position;
         float keyboardHalfHeight = (_logicalHeight * PixelToMeter) / 2f;
@@ -469,7 +469,7 @@ public class VRMobileKeyboard : MonoBehaviour
 
         // Get primary frame bottom position
         Vector3 primaryPos = primary.transform.position;
-        float primaryHalfHeight = primary.panelHeight / 2f;
+        float primaryHalfHeight = primary.PanelHeight / 2f;
         float frameBottomY = primaryPos.y - primaryHalfHeight;
 
         // Keyboard top edge should slightly overlap frame bottom (by ~5% of keyboard height)
@@ -592,9 +592,9 @@ public class VRMobileKeyboard : MonoBehaviour
 
     void BuildKeyboard()
     {
-        // Calculate dimensions based on VRMenuFrame (2/3 width)
-        VRMenuFrame primary = VRMenuFrame.PrimaryInstance;
-        float frameLogicalWidth = primary != null ? primary.logicalWidth : 1920f;
+        // Calculate dimensions based on RTTMenuFrame (2/3 width)
+        RTTMenuFrame primary = RTTMenuFrame.PrimaryInstance;
+        float frameLogicalWidth = primary != null ? primary.LogicalWidthValue : 1920f;
 
         // Keyboard logical width = 2/3 of VRMenuFrame
         _logicalWidth = frameLogicalWidth * widthRatioToFrame;
@@ -1323,7 +1323,7 @@ public class VRMobileKeyboard : MonoBehaviour
         CreatePreviewUnderline(_previewText.transform, contentWidth);
 
         // Create Close button (BareIconButton) inside PreviewText, on the left, above underline
-        Sprite closeIcon = VRTaskbar.LoadIcon("icon_close");
+        Sprite closeIcon = RTTTaskbar.LoadIcon("close");
         GameObject closeBtn = VRButtonFactory.CreateBareIconButton(
             _previewText.transform,
             buttonSize,
@@ -1340,7 +1340,7 @@ public class VRMobileKeyboard : MonoBehaviour
         closeRT.anchoredPosition = new Vector2(buttonPadding * 1.5f, keyHeight * 0.04f); // Slightly above underline
 
         // Create Clear button (BareIconButton) inside PreviewText, on the right, above underline
-        Sprite clearIcon = VRTaskbar.LoadIcon("clear");
+        Sprite clearIcon = RTTTaskbar.LoadIcon("clear");
         GameObject clearBtn = VRButtonFactory.CreateBareIconButton(
             _previewText.transform,
             buttonSize,
@@ -1768,7 +1768,7 @@ public class VRMobileKeyboard : MonoBehaviour
 
             _instance = keyboardObj.AddComponent<VRMobileKeyboard>();
 
-            var remoteMenu = inputField.GetComponentInParent<VRRemoteMenu>();
+            var remoteMenu = inputField.GetComponentInParent<RTTRemoteMenu>();
             if (remoteMenu != null)
             {
                 _instance.themeColor = remoteMenu.themeColor;

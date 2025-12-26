@@ -29,7 +29,8 @@ public class QRScannerView : MonoBehaviour
     private Material _previewMaterial;
     private RectTransform _scanFrame;
     private TextMeshProUGUI _statusText;
-    private ScanLineAnimator _scanLineAnimator;
+    private RectTransform _scanLineRT;
+    private Coroutine _scanLineCoroutine;
     private CanvasGroup _canvasGroup;
 
     // Camera
@@ -303,11 +304,11 @@ public class QRScannerView : MonoBehaviour
         GameObject lineObj = new GameObject("ScanLine");
         lineObj.transform.SetParent(parent, false);
 
-        RectTransform lineRT = lineObj.AddComponent<RectTransform>();
-        lineRT.anchorMin = new Vector2(0.1f, 0.5f);
-        lineRT.anchorMax = new Vector2(0.9f, 0.5f);
-        lineRT.pivot = new Vector2(0.5f, 0.5f);
-        lineRT.sizeDelta = new Vector2(0, 4f);
+        _scanLineRT = lineObj.AddComponent<RectTransform>();
+        _scanLineRT.anchorMin = new Vector2(0.1f, 0.9f);
+        _scanLineRT.anchorMax = new Vector2(0.9f, 0.9f);
+        _scanLineRT.pivot = new Vector2(0.5f, 0.5f);
+        _scanLineRT.sizeDelta = new Vector2(0, 4f);
 
         Image lineImg = lineObj.AddComponent<Image>();
         lineImg.color = Color.white;
@@ -318,11 +319,41 @@ public class QRScannerView : MonoBehaviour
         glow.effectColor = new Color(1f, 1f, 1f, 0.7f);
         glow.effectDistance = new Vector2(0, 3);
 
-        // Add animator
-        _scanLineAnimator = lineObj.AddComponent<ScanLineAnimator>();
-        _scanLineAnimator.duration = 2f;
-        _scanLineAnimator.startY = 0.9f;
-        _scanLineAnimator.endY = 0.1f;
+        // Start scan line animation
+        _scanLineCoroutine = StartCoroutine(ScanLineAnimation());
+    }
+
+    IEnumerator ScanLineAnimation()
+    {
+        float duration = 2f;
+        float startY = 0.9f;
+        float endY = 0.1f;
+
+        while (true)
+        {
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                float y = Mathf.Lerp(startY, endY, t);
+                if (_scanLineRT != null)
+                {
+                    _scanLineRT.anchorMin = new Vector2(0.1f, y);
+                    _scanLineRT.anchorMax = new Vector2(0.9f, y);
+                }
+                yield return null;
+            }
+        }
+    }
+
+    void StopScanLineAnimation()
+    {
+        if (_scanLineCoroutine != null)
+        {
+            StopCoroutine(_scanLineCoroutine);
+            _scanLineCoroutine = null;
+        }
     }
 
     void CreateStatusText(Transform parent, float width)
@@ -524,7 +555,7 @@ public class QRScannerView : MonoBehaviour
                 _statusText.color = Color.green;
 
                 // Stop scan line
-                if (_scanLineAnimator != null) _scanLineAnimator.Stop();
+                StopScanLineAnimation();
 
                 // Haptic feedback
                 #if UNITY_ANDROID && !UNITY_EDITOR
