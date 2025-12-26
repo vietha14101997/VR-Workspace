@@ -8,6 +8,7 @@ Shader "Custom/GlassGradientBackground"
         [Header(Rounded Corners)]
         _CornerRadius ("Corner Radius (UV)", Range(0.01, 0.2)) = 0.07
         _EdgePadding ("Edge Padding (UV)", Range(0, 0.2)) = 0.05
+        _Aspect ("Aspect Ratio", Float) = 1.0
 
         [Header(Gradient)]
         _ColorA ("Color A (Cyan)", Color) = (0.3, 0.85, 1, 0.15)
@@ -66,7 +67,7 @@ Shader "Custom/GlassGradientBackground"
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-            #pragma target 3.0
+            #pragma target 2.0
 
             #include "UnityCG.cginc"
             #include "UnityUI.cginc"
@@ -74,7 +75,7 @@ Shader "Custom/GlassGradientBackground"
             struct appdata
             {
                 float4 vertex : POSITION;
-                float4 color : COLOR;
+                half4 color : COLOR;
                 float2 texcoord : TEXCOORD0;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
@@ -82,33 +83,33 @@ Shader "Custom/GlassGradientBackground"
             struct v2f
             {
                 float4 vertex : SV_POSITION;
-                fixed4 color : COLOR;
+                half4 color : COLOR;
                 float2 uv : TEXCOORD0;
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
             sampler2D _MainTex;
             float4 _MainTex_ST;
-            fixed4 _Color;
+            half4 _Color;
 
-            float _CornerRadius;
-            float _EdgePadding;
-            fixed4 _ColorA;
-            fixed4 _ColorB;
-            float _GradientOffset;
-            float _GradientAngle;
-            float _CyanRatio;
-            float _GlassAlpha;
-            float _FresnelPower;
-            float _FresnelStrength;
-            float _HoverAmount;
-            float _Aspect;
+            half _CornerRadius;
+            half _EdgePadding;
+            half _Aspect;
+            half4 _ColorA;
+            half4 _ColorB;
+            half _GradientOffset;
+            half _GradientAngle;
+            half _CyanRatio;
+            half _GlassAlpha;
+            half _FresnelPower;
+            half _FresnelStrength;
+            half _HoverAmount;
 
             // SDF for rounded box with Aspect Ratio correction
-            float sdRoundedBoxAspect(float2 uv, float aspect, float radius, float padding)
+            half sdRoundedBoxAspect(float2 uv, half aspect, half radius, half padding)
             {
                 float2 center = float2(0.5, 0.5);
-                float2 pos = (uv - center);
+                float2 pos = uv - center;
                 pos.x *= aspect;
 
                 float2 halfSize = float2(0.5 * aspect - padding * aspect, 0.5 - padding);
@@ -130,41 +131,47 @@ Shader "Custom/GlassGradientBackground"
                 return o;
             }
 
-            fixed4 frag(v2f i) : SV_Target
+            half4 frag(v2f i) : SV_Target
             {
                 float2 uv = i.uv;
 
-                // Default aspect if not set
-                float aspect = (_Aspect > 0.0) ? _Aspect : 1.0;
+                // Aspect ratio - use property value or default to 1
+                half aspect = max(_Aspect, 0.01);
 
                 // SDF with aspect correction
-                float dist = sdRoundedBoxAspect(uv, aspect, _CornerRadius, _EdgePadding);
+                half dist = sdRoundedBoxAspect(uv, aspect, _CornerRadius, _EdgePadding);
 
-                // Alpha mask for rounded corners
-                float alphaMask = 1.0 - smoothstep(-0.01, 0.0, dist);
-                if (alphaMask <= 0.001) clip(-1);
+                // Alpha mask for rounded corners - smooth falloff instead of clip
+                half alphaMask = 1.0 - smoothstep(-0.01, 0.005, dist);
+
+                // Early out for fully transparent pixels
+                if (alphaMask < 0.001)
+                {
+                    return half4(0, 0, 0, 0);
+                }
 
                 // === GRADIENT COLOR ===
-                float t = uv.x;
-                t = pow(t, 1.2);
-                float angleOffset = (1.0 - uv.y) * 0.15;
-                t += angleOffset;
-                t = saturate(t);
-                fixed4 gradColor = lerp(_ColorA, _ColorB, t);
+                half t = saturate(uv.x);
+                t = t * t * (3.0 - 2.0 * t); // smoothstep approximation, safer than pow
+                half angleOffset = (1.0 - uv.y) * 0.15;
+                t = saturate(t + angleOffset);
+                half4 gradColor = lerp(_ColorA, _ColorB, t);
 
                 // === HOVER ===
-                float hoverBrightness = 1.0 + _HoverAmount * 0.3;
-                float hoverAlphaBoost = _HoverAmount * 0.1;
+                half hoverBrightness = 1.0 + _HoverAmount * 0.3;
+                half hoverAlphaBoost = _HoverAmount * 0.1;
 
                 // ========== GLASS EFFECT ==========
                 float2 centerDist = abs(uv - 0.5);
-                float centerGlow = 1.0 - saturate(length(centerDist) / 0.5);
-                centerGlow = pow(centerGlow, 1.5) * 0.15;
+                half centerGlow = 1.0 - saturate(length(centerDist) * 2.0);
+                centerGlow = centerGlow * centerGlow * 0.15; // Safer than pow
 
-                float edgeFactor = 1.0 - saturate(abs(dist) / 0.2);
-                float fresnel = pow(edgeFactor, _FresnelPower) * _FresnelStrength;
+                half edgeFactor = 1.0 - saturate(abs(dist) * 5.0);
+                // Safe pow - ensure base is positive
+                half safeFresnel = max(edgeFactor, 0.001);
+                half fresnel = exp2(_FresnelPower * log2(safeFresnel)) * _FresnelStrength;
 
-                fixed4 finalColor = gradColor;
+                half4 finalColor = gradColor;
                 finalColor.a = _GlassAlpha + gradColor.a * 0.5 + hoverAlphaBoost;
                 finalColor.a *= alphaMask;
                 finalColor.rgb += fresnel + centerGlow;
