@@ -47,8 +47,8 @@ public static class VRInputFieldFactory
         public int characterLimit = 0;
 
         // Visual settings
-        public float cornerRadius = 0.126f;
-        public float edgePadding = 0.12f;
+        public float cornerRadius = 0.12f;
+        public float edgePadding = 0.06f;  // Match Space key value for Android compatibility
         public float backgroundAlpha = 0.08f;
         public float borderWidth = 0.09f;
         public float glowWidth = 0.04f;
@@ -139,13 +139,13 @@ public static class VRInputFieldFactory
         int vrLayer = LayerMask.NameToLayer(config.layerName);
         if (vrLayer != -1) hitArea.layer = vrLayer;
 
-        // 5. Visuals - container cho visual elements với expansion (giống VRButtonFactory)
+        // 5. Visuals - container cho visual elements
+        // Keep within bounds - edge padding in shader handles visual margin
         GameObject visuals = new GameObject("Visuals");
         visuals.transform.SetParent(hitArea.transform, false);
         RectTransform visRT = visuals.AddComponent<RectTransform>();
-        float expansion = config.edgePadding;
-        visRT.anchorMin = new Vector2(-expansion, -expansion);
-        visRT.anchorMax = new Vector2(1f + expansion, 1f + expansion);
+        visRT.anchorMin = Vector2.zero;
+        visRT.anchorMax = Vector2.one;
         visRT.offsetMin = Vector2.zero;
         visRT.offsetMax = Vector2.zero;
 
@@ -295,7 +295,8 @@ public static class VRInputFieldFactory
         float aspect = config.width / boxHeight;
         Color col = config.themeColor;
 
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
+        // Use Wide shader for better Android GPU compatibility
+        Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
         if (glassShader != null)
         {
             Material mat = new Material(glassShader);
@@ -360,13 +361,9 @@ public static class VRInputFieldFactory
         content.transform.SetParent(parent, false);
         RectTransform cRT = content.AddComponent<RectTransform>();
 
-        // Compensate for Visuals expansion để Content nằm đúng vị trí HitArea gốc
-        float e = config.edgePadding;
-        float totalSize = 1f + 2f * e; // Visuals size ratio
-        float normalizedMin = e / totalSize;
-        float normalizedMax = (1f + e) / totalSize;
-        cRT.anchorMin = new Vector2(normalizedMin, normalizedMin);
-        cRT.anchorMax = new Vector2(normalizedMax, normalizedMax);
+        // Content fills Visuals (no expansion compensation needed)
+        cRT.anchorMin = Vector2.zero;
+        cRT.anchorMax = Vector2.one;
         cRT.offsetMin = Vector2.zero;
         cRT.offsetMax = Vector2.zero;
 

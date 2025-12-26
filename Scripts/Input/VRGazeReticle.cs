@@ -13,6 +13,10 @@ public class VRGazeReticle : MonoBehaviour
 
     public Color colorInteract = new Color(1f, 0f, 0f, 1f);
 
+    [Header("RTT Integration")]
+    [Tooltip("Enable RTT (Render-to-Texture) raycast for RTT panels")]
+    public bool useRTTRaycast = true;
+
     [Header("Dwell Click Settings")]
     [Tooltip("Thời gian phải giữ yên reticle trước khi bắt đầu đếm click (giây)")]
     public float dwellStartDelay = 0.5f;
@@ -30,6 +34,10 @@ public class VRGazeReticle : MonoBehaviour
     private Camera _cam;
     private RectTransform _canvasRT;
     private int _layerMask;
+
+    // Custom cursor support
+    private Sprite _defaultSprite;
+    private Sprite _currentCustomSprite;
 
     // Recenter State
     private bool _isRecentering = false;
@@ -52,7 +60,11 @@ public class VRGazeReticle : MonoBehaviour
     private Image _dwellRing;
     private GameObject _dwellableTarget;
     private RaycastHit _lastHit;
-    
+
+    // RTT State
+    private RTTHitResult _lastRTTHit;
+    private bool _isHoveringRTT = false;
+
     // Singleton access helper (optional, or use FindObjectOfType)
     public static VRGazeReticle Instance { get; private set; }
 
@@ -108,7 +120,8 @@ public class VRGazeReticle : MonoBehaviour
         imgObj.layer = _cam.gameObject.layer;
         
         _reticleImage = imgObj.AddComponent<Image>();
-        _reticleImage.sprite = GetCircleSprite();
+        _defaultSprite = GetCircleSprite();
+        _reticleImage.sprite = _defaultSprite;
         _reticleImage.color = colorInteract;
         _reticleImage.raycastTarget = false; 
         
@@ -285,8 +298,111 @@ public class VRGazeReticle : MonoBehaviour
         if (_canvasRT.localScale != Vector3.one) _canvasRT.localScale = Vector3.one;
 
         Ray ray = new Ray(_cam.transform.position, _cam.transform.forward);
-        RaycastHit hit;
         Vector3 currentGazeDir = _cam.transform.forward;
+
+        // Priority check: If there's an open world-space dropdown, check physics raycast first
+        // The world-space dropdown is positioned in front of RTT panels, so physics raycast takes priority
+        if (VRDropdown.CurrentlyOpenDropdown != null && VRDropdown.CurrentlyOpenDropdown.IsOpen)
+        {
+            RaycastHit worldDropdownHit;
+            if (_layerMask != 0 && Physics.Raycast(ray, out worldDropdownHit, 100.0f, _layerMask))
+            {
+                GameObject hitObj = worldDropdownHit.collider.gameObject;
+
+                // Check if this hit is part of the open dropdown's world-space panel
+                if (VRDropdown.CurrentlyOpenDropdown.IsPartOfDropdownPanel(hitObj))
+                {
+                    // Process as standard physics hit for the dropdown
+                    _isHoveringRTT = false;
+
+                    if (!_reticleImage.enabled) _reticleImage.enabled = true;
+
+                    float dist = worldDropdownHit.distance;
+                    if (dist < _cam.nearClipPlane) dist = _cam.nearClipPlane + 0.05f;
+                    _canvasRT.localPosition = new Vector3(0, 0, dist);
+
+                    float scale = (reticleSize / 100f) * dist;
+                    float finalScale = scale * _customCursorScaleMultiplier;
+                    _reticleImage.rectTransform.localScale = new Vector3(finalScale, finalScale, 1f);
+
+                    if (_dwellRing != null)
+                    {
+                        _dwellRing.rectTransform.localScale = new Vector3(finalScale, finalScale, 1f);
+                    }
+
+                    if (_currentHitObj != hitObj)
+                    {
+                        HandlePointerExit(_currentHitObj);
+                        HandlePointerEnter(hitObj);
+                        _currentHitObj = hitObj;
+                        ResetDwellState();
+                    }
+
+                    _lastHit = worldDropdownHit;
+
+                    if (dwellClickEnabled && _currentHitObj != null)
+                    {
+                        ProcessDwellClick(currentGazeDir, hitObj, worldDropdownHit);
+                    }
+
+                    _lastGazeDirection = currentGazeDir;
+                    return;
+                }
+            }
+        }
+
+        // Try RTT raycast first if enabled
+        if (useRTTRaycast && RTTRaycastManager.Instance != null)
+        {
+            _lastRTTHit = RTTRaycastManager.Instance.Raycast(ray);
+
+            if (_lastRTTHit.isValid)
+            {
+                _isHoveringRTT = true;
+
+                if (!_reticleImage.enabled) _reticleImage.enabled = true;
+
+                float dist = _lastRTTHit.distance;
+                if (dist < _cam.nearClipPlane) dist = _cam.nearClipPlane + 0.05f;
+                _canvasRT.localPosition = new Vector3(0, 0, dist);
+
+                float scale = (reticleSize / 100f) * dist;
+                float finalScale = scale * _customCursorScaleMultiplier;
+                _reticleImage.rectTransform.localScale = new Vector3(finalScale, finalScale, 1f);
+
+                // Dwell ring scales with cursor (stays proportional to cursor size)
+                if (_dwellRing != null)
+                {
+                    _dwellRing.rectTransform.localScale = new Vector3(finalScale, finalScale, 1f);
+                }
+
+                // Handle hover state changes for RTT
+                GameObject hitObj = _lastRTTHit.hitUIElement;
+                if (_currentHitObj != hitObj)
+                {
+                    // Exit old non-RTT object if any
+                    if (_currentHitObj != null && !_isHoveringRTT)
+                    {
+                        HandlePointerExit(_currentHitObj);
+                    }
+                    _currentHitObj = hitObj;
+                    ResetDwellState();
+                }
+
+                // Process dwell click for RTT
+                if (dwellClickEnabled && hitObj != null)
+                {
+                    ProcessDwellClickRTT(currentGazeDir);
+                }
+
+                _lastGazeDirection = currentGazeDir;
+                return;
+            }
+        }
+
+        // Fallback to standard physics raycast
+        _isHoveringRTT = false;
+        RaycastHit hit;
 
         if (_layerMask != 0 && Physics.Raycast(ray, out hit, 100.0f, _layerMask))
         {
@@ -297,12 +413,13 @@ public class VRGazeReticle : MonoBehaviour
             _canvasRT.localPosition = new Vector3(0, 0, dist);
 
             float scale = (reticleSize / 100f) * dist;
-            _reticleImage.rectTransform.localScale = new Vector3(scale, scale, 1f);
+            float finalScale = scale * _customCursorScaleMultiplier;
+            _reticleImage.rectTransform.localScale = new Vector3(finalScale, finalScale, 1f);
 
-            // Scale dwell ring theo khoảng cách
+            // Dwell ring scales with cursor (stays proportional to cursor size)
             if (_dwellRing != null)
             {
-                _dwellRing.rectTransform.localScale = new Vector3(scale, scale, 1f);
+                _dwellRing.rectTransform.localScale = new Vector3(finalScale, finalScale, 1f);
             }
 
             GameObject hitObj = hit.collider.gameObject;
@@ -338,15 +455,187 @@ public class VRGazeReticle : MonoBehaviour
         _lastGazeDirection = currentGazeDir;
     }
 
+    /// <summary>
+    /// Process dwell click for RTT panels
+    /// </summary>
+    void ProcessDwellClickRTT(Vector3 currentGazeDir)
+    {
+        if (!_lastRTTHit.isValid || _lastRTTHit.hitUIElement == null)
+        {
+            ResetDwellState();
+            return;
+        }
+
+        GameObject target = _lastRTTHit.hitUIElement;
+
+        // Check if dropdown is open - allow dwell on ANY object to close it
+        bool hasOpenDropdown = VRDropdown.CurrentlyOpenDropdown != null;
+        bool isDropdownOption = hasOpenDropdown && VRDropdown.CurrentlyOpenDropdown.IsPartOfDropdownPanel(target);
+
+        // Check if RTT keyboard is open
+        bool hasOpenKeyboard = RTTMobileKeyboard.CurrentlyOpenKeyboard != null;
+        bool isKeyboardPart = hasOpenKeyboard && RTTMobileKeyboard.CurrentlyOpenKeyboard.IsPartOfKeyboard(target);
+
+        // Check if target is an InputField
+        VRInputFieldTrigger inputFieldTrigger = target.GetComponent<VRInputFieldTrigger>();
+        if (inputFieldTrigger == null) inputFieldTrigger = target.GetComponentInParent<VRInputFieldTrigger>();
+
+        // Check if target is a Dropdown
+        VRDropdown targetDropdown = target.GetComponent<VRDropdown>();
+        if (targetDropdown == null) targetDropdown = target.GetComponentInParent<VRDropdown>();
+
+        // Check if target is dwellable
+        bool isDwellableTarget = IsDwellable(target);
+
+        // If no dropdown/keyboard open and target is not dwellable, skip
+        if (!hasOpenDropdown && !hasOpenKeyboard && !isDwellableTarget)
+        {
+            ResetDwellState();
+            return;
+        }
+
+        // If keyboard is open and target is keyboard background (not a button), skip dwell
+        if (hasOpenKeyboard && isKeyboardPart && !isDwellableTarget)
+        {
+            ResetDwellState();
+            return;
+        }
+
+        // Calculate angle moved
+        float angleMoved = Vector3.Angle(_lastGazeDirection, currentGazeDir);
+
+        // Reset if moved too much
+        if (angleMoved > dwellMovementThreshold * Time.deltaTime * 10f)
+        {
+            ResetDwellState();
+            return;
+        }
+
+        // Already clicked
+        if (_dwellClickTriggered)
+        {
+            return;
+        }
+
+        // Accumulate stable time
+        _stableTime += Time.deltaTime;
+
+        // Phase 1: Wait for delay
+        if (_stableTime < dwellStartDelay)
+        {
+            return;
+        }
+
+        // Phase 2: Show progress ring
+        if (!_isDwelling)
+        {
+            _isDwelling = true;
+            _dwellableTarget = target;
+            if (_dwellRing != null)
+            {
+                _dwellRing.enabled = true;
+                _dwellRing.fillAmount = 0f;
+            }
+        }
+
+        // Calculate progress
+        float dwellElapsed = _stableTime - dwellStartDelay;
+        _dwellProgress = Mathf.Clamp01(dwellElapsed / dwellClickTime);
+
+        // Update visual
+        if (_dwellRing != null)
+        {
+            _dwellRing.fillAmount = _dwellProgress;
+        }
+
+        // Phase 3: Click when done
+        if (_dwellProgress >= 1f)
+        {
+            _dwellClickTriggered = true;
+
+            if (_dwellRing != null)
+            {
+                _dwellRing.enabled = false;
+            }
+
+            // Priority 1: Handle keyboard click-outside
+            if (hasOpenKeyboard && !isKeyboardPart)
+            {
+                // Clicking outside keyboard
+                if (inputFieldTrigger != null && inputFieldTrigger.InputField != null)
+                {
+                    var currentTarget = RTTMobileKeyboard.CurrentlyOpenKeyboard.GetTargetInputField();
+                    if (inputFieldTrigger.InputField != currentTarget)
+                    {
+                        // Clicking a DIFFERENT InputField - switch keyboard target first
+                        RTTMobileKeyboard.CurrentlyOpenKeyboard.SwitchToInputField(inputFieldTrigger.InputField);
+                        // Continue to SendClick below to set caret position via OnPointerClick
+                    }
+                    // Clicking InputField - let SendClick happen to set caret position
+                }
+                else if (targetDropdown != null)
+                {
+                    // Clicking a dropdown - close keyboard and open dropdown
+                    RTTMobileKeyboard.CurrentlyOpenKeyboard.Hide();
+                    targetDropdown.OpenDropdown();
+                    // Mark RTT panel dirty for re-render
+                    _lastRTTHit.panel?.MarkDirty();
+                    return;
+                }
+                else
+                {
+                    // Clicking on other functional object (button) - close keyboard first
+                    RTTMobileKeyboard.CurrentlyOpenKeyboard.Hide();
+                    // Continue to perform the button click below
+                }
+            }
+
+            // Priority 2: Handle dropdown click-outside
+            if (hasOpenDropdown)
+            {
+                if (isDropdownOption)
+                {
+                    // Target is a dropdown option - perform normal click via RTTRaycastManager
+                    if (RTTRaycastManager.Instance != null)
+                    {
+                        RTTRaycastManager.Instance.SendClick();
+                    }
+                }
+                else if (targetDropdown != null && targetDropdown != VRDropdown.CurrentlyOpenDropdown)
+                {
+                    // Clicking another dropdown - close current and open new one
+                    VRDropdown.CurrentlyOpenDropdown.CloseDropdown();
+                    targetDropdown.OpenDropdown();
+                    // Mark RTT panel dirty for re-render
+                    _lastRTTHit.panel?.MarkDirty();
+                }
+                else
+                {
+                    // Target is NOT part of the dropdown - close dropdown instead of clicking
+                    VRDropdown.CurrentlyOpenDropdown.CloseDropdown();
+                    // Mark RTT panel dirty for re-render
+                    _lastRTTHit.panel?.MarkDirty();
+                }
+                return;
+            }
+
+            // Normal click - use RTTRaycastManager to send click
+            if (RTTRaycastManager.Instance != null)
+            {
+                RTTRaycastManager.Instance.SendClick();
+            }
+        }
+    }
+
     void ProcessDwellClick(Vector3 currentGazeDir, GameObject target, RaycastHit hit)
     {
         // Check if dropdown is open - allow dwell on ANY object to close it
         bool hasOpenDropdown = VRDropdown.CurrentlyOpenDropdown != null;
         bool isDropdownOption = hasOpenDropdown && VRDropdown.CurrentlyOpenDropdown.IsPartOfDropdownPanel(target);
 
-        // Check if keyboard is open
-        bool hasOpenKeyboard = VRMobileKeyboard.CurrentlyOpenKeyboard != null;
-        bool isKeyboardPart = hasOpenKeyboard && VRMobileKeyboard.CurrentlyOpenKeyboard.IsPartOfKeyboard(target);
+        // Check if keyboard is open (RTTMobileKeyboard only)
+        bool hasOpenKeyboard = RTTMobileKeyboard.CurrentlyOpenKeyboard != null;
+        bool isKeyboardPart = hasOpenKeyboard && RTTMobileKeyboard.CurrentlyOpenKeyboard.IsPartOfKeyboard(target);
 
         // Check if target is an InputField
         VRInputFieldTrigger inputFieldTrigger = target.GetComponent<VRInputFieldTrigger>();
@@ -439,18 +728,18 @@ public class VRGazeReticle : MonoBehaviour
                 if (inputFieldTrigger != null && inputFieldTrigger.InputField != null)
                 {
                     // Clicking another InputField - switch keyboard target
-                    VRMobileKeyboard.CurrentlyOpenKeyboard.SwitchToInputField(inputFieldTrigger.InputField);
+                    RTTMobileKeyboard.CurrentlyOpenKeyboard.SwitchToInputField(inputFieldTrigger.InputField);
                 }
                 else if (targetDropdown != null)
                 {
                     // Clicking a dropdown - close keyboard and open dropdown
-                    VRMobileKeyboard.CurrentlyOpenKeyboard.Hide();
+                    RTTMobileKeyboard.CurrentlyOpenKeyboard.Hide();
                     targetDropdown.OpenDropdown();
                 }
                 else
                 {
                     // Clicking elsewhere - close keyboard
-                    VRMobileKeyboard.CurrentlyOpenKeyboard.Hide();
+                    RTTMobileKeyboard.CurrentlyOpenKeyboard.Hide();
                 }
                 return;
             }
@@ -713,7 +1002,7 @@ public class VRGazeReticle : MonoBehaviour
         int res = 128;
         Texture2D tex = new Texture2D(res, res, TextureFormat.RGBA32, false);
         Color[] c = new Color[res*res];
-        float radius = res / 2f; 
+        float radius = res / 2f;
         Vector2 center = new Vector2(radius, radius);
 
         for(int y=0; y<res; y++)
@@ -722,13 +1011,13 @@ public class VRGazeReticle : MonoBehaviour
             {
                 float d = Vector2.Distance(new Vector2(x,y), center);
                 if (d > radius) { c[y*res+x] = Color.clear; continue; }
-                
-                float edgeAlpha = Mathf.Clamp01     (radius - d); 
-                float innerAlpha = Mathf.Clamp01(d - (radius - thickness)); 
-                
+
+                float edgeAlpha = Mathf.Clamp01     (radius - d);
+                float innerAlpha = Mathf.Clamp01(d - (radius - thickness));
+
                 float alpha = edgeAlpha * innerAlpha;
                 alpha = Mathf.Pow(alpha, 0.5f);
-                
+
                 c[y*res+x] = new Color(1,1,1, alpha);
             }
         }
@@ -736,4 +1025,81 @@ public class VRGazeReticle : MonoBehaviour
         tex.Apply();
         return Sprite.Create(tex, new Rect(0,0,res,res), new Vector2(0.5f,0.5f));
     }
+
+    #region Custom Cursor API
+    private Color _defaultColor;
+    private float _customCursorScaleMultiplier = 1f;
+    private const float CUSTOM_CURSOR_SCALE = 3f; // Scale multiplier for custom cursors
+
+    /// <summary>
+    /// Set a custom sprite for the reticle cursor.
+    /// Call ResetCursorSprite() to restore the default circle.
+    /// </summary>
+    public void SetCursorSprite(Sprite sprite)
+    {
+        if (sprite == null) return;
+        _currentCustomSprite = sprite;
+        if (_reticleImage != null)
+        {
+            // Save defaults on first custom cursor
+            if (_defaultColor == default)
+                _defaultColor = _reticleImage.color;
+
+            _reticleImage.sprite = sprite;
+            _reticleImage.preserveAspect = true;
+            _reticleImage.color = Color.white; // White color for custom cursors
+
+            // Set scale multiplier (will be applied in CheckGaze)
+            _customCursorScaleMultiplier = CUSTOM_CURSOR_SCALE;
+        }
+    }
+
+    /// <summary>
+    /// Set cursor sprite by loading from Resources folder.
+    /// </summary>
+    public void SetCursorSprite(string resourceName)
+    {
+        Sprite sprite = Resources.Load<Sprite>(resourceName);
+        if (sprite != null)
+        {
+            SetCursorSprite(sprite);
+        }
+        else
+        {
+            // Try loading as Texture2D and convert to Sprite
+            Texture2D tex = Resources.Load<Texture2D>(resourceName);
+            if (tex != null)
+            {
+                sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+                SetCursorSprite(sprite);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reset cursor to default circle sprite.
+    /// </summary>
+    public void ResetCursorSprite()
+    {
+        _currentCustomSprite = null;
+        _customCursorScaleMultiplier = 1f; // Reset scale multiplier
+
+        if (_reticleImage != null && _defaultSprite != null)
+        {
+            _reticleImage.sprite = _defaultSprite;
+            _reticleImage.preserveAspect = false;
+
+            // Restore default color
+            if (_defaultColor != default)
+                _reticleImage.color = _defaultColor;
+            else
+                _reticleImage.color = colorInteract;
+        }
+    }
+
+    /// <summary>
+    /// Check if currently using a custom cursor sprite.
+    /// </summary>
+    public bool IsUsingCustomCursor => _currentCustomSprite != null;
+    #endregion
 }

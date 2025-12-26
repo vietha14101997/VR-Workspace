@@ -1,5 +1,9 @@
-Shader "Custom/GlassGradientBackground"
+Shader "Custom/GlassGradientBackgroundWide"
 {
+    // Specialized shader for wide elements (like Space key) with correct aspect ratio handling
+    // The key difference from GlassGradientBackground is that padding is applied uniformly
+    // relative to the height dimension, not scaled by aspect ratio.
+
     Properties
     {
         [PerRendererData] _MainTex ("Sprite Texture", 2D) = "white" {}
@@ -63,7 +67,7 @@ Shader "Custom/GlassGradientBackground"
 
         Pass
         {
-            Name "GlassGradientBackground"
+            Name "GlassGradientBackgroundWide"
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
@@ -105,18 +109,29 @@ Shader "Custom/GlassGradientBackground"
             float _FresnelStrength;
             float _HoverAmount;
 
-            // SDF with Wide formula: padding NOT scaled by aspect for Android compatibility
-            float sdRoundedBoxAspect(float2 uv, float aspect, float radius, float padding)
+            // SDF for rounded box - CORRECTED for wide elements
+            // Padding is applied uniformly relative to height (the shorter dimension)
+            float sdRoundedBoxWide(float2 uv, float aspect, float radius, float padding)
             {
                 float2 center = float2(0.5, 0.5);
                 float2 pos = (uv - center);
+
+                // Scale to square space for correct corner calculation
                 pos.x *= aspect;
 
-                // Wide formula: padding is uniform in scaled space
-                float2 halfSize = float2(0.5 * aspect - padding, 0.5 - padding);
+                // CRITICAL FIX: Padding is uniform in visual space
+                // In the scaled space, X padding should be same as Y padding (not scaled by aspect)
+                float paddingX = padding;
+                float paddingY = padding;
 
-                float2 d = abs(pos) - halfSize + radius;
-                return min(max(d.x, d.y), 0.0) + length(max(d, 0.0)) - radius;
+                // Half size of the box in scaled space
+                float2 halfSize = float2(0.5 * aspect - paddingX, 0.5 - paddingY);
+
+                // Corner radius
+                float r = radius;
+
+                float2 d = abs(pos) - halfSize + r;
+                return min(max(d.x, d.y), 0.0) + length(max(d, 0.0)) - r;
             }
 
             v2f vert(appdata v)
@@ -136,11 +151,11 @@ Shader "Custom/GlassGradientBackground"
             {
                 float2 uv = i.uv;
 
-                // Default aspect if not set
+                // Default aspect to 1.0 if not set
                 float aspect = (_Aspect > 0.0) ? _Aspect : 1.0;
 
-                // SDF with aspect correction
-                float dist = sdRoundedBoxAspect(uv, aspect, _CornerRadius, _EdgePadding);
+                // SDF with corrected wide element handling
+                float dist = sdRoundedBoxWide(uv, aspect, _CornerRadius, _EdgePadding);
 
                 // Alpha mask for rounded corners
                 float alphaMask = 1.0 - smoothstep(-0.01, 0.0, dist);
@@ -153,7 +168,7 @@ Shader "Custom/GlassGradientBackground"
 
                 // === GRADIENT COLOR ===
                 float t = uv.x;
-                t = saturate(t * t * 1.2);
+                t = saturate(t * t * 1.2); // Slight curve for gradient
                 float angleOffset = (1.0 - uv.y) * 0.15;
                 t += angleOffset;
                 t = saturate(t);

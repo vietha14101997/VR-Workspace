@@ -4,7 +4,8 @@ using UnityEngine.UI;
 public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointerEnterHandler, UnityEngine.EventSystems.IPointerExitHandler, UnityEngine.EventSystems.IPointerClickHandler
 {
     public Transform targetVisuals; // Target to animate
-    public float popAmount = 0.1f;  // Set Default to 0.1
+    public float popAmount = 0.1f;  // Z-axis pop amount (for World Space Canvas with perspective)
+    public float hoverScaleAmount = 0.05f; // Scale increase when hovering (0.05 = 5%, 0.15 = 15%)
     public float hoverBorderMultiplier = 1f; // Border width multiplier when hovering (default 1 = no change)
 
     private bool _isHovered = false;
@@ -134,7 +135,8 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
         float targetZ = effectiveHover ? -popAmount : 0f;
         _currentPop = Mathf.Lerp(_currentPop, targetZ, Time.unscaledDeltaTime * 10f);
 
-        float targetScale = effectiveHover ? 1.05f : 1.0f;
+        // Scale effect - works for both World Space and RTT (use hoverScaleAmount for visibility)
+        float targetScale = effectiveHover ? (1f + hoverScaleAmount) : 1.0f;
         _currentValidScale = Mathf.Lerp(_currentValidScale, targetScale, Time.unscaledDeltaTime * 10f);
 
         if (targetVisuals != null)

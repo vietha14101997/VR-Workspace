@@ -1,8 +1,10 @@
 using UnityEngine;
+using System;
+using Random = UnityEngine.Random;
 
 /// <summary>
 /// Animates floating data particles for VR UI effects.
-/// Used by VRMenuFrame's FX_DataStream.
+/// Used by VRMenuFrame's FX_DataStream and RTTMenuFrame.
 /// </summary>
 public class FloatingDataAnim : MonoBehaviour
 {
@@ -10,6 +12,11 @@ public class FloatingDataAnim : MonoBehaviour
     public Vector2 range;
     private RectTransform _rt;
     private Vector2 _dir;
+
+    /// <summary>
+    /// Event called when animation updates (for RTT dirty flag optimization)
+    /// </summary>
+    public event Action OnAnimationUpdate;
 
     void Start()
     {
@@ -61,5 +68,8 @@ public class FloatingDataAnim : MonoBehaviour
 
         if (_rt.anchoredPosition.x > halfW) _rt.anchoredPosition = new Vector2(-halfW, Random.Range(-halfH, halfH));
         else if (_rt.anchoredPosition.x < -halfW) _rt.anchoredPosition = new Vector2(halfW, Random.Range(-halfH, halfH));
+
+        // Notify RTT panels to mark dirty
+        OnAnimationUpdate?.Invoke();
     }
 }

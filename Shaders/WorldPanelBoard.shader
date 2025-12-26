@@ -21,7 +21,6 @@ Shader "Unlit/WorldPanelBoard"
     SubShader
     {
         Tags { "Queue"="Transparent" "RenderType"="Transparent" }
-        LOD 100
 
         Cull Back
         ZWrite Off

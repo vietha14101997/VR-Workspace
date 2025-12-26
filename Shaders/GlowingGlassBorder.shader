@@ -62,6 +62,9 @@ Shader "Custom/GlowingGlassBorder"
         _HSeparatorLength ("H Separator Length (deprecated)", Range(0, 1)) = 1.0
         _HSeparatorLengths ("H Separator Lengths (per separator)", Vector) = (1, 1, 1, 1)
 
+        [Header(Aspect Ratio)]
+        _Aspect ("Aspect Ratio", Float) = 1.0
+
         // UI Masking
         _StencilComp ("Stencil Comparison", Float) = 8
         _Stencil ("Stencil ID", Float) = 0
@@ -104,7 +107,7 @@ Shader "Custom/GlowingGlassBorder"
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-            #pragma target 3.0
+            #pragma target 2.0
             
             #include "UnityCG.cginc"
             #include "UnityUI.cginc"
@@ -419,27 +422,18 @@ Shader "Custom/GlowingGlassBorder"
             }
 
             // SDF for rounded box with Aspect Ratio correction
-            // radius is for the corner
+            // Uses Wide formula: padding is NOT scaled by aspect for better Android compatibility
+            // This matches GlassGradientBackgroundWide shader
             float sdRoundedBoxAspect(float2 uv, float aspect, float radius, float padding)
             {
                 float2 center = float2(0.5, 0.5);
                 float2 pos = (uv - center);
-                pos.x *= aspect; // Correct X scale
-                
-                // Effective size is reduced by padding to allow glow space
-                // Padding is in UV space (Vertical), so we scale it for X too if needed, 
-                // but usually padding is uniform distance.
-                // Box Half Size = (0.5 - padding)
-                float2 halfSize = float2(0.5 * aspect - padding * aspect, 0.5 - padding); // Scale padding on X? 
-                
-                // Let's keep padding conceptually uniform in Y height terms.
-                // If Aspect > 1, horizontal padding in UV should be smaller? 
-                // Wait, if halfSize.y is 0.4 (0.5 - 0.1), halfSize.x should be 0.4 * aspect.
-                // This maintains the aspect ratio of the inner box.
-                
-                // Let's re-verify:
-                // We want the visual box to be smaller than the quad.
-                
+                pos.x *= aspect;
+
+                // Wide formula: padding is uniform in scaled space (not scaled by aspect)
+                // This matches GlassGradientBackgroundWide for consistent rendering
+                float2 halfSize = float2(0.5 * aspect - padding, 0.5 - padding);
+
                 float2 d = abs(pos) - halfSize + radius;
                 return min(max(d.x, d.y), 0.0) + length(max(d, 0.0)) - radius;
             }
@@ -652,6 +646,6 @@ Shader "Custom/GlowingGlassBorder"
             ENDCG
         }
     }
-    
+
     FallBack "UI/Default"
 }

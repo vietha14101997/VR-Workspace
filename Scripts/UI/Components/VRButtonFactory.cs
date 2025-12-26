@@ -55,7 +55,7 @@ public static class VRButtonFactory
 
         // Visual settings
         public float cornerRadius = 0.12f;
-        public float edgePadding = 0.12f;
+        public float edgePadding = 0.06f;  // Match Space key value for Android compatibility
         public float backgroundAlpha = 0.08f;
         public float borderWidth = 0.005f;
         public float glowWidth = 0.03f;
@@ -63,6 +63,7 @@ public static class VRButtonFactory
 
         // Animation
         public float popAmount = 0.05f;
+        public float hoverScaleAmount = 0.05f; // Scale increase when hovering (0.05 = 5%, 0.15 = 15%)
         public bool enablePulse = false;
         public float pulseSpeed = 2f;
 
@@ -138,9 +139,9 @@ public static class VRButtonFactory
         else if (config.useConnectButtonShader)
         {
             // Special Connect Button: all-in-one shader with gradient + glow + shimmer
-            float expansion = config.edgePadding;
-            visRT.anchorMin = new Vector2(-expansion, -expansion);
-            visRT.anchorMax = new Vector2(1f + expansion, 1f + expansion);
+            // Keep within bounds - edge padding in shader handles visual margin
+            visRT.anchorMin = Vector2.zero;
+            visRT.anchorMax = Vector2.one;
             visRT.offsetMin = Vector2.zero;
             visRT.offsetMax = Vector2.zero;
 
@@ -152,9 +153,9 @@ public static class VRButtonFactory
         }
         else
         {
-            float expansion = config.edgePadding;
-            visRT.anchorMin = new Vector2(-expansion, -expansion);
-            visRT.anchorMax = new Vector2(1f + expansion, 1f + expansion);
+            // Keep within bounds - edge padding in shader handles visual margin
+            visRT.anchorMin = Vector2.zero;
+            visRT.anchorMax = Vector2.one;
             visRT.offsetMin = Vector2.zero;
             visRT.offsetMax = Vector2.zero;
 
@@ -181,6 +182,7 @@ public static class VRButtonFactory
         VRButtonAnimation anim = hitArea.AddComponent<VRButtonAnimation>();
         anim.targetVisuals = visuals.transform;
         anim.popAmount = config.popAmount;
+        anim.hoverScaleAmount = config.hoverScaleAmount;
 
         return wrapper;
     }
@@ -210,8 +212,9 @@ public static class VRButtonFactory
     /// Tạo Button chỉ có icon, không có khung (background/border) và text
     /// Icon có glow effect và hover animation
     /// </summary>
+    /// <param name="hoverScaleAmount">Scale increase on hover (0.05=5%, 0.15=15%). Use higher values for RTT panels where Z-pop doesn't work.</param>
     public static GameObject CreateBareIconButton(Transform parent, float size, Sprite icon, Color color,
-        UnityEngine.Events.UnityAction onClick, float popAmount = 0.005f, float iconScale = 0.7f)
+        UnityEngine.Events.UnityAction onClick, float popAmount = 0.005f, float iconScale = 0.7f, float hoverScaleAmount = 0.15f)
     {
         var config = new ButtonConfig
         {
@@ -223,7 +226,8 @@ public static class VRButtonFactory
             iconOnly = true,
             iconSize = size * iconScale,
             frameless = true,
-            popAmount = popAmount
+            popAmount = popAmount,
+            hoverScaleAmount = hoverScaleAmount
         };
         return CreateButton(parent, config, onClick);
     }
@@ -317,7 +321,8 @@ public static class VRButtonFactory
         float aspect = config.width / config.height;
         Color col = config.themeColor;
 
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackground");
+        // Use Wide shader for better Android GPU compatibility
+        Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
         if (glassShader != null)
         {
             Material mat = new Material(glassShader);
