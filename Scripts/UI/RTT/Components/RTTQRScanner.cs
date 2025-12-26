@@ -29,10 +29,6 @@ public class RTTQRScanner : MonoBehaviour
 
     [Header("Scan Settings")]
     [SerializeField] private float scanInterval = 0.2f;
-
-    [Header("Border Settings")]
-    [SerializeField] private float cornerRadius = 0.04f;
-    [SerializeField] private float edgePadding = 0.0075f;
     #endregion
 
     #region Events

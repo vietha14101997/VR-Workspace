@@ -60,6 +60,16 @@ public static class VRDropdownFactory
         public float glowWidth = 0.04f;
         public float glowIntensity = 2.5f;
 
+        // Glassmorphism settings (uses GlassGradientBackgroundOverlay with higher Queue)
+        public bool enableGlassmorphism = true;
+        public float blurIntensity = 6;
+        public int blurQuality = 8;
+        public float glassOpacity = 0f;
+        public float tintStrength = 0.1f;
+        public float innerGlow = 0f;
+        public float brightness = 1f;
+        public float saturation = 1f;
+
         // Animation
         public float popAmount = 0.005f;
 
@@ -759,6 +769,16 @@ public static class VRDropdownFactory
             mat.SetFloat("_GlassAlpha", config.backgroundAlpha * 1.2f);
             mat.SetFloat("_FresnelPower", 2.2f);
             mat.SetFloat("_FresnelStrength", 0.12f);
+
+            // Glassmorphism settings
+            mat.SetFloat("_BlurEnabled", config.enableGlassmorphism ? 1f : 0f);
+            mat.SetFloat("_BlurRadius", config.blurIntensity);
+            mat.SetFloat("_BlurIterations", config.blurQuality);
+            mat.SetFloat("_GlassOpacity", config.glassOpacity);
+            mat.SetFloat("_TintStrength", config.tintStrength);
+            mat.SetFloat("_InnerGlow", config.innerGlow);
+            mat.SetFloat("_Brightness", config.brightness);
+            mat.SetFloat("_Saturation", config.saturation);
 
             img.material = mat;
             img.color = Color.white;
