@@ -188,8 +188,13 @@ public abstract class RTTCanvasBase : MonoBehaviour
     {
         var resolution = GetResolution();
 
-        _renderTexture = new RenderTexture(resolution.x, resolution.y, 24, config.format);
-        _renderTexture.antiAliasing = config.antiAliasing;
+        // Use mobile-compatible settings on Android/iOS
+        int depthBits = GetMobileCompatibleDepthBits();
+        int antiAliasing = GetMobileCompatibleAntiAliasing();
+        RenderTextureFormat format = GetMobileCompatibleFormat();
+
+        _renderTexture = new RenderTexture(resolution.x, resolution.y, depthBits, format);
+        _renderTexture.antiAliasing = antiAliasing;
         _renderTexture.filterMode = config.filterMode;
         _renderTexture.useMipMap = false;
         _renderTexture.autoGenerateMips = false;
@@ -200,6 +205,44 @@ public abstract class RTTCanvasBase : MonoBehaviour
         {
             throw new Exception("Failed to create RenderTexture");
         }
+    }
+
+    /// <summary>
+    /// Get mobile-compatible depth buffer bits
+    /// </summary>
+    protected int GetMobileCompatibleDepthBits()
+    {
+#if UNITY_ANDROID || UNITY_IOS
+        return 16; // Use 16-bit depth on mobile for better compatibility
+#else
+        return 24;
+#endif
+    }
+
+    /// <summary>
+    /// Get mobile-compatible anti-aliasing level
+    /// </summary>
+    protected int GetMobileCompatibleAntiAliasing()
+    {
+#if UNITY_ANDROID || UNITY_IOS
+        // Disable MSAA on mobile - can cause issues with RenderTextures
+        return 1;
+#else
+        return config.antiAliasing;
+#endif
+    }
+
+    /// <summary>
+    /// Get mobile-compatible RenderTexture format
+    /// </summary>
+    protected RenderTextureFormat GetMobileCompatibleFormat()
+    {
+#if UNITY_ANDROID || UNITY_IOS
+        // Use ARGB32 which is universally supported
+        return RenderTextureFormat.ARGB32;
+#else
+        return config.format;
+#endif
     }
 
     /// <summary>
@@ -227,9 +270,14 @@ public abstract class RTTCanvasBase : MonoBehaviour
             Destroy(_renderTexture);
         }
 
+        // Use mobile-compatible settings
+        int depthBits = GetMobileCompatibleDepthBits();
+        int antiAliasing = GetMobileCompatibleAntiAliasing();
+        RenderTextureFormat format = GetMobileCompatibleFormat();
+
         // Create new
-        _renderTexture = new RenderTexture(newWidth, newHeight, 24, config.format);
-        _renderTexture.antiAliasing = config.antiAliasing;
+        _renderTexture = new RenderTexture(newWidth, newHeight, depthBits, format);
+        _renderTexture.antiAliasing = antiAliasing;
         _renderTexture.filterMode = config.filterMode;
         _renderTexture.useMipMap = false;
         _renderTexture.name = $"RTT_{GetType().Name}_{GetInstanceID()}";
