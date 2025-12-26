@@ -55,6 +55,7 @@ public class QRScannerManager : MonoBehaviour
     // Scan UI elements
     private RectTransform _scanFrame;
     private ScanLineAnimator _scanLineAnimator;
+    private TextMeshProUGUI _statusText;
 
     // Position tracking
     private Vector3 _initialFramePosition;
@@ -490,10 +491,42 @@ public class QRScannerManager : MonoBehaviour
         previewRT.offsetMax = Vector2.zero;
 
         _cameraPreview = previewObj.AddComponent<RawImage>();
-        _cameraPreview.color = new Color(0.1f, 0.1f, 0.1f, 1f); // Dark placeholder
+        _cameraPreview.color = Color.white; // White so texture displays correctly
+
+        // Status text (shown when camera not available)
+        CreateStatusText(previewObj.transform);
 
         // Scan overlay
         CreateScanOverlay(maskObj.transform, contentW, contentH);
+    }
+
+    void CreateStatusText(Transform parent)
+    {
+        GameObject textObj = new GameObject("StatusText");
+        textObj.transform.SetParent(parent, false);
+
+        RectTransform textRT = textObj.AddComponent<RectTransform>();
+        textRT.anchorMin = Vector2.zero;
+        textRT.anchorMax = Vector2.one;
+        textRT.offsetMin = Vector2.zero;
+        textRT.offsetMax = Vector2.zero;
+
+        _statusText = textObj.AddComponent<TextMeshProUGUI>();
+        _statusText.text = "Initializing camera...";
+        _statusText.fontSize = 48;
+        _statusText.color = Color.white;
+        _statusText.alignment = TextAlignmentOptions.Center;
+        _statusText.raycastTarget = false;
+        if (customFont != null) _statusText.font = customFont;
+    }
+
+    void UpdateStatusText(string message, bool show = true)
+    {
+        if (_statusText != null)
+        {
+            _statusText.text = message;
+            _statusText.gameObject.SetActive(show);
+        }
     }
 
     void CreateScanOverlay(Transform parent, float width, float height)
@@ -855,6 +888,7 @@ public class QRScannerManager : MonoBehaviour
         if (devices.Length == 0)
         {
             Debug.LogWarning("[QRScannerManager] No camera found");
+            UpdateStatusText("No camera found.\nPlease connect a camera.");
             yield break;
         }
 
@@ -869,23 +903,40 @@ public class QRScannerManager : MonoBehaviour
             }
         }
 
-        _webCamTexture = new WebCamTexture(devices[deviceIndex].name, 1280, 720, 30);
+        string cameraName = devices[deviceIndex].name;
+        Debug.Log($"[QRScannerManager] Using camera: {cameraName}");
+        UpdateStatusText($"Connecting to camera...\n{cameraName}");
+
+        _webCamTexture = new WebCamTexture(cameraName, 1280, 720, 30);
         _cameraPreview.texture = _webCamTexture;
         _webCamTexture.Play();
 
         // Wait for camera to initialize
         float timeout = 5f;
         float elapsed = 0f;
+        int frameCount = 0;
         while (!_webCamTexture.didUpdateThisFrame && elapsed < timeout)
         {
             elapsed += Time.deltaTime;
+            frameCount++;
             yield return null;
         }
 
-        if (_webCamTexture.didUpdateThisFrame)
+        if (_webCamTexture.didUpdateThisFrame && _webCamTexture.width > 16 && _webCamTexture.height > 16)
         {
+            Debug.Log($"[QRScannerManager] Camera initialized successfully after {frameCount} frames. " +
+                      $"Size: {_webCamTexture.width}x{_webCamTexture.height}, " +
+                      $"IsPlaying: {_webCamTexture.isPlaying}");
+            UpdateStatusText("", false); // Hide status text
             AdjustPreviewAspect();
             _scanCoroutine = StartCoroutine(ScanRoutine());
+        }
+        else
+        {
+            Debug.LogWarning($"[QRScannerManager] Camera failed to initialize within {timeout}s. " +
+                             $"Size: {_webCamTexture.width}x{_webCamTexture.height}, " +
+                             $"IsPlaying: {_webCamTexture.isPlaying}");
+            UpdateStatusText($"Camera not available.\n{cameraName}\nSize: {_webCamTexture.width}x{_webCamTexture.height}");
         }
     }
 
