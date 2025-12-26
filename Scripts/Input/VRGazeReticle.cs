@@ -300,6 +300,57 @@ public class VRGazeReticle : MonoBehaviour
         Ray ray = new Ray(_cam.transform.position, _cam.transform.forward);
         Vector3 currentGazeDir = _cam.transform.forward;
 
+        // Priority check: If there's an open world-space dropdown, check physics raycast first
+        // The world-space dropdown is positioned in front of RTT panels, so physics raycast takes priority
+        if (VRDropdown.CurrentlyOpenDropdown != null && VRDropdown.CurrentlyOpenDropdown.IsOpen)
+        {
+            RaycastHit worldDropdownHit;
+            if (_layerMask != 0 && Physics.Raycast(ray, out worldDropdownHit, 100.0f, _layerMask))
+            {
+                GameObject hitObj = worldDropdownHit.collider.gameObject;
+
+                // Check if this hit is part of the open dropdown's world-space panel
+                if (VRDropdown.CurrentlyOpenDropdown.IsPartOfDropdownPanel(hitObj))
+                {
+                    // Process as standard physics hit for the dropdown
+                    _isHoveringRTT = false;
+
+                    if (!_reticleImage.enabled) _reticleImage.enabled = true;
+
+                    float dist = worldDropdownHit.distance;
+                    if (dist < _cam.nearClipPlane) dist = _cam.nearClipPlane + 0.05f;
+                    _canvasRT.localPosition = new Vector3(0, 0, dist);
+
+                    float scale = (reticleSize / 100f) * dist;
+                    float finalScale = scale * _customCursorScaleMultiplier;
+                    _reticleImage.rectTransform.localScale = new Vector3(finalScale, finalScale, 1f);
+
+                    if (_dwellRing != null)
+                    {
+                        _dwellRing.rectTransform.localScale = new Vector3(finalScale, finalScale, 1f);
+                    }
+
+                    if (_currentHitObj != hitObj)
+                    {
+                        HandlePointerExit(_currentHitObj);
+                        HandlePointerEnter(hitObj);
+                        _currentHitObj = hitObj;
+                        ResetDwellState();
+                    }
+
+                    _lastHit = worldDropdownHit;
+
+                    if (dwellClickEnabled && _currentHitObj != null)
+                    {
+                        ProcessDwellClick(currentGazeDir, hitObj, worldDropdownHit);
+                    }
+
+                    _lastGazeDirection = currentGazeDir;
+                    return;
+                }
+            }
+        }
+
         // Try RTT raycast first if enabled
         if (useRTTRaycast && RTTRaycastManager.Instance != null)
         {
@@ -417,6 +468,10 @@ public class VRGazeReticle : MonoBehaviour
 
         GameObject target = _lastRTTHit.hitUIElement;
 
+        // Check if dropdown is open - allow dwell on ANY object to close it
+        bool hasOpenDropdown = VRDropdown.CurrentlyOpenDropdown != null;
+        bool isDropdownOption = hasOpenDropdown && VRDropdown.CurrentlyOpenDropdown.IsPartOfDropdownPanel(target);
+
         // Check if RTT keyboard is open
         bool hasOpenKeyboard = RTTMobileKeyboard.CurrentlyOpenKeyboard != null;
         bool isKeyboardPart = hasOpenKeyboard && RTTMobileKeyboard.CurrentlyOpenKeyboard.IsPartOfKeyboard(target);
@@ -425,11 +480,22 @@ public class VRGazeReticle : MonoBehaviour
         VRInputFieldTrigger inputFieldTrigger = target.GetComponent<VRInputFieldTrigger>();
         if (inputFieldTrigger == null) inputFieldTrigger = target.GetComponentInParent<VRInputFieldTrigger>();
 
+        // Check if target is a Dropdown
+        VRDropdown targetDropdown = target.GetComponent<VRDropdown>();
+        if (targetDropdown == null) targetDropdown = target.GetComponentInParent<VRDropdown>();
+
         // Check if target is dwellable
         bool isDwellableTarget = IsDwellable(target);
 
-        // Only dwell on functional objects (dwellable targets)
-        if (!isDwellableTarget)
+        // If no dropdown/keyboard open and target is not dwellable, skip
+        if (!hasOpenDropdown && !hasOpenKeyboard && !isDwellableTarget)
+        {
+            ResetDwellState();
+            return;
+        }
+
+        // If keyboard is open and target is keyboard background (not a button), skip dwell
+        if (hasOpenKeyboard && isKeyboardPart && !isDwellableTarget)
         {
             ResetDwellState();
             return;
@@ -492,7 +558,7 @@ public class VRGazeReticle : MonoBehaviour
                 _dwellRing.enabled = false;
             }
 
-            // Handle keyboard click-outside logic
+            // Priority 1: Handle keyboard click-outside
             if (hasOpenKeyboard && !isKeyboardPart)
             {
                 // Clicking outside keyboard
@@ -507,12 +573,50 @@ public class VRGazeReticle : MonoBehaviour
                     }
                     // Clicking InputField - let SendClick happen to set caret position
                 }
+                else if (targetDropdown != null)
+                {
+                    // Clicking a dropdown - close keyboard and open dropdown
+                    RTTMobileKeyboard.CurrentlyOpenKeyboard.Hide();
+                    targetDropdown.OpenDropdown();
+                    // Mark RTT panel dirty for re-render
+                    _lastRTTHit.panel?.MarkDirty();
+                    return;
+                }
                 else
                 {
                     // Clicking on other functional object (button) - close keyboard first
                     RTTMobileKeyboard.CurrentlyOpenKeyboard.Hide();
                     // Continue to perform the button click below
                 }
+            }
+
+            // Priority 2: Handle dropdown click-outside
+            if (hasOpenDropdown)
+            {
+                if (isDropdownOption)
+                {
+                    // Target is a dropdown option - perform normal click via RTTRaycastManager
+                    if (RTTRaycastManager.Instance != null)
+                    {
+                        RTTRaycastManager.Instance.SendClick();
+                    }
+                }
+                else if (targetDropdown != null && targetDropdown != VRDropdown.CurrentlyOpenDropdown)
+                {
+                    // Clicking another dropdown - close current and open new one
+                    VRDropdown.CurrentlyOpenDropdown.CloseDropdown();
+                    targetDropdown.OpenDropdown();
+                    // Mark RTT panel dirty for re-render
+                    _lastRTTHit.panel?.MarkDirty();
+                }
+                else
+                {
+                    // Target is NOT part of the dropdown - close dropdown instead of clicking
+                    VRDropdown.CurrentlyOpenDropdown.CloseDropdown();
+                    // Mark RTT panel dirty for re-render
+                    _lastRTTHit.panel?.MarkDirty();
+                }
+                return;
             }
 
             // Normal click - use RTTRaycastManager to send click

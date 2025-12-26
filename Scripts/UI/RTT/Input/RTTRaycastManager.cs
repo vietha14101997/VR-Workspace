@@ -202,10 +202,20 @@ public class RTTRaycastManager : MonoBehaviour
             Debug.Log($"[RTTRaycast] Panel: {panel.name}, WorldHit: {physicsHit.point}, UV: ({uv.x:F3}, {uv.y:F3}), Screen: ({screenPos.x:F0}, {screenPos.y:F0})");
         }
 
-        // Step 5: Perform UI raycast
+        // Step 5: Perform UI raycast on main canvas
         _raycastResults.Clear();
         _pointerEventData.position = screenPos;
         panelData.graphicRaycaster.Raycast(_pointerEventData, _raycastResults);
+
+        // Step 5b: Also raycast against nested GraphicRaycasters (for dropdown panels, etc.)
+        // Nested Canvases with overrideSorting=true need their own GraphicRaycaster
+        RaycastNestedCanvases(panelData.graphicRaycaster.transform, screenPos);
+
+        // Sort results by depth (higher sorting order = closer to camera)
+        if (_raycastResults.Count > 1)
+        {
+            _raycastResults.Sort((a, b) => b.sortingOrder.CompareTo(a.sortingOrder));
+        }
 
         // Step 6: Build hit result
         if (_raycastResults.Count > 0)
@@ -259,6 +269,29 @@ public class RTTRaycastManager : MonoBehaviour
         }
 
         return _currentHit;
+    }
+
+    /// <summary>
+    /// Raycast against nested GraphicRaycasters in the canvas hierarchy.
+    /// This handles nested Canvases with overrideSorting (like dropdown panels).
+    /// </summary>
+    private void RaycastNestedCanvases(Transform root, Vector2 screenPos)
+    {
+        // Find all GraphicRaycasters in children (excluding the root one we already used)
+        var nestedRaycasters = root.GetComponentsInChildren<GraphicRaycaster>(false);
+
+        foreach (var raycaster in nestedRaycasters)
+        {
+            // Skip the root raycaster (already processed)
+            if (raycaster.transform == root) continue;
+
+            // Check if the raycaster's canvas is active and has overrideSorting
+            var canvas = raycaster.GetComponent<Canvas>();
+            if (canvas == null || !canvas.gameObject.activeInHierarchy) continue;
+
+            // Raycast against this nested raycaster
+            raycaster.Raycast(_pointerEventData, _raycastResults);
+        }
     }
 
     /// <summary>
@@ -545,6 +578,18 @@ public class RTTRaycastManager : MonoBehaviour
             buttonAnim?.OnPointerEnter(null);
         }
 
+        // Also trigger VROptionHoverEffect if present (for dropdown options)
+        var optionHover = target.GetComponent<VROptionHoverEffect>();
+        if (optionHover != null)
+        {
+            optionHover.OnPointerEnter(null);
+        }
+        else
+        {
+            optionHover = target.GetComponentInParent<VROptionHoverEffect>();
+            optionHover?.OnPointerEnter(null);
+        }
+
         // Also trigger KeyHoverEffect if present (for RTTMobileKeyboard)
         var keyHover = target.GetComponent<KeyHoverEffect>();
         if (keyHover != null)
@@ -601,6 +646,18 @@ public class RTTRaycastManager : MonoBehaviour
         {
             buttonAnim = target.GetComponentInParent<VRButtonAnimation>();
             buttonAnim?.OnPointerExit(null);
+        }
+
+        // Also trigger VROptionHoverEffect if present (for dropdown options)
+        var optionHover = target.GetComponent<VROptionHoverEffect>();
+        if (optionHover != null)
+        {
+            optionHover.OnPointerExit(null);
+        }
+        else
+        {
+            optionHover = target.GetComponentInParent<VROptionHoverEffect>();
+            optionHover?.OnPointerExit(null);
         }
 
         // Also trigger KeyHoverEffect if present (for RTTMobileKeyboard)

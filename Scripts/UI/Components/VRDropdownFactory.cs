@@ -614,23 +614,30 @@ public static class VRDropdownFactory
         Canvas panelCanvas = panel.AddComponent<Canvas>();
         panelCanvas.overrideSorting = true;
         panelCanvas.sortingOrder = 100;
-        // NOTE: Do NOT add GraphicRaycaster here - parent Canvas's raycaster will handle it
-        // Adding separate GraphicRaycaster causes parent raycaster to skip this Canvas's children
+        // Add GraphicRaycaster for RTT support
+        // RTT mode uses RTTRaycastManager which needs GraphicRaycaster on nested Canvases
+        // to properly raycast into dropdown options
+        panel.AddComponent<GraphicRaycaster>();
 
         // NO Image on panel - background is now on Viewport
 
-        // BoxCollider cho VR raycast
+        // BoxCollider cho VR raycast (non-RTT mode)
+        // Note: In RTT mode, BoxCollider is not used - RTTRaycastManager uses GraphicRaycaster instead
         BoxCollider panelCol = panel.AddComponent<BoxCollider>();
         panelCol.size = new Vector3(config.width, panelHeight, 0.1f);
         panelCol.center = new Vector3(0, -panelHeight / 2f, -0.05f);
 
-        int vrLayer = LayerMask.NameToLayer(config.layerName);
-        if (vrLayer != -1) panel.layer = vrLayer;
+        // Set layer to match parent Canvas for RTT compatibility
+        // RTT Camera only renders UI layer - must inherit from parent, not use VirtualObjects
+        // New GameObjects default to layer 0 (Default), so we need to explicitly set it
+        Canvas parentCanvas = parent.GetComponentInParent<Canvas>();
+        int renderLayer = parentCanvas != null ? parentCanvas.gameObject.layer : panel.layer;
+        panel.layer = renderLayer;
 
         // Viewport - contains everything
         GameObject viewport = new GameObject("Viewport");
         viewport.transform.SetParent(panel.transform, false);
-        if (vrLayer != -1) viewport.layer = vrLayer;
+        viewport.layer = renderLayer;
         RectTransform viewportRT = viewport.AddComponent<RectTransform>();
         viewportRT.anchorMin = Vector2.zero;
         viewportRT.anchorMax = Vector2.one;
@@ -644,6 +651,7 @@ public static class VRDropdownFactory
 
         GameObject viewportVisuals = new GameObject("Visuals");
         viewportVisuals.transform.SetParent(viewport.transform, false);
+        viewportVisuals.layer = renderLayer;
         RectTransform viewportVisualsRT = viewportVisuals.AddComponent<RectTransform>();
         viewportVisualsRT.anchorMin = new Vector2(-adjustedExpansion, -adjustedExpansion);
         viewportVisualsRT.anchorMax = new Vector2(1f + adjustedExpansion, 1f + adjustedExpansion);
@@ -660,6 +668,7 @@ public static class VRDropdownFactory
         // Uses nested Canvas with higher sorting order so content renders AFTER glassmorphism background
         GameObject viewportContent = new GameObject("Content");
         viewportContent.transform.SetParent(viewportVisuals.transform, false);
+        viewportContent.layer = renderLayer;
         RectTransform viewportContentRT = viewportContent.AddComponent<RectTransform>();
         viewportContentRT.anchorMin = Vector2.zero;
         viewportContentRT.anchorMax = Vector2.one;
@@ -673,7 +682,8 @@ public static class VRDropdownFactory
         Canvas contentCanvas = viewportContent.AddComponent<Canvas>();
         contentCanvas.overrideSorting = true;
         contentCanvas.sortingOrder = 110; // Higher than panel's 100, after Overlay shader Queue
-        // NOTE: Do NOT add GraphicRaycaster - parent's raycaster handles all children
+        // Add GraphicRaycaster for RTT support - RTTRaycastManager needs this to raycast into options
+        viewportContent.AddComponent<GraphicRaycaster>();
 
         // Use RectMask2D on Content for scrolling
         RectMask2D rectMask = viewportContent.AddComponent<RectMask2D>();
@@ -682,7 +692,7 @@ public static class VRDropdownFactory
         // Options container - inside Content (which is inside Visuals)
         GameObject optionsContainer = new GameObject("Options");
         optionsContainer.transform.SetParent(viewportContent.transform, false);
-        if (vrLayer != -1) optionsContainer.layer = vrLayer;
+        optionsContainer.layer = renderLayer;
         RectTransform optionsRT = optionsContainer.AddComponent<RectTransform>();
         optionsRT.anchorMin = new Vector2(0, 1);
         optionsRT.anchorMax = new Vector2(1, 1);
@@ -707,7 +717,7 @@ public static class VRDropdownFactory
         VRDropdown dropdownComp = parent.GetComponentInParent<VRDropdown>();
         for (int i = 0; i < config.options.Count; i++)
         {
-            CreateOptionItem(optionsContainer.transform, config, i, valueTxt, panel, onValueChanged, dropdownComp, panelHeight, adjustedExpansion);
+            CreateOptionItem(optionsContainer.transform, config, i, valueTxt, panel, onValueChanged, dropdownComp, panelHeight, adjustedExpansion, renderLayer);
         }
 
         // ScrollRect (nếu nhiều options)
@@ -733,6 +743,7 @@ public static class VRDropdownFactory
     {
         GameObject bgObj = new GameObject("Background");
         bgObj.transform.SetParent(parent, false);
+        bgObj.layer = parent.gameObject.layer; // Inherit layer from parent for RTT compatibility
         RectTransform rt = bgObj.AddComponent<RectTransform>();
         rt.anchorMin = Vector2.zero;
         rt.anchorMax = Vector2.one;
@@ -818,6 +829,7 @@ public static class VRDropdownFactory
     {
         GameObject borderObj = new GameObject("Border");
         borderObj.transform.SetParent(parent, false);
+        borderObj.layer = parent.gameObject.layer; // Inherit layer from parent for RTT compatibility
         RectTransform rt = borderObj.AddComponent<RectTransform>();
         rt.anchorMin = Vector2.zero;
         rt.anchorMax = Vector2.one;
@@ -860,7 +872,7 @@ public static class VRDropdownFactory
 
     private static void CreateOptionItem(Transform parent, DropdownConfig config, int index,
         TextMeshProUGUI valueTxt, GameObject panel, System.Action<int, string> onValueChanged,
-        VRDropdown dropdownComponent, float panelHeight, float adjustedExpansion)
+        VRDropdown dropdownComponent, float panelHeight, float adjustedExpansion, int renderLayer)
     {
         string optionText = config.options[index];
         bool isSelected = index == config.defaultIndex;
@@ -872,6 +884,7 @@ public static class VRDropdownFactory
 
         GameObject option = new GameObject("Option_" + index);
         option.transform.SetParent(parent, false);
+        option.layer = renderLayer;
 
         RectTransform optRT = option.AddComponent<RectTransform>();
         optRT.sizeDelta = new Vector2(0, optionHeight);
@@ -978,13 +991,10 @@ public static class VRDropdownFactory
             hoverEffect.SetSelected(true);
         }
 
-        // BoxCollider cho VR raycast
+        // BoxCollider cho VR raycast (non-RTT mode)
         BoxCollider optCol = option.AddComponent<BoxCollider>();
         optCol.size = new Vector3(config.width - 20f, optionHeight, 0.1f);
         optCol.center = new Vector3(0, 0, -0.1f);
-
-        int vrLayer = LayerMask.NameToLayer(config.layerName);
-        if (vrLayer != -1) option.layer = vrLayer;
 
         // Layout: Checkmark | Icon | Text
         // Checkmark size first (needed for icon position calculation)
@@ -1004,6 +1014,7 @@ public static class VRDropdownFactory
         // Checkmark - sử dụng Image với checkmark sprite
         GameObject checkObj = new GameObject("Checkmark");
         checkObj.transform.SetParent(option.transform, false);
+        checkObj.layer = renderLayer;
         RectTransform checkRT = checkObj.AddComponent<RectTransform>();
         checkRT.anchorMin = new Vector2(0f, 0.5f);
         checkRT.anchorMax = new Vector2(0f, 0.5f);
@@ -1042,6 +1053,7 @@ public static class VRDropdownFactory
 
             GameObject iconObj = new GameObject("Icon");
             iconObj.transform.SetParent(option.transform, false);
+            iconObj.layer = renderLayer;
             RectTransform iconRT = iconObj.AddComponent<RectTransform>();
             iconRT.anchorMin = new Vector2(0f, 0.5f);
             iconRT.anchorMax = new Vector2(0f, 0.5f);
@@ -1066,6 +1078,7 @@ public static class VRDropdownFactory
         // Text
         GameObject txtObj = new GameObject("Text");
         txtObj.transform.SetParent(option.transform, false);
+        txtObj.layer = renderLayer;
         RectTransform txtRT = txtObj.AddComponent<RectTransform>();
         txtRT.anchorMin = Vector2.zero;
         txtRT.anchorMax = Vector2.one;
@@ -1273,6 +1286,13 @@ public class VRDropdown : MonoBehaviour
     private System.Action<int, string> _onValueChanged;
     private VRButtonAnimation _buttonAnimation;  // Reference to button animation for hover state
 
+    // For RTT mode: create a world-space floating panel to avoid RenderTexture clipping
+    private RTTCanvasBase _rttCanvasBase;
+    private GameObject _worldSpaceDropdownRoot;  // Root object for world-space dropdown
+    private Canvas _worldSpaceCanvas;
+    private bool _isRTTMode = false;
+    private bool _rttModeChecked = false;
+
     // Static reference to currently open dropdown (for VRGazeReticle to check)
     public static VRDropdown CurrentlyOpenDropdown { get; private set; }
 
@@ -1286,7 +1306,8 @@ public class VRDropdown : MonoBehaviour
     private Dictionary<int, OptionRef> _optionRefs = new Dictionary<int, OptionRef>();
 
     public int SelectedIndex => _selectedIndex;
-    public GameObject DropdownPanel => _dropdownPanel;
+    public GameObject DropdownPanel => _isRTTMode && _worldSpaceDropdownRoot != null ? _worldSpaceDropdownRoot : _dropdownPanel;
+    public bool IsOpen => _isRTTMode ? _worldSpaceDropdownRoot != null : (_dropdownPanel != null && _dropdownPanel.activeSelf);
     public string SelectedValue => _options != null && _selectedIndex >= 0 && _selectedIndex < _options.Count
         ? _options[_selectedIndex] : "";
 
@@ -1392,10 +1413,16 @@ public class VRDropdown : MonoBehaviour
 
     public void CloseDropdown()
     {
-        if (_dropdownPanel != null)
+        // Cleanup world-space dropdown if in RTT mode
+        if (_isRTTMode)
+        {
+            CleanupWorldSpaceDropdown();
+        }
+        else if (_dropdownPanel != null)
         {
             _dropdownPanel.SetActive(false);
         }
+
         // Release force hover when panel closes
         if (_buttonAnimation != null)
         {
@@ -1418,7 +1445,18 @@ public class VRDropdown : MonoBehaviour
 
         if (_dropdownPanel != null)
         {
-            _dropdownPanel.SetActive(true);
+            // Check if we're in RTT mode
+            CheckRTTMode();
+
+            if (_isRTTMode)
+            {
+                // Create world-space dropdown to avoid RenderTexture clipping
+                CreateWorldSpaceDropdown();
+            }
+            else
+            {
+                _dropdownPanel.SetActive(true);
+            }
         }
         // Force hover when panel opens
         if (_buttonAnimation != null)
@@ -1429,19 +1467,265 @@ public class VRDropdown : MonoBehaviour
         CurrentlyOpenDropdown = this;
     }
 
+    /// <summary>
+    /// Check if we're inside an RTT (Render-to-Texture) canvas
+    /// </summary>
+    private void CheckRTTMode()
+    {
+        if (_rttModeChecked) return;
+        _rttModeChecked = true;
+
+        // Look for RTTCanvasBase in parents
+        _rttCanvasBase = GetComponentInParent<RTTCanvasBase>();
+        _isRTTMode = _rttCanvasBase != null;
+    }
+
+    /// <summary>
+    /// Create a world-space Canvas for the dropdown panel that floats in front of the RTT DisplayQuad.
+    /// This completely bypasses the RenderTexture clipping issue.
+    /// </summary>
+    private void CreateWorldSpaceDropdown()
+    {
+        if (_rttCanvasBase == null) return;
+
+        // Get the DisplayQuad to position our world-space dropdown
+        MeshRenderer displayQuad = _rttCanvasBase.GetDisplayQuad();
+        if (displayQuad == null) return;
+
+        // Get dropdown button's RectTransform
+        RectTransform dropdownRT = GetComponent<RectTransform>();
+        if (dropdownRT == null) return;
+
+        // Get panel dimensions from the original panel
+        RectTransform originalPanelRT = _dropdownPanel.GetComponent<RectTransform>();
+        float panelWidth = originalPanelRT.rect.width;
+        float panelHeight = originalPanelRT.rect.height;
+
+        // If width is 0 (stretch anchors), use dropdown width
+        if (panelWidth <= 0)
+        {
+            panelWidth = dropdownRT.rect.width;
+        }
+        if (panelHeight <= 0)
+        {
+            panelHeight = originalPanelRT.sizeDelta.y;
+        }
+
+        // Lấy UI Camera từ RTT
+        Camera uiCamera = _rttCanvasBase.GetUICamera();
+        if (uiCamera == null) return;
+
+        // Lấy world corners của dropdown button
+        Vector3[] worldCorners = new Vector3[4];
+        dropdownRT.GetWorldCorners(worldCorners);
+        // 0=bottom-left, 1=top-left, 2=top-right, 3=bottom-right
+
+        // Tính bottom-center trong world space của UI Camera
+        Vector3 bottomCenterWorld = (worldCorners[0] + worldCorners[3]) / 2f;
+
+        // Chuyển sang viewport coordinates (0-1) của UI Camera
+        Vector3 viewportPos = uiCamera.WorldToViewportPoint(bottomCenterWorld);
+
+        // Viewport coordinates chính là normalized position trên DisplayQuad
+        Vector2 bottomCenterNorm = new Vector2(viewportPos.x, viewportPos.y);
+
+        // Get RTT resolution and world size
+        Vector2Int rttResolution = _rttCanvasBase.CurrentResolution;
+        Vector2 worldSize = _rttCanvasBase.GetWorldSize();
+
+        // Calculate pixels per world unit
+        float pixelsPerWorldUnitX = rttResolution.x / worldSize.x;
+        float pixelsPerWorldUnitY = rttResolution.y / worldSize.y;
+
+        // Calculate panel world dimensions
+        float worldPanelWidth = panelWidth / pixelsPerWorldUnitX;
+        float worldPanelHeight = panelHeight / pixelsPerWorldUnitY;
+
+        // Map normalized canvas position to DisplayQuad world position
+        // DisplayQuad is centered, so we map from (-0.5 to 0.5) * worldSize
+        Vector3 quadCenter = displayQuad.transform.position;
+        Vector3 quadRight = displayQuad.transform.right;
+        Vector3 quadUp = displayQuad.transform.up;
+        Vector3 quadForward = displayQuad.transform.forward;
+
+        // Calculate bottom-center position on the quad in world space
+        Vector3 dropdownBottomCenter = quadCenter
+            + quadRight * (bottomCenterNorm.x - 0.5f) * worldSize.x
+            + quadUp * (bottomCenterNorm.y - 0.5f) * worldSize.y;
+
+        // Create world-space root object
+        if (_worldSpaceDropdownRoot != null)
+        {
+            Object.Destroy(_worldSpaceDropdownRoot);
+        }
+
+        _worldSpaceDropdownRoot = new GameObject("WorldSpaceDropdown_" + gameObject.name);
+
+        // Fix Issue 2: Calculate proper gap from original panel's anchoredPosition (-25f pixels)
+        // Original panel has anchoredPosition = (0, -25f), need to convert this to world space
+        float panelGapPixels = 25f; // From CreateDropdownPanel: anchoredPosition = new Vector2(0, -25f)
+        float worldPanelGap = panelGapPixels / pixelsPerWorldUnitY;
+
+        // Set layer to VirtualObjects for VR raycast
+        int vrLayer = LayerMask.NameToLayer("VirtualObjects");
+        if (vrLayer == -1) vrLayer = LayerMask.NameToLayer("Default");
+        _worldSpaceDropdownRoot.layer = vrLayer;
+
+        // Create World Space Canvas FIRST so we can set pivot before positioning
+        _worldSpaceCanvas = _worldSpaceDropdownRoot.AddComponent<Canvas>();
+        _worldSpaceCanvas.renderMode = RenderMode.WorldSpace;
+
+        // Setup RectTransform for canvas with TOP-CENTER pivot (like original panel)
+        // Original panel has pivot = (0.5, 1) which means position refers to top-center
+        RectTransform worldCanvasRT = _worldSpaceDropdownRoot.GetComponent<RectTransform>();
+        worldCanvasRT.pivot = new Vector2(0.5f, 1f); // Top-center pivot
+        worldCanvasRT.sizeDelta = new Vector2(panelWidth, panelHeight);
+
+        // Scale canvas to match world dimensions
+        float scaleX = worldPanelWidth / panelWidth;
+        float scaleY = worldPanelHeight / panelHeight;
+        _worldSpaceDropdownRoot.transform.localScale = new Vector3(scaleX, scaleY, 1f);
+
+        // Position with TOP-CENTER pivot: position is where top-center of panel will be
+        // dropdownBottomCenter is the bottom of dropdown button
+        // We want panel's top to be at dropdownBottomCenter - gap (slightly below dropdown)
+        Vector3 panelPosition = dropdownBottomCenter - quadForward * 0.005f; // 5mm in front
+        panelPosition -= quadUp * worldPanelGap; // Only gap, no half-height since pivot is at top
+
+        _worldSpaceDropdownRoot.transform.position = panelPosition;
+        _worldSpaceDropdownRoot.transform.rotation = displayQuad.transform.rotation;
+
+        // Add CanvasScaler for consistent sizing
+        CanvasScaler scaler = _worldSpaceDropdownRoot.AddComponent<CanvasScaler>();
+        scaler.dynamicPixelsPerUnit = 100f;
+
+        // Add GraphicRaycaster for UI interaction
+        _worldSpaceDropdownRoot.AddComponent<GraphicRaycaster>();
+
+        // Note: No BoxCollider on the root - each option already has its own BoxCollider for VR raycast
+
+        // Clone the dropdown panel content to this world-space canvas
+        GameObject clonedPanel = Object.Instantiate(_dropdownPanel, _worldSpaceDropdownRoot.transform);
+        clonedPanel.name = "DropdownPanelClone";
+
+        // Setup cloned panel RectTransform
+        RectTransform clonedRT = clonedPanel.GetComponent<RectTransform>();
+        clonedRT.anchorMin = Vector2.zero;
+        clonedRT.anchorMax = Vector2.one;
+        clonedRT.offsetMin = Vector2.zero;
+        clonedRT.offsetMax = Vector2.zero;
+        clonedRT.localPosition = Vector3.zero;
+        clonedRT.localRotation = Quaternion.identity;
+        clonedRT.localScale = Vector3.one;
+
+        // Set layer recursively
+        SetLayerRecursively(_worldSpaceDropdownRoot, vrLayer);
+
+        // Activate the cloned panel
+        clonedPanel.SetActive(true);
+
+        // Re-register option click handlers for the cloned panel
+        ReconnectClonedPanelHandlers(clonedPanel);
+    }
+
+    /// <summary>
+    /// Reconnect click handlers for cloned dropdown panel options
+    /// </summary>
+    private void ReconnectClonedPanelHandlers(GameObject clonedPanel)
+    {
+        // Find all buttons in the cloned panel and reconnect their handlers
+        Button[] buttons = clonedPanel.GetComponentsInChildren<Button>(true);
+
+        int optionIndex = 0;
+        foreach (Button btn in buttons)
+        {
+            // Skip if this is a scroll rect or other non-option button
+            if (!btn.gameObject.name.StartsWith("Option_")) continue;
+
+            // Parse index from name
+            string indexStr = btn.gameObject.name.Replace("Option_", "");
+            if (int.TryParse(indexStr, out int idx))
+            {
+                int capturedIndex = idx;
+                string optionText = _options != null && capturedIndex < _options.Count ? _options[capturedIndex] : "";
+
+                // Clear existing listeners and add new one
+                btn.onClick.RemoveAllListeners();
+                btn.onClick.AddListener(() =>
+                {
+                    if (_valueTxt != null)
+                    {
+                        _valueTxt.text = optionText;
+                    }
+                    UpdateSelection(capturedIndex);
+                    CloseDropdown();
+                    _onValueChanged?.Invoke(capturedIndex, optionText);
+                });
+
+                // Fix Issue 1: Restore _isSelected state on cloned VROptionHoverEffect
+                // When panel is cloned, VROptionHoverEffect instances lose their selected state
+                VROptionHoverEffect hoverEffect = btn.GetComponent<VROptionHoverEffect>();
+                if (hoverEffect != null)
+                {
+                    // Set selected state for the currently selected option
+                    bool isSelected = (capturedIndex == _selectedIndex);
+                    hoverEffect.SetSelected(isSelected);
+                }
+
+                optionIndex++;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Cleanup world-space dropdown when closing
+    /// </summary>
+    private void CleanupWorldSpaceDropdown()
+    {
+        if (_worldSpaceDropdownRoot != null)
+        {
+            Object.Destroy(_worldSpaceDropdownRoot);
+            _worldSpaceDropdownRoot = null;
+            _worldSpaceCanvas = null;
+        }
+    }
+
+    /// <summary>
+    /// Tính vị trí center của một RectTransform trên Canvas (trong Canvas local space)
+    /// Đi ngược hierarchy từ element lên đến canvas để tính tổng offset
+    /// </summary>
+    private Vector2 GetPositionOnCanvas(RectTransform element, RectTransform canvas)
+    {
+        // Sử dụng TransformPoint để chuyển đổi từ local space của element sang world space
+        // Sau đó chuyển sang local space của canvas
+        Vector3 worldPos = element.TransformPoint(Vector3.zero); // Center của element trong world
+        Vector3 canvasLocalPos = canvas.InverseTransformPoint(worldPos);
+        return new Vector2(canvasLocalPos.x, canvasLocalPos.y);
+    }
+
+    /// <summary>
+    /// Recursively set layer for GameObject and all children
+    /// </summary>
+    private void SetLayerRecursively(GameObject obj, int layer)
+    {
+        if (obj == null) return;
+        obj.layer = layer;
+        foreach (Transform child in obj.transform)
+        {
+            SetLayerRecursively(child.gameObject, layer);
+        }
+    }
+
     public void ToggleDropdown()
     {
-        if (_dropdownPanel != null)
+        // Use IsOpen property which handles both RTT and non-RTT modes
+        if (IsOpen)
         {
-            bool willBeActive = !_dropdownPanel.activeSelf;
-            if (willBeActive)
-            {
-                OpenDropdown();
-            }
-            else
-            {
-                CloseDropdown();
-            }
+            CloseDropdown();
+        }
+        else
+        {
+            OpenDropdown();
         }
     }
 
@@ -1450,18 +1734,36 @@ public class VRDropdown : MonoBehaviour
     /// </summary>
     public bool IsPartOfDropdownPanel(GameObject obj)
     {
-        if (_dropdownPanel == null || obj == null) return false;
+        if (obj == null) return false;
 
-        // Check if obj is a child of the dropdown panel
-        Transform current = obj.transform;
-        while (current != null)
+        // Check if obj is a child of the dropdown panel (non-RTT mode)
+        if (_dropdownPanel != null)
         {
-            if (current.gameObject == _dropdownPanel)
+            Transform current = obj.transform;
+            while (current != null)
             {
-                return true;
+                if (current.gameObject == _dropdownPanel)
+                {
+                    return true;
+                }
+                current = current.parent;
             }
-            current = current.parent;
         }
+
+        // Check if obj is a child of the world-space dropdown (RTT mode)
+        if (_worldSpaceDropdownRoot != null)
+        {
+            Transform current = obj.transform;
+            while (current != null)
+            {
+                if (current.gameObject == _worldSpaceDropdownRoot)
+                {
+                    return true;
+                }
+                current = current.parent;
+            }
+        }
+
         return false;
     }
 
