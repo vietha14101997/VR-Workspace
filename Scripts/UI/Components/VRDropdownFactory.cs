@@ -945,7 +945,7 @@ public static class VRDropdownFactory
         float yOffset = (firstOptionExtraTop + 10f) / 2f;
         if (index == config.options.Count - 1)
         {
-            yOffset = lastOptionExtraBottom / 4f;
+            yOffset = 0f;
         }
         borderRT.anchoredPosition = new Vector2(0f, yOffset);
 
