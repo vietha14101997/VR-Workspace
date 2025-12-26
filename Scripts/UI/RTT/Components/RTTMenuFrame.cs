@@ -290,7 +290,7 @@ public class RTTMenuFrame : RTTCanvasBase
             _glassMaterial.SetFloat("_GradientOffset", 0f);
             _glassMaterial.SetFloat("_GradientAngle", -10f);
             _glassMaterial.SetFloat("_CyanRatio", 0.7f);
-            _glassMaterial.SetFloat("_GlassAlpha", 0.38f);
+            _glassMaterial.SetFloat("_GlassAlpha", 0.65f);
             _glassMaterial.SetFloat("_FresnelPower", 2.2f);
             _glassMaterial.SetFloat("_FresnelStrength", 0.12f);
 
