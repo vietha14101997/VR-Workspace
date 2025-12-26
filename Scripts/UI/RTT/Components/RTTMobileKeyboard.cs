@@ -102,6 +102,7 @@ public class RTTMobileKeyboard : RTTCanvasBase
     private Sprite _pixelSprite;
     private Material _glassMaterial;
     private Material _borderMaterial;
+    private RTTBlurBackgroundCapture _blurCapture;
 
     // Track if Show() was called before Start() completes
     private bool _showRequested = false;
@@ -155,10 +156,38 @@ public class RTTMobileKeyboard : RTTCanvasBase
 
         _startCompleted = true;
 
+        // Setup RTT blur capture after initialization
+        if (_isInitialized)
+        {
+            SetupBlurCapture();
+        }
+
         // Only hide if Show() wasn't already called
         if (!_showRequested)
         {
             gameObject.SetActive(false); // Hidden by default
+        }
+    }
+
+    private void SetupBlurCapture()
+    {
+        if (_displayQuad == null || _glassMaterial == null) return;
+
+        _blurCapture = gameObject.AddComponent<RTTBlurBackgroundCapture>();
+        _blurCapture.BlurRadius = 2f * 0.3f;
+        _blurCapture.BlurIterations = 2;
+        _blurCapture.Initialize(this, _displayQuad);
+
+        if (_blurCapture.IsReady)
+        {
+            _blurCapture.ApplyToMaterial(_glassMaterial);
+            _glassMaterial.SetFloat("_UseProcedural", 0f);
+            Debug.Log("[RTTMobileKeyboard] RTT Blur Capture initialized successfully");
+        }
+        else
+        {
+            _glassMaterial.SetFloat("_UseProcedural", 1f);
+            Debug.Log("[RTTMobileKeyboard] RTT Blur Capture failed - using procedural fallback");
         }
     }
 
@@ -171,6 +200,16 @@ public class RTTMobileKeyboard : RTTCanvasBase
         if (_borderMaterial != null) Destroy(_borderMaterial);
 
         base.OnDestroy();
+    }
+
+    public override void MarkDirty()
+    {
+        base.MarkDirty();
+
+        if (_blurCapture != null)
+        {
+            _blurCapture.MarkDirty();
+        }
     }
 
     protected override void LateUpdate()
@@ -297,6 +336,13 @@ public class RTTMobileKeyboard : RTTCanvasBase
             // ColorB: Deep Sea Blue blended with Purple (bottom area)
             _glassMaterial.SetColor("_ColorB", new Color(0.30f, 0.12f, 0.50f, 0.32f));
             _glassMaterial.SetFloat("_GlassAlpha", 0.38f);
+
+            // RTT blur settings
+            _glassMaterial.SetFloat("_BlurEnabled", 1f);
+            _glassMaterial.SetFloat("_UseExternalBlur", 1f);
+            _glassMaterial.SetFloat("_UseProcedural", 1f);
+            _glassMaterial.SetColor("_ProceduralBaseColor", new Color(0.1f, 0.3f, 0.4f, 0.5f));
+
             img.material = _glassMaterial;
             img.color = Color.white;
         }
