@@ -7,11 +7,13 @@ using TMPro;
 /// Trigger component for VR Input Fields.
 /// Handles click/pointer events to show VR keyboard.
 /// Blocks system keyboard input and redirects to virtual keyboard.
+/// Changes reticle to text cursor on hover.
 /// </summary>
-public class VRInputFieldTrigger : MonoBehaviour, IPointerClickHandler, IPointerDownHandler
+public class VRInputFieldTrigger : MonoBehaviour, IPointerClickHandler, IPointerDownHandler, IPointerEnterHandler, IPointerExitHandler
 {
     private TMP_InputField _inputField;
     private bool _isInitialized = false;
+    private Sprite _textCursorSprite;
 
     /// <summary>
     /// Initialize with the target input field
@@ -20,6 +22,9 @@ public class VRInputFieldTrigger : MonoBehaviour, IPointerClickHandler, IPointer
     {
         _inputField = inputField;
         _isInitialized = true;
+
+        // Load text cursor icon from Resources
+        LoadTextCursorSprite();
 
         if (_inputField != null)
         {
@@ -39,6 +44,20 @@ public class VRInputFieldTrigger : MonoBehaviour, IPointerClickHandler, IPointer
         }
     }
 
+    private void LoadTextCursorSprite()
+    {
+        _textCursorSprite = Resources.Load<Sprite>("icon_text_cursor");
+        if (_textCursorSprite == null)
+        {
+            // Try loading as Texture2D
+            Texture2D tex = Resources.Load<Texture2D>("icon_text_cursor");
+            if (tex != null)
+            {
+                _textCursorSprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+            }
+        }
+    }
+
     void OnDestroy()
     {
         if (_inputField != null && VRKeyboardManager.Instance != null)
@@ -52,7 +71,112 @@ public class VRInputFieldTrigger : MonoBehaviour, IPointerClickHandler, IPointer
     /// </summary>
     public void OnPointerClick(PointerEventData eventData)
     {
-        ShowKeyboard();
+        if (_inputField == null) return;
+
+        // Calculate caret position from click position
+        int caretPos = GetCharacterIndexFromPosition(eventData);
+        _inputField.caretPosition = caretPos;
+
+        // If RTT keyboard is already open for this input, update its caret position
+        if (RTTMobileKeyboard.CurrentlyOpenKeyboard != null)
+        {
+            RTTMobileKeyboard.CurrentlyOpenKeyboard.SetCaretPosition(caretPos);
+        }
+        else
+        {
+            // Show keyboard if not open
+            ShowKeyboard();
+        }
+    }
+
+    /// <summary>
+    /// Calculate character index from click position
+    /// </summary>
+    private int GetCharacterIndexFromPosition(PointerEventData eventData)
+    {
+        if (_inputField == null) return 0;
+
+        string text = _inputField.text;
+        if (string.IsNullOrEmpty(text)) return 0;
+
+        // Get screen position - use RTTRaycastManager for RTT context
+        Vector2 screenPos = eventData.position;
+        if (RTTRaycastManager.Instance != null && RTTRaycastManager.Instance.CurrentHit.isValid)
+        {
+            screenPos = RTTRaycastManager.Instance.CurrentHit.screenPosition;
+        }
+
+        // Get the text component from input field
+        TMP_Text textComponent = _inputField.textComponent;
+        if (textComponent == null) return text.Length;
+
+        // Force mesh update
+        textComponent.ForceMeshUpdate();
+
+        var textInfo = textComponent.textInfo;
+        if (textInfo.characterCount == 0) return 0;
+
+        // Get canvas and camera
+        Canvas canvas = _inputField.GetComponentInParent<Canvas>();
+        Camera cam = canvas?.worldCamera;
+
+        // Convert screen position to local position
+        RectTransform rectTransform = textComponent.rectTransform;
+        Vector2 localPoint;
+
+        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(rectTransform, screenPos, cam, out localPoint))
+        {
+            // Fallback: estimate based on text length and x position
+            return EstimateCharacterIndex(screenPos, text);
+        }
+
+        // Find character by comparing x positions
+        for (int i = 0; i < textInfo.characterCount && i < text.Length; i++)
+        {
+            var charInfo = textInfo.characterInfo[i];
+            if (!charInfo.isVisible) continue;
+
+            float charCenterX = (charInfo.bottomLeft.x + charInfo.bottomRight.x) / 2f;
+
+            if (localPoint.x < charCenterX)
+            {
+                return i;
+            }
+        }
+
+        return text.Length;
+    }
+
+    /// <summary>
+    /// Estimate character index when coordinate conversion fails
+    /// </summary>
+    private int EstimateCharacterIndex(Vector2 screenPos, string text)
+    {
+        if (string.IsNullOrEmpty(text)) return 0;
+
+        RectTransform rt = _inputField.GetComponent<RectTransform>();
+        if (rt == null) return text.Length;
+
+        // Get rect bounds in screen space
+        Vector3[] corners = new Vector3[4];
+        rt.GetWorldCorners(corners);
+
+        Canvas canvas = _inputField.GetComponentInParent<Canvas>();
+        Camera cam = canvas?.worldCamera;
+
+        if (cam != null)
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                corners[i] = cam.WorldToScreenPoint(corners[i]);
+            }
+        }
+
+        float minX = Mathf.Min(corners[0].x, corners[1].x, corners[2].x, corners[3].x);
+        float maxX = Mathf.Max(corners[0].x, corners[1].x, corners[2].x, corners[3].x);
+
+        float normalizedX = Mathf.Clamp01((screenPos.x - minX) / (maxX - minX));
+        return Mathf.RoundToInt(normalizedX * text.Length);
     }
 
     /// <summary>
@@ -64,6 +188,28 @@ public class VRInputFieldTrigger : MonoBehaviour, IPointerClickHandler, IPointer
         if (_inputField != null)
         {
             EventSystem.current?.SetSelectedGameObject(_inputField.gameObject);
+        }
+    }
+
+    /// <summary>
+    /// Handle pointer enter - change reticle to text cursor
+    /// </summary>
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        if (VRGazeReticle.Instance != null && _textCursorSprite != null)
+        {
+            VRGazeReticle.Instance.SetCursorSprite(_textCursorSprite);
+        }
+    }
+
+    /// <summary>
+    /// Handle pointer exit - reset reticle to default
+    /// </summary>
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        if (VRGazeReticle.Instance != null)
+        {
+            VRGazeReticle.Instance.ResetCursorSprite();
         }
     }
 

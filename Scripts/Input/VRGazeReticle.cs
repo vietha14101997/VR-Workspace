@@ -417,8 +417,18 @@ public class VRGazeReticle : MonoBehaviour
 
         GameObject target = _lastRTTHit.hitUIElement;
 
+        // Check if RTT keyboard is open
+        bool hasOpenKeyboard = RTTMobileKeyboard.CurrentlyOpenKeyboard != null;
+        bool isKeyboardPart = hasOpenKeyboard && RTTMobileKeyboard.CurrentlyOpenKeyboard.IsPartOfKeyboard(target);
+
+        // Check if target is an InputField
+        VRInputFieldTrigger inputFieldTrigger = target.GetComponent<VRInputFieldTrigger>();
+        if (inputFieldTrigger == null) inputFieldTrigger = target.GetComponentInParent<VRInputFieldTrigger>();
+
         // Check if target is dwellable
         bool isDwellableTarget = IsDwellable(target);
+
+        // Only dwell on functional objects (dwellable targets)
         if (!isDwellableTarget)
         {
             ResetDwellState();
@@ -482,7 +492,30 @@ public class VRGazeReticle : MonoBehaviour
                 _dwellRing.enabled = false;
             }
 
-            // Use RTTRaycastManager to send click
+            // Handle keyboard click-outside logic
+            if (hasOpenKeyboard && !isKeyboardPart)
+            {
+                // Clicking outside keyboard
+                if (inputFieldTrigger != null && inputFieldTrigger.InputField != null)
+                {
+                    var currentTarget = RTTMobileKeyboard.CurrentlyOpenKeyboard.GetTargetInputField();
+                    if (inputFieldTrigger.InputField != currentTarget)
+                    {
+                        // Clicking a DIFFERENT InputField - switch keyboard target first
+                        RTTMobileKeyboard.CurrentlyOpenKeyboard.SwitchToInputField(inputFieldTrigger.InputField);
+                        // Continue to SendClick below to set caret position via OnPointerClick
+                    }
+                    // Clicking InputField - let SendClick happen to set caret position
+                }
+                else
+                {
+                    // Clicking on other functional object (button) - close keyboard first
+                    RTTMobileKeyboard.CurrentlyOpenKeyboard.Hide();
+                    // Continue to perform the button click below
+                }
+            }
+
+            // Normal click - use RTTRaycastManager to send click
             if (RTTRaycastManager.Instance != null)
             {
                 RTTRaycastManager.Instance.SendClick();

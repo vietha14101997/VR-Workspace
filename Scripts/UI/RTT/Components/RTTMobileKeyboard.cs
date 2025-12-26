@@ -103,6 +103,9 @@ public class RTTMobileKeyboard : RTTCanvasBase
     // Track if Show() was called before Start() completes
     private bool _showRequested = false;
     private bool _startCompleted = false;
+
+    // Store original text for cancel/restore functionality
+    private string _originalText = "";
     #endregion
 
     #region Private Fields
@@ -491,6 +494,11 @@ public class RTTMobileKeyboard : RTTCanvasBase
 
     private void OnClose()
     {
+        // Restore original text when closing via Close button (cancel operation)
+        if (_targetInputField != null)
+        {
+            _targetInputField.text = _originalText;
+        }
         Hide();
     }
 
@@ -1747,7 +1755,16 @@ public class RTTMobileKeyboard : RTTCanvasBase
 
         _showRequested = true;
         _targetInputField = inputField;
+        _originalText = inputField.text; // Save original text for cancel/restore
         gameObject.SetActive(true);
+
+        // Ensure UI is initialized before updating preview (fixes first-time delay)
+        if (!IsInitialized)
+        {
+            Initialize();
+        }
+
+        SetVisible(true); // Reset visibility state after Hide()
         CurrentlyOpenKeyboard = this;
 
         // NOTE: Do NOT call SetLayerRecursive here!
@@ -1756,9 +1773,8 @@ public class RTTMobileKeyboard : RTTCanvasBase
         // Position relative to RTTMenuFrame
         UpdatePositionRelativeToTaskbar();
 
-        // Set caret to end of text when opening keyboard
-        _caretPosition = _targetInputField.text.Length;
-        _targetInputField.caretPosition = _caretPosition;
+        // Use inputField's current caret position (may have been set by click handler)
+        _caretPosition = _targetInputField.caretPosition;
 
         // Reset caret blink
         _caretBlinkTimer = 0f;
@@ -1785,15 +1801,22 @@ public class RTTMobileKeyboard : RTTCanvasBase
 
     public void SwitchToInputField(TMP_InputField newInputField)
     {
+        if (newInputField == null) return;
         _targetInputField = newInputField;
-        UpdatePreview();
-        MarkDirty();
+        _originalText = newInputField.text; // Save new original text
+        // Don't set caret or update preview here - OnPointerClick will be called
+        // right after this to set the correct caret position from click
     }
 
     public bool IsPartOfKeyboard(GameObject obj)
     {
         if (obj == null) return false;
         return obj.transform.IsChildOf(transform);
+    }
+
+    public TMP_InputField GetTargetInputField()
+    {
+        return _targetInputField;
     }
     #endregion
 
