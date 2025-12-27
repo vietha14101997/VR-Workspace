@@ -240,9 +240,9 @@ Shader "Custom/GlowingGlassBorderPanel"
                 float boardLeft = marginH;
                 float boardRight = 1.0 - marginH;
 
-                // On masked left edge, clip PAST boardLeft to avoid overlap
+                // On masked left edge, clip slightly PAST boardLeft to avoid overlap
                 // This panel yields to the adjacent panel's right edge
-                if (edgeMask.x < 0.5 && contentUV.x < boardLeft + 0.02)
+                if (edgeMask.x < 0.5 && contentUV.x < boardLeft)
                 {
                     return 0.0;
                 }

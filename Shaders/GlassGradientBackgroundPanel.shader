@@ -286,7 +286,7 @@ Shader "Custom/GlassGradientBackgroundPanel"
 
                 // On masked left edge, clip PAST boardLeft to avoid overlap shadow
                 // This panel yields to the adjacent panel's right edge
-                if (_EdgeMask.x < 0.5 && contentUV.x < boardLeft + 0.02)
+                if (_EdgeMask.x < 0.5 && contentUV.x < boardLeft)
                 {
                     alphaMask = 0;
                 }
