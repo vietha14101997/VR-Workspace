@@ -46,6 +46,7 @@ public class RTTInfoSidePanel : MonoBehaviour
     private Material _borderMaterial;
     private GameObject _contentRoot;
     private Sprite _pixelSprite;
+    private Sprite _roundedMaskSprite;
 
     // Resolution for RTT (calculated from panel dimensions)
     private int _rttWidth = 640;
@@ -72,9 +73,11 @@ public class RTTInfoSidePanel : MonoBehaviour
 
         CreateRenderTexture();
         SetupUICamera();
-        SetupCanvas();
+        SetupCanvas();  // Creates GlassPanel with FX_DataStream and GlowingBorder
         SetupDisplayQuad();
-        BuildContent();
+
+        // Initial render to texture
+        MarkDirty();
 
         gameObject.SetActive(false); // Hidden by default
     }
@@ -180,8 +183,11 @@ public class RTTInfoSidePanel : MonoBehaviour
 
         canvasObj.AddComponent<GraphicRaycaster>();
 
-        // Content root with margins
-        _contentRoot = new GameObject("ContentRoot");
+        // Create GlassBackground (like RTTMenuFrame) - contains FX_DataStream and GlowingBorder
+        CreateGlassPanel(canvasRT);
+
+        // Content container (sibling of GlassBackground, like RTTMenuFrame)
+        _contentRoot = new GameObject("ContentContainer");
         _contentRoot.transform.SetParent(canvasObj.transform, false);
         _contentRoot.layer = LayerMask.NameToLayer("UI");
 
@@ -202,95 +208,160 @@ public class RTTInfoSidePanel : MonoBehaviour
         layout.padding = new RectOffset(20, 20, 40, 40);
     }
 
-    private void SetupDisplayQuad()
+    private void CreateGlassPanel(RectTransform parent)
     {
-        GameObject quadObj = new GameObject("DisplayQuad");
-        quadObj.transform.SetParent(transform, false);
-        quadObj.transform.localPosition = Vector3.zero;
-        quadObj.layer = LayerMask.NameToLayer("VirtualObjects");
+        float w = _rttWidth;
+        float h = _rttHeight;
+        float aspect = (float)_rttWidth / _rttHeight;
+        float edgePad = 0.0075f;
+        float bgCornerRadius = 0.04f;
 
-        // Create quad mesh
-        MeshFilter meshFilter = quadObj.AddComponent<MeshFilter>();
-        meshFilter.mesh = CreateQuadMesh();
+        // GlassBackground - exactly like RTTMenuFrame
+        GameObject bgObj = new GameObject("GlassBackground");
+        bgObj.transform.SetParent(parent, false);
+        bgObj.layer = LayerMask.NameToLayer("UI");
 
-        _displayQuad = quadObj.AddComponent<MeshRenderer>();
+        Image img = bgObj.AddComponent<Image>();
+        img.sprite = GetPixelSprite();
+        img.raycastTarget = true;
 
-        float aspect = panelWidth / panelHeight;
-
-        // Use Wide version of shader (same as RTTMenuFrame) for better compatibility
+        // Use glass shader like RTTMenuFrame
         Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
-        if (glassShader == null) glassShader = Shader.Find("UI/Default");
-
-        _glassMaterial = new Material(glassShader);
-        _glassMaterial.SetTexture("_MainTex", _renderTexture);
-
-        // Match RTTMenuFrame glass effect settings exactly
-        if (glassShader != null && glassShader.name.Contains("Glass"))
+        if (glassShader != null)
         {
-            _glassMaterial.SetFloat("_CornerRadius", 0.04f);
-            _glassMaterial.SetFloat("_EdgePadding", 0.0075f);
+            _glassMaterial = new Material(glassShader);
+
+            _glassMaterial.SetFloat("_CornerRadius", bgCornerRadius);
+            _glassMaterial.SetFloat("_EdgePadding", edgePad);
             _glassMaterial.SetFloat("_Aspect", aspect);
 
-            // Color based on panel type: HardwareInfo = Cyan, NetworkInfo = Purple
+            // Color based on panel type
             Color colorA, colorB;
             if (panelType == PanelType.HardwareInfo)
             {
-                // Full cyan gradient for left panel
-                colorA = new Color(0.0f, 0.55f, 0.70f, 0.30f);
-                colorB = new Color(0.0f, 0.45f, 0.60f, 0.25f);
+                colorA = new Color(0.0f, 0.55f, 0.70f, 0.35f);
+                colorB = new Color(0.0f, 0.45f, 0.60f, 0.32f);
             }
             else
             {
-                // Full purple gradient for right panel
-                colorA = new Color(0.35f, 0.15f, 0.55f, 0.30f);
-                colorB = new Color(0.28f, 0.10f, 0.45f, 0.25f);
+                colorA = new Color(0.35f, 0.15f, 0.55f, 0.35f);
+                colorB = new Color(0.28f, 0.10f, 0.45f, 0.32f);
             }
             _glassMaterial.SetColor("_ColorA", colorA);
             _glassMaterial.SetColor("_ColorB", colorB);
             _glassMaterial.SetFloat("_GradientOffset", 0f);
             _glassMaterial.SetFloat("_GradientAngle", -10f);
-            _glassMaterial.SetFloat("_CyanRatio", 0.5f); // Even distribution
-            _glassMaterial.SetFloat("_GlassAlpha", 0.50f);
+            _glassMaterial.SetFloat("_CyanRatio", 0.7f);
+            _glassMaterial.SetFloat("_GlassAlpha", 0.65f);
             _glassMaterial.SetFloat("_FresnelPower", 2.2f);
             _glassMaterial.SetFloat("_FresnelStrength", 0.12f);
 
-            // Set render queue behind border
-            _glassMaterial.renderQueue = 2999;
+            img.material = _glassMaterial;
+            img.color = Color.white;
+        }
+        else
+        {
+            img.color = new Color(0.0f, 0.4f, 0.5f, 0.35f);
         }
 
-        _displayQuad.material = _glassMaterial;
-        _displayQuad.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        _displayQuad.receiveShadows = false;
+        RectTransform rt = bgObj.GetComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.sizeDelta = Vector2.zero;
+        rt.localScale = Vector3.one;
+        rt.localPosition = Vector3.zero;
+        rt.SetAsFirstSibling();
 
-        // Create glowing border as 3D quad (with minimal glow to avoid overflow)
-        CreateGlowingBorder3D(quadObj.transform, aspect);
+        // Create floating data effects as child of GlassBackground (like RTTMenuFrame)
+        if (enableFloatingData)
+        {
+            CreateFloatingDataEffects(bgObj.transform, w, h);
+        }
 
-        // Add collider for interaction
-        BoxCollider collider = quadObj.AddComponent<BoxCollider>();
-        collider.size = new Vector3(panelWidth, panelHeight, 0.01f);
+        // Create glowing border as child of GlassBackground (like RTTMenuFrame)
+        CreateGlowingBorder2D(bgObj.transform, w, h, edgePad * 1.175f);
     }
 
-    /// <summary>
-    /// Creates glowing border as a separate 3D quad with minimal glow to prevent overflow.
-    /// </summary>
-    private void CreateGlowingBorder3D(Transform parent, float aspect)
+    private void CreateFloatingDataEffects(Transform parent, float w, float h)
     {
+        // Exactly like RTTMenuFrame
+        GameObject fxContainer = new GameObject("FX_DataStream");
+        fxContainer.transform.SetParent(parent, false);
+        fxContainer.layer = LayerMask.NameToLayer("UI");
+
+        RectTransform rt = fxContainer.AddComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+
+        float margin = 40f;
+        rt.offsetMin = new Vector2(margin, margin);
+        rt.offsetMax = new Vector2(-margin, -margin);
+
+        // Use Mask for rounded clipping
+        Image maskImage = fxContainer.AddComponent<Image>();
+        maskImage.sprite = GetRoundedMaskSprite();
+        maskImage.type = Image.Type.Sliced;
+        maskImage.color = Color.white;
+        maskImage.raycastTarget = false;
+
+        Mask mask = fxContainer.AddComponent<Mask>();
+        mask.showMaskGraphic = false;
+
+        // Create particles
+        for (int i = 0; i < particleCount; i++)
+        {
+            CreateDataParticle(fxContainer.transform, w, h, i);
+        }
+    }
+
+    private void CreateDataParticle(Transform parent, float w, float h, int index)
+    {
+        GameObject p = new GameObject($"Bit_{index}");
+        p.transform.SetParent(parent, false);
+        p.layer = LayerMask.NameToLayer("UI");
+
+        Image pImg = p.AddComponent<Image>();
+        pImg.sprite = GetPixelSprite();
+        pImg.raycastTarget = false;
+
+        // Color based on panel type
+        Color baseCol = (panelType == PanelType.HardwareInfo) ? Color.cyan : new Color(0.8f, 0f, 1f);
+        pImg.color = new Color(baseCol.r, baseCol.g, baseCol.b, Random.Range(0.1f, 0.4f));
+
+        RectTransform pRT = p.GetComponent<RectTransform>();
+        float size = Random.Range(10f, 60f);
+        pRT.sizeDelta = new Vector2(size, size * Random.Range(0.2f, 1.0f));
+
+        float startX = Random.Range(-w / 2f, w / 2f);
+        float startY = Random.Range(-h / 2f, h / 2f);
+        pRT.anchoredPosition = new Vector2(startX, startY);
+
+        var anim = p.AddComponent<FloatingDataAnim>();
+        anim.speed = Random.Range(10f, 40f);
+        anim.range = new Vector2(w - 80f, h - 80f);
+        anim.OnAnimationUpdate += MarkDirty;
+    }
+
+    private void CreateGlowingBorder2D(Transform parent, float w, float h, float edgePad)
+    {
+        // 2D border like RTTMenuFrame (not 3D quad)
         GameObject borderObj = new GameObject("GlowingBorder");
         borderObj.transform.SetParent(parent, false);
-        borderObj.transform.localPosition = new Vector3(0, 0, -0.001f); // Slightly in front
-        borderObj.layer = LayerMask.NameToLayer("VirtualObjects");
+        borderObj.layer = LayerMask.NameToLayer("UI");
 
-        // Create border quad
-        MeshFilter meshFilter = borderObj.AddComponent<MeshFilter>();
-        meshFilter.mesh = CreateQuadMesh();
+        RectTransform rt = borderObj.AddComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
 
-        MeshRenderer borderRenderer = borderObj.AddComponent<MeshRenderer>();
+        Image borderImg = borderObj.AddComponent<Image>();
+        borderImg.raycastTarget = false;
+        borderImg.sprite = GetPixelSprite();
 
-        // Use Panel version for clipping support
-        Shader glowShader = Shader.Find("Custom/GlowingGlassBorderPanel");
-        if (glowShader == null)
-            glowShader = Shader.Find("Custom/GlowingGlassBorder");
+        float aspect = (float)_rttWidth / _rttHeight;
 
+        Shader glowShader = Shader.Find("Custom/GlowingGlassBorder");
         if (glowShader != null)
         {
             _borderMaterial = new Material(glowShader);
@@ -298,35 +369,28 @@ public class RTTInfoSidePanel : MonoBehaviour
             _borderMaterial.SetFloat("_StrokeEnabled", 0);
             _borderMaterial.SetFloat("_BorderWidth", 0.025f);
             _borderMaterial.SetFloat("_CornerRadius", 0.04f);
-            _borderMaterial.SetFloat("_EdgePadding", 0.0075f * 1.175f);
+            _borderMaterial.SetFloat("_EdgePadding", edgePad);
             _borderMaterial.SetFloat("_Aspect", aspect);
 
-            // EdgeMask and ContentBounds for Panel shader
-            _borderMaterial.SetVector("_EdgeMask", Vector4.one);
-            _borderMaterial.SetVector("_ContentBounds", new Vector4(0f, 1f, 0f, 1f));
+            // Glow layers like RTTMenuFrame
+            _borderMaterial.SetFloat("_Layer1Width", 0.01f);
+            _borderMaterial.SetFloat("_Layer1Alpha", 1.5f);
+            _borderMaterial.SetFloat("_Layer2Width", 0.02f);
+            _borderMaterial.SetFloat("_Layer2Alpha", 1.0f);
+            _borderMaterial.SetFloat("_Layer3Width", 0.045f);
+            _borderMaterial.SetFloat("_Layer3Alpha", 0.6f);
+            _borderMaterial.SetFloat("_Layer4Width", 0.09f);
+            _borderMaterial.SetFloat("_Layer4Alpha", 0.3f);
 
-            // Minimal glow layers - only inner layers, disable outer layers that cause overflow
-            _borderMaterial.SetFloat("_Layer1Width", 0.008f);
-            _borderMaterial.SetFloat("_Layer1Alpha", 1.2f);
-            _borderMaterial.SetFloat("_Layer2Width", 0.012f);
-            _borderMaterial.SetFloat("_Layer2Alpha", 0.6f);
-            // Disable outer glow layers to prevent overflow
-            _borderMaterial.SetFloat("_Layer3Width", 0f);
-            _borderMaterial.SetFloat("_Layer3Alpha", 0f);
-            _borderMaterial.SetFloat("_Layer4Width", 0f);
-            _borderMaterial.SetFloat("_Layer4Alpha", 0f);
-
-            // Glow colors based on panel type
+            // Border colors based on panel type
             Color borderColorA, borderColorB;
             if (panelType == PanelType.HardwareInfo)
             {
-                // Cyan border for left panel
                 borderColorA = new Color(0.3f, 1f, 1f, 1f);
                 borderColorB = new Color(0.2f, 0.9f, 0.95f, 1f);
             }
             else
             {
-                // Purple border for right panel
                 borderColorA = new Color(1f, 0.4f, 1f, 1f);
                 borderColorB = new Color(0.9f, 0.3f, 0.95f, 1f);
             }
@@ -334,17 +398,42 @@ public class RTTInfoSidePanel : MonoBehaviour
             _borderMaterial.SetColor("_ColorB", borderColorB);
             _borderMaterial.SetFloat("_GradientMode", 2f);
             _borderMaterial.SetFloat("_GradientAngle", -10f);
+            _borderMaterial.SetFloat("_GlassAlpha", 0.02f);
+            _borderMaterial.SetColor("_GlassTint", new Color(0.9f, 0.95f, 1f, 1f));
 
-            // Disable glass to avoid overflow
-            _borderMaterial.SetFloat("_GlassAlpha", 0f);
-            _borderMaterial.SetColor("_GlassTint", new Color(0.9f, 0.95f, 1f, 0f));
-
-            _borderMaterial.renderQueue = 3001;
-
-            borderRenderer.material = _borderMaterial;
-            borderRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            borderRenderer.receiveShadows = false;
+            borderImg.material = _borderMaterial;
         }
+
+        borderObj.transform.SetAsLastSibling();
+    }
+
+    private void SetupDisplayQuad()
+    {
+        // Simple quad to display the render texture (glass effect is in canvas now)
+        GameObject quadObj = new GameObject("DisplayQuad");
+        quadObj.transform.SetParent(transform, false);
+        quadObj.transform.localPosition = Vector3.zero;
+        quadObj.layer = LayerMask.NameToLayer("VirtualObjects");
+
+        MeshFilter meshFilter = quadObj.AddComponent<MeshFilter>();
+        meshFilter.mesh = CreateQuadMesh();
+
+        _displayQuad = quadObj.AddComponent<MeshRenderer>();
+
+        // Simple unlit material to display the RTT
+        Shader unlitShader = Shader.Find("Unlit/Transparent");
+        if (unlitShader == null) unlitShader = Shader.Find("UI/Default");
+
+        Material displayMat = new Material(unlitShader);
+        displayMat.mainTexture = _renderTexture;
+
+        _displayQuad.material = displayMat;
+        _displayQuad.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        _displayQuad.receiveShadows = false;
+
+        // Add collider for interaction
+        BoxCollider collider = quadObj.AddComponent<BoxCollider>();
+        collider.size = new Vector3(panelWidth, panelHeight, 0.01f);
     }
 
     private Mesh CreateQuadMesh()
@@ -382,107 +471,6 @@ public class RTTInfoSidePanel : MonoBehaviour
     #endregion
 
     #region Content Building
-    private void BuildContent()
-    {
-        // Add transparent background to canvas (for RTT rendering)
-        // The glass effect is handled by the 3D display quad
-        AddCanvasBackground();
-
-        // Add floating data effects
-        if (enableFloatingData)
-        {
-            CreateFloatingDataEffects();
-        }
-    }
-
-    private void CreateFloatingDataEffects()
-    {
-        GameObject fxContainer = new GameObject("FX_DataStream");
-        fxContainer.transform.SetParent(_canvas.transform, false);
-        fxContainer.transform.SetAsFirstSibling(); // Behind content
-        fxContainer.layer = LayerMask.NameToLayer("UI");
-
-        RectTransform rt = fxContainer.AddComponent<RectTransform>();
-        rt.anchorMin = Vector2.zero;
-        rt.anchorMax = Vector2.one;
-        rt.offsetMin = new Vector2(20, 20);
-        rt.offsetMax = new Vector2(-20, -20);
-
-        // Use Mask for clipping
-        Image maskImage = fxContainer.AddComponent<Image>();
-        maskImage.color = new Color(1, 1, 1, 0.01f); // Nearly transparent
-        maskImage.raycastTarget = false;
-
-        Mask mask = fxContainer.AddComponent<Mask>();
-        mask.showMaskGraphic = false;
-
-        // Create particles with panel-specific color
-        for (int i = 0; i < particleCount; i++)
-        {
-            CreateDataParticle(fxContainer.transform, i);
-        }
-    }
-
-    private void CreateDataParticle(Transform parent, int index)
-    {
-        GameObject p = new GameObject($"Bit_{index}");
-        p.transform.SetParent(parent, false);
-        p.layer = LayerMask.NameToLayer("UI");
-
-        Image pImg = p.AddComponent<Image>();
-        pImg.sprite = GetPixelSprite();
-        pImg.raycastTarget = false;
-
-        // Color based on panel type
-        Color baseCol;
-        if (panelType == PanelType.HardwareInfo)
-        {
-            // Cyan particles for left panel
-            baseCol = Color.cyan;
-        }
-        else
-        {
-            // Purple particles for right panel
-            baseCol = new Color(0.8f, 0f, 1f);
-        }
-        pImg.color = new Color(baseCol.r, baseCol.g, baseCol.b, Random.Range(0.1f, 0.4f));
-
-        RectTransform pRT = p.GetComponent<RectTransform>();
-        float size = Random.Range(8f, 40f);
-        pRT.sizeDelta = new Vector2(size, size * Random.Range(0.2f, 1.0f));
-
-        float startX = Random.Range(-_rttWidth / 2f + 40, _rttWidth / 2f - 40);
-        float startY = Random.Range(-_rttHeight / 2f + 40, _rttHeight / 2f - 40);
-        pRT.anchoredPosition = new Vector2(startX, startY);
-
-        // Add animation component
-        var anim = p.AddComponent<FloatingDataAnim>();
-        anim.speed = Random.Range(8f, 30f);
-        anim.range = new Vector2(_rttWidth - 80, _rttHeight - 80);
-
-        // Subscribe to animation updates to mark dirty
-        anim.OnAnimationUpdate += MarkDirty;
-    }
-
-    private void AddCanvasBackground()
-    {
-        GameObject bgObj = new GameObject("Background");
-        bgObj.transform.SetParent(_canvas.transform, false);
-        bgObj.transform.SetAsFirstSibling();
-        bgObj.layer = LayerMask.NameToLayer("UI");
-
-        RectTransform rt = bgObj.AddComponent<RectTransform>();
-        rt.anchorMin = Vector2.zero;
-        rt.anchorMax = Vector2.one;
-        rt.offsetMin = Vector2.zero;
-        rt.offsetMax = Vector2.zero;
-
-        Image img = bgObj.AddComponent<Image>();
-        // Transparent background - the 3D quad provides the glass effect
-        img.color = new Color(0, 0, 0, 0);
-        img.raycastTarget = false;
-    }
-
     private void ClearContent()
     {
         if (_contentRoot == null) return;
@@ -643,6 +631,46 @@ public class RTTInfoSidePanel : MonoBehaviour
         tex.Apply();
         _pixelSprite = Sprite.Create(tex, new Rect(0, 0, 2, 2), Vector2.one * 0.5f);
         return _pixelSprite;
+    }
+
+    private Sprite GetRoundedMaskSprite()
+    {
+        if (_roundedMaskSprite != null) return _roundedMaskSprite;
+
+        int size = 128;
+        int radius = 24;
+        int border = radius;
+
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        Color[] colors = new Color[size * size];
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float alpha = 1f;
+
+                int cornerX = -1, cornerY = -1;
+                if (x < radius && y < radius) { cornerX = radius; cornerY = radius; }
+                else if (x >= size - radius && y < radius) { cornerX = size - radius - 1; cornerY = radius; }
+                else if (x < radius && y >= size - radius) { cornerX = radius; cornerY = size - radius - 1; }
+                else if (x >= size - radius && y >= size - radius) { cornerX = size - radius - 1; cornerY = size - radius - 1; }
+
+                if (cornerX >= 0)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), new Vector2(cornerX, cornerY));
+                    alpha = Mathf.Clamp01(radius + 0.5f - dist);
+                }
+
+                colors[y * size + x] = new Color(1, 1, 1, alpha);
+            }
+        }
+
+        tex.SetPixels(colors);
+        tex.Apply();
+        _roundedMaskSprite = Sprite.Create(tex, new Rect(0, 0, size, size), Vector2.one * 0.5f,
+            100, 0, SpriteMeshType.FullRect, new Vector4(border, border, border, border));
+        return _roundedMaskSprite;
     }
     #endregion
 
