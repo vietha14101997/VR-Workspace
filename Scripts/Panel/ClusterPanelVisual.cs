@@ -89,6 +89,10 @@ public class ClusterPanelVisual : MonoBehaviour
     // Cached edge mask
     private Vector4 _edgeMask = Vector4.one;
 
+    // Cluster gradient mapping (for seamless gradient across cluster)
+    private float _clusterUVOffset = 0f;
+    private float _clusterUVScale = 1f;
+
     #region Lifecycle
 
     void Awake()
@@ -157,13 +161,15 @@ public class ClusterPanelVisual : MonoBehaviour
     }
 
     /// <summary>
-    /// Configure position in cluster (updates EdgeMask automatically)
+    /// Configure position in cluster (updates EdgeMask and gradient mapping automatically)
     /// </summary>
     public void SetClusterPosition(int index, int totalCount)
     {
         if (totalCount <= 1)
         {
             Position = PanelPosition.Single;
+            _clusterUVOffset = 0f;
+            _clusterUVScale = 1f;
         }
         else if (index == 0)
         {
@@ -177,6 +183,28 @@ public class ClusterPanelVisual : MonoBehaviour
         {
             Position = PanelPosition.Middle;
         }
+
+        // Calculate gradient mapping for seamless gradient across cluster
+        // Assumes equal-width panels; use SetClusterGradientMapping for custom widths
+        if (totalCount > 1)
+        {
+            _clusterUVScale = 1f / totalCount;
+            _clusterUVOffset = index * _clusterUVScale;
+        }
+
+        ApplyVisualSettings();
+    }
+
+    /// <summary>
+    /// Set custom gradient mapping for panels with different widths
+    /// </summary>
+    /// <param name="uvOffset">Starting position in cluster gradient (0-1)</param>
+    /// <param name="uvScale">Width of this panel relative to total cluster width (0-1)</param>
+    public void SetClusterGradientMapping(float uvOffset, float uvScale)
+    {
+        _clusterUVOffset = uvOffset;
+        _clusterUVScale = uvScale;
+        ApplyVisualSettings();
     }
 
     /// <summary>
@@ -504,6 +532,10 @@ public class ClusterPanelVisual : MonoBehaviour
         _backgroundMaterial.SetVector("_EdgeMask", _edgeMask);
         _backgroundMaterial.SetVector("_ContentBounds", contentBounds);
 
+        // Cluster gradient mapping
+        _backgroundMaterial.SetFloat("_ClusterUVOffset", _clusterUVOffset);
+        _backgroundMaterial.SetFloat("_ClusterUVScale", _clusterUVScale);
+
         // Glass colors (matching RTTMenuFrame)
         _backgroundMaterial.SetColor("_ColorA", glassColorA);
         _backgroundMaterial.SetColor("_ColorB", glassColorB);
@@ -527,6 +559,10 @@ public class ClusterPanelVisual : MonoBehaviour
         _borderMaterial.SetFloat("_Aspect", aspect);
         _borderMaterial.SetVector("_EdgeMask", _edgeMask);
         _borderMaterial.SetVector("_ContentBounds", contentBounds);
+
+        // Cluster gradient mapping
+        _borderMaterial.SetFloat("_ClusterUVOffset", _clusterUVOffset);
+        _borderMaterial.SetFloat("_ClusterUVScale", _clusterUVScale);
 
         // Glow colors (matching RTTMenuFrame)
         _borderMaterial.SetColor("_ColorA", glowColorA);

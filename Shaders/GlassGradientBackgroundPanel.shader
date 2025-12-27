@@ -41,6 +41,10 @@ Shader "Custom/GlassGradientBackgroundPanel"
         [Header(Hover State)]
         _HoverAmount ("Hover Amount", Range(0, 1)) = 0
 
+        [Header(Cluster Positioning)]
+        _ClusterUVOffset ("Cluster UV Offset X", Float) = 0
+        _ClusterUVScale ("Cluster UV Scale X", Float) = 1
+
         // UI Masking
         _StencilComp ("Stencil Comparison", Float) = 8
         _Stencil ("Stencil ID", Float) = 0
@@ -122,6 +126,8 @@ Shader "Custom/GlassGradientBackgroundPanel"
             float _FresnelPower;
             float _FresnelStrength;
             float _HoverAmount;
+            float _ClusterUVOffset;
+            float _ClusterUVScale;
 
             // SDF for rounded box with per-corner radius based on EdgeMask
             // Corners are disabled when their adjacent edges are masked out
@@ -282,6 +288,12 @@ Shader "Custom/GlassGradientBackgroundPanel"
                     contentUV = uv;
                 }
 
+                // Hard clip at hidden edges to prevent overlap with neighbor panels
+                if (_EdgeMask.x < 0.5 && contentUV.x < 0.0) return fixed4(0,0,0,0);
+                if (_EdgeMask.y < 0.5 && contentUV.x > 1.0) return fixed4(0,0,0,0);
+                if (_EdgeMask.w < 0.5 && contentUV.y < 0.0) return fixed4(0,0,0,0);
+                if (_EdgeMask.z < 0.5 && contentUV.y > 1.0) return fixed4(0,0,0,0);
+
                 // SDF with per-edge control
                 float dist = sdRoundedBoxPanel(uv, aspect, _CornerRadius, _EdgePadding, _EdgeMask, _ContentBounds);
 
@@ -298,8 +310,10 @@ Shader "Custom/GlassGradientBackgroundPanel"
                     return fixed4(0, 0, 0, 0);
                 }
 
-                // === GRADIENT COLOR (use content-normalized UV) ===
-                float t = contentUV.x;
+                // === GRADIENT COLOR (use cluster-wide UV for seamless gradient) ===
+                // Map local contentUV.x to cluster-wide position
+                float clusterX = contentUV.x * _ClusterUVScale + _ClusterUVOffset;
+                float t = clusterX;
                 t = saturate(t * t * 1.2); // Slight curve for gradient
                 float angleOffset = (1.0 - contentUV.y) * 0.15;
                 t += angleOffset;

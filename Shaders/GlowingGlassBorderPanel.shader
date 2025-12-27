@@ -48,6 +48,10 @@ Shader "Custom/GlowingGlassBorderPanel"
         [Header(Aspect Ratio)]
         _Aspect ("Aspect Ratio", Float) = 1.0
 
+        [Header(Cluster Positioning)]
+        _ClusterUVOffset ("Cluster UV Offset X", Float) = 0
+        _ClusterUVScale ("Cluster UV Scale X", Float) = 1
+
         // UI Masking
         _StencilComp ("Stencil Comparison", Float) = 8
         _Stencil ("Stencil ID", Float) = 0
@@ -144,6 +148,8 @@ Shader "Custom/GlowingGlassBorderPanel"
             float _LightGlow;
 
             float _Aspect;
+            float _ClusterUVOffset;
+            float _ClusterUVScale;
 
             // SDF for rounded box with per-corner radius based on EdgeMask
             // contentBounds: (left, right, bottom, top) in UV space
@@ -316,9 +322,19 @@ Shader "Custom/GlowingGlassBorderPanel"
                 // Edge border visibility mask - fade out border on masked edges
                 float edgeBorderMask = getEdgeBorderMask(uv, _EdgeMask, _EdgePadding, aspect, _ContentBounds);
 
-                // === GRADIENT (use content-normalized UV) ===
+                // Hard clip at hidden edges to prevent glow overlap with neighbor panels
+                // When an edge is hidden (EdgeMask = 0), clip pixels that extend beyond content bounds
+                if (_EdgeMask.x < 0.5 && contentUV.x < 0.0) return fixed4(0,0,0,0);
+                if (_EdgeMask.y < 0.5 && contentUV.x > 1.0) return fixed4(0,0,0,0);
+                if (_EdgeMask.w < 0.5 && contentUV.y < 0.0) return fixed4(0,0,0,0);
+                if (_EdgeMask.z < 0.5 && contentUV.y > 1.0) return fixed4(0,0,0,0);
+
+                // === GRADIENT (use cluster-wide UV for seamless gradient across panels) ===
+                // Map local contentUV.x to cluster-wide position
+                float clusterX = contentUV.x * _ClusterUVScale + _ClusterUVOffset;
+
                 float angleRad = _GradientAngle * 3.14159 / 180.0;
-                float2 centeredUV = contentUV - 0.5;
+                float2 centeredUV = float2(clusterX, contentUV.y) - 0.5;
                 float2 rotatedUV;
                 rotatedUV.x = centeredUV.x * cos(angleRad) - centeredUV.y * sin(angleRad);
                 rotatedUV.y = centeredUV.x * sin(angleRad) + centeredUV.y * cos(angleRad);
