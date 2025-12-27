@@ -210,7 +210,7 @@ Shader "Custom/GlassGradientBackgroundPanel"
                 return o;
             }
 
-            // Check if we're at a masked edge (should not fade there)
+            // Check if we're at a masked vertical edge (should maintain full alpha for seamless join)
             float getEdgeAlphaOverride(float2 uv, float4 edgeMask, float aspect, float padding, float4 contentBounds)
             {
                 // Remap UV to content-normalized space
@@ -228,41 +228,14 @@ Shader "Custom/GlassGradientBackgroundPanel"
                     contentUV = uv;
                 }
 
-                // Position in aspect-corrected space
-                float2 pos = (contentUV - 0.5) * float2(aspect, 1.0);
+                // Zone near edge where we override alpha (for seamless panel join)
+                float edgeZone = 0.05;
 
-                // Calculate per-edge padding (0 if masked)
-                float padL = padding * edgeMask.x;
-                float padR = padding * edgeMask.y;
-                float padT = padding * edgeMask.z;
-                float padB = padding * edgeMask.w;
+                // If we're at a masked left edge, maintain full alpha
+                if (edgeMask.x < 0.5 && contentUV.x < edgeZone) return 1.0;
 
-                // Box boundaries
-                float left = -0.5 * aspect + padL;
-                float right = 0.5 * aspect - padR;
-                float bottom = -0.5 + padB;
-                float top = 0.5 - padT;
-
-                // Distance from each edge (positive = inside)
-                float dLeft = pos.x - left;
-                float dRight = right - pos.x;
-                float dBottom = pos.y - bottom;
-                float dTop = top - pos.y;
-
-                // Find which edge we're closest to
-                float minHDist = min(dLeft, dRight);
-                float minVDist = min(dBottom, dTop);
-
-                bool onVerticalEdge = minHDist < minVDist;
-                bool closerToLeft = dLeft < dRight;
-                bool closerToRight = dRight < dLeft;
-
-                // If we're at a masked edge, don't fade (return 1 to override alpha)
-                if (onVerticalEdge)
-                {
-                    if (closerToLeft && edgeMask.x < 0.5) return 1.0;
-                    if (closerToRight && edgeMask.y < 0.5) return 1.0;
-                }
+                // If we're at a masked right edge, maintain full alpha
+                if (edgeMask.y < 0.5 && contentUV.x > (1.0 - edgeZone)) return 1.0;
 
                 return 0.0; // Normal fade behavior
             }
@@ -310,25 +283,18 @@ Shader "Custom/GlassGradientBackgroundPanel"
                     return fixed4(0, 0, 0, 0);
                 }
 
-                // Glow fade at hidden edges - prevents overlap that creates artifacts at junctions
-                // Only protect actual corner zones
+                // Fade fresnel/glow at masked edges to prevent artifacts at junctions
                 float glowFade = 1.0;
-                float glowFadeZone = 0.08;
-                float cornerProtectZone = _CornerRadius + _EdgePadding;
+                float glowFadeZone = 0.05;
 
-                float distFromTop = 1.0 - contentUV.y;
-                float distFromBottom = contentUV.y;
-                float cornerProtect = 1.0 - smoothstep(0.0, cornerProtectZone, min(distFromTop, distFromBottom));
-
+                // Fade fresnel at masked vertical edges (no corner protection - clean junction)
                 if (_EdgeMask.x < 0.5)
                 {
-                    float fade = smoothstep(0.0, glowFadeZone, contentUV.x);
-                    glowFade *= lerp(fade, 1.0, cornerProtect);
+                    glowFade *= smoothstep(0.0, glowFadeZone, contentUV.x);
                 }
                 if (_EdgeMask.y < 0.5)
                 {
-                    float fade = smoothstep(0.0, glowFadeZone, 1.0 - contentUV.x);
-                    glowFade *= lerp(fade, 1.0, cornerProtect);
+                    glowFade *= smoothstep(0.0, glowFadeZone, 1.0 - contentUV.x);
                 }
                 if (_EdgeMask.z < 0.5) glowFade *= smoothstep(0.0, glowFadeZone, 1.0 - contentUV.y);
                 if (_EdgeMask.w < 0.5) glowFade *= smoothstep(0.0, glowFadeZone, contentUV.y);

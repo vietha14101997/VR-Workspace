@@ -211,10 +211,8 @@ Shader "Custom/GlowingGlassBorderPanel"
                 return min(max(d.x, d.y), 0.0) + length(max(d, 0.0)) - r;
             }
 
-            // Calculate edge visibility mask based on which side of the box we're on
-            // Hides VERTICAL borders (left/right) when masked
-            // HORIZONTAL borders (top/bottom) always remain visible for seamless cluster
-            // Uses corner protection to prevent triangular cutouts at junction corners
+            // Calculate edge visibility mask - only hides VERTICAL border portions at masked edges
+            // HORIZONTAL borders (top/bottom) extend fully to edge for seamless cluster
             float getEdgeBorderMask(float2 uv, float4 edgeMask, float edgePadding, float aspect, float4 contentBounds, float cornerRadius)
             {
                 // Remap UV to content-normalized space
@@ -234,43 +232,39 @@ Shader "Custom/GlowingGlassBorderPanel"
 
                 // Position in aspect-corrected space
                 float2 pos = (contentUV - 0.5) * float2(aspect, 1.0);
-
-                // Box boundaries (no per-edge padding for mask calculation - use full boundaries)
                 float halfW = 0.5 * aspect;
                 float halfH = 0.5;
 
-                // Distance from vertical edges (left/right)
-                float dLeft = pos.x + halfW;    // Distance from left edge
-                float dRight = halfW - pos.x;   // Distance from right edge
+                // Distance from each edge
+                float dLeft = pos.x + halfW;
+                float dRight = halfW - pos.x;
+                float dTop = halfH - pos.y;
+                float dBottom = pos.y + halfH;
 
-                // Distance from horizontal edges (top/bottom)
-                float dTop = halfH - pos.y;     // Distance from top edge
-                float dBottom = pos.y + halfH;  // Distance from bottom edge
+                // Determine if we're primarily on a vertical edge (left/right) vs horizontal (top/bottom)
+                float minHorizontal = min(dTop, dBottom);
+                float minVertical = min(dLeft, dRight);
 
-                // Corner protection: only protect the actual corner area (where rounded corners are)
-                // This allows vertical border to be hidden except at the corner rounding
-                float cornerProtection = cornerRadius + edgePadding;
-                float nearTopEdge = 1.0 - smoothstep(0.0, cornerProtection, dTop);
-                float nearBottomEdge = 1.0 - smoothstep(0.0, cornerProtection, dBottom);
-                float inCornerZone = max(nearTopEdge, nearBottomEdge);
+                // Only fade when clearly on vertical edge, not at corners where horizontal meets vertical
+                // verticalDominance: 1 = on vertical edge, 0 = on horizontal edge or corner
+                float verticalDominance = smoothstep(0.0, 0.03, minHorizontal - minVertical);
 
-                // Only hide vertical border portions far from corners
                 float mask = 1.0;
+                float fadeZone = 0.08;
 
-                // Left edge masked - hide left vertical portion (but protect corners)
+                // Left edge masked - fade only vertical portion
                 if (edgeMask.x < 0.5)
                 {
-                    float leftFade = 1.0 - smoothstep(0.0, edgePadding * 2.0, dLeft);
-                    leftFade *= (1.0 - inCornerZone); // Don't fade in corner zones
-                    mask *= (1.0 - leftFade);
+                    float leftFade = smoothstep(0.0, fadeZone, contentUV.x);
+                    // Only apply fade where we're on vertical edge, not corners
+                    mask *= lerp(1.0, leftFade, verticalDominance);
                 }
 
-                // Right edge masked - hide right vertical portion (but protect corners)
+                // Right edge masked - fade only vertical portion
                 if (edgeMask.y < 0.5)
                 {
-                    float rightFade = 1.0 - smoothstep(0.0, edgePadding * 2.0, dRight);
-                    rightFade *= (1.0 - inCornerZone); // Don't fade in corner zones
-                    mask *= (1.0 - rightFade);
+                    float rightFade = smoothstep(0.0, fadeZone, 1.0 - contentUV.x);
+                    mask *= lerp(1.0, rightFade, verticalDominance);
                 }
 
                 return mask;
@@ -445,8 +439,19 @@ Shader "Custom/GlowingGlassBorderPanel"
                 finalColor.rgb = lerp(finalColor.rgb, glowColor * 1.2, layer2 * _Layer2Alpha);
                 finalColor.a = max(finalColor.a, layer2 * _Layer2Alpha);
 
+                // White core with extra suppression at masked edges to prevent white line at junction
+                float coreSuppression = 1.0;
+                if (_EdgeMask.x < 0.5)
+                {
+                    coreSuppression *= smoothstep(0.0, 0.05, contentUV.x);
+                }
+                if (_EdgeMask.y < 0.5)
+                {
+                    coreSuppression *= smoothstep(0.0, 0.05, 1.0 - contentUV.x);
+                }
+
                 fixed3 whiteCore = fixed3(1,1,1);
-                float coreMix = layer1 * _Layer1Alpha * 0.5;
+                float coreMix = layer1 * _Layer1Alpha * 0.5 * coreSuppression;
                 finalColor.rgb = lerp(finalColor.rgb, whiteCore, coreMix);
                 finalColor.a = max(finalColor.a, layer1 * _Layer1Alpha);
 
