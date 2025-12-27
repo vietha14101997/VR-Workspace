@@ -21,6 +21,11 @@ Shader "Custom/GlassGradientBackgroundPanel"
         // z = Top edge:    1 = show, 0 = hide
         // w = Bottom edge: 1 = show, 0 = hide
 
+        [Header(Content Bounds for Expanded Quads)]
+        _ContentBounds ("Content Bounds (L,R,B,T)", Vector) = (0,1,0,1)
+        // UV bounds of actual content area when quad is expanded for glow overflow
+        // x = left edge UV, y = right edge UV, z = bottom edge UV, w = top edge UV
+
         [Header(Gradient)]
         _ColorA ("Color A (Cyan)", Color) = (0.3, 0.85, 1, 0.15)
         _ColorB ("Color B (Purple)", Color) = (0.7, 0.4, 1, 0.2)
@@ -107,6 +112,7 @@ Shader "Custom/GlassGradientBackgroundPanel"
             float _EdgePadding;
             float _Aspect;
             float4 _EdgeMask; // L, R, T, B
+            float4 _ContentBounds; // L, R, B, T in UV space
             fixed4 _ColorA;
             fixed4 _ColorB;
             float _GradientOffset;
@@ -119,10 +125,27 @@ Shader "Custom/GlassGradientBackgroundPanel"
 
             // SDF for rounded box with per-corner radius based on EdgeMask
             // Corners are disabled when their adjacent edges are masked out
-            float sdRoundedBoxPanel(float2 uv, float aspect, float radius, float padding, float4 edgeMask)
+            // contentBounds: (left, right, bottom, top) in UV space - defines actual content area
+            float sdRoundedBoxPanel(float2 uv, float aspect, float radius, float padding, float4 edgeMask, float4 contentBounds)
             {
+                // Remap UV from quad space to content-normalized space (0-1)
+                float contentWidth = contentBounds.y - contentBounds.x;
+                float contentHeight = contentBounds.w - contentBounds.z;
+
+                // Handle non-expanded case (contentBounds = 0,1,0,1)
+                float2 contentUV;
+                if (contentWidth > 0.001 && contentHeight > 0.001)
+                {
+                    contentUV.x = (uv.x - contentBounds.x) / contentWidth;
+                    contentUV.y = (uv.y - contentBounds.z) / contentHeight;
+                }
+                else
+                {
+                    contentUV = uv;
+                }
+
                 float2 center = float2(0.5, 0.5);
-                float2 pos = (uv - center);
+                float2 pos = (contentUV - center);
 
                 // Scale to square space for correct corner calculation
                 pos.x *= aspect;
@@ -182,10 +205,25 @@ Shader "Custom/GlassGradientBackgroundPanel"
             }
 
             // Check if we're at a masked edge (should not fade there)
-            float getEdgeAlphaOverride(float2 uv, float4 edgeMask, float aspect, float padding)
+            float getEdgeAlphaOverride(float2 uv, float4 edgeMask, float aspect, float padding, float4 contentBounds)
             {
+                // Remap UV to content-normalized space
+                float contentWidth = contentBounds.y - contentBounds.x;
+                float contentHeight = contentBounds.w - contentBounds.z;
+
+                float2 contentUV;
+                if (contentWidth > 0.001 && contentHeight > 0.001)
+                {
+                    contentUV.x = (uv.x - contentBounds.x) / contentWidth;
+                    contentUV.y = (uv.y - contentBounds.z) / contentHeight;
+                }
+                else
+                {
+                    contentUV = uv;
+                }
+
                 // Position in aspect-corrected space
-                float2 pos = (uv - 0.5) * float2(aspect, 1.0);
+                float2 pos = (contentUV - 0.5) * float2(aspect, 1.0);
 
                 // Calculate per-edge padding (0 if masked)
                 float padL = padding * edgeMask.x;
@@ -230,14 +268,28 @@ Shader "Custom/GlassGradientBackgroundPanel"
                 // Default aspect to 1.0 if not set
                 float aspect = (_Aspect > 0.0) ? _Aspect : 1.0;
 
+                // Calculate content-normalized UV for gradient and effects
+                float contentWidth = _ContentBounds.y - _ContentBounds.x;
+                float contentHeight = _ContentBounds.w - _ContentBounds.z;
+                float2 contentUV;
+                if (contentWidth > 0.001 && contentHeight > 0.001)
+                {
+                    contentUV.x = (uv.x - _ContentBounds.x) / contentWidth;
+                    contentUV.y = (uv.y - _ContentBounds.z) / contentHeight;
+                }
+                else
+                {
+                    contentUV = uv;
+                }
+
                 // SDF with per-edge control
-                float dist = sdRoundedBoxPanel(uv, aspect, _CornerRadius, _EdgePadding, _EdgeMask);
+                float dist = sdRoundedBoxPanel(uv, aspect, _CornerRadius, _EdgePadding, _EdgeMask, _ContentBounds);
 
                 // Alpha mask for rounded corners
                 float alphaMask = 1.0 - smoothstep(-0.01, 0.0, dist);
 
                 // Override alpha at masked edges (no fade at junctions)
-                float edgeOverride = getEdgeAlphaOverride(uv, _EdgeMask, aspect, _EdgePadding);
+                float edgeOverride = getEdgeAlphaOverride(uv, _EdgeMask, aspect, _EdgePadding, _ContentBounds);
                 if (edgeOverride > 0.5 && dist < 0.01) alphaMask = 1.0;
 
                 // Early out for transparent pixels
@@ -246,10 +298,10 @@ Shader "Custom/GlassGradientBackgroundPanel"
                     return fixed4(0, 0, 0, 0);
                 }
 
-                // === GRADIENT COLOR ===
-                float t = uv.x;
+                // === GRADIENT COLOR (use content-normalized UV) ===
+                float t = contentUV.x;
                 t = saturate(t * t * 1.2); // Slight curve for gradient
-                float angleOffset = (1.0 - uv.y) * 0.15;
+                float angleOffset = (1.0 - contentUV.y) * 0.15;
                 t += angleOffset;
                 t = saturate(t);
                 fixed4 gradColor = lerp(_ColorA, _ColorB, t);
@@ -258,8 +310,8 @@ Shader "Custom/GlassGradientBackgroundPanel"
                 float hoverBrightness = 1.0 + _HoverAmount * 0.3;
                 float hoverAlphaBoost = _HoverAmount * 0.1;
 
-                // ========== GLASS EFFECT ==========
-                float2 centerDist = abs(uv - 0.5);
+                // ========== GLASS EFFECT (use content-normalized UV) ==========
+                float2 centerDist = abs(contentUV - 0.5);
                 float centerGlow = 1.0 - saturate(length(centerDist) / 0.5);
                 centerGlow = centerGlow * centerGlow * 0.15;
 

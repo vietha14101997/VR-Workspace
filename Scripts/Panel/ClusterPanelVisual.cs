@@ -451,16 +451,50 @@ public class ClusterPanelVisual : MonoBehaviour
 
     private void ApplyVisualSettings()
     {
-        // Use the expanded quad's aspect ratio, not the original panel's
-        // This ensures shader calculations align with actual quad geometry
-        CalculateExpandedQuadParams(out Vector3 scale, out _);
-        float aspect = scale.x / scale.y;
+        // Use the original panel's aspect ratio (shader handles UV remapping via ContentBounds)
+        float aspect = 1f;
+        if (_panel != null)
+        {
+            aspect = _panel.width / _panel.height;
+        }
 
-        ApplyBackgroundSettings(aspect);
-        ApplyBorderSettings(aspect);
+        // Calculate content bounds in UV space for expanded quads
+        Vector4 contentBounds = CalculateContentBounds();
+
+        ApplyBackgroundSettings(aspect, contentBounds);
+        ApplyBorderSettings(aspect, contentBounds);
     }
 
-    private void ApplyBackgroundSettings(float aspect)
+    /// <summary>
+    /// Calculate the UV bounds of the content area within the expanded quad
+    /// Returns (left, right, bottom, top) in UV space (0-1)
+    /// </summary>
+    private Vector4 CalculateContentBounds()
+    {
+        if (_panel == null) return new Vector4(0, 1, 0, 1);
+
+        float baseWidth = _panel.width;
+        float baseHeight = _panel.height;
+
+        // Expansion per edge (only expand on visible edges)
+        float expandLeft = _edgeMask.x > 0.5f ? glowExpansion : 0f;
+        float expandRight = _edgeMask.y > 0.5f ? glowExpansion : 0f;
+        float expandTop = _edgeMask.z > 0.5f ? glowExpansion : 0f;
+        float expandBottom = _edgeMask.w > 0.5f ? glowExpansion : 0f;
+
+        float totalWidth = baseWidth + expandLeft + expandRight;
+        float totalHeight = baseHeight + expandTop + expandBottom;
+
+        // Content bounds in UV space
+        float contentLeft = expandLeft / totalWidth;
+        float contentRight = 1f - expandRight / totalWidth;
+        float contentBottom = expandBottom / totalHeight;
+        float contentTop = 1f - expandTop / totalHeight;
+
+        return new Vector4(contentLeft, contentRight, contentBottom, contentTop);
+    }
+
+    private void ApplyBackgroundSettings(float aspect, Vector4 contentBounds)
     {
         if (_backgroundMaterial == null) return;
 
@@ -468,6 +502,7 @@ public class ClusterPanelVisual : MonoBehaviour
         _backgroundMaterial.SetFloat("_EdgePadding", edgePadding);
         _backgroundMaterial.SetFloat("_Aspect", aspect);
         _backgroundMaterial.SetVector("_EdgeMask", _edgeMask);
+        _backgroundMaterial.SetVector("_ContentBounds", contentBounds);
 
         // Glass colors (matching RTTMenuFrame)
         _backgroundMaterial.SetColor("_ColorA", glassColorA);
@@ -482,7 +517,7 @@ public class ClusterPanelVisual : MonoBehaviour
         _backgroundMaterial.SetFloat("_CyanRatio", 0.7f);
     }
 
-    private void ApplyBorderSettings(float aspect)
+    private void ApplyBorderSettings(float aspect, Vector4 contentBounds)
     {
         if (_borderMaterial == null) return;
 
@@ -491,6 +526,7 @@ public class ClusterPanelVisual : MonoBehaviour
         _borderMaterial.SetFloat("_BorderWidth", borderWidth);
         _borderMaterial.SetFloat("_Aspect", aspect);
         _borderMaterial.SetVector("_EdgeMask", _edgeMask);
+        _borderMaterial.SetVector("_ContentBounds", contentBounds);
 
         // Glow colors (matching RTTMenuFrame)
         _borderMaterial.SetColor("_ColorA", glowColorA);

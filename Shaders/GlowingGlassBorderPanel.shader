@@ -21,6 +21,10 @@ Shader "Custom/GlowingGlassBorderPanel"
         // z = Top edge:    1 = show, 0 = hide
         // w = Bottom edge: 1 = show, 0 = hide
 
+        [Header(Content Bounds for Expanded Quads)]
+        _ContentBounds ("Content Bounds (L,R,B,T)", Vector) = (0,1,0,1)
+        // UV bounds of actual content area when quad is expanded for glow overflow
+
         [Header(Multi Layer Glow)]
         _Layer1Width ("Layer 1 (Inner)", Range(0.005, 0.05)) = 0.015
         _Layer1Alpha ("Layer 1 Alpha", Range(0, 2)) = 1.2
@@ -115,6 +119,7 @@ Shader "Custom/GlowingGlassBorderPanel"
             float _BorderWidth;
             float _CornerRadius;
             float4 _EdgeMask; // L, R, T, B
+            float4 _ContentBounds; // L, R, B, T in UV space
 
             float _Layer1Width;
             float _Layer1Alpha;
@@ -141,10 +146,26 @@ Shader "Custom/GlowingGlassBorderPanel"
             float _Aspect;
 
             // SDF for rounded box with per-corner radius based on EdgeMask
-            float sdRoundedBoxPanel(float2 uv, float aspect, float radius, float padding, float4 edgeMask)
+            // contentBounds: (left, right, bottom, top) in UV space
+            float sdRoundedBoxPanel(float2 uv, float aspect, float radius, float padding, float4 edgeMask, float4 contentBounds)
             {
+                // Remap UV from quad space to content-normalized space (0-1)
+                float contentWidth = contentBounds.y - contentBounds.x;
+                float contentHeight = contentBounds.w - contentBounds.z;
+
+                float2 contentUV;
+                if (contentWidth > 0.001 && contentHeight > 0.001)
+                {
+                    contentUV.x = (uv.x - contentBounds.x) / contentWidth;
+                    contentUV.y = (uv.y - contentBounds.z) / contentHeight;
+                }
+                else
+                {
+                    contentUV = uv;
+                }
+
                 float2 center = float2(0.5, 0.5);
-                float2 pos = (uv - center);
+                float2 pos = (contentUV - center);
                 pos.x *= aspect;
 
                 // Per-edge padding
@@ -187,10 +208,25 @@ Shader "Custom/GlowingGlassBorderPanel"
             // Calculate edge visibility mask based on which side of the box we're on
             // Hides VERTICAL borders (left/right) when masked
             // HORIZONTAL borders (top/bottom) always remain visible for seamless cluster
-            float getEdgeBorderMask(float2 uv, float4 edgeMask, float edgePadding, float aspect)
+            float getEdgeBorderMask(float2 uv, float4 edgeMask, float edgePadding, float aspect, float4 contentBounds)
             {
+                // Remap UV to content-normalized space
+                float contentWidth = contentBounds.y - contentBounds.x;
+                float contentHeight = contentBounds.w - contentBounds.z;
+
+                float2 contentUV;
+                if (contentWidth > 0.001 && contentHeight > 0.001)
+                {
+                    contentUV.x = (uv.x - contentBounds.x) / contentWidth;
+                    contentUV.y = (uv.y - contentBounds.z) / contentHeight;
+                }
+                else
+                {
+                    contentUV = uv;
+                }
+
                 // Position in aspect-corrected space
-                float2 pos = (uv - 0.5) * float2(aspect, 1.0);
+                float2 pos = (contentUV - 0.5) * float2(aspect, 1.0);
 
                 // Calculate per-edge padding (0 if masked)
                 float padL = edgePadding * edgeMask.x;
@@ -260,15 +296,29 @@ Shader "Custom/GlowingGlassBorderPanel"
 
                 float aspect = (_Aspect > 0.0) ? _Aspect : 1.0;
 
+                // Calculate content-normalized UV for effects
+                float contentWidth = _ContentBounds.y - _ContentBounds.x;
+                float contentHeight = _ContentBounds.w - _ContentBounds.z;
+                float2 contentUV;
+                if (contentWidth > 0.001 && contentHeight > 0.001)
+                {
+                    contentUV.x = (uv.x - _ContentBounds.x) / contentWidth;
+                    contentUV.y = (uv.y - _ContentBounds.z) / contentHeight;
+                }
+                else
+                {
+                    contentUV = uv;
+                }
+
                 // SDF with per-edge control
-                float dist = sdRoundedBoxPanel(uv, aspect, _CornerRadius, _EdgePadding, _EdgeMask);
+                float dist = sdRoundedBoxPanel(uv, aspect, _CornerRadius, _EdgePadding, _EdgeMask, _ContentBounds);
 
                 // Edge border visibility mask - fade out border on masked edges
-                float edgeBorderMask = getEdgeBorderMask(uv, _EdgeMask, _EdgePadding, aspect);
+                float edgeBorderMask = getEdgeBorderMask(uv, _EdgeMask, _EdgePadding, aspect, _ContentBounds);
 
-                // === GRADIENT ===
+                // === GRADIENT (use content-normalized UV) ===
                 float angleRad = _GradientAngle * 3.14159 / 180.0;
-                float2 centeredUV = uv - 0.5;
+                float2 centeredUV = contentUV - 0.5;
                 float2 rotatedUV;
                 rotatedUV.x = centeredUV.x * cos(angleRad) - centeredUV.y * sin(angleRad);
                 rotatedUV.y = centeredUV.x * sin(angleRad) + centeredUV.y * cos(angleRad);
@@ -308,17 +358,17 @@ Shader "Custom/GlowingGlassBorderPanel"
                 layer3 *= edgeBorderMask;
                 layer4 *= edgeBorderMask;
 
-                // === SHIMMER EFFECT ===
+                // === SHIMMER EFFECT (use content-normalized UV) ===
                 float time = _Time.y * _ShimmerSpeed;
                 float shimmerPos = frac(time);
 
-                // Calculate position along top and bottom edges
-                float topDist = abs(uv.y - (1.0 - _EdgePadding));
-                float bottomDist = abs(uv.y - _EdgePadding);
+                // Calculate position along top and bottom edges (using contentUV)
+                float topDist = abs(contentUV.y - (1.0 - _EdgePadding));
+                float bottomDist = abs(contentUV.y - _EdgePadding);
                 float isOnHorizontalEdge = step(topDist, 0.02) + step(bottomDist, 0.02);
 
                 // Shimmer light moving along horizontal edges
-                float shimmerX = abs(uv.x - shimmerPos);
+                float shimmerX = abs(contentUV.x - shimmerPos);
                 shimmerX = min(shimmerX, 1.0 - shimmerX); // Wrap around
                 float shimmerLight = 1.0 - saturate(shimmerX / _LightSize);
                 shimmerLight = pow(shimmerLight, 2.0) * isOnHorizontalEdge * _ShimmerIntensity;
@@ -329,8 +379,8 @@ Shader "Custom/GlowingGlassBorderPanel"
 
                 // Apply edge mask to shimmer (don't shimmer on hidden edges)
                 float shimmerMask = 1.0;
-                if (_EdgeMask.z < 0.5) shimmerMask *= smoothstep(0.0, 0.1, 1.0 - uv.y); // top hidden
-                if (_EdgeMask.w < 0.5) shimmerMask *= smoothstep(0.0, 0.1, uv.y); // bottom hidden
+                if (_EdgeMask.z < 0.5) shimmerMask *= smoothstep(0.0, 0.1, 1.0 - contentUV.y); // top hidden
+                if (_EdgeMask.w < 0.5) shimmerMask *= smoothstep(0.0, 0.1, contentUV.y); // bottom hidden
                 shimmerLight *= shimmerMask;
                 shimmerGlow *= shimmerMask;
 
