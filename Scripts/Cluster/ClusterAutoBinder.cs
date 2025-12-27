@@ -12,7 +12,7 @@ public class ClusterAutoBinder : MonoBehaviour
 {
     public string serverBase = "http://192.168.1.9:8288";
     public WorldPanelClusterRig rig;
-    
+
     // Signal path is auto-generated from configuration
     private string signalPath;
 
@@ -28,6 +28,10 @@ public class ClusterAutoBinder : MonoBehaviour
     [Tooltip("Frames per second")]
     public int fps = 30;
 
+    [Header("Auto Start")]
+    [Tooltip("If true, automatically start streaming on Start(). If false, call StartStreaming() manually.")]
+    public bool autoStart = true;
+
     [Header("Layout Info (auto-calculated, not shown)")]
     private int frameWidth = 3840;
     private int frameHeight = 1080;
@@ -35,15 +39,40 @@ public class ClusterAutoBinder : MonoBehaviour
     private int cellHeight = 1080;
 
     private MultiPCStreamClient _multiPCClient;  // N separate PeerConnections for multi-track mode
+    private bool _isStreaming = false;
+
+    public bool IsStreaming => _isStreaming;
 
     void Start()
     {
+        if (autoStart)
+        {
+            StartStreaming();
+        }
+    }
+
+    /// <summary>
+    /// Start streaming with current configuration.
+    /// Can be called manually after configuring the binder properties.
+    /// </summary>
+    public void StartStreaming()
+    {
+        if (_isStreaming)
+        {
+            Debug.LogWarning("[ClusterAutoBinder] Already streaming!");
+            return;
+        }
+
         if (!rig) rig = GetComponent<WorldPanelClusterRig>();
-        if (!rig) return;
-        
+        if (!rig)
+        {
+            Debug.LogError("[ClusterAutoBinder] No WorldPanelClusterRig found!");
+            return;
+        }
+
         // Generate signal path from configuration
         GenerateSignalPath();
-        
+
         // Calculate layout based on configuration
         CalculateLayoutInfo();
 
@@ -51,11 +80,33 @@ public class ClusterAutoBinder : MonoBehaviour
         Debug.Log($"[ClusterAutoBinder] Signal: {signalPath}");
         Debug.Log($"[ClusterAutoBinder] Layout: frame={frameWidth}x{frameHeight}, cell={cellWidth}x{cellHeight}");
 
-        // Build panels based on monitor count before binding
-        rig.BuildWithPanelCount(monitorCount);
+        // Build panels based on monitor count before binding (if not already built)
+        if (rig.panels == null || rig.panels.Count != monitorCount)
+        {
+            rig.BuildWithPanelCount(monitorCount);
+        }
 
         // Multi-track mode is now default and only option
         BindPanelsMultiTrack();
+
+        _isStreaming = true;
+    }
+
+    /// <summary>
+    /// Stop streaming and cleanup.
+    /// </summary>
+    public void StopStreaming()
+    {
+        if (!_isStreaming) return;
+
+        if (_multiPCClient != null)
+        {
+            Destroy(_multiPCClient);
+            _multiPCClient = null;
+        }
+
+        _isStreaming = false;
+        Debug.Log("[ClusterAutoBinder] Streaming stopped");
     }
 
     void BindPanelsMultiTrack()
@@ -83,7 +134,7 @@ public class ClusterAutoBinder : MonoBehaviour
 
     void OnDestroy()
     {
-        if (_multiPCClient) Destroy(_multiPCClient);
+        StopStreaming();
     }
 
     void GenerateSignalPath()

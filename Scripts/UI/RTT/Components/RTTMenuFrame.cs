@@ -89,6 +89,12 @@ public class RTTMenuFrame : RTTCanvasBase
     [SerializeField] private Sprite iconFiles;
     [SerializeField] private Sprite iconSettings;
     [SerializeField] private Sprite iconQuit;
+
+    [Header("Remote Desktop Streaming")]
+    [Tooltip("Prefab for WorldPanelClusterRig (if null, will create dynamically)")]
+    [SerializeField] private WorldPanelClusterRig clusterRigPrefab;
+    [Tooltip("Reference to existing ClusterRig in scene (optional)")]
+    [SerializeField] private WorldPanelClusterRig clusterRigInstance;
     #endregion
 
     #region Private Fields
@@ -786,8 +792,133 @@ public class RTTMenuFrame : RTTCanvasBase
     {
         if (_remoteMenuInstance == null) return;
 
-        Debug.Log($"[RTTMenuFrame] Connect clicked - Host: {_remoteMenuInstance.Host}, Port: {_remoteMenuInstance.Port}");
-        // TODO: Implement actual connection logic
+        // Get connection settings from menu
+        string host = _remoteMenuInstance.Host;
+        string port = _remoteMenuInstance.Port;
+        int monitorCount = _remoteMenuInstance.MonitorIndex + 1; // MonitorIndex is 0-based
+        string resolution = _remoteMenuInstance.Resolution;
+        string bitrate = _remoteMenuInstance.Bitrate;
+        string fps = _remoteMenuInstance.FPS;
+
+        Debug.Log($"[RTTMenuFrame] Connect clicked - Host: {host}, Port: {port}, Monitors: {monitorCount}");
+        Debug.Log($"[RTTMenuFrame] Settings - Resolution: {resolution}, Bitrate: {bitrate}, FPS: {fps}");
+
+        // Create or configure ClusterRig
+        StartRemoteDesktopStream(host, port, monitorCount, resolution, bitrate, fps);
+    }
+
+    /// <summary>
+    /// Start remote desktop streaming with the specified settings.
+    /// Creates ClusterRig and ClusterAutoBinder to handle multi-monitor streaming.
+    /// </summary>
+    private void StartRemoteDesktopStream(string host, string port, int monitorCount, string resolution, string bitrate, string fps)
+    {
+        // Parse resolution (e.g., "1920 x 1080" -> width=1920, height=1080)
+        int resWidth = 1920, resHeight = 1080;
+        if (!string.IsNullOrEmpty(resolution))
+        {
+            var parts = resolution.Replace(" ", "").Split('x');
+            if (parts.Length == 2)
+            {
+                int.TryParse(parts[0], out resWidth);
+                int.TryParse(parts[1], out resHeight);
+            }
+        }
+
+        // Parse bitrate (e.g., "20 Mbps" -> 20000 kbps)
+        int bitrateKbps = 20000;
+        if (!string.IsNullOrEmpty(bitrate))
+        {
+            var bitrateNum = System.Text.RegularExpressions.Regex.Match(bitrate, @"\d+");
+            if (bitrateNum.Success)
+            {
+                bitrateKbps = int.Parse(bitrateNum.Value) * 1000;
+            }
+        }
+
+        // Parse FPS (e.g., "60 FPS" -> 60)
+        int fpsValue = 60;
+        if (!string.IsNullOrEmpty(fps))
+        {
+            var fpsNum = System.Text.RegularExpressions.Regex.Match(fps, @"\d+");
+            if (fpsNum.Success)
+            {
+                fpsValue = int.Parse(fpsNum.Value);
+            }
+        }
+
+        // Get or create ClusterRig
+        WorldPanelClusterRig rig = GetOrCreateClusterRig();
+        if (rig == null)
+        {
+            Debug.LogError("[RTTMenuFrame] Failed to create ClusterRig!");
+            return;
+        }
+
+        // Build cluster with the specified monitor count
+        rig.BuildWithPanelCount(monitorCount);
+
+        // Get or create ClusterAutoBinder
+        ClusterAutoBinder binder = rig.GetComponent<ClusterAutoBinder>();
+        if (binder == null)
+        {
+            binder = rig.gameObject.AddComponent<ClusterAutoBinder>();
+        }
+
+        // Stop existing stream if running
+        if (binder.IsStreaming)
+        {
+            binder.StopStreaming();
+        }
+
+        // Configure binder (disable auto-start since we'll call StartStreaming manually)
+        binder.autoStart = false;
+        binder.serverBase = $"http://{host}:{port}";
+        binder.rig = rig;
+        binder.monitorCount = monitorCount;
+        binder.resolutionWidth = resWidth;
+        binder.resolutionHeight = resHeight;
+        binder.bitrateKbps = bitrateKbps;
+        binder.fps = fpsValue;
+
+        Debug.Log($"[RTTMenuFrame] ClusterRig configured: {monitorCount} panels, {resWidth}x{resHeight}, {bitrateKbps}kbps, {fpsValue}fps");
+        Debug.Log($"[RTTMenuFrame] Server: {binder.serverBase}");
+
+        // Start streaming
+        binder.StartStreaming();
+
+        // Hide menu frame (optional - can show/hide based on user preference)
+        // gameObject.SetActive(false);
+    }
+
+    /// <summary>
+    /// Get existing ClusterRig or create a new one.
+    /// </summary>
+    private WorldPanelClusterRig GetOrCreateClusterRig()
+    {
+        // Use existing instance if available
+        if (clusterRigInstance != null)
+        {
+            return clusterRigInstance;
+        }
+
+        // Instantiate from prefab if available
+        if (clusterRigPrefab != null)
+        {
+            clusterRigInstance = Instantiate(clusterRigPrefab);
+            clusterRigInstance.name = "WorldPanelClusterRig";
+            return clusterRigInstance;
+        }
+
+        // Create dynamically
+        GameObject rigObj = new GameObject("WorldPanelClusterRig");
+        clusterRigInstance = rigObj.AddComponent<WorldPanelClusterRig>();
+
+        // Position the rig in front of the menu frame
+        rigObj.transform.position = transform.position + transform.forward * 2f;
+        rigObj.transform.rotation = transform.rotation;
+
+        return clusterRigInstance;
     }
 
     /// <summary>
