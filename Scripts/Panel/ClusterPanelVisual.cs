@@ -77,6 +77,10 @@ public class ClusterPanelVisual : MonoBehaviour
     [Tooltip("Extra size (in meters) added to quads for glow overflow")]
     [SerializeField] private float glowExpansion = 0.05f;
 
+    [Header("Junction Overlap")]
+    [Tooltip("Overlap amount (in meters) at panel junctions for seamless appearance")]
+    [SerializeField] private float junctionOverlap = 0.01f;
+
     // Runtime references
     private Material _backgroundMaterial;
     private Material _borderMaterial;
@@ -266,6 +270,15 @@ public class ClusterPanelVisual : MonoBehaviour
     }
 
     /// <summary>
+    /// Update junction overlap (in meters) for seamless panel junctions
+    /// </summary>
+    public void SetJunctionOverlap(float overlap)
+    {
+        junctionOverlap = overlap;
+        UpdateSize();
+    }
+
+    /// <summary>
     /// Rebuild all visuals
     /// </summary>
     public void Rebuild()
@@ -303,15 +316,19 @@ public class ClusterPanelVisual : MonoBehaviour
 
     /// <summary>
     /// Calculate expanded quad size and position offset based on EdgeMask
+    /// On visible edges: expand by glowExpansion for glow effect
+    /// On masked edges: add junctionOverlap for seamless panel junctions
     /// </summary>
     private void CalculateExpandedQuadParams(out Vector3 scale, out Vector3 offset)
     {
         float baseWidth = _panel != null ? _panel.width : 1f;
         float baseHeight = _panel != null ? _panel.height : 1f;
 
-        // Expansion per edge (only expand on visible edges)
-        float expandLeft = _edgeMask.x > 0.5f ? glowExpansion : 0f;
-        float expandRight = _edgeMask.y > 0.5f ? glowExpansion : 0f;
+        // Expansion per edge:
+        // - Visible edges (mask=1): expand by glowExpansion for glow effect
+        // - Masked edges (mask=0): add junctionOverlap so adjacent panels overlap
+        float expandLeft = _edgeMask.x > 0.5f ? glowExpansion : junctionOverlap;
+        float expandRight = _edgeMask.y > 0.5f ? glowExpansion : junctionOverlap;
         float expandTop = _edgeMask.z > 0.5f ? glowExpansion : 0f;
         float expandBottom = _edgeMask.w > 0.5f ? glowExpansion : 0f;
 
@@ -504,9 +521,11 @@ public class ClusterPanelVisual : MonoBehaviour
         float baseWidth = _panel.width;
         float baseHeight = _panel.height;
 
-        // Expansion per edge (only expand on visible edges)
-        float expandLeft = _edgeMask.x > 0.5f ? glowExpansion : 0f;
-        float expandRight = _edgeMask.y > 0.5f ? glowExpansion : 0f;
+        // Expansion per edge (matches CalculateExpandedQuadParams)
+        // - Visible edges: glowExpansion for glow effect
+        // - Masked edges: junctionOverlap for seamless junction
+        float expandLeft = _edgeMask.x > 0.5f ? glowExpansion : junctionOverlap;
+        float expandRight = _edgeMask.y > 0.5f ? glowExpansion : junctionOverlap;
         float expandTop = _edgeMask.z > 0.5f ? glowExpansion : 0f;
         float expandBottom = _edgeMask.w > 0.5f ? glowExpansion : 0f;
 
@@ -547,6 +566,10 @@ public class ClusterPanelVisual : MonoBehaviour
         _backgroundMaterial.SetFloat("_GradientOffset", 0f);
         _backgroundMaterial.SetFloat("_GradientAngle", gradientAngle);
         _backgroundMaterial.SetFloat("_CyanRatio", 0.7f);
+
+        // Content margins for edge fading
+        _backgroundMaterial.SetFloat("_MarginH", contentMarginHorizontal);
+        _backgroundMaterial.SetFloat("_MarginV", contentMarginVertical);
     }
 
     private void ApplyBorderSettings(float aspect, Vector4 contentBounds)
@@ -582,6 +605,10 @@ public class ClusterPanelVisual : MonoBehaviour
         _borderMaterial.SetFloat("_GlassAlpha", 0f);
         _borderMaterial.SetColor("_GlassTint", new Color(0.9f, 0.95f, 1f, 0f));
         _borderMaterial.SetFloat("_GradientAngle", gradientAngle);
+
+        // Content margins for edge fading
+        _borderMaterial.SetFloat("_MarginH", contentMarginHorizontal);
+        _borderMaterial.SetFloat("_MarginV", contentMarginVertical);
     }
 
     #endregion

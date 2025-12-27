@@ -45,6 +45,10 @@ Shader "Custom/GlassGradientBackgroundPanel"
         _ClusterUVOffset ("Cluster UV Offset X", Float) = 0
         _ClusterUVScale ("Cluster UV Scale X", Float) = 1
 
+        [Header(Content Margins)]
+        _MarginH ("Horizontal Margin", Float) = 0.04
+        _MarginV ("Vertical Margin", Float) = 0.045
+
         // UI Masking
         _StencilComp ("Stencil Comparison", Float) = 8
         _Stencil ("Stencil ID", Float) = 0
@@ -128,6 +132,8 @@ Shader "Custom/GlassGradientBackgroundPanel"
             float _HoverAmount;
             float _ClusterUVOffset;
             float _ClusterUVScale;
+            float _MarginH;
+            float _MarginV;
 
             // SDF for rounded box with per-corner radius based on EdgeMask
             // Corners are disabled when their adjacent edges are masked out
@@ -266,43 +272,35 @@ Shader "Custom/GlassGradientBackgroundPanel"
                     contentUV = uv;
                 }
 
-                // Hard clip at hidden edges - clip exactly at content boundary
-                if (_EdgeMask.x < 0.5 && contentUV.x < 0.0) return fixed4(0,0,0,0);
-                if (_EdgeMask.y < 0.5 && contentUV.x > 1.0) return fixed4(0,0,0,0);
-                if (_EdgeMask.w < 0.5 && contentUV.y < 0.0) return fixed4(0,0,0,0);
-                if (_EdgeMask.z < 0.5 && contentUV.y > 1.0) return fixed4(0,0,0,0);
-
                 // SDF with per-edge control
+                // On masked edges: padding=0, cornerRadius=0, so shape extends to full boundary
                 float dist = sdRoundedBoxPanel(uv, aspect, _CornerRadius, _EdgePadding, _EdgeMask, _ContentBounds);
 
-                // Alpha mask for rounded corners
-                float alphaMask = 1.0 - smoothstep(-0.01, 0.0, dist);
+                // Alpha mask for rounded corners (SDF handles masked edges naturally)
+                float alphaMask = 1.0 - smoothstep(-0.005, 0.005, dist);
 
-                // Override alpha at masked edges (no fade at junctions)
-                float edgeOverride = getEdgeAlphaOverride(uv, _EdgeMask, aspect, _EdgePadding, _ContentBounds);
-                if (edgeOverride > 0.5) alphaMask = 1.0;
+                // Hard clip from panel edge to Board edge on masked edges
+                // Board boundaries in contentUV space
+                float boardLeft = _MarginH;
+                float boardRight = 1.0 - _MarginH;
+
+                // On masked left edge, clip to 0 before boardLeft
+                if (_EdgeMask.x < 0.5 && contentUV.x < boardLeft)
+                {
+                    alphaMask = 0;
+                }
+
+                // On masked right edge, clip to 0 after boardRight
+                if (_EdgeMask.y < 0.5 && contentUV.x > boardRight)
+                {
+                    alphaMask = 0;
+                }
 
                 // Early out for transparent pixels
                 if (alphaMask <= 0.001)
                 {
                     return fixed4(0, 0, 0, 0);
                 }
-
-                // Fade fresnel/glow at masked edges to prevent artifacts at junctions
-                float glowFade = 1.0;
-                float glowFadeZone = 0.05;
-
-                // Fade fresnel at masked vertical edges (no corner protection - clean junction)
-                if (_EdgeMask.x < 0.5)
-                {
-                    glowFade *= smoothstep(0.0, glowFadeZone, contentUV.x);
-                }
-                if (_EdgeMask.y < 0.5)
-                {
-                    glowFade *= smoothstep(0.0, glowFadeZone, 1.0 - contentUV.x);
-                }
-                if (_EdgeMask.z < 0.5) glowFade *= smoothstep(0.0, glowFadeZone, 1.0 - contentUV.y);
-                if (_EdgeMask.w < 0.5) glowFade *= smoothstep(0.0, glowFadeZone, contentUV.y);
 
                 // === GRADIENT COLOR (use cluster-wide UV for seamless gradient) ===
                 // Map local contentUV.x to cluster-wide position
@@ -324,7 +322,7 @@ Shader "Custom/GlassGradientBackgroundPanel"
                 centerGlow = centerGlow * centerGlow * 0.15;
 
                 float edgeFactor = 1.0 - saturate(abs(dist) / 0.2);
-                float fresnel = edgeFactor * edgeFactor * _FresnelStrength * glowFade;
+                float fresnel = edgeFactor * edgeFactor * _FresnelStrength;
 
                 fixed4 finalColor = gradColor;
                 finalColor.a = _GlassAlpha + gradColor.a * 0.5 + hoverAlphaBoost;

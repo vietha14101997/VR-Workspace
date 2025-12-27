@@ -52,6 +52,10 @@ Shader "Custom/GlowingGlassBorderPanel"
         _ClusterUVOffset ("Cluster UV Offset X", Float) = 0
         _ClusterUVScale ("Cluster UV Scale X", Float) = 1
 
+        [Header(Content Margins)]
+        _MarginH ("Horizontal Margin", Float) = 0.04
+        _MarginV ("Vertical Margin", Float) = 0.045
+
         // UI Masking
         _StencilComp ("Stencil Comparison", Float) = 8
         _Stencil ("Stencil ID", Float) = 0
@@ -150,6 +154,8 @@ Shader "Custom/GlowingGlassBorderPanel"
             float _Aspect;
             float _ClusterUVOffset;
             float _ClusterUVScale;
+            float _MarginH;
+            float _MarginV;
 
             // SDF for rounded box with per-corner radius based on EdgeMask
             // contentBounds: (left, right, bottom, top) in UV space
@@ -211,9 +217,9 @@ Shader "Custom/GlowingGlassBorderPanel"
                 return min(max(d.x, d.y), 0.0) + length(max(d, 0.0)) - r;
             }
 
-            // Calculate edge visibility mask - only hides VERTICAL border portions at masked edges
-            // HORIZONTAL borders (top/bottom) extend fully to edge for seamless cluster
-            float getEdgeBorderMask(float2 uv, float4 edgeMask, float edgePadding, float aspect, float4 contentBounds, float cornerRadius)
+            // Calculate edge visibility mask - hard clips from panel edge to Board edge on masked edges
+            // Uses margin values to determine Board boundary
+            float getEdgeBorderMask(float2 uv, float4 edgeMask, float edgePadding, float aspect, float4 contentBounds, float cornerRadius, float marginH, float marginV)
             {
                 // Remap UV to content-normalized space
                 float contentWidth = contentBounds.y - contentBounds.x;
@@ -230,44 +236,23 @@ Shader "Custom/GlowingGlassBorderPanel"
                     contentUV = uv;
                 }
 
-                // Position in aspect-corrected space
-                float2 pos = (contentUV - 0.5) * float2(aspect, 1.0);
-                float halfW = 0.5 * aspect;
-                float halfH = 0.5;
+                // Board boundaries in contentUV space
+                float boardLeft = marginH;
+                float boardRight = 1.0 - marginH;
 
-                // Distance from each edge
-                float dLeft = pos.x + halfW;
-                float dRight = halfW - pos.x;
-                float dTop = halfH - pos.y;
-                float dBottom = pos.y + halfH;
-
-                // Determine if we're primarily on a vertical edge (left/right) vs horizontal (top/bottom)
-                float minHorizontal = min(dTop, dBottom);
-                float minVertical = min(dLeft, dRight);
-
-                // Only fade when clearly on vertical edge, not at corners where horizontal meets vertical
-                // verticalDominance: 1 = on vertical edge, 0 = on horizontal edge or corner
-                float verticalDominance = smoothstep(0.0, 0.03, minHorizontal - minVertical);
-
-                float mask = 1.0;
-                float fadeZone = 0.08;
-
-                // Left edge masked - fade only vertical portion
-                if (edgeMask.x < 0.5)
+                // On masked left edge, hard clip before boardLeft
+                if (edgeMask.x < 0.5 && contentUV.x < boardLeft)
                 {
-                    float leftFade = smoothstep(0.0, fadeZone, contentUV.x);
-                    // Only apply fade where we're on vertical edge, not corners
-                    mask *= lerp(1.0, leftFade, verticalDominance);
+                    return 0.0;
                 }
 
-                // Right edge masked - fade only vertical portion
-                if (edgeMask.y < 0.5)
+                // On masked right edge, hard clip after boardRight
+                if (edgeMask.y < 0.5 && contentUV.x > boardRight)
                 {
-                    float rightFade = smoothstep(0.0, fadeZone, 1.0 - contentUV.x);
-                    mask *= lerp(1.0, rightFade, verticalDominance);
+                    return 0.0;
                 }
 
-                return mask;
+                return 1.0;
             }
 
             v2f vert(appdata v)
@@ -304,50 +289,8 @@ Shader "Custom/GlowingGlassBorderPanel"
                 }
 
                 // SDF with per-edge control
+                // On masked edges: padding=0, cornerRadius=0, so border extends to full boundary
                 float dist = sdRoundedBoxPanel(uv, aspect, _CornerRadius, _EdgePadding, _EdgeMask, _ContentBounds);
-
-                // Edge border visibility mask - fade out border on masked edges
-                float edgeBorderMask = getEdgeBorderMask(uv, _EdgeMask, _EdgePadding, aspect, _ContentBounds, _CornerRadius);
-
-                // Hard clip at hidden edges - clip exactly at content boundary
-                if (_EdgeMask.x < 0.5 && contentUV.x < 0.0) return fixed4(0,0,0,0);
-                if (_EdgeMask.y < 0.5 && contentUV.x > 1.0) return fixed4(0,0,0,0);
-                if (_EdgeMask.w < 0.5 && contentUV.y < 0.0) return fixed4(0,0,0,0);
-                if (_EdgeMask.z < 0.5 && contentUV.y > 1.0) return fixed4(0,0,0,0);
-
-                // Glow fade at hidden edges - prevents overlap that creates triangle artifacts
-                // Only protect actual corner zones (where rounded corners are)
-                float glowFade = 1.0;
-                float glowFadeZone = 0.08; // UV zone where glow fades out near hidden edges
-                float cornerProtectZone = _CornerRadius + _EdgePadding; // Match actual corner size
-
-                // Calculate distance from top/bottom for corner protection
-                float distFromTop = 1.0 - contentUV.y;
-                float distFromBottom = contentUV.y;
-                float cornerProtect = 1.0 - smoothstep(0.0, cornerProtectZone, min(distFromTop, distFromBottom));
-
-                // Fade glow near hidden left edge (but not at corners)
-                if (_EdgeMask.x < 0.5)
-                {
-                    float fade = smoothstep(0.0, glowFadeZone, contentUV.x);
-                    glowFade *= lerp(fade, 1.0, cornerProtect);
-                }
-                // Fade glow near hidden right edge (but not at corners)
-                if (_EdgeMask.y < 0.5)
-                {
-                    float fade = smoothstep(0.0, glowFadeZone, 1.0 - contentUV.x);
-                    glowFade *= lerp(fade, 1.0, cornerProtect);
-                }
-                // Fade glow near hidden top edge
-                if (_EdgeMask.z < 0.5)
-                {
-                    glowFade *= smoothstep(0.0, glowFadeZone, 1.0 - contentUV.y);
-                }
-                // Fade glow near hidden bottom edge
-                if (_EdgeMask.w < 0.5)
-                {
-                    glowFade *= smoothstep(0.0, glowFadeZone, contentUV.y);
-                }
 
                 // === GRADIENT (use cluster-wide UV for seamless gradient across panels) ===
                 // Map local contentUV.x to cluster-wide position
@@ -388,15 +331,8 @@ Shader "Custom/GlowingGlassBorderPanel"
                 float layer1 = 1.0 - saturate(absDist / _Layer1Width);
                 layer1 = pow(layer1, 0.5);
 
-                // Apply edge border mask to all layers
-                layer1 *= edgeBorderMask;
-                layer2 *= edgeBorderMask;
-                layer3 *= edgeBorderMask;
-                layer4 *= edgeBorderMask;
-
-                // Apply glow fade at hidden edges (outer layers only to prevent overlap)
-                layer3 *= glowFade;
-                layer4 *= glowFade;
+                // Layers use SDF naturally - no special masking needed
+                // SDF handles masked edges with padding=0 and cornerRadius=0
 
                 // === SHIMMER EFFECT (use content-normalized UV) ===
                 float time = _Time.y * _ShimmerSpeed;
@@ -439,19 +375,9 @@ Shader "Custom/GlowingGlassBorderPanel"
                 finalColor.rgb = lerp(finalColor.rgb, glowColor * 1.2, layer2 * _Layer2Alpha);
                 finalColor.a = max(finalColor.a, layer2 * _Layer2Alpha);
 
-                // White core with extra suppression at masked edges to prevent white line at junction
-                float coreSuppression = 1.0;
-                if (_EdgeMask.x < 0.5)
-                {
-                    coreSuppression *= smoothstep(0.0, 0.05, contentUV.x);
-                }
-                if (_EdgeMask.y < 0.5)
-                {
-                    coreSuppression *= smoothstep(0.0, 0.05, 1.0 - contentUV.x);
-                }
-
+                // White core - hard clip handles junction, no extra suppression needed
                 fixed3 whiteCore = fixed3(1,1,1);
-                float coreMix = layer1 * _Layer1Alpha * 0.5 * coreSuppression;
+                float coreMix = layer1 * _Layer1Alpha * 0.5;
                 finalColor.rgb = lerp(finalColor.rgb, whiteCore, coreMix);
                 finalColor.a = max(finalColor.a, layer1 * _Layer1Alpha);
 
@@ -459,6 +385,11 @@ Shader "Custom/GlowingGlassBorderPanel"
                 finalColor.rgb += glowColor * shimmerGlow;
                 finalColor.rgb += whiteCore * shimmerLight;
                 finalColor.a = max(finalColor.a, shimmerLight * 0.8);
+
+                // Apply margin-based edge fade (from panel edge to Board edge on masked edges)
+                float edgeMask = getEdgeBorderMask(uv, _EdgeMask, _EdgePadding, aspect, _ContentBounds, _CornerRadius, _MarginH, _MarginV);
+                finalColor.a *= edgeMask;
+                finalColor.rgb *= edgeMask;
 
                 finalColor *= i.color;
 

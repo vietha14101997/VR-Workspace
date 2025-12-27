@@ -30,6 +30,8 @@ public class WorldPanelClusterRig : MonoBehaviour
     [SerializeField] private float edgePadding = 0.009f;
     [Tooltip("Extra size (in meters) for glow overflow on outer edges")]
     [SerializeField] private float glowExpansion = 0.05f;
+    [Tooltip("Overlap amount (in meters) at panel junctions for seamless appearance")]
+    [SerializeField] private float junctionOverlap = 0.01f;
     [Tooltip("Content margin ratio (content is inset by this fraction)")]
     [SerializeField] private float contentMarginHorizontal = 0.04f;
     [SerializeField] private float contentMarginVertical = 0.045f;
@@ -102,10 +104,13 @@ public class WorldPanelClusterRig : MonoBehaviour
         var refPanel = _panels[_panels.Count / 2];
         float panelWidth = refPanel ? refPanel.width : 1f;
 
-        float panelAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(panelWidth / 2f / distanceFromCamera);
+        // Use Board width (panel minus margins) for spacing so Board edges touch
+        float boardWidth = panelWidth * (1f - 2f * contentMarginHorizontal);
+
+        float boardAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(boardWidth / 2f / distanceFromCamera);
         float gapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(edgeGapMeters / 2f / distanceFromCamera);
 
-        float angleDeg = panelAngleDeg + gapAngleDeg;
+        float angleDeg = boardAngleDeg + gapAngleDeg;
 
         int count = _panels.Count;
         for (int i = 0; i < count; i++)
@@ -251,6 +256,7 @@ public class WorldPanelClusterRig : MonoBehaviour
         visual.SetGlassColors(glassColorA, glassColorB);
         visual.SetCornerSettings(cornerRadius, edgePadding);
         visual.SetGlowExpansion(glowExpansion);
+        visual.SetJunctionOverlap(junctionOverlap);
         visual.SetContentMargins(contentMarginHorizontal, contentMarginVertical);
     }
 
