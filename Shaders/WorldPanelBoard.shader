@@ -162,14 +162,19 @@ Shader "Unlit/WorldPanelBoard"
                 // UV 0..1  ->  (-W/2..+W/2, -H/2..+H/2) mét
                 float2 pMeters = (i.uv - 0.5) * size;
 
-                // ---- Rounded-rect clip + feather with EdgeMask ----
+                // ---- Rounded-rect clip + feather with EdgeMask and Edge-only Anti-aliasing ----
                 float r   = max(0.0, _CornerRadius);
                 float sdf = RoundRectSDF(pMeters, halfSize, r, _EdgeMask);
 
-                // clip ngoài viền (giữ cạnh mượt bằng feather)
-                // dist < 0 => bên trong; dùng smooth edge quanh 0..+_EdgeFeather
-                float aRound = 1.0 - smoothstep(0.0, max(1e-6, _EdgeFeather), sdf);
-                clip(aRound - 0.001); // bỏ hoàn toàn pixel ngoài bo
+                // Edge-only anti-aliasing: only smooth at the boundary, keep interior fully opaque
+                float aaWidth = fwidth(sdf);
+
+                // aRound = 1 inside, smooth transition to 0 at edge, 0 outside
+                // Only the narrow edge band gets AA, interior stays at full alpha
+                float aRound = 1.0 - smoothstep(-aaWidth, aaWidth, sdf);
+
+                // Hard clip pixels that are fully outside
+                clip(aRound - 0.001);
 
                 // ---- Lấy màu texture + tint ----
                 fixed4 col = tex2D(_MainTex, i.uv) * _Color;
