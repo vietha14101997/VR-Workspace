@@ -302,7 +302,7 @@ Shader "Custom/GlassGradientBackgroundPanel"
 
                 // Override alpha at masked edges (no fade at junctions)
                 float edgeOverride = getEdgeAlphaOverride(uv, _EdgeMask, aspect, _EdgePadding, _ContentBounds);
-                if (edgeOverride > 0.5 && dist < 0.01) alphaMask = 1.0;
+                if (edgeOverride > 0.5) alphaMask = 1.0;
 
                 // Early out for transparent pixels
                 if (alphaMask <= 0.001)
@@ -311,11 +311,25 @@ Shader "Custom/GlassGradientBackgroundPanel"
                 }
 
                 // Glow fade at hidden edges - prevents overlap that creates artifacts at junctions
+                // Only protect actual corner zones
                 float glowFade = 1.0;
-                float glowFadeZone = 0.12;
+                float glowFadeZone = 0.08;
+                float cornerProtectZone = _CornerRadius + _EdgePadding;
 
-                if (_EdgeMask.x < 0.5) glowFade *= smoothstep(0.0, glowFadeZone, contentUV.x);
-                if (_EdgeMask.y < 0.5) glowFade *= smoothstep(0.0, glowFadeZone, 1.0 - contentUV.x);
+                float distFromTop = 1.0 - contentUV.y;
+                float distFromBottom = contentUV.y;
+                float cornerProtect = 1.0 - smoothstep(0.0, cornerProtectZone, min(distFromTop, distFromBottom));
+
+                if (_EdgeMask.x < 0.5)
+                {
+                    float fade = smoothstep(0.0, glowFadeZone, contentUV.x);
+                    glowFade *= lerp(fade, 1.0, cornerProtect);
+                }
+                if (_EdgeMask.y < 0.5)
+                {
+                    float fade = smoothstep(0.0, glowFadeZone, 1.0 - contentUV.x);
+                    glowFade *= lerp(fade, 1.0, cornerProtect);
+                }
                 if (_EdgeMask.z < 0.5) glowFade *= smoothstep(0.0, glowFadeZone, 1.0 - contentUV.y);
                 if (_EdgeMask.w < 0.5) glowFade *= smoothstep(0.0, glowFadeZone, contentUV.y);
 
