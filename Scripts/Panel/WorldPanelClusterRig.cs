@@ -104,12 +104,10 @@ public class WorldPanelClusterRig : MonoBehaviour
         var refPanel = _panels[_panels.Count / 2];
         float panelWidth = refPanel ? refPanel.width : 1f;
 
-        // Use Board width (panel minus margins) for spacing, minus overlap for seamless junction
+        // Use Board width (panel minus margins) for spacing so Board edges touch
         float boardWidth = panelWidth * (1f - 2f * contentMarginHorizontal);
-        // Subtract junction overlap so adjacent Board edges overlap slightly
-        float effectiveWidth = boardWidth - junctionOverlap;
 
-        float boardAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(effectiveWidth / 2f / distanceFromCamera);
+        float boardAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(boardWidth / 2f / distanceFromCamera);
         float gapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(edgeGapMeters / 2f / distanceFromCamera);
 
         float angleDeg = boardAngleDeg + gapAngleDeg;

@@ -16,6 +16,10 @@ Shader "Unlit/WorldPanelBoard"
         // NEW: Bo góc (theo mét) + feather của mép
         _CornerRadius  ("Corner Radius (m)", Float) = 0.03
         _EdgeFeather   ("Edge Feather (m)", Float) = 0.001
+
+        // Content bounds clipping (UV space: left, right, bottom, top)
+        _ContentBounds ("Content Bounds (L,R,B,T)", Vector) = (0,1,0,1)
+        _EnableClipping ("Enable Clipping", Float) = 0
     }
 
     SubShader
@@ -44,6 +48,9 @@ Shader "Unlit/WorldPanelBoard"
 
             float   _CornerRadius;
             float   _EdgeFeather;
+
+            float4  _ContentBounds; // (left, right, bottom, top) in UV space
+            float   _EnableClipping;
 
             struct appdata
             {
@@ -99,6 +106,23 @@ Shader "Unlit/WorldPanelBoard"
 
             fixed4 frag (v2f i) : SV_Target
             {
+                // ---- Content bounds clipping (UV space) ----
+                if (_EnableClipping > 0.5)
+                {
+                    // _ContentBounds = (left, right, bottom, top)
+                    float left = _ContentBounds.x;
+                    float right = _ContentBounds.y;
+                    float bottom = _ContentBounds.z;
+                    float top = _ContentBounds.w;
+
+                    // Clip pixels outside content bounds
+                    if (i.uv.x < left || i.uv.x > right || i.uv.y < bottom || i.uv.y > top)
+                    {
+                        clip(-1);
+                        return fixed4(0,0,0,0);
+                    }
+                }
+
                 // ---- Tính toạ độ theo mét (gốc giữa panel) ----
                 float2 size     = _PanelSize.xy;
                 float2 halfSize = 0.5 * size;

@@ -143,25 +143,56 @@ public class ClusterPanelVisual : MonoBehaviour
     }
 
     /// <summary>
-    /// Apply margins to the content Board quad so it's inset from the outer Background/Border
+    /// Apply margins to the content Board quad.
+    /// Scales the Board to content size and applies shader clipping for clean edges.
     /// </summary>
     private void ApplyContentMargins()
     {
         if (_panel == null || _panel.board == null) return;
 
         // Calculate content size with margins (inset from full panel size)
-        float marginH = contentMarginHorizontal; // Horizontal margin ratio
-        float marginV = contentMarginVertical;   // Vertical margin ratio
+        float marginH = contentMarginHorizontal;
+        float marginV = contentMarginVertical;
 
         // Content is smaller by margin on each side
         float contentWidth = _panel.width * (1f - 2f * marginH);
         float contentHeight = _panel.height * (1f - 2f * marginV);
 
-        // Scale the board to the content size
+        // Scale the board to the content size (collider will match this)
         _panel.board.localScale = new Vector3(contentWidth, contentHeight, 1f);
 
         // Board stays at local position (0,0,0) - centered within the panel
         _panel.board.localPosition = Vector3.zero;
+
+        // Apply shader-based clipping for clean edges
+        ApplyBoardContentClipping();
+    }
+
+    /// <summary>
+    /// Apply content bounds clipping to the Board's shader material.
+    /// This ensures content is properly clipped at the Board's boundaries.
+    /// </summary>
+    private void ApplyBoardContentClipping()
+    {
+        if (_panel == null || _panel.board == null) return;
+
+        var boardRenderer = _panel.board.GetComponent<MeshRenderer>();
+        if (boardRenderer == null || boardRenderer.sharedMaterial == null) return;
+
+        var mat = boardRenderer.sharedMaterial;
+
+        // Enable clipping - clip at full UV bounds since board is already scaled to content size
+        if (mat.HasProperty("_EnableClipping"))
+        {
+            mat.SetFloat("_EnableClipping", 1f);
+        }
+
+        if (mat.HasProperty("_ContentBounds"))
+        {
+            // Board is scaled to content size, so UV 0-1 represents the visible content area
+            // Clip at full bounds to ensure clean edges with rounded corners
+            mat.SetVector("_ContentBounds", new Vector4(0f, 1f, 0f, 1f));
+        }
     }
 
     /// <summary>

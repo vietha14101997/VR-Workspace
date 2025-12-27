@@ -290,7 +290,14 @@ public class WorldPanelPlus : MonoBehaviour
 
         EnsureMaterials();
 
-        board.localScale = new Vector3(width, height, 1);
+        // Check if ClusterPanelVisual is managing the board scale
+        var clusterVisual = GetComponent<ClusterPanelVisual>();
+        if (clusterVisual == null)
+        {
+            // No cluster visual - apply full panel scale
+            board.localScale = new Vector3(width, height, 1);
+        }
+        // If ClusterPanelVisual exists, it manages the board scale via ApplyContentMargins()
 
         var mr = board.GetComponent<MeshRenderer>();
         if (mr)
