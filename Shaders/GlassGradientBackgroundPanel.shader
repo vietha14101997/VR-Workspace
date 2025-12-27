@@ -211,6 +211,7 @@ Shader "Custom/GlassGradientBackgroundPanel"
             }
 
             // Check if we're at a masked vertical edge (should maintain full alpha for seamless join)
+            // Only applies within the actual content area, not in glow expansion zones
             float getEdgeAlphaOverride(float2 uv, float4 edgeMask, float aspect, float padding, float4 contentBounds)
             {
                 // Remap UV to content-normalized space
@@ -227,6 +228,10 @@ Shader "Custom/GlassGradientBackgroundPanel"
                 {
                     contentUV = uv;
                 }
+
+                // Only override within the content area (not in glow expansion zones)
+                if (contentUV.y < 0.0 || contentUV.y > 1.0) return 0.0;
+                if (contentUV.x < 0.0 || contentUV.x > 1.0) return 0.0;
 
                 // Zone near edge where we override alpha (for seamless panel join)
                 float edgeZone = 0.05;
