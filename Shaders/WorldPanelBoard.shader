@@ -20,6 +20,9 @@ Shader "Unlit/WorldPanelBoard"
         // Content bounds clipping (UV space: left, right, bottom, top)
         _ContentBounds ("Content Bounds (L,R,B,T)", Vector) = (0,1,0,1)
         _EnableClipping ("Enable Clipping", Float) = 0
+
+        // Edge mask for cluster panels (Left, Right, Top, Bottom): 1=show corner, 0=no corner
+        _EdgeMask ("Edge Mask (L,R,T,B)", Vector) = (1,1,1,1)
     }
 
     SubShader
@@ -51,6 +54,8 @@ Shader "Unlit/WorldPanelBoard"
 
             float4  _ContentBounds; // (left, right, bottom, top) in UV space
             float   _EnableClipping;
+
+            float4  _EdgeMask; // (Left, Right, Top, Bottom): 1=show corner, 0=no corner
 
             struct appdata
             {
@@ -94,14 +99,41 @@ Shader "Unlit/WorldPanelBoard"
                 return lerp(1.0, minA, e);
             }
 
-            // SDF cho rounded-rect theo mét
+            // SDF cho rounded-rect theo mét với EdgeMask support
             // pMeters: toạ độ từ tâm (m), halfSize: nửa kích thước (m), r: bán kính (m)
-            float RoundRectSDF(float2 pMeters, float2 halfSize, float r)
+            // edgeMask: (Left, Right, Top, Bottom) - 1=show corner, 0=no corner
+            float RoundRectSDF(float2 pMeters, float2 halfSize, float r, float4 edgeMask)
             {
+                // Determine which corner we're in based on position
+                // TopLeft: x<0, y>0 -> needs Left(x) AND Top(z) visible
+                // TopRight: x>0, y>0 -> needs Right(y) AND Top(z) visible
+                // BottomLeft: x<0, y<0 -> needs Left(x) AND Bottom(w) visible
+                // BottomRight: x>0, y<0 -> needs Right(y) AND Bottom(w) visible
+
+                float cornerRadius = r;
+
+                // Check which quadrant we're in and apply appropriate corner radius
+                if (pMeters.x < 0 && pMeters.y > 0) // Top-Left
+                {
+                    cornerRadius = (edgeMask.x > 0.5 && edgeMask.z > 0.5) ? r : 0.0;
+                }
+                else if (pMeters.x > 0 && pMeters.y > 0) // Top-Right
+                {
+                    cornerRadius = (edgeMask.y > 0.5 && edgeMask.z > 0.5) ? r : 0.0;
+                }
+                else if (pMeters.x < 0 && pMeters.y < 0) // Bottom-Left
+                {
+                    cornerRadius = (edgeMask.x > 0.5 && edgeMask.w > 0.5) ? r : 0.0;
+                }
+                else if (pMeters.x > 0 && pMeters.y < 0) // Bottom-Right
+                {
+                    cornerRadius = (edgeMask.y > 0.5 && edgeMask.w > 0.5) ? r : 0.0;
+                }
+
                 // co lại nửa kích thước để chừa chỗ cho bán kính
-                float2 q = abs(pMeters) - (halfSize - r);
+                float2 q = abs(pMeters) - (halfSize - cornerRadius);
                 // length(max(q,0)) - r  : >0 ngoài bo, <0 trong bo
-                return length(max(q, 0.0)) - r;
+                return length(max(q, 0.0)) - cornerRadius;
             }
 
             fixed4 frag (v2f i) : SV_Target
@@ -130,9 +162,9 @@ Shader "Unlit/WorldPanelBoard"
                 // UV 0..1  ->  (-W/2..+W/2, -H/2..+H/2) mét
                 float2 pMeters = (i.uv - 0.5) * size;
 
-                // ---- Rounded-rect clip + feather ----
+                // ---- Rounded-rect clip + feather with EdgeMask ----
                 float r   = max(0.0, _CornerRadius);
-                float sdf = RoundRectSDF(pMeters, halfSize, r);
+                float sdf = RoundRectSDF(pMeters, halfSize, r, _EdgeMask);
 
                 // clip ngoài viền (giữ cạnh mượt bằng feather)
                 // dist < 0 => bên trong; dùng smooth edge quanh 0..+_EdgeFeather

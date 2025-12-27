@@ -181,6 +181,30 @@ public class ClusterPanelVisual : MonoBehaviour
 
         var mat = boardRenderer.sharedMaterial;
 
+        // Calculate actual content size (board is scaled to this)
+        float marginH = contentMarginHorizontal;
+        float marginV = contentMarginVertical;
+        float contentWidth = _panel.width * (1f - 2f * marginH);
+        float contentHeight = _panel.height * (1f - 2f * marginV);
+
+        // Update PanelSize to match the actual scaled board size for correct corner radius
+        if (mat.HasProperty("_PanelSize"))
+        {
+            mat.SetVector("_PanelSize", new Vector4(contentWidth, contentHeight, 0, 0));
+        }
+
+        // Set corner radius to match the background/border
+        if (mat.HasProperty("_CornerRadius"))
+        {
+            mat.SetFloat("_CornerRadius", cornerRadius);
+        }
+
+        // Set EdgeMask so corners only appear on outer edges of cluster
+        if (mat.HasProperty("_EdgeMask"))
+        {
+            mat.SetVector("_EdgeMask", _edgeMask);
+        }
+
         // Enable clipping - clip at full UV bounds since board is already scaled to content size
         if (mat.HasProperty("_EnableClipping"))
         {
@@ -519,6 +543,9 @@ public class ClusterPanelVisual : MonoBehaviour
         {
             _borderMaterial.SetVector("_EdgeMask", _edgeMask);
         }
+
+        // Also update Board material EdgeMask
+        ApplyBoardContentClipping();
     }
 
     #endregion
