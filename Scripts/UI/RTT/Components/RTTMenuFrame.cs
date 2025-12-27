@@ -313,14 +313,14 @@ public class RTTMenuFrame : RTTCanvasBase
         rt.localPosition = Vector3.zero;
         rt.SetAsFirstSibling();
 
-        // Create glowing border
-        CreateGlowingBorder(bgObj.transform, w, h, edgePad * 1.175f);
-
         // Create floating data effects
         if (enableFloatingData)
         {
             CreateFloatingDataEffects(bgObj.transform, w, h);
         }
+
+        // Create glowing border
+        CreateGlowingBorder(bgObj.transform, w, h, edgePad * 1.175f);
     }
 
     private void CreateGlowingBorder(Transform parent, float w, float h, float edgePad)

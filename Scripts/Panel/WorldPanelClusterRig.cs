@@ -4,6 +4,7 @@ using System.Collections.Generic;
 /// <summary>
 /// Manages a cluster of WorldPanelPlus panels arranged in an arc.
 /// Handles dynamic panel creation, positioning, and neighbor linking.
+/// Optionally applies seamless ClusterPanelVisual for connected appearance.
 /// </summary>
 [ExecuteAlways]
 public class WorldPanelClusterRig : MonoBehaviour
@@ -14,15 +15,37 @@ public class WorldPanelClusterRig : MonoBehaviour
     [Header("Layout")]
     public float distanceFromCamera = 2.0f;
     [Tooltip("Extra gap in meters between panel edges (0 = edges touch)")]
-    [Range(0f, 0.1f)] public float edgeGapMeters = 0.01f;
+    [Range(0f, 0.1f)] public float edgeGapMeters = 0f;
     [Tooltip("Whether panels should face directly toward camera (true) or have limited tilt (false)")]
     public bool panelsFaceCamera = true;
     public float verticalOffset = 0f;
     public bool faceCameraYawOnly = true;
 
+    [Header("Cluster Visuals")]
+    [Tooltip("Enable seamless glass background and glowing border across all panels")]
+    public bool enableClusterVisuals = true;
+
+    [Header("Visual Settings")]
+    [SerializeField] private float cornerRadius = 0.04f;
+    [SerializeField] private float edgePadding = 0.009f;
+    [Tooltip("Extra size (in meters) for glow overflow on outer edges")]
+    [SerializeField] private float glowExpansion = 0.05f;
+    [Tooltip("Content margin ratio (content is inset by this fraction)")]
+    [SerializeField] private float contentMarginHorizontal = 0.04f;
+    [SerializeField] private float contentMarginVertical = 0.045f;
+    [ColorUsage(true, true)]
+    [SerializeField] private Color glowColorA = new Color(0.3f, 1f, 1f, 1f);
+    [ColorUsage(true, true)]
+    [SerializeField] private Color glowColorB = new Color(1f, 0.4f, 1f, 1f);
+    [SerializeField] private Color glassColorA = new Color(0f, 0.55f, 0.65f, 0.35f);
+    [SerializeField] private Color glassColorB = new Color(0.30f, 0.12f, 0.50f, 0.32f);
+
     [Header("Dynamic Panels")]
     [SerializeField] private List<WorldPanelPlus> _panels = new List<WorldPanelPlus>();
     public List<WorldPanelPlus> panels => _panels;
+
+    [SerializeField, HideInInspector]
+    private List<ClusterPanelVisual> _panelVisuals = new List<ClusterPanelVisual>();
 
     Camera Cam => Application.isPlaying ? Camera.main : FindObjectOfType<Camera>();
 
@@ -39,7 +62,13 @@ public class WorldPanelClusterRig : MonoBehaviour
         LinkNeighbors();
         LayoutFromCamera();
 
-        Debug.Log($"[WorldPanelClusterRig] Built {count} panels");
+        if (enableClusterVisuals)
+        {
+            ApplyClusterVisuals();
+        }
+
+        Debug.Log($"[WorldPanelClusterRig] Built {count} panels" +
+            (enableClusterVisuals ? " with cluster visuals" : ""));
     }
 
     [ContextMenu("Build or Rebuild Cluster (3 panels)")]
@@ -178,6 +207,71 @@ public class WorldPanelClusterRig : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Apply ClusterPanelVisual to all panels for seamless appearance
+    /// </summary>
+    void ApplyClusterVisuals()
+    {
+        _panelVisuals.Clear();
+
+        int count = _panels.Count;
+        for (int i = 0; i < count; i++)
+        {
+            var panel = _panels[i];
+            if (panel == null) continue;
+
+            // Get or add ClusterPanelVisual component
+            var visual = panel.GetComponent<ClusterPanelVisual>();
+            if (visual == null)
+            {
+                visual = panel.gameObject.AddComponent<ClusterPanelVisual>();
+            }
+
+            // Configure position in cluster
+            visual.SetClusterPosition(i, count);
+
+            // Initialize visuals
+            visual.Initialize();
+
+            // Apply custom settings via serialized fields reflection or direct access
+            ApplyVisualSettings(visual);
+
+            _panelVisuals.Add(visual);
+        }
+    }
+
+    /// <summary>
+    /// Apply visual settings from rig to individual panel visual
+    /// </summary>
+    void ApplyVisualSettings(ClusterPanelVisual visual)
+    {
+        if (visual == null) return;
+
+        visual.SetGlowColors(glowColorA, glowColorB);
+        visual.SetGlassColors(glassColorA, glassColorB);
+        visual.SetCornerSettings(cornerRadius, edgePadding);
+        visual.SetGlowExpansion(glowExpansion);
+        visual.SetContentMargins(contentMarginHorizontal, contentMarginVertical);
+    }
+
+    /// <summary>
+    /// Refresh cluster visuals (call after changing visual settings)
+    /// </summary>
+    [ContextMenu("Refresh Cluster Visuals")]
+    public void RefreshClusterVisuals()
+    {
+        if (!enableClusterVisuals) return;
+
+        foreach (var visual in _panelVisuals)
+        {
+            if (visual != null)
+            {
+                ApplyVisualSettings(visual);
+                visual.UpdateSize();
+            }
+        }
+    }
+
     void KillChildren()
     {
 #if UNITY_EDITOR
@@ -188,6 +282,7 @@ public class WorldPanelClusterRig : MonoBehaviour
             Destroy(transform.GetChild(i).gameObject);
 #endif
         _panels.Clear();
+        _panelVisuals.Clear();
     }
 
 #if UNITY_EDITOR
