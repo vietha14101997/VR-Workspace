@@ -322,12 +322,37 @@ Shader "Custom/GlowingGlassBorderPanel"
                 // Edge border visibility mask - fade out border on masked edges
                 float edgeBorderMask = getEdgeBorderMask(uv, _EdgeMask, _EdgePadding, aspect, _ContentBounds);
 
-                // Hard clip at hidden edges to prevent glow overlap with neighbor panels
-                // When an edge is hidden (EdgeMask = 0), clip pixels that extend beyond content bounds
+                // Hard clip at hidden edges - clip exactly at content boundary
                 if (_EdgeMask.x < 0.5 && contentUV.x < 0.0) return fixed4(0,0,0,0);
                 if (_EdgeMask.y < 0.5 && contentUV.x > 1.0) return fixed4(0,0,0,0);
                 if (_EdgeMask.w < 0.5 && contentUV.y < 0.0) return fixed4(0,0,0,0);
                 if (_EdgeMask.z < 0.5 && contentUV.y > 1.0) return fixed4(0,0,0,0);
+
+                // Glow fade at hidden edges - prevents overlap that creates triangle artifacts
+                // Fade out glow contribution as we approach hidden edge boundaries
+                float glowFade = 1.0;
+                float glowFadeZone = 0.12; // UV zone where glow fades out near hidden edges
+
+                // Fade glow near hidden left edge
+                if (_EdgeMask.x < 0.5)
+                {
+                    glowFade *= smoothstep(0.0, glowFadeZone, contentUV.x);
+                }
+                // Fade glow near hidden right edge
+                if (_EdgeMask.y < 0.5)
+                {
+                    glowFade *= smoothstep(0.0, glowFadeZone, 1.0 - contentUV.x);
+                }
+                // Fade glow near hidden top edge
+                if (_EdgeMask.z < 0.5)
+                {
+                    glowFade *= smoothstep(0.0, glowFadeZone, 1.0 - contentUV.y);
+                }
+                // Fade glow near hidden bottom edge
+                if (_EdgeMask.w < 0.5)
+                {
+                    glowFade *= smoothstep(0.0, glowFadeZone, contentUV.y);
+                }
 
                 // === GRADIENT (use cluster-wide UV for seamless gradient across panels) ===
                 // Map local contentUV.x to cluster-wide position
@@ -373,6 +398,10 @@ Shader "Custom/GlowingGlassBorderPanel"
                 layer2 *= edgeBorderMask;
                 layer3 *= edgeBorderMask;
                 layer4 *= edgeBorderMask;
+
+                // Apply glow fade at hidden edges (outer layers only to prevent overlap)
+                layer3 *= glowFade;
+                layer4 *= glowFade;
 
                 // === SHIMMER EFFECT (use content-normalized UV) ===
                 float time = _Time.y * _ShimmerSpeed;

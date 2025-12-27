@@ -288,7 +288,7 @@ Shader "Custom/GlassGradientBackgroundPanel"
                     contentUV = uv;
                 }
 
-                // Hard clip at hidden edges to prevent overlap with neighbor panels
+                // Hard clip at hidden edges - clip exactly at content boundary
                 if (_EdgeMask.x < 0.5 && contentUV.x < 0.0) return fixed4(0,0,0,0);
                 if (_EdgeMask.y < 0.5 && contentUV.x > 1.0) return fixed4(0,0,0,0);
                 if (_EdgeMask.w < 0.5 && contentUV.y < 0.0) return fixed4(0,0,0,0);
@@ -310,6 +310,15 @@ Shader "Custom/GlassGradientBackgroundPanel"
                     return fixed4(0, 0, 0, 0);
                 }
 
+                // Glow fade at hidden edges - prevents overlap that creates artifacts at junctions
+                float glowFade = 1.0;
+                float glowFadeZone = 0.12;
+
+                if (_EdgeMask.x < 0.5) glowFade *= smoothstep(0.0, glowFadeZone, contentUV.x);
+                if (_EdgeMask.y < 0.5) glowFade *= smoothstep(0.0, glowFadeZone, 1.0 - contentUV.x);
+                if (_EdgeMask.z < 0.5) glowFade *= smoothstep(0.0, glowFadeZone, 1.0 - contentUV.y);
+                if (_EdgeMask.w < 0.5) glowFade *= smoothstep(0.0, glowFadeZone, contentUV.y);
+
                 // === GRADIENT COLOR (use cluster-wide UV for seamless gradient) ===
                 // Map local contentUV.x to cluster-wide position
                 float clusterX = contentUV.x * _ClusterUVScale + _ClusterUVOffset;
@@ -330,7 +339,7 @@ Shader "Custom/GlassGradientBackgroundPanel"
                 centerGlow = centerGlow * centerGlow * 0.15;
 
                 float edgeFactor = 1.0 - saturate(abs(dist) / 0.2);
-                float fresnel = edgeFactor * edgeFactor * _FresnelStrength;
+                float fresnel = edgeFactor * edgeFactor * _FresnelStrength * glowFade;
 
                 fixed4 finalColor = gradColor;
                 finalColor.a = _GlassAlpha + gradColor.a * 0.5 + hoverAlphaBoost;
