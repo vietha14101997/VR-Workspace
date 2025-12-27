@@ -1,0 +1,2049 @@
+[RTTRemoteMenu] Button clicked! clusterBinder=True, useV2=True, currentState=Disconnected
+UnityEngine.Debug:Log (object)
+RTTRemoteMenu/<OnConnectButtonClicked>d__58:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTRemoteMenu.cs:316)
+System.Runtime.CompilerServices.AsyncVoidMethodBuilder:Start<RTTRemoteMenu/<OnConnectButtonClicked>d__58> (RTTRemoteMenu/<OnConnectButtonClicked>d__58&)
+RTTRemoteMenu:OnConnectButtonClicked ()
+UnityEngine.EventSystems.ExecuteEvents:Execute<UnityEngine.EventSystems.IPointerClickHandler> (UnityEngine.GameObject,UnityEngine.EventSystems.BaseEventData,UnityEngine.EventSystems.ExecuteEvents/EventFunction`1<UnityEngine.EventSystems.IPointerClickHandler>)
+RTTRaycastManager:SendClick () (at Assets/VR-Workspace/Scripts/UI/RTT/Input/RTTRaycastManager.cs:313)
+VRGazeReticle:ProcessDwellClickRTT (UnityEngine.Vector3) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:625)
+VRGazeReticle:CheckGaze () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:395)
+VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:268)
+
+[RTTRemoteMenu] Connecting...
+UnityEngine.Debug:Log (object)
+RTTRemoteMenu/<OnConnectButtonClicked>d__58:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTRemoteMenu.cs:330)
+System.Runtime.CompilerServices.AsyncVoidMethodBuilder:Start<RTTRemoteMenu/<OnConnectButtonClicked>d__58> (RTTRemoteMenu/<OnConnectButtonClicked>d__58&)
+RTTRemoteMenu:OnConnectButtonClicked ()
+UnityEngine.EventSystems.ExecuteEvents:Execute<UnityEngine.EventSystems.IPointerClickHandler> (UnityEngine.GameObject,UnityEngine.EventSystems.BaseEventData,UnityEngine.EventSystems.ExecuteEvents/EventFunction`1<UnityEngine.EventSystems.IPointerClickHandler>)
+RTTRaycastManager:SendClick () (at Assets/VR-Workspace/Scripts/UI/RTT/Input/RTTRaycastManager.cs:313)
+VRGazeReticle:ProcessDwellClickRTT (UnityEngine.Vector3) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:625)
+VRGazeReticle:CheckGaze () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:395)
+VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:268)
+
+[RTTRemoteMenu] Applied to binder: http://192.168.1.8:8288, 2mon, 1920x1080, 20000kbps, 60fps
+UnityEngine.Debug:Log (object)
+RTTRemoteMenu:ApplyFormToBinder () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTRemoteMenu.cs:440)
+RTTRemoteMenu/<OnConnectButtonClicked>d__58:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTRemoteMenu.cs:334)
+System.Runtime.CompilerServices.AsyncVoidMethodBuilder:Start<RTTRemoteMenu/<OnConnectButtonClicked>d__58> (RTTRemoteMenu/<OnConnectButtonClicked>d__58&)
+RTTRemoteMenu:OnConnectButtonClicked ()
+UnityEngine.EventSystems.ExecuteEvents:Execute<UnityEngine.EventSystems.IPointerClickHandler> (UnityEngine.GameObject,UnityEngine.EventSystems.BaseEventData,UnityEngine.EventSystems.ExecuteEvents/EventFunction`1<UnityEngine.EventSystems.IPointerClickHandler>)
+RTTRaycastManager:SendClick () (at Assets/VR-Workspace/Scripts/UI/RTT/Input/RTTRaycastManager.cs:313)
+VRGazeReticle:ProcessDwellClickRTT (UnityEngine.Vector3) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:625)
+VRGazeReticle:CheckGaze () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:395)
+VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:268)
+
+[ClusterAutoBinder] State: Disconnected -> Connecting
+UnityEngine.Debug:Log (object)
+ClusterAutoBinder:SetState (ClusterAutoBinder/ConnectionState) (at Assets/VR-Workspace/Scripts/Cluster/ClusterAutoBinder.cs:313)
+ClusterAutoBinder/<ConnectToServerAsync>d__55:MoveNext () (at Assets/VR-Workspace/Scripts/Cluster/ClusterAutoBinder.cs:117)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1<bool>:Start<ClusterAutoBinder/<ConnectToServerAsync>d__55> (ClusterAutoBinder/<ConnectToServerAsync>d__55&)
+ClusterAutoBinder:ConnectToServerAsync ()
+RTTRemoteMenu/<OnConnectButtonClicked>d__58:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTRemoteMenu.cs:336)
+System.Runtime.CompilerServices.AsyncVoidMethodBuilder:Start<RTTRemoteMenu/<OnConnectButtonClicked>d__58> (RTTRemoteMenu/<OnConnectButtonClicked>d__58&)
+RTTRemoteMenu:OnConnectButtonClicked ()
+UnityEngine.EventSystems.ExecuteEvents:Execute<UnityEngine.EventSystems.IPointerClickHandler> (UnityEngine.GameObject,UnityEngine.EventSystems.BaseEventData,UnityEngine.EventSystems.ExecuteEvents/EventFunction`1<UnityEngine.EventSystems.IPointerClickHandler>)
+RTTRaycastManager:SendClick () (at Assets/VR-Workspace/Scripts/UI/RTT/Input/RTTRaycastManager.cs:313)
+VRGazeReticle:ProcessDwellClickRTT (UnityEngine.Vector3) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:625)
+VRGazeReticle:CheckGaze () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:395)
+VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:268)
+
+[RTTRemoteMenu] HandleConnectionStateChanged: Disconnected -> Connecting
+UnityEngine.Debug:Log (object)
+RTTRemoteMenu:HandleConnectionStateChanged (ClusterAutoBinder/ConnectionState) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTRemoteMenu.cs:459)
+ClusterAutoBinder:SetState (ClusterAutoBinder/ConnectionState) (at Assets/VR-Workspace/Scripts/Cluster/ClusterAutoBinder.cs:314)
+ClusterAutoBinder/<ConnectToServerAsync>d__55:MoveNext () (at Assets/VR-Workspace/Scripts/Cluster/ClusterAutoBinder.cs:117)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1<bool>:Start<ClusterAutoBinder/<ConnectToServerAsync>d__55> (ClusterAutoBinder/<ConnectToServerAsync>d__55&)
+ClusterAutoBinder:ConnectToServerAsync ()
+RTTRemoteMenu/<OnConnectButtonClicked>d__58:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTRemoteMenu.cs:336)
+System.Runtime.CompilerServices.AsyncVoidMethodBuilder:Start<RTTRemoteMenu/<OnConnectButtonClicked>d__58> (RTTRemoteMenu/<OnConnectButtonClicked>d__58&)
+RTTRemoteMenu:OnConnectButtonClicked ()
+UnityEngine.EventSystems.ExecuteEvents:Execute<UnityEngine.EventSystems.IPointerClickHandler> (UnityEngine.GameObject,UnityEngine.EventSystems.BaseEventData,UnityEngine.EventSystems.ExecuteEvents/EventFunction`1<UnityEngine.EventSystems.IPointerClickHandler>)
+RTTRaycastManager:SendClick () (at Assets/VR-Workspace/Scripts/UI/RTT/Input/RTTRaycastManager.cs:313)
+VRGazeReticle:ProcessDwellClickRTT (UnityEngine.Vector3) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:625)
+VRGazeReticle:CheckGaze () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:395)
+VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:268)
+
+[ClusterAutoBinder] Connecting to server (V2 protocol)...
+UnityEngine.Debug:Log (object)
+ClusterAutoBinder/<ConnectToServerAsync>d__55:MoveNext () (at Assets/VR-Workspace/Scripts/Cluster/ClusterAutoBinder.cs:118)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1<bool>:Start<ClusterAutoBinder/<ConnectToServerAsync>d__55> (ClusterAutoBinder/<ConnectToServerAsync>d__55&)
+ClusterAutoBinder:ConnectToServerAsync ()
+RTTRemoteMenu/<OnConnectButtonClicked>d__58:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTRemoteMenu.cs:336)
+System.Runtime.CompilerServices.AsyncVoidMethodBuilder:Start<RTTRemoteMenu/<OnConnectButtonClicked>d__58> (RTTRemoteMenu/<OnConnectButtonClicked>d__58&)
+RTTRemoteMenu:OnConnectButtonClicked ()
+UnityEngine.EventSystems.ExecuteEvents:Execute<UnityEngine.EventSystems.IPointerClickHandler> (UnityEngine.GameObject,UnityEngine.EventSystems.BaseEventData,UnityEngine.EventSystems.ExecuteEvents/EventFunction`1<UnityEngine.EventSystems.IPointerClickHandler>)
+RTTRaycastManager:SendClick () (at Assets/VR-Workspace/Scripts/UI/RTT/Input/RTTRaycastManager.cs:313)
+VRGazeReticle:ProcessDwellClickRTT (UnityEngine.Vector3) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:625)
+VRGazeReticle:CheckGaze () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:395)
+VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:268)
+
+[ClusterAutoBinder] Signal URL: ws://192.168.1.8:8288/signal?mode=multitrack&monitors=2&resW=1920&resH=1080&kbps=10000&fps=60&zerolat=1&lan=1&protocol=v2
+UnityEngine.Debug:Log (object)
+ClusterAutoBinder/<ConnectToServerAsync>d__55:MoveNext () (at Assets/VR-Workspace/Scripts/Cluster/ClusterAutoBinder.cs:147)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1<bool>:Start<ClusterAutoBinder/<ConnectToServerAsync>d__55> (ClusterAutoBinder/<ConnectToServerAsync>d__55&)
+ClusterAutoBinder:ConnectToServerAsync ()
+RTTRemoteMenu/<OnConnectButtonClicked>d__58:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTRemoteMenu.cs:336)
+System.Runtime.CompilerServices.AsyncVoidMethodBuilder:Start<RTTRemoteMenu/<OnConnectButtonClicked>d__58> (RTTRemoteMenu/<OnConnectButtonClicked>d__58&)
+RTTRemoteMenu:OnConnectButtonClicked ()
+UnityEngine.EventSystems.ExecuteEvents:Execute<UnityEngine.EventSystems.IPointerClickHandler> (UnityEngine.GameObject,UnityEngine.EventSystems.BaseEventData,UnityEngine.EventSystems.ExecuteEvents/EventFunction`1<UnityEngine.EventSystems.IPointerClickHandler>)
+RTTRaycastManager:SendClick () (at Assets/VR-Workspace/Scripts/UI/RTT/Input/RTTRaycastManager.cs:313)
+VRGazeReticle:ProcessDwellClickRTT (UnityEngine.Vector3) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:625)
+VRGazeReticle:CheckGaze () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:395)
+VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:268)
+
+[MultiPC] Manually starting V2 protocol connection
+UnityEngine.Debug:Log (object)
+MultiPCStreamClient/<ConnectV2Async>d__51:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/MultiPCStreamClient.cs:330)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<MultiPCStreamClient/<ConnectV2Async>d__51> (MultiPCStreamClient/<ConnectV2Async>d__51&)
+MultiPCStreamClient:ConnectV2Async ()
+ClusterAutoBinder/<ConnectToServerAsync>d__55:MoveNext () (at Assets/VR-Workspace/Scripts/Cluster/ClusterAutoBinder.cs:150)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1<bool>:Start<ClusterAutoBinder/<ConnectToServerAsync>d__55> (ClusterAutoBinder/<ConnectToServerAsync>d__55&)
+ClusterAutoBinder:ConnectToServerAsync ()
+RTTRemoteMenu/<OnConnectButtonClicked>d__58:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTRemoteMenu.cs:336)
+System.Runtime.CompilerServices.AsyncVoidMethodBuilder:Start<RTTRemoteMenu/<OnConnectButtonClicked>d__58> (RTTRemoteMenu/<OnConnectButtonClicked>d__58&)
+RTTRemoteMenu:OnConnectButtonClicked ()
+UnityEngine.EventSystems.ExecuteEvents:Execute<UnityEngine.EventSystems.IPointerClickHandler> (UnityEngine.GameObject,UnityEngine.EventSystems.BaseEventData,UnityEngine.EventSystems.ExecuteEvents/EventFunction`1<UnityEngine.EventSystems.IPointerClickHandler>)
+RTTRaycastManager:SendClick () (at Assets/VR-Workspace/Scripts/UI/RTT/Input/RTTRaycastManager.cs:313)
+VRGazeReticle:ProcessDwellClickRTT (UnityEngine.Vector3) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:625)
+VRGazeReticle:CheckGaze () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:395)
+VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:268)
+
+[PhaseProtocol] Connecting to ws://192.168.1.8:8288/signal?mode=multitrack&monitors=2&resW=1920&resH=1080&kbps=10000&fps=60&zerolat=1&lan=1&protocol=v2
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ConnectAsync>d__60:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:106)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<ConnectAsync>d__60> (VRWorkspace.Streaming.PhaseProtocolClient/<ConnectAsync>d__60&)
+VRWorkspace.Streaming.PhaseProtocolClient:ConnectAsync (string)
+MultiPCStreamClient/<StartV2ProtocolAsync>d__52:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/MultiPCStreamClient.cs:397)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<MultiPCStreamClient/<StartV2ProtocolAsync>d__52> (MultiPCStreamClient/<StartV2ProtocolAsync>d__52&)
+MultiPCStreamClient:StartV2ProtocolAsync ()
+MultiPCStreamClient/<ConnectV2Async>d__51:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/MultiPCStreamClient.cs:331)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<MultiPCStreamClient/<ConnectV2Async>d__51> (MultiPCStreamClient/<ConnectV2Async>d__51&)
+MultiPCStreamClient:ConnectV2Async ()
+ClusterAutoBinder/<ConnectToServerAsync>d__55:MoveNext () (at Assets/VR-Workspace/Scripts/Cluster/ClusterAutoBinder.cs:150)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1<bool>:Start<ClusterAutoBinder/<ConnectToServerAsync>d__55> (ClusterAutoBinder/<ConnectToServerAsync>d__55&)
+ClusterAutoBinder:ConnectToServerAsync ()
+RTTRemoteMenu/<OnConnectButtonClicked>d__58:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTRemoteMenu.cs:336)
+System.Runtime.CompilerServices.AsyncVoidMethodBuilder:Start<RTTRemoteMenu/<OnConnectButtonClicked>d__58> (RTTRemoteMenu/<OnConnectButtonClicked>d__58&)
+RTTRemoteMenu:OnConnectButtonClicked ()
+UnityEngine.EventSystems.ExecuteEvents:Execute<UnityEngine.EventSystems.IPointerClickHandler> (UnityEngine.GameObject,UnityEngine.EventSystems.BaseEventData,UnityEngine.EventSystems.ExecuteEvents/EventFunction`1<UnityEngine.EventSystems.IPointerClickHandler>)
+RTTRaycastManager:SendClick () (at Assets/VR-Workspace/Scripts/UI/RTT/Input/RTTRaycastManager.cs:313)
+VRGazeReticle:ProcessDwellClickRTT (UnityEngine.Vector3) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:625)
+VRGazeReticle:CheckGaze () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:395)
+VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:268)
+
+[StateMachine] Disconnected -> Connecting
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.ConnectionStateMachine:TryTransition (VRWorkspace.Streaming.ConnectionPhase,string) (at Assets/VR-Workspace/Scripts/Streaming/ConnectionStateMachine.cs:102)
+VRWorkspace.Streaming.PhaseProtocolClient/<ConnectAsync>d__60:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:107)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<ConnectAsync>d__60> (VRWorkspace.Streaming.PhaseProtocolClient/<ConnectAsync>d__60&)
+VRWorkspace.Streaming.PhaseProtocolClient:ConnectAsync (string)
+MultiPCStreamClient/<StartV2ProtocolAsync>d__52:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/MultiPCStreamClient.cs:397)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<MultiPCStreamClient/<StartV2ProtocolAsync>d__52> (MultiPCStreamClient/<StartV2ProtocolAsync>d__52&)
+MultiPCStreamClient:StartV2ProtocolAsync ()
+MultiPCStreamClient/<ConnectV2Async>d__51:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/MultiPCStreamClient.cs:331)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<MultiPCStreamClient/<ConnectV2Async>d__51> (MultiPCStreamClient/<ConnectV2Async>d__51&)
+MultiPCStreamClient:ConnectV2Async ()
+ClusterAutoBinder/<ConnectToServerAsync>d__55:MoveNext () (at Assets/VR-Workspace/Scripts/Cluster/ClusterAutoBinder.cs:150)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1<bool>:Start<ClusterAutoBinder/<ConnectToServerAsync>d__55> (ClusterAutoBinder/<ConnectToServerAsync>d__55&)
+ClusterAutoBinder:ConnectToServerAsync ()
+RTTRemoteMenu/<OnConnectButtonClicked>d__58:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTRemoteMenu.cs:336)
+System.Runtime.CompilerServices.AsyncVoidMethodBuilder:Start<RTTRemoteMenu/<OnConnectButtonClicked>d__58> (RTTRemoteMenu/<OnConnectButtonClicked>d__58&)
+RTTRemoteMenu:OnConnectButtonClicked ()
+UnityEngine.EventSystems.ExecuteEvents:Execute<UnityEngine.EventSystems.IPointerClickHandler> (UnityEngine.GameObject,UnityEngine.EventSystems.BaseEventData,UnityEngine.EventSystems.ExecuteEvents/EventFunction`1<UnityEngine.EventSystems.IPointerClickHandler>)
+RTTRaycastManager:SendClick () (at Assets/VR-Workspace/Scripts/UI/RTT/Input/RTTRaycastManager.cs:313)
+VRGazeReticle:ProcessDwellClickRTT (UnityEngine.Vector3) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:625)
+VRGazeReticle:CheckGaze () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:395)
+VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:268)
+
+[MultiPC] V2 protocol - waiting for manual ConnectV2Async() call
+UnityEngine.Debug:Log (object)
+MultiPCStreamClient/<Start>d__48:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/MultiPCStreamClient.cs:156)
+System.Runtime.CompilerServices.AsyncVoidMethodBuilder:Start<MultiPCStreamClient/<Start>d__48> (MultiPCStreamClient/<Start>d__48&)
+MultiPCStreamClient:Start ()
+
+[PhaseProtocol] WebSocket connected, waiting for hardware_info
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ConnectAsync>d__60:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:115)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[StateMachine] Connecting -> AwaitingHardwareInfo
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.ConnectionStateMachine:TryTransition (VRWorkspace.Streaming.ConnectionPhase,string) (at Assets/VR-Workspace/Scripts/Streaming/ConnectionStateMachine.cs:102)
+VRWorkspace.Streaming.PhaseProtocolClient/<ConnectAsync>d__60:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:116)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#1 Text, len=481, phase=AwaitingHardwareInfo
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:259)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Received: {"type":"hardware_info","device":{"name":"HANGUYEN","processor":"Intel(R) Core(TM) i5-14600K","gpu":...
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:285)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Parsed type='hardware_info' from message len=481
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:295)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Received hardware_info
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleHardwareInfoAsync>d__67:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:385)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleHardwareInfoAsync>d__67> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleHardwareInfoAsync>d__67&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleHardwareInfoAsync (VRWorkspace.Streaming.SimpleJson)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:300)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Server: HANGUYEN, GPU: Virtual Display Driver (0MB)
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleHardwareInfoAsync>d__67:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:404)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleHardwareInfoAsync>d__67> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleHardwareInfoAsync>d__67&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleHardwareInfoAsync (VRWorkspace.Streaming.SimpleJson)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:300)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Encoder: AMF, HW: True
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleHardwareInfoAsync>d__67:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:405)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleHardwareInfoAsync>d__67> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleHardwareInfoAsync>d__67&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleHardwareInfoAsync (VRWorkspace.Streaming.SimpleJson)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:300)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[StateMachine] AwaitingHardwareInfo -> SpeedTesting
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.ConnectionStateMachine:TryTransition (VRWorkspace.Streaming.ConnectionPhase,string) (at Assets/VR-Workspace/Scripts/Streaming/ConnectionStateMachine.cs:102)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleHardwareInfoAsync>d__67:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:407)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleHardwareInfoAsync>d__67> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleHardwareInfoAsync>d__67&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleHardwareInfoAsync (VRWorkspace.Streaming.SimpleJson)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:300)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[MultiPC-V2] Hardware: HANGUYEN, GPU: Virtual Display Driver (0GB)
+UnityEngine.Debug:Log (object)
+MultiPCStreamClient:<StartV2ProtocolAsync>b__52_0 (VRWorkspace.Streaming.ServerHardwareInfo) (at Assets/VR-Workspace/Scripts/Streaming/MultiPCStreamClient.cs:344)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleHardwareInfoAsync>d__67:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:408)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleHardwareInfoAsync>d__67> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleHardwareInfoAsync>d__67&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleHardwareInfoAsync (VRWorkspace.Streaming.SimpleJson)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:300)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[ClusterAutoBinder] Received hardware info: HANGUYEN, Virtual Display Driver
+UnityEngine.Debug:Log (object)
+ClusterAutoBinder:HandleHardwareInfo (VRWorkspace.Streaming.ServerHardwareInfo) (at Assets/VR-Workspace/Scripts/Cluster/ClusterAutoBinder.cs:320)
+MultiPCStreamClient:<StartV2ProtocolAsync>b__52_0 (VRWorkspace.Streaming.ServerHardwareInfo) (at Assets/VR-Workspace/Scripts/Streaming/MultiPCStreamClient.cs:345)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleHardwareInfoAsync>d__67:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:408)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleHardwareInfoAsync>d__67> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleHardwareInfoAsync>d__67&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleHardwareInfoAsync (VRWorkspace.Streaming.SimpleJson)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:300)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Sending hardware_info_ack
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleHardwareInfoAsync>d__67:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:411)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleHardwareInfoAsync>d__67> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleHardwareInfoAsync>d__67&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleHardwareInfoAsync (VRWorkspace.Streaming.SimpleJson)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:300)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#2 Text, len=4, phase=SpeedTesting
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:259)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Received: ping...
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:285)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#3 Text, len=4, phase=SpeedTesting
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:259)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Received: ping...
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:285)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#4 Text, len=4, phase=SpeedTesting
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:259)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Received: ping...
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:285)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#5 Text, len=4, phase=SpeedTesting
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:259)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Received: ping...
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:285)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#6 Text, len=4, phase=SpeedTesting
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:259)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Received: ping...
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:285)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#7 Text, len=85, phase=SpeedTesting
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:259)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Received: {"type":"speedtest_start","direction":"download","chunkSize":65536,"durationMs":2000}...
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:285)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Parsed type='speedtest_start' from message len=85
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:295)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Speed test start: direction=download, chunk=65536, duration=2000ms
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestStartAsync>d__69:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:435)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestStartAsync>d__69> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestStartAsync>d__69&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleSpeedTestStartAsync (VRWorkspace.Streaming.SimpleJson)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:304)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[SpeedTest] Starting download test (chunk=65536, duration=2000ms)
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.SpeedTestClient/<HandleSpeedTestStartAsync>d__20:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/SpeedTestClient.cs:50)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.SpeedTestClient/<HandleSpeedTestStartAsync>d__20> (VRWorkspace.Streaming.SpeedTestClient/<HandleSpeedTestStartAsync>d__20&)
+VRWorkspace.Streaming.SpeedTestClient:HandleSpeedTestStartAsync (string,int,int)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestStartAsync>d__69:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:440)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestStartAsync>d__69> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestStartAsync>d__69&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleSpeedTestStartAsync (VRWorkspace.Streaming.SimpleJson)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:304)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#8 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#9 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#10 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#11 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#12 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#13 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#14 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#15 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#16 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#17 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#18 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#19 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#20 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#21 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#22 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#23 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#24 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#25 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#26 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#27 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#28 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#29 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#30 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#31 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#32 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#33 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#34 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#35 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#36 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#37 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#38 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#39 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#40 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#41 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#42 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#43 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#44 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#45 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#46 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#47 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#48 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#49 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#50 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#51 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#52 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#53 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#54 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#55 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#56 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#57 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#58 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#59 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#60 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#61 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#62 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#63 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#64 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#65 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#66 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#67 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#68 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#69 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#70 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#71 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#72 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#73 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#74 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#75 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#76 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#77 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#78 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#79 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#80 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#81 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#82 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#83 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#84 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#85 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#86 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#87 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#88 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#89 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#90 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#91 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#92 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#93 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#94 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#95 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#96 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#97 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#98 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#99 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#100 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#101 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#102 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#103 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#104 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#105 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#106 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#107 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#108 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#109 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#110 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#111 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#112 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#113 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#114 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#115 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#116 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#117 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#118 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#119 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#120 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#121 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#122 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#123 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#124 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#125 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#126 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#127 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#128 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#129 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#130 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#131 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#132 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#133 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#134 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#135 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#136 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#137 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#138 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#139 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#140 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#141 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#142 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#143 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#144 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#145 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#146 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#147 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#148 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#149 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#150 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#151 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#152 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#153 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#154 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#155 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#156 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#157 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#158 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#159 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#160 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#161 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#162 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#163 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#164 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#165 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#166 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#167 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#168 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#169 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#170 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#171 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#172 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#173 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#174 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#175 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#176 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#177 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#178 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#179 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#180 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#181 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#182 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#183 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#184 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#185 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#186 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#187 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#188 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#189 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#190 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#191 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#192 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#193 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#194 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#195 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#196 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#197 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#198 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#199 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#200 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#201 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#202 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#203 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#204 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#205 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#206 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#207 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#208 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#209 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#210 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#211 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#212 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#213 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#214 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#215 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#216 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#217 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#218 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#219 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#220 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#221 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#222 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#223 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#224 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#225 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#226 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#227 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#228 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#229 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#230 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#231 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#232 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#233 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#234 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#235 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#236 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#237 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#238 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#239 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#240 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#241 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#242 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#243 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#244 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#245 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#246 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#247 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#248 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#249 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#250 Binary data, len=65536
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:253)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#251 Text, len=87, phase=SpeedTesting
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:259)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Received: {"type":"speedtest_end","direction":"download","totalBytes":15925248,"durationMs":2001}...
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:285)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Parsed type='speedtest_end' from message len=87
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:295)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Speed test end: direction=download, current phase: SpeedTesting
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestEndAsync>d__70:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:450)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestEndAsync>d__70> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestEndAsync>d__70&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleSpeedTestEndAsync (VRWorkspace.Streaming.SimpleJson)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:308)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[SpeedTest] download complete: 15925248 bytes in 2.03s = 62.7 Mbps
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.SpeedTestClient/<HandleSpeedTestEndAsync>d__23:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/SpeedTestClient.cs:115)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1<double>:Start<VRWorkspace.Streaming.SpeedTestClient/<HandleSpeedTestEndAsync>d__23> (VRWorkspace.Streaming.SpeedTestClient/<HandleSpeedTestEndAsync>d__23&)
+VRWorkspace.Streaming.SpeedTestClient:HandleSpeedTestEndAsync (string,long,long)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestEndAsync>d__70:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:452)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestEndAsync>d__70> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestEndAsync>d__70&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleSpeedTestEndAsync (VRWorkspace.Streaming.SimpleJson)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:308)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[SpeedTest] Server reported: 15925248 bytes in 2001ms
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.SpeedTestClient/<HandleSpeedTestEndAsync>d__23:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/SpeedTestClient.cs:116)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1<double>:Start<VRWorkspace.Streaming.SpeedTestClient/<HandleSpeedTestEndAsync>d__23> (VRWorkspace.Streaming.SpeedTestClient/<HandleSpeedTestEndAsync>d__23&)
+VRWorkspace.Streaming.SpeedTestClient:HandleSpeedTestEndAsync (string,long,long)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestEndAsync>d__70:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:452)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestEndAsync>d__70> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestEndAsync>d__70&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleSpeedTestEndAsync (VRWorkspace.Streaming.SimpleJson)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:308)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#252 Text, len=83, phase=SpeedTesting
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:259)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Received: {"type":"speedtest_start","direction":"upload","chunkSize":65536,"durationMs":2000}...
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:285)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Parsed type='speedtest_start' from message len=83
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:295)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Speed test start: direction=upload, chunk=65536, duration=2000ms
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestStartAsync>d__69:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:435)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestStartAsync>d__69> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestStartAsync>d__69&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleSpeedTestStartAsync (VRWorkspace.Streaming.SimpleJson)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:304)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[SpeedTest] Starting upload test (chunk=65536, duration=2000ms)
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.SpeedTestClient/<HandleSpeedTestStartAsync>d__20:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/SpeedTestClient.cs:50)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.SpeedTestClient/<HandleSpeedTestStartAsync>d__20> (VRWorkspace.Streaming.SpeedTestClient/<HandleSpeedTestStartAsync>d__20&)
+VRWorkspace.Streaming.SpeedTestClient:HandleSpeedTestStartAsync (string,int,int)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestStartAsync>d__69:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:440)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestStartAsync>d__69> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestStartAsync>d__69&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleSpeedTestStartAsync (VRWorkspace.Streaming.SimpleJson)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:304)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[SpeedTest] Starting upload test (chunk=65536, duration=2000ms)
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.SpeedTestClient/<RunUploadTestAsync>d__24:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/SpeedTestClient.cs:135)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.SpeedTestClient/<RunUploadTestAsync>d__24> (VRWorkspace.Streaming.SpeedTestClient/<RunUploadTestAsync>d__24&)
+VRWorkspace.Streaming.SpeedTestClient:RunUploadTestAsync (int,int)
+VRWorkspace.Streaming.SpeedTestClient/<HandleSpeedTestStartAsync>d__20:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/SpeedTestClient.cs:65)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.SpeedTestClient/<HandleSpeedTestStartAsync>d__20> (VRWorkspace.Streaming.SpeedTestClient/<HandleSpeedTestStartAsync>d__20&)
+VRWorkspace.Streaming.SpeedTestClient:HandleSpeedTestStartAsync (string,int,int)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestStartAsync>d__69:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:440)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestStartAsync>d__69> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestStartAsync>d__69&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleSpeedTestStartAsync (VRWorkspace.Streaming.SimpleJson)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:304)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[SpeedTest] Upload complete: 15794176 bytes in 2.01s = 63.0 Mbps
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.SpeedTestClient/<RunUploadTestAsync>d__24:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/SpeedTestClient.cs:182)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:SetResult ()
+VRWorkspace.Streaming.SpeedTestClient/<SendTextAsync>d__27:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/SpeedTestClient.cs:220)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#253 Text, len=116, phase=SpeedTesting
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:259)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Received: {"type":"speedtest_end","direction":"upload","totalBytes":15794176,"durationMs":2064,"serverMbps":61...
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:285)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Parsed type='speedtest_end' from message len=116
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:295)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Speed test end: direction=upload, current phase: SpeedTesting
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestEndAsync>d__70:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:450)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestEndAsync>d__70> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestEndAsync>d__70&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleSpeedTestEndAsync (VRWorkspace.Streaming.SimpleJson)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:308)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[StateMachine] SpeedTesting -> AwaitingNetworkInfo
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.ConnectionStateMachine:TryTransition (VRWorkspace.Streaming.ConnectionPhase,string) (at Assets/VR-Workspace/Scripts/Streaming/ConnectionStateMachine.cs:102)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestEndAsync>d__70:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:456)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestEndAsync>d__70> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestEndAsync>d__70&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleSpeedTestEndAsync (VRWorkspace.Streaming.SimpleJson)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:308)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Transition to AwaitingNetworkInfo: True, new phase: AwaitingNetworkInfo
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestEndAsync>d__70:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:457)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestEndAsync>d__70> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleSpeedTestEndAsync>d__70&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleSpeedTestEndAsync (VRWorkspace.Streaming.SimpleJson)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:308)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#254 Text, len=143, phase=AwaitingNetworkInfo
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:259)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Received: {"type":"network_info","pingMs":7.5549800000000005,"jitterMs":0.6380750000000002,"bandwidthMbps":63....
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:285)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Parsed type='network_info' from message len=143
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:295)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Received network_info, current phase: AwaitingNetworkInfo
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleNetworkInfo (VRWorkspace.Streaming.SimpleJson) (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:463)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:312)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Network: Ethernet, Ping: 7.6ms, BW: 64Mbps
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleNetworkInfo (VRWorkspace.Streaming.SimpleJson) (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:473)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:312)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[StateMachine] AwaitingNetworkInfo -> AwaitingSuggestedConfig
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.ConnectionStateMachine:TryTransition (VRWorkspace.Streaming.ConnectionPhase,string) (at Assets/VR-Workspace/Scripts/Streaming/ConnectionStateMachine.cs:102)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleNetworkInfo (VRWorkspace.Streaming.SimpleJson) (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:475)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:312)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Transition to AwaitingSuggestedConfig: True, new phase: AwaitingSuggestedConfig
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleNetworkInfo (VRWorkspace.Streaming.SimpleJson) (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:476)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:312)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[MultiPC-V2] Network: Ethernet, Ping: 7.6ms, BW: 64Mbps
+UnityEngine.Debug:Log (object)
+MultiPCStreamClient:<StartV2ProtocolAsync>b__52_1 (VRWorkspace.Streaming.NetworkTestResult) (at Assets/VR-Workspace/Scripts/Streaming/MultiPCStreamClient.cs:350)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleNetworkInfo (VRWorkspace.Streaming.SimpleJson) (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:478)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:312)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[ClusterAutoBinder] Received network info: Ethernet, 7.6ms, 64Mbps
+UnityEngine.Debug:Log (object)
+ClusterAutoBinder:HandleNetworkInfo (VRWorkspace.Streaming.NetworkTestResult) (at Assets/VR-Workspace/Scripts/Cluster/ClusterAutoBinder.cs:327)
+MultiPCStreamClient:<StartV2ProtocolAsync>b__52_1 (VRWorkspace.Streaming.NetworkTestResult) (at Assets/VR-Workspace/Scripts/Streaming/MultiPCStreamClient.cs:351)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleNetworkInfo (VRWorkspace.Streaming.SimpleJson) (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:478)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:312)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#255 Text, len=196, phase=AwaitingSuggestedConfig
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:259)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Received: {"type":"suggested_config","monitors":3,"resolution":{"w":1366,"h":768},"bitrateKbps":14842,"fps":60...
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:285)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Parsed type='suggested_config' from message len=196
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:295)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Received suggested_config, current phase: AwaitingSuggestedConfig
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleSuggestedConfig (VRWorkspace.Streaming.SimpleJson) (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:483)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:316)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Suggested: 3mon @ 1366x768, 60fps, 14842kbps
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleSuggestedConfig (VRWorkspace.Streaming.SimpleJson) (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:498)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:316)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Reason: 768p (VRAM limited) | 14Mbps (BW: 64Mbps) | 60fps (AMF, ping: 8ms)
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleSuggestedConfig (VRWorkspace.Streaming.SimpleJson) (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:499)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:316)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[StateMachine] AwaitingSuggestedConfig -> ConfiguringSettings
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.ConnectionStateMachine:TryTransition (VRWorkspace.Streaming.ConnectionPhase,string) (at Assets/VR-Workspace/Scripts/Streaming/ConnectionStateMachine.cs:102)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleSuggestedConfig (VRWorkspace.Streaming.SimpleJson) (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:501)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:316)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Transition to ConfiguringSettings: True, new phase: ConfiguringSettings
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleSuggestedConfig (VRWorkspace.Streaming.SimpleJson) (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:502)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:316)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[MultiPC-V2] Suggested: 3mon @ 1366x768, 60fps
+UnityEngine.Debug:Log (object)
+MultiPCStreamClient:<StartV2ProtocolAsync>b__52_2 (VRWorkspace.Streaming.SuggestedStreamConfig) (at Assets/VR-Workspace/Scripts/Streaming/MultiPCStreamClient.cs:356)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleSuggestedConfig (VRWorkspace.Streaming.SimpleJson) (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:504)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:316)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[ClusterAutoBinder] Received suggested config: 3mon @ 1366x768
+UnityEngine.Debug:Log (object)
+ClusterAutoBinder:HandleSuggestedConfig (VRWorkspace.Streaming.SuggestedStreamConfig) (at Assets/VR-Workspace/Scripts/Cluster/ClusterAutoBinder.cs:334)
+MultiPCStreamClient:<StartV2ProtocolAsync>b__52_2 (VRWorkspace.Streaming.SuggestedStreamConfig) (at Assets/VR-Workspace/Scripts/Streaming/MultiPCStreamClient.cs:357)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleSuggestedConfig (VRWorkspace.Streaming.SimpleJson) (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:504)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:316)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[ClusterAutoBinder] State: Connecting -> Connected
+UnityEngine.Debug:Log (object)
+ClusterAutoBinder:SetState (ClusterAutoBinder/ConnectionState) (at Assets/VR-Workspace/Scripts/Cluster/ClusterAutoBinder.cs:313)
+ClusterAutoBinder:HandleSuggestedConfig (VRWorkspace.Streaming.SuggestedStreamConfig) (at Assets/VR-Workspace/Scripts/Cluster/ClusterAutoBinder.cs:337)
+MultiPCStreamClient:<StartV2ProtocolAsync>b__52_2 (VRWorkspace.Streaming.SuggestedStreamConfig) (at Assets/VR-Workspace/Scripts/Streaming/MultiPCStreamClient.cs:357)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleSuggestedConfig (VRWorkspace.Streaming.SimpleJson) (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:504)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:316)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[RTTRemoteMenu] HandleConnectionStateChanged: Connecting -> Connected
+UnityEngine.Debug:Log (object)
+RTTRemoteMenu:HandleConnectionStateChanged (ClusterAutoBinder/ConnectionState) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTRemoteMenu.cs:459)
+ClusterAutoBinder:SetState (ClusterAutoBinder/ConnectionState) (at Assets/VR-Workspace/Scripts/Cluster/ClusterAutoBinder.cs:314)
+ClusterAutoBinder:HandleSuggestedConfig (VRWorkspace.Streaming.SuggestedStreamConfig) (at Assets/VR-Workspace/Scripts/Cluster/ClusterAutoBinder.cs:337)
+MultiPCStreamClient:<StartV2ProtocolAsync>b__52_2 (VRWorkspace.Streaming.SuggestedStreamConfig) (at Assets/VR-Workspace/Scripts/Streaming/MultiPCStreamClient.cs:357)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleSuggestedConfig (VRWorkspace.Streaming.SimpleJson) (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:504)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:316)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+Monitor: 3 Monitors
+UnityEngine.Debug:Log (object)
+RTTRemoteMenu/<>c:<CreateGrid>b__56_0 (int,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTRemoteMenu.cs:244)
+VRDropdown:SetSelectedIndex (int) (at Assets/VR-Workspace/Scripts/UI/Components/VRDropdownFactory.cs:1402)
+VRDropdownFactory:SetSelectedIndex (UnityEngine.GameObject,int) (at Assets/VR-Workspace/Scripts/UI/Components/VRDropdownFactory.cs:297)
+RTTRemoteMenu:ApplySuggestedConfig (VRWorkspace.Streaming.SuggestedStreamConfig) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTRemoteMenu.cs:498)
+ClusterAutoBinder:HandleSuggestedConfig (VRWorkspace.Streaming.SuggestedStreamConfig) (at Assets/VR-Workspace/Scripts/Cluster/ClusterAutoBinder.cs:338)
+MultiPCStreamClient:<StartV2ProtocolAsync>b__52_2 (VRWorkspace.Streaming.SuggestedStreamConfig) (at Assets/VR-Workspace/Scripts/Streaming/MultiPCStreamClient.cs:357)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleSuggestedConfig (VRWorkspace.Streaming.SimpleJson) (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:504)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:316)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+Resolution: 1366 x 768
+UnityEngine.Debug:Log (object)
+RTTRemoteMenu/<>c:<CreateGrid>b__56_1 (int,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTRemoteMenu.cs:252)
+VRDropdown:SetSelectedIndex (int) (at Assets/VR-Workspace/Scripts/UI/Components/VRDropdownFactory.cs:1402)
+VRDropdownFactory:SetSelectedIndex (UnityEngine.GameObject,int) (at Assets/VR-Workspace/Scripts/UI/Components/VRDropdownFactory.cs:297)
+RTTRemoteMenu:ApplySuggestedConfig (VRWorkspace.Streaming.SuggestedStreamConfig) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTRemoteMenu.cs:504)
+ClusterAutoBinder:HandleSuggestedConfig (VRWorkspace.Streaming.SuggestedStreamConfig) (at Assets/VR-Workspace/Scripts/Cluster/ClusterAutoBinder.cs:338)
+MultiPCStreamClient:<StartV2ProtocolAsync>b__52_2 (VRWorkspace.Streaming.SuggestedStreamConfig) (at Assets/VR-Workspace/Scripts/Streaming/MultiPCStreamClient.cs:357)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleSuggestedConfig (VRWorkspace.Streaming.SimpleJson) (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:504)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:316)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+FPS: 60 FPS
+UnityEngine.Debug:Log (object)
+RTTRemoteMenu/<>c:<CreateGrid>b__56_3 (int,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTRemoteMenu.cs:269)
+VRDropdown:SetSelectedIndex (int) (at Assets/VR-Workspace/Scripts/UI/Components/VRDropdownFactory.cs:1402)
+VRDropdownFactory:SetSelectedIndex (UnityEngine.GameObject,int) (at Assets/VR-Workspace/Scripts/UI/Components/VRDropdownFactory.cs:297)
+RTTRemoteMenu:ApplySuggestedConfig (VRWorkspace.Streaming.SuggestedStreamConfig) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTRemoteMenu.cs:517)
+ClusterAutoBinder:HandleSuggestedConfig (VRWorkspace.Streaming.SuggestedStreamConfig) (at Assets/VR-Workspace/Scripts/Cluster/ClusterAutoBinder.cs:338)
+MultiPCStreamClient:<StartV2ProtocolAsync>b__52_2 (VRWorkspace.Streaming.SuggestedStreamConfig) (at Assets/VR-Workspace/Scripts/Streaming/MultiPCStreamClient.cs:357)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleSuggestedConfig (VRWorkspace.Streaming.SimpleJson) (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:504)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:316)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[RTTRemoteMenu] Applied suggested config: 3mon @ 1366x768, 60fps, 14842kbps
+UnityEngine.Debug:Log (object)
+RTTRemoteMenu:ApplySuggestedConfig (VRWorkspace.Streaming.SuggestedStreamConfig) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTRemoteMenu.cs:519)
+ClusterAutoBinder:HandleSuggestedConfig (VRWorkspace.Streaming.SuggestedStreamConfig) (at Assets/VR-Workspace/Scripts/Cluster/ClusterAutoBinder.cs:338)
+MultiPCStreamClient:<StartV2ProtocolAsync>b__52_2 (VRWorkspace.Streaming.SuggestedStreamConfig) (at Assets/VR-Workspace/Scripts/Streaming/MultiPCStreamClient.cs:357)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleSuggestedConfig (VRWorkspace.Streaming.SimpleJson) (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:504)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:316)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] MSG#256 Text, len=4, phase=ConfiguringSettings
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:259)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Received: pong...
+UnityEngine.Debug:Log (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:285)
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__66&)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__65:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:262)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+

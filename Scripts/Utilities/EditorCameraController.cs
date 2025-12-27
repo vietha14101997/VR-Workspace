@@ -34,14 +34,12 @@ public class EditorCameraController : MonoBehaviour
         
         if (mouse == null)
         {
-            Debug.LogError("[EditorCameraController] No mouse detected!");
             enabled = false;
             return;
         }
         
         if (keyboard == null)
         {
-            Debug.LogError("[EditorCameraController] No keyboard detected!");
             enabled = false;
             return;
         }
@@ -57,7 +55,6 @@ public class EditorCameraController : MonoBehaviour
         
         // Start with mouse look active
         SetMouseLookActive(true);
-        Debug.Log("[EditorCameraController] Started with New Input System. Initial rotation: " + currentRotation);
     }
     
     private void Update()
@@ -109,14 +106,12 @@ public class EditorCameraController : MonoBehaviour
             // Hide and lock cursor
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
-            Debug.Log("[EditorCameraController] Mouse Look ENABLED - Press Alt or Escape to exit");
         }
         else
         {
             // Show and unlock cursor
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
-            Debug.Log("[EditorCameraController] Mouse Look DISABLED - Press Alt or Escape to enable");
         }
     }
     

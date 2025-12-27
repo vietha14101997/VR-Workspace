@@ -3,11 +3,15 @@ using UnityEngine.UI;
 using TMPro;
 using System;
 using System.Collections.Generic;
+using VRWorkspace.Streaming;
 
 /// <summary>
 /// RTT-based Remote Desktop connection menu.
 /// Features: Host/Port inputs, Monitors/Resolution/Bitrate/FPS dropdowns, QR scanner.
 /// Easy to use: Set themeColor, subscribe to events, call BuildUI().
+///
+/// V2 Protocol: Supports phased connection flow with button state changes:
+/// - "Connect" → "Setup Remote" → "Start Remote"
 /// </summary>
 public class RTTRemoteMenu : MonoBehaviour
 {
@@ -16,12 +20,19 @@ public class RTTRemoteMenu : MonoBehaviour
     public Color themeColor = new Color(0f, 0.9f, 1f);
     public Color accentColor = new Color(0.8f, 0.4f, 1f);
     public TMP_FontAsset customFont;
+
+    [Header("V2 Protocol")]
+    [Tooltip("Reference to ClusterAutoBinder for V2 protocol phased connection")]
+    public ClusterAutoBinder clusterBinder;
     #endregion
 
     #region Events
     public event Action OnBackClicked;
     public event Action OnConnectClicked;
     public event Action OnQRClicked;
+    public event Action OnSetupClicked;
+    public event Action OnStartClicked;
+    public event Action<ClusterAutoBinder.ConnectionState> OnConnectionStateChanged;
     #endregion
 
     #region Private Fields
@@ -33,6 +44,11 @@ public class RTTRemoteMenu : MonoBehaviour
     private GameObject _bitrateDropdown;
     private GameObject _fpsDropdown;
     private GameObject _bodyContainer;
+
+    // Connect button reference for dynamic text change
+    private GameObject _connectButton;
+    private TextMeshProUGUI _connectButtonText;
+    private ClusterAutoBinder.ConnectionState _currentState = ClusterAutoBinder.ConnectionState.Disconnected;
 
     // QR Scanner
     private QRScannerManager _qrScannerManager;
@@ -131,6 +147,30 @@ public class RTTRemoteMenu : MonoBehaviour
         }
 
         Debug.Log("[RTTRemoteMenu] UI built");
+
+        // Subscribe to ClusterAutoBinder events if available
+        BindToClusterBinder();
+    }
+
+    /// <summary>
+    /// Bind to ClusterAutoBinder events for V2 protocol.
+    /// </summary>
+    public void BindToClusterBinder()
+    {
+        if (clusterBinder == null) return;
+
+        // Unsubscribe first in case of rebinding
+        clusterBinder.OnStateChanged -= HandleConnectionStateChanged;
+        clusterBinder.OnSuggestedConfigReceived -= ApplySuggestedConfig;
+
+        // Subscribe
+        clusterBinder.OnStateChanged += HandleConnectionStateChanged;
+        clusterBinder.OnSuggestedConfigReceived += ApplySuggestedConfig;
+
+        // Update current state
+        HandleConnectionStateChanged(clusterBinder.CurrentState);
+
+        Debug.Log("[RTTRemoteMenu] Bound to ClusterAutoBinder");
     }
     #endregion
 
@@ -165,7 +205,7 @@ public class RTTRemoteMenu : MonoBehaviour
         // Host Input
         _hostInput = VRInputFieldFactory.CreateLabeledInputField(
             row.transform, hostW,
-            "Host", "192.168.1.12", accentColor,
+            "Host", "192.168.1.8", accentColor,
             onEndEdit: (value) => Debug.Log("Host: " + value),
             labelFontSize: LABEL_FONT_SIZE, inputFontSize: INPUT_FONT_SIZE, font: customFont);
         PositionElement(_hostInput, 0, 0);
@@ -256,13 +296,227 @@ public class RTTRemoteMenu : MonoBehaviour
             connectColorC = accentColor
         };
 
-        var btn = VRButtonFactory.CreateButton(parent, config, () => OnConnectClicked?.Invoke());
+        _connectButton = VRButtonFactory.CreateButton(parent, config, OnConnectButtonClicked);
 
-        RectTransform rt = btn.GetComponent<RectTransform>();
+        // Find and save reference to button text
+        _connectButtonText = _connectButton.GetComponentInChildren<TextMeshProUGUI>();
+
+        RectTransform rt = _connectButton.GetComponent<RectTransform>();
         rt.anchorMin = new Vector2(0.5f, 0);
         rt.anchorMax = new Vector2(0.5f, 0);
         rt.pivot = new Vector2(0.5f, 0);
         rt.anchoredPosition = Vector2.zero;
+    }
+
+    /// <summary>
+    /// Handle connect button click based on current state.
+    /// </summary>
+    private async void OnConnectButtonClicked()
+    {
+        Debug.Log($"[RTTRemoteMenu] Button clicked! clusterBinder={clusterBinder != null}, useV2={clusterBinder?.useV2Protocol}, currentState={_currentState}");
+
+        // If no binder or not using V2, use legacy event
+        if (clusterBinder == null || !clusterBinder.useV2Protocol)
+        {
+            Debug.Log("[RTTRemoteMenu] Using legacy event (no binder or V2 disabled)");
+            OnConnectClicked?.Invoke();
+            return;
+        }
+
+        switch (_currentState)
+        {
+            case ClusterAutoBinder.ConnectionState.Disconnected:
+                // Step 1: Connect
+                Debug.Log("[RTTRemoteMenu] Connecting...");
+                UpdateButtonText("CONNECTING...");
+
+                // Apply form values to binder
+                ApplyFormToBinder();
+
+                bool connected = await clusterBinder.ConnectToServerAsync();
+                if (!connected)
+                {
+                    UpdateButtonText("CONNECT");
+                    Debug.LogError("[RTTRemoteMenu] Connection failed");
+                }
+                // State change will trigger button text update via event
+                break;
+
+            case ClusterAutoBinder.ConnectionState.Connected:
+                // Step 2: Setup
+                Debug.Log("[RTTRemoteMenu] State is Connected, calling SetupRemoteAsync...");
+                UpdateButtonText("SETTING UP...");
+                OnSetupClicked?.Invoke();
+
+                Debug.Log("[RTTRemoteMenu] Awaiting SetupRemoteAsync...");
+                bool setup = await clusterBinder.SetupRemoteAsync();
+                Debug.Log($"[RTTRemoteMenu] SetupRemoteAsync returned: {setup}");
+                if (!setup)
+                {
+                    UpdateButtonText("SETUP REMOTE");
+                    Debug.LogError("[RTTRemoteMenu] Setup failed");
+                }
+                break;
+
+            case ClusterAutoBinder.ConnectionState.Ready:
+                // Step 3: Start
+                Debug.Log("[RTTRemoteMenu] Starting remote...");
+                UpdateButtonText("STARTING...");
+                OnStartClicked?.Invoke();
+
+                bool started = await clusterBinder.StartRemoteAsync();
+                if (started)
+                {
+                    // Hide menu after successful start
+                    // This will be handled by external code via OnStartClicked event
+                }
+                break;
+
+            case ClusterAutoBinder.ConnectionState.Streaming:
+                // Already streaming - could offer disconnect
+                Debug.Log("[RTTRemoteMenu] Already streaming");
+                break;
+
+            case ClusterAutoBinder.ConnectionState.Error:
+                // Reset and try again
+                clusterBinder.StopStreaming();
+                UpdateButtonText("CONNECT");
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Apply form values to ClusterAutoBinder.
+    /// </summary>
+    private void ApplyFormToBinder()
+    {
+        if (clusterBinder == null) return;
+
+        // Host and Port
+        string host = Host;
+        string port = Port;
+        if (!string.IsNullOrEmpty(host) && !string.IsNullOrEmpty(port))
+        {
+            clusterBinder.serverBase = $"http://{host}:{port}";
+        }
+
+        // Monitors
+        clusterBinder.monitorCount = MonitorIndex + 1;
+
+        // Resolution
+        var resolution = Resolution;
+        if (!string.IsNullOrEmpty(resolution))
+        {
+            var parts = resolution.Replace(" ", "").Split('x');
+            if (parts.Length == 2 && int.TryParse(parts[0], out int w) && int.TryParse(parts[1], out int h))
+            {
+                clusterBinder.resolutionWidth = w;
+                clusterBinder.resolutionHeight = h;
+            }
+        }
+
+        // Bitrate
+        var bitrate = Bitrate;
+        if (!string.IsNullOrEmpty(bitrate))
+        {
+            var numStr = bitrate.Replace(" ", "").Replace("Mbps", "").Replace("mbps", "");
+            if (int.TryParse(numStr, out int mbps))
+            {
+                clusterBinder.bitrateKbps = mbps * 1000;
+            }
+        }
+
+        // FPS
+        var fps = FPS;
+        if (!string.IsNullOrEmpty(fps))
+        {
+            var numStr = fps.Replace(" ", "").Replace("FPS", "").Replace("fps", "");
+            if (int.TryParse(numStr, out int fpsVal))
+            {
+                clusterBinder.fps = fpsVal;
+            }
+        }
+
+        Debug.Log($"[RTTRemoteMenu] Applied to binder: {clusterBinder.serverBase}, {clusterBinder.monitorCount}mon, {clusterBinder.resolutionWidth}x{clusterBinder.resolutionHeight}, {clusterBinder.bitrateKbps}kbps, {clusterBinder.fps}fps");
+    }
+
+    /// <summary>
+    /// Update button text.
+    /// </summary>
+    public void UpdateButtonText(string text)
+    {
+        if (_connectButtonText != null)
+        {
+            _connectButtonText.text = text;
+        }
+    }
+
+    /// <summary>
+    /// Handle connection state change from ClusterAutoBinder.
+    /// </summary>
+    public void HandleConnectionStateChanged(ClusterAutoBinder.ConnectionState state)
+    {
+        Debug.Log($"[RTTRemoteMenu] HandleConnectionStateChanged: {_currentState} -> {state}");
+        _currentState = state;
+        OnConnectionStateChanged?.Invoke(state);
+
+        switch (state)
+        {
+            case ClusterAutoBinder.ConnectionState.Disconnected:
+                UpdateButtonText("CONNECT");
+                break;
+            case ClusterAutoBinder.ConnectionState.Connecting:
+                UpdateButtonText("CONNECTING...");
+                break;
+            case ClusterAutoBinder.ConnectionState.Connected:
+                UpdateButtonText("SETUP REMOTE");
+                break;
+            case ClusterAutoBinder.ConnectionState.SettingUp:
+                UpdateButtonText("SETTING UP...");
+                break;
+            case ClusterAutoBinder.ConnectionState.Ready:
+                UpdateButtonText("START REMOTE");
+                break;
+            case ClusterAutoBinder.ConnectionState.Streaming:
+                UpdateButtonText("STREAMING");
+                break;
+            case ClusterAutoBinder.ConnectionState.Error:
+                UpdateButtonText("RETRY");
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Update dropdowns with suggested config from server.
+    /// </summary>
+    public void ApplySuggestedConfig(SuggestedStreamConfig config)
+    {
+        if (config == null) return;
+
+        // Monitors
+        int monitorIndex = Mathf.Clamp(config.monitors - 1, 0, 2);
+        VRDropdownFactory.SetSelectedIndex(_monitorsDropdown, monitorIndex);
+
+        // Resolution
+        string resolution = $"{config.resolutionWidth} x {config.resolutionHeight}";
+        int resIndex = FindOptionIndex(new[] { "1280 x 720", "1366 x 768", "1600 x 900", "1920 x 1080" }, resolution);
+        if (resIndex >= 0)
+            VRDropdownFactory.SetSelectedIndex(_resolutionDropdown, resIndex);
+
+        // Bitrate
+        int bitrateMbps = config.bitrateKbps / 1000;
+        string bitrateStr = $"{bitrateMbps} Mbps";
+        int bitrateIndex = FindOptionIndex(new[] { "5 Mbps", "10 Mbps", "20 Mbps", "30 Mbps", "50 Mbps" }, bitrateStr);
+        if (bitrateIndex >= 0)
+            VRDropdownFactory.SetSelectedIndex(_bitrateDropdown, bitrateIndex);
+
+        // FPS
+        string fpsStr = $"{config.fps} FPS";
+        int fpsIndex = FindOptionIndex(new[] { "30 FPS", "45 FPS", "60 FPS" }, fpsStr);
+        if (fpsIndex >= 0)
+            VRDropdownFactory.SetSelectedIndex(_fpsDropdown, fpsIndex);
+
+        Debug.Log($"[RTTRemoteMenu] Applied suggested config: {config.monitors}mon @ {config.resolutionWidth}x{config.resolutionHeight}, {config.fps}fps, {config.bitrateKbps}kbps");
     }
     #endregion
 
@@ -521,6 +775,13 @@ public class RTTRemoteMenu : MonoBehaviour
         {
             _qrScannerManager.OnQRScanned -= OnQRCodeScanned;
             _qrScannerManager.OnCancelled -= OnQRScanCancelled;
+        }
+
+        // Unsubscribe from ClusterAutoBinder events
+        if (clusterBinder != null)
+        {
+            clusterBinder.OnStateChanged -= HandleConnectionStateChanged;
+            clusterBinder.OnSuggestedConfigReceived -= ApplySuggestedConfig;
         }
     }
     #endregion

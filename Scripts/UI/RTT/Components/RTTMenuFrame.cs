@@ -765,6 +765,24 @@ public class RTTMenuFrame : RTTCanvasBase
             : new Color(0.76f, 0.36f, 1f);
         _remoteMenuInstance.customFont = menuFont;
 
+        // Get or create ClusterRig and ClusterAutoBinder for V2 protocol
+        WorldPanelClusterRig rig = GetOrCreateClusterRig();
+        if (rig != null)
+        {
+            ClusterAutoBinder binder = rig.GetComponent<ClusterAutoBinder>();
+            if (binder == null)
+            {
+                binder = rig.gameObject.AddComponent<ClusterAutoBinder>();
+            }
+            binder.autoStart = false;
+            binder.rig = rig;
+            binder.useV2Protocol = true; // Enable V2 protocol
+
+            // Assign binder to remote menu for V2 phased flow
+            _remoteMenuInstance.clusterBinder = binder;
+            Debug.Log("[RTTMenuFrame] ClusterAutoBinder assigned to RTTRemoteMenu for V2 protocol");
+        }
+
         // Get container size
         float containerW = _contentContainer.rect.width;
         float containerH = _contentContainer.rect.height;
@@ -777,6 +795,7 @@ public class RTTMenuFrame : RTTCanvasBase
         // Subscribe to events
         _remoteMenuInstance.OnBackClicked += ReturnToMainMenu;
         _remoteMenuInstance.OnConnectClicked += OnRemoteConnectClicked;
+        _remoteMenuInstance.OnStartClicked += OnRemoteStartClicked;
 
         // Build the remote menu UI
         _remoteMenuInstance.BuildUI(remoteObj.transform, containerW, containerH);
@@ -786,6 +805,15 @@ public class RTTMenuFrame : RTTCanvasBase
 
         MarkDirty();
         Debug.Log("[RTTMenuFrame] Switched to Remote Menu");
+    }
+
+    /// <summary>
+    /// Handle Start Remote clicked (V2 Phase 3) - hide menu
+    /// </summary>
+    private void OnRemoteStartClicked()
+    {
+        Debug.Log("[RTTMenuFrame] Start Remote clicked - hiding menu");
+        gameObject.SetActive(false);
     }
 
     private void OnRemoteConnectClicked()
@@ -934,6 +962,7 @@ public class RTTMenuFrame : RTTCanvasBase
         {
             _remoteMenuInstance.OnBackClicked -= ReturnToMainMenu;
             _remoteMenuInstance.OnConnectClicked -= OnRemoteConnectClicked;
+            _remoteMenuInstance.OnStartClicked -= OnRemoteStartClicked;
         }
 
         // Destroy current remote menu

@@ -7,11 +7,16 @@ using System.Threading.Tasks;
 using System.Linq;
 using Unity.WebRTC;
 using UnityEngine;
+using VRWorkspace.Streaming;
 
 /// <summary>
 /// Multi-PC WebRTC stream client: Creates N PeerConnections (one per monitor).
 /// Uses multiplexed signaling over single WebSocket:
 /// - offer:N:sdp, answer:N:sdp, candidate:N:candidate
+///
+/// Supports two protocols:
+/// - V1 (legacy): Direct WebRTC signaling
+/// - V2 (new): 3-phase connection with hardware info, speed test, and suggested config
 /// </summary>
 [DisallowMultipleComponent]
 public class MultiPCStreamClient : MonoBehaviour
@@ -24,10 +29,37 @@ public class MultiPCStreamClient : MonoBehaviour
 
     [Header("ICE")]
     public bool skipTcpIceCandidates = true;
-    
+
     [Header("LAN Optimization")]
     [Tooltip("Auto-detect LAN connection and add &lan=1 parameter")]
     public bool autoDetectLAN = true;
+
+    [Header("Protocol")]
+    [Tooltip("Use V2 protocol with 3-phase connection (hardware info, speed test, suggested config)")]
+    public bool useV2Protocol = false;
+
+    [Tooltip("Auto-accept suggested config in V2 mode (skip user review)")]
+    public bool autoAcceptSuggestedConfig = true;
+
+    [Tooltip("If true, automatically start connection in Start(). Set to false for manual control via ConnectV2Async().")]
+    public bool autoStartConnection = true;
+
+    // V2 Protocol client
+    private PhaseProtocolClient _v2Client;
+
+    // V2 Protocol events (for external UI integration)
+    public event Action<ServerHardwareInfo> OnHardwareInfoReceived;
+    public event Action<NetworkTestResult> OnNetworkInfoReceived;
+    public event Action<SuggestedStreamConfig> OnSuggestedConfigReceived;
+    public event Action<string, int, string> OnConfigProgress;
+    public event Action<string> OnConnectionError;
+    public event Action OnStreamingStarted;
+
+    // V2 Protocol state (read-only)
+    public ConnectionStateMachine StateMachine => _v2Client?.StateMachine;
+    public ServerHardwareInfo HardwareInfo => _v2Client?.HardwareInfo;
+    public NetworkTestResult NetworkInfo => _v2Client?.NetworkInfo;
+    public SuggestedStreamConfig SuggestedConfig => _v2Client?.SuggestedConfig;
 
     private ClientWebSocket _ws;
     private CancellationTokenSource _cts;
@@ -43,8 +75,23 @@ public class MultiPCStreamClient : MonoBehaviour
         public List<string> PendingIce = new();
     }
 
-    public int MonitorCount => _pcs.Count;
-    public Texture GetTexture(int index) => index >= 0 && index < _pcs.Count ? _pcs[index].Texture : null;
+    public int MonitorCount => useV2Protocol ? (_v2Client?.MonitorCount ?? 0) : _pcs.Count;
+    public Texture GetTexture(int index)
+    {
+        if (useV2Protocol)
+            return _v2Client?.GetTexture(index);
+        return index >= 0 && index < _pcs.Count ? _pcs[index].Texture : null;
+    }
+
+    /// <summary>
+    /// Check if currently streaming (V2 only).
+    /// </summary>
+    public bool IsStreaming => _v2Client?.IsStreaming ?? false;
+
+    /// <summary>
+    /// Check if connected (V2 only).
+    /// </summary>
+    public bool IsConnected => useV2Protocol ? (_v2Client?.IsConnected ?? false) : (_ws?.State == WebSocketState.Open);
 
     static bool IsPrivateHost(string host)
     {
@@ -101,8 +148,22 @@ public class MultiPCStreamClient : MonoBehaviour
         Application.targetFrameRate = 120; // Cap at 120 to prevent GPU starvation (vs unlimited) on single-device setup
         _cts = new CancellationTokenSource();
 
+        // V2 Protocol: Wait for manual connection if autoStartConnection is false
+        if (useV2Protocol)
+        {
+            if (!autoStartConnection)
+            {
+                Debug.Log("[MultiPC] V2 protocol - waiting for manual ConnectV2Async() call");
+                return;
+            }
+            Debug.Log("[MultiPC] Using V2 protocol (3-phase connection)");
+            await StartV2ProtocolAsync();
+            return;
+        }
+
+        // V1 Protocol (legacy)
         int monitors = GetExpectedMonitors();
-        Debug.Log($"[MultiPC] Creating {monitors} PeerConnections");
+        Debug.Log($"[MultiPC] Using V1 protocol, creating {monitors} PeerConnections");
 
         // Create N PeerConnections
         for (int i = 0; i < monitors; i++)
@@ -202,11 +263,17 @@ public class MultiPCStreamClient : MonoBehaviour
 
     void Update()
     {
-        // Poll textures and apply to panels
+        if (useV2Protocol)
+        {
+            UpdateV2();
+            return;
+        }
+
+        // V1 Protocol: Poll textures and apply to panels
         for (int i = 0; i < _pcs.Count; i++)
         {
             var wrapper = _pcs[i];
-            
+
             // Poll texture directly (Android workaround)
             try
             {
@@ -223,6 +290,182 @@ public class MultiPCStreamClient : MonoBehaviour
                 panels[i].contentTexture = wrapper.Texture;
                 panels[i].Apply();
             }
+        }
+    }
+
+    void UpdateV2()
+    {
+        if (_v2Client == null) return;
+
+        // Poll textures
+        _v2Client.PollTextures();
+
+        // Apply textures to panels
+        int count = _v2Client.MonitorCount;
+        for (int i = 0; i < count; i++)
+        {
+            var tex = _v2Client.GetTexture(i);
+            if (tex == null) continue;
+
+            if (panels != null && i < panels.Length && panels[i] != null)
+            {
+                panels[i].contentTexture = tex;
+                panels[i].Apply();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Connect using V2 protocol (for manual connection control).
+    /// Call this after setting signalUrl and subscribing to events when autoStartConnection is false.
+    /// </summary>
+    public async Task ConnectV2Async()
+    {
+        if (_v2Client != null && _v2Client.IsConnected)
+        {
+            Debug.LogWarning("[MultiPC-V2] Already connected");
+            return;
+        }
+
+        Debug.Log("[MultiPC] Manually starting V2 protocol connection");
+        await StartV2ProtocolAsync();
+    }
+
+    /// <summary>
+    /// Start V2 protocol connection flow.
+    /// </summary>
+    async Task StartV2ProtocolAsync()
+    {
+        _v2Client = new PhaseProtocolClient();
+
+        // Subscribe to events
+        _v2Client.OnHardwareInfoReceived += hw =>
+        {
+            Debug.Log($"[MultiPC-V2] Hardware: {hw.deviceName}, GPU: {hw.gpu} ({hw.gpuVramMB / 1024}GB)");
+            OnHardwareInfoReceived?.Invoke(hw);
+        };
+
+        _v2Client.OnNetworkInfoReceived += net =>
+        {
+            Debug.Log($"[MultiPC-V2] Network: {net.connectionType}, Ping: {net.pingMs:F1}ms, BW: {net.bandwidthMbps:F0}Mbps");
+            OnNetworkInfoReceived?.Invoke(net);
+        };
+
+        _v2Client.OnSuggestedConfigReceived += cfg =>
+        {
+            Debug.Log($"[MultiPC-V2] Suggested: {cfg.monitors}mon @ {cfg.resolutionWidth}x{cfg.resolutionHeight}, {cfg.fps}fps");
+            OnSuggestedConfigReceived?.Invoke(cfg);
+
+            // Auto-accept if enabled
+            if (autoAcceptSuggestedConfig)
+            {
+                Debug.Log("[MultiPC-V2] Auto-accepting suggested config");
+                _ = AcceptSuggestedConfigAsync();
+            }
+        };
+
+        _v2Client.OnConfigProgress += (step, progress, message) =>
+        {
+            Debug.Log($"[MultiPC-V2] Config: {step} {progress}% - {message}");
+            OnConfigProgress?.Invoke(step, progress, message);
+        };
+
+        _v2Client.OnVideoTextureReceived += (idx, tex) =>
+        {
+            Debug.Log($"[MultiPC-V2] Monitor {idx} texture received: {tex.width}x{tex.height}");
+        };
+
+        _v2Client.OnStreamingStarted += () =>
+        {
+            Debug.Log("[MultiPC-V2] Streaming started!");
+            OnStreamingStarted?.Invoke();
+        };
+
+        _v2Client.OnError += err =>
+        {
+            Debug.LogError($"[MultiPC-V2] Error: {err}");
+            OnConnectionError?.Invoke(err);
+        };
+
+        _v2Client.OnDisconnected += () =>
+        {
+            Debug.Log("[MultiPC-V2] Disconnected");
+        };
+
+        // Connect
+        string url = BuildOptimizedSignalUrl();
+        await _v2Client.ConnectAsync(url);
+    }
+
+    /// <summary>
+    /// Accept suggested config and proceed to Phase 2 (V2 protocol).
+    /// </summary>
+    public async Task AcceptSuggestedConfigAsync()
+    {
+        if (_v2Client == null || _v2Client.SuggestedConfig == null)
+        {
+            Debug.LogWarning("[MultiPC-V2] No suggested config available");
+            return;
+        }
+
+        var config = StreamingConfig.FromSuggested(_v2Client.SuggestedConfig);
+        await _v2Client.ProceedToPhase2Async(config);
+
+        // Wait for ICE to complete and start streaming
+        while (_v2Client.StateMachine.CurrentPhase != ConnectionPhase.ReadyToStream &&
+               _v2Client.StateMachine.CurrentPhase != ConnectionPhase.Error)
+        {
+            await Task.Delay(100);
+        }
+
+        if (_v2Client.StateMachine.CurrentPhase == ConnectionPhase.ReadyToStream)
+        {
+            await _v2Client.StartStreamingAsync();
+        }
+    }
+
+    /// <summary>
+    /// Apply custom config and proceed to Phase 2 (V2 protocol).
+    /// </summary>
+    public async Task ApplyConfigAsync(StreamingConfig config)
+    {
+        Debug.Log("[MultiPC-V2] ApplyConfigAsync called");
+
+        if (_v2Client == null)
+        {
+            Debug.LogWarning("[MultiPC-V2] Not connected (_v2Client is null)");
+            return;
+        }
+
+        Debug.Log("[MultiPC-V2] Calling _v2Client.ProceedToPhase2Async...");
+        await _v2Client.ProceedToPhase2Async(config);
+        Debug.Log("[MultiPC-V2] ProceedToPhase2Async returned");
+    }
+
+    /// <summary>
+    /// Start streaming after ICE is complete (V2 protocol).
+    /// </summary>
+    public async Task StartStreamingV2Async()
+    {
+        if (_v2Client == null)
+        {
+            Debug.LogWarning("[MultiPC-V2] Not connected");
+            return;
+        }
+
+        await _v2Client.StartStreamingAsync();
+    }
+
+    /// <summary>
+    /// Stop V2 connection.
+    /// </summary>
+    public async Task StopV2Async()
+    {
+        if (_v2Client != null)
+        {
+            await _v2Client.StopAsync();
+            _v2Client.Dispose();
+            _v2Client = null;
         }
     }
 
@@ -527,6 +770,14 @@ public class MultiPCStreamClient : MonoBehaviour
 
     void Cleanup()
     {
+        // V2 Protocol cleanup
+        if (_v2Client != null)
+        {
+            try { _v2Client.Dispose(); } catch { }
+            _v2Client = null;
+        }
+
+        // V1 Protocol cleanup
         try { _cts?.Cancel(); } catch { }
         foreach (var w in _pcs)
         {
