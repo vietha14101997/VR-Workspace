@@ -298,6 +298,41 @@ public static class VRDropdownFactory
         }
     }
 
+    /// <summary>
+    /// Đặt danh sách options mới cho dropdown
+    /// </summary>
+    public static void SetOptions(GameObject wrapper, List<string> options, int selectedIndex = 0)
+    {
+        var dropdown = GetDropdown(wrapper);
+        if (dropdown != null)
+        {
+            dropdown.SetOptions(options, selectedIndex);
+        }
+    }
+
+    /// <summary>
+    /// Enable/disable dropdown interaction với visual feedback
+    /// </summary>
+    public static void SetInteractable(GameObject wrapper, bool interactable)
+    {
+        if (wrapper == null) return;
+
+        // Find HitArea button
+        var hitArea = wrapper.transform.Find("HitArea");
+        if (hitArea != null)
+        {
+            var button = hitArea.GetComponent<Button>();
+            if (button != null) button.interactable = interactable;
+        }
+
+        // Visual feedback - dim when disabled
+        var canvasGroup = wrapper.GetComponent<CanvasGroup>();
+        if (canvasGroup == null) canvasGroup = wrapper.AddComponent<CanvasGroup>();
+        canvasGroup.alpha = interactable ? 1f : 0.5f;
+        canvasGroup.interactable = interactable;
+        canvasGroup.blocksRaycasts = interactable;
+    }
+
     // ==================== INTERNAL HELPERS ====================
 
     private static Image CreateBackground(Transform parent, DropdownConfig config)

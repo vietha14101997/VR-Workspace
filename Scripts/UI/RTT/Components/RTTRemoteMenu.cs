@@ -53,6 +53,13 @@ public class RTTRemoteMenu : MonoBehaviour
     // QR Scanner
     private QRScannerManager _qrScannerManager;
 
+    // Side Panels for hardware/network info
+    private RTTInfoSidePanel _hardwareInfoPanel;
+    private RTTInfoSidePanel _networkInfoPanel;
+
+    // Cached suggested config for "(Recommended)" suffix
+    private SuggestedStreamConfig _cachedSuggestedConfig;
+
     // Parent references
     private RTTMenuFrame _menuFrame;
     private float _containerWidth;
@@ -63,6 +70,12 @@ public class RTTRemoteMenu : MonoBehaviour
     private const int INPUT_FONT_SIZE = 42;
     private const int DROPDOWN_LABEL_FONT_SIZE = 40;
     private const int DROPDOWN_VALUE_FONT_SIZE = 42;
+
+    // Default dropdown options (without Recommended suffix)
+    private static readonly string[] MONITOR_OPTIONS = { "1 Monitor", "2 Monitors", "3 Monitors" };
+    private static readonly string[] RESOLUTION_OPTIONS = { "1280 x 720", "1366 x 768", "1600 x 900", "1920 x 1080" };
+    private static readonly string[] BITRATE_OPTIONS = { "5 Mbps", "10 Mbps", "20 Mbps", "30 Mbps", "50 Mbps" };
+    private static readonly string[] FPS_OPTIONS = { "30 FPS", "45 FPS", "60 FPS" };
     #endregion
 
     #region Public Accessors (Easy Form Data Access)
@@ -148,6 +161,15 @@ public class RTTRemoteMenu : MonoBehaviour
 
         Debug.Log("[RTTRemoteMenu] UI built");
 
+        // Initialize dropdowns as disabled (show "----")
+        InitializeDropdownsDisabled();
+
+        // Create side panels (hidden by default)
+        CreateSidePanels();
+
+        // Load saved host/port from preferences
+        LoadSavedHostPort();
+
         // Subscribe to ClusterAutoBinder events if available
         BindToClusterBinder();
     }
@@ -162,10 +184,14 @@ public class RTTRemoteMenu : MonoBehaviour
         // Unsubscribe first in case of rebinding
         clusterBinder.OnStateChanged -= HandleConnectionStateChanged;
         clusterBinder.OnSuggestedConfigReceived -= ApplySuggestedConfig;
+        clusterBinder.OnHardwareInfoReceived -= HandleHardwareInfoReceived;
+        clusterBinder.OnNetworkInfoReceived -= HandleNetworkInfoReceived;
 
         // Subscribe
         clusterBinder.OnStateChanged += HandleConnectionStateChanged;
         clusterBinder.OnSuggestedConfigReceived += ApplySuggestedConfig;
+        clusterBinder.OnHardwareInfoReceived += HandleHardwareInfoReceived;
+        clusterBinder.OnNetworkInfoReceived += HandleNetworkInfoReceived;
 
         // Update current state
         HandleConnectionStateChanged(clusterBinder.CurrentState);
@@ -346,6 +372,13 @@ public class RTTRemoteMenu : MonoBehaviour
                 // Step 2: Setup
                 Debug.Log("[RTTRemoteMenu] State is Connected, calling SetupRemoteAsync...");
                 UpdateButtonText("SETTING UP...");
+
+                // Save user selections before sending to server
+                SaveCurrentSelections();
+
+                // Apply selected values (not suggested) to binder
+                ApplyFormToBinder();
+
                 OnSetupClicked?.Invoke();
 
                 Debug.Log("[RTTRemoteMenu] Awaiting SetupRemoteAsync...");
@@ -387,6 +420,7 @@ public class RTTRemoteMenu : MonoBehaviour
 
     /// <summary>
     /// Apply form values to ClusterAutoBinder.
+    /// Cleans "(Recommended)" suffix from dropdown values.
     /// </summary>
     private void ApplyFormToBinder()
     {
@@ -403,8 +437,8 @@ public class RTTRemoteMenu : MonoBehaviour
         // Monitors
         clusterBinder.monitorCount = MonitorIndex + 1;
 
-        // Resolution
-        var resolution = Resolution;
+        // Resolution - clean "(Recommended)" suffix
+        var resolution = RemotePreferences.CleanValue(Resolution);
         if (!string.IsNullOrEmpty(resolution))
         {
             var parts = resolution.Replace(" ", "").Split('x');
@@ -415,8 +449,8 @@ public class RTTRemoteMenu : MonoBehaviour
             }
         }
 
-        // Bitrate
-        var bitrate = Bitrate;
+        // Bitrate - clean "(Recommended)" suffix
+        var bitrate = RemotePreferences.CleanValue(Bitrate);
         if (!string.IsNullOrEmpty(bitrate))
         {
             var numStr = bitrate.Replace(" ", "").Replace("Mbps", "").Replace("mbps", "");
@@ -426,8 +460,8 @@ public class RTTRemoteMenu : MonoBehaviour
             }
         }
 
-        // FPS
-        var fps = FPS;
+        // FPS - clean "(Recommended)" suffix
+        var fps = RemotePreferences.CleanValue(FPS);
         if (!string.IsNullOrEmpty(fps))
         {
             var numStr = fps.Replace(" ", "").Replace("FPS", "").Replace("fps", "");
@@ -464,59 +498,331 @@ public class RTTRemoteMenu : MonoBehaviour
         {
             case ClusterAutoBinder.ConnectionState.Disconnected:
                 UpdateButtonText("CONNECT");
+                // Reset to disabled state
+                InitializeDropdownsDisabled();
+                HideSidePanels();
                 break;
+
             case ClusterAutoBinder.ConnectionState.Connecting:
                 UpdateButtonText("CONNECTING...");
                 break;
+
             case ClusterAutoBinder.ConnectionState.Connected:
                 UpdateButtonText("SETUP REMOTE");
+                // Show side panels (data already set via events)
+                ShowSidePanels();
                 break;
+
             case ClusterAutoBinder.ConnectionState.SettingUp:
                 UpdateButtonText("SETTING UP...");
                 break;
+
             case ClusterAutoBinder.ConnectionState.Ready:
                 UpdateButtonText("START REMOTE");
                 break;
+
             case ClusterAutoBinder.ConnectionState.Streaming:
                 UpdateButtonText("STREAMING");
                 break;
+
             case ClusterAutoBinder.ConnectionState.Error:
                 UpdateButtonText("RETRY");
+                HideSidePanels();
                 break;
         }
     }
 
     /// <summary>
+    /// Handle hardware info received from server.
+    /// </summary>
+    private void HandleHardwareInfoReceived(ServerHardwareInfo info)
+    {
+        if (_hardwareInfoPanel != null && info != null)
+        {
+            _hardwareInfoPanel.SetHardwareInfo(info);
+            Debug.Log($"[RTTRemoteMenu] Updated hardware info panel: {info.deviceName}");
+        }
+    }
+
+    /// <summary>
+    /// Handle network info received from server.
+    /// </summary>
+    private void HandleNetworkInfoReceived(NetworkTestResult info)
+    {
+        if (_networkInfoPanel != null && info != null)
+        {
+            _networkInfoPanel.SetNetworkInfo(info);
+            Debug.Log($"[RTTRemoteMenu] Updated network info panel: {info.pingMs:F1}ms, {info.bandwidthMbps:F0}Mbps");
+        }
+    }
+
+    /// <summary>
     /// Update dropdowns with suggested config from server.
+    /// Adds "(Recommended)" suffix to server-suggested options.
+    /// Uses saved preferences if available, otherwise uses suggested values.
     /// </summary>
     public void ApplySuggestedConfig(SuggestedStreamConfig config)
     {
         if (config == null) return;
 
-        // Monitors
-        int monitorIndex = Mathf.Clamp(config.monitors - 1, 0, 2);
-        VRDropdownFactory.SetSelectedIndex(_monitorsDropdown, monitorIndex);
+        _cachedSuggestedConfig = config;
 
-        // Resolution
-        string resolution = $"{config.resolutionWidth} x {config.resolutionHeight}";
-        int resIndex = FindOptionIndex(new[] { "1280 x 720", "1366 x 768", "1600 x 900", "1920 x 1080" }, resolution);
-        if (resIndex >= 0)
-            VRDropdownFactory.SetSelectedIndex(_resolutionDropdown, resIndex);
+        // Load saved preferences
+        var prefs = RemotePreferences.Load();
 
-        // Bitrate
+        // Enable all dropdowns first
+        EnableDropdowns();
+
+        // === Monitors ===
+        int suggestedMonitorIndex = Mathf.Clamp(config.monitors - 1, 0, 2);
+        var monitorOptions = BuildOptionsWithRecommended(MONITOR_OPTIONS, suggestedMonitorIndex);
+        int selectedMonitorIndex = prefs.HasMonitorPreference ? prefs.monitors : suggestedMonitorIndex;
+        selectedMonitorIndex = Mathf.Clamp(selectedMonitorIndex, 0, monitorOptions.Count - 1);
+        VRDropdownFactory.SetOptions(_monitorsDropdown, monitorOptions, selectedMonitorIndex);
+
+        // === Resolution ===
+        string suggestedResolution = $"{config.resolutionWidth} x {config.resolutionHeight}";
+        int suggestedResIndex = FindOptionIndex(RESOLUTION_OPTIONS, suggestedResolution);
+        if (suggestedResIndex < 0) suggestedResIndex = 3; // Default to 1920x1080
+        var resolutionOptions = BuildOptionsWithRecommended(RESOLUTION_OPTIONS, suggestedResIndex);
+        int selectedResIndex = prefs.HasResolutionPreference
+            ? FindOptionIndexClean(RESOLUTION_OPTIONS, prefs.resolution)
+            : suggestedResIndex;
+        if (selectedResIndex < 0) selectedResIndex = suggestedResIndex;
+        VRDropdownFactory.SetOptions(_resolutionDropdown, resolutionOptions, selectedResIndex);
+
+        // === Bitrate ===
         int bitrateMbps = config.bitrateKbps / 1000;
-        string bitrateStr = $"{bitrateMbps} Mbps";
-        int bitrateIndex = FindOptionIndex(new[] { "5 Mbps", "10 Mbps", "20 Mbps", "30 Mbps", "50 Mbps" }, bitrateStr);
-        if (bitrateIndex >= 0)
-            VRDropdownFactory.SetSelectedIndex(_bitrateDropdown, bitrateIndex);
+        string suggestedBitrate = $"{bitrateMbps} Mbps";
+        int suggestedBitrateIndex = FindOptionIndex(BITRATE_OPTIONS, suggestedBitrate);
+        if (suggestedBitrateIndex < 0) suggestedBitrateIndex = 2; // Default to 20 Mbps
+        var bitrateOptions = BuildOptionsWithRecommended(BITRATE_OPTIONS, suggestedBitrateIndex);
+        int selectedBitrateIndex = prefs.HasBitratePreference
+            ? FindOptionIndexClean(BITRATE_OPTIONS, prefs.bitrate)
+            : suggestedBitrateIndex;
+        if (selectedBitrateIndex < 0) selectedBitrateIndex = suggestedBitrateIndex;
+        VRDropdownFactory.SetOptions(_bitrateDropdown, bitrateOptions, selectedBitrateIndex);
 
-        // FPS
-        string fpsStr = $"{config.fps} FPS";
-        int fpsIndex = FindOptionIndex(new[] { "30 FPS", "45 FPS", "60 FPS" }, fpsStr);
-        if (fpsIndex >= 0)
-            VRDropdownFactory.SetSelectedIndex(_fpsDropdown, fpsIndex);
+        // === FPS ===
+        string suggestedFps = $"{config.fps} FPS";
+        int suggestedFpsIndex = FindOptionIndex(FPS_OPTIONS, suggestedFps);
+        if (suggestedFpsIndex < 0) suggestedFpsIndex = 2; // Default to 60 FPS
+        var fpsOptions = BuildOptionsWithRecommended(FPS_OPTIONS, suggestedFpsIndex);
+        int selectedFpsIndex = prefs.HasFpsPreference
+            ? FindOptionIndexClean(FPS_OPTIONS, prefs.fps)
+            : suggestedFpsIndex;
+        if (selectedFpsIndex < 0) selectedFpsIndex = suggestedFpsIndex;
+        VRDropdownFactory.SetOptions(_fpsDropdown, fpsOptions, selectedFpsIndex);
 
-        Debug.Log($"[RTTRemoteMenu] Applied suggested config: {config.monitors}mon @ {config.resolutionWidth}x{config.resolutionHeight}, {config.fps}fps, {config.bitrateKbps}kbps");
+        Debug.Log($"[RTTRemoteMenu] Applied suggested config with (Recommended): {config.monitors}mon @ {config.resolutionWidth}x{config.resolutionHeight}, {config.fps}fps, {config.bitrateKbps}kbps");
+    }
+
+    /// <summary>
+    /// Build options list with "(Recommended)" suffix on the specified index.
+    /// </summary>
+    private List<string> BuildOptionsWithRecommended(string[] baseOptions, int recommendedIndex)
+    {
+        var options = new List<string>();
+        for (int i = 0; i < baseOptions.Length; i++)
+        {
+            if (i == recommendedIndex)
+                options.Add(baseOptions[i] + " (Recommended)");
+            else
+                options.Add(baseOptions[i]);
+        }
+        return options;
+    }
+
+    /// <summary>
+    /// Find option index, ignoring " (Recommended)" suffix.
+    /// </summary>
+    private int FindOptionIndexClean(string[] options, string value)
+    {
+        if (string.IsNullOrEmpty(value)) return -1;
+        string cleanValue = RemotePreferences.CleanValue(value);
+        for (int i = 0; i < options.Length; i++)
+        {
+            if (options[i].Replace(" ", "").Equals(cleanValue.Replace(" ", ""), StringComparison.OrdinalIgnoreCase))
+                return i;
+        }
+        return -1;
+    }
+    #endregion
+
+    #region Dropdown Management
+    /// <summary>
+    /// Initialize dropdowns as disabled with "----" placeholder.
+    /// Called on startup and when disconnected.
+    /// </summary>
+    private void InitializeDropdownsDisabled()
+    {
+        var placeholder = new List<string> { "----" };
+
+        VRDropdownFactory.SetOptions(_monitorsDropdown, placeholder, 0);
+        VRDropdownFactory.SetOptions(_resolutionDropdown, placeholder, 0);
+        VRDropdownFactory.SetOptions(_bitrateDropdown, placeholder, 0);
+        VRDropdownFactory.SetOptions(_fpsDropdown, placeholder, 0);
+
+        VRDropdownFactory.SetInteractable(_monitorsDropdown, false);
+        VRDropdownFactory.SetInteractable(_resolutionDropdown, false);
+        VRDropdownFactory.SetInteractable(_bitrateDropdown, false);
+        VRDropdownFactory.SetInteractable(_fpsDropdown, false);
+    }
+
+    /// <summary>
+    /// Enable all dropdowns for interaction.
+    /// </summary>
+    private void EnableDropdowns()
+    {
+        VRDropdownFactory.SetInteractable(_monitorsDropdown, true);
+        VRDropdownFactory.SetInteractable(_resolutionDropdown, true);
+        VRDropdownFactory.SetInteractable(_bitrateDropdown, true);
+        VRDropdownFactory.SetInteractable(_fpsDropdown, true);
+    }
+
+    /// <summary>
+    /// Load saved host/port from preferences and apply to inputs.
+    /// </summary>
+    private void LoadSavedHostPort()
+    {
+        var prefs = RemotePreferences.Load();
+        if (!string.IsNullOrEmpty(prefs.lastHost))
+            VRInputFieldFactory.SetValue(_hostInput, prefs.lastHost);
+        if (!string.IsNullOrEmpty(prefs.lastPort))
+            VRInputFieldFactory.SetValue(_portInput, prefs.lastPort);
+    }
+
+    /// <summary>
+    /// Save current dropdown selections and host/port to preferences.
+    /// Called when SETUP REMOTE is clicked.
+    /// </summary>
+    private void SaveCurrentSelections()
+    {
+        var prefs = new RemotePreferences
+        {
+            monitors = MonitorIndex,
+            resolution = RemotePreferences.CleanValue(Resolution),
+            bitrate = RemotePreferences.CleanValue(Bitrate),
+            fps = RemotePreferences.CleanValue(FPS),
+            lastHost = Host,
+            lastPort = Port
+        };
+        prefs.Save();
+        Debug.Log($"[RTTRemoteMenu] Saved preferences: {prefs.monitors}mon, {prefs.resolution}, {prefs.bitrate}, {prefs.fps}");
+    }
+    #endregion
+
+    #region Side Panels
+    /// <summary>
+    /// Create side panels for hardware and network info.
+    /// Panels are hidden by default and shown when connected.
+    /// Uses arc positioning like WorldPanelClusterRig for proper placement.
+    /// </summary>
+    private void CreateSidePanels()
+    {
+        if (_menuFrame == null) return;
+
+        float mainPanelWidth = _menuFrame.PanelWidth;   // ~1.6m
+        float mainPanelHeight = _menuFrame.PanelHeight; // ~0.9m
+        float sideWidth = mainPanelWidth / 3f;          // ~0.53m
+        float sideHeight = mainPanelHeight;             // Same height as main panel
+
+        // Gap between main panel and side panels (in meters)
+        float gapMeters = 0.05f;
+
+        // Angle to rotate side panels (facing slightly toward viewer)
+        float rotationAngle = 30f;
+
+        // Hardware Info Panel (Left)
+        PlaceSidePanelFlat("HardwareInfoPanel", -1, mainPanelWidth, sideWidth, sideHeight,
+            gapMeters, rotationAngle, RTTInfoSidePanel.PanelType.HardwareInfo, ref _hardwareInfoPanel);
+
+        // Network Info Panel (Right)
+        PlaceSidePanelFlat("NetworkInfoPanel", 1, mainPanelWidth, sideWidth, sideHeight,
+            gapMeters, rotationAngle, RTTInfoSidePanel.PanelType.NetworkInfo, ref _networkInfoPanel);
+
+        Debug.Log($"[RTTRemoteMenu] Side panels created ({sideWidth:F2}m x {sideHeight:F2}m) gap={gapMeters}m angle={rotationAngle}° (hidden)");
+    }
+
+    /// <summary>
+    /// Place a side panel adjacent to the main panel with inner edge at same Z.
+    /// </summary>
+    /// <param name="side">-1 for left, +1 for right</param>
+    private void PlaceSidePanelFlat(string name, int side, float mainWidth, float sideWidth, float sideHeight,
+        float gap, float rotationAngle, RTTInfoSidePanel.PanelType type, ref RTTInfoSidePanel panelRef)
+    {
+        GameObject panelObj = new GameObject(name);
+
+        // Get main panel's world transform
+        Vector3 mainPos = _menuFrame.transform.position;
+        Quaternion mainRot = _menuFrame.transform.rotation;
+        Vector3 mainRight = _menuFrame.transform.right;
+        Vector3 mainForward = _menuFrame.transform.forward;
+
+        // Side panel is rotated, so we need to calculate where its inner edge should be
+        // Inner edge of side panel should be at: mainPanel edge + gap
+        // Side panel center offset from its inner edge depends on rotation
+
+        float rotRad = rotationAngle * Mathf.Deg2Rad;
+
+        // When panel is rotated by angle toward viewer, its center is offset from inner edge by:
+        // X offset: (sideWidth/2) * cos(angle)
+        // Z offset: -(sideWidth/2) * sin(angle)  (panel rotates toward viewer, center moves forward)
+
+        float halfSide = sideWidth / 2f;
+        float centerOffsetX = halfSide * Mathf.Cos(rotRad);
+        float centerOffsetZ = -halfSide * Mathf.Sin(rotRad); // Negative: center moves toward viewer
+
+        // Total X offset from main panel center:
+        // = half main width + gap + center offset from inner edge
+        float totalX = (mainWidth / 2f) + gap + centerOffsetX;
+
+        // Z offset: panel rotates toward viewer, so center moves forward
+        float totalZ = centerOffsetZ;
+
+        // Calculate world position
+        Vector3 offset = mainRight * (side * totalX) + mainForward * totalZ;
+        panelObj.transform.position = mainPos + offset;
+
+        // Rotate panel: left panel rotates negative (faces right), right panel rotates positive (faces left)
+        panelObj.transform.rotation = mainRot * Quaternion.Euler(0, side * rotationAngle, 0);
+
+        // Ensure scale is 1:1:1
+        panelObj.transform.localScale = Vector3.one;
+
+        // Parent to menuFrame for organization
+        panelObj.transform.SetParent(_menuFrame.transform, true);
+
+        // Create and initialize the side panel component
+        var panel = panelObj.AddComponent<RTTInfoSidePanel>();
+        panel.Initialize(type, themeColor, accentColor, customFont, sideWidth, sideHeight);
+        panelRef = panel;
+    }
+
+    /// <summary>
+    /// Show side panels.
+    /// </summary>
+    private void ShowSidePanels()
+    {
+        if (_hardwareInfoPanel != null)
+            _hardwareInfoPanel.gameObject.SetActive(true);
+        if (_networkInfoPanel != null)
+            _networkInfoPanel.gameObject.SetActive(true);
+
+        Debug.Log("[RTTRemoteMenu] Side panels shown");
+    }
+
+    /// <summary>
+    /// Hide side panels.
+    /// </summary>
+    private void HideSidePanels()
+    {
+        if (_hardwareInfoPanel != null)
+            _hardwareInfoPanel.gameObject.SetActive(false);
+        if (_networkInfoPanel != null)
+            _networkInfoPanel.gameObject.SetActive(false);
+
+        Debug.Log("[RTTRemoteMenu] Side panels hidden");
     }
     #endregion
 
@@ -782,7 +1088,15 @@ public class RTTRemoteMenu : MonoBehaviour
         {
             clusterBinder.OnStateChanged -= HandleConnectionStateChanged;
             clusterBinder.OnSuggestedConfigReceived -= ApplySuggestedConfig;
+            clusterBinder.OnHardwareInfoReceived -= HandleHardwareInfoReceived;
+            clusterBinder.OnNetworkInfoReceived -= HandleNetworkInfoReceived;
         }
+
+        // Destroy side panels
+        if (_hardwareInfoPanel != null)
+            Destroy(_hardwareInfoPanel.gameObject);
+        if (_networkInfoPanel != null)
+            Destroy(_networkInfoPanel.gameObject);
     }
     #endregion
 }

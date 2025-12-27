@@ -341,7 +341,7 @@ public class MultiPCStreamClient : MonoBehaviour
         // Subscribe to events
         _v2Client.OnHardwareInfoReceived += hw =>
         {
-            Debug.Log($"[MultiPC-V2] Hardware: {hw.deviceName}, GPU: {hw.gpu} ({hw.gpuVramMB / 1024}GB)");
+            Debug.Log($"[MultiPC-V2] Hardware: {hw.deviceName}, GPU: {hw.gpu} ({hw.gpuVramGB}GB)");
             OnHardwareInfoReceived?.Invoke(hw);
         };
 

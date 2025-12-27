@@ -12,8 +12,8 @@ namespace VRWorkspace.Streaming
         public string deviceName;
         public string processor;
         public string gpu;
-        public long gpuVramMB;
-        public long ramMB;
+        public int gpuVramGB;
+        public int ramGB;
         public string os;
         public string encoderType;
         public bool hwAccelEnabled;
@@ -139,13 +139,13 @@ namespace VRWorkspace.Streaming
         {
             var config = new SuggestedStreamConfig();
 
-            // Resolution based on GPU VRAM
-            if (hardware.gpuVramMB >= 8192) // 8GB+
+            // Resolution based on GPU VRAM (now in GB)
+            if (hardware.gpuVramGB >= 8) // 8GB+
             {
                 config.resolutionWidth = 1920;
                 config.resolutionHeight = 1080;
             }
-            else if (hardware.gpuVramMB >= 4096) // 4GB
+            else if (hardware.gpuVramGB >= 4) // 4GB
             {
                 config.resolutionWidth = 1600;
                 config.resolutionHeight = 900;
@@ -208,10 +208,10 @@ namespace VRWorkspace.Streaming
             var reasons = new System.Collections.Generic.List<string>();
 
             // Resolution reason
-            if (hardware.gpuVramMB >= 8192)
-                reasons.Add($"1080p (VRAM: {hardware.gpuVramMB / 1024}GB)");
-            else if (hardware.gpuVramMB >= 4096)
-                reasons.Add($"900p (VRAM: {hardware.gpuVramMB / 1024}GB)");
+            if (hardware.gpuVramGB >= 8)
+                reasons.Add($"1080p (VRAM: {hardware.gpuVramGB}GB)");
+            else if (hardware.gpuVramGB >= 4)
+                reasons.Add($"900p (VRAM: {hardware.gpuVramGB}GB)");
             else
                 reasons.Add($"768p (VRAM limited)");
 
@@ -244,12 +244,12 @@ namespace VRWorkspace.Streaming
                 warnings.Add($"Bitrate ({totalBitrateNeeded / 1000:F0}Mbps total) may exceed bandwidth ({network.bandwidthMbps:F0}Mbps)");
             }
 
-            // Check VRAM for resolution
+            // Check VRAM for resolution (now in GB)
             int pixelCount = config.resolutionWidth * config.resolutionHeight * config.monitors;
-            long estimatedVramMB = pixelCount * 4 / (1024 * 1024); // Rough estimate
-            if (hardware.gpuVramMB > 0 && estimatedVramMB > hardware.gpuVramMB * 0.5)
+            long estimatedVramGB = pixelCount * 4 / (1024 * 1024 * 1024); // Rough estimate in GB
+            if (hardware.gpuVramGB > 0 && estimatedVramGB > hardware.gpuVramGB * 0.5)
             {
-                warnings.Add($"High resolution may strain GPU VRAM ({hardware.gpuVramMB}MB)");
+                warnings.Add($"High resolution may strain GPU VRAM ({hardware.gpuVramGB}GB)");
             }
 
             // Check FPS with software encoder
@@ -307,8 +307,8 @@ namespace VRWorkspace.Streaming
         {
             return $@"Device: {hw.deviceName}
 CPU: {hw.processor}
-GPU: {hw.gpu} ({hw.gpuVramMB / 1024}GB VRAM)
-RAM: {hw.ramMB / 1024}GB
+GPU: {hw.gpu} ({hw.gpuVramGB}GB VRAM)
+RAM: {hw.ramGB}GB
 OS: {hw.os}
 Encoder: {hw.encoderType} (HW: {(hw.hwAccelEnabled ? "Yes" : "No")})";
         }

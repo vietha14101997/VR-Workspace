@@ -393,15 +393,15 @@ namespace VRWorkspace.Streaming
                 deviceName = device?.GetString("name") ?? "Unknown",
                 processor = device?.GetString("processor") ?? "Unknown",
                 gpu = device?.GetString("gpu") ?? "Unknown",
-                gpuVramMB = device?.GetLong("gpuVramMB") ?? 0,
-                ramMB = device?.GetLong("ramMB") ?? 0,
+                gpuVramGB = device?.GetInt("gpuVramGB") ?? 0,
+                ramGB = device?.GetInt("ramGB") ?? 0,
                 os = device?.GetString("os") ?? "Unknown",
                 encoderType = encoder?.GetString("type") ?? "Unknown",
                 hwAccelEnabled = encoder?.GetBool("hwAccel") ?? false,
                 monitors = ParseMonitors(monitorsArr)
             };
 
-            Debug.Log($"[PhaseProtocol] Server: {_hardwareInfo.deviceName}, GPU: {_hardwareInfo.gpu} ({_hardwareInfo.gpuVramMB}MB)");
+            Debug.Log($"[PhaseProtocol] Server: {_hardwareInfo.deviceName}, GPU: {_hardwareInfo.gpu} ({_hardwareInfo.gpuVramGB}GB)");
             Debug.Log($"[PhaseProtocol] Encoder: {_hardwareInfo.encoderType}, HW: {_hardwareInfo.hwAccelEnabled}");
 
             _stateMachine.TryTransition(ConnectionPhase.SpeedTesting);
