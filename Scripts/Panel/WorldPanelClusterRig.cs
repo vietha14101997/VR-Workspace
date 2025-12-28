@@ -92,10 +92,22 @@ public class WorldPanelClusterRig : MonoBehaviour
             if (layer >= 0) virtualObjects.layer = layer;
         }
 
-        // Parent this cluster under VirtualObjects
-        transform.SetParent(virtualObjects.transform, false);
-        // Reset local position to align with VirtualObjects
-        transform.localPosition = Vector3.zero;
+        // Parent this cluster under VirtualObjects, preserving world position
+        transform.SetParent(virtualObjects.transform, true);
+
+        // Position cluster in front of camera if not already positioned
+        var cam = Cam;
+        if (cam != null && transform.position == Vector3.zero)
+        {
+            // Place cluster 2m in front of camera at eye level
+            Vector3 camFwd = cam.transform.forward;
+            camFwd.y = 0f;
+            if (camFwd.sqrMagnitude < 1e-6f) camFwd = Vector3.forward;
+            camFwd.Normalize();
+
+            transform.position = cam.transform.position + camFwd * 2f;
+            transform.position = new Vector3(transform.position.x, cam.transform.position.y, transform.position.z);
+        }
 
         // Set layer for entire cluster hierarchy
         int virtualObjectsLayer = LayerMask.NameToLayer("VirtualObjects");
