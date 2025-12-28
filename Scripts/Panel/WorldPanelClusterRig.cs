@@ -22,6 +22,8 @@ public class WorldPanelClusterRig : MonoBehaviour
     [Range(0f, 1f)] public float panelTiltFactor = 1f;
     public float verticalOffset = 0f;
     public bool faceCameraYawOnly = true;
+    [Tooltip("Overlap amount (in meters) between adjacent panels to eliminate seams")]
+    [Range(0f, 0.01f)] public float panelOverlap = 0.002f;
 
     [Header("Cluster Visuals")]
     [Tooltip("Enable seamless glass background and glowing border across all panels")]
@@ -208,14 +210,14 @@ public class WorldPanelClusterRig : MonoBehaviour
         // Junction point at center
         Vector3 junction = cam.transform.position + camFwd * distanceFromCamera + camUp * verticalOffset;
 
-        // Left panel: right edge at junction
+        // Left panel: right edge at junction (with overlap)
         Vector3 leftRight = GetPanelRightVector(leftRotYawDeg, camFwd, camUp);
-        Vector3 leftPos = junction - (boardWidth / 2f) * leftRight;
+        Vector3 leftPos = junction - (boardWidth / 2f - panelOverlap / 2f) * leftRight;
         leftPanel.transform.SetPositionAndRotation(leftPos, GetPanelRotation(leftRotYawDeg, camFwd, camUp));
 
-        // Right panel: left edge at junction
+        // Right panel: left edge at junction (with overlap)
         Vector3 rightRight = GetPanelRightVector(rightRotYawDeg, camFwd, camUp);
-        Vector3 rightPos = junction + (boardWidth / 2f) * rightRight;
+        Vector3 rightPos = junction + (boardWidth / 2f - panelOverlap / 2f) * rightRight;
         rightPanel.transform.SetPositionAndRotation(rightPos, GetPanelRotation(rightRotYawDeg, camFwd, camUp));
     }
 
@@ -228,9 +230,9 @@ public class WorldPanelClusterRig : MonoBehaviour
         Vector3 neighborRight = GetPanelRightVector(neighborRotYawDeg, camFwd, camUp);
         Vector3 neighborLeftEdge = neighbor.transform.position - (boardWidth / 2f) * neighborRight;
 
-        // This panel's right edge should be at neighborLeftEdge
+        // This panel's right edge should be at neighborLeftEdge (with overlap)
         Vector3 panelRight = GetPanelRightVector(panelRotYawDeg, camFwd, camUp);
-        Vector3 pos = neighborLeftEdge - (boardWidth / 2f) * panelRight;
+        Vector3 pos = neighborLeftEdge - (boardWidth / 2f - panelOverlap) * panelRight;
 
         panel.transform.SetPositionAndRotation(pos, GetPanelRotation(panelRotYawDeg, camFwd, camUp));
     }
@@ -244,9 +246,9 @@ public class WorldPanelClusterRig : MonoBehaviour
         Vector3 neighborRight = GetPanelRightVector(neighborRotYawDeg, camFwd, camUp);
         Vector3 neighborRightEdge = neighbor.transform.position + (boardWidth / 2f) * neighborRight;
 
-        // This panel's left edge should be at neighborRightEdge
+        // This panel's left edge should be at neighborRightEdge (with overlap)
         Vector3 panelRight = GetPanelRightVector(panelRotYawDeg, camFwd, camUp);
-        Vector3 pos = neighborRightEdge + (boardWidth / 2f) * panelRight;
+        Vector3 pos = neighborRightEdge + (boardWidth / 2f - panelOverlap) * panelRight;
 
         panel.transform.SetPositionAndRotation(pos, GetPanelRotation(panelRotYawDeg, camFwd, camUp));
     }
