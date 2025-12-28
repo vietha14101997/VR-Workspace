@@ -161,8 +161,14 @@ public class ClusterPanelVisual : MonoBehaviour
         // Scale the board to the content size (collider will match this)
         _panel.board.localScale = new Vector3(contentWidth, contentHeight, 1f);
 
-        // Board stays at local position (0,0,0) - centered within the panel
-        _panel.board.localPosition = Vector3.zero;
+        // Resolve Board Z-fighting at junctions
+        // Panel with masked left edge renders "on top" at junction
+        float boardZ = 0f;
+        if (_edgeMask.x < 0.5f) // masked left edge (Middle/Last panel)
+        {
+            boardZ = -0.0002f; // slightly forward to render on top
+        }
+        _panel.board.localPosition = new Vector3(0, 0, boardZ);
 
         // Apply shader-based clipping for clean edges
         ApplyBoardContentClipping();
