@@ -55,6 +55,7 @@ public class MultiPCStreamClient : MonoBehaviour
     public event Action<string> OnConnectionError;
     public event Action OnStreamingStarted;
     public event Action<string, double, int> OnSpeedTestProgress; // direction, currentMbps, progress%
+    public event Action<int, float, float, bool> OnCursorPosition; // monitorIndex, u, v, visible
 
     // V2 Protocol state (read-only)
     public ConnectionStateMachine StateMachine => _v2Client?.StateMachine;
@@ -396,6 +397,11 @@ public class MultiPCStreamClient : MonoBehaviour
         _v2Client.OnDisconnected += () =>
         {
             Debug.Log("[MultiPC-V2] Disconnected");
+        };
+
+        _v2Client.OnCursorPosition += (monitorIndex, u, v, visible) =>
+        {
+            OnCursorPosition?.Invoke(monitorIndex, u, v, visible);
         };
 
         // Connect

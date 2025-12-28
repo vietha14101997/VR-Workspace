@@ -49,6 +49,7 @@ namespace VRWorkspace.Streaming
         public event Action OnStreamingStarted;
         public event Action<string> OnError;
         public event Action OnDisconnected;
+        public event Action<int, float, float, bool> OnCursorPosition; // monitorIndex, u, v, visible
 
         private class PCWrapper
         {
@@ -356,6 +357,11 @@ namespace VRWorkspace.Streaming
                         case "streaming_started":
                             Debug.Log("[PhaseProtocol] >>> Handling streaming_started");
                             HandleStreamingStarted(json);
+                            break;
+
+                        case "cursor_position":
+                            // Don't log every cursor update (too noisy)
+                            HandleCursorPosition(json);
                             break;
 
                         case "error":
@@ -1050,6 +1056,20 @@ namespace VRWorkspace.Streaming
             OnStreamingStarted?.Invoke();
         }
 
+        /// <summary>
+        /// Handle cursor position update from server.
+        /// </summary>
+        private void HandleCursorPosition(SimpleJson json)
+        {
+            int monitorIndex = json.GetInt("monitorIndex");
+            float u = json.GetFloat("u");
+            float v = json.GetFloat("v");
+            bool visible = json.GetBool("visible");
+
+            // Invoke event for ClusterAutoBinder to handle
+            OnCursorPosition?.Invoke(monitorIndex, u, v, visible);
+        }
+
         // === Error Handler ===
 
         private void HandleError(SimpleJson json)
@@ -1277,6 +1297,7 @@ namespace VRWorkspace.Streaming
         public int GetInt(string key) => _data.TryGetValue(key, out var v) && v != null ? Convert.ToInt32(v) : 0;
         public long GetLong(string key) => _data.TryGetValue(key, out var v) && v != null ? Convert.ToInt64(v) : 0;
         public double GetDouble(string key) => _data.TryGetValue(key, out var v) && v != null ? Convert.ToDouble(v) : 0;
+        public float GetFloat(string key) => _data.TryGetValue(key, out var v) && v != null ? Convert.ToSingle(v) : 0f;
         public bool GetBool(string key) => _data.TryGetValue(key, out var v) && v != null && Convert.ToBoolean(v);
         public SimpleJson GetObject(string key) => _data.TryGetValue(key, out var v) && v is Dictionary<string, object> d ? new SimpleJson(d) : null;
         public List<SimpleJson> GetArray(string key)

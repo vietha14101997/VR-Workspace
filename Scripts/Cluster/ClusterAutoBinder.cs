@@ -52,6 +52,9 @@ public class ClusterAutoBinder : MonoBehaviour
     private MultiPCStreamClient _multiPCClient;  // N separate PeerConnections for multi-track mode
     private bool _isStreaming = false;
 
+    // Cursor tracking - only ONE cursor should be visible across all panels
+    private int _activeCursorPanelIndex = -1;
+
     // V2 Protocol - Phased connection state
     public enum ConnectionState
     {
@@ -178,6 +181,7 @@ public class ClusterAutoBinder : MonoBehaviour
             _multiPCClient.OnStreamingStarted += HandleStreamingStarted;
             _multiPCClient.OnConnectionError += HandleError;
             _multiPCClient.OnSpeedTestProgress += HandleSpeedTestProgress;
+            _multiPCClient.OnCursorPosition += HandleCursorPosition;
 
             // Build signal URL
             var wsBase = serverBase.Replace("http://", "ws://").Replace("https://", "wss://");
@@ -400,6 +404,65 @@ public class ClusterAutoBinder : MonoBehaviour
         OnSpeedTestProgress?.Invoke(direction, currentMbps, progress);
     }
 
+    /// <summary>
+    /// Handle cursor position update from server and sync with panel cursor.
+    /// Only ONE cursor is visible across all panels at any time.
+    /// </summary>
+    private void HandleCursorPosition(int monitorIndex, float u, float v, bool visible)
+    {
+        if (rig == null || rig.panels == null)
+            return;
+
+        // If cursor is not visible or monitorIndex is invalid, hide all cursors
+        if (!visible || monitorIndex < 0 || monitorIndex >= rig.panels.Count)
+        {
+            HideAllCursors();
+            _activeCursorPanelIndex = -1;
+            return;
+        }
+
+        // If cursor moved to a different panel, hide cursor on old panel
+        if (_activeCursorPanelIndex != monitorIndex && _activeCursorPanelIndex >= 0 && _activeCursorPanelIndex < rig.panels.Count)
+        {
+            var oldPanel = rig.panels[_activeCursorPanelIndex];
+            if (oldPanel != null && oldPanel.cursor != null)
+            {
+                oldPanel.cursor.SetVisible(false);
+            }
+        }
+
+        // Update cursor on new panel
+        var panel = rig.panels[monitorIndex];
+        if (panel == null) return;
+
+        panel.EnsureCursor();
+        if (panel.cursor == null) return;
+
+        // Convert from top-left origin (Windows) to bottom-left origin (Unity UV)
+        // Server sends v where 0 = top, 1 = bottom
+        // Unity cursor expects v where 0 = bottom, 1 = top
+        float unityV = 1f - v;
+        panel.cursor.SetUV(u, unityV, silent: true);
+        panel.cursor.SetVisible(true);
+
+        _activeCursorPanelIndex = monitorIndex;
+    }
+
+    /// <summary>
+    /// Hide cursors on all panels.
+    /// </summary>
+    private void HideAllCursors()
+    {
+        if (rig == null || rig.panels == null) return;
+        foreach (var panel in rig.panels)
+        {
+            if (panel != null && panel.cursor != null)
+            {
+                panel.cursor.SetVisible(false);
+            }
+        }
+    }
+
     #endregion
 
     #region V1 Protocol - Legacy Direct Connection
@@ -463,6 +526,7 @@ public class ClusterAutoBinder : MonoBehaviour
             _multiPCClient.OnStreamingStarted -= HandleStreamingStarted;
             _multiPCClient.OnConnectionError -= HandleError;
             _multiPCClient.OnSpeedTestProgress -= HandleSpeedTestProgress;
+            _multiPCClient.OnCursorPosition -= HandleCursorPosition;
 
             if (_multiPCClient.useV2Protocol)
             {
