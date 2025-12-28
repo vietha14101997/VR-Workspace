@@ -157,10 +157,12 @@ public class ClusterAutoBinder : MonoBehaviour
         try
         {
             // Create MultiPCStreamClient with V2 protocol
+            // IMPORTANT: Do NOT parent to this transform because WorldPanelClusterRig.KillChildren()
+            // will destroy all children when rebuilding panels, which would kill the WebSocket connection!
             if (_multiPCClient == null)
             {
                 var go = new GameObject("MultiPCStreamClient");
-                go.transform.SetParent(transform);
+                // Keep at scene root to survive panel rebuilds
                 _multiPCClient = go.AddComponent<MultiPCStreamClient>();
             }
 
