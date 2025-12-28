@@ -872,6 +872,11 @@ public class VRGazeReticle : MonoBehaviour
         Button btn = obj.GetComponentInParent<Button>();
         if (btn != null && btn.interactable) return true;
 
+        // Kiểm tra Selectable (base class cho Button, InputField, Dropdown, etc.)
+        // Nếu không interactable thì không cho dwell click
+        Selectable selectable = obj.GetComponentInParent<Selectable>();
+        if (selectable != null && !selectable.interactable) return false;
+
         IPointerClickHandler clickHandler = obj.GetComponentInParent<IPointerClickHandler>();
         if (clickHandler != null) return true;
 

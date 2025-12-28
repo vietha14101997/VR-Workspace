@@ -73,6 +73,9 @@ public class VRInputFieldTrigger : MonoBehaviour, IPointerClickHandler, IPointer
     {
         if (_inputField == null) return;
 
+        // Không xử lý nếu input field bị khóa
+        if (!_inputField.interactable) return;
+
         // Calculate caret position from click position
         int caretPos = GetCharacterIndexFromPosition(eventData);
         _inputField.caretPosition = caretPos;
@@ -184,11 +187,11 @@ public class VRInputFieldTrigger : MonoBehaviour, IPointerClickHandler, IPointer
     /// </summary>
     public void OnPointerDown(PointerEventData eventData)
     {
+        // Không xử lý nếu input field bị khóa
+        if (_inputField == null || !_inputField.interactable) return;
+
         // Select the input field for visual feedback
-        if (_inputField != null)
-        {
-            EventSystem.current?.SetSelectedGameObject(_inputField.gameObject);
-        }
+        EventSystem.current?.SetSelectedGameObject(_inputField.gameObject);
     }
 
     /// <summary>
@@ -196,6 +199,9 @@ public class VRInputFieldTrigger : MonoBehaviour, IPointerClickHandler, IPointer
     /// </summary>
     public void OnPointerEnter(PointerEventData eventData)
     {
+        // Không đổi cursor nếu input field bị khóa
+        if (_inputField == null || !_inputField.interactable) return;
+
         if (VRGazeReticle.Instance != null && _textCursorSprite != null)
         {
             VRGazeReticle.Instance.SetCursorSprite(_textCursorSprite);
@@ -220,6 +226,9 @@ public class VRInputFieldTrigger : MonoBehaviour, IPointerClickHandler, IPointer
     public void ShowKeyboard()
     {
         if (!_isInitialized || _inputField == null) return;
+
+        // Không mở keyboard nếu input field bị khóa
+        if (!_inputField.interactable) return;
 
         // Use VRKeyboardManager if available (it handles RTT vs legacy internally)
         if (VRKeyboardManager.Instance != null)

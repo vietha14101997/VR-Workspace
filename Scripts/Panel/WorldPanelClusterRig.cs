@@ -13,17 +13,15 @@ public class WorldPanelClusterRig : MonoBehaviour
     public WorldPanelPlus panelPrefab;
 
     [Header("Layout")]
-    public float distanceFromCamera = 2.0f;
     [Tooltip("Extra gap in meters between panel edges (0 = edges touch)")]
     [Range(0f, 0.1f)] public float edgeGapMeters = 0f;
     [Tooltip("Whether panels should face directly toward camera (true) or have limited tilt (false)")]
     public bool panelsFaceCamera = true;
     [Tooltip("How much panels tilt toward camera (0 = flat/parallel, 1 = fully facing camera)")]
     [Range(0f, 1f)] public float panelTiltFactor = 1f;
-    public float verticalOffset = 0f;
     public bool faceCameraYawOnly = true;
     [Tooltip("Overlap amount (in meters) between adjacent panels to eliminate seams")]
-    [Range(0f, 0.01f)] public float panelOverlap = 0.002f;
+    [Range(0f, 0.01f)] public float panelOverlap = 0.001f;
 
     [Header("Cluster Visuals")]
     [Tooltip("Enable seamless glass background and glowing border across all panels")]
@@ -63,6 +61,9 @@ public class WorldPanelClusterRig : MonoBehaviour
         if (count < 1) count = 1;
         if (count > 6) count = 6;
 
+        // Parent cluster under VirtualObjects and set layer
+        SetupVirtualObjectsParent();
+
         KillChildren();
         CreatePanels(count);
         LinkNeighbors();
@@ -75,6 +76,33 @@ public class WorldPanelClusterRig : MonoBehaviour
 
         Debug.Log($"[WorldPanelClusterRig] Built {count} panels" +
             (enableClusterVisuals ? " with cluster visuals" : ""));
+    }
+
+    /// <summary>
+    /// Find or create VirtualObjects parent and set layer
+    /// </summary>
+    void SetupVirtualObjectsParent()
+    {
+        // Find or create VirtualObjects parent
+        var virtualObjects = GameObject.Find("VirtualObjects");
+        if (virtualObjects == null)
+        {
+            virtualObjects = new GameObject("VirtualObjects");
+            int layer = LayerMask.NameToLayer("VirtualObjects");
+            if (layer >= 0) virtualObjects.layer = layer;
+        }
+
+        // Parent this cluster under VirtualObjects
+        transform.SetParent(virtualObjects.transform, false);
+        // Reset local position to align with VirtualObjects
+        transform.localPosition = Vector3.zero;
+
+        // Set layer for entire cluster hierarchy
+        int virtualObjectsLayer = LayerMask.NameToLayer("VirtualObjects");
+        if (virtualObjectsLayer >= 0)
+        {
+            SetLayerRecursively(gameObject, virtualObjectsLayer);
+        }
     }
 
     [ContextMenu("Build or Rebuild Cluster (3 panels)")]
@@ -93,7 +121,15 @@ public class WorldPanelClusterRig : MonoBehaviour
         var cam = Cam;
         if (!cam || _panels.Count == 0) return;
 
-        Vector3 camFwd = cam.transform.forward;
+        // Cluster center = current position (set in scene, like RTTMenuFrame)
+        Vector3 clusterCenter = transform.position;
+
+        // Calculate distance from camera to cluster at runtime
+        float distanceToCamera = Vector3.Distance(clusterCenter, cam.transform.position);
+        if (distanceToCamera < 0.1f) distanceToCamera = 2f; // fallback
+
+        // Direction from camera to cluster
+        Vector3 camFwd = (clusterCenter - cam.transform.position).normalized;
         Vector3 camUp = Vector3.up;
         if (faceCameraYawOnly)
         {
@@ -102,8 +138,8 @@ public class WorldPanelClusterRig : MonoBehaviour
             camFwd.Normalize();
         }
 
-        Vector3 clusterCenter = cam.transform.position + camFwd * distanceFromCamera + camUp * verticalOffset;
-        transform.SetPositionAndRotation(clusterCenter, Quaternion.LookRotation(camFwd, camUp));
+        // Only update rotation to face camera (position stays fixed)
+        transform.rotation = Quaternion.LookRotation(camFwd, camUp);
 
         var refPanel = _panels[_panels.Count / 2];
         float panelWidth = refPanel ? refPanel.width : 1f;
@@ -112,8 +148,8 @@ public class WorldPanelClusterRig : MonoBehaviour
         float boardWidth = panelWidth * (1f - 2f * contentMarginHorizontal);
 
         // Calculate base angle for rotation (used for tilt calculation)
-        float boardAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(boardWidth / 2f / distanceFromCamera);
-        float gapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(edgeGapMeters / 2f / distanceFromCamera);
+        float boardAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(boardWidth / 2f / distanceToCamera);
+        float gapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(edgeGapMeters / 2f / distanceToCamera);
         float angleDeg = boardAngleDeg + gapAngleDeg;
 
         int count = _panels.Count;
@@ -127,8 +163,8 @@ public class WorldPanelClusterRig : MonoBehaviour
             rotYawDegs[i] = panelsFaceCamera ? yawDeg * panelTiltFactor : 0f;
         }
 
-        // Desired center position (should stay fixed)
-        Vector3 desiredCenter = cam.transform.position + camFwd * distanceFromCamera + camUp * verticalOffset;
+        // Desired center position = current cluster position
+        Vector3 desiredCenter = clusterCenter;
 
         // Position panels using pair-based approach
         if (count % 2 == 1)
@@ -197,7 +233,8 @@ public class WorldPanelClusterRig : MonoBehaviour
     {
         if (!p) return;
 
-        Vector3 pos = cam.transform.position + camFwd * distanceFromCamera + camUp * verticalOffset;
+        // Use cluster position (set in scene)
+        Vector3 pos = transform.position;
         Quaternion rot = GetPanelRotation(rotYawDeg, camFwd, camUp);
         p.transform.SetPositionAndRotation(pos, rot);
     }
@@ -207,8 +244,8 @@ public class WorldPanelClusterRig : MonoBehaviour
     {
         if (!leftPanel || !rightPanel) return;
 
-        // Junction point at center
-        Vector3 junction = cam.transform.position + camFwd * distanceFromCamera + camUp * verticalOffset;
+        // Junction point at cluster center (set in scene)
+        Vector3 junction = transform.position;
 
         // Left panel: right edge at junction (with overlap)
         Vector3 leftRight = GetPanelRightVector(leftRotYawDeg, camFwd, camUp);

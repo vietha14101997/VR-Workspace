@@ -50,6 +50,9 @@ public class RTTRemoteMenu : MonoBehaviour
     private TextMeshProUGUI _connectButtonText;
     private ClusterAutoBinder.ConnectionState _currentState = ClusterAutoBinder.ConnectionState.Disconnected;
 
+    // QR button reference for locking
+    private GameObject _qrButton;
+
     // QR Scanner
     private QRScannerManager _qrScannerManager;
 
@@ -221,7 +224,7 @@ public class RTTRemoteMenu : MonoBehaviour
 
         // QR button
         float qrSize = 100f;
-        CreateButton(header.transform, w - qrSize, (h - qrSize) / 2f, qrSize, qrSize, "", LoadIcon("qr"), accentColor,
+        _qrButton = CreateButton(header.transform, w - qrSize, (h - qrSize) / 2f, qrSize, qrSize, "", LoadIcon("qr"), accentColor,
             () => ShowQRScanner());
     }
     #endregion
@@ -362,6 +365,11 @@ public class RTTRemoteMenu : MonoBehaviour
                 Debug.Log("[RTTRemoteMenu] Connecting...");
                 UpdateButtonText("CONNECTING...");
 
+                // Khóa 2 InputText và QR button khi bắt đầu kết nối
+                VRInputFieldFactory.SetInteractable(_hostInput, false);
+                VRInputFieldFactory.SetInteractable(_portInput, false);
+                VRButtonFactory.SetInteractable(_qrButton, false);
+
                 // Apply form values to binder
                 ApplyFormToBinder();
 
@@ -369,6 +377,10 @@ public class RTTRemoteMenu : MonoBehaviour
                 if (!connected)
                 {
                     UpdateButtonText("CONNECT");
+                    // Mở khóa 2 InputText và QR button nếu kết nối thất bại
+                    VRInputFieldFactory.SetInteractable(_hostInput, true);
+                    VRInputFieldFactory.SetInteractable(_portInput, true);
+                    VRButtonFactory.SetInteractable(_qrButton, true);
                     Debug.LogError("[RTTRemoteMenu] Connection failed");
                 }
                 // State change will trigger button text update via event
@@ -506,6 +518,11 @@ public class RTTRemoteMenu : MonoBehaviour
                 UpdateButtonText("CONNECT");
                 // Reset to disabled state
                 InitializeDropdownsDisabled();
+                // Mở khóa input fields để user có thể sửa host/port
+                VRInputFieldFactory.SetInteractable(_hostInput, true);
+                VRInputFieldFactory.SetInteractable(_portInput, true);
+                // Mở khóa QR button
+                VRButtonFactory.SetInteractable(_qrButton, true);
                 HideSidePanels();
                 break;
 
@@ -522,6 +539,8 @@ public class RTTRemoteMenu : MonoBehaviour
 
             case ClusterAutoBinder.ConnectionState.SettingUp:
                 UpdateButtonText("SETTING UP...");
+                // Khóa tất cả dropdowns và input fields
+                LockAllInputs();
                 break;
 
             case ClusterAutoBinder.ConnectionState.Ready:
@@ -829,6 +848,49 @@ public class RTTRemoteMenu : MonoBehaviour
     }
 
     /// <summary>
+    /// Lock all dropdowns, input fields, and QR button (disable interaction).
+    /// Called when state changes to Ready (START REMOTE).
+    /// </summary>
+    private void LockAllInputs()
+    {
+        // Khóa 4 dropdowns
+        VRDropdownFactory.SetInteractable(_monitorsDropdown, false);
+        VRDropdownFactory.SetInteractable(_resolutionDropdown, false);
+        VRDropdownFactory.SetInteractable(_bitrateDropdown, false);
+        VRDropdownFactory.SetInteractable(_fpsDropdown, false);
+
+        // Khóa 2 input fields
+        VRInputFieldFactory.SetInteractable(_hostInput, false);
+        VRInputFieldFactory.SetInteractable(_portInput, false);
+
+        // Khóa QR button
+        VRButtonFactory.SetInteractable(_qrButton, false);
+
+        Debug.Log("[RTTRemoteMenu] All inputs locked (Ready state)");
+    }
+
+    /// <summary>
+    /// Unlock all dropdowns, input fields, and QR button (enable interaction).
+    /// </summary>
+    private void UnlockAllInputs()
+    {
+        // Mở khóa 4 dropdowns
+        VRDropdownFactory.SetInteractable(_monitorsDropdown, true);
+        VRDropdownFactory.SetInteractable(_resolutionDropdown, true);
+        VRDropdownFactory.SetInteractable(_bitrateDropdown, true);
+        VRDropdownFactory.SetInteractable(_fpsDropdown, true);
+
+        // Mở khóa 2 input fields
+        VRInputFieldFactory.SetInteractable(_hostInput, true);
+        VRInputFieldFactory.SetInteractable(_portInput, true);
+
+        // Mở khóa QR button
+        VRButtonFactory.SetInteractable(_qrButton, true);
+
+        Debug.Log("[RTTRemoteMenu] All inputs unlocked");
+    }
+
+    /// <summary>
     /// Load saved host/port from preferences and apply to inputs.
     /// </summary>
     private void LoadSavedHostPort()
@@ -1055,7 +1117,7 @@ public class RTTRemoteMenu : MonoBehaviour
         rt.anchoredPosition = new Vector2(x, y);
     }
 
-    private void CreateButton(Transform parent, float x, float y, float w, float h,
+    private GameObject CreateButton(Transform parent, float x, float y, float w, float h,
         string text, Sprite icon, Color col, UnityEngine.Events.UnityAction onClick)
     {
         bool hasText = !string.IsNullOrEmpty(text);
@@ -1086,6 +1148,8 @@ public class RTTRemoteMenu : MonoBehaviour
         rt.anchorMin = rt.anchorMax = Vector2.zero;
         rt.pivot = Vector2.zero;
         rt.anchoredPosition = new Vector2(x, y);
+
+        return btn;
     }
 
     private GameObject CreateLabel(Transform parent, float x, float y, float w, float h,

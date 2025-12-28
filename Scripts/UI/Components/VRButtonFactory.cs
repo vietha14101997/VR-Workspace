@@ -724,4 +724,30 @@ public static class VRButtonFactory
         _pixelSprite = Sprite.Create(tex, new Rect(0, 0, 2, 2), Vector2.one * 0.5f);
         return _pixelSprite;
     }
+
+    // ==================== UTILITY METHODS ====================
+
+    /// <summary>
+    /// Bật/tắt khả năng tương tác của button
+    /// </summary>
+    public static void SetInteractable(GameObject wrapper, bool interactable)
+    {
+        if (wrapper == null) return;
+
+        // Tìm Button component trong HitArea
+        Button btn = wrapper.GetComponentInChildren<Button>();
+        if (btn != null)
+        {
+            btn.interactable = interactable;
+        }
+
+        // Làm mờ visual khi disabled
+        Transform visuals = wrapper.transform.Find("HitArea/Visuals");
+        if (visuals != null)
+        {
+            CanvasGroup cg = visuals.GetComponent<CanvasGroup>();
+            if (cg == null) cg = visuals.gameObject.AddComponent<CanvasGroup>();
+            cg.alpha = interactable ? 1f : 0.4f;
+        }
+    }
 }

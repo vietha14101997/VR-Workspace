@@ -263,6 +263,27 @@ public static class VRInputFieldFactory
         }
     }
 
+    /// <summary>
+    /// Bật/tắt khả năng tương tác của input field
+    /// </summary>
+    public static void SetInteractable(GameObject wrapper, bool interactable)
+    {
+        if (wrapper == null) return;
+
+        var inputField = GetInputField(wrapper);
+        if (inputField != null)
+        {
+            inputField.interactable = interactable;
+        }
+
+        // Sử dụng CanvasGroup để block raycast khi disabled (giống VRDropdownFactory)
+        var canvasGroup = wrapper.GetComponent<CanvasGroup>();
+        if (canvasGroup == null) canvasGroup = wrapper.AddComponent<CanvasGroup>();
+        canvasGroup.alpha = interactable ? 1f : 0.5f;
+        canvasGroup.interactable = interactable;
+        canvasGroup.blocksRaycasts = interactable;
+    }
+
     // ==================== VR KEYBOARD INTEGRATION ====================
 
     /// <summary>
