@@ -78,6 +78,7 @@ public class ClusterAutoBinder : MonoBehaviour
     public event Action<NetworkTestResult> OnNetworkInfoReceived;
     public event Action<SuggestedStreamConfig> OnSuggestedConfigReceived;
     public event Action<string, int, string> OnConfigProgress; // step, progress%, message
+    public event Action<string, double, int> OnSpeedTestProgress; // direction, currentMbps, progress%
     public event Action<string> OnError;
 
     public bool IsStreaming => _isStreaming;
@@ -103,6 +104,32 @@ public class ClusterAutoBinder : MonoBehaviour
     #region V2 Protocol - Phased Connection
 
     /// <summary>
+    /// Quick validation: HTTP ping to check if server is alive (100-500ms timeout)
+    /// </summary>
+    public async Task<bool> ValidateServerAsync()
+    {
+        try
+        {
+            using var http = new System.Net.Http.HttpClient();
+            http.Timeout = TimeSpan.FromSeconds(2); // Max 2 giây
+
+            var url = $"{serverBase}/ping";
+            Debug.Log($"[ClusterAutoBinder] Validating server at {url}...");
+
+            var response = await http.GetAsync(url);
+            bool valid = response.IsSuccessStatusCode;
+
+            Debug.Log($"[ClusterAutoBinder] Server validation: {(valid ? "OK" : "FAILED")}");
+            return valid;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[ClusterAutoBinder] Server validation failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Step 1: Connect to server (Phase 1 - receive hardware info).
     /// Button: "Connect" → After complete, button shows "Setup Remote"
     /// </summary>
@@ -116,6 +143,16 @@ public class ClusterAutoBinder : MonoBehaviour
 
         SetState(ConnectionState.Connecting);
         Debug.Log("[ClusterAutoBinder] Connecting to server (V2 protocol)...");
+
+        // Quick validation first
+        bool serverValid = await ValidateServerAsync();
+        if (!serverValid)
+        {
+            Debug.LogError("[ClusterAutoBinder] Server validation failed - cannot reach server");
+            SetState(ConnectionState.Error);
+            OnError?.Invoke("Cannot reach server. Check host and port.");
+            return false;
+        }
 
         try
         {
@@ -138,6 +175,7 @@ public class ClusterAutoBinder : MonoBehaviour
             _multiPCClient.OnConfigProgress += HandleConfigProgress;
             _multiPCClient.OnStreamingStarted += HandleStreamingStarted;
             _multiPCClient.OnConnectionError += HandleError;
+            _multiPCClient.OnSpeedTestProgress += HandleSpeedTestProgress;
 
             // Build signal URL
             var wsBase = serverBase.Replace("http://", "ws://").Replace("https://", "wss://");
@@ -194,24 +232,21 @@ public class ClusterAutoBinder : MonoBehaviour
 
         try
         {
-            // Apply suggested config (or use current settings)
+            // Sử dụng giá trị từ properties (đã được set từ dropdown qua ApplyFormToBinder)
+            // bitrateKbps từ dropdown là bitrate MỖI MONITOR, nhân với số monitor để có tổng
+            int totalBitrateKbps = bitrateKbps * monitorCount;
+
             var config = new StreamingConfig
             {
                 monitors = monitorCount,
                 resolutionWidth = resolutionWidth,
                 resolutionHeight = resolutionHeight,
                 refreshRate = 60,
-                bitrateKbps = bitrateKbps,
+                bitrateKbps = totalBitrateKbps,  // Total bitrate = per-monitor * monitors
                 fps = fps
             };
 
-            // If we have suggested config, use it as base
-            if (SuggestedConfig != null)
-            {
-                config = StreamingConfig.FromSuggested(SuggestedConfig);
-            }
-
-            Debug.Log($"[ClusterAutoBinder] Applying config: {config.monitors}mon @ {config.resolutionWidth}x{config.resolutionHeight}, {config.fps}fps, {config.bitrateKbps}kbps");
+            Debug.Log($"[ClusterAutoBinder] Applying config: {config.monitors}mon @ {config.resolutionWidth}x{config.resolutionHeight}, {config.fps}fps, {bitrateKbps}kbps/mon = {totalBitrateKbps}kbps total");
             Debug.Log("[ClusterAutoBinder] Calling _multiPCClient.ApplyConfigAsync...");
 
             await _multiPCClient.ApplyConfigAsync(config);
@@ -358,6 +393,11 @@ public class ClusterAutoBinder : MonoBehaviour
         OnError?.Invoke(error);
     }
 
+    private void HandleSpeedTestProgress(string direction, double currentMbps, int progress)
+    {
+        OnSpeedTestProgress?.Invoke(direction, currentMbps, progress);
+    }
+
     #endregion
 
     #region V1 Protocol - Legacy Direct Connection
@@ -420,6 +460,7 @@ public class ClusterAutoBinder : MonoBehaviour
             _multiPCClient.OnConfigProgress -= HandleConfigProgress;
             _multiPCClient.OnStreamingStarted -= HandleStreamingStarted;
             _multiPCClient.OnConnectionError -= HandleError;
+            _multiPCClient.OnSpeedTestProgress -= HandleSpeedTestProgress;
 
             if (_multiPCClient.useV2Protocol)
             {

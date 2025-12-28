@@ -1136,7 +1136,9 @@ public static class VRDropdownFactory
         int capturedIndex = index;
         optBtn.onClick.AddListener(() =>
         {
-            valueTxt.text = optionText;
+            // Strip "(Recommended)" suffix from displayed value
+            string displayValue = optionText.Replace(" (Recommended)", "").Trim();
+            valueTxt.text = displayValue;
 
             if (dropdownComponent != null)
             {
@@ -1148,7 +1150,8 @@ public static class VRDropdownFactory
                 panel.SetActive(false);
             }
 
-            onValueChanged?.Invoke(capturedIndex, optionText);
+            // Callback with clean value (no "(Recommended)")
+            onValueChanged?.Invoke(capturedIndex, displayValue);
         });
 
         // Register option with hover effect
@@ -1430,17 +1433,69 @@ public class VRDropdown : MonoBehaviour
         if (_options == null || index < 0 || index >= _options.Count) return;
 
         UpdateSelection(index);
+        // Strip "(Recommended)" suffix from displayed value
+        string displayValue = _options[index].Replace(" (Recommended)", "").Trim();
         if (_valueTxt != null)
         {
-            _valueTxt.text = _options[index];
+            _valueTxt.text = displayValue;
         }
-        _onValueChanged?.Invoke(index, _options[index]);
+        _onValueChanged?.Invoke(index, displayValue);
     }
 
     public void SetOptions(List<string> options, int selectedIndex = 0)
     {
         _options = options;
+
+        // Update option labels in the dropdown panel
+        UpdateOptionLabels();
+
         SetSelectedIndex(selectedIndex);
+    }
+
+    /// <summary>
+    /// Update the text labels in the dropdown panel to match current _options list.
+    /// This ensures "(Recommended)" suffix is displayed correctly after SetOptions is called.
+    /// </summary>
+    private void UpdateOptionLabels()
+    {
+        if (_dropdownPanel == null || _options == null) return;
+
+        // Find all option items in the dropdown panel
+        // Structure: DropdownPanel > Viewport > Visuals > Content > Options > Option_X > Text
+        for (int i = 0; i < _options.Count; i++)
+        {
+            // Find Option_X by name
+            Transform optionTransform = FindChildRecursive(_dropdownPanel.transform, "Option_" + i);
+            if (optionTransform != null)
+            {
+                // Find Text child
+                Transform textTransform = optionTransform.Find("Text");
+                if (textTransform != null)
+                {
+                    TextMeshProUGUI txt = textTransform.GetComponent<TextMeshProUGUI>();
+                    if (txt != null)
+                    {
+                        txt.text = _options[i];
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Recursively find a child Transform by name
+    /// </summary>
+    private Transform FindChildRecursive(Transform parent, string name)
+    {
+        if (parent.name == name) return parent;
+
+        foreach (Transform child in parent)
+        {
+            Transform found = FindChildRecursive(child, name);
+            if (found != null) return found;
+        }
+
+        return null;
     }
 
     public void CloseDropdown()
@@ -1685,13 +1740,15 @@ public class VRDropdown : MonoBehaviour
                 btn.onClick.RemoveAllListeners();
                 btn.onClick.AddListener(() =>
                 {
+                    // Strip "(Recommended)" suffix from displayed value
+                    string displayValue = optionText.Replace(" (Recommended)", "").Trim();
                     if (_valueTxt != null)
                     {
-                        _valueTxt.text = optionText;
+                        _valueTxt.text = displayValue;
                     }
                     UpdateSelection(capturedIndex);
                     CloseDropdown();
-                    _onValueChanged?.Invoke(capturedIndex, optionText);
+                    _onValueChanged?.Invoke(capturedIndex, displayValue);
                 });
 
                 // Fix Issue 1: Restore _isSelected state on cloned VROptionHoverEffect

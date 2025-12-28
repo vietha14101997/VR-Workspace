@@ -31,7 +31,7 @@ public class RTTInfoSidePanel : MonoBehaviour
     [SerializeField] private int titleFontSize = 48;
     [SerializeField] private int labelFontSize = 36;
     [SerializeField] private int valueFontSize = 40;
-    [SerializeField] private float lineSpacing = 60f;
+    [SerializeField] private float lineSpacing = 80f; // Increased for better readability
 
     [Header("Floating Data Effect")]
     [SerializeField] private bool enableFloatingData = true;
@@ -48,6 +48,9 @@ public class RTTInfoSidePanel : MonoBehaviour
     private Sprite _pixelSprite;
     private Sprite _roundedMaskSprite;
 
+    // Speed test UI references (for live updates)
+    private System.Collections.Generic.Dictionary<string, TextMeshProUGUI> _valueTexts = new System.Collections.Generic.Dictionary<string, TextMeshProUGUI>();
+
     // Resolution for RTT (calculated from panel dimensions)
     private int _rttWidth = 640;
     private int _rttHeight = 1080;
@@ -59,6 +62,8 @@ public class RTTInfoSidePanel : MonoBehaviour
     public void Initialize(PanelType type, Color theme, Color accent, TMP_FontAsset font,
         float width = 0.53f, float height = 0.9f)
     {
+        Debug.Log($"[RTTInfoSidePanel] Initialize START for {type}, name={gameObject.name}");
+
         panelType = type;
         themeColor = theme;
         accentColor = accent;
@@ -71,15 +76,65 @@ public class RTTInfoSidePanel : MonoBehaviour
         _rttHeight = 1080;
         _rttWidth = Mathf.RoundToInt(_rttHeight * aspect);
 
+        Debug.Log($"[RTTInfoSidePanel] Creating RTT: {_rttWidth}x{_rttHeight}");
+
         CreateRenderTexture();
         SetupUICamera();
         SetupCanvas();  // Creates GlassPanel with FX_DataStream and GlowingBorder
         SetupDisplayQuad();
 
+        Debug.Log($"[RTTInfoSidePanel] Initialize setup done, _contentRoot null: {_contentRoot == null}, _displayQuad null: {_displayQuad == null}");
+
         // Initial render to texture
         MarkDirty();
 
         gameObject.SetActive(false); // Hidden by default
+        Debug.Log($"[RTTInfoSidePanel] Initialize DONE for {type}");
+    }
+
+    /// <summary>
+    /// Show panel with loading state (before data arrives).
+    /// </summary>
+    public void ShowWithLoadingState()
+    {
+        Debug.Log($"[RTTInfoSidePanel] ShowWithLoadingState START for {panelType}, gameObject={gameObject.name}, active={gameObject.activeSelf}");
+
+        if (_contentRoot == null)
+        {
+            Debug.LogError($"[RTTInfoSidePanel] ShowWithLoadingState: _contentRoot is NULL for {panelType}! Reinitializing canvas...");
+            // Try to reinitialize if _contentRoot is missing
+            return;
+        }
+
+        gameObject.SetActive(true);
+        Debug.Log($"[RTTInfoSidePanel] SetActive(true) done for {panelType}");
+
+        ClearContent();
+        Debug.Log($"[RTTInfoSidePanel] ClearContent done for {panelType}, children before adding: {_contentRoot.transform.childCount}");
+
+        if (panelType == PanelType.HardwareInfo)
+        {
+            AddTitle("SERVER INFO");
+            AddInfoRow("Device", "Loading...");
+            AddInfoRow("CPU", "...");
+            AddInfoRow("VGA", "...");
+            AddInfoRow("RAM", "...");
+            AddInfoRow("OS", "...");
+        }
+        else
+        {
+            AddTitle("NETWORK INFO");
+            AddInfoRow("Ping", "...");
+            AddInfoRow("Jitter", "...");
+            AddInfoRow("Bandwidth", "...");
+            AddInfoRow("Type", "...");
+            AddInfoRow("Quality", "...");
+        }
+
+        Debug.Log($"[RTTInfoSidePanel] Content added for {panelType}, children: {_contentRoot.transform.childCount}");
+
+        MarkDirty();
+        Debug.Log($"[RTTInfoSidePanel] ShowWithLoadingState DONE for {panelType}, children: {_contentRoot.transform.childCount}, displayQuad active: {_displayQuad?.gameObject.activeSelf}");
     }
 
     /// <summary>
@@ -87,20 +142,33 @@ public class RTTInfoSidePanel : MonoBehaviour
     /// </summary>
     public void SetHardwareInfo(ServerHardwareInfo info)
     {
-        if (info == null || panelType != PanelType.HardwareInfo) return;
+        Debug.Log($"[RTTInfoSidePanel] SetHardwareInfo called, info null: {info == null}, panelType: {panelType}");
 
+        if (info == null)
+        {
+            Debug.LogWarning("[RTTInfoSidePanel] SetHardwareInfo: info is null");
+            return;
+        }
+        if (panelType != PanelType.HardwareInfo)
+        {
+            Debug.LogWarning($"[RTTInfoSidePanel] SetHardwareInfo: wrong panel type {panelType}");
+            return;
+        }
+
+        gameObject.SetActive(true);
         ClearContent();
 
         AddTitle("SERVER INFO");
-        AddInfoRow("Device", info.deviceName);
-        AddInfoRow("CPU", TruncateText(info.processor, 24));
-        AddInfoRow("GPU", TruncateText(info.gpu, 24));
-        AddInfoRow("VRAM", $"{info.gpuVramGB} GB");
+        AddInfoRow("Device", info.deviceName ?? "Unknown");
+        AddInfoRow("CPU", info.processor ?? "Unknown");
+        // VGA + VRAM combined
+        string gpuInfo = $"{info.gpu ?? "Unknown"} - {info.gpuVramGB}GB";
+        AddInfoRow("VGA", gpuInfo);
         AddInfoRow("RAM", $"{info.ramGB} GB");
-        AddInfoRow("OS", TruncateText(info.os, 24));
-        AddInfoRow("Encoder", info.encoderType ?? "N/A");
+        AddInfoRow("OS", info.os ?? "Unknown");
 
         MarkDirty();
+        Debug.Log($"[RTTInfoSidePanel] SetHardwareInfo completed: {info.deviceName}");
     }
 
     /// <summary>
@@ -108,9 +176,29 @@ public class RTTInfoSidePanel : MonoBehaviour
     /// </summary>
     public void SetNetworkInfo(NetworkTestResult info)
     {
-        if (info == null || panelType != PanelType.NetworkInfo) return;
+        Debug.Log($"[RTTInfoSidePanel] SetNetworkInfo called, info null: {info == null}, panelType: {panelType}, _contentRoot null: {_contentRoot == null}");
+
+        if (info == null)
+        {
+            Debug.LogWarning("[RTTInfoSidePanel] SetNetworkInfo: info is null");
+            return;
+        }
+        if (panelType != PanelType.NetworkInfo)
+        {
+            Debug.LogWarning($"[RTTInfoSidePanel] SetNetworkInfo: wrong panel type {panelType}");
+            return;
+        }
+        if (_contentRoot == null)
+        {
+            Debug.LogError($"[RTTInfoSidePanel] SetNetworkInfo: _contentRoot is NULL!");
+            return;
+        }
+
+        gameObject.SetActive(true);
+        Debug.Log($"[RTTInfoSidePanel] SetNetworkInfo: SetActive done, clearing content");
 
         ClearContent();
+        Debug.Log($"[RTTInfoSidePanel] SetNetworkInfo: ClearContent done, children: {_contentRoot.transform.childCount}");
 
         AddTitle("NETWORK INFO");
         AddInfoRow("Ping", $"{info.pingMs:F1} ms");
@@ -122,7 +210,10 @@ public class RTTInfoSidePanel : MonoBehaviour
         string quality = GetNetworkQuality(info);
         AddInfoRow("Quality", quality, GetQualityColor(quality));
 
+        Debug.Log($"[RTTInfoSidePanel] SetNetworkInfo: content added, children: {_contentRoot.transform.childCount}");
+
         MarkDirty();
+        Debug.Log($"[RTTInfoSidePanel] SetNetworkInfo DONE: {info.pingMs:F1}ms, children: {_contentRoot.transform.childCount}");
     }
     #endregion
 
@@ -156,56 +247,67 @@ public class RTTInfoSidePanel : MonoBehaviour
 
     private void SetupCanvas()
     {
-        // Create a container for RTT rendering - positioned far from main scene
-        // to avoid interference with other UI cameras
-        GameObject rttContainer = new GameObject("RTTContainer");
-        rttContainer.transform.SetParent(transform, false);
-        // Position far away from main scene to avoid culling conflicts
-        float uniqueOffset = GetInstanceID() % 10000;
-        rttContainer.transform.localPosition = new Vector3(uniqueOffset, 10000, 0);
+        try
+        {
+            Debug.Log($"[RTTInfoSidePanel] SetupCanvas START for {panelType}");
 
-        // Camera follows container
-        _uiCamera.transform.SetParent(rttContainer.transform, false);
-        _uiCamera.transform.localPosition = new Vector3(0, 0, -10);
+            // Create a container for RTT rendering - positioned far from main scene
+            // to avoid interference with other UI cameras
+            GameObject rttContainer = new GameObject("RTTContainer");
+            rttContainer.transform.SetParent(transform, false);
+            // Position far away from main scene to avoid culling conflicts
+            float uniqueOffset = GetInstanceID() % 10000;
+            rttContainer.transform.localPosition = new Vector3(uniqueOffset, 10000, 0);
 
-        GameObject canvasObj = new GameObject("Canvas");
-        canvasObj.transform.SetParent(rttContainer.transform, false);
-        canvasObj.layer = LayerMask.NameToLayer("UI");
+            // Camera follows container
+            _uiCamera.transform.SetParent(rttContainer.transform, false);
+            _uiCamera.transform.localPosition = new Vector3(0, 0, -10);
 
-        _canvas = canvasObj.AddComponent<Canvas>();
-        _canvas.renderMode = RenderMode.WorldSpace;
-        _canvas.worldCamera = _uiCamera;
+            GameObject canvasObj = new GameObject("Canvas");
+            canvasObj.transform.SetParent(rttContainer.transform, false);
+            canvasObj.layer = LayerMask.NameToLayer("UI");
 
-        RectTransform canvasRT = _canvas.GetComponent<RectTransform>();
-        canvasRT.sizeDelta = new Vector2(_rttWidth, _rttHeight);
-        canvasRT.localPosition = Vector3.zero;
-        canvasRT.localScale = Vector3.one;
+            _canvas = canvasObj.AddComponent<Canvas>();
+            _canvas.renderMode = RenderMode.WorldSpace;
+            _canvas.worldCamera = _uiCamera;
 
-        canvasObj.AddComponent<GraphicRaycaster>();
+            RectTransform canvasRT = _canvas.GetComponent<RectTransform>();
+            canvasRT.sizeDelta = new Vector2(_rttWidth, _rttHeight);
+            canvasRT.localPosition = Vector3.zero;
+            canvasRT.localScale = Vector3.one;
 
-        // Create GlassBackground (like RTTMenuFrame) - contains FX_DataStream and GlowingBorder
-        CreateGlassPanel(canvasRT);
+            canvasObj.AddComponent<GraphicRaycaster>();
 
-        // Content container (sibling of GlassBackground, like RTTMenuFrame)
-        _contentRoot = new GameObject("ContentContainer");
-        _contentRoot.transform.SetParent(canvasObj.transform, false);
-        _contentRoot.layer = LayerMask.NameToLayer("UI");
+            // Create GlassBackground (like RTTMenuFrame) - contains FX_DataStream and GlowingBorder
+            CreateGlassPanel(canvasRT);
 
-        RectTransform contentRT = _contentRoot.AddComponent<RectTransform>();
-        contentRT.anchorMin = Vector2.zero;
-        contentRT.anchorMax = Vector2.one;
-        contentRT.offsetMin = new Vector2(40, 40);
-        contentRT.offsetMax = new Vector2(-40, -40);
+            // Content container (sibling of GlassBackground, like RTTMenuFrame)
+            _contentRoot = new GameObject("ContentContainer");
+            _contentRoot.transform.SetParent(canvasObj.transform, false);
+            _contentRoot.layer = LayerMask.NameToLayer("UI");
 
-        // Add vertical layout
-        var layout = _contentRoot.AddComponent<VerticalLayoutGroup>();
-        layout.spacing = lineSpacing;
-        layout.childAlignment = TextAnchor.UpperCenter;
-        layout.childControlWidth = true;
-        layout.childControlHeight = false;
-        layout.childForceExpandWidth = true;
-        layout.childForceExpandHeight = false;
-        layout.padding = new RectOffset(20, 20, 40, 40);
+            RectTransform contentRT = _contentRoot.AddComponent<RectTransform>();
+            contentRT.anchorMin = Vector2.zero;
+            contentRT.anchorMax = Vector2.one;
+            contentRT.offsetMin = new Vector2(40, 40);
+            contentRT.offsetMax = new Vector2(-40, -40);
+
+            // Add vertical layout
+            var layout = _contentRoot.AddComponent<VerticalLayoutGroup>();
+            layout.spacing = lineSpacing;
+            layout.childAlignment = TextAnchor.UpperCenter;
+            layout.childControlWidth = true;
+            layout.childControlHeight = false;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
+            layout.padding = new RectOffset(20, 20, 40, 40);
+
+            Debug.Log($"[RTTInfoSidePanel] SetupCanvas DONE for {panelType}, _contentRoot: {_contentRoot != null}");
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"[RTTInfoSidePanel] SetupCanvas EXCEPTION for {panelType}: {ex.Message}\n{ex.StackTrace}");
+        }
     }
 
     private void CreateGlassPanel(RectTransform parent)
@@ -573,12 +675,75 @@ public class RTTInfoSidePanel : MonoBehaviour
         valueTxt.alignment = TextAlignmentOptions.Left;
         valueTxt.fontStyle = FontStyles.Bold;
         valueTxt.raycastTarget = false;
-        valueTxt.enableWordWrapping = false;
-        valueTxt.overflowMode = TextOverflowModes.Ellipsis;
+        valueTxt.enableWordWrapping = true;
+        valueTxt.overflowMode = TextOverflowModes.Overflow;
         if (customFont != null) valueTxt.font = customFont;
 
         var valueLayout = valueObj.AddComponent<LayoutElement>();
         valueLayout.flexibleWidth = 1;
+
+        // Store reference for live updates
+        _valueTexts[label] = valueTxt;
+    }
+
+    /// <summary>
+    /// Update speed test progress (call during speed test for live updates).
+    /// </summary>
+    public void UpdateSpeedTestProgress(string direction, double currentMbps, int progress)
+    {
+        if (panelType != PanelType.NetworkInfo) return;
+
+        // Only handle bandwidth (download) - upload test removed
+        if (direction != "bandwidth") return;
+
+        string value = progress < 100
+            ? $"{currentMbps:F1} Mbps ({progress}%)"
+            : $"{currentMbps:F1} Mbps";
+
+        if (_valueTexts.TryGetValue("Bandwidth", out var txt))
+        {
+            txt.text = value;
+            MarkDirty();
+        }
+    }
+
+    /// <summary>
+    /// Show network panel with speed test loading state.
+    /// </summary>
+    public void ShowSpeedTestLoadingState()
+    {
+        if (panelType != PanelType.NetworkInfo) return;
+        if (_contentRoot == null) return;
+
+        gameObject.SetActive(true);
+        ClearContent();
+        _valueTexts.Clear();
+
+        AddTitle("NETWORK INFO");
+        AddInfoRow("Ping", "Measuring...");
+        AddInfoRow("Jitter", "Waiting...");
+        AddInfoRow("Bandwidth", "Waiting...");
+        AddInfoRow("Quality", "Testing...");
+
+        MarkDirty();
+    }
+
+    /// <summary>
+    /// Update ping values immediately.
+    /// </summary>
+    public void UpdatePingValues(double pingMs, double jitterMs)
+    {
+        if (panelType != PanelType.NetworkInfo) return;
+
+        if (_valueTexts.TryGetValue("Ping", out var pingTxt))
+        {
+            pingTxt.text = $"{pingMs:F1} ms";
+        }
+        if (_valueTexts.TryGetValue("Jitter", out var jitterTxt))
+        {
+            jitterTxt.text = $"{jitterMs:F1} ms";
+        }
+        MarkDirty();
     }
 
     private string GetNetworkQuality(NetworkTestResult info)
@@ -617,6 +782,10 @@ public class RTTInfoSidePanel : MonoBehaviour
         if (_uiCamera != null)
         {
             _uiCamera.Render();
+        }
+        else
+        {
+            Debug.LogWarning($"[RTTInfoSidePanel] MarkDirty: _uiCamera is NULL for {panelType}!");
         }
     }
     #endregion

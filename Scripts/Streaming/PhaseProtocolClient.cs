@@ -297,55 +297,75 @@ namespace VRWorkspace.Streaming
                     switch (type)
                     {
                         case "hardware_info":
+                            Debug.Log("[PhaseProtocol] >>> Handling hardware_info");
                             await HandleHardwareInfoAsync(json);
                             break;
 
                         case "speedtest_start":
+                            Debug.Log("[PhaseProtocol] >>> Handling speedtest_start");
                             await HandleSpeedTestStartAsync(json);
                             break;
 
                         case "speedtest_end":
+                            Debug.Log("[PhaseProtocol] >>> Handling speedtest_end");
                             await HandleSpeedTestEndAsync(json);
                             break;
 
                         case "network_info":
+                            Debug.Log("[PhaseProtocol] >>> Handling network_info");
                             HandleNetworkInfo(json);
                             break;
 
                         case "suggested_config":
+                            Debug.Log("[PhaseProtocol] >>> Handling suggested_config");
                             HandleSuggestedConfig(json);
                             break;
 
                         case "config_progress":
+                            Debug.Log("[PhaseProtocol] >>> Handling config_progress");
                             HandleConfigProgress(json);
                             break;
 
                         case "config_complete":
+                            Debug.Log("[PhaseProtocol] >>> Handling config_complete");
                             await HandleConfigCompleteAsync(json);
+                            Debug.Log("[PhaseProtocol] <<< Finished config_complete");
                             break;
 
                         case "answer":
+                            Debug.Log($"[PhaseProtocol] >>> Handling answer for monitor {json.GetInt("monitorIndex")}");
                             await HandleAnswerAsync(json);
+                            Debug.Log($"[PhaseProtocol] <<< Finished answer handler");
                             break;
 
                         case "candidate":
+                            Debug.Log($"[PhaseProtocol] >>> Handling candidate for monitor {json.GetInt("monitorIndex")}");
                             HandleCandidate(json);
                             break;
 
                         case "end_of_candidates":
+                            Debug.Log("[PhaseProtocol] >>> Handling end_of_candidates");
                             HandleEndOfCandidates(json);
                             break;
 
+                        case "ice_ready":
+                            Debug.Log("[PhaseProtocol] >>> Handling ice_ready");
+                            HandleIceReady(json);
+                            break;
+
                         case "streaming_started":
+                            Debug.Log("[PhaseProtocol] >>> Handling streaming_started");
                             HandleStreamingStarted(json);
                             break;
 
                         case "error":
+                            Debug.Log("[PhaseProtocol] >>> Handling error");
                             HandleError(json);
                             break;
 
                         case "pong":
-                            // Ignore keepalive response
+                            // Notify speed test client for ping measurement
+                            _speedTest?.HandlePong();
                             break;
 
                         case null:
@@ -369,7 +389,8 @@ namespace VRWorkspace.Streaming
             }
             else if (text.Equals("pong", StringComparison.OrdinalIgnoreCase))
             {
-                // Ignore
+                // Notify speed test client for ping measurement
+                _speedTest?.HandlePong();
             }
             else
             {
@@ -379,6 +400,9 @@ namespace VRWorkspace.Streaming
         }
 
         // === Phase 1 Handlers ===
+
+        // Event for speed test progress (direction, currentMbps, progress%)
+        public event Action<string, double, int> OnSpeedTestProgress;
 
         private async Task HandleHardwareInfoAsync(SimpleJson json)
         {
@@ -404,12 +428,107 @@ namespace VRWorkspace.Streaming
             Debug.Log($"[PhaseProtocol] Server: {_hardwareInfo.deviceName}, GPU: {_hardwareInfo.gpu} ({_hardwareInfo.gpuVramGB}GB)");
             Debug.Log($"[PhaseProtocol] Encoder: {_hardwareInfo.encoderType}, HW: {_hardwareInfo.hwAccelEnabled}");
 
-            _stateMachine.TryTransition(ConnectionPhase.SpeedTesting);
+            // Fire event immediately so UI can show hardware info
             OnHardwareInfoReceived?.Invoke(_hardwareInfo);
 
-            // Send acknowledgment to server before speed test starts
+            // Send acknowledgment to server
             Debug.Log("[PhaseProtocol] Sending hardware_info_ack");
             await SendTextAsync("{\"type\":\"hardware_info_ack\"}");
+
+            // NEW FLOW: Client initiates speed test
+            _stateMachine.TryTransition(ConnectionPhase.SpeedTesting);
+
+            // Subscribe to speed test progress for UI updates
+            _speedTest.OnSpeedProgress += (direction, mbps, progress) =>
+            {
+                OnSpeedTestProgress?.Invoke(direction, mbps, progress);
+            };
+
+            // IMPORTANT: Run speed test as fire-and-forget to avoid blocking receive loop
+            // Binary data from server needs to be received while speed test is running
+            Debug.Log("[PhaseProtocol] Starting client-initiated speed test (non-blocking)...");
+            _ = RunSpeedTestInBackgroundAsync();
+        }
+
+        /// <summary>
+        /// Run speed test in background so receive loop can continue processing binary data.
+        /// </summary>
+        private async Task RunSpeedTestInBackgroundAsync()
+        {
+            try
+            {
+                var speedResult = await _speedTest.RunSpeedTestAsync();
+
+                // Detect network adapter type
+                string networkType = DetectNetworkAdapterType();
+
+                // Create network info from speed test results
+                _networkInfo = new NetworkTestResult
+                {
+                    pingMs = speedResult.PingMs,
+                    jitterMs = speedResult.JitterMs,
+                    bandwidthMbps = speedResult.BandwidthMbps,
+                    connectionType = networkType
+                };
+
+                // Fire event for UI to update network info
+                OnNetworkInfoReceived?.Invoke(_networkInfo);
+                Debug.Log($"[PhaseProtocol] Speed test complete: {_networkInfo.bandwidthMbps:F1}Mbps, {_networkInfo.pingMs:F1}ms ping, type={networkType}");
+
+                // Wait for suggested_config from Server (Server calculates based on our speed test result)
+                _stateMachine.TryTransition(ConnectionPhase.AwaitingSuggestedConfig);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[PhaseProtocol] Speed test failed: {ex.Message}");
+                OnError?.Invoke($"Speed test failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Detect the type of network adapter (Ethernet or Wi-Fi).
+        /// </summary>
+        private string DetectNetworkAdapterType()
+        {
+            try
+            {
+                var interfaces = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces();
+                foreach (var ni in interfaces)
+                {
+                    // Skip non-operational interfaces
+                    if (ni.OperationalStatus != System.Net.NetworkInformation.OperationalStatus.Up)
+                        continue;
+
+                    // Skip loopback and tunnel interfaces
+                    if (ni.NetworkInterfaceType == System.Net.NetworkInformation.NetworkInterfaceType.Loopback ||
+                        ni.NetworkInterfaceType == System.Net.NetworkInformation.NetworkInterfaceType.Tunnel)
+                        continue;
+
+                    // Check if this interface has an IP address
+                    var props = ni.GetIPProperties();
+                    if (props.UnicastAddresses.Count == 0)
+                        continue;
+
+                    // Determine type
+                    switch (ni.NetworkInterfaceType)
+                    {
+                        case System.Net.NetworkInformation.NetworkInterfaceType.Wireless80211:
+                            return "Wi-Fi";
+                        case System.Net.NetworkInformation.NetworkInterfaceType.Ethernet:
+                        case System.Net.NetworkInformation.NetworkInterfaceType.GigabitEthernet:
+                            return "Ethernet";
+                        case System.Net.NetworkInformation.NetworkInterfaceType.FastEthernetT:
+                        case System.Net.NetworkInformation.NetworkInterfaceType.FastEthernetFx:
+                            return "Ethernet";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[PhaseProtocol] Failed to detect network type: {ex.Message}");
+            }
+
+            return "Unknown";
         }
 
         private MonitorInfo[] ParseMonitors(List<SimpleJson> arr)
@@ -449,6 +568,11 @@ namespace VRWorkspace.Streaming
 
             Debug.Log($"[PhaseProtocol] Speed test end: direction={direction}, current phase: {_stateMachine.CurrentPhase}");
 
+            // Signal the client-initiated speed test that data transfer is complete
+            // This is used by the improved bandwidth measurement
+            _speedTest?.HandleSpeedTestEnd();
+
+            // Legacy handler for server-initiated speed test
             await _speedTest?.HandleSpeedTestEndAsync(direction, totalBytes, durationMs);
 
             if (direction == "upload")
@@ -498,8 +622,21 @@ namespace VRWorkspace.Streaming
             Debug.Log($"[PhaseProtocol] Suggested: {_suggestedConfig.monitors}mon @ {_suggestedConfig.resolutionWidth}x{_suggestedConfig.resolutionHeight}, {_suggestedConfig.fps}fps, {_suggestedConfig.bitrateKbps}kbps");
             Debug.Log($"[PhaseProtocol] Reason: {_suggestedConfig.reason}");
 
-            bool transitioned = _stateMachine.TryTransition(ConnectionPhase.ConfiguringSettings);
-            Debug.Log($"[PhaseProtocol] Transition to ConfiguringSettings: {transitioned}, new phase: {_stateMachine.CurrentPhase}");
+            // Handle race condition: suggested_config may arrive while still in SpeedTesting phase
+            // (server sends immediately after receiving speedtest_result)
+            var currentPhase = _stateMachine.CurrentPhase;
+            if (currentPhase == ConnectionPhase.SpeedTesting ||
+                currentPhase == ConnectionPhase.AwaitingNetworkInfo)
+            {
+                // Skip intermediate states - server already has our speed test result
+                Debug.Log($"[PhaseProtocol] Forcing transition from {currentPhase} to ConfiguringSettings (race condition fix)");
+                _stateMachine.ForceTransition(ConnectionPhase.ConfiguringSettings, "suggested_config received");
+            }
+            else
+            {
+                bool transitioned = _stateMachine.TryTransition(ConnectionPhase.ConfiguringSettings);
+                Debug.Log($"[PhaseProtocol] Transition to ConfiguringSettings: {transitioned}, new phase: {_stateMachine.CurrentPhase}");
+            }
 
             OnSuggestedConfigReceived?.Invoke(_suggestedConfig);
         }
@@ -516,7 +653,7 @@ namespace VRWorkspace.Streaming
             OnConfigProgress?.Invoke(step, progress, message);
         }
 
-        private async Task HandleConfigCompleteAsync(SimpleJson json)
+        private Task HandleConfigCompleteAsync(SimpleJson json)
         {
             Debug.Log("[PhaseProtocol] Config complete, starting ICE negotiation");
 
@@ -534,10 +671,31 @@ namespace VRWorkspace.Streaming
 
             _stateMachine.TryTransition(ConnectionPhase.ICENegotiating);
 
-            // Create PeerConnections and send offers
-            Debug.Log("[PhaseProtocol] Starting CreatePeerConnectionsAsync...");
-            await CreatePeerConnectionsAsync(_configuredMonitors.Count);
-            Debug.Log("[PhaseProtocol] CreatePeerConnectionsAsync completed, receive loop should continue");
+            // IMPORTANT: Run PeerConnection creation in background (fire-and-forget)
+            // This allows the receive loop to continue processing incoming messages (answers, ICE candidates)
+            // while we're still creating and setting up PeerConnections
+            Debug.Log("[PhaseProtocol] Starting CreatePeerConnectionsAsync in background...");
+            _ = CreatePeerConnectionsInBackgroundAsync(_configuredMonitors.Count);
+
+            // Return immediately to unblock receive loop
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Create PeerConnections in background so receive loop can process incoming messages.
+        /// </summary>
+        private async Task CreatePeerConnectionsInBackgroundAsync(int count)
+        {
+            try
+            {
+                await CreatePeerConnectionsAsync(count);
+                Debug.Log("[PhaseProtocol] CreatePeerConnectionsAsync completed successfully");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[PhaseProtocol] CreatePeerConnectionsAsync FAILED: {ex.Message}");
+                Debug.LogError($"[PhaseProtocol] Stack trace: {ex.StackTrace}");
+            }
         }
 
         private async Task CreatePeerConnectionsAsync(int count)
@@ -558,11 +716,22 @@ namespace VRWorkspace.Streaming
                 var h264 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("H264", StringComparison.OrdinalIgnoreCase)).ToArray();
                 trans.SetCodecPreferences(h264.Concat(caps.codecs.Except(h264)).ToArray());
 
-                pc.OnIceConnectionChange = s => Debug.Log($"[PhaseProtocol] PC{idx} ICE: {s}");
+                pc.OnIceConnectionChange = s =>
+                {
+                    Debug.Log($"[PhaseProtocol] PC{idx} ICE: {s}");
+                    if (s == RTCIceConnectionState.Connected)
+                    {
+                        Debug.Log($"[PhaseProtocol] PC{idx} ICE connected");
+                    }
+                };
                 pc.OnConnectionStateChange = s =>
                 {
                     Debug.Log($"[PhaseProtocol] PC{idx} State: {s}");
-                    if (s == RTCPeerConnectionState.Failed || s == RTCPeerConnectionState.Disconnected)
+                    if (s == RTCPeerConnectionState.Connected)
+                    {
+                        Debug.Log($"[PhaseProtocol] PC{idx} PC connected");
+                    }
+                    else if (s == RTCPeerConnectionState.Failed || s == RTCPeerConnectionState.Disconnected)
                     {
                         Debug.LogWarning($"[PhaseProtocol] PC{idx} connection lost");
                     }
@@ -611,10 +780,13 @@ namespace VRWorkspace.Streaming
 
                 lock (_lock) { _peerConnections.Add(wrapper); }
 
-                // Create and send offer
+                // Create and send offer - use Task.Delay(10) like v1 for consistent async behavior
                 var offerOp = pc.CreateOffer();
-                while (!offerOp.IsDone) await Task.Yield();
-                if (offerOp.IsError)
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                while (!offerOp.IsDone && sw.ElapsedMilliseconds < 5000)
+                    await Task.Delay(10);
+
+                if (!offerOp.IsDone || offerOp.IsError)
                 {
                     Debug.LogError($"[PhaseProtocol] PC{idx} CreateOffer failed");
                     continue;
@@ -622,8 +794,11 @@ namespace VRWorkspace.Streaming
 
                 var offer = offerOp.Desc;
                 var setLocalOp = pc.SetLocalDescription(ref offer);
-                while (!setLocalOp.IsDone) await Task.Yield();
-                if (setLocalOp.IsError)
+                sw.Restart();
+                while (!setLocalOp.IsDone && sw.ElapsedMilliseconds < 5000)
+                    await Task.Delay(10);
+
+                if (!setLocalOp.IsDone || setLocalOp.IsError)
                 {
                     Debug.LogError($"[PhaseProtocol] PC{idx} SetLocal failed");
                     continue;
@@ -637,9 +812,11 @@ namespace VRWorkspace.Streaming
         private async Task HandleAnswerAsync(SimpleJson json)
         {
             var monitorIndex = json.GetInt("monitorIndex");
-            var sdp = FixSdp(json.GetString("sdp") ?? "");
+            var rawSdp = json.GetString("sdp") ?? "";
+            var sdp = FixSdp(rawSdp);
 
             Debug.Log($"[PhaseProtocol] PC{monitorIndex} received answer, _peerConnections.Count={_peerConnections.Count}");
+            Debug.Log($"[PhaseProtocol] PC{monitorIndex} raw SDP length={rawSdp.Length}, fixed SDP length={sdp.Length}");
 
             PCWrapper wrapper;
             lock (_lock)
@@ -652,24 +829,111 @@ namespace VRWorkspace.Streaming
                 wrapper = _peerConnections[monitorIndex];
             }
 
-            var answer = new RTCSessionDescription { type = RTCSdpType.Answer, sdp = sdp };
-            Debug.Log($"[PhaseProtocol] PC{monitorIndex} calling SetRemoteDescription...");
+            // Validate wrapper and PC
+            if (wrapper == null)
+            {
+                Debug.LogError($"[PhaseProtocol] PC{monitorIndex} wrapper is NULL!");
+                return;
+            }
+            if (wrapper.PC == null)
+            {
+                Debug.LogError($"[PhaseProtocol] PC{monitorIndex} wrapper.PC is NULL!");
+                return;
+            }
 
-            // Call SetRemoteDescription - Unity WebRTC processes async internally
-            // Don't wait for completion - WebRTC will handle it and fire ICE/connection events
-            wrapper.PC.SetRemoteDescription(ref answer);
+            // Use EXACT same pattern as working v1 code (MultiPCStreamClient line 534-550)
+            try
+            {
+                // Log PC state before attempting SetRemoteDescription
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} SignalingState={wrapper.PC.SignalingState}, ConnectionState={wrapper.PC.ConnectionState}, IsClosed={wrapper.PC.ConnectionState == RTCPeerConnectionState.Closed}");
 
-            // Mark as set immediately
-            wrapper.AnswerSet = true;
-            Debug.Log($"[PhaseProtocol] PC{monitorIndex} answer set (async)");
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} creating RTCSessionDescription...");
+                var answer = new RTCSessionDescription { type = RTCSdpType.Answer, sdp = sdp };
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} RTCSessionDescription created, sdp length={sdp.Length}");
 
-            // Process pending ICE
-            foreach (var cand in wrapper.PendingIce)
-                AddIceCandidate(wrapper, cand);
-            wrapper.PendingIce.Clear();
+                // Check that PC is in correct state for SetRemoteDescription
+                if (wrapper.PC.SignalingState != RTCSignalingState.HaveLocalOffer)
+                {
+                    Debug.LogError($"[PhaseProtocol] PC{monitorIndex} WRONG STATE: SignalingState={wrapper.PC.SignalingState}, expected HaveLocalOffer");
+                    return;
+                }
 
-            // Check if all PCs have answers
-            CheckIceComplete();
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} calling wrapper.PC.SetRemoteDescription...");
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} FULL SDP ({sdp.Length} chars):\n{sdp}");
+                // Log individual lines for debugging
+                var sdpLines = sdp.Split('\n');
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} SDP has {sdpLines.Length} lines");
+                RTCSetSessionDescriptionAsyncOperation setRemoteOp = null;
+                try
+                {
+                    setRemoteOp = wrapper.PC.SetRemoteDescription(ref answer);
+                    Debug.Log($"[PhaseProtocol] PC{monitorIndex} SetRemoteDescription call returned (setRemoteOp null? {setRemoteOp == null})");
+                }
+                catch (Exception innerEx)
+                {
+                    Debug.Log($"[PhaseProtocol] PC{monitorIndex} SetRemoteDescription EXCEPTION: {innerEx.GetType().Name}: {innerEx.Message}");
+                    Debug.Log($"[PhaseProtocol] PC{monitorIndex} Stack: {innerEx.StackTrace}");
+                    return;
+                }
+
+                // Debug: Log that we passed try-catch
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} Passed try-catch, setRemoteOp null? {setRemoteOp == null}");
+
+                if (setRemoteOp == null)
+                {
+                    Debug.Log($"[PhaseProtocol] PC{monitorIndex} ERROR: SetRemoteDescription returned NULL operation!");
+                    return;
+                }
+
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} SetRemoteDescription returned op, IsDone={setRemoteOp.IsDone}, waiting...");
+
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                int loopCount = 0;
+                while (!setRemoteOp.IsDone && sw.ElapsedMilliseconds < 5000)
+                {
+                    await Task.Delay(10);
+                    loopCount++;
+                    if (loopCount % 100 == 0) // Log every 1 second
+                    {
+                        Debug.Log($"[PhaseProtocol] PC{monitorIndex} waiting... {sw.ElapsedMilliseconds}ms, IsDone={setRemoteOp.IsDone}");
+                    }
+                }
+
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} loop exited: loops={loopCount}, elapsed={sw.ElapsedMilliseconds}ms, IsDone={setRemoteOp.IsDone}, IsError={setRemoteOp.IsError}");
+
+                if (!setRemoteOp.IsDone || setRemoteOp.IsError)
+                {
+                    Debug.Log($"[PhaseProtocol] PC{monitorIndex} SetRemoteDescription FAILED (IsDone={setRemoteOp.IsDone}, IsError={setRemoteOp.IsError})");
+                    if (setRemoteOp.IsError)
+                    {
+                        try
+                        {
+                            Debug.Log($"[PhaseProtocol] PC{monitorIndex} Error detail: {setRemoteOp.Error.message}");
+                        }
+                        catch (Exception errEx)
+                        {
+                            Debug.Log($"[PhaseProtocol] PC{monitorIndex} Could not get error detail: {errEx.Message}");
+                        }
+                    }
+                    return;
+                }
+
+                wrapper.AnswerSet = true;
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} ✓ answer set OK, AnswerSet=true");
+
+                // Process pending ICE
+                foreach (var cand in wrapper.PendingIce)
+                    AddIceCandidate(wrapper, cand);
+                wrapper.PendingIce.Clear();
+
+                // Check if all PCs have answers
+                CheckIceComplete();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[PhaseProtocol] PC{monitorIndex} HandleAnswerAsync EXCEPTION: {ex.GetType().Name}: {ex.Message}");
+                Debug.LogException(ex);
+            }
         }
 
         private void HandleCandidate(SimpleJson json)
@@ -703,6 +967,28 @@ namespace VRWorkspace.Streaming
             var monitorIndex = json.GetInt("monitorIndex");
             Debug.Log($"[PhaseProtocol] PC{monitorIndex} server ICE complete");
             CheckIceComplete();
+        }
+
+        /// <summary>
+        /// Handle ice_ready message from server - all ICE connections are established.
+        /// This provides a reliable server-side confirmation for transitioning to ReadyToStream.
+        /// </summary>
+        private void HandleIceReady(SimpleJson json)
+        {
+            var monitorCount = json.GetInt("monitorCount");
+            Debug.Log($"[PhaseProtocol] Server confirmed {monitorCount} ICE connections ready");
+
+            if (_stateMachine.CurrentPhase == ConnectionPhase.ICENegotiating)
+            {
+                Debug.Log("[PhaseProtocol] Transitioning to ReadyToStream (server-initiated via ice_ready)");
+                _stateMachine.TryTransition(ConnectionPhase.ReadyToStream);
+                _ = SendJsonAsync(new { type = "proceed", phase = 3 });
+                OnReadyToStream?.Invoke();
+            }
+            else
+            {
+                Debug.Log($"[PhaseProtocol] ice_ready received but phase is {_stateMachine.CurrentPhase}, ignoring");
+            }
         }
 
         private void AddIceCandidate(PCWrapper wrapper, string candStr)
@@ -853,7 +1139,31 @@ namespace VRWorkspace.Streaming
         {
             if (string.IsNullOrEmpty(sdp)) return sdp;
 
-            sdp = sdp.Replace("UDP/TLS/RTP/SAVP", "UDP/TLS/RTP/SAVPF");
+            // CRITICAL: Unescape literal \r\n strings to actual CRLF characters
+            // JSON may contain escaped sequences that weren't properly unescaped
+            if (sdp.Contains("\\r\\n"))
+            {
+                Debug.Log("[PhaseProtocol] FixSdp: Unescaping literal \\r\\n to actual CRLF");
+                sdp = sdp.Replace("\\r\\n", "\r\n");
+            }
+            else if (sdp.Contains("\\n"))
+            {
+                Debug.Log("[PhaseProtocol] FixSdp: Unescaping literal \\n to actual LF");
+                sdp = sdp.Replace("\\n", "\n");
+            }
+
+            // Only fix SAVP -> SAVPF if not already SAVPF (avoid SAVPFF bug)
+            if (!sdp.Contains("UDP/TLS/RTP/SAVPF"))
+            {
+                Debug.Log("[PhaseProtocol] FixSdp: Converting SAVP -> SAVPF");
+                sdp = sdp.Replace("UDP/TLS/RTP/SAVP", "UDP/TLS/RTP/SAVPF");
+            }
+
+            // Verify no double-F bug
+            if (sdp.Contains("SAVPFF"))
+            {
+                Debug.LogError("[PhaseProtocol] FixSdp BUG: SDP contains SAVPFF!");
+            }
 
             if (sdp.Contains("IP4 0.0.0.0"))
             {
@@ -861,20 +1171,42 @@ namespace VRWorkspace.Streaming
                 sdp = sdp.Replace("IP4 0.0.0.0", "IP4 127.0.0.1");
             }
 
+            // CRITICAL: Answer SDP must have setup:active or setup:passive, NOT actpass!
+            // SIPSorcery sends actpass but Unity WebRTC requires active/passive for answers
+            if (sdp.Contains("a=setup:actpass"))
+            {
+                Debug.Log("[PhaseProtocol] FixSdp: Converting a=setup:actpass -> a=setup:active (required for answer)");
+                sdp = sdp.Replace("a=setup:actpass", "a=setup:active");
+            }
+
             var lines = sdp.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
             var filtered = new List<string>();
+            int removedCandidates = 0;
 
             foreach (var rawLine in lines)
             {
                 var line = rawLine.Trim();
                 if (string.IsNullOrWhiteSpace(line)) continue;
-                // KEEP ICE candidates from server SDP - they are needed for connection!
-                // if (line.StartsWith("a=candidate:", StringComparison.OrdinalIgnoreCase)) continue;
+
+                // CRITICAL FIX: Remove embedded ICE candidates from answer SDP!
+                // V1 does this and it works. Keeping them causes SetRemoteDescription to hang.
+                // ICE candidates are sent separately via "candidate" messages (trickle ICE).
+                if (line.StartsWith("a=candidate:", StringComparison.OrdinalIgnoreCase))
+                {
+                    removedCandidates++;
+                    continue;
+                }
+
                 if (line.StartsWith("a=ice-options:", StringComparison.OrdinalIgnoreCase) && line.Contains("ice2"))
                 {
                     line = line.Replace("ice2,", "").Replace(",ice2", "").Replace("ice2", "trickle");
                 }
                 filtered.Add(line);
+            }
+
+            if (removedCandidates > 0)
+            {
+                Debug.Log($"[PhaseProtocol] FixSdp: Removed {removedCandidates} embedded ICE candidates (using trickle ICE)");
             }
 
             sdp = string.Join("\r\n", filtered);
@@ -1026,16 +1358,26 @@ namespace VRWorkspace.Streaming
                     if (escaped)
                     {
                         escaped = false;
-                        if (readingKey) currentKey.Append(c);
-                        else currentValue.Append(c);
+                        // CRITICAL FIX: Properly unescape JSON escape sequences
+                        char unescaped = c switch
+                        {
+                            'n' => '\n',
+                            'r' => '\r',
+                            't' => '\t',
+                            '\\' => '\\',
+                            '"' => '"',
+                            '/' => '/',
+                            _ => c
+                        };
+                        if (readingKey) currentKey.Append(unescaped);
+                        else currentValue.Append(unescaped);
                         continue;
                     }
 
                     if (c == '\\')
                     {
                         escaped = true;
-                        if (readingKey) currentKey.Append(c);
-                        else currentValue.Append(c);
+                        // Don't append backslash yet - wait for next char to determine escape sequence
                         continue;
                     }
 

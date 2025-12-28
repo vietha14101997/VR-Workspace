@@ -60,6 +60,10 @@ public class RTTRemoteMenu : MonoBehaviour
     // Cached suggested config for "(Recommended)" suffix
     private SuggestedStreamConfig _cachedSuggestedConfig;
 
+    // Cached hardware and network info for recalculating suggestions
+    private ServerHardwareInfo _cachedHardwareInfo;
+    private NetworkTestResult _cachedNetworkInfo;
+
     // Parent references
     private RTTMenuFrame _menuFrame;
     private float _containerWidth;
@@ -74,7 +78,7 @@ public class RTTRemoteMenu : MonoBehaviour
     // Default dropdown options (without Recommended suffix)
     private static readonly string[] MONITOR_OPTIONS = { "1 Monitor", "2 Monitors", "3 Monitors" };
     private static readonly string[] RESOLUTION_OPTIONS = { "1280 x 720", "1366 x 768", "1600 x 900", "1920 x 1080" };
-    private static readonly string[] BITRATE_OPTIONS = { "5 Mbps", "10 Mbps", "20 Mbps", "30 Mbps", "50 Mbps" };
+    private static readonly string[] BITRATE_OPTIONS = { "5 Mbps", "10 Mbps", "15 Mbps", "20 Mbps", "30 Mbps" };
     private static readonly string[] FPS_OPTIONS = { "30 FPS", "45 FPS", "60 FPS" };
     #endregion
 
@@ -186,12 +190,14 @@ public class RTTRemoteMenu : MonoBehaviour
         clusterBinder.OnSuggestedConfigReceived -= ApplySuggestedConfig;
         clusterBinder.OnHardwareInfoReceived -= HandleHardwareInfoReceived;
         clusterBinder.OnNetworkInfoReceived -= HandleNetworkInfoReceived;
+        clusterBinder.OnSpeedTestProgress -= HandleSpeedTestProgress;
 
         // Subscribe
         clusterBinder.OnStateChanged += HandleConnectionStateChanged;
         clusterBinder.OnSuggestedConfigReceived += ApplySuggestedConfig;
         clusterBinder.OnHardwareInfoReceived += HandleHardwareInfoReceived;
         clusterBinder.OnNetworkInfoReceived += HandleNetworkInfoReceived;
+        clusterBinder.OnSpeedTestProgress += HandleSpeedTestProgress;
 
         // Update current state
         HandleConnectionStateChanged(clusterBinder.CurrentState);
@@ -267,7 +273,7 @@ public class RTTRemoteMenu : MonoBehaviour
             grid.transform, cellW,
             "Monitors", LoadIcon("monitor"), themeColor,
             monitorOptions, 1,
-            onValueChanged: (index, value) => Debug.Log("Monitor: " + value),
+            onValueChanged: HandleMonitorSelectionChanged,
             labelFontSize: DROPDOWN_LABEL_FONT_SIZE, valueFontSize: DROPDOWN_VALUE_FONT_SIZE, font: customFont);
         PositionElement(_monitorsDropdown, 0, row1Y);
 
@@ -505,12 +511,13 @@ public class RTTRemoteMenu : MonoBehaviour
 
             case ClusterAutoBinder.ConnectionState.Connecting:
                 UpdateButtonText("CONNECTING...");
+                // Hiển thị panels ngay khi bắt đầu kết nối với loading state
+                ShowSidePanels();
                 break;
 
             case ClusterAutoBinder.ConnectionState.Connected:
                 UpdateButtonText("SETUP REMOTE");
-                // Show side panels (data already set via events)
-                ShowSidePanels();
+                // Panels đã hiển thị rồi từ Connecting state, không cần gọi lại
                 break;
 
             case ClusterAutoBinder.ConnectionState.SettingUp:
@@ -537,10 +544,22 @@ public class RTTRemoteMenu : MonoBehaviour
     /// </summary>
     private void HandleHardwareInfoReceived(ServerHardwareInfo info)
     {
+        Debug.Log($"[RTTRemoteMenu] HandleHardwareInfoReceived called, info null: {info == null}, panel null: {_hardwareInfoPanel == null}");
+
+        // Cache for later recalculation
+        _cachedHardwareInfo = info;
+
+        // Show both panels when first info arrives (network panel with loading state)
+        EnsureBothPanelsVisible();
+
         if (_hardwareInfoPanel != null && info != null)
         {
             _hardwareInfoPanel.SetHardwareInfo(info);
             Debug.Log($"[RTTRemoteMenu] Updated hardware info panel: {info.deviceName}");
+        }
+        else
+        {
+            Debug.LogWarning($"[RTTRemoteMenu] HandleHardwareInfoReceived skipped: panel={_hardwareInfoPanel != null}, info={info != null}");
         }
     }
 
@@ -549,10 +568,22 @@ public class RTTRemoteMenu : MonoBehaviour
     /// </summary>
     private void HandleNetworkInfoReceived(NetworkTestResult info)
     {
+        Debug.Log($"[RTTRemoteMenu] HandleNetworkInfoReceived called, info null: {info == null}, panel null: {_networkInfoPanel == null}");
+
+        // Cache for later recalculation
+        _cachedNetworkInfo = info;
+
+        // Show both panels when first info arrives (hardware panel with loading state)
+        EnsureBothPanelsVisible();
+
         if (_networkInfoPanel != null && info != null)
         {
             _networkInfoPanel.SetNetworkInfo(info);
             Debug.Log($"[RTTRemoteMenu] Updated network info panel: {info.pingMs:F1}ms, {info.bandwidthMbps:F0}Mbps");
+        }
+        else
+        {
+            Debug.LogWarning($"[RTTRemoteMenu] HandleNetworkInfoReceived skipped: panel={_networkInfoPanel != null}, info={info != null}");
         }
     }
 
@@ -567,54 +598,56 @@ public class RTTRemoteMenu : MonoBehaviour
 
         _cachedSuggestedConfig = config;
 
-        // Load saved preferences
-        var prefs = RemotePreferences.Load();
-
         // Enable all dropdowns first
         EnableDropdowns();
 
         // === Monitors ===
+        // Server suggests based on bandwidth calculation
         int suggestedMonitorIndex = Mathf.Clamp(config.monitors - 1, 0, 2);
         var monitorOptions = BuildOptionsWithRecommended(MONITOR_OPTIONS, suggestedMonitorIndex);
-        int selectedMonitorIndex = prefs.HasMonitorPreference ? prefs.monitors : suggestedMonitorIndex;
-        selectedMonitorIndex = Mathf.Clamp(selectedMonitorIndex, 0, monitorOptions.Count - 1);
-        VRDropdownFactory.SetOptions(_monitorsDropdown, monitorOptions, selectedMonitorIndex);
+        VRDropdownFactory.SetOptions(_monitorsDropdown, monitorOptions, suggestedMonitorIndex);
 
         // === Resolution ===
         string suggestedResolution = $"{config.resolutionWidth} x {config.resolutionHeight}";
         int suggestedResIndex = FindOptionIndex(RESOLUTION_OPTIONS, suggestedResolution);
-        if (suggestedResIndex < 0) suggestedResIndex = 3; // Default to 1920x1080
+        if (suggestedResIndex < 0)
+        {
+            Debug.LogWarning($"[RTTRemoteMenu] Resolution '{suggestedResolution}' not found, defaulting to 1920x1080");
+            suggestedResIndex = 3; // Default to 1920x1080
+        }
         var resolutionOptions = BuildOptionsWithRecommended(RESOLUTION_OPTIONS, suggestedResIndex);
-        int selectedResIndex = prefs.HasResolutionPreference
-            ? FindOptionIndexClean(RESOLUTION_OPTIONS, prefs.resolution)
-            : suggestedResIndex;
-        if (selectedResIndex < 0) selectedResIndex = suggestedResIndex;
-        VRDropdownFactory.SetOptions(_resolutionDropdown, resolutionOptions, selectedResIndex);
+        VRDropdownFactory.SetOptions(_resolutionDropdown, resolutionOptions, suggestedResIndex);
 
         // === Bitrate ===
         int bitrateMbps = config.bitrateKbps / 1000;
         string suggestedBitrate = $"{bitrateMbps} Mbps";
         int suggestedBitrateIndex = FindOptionIndex(BITRATE_OPTIONS, suggestedBitrate);
-        if (suggestedBitrateIndex < 0) suggestedBitrateIndex = 2; // Default to 20 Mbps
+        if (suggestedBitrateIndex < 0)
+        {
+            // Find nearest option: 5, 10, 15, 20, 30 Mbps
+            if (bitrateMbps >= 25) suggestedBitrateIndex = 4;      // 30 Mbps
+            else if (bitrateMbps >= 17) suggestedBitrateIndex = 3; // 20 Mbps
+            else if (bitrateMbps >= 12) suggestedBitrateIndex = 2; // 15 Mbps
+            else if (bitrateMbps >= 7) suggestedBitrateIndex = 1;  // 10 Mbps
+            else suggestedBitrateIndex = 0;                        // 5 Mbps
+            Debug.LogWarning($"[RTTRemoteMenu] Bitrate '{suggestedBitrate}' not found, using nearest: {BITRATE_OPTIONS[suggestedBitrateIndex]}");
+        }
         var bitrateOptions = BuildOptionsWithRecommended(BITRATE_OPTIONS, suggestedBitrateIndex);
-        int selectedBitrateIndex = prefs.HasBitratePreference
-            ? FindOptionIndexClean(BITRATE_OPTIONS, prefs.bitrate)
-            : suggestedBitrateIndex;
-        if (selectedBitrateIndex < 0) selectedBitrateIndex = suggestedBitrateIndex;
-        VRDropdownFactory.SetOptions(_bitrateDropdown, bitrateOptions, selectedBitrateIndex);
+        VRDropdownFactory.SetOptions(_bitrateDropdown, bitrateOptions, suggestedBitrateIndex);
 
         // === FPS ===
         string suggestedFps = $"{config.fps} FPS";
         int suggestedFpsIndex = FindOptionIndex(FPS_OPTIONS, suggestedFps);
-        if (suggestedFpsIndex < 0) suggestedFpsIndex = 2; // Default to 60 FPS
+        if (suggestedFpsIndex < 0)
+        {
+            Debug.LogWarning($"[RTTRemoteMenu] FPS '{suggestedFps}' not found, defaulting to 60 FPS");
+            suggestedFpsIndex = 2; // Default to 60 FPS
+        }
         var fpsOptions = BuildOptionsWithRecommended(FPS_OPTIONS, suggestedFpsIndex);
-        int selectedFpsIndex = prefs.HasFpsPreference
-            ? FindOptionIndexClean(FPS_OPTIONS, prefs.fps)
-            : suggestedFpsIndex;
-        if (selectedFpsIndex < 0) selectedFpsIndex = suggestedFpsIndex;
-        VRDropdownFactory.SetOptions(_fpsDropdown, fpsOptions, selectedFpsIndex);
+        VRDropdownFactory.SetOptions(_fpsDropdown, fpsOptions, suggestedFpsIndex);
 
-        Debug.Log($"[RTTRemoteMenu] Applied suggested config with (Recommended): {config.monitors}mon @ {config.resolutionWidth}x{config.resolutionHeight}, {config.fps}fps, {config.bitrateKbps}kbps");
+        Debug.Log($"[RTTRemoteMenu] Applied suggested config: {config.monitors}mon @ {config.resolutionWidth}x{config.resolutionHeight}, {config.fps}fps, {config.bitrateKbps}kbps");
+        Debug.Log($"[RTTRemoteMenu] Selected indices: Mon={suggestedMonitorIndex}, Res={suggestedResIndex}, Bitrate={suggestedBitrateIndex}, FPS={suggestedFpsIndex}");
     }
 
     /// <summary>
@@ -646,6 +679,121 @@ public class RTTRemoteMenu : MonoBehaviour
                 return i;
         }
         return -1;
+    }
+
+    /// <summary>
+    /// Handle Monitors dropdown selection changed.
+    /// Recalculates suggested config for Resolution, Bitrate, FPS based on new monitor count.
+    /// </summary>
+    private void HandleMonitorSelectionChanged(int index, string value)
+    {
+        Debug.Log($"[RTTRemoteMenu] Monitor selection changed: index={index}, value={value}");
+
+        // Only recalculate if we have cached info
+        if (_cachedNetworkInfo == null || _cachedHardwareInfo == null)
+        {
+            Debug.Log("[RTTRemoteMenu] No cached info, skipping recalculation");
+            return;
+        }
+
+        int selectedMonitors = index + 1; // 1, 2, or 3 monitors
+        RecalculateSuggestionsForMonitorCount(selectedMonitors);
+    }
+
+    /// <summary>
+    /// Recalculate suggested config based on selected monitor count.
+    /// Updates Resolution, Bitrate, FPS dropdowns with new "(Recommended)" positions.
+    /// </summary>
+    private void RecalculateSuggestionsForMonitorCount(int monitorCount)
+    {
+        if (_cachedNetworkInfo == null || _cachedHardwareInfo == null) return;
+
+        // Get current selections before updating options
+        int currentResIndex = VRDropdownFactory.GetSelectedIndex(_resolutionDropdown);
+        int currentBitrateIndex = VRDropdownFactory.GetSelectedIndex(_bitrateDropdown);
+        int currentFpsIndex = VRDropdownFactory.GetSelectedIndex(_fpsDropdown);
+
+        // === Calculate recommended Bitrate based on resolution and network ===
+        double availableBandwidth = _cachedNetworkInfo.bandwidthMbps > 0 ? _cachedNetworkInfo.bandwidthMbps : 100;
+
+        // Base bitrate recommendation based on resolution (same logic as server)
+        int baseBitrateKbps;
+        if (_cachedHardwareInfo.gpuVramGB >= 8) // 1080p
+            baseBitrateKbps = 15000;
+        else if (_cachedHardwareInfo.gpuVramGB >= 4) // 900p
+            baseBitrateKbps = 12000;
+        else // 768p
+            baseBitrateKbps = 10000;
+
+        // Scale up for excellent network (low ping, high bandwidth)
+        if (_cachedNetworkInfo.pingMs < 10 && availableBandwidth > 500)
+            baseBitrateKbps = (int)(baseBitrateKbps * 1.3f);
+        else if (_cachedNetworkInfo.pingMs < 20 && availableBandwidth > 200)
+            baseBitrateKbps = (int)(baseBitrateKbps * 1.15f);
+
+        // Max bitrate per monitor based on bandwidth
+        double maxBitratePerMonitor = availableBandwidth * 0.6 / monitorCount * 1000;
+        int suggestedBitrateKbps = (int)Math.Clamp(Math.Min(baseBitrateKbps, maxBitratePerMonitor), 5000, 30000);
+
+        // Map to bitrate option index: 5, 10, 15, 20, 30 Mbps
+        int suggestedBitrateIndex;
+        if (suggestedBitrateKbps >= 25000) suggestedBitrateIndex = 4; // 30 Mbps
+        else if (suggestedBitrateKbps >= 17500) suggestedBitrateIndex = 3; // 20 Mbps
+        else if (suggestedBitrateKbps >= 12500) suggestedBitrateIndex = 2; // 15 Mbps
+        else if (suggestedBitrateKbps >= 7500) suggestedBitrateIndex = 1; // 10 Mbps
+        else suggestedBitrateIndex = 0; // 5 Mbps
+
+        // === Calculate recommended Resolution based on GPU VRAM and monitor count ===
+        // More monitors = potentially lower resolution to reduce GPU load
+        int suggestedResIndex;
+        if (_cachedHardwareInfo.gpuVramGB >= 8 && monitorCount <= 2)
+        {
+            suggestedResIndex = 3; // 1920x1080
+        }
+        else if (_cachedHardwareInfo.gpuVramGB >= 6 || (_cachedHardwareInfo.gpuVramGB >= 4 && monitorCount == 1))
+        {
+            suggestedResIndex = 2; // 1600x900
+        }
+        else if (_cachedHardwareInfo.gpuVramGB >= 4 || monitorCount == 1)
+        {
+            suggestedResIndex = 1; // 1366x768
+        }
+        else
+        {
+            suggestedResIndex = 0; // 1280x720
+        }
+
+        // === Calculate recommended FPS based on encoder and ping ===
+        int suggestedFpsIndex;
+        if (_cachedHardwareInfo.hwAccelEnabled && _cachedNetworkInfo.pingMs < 20)
+        {
+            suggestedFpsIndex = 2; // 60 FPS
+        }
+        else if (_cachedHardwareInfo.hwAccelEnabled && _cachedNetworkInfo.pingMs < 50)
+        {
+            suggestedFpsIndex = 1; // 45 FPS
+        }
+        else
+        {
+            suggestedFpsIndex = 0; // 30 FPS
+        }
+
+        // === Update dropdowns with new "(Recommended)" values ===
+        // AUTO-SELECT recommended values when Monitor count changes
+
+        // Resolution - auto-select recommended
+        var resolutionOptions = BuildOptionsWithRecommended(RESOLUTION_OPTIONS, suggestedResIndex);
+        VRDropdownFactory.SetOptions(_resolutionDropdown, resolutionOptions, suggestedResIndex);
+
+        // Bitrate - auto-select recommended
+        var bitrateOptions = BuildOptionsWithRecommended(BITRATE_OPTIONS, suggestedBitrateIndex);
+        VRDropdownFactory.SetOptions(_bitrateDropdown, bitrateOptions, suggestedBitrateIndex);
+
+        // FPS - auto-select recommended
+        var fpsOptions = BuildOptionsWithRecommended(FPS_OPTIONS, suggestedFpsIndex);
+        VRDropdownFactory.SetOptions(_fpsDropdown, fpsOptions, suggestedFpsIndex);
+
+        Debug.Log($"[RTTRemoteMenu] Auto-selected for {monitorCount} monitors: Res={RESOLUTION_OPTIONS[suggestedResIndex]}, Bitrate={BITRATE_OPTIONS[suggestedBitrateIndex]}, FPS={FPS_OPTIONS[suggestedFpsIndex]}");
     }
     #endregion
 
@@ -720,7 +868,13 @@ public class RTTRemoteMenu : MonoBehaviour
     /// </summary>
     private void CreateSidePanels()
     {
-        if (_menuFrame == null) return;
+        Debug.Log($"[RTTRemoteMenu] CreateSidePanels called, _menuFrame null: {_menuFrame == null}");
+
+        if (_menuFrame == null)
+        {
+            Debug.LogError("[RTTRemoteMenu] CreateSidePanels: _menuFrame is NULL, cannot create side panels!");
+            return;
+        }
 
         float mainPanelWidth = _menuFrame.PanelWidth;   // ~1.6m
         float mainPanelHeight = _menuFrame.PanelHeight; // ~0.9m
@@ -733,13 +887,17 @@ public class RTTRemoteMenu : MonoBehaviour
         // Angle to rotate side panels (facing slightly toward viewer)
         float rotationAngle = 30f;
 
+        Debug.Log($"[RTTRemoteMenu] Creating Hardware Info Panel (left)...");
         // Hardware Info Panel (Left)
         PlaceSidePanelFlat("HardwareInfoPanel", -1, mainPanelWidth, sideWidth, sideHeight,
             gapMeters, rotationAngle, RTTInfoSidePanel.PanelType.HardwareInfo, ref _hardwareInfoPanel);
+        Debug.Log($"[RTTRemoteMenu] Hardware panel created: {_hardwareInfoPanel != null}");
 
+        Debug.Log($"[RTTRemoteMenu] Creating Network Info Panel (right)...");
         // Network Info Panel (Right)
         PlaceSidePanelFlat("NetworkInfoPanel", 1, mainPanelWidth, sideWidth, sideHeight,
             gapMeters, rotationAngle, RTTInfoSidePanel.PanelType.NetworkInfo, ref _networkInfoPanel);
+        Debug.Log($"[RTTRemoteMenu] Network panel created: {_networkInfoPanel != null}");
 
         Debug.Log($"[RTTRemoteMenu] Side panels created ({sideWidth:F2}m x {sideHeight:F2}m) gap={gapMeters}m angle={rotationAngle}° (hidden)");
     }
@@ -800,16 +958,65 @@ public class RTTRemoteMenu : MonoBehaviour
     }
 
     /// <summary>
-    /// Show side panels.
+    /// Ensure both panels are visible. Shows loading state for panels that aren't active yet.
+    /// Called when any info is received to ensure both panels show together.
+    /// </summary>
+    private void EnsureBothPanelsVisible()
+    {
+        // Show hardware panel with loading state if not already active
+        if (_hardwareInfoPanel != null && !_hardwareInfoPanel.gameObject.activeSelf)
+        {
+            Debug.Log("[RTTRemoteMenu] EnsureBothPanelsVisible: Showing hardware panel with loading state");
+            _hardwareInfoPanel.ShowWithLoadingState();
+        }
+
+        // Show network panel with loading state if not already active
+        if (_networkInfoPanel != null && !_networkInfoPanel.gameObject.activeSelf)
+        {
+            Debug.Log("[RTTRemoteMenu] EnsureBothPanelsVisible: Showing network panel with loading state");
+            _networkInfoPanel.ShowWithLoadingState();
+        }
+    }
+
+    /// <summary>
+    /// Show side panels with loading state (data will be filled when received).
     /// </summary>
     private void ShowSidePanels()
     {
-        if (_hardwareInfoPanel != null)
-            _hardwareInfoPanel.gameObject.SetActive(true);
-        if (_networkInfoPanel != null)
-            _networkInfoPanel.gameObject.SetActive(true);
+        Debug.Log($"[RTTRemoteMenu] ShowSidePanels called, hardware null: {_hardwareInfoPanel == null}, network null: {_networkInfoPanel == null}");
 
-        Debug.Log("[RTTRemoteMenu] Side panels shown");
+        if (_hardwareInfoPanel != null)
+        {
+            Debug.Log("[RTTRemoteMenu] Calling ShowWithLoadingState on hardware panel");
+            _hardwareInfoPanel.ShowWithLoadingState();
+        }
+        else
+        {
+            Debug.LogError("[RTTRemoteMenu] Hardware panel is NULL!");
+        }
+
+        if (_networkInfoPanel != null)
+        {
+            Debug.Log("[RTTRemoteMenu] Calling ShowSpeedTestLoadingState on network panel");
+            _networkInfoPanel.ShowSpeedTestLoadingState();
+        }
+        else
+        {
+            Debug.LogError("[RTTRemoteMenu] Network panel is NULL!");
+        }
+
+        Debug.Log("[RTTRemoteMenu] Side panels shown with loading state");
+    }
+
+    /// <summary>
+    /// Handle speed test progress from client.
+    /// </summary>
+    public void HandleSpeedTestProgress(string direction, double currentMbps, int progress)
+    {
+        if (_networkInfoPanel != null)
+        {
+            _networkInfoPanel.UpdateSpeedTestProgress(direction, currentMbps, progress);
+        }
     }
 
     /// <summary>
@@ -1059,15 +1266,27 @@ public class RTTRemoteMenu : MonoBehaviour
 
     private int FindOptionIndex(string[] options, string value)
     {
-        string normalized = value.Replace("x", " x ").Replace("  ", " ").Trim();
+        if (string.IsNullOrEmpty(value)) return -1;
+
+        // Normalize: replace all double-spaces with single space
+        string normalized = value.Replace("x", " x ");
+        while (normalized.Contains("  "))
+            normalized = normalized.Replace("  ", " ");
+        normalized = normalized.Trim();
+
+        // Also create a no-space version for comparison
+        string noSpaceValue = value.Replace(" ", "");
+
         for (int i = 0; i < options.Length; i++)
         {
             if (options[i].Equals(normalized, StringComparison.OrdinalIgnoreCase) ||
-                options[i].Replace(" ", "").Equals(value.Replace(" ", ""), StringComparison.OrdinalIgnoreCase))
+                options[i].Replace(" ", "").Equals(noSpaceValue, StringComparison.OrdinalIgnoreCase))
             {
                 return i;
             }
         }
+
+        Debug.Log($"[RTTRemoteMenu] FindOptionIndex: '{value}' not found in options. Normalized: '{normalized}'");
         return -1;
     }
     #endregion
@@ -1090,6 +1309,7 @@ public class RTTRemoteMenu : MonoBehaviour
             clusterBinder.OnSuggestedConfigReceived -= ApplySuggestedConfig;
             clusterBinder.OnHardwareInfoReceived -= HandleHardwareInfoReceived;
             clusterBinder.OnNetworkInfoReceived -= HandleNetworkInfoReceived;
+            clusterBinder.OnSpeedTestProgress -= HandleSpeedTestProgress;
         }
 
         // Destroy side panels

@@ -18,6 +18,8 @@ public class WorldPanelClusterRig : MonoBehaviour
     [Range(0f, 0.1f)] public float edgeGapMeters = 0f;
     [Tooltip("Whether panels should face directly toward camera (true) or have limited tilt (false)")]
     public bool panelsFaceCamera = true;
+    [Tooltip("How much panels tilt toward camera (0 = flat/parallel, 1 = fully facing camera)")]
+    [Range(0f, 1f)] public float panelTiltFactor = 1f;
     public float verticalOffset = 0f;
     public bool faceCameraYawOnly = true;
 
@@ -107,39 +109,146 @@ public class WorldPanelClusterRig : MonoBehaviour
         // Use Board width (panel minus margins) for spacing so Board edges touch
         float boardWidth = panelWidth * (1f - 2f * contentMarginHorizontal);
 
+        // Calculate base angle for rotation (used for tilt calculation)
         float boardAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(boardWidth / 2f / distanceFromCamera);
         float gapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(edgeGapMeters / 2f / distanceFromCamera);
-
         float angleDeg = boardAngleDeg + gapAngleDeg;
 
         int count = _panels.Count;
+
+        // Calculate rotation for each panel
+        float[] rotYawDegs = new float[count];
         for (int i = 0; i < count; i++)
         {
             float offset = i - (count - 1) / 2f;
             float yawDeg = offset * angleDeg;
-            PlacePanelOnArc(_panels[i], yawDeg, cam, camFwd, camUp);
+            rotYawDegs[i] = panelsFaceCamera ? yawDeg * panelTiltFactor : 0f;
         }
-    }
 
-    void PlacePanelOnArc(WorldPanelPlus p, float yawDeg, Camera cam, Vector3 camFwd, Vector3 camUp)
-    {
-        if (!p) return;
+        // Desired center position (should stay fixed)
+        Vector3 desiredCenter = cam.transform.position + camFwd * distanceFromCamera + camUp * verticalOffset;
 
-        Quaternion yaw = Quaternion.AngleAxis(yawDeg, camUp);
-        Vector3 dir = yaw * camFwd;
-        Vector3 pos = cam.transform.position + dir * distanceFromCamera + camUp * verticalOffset;
-
-        Quaternion rot;
-        if (panelsFaceCamera)
+        // Position panels using pair-based approach
+        if (count % 2 == 1)
         {
-            rot = Quaternion.LookRotation(dir, camUp);
+            // Odd count: center panel at index count/2
+            int centerIdx = count / 2;
+            PositionPanelAtCenter(_panels[centerIdx], rotYawDegs[centerIdx], cam, camFwd, camUp);
+
+            // Work outward to the left
+            for (int i = centerIdx - 1; i >= 0; i--)
+                PositionPanelLeftOf(_panels[i], _panels[i + 1], rotYawDegs[i], rotYawDegs[i + 1], boardWidth, camFwd, camUp);
+
+            // Work outward to the right
+            for (int i = centerIdx + 1; i < count; i++)
+                PositionPanelRightOf(_panels[i], _panels[i - 1], rotYawDegs[i], rotYawDegs[i - 1], boardWidth, camFwd, camUp);
         }
         else
         {
-            rot = Quaternion.LookRotation(-camFwd, camUp);
+            // Even count: center pair at indices count/2-1 and count/2
+            int leftCenter = count / 2 - 1;
+            int rightCenter = count / 2;
+            PositionCenterPair(_panels[leftCenter], _panels[rightCenter],
+                rotYawDegs[leftCenter], rotYawDegs[rightCenter], boardWidth, cam, camFwd, camUp);
+
+            // Work outward to the left
+            for (int i = leftCenter - 1; i >= 0; i--)
+                PositionPanelLeftOf(_panels[i], _panels[i + 1], rotYawDegs[i], rotYawDegs[i + 1], boardWidth, camFwd, camUp);
+
+            // Work outward to the right
+            for (int i = rightCenter + 1; i < count; i++)
+                PositionPanelRightOf(_panels[i], _panels[i - 1], rotYawDegs[i], rotYawDegs[i - 1], boardWidth, camFwd, camUp);
         }
 
+        // Calculate actual center and apply correction to keep cluster centered
+        // Only correct perpendicular to camFwd (don't move cluster forward/backward)
+        Vector3 actualCenter = Vector3.zero;
+        foreach (var p in _panels)
+            actualCenter += p.transform.position;
+        actualCenter /= count;
+
+        Vector3 correction = desiredCenter - actualCenter;
+        // Remove the component along camFwd to prevent forward/backward drift
+        correction -= Vector3.Dot(correction, camFwd) * camFwd;
+        foreach (var p in _panels)
+            p.transform.position += correction;
+    }
+
+    Vector3 GetPanelRightVector(float rotYawDeg, Vector3 camFwd, Vector3 camUp)
+    {
+        // Panel faces AWAY from camera, so its forward is -camFwd rotated by rotYawDeg
+        Quaternion rot = Quaternion.AngleAxis(rotYawDeg, camUp);
+        Vector3 panelForward = rot * camFwd;  // direction panel is looking (away from camera)
+        // Right vector: Cross(up, forward) in Unity's left-handed system
+        return Vector3.Cross(camUp, panelForward).normalized;
+    }
+
+    Quaternion GetPanelRotation(float rotYawDeg, Vector3 camFwd, Vector3 camUp)
+    {
+        // Panel faces AWAY from camera (toward the user viewing the panel)
+        Quaternion yawRot = Quaternion.AngleAxis(rotYawDeg, camUp);
+        Vector3 panelForward = yawRot * camFwd;
+        return Quaternion.LookRotation(panelForward, camUp);
+    }
+
+    void PositionPanelAtCenter(WorldPanelPlus p, float rotYawDeg, Camera cam, Vector3 camFwd, Vector3 camUp)
+    {
+        if (!p) return;
+
+        Vector3 pos = cam.transform.position + camFwd * distanceFromCamera + camUp * verticalOffset;
+        Quaternion rot = GetPanelRotation(rotYawDeg, camFwd, camUp);
         p.transform.SetPositionAndRotation(pos, rot);
+    }
+
+    void PositionCenterPair(WorldPanelPlus leftPanel, WorldPanelPlus rightPanel,
+        float leftRotYawDeg, float rightRotYawDeg, float boardWidth, Camera cam, Vector3 camFwd, Vector3 camUp)
+    {
+        if (!leftPanel || !rightPanel) return;
+
+        // Junction point at center
+        Vector3 junction = cam.transform.position + camFwd * distanceFromCamera + camUp * verticalOffset;
+
+        // Left panel: right edge at junction
+        Vector3 leftRight = GetPanelRightVector(leftRotYawDeg, camFwd, camUp);
+        Vector3 leftPos = junction - (boardWidth / 2f) * leftRight;
+        leftPanel.transform.SetPositionAndRotation(leftPos, GetPanelRotation(leftRotYawDeg, camFwd, camUp));
+
+        // Right panel: left edge at junction
+        Vector3 rightRight = GetPanelRightVector(rightRotYawDeg, camFwd, camUp);
+        Vector3 rightPos = junction + (boardWidth / 2f) * rightRight;
+        rightPanel.transform.SetPositionAndRotation(rightPos, GetPanelRotation(rightRotYawDeg, camFwd, camUp));
+    }
+
+    void PositionPanelLeftOf(WorldPanelPlus panel, WorldPanelPlus neighbor,
+        float panelRotYawDeg, float neighborRotYawDeg, float boardWidth, Vector3 camFwd, Vector3 camUp)
+    {
+        if (!panel || !neighbor) return;
+
+        // Get neighbor's left edge position
+        Vector3 neighborRight = GetPanelRightVector(neighborRotYawDeg, camFwd, camUp);
+        Vector3 neighborLeftEdge = neighbor.transform.position - (boardWidth / 2f) * neighborRight;
+
+        // This panel's right edge should be at neighborLeftEdge
+        Vector3 panelRight = GetPanelRightVector(panelRotYawDeg, camFwd, camUp);
+        Vector3 pos = neighborLeftEdge - (boardWidth / 2f) * panelRight;
+
+        panel.transform.SetPositionAndRotation(pos, GetPanelRotation(panelRotYawDeg, camFwd, camUp));
+    }
+
+    void PositionPanelRightOf(WorldPanelPlus panel, WorldPanelPlus neighbor,
+        float panelRotYawDeg, float neighborRotYawDeg, float boardWidth, Vector3 camFwd, Vector3 camUp)
+    {
+        if (!panel || !neighbor) return;
+
+        // Get neighbor's right edge position
+        Vector3 neighborRight = GetPanelRightVector(neighborRotYawDeg, camFwd, camUp);
+        Vector3 neighborRightEdge = neighbor.transform.position + (boardWidth / 2f) * neighborRight;
+
+        // This panel's left edge should be at neighborRightEdge
+        Vector3 panelRight = GetPanelRightVector(panelRotYawDeg, camFwd, camUp);
+        Vector3 pos = neighborRightEdge + (boardWidth / 2f) * panelRight;
+
+        panel.transform.SetPositionAndRotation(pos, GetPanelRotation(panelRotYawDeg, camFwd, camUp));
     }
 
     void CreatePanels(int count)

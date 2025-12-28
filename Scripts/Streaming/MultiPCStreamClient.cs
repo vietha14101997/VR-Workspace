@@ -54,6 +54,7 @@ public class MultiPCStreamClient : MonoBehaviour
     public event Action<string, int, string> OnConfigProgress;
     public event Action<string> OnConnectionError;
     public event Action OnStreamingStarted;
+    public event Action<string, double, int> OnSpeedTestProgress; // direction, currentMbps, progress%
 
     // V2 Protocol state (read-only)
     public ConnectionStateMachine StateMachine => _v2Client?.StateMachine;
@@ -349,6 +350,11 @@ public class MultiPCStreamClient : MonoBehaviour
         {
             Debug.Log($"[MultiPC-V2] Network: {net.connectionType}, Ping: {net.pingMs:F1}ms, BW: {net.bandwidthMbps:F0}Mbps");
             OnNetworkInfoReceived?.Invoke(net);
+        };
+
+        _v2Client.OnSpeedTestProgress += (direction, currentMbps, progress) =>
+        {
+            OnSpeedTestProgress?.Invoke(direction, currentMbps, progress);
         };
 
         _v2Client.OnSuggestedConfigReceived += cfg =>
@@ -721,10 +727,17 @@ public class MultiPCStreamClient : MonoBehaviour
         sdp = sdp.Replace("UDP/TLS/RTP/SAVP", "UDP/TLS/RTP/SAVPF");
         
         // 2. Fix 0.0.0.0 in connection line
-        if (sdp.Contains("IP4 0.0.0.0")) 
+        if (sdp.Contains("IP4 0.0.0.0"))
         {
             Debug.Log("[MultiPC] Fixing SDP: IP4 0.0.0.0 -> IP4 127.0.0.1");
             sdp = sdp.Replace("IP4 0.0.0.0", "IP4 127.0.0.1");
+        }
+
+        // 3. Answer SDP must have setup:active or setup:passive, NOT actpass!
+        if (sdp.Contains("a=setup:actpass"))
+        {
+            Debug.Log("[MultiPC] FixSdp: Converting a=setup:actpass -> a=setup:active");
+            sdp = sdp.Replace("a=setup:actpass", "a=setup:active");
         }
         
         // 3. Remove embedded candidates and fix ice-options
