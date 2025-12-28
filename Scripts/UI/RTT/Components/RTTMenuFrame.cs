@@ -1,11 +1,10 @@
 using UnityEngine;
 using UnityEngine.UI;
-using System.Collections.Generic;
-using TMPro;
 
 /// <summary>
 /// RTT-based Menu Frame with glass effect, glowing borders, and floating data particles.
-/// Migrated from VRMenuFrame to use Render-to-Texture approach.
+/// This class is responsible ONLY for creating the visual frame UI.
+/// Menu logic is handled by RTTMenuManager and its controllers.
 /// </summary>
 public class RTTMenuFrame : RTTCanvasBase
 {
@@ -61,40 +60,6 @@ public class RTTMenuFrame : RTTCanvasBase
     [Header("Floating Data Effect")]
     [SerializeField] private bool enableFloatingData = true;
     [SerializeField] private int particleCount = 20;
-
-    [Header("Main Menu")]
-    [Tooltip("Automatically create Main Menu content on init")]
-    [SerializeField] private bool initMainMenu = true;
-    [SerializeField] private int menuColumns = 3;
-#pragma warning disable 0414 // Reserved for future menu layout customization
-    [SerializeField] private int menuRows = 2;
-#pragma warning restore 0414
-    [SerializeField] private Vector2 menuSpacing = new Vector2(50f, 75f);
-    [SerializeField] private float menuButtonAspect = 1.4f;
-    [SerializeField] private int menuFontSize = 42;
-    [SerializeField] private TMP_FontAsset menuFont;
-    [SerializeField] private Color[] menuButtonColors = new Color[] {
-        new Color(0.0f, 0.9f, 1.0f, 1.0f),  // Cyan
-        new Color(0.0f, 0.9f, 1.0f, 1.0f),  // Cyan
-        new Color(0.76f, 0.36f, 1.0f, 1.0f), // Purple
-        new Color(0.0f, 0.9f, 1.0f, 1.0f),  // Cyan
-        new Color(0.76f, 0.36f, 1.0f, 1.0f), // Purple
-        new Color(0.0f, 0.9f, 1.0f, 1.0f),  // Cyan
-    };
-
-    [Header("Menu Icons")]
-    [SerializeField] private Sprite iconRemote;
-    [SerializeField] private Sprite iconBrowser;
-    [SerializeField] private Sprite iconMedia;
-    [SerializeField] private Sprite iconFiles;
-    [SerializeField] private Sprite iconSettings;
-    [SerializeField] private Sprite iconQuit;
-
-    [Header("Remote Desktop Streaming")]
-    [Tooltip("Prefab for WorldPanelClusterRig (if null, will create dynamically)")]
-    [SerializeField] private WorldPanelClusterRig clusterRigPrefab;
-    [Tooltip("Reference to existing ClusterRig in scene (optional)")]
-    [SerializeField] private WorldPanelClusterRig clusterRigInstance;
     #endregion
 
     #region Private Fields
@@ -103,13 +68,6 @@ public class RTTMenuFrame : RTTCanvasBase
     private Material _borderMaterial;
     private Sprite _pixelSprite;
     private Sprite _roundedMaskSprite;
-
-    // Menu navigation state
-    private enum MenuState { MainMenu, RemoteMenu }
-    private MenuState _currentMenuState = MenuState.MainMenu;
-    private GameObject _currentMenuContent;
-    private RTTRemoteMenu _remoteMenuInstance;
-    private RTTMainMenu _mainMenuInstance;
 
     // Calculated values
     private float LogicalHeight => (logicalWidth / panelWidth) * panelHeight;
@@ -121,6 +79,11 @@ public class RTTMenuFrame : RTTCanvasBase
     public float PanelWidth => panelWidth;
     public float PanelHeight => panelHeight;
     public float LogicalWidthValue => logicalWidth;
+    public float LogicalHeightValue => LogicalHeight;
+    public float ContentMarginLeft => contentMarginLeft;
+    public float ContentMarginRight => contentMarginRight;
+    public float ContentMarginTop => contentMarginTop;
+    public float ContentMarginBottom => contentMarginBottom;
     #endregion
 
     #region Lifecycle
@@ -202,13 +165,6 @@ public class RTTMenuFrame : RTTCanvasBase
 
         // 2. Create Content Container
         CreateContentContainer(canvasRect);
-
-        // 3. Build Main Menu if enabled
-        if (initMainMenu)
-        {
-            LoadMenuIcons();
-            BuildMainMenu();
-        }
 
         Debug.Log($"[RTTMenuFrame] UI built: {w}x{h} logical pixels");
     }
@@ -471,7 +427,7 @@ public class RTTMenuFrame : RTTCanvasBase
 
     #region Public API
     /// <summary>
-    /// Set content to fill the content container
+    /// Set content to fill the content container.
     /// </summary>
     public void SetContent(RectTransform content)
     {
@@ -492,7 +448,7 @@ public class RTTMenuFrame : RTTCanvasBase
     }
 
     /// <summary>
-    /// Set content from GameObject
+    /// Set content from GameObject.
     /// </summary>
     public void SetContent(GameObject content)
     {
@@ -502,7 +458,22 @@ public class RTTMenuFrame : RTTCanvasBase
     }
 
     /// <summary>
-    /// Update glow colors dynamically
+    /// Clear all content from the content container.
+    /// </summary>
+    public void ClearContent()
+    {
+        if (_contentContainer == null) return;
+
+        for (int i = _contentContainer.childCount - 1; i >= 0; i--)
+        {
+            Destroy(_contentContainer.GetChild(i).gameObject);
+        }
+
+        MarkDirty();
+    }
+
+    /// <summary>
+    /// Update glow colors dynamically.
     /// </summary>
     public void UpdateGlowColors(Color colorA, Color colorB)
     {
@@ -515,7 +486,7 @@ public class RTTMenuFrame : RTTCanvasBase
     }
 
     /// <summary>
-    /// Set horizontal separators on the border
+    /// Set horizontal separators on the border.
     /// </summary>
     public void SetHorizontalSeparators(int count, Vector4 positions, float width = 0.004f,
         float glowWidth = 0.015f, float alpha = 0.8f, float length = 1.0f)
@@ -545,7 +516,7 @@ public class RTTMenuFrame : RTTCanvasBase
     }
 
     /// <summary>
-    /// Set vertical separators on the border
+    /// Set vertical separators on the border.
     /// </summary>
     public void SetVerticalSeparators(int count, Vector4 positions, float width = 0.004f,
         float glowWidth = 0.015f, float alpha = 0.8f)
@@ -560,446 +531,23 @@ public class RTTMenuFrame : RTTCanvasBase
 
         MarkDirty();
     }
-    #endregion
-
-    #region Main Menu
-    private void LoadMenuIcons()
-    {
-        if (iconRemote == null) iconRemote = Resources.Load<Sprite>("icon_remote");
-        if (iconBrowser == null) iconBrowser = Resources.Load<Sprite>("icon_browser");
-        if (iconMedia == null) iconMedia = Resources.Load<Sprite>("icon_media");
-        if (iconFiles == null) iconFiles = Resources.Load<Sprite>("icon_files");
-        if (iconSettings == null) iconSettings = Resources.Load<Sprite>("icon_settings");
-        if (iconQuit == null) iconQuit = Resources.Load<Sprite>("icon_quit");
-
-        Debug.Log($"[RTTMenuFrame] Menu icons loaded - Remote:{iconRemote != null}, Browser:{iconBrowser != null}, Media:{iconMedia != null}, Files:{iconFiles != null}, Settings:{iconSettings != null}, Quit:{iconQuit != null}");
-    }
-
-    private void BuildMainMenu()
-    {
-        if (_contentContainer == null) return;
-
-        // Create menu container
-        GameObject menuObj = new GameObject("MainMenu");
-        menuObj.transform.SetParent(_contentContainer, false);
-
-        RectTransform menuRT = menuObj.AddComponent<RectTransform>();
-        menuRT.anchorMin = Vector2.zero;
-        menuRT.anchorMax = Vector2.one;
-        menuRT.offsetMin = Vector2.zero;
-        menuRT.offsetMax = Vector2.zero;
-
-        // Get container size
-        float containerW = _contentContainer.rect.width;
-        float containerH = _contentContainer.rect.height;
-
-        // If rect not ready, calculate from logical size
-        if (containerW <= 0 || containerH <= 0)
-        {
-            containerW = logicalWidth - contentMarginLeft - contentMarginRight;
-            containerH = LogicalHeight - contentMarginTop - contentMarginBottom;
-        }
-
-        // Create RTTMainMenu component
-        _mainMenuInstance = menuObj.AddComponent<RTTMainMenu>();
-        _mainMenuInstance.CustomFont = menuFont;
-        _mainMenuInstance.FontSize = menuFontSize;
-        _mainMenuInstance.Columns = menuColumns;
-        _mainMenuInstance.Spacing = menuSpacing;
-        _mainMenuInstance.ButtonAspect = menuButtonAspect;
-
-        // Add menu items with custom icons and colors
-        _mainMenuInstance.AddItem("remote", "Remote Desktop", iconRemote, GetMenuButtonColor(0));
-        _mainMenuInstance.AddItem("browser", "Browser", iconBrowser, GetMenuButtonColor(1));
-        _mainMenuInstance.AddItem("media", "Media", iconMedia, GetMenuButtonColor(2));
-        _mainMenuInstance.AddItem("files", "Files", iconFiles, GetMenuButtonColor(3));
-        _mainMenuInstance.AddItem("settings", "Settings", iconSettings, GetMenuButtonColor(4));
-        _mainMenuInstance.AddItem("quit", "Quit", iconQuit, GetMenuButtonColor(5));
-
-        // Subscribe to menu item clicks
-        _mainMenuInstance.OnMenuItemClicked += OnMainMenuItemClicked;
-
-        // Build the UI
-        _mainMenuInstance.BuildUI(_contentContainer, containerW, containerH);
-
-        _currentMenuContent = menuObj;
-
-        Debug.Log($"[RTTMenuFrame] Main Menu built with RTTMainMenu component");
-    }
-
-    private void OnMainMenuItemClicked(string itemId)
-    {
-        switch (itemId)
-        {
-            case "remote":
-                OnRemoteDesktopClicked();
-                break;
-            case "browser":
-                OnBrowserClicked();
-                break;
-            case "media":
-                OnMediaClicked();
-                break;
-            case "files":
-                OnFilesClicked();
-                break;
-            case "settings":
-                OnSettingsClicked();
-                break;
-            case "quit":
-                OnQuitClicked();
-                break;
-        }
-        MarkDirty();
-    }
-
-    private Color GetMenuButtonColor(int index)
-    {
-        if (menuButtonColors != null && index < menuButtonColors.Length)
-            return menuButtonColors[index];
-        return new Color(0f, 0.9f, 1f); // Default cyan
-    }
-
-    // Menu button click handlers
-    private void OnRemoteDesktopClicked()
-    {
-        Debug.Log("[RTTMenuFrame] Remote Desktop clicked");
-        SwitchToRemoteMenu();
-    }
-
-    private void OnBrowserClicked()
-    {
-        Debug.Log("[RTTMenuFrame] Browser clicked");
-    }
-
-    private void OnMediaClicked()
-    {
-        Debug.Log("[RTTMenuFrame] Media clicked");
-    }
-
-    private void OnFilesClicked()
-    {
-        Debug.Log("[RTTMenuFrame] Files clicked");
-    }
-
-    private void OnSettingsClicked()
-    {
-        Debug.Log("[RTTMenuFrame] Settings clicked");
-    }
-
-    private void OnQuitClicked()
-    {
-        Debug.Log("[RTTMenuFrame] Quit clicked");
-#if UNITY_EDITOR
-        UnityEditor.EditorApplication.isPlaying = false;
-#else
-        Application.Quit();
-#endif
-    }
 
     /// <summary>
-    /// Clear and rebuild main menu
+    /// Get the content container size.
     /// </summary>
-    public void RebuildMainMenu()
+    public Vector2 GetContentSize()
     {
-        // Unsubscribe from existing main menu events
-        if (_mainMenuInstance != null)
+        if (_contentContainer != null && _contentContainer.rect.width > 0)
         {
-            _mainMenuInstance.OnMenuItemClicked -= OnMainMenuItemClicked;
+            return new Vector2(_contentContainer.rect.width, _contentContainer.rect.height);
         }
 
-        // Find and destroy existing main menu
-        Transform existingMenu = _contentContainer?.Find("MainMenu");
-        if (existingMenu != null)
-        {
-            Destroy(existingMenu.gameObject);
-        }
-        _mainMenuInstance = null;
-
-        LoadMenuIcons();
-        BuildMainMenu();
-        MarkDirty();
+        // Fallback calculation
+        return new Vector2(
+            logicalWidth - contentMarginLeft - contentMarginRight,
+            LogicalHeight - contentMarginTop - contentMarginBottom
+        );
     }
-    #endregion
-
-    #region Menu Navigation
-    /// <summary>
-    /// Switch from Main Menu to Remote Menu
-    /// </summary>
-    public void SwitchToRemoteMenu()
-    {
-        if (_currentMenuState == MenuState.RemoteMenu) return;
-        if (_contentContainer == null) return;
-
-        // Unsubscribe from main menu events
-        if (_mainMenuInstance != null)
-        {
-            _mainMenuInstance.OnMenuItemClicked -= OnMainMenuItemClicked;
-        }
-
-        // Destroy current main menu
-        Transform mainMenu = _contentContainer.Find("MainMenu");
-        if (mainMenu != null)
-        {
-            Destroy(mainMenu.gameObject);
-        }
-        _mainMenuInstance = null;
-
-        // Create Remote Menu container
-        GameObject remoteObj = new GameObject("RemoteMenu");
-        remoteObj.transform.SetParent(_contentContainer, false);
-
-        RectTransform remoteRT = remoteObj.AddComponent<RectTransform>();
-        remoteRT.anchorMin = Vector2.zero;
-        remoteRT.anchorMax = Vector2.one;
-        remoteRT.offsetMin = Vector2.zero;
-        remoteRT.offsetMax = Vector2.zero;
-
-        // Add RTTRemoteMenu component
-        _remoteMenuInstance = remoteObj.AddComponent<RTTRemoteMenu>();
-        _remoteMenuInstance.themeColor = menuButtonColors != null && menuButtonColors.Length > 0
-            ? menuButtonColors[0]
-            : new Color(0f, 0.9f, 1f);
-        _remoteMenuInstance.accentColor = menuButtonColors != null && menuButtonColors.Length > 2
-            ? menuButtonColors[2]
-            : new Color(0.76f, 0.36f, 1f);
-        _remoteMenuInstance.customFont = menuFont;
-
-        // Get or create ClusterRig and ClusterAutoBinder for V2 protocol
-        WorldPanelClusterRig rig = GetOrCreateClusterRig();
-        if (rig != null)
-        {
-            ClusterAutoBinder binder = rig.GetComponent<ClusterAutoBinder>();
-            if (binder == null)
-            {
-                binder = rig.gameObject.AddComponent<ClusterAutoBinder>();
-            }
-            binder.autoStart = false;
-            binder.rig = rig;
-            binder.useV2Protocol = true; // Enable V2 protocol
-
-            // Assign binder to remote menu for V2 phased flow
-            _remoteMenuInstance.clusterBinder = binder;
-            Debug.Log("[RTTMenuFrame] ClusterAutoBinder assigned to RTTRemoteMenu for V2 protocol");
-        }
-
-        // Get container size
-        float containerW = _contentContainer.rect.width;
-        float containerH = _contentContainer.rect.height;
-        if (containerW <= 0 || containerH <= 0)
-        {
-            containerW = logicalWidth - contentMarginLeft - contentMarginRight;
-            containerH = LogicalHeight - contentMarginTop - contentMarginBottom;
-        }
-
-        // Subscribe to events
-        _remoteMenuInstance.OnBackClicked += ReturnToMainMenu;
-        _remoteMenuInstance.OnConnectClicked += OnRemoteConnectClicked;
-        _remoteMenuInstance.OnStartClicked += OnRemoteStartClicked;
-
-        // Build the remote menu UI
-        _remoteMenuInstance.BuildUI(remoteObj.transform, containerW, containerH);
-
-        _currentMenuState = MenuState.RemoteMenu;
-        _currentMenuContent = remoteObj;
-
-        MarkDirty();
-        Debug.Log("[RTTMenuFrame] Switched to Remote Menu");
-    }
-
-    /// <summary>
-    /// Handle Start Remote clicked (V2 Phase 3) - hide menu
-    /// </summary>
-    private void OnRemoteStartClicked()
-    {
-        Debug.Log("[RTTMenuFrame] Start Remote clicked - hiding menu");
-        gameObject.SetActive(false);
-    }
-
-    private void OnRemoteConnectClicked()
-    {
-        if (_remoteMenuInstance == null) return;
-
-        // Get connection settings from menu
-        string host = _remoteMenuInstance.Host;
-        string port = _remoteMenuInstance.Port;
-        int monitorCount = _remoteMenuInstance.MonitorIndex + 1; // MonitorIndex is 0-based
-        string resolution = _remoteMenuInstance.Resolution;
-        string bitrate = _remoteMenuInstance.Bitrate;
-        string fps = _remoteMenuInstance.FPS;
-
-        Debug.Log($"[RTTMenuFrame] Connect clicked - Host: {host}, Port: {port}, Monitors: {monitorCount}");
-        Debug.Log($"[RTTMenuFrame] Settings - Resolution: {resolution}, Bitrate: {bitrate}, FPS: {fps}");
-
-        // Create or configure ClusterRig
-        StartRemoteDesktopStream(host, port, monitorCount, resolution, bitrate, fps);
-    }
-
-    /// <summary>
-    /// Start remote desktop streaming with the specified settings.
-    /// Creates ClusterRig and ClusterAutoBinder to handle multi-monitor streaming.
-    /// </summary>
-    private void StartRemoteDesktopStream(string host, string port, int monitorCount, string resolution, string bitrate, string fps)
-    {
-        // Parse resolution (e.g., "1920 x 1080" -> width=1920, height=1080)
-        int resWidth = 1920, resHeight = 1080;
-        if (!string.IsNullOrEmpty(resolution))
-        {
-            var parts = resolution.Replace(" ", "").Split('x');
-            if (parts.Length == 2)
-            {
-                int.TryParse(parts[0], out resWidth);
-                int.TryParse(parts[1], out resHeight);
-            }
-        }
-
-        // Parse bitrate (e.g., "20 Mbps" -> 20000 kbps)
-        int bitrateKbps = 20000;
-        if (!string.IsNullOrEmpty(bitrate))
-        {
-            var bitrateNum = System.Text.RegularExpressions.Regex.Match(bitrate, @"\d+");
-            if (bitrateNum.Success)
-            {
-                bitrateKbps = int.Parse(bitrateNum.Value) * 1000;
-            }
-        }
-
-        // Parse FPS (e.g., "60 FPS" -> 60)
-        int fpsValue = 60;
-        if (!string.IsNullOrEmpty(fps))
-        {
-            var fpsNum = System.Text.RegularExpressions.Regex.Match(fps, @"\d+");
-            if (fpsNum.Success)
-            {
-                fpsValue = int.Parse(fpsNum.Value);
-            }
-        }
-
-        // Get or create ClusterRig
-        WorldPanelClusterRig rig = GetOrCreateClusterRig();
-        if (rig == null)
-        {
-            Debug.LogError("[RTTMenuFrame] Failed to create ClusterRig!");
-            return;
-        }
-
-        // Build cluster with the specified monitor count
-        rig.BuildWithPanelCount(monitorCount);
-
-        // Get or create ClusterAutoBinder
-        ClusterAutoBinder binder = rig.GetComponent<ClusterAutoBinder>();
-        if (binder == null)
-        {
-            binder = rig.gameObject.AddComponent<ClusterAutoBinder>();
-        }
-
-        // Stop existing stream if running
-        if (binder.IsStreaming)
-        {
-            binder.StopStreaming();
-        }
-
-        // Configure binder (disable auto-start since we'll call StartStreaming manually)
-        binder.autoStart = false;
-        binder.serverBase = $"http://{host}:{port}";
-        binder.rig = rig;
-        binder.monitorCount = monitorCount;
-        binder.resolutionWidth = resWidth;
-        binder.resolutionHeight = resHeight;
-        binder.bitrateKbps = bitrateKbps;
-        binder.fps = fpsValue;
-
-        Debug.Log($"[RTTMenuFrame] ClusterRig configured: {monitorCount} panels, {resWidth}x{resHeight}, {bitrateKbps}kbps, {fpsValue}fps");
-        Debug.Log($"[RTTMenuFrame] Server: {binder.serverBase}");
-
-        // Start streaming
-        binder.StartStreaming();
-
-        // Hide menu frame (optional - can show/hide based on user preference)
-        // gameObject.SetActive(false);
-    }
-
-    /// <summary>
-    /// Get existing ClusterRig or create a new one.
-    /// </summary>
-    private WorldPanelClusterRig GetOrCreateClusterRig()
-    {
-        // Use existing instance if available
-        if (clusterRigInstance != null)
-        {
-            return clusterRigInstance;
-        }
-
-        // Instantiate from prefab if available
-        if (clusterRigPrefab != null)
-        {
-            clusterRigInstance = Instantiate(clusterRigPrefab);
-            clusterRigInstance.name = "WorldPanelClusterRig";
-            return clusterRigInstance;
-        }
-
-        // Create dynamically
-        GameObject rigObj = new GameObject("WorldPanelClusterRig");
-        clusterRigInstance = rigObj.AddComponent<WorldPanelClusterRig>();
-
-        // Position the rig in front of the menu frame
-        rigObj.transform.position = transform.position + transform.forward * 2f;
-        rigObj.transform.rotation = transform.rotation;
-
-        return clusterRigInstance;
-    }
-
-    /// <summary>
-    /// Return from Remote Menu to Main Menu
-    /// </summary>
-    public void ReturnToMainMenu()
-    {
-        if (_currentMenuState == MenuState.MainMenu) return;
-        if (_contentContainer == null) return;
-
-        // Unsubscribe from remote menu events
-        if (_remoteMenuInstance != null)
-        {
-            _remoteMenuInstance.OnBackClicked -= ReturnToMainMenu;
-            _remoteMenuInstance.OnConnectClicked -= OnRemoteConnectClicked;
-            _remoteMenuInstance.OnStartClicked -= OnRemoteStartClicked;
-        }
-
-        // Destroy current remote menu
-        Transform remoteMenu = _contentContainer.Find("RemoteMenu");
-        if (remoteMenu != null)
-        {
-            Destroy(remoteMenu.gameObject);
-        }
-
-        _remoteMenuInstance = null;
-        _currentMenuContent = null;
-
-        // Rebuild main menu
-        LoadMenuIcons();
-        BuildMainMenu();
-
-        _currentMenuState = MenuState.MainMenu;
-
-        MarkDirty();
-        Debug.Log("[RTTMenuFrame] Returned to Main Menu");
-    }
-
-    /// <summary>
-    /// Get current menu state
-    /// </summary>
-    public bool IsMainMenuActive => _currentMenuState == MenuState.MainMenu;
-    public bool IsRemoteMenuActive => _currentMenuState == MenuState.RemoteMenu;
-
-    /// <summary>
-    /// Get Remote Menu instance (for accessing connection settings)
-    /// </summary>
-    public RTTRemoteMenu RemoteMenuInstance => _remoteMenuInstance;
-
-    /// <summary>
-    /// Get Main Menu instance
-    /// </summary>
-    public RTTMainMenu MainMenuInstance => _mainMenuInstance;
     #endregion
 
     #region Sprite Helpers

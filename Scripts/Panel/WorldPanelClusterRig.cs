@@ -21,7 +21,7 @@ public class WorldPanelClusterRig : MonoBehaviour
     public float verticalOffset = 0f;
     public bool faceCameraYawOnly = true;
     [Tooltip("Overlap amount (in meters) between adjacent panels to eliminate seams")]
-    [Range(0f, 0.01f)] public float panelOverlap = 0.001f;
+    [Range(0f, 0.01f)] public float panelOverlap = 0.01f;
 
     [Header("Cluster Visuals")]
     [Tooltip("Enable seamless glass background and glowing border across all panels")]
@@ -61,6 +61,9 @@ public class WorldPanelClusterRig : MonoBehaviour
         if (count < 1) count = 1;
         if (count > 6) count = 6;
 
+        // Ensure cluster is inside VirtualObjects parent and has correct layer
+        EnsureVirtualObjectsParent();
+
         KillChildren();
         CreatePanels(count);
         LinkNeighbors();
@@ -73,6 +76,38 @@ public class WorldPanelClusterRig : MonoBehaviour
 
         Debug.Log($"[WorldPanelClusterRig] Built {count} panels" +
             (enableClusterVisuals ? " with cluster visuals" : ""));
+    }
+
+    /// <summary>
+    /// Ensures the cluster rig is placed inside a VirtualObjects parent and has the correct layer
+    /// </summary>
+    void EnsureVirtualObjectsParent()
+    {
+        const string VIRTUAL_OBJECTS_NAME = "VirtualObjects";
+        int virtualObjectsLayer = LayerMask.NameToLayer(VIRTUAL_OBJECTS_NAME);
+
+        if (virtualObjectsLayer == -1)
+        {
+            Debug.LogWarning($"[WorldPanelClusterRig] Layer '{VIRTUAL_OBJECTS_NAME}' not found. Please create it in Edit > Project Settings > Tags and Layers.");
+            return;
+        }
+
+        // Find or create VirtualObjects parent
+        GameObject virtualObjectsParent = GameObject.Find(VIRTUAL_OBJECTS_NAME);
+        if (virtualObjectsParent == null)
+        {
+            virtualObjectsParent = new GameObject(VIRTUAL_OBJECTS_NAME);
+            virtualObjectsParent.layer = virtualObjectsLayer;
+        }
+
+        // Move this cluster rig under VirtualObjects if not already
+        if (transform.parent != virtualObjectsParent.transform)
+        {
+            transform.SetParent(virtualObjectsParent.transform, true);
+        }
+
+        // Set layer for the cluster rig itself
+        SetLayerRecursively(gameObject, virtualObjectsLayer);
     }
 
     [ContextMenu("Build or Rebuild Cluster (3 panels)")]
@@ -186,7 +221,17 @@ public class WorldPanelClusterRig : MonoBehaviour
         }
 
         p.Apply();
-        SetLayerRecursively(p.gameObject, gameObject.layer);
+
+        // Set VirtualObjects layer for the panel
+        int virtualObjectsLayer = LayerMask.NameToLayer("VirtualObjects");
+        if (virtualObjectsLayer != -1)
+        {
+            SetLayerRecursively(p.gameObject, virtualObjectsLayer);
+        }
+        else
+        {
+            SetLayerRecursively(p.gameObject, gameObject.layer);
+        }
 
         return p;
     }
