@@ -304,7 +304,7 @@ public class RTTInfoSidePanel : MonoBehaviour
         TextMeshProUGUI labelTxt = labelObj.AddComponent<TextMeshProUGUI>();
         labelTxt.text = label;
         labelTxt.fontSize = labelFontSize;
-        labelTxt.color = new Color(0.7f, 0.7f, 0.7f);
+        labelTxt.color = Color.white;
         labelTxt.alignment = TextAlignmentOptions.Left;
         labelTxt.raycastTarget = false;
         if (customFont != null) labelTxt.font = customFont;
