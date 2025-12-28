@@ -62,9 +62,20 @@ public class WorldPanelPlus : MonoBehaviour
             go.transform.SetParent(board, false);
             cursor = go.AddComponent<WorldPanelCursor>();
             if (cursorTexture) cursor.cursorTexture = cursorTexture;
+#if UNITY_ANDROID && !UNITY_EDITOR
+            // Force cursor visible on Android
+            cursor.forceAlwaysVisible = true;
+            Debug.Log($"[WorldPanelPlus] Created cursor for {name}, forceAlwaysVisible=true");
+#endif
         }
         cursor.AttachToBoard(board, width, height);
+#if UNITY_ANDROID && !UNITY_EDITOR
+        // On Android, always show cursor after ensuring it exists
+        cursor.SetVisible(true);
+        Debug.Log($"[WorldPanelPlus] EnsureCursor for {name}: forcing visible=true");
+#else
         if (cursor) cursor.SetVisible(cursor.visible);
+#endif
     }
 
     public void CursorFocusStealFrom(WorldPanelPlus fromPanel, float startU01, float startV01)
@@ -88,6 +99,14 @@ public class WorldPanelPlus : MonoBehaviour
 
     public void CursorFocusEnd()
     {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        // On Android, don't hide cursor if forceAlwaysVisible is enabled
+        if (cursor && cursor.forceAlwaysVisible)
+        {
+            Debug.Log($"[WorldPanelPlus] CursorFocusEnd for {name}: NOT hiding, forceAlwaysVisible=true");
+            return;
+        }
+#endif
         if (cursor) cursor.SetVisible(false);
     }
 
@@ -202,7 +221,15 @@ public class WorldPanelPlus : MonoBehaviour
             var col = board.GetComponent<BoxCollider>();
             if (col) col.enabled = visible;
         }
+#if UNITY_ANDROID && !UNITY_EDITOR
+        // On Android, don't hide cursor if forceAlwaysVisible is enabled
+        if (!visible && cursor && !cursor.forceAlwaysVisible)
+            cursor.SetVisible(false);
+        else if (cursor)
+            Debug.Log($"[WorldPanelPlus] SetVisible({visible}) for {name}: cursor kept visible due to forceAlwaysVisible");
+#else
         if (!visible && cursor) cursor.SetVisible(false);
+#endif
     }
 
     public void Show() => SetVisible(true);
