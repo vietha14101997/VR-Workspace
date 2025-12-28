@@ -67,6 +67,11 @@ public class RTTRemoteMenu : MonoBehaviour
     private ServerHardwareInfo _cachedHardwareInfo;
     private NetworkTestResult _cachedNetworkInfo;
 
+    // Speed test UI throttling - prevent excessive UI updates that hurt FPS
+    private float _lastSpeedTestUIUpdate = 0f;
+    private const float SPEED_TEST_UI_UPDATE_INTERVAL = 0.15f; // 150ms between UI updates
+    private double _lastReportedMbps = -1;
+
     // Parent references
     private RTTMenuFrame _menuFrame;
     private float _containerWidth;
@@ -1072,11 +1077,24 @@ public class RTTRemoteMenu : MonoBehaviour
 
     /// <summary>
     /// Handle speed test progress from client.
+    /// Throttled to prevent excessive UI updates that hurt FPS and measurement accuracy.
     /// </summary>
     public void HandleSpeedTestProgress(string direction, double currentMbps, int progress)
     {
-        if (_networkInfoPanel != null)
+        if (_networkInfoPanel == null) return;
+
+        // Always update on completion (progress == 100)
+        bool isComplete = progress >= 100;
+
+        // Throttle UI updates during speed test
+        float now = Time.unscaledTime;
+        bool shouldUpdate = isComplete ||
+                           (now - _lastSpeedTestUIUpdate >= SPEED_TEST_UI_UPDATE_INTERVAL);
+
+        if (shouldUpdate)
         {
+            _lastSpeedTestUIUpdate = now;
+            _lastReportedMbps = currentMbps;
             _networkInfoPanel.UpdateSpeedTestProgress(direction, currentMbps, progress);
         }
     }
