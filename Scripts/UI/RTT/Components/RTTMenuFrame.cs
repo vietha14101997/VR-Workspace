@@ -427,6 +427,110 @@ public class RTTMenuFrame : RTTCanvasBase
 
     #region Public API
     /// <summary>
+    /// Configure frame size before initialization.
+    /// Call this immediately after AddComponent before Awake runs.
+    /// </summary>
+    /// <param name="widthMeters">Physical width in meters</param>
+    /// <param name="heightMeters">Physical height in meters</param>
+    /// <param name="logicalWidthPixels">Logical width for UI layout (default 1920)</param>
+    public void Configure(float widthMeters, float heightMeters, float logicalWidthPixels = 1920f)
+    {
+        panelWidth = widthMeters;
+        panelHeight = heightMeters;
+        logicalWidth = logicalWidthPixels;
+        worldWidth = widthMeters;
+        worldHeight = heightMeters;
+    }
+
+    /// <summary>
+    /// Configure frame size and colors before initialization.
+    /// </summary>
+    public void Configure(float widthMeters, float heightMeters, float logicalWidthPixels,
+        Color borderColorA, Color borderColorB)
+    {
+        Configure(widthMeters, heightMeters, logicalWidthPixels);
+        glowColorA = borderColorA;
+        glowColorB = borderColorB;
+    }
+
+    /// <summary>
+    /// Configure all visual parameters before initialization.
+    /// </summary>
+    public void Configure(float widthMeters, float heightMeters, float logicalWidthPixels,
+        Color borderColorA, Color borderColorB, Color glassCol,
+        float marginLeft = 75f, float marginRight = 75f, float marginTop = 50f, float marginBottom = 50f)
+    {
+        Configure(widthMeters, heightMeters, logicalWidthPixels, borderColorA, borderColorB);
+        glassColor = glassCol;
+        contentMarginLeft = marginLeft;
+        contentMarginRight = marginRight;
+        contentMarginTop = marginTop;
+        contentMarginBottom = marginBottom;
+    }
+
+    /// <summary>
+    /// Set whether this frame is primary (only one primary at a time).
+    /// </summary>
+    public void SetPrimary(bool primary)
+    {
+        isPrimary = primary;
+        if (primary)
+        {
+            SetAsPrimary();
+        }
+    }
+
+    /// <summary>
+    /// Enable or disable floating data particle effects.
+    /// </summary>
+    public void SetFloatingDataEnabled(bool enabled, int particles = 20)
+    {
+        enableFloatingData = enabled;
+        particleCount = particles;
+    }
+
+    /// <summary>
+    /// Set content margins.
+    /// </summary>
+    public void SetContentMargins(float left, float right, float top, float bottom)
+    {
+        contentMarginLeft = left;
+        contentMarginRight = right;
+        contentMarginTop = top;
+        contentMarginBottom = bottom;
+    }
+
+    /// <summary>
+    /// Factory method to create a configured RTTMenuFrame.
+    /// </summary>
+    public static RTTMenuFrame Create(Transform parent, float widthMeters, float heightMeters,
+        float logicalWidthPixels = 1920f, bool isPrimaryFrame = false)
+    {
+        GameObject frameObj = new GameObject("RTTMenuFrame");
+        frameObj.transform.SetParent(parent, false);
+        frameObj.transform.localPosition = Vector3.zero;
+        frameObj.transform.localRotation = Quaternion.identity;
+
+        RTTMenuFrame frame = frameObj.AddComponent<RTTMenuFrame>();
+        frame.Configure(widthMeters, heightMeters, logicalWidthPixels);
+        frame.SetPrimary(isPrimaryFrame);
+
+        return frame;
+    }
+
+    /// <summary>
+    /// Factory method with color configuration.
+    /// </summary>
+    public static RTTMenuFrame Create(Transform parent, float widthMeters, float heightMeters,
+        float logicalWidthPixels, Color borderColorA, Color borderColorB, bool isPrimaryFrame = false)
+    {
+        RTTMenuFrame frame = Create(parent, widthMeters, heightMeters, logicalWidthPixels, isPrimaryFrame);
+        frame.glowColorA = borderColorA;
+        frame.glowColorB = borderColorB;
+        return frame;
+    }
+
+    /// <summary>
     /// Set content to fill the content container.
     /// </summary>
     public void SetContent(RectTransform content)

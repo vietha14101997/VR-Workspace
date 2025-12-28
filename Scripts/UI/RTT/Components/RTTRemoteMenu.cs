@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using VRWorkspace.Streaming;
 
@@ -59,6 +60,8 @@ public class RTTRemoteMenu : MonoBehaviour
     // Side Panels for hardware/network info
     private RTTInfoSidePanel _hardwareInfoPanel;
     private RTTInfoSidePanel _networkInfoPanel;
+    private RTTMenuFrame _hardwareFrame;
+    private RTTMenuFrame _networkFrame;
 
     // Cached suggested config for "(Recommended)" suffix
     private SuggestedStreamConfig _cachedSuggestedConfig;
@@ -67,9 +70,7 @@ public class RTTRemoteMenu : MonoBehaviour
     private ServerHardwareInfo _cachedHardwareInfo;
     private NetworkTestResult _cachedNetworkInfo;
 
-    // Speed test UI throttling - prevent excessive UI updates that hurt FPS
-    private float _lastSpeedTestUIUpdate = 0f;
-    private const float SPEED_TEST_UI_UPDATE_INTERVAL = 0.15f; // 150ms between UI updates
+    // Speed test - only store final result
     private double _lastReportedMbps = -1;
 
     // Parent references
@@ -957,27 +958,26 @@ public class RTTRemoteMenu : MonoBehaviour
         Debug.Log($"[RTTRemoteMenu] Creating Hardware Info Panel (left)...");
         // Hardware Info Panel (Left)
         PlaceSidePanelFlat("HardwareInfoPanel", -1, mainPanelWidth, sideWidth, sideHeight,
-            gapMeters, rotationAngle, RTTInfoSidePanel.PanelType.HardwareInfo, ref _hardwareInfoPanel);
-        Debug.Log($"[RTTRemoteMenu] Hardware panel created: {_hardwareInfoPanel != null}");
+            gapMeters, rotationAngle, RTTInfoSidePanel.PanelType.HardwareInfo, ref _hardwareFrame);
+        Debug.Log($"[RTTRemoteMenu] Hardware frame created: {_hardwareFrame != null}");
 
         Debug.Log($"[RTTRemoteMenu] Creating Network Info Panel (right)...");
         // Network Info Panel (Right)
         PlaceSidePanelFlat("NetworkInfoPanel", 1, mainPanelWidth, sideWidth, sideHeight,
-            gapMeters, rotationAngle, RTTInfoSidePanel.PanelType.NetworkInfo, ref _networkInfoPanel);
-        Debug.Log($"[RTTRemoteMenu] Network panel created: {_networkInfoPanel != null}");
+            gapMeters, rotationAngle, RTTInfoSidePanel.PanelType.NetworkInfo, ref _networkFrame);
+        Debug.Log($"[RTTRemoteMenu] Network frame created: {_networkFrame != null}");
 
         Debug.Log($"[RTTRemoteMenu] Side panels created ({sideWidth:F2}m x {sideHeight:F2}m) gap={gapMeters}m angle={rotationAngle}° (hidden)");
     }
 
     /// <summary>
     /// Place a side panel adjacent to the main panel with inner edge at same Z.
+    /// Uses RTTMenuFrame for frame rendering and RTTInfoSidePanel for content.
     /// </summary>
     /// <param name="side">-1 for left, +1 for right</param>
     private void PlaceSidePanelFlat(string name, int side, float mainWidth, float sideWidth, float sideHeight,
-        float gap, float rotationAngle, RTTInfoSidePanel.PanelType type, ref RTTInfoSidePanel panelRef)
+        float gap, float rotationAngle, RTTInfoSidePanel.PanelType type, ref RTTMenuFrame frameRef)
     {
-        GameObject panelObj = new GameObject(name);
-
         // Get main panel's world transform
         Vector3 mainPos = _menuFrame.transform.position;
         Quaternion mainRot = _menuFrame.transform.rotation;
@@ -1007,21 +1007,71 @@ public class RTTRemoteMenu : MonoBehaviour
 
         // Calculate world position
         Vector3 offset = mainRight * (side * totalX) + mainForward * totalZ;
-        panelObj.transform.position = mainPos + offset;
+        Vector3 panelPos = mainPos + offset;
 
         // Rotate panel: left panel rotates negative (faces right), right panel rotates positive (faces left)
-        panelObj.transform.rotation = mainRot * Quaternion.Euler(0, side * rotationAngle, 0);
+        Quaternion panelRot = mainRot * Quaternion.Euler(0, side * rotationAngle, 0);
 
-        // Ensure scale is 1:1:1
-        panelObj.transform.localScale = Vector3.one;
+        // Calculate logical width based on aspect ratio (same resolution density as main panel)
+        float logicalWidthPixels = (sideWidth / _menuFrame.PanelWidth) * _menuFrame.LogicalWidthValue;
 
-        // Parent to menuFrame for organization
-        panelObj.transform.SetParent(_menuFrame.transform, true);
+        // Create RTTMenuFrame for the side panel
+        frameRef = RTTMenuFrame.Create(_menuFrame.transform, sideWidth, sideHeight, logicalWidthPixels, false);
+        frameRef.gameObject.name = name;
+        frameRef.transform.position = panelPos;
+        frameRef.transform.rotation = panelRot;
+        frameRef.transform.localScale = Vector3.one;
 
-        // Create and initialize the side panel component
-        var panel = panelObj.AddComponent<RTTInfoSidePanel>();
-        panel.Initialize(type, themeColor, accentColor, customFont, sideWidth, sideHeight);
-        panelRef = panel;
+        // Configure frame appearance (smaller margins for side panels)
+        frameRef.SetContentMargins(40f, 40f, 30f, 30f);
+        frameRef.SetFloatingDataEnabled(true, 10); // Fewer particles for smaller panel
+
+        // Start hidden
+        frameRef.gameObject.SetActive(false);
+
+        // Wait for frame to initialize, then create content
+        StartCoroutine(CreateSidePanelContent(frameRef, type));
+    }
+
+    /// <summary>
+    /// Coroutine to create side panel content after frame is initialized.
+    /// </summary>
+    private IEnumerator CreateSidePanelContent(RTTMenuFrame frame, RTTInfoSidePanel.PanelType type)
+    {
+        // Wait for frame's ContentContainer to be ready
+        while (frame.ContentContainer == null)
+        {
+            yield return null;
+        }
+        yield return null; // Extra frame for layout
+
+        // Create RTTInfoSidePanel as content
+        GameObject contentObj = new GameObject($"InfoPanel_{type}");
+        var panel = contentObj.AddComponent<RTTInfoSidePanel>();
+        panel.ThemeColor = themeColor;
+        panel.CustomFont = customFont;
+
+        // Build panel content inside frame's container
+        panel.BuildUI(frame.ContentContainer, type, themeColor, customFont);
+
+        // Subscribe to content changes to trigger RTT re-render
+        panel.OnContentChanged += () => frame.MarkDirty();
+
+        // Assign to the appropriate field based on type and show loading state immediately
+        if (type == RTTInfoSidePanel.PanelType.HardwareInfo)
+        {
+            _hardwareInfoPanel = panel;
+            // Show loading state immediately so user sees placeholder text
+            panel.ShowLoadingState();
+        }
+        else
+        {
+            _networkInfoPanel = panel;
+            // Show speed test loading state for network panel
+            panel.ShowSpeedTestLoadingState();
+        }
+
+        Debug.Log($"[RTTRemoteMenu] Side panel content created for {type} with loading state");
     }
 
     /// <summary>
@@ -1030,18 +1080,26 @@ public class RTTRemoteMenu : MonoBehaviour
     /// </summary>
     private void EnsureBothPanelsVisible()
     {
-        // Show hardware panel with loading state if not already active
-        if (_hardwareInfoPanel != null && !_hardwareInfoPanel.gameObject.activeSelf)
+        // Show hardware frame with loading state if not already active
+        if (_hardwareFrame != null && !_hardwareFrame.gameObject.activeSelf)
         {
-            Debug.Log("[RTTRemoteMenu] EnsureBothPanelsVisible: Showing hardware panel with loading state");
-            _hardwareInfoPanel.ShowWithLoadingState();
+            Debug.Log("[RTTRemoteMenu] EnsureBothPanelsVisible: Showing hardware frame with loading state");
+            _hardwareFrame.gameObject.SetActive(true);
+            if (_hardwareInfoPanel != null)
+            {
+                _hardwareInfoPanel.ShowLoadingState();
+            }
         }
 
-        // Show network panel with loading state if not already active
-        if (_networkInfoPanel != null && !_networkInfoPanel.gameObject.activeSelf)
+        // Show network frame with loading state if not already active
+        if (_networkFrame != null && !_networkFrame.gameObject.activeSelf)
         {
-            Debug.Log("[RTTRemoteMenu] EnsureBothPanelsVisible: Showing network panel with loading state");
-            _networkInfoPanel.ShowWithLoadingState();
+            Debug.Log("[RTTRemoteMenu] EnsureBothPanelsVisible: Showing network frame with loading state");
+            _networkFrame.gameObject.SetActive(true);
+            if (_networkInfoPanel != null)
+            {
+                _networkInfoPanel.ShowLoadingState();
+            }
         }
     }
 
@@ -1050,26 +1108,34 @@ public class RTTRemoteMenu : MonoBehaviour
     /// </summary>
     private void ShowSidePanels()
     {
-        Debug.Log($"[RTTRemoteMenu] ShowSidePanels called, hardware null: {_hardwareInfoPanel == null}, network null: {_networkInfoPanel == null}");
+        Debug.Log($"[RTTRemoteMenu] ShowSidePanels called, hardware frame: {_hardwareFrame != null}, network frame: {_networkFrame != null}");
 
-        if (_hardwareInfoPanel != null)
+        if (_hardwareFrame != null)
         {
-            Debug.Log("[RTTRemoteMenu] Calling ShowWithLoadingState on hardware panel");
-            _hardwareInfoPanel.ShowWithLoadingState();
+            Debug.Log("[RTTRemoteMenu] Activating hardware frame with loading state");
+            _hardwareFrame.gameObject.SetActive(true);
+            if (_hardwareInfoPanel != null)
+            {
+                _hardwareInfoPanel.ShowLoadingState();
+            }
         }
         else
         {
-            Debug.LogError("[RTTRemoteMenu] Hardware panel is NULL!");
+            Debug.LogError("[RTTRemoteMenu] Hardware frame is NULL!");
         }
 
-        if (_networkInfoPanel != null)
+        if (_networkFrame != null)
         {
-            Debug.Log("[RTTRemoteMenu] Calling ShowSpeedTestLoadingState on network panel");
-            _networkInfoPanel.ShowSpeedTestLoadingState();
+            Debug.Log("[RTTRemoteMenu] Activating network frame with speed test loading state");
+            _networkFrame.gameObject.SetActive(true);
+            if (_networkInfoPanel != null)
+            {
+                _networkInfoPanel.ShowSpeedTestLoadingState();
+            }
         }
         else
         {
-            Debug.LogError("[RTTRemoteMenu] Network panel is NULL!");
+            Debug.LogError("[RTTRemoteMenu] Network frame is NULL!");
         }
 
         Debug.Log("[RTTRemoteMenu] Side panels shown with loading state");
@@ -1077,37 +1143,31 @@ public class RTTRemoteMenu : MonoBehaviour
 
     /// <summary>
     /// Handle speed test progress from client.
-    /// Throttled to prevent excessive UI updates that hurt FPS and measurement accuracy.
+    /// Only updates UI on completion to reduce measurement time.
     /// </summary>
     public void HandleSpeedTestProgress(string direction, double currentMbps, int progress)
     {
         if (_networkInfoPanel == null) return;
 
-        // Always update on completion (progress == 100)
+        // Only update UI when test is complete - skip progress updates to reduce time
         bool isComplete = progress >= 100;
 
-        // Throttle UI updates during speed test
-        float now = Time.unscaledTime;
-        bool shouldUpdate = isComplete ||
-                           (now - _lastSpeedTestUIUpdate >= SPEED_TEST_UI_UPDATE_INTERVAL);
-
-        if (shouldUpdate)
+        if (isComplete)
         {
-            _lastSpeedTestUIUpdate = now;
             _lastReportedMbps = currentMbps;
             _networkInfoPanel.UpdateSpeedTestProgress(direction, currentMbps, progress);
         }
     }
 
     /// <summary>
-    /// Hide side panels.
+    /// Hide side panels (hides the frames which contain the panels).
     /// </summary>
     private void HideSidePanels()
     {
-        if (_hardwareInfoPanel != null)
-            _hardwareInfoPanel.gameObject.SetActive(false);
-        if (_networkInfoPanel != null)
-            _networkInfoPanel.gameObject.SetActive(false);
+        if (_hardwareFrame != null)
+            _hardwareFrame.gameObject.SetActive(false);
+        if (_networkFrame != null)
+            _networkFrame.gameObject.SetActive(false);
 
         Debug.Log("[RTTRemoteMenu] Side panels hidden");
     }
