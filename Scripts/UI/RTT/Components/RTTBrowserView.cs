@@ -227,18 +227,24 @@ namespace VRWorkspace.UI
             displayObj.transform.SetParent(parent, false);
 
             var rt = displayObj.AddComponent<RectTransform>();
-            rt.anchorMin = Vector2.zero;
-            rt.anchorMax = new Vector2(1, 1);
+
+            // Use explicit sizeDelta instead of anchors for WebViewManager compatibility
+            // WebViewManager.Start() reads sizeDelta directly to calculate texture dimensions
+            rt.anchorMin = new Vector2(0.5f, 0);
+            rt.anchorMax = new Vector2(0.5f, 0);
             rt.pivot = new Vector2(0.5f, 0);
-            rt.offsetMin = Vector2.zero;
-            rt.offsetMax = new Vector2(0, -headerHeight);
+            rt.anchoredPosition = new Vector2(0, 0);
+
+            // Set explicit size (WebViewManager needs this for texture calculation)
+            float displayHeight = height - headerHeight;
+            rt.sizeDelta = new Vector2(width, displayHeight);
 
             // RawImage to display WebView content
             _webViewDisplay = displayObj.AddComponent<RawImage>();
             _webViewDisplay.color = new Color(0.08f, 0.1f, 0.12f, 1f); // Dark background until loaded
 
             _webViewDisplayObj = displayObj;
-            Debug.Log($"[RTTBrowserView] WebView display created");
+            Debug.Log($"[RTTBrowserView] WebView display created with size: {width}x{displayHeight}");
         }
 
         private GameObject _webViewDisplayObj;
@@ -257,96 +263,118 @@ namespace VRWorkspace.UI
         }
 
 #if UNITY_ANDROID && !UNITY_EDITOR
+        private GameObject _webViewPrefabInstance;
+
         /// <summary>
-        /// Initialize SimpleUnity3DWebView components using reflection.
-        /// PointerEventSource is internal, so we add it via reflection.
+        /// Initialize SimpleUnity3DWebView by instantiating the pre-configured prefab.
+        /// This avoids reflection issues with internal PointerEventSource class.
         /// </summary>
         private void InitializeSimpleWebView()
         {
-            if (_webViewDisplayObj == null || _webViewDisplay == null)
-            {
-                Debug.LogError("[RTTBrowserView] WebView display not created");
-                return;
-            }
-
             try
             {
-                // Add PointerEventSource via reflection (it's internal)
-                var webViewAssembly = System.Reflection.Assembly.Load("WebView");
-                var pointerEventSourceType = webViewAssembly?.GetType("WebView.PointerEventSource");
-                if (pointerEventSourceType != null)
+                // Load the pre-configured WebView prefab from Resources
+                var prefab = Resources.Load<GameObject>("WebViewSample");
+                if (prefab == null)
                 {
-                    _webViewDisplayObj.AddComponent(pointerEventSourceType);
-                    Debug.Log("[RTTBrowserView] Added PointerEventSource via reflection");
-                }
-                else
-                {
-                    Debug.LogWarning("[RTTBrowserView] PointerEventSource type not found");
+                    Debug.LogError("[RTTBrowserView] WebViewSample.prefab not found in Resources!");
+                    return;
                 }
 
-                // Add WebViewManager component
-                var webViewManagerType = webViewAssembly?.GetType("WebView.WebViewManager");
-                if (webViewManagerType != null)
-                {
-                    _webViewManagerComponent = _webViewDisplayObj.AddComponent(webViewManagerType);
+                Debug.Log("[RTTBrowserView] Loaded WebViewSample prefab");
 
-                    // Configure via reflection
-                    ConfigureWebViewManager(_webViewManagerComponent, webViewManagerType);
+                // Instantiate as child of our display container
+                _webViewPrefabInstance = Instantiate(prefab, _webViewDisplayObj.transform);
+                _webViewPrefabInstance.name = "WebViewInstance";
 
-                    Debug.Log("[RTTBrowserView] SimpleUnity3DWebView initialized");
-                }
-                else
+                // Find the WebViewManager component in the prefab hierarchy
+                foreach (var comp in _webViewPrefabInstance.GetComponentsInChildren<Component>(true))
                 {
-                    Debug.LogError("[RTTBrowserView] WebViewManager type not found");
+                    if (comp != null && comp.GetType().Name == "WebViewManager")
+                    {
+                        _webViewManagerComponent = comp;
+                        Debug.Log($"[RTTBrowserView] Found WebViewManager: {comp}");
+                        break;
+                    }
                 }
+
+                if (_webViewManagerComponent == null)
+                {
+                    Debug.LogError("[RTTBrowserView] WebViewManager not found in prefab!");
+                    return;
+                }
+
+                // Find and resize the RawImage in the prefab to fill our container
+                var prefabRawImage = _webViewPrefabInstance.GetComponentInChildren<RawImage>();
+                if (prefabRawImage != null)
+                {
+                    var rt = prefabRawImage.GetComponent<RectTransform>();
+                    rt.anchorMin = Vector2.zero;
+                    rt.anchorMax = Vector2.one;
+                    rt.offsetMin = Vector2.zero;
+                    rt.offsetMax = Vector2.zero;
+                    rt.localScale = Vector3.one;
+                    Debug.Log($"[RTTBrowserView] Configured prefab RawImage to fill container");
+                }
+
+                // Position the prefab instance to fill our WebViewDisplay area
+                var instanceRT = _webViewPrefabInstance.GetComponent<RectTransform>();
+                if (instanceRT == null)
+                {
+                    instanceRT = _webViewPrefabInstance.AddComponent<RectTransform>();
+                }
+                instanceRT.anchorMin = Vector2.zero;
+                instanceRT.anchorMax = Vector2.one;
+                instanceRT.offsetMin = Vector2.zero;
+                instanceRT.offsetMax = Vector2.zero;
+                instanceRT.localScale = Vector3.one;
+                instanceRT.localPosition = Vector3.zero;
+
+                // Hide the sample prefab's UI elements (we use our own header bar)
+                HideSamplePrefabUI();
+
+                // Hide our placeholder RawImage (use prefab's instead)
+                if (_webViewDisplay != null)
+                {
+                    _webViewDisplay.enabled = false;
+                }
+
+                Debug.Log("[RTTBrowserView] SimpleUnity3DWebView initialized from prefab");
             }
             catch (System.Exception ex)
             {
-                Debug.LogError($"[RTTBrowserView] Failed to initialize WebView: {ex.Message}");
+                Debug.LogError($"[RTTBrowserView] Failed to initialize WebView: {ex.Message}\n{ex.StackTrace}");
             }
         }
 
         /// <summary>
-        /// Configure WebViewManager fields via reflection.
+        /// Hide the sample prefab's built-in UI elements (we use our own header bar).
         /// </summary>
-        private void ConfigureWebViewManager(Component manager, System.Type managerType)
+        private void HideSamplePrefabUI()
         {
-            try
+            if (_webViewPrefabInstance == null) return;
+
+            foreach (Transform child in _webViewPrefabInstance.GetComponentsInChildren<Transform>(true))
             {
-                // Set webViewImage field (RawImage)
-                var webViewImageField = managerType.GetField("webViewImage",
-                    System.Reflection.BindingFlags.NonPublic |
-                    System.Reflection.BindingFlags.Public |
-                    System.Reflection.BindingFlags.Instance);
-                webViewImageField?.SetValue(manager, _webViewDisplay);
+                if (child == null) continue;
+                string name = child.name.ToLower();
 
-                // Set pointerEventSource field
-                var pointerEventSourceField = managerType.GetField("pointerEventSource",
-                    System.Reflection.BindingFlags.NonPublic |
-                    System.Reflection.BindingFlags.Public |
-                    System.Reflection.BindingFlags.Instance);
-                var pointerSource = _webViewDisplayObj.GetComponent("PointerEventSource");
-                pointerEventSourceField?.SetValue(manager, pointerSource);
+                // Hide address bar, navigation buttons, and Canvas from sample prefab
+                if (name.Contains("address") || name.Contains("urlfield") ||
+                    name.Contains("back") || name.Contains("forward") ||
+                    name.Contains("reload") || name.Contains("navigation") ||
+                    name.Contains("canvas"))
+                {
+                    // Don't hide the main Canvas that contains the RawImage
+                    if (child.GetComponentInChildren<RawImage>() != null &&
+                        child.GetComponent<Canvas>() != null)
+                    {
+                        continue;
+                    }
 
-                // Set textureWidth
-                var textureWidthField = managerType.GetField("textureWidth",
-                    System.Reflection.BindingFlags.NonPublic |
-                    System.Reflection.BindingFlags.Public |
-                    System.Reflection.BindingFlags.Instance);
-                textureWidthField?.SetValue(manager, textureWidth);
-
-                // Set intervalMSec
-                var intervalField = managerType.GetField("intervalMSec",
-                    System.Reflection.BindingFlags.NonPublic |
-                    System.Reflection.BindingFlags.Public |
-                    System.Reflection.BindingFlags.Instance);
-                intervalField?.SetValue(manager, updateIntervalMs);
-
-                Debug.Log($"[RTTBrowserView] Configured WebViewManager: {textureWidth}px, {updateIntervalMs}ms");
-            }
-            catch (System.Exception ex)
-            {
-                Debug.LogWarning($"[RTTBrowserView] Config warning: {ex.Message}");
+                    child.gameObject.SetActive(false);
+                    Debug.Log($"[RTTBrowserView] Hidden sample UI: {child.name}");
+                }
             }
         }
 #endif
@@ -491,18 +519,24 @@ namespace VRWorkspace.UI
 #if UNITY_ANDROID && !UNITY_EDITOR
         private System.Collections.IEnumerator LoadUrlAfterInit(string url)
         {
-            // Wait for WebViewManager to initialize
-            yield return null;
-            yield return null; // Extra frame for safety
+            Debug.Log($"[RTTBrowserView] LoadUrlAfterInit started, waiting for WebView...");
+
+            // Wait longer for WebViewManager to fully initialize
+            // Android WebView needs time to create the native view
+            yield return new WaitForSeconds(0.5f);
 
             if (_webViewManagerComponent != null)
             {
+                Debug.Log($"[RTTBrowserView] WebViewManager exists, loading URL...");
                 InvokeWebViewMethod("LoadUrl", url);
-                Debug.Log($"[RTTBrowserView] WebViewManager loading: {url}");
+                Debug.Log($"[RTTBrowserView] LoadUrl called: {url}");
+
+                // Also try calling Init if available
+                InvokeWebViewMethod("Init");
             }
             else
             {
-                Debug.LogError("[RTTBrowserView] WebViewManager is null");
+                Debug.LogError("[RTTBrowserView] WebViewManager is null after wait");
             }
         }
 
