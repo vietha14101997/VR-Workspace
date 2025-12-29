@@ -2,9 +2,6 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System;
-#if UNITY_ANDROID && !UNITY_EDITOR
-using WebView;
-#endif
 
 namespace VRWorkspace.UI
 {
@@ -44,11 +41,8 @@ namespace VRWorkspace.UI
         private string _currentUrl;
         private bool _isLoading;
 
-#if UNITY_ANDROID && !UNITY_EDITOR
-        // SimpleUnity3DWebView components
-        private WebViewManager _webViewManager;
-        private PointerEventSource _pointerEventSource;
-#endif
+        // WebViewManager reference (stored as Component to avoid type dependency)
+        private Component _webViewManagerComponent;
 
         // Container references
         private float _containerWidth;
@@ -264,7 +258,8 @@ namespace VRWorkspace.UI
 
 #if UNITY_ANDROID && !UNITY_EDITOR
         /// <summary>
-        /// Initialize SimpleUnity3DWebView components.
+        /// Initialize SimpleUnity3DWebView components using reflection.
+        /// PointerEventSource is internal, so we add it via reflection.
         /// </summary>
         private void InitializeSimpleWebView()
         {
@@ -274,23 +269,85 @@ namespace VRWorkspace.UI
                 return;
             }
 
-            // Add PointerEventSource for touch input
-            _pointerEventSource = _webViewDisplayObj.AddComponent<PointerEventSource>();
+            try
+            {
+                // Add PointerEventSource via reflection (it's internal)
+                var webViewAssembly = System.Reflection.Assembly.Load("WebView");
+                var pointerEventSourceType = webViewAssembly?.GetType("WebView.PointerEventSource");
+                if (pointerEventSourceType != null)
+                {
+                    _webViewDisplayObj.AddComponent(pointerEventSourceType);
+                    Debug.Log("[RTTBrowserView] Added PointerEventSource via reflection");
+                }
+                else
+                {
+                    Debug.LogWarning("[RTTBrowserView] PointerEventSource type not found");
+                }
 
-            // Add WebViewManager component
-            _webViewManager = _webViewDisplayObj.AddComponent<WebViewManager>();
+                // Add WebViewManager component
+                var webViewManagerType = webViewAssembly?.GetType("WebView.WebViewManager");
+                if (webViewManagerType != null)
+                {
+                    _webViewManagerComponent = _webViewDisplayObj.AddComponent(webViewManagerType);
 
-            // Configure WebViewManager via reflection (since fields are serialized)
-            // Note: SimpleUnity3DWebView expects these to be set in Inspector,
-            // but we can use reflection or the public methods
+                    // Configure via reflection
+                    ConfigureWebViewManager(_webViewManagerComponent, webViewManagerType);
 
-            // The WebViewManager will auto-initialize in its Start() method
-            // We need to wait a frame for it to initialize, then load our URL
+                    Debug.Log("[RTTBrowserView] SimpleUnity3DWebView initialized");
+                }
+                else
+                {
+                    Debug.LogError("[RTTBrowserView] WebViewManager type not found");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[RTTBrowserView] Failed to initialize WebView: {ex.Message}");
+            }
+        }
 
-            Debug.Log("[RTTBrowserView] SimpleUnity3DWebView initialized");
+        /// <summary>
+        /// Configure WebViewManager fields via reflection.
+        /// </summary>
+        private void ConfigureWebViewManager(Component manager, System.Type managerType)
+        {
+            try
+            {
+                // Set webViewImage field (RawImage)
+                var webViewImageField = managerType.GetField("webViewImage",
+                    System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.Public |
+                    System.Reflection.BindingFlags.Instance);
+                webViewImageField?.SetValue(manager, _webViewDisplay);
 
-            // Subscribe to URL change events
-            // WebViewManager uses UnityEvent, we'll check for changes in Update
+                // Set pointerEventSource field
+                var pointerEventSourceField = managerType.GetField("pointerEventSource",
+                    System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.Public |
+                    System.Reflection.BindingFlags.Instance);
+                var pointerSource = _webViewDisplayObj.GetComponent("PointerEventSource");
+                pointerEventSourceField?.SetValue(manager, pointerSource);
+
+                // Set textureWidth
+                var textureWidthField = managerType.GetField("textureWidth",
+                    System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.Public |
+                    System.Reflection.BindingFlags.Instance);
+                textureWidthField?.SetValue(manager, textureWidth);
+
+                // Set intervalMSec
+                var intervalField = managerType.GetField("intervalMSec",
+                    System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.Public |
+                    System.Reflection.BindingFlags.Instance);
+                intervalField?.SetValue(manager, updateIntervalMs);
+
+                Debug.Log($"[RTTBrowserView] Configured WebViewManager: {textureWidth}px, {updateIntervalMs}ms");
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"[RTTBrowserView] Config warning: {ex.Message}");
+            }
         }
 #endif
 
@@ -398,7 +455,7 @@ namespace VRWorkspace.UI
             OnUrlChanged?.Invoke(url);
 
 #if UNITY_ANDROID && !UNITY_EDITOR
-            _webViewManager?.LoadUrl(url);
+            InvokeWebViewMethod("LoadUrl", url);
 #else
             if (_statusText != null) _statusText.text = "Editor Mode";
 #endif
@@ -438,14 +495,32 @@ namespace VRWorkspace.UI
             yield return null;
             yield return null; // Extra frame for safety
 
-            if (_webViewManager != null)
+            if (_webViewManagerComponent != null)
             {
-                _webViewManager.LoadUrl(url);
+                InvokeWebViewMethod("LoadUrl", url);
                 Debug.Log($"[RTTBrowserView] WebViewManager loading: {url}");
             }
             else
             {
                 Debug.LogError("[RTTBrowserView] WebViewManager is null");
+            }
+        }
+
+        /// <summary>
+        /// Invoke a method on WebViewManager via reflection.
+        /// </summary>
+        private void InvokeWebViewMethod(string methodName, params object[] args)
+        {
+            if (_webViewManagerComponent == null) return;
+
+            try
+            {
+                var method = _webViewManagerComponent.GetType().GetMethod(methodName);
+                method?.Invoke(_webViewManagerComponent, args);
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"[RTTBrowserView] Failed to invoke {methodName}: {ex.Message}");
             }
         }
 #endif
@@ -523,7 +598,7 @@ namespace VRWorkspace.UI
         public void Refresh()
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
-            _webViewManager?.Reload();
+            InvokeWebViewMethod("Reload");
 #else
             if (!string.IsNullOrEmpty(_currentUrl))
             {
@@ -538,7 +613,7 @@ namespace VRWorkspace.UI
         public void GoBack()
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
-            _webViewManager?.GoBack();
+            InvokeWebViewMethod("GoBack");
 #endif
         }
 
@@ -548,7 +623,7 @@ namespace VRWorkspace.UI
         public void ExecuteJS(string script)
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
-            _webViewManager?.EvaluateJavascript(script);
+            InvokeWebViewMethod("EvaluateJavascript", script);
 #endif
         }
         #endregion
