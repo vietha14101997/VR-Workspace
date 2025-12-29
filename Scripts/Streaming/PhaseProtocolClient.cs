@@ -1047,6 +1047,125 @@ namespace VRWorkspace.Streaming
             }
         }
 
+        // === Reconnect Handler ===
+
+        /// <summary>
+        /// Reconnect a specific monitor by recreating PeerConnection and sending new offer.
+        /// Called when server requests reconnect due to connection loss.
+        /// </summary>
+        private async Task ReconnectMonitorAsync(int monitorIndex)
+        {
+            // Don't reconnect if application is shutting down
+            if (_cts == null || _cts.IsCancellationRequested) return;
+
+            PCWrapper oldWrapper;
+            lock (_lock)
+            {
+                if (monitorIndex < 0 || monitorIndex >= _peerConnections.Count)
+                {
+                    Debug.LogWarning($"[PhaseProtocol] Reconnect ignored: invalid monitor index {monitorIndex}");
+                    return;
+                }
+                oldWrapper = _peerConnections[monitorIndex];
+            }
+
+            Debug.Log($"[PhaseProtocol] Reconnecting PC{monitorIndex}...");
+
+            // Close old PC
+            try { oldWrapper.PC?.Close(); oldWrapper.PC?.Dispose(); } catch { }
+
+            // Create new PeerConnection
+            var cfg = new RTCConfiguration { iceServers = Array.Empty<RTCIceServer>() };
+            var pc = new RTCPeerConnection(ref cfg);
+            var wrapper = new PCWrapper { Index = monitorIndex, PC = pc };
+
+            int idx = monitorIndex;
+
+            // Add video transceiver
+            var trans = pc.AddTransceiver(TrackKind.Video, new RTCRtpTransceiverInit { direction = RTCRtpTransceiverDirection.RecvOnly });
+            var caps = RTCRtpReceiver.GetCapabilities(TrackKind.Video);
+            var h264 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("H264", StringComparison.OrdinalIgnoreCase)).ToArray();
+            trans.SetCodecPreferences(h264.Concat(caps.codecs.Except(h264)).ToArray());
+
+            // Connection state handlers
+            pc.OnIceConnectionChange = s =>
+            {
+                Debug.Log($"[PhaseProtocol] PC{idx} ICE (reconnected): {s}");
+            };
+            pc.OnConnectionStateChange = s =>
+            {
+                Debug.Log($"[PhaseProtocol] PC{idx} State (reconnected): {s}");
+                if (s == RTCPeerConnectionState.Failed || s == RTCPeerConnectionState.Disconnected)
+                {
+                    Debug.LogWarning($"[PhaseProtocol] PC{idx} connection lost again after reconnect");
+                }
+            };
+
+            // ICE candidates
+            pc.OnIceCandidate = cand =>
+            {
+                if (string.IsNullOrEmpty(cand.Candidate)) return;
+
+                string msg = cand.Candidate;
+                if (_skipTcpIceCandidates && (msg.Contains(" tcp ", StringComparison.OrdinalIgnoreCase) || msg.Contains("tcptype", StringComparison.OrdinalIgnoreCase)))
+                    return;
+
+                string rawCandidate = msg.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase)
+                    ? msg.Substring("candidate:".Length)
+                    : msg;
+
+                _ = SendJsonAsync(new { type = "candidate", monitorIndex = idx, candidate = rawCandidate });
+            };
+
+            // Track received
+            pc.OnTrack = e =>
+            {
+                if (e.Track is VideoStreamTrack v)
+                {
+                    wrapper.VideoTrack = v;
+                    v.OnVideoReceived += tex =>
+                    {
+                        wrapper.Texture = tex;
+                        OnVideoTextureReceived?.Invoke(idx, tex);
+                    };
+                    Debug.Log($"[PhaseProtocol] PC{idx} received video track (reconnected)");
+                }
+            };
+
+            // Replace wrapper
+            lock (_lock)
+            {
+                _peerConnections[monitorIndex] = wrapper;
+            }
+
+            // Create and send new offer
+            var offerOp = pc.CreateOffer();
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            while (!offerOp.IsDone && sw.ElapsedMilliseconds < 5000)
+                await Task.Delay(10);
+
+            if (!offerOp.IsDone || offerOp.IsError)
+            {
+                Debug.LogError($"[PhaseProtocol] PC{idx} CreateOffer failed on reconnect");
+                return;
+            }
+
+            var offer = offerOp.Desc;
+            var setLocalOp = pc.SetLocalDescription(ref offer);
+            sw.Restart();
+            while (!setLocalOp.IsDone && sw.ElapsedMilliseconds < 5000)
+                await Task.Delay(10);
+
+            if (!setLocalOp.IsDone || setLocalOp.IsError)
+            {
+                Debug.LogError($"[PhaseProtocol] PC{idx} SetLocal failed on reconnect");
+                return;
+            }
+
+            await SendJsonAsync(new { type = "offer", monitorIndex = idx, sdp = offer.sdp });
+            Debug.Log($"[PhaseProtocol] PC{idx} reconnect offer sent");
+        }
+
         // === Phase 3 Handlers ===
 
         private void HandleStreamingStarted(SimpleJson json)
@@ -1087,6 +1206,18 @@ namespace VRWorkspace.Streaming
 
         private async Task HandleLegacyMessageAsync(string text)
         {
+            // Handle reconnect request from server
+            if (text.StartsWith("reconnect:", StringComparison.OrdinalIgnoreCase))
+            {
+                var rest = text.Substring(10);
+                if (int.TryParse(rest.Trim(), out int monIdx))
+                {
+                    Debug.Log($"[PhaseProtocol] Server requested reconnect for monitor {monIdx}");
+                    await ReconnectMonitorAsync(monIdx);
+                }
+                return;
+            }
+
             // Handle legacy format: answer:N:sdp, candidate:N:candidate
             if (text.StartsWith("answer:", StringComparison.OrdinalIgnoreCase))
             {
