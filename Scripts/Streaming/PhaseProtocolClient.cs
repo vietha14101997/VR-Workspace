@@ -381,6 +381,11 @@ namespace VRWorkspace.Streaming
                             HandleError(json);
                             break;
 
+                        case "ping":
+                            // Server sent JSON ping - respond immediately with pong
+                            _ = SendTextAsync("{\"type\":\"pong\"}");
+                            break;
+
                         case "pong":
                             // Notify speed test client for ping measurement
                             _speedTest?.HandlePong();
@@ -407,7 +412,9 @@ namespace VRWorkspace.Streaming
             }
             else if (text.Equals("ping", StringComparison.OrdinalIgnoreCase))
             {
-                await _speedTest?.SendPongAsync();
+                // Send pong immediately - don't await, fire-and-forget for lowest latency
+                // This matches browser behavior which sends pong synchronously
+                _ = SendTextAsync("pong");
             }
             else if (text.Equals("pong", StringComparison.OrdinalIgnoreCase))
             {
@@ -1065,53 +1072,29 @@ namespace VRWorkspace.Streaming
                 await SendTextAsync($"{{\"type\":\"offer\",\"monitorIndex\":{idx},\"sdp\":\"{EscapeJsonString(offer.sdp)}\"}}");
                 Debug.Log($"[PhaseProtocol] PC{idx} offer sent");
 
-                // SEQUENTIAL FIX: Wait for answer and ICE connection before creating next PC
-                // This prevents simultaneous ICE negotiations which fail on Android
+                // SEQUENTIAL FIX: Wait for answer before creating next PC
+                // Reduced timeouts to match browser's faster connection pattern
                 if (i < count - 1) // Don't wait after last PC
                 {
-                    Debug.Log($"[PhaseProtocol] PC{idx} waiting for answer and ICE connection before creating next PC...");
+                    Debug.Log($"[PhaseProtocol] PC{idx} waiting for answer before creating next PC...");
 
-                    // Wait for answer to be set (max 10 seconds)
+                    // Wait for answer to be set (max 5 seconds - reduced from 10s)
                     sw.Restart();
-                    while (!wrapper.AnswerSet && sw.ElapsedMilliseconds < 10000)
+                    while (!wrapper.AnswerSet && sw.ElapsedMilliseconds < 5000)
                     {
-                        await Task.Delay(50);
+                        await Task.Delay(20); // Faster polling (20ms vs 50ms)
                     }
 
                     if (!wrapper.AnswerSet)
                     {
-                        Debug.LogWarning($"[PhaseProtocol] PC{idx} answer timeout, continuing anyway");
+                        Debug.LogWarning($"[PhaseProtocol] PC{idx} answer timeout after 5s, continuing anyway");
                     }
                     else
                     {
-                        Debug.Log($"[PhaseProtocol] PC{idx} answer received, waiting for ICE...");
-
-                        // Wait for ICE connection (max 10 seconds)
-                        sw.Restart();
-                        while (pc.IceConnectionState != RTCIceConnectionState.Connected &&
-                               pc.IceConnectionState != RTCIceConnectionState.Completed &&
-                               sw.ElapsedMilliseconds < 10000)
-                        {
-                            // Also break if ICE failed completely
-                            if (pc.IceConnectionState == RTCIceConnectionState.Failed ||
-                                pc.IceConnectionState == RTCIceConnectionState.Closed)
-                            {
-                                Debug.LogWarning($"[PhaseProtocol] PC{idx} ICE failed/closed, continuing anyway");
-                                break;
-                            }
-                            await Task.Delay(50);
-                        }
-
-                        if (pc.IceConnectionState == RTCIceConnectionState.Connected ||
-                            pc.IceConnectionState == RTCIceConnectionState.Completed)
-                        {
-                            Debug.Log($"[PhaseProtocol] PC{idx} ICE connected! Adding delay before next PC...");
-                            await Task.Delay(500); // Small stabilization delay
-                        }
-                        else
-                        {
-                            Debug.LogWarning($"[PhaseProtocol] PC{idx} ICE not connected ({pc.IceConnectionState}), continuing anyway");
-                        }
+                        Debug.Log($"[PhaseProtocol] PC{idx} answer received, brief wait before next PC...");
+                        // Just a brief delay for stability (200ms vs 500ms)
+                        // Don't wait for full ICE connection - let it happen in parallel like browser
+                        await Task.Delay(200);
                     }
                 }
             }
@@ -1123,124 +1106,70 @@ namespace VRWorkspace.Streaming
             var rawSdp = json.GetString("sdp") ?? "";
             var sdp = FixSdp(rawSdp);
 
-            Debug.Log($"[PhaseProtocol] PC{monitorIndex} received answer, _peerConnections.Count={_peerConnections.Count}");
-            Debug.Log($"[PhaseProtocol] PC{monitorIndex} raw SDP length={rawSdp.Length}, fixed SDP length={sdp.Length}");
+            Debug.Log($"[PhaseProtocol] PC{monitorIndex} received answer (SDP: {rawSdp.Length} -> {sdp.Length} bytes)");
 
             PCWrapper wrapper;
             lock (_lock)
             {
                 if (monitorIndex < 0 || monitorIndex >= _peerConnections.Count)
                 {
-                    Debug.LogWarning($"[PhaseProtocol] PC{monitorIndex} answer ignored: index out of range (count={_peerConnections.Count})");
+                    Debug.LogWarning($"[PhaseProtocol] PC{monitorIndex} answer ignored: index out of range");
                     return;
                 }
                 wrapper = _peerConnections[monitorIndex];
             }
 
-            // Validate wrapper and PC
-            if (wrapper == null)
+            if (wrapper?.PC == null)
             {
-                Debug.LogError($"[PhaseProtocol] PC{monitorIndex} wrapper is NULL!");
-                return;
-            }
-            if (wrapper.PC == null)
-            {
-                Debug.LogError($"[PhaseProtocol] PC{monitorIndex} wrapper.PC is NULL!");
+                Debug.LogError($"[PhaseProtocol] PC{monitorIndex} wrapper or PC is NULL!");
                 return;
             }
 
-            // Use EXACT same pattern as working v1 code (MultiPCStreamClient line 534-550)
             try
             {
-                // Log PC state before attempting SetRemoteDescription
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} SignalingState={wrapper.PC.SignalingState}, ConnectionState={wrapper.PC.ConnectionState}, IsClosed={wrapper.PC.ConnectionState == RTCPeerConnectionState.Closed}");
-
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} creating RTCSessionDescription...");
-                var answer = new RTCSessionDescription { type = RTCSdpType.Answer, sdp = sdp };
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} RTCSessionDescription created, sdp length={sdp.Length}");
-
-                // Check that PC is in correct state for SetRemoteDescription
+                // Check PC is in correct state
                 if (wrapper.PC.SignalingState != RTCSignalingState.HaveLocalOffer)
                 {
-                    Debug.LogError($"[PhaseProtocol] PC{monitorIndex} WRONG STATE: SignalingState={wrapper.PC.SignalingState}, expected HaveLocalOffer");
+                    Debug.LogError($"[PhaseProtocol] PC{monitorIndex} wrong state: {wrapper.PC.SignalingState}");
                     return;
                 }
 
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} calling wrapper.PC.SetRemoteDescription...");
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} FULL SDP ({sdp.Length} chars):\n{sdp}");
-                // Log individual lines for debugging
-                var sdpLines = sdp.Split('\n');
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} SDP has {sdpLines.Length} lines");
-                RTCSetSessionDescriptionAsyncOperation setRemoteOp = null;
-                try
-                {
-                    setRemoteOp = wrapper.PC.SetRemoteDescription(ref answer);
-                    Debug.Log($"[PhaseProtocol] PC{monitorIndex} SetRemoteDescription call returned (setRemoteOp null? {setRemoteOp == null})");
-                }
-                catch (Exception innerEx)
-                {
-                    Debug.Log($"[PhaseProtocol] PC{monitorIndex} SetRemoteDescription EXCEPTION: {innerEx.GetType().Name}: {innerEx.Message}");
-                    Debug.Log($"[PhaseProtocol] PC{monitorIndex} Stack: {innerEx.StackTrace}");
-                    return;
-                }
-
-                // Debug: Log that we passed try-catch
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} Passed try-catch, setRemoteOp null? {setRemoteOp == null}");
+                var answer = new RTCSessionDescription { type = RTCSdpType.Answer, sdp = sdp };
+                var setRemoteOp = wrapper.PC.SetRemoteDescription(ref answer);
 
                 if (setRemoteOp == null)
                 {
-                    Debug.Log($"[PhaseProtocol] PC{monitorIndex} ERROR: SetRemoteDescription returned NULL operation!");
+                    Debug.LogError($"[PhaseProtocol] PC{monitorIndex} SetRemoteDescription returned null!");
                     return;
                 }
 
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} SetRemoteDescription returned op, IsDone={setRemoteOp.IsDone}, waiting...");
-
+                // Wait for operation to complete (max 5 seconds)
                 var sw = System.Diagnostics.Stopwatch.StartNew();
-                int loopCount = 0;
                 while (!setRemoteOp.IsDone && sw.ElapsedMilliseconds < 5000)
                 {
                     await Task.Delay(10);
-                    loopCount++;
-                    if (loopCount % 100 == 0) // Log every 1 second
-                    {
-                        Debug.Log($"[PhaseProtocol] PC{monitorIndex} waiting... {sw.ElapsedMilliseconds}ms, IsDone={setRemoteOp.IsDone}");
-                    }
                 }
-
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} loop exited: loops={loopCount}, elapsed={sw.ElapsedMilliseconds}ms, IsDone={setRemoteOp.IsDone}, IsError={setRemoteOp.IsError}");
 
                 if (!setRemoteOp.IsDone || setRemoteOp.IsError)
                 {
-                    Debug.Log($"[PhaseProtocol] PC{monitorIndex} SetRemoteDescription FAILED (IsDone={setRemoteOp.IsDone}, IsError={setRemoteOp.IsError})");
-                    if (setRemoteOp.IsError)
-                    {
-                        try
-                        {
-                            Debug.Log($"[PhaseProtocol] PC{monitorIndex} Error detail: {setRemoteOp.Error.message}");
-                        }
-                        catch (Exception errEx)
-                        {
-                            Debug.Log($"[PhaseProtocol] PC{monitorIndex} Could not get error detail: {errEx.Message}");
-                        }
-                    }
+                    var errorMsg = setRemoteOp.IsError ? setRemoteOp.Error?.message ?? "unknown" : "timeout";
+                    Debug.LogError($"[PhaseProtocol] PC{monitorIndex} SetRemoteDescription failed: {errorMsg}");
                     return;
                 }
 
                 wrapper.AnswerSet = true;
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} ✓ answer set OK, AnswerSet=true");
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} answer set OK ({sw.ElapsedMilliseconds}ms)");
 
-                // Process pending ICE
+                // Process pending ICE candidates
                 foreach (var cand in wrapper.PendingIce)
                     AddIceCandidate(wrapper, cand);
                 wrapper.PendingIce.Clear();
 
-                // Check if all PCs have answers
                 CheckIceComplete();
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[PhaseProtocol] PC{monitorIndex} HandleAnswerAsync EXCEPTION: {ex.GetType().Name}: {ex.Message}");
-                Debug.LogException(ex);
+                Debug.LogError($"[PhaseProtocol] PC{monitorIndex} HandleAnswerAsync error: {ex.Message}");
             }
         }
 
@@ -1775,83 +1704,35 @@ namespace VRWorkspace.Streaming
                     .Replace("\t", "\\t");
         }
 
+        /// <summary>
+        /// Fix SDP to be compatible with Unity WebRTC.
+        /// SIMPLIFIED to match browser implementation - only 2 essential transformations:
+        /// 1. SAVP → SAVPF (required for DTLS-SRTP)
+        /// 2. Remove embedded ICE candidates (server sends them separately via trickle ICE)
+        /// </summary>
         private string FixSdp(string sdp)
         {
             if (string.IsNullOrEmpty(sdp)) return sdp;
 
-            // CRITICAL: Unescape literal \r\n strings to actual CRLF characters
-            // JSON may contain escaped sequences that weren't properly unescaped
-            if (sdp.Contains("\\r\\n"))
+            // Fix 1: SAVP → SAVPF (browser does this too)
+            // Use regex-like replacement with word boundary to avoid SAVPFF bug
+            if (sdp.Contains("UDP/TLS/RTP/SAVP") && !sdp.Contains("UDP/TLS/RTP/SAVPF"))
             {
-                Debug.Log("[PhaseProtocol] FixSdp: Unescaping literal \\r\\n to actual CRLF");
-                sdp = sdp.Replace("\\r\\n", "\r\n");
-            }
-            else if (sdp.Contains("\\n"))
-            {
-                Debug.Log("[PhaseProtocol] FixSdp: Unescaping literal \\n to actual LF");
-                sdp = sdp.Replace("\\n", "\n");
-            }
-
-            // Only fix SAVP -> SAVPF if not already SAVPF (avoid SAVPFF bug)
-            if (!sdp.Contains("UDP/TLS/RTP/SAVPF"))
-            {
-                Debug.Log("[PhaseProtocol] FixSdp: Converting SAVP -> SAVPF");
                 sdp = sdp.Replace("UDP/TLS/RTP/SAVP", "UDP/TLS/RTP/SAVPF");
             }
 
-            // Verify no double-F bug
-            if (sdp.Contains("SAVPFF"))
+            // Fix 2: Remove embedded ICE candidates (browser does this too)
+            // Server sends candidates separately via trickle ICE
+            var lines = sdp.Split('\n');
+            var filtered = lines.Where(l => !l.TrimStart().StartsWith("a=candidate:")).ToArray();
+
+            int removedCount = lines.Length - filtered.Length;
+            if (removedCount > 0)
             {
-                Debug.LogError("[PhaseProtocol] FixSdp BUG: SDP contains SAVPFF!");
+                Debug.Log($"[PhaseProtocol] FixSdp: Removed {removedCount} embedded ICE candidates");
             }
 
-            if (sdp.Contains("IP4 0.0.0.0"))
-            {
-                Debug.Log("[PhaseProtocol] Fixing SDP: IP4 0.0.0.0 -> IP4 127.0.0.1");
-                sdp = sdp.Replace("IP4 0.0.0.0", "IP4 127.0.0.1");
-            }
-
-            // CRITICAL: Answer SDP must have setup:active or setup:passive, NOT actpass!
-            // SIPSorcery sends actpass but Unity WebRTC requires active/passive for answers
-            if (sdp.Contains("a=setup:actpass"))
-            {
-                Debug.Log("[PhaseProtocol] FixSdp: Converting a=setup:actpass -> a=setup:active (required for answer)");
-                sdp = sdp.Replace("a=setup:actpass", "a=setup:active");
-            }
-
-            var lines = sdp.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
-            var filtered = new List<string>();
-            int removedCandidates = 0;
-
-            foreach (var rawLine in lines)
-            {
-                var line = rawLine.Trim();
-                if (string.IsNullOrWhiteSpace(line)) continue;
-
-                // CRITICAL FIX: Remove embedded ICE candidates from answer SDP!
-                // V1 does this and it works. Keeping them causes SetRemoteDescription to hang.
-                // ICE candidates are sent separately via "candidate" messages (trickle ICE).
-                if (line.StartsWith("a=candidate:", StringComparison.OrdinalIgnoreCase))
-                {
-                    removedCandidates++;
-                    continue;
-                }
-
-                if (line.StartsWith("a=ice-options:", StringComparison.OrdinalIgnoreCase) && line.Contains("ice2"))
-                {
-                    line = line.Replace("ice2,", "").Replace(",ice2", "").Replace("ice2", "trickle");
-                }
-                filtered.Add(line);
-            }
-
-            if (removedCandidates > 0)
-            {
-                Debug.Log($"[PhaseProtocol] FixSdp: Removed {removedCandidates} embedded ICE candidates (using trickle ICE)");
-            }
-
-            sdp = string.Join("\r\n", filtered);
-            if (!sdp.EndsWith("\r\n")) sdp += "\r\n";
-            return sdp;
+            return string.Join("\n", filtered);
         }
 
         /// <summary>
