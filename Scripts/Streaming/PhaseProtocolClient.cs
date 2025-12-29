@@ -38,6 +38,7 @@ namespace VRWorkspace.Streaming
         // WebRTC
         private readonly List<PCWrapper> _peerConnections = new List<PCWrapper>();
         private bool _skipTcpIceCandidates = true;
+        private int _expectedMonitorCount; // Track expected count for CheckIceComplete
 
         // Events
         public event Action<ServerHardwareInfo> OnHardwareInfoReceived;
@@ -915,6 +916,9 @@ namespace VRWorkspace.Streaming
         {
             Debug.Log($"[PhaseProtocol] Creating {count} PeerConnections");
 
+            // Set expected count BEFORE creating any PCs, so CheckIceComplete knows to wait for all
+            _expectedMonitorCount = count;
+
             // ICE servers for better NAT traversal and connection stability
             var iceServers = new RTCIceServer[]
             {
@@ -1311,16 +1315,19 @@ namespace VRWorkspace.Streaming
 
             lock (_lock)
             {
-                int total = _peerConnections.Count;
+                int created = _peerConnections.Count;
                 int answered = _peerConnections.Count(p => p.AnswerSet);
-                Debug.Log($"[PhaseProtocol] CheckIceComplete: {answered}/{total} PCs have answers, phase={_stateMachine.CurrentPhase}");
+                int expected = _expectedMonitorCount;
+                Debug.Log($"[PhaseProtocol] CheckIceComplete: {answered}/{created} PCs have answers (expected {expected} total), phase={_stateMachine.CurrentPhase}");
 
-                if (_peerConnections.All(p => p.AnswerSet))
+                // IMPORTANT: Wait for ALL expected PCs to be created AND have answers
+                // This prevents proceeding too early when creating PCs sequentially
+                if (created >= expected && created > 0 && _peerConnections.All(p => p.AnswerSet))
                 {
                     allReady = true;
                     if (_stateMachine.CurrentPhase == ConnectionPhase.ICENegotiating)
                     {
-                        Debug.Log("[PhaseProtocol] All PeerConnections ready, transitioning to ReadyToStream");
+                        Debug.Log($"[PhaseProtocol] All {expected} PeerConnections ready, transitioning to ReadyToStream");
                         _stateMachine.TryTransition(ConnectionPhase.ReadyToStream);
                         shouldSendProceed = true;
                     }
@@ -1799,6 +1806,7 @@ namespace VRWorkspace.Streaming
                     try { w.PC?.Close(); w.PC?.Dispose(); } catch { }
                 }
                 _peerConnections.Clear();
+                _expectedMonitorCount = 0;
             }
 
             try { _ws?.Abort(); _ws?.Dispose(); } catch { }
