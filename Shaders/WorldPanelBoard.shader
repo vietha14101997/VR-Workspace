@@ -23,6 +23,13 @@ Shader "Unlit/WorldPanelBoard"
 
         // Edge mask for cluster panels (Left, Right, Top, Bottom): 1=show corner, 0=no corner
         _EdgeMask ("Edge Mask (L,R,T,B)", Vector) = (1,1,1,1)
+
+        // Video streaming quality enhancement
+        [Header(Streaming Quality)]
+        _Sharpness ("Sharpness", Range(0, 2)) = 0.5
+        _SharpnessRadius ("Sharpness Radius", Range(0.5, 3)) = 1.0
+        _ChromaSharpness ("Chroma Sharpness", Range(0, 1)) = 0.3
+        _EnableSharpening ("Enable Sharpening", Float) = 1
     }
 
     SubShader
@@ -42,7 +49,14 @@ Shader "Unlit/WorldPanelBoard"
 
             sampler2D _MainTex;
             float4    _MainTex_ST;
+            float4    _MainTex_TexelSize; // (1/width, 1/height, width, height)
             float4    _Color;
+
+            // Sharpening parameters
+            float _Sharpness;
+            float _SharpnessRadius;
+            float _ChromaSharpness;
+            float _EnableSharpening;
 
             float4 _PanelSize;   // (W,H,0,0)
             float   _EdgeFadeX;
@@ -136,6 +150,41 @@ Shader "Unlit/WorldPanelBoard"
                 return length(max(q, 0.0)) - cornerRadius;
             }
 
+            // Unsharp Mask sharpening - enhances edges after H.264 decode blur
+            float4 UnsharpMask(sampler2D tex, float2 uv, float2 texelSize, float sharpness, float radius)
+            {
+                float4 center = tex2D(tex, uv);
+
+                // 4-tap box blur for performance (sufficient for streaming artifacts)
+                float4 blur = (
+                    tex2D(tex, uv + float2(-texelSize.x, 0) * radius) +
+                    tex2D(tex, uv + float2(texelSize.x, 0) * radius) +
+                    tex2D(tex, uv + float2(0, -texelSize.y) * radius) +
+                    tex2D(tex, uv + float2(0, texelSize.y) * radius)
+                ) * 0.25;
+
+                // Unsharp mask: center + (center - blur) * strength
+                float4 sharpened = center + (center - blur) * sharpness;
+
+                // Clamp to valid range
+                return saturate(sharpened);
+            }
+
+            // Chroma correction to reduce YUV 4:2:0 color bleeding on text edges
+            float4 ChromaCorrect(float4 color, float chromaSharpness)
+            {
+                // Calculate luma (perceived brightness)
+                float luma = dot(color.rgb, float3(0.299, 0.587, 0.114));
+
+                // Extract chroma (color difference from gray)
+                float3 chromaDiff = color.rgb - float3(luma, luma, luma);
+
+                // Boost chroma to counteract 4:2:0 subsampling blur
+                color.rgb = luma + chromaDiff * (1.0 + chromaSharpness);
+
+                return saturate(color);
+            }
+
             fixed4 frag (v2f i) : SV_Target
             {
                 // ---- Content bounds clipping (UV space) ----
@@ -176,8 +225,21 @@ Shader "Unlit/WorldPanelBoard"
                 // Hard clip pixels that are fully outside
                 clip(aRound - 0.001);
 
-                // ---- Lấy màu texture + tint ----
-                fixed4 col = tex2D(_MainTex, i.uv) * _Color;
+                // ---- Lấy màu texture với sharpening (nếu enabled) ----
+                fixed4 col;
+                if (_EnableSharpening > 0.5)
+                {
+                    // Apply Unsharp Mask to combat H.264 decode blur
+                    col = UnsharpMask(_MainTex, i.uv, _MainTex_TexelSize.xy, _Sharpness, _SharpnessRadius);
+
+                    // Apply chroma correction to reduce YUV 4:2:0 color bleeding
+                    col = ChromaCorrect(col, _ChromaSharpness);
+                }
+                else
+                {
+                    col = tex2D(_MainTex, i.uv);
+                }
+                col *= _Color;
 
                 // ---- Edge fade cũ (mờ dần về mép) ----
                 float aEdge = EdgeFade(pMeters, halfSize, _EdgeFadeX, _EdgeFadeY, _EdgeMinAlpha);
