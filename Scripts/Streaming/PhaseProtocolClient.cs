@@ -153,26 +153,20 @@ namespace VRWorkspace.Streaming
             _stateMachine.TryTransition(ConnectionPhase.SendingDisplayConfig);
 
             // Send proceed message
+            // NOTE: Build JSON manually because SimpleJson.Serialize doesn't work with anonymous objects on Android IL2CPP
             Debug.Log("[PhaseProtocol] Sending proceed message (phase 2)");
-            await SendJsonAsync(new
-            {
-                type = "proceed",
-                phase = 2
-            });
+            await SendTextAsync("{\"type\":\"proceed\",\"phase\":2}");
             Debug.Log("[PhaseProtocol] Proceed message sent");
 
             // Send display config
+            // NOTE: Build JSON manually because SimpleJson.Serialize doesn't work with anonymous objects on Android IL2CPP
             Debug.Log("[PhaseProtocol] Sending display_config message");
-            await SendJsonAsync(new
-            {
-                type = "display_config",
-                monitors = config.monitors,
-                resolution = new { w = config.resolutionWidth, h = config.resolutionHeight },
-                refreshRate = config.refreshRate,
-                bitrateKbps = config.bitrateKbps,
-                fps = config.fps,
-                preferGpu = config.preferGpu
-            });
+            var preferGpuStr = string.IsNullOrEmpty(config.preferGpu) ? "null" : $"\"{EscapeJsonString(config.preferGpu)}\"";
+            var displayConfigJson = $"{{\"type\":\"display_config\",\"monitors\":{config.monitors}," +
+                $"\"resolution\":{{\"w\":{config.resolutionWidth},\"h\":{config.resolutionHeight}}}," +
+                $"\"refreshRate\":{config.refreshRate},\"bitrateKbps\":{config.bitrateKbps}," +
+                $"\"fps\":{config.fps},\"preferGpu\":{preferGpuStr}}}";
+            await SendTextAsync(displayConfigJson);
             Debug.Log("[PhaseProtocol] Display config sent");
 
             _stateMachine.TryTransition(ConnectionPhase.AwaitingSetupComplete);
@@ -192,7 +186,7 @@ namespace VRWorkspace.Streaming
             Debug.Log("[PhaseProtocol] Starting streaming (Phase 3)");
             _stateMachine.TryTransition(ConnectionPhase.StartingStream);
 
-            await SendJsonAsync(new { type = "start_streaming" });
+            await SendTextAsync("{\"type\":\"start_streaming\"}");
         }
 
         /// <summary>
@@ -206,7 +200,7 @@ namespace VRWorkspace.Streaming
             {
                 try
                 {
-                    await SendJsonAsync(new { type = "stop_streaming" });
+                    await SendTextAsync("{\"type\":\"stop_streaming\"}");
                     await _ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Stop", CancellationToken.None);
                 }
                 catch { }
@@ -968,7 +962,7 @@ namespace VRWorkspace.Streaming
                     if (string.IsNullOrEmpty(cand.Candidate))
                     {
                         Debug.Log($"[PhaseProtocol] PC{idx} ICE gathering complete");
-                        _ = SendJsonAsync(new { type = "end_of_candidates", monitorIndex = idx });
+                        _ = SendTextAsync($"{{\"type\":\"end_of_candidates\",\"monitorIndex\":{idx}}}");
                         return;
                     }
 
@@ -985,7 +979,7 @@ namespace VRWorkspace.Streaming
                         : msg;
 
                     Debug.Log($"[PhaseProtocol] PC{idx} Sending ICE: {rawCandidate.Substring(0, Math.Min(60, rawCandidate.Length))}...");
-                    _ = SendJsonAsync(new { type = "candidate", monitorIndex = idx, candidate = rawCandidate });
+                    _ = SendTextAsync($"{{\"type\":\"candidate\",\"monitorIndex\":{idx},\"candidate\":\"{EscapeJsonString(rawCandidate)}\"}}");
                 };
 
                 // Track received
@@ -1029,7 +1023,7 @@ namespace VRWorkspace.Streaming
                     continue;
                 }
 
-                await SendJsonAsync(new { type = "offer", monitorIndex = idx, sdp = offer.sdp });
+                await SendTextAsync($"{{\"type\":\"offer\",\"monitorIndex\":{idx},\"sdp\":\"{EscapeJsonString(offer.sdp)}\"}}");
                 Debug.Log($"[PhaseProtocol] PC{idx} offer sent");
             }
         }
@@ -1207,7 +1201,7 @@ namespace VRWorkspace.Streaming
             {
                 Debug.Log("[PhaseProtocol] Transitioning to ReadyToStream (server-initiated via ice_ready)");
                 _stateMachine.TryTransition(ConnectionPhase.ReadyToStream);
-                _ = SendJsonAsync(new { type = "proceed", phase = 3 });
+                _ = SendTextAsync("{\"type\":\"proceed\",\"phase\":3}");
                 OnReadyToStream?.Invoke();
             }
             else
@@ -1261,7 +1255,7 @@ namespace VRWorkspace.Streaming
             if (shouldSendProceed)
             {
                 Debug.Log("[PhaseProtocol] Sending proceed message for phase 3");
-                _ = SendJsonAsync(new { type = "proceed", phase = 3 });
+                _ = SendTextAsync("{\"type\":\"proceed\",\"phase\":3}");
                 OnReadyToStream?.Invoke();
             }
         }
@@ -1347,7 +1341,7 @@ namespace VRWorkspace.Streaming
                     ? msg.Substring("candidate:".Length)
                     : msg;
 
-                _ = SendJsonAsync(new { type = "candidate", monitorIndex = idx, candidate = rawCandidate });
+                _ = SendTextAsync($"{{\"type\":\"candidate\",\"monitorIndex\":{idx},\"candidate\":\"{EscapeJsonString(rawCandidate)}\"}}");
             };
 
             // Track received
@@ -1395,7 +1389,7 @@ namespace VRWorkspace.Streaming
                 return;
             }
 
-            await SendJsonAsync(new { type = "offer", monitorIndex = idx, sdp = offer.sdp });
+            await SendTextAsync($"{{\"type\":\"offer\",\"monitorIndex\":{idx},\"sdp\":\"{EscapeJsonString(offer.sdp)}\"}}");
             Debug.Log($"[PhaseProtocol] PC{idx} reconnect offer sent");
         }
 
@@ -1496,12 +1490,6 @@ namespace VRWorkspace.Streaming
                 catch { }
                 await Task.Delay(5000, ct);
             }
-        }
-
-        private async Task SendJsonAsync(object obj)
-        {
-            var json = SimpleJson.Serialize(obj);
-            await SendTextAsync(json);
         }
 
         private async Task SendTextAsync(string text)
