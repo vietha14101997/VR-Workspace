@@ -389,27 +389,24 @@ namespace VRWorkspace.UI
         }
 
         /// <summary>
-        /// Load webrtc_protocolv2.html with connection parameters.
-        /// </summary>
-        public void LoadWebRTCProtocol(string serverIp, int port)
-        {
-            string url = $"http://{serverIp}:{port}/webrtc_protocolv2.html?wsHost={serverIp}&wsPort={port}";
-            LoadUrl(url);
-        }
-
-        /// <summary>
-        /// Load webrtc_protocolv2.html from Android Download folder.
-        /// File path: /storage/emulated/0/Download/webrtc_protocolv2.html
+        /// Load webrtc_protocolv2.html from bundled Resources.
+        /// Extracts to persistentDataPath on first run.
         /// </summary>
         public void LoadLocalWebRTCProtocol(string serverIp, int port)
         {
-            // Android Download folder path
-            string localPath = "/storage/emulated/0/Download/webrtc_protocolv2.html";
-            string url = $"file://{localPath}";
-
-            _currentUrl = url;
             _pendingServerIp = serverIp;
             _pendingPort = port;
+
+            // Extract HTML from Resources to persistentDataPath
+            string localPath = ExtractWebRTCHtml();
+            if (string.IsNullOrEmpty(localPath))
+            {
+                Debug.LogError("[RTTBrowserView] Failed to extract webrtc_protocolv2.html");
+                return;
+            }
+
+            string url = $"file://{localPath}";
+            _currentUrl = url;
 
             if (_urlInput != null) _urlInput.text = $"{url} → {serverIp}:{port}";
 
@@ -423,6 +420,43 @@ namespace VRWorkspace.UI
 #else
             _statusText.text = "Editor Mode";
 #endif
+        }
+
+        /// <summary>
+        /// Extract webrtc_protocolv2.html from Resources to persistentDataPath.
+        /// Returns the file path if successful, null otherwise.
+        /// </summary>
+        private string ExtractWebRTCHtml()
+        {
+            string destPath = System.IO.Path.Combine(Application.persistentDataPath, "webrtc_protocolv2.html");
+
+            // Check if already extracted (skip re-extraction for performance)
+            if (System.IO.File.Exists(destPath))
+            {
+                Debug.Log($"[RTTBrowserView] Using cached: {destPath}");
+                return destPath;
+            }
+
+            // Load from Resources (file is stored as .txt TextAsset)
+            TextAsset htmlAsset = Resources.Load<TextAsset>("webrtc_protocolv2");
+            if (htmlAsset == null)
+            {
+                Debug.LogError("[RTTBrowserView] webrtc_protocolv2.txt not found in Resources!");
+                return null;
+            }
+
+            try
+            {
+                // Write to persistentDataPath
+                System.IO.File.WriteAllText(destPath, htmlAsset.text);
+                Debug.Log($"[RTTBrowserView] Extracted to: {destPath}");
+                return destPath;
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[RTTBrowserView] Failed to write HTML: {ex.Message}");
+                return null;
+            }
         }
 
         private string _pendingServerIp;
