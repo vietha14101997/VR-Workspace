@@ -23,6 +23,12 @@ public class WorldPanelPlus : MonoBehaviour
     public bool boardEdgeRespectContentAlpha = true;
     [Range(0, 0.1f)] public float boardCornerRadius = 0.03f;
 
+    [Header("Texture Quality")]
+    [Tooltip("FilterMode for video textures. Trilinear recommended for VR.")]
+    public FilterMode textureFilterMode = FilterMode.Trilinear;
+    [Tooltip("Anisotropic filtering level (1-16). Higher = sharper at angles.")]
+    [Range(1, 16)] public int anisoLevel = 8;
+
     [Header("Cursor")]
     public bool cursorEnable = true;
     public float cursorSpeedPerPixel = 0.0015f;
@@ -307,6 +313,14 @@ public class WorldPanelPlus : MonoBehaviour
             if (mr.sharedMaterial != null)
             {
                 mr.sharedMaterial.mainTexture = GetSafeTex(contentTexture);
+
+                // Apply texture quality settings for video streaming
+                if (contentTexture != null && contentTexture != Texture2D.blackTexture)
+                {
+                    contentTexture.filterMode = textureFilterMode;
+                    contentTexture.anisoLevel = anisoLevel;
+                }
+
                 mr.enabled = boardVisible;
                 ApplyBoardTint(mr);
             }

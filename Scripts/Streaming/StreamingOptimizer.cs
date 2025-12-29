@@ -160,8 +160,15 @@ namespace VRWorkspace.Streaming
             double availableBandwidth = network.bandwidthMbps > 0 ? network.bandwidthMbps : 100;
             double bitratePerMonitor = availableBandwidth * 1000 * 0.7 / 3;
 
-            // Clamp bitrate to reasonable range
-            config.bitrateKbps = (int)Math.Clamp(bitratePerMonitor, 5000, 30000);
+            // Clamp bitrate to reasonable range (higher minimum for text clarity)
+            config.bitrateKbps = (int)Math.Clamp(bitratePerMonitor, 15000, 40000);
+
+            // LAN quality override: maximize quality for local connections
+            if ((network.connectionType == "Ethernet" || network.connectionType == "LAN")
+                && network.bandwidthMbps > 500)
+            {
+                config.bitrateKbps = 40000;  // Max quality for LAN
+            }
 
             // FPS based on encoder capability and ping
             if (hardware.hwAccelEnabled && network.pingMs < 20)

@@ -147,7 +147,7 @@ public class MultiPCStreamClient : MonoBehaviour
         Application.runInBackground = true; // Prevent throttling when not focused (critical for same-machine testing)
         StartCoroutine(WebRTC.Update());
         QualitySettings.vSyncCount = 0;
-        Application.targetFrameRate = 120; // Cap at 120 to prevent GPU starvation (vs unlimited) on single-device setup
+        Application.targetFrameRate = -1; // Uncapped for lower input latency
         _cts = new CancellationTokenSource();
 
         // V2 Protocol: Wait for manual connection if autoStartConnection is false
@@ -286,6 +286,10 @@ public class MultiPCStreamClient : MonoBehaviour
 
             if (wrapper.Texture == null) continue;
 
+            // Apply texture quality settings for VR clarity
+            wrapper.Texture.filterMode = FilterMode.Trilinear;
+            wrapper.Texture.anisoLevel = 8;
+
             // Apply to panel
             if (panels != null && i < panels.Length && panels[i] != null)
             {
@@ -308,6 +312,10 @@ public class MultiPCStreamClient : MonoBehaviour
         {
             var tex = _v2Client.GetTexture(i);
             if (tex == null) continue;
+
+            // Apply texture quality settings for VR clarity
+            tex.filterMode = FilterMode.Trilinear;
+            tex.anisoLevel = 8;
 
             if (panels != null && i < panels.Length && panels[i] != null)
             {
