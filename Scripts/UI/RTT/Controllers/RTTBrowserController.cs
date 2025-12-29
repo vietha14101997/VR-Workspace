@@ -68,7 +68,8 @@ public class RTTBrowserController : MonoBehaviour
     /// Load webrtc_protocolv2.html with connection parameters.
     /// Gets host/port from RemotePreferences.
     /// </summary>
-    public void LoadWebRTCProtocol()
+    /// <param name="useLocalFile">If true, load from Download folder instead of server</param>
+    public void LoadWebRTCProtocol(bool useLocalFile = true)
     {
         if (_browserViewInstance == null) return;
 
@@ -82,8 +83,18 @@ public class RTTBrowserController : MonoBehaviour
         if (!string.IsNullOrEmpty(prefs.lastPort) && int.TryParse(prefs.lastPort, out int parsedPort))
             port = parsedPort;
 
-        Debug.Log($"[RTTBrowserController] Loading WebRTC protocol: {host}:{port}");
-        _browserViewInstance.LoadWebRTCProtocol(host, port);
+        if (useLocalFile)
+        {
+            // Load from Android Download folder
+            Debug.Log($"[RTTBrowserController] Loading local WebRTC protocol with server: {host}:{port}");
+            _browserViewInstance.LoadLocalWebRTCProtocol(host, port);
+        }
+        else
+        {
+            // Load from server
+            Debug.Log($"[RTTBrowserController] Loading WebRTC protocol from server: {host}:{port}");
+            _browserViewInstance.LoadWebRTCProtocol(host, port);
+        }
     }
 
     /// <summary>

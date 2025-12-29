@@ -398,6 +398,61 @@ namespace VRWorkspace.UI
         }
 
         /// <summary>
+        /// Load webrtc_protocolv2.html from Android Download folder.
+        /// File path: /storage/emulated/0/Download/webrtc_protocolv2.html
+        /// </summary>
+        public void LoadLocalWebRTCProtocol(string serverIp, int port)
+        {
+            // Android Download folder path
+            string localPath = "/storage/emulated/0/Download/webrtc_protocolv2.html";
+            string url = $"file://{localPath}";
+
+            _currentUrl = url;
+            _pendingServerIp = serverIp;
+            _pendingPort = port;
+
+            if (_urlInput != null) _urlInput.text = $"{url} → {serverIp}:{port}";
+
+            Debug.Log($"[RTTBrowserView] Loading local file: {url} with server {serverIp}:{port}");
+            OnUrlChanged?.Invoke(url);
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+            _androidBridge?.LoadUrl(url);
+            // Inject connection params after page loads
+            _androidBridge.OnPageFinished += OnLocalPageLoaded;
+#else
+            _statusText.text = "Editor Mode";
+#endif
+        }
+
+        private string _pendingServerIp;
+        private int _pendingPort;
+
+        private void OnLocalPageLoaded(string url)
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            // Unsubscribe to avoid multiple calls
+            _androidBridge.OnPageFinished -= OnLocalPageLoaded;
+
+            // Inject connection params via JavaScript
+            if (!string.IsNullOrEmpty(_pendingServerIp))
+            {
+                string js = $@"
+                    if (document.getElementById('host')) {{
+                        document.getElementById('host').value = '{_pendingServerIp}';
+                    }}
+                    if (document.getElementById('port')) {{
+                        document.getElementById('port').value = '{_pendingPort}';
+                    }}
+                    console.log('Unity injected: {_pendingServerIp}:{_pendingPort}');
+                ";
+                ExecuteJS(js);
+                Debug.Log($"[RTTBrowserView] Injected connection params: {_pendingServerIp}:{_pendingPort}");
+            }
+#endif
+        }
+
+        /// <summary>
         /// Refresh the current page.
         /// </summary>
         public void Refresh()
@@ -538,6 +593,20 @@ namespace VRWorkspace.UI
                 {
                     _webView.Call("loadUrl", url);
                     OnPageStarted?.Invoke(url);
+
+                    // Since we don't have WebViewClient callbacks set up yet,
+                    // fire OnPageFinished after a delay for local file loading
+                    // This is a workaround - proper implementation needs WebViewClient
+                    if (url.StartsWith("file://"))
+                    {
+                        // Local files load fast, fire after short delay
+                        var handler = new AndroidJavaObject("android.os.Handler",
+                            new AndroidJavaClass("android.os.Looper").CallStatic<AndroidJavaObject>("getMainLooper"));
+                        handler.Call<bool>("postDelayed", new AndroidJavaRunnable(() =>
+                        {
+                            OnPageFinished?.Invoke(url);
+                        }), 500L); // 500ms delay for local file
+                    }
                 }
                 catch (Exception ex)
                 {
