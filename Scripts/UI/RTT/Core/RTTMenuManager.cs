@@ -1,15 +1,17 @@
 using UnityEngine;
 using System.Collections;
 using TMPro;
+using VRWorkspace.Utils;
+using VRWorkspace.Streaming;
 
 /// <summary>
 /// Manages menu state and navigation between different menu screens.
-/// Coordinates RTTMainMenuController and RTTRemoteMenuController.
+/// Coordinates RTTMainMenuController, RTTRemoteMenuController, and RTTBrowserController.
 /// </summary>
 public class RTTMenuManager : MonoBehaviour
 {
     #region Types
-    public enum MenuState { MainMenu, RemoteMenu }
+    public enum MenuState { MainMenu, RemoteMenu, BrowserView }
     #endregion
 
     #region Configuration
@@ -19,6 +21,7 @@ public class RTTMenuManager : MonoBehaviour
     [Header("Controllers")]
     [SerializeField] private RTTMainMenuController mainMenuController;
     [SerializeField] private RTTRemoteMenuController remoteMenuController;
+    [SerializeField] private RTTBrowserController browserController;
 
     [Header("Shared Config")]
     [SerializeField] private TMP_FontAsset menuFont;
@@ -43,9 +46,11 @@ public class RTTMenuManager : MonoBehaviour
     public MenuState CurrentState => _currentState;
     public bool IsMainMenuActive => _currentState == MenuState.MainMenu;
     public bool IsRemoteMenuActive => _currentState == MenuState.RemoteMenu;
+    public bool IsBrowserViewActive => _currentState == MenuState.BrowserView;
     public RTTMenuFrame MenuFrame => menuFrame;
     public RTTMainMenuController MainMenuController => mainMenuController;
     public RTTRemoteMenuController RemoteMenuController => remoteMenuController;
+    public RTTBrowserController BrowserController => browserController;
     #endregion
 
     #region Lifecycle
@@ -73,6 +78,14 @@ public class RTTMenuManager : MonoBehaviour
             remoteMenuController = gameObject.AddComponent<RTTRemoteMenuController>();
             Debug.Log("[RTTMenuManager] Created RTTRemoteMenuController");
         }
+
+        if (browserController == null)
+            browserController = GetComponentInChildren<RTTBrowserController>();
+        if (browserController == null)
+        {
+            browserController = gameObject.AddComponent<RTTBrowserController>();
+            Debug.Log("[RTTMenuManager] Created RTTBrowserController");
+        }
     }
 
     private void Start()
@@ -87,6 +100,11 @@ public class RTTMenuManager : MonoBehaviour
         {
             remoteMenuController.OnBackClicked += ReturnToMainMenu;
             remoteMenuController.OnStartClicked += HandleRemoteStartClicked;
+        }
+
+        if (browserController != null)
+        {
+            browserController.OnBackClicked += ReturnToMainMenu;
         }
 
         // Auto show main menu if enabled
@@ -123,6 +141,11 @@ public class RTTMenuManager : MonoBehaviour
         {
             remoteMenuController.OnBackClicked -= ReturnToMainMenu;
             remoteMenuController.OnStartClicked -= HandleRemoteStartClicked;
+        }
+
+        if (browserController != null)
+        {
+            browserController.OnBackClicked -= ReturnToMainMenu;
         }
     }
     #endregion
@@ -226,6 +249,10 @@ public class RTTMenuManager : MonoBehaviour
             {
                 remoteMenuController.Cleanup();
             }
+            else if (_currentState == MenuState.BrowserView && browserController != null)
+            {
+                browserController.Cleanup();
+            }
 
             Destroy(_currentMenuContent);
             _currentMenuContent = null;
@@ -256,7 +283,8 @@ public class RTTMenuManager : MonoBehaviour
                 SwitchToRemoteMenu();
                 break;
             case "browser":
-                Debug.Log("[RTTMenuManager] Browser clicked");
+                Debug.Log("[RTTMenuManager] Browser clicked - opening WebView with webrtc_protocolv2.html");
+                OpenBrowserWebView();
                 break;
             case "media":
                 Debug.Log("[RTTMenuManager] Media clicked");
@@ -290,6 +318,49 @@ public class RTTMenuManager : MonoBehaviour
 #else
         Application.Quit();
 #endif
+    }
+
+    /// <summary>
+    /// Switch to embedded Browser View with webrtc_protocolv2.html.
+    /// </summary>
+    private void OpenBrowserWebView()
+    {
+        SwitchToBrowserView();
+    }
+
+    /// <summary>
+    /// Switch from current view to embedded Browser View.
+    /// </summary>
+    public void SwitchToBrowserView()
+    {
+        if (_currentState == MenuState.BrowserView) return;
+        if (menuFrame == null || menuFrame.ContentContainer == null) return;
+
+        // Destroy current content
+        DestroyCurrentContent();
+
+        // Create browser view
+        if (browserController != null)
+        {
+            var containerSize = GetContainerSize();
+            _currentMenuContent = browserController.CreateBrowser(
+                menuFrame.ContentContainer,
+                containerSize.x,
+                containerSize.y,
+                menuFont,
+                themeColor,
+                accentColor
+            );
+
+            // Auto-load webrtc_protocolv2.html
+            browserController.LoadWebRTCProtocol();
+        }
+
+        _currentState = MenuState.BrowserView;
+        OnMenuStateChanged?.Invoke(_currentState);
+
+        menuFrame.MarkDirty();
+        Debug.Log("[RTTMenuManager] Switched to Browser View");
     }
     #endregion
 }
