@@ -1055,6 +1055,56 @@ namespace VRWorkspace.Streaming
 
                 await SendTextAsync($"{{\"type\":\"offer\",\"monitorIndex\":{idx},\"sdp\":\"{EscapeJsonString(offer.sdp)}\"}}");
                 Debug.Log($"[PhaseProtocol] PC{idx} offer sent");
+
+                // SEQUENTIAL FIX: Wait for answer and ICE connection before creating next PC
+                // This prevents simultaneous ICE negotiations which fail on Android
+                if (i < count - 1) // Don't wait after last PC
+                {
+                    Debug.Log($"[PhaseProtocol] PC{idx} waiting for answer and ICE connection before creating next PC...");
+
+                    // Wait for answer to be set (max 10 seconds)
+                    sw.Restart();
+                    while (!wrapper.AnswerSet && sw.ElapsedMilliseconds < 10000)
+                    {
+                        await Task.Delay(50);
+                    }
+
+                    if (!wrapper.AnswerSet)
+                    {
+                        Debug.LogWarning($"[PhaseProtocol] PC{idx} answer timeout, continuing anyway");
+                    }
+                    else
+                    {
+                        Debug.Log($"[PhaseProtocol] PC{idx} answer received, waiting for ICE...");
+
+                        // Wait for ICE connection (max 10 seconds)
+                        sw.Restart();
+                        while (pc.IceConnectionState != RTCIceConnectionState.Connected &&
+                               pc.IceConnectionState != RTCIceConnectionState.Completed &&
+                               sw.ElapsedMilliseconds < 10000)
+                        {
+                            // Also break if ICE failed completely
+                            if (pc.IceConnectionState == RTCIceConnectionState.Failed ||
+                                pc.IceConnectionState == RTCIceConnectionState.Closed)
+                            {
+                                Debug.LogWarning($"[PhaseProtocol] PC{idx} ICE failed/closed, continuing anyway");
+                                break;
+                            }
+                            await Task.Delay(50);
+                        }
+
+                        if (pc.IceConnectionState == RTCIceConnectionState.Connected ||
+                            pc.IceConnectionState == RTCIceConnectionState.Completed)
+                        {
+                            Debug.Log($"[PhaseProtocol] PC{idx} ICE connected! Adding delay before next PC...");
+                            await Task.Delay(500); // Small stabilization delay
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"[PhaseProtocol] PC{idx} ICE not connected ({pc.IceConnectionState}), continuing anyway");
+                        }
+                    }
+                }
             }
         }
 
