@@ -8,6 +8,12 @@ using Random = UnityEngine.Random;
 /// </summary>
 public class FloatingDataAnim : MonoBehaviour
 {
+    /// <summary>
+    /// Global toggle to enable/disable all FloatingDataAnim effects.
+    /// Set to false to temporarily disable all floating data animations.
+    /// </summary>
+    public static bool IsEnabled = false; // Temporarily disabled
+
     public float speed;
     public Vector2 range;
     private RectTransform _rt;
@@ -57,7 +63,7 @@ public class FloatingDataAnim : MonoBehaviour
 
     void Update()
     {
-        if (_rt == null) return;
+        if (!IsEnabled || _rt == null) return;
         _rt.anchoredPosition += _dir * speed * Time.deltaTime;
 
         float halfW = range.x / 2f + 50f;
