@@ -4,6 +4,15 @@ using UnityEngine;
 namespace VRWorkspace.Streaming
 {
     /// <summary>
+    /// Video codec types.
+    /// </summary>
+    public enum VideoCodec
+    {
+        H264,
+        H265
+    }
+
+    /// <summary>
     /// Server hardware info received in Phase 1.
     /// </summary>
     [Serializable]
@@ -18,6 +27,24 @@ namespace VRWorkspace.Streaming
         public string encoderType;
         public bool hwAccelEnabled;
         public MonitorInfo[] monitors;
+
+        // Codec capability fields
+        public string[] supportedCodecs;    // ["H264", "H265"]
+        public string preferredCodec;       // "H265" or "H264"
+        public bool supportsHevc;           // Quick check for HEVC support
+    }
+
+    /// <summary>
+    /// Client codec capabilities sent to server.
+    /// </summary>
+    [Serializable]
+    public class ClientCodecCapability
+    {
+        public string[] supportedCodecs;    // Codecs client can decode
+        public string preferredCodec;       // Client's preferred codec
+        public bool supportsHevc;           // HEVC hardware decoder available
+        public string deviceModel;          // Android device model
+        public int apiLevel;                // Android API level
     }
 
     /// <summary>
@@ -58,6 +85,7 @@ namespace VRWorkspace.Streaming
         public int fps = 60;
         public int refreshRate = 60;
         public string reason;
+        public string selectedCodec = "H264";  // Codec negotiated for streaming
     }
 
     /// <summary>
@@ -73,6 +101,7 @@ namespace VRWorkspace.Streaming
         public int bitrateKbps = 20000;
         public int fps = 60;
         public string preferGpu;
+        public string selectedCodec = "H264";  // Negotiated codec for streaming
 
         /// <summary>
         /// Create config from suggested config.
@@ -86,7 +115,8 @@ namespace VRWorkspace.Streaming
                 resolutionHeight = suggested.resolutionHeight,
                 refreshRate = suggested.refreshRate,
                 bitrateKbps = suggested.bitrateKbps,
-                fps = suggested.fps
+                fps = suggested.fps,
+                selectedCodec = suggested.selectedCodec ?? "H264"
             };
         }
 

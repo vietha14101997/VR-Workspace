@@ -8,6 +8,18 @@ using System.Linq;
 using Unity.WebRTC;
 using UnityEngine;
 using VRWorkspace.Streaming;
+using VRWorkspace.Native;
+
+/// <summary>
+/// Decoder mode for video stream.
+/// </summary>
+public enum DecoderMode
+{
+    /// <summary>WebRTC internal decoder (H.264)</summary>
+    WebRTC,
+    /// <summary>Native HEVC decoder via MediaCodec</summary>
+    NativeHevc
+}
 
 /// <summary>
 /// Multi-PC WebRTC stream client: Creates N PeerConnections (one per monitor).
@@ -17,6 +29,10 @@ using VRWorkspace.Streaming;
 /// Supports two protocols:
 /// - V1 (legacy): Direct WebRTC signaling
 /// - V2 (new): 3-phase connection with hardware info, speed test, and suggested config
+///
+/// Decoder modes:
+/// - WebRTC: Use WebRTC internal decoder (H.264)
+/// - NativeHevc: Use native HEVC decoder via HevcDecoderPlugin (requires RTP depacketization)
 /// </summary>
 [DisallowMultipleComponent]
 public class MultiPCStreamClient : MonoBehaviour
@@ -44,6 +60,10 @@ public class MultiPCStreamClient : MonoBehaviour
     [Tooltip("If true, automatically start connection in Start(). Set to false for manual control via ConnectV2Async().")]
     public bool autoStartConnection = true;
 
+    [Header("Decoder")]
+    [Tooltip("Force H.264 even if server supports H.265")]
+    public bool forceH264 = false;
+
     // V2 Protocol client
     private PhaseProtocolClient _v2Client;
 
@@ -56,12 +76,32 @@ public class MultiPCStreamClient : MonoBehaviour
     public event Action OnStreamingStarted;
     public event Action<string, double, int> OnSpeedTestProgress; // direction, currentMbps, progress%
     public event Action<int, float, float, bool> OnCursorPosition; // monitorIndex, u, v, visible
+    public event Action<VideoCodec> OnCodecSelected; // Fires when codec is negotiated
 
     // V2 Protocol state (read-only)
     public ConnectionStateMachine StateMachine => _v2Client?.StateMachine;
     public ServerHardwareInfo HardwareInfo => _v2Client?.HardwareInfo;
     public NetworkTestResult NetworkInfo => _v2Client?.NetworkInfo;
     public SuggestedStreamConfig SuggestedConfig => _v2Client?.SuggestedConfig;
+
+    // Decoder state
+    private DecoderMode _decoderMode = DecoderMode.WebRTC;
+    private VideoCodec _selectedCodec = VideoCodec.H264;
+
+    /// <summary>
+    /// Current decoder mode (WebRTC or NativeHevc).
+    /// </summary>
+    public DecoderMode CurrentDecoderMode => _decoderMode;
+
+    /// <summary>
+    /// Selected video codec for this session.
+    /// </summary>
+    public VideoCodec SelectedCodec => useV2Protocol ? (_v2Client?.SelectedCodec ?? VideoCodec.H264) : _selectedCodec;
+
+    /// <summary>
+    /// Check if using native HEVC decoder.
+    /// </summary>
+    public bool IsUsingNativeHevc => _decoderMode == DecoderMode.NativeHevc;
 
     private ClientWebSocket _ws;
     private CancellationTokenSource _cts;
@@ -368,8 +408,11 @@ public class MultiPCStreamClient : MonoBehaviour
 
         _v2Client.OnSuggestedConfigReceived += cfg =>
         {
-            Debug.Log($"[MultiPC-V2] Suggested: {cfg.monitors}mon @ {cfg.resolutionWidth}x{cfg.resolutionHeight}, {cfg.fps}fps");
+            Debug.Log($"[MultiPC-V2] Suggested: {cfg.monitors}mon @ {cfg.resolutionWidth}x{cfg.resolutionHeight}, {cfg.fps}fps, codec: {cfg.selectedCodec}");
             OnSuggestedConfigReceived?.Invoke(cfg);
+
+            // Determine decoder mode based on selected codec
+            SetupDecoderMode(_v2Client.SelectedCodec);
 
             // Auto-accept if enabled
             if (autoAcceptSuggestedConfig)
@@ -487,6 +530,67 @@ public class MultiPCStreamClient : MonoBehaviour
             _v2Client.Dispose();
             _v2Client = null;
         }
+    }
+
+    /// <summary>
+    /// Setup decoder mode based on selected codec.
+    /// </summary>
+    private void SetupDecoderMode(VideoCodec codec)
+    {
+        // Check if forceH264 is enabled
+        if (forceH264)
+        {
+            Debug.Log("[MultiPC] forceH264 enabled, using WebRTC decoder");
+            _decoderMode = DecoderMode.WebRTC;
+            _selectedCodec = VideoCodec.H264;
+            OnCodecSelected?.Invoke(VideoCodec.H264);
+            return;
+        }
+
+        _selectedCodec = codec;
+
+        if (codec == VideoCodec.H265)
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            // Check if native HEVC decoder is available
+            if (HevcDecoderPlugin.IsAvailable())
+            {
+                _decoderMode = DecoderMode.NativeHevc;
+                Debug.Log("[MultiPC] Using Native HEVC decoder (MediaCodec)");
+            }
+            else
+            {
+                // Fallback to WebRTC (will likely fail for HEVC)
+                _decoderMode = DecoderMode.WebRTC;
+                Debug.LogWarning("[MultiPC] HEVC selected but native decoder not available, falling back to WebRTC");
+            }
+#else
+            // Non-Android: WebRTC only
+            _decoderMode = DecoderMode.WebRTC;
+            Debug.Log("[MultiPC] Non-Android platform, using WebRTC decoder for HEVC (may not work)");
+#endif
+        }
+        else
+        {
+            // H.264: Use WebRTC decoder
+            _decoderMode = DecoderMode.WebRTC;
+            Debug.Log("[MultiPC] Using WebRTC decoder for H.264");
+        }
+
+        OnCodecSelected?.Invoke(codec);
+        Debug.Log($"[MultiPC] Decoder mode: {_decoderMode}, Codec: {codec}");
+    }
+
+    /// <summary>
+    /// Check if HEVC hardware decoder is available on this device.
+    /// </summary>
+    public static bool IsHevcDecoderAvailable()
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        return HevcDecoderPlugin.IsAvailable();
+#else
+        return false;
+#endif
     }
 
     async Task ConnectAndSignal()

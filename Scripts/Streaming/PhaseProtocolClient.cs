@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Linq;
 using Unity.WebRTC;
 using UnityEngine;
+using VRWorkspace.Native;
 
 namespace VRWorkspace.Streaming
 {
@@ -410,6 +411,57 @@ namespace VRWorkspace.Streaming
         // Event for speed test progress (direction, currentMbps, progress%)
         public event Action<string, double, int> OnSpeedTestProgress;
 
+        // Selected codec for this session
+        private VideoCodec _selectedCodec = VideoCodec.H264;
+        public VideoCodec SelectedCodec => _selectedCodec;
+
+        /// <summary>
+        /// Get client codec capabilities for negotiation.
+        /// </summary>
+        private ClientCodecCapability GetClientCodecCapability()
+        {
+            var capability = new ClientCodecCapability
+            {
+                supportedCodecs = new[] { "H264" },
+                preferredCodec = "H264",
+                supportsHevc = false,
+                deviceModel = SystemInfo.deviceModel,
+                apiLevel = 0
+            };
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+            try
+            {
+                // Get Android API level
+                using (var version = new AndroidJavaClass("android.os.Build$VERSION"))
+                {
+                    capability.apiLevel = version.GetStatic<int>("SDK_INT");
+                }
+
+                // Check HEVC decoder availability
+                if (HevcDecoderPlugin.IsAvailable())
+                {
+                    capability.supportsHevc = true;
+                    capability.supportedCodecs = new[] { "H265", "H264" };
+                    capability.preferredCodec = "H265";
+                    Debug.Log("[PhaseProtocol] Client supports HEVC hardware decoding");
+                }
+                else
+                {
+                    Debug.Log("[PhaseProtocol] HEVC hardware decoder not available, using H.264 only");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[PhaseProtocol] Failed to check HEVC capability: {ex.Message}");
+            }
+#else
+            Debug.Log("[PhaseProtocol] Non-Android platform, using H.264 only");
+#endif
+
+            return capability;
+        }
+
         private async Task HandleHardwareInfoAsync(SimpleJson json)
         {
             Debug.Log("[PhaseProtocol] Received hardware_info");
@@ -431,15 +483,43 @@ namespace VRWorkspace.Streaming
                 monitors = ParseMonitors(monitorsArr)
             };
 
+            // Parse server codec capabilities
+            var supportedCodecsArr = encoder?.GetArray("supportedCodecs");
+            if (supportedCodecsArr != null)
+            {
+                _hardwareInfo.supportedCodecs = supportedCodecsArr
+                    .Select(c => c?.GetString("codec") ?? c?.ToString() ?? "")
+                    .Where(s => !string.IsNullOrEmpty(s))
+                    .ToArray();
+            }
+            _hardwareInfo.preferredCodec = encoder?.GetString("preferredCodec") ?? "H264";
+            _hardwareInfo.supportsHevc = encoder?.GetBool("supportsHevc") ?? false;
+
             Debug.Log($"[PhaseProtocol] Server: {_hardwareInfo.deviceName}, GPU: {_hardwareInfo.gpu} ({_hardwareInfo.gpuVramGB}GB)");
             Debug.Log($"[PhaseProtocol] Encoder: {_hardwareInfo.encoderType}, HW: {_hardwareInfo.hwAccelEnabled}");
+            Debug.Log($"[PhaseProtocol] Server codecs: [{string.Join(", ", _hardwareInfo.supportedCodecs ?? new[] { "H264" })}], prefers: {_hardwareInfo.preferredCodec}, HEVC: {_hardwareInfo.supportsHevc}");
 
             // Fire event immediately so UI can show hardware info
             OnHardwareInfoReceived?.Invoke(_hardwareInfo);
 
-            // Send acknowledgment to server
-            Debug.Log("[PhaseProtocol] Sending hardware_info_ack");
-            await SendTextAsync("{\"type\":\"hardware_info_ack\"}");
+            // Get client codec capabilities
+            var clientCapability = GetClientCodecCapability();
+            Debug.Log($"[PhaseProtocol] Client codecs: [{string.Join(", ", clientCapability.supportedCodecs)}], prefers: {clientCapability.preferredCodec}, HEVC: {clientCapability.supportsHevc}");
+
+            // Send acknowledgment with client codec capabilities
+            Debug.Log("[PhaseProtocol] Sending hardware_info_ack with codec capabilities");
+            await SendJsonAsync(new
+            {
+                type = "hardware_info_ack",
+                clientCodecs = new
+                {
+                    supportedCodecs = clientCapability.supportedCodecs,
+                    preferredCodec = clientCapability.preferredCodec,
+                    supportsHevc = clientCapability.supportsHevc,
+                    deviceModel = clientCapability.deviceModel,
+                    apiLevel = clientCapability.apiLevel
+                }
+            });
 
             // NEW FLOW: Client initiates speed test
             _stateMachine.TryTransition(ConnectionPhase.SpeedTesting);
@@ -622,10 +702,17 @@ namespace VRWorkspace.Streaming
                 bitrateKbps = json.GetInt("bitrateKbps"),
                 fps = json.GetInt("fps"),
                 refreshRate = json.GetInt("refreshRate"),
-                reason = json.GetString("reason") ?? ""
+                reason = json.GetString("reason") ?? "",
+                selectedCodec = json.GetString("selectedCodec") ?? "H264"
             };
 
+            // Update selected codec based on server's decision
+            _selectedCodec = _suggestedConfig.selectedCodec.Equals("H265", StringComparison.OrdinalIgnoreCase)
+                ? VideoCodec.H265
+                : VideoCodec.H264;
+
             Debug.Log($"[PhaseProtocol] Suggested: {_suggestedConfig.monitors}mon @ {_suggestedConfig.resolutionWidth}x{_suggestedConfig.resolutionHeight}, {_suggestedConfig.fps}fps, {_suggestedConfig.bitrateKbps}kbps");
+            Debug.Log($"[PhaseProtocol] Selected codec: {_suggestedConfig.selectedCodec}");
             Debug.Log($"[PhaseProtocol] Reason: {_suggestedConfig.reason}");
 
             // Handle race condition: suggested_config may arrive while still in SpeedTesting phase
@@ -716,11 +803,29 @@ namespace VRWorkspace.Streaming
 
                 int idx = i; // Capture for closures
 
-                // Add video transceiver
+                // Add video transceiver with codec preference based on negotiated codec
                 var trans = pc.AddTransceiver(TrackKind.Video, new RTCRtpTransceiverInit { direction = RTCRtpTransceiverDirection.RecvOnly });
                 var caps = RTCRtpReceiver.GetCapabilities(TrackKind.Video);
-                var h264 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("H264", StringComparison.OrdinalIgnoreCase)).ToArray();
-                trans.SetCodecPreferences(h264.Concat(caps.codecs.Except(h264)).ToArray());
+
+                // Set codec preferences based on selected codec
+                RTCRtpCodecCapability[] preferredCodecs;
+                if (_selectedCodec == VideoCodec.H265)
+                {
+                    // H.265 preferred: HEVC first, then H.264
+                    var h265 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("H265", StringComparison.OrdinalIgnoreCase) ||
+                                                       (c.mimeType ?? "").Contains("HEVC", StringComparison.OrdinalIgnoreCase)).ToArray();
+                    var h264 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("H264", StringComparison.OrdinalIgnoreCase)).ToArray();
+                    preferredCodecs = h265.Concat(h264).Concat(caps.codecs.Except(h265).Except(h264)).ToArray();
+                    Debug.Log($"[PhaseProtocol] PC{idx} using HEVC codec preference ({h265.Length} HEVC codecs found)");
+                }
+                else
+                {
+                    // H.264 preferred
+                    var h264 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("H264", StringComparison.OrdinalIgnoreCase)).ToArray();
+                    preferredCodecs = h264.Concat(caps.codecs.Except(h264)).ToArray();
+                    Debug.Log($"[PhaseProtocol] PC{idx} using H.264 codec preference");
+                }
+                trans.SetCodecPreferences(preferredCodecs);
 
                 pc.OnIceConnectionChange = s =>
                 {
@@ -1081,11 +1186,25 @@ namespace VRWorkspace.Streaming
 
             int idx = monitorIndex;
 
-            // Add video transceiver
+            // Add video transceiver with codec preference based on negotiated codec
             var trans = pc.AddTransceiver(TrackKind.Video, new RTCRtpTransceiverInit { direction = RTCRtpTransceiverDirection.RecvOnly });
             var caps = RTCRtpReceiver.GetCapabilities(TrackKind.Video);
-            var h264 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("H264", StringComparison.OrdinalIgnoreCase)).ToArray();
-            trans.SetCodecPreferences(h264.Concat(caps.codecs.Except(h264)).ToArray());
+
+            // Set codec preferences based on selected codec
+            RTCRtpCodecCapability[] preferredCodecs;
+            if (_selectedCodec == VideoCodec.H265)
+            {
+                var h265 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("H265", StringComparison.OrdinalIgnoreCase) ||
+                                                   (c.mimeType ?? "").Contains("HEVC", StringComparison.OrdinalIgnoreCase)).ToArray();
+                var h264 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("H264", StringComparison.OrdinalIgnoreCase)).ToArray();
+                preferredCodecs = h265.Concat(h264).Concat(caps.codecs.Except(h265).Except(h264)).ToArray();
+            }
+            else
+            {
+                var h264 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("H264", StringComparison.OrdinalIgnoreCase)).ToArray();
+                preferredCodecs = h264.Concat(caps.codecs.Except(h264)).ToArray();
+            }
+            trans.SetCodecPreferences(preferredCodecs);
 
             // Connection state handlers
             pc.OnIceConnectionChange = s =>
@@ -1452,35 +1571,77 @@ namespace VRWorkspace.Streaming
             if (type.IsPrimitive || type == typeof(decimal))
                 return obj.ToString();
 
+            // Handle arrays
+            if (type.IsArray)
+            {
+                var array = (Array)obj;
+                var sb = new StringBuilder();
+                sb.Append("[");
+                for (int i = 0; i < array.Length; i++)
+                {
+                    if (i > 0) sb.Append(",");
+                    sb.Append(Serialize(array.GetValue(i)));
+                }
+                sb.Append("]");
+                return sb.ToString();
+            }
+
+            // Handle IEnumerable (lists, etc.) but not string or dictionary
+            if (obj is System.Collections.IEnumerable enumerable && !(obj is string) && !(obj is System.Collections.IDictionary))
+            {
+                var sb = new StringBuilder();
+                sb.Append("[");
+                bool first = true;
+                foreach (var item in enumerable)
+                {
+                    if (!first) sb.Append(",");
+                    first = false;
+                    sb.Append(Serialize(item));
+                }
+                sb.Append("]");
+                return sb.ToString();
+            }
+
             // Handle anonymous types and objects
-            var sb = new StringBuilder();
-            sb.Append("{");
-            bool first = true;
+            var objSb = new StringBuilder();
+            objSb.Append("{");
+            bool firstProp = true;
 
             foreach (var prop in type.GetProperties())
             {
-                if (!first) sb.Append(",");
-                first = false;
+                // Skip indexers and internal properties
+                if (prop.GetIndexParameters().Length > 0) continue;
+                if (prop.Name == "SyncRoot" || prop.Name == "IsReadOnly" || prop.Name == "IsFixedSize" || prop.Name == "IsSynchronized") continue;
 
-                var value = prop.GetValue(obj);
-                var name = char.ToLower(prop.Name[0]) + prop.Name.Substring(1); // camelCase
+                try
+                {
+                    var value = prop.GetValue(obj);
+                    var name = char.ToLower(prop.Name[0]) + prop.Name.Substring(1); // camelCase
 
-                sb.Append($"\"{name}\":");
+                    if (!firstProp) objSb.Append(",");
+                    firstProp = false;
 
-                if (value == null)
-                    sb.Append("null");
-                else if (value is string s)
-                    sb.Append($"\"{EscapeString(s)}\"");
-                else if (value is bool b)
-                    sb.Append(b ? "true" : "false");
-                else if (value.GetType().IsPrimitive || value.GetType() == typeof(decimal))
-                    sb.Append(value.ToString());
-                else
-                    sb.Append(Serialize(value));
+                    objSb.Append($"\"{name}\":");
+
+                    if (value == null)
+                        objSb.Append("null");
+                    else if (value is string s)
+                        objSb.Append($"\"{EscapeString(s)}\"");
+                    else if (value is bool b)
+                        objSb.Append(b ? "true" : "false");
+                    else if (value.GetType().IsPrimitive || value.GetType() == typeof(decimal))
+                        objSb.Append(value.ToString());
+                    else
+                        objSb.Append(Serialize(value));
+                }
+                catch
+                {
+                    // Skip properties that throw exceptions
+                }
             }
 
-            sb.Append("}");
-            return sb.ToString();
+            objSb.Append("}");
+            return objSb.ToString();
         }
 
         private static string EscapeString(string s)
