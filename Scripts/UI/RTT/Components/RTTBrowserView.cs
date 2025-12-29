@@ -257,59 +257,100 @@ namespace VRWorkspace.UI
         #region WebView Bridge
         private void InitializeWebViewBridge()
         {
-#if UNITY_ANDROID && !UNITY_EDITOR
-            _androidBridge = new AndroidWebViewBridge(_renderTexture);
-            _androidBridge.OnPageStarted += url => {
-                _isLoading = true;
-                _statusText.text = "Loading...";
-                OnLoadStarted?.Invoke();
-            };
-            _androidBridge.OnPageFinished += url => {
-                _isLoading = false;
-                _statusText.text = "";
-                _currentUrl = url;
-                if (_urlInput != null) _urlInput.text = url;
-                OnLoadFinished?.Invoke();
-            };
-            _androidBridge.OnError += error => {
-                _isLoading = false;
-                _statusText.text = "Error";
-                OnError?.Invoke(error);
-            };
-            Debug.Log("[RTTBrowserView] Android WebView bridge initialized");
-#else
-            // Editor placeholder - show message
-            ShowEditorPlaceholder();
-            Debug.Log("[RTTBrowserView] Editor mode - using placeholder");
-#endif
+            // Show placeholder with "Open in Chrome" button
+            // WebView texture capture requires native plugin - not implemented yet
+            ShowOpenInChromeUI();
+            Debug.Log("[RTTBrowserView] Showing Open in Chrome UI (WebView texture capture not implemented)");
         }
 
-        private void ShowEditorPlaceholder()
+        private void ShowOpenInChromeUI()
         {
             if (_webViewDisplayObj == null) return;
 
-            // Add placeholder text to the display container
-            var textObj = new GameObject("PlaceholderText");
+            // Add instruction text
+            var textObj = new GameObject("InstructionText");
             textObj.transform.SetParent(_webViewDisplayObj.transform, false);
 
             var textRt = textObj.AddComponent<RectTransform>();
-            textRt.anchorMin = Vector2.zero;
-            textRt.anchorMax = Vector2.one;
-            textRt.offsetMin = new Vector2(50, 50);
+            textRt.anchorMin = new Vector2(0, 0.5f);
+            textRt.anchorMax = new Vector2(1, 1);
+            textRt.offsetMin = new Vector2(50, 0);
             textRt.offsetMax = new Vector2(-50, -50);
 
             var tmp = textObj.AddComponent<TextMeshProUGUI>();
-            tmp.text = "<size=48><color=#00E5FF>WebView Browser</color></size>\n\n" +
-                       "WebView is only available on Android device.\n\n" +
-                       "<size=28>Click the button below to open in external browser:</size>";
+            tmp.text = "<size=48><color=#00E5FF>WebRTC Browser</color></size>\n\n" +
+                       "Tap the button below to open Chrome\n" +
+                       "with full WebRTC support (340 Mbps)";
             tmp.fontSize = 36;
             tmp.color = new Color(0.7f, 0.75f, 0.8f);
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.font = customFont;
             tmp.enableWordWrapping = true;
 
-            // Add "Open in Browser" button for Editor testing
-            CreateOpenInBrowserButton(_webViewDisplayObj.transform);
+            // Add "Open in Chrome" button
+            CreateOpenInChromeButton(_webViewDisplayObj.transform);
+        }
+
+        private void CreateOpenInChromeButton(Transform parent)
+        {
+            var btnObj = new GameObject("OpenInChromeBtn");
+            btnObj.transform.SetParent(parent, false);
+
+            var rt = btnObj.AddComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0.5f, 0.25f);
+            rt.anchorMax = new Vector2(0.5f, 0.25f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = Vector2.zero;
+            rt.sizeDelta = new Vector2(500f, 100f);
+
+            var bg = btnObj.AddComponent<Image>();
+            bg.color = new Color(0f, 0.8f, 0.4f, 0.8f); // Green button
+
+            var btn = btnObj.AddComponent<Button>();
+            btn.targetGraphic = bg;
+            btn.onClick.AddListener(() => OpenInChrome());
+
+            // Button text
+            var textObj = new GameObject("Text");
+            textObj.transform.SetParent(btnObj.transform, false);
+
+            var textRt = textObj.AddComponent<RectTransform>();
+            textRt.anchorMin = Vector2.zero;
+            textRt.anchorMax = Vector2.one;
+            textRt.offsetMin = Vector2.zero;
+            textRt.offsetMax = Vector2.zero;
+
+            var tmp = textObj.AddComponent<TextMeshProUGUI>();
+            tmp.text = "Open in Chrome";
+            tmp.fontSize = 40;
+            tmp.color = Color.white;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.font = customFont;
+            tmp.fontStyle = FontStyles.Bold;
+        }
+
+        private void OpenInChrome()
+        {
+            if (!string.IsNullOrEmpty(_pendingServerIp))
+            {
+                // Use AndroidWebViewHelper to open in Chrome
+                VRWorkspace.Utils.AndroidWebViewHelper.OpenWebRTCProtocolWithParams(
+                    _pendingServerIp,
+                    _pendingPort,
+                    _pendingPort,
+                    autoConnect: true
+                );
+                Debug.Log($"[RTTBrowserView] Opening Chrome: {_pendingServerIp}:{_pendingPort}");
+            }
+            else
+            {
+                Debug.LogWarning("[RTTBrowserView] No server IP set");
+            }
+        }
+
+        private void ShowEditorPlaceholder()
+        {
+            ShowOpenInChromeUI();
         }
 
         private void CreateOpenInBrowserButton(Transform parent)
@@ -389,37 +430,16 @@ namespace VRWorkspace.UI
         }
 
         /// <summary>
-        /// Load webrtc_protocolv2.html from bundled Resources.
-        /// Extracts to persistentDataPath on first run.
+        /// Set connection parameters for Chrome browser.
         /// </summary>
         public void LoadLocalWebRTCProtocol(string serverIp, int port)
         {
             _pendingServerIp = serverIp;
             _pendingPort = port;
 
-            // Extract HTML from Resources to persistentDataPath
-            string localPath = ExtractWebRTCHtml();
-            if (string.IsNullOrEmpty(localPath))
-            {
-                Debug.LogError("[RTTBrowserView] Failed to extract webrtc_protocolv2.html");
-                return;
-            }
+            if (_urlInput != null) _urlInput.text = $"{serverIp}:{port}";
 
-            string url = $"file://{localPath}";
-            _currentUrl = url;
-
-            if (_urlInput != null) _urlInput.text = $"{url} → {serverIp}:{port}";
-
-            Debug.Log($"[RTTBrowserView] Loading local file: {url} with server {serverIp}:{port}");
-            OnUrlChanged?.Invoke(url);
-
-#if UNITY_ANDROID && !UNITY_EDITOR
-            _androidBridge?.LoadUrl(url);
-            // Inject connection params after page loads
-            _androidBridge.OnPageFinished += OnLocalPageLoaded;
-#else
-            _statusText.text = "Editor Mode";
-#endif
+            Debug.Log($"[RTTBrowserView] Ready to open Chrome with server: {serverIp}:{port}");
         }
 
         /// <summary>
