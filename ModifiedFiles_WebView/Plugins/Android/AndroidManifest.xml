@@ -4,6 +4,9 @@
     xmlns:tools="http://schemas.android.com/tools">
 	<!-- Streaming stability permissions (merged with Unity's manifest) -->
 
+    <!-- Internet: Required for WebView -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- Wake Lock: Keep CPU active during streaming -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
@@ -16,10 +19,13 @@
 
     <!-- Foreground service (Android 9+) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-	
-    <application>
+
+    <application
+        android:hardwareAccelerated="true"
+        android:networkSecurityConfig="@xml/network_security_config">
         <activity android:name="com.unity3d.player.UnityPlayerActivity"
-                  android:theme="@style/UnityThemeSelector">
+                  android:theme="@style/UnityThemeSelector"
+                  android:hardwareAccelerated="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

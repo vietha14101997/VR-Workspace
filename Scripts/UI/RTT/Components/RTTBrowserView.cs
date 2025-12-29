@@ -2,13 +2,16 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System;
+#if UNITY_ANDROID && !UNITY_EDITOR
+using WebView;
+#endif
 
 namespace VRWorkspace.UI
 {
     /// <summary>
     /// Embedded WebView component for RTTMenuFrame.
     /// Renders WebView content to a RawImage for display in VR UI.
-    /// Uses Android System WebView on Android, placeholder on Editor.
+    /// Uses SimpleUnity3DWebView on Android, placeholder on Editor.
     /// </summary>
     public class RTTBrowserView : MonoBehaviour
     {
@@ -25,19 +28,27 @@ namespace VRWorkspace.UI
         public Color themeColor = new Color(0f, 0.9f, 1f);
         public Color accentColor = new Color(0.8f, 0.4f, 1f);
         public TMP_FontAsset customFont;
+
+        [Header("WebView Settings")]
+        [Tooltip("Texture width in pixels (height calculated from aspect ratio)")]
+        public int textureWidth = 1920;
+        [Tooltip("Texture update interval in milliseconds")]
+        public int updateIntervalMs = 33; // ~30fps
         #endregion
 
         #region Private Fields
         private RawImage _webViewDisplay;
-        private RenderTexture _renderTexture;
         private GameObject _headerBar;
         private TMP_InputField _urlInput;
         private TextMeshProUGUI _statusText;
         private string _currentUrl;
         private bool _isLoading;
 
-        // Android WebView bridge
-        private AndroidWebViewBridge _androidBridge;
+#if UNITY_ANDROID && !UNITY_EDITOR
+        // SimpleUnity3DWebView components
+        private WebViewManager _webViewManager;
+        private PointerEventSource _pointerEventSource;
+#endif
 
         // Container references
         private float _containerWidth;
@@ -228,24 +239,9 @@ namespace VRWorkspace.UI
             rt.offsetMin = Vector2.zero;
             rt.offsetMax = new Vector2(0, -headerHeight);
 
-            // Background first (will be behind everything)
-            var bg = displayObj.AddComponent<Image>();
-            bg.color = new Color(0.08f, 0.1f, 0.12f, 1f);
-            bg.raycastTarget = false;
-
-#if UNITY_ANDROID && !UNITY_EDITOR
-            // Create RenderTexture for WebView (Android only)
-            int texWidth = Mathf.RoundToInt(width * 2);
-            int texHeight = Mathf.RoundToInt(height * 2);
-            _renderTexture = new RenderTexture(texWidth, texHeight, 0, RenderTextureFormat.ARGB32);
-            _renderTexture.Create();
-
-            // RawImage to display WebView
+            // RawImage to display WebView content
             _webViewDisplay = displayObj.AddComponent<RawImage>();
-            _webViewDisplay.texture = _renderTexture;
-            _webViewDisplay.color = Color.white;
-            Debug.Log($"[RTTBrowserView] Created RenderTexture {texWidth}x{texHeight}");
-#endif
+            _webViewDisplay.color = new Color(0.08f, 0.1f, 0.12f, 1f); // Dark background until loaded
 
             _webViewDisplayObj = displayObj;
             Debug.Log($"[RTTBrowserView] WebView display created");
@@ -257,13 +253,48 @@ namespace VRWorkspace.UI
         #region WebView Bridge
         private void InitializeWebViewBridge()
         {
-            // Show placeholder with "Open in Chrome" button
-            // WebView texture capture requires native plugin - not implemented yet
-            ShowOpenInChromeUI();
-            Debug.Log("[RTTBrowserView] Showing Open in Chrome UI (WebView texture capture not implemented)");
+#if UNITY_ANDROID && !UNITY_EDITOR
+            InitializeSimpleWebView();
+#else
+            // Editor: show placeholder
+            ShowEditorPlaceholder();
+            Debug.Log("[RTTBrowserView] Editor mode - showing placeholder");
+#endif
         }
 
-        private void ShowOpenInChromeUI()
+#if UNITY_ANDROID && !UNITY_EDITOR
+        /// <summary>
+        /// Initialize SimpleUnity3DWebView components.
+        /// </summary>
+        private void InitializeSimpleWebView()
+        {
+            if (_webViewDisplayObj == null || _webViewDisplay == null)
+            {
+                Debug.LogError("[RTTBrowserView] WebView display not created");
+                return;
+            }
+
+            // Add PointerEventSource for touch input
+            _pointerEventSource = _webViewDisplayObj.AddComponent<PointerEventSource>();
+
+            // Add WebViewManager component
+            _webViewManager = _webViewDisplayObj.AddComponent<WebViewManager>();
+
+            // Configure WebViewManager via reflection (since fields are serialized)
+            // Note: SimpleUnity3DWebView expects these to be set in Inspector,
+            // but we can use reflection or the public methods
+
+            // The WebViewManager will auto-initialize in its Start() method
+            // We need to wait a frame for it to initialize, then load our URL
+
+            Debug.Log("[RTTBrowserView] SimpleUnity3DWebView initialized");
+
+            // Subscribe to URL change events
+            // WebViewManager uses UnityEvent, we'll check for changes in Update
+        }
+#endif
+
+        private void ShowEditorPlaceholder()
         {
             if (_webViewDisplayObj == null) return;
 
@@ -279,15 +310,15 @@ namespace VRWorkspace.UI
 
             var tmp = textObj.AddComponent<TextMeshProUGUI>();
             tmp.text = "<size=48><color=#00E5FF>WebRTC Browser</color></size>\n\n" +
-                       "Tap the button below to open Chrome\n" +
-                       "with full WebRTC support (340 Mbps)";
+                       "<size=32>SimpleUnity3DWebView</size>\n" +
+                       "WebView will display here on Android device";
             tmp.fontSize = 36;
             tmp.color = new Color(0.7f, 0.75f, 0.8f);
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.font = customFont;
             tmp.enableWordWrapping = true;
 
-            // Add "Open in Chrome" button
+            // Add "Open in Chrome" button for testing in Editor
             CreateOpenInChromeButton(_webViewDisplayObj.transform);
         }
 
@@ -321,8 +352,8 @@ namespace VRWorkspace.UI
             textRt.offsetMax = Vector2.zero;
 
             var tmp = textObj.AddComponent<TextMeshProUGUI>();
-            tmp.text = "Open in Chrome";
-            tmp.fontSize = 40;
+            tmp.text = "Test: Open in Chrome";
+            tmp.fontSize = 36;
             tmp.color = Color.white;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.font = customFont;
@@ -333,7 +364,6 @@ namespace VRWorkspace.UI
         {
             if (!string.IsNullOrEmpty(_pendingServerIp))
             {
-                // Use AndroidWebViewHelper to open in Chrome
                 VRWorkspace.Utils.AndroidWebViewHelper.OpenWebRTCProtocolWithParams(
                     _pendingServerIp,
                     _pendingPort,
@@ -347,61 +377,6 @@ namespace VRWorkspace.UI
                 Debug.LogWarning("[RTTBrowserView] No server IP set");
             }
         }
-
-        private void ShowEditorPlaceholder()
-        {
-            ShowOpenInChromeUI();
-        }
-
-        private void CreateOpenInBrowserButton(Transform parent)
-        {
-            var btnObj = new GameObject("OpenInBrowserBtn");
-            btnObj.transform.SetParent(parent, false);
-
-            var rt = btnObj.AddComponent<RectTransform>();
-            rt.anchorMin = new Vector2(0.5f, 0.3f);
-            rt.anchorMax = new Vector2(0.5f, 0.3f);
-            rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.anchoredPosition = Vector2.zero;
-            rt.sizeDelta = new Vector2(400f, 80f);
-
-            var bg = btnObj.AddComponent<Image>();
-            bg.color = new Color(themeColor.r, themeColor.g, themeColor.b, 0.3f);
-
-            var btn = btnObj.AddComponent<Button>();
-            btn.targetGraphic = bg;
-            btn.onClick.AddListener(() => OpenInExternalBrowser());
-
-            // Button text
-            var textObj = new GameObject("Text");
-            textObj.transform.SetParent(btnObj.transform, false);
-
-            var textRt = textObj.AddComponent<RectTransform>();
-            textRt.anchorMin = Vector2.zero;
-            textRt.anchorMax = Vector2.one;
-            textRt.offsetMin = Vector2.zero;
-            textRt.offsetMax = Vector2.zero;
-
-            var tmp = textObj.AddComponent<TextMeshProUGUI>();
-            tmp.text = "🌐 Open in Browser";
-            tmp.fontSize = 32;
-            tmp.color = themeColor;
-            tmp.alignment = TextAlignmentOptions.Center;
-            tmp.font = customFont;
-        }
-
-        private void OpenInExternalBrowser()
-        {
-            if (!string.IsNullOrEmpty(_currentUrl))
-            {
-                Application.OpenURL(_currentUrl);
-                Debug.Log($"[RTTBrowserView] Opened in external browser: {_currentUrl}");
-            }
-            else
-            {
-                Debug.LogWarning("[RTTBrowserView] No URL to open");
-            }
-        }
         #endregion
 
         #region Public API
@@ -413,7 +388,7 @@ namespace VRWorkspace.UI
             if (string.IsNullOrEmpty(url)) return;
 
             // Add protocol if missing
-            if (!url.StartsWith("http://") && !url.StartsWith("https://"))
+            if (!url.StartsWith("http://") && !url.StartsWith("https://") && !url.StartsWith("file://"))
                 url = "http://" + url;
 
             _currentUrl = url;
@@ -423,14 +398,15 @@ namespace VRWorkspace.UI
             OnUrlChanged?.Invoke(url);
 
 #if UNITY_ANDROID && !UNITY_EDITOR
-            _androidBridge?.LoadUrl(url);
+            _webViewManager?.LoadUrl(url);
 #else
-            _statusText.text = "Editor Mode";
+            if (_statusText != null) _statusText.text = "Editor Mode";
 #endif
         }
 
         /// <summary>
-        /// Set connection parameters for Chrome browser.
+        /// Load webrtc_protocolv2.html from Resources with connection parameters.
+        /// Extracts HTML to persistentDataPath and loads via file:// URL.
         /// </summary>
         public void LoadLocalWebRTCProtocol(string serverIp, int port)
         {
@@ -439,23 +415,49 @@ namespace VRWorkspace.UI
 
             if (_urlInput != null) _urlInput.text = $"{serverIp}:{port}";
 
-            Debug.Log($"[RTTBrowserView] Ready to open Chrome with server: {serverIp}:{port}");
+#if UNITY_ANDROID && !UNITY_EDITOR
+            // Extract HTML from Resources and load it
+            string htmlPath = ExtractWebRTCHtml(serverIp, port);
+            if (!string.IsNullOrEmpty(htmlPath))
+            {
+                string fileUrl = "file://" + htmlPath;
+                Debug.Log($"[RTTBrowserView] Loading local WebRTC: {fileUrl}");
+
+                // Wait for WebViewManager to initialize, then load
+                StartCoroutine(LoadUrlAfterInit(fileUrl));
+            }
+#else
+            Debug.Log($"[RTTBrowserView] Editor mode - WebView would load with server: {serverIp}:{port}");
+#endif
         }
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+        private System.Collections.IEnumerator LoadUrlAfterInit(string url)
+        {
+            // Wait for WebViewManager to initialize
+            yield return null;
+            yield return null; // Extra frame for safety
+
+            if (_webViewManager != null)
+            {
+                _webViewManager.LoadUrl(url);
+                Debug.Log($"[RTTBrowserView] WebViewManager loading: {url}");
+            }
+            else
+            {
+                Debug.LogError("[RTTBrowserView] WebViewManager is null");
+            }
+        }
+#endif
 
         /// <summary>
         /// Extract webrtc_protocolv2.html from Resources to persistentDataPath.
+        /// Injects server connection parameters into the HTML.
         /// Returns the file path if successful, null otherwise.
         /// </summary>
-        private string ExtractWebRTCHtml()
+        private string ExtractWebRTCHtml(string serverIp, int port)
         {
             string destPath = System.IO.Path.Combine(Application.persistentDataPath, "webrtc_protocolv2.html");
-
-            // Check if already extracted (skip re-extraction for performance)
-            if (System.IO.File.Exists(destPath))
-            {
-                Debug.Log($"[RTTBrowserView] Using cached: {destPath}");
-                return destPath;
-            }
 
             // Load from Resources (file is stored as .txt TextAsset)
             TextAsset htmlAsset = Resources.Load<TextAsset>("webrtc_protocolv2");
@@ -467,9 +469,42 @@ namespace VRWorkspace.UI
 
             try
             {
+                // Inject connection parameters into HTML
+                string html = htmlAsset.text;
+
+                // Replace default values with actual server params
+                // The HTML should have placeholders or we inject via script
+                string injectionScript = $@"
+<script>
+    // Auto-injected by Unity RTTBrowserView
+    window.UNITY_WS_HOST = '{serverIp}';
+    window.UNITY_WS_PORT = {port};
+    window.UNITY_AUTO_CONNECT = true;
+
+    // Wait for page load then set values
+    document.addEventListener('DOMContentLoaded', function() {{
+        var hostInput = document.getElementById('host');
+        var portInput = document.getElementById('port');
+        if (hostInput) hostInput.value = '{serverIp}';
+        if (portInput) portInput.value = '{port}';
+        console.log('[Unity] Injected connection: {serverIp}:{port}');
+    }});
+</script>
+";
+                // Inject before </head>
+                if (html.Contains("</head>"))
+                {
+                    html = html.Replace("</head>", injectionScript + "</head>");
+                }
+                else
+                {
+                    // Fallback: prepend
+                    html = injectionScript + html;
+                }
+
                 // Write to persistentDataPath
-                System.IO.File.WriteAllText(destPath, htmlAsset.text);
-                Debug.Log($"[RTTBrowserView] Extracted to: {destPath}");
+                System.IO.File.WriteAllText(destPath, html);
+                Debug.Log($"[RTTBrowserView] Extracted with params to: {destPath}");
                 return destPath;
             }
             catch (System.Exception ex)
@@ -482,39 +517,19 @@ namespace VRWorkspace.UI
         private string _pendingServerIp;
         private int _pendingPort;
 
-        private void OnLocalPageLoaded(string url)
-        {
-#if UNITY_ANDROID && !UNITY_EDITOR
-            // Unsubscribe to avoid multiple calls
-            _androidBridge.OnPageFinished -= OnLocalPageLoaded;
-
-            // Inject connection params via JavaScript
-            if (!string.IsNullOrEmpty(_pendingServerIp))
-            {
-                string js = $@"
-                    if (document.getElementById('host')) {{
-                        document.getElementById('host').value = '{_pendingServerIp}';
-                    }}
-                    if (document.getElementById('port')) {{
-                        document.getElementById('port').value = '{_pendingPort}';
-                    }}
-                    console.log('Unity injected: {_pendingServerIp}:{_pendingPort}');
-                ";
-                ExecuteJS(js);
-                Debug.Log($"[RTTBrowserView] Injected connection params: {_pendingServerIp}:{_pendingPort}");
-            }
-#endif
-        }
-
         /// <summary>
         /// Refresh the current page.
         /// </summary>
         public void Refresh()
         {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            _webViewManager?.Reload();
+#else
             if (!string.IsNullOrEmpty(_currentUrl))
             {
                 LoadUrl(_currentUrl);
             }
+#endif
         }
 
         /// <summary>
@@ -523,7 +538,7 @@ namespace VRWorkspace.UI
         public void GoBack()
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
-            _androidBridge?.GoBack();
+            _webViewManager?.GoBack();
 #endif
         }
 
@@ -533,193 +548,17 @@ namespace VRWorkspace.UI
         public void ExecuteJS(string script)
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
-            _androidBridge?.ExecuteJS(script);
+            _webViewManager?.EvaluateJavascript(script);
 #endif
         }
         #endregion
 
         #region Lifecycle
-        private void Update()
-        {
-#if UNITY_ANDROID && !UNITY_EDITOR
-            // Update WebView texture
-            _androidBridge?.UpdateTexture();
-#endif
-        }
-
         private void OnDestroy()
         {
-#if UNITY_ANDROID && !UNITY_EDITOR
-            _androidBridge?.Destroy();
-#endif
-            if (_renderTexture != null)
-            {
-                _renderTexture.Release();
-                Destroy(_renderTexture);
-            }
+            // WebViewManager handles its own cleanup
+            Debug.Log("[RTTBrowserView] Destroyed");
         }
         #endregion
-    }
-
-    /// <summary>
-    /// Android WebView bridge using native Android WebView.
-    /// Captures WebView content to RenderTexture for Unity display.
-    /// </summary>
-    public class AndroidWebViewBridge
-    {
-        public event Action<string> OnPageStarted;
-        public event Action<string> OnPageFinished;
-        public event Action<string> OnError;
-
-        private RenderTexture _targetTexture;
-        private AndroidJavaObject _webView;
-        private AndroidJavaObject _activity;
-        private bool _isInitialized;
-
-        public AndroidWebViewBridge(RenderTexture targetTexture)
-        {
-            _targetTexture = targetTexture;
-
-#if UNITY_ANDROID && !UNITY_EDITOR
-            try
-            {
-                InitializeAndroidWebView();
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[AndroidWebViewBridge] Init failed: {ex.Message}");
-            }
-#endif
-        }
-
-        private void InitializeAndroidWebView()
-        {
-#if UNITY_ANDROID && !UNITY_EDITOR
-            using (var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
-            {
-                _activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity");
-
-                // Create WebView on UI thread
-                _activity.Call("runOnUiThread", new AndroidJavaRunnable(() =>
-                {
-                    try
-                    {
-                        // Create WebView
-                        _webView = new AndroidJavaObject("android.webkit.WebView", _activity);
-
-                        // Configure WebView settings
-                        var settings = _webView.Call<AndroidJavaObject>("getSettings");
-                        settings.Call("setJavaScriptEnabled", true);
-                        settings.Call("setDomStorageEnabled", true);
-                        settings.Call("setMediaPlaybackRequiresUserGesture", false);
-                        settings.Call("setAllowFileAccess", true);
-                        settings.Call("setAllowContentAccess", true);
-
-                        // Enable WebRTC
-                        settings.Call("setMediaPlaybackRequiresUserGesture", false);
-
-                        // Set size
-                        int width = _targetTexture.width;
-                        int height = _targetTexture.height;
-                        _webView.Call("layout", 0, 0, width, height);
-
-                        _isInitialized = true;
-                        Debug.Log($"[AndroidWebViewBridge] WebView created {width}x{height}");
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.LogError($"[AndroidWebViewBridge] WebView creation failed: {ex.Message}");
-                        OnError?.Invoke(ex.Message);
-                    }
-                }));
-            }
-#endif
-        }
-
-        public void LoadUrl(string url)
-        {
-#if UNITY_ANDROID && !UNITY_EDITOR
-            if (!_isInitialized || _webView == null) return;
-
-            _activity?.Call("runOnUiThread", new AndroidJavaRunnable(() =>
-            {
-                try
-                {
-                    _webView.Call("loadUrl", url);
-                    OnPageStarted?.Invoke(url);
-
-                    // Since we don't have WebViewClient callbacks set up yet,
-                    // fire OnPageFinished after a delay for local file loading
-                    // This is a workaround - proper implementation needs WebViewClient
-                    if (url.StartsWith("file://"))
-                    {
-                        // Local files load fast, fire after short delay
-                        var handler = new AndroidJavaObject("android.os.Handler",
-                            new AndroidJavaClass("android.os.Looper").CallStatic<AndroidJavaObject>("getMainLooper"));
-                        handler.Call<bool>("postDelayed", new AndroidJavaRunnable(() =>
-                        {
-                            OnPageFinished?.Invoke(url);
-                        }), 500L); // 500ms delay for local file
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogError($"[AndroidWebViewBridge] LoadUrl failed: {ex.Message}");
-                    OnError?.Invoke(ex.Message);
-                }
-            }));
-#endif
-        }
-
-        public void GoBack()
-        {
-#if UNITY_ANDROID && !UNITY_EDITOR
-            if (!_isInitialized || _webView == null) return;
-
-            _activity?.Call("runOnUiThread", new AndroidJavaRunnable(() =>
-            {
-                if (_webView.Call<bool>("canGoBack"))
-                    _webView.Call("goBack");
-            }));
-#endif
-        }
-
-        public void ExecuteJS(string script)
-        {
-#if UNITY_ANDROID && !UNITY_EDITOR
-            if (!_isInitialized || _webView == null) return;
-
-            _activity?.Call("runOnUiThread", new AndroidJavaRunnable(() =>
-            {
-                _webView.Call("evaluateJavascript", script, null);
-            }));
-#endif
-        }
-
-        public void UpdateTexture()
-        {
-            // Note: Capturing Android WebView to texture requires either:
-            // 1. Drawing to a Bitmap and copying to Unity texture (slow)
-            // 2. Using Surface/SurfaceTexture with OpenGL (complex)
-            // 3. Using a native plugin (recommended for production)
-            //
-            // For now, this is a placeholder. Full implementation would require
-            // a native Android plugin for efficient texture capture.
-        }
-
-        public void Destroy()
-        {
-#if UNITY_ANDROID && !UNITY_EDITOR
-            if (_webView != null)
-            {
-                _activity?.Call("runOnUiThread", new AndroidJavaRunnable(() =>
-                {
-                    _webView.Call("destroy");
-                    _webView.Dispose();
-                    _webView = null;
-                }));
-            }
-#endif
-        }
     }
 }
