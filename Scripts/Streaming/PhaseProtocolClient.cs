@@ -60,6 +60,10 @@ namespace VRWorkspace.Streaming
             public Texture Texture;
             public bool AnswerSet;
             public List<string> PendingIce = new List<string>();
+            public bool IsReconnecting; // Prevent duplicate reconnect attempts
+            public DateTime LastConnectedTime;
+            public int ReconnectAttempts; // Track consecutive reconnect attempts
+            public const int MaxReconnectAttempts = 5; // Max attempts before giving up
         }
 
         // Public properties
@@ -195,6 +199,14 @@ namespace VRWorkspace.Streaming
         public async Task StopAsync()
         {
             Debug.Log("[PhaseProtocol] Stopping...");
+
+            // Release Android power locks
+            try
+            {
+                AndroidStreamingHelper.Instance?.ReleaseLocks();
+                AndroidStreamingHelper.Instance?.SetKeepScreenOn(false);
+            }
+            catch { }
 
             if (_ws?.State == WebSocketState.Open)
             {
@@ -903,9 +915,17 @@ namespace VRWorkspace.Streaming
         {
             Debug.Log($"[PhaseProtocol] Creating {count} PeerConnections");
 
+            // ICE servers for better NAT traversal and connection stability
+            var iceServers = new RTCIceServer[]
+            {
+                // Google STUN servers (free, reliable)
+                new RTCIceServer { urls = new[] { "stun:stun.l.google.com:19302" } },
+                new RTCIceServer { urls = new[] { "stun:stun1.l.google.com:19302" } },
+            };
+
             for (int i = 0; i < count; i++)
             {
-                var cfg = new RTCConfiguration { iceServers = Array.Empty<RTCIceServer>() };
+                var cfg = new RTCConfiguration { iceServers = iceServers };
                 var pc = new RTCPeerConnection(ref cfg);
                 var wrapper = new PCWrapper { Index = i, PC = pc };
 
@@ -949,10 +969,20 @@ namespace VRWorkspace.Streaming
                     if (s == RTCPeerConnectionState.Connected)
                     {
                         Debug.Log($"[PhaseProtocol] PC{idx} PC connected");
+                        wrapper.LastConnectedTime = DateTime.UtcNow;
+                        wrapper.IsReconnecting = false;
+                        wrapper.ReconnectAttempts = 0; // Reset on successful connection
                     }
                     else if (s == RTCPeerConnectionState.Failed || s == RTCPeerConnectionState.Disconnected)
                     {
                         Debug.LogWarning($"[PhaseProtocol] PC{idx} connection lost");
+                        // Client-side auto-heal: Attempt reconnect if we're still streaming
+                        if (_stateMachine.IsStreaming && !wrapper.IsReconnecting)
+                        {
+                            wrapper.IsReconnecting = true;
+                            Debug.Log($"[PhaseProtocol] PC{idx} initiating client-side auto-heal...");
+                            _ = AutoHealMonitorAsync(idx);
+                        }
                     }
                 };
 
@@ -1287,8 +1317,13 @@ namespace VRWorkspace.Streaming
             // Close old PC
             try { oldWrapper.PC?.Close(); oldWrapper.PC?.Dispose(); } catch { }
 
-            // Create new PeerConnection
-            var cfg = new RTCConfiguration { iceServers = Array.Empty<RTCIceServer>() };
+            // Create new PeerConnection with STUN servers for better stability
+            var iceServers = new RTCIceServer[]
+            {
+                new RTCIceServer { urls = new[] { "stun:stun.l.google.com:19302" } },
+                new RTCIceServer { urls = new[] { "stun:stun1.l.google.com:19302" } },
+            };
+            var cfg = new RTCConfiguration { iceServers = iceServers };
             var pc = new RTCPeerConnection(ref cfg);
             var wrapper = new PCWrapper { Index = monitorIndex, PC = pc };
 
@@ -1322,9 +1357,23 @@ namespace VRWorkspace.Streaming
             pc.OnConnectionStateChange = s =>
             {
                 Debug.Log($"[PhaseProtocol] PC{idx} State (reconnected): {s}");
-                if (s == RTCPeerConnectionState.Failed || s == RTCPeerConnectionState.Disconnected)
+                if (s == RTCPeerConnectionState.Connected)
+                {
+                    Debug.Log($"[PhaseProtocol] PC{idx} reconnect successful!");
+                    wrapper.LastConnectedTime = DateTime.UtcNow;
+                    wrapper.IsReconnecting = false;
+                    wrapper.ReconnectAttempts = 0; // Reset on successful reconnection
+                }
+                else if (s == RTCPeerConnectionState.Failed || s == RTCPeerConnectionState.Disconnected)
                 {
                     Debug.LogWarning($"[PhaseProtocol] PC{idx} connection lost again after reconnect");
+                    // Auto-heal again if still streaming
+                    if (_stateMachine.IsStreaming && !wrapper.IsReconnecting)
+                    {
+                        wrapper.IsReconnecting = true;
+                        Debug.Log($"[PhaseProtocol] PC{idx} re-initiating auto-heal...");
+                        _ = AutoHealMonitorAsync(idx);
+                    }
                 }
             };
 
@@ -1393,12 +1442,82 @@ namespace VRWorkspace.Streaming
             Debug.Log($"[PhaseProtocol] PC{idx} reconnect offer sent");
         }
 
+        /// <summary>
+        /// Client-side auto-heal: Detect disconnection and automatically attempt reconnect.
+        /// This runs independently of server's reconnect request for faster recovery.
+        /// Uses exponential backoff: 2s, 4s, 8s, 16s, 32s between attempts.
+        /// </summary>
+        private async Task AutoHealMonitorAsync(int monitorIndex)
+        {
+            PCWrapper wrapper;
+            lock (_lock)
+            {
+                if (monitorIndex < 0 || monitorIndex >= _peerConnections.Count) return;
+                wrapper = _peerConnections[monitorIndex];
+            }
+
+            // Check max attempts
+            if (wrapper.ReconnectAttempts >= PCWrapper.MaxReconnectAttempts)
+            {
+                Debug.LogError($"[PhaseProtocol] PC{monitorIndex} auto-heal: max attempts ({PCWrapper.MaxReconnectAttempts}) reached, giving up");
+                wrapper.IsReconnecting = false;
+                OnError?.Invoke($"Monitor {monitorIndex} reconnect failed after {PCWrapper.MaxReconnectAttempts} attempts");
+                return;
+            }
+
+            // Exponential backoff: 2s, 4s, 8s, 16s, 32s
+            int delayMs = 2000 * (1 << wrapper.ReconnectAttempts);
+            wrapper.ReconnectAttempts++;
+            Debug.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal: attempt {wrapper.ReconnectAttempts}/{PCWrapper.MaxReconnectAttempts}, waiting {delayMs}ms...");
+            await Task.Delay(delayMs);
+
+            // Check if we're still streaming and need reconnect
+            if (_cts == null || _cts.IsCancellationRequested) return;
+            if (!_stateMachine.IsStreaming)
+            {
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal: no longer streaming, skip reconnect");
+                wrapper.IsReconnecting = false;
+                return;
+            }
+
+            // Check if PC is still disconnected
+            var state = wrapper.PC?.ConnectionState ?? RTCPeerConnectionState.Closed;
+            if (state == RTCPeerConnectionState.Connected)
+            {
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal: already recovered, skip reconnect");
+                wrapper.IsReconnecting = false;
+                wrapper.ReconnectAttempts = 0; // Reset on success
+                return;
+            }
+
+            Debug.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal: PC still {state}, initiating reconnect...");
+
+            try
+            {
+                await ReconnectMonitorAsync(monitorIndex);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[PhaseProtocol] PC{monitorIndex} auto-heal failed: {ex.Message}");
+                wrapper.IsReconnecting = false;
+            }
+        }
+
         // === Phase 3 Handlers ===
 
         private void HandleStreamingStarted(SimpleJson json)
         {
             Debug.Log("[PhaseProtocol] Streaming started!");
             _stateMachine.TryTransition(ConnectionPhase.Streaming);
+
+            // Acquire Android power locks for stable streaming
+            try
+            {
+                AndroidStreamingHelper.Instance?.AcquireLocks();
+                AndroidStreamingHelper.Instance?.SetKeepScreenOn(true);
+            }
+            catch { }
+
             OnStreamingStarted?.Invoke();
         }
 
@@ -1488,7 +1607,8 @@ namespace VRWorkspace.Streaming
                     await SendTextAsync("ping");
                 }
                 catch { }
-                await Task.Delay(5000, ct);
+                // More aggressive keepalive (3s) for better connection stability on mobile
+                await Task.Delay(3000, ct);
             }
         }
 
