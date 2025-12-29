@@ -65,6 +65,8 @@ namespace VRWorkspace.Streaming
             public DateTime LastConnectedTime;
             public int ReconnectAttempts; // Track consecutive reconnect attempts
             public const int MaxReconnectAttempts = 5; // Max attempts before giving up
+            public DateTime LastFrameTime; // Track when last video frame was received
+            public int FrameCount; // Count frames for monitoring
         }
 
         // Public properties
@@ -1022,9 +1024,12 @@ namespace VRWorkspace.Streaming
                     if (e.Track is VideoStreamTrack v)
                     {
                         wrapper.VideoTrack = v;
+                        wrapper.LastFrameTime = DateTime.UtcNow; // Initialize
                         v.OnVideoReceived += tex =>
                         {
                             wrapper.Texture = tex;
+                            wrapper.LastFrameTime = DateTime.UtcNow;
+                            wrapper.FrameCount++;
                             OnVideoTextureReceived?.Invoke(idx, tex);
                         };
                         Debug.Log($"[PhaseProtocol] PC{idx} received video track");
@@ -1456,9 +1461,12 @@ namespace VRWorkspace.Streaming
                 if (e.Track is VideoStreamTrack v)
                 {
                     wrapper.VideoTrack = v;
+                    wrapper.LastFrameTime = DateTime.UtcNow; // Initialize
                     v.OnVideoReceived += tex =>
                     {
                         wrapper.Texture = tex;
+                        wrapper.LastFrameTime = DateTime.UtcNow;
+                        wrapper.FrameCount++;
                         OnVideoTextureReceived?.Invoke(idx, tex);
                     };
                     Debug.Log($"[PhaseProtocol] PC{idx} received video track (reconnected)");
@@ -1575,7 +1583,77 @@ namespace VRWorkspace.Streaming
             }
             catch { }
 
+            // Start frame stall monitor to detect frozen streams
+            _ = FrameStallMonitorAsync(_cts.Token);
+
             OnStreamingStarted?.Invoke();
+        }
+
+        /// <summary>
+        /// Monitor for frame stalls - detect when video frames stop arriving even though
+        /// the WebRTC connection appears healthy. This catches cases where the decoder
+        /// freezes but the connection state doesn't change.
+        /// </summary>
+        private async Task FrameStallMonitorAsync(CancellationToken ct)
+        {
+            const int CHECK_INTERVAL_MS = 2000; // Check every 2 seconds
+            const int STALL_THRESHOLD_MS = 5000; // Consider stalled if no frames for 5 seconds
+            const int INITIAL_GRACE_PERIOD_MS = 10000; // Wait 10 seconds before monitoring
+
+            Debug.Log("[PhaseProtocol] Frame stall monitor started");
+
+            // Initial grace period to let streams stabilize
+            await Task.Delay(INITIAL_GRACE_PERIOD_MS, ct);
+
+            while (!ct.IsCancellationRequested && _stateMachine.IsStreaming)
+            {
+                try
+                {
+                    List<PCWrapper> wrappers;
+                    lock (_lock)
+                    {
+                        wrappers = _peerConnections.ToList();
+                    }
+
+                    foreach (var wrapper in wrappers)
+                    {
+                        if (wrapper.PC == null) continue;
+                        if (wrapper.IsReconnecting) continue; // Already reconnecting
+
+                        var timeSinceFrame = DateTime.UtcNow - wrapper.LastFrameTime;
+                        var pcState = wrapper.PC.ConnectionState;
+
+                        // Only check for stalls if PC appears connected
+                        if (pcState == RTCPeerConnectionState.Connected &&
+                            wrapper.LastFrameTime != default &&
+                            timeSinceFrame.TotalMilliseconds > STALL_THRESHOLD_MS)
+                        {
+                            Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} FRAME STALL detected! No frames for {timeSinceFrame.TotalSeconds:F1}s (frames received: {wrapper.FrameCount})");
+
+                            // Trigger reconnect
+                            if (!wrapper.IsReconnecting)
+                            {
+                                wrapper.IsReconnecting = true;
+                                Debug.Log($"[PhaseProtocol] PC{wrapper.Index} triggering reconnect due to frame stall");
+                                _ = AutoHealMonitorAsync(wrapper.Index);
+                            }
+                        }
+                    }
+
+                    await Task.Delay(CHECK_INTERVAL_MS, ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[PhaseProtocol] Frame stall monitor error: {ex.Message}");
+                    await Task.Delay(CHECK_INTERVAL_MS, ct);
+                }
+            }
+
+            Debug.Log("[PhaseProtocol] Frame stall monitor stopped");
         }
 
         /// <summary>
