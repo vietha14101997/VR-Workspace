@@ -1152,7 +1152,7 @@ namespace VRWorkspace.Streaming
 
                 if (!setRemoteOp.IsDone || setRemoteOp.IsError)
                 {
-                    var errorMsg = setRemoteOp.IsError ? setRemoteOp.Error?.message ?? "unknown" : "timeout";
+                    var errorMsg = setRemoteOp.IsError ? setRemoteOp.Error.message ?? "unknown" : "timeout";
                     Debug.LogError($"[PhaseProtocol] PC{monitorIndex} SetRemoteDescription failed: {errorMsg}");
                     return;
                 }
