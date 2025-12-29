@@ -283,8 +283,9 @@ namespace VRWorkspace.Streaming
         /// </summary>
         private async Task HandleTextMessageAsync(string text)
         {
-            // Debug: Log received message (truncated)
-            Debug.Log($"[PhaseProtocol] Received: {text.Substring(0, Math.Min(100, text.Length))}...");
+            // Debug: Log received message (truncated), skip noisy cursor_position
+            if (!text.Contains("cursor_position"))
+                Debug.Log($"[PhaseProtocol] Received: {text.Substring(0, Math.Min(100, text.Length))}...");
 
             // Try to parse as JSON
             if (text.StartsWith("{"))
@@ -294,7 +295,8 @@ namespace VRWorkspace.Streaming
                     var json = SimpleJson.Parse(text);
                     // Handle both "type" (camelCase) and "Type" (PascalCase) from server
                     var type = json.GetString("type") ?? json.GetString("Type");
-                    Debug.Log($"[PhaseProtocol] Parsed type='{type}' from message len={text.Length}");
+                    if (type != "cursor_position")
+                        Debug.Log($"[PhaseProtocol] Parsed type='{type}' from message len={text.Length}");
 
                     switch (type)
                     {
@@ -437,18 +439,51 @@ namespace VRWorkspace.Streaming
                 {
                     capability.apiLevel = version.GetStatic<int>("SDK_INT");
                 }
+                Debug.Log($"[PhaseProtocol] Android API level: {capability.apiLevel}, device: {capability.deviceModel}");
 
-                // Check HEVC decoder availability
-                if (HevcDecoderPlugin.IsAvailable())
+                // Check HEVC decoder availability via native plugin
+                bool pluginAvailable = false;
+                try
+                {
+                    pluginAvailable = HevcDecoderPlugin.IsAvailable();
+                    Debug.Log($"[PhaseProtocol] HevcDecoderPlugin.IsAvailable() = {pluginAvailable}");
+                }
+                catch (Exception pluginEx)
+                {
+                    Debug.LogWarning($"[PhaseProtocol] HevcDecoderPlugin check failed: {pluginEx.Message}");
+                }
+
+                // HEVC detection with fallback:
+                // 1. If native plugin reports available -> use HEVC
+                // 2. If plugin fails but Android API >= 21 -> assume HEVC available (MediaCodec supports it)
+                // Note: Android 5.0 (API 21) introduced hardware HEVC decoding in MediaCodec
+                if (pluginAvailable)
                 {
                     capability.supportsHevc = true;
                     capability.supportedCodecs = new[] { "H265", "H264" };
                     capability.preferredCodec = "H265";
-                    Debug.Log("[PhaseProtocol] Client supports HEVC hardware decoding");
+                    Debug.Log("[PhaseProtocol] Client supports HEVC via native plugin");
+                }
+                else if (capability.apiLevel >= 21)
+                {
+                    // Fallback: Android 5.0+ has MediaCodec HEVC support
+                    // Use system MediaCodec check as fallback
+                    bool mediaCodecHevc = CheckMediaCodecHevcSupport();
+                    if (mediaCodecHevc)
+                    {
+                        capability.supportsHevc = true;
+                        capability.supportedCodecs = new[] { "H265", "H264" };
+                        capability.preferredCodec = "H265";
+                        Debug.Log($"[PhaseProtocol] Client supports HEVC via MediaCodec fallback (API {capability.apiLevel})");
+                    }
+                    else
+                    {
+                        Debug.Log($"[PhaseProtocol] MediaCodec HEVC not available despite API {capability.apiLevel}");
+                    }
                 }
                 else
                 {
-                    Debug.Log("[PhaseProtocol] HEVC hardware decoder not available, using H.264 only");
+                    Debug.Log($"[PhaseProtocol] HEVC not available: plugin={pluginAvailable}, API={capability.apiLevel}");
                 }
             }
             catch (Exception ex)
@@ -461,6 +496,61 @@ namespace VRWorkspace.Streaming
 
             return capability;
         }
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+        /// <summary>
+        /// Check if Android MediaCodec supports HEVC decoding.
+        /// This is a fallback when native plugin is unavailable.
+        /// </summary>
+        private bool CheckMediaCodecHevcSupport()
+        {
+            try
+            {
+                // Query MediaCodecList for HEVC decoder
+                using (var mediaCodecList = new AndroidJavaClass("android.media.MediaCodecList"))
+                {
+                    int codecCount = mediaCodecList.CallStatic<int>("getCodecCount");
+                    Debug.Log($"[PhaseProtocol] MediaCodecList has {codecCount} codecs");
+
+                    for (int i = 0; i < codecCount; i++)
+                    {
+                        using (var codecInfo = mediaCodecList.CallStatic<AndroidJavaObject>("getCodecInfoAt", i))
+                        {
+                            if (codecInfo == null) continue;
+
+                            // Skip encoders, we need decoder
+                            bool isEncoder = codecInfo.Call<bool>("isEncoder");
+                            if (isEncoder) continue;
+
+                            // Check supported types
+                            string[] types = codecInfo.Call<string[]>("getSupportedTypes");
+                            if (types == null) continue;
+
+                            foreach (var type in types)
+                            {
+                                // HEVC MIME types: video/hevc, video/x-hevc
+                                if (type != null && (type.Contains("hevc") || type.Contains("HEVC")))
+                                {
+                                    string codecName = codecInfo.Call<string>("getName") ?? "unknown";
+                                    Debug.Log($"[PhaseProtocol] Found HEVC decoder: {codecName} ({type})");
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Debug.Log("[PhaseProtocol] No HEVC decoder found in MediaCodecList");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[PhaseProtocol] MediaCodec HEVC check failed: {ex.Message}");
+                // On error, assume HEVC is supported if API >= 21 (most devices have it)
+                return true;
+            }
+        }
+#endif
 
         private async Task HandleHardwareInfoAsync(SimpleJson json)
         {
