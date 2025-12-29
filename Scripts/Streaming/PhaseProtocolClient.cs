@@ -239,39 +239,50 @@ namespace VRWorkspace.Streaming
             {
                 while (_ws.State == WebSocketState.Open && !ct.IsCancellationRequested)
                 {
-                    var ms = new System.IO.MemoryStream();
-                    WebSocketReceiveResult result;
+                    // First receive to determine message type
+                    var firstResult = await _ws.ReceiveAsync(new ArraySegment<byte>(buffer), ct);
 
-                    do
+                    if (firstResult.MessageType == WebSocketMessageType.Close)
                     {
-                        result = await _ws.ReceiveAsync(new ArraySegment<byte>(buffer), ct);
-                        if (result.MessageType == WebSocketMessageType.Close)
-                        {
-                            Debug.Log("[PhaseProtocol] WebSocket closed by server");
-                            _stateMachine.ForceTransition(ConnectionPhase.Disconnected);
-                            OnDisconnected?.Invoke();
-                            return;
-                        }
-                        ms.Write(buffer, 0, result.Count);
-                    } while (!result.EndOfMessage);
+                        Debug.Log("[PhaseProtocol] WebSocket closed by server");
+                        _stateMachine.ForceTransition(ConnectionPhase.Disconnected);
+                        OnDisconnected?.Invoke();
+                        return;
+                    }
 
                     _msgCounter++;
 
-                    // Handle message
-                    if (result.MessageType == WebSocketMessageType.Binary)
+                    // OPTIMIZATION: Binary messages (speed test) - just count bytes, no copy
+                    if (firstResult.MessageType == WebSocketMessageType.Binary)
                     {
-                        // Speed test binary data
-                        Debug.Log($"[PhaseProtocol] MSG#{_msgCounter} Binary data, len={ms.Length}");
-                        _speedTest?.HandleBinaryData(ms.ToArray(), (int)ms.Length);
-                    }
-                    else
-                    {
-                        var text = Encoding.UTF8.GetString(ms.ToArray());
-                        Debug.Log($"[PhaseProtocol] MSG#{_msgCounter} Text, len={text.Length}, phase={_stateMachine.CurrentPhase}");
-                        if (!string.IsNullOrWhiteSpace(text))
+                        int totalBytes = firstResult.Count;
+
+                        // Continue receiving if message not complete
+                        while (!firstResult.EndOfMessage)
                         {
-                            await HandleTextMessageAsync(text);
+                            firstResult = await _ws.ReceiveAsync(new ArraySegment<byte>(buffer), ct);
+                            totalBytes += firstResult.Count;
                         }
+
+                        // Pass only byte count - no allocation!
+                        _speedTest?.RecordBytesReceived(totalBytes);
+                        continue;
+                    }
+
+                    // Text messages - use MemoryStream (needed for JSON parsing)
+                    var ms = new System.IO.MemoryStream();
+                    ms.Write(buffer, 0, firstResult.Count);
+
+                    while (!firstResult.EndOfMessage)
+                    {
+                        firstResult = await _ws.ReceiveAsync(new ArraySegment<byte>(buffer), ct);
+                        ms.Write(buffer, 0, firstResult.Count);
+                    }
+
+                    var text = Encoding.UTF8.GetString(ms.ToArray());
+                    if (!string.IsNullOrWhiteSpace(text))
+                    {
+                        await HandleTextMessageAsync(text);
                     }
                 }
             }

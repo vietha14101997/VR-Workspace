@@ -255,6 +255,16 @@ namespace VRWorkspace.Streaming
         /// </summary>
         public void HandleBinaryData(byte[] data, int length)
         {
+            // Delegate to RecordBytesReceived - data is not used
+            RecordBytesReceived(length);
+        }
+
+        /// <summary>
+        /// Record bytes received during bandwidth test - OPTIMIZED version.
+        /// No memory allocation, just counts bytes.
+        /// </summary>
+        public void RecordBytesReceived(int byteCount)
+        {
             if (!_isRunning || _currentDirection != "bandwidth") return;
 
             var now = _masterTimer.ElapsedTicks;
@@ -278,7 +288,7 @@ namespace VRWorkspace.Streaming
                     _bytesReceived = 0;           // Reset byte count
                     Debug.Log("[SpeedTest] Warmup complete - starting measurement");
                 }
-                _bytesReceived += length;
+                _bytesReceived += byteCount;
 
                 // Calculate progress and current speed
                 var measureElapsedMs = (now - _measurementStartTicks) * 1000.0 / Stopwatch.Frequency;
