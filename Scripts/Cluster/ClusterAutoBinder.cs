@@ -107,27 +107,23 @@ public class ClusterAutoBinder : MonoBehaviour
     #region V2 Protocol - Phased Connection
 
     /// <summary>
-    /// Quick validation: HTTP ping to check if server is alive (100-500ms timeout)
+    /// Quick validation: HTTP ping to check if server is alive (500ms timeout - reduced for speed)
     /// </summary>
     public async Task<bool> ValidateServerAsync()
     {
         try
         {
             using var http = new System.Net.Http.HttpClient();
-            http.Timeout = TimeSpan.FromSeconds(2); // Max 2 giây
+            http.Timeout = TimeSpan.FromMilliseconds(500); // Reduced from 2s to 500ms for speed
 
             var url = $"{serverBase}/ping";
-            Debug.Log($"[ClusterAutoBinder] Validating server at {url}...");
-
             var response = await http.GetAsync(url);
-            bool valid = response.IsSuccessStatusCode;
 
-            Debug.Log($"[ClusterAutoBinder] Server validation: {(valid ? "OK" : "FAILED")}");
-            return valid;
+            return response.IsSuccessStatusCode;
         }
-        catch (Exception ex)
+        catch
         {
-            Debug.LogWarning($"[ClusterAutoBinder] Server validation failed: {ex.Message}");
+            // Don't log - validation failure is expected on slow/unreachable servers
             return false;
         }
     }

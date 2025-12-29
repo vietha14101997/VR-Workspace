@@ -11,35 +11,47 @@ namespace VRWorkspace.Streaming
 {
     /// <summary>
     /// Handles client-side speed test protocol.
-    /// Receives binary chunks from server and measures bandwidth.
+    /// REWRITTEN to match browser performance (340 Mbps vs previous 65 Mbps).
+    /// Key changes:
+    /// - Increased duration to 4 seconds (was 2s)
+    /// - High-resolution Stopwatch timing throughout
+    /// - Event-driven with TaskCompletionSource (no polling)
+    /// - 500ms warmup period before measuring
     /// </summary>
     public class SpeedTestClient
     {
         private readonly ClientWebSocket _ws;
         private readonly CancellationToken _ct;
 
+        // High-resolution timing (like browser's performance.now())
+        private readonly Stopwatch _masterTimer = Stopwatch.StartNew();
+
         // Speed test state
-        private bool _isRunning;
+        private volatile bool _isRunning;
         private string _currentDirection;
-        private int _chunkSize;
         private int _durationMs;
         private long _bytesReceived;
-        private Stopwatch _stopwatch;
 
-        // Improved bandwidth measurement - track actual data transfer time
-        private Stopwatch _dataTransferStopwatch;
-        private bool _firstByteReceived;
-        private bool _speedTestEndReceived;
-        private TaskCompletionSource<bool> _speedTestEndTcs;
+        // Improved measurement - event-driven instead of polling
+        private long _measurementStartTicks;
+        private bool _warmupComplete;
+        private TaskCompletionSource<double> _bandwidthComplete;
+
+        // Constants - tuned for accurate measurement
+        private const int SPEED_TEST_DURATION_MS = 4000;  // 4 seconds (was 2s)
+        private const int WARMUP_PERIOD_MS = 500;         // First 500ms = warmup
+        private const int PING_SAMPLES = 5;
+        private const int PING_TIMEOUT_MS = 2000;
 
         // Results
-        public double BandwidthMbps { get; private set; } // Download speed only (upload test removed)
+        public double BandwidthMbps { get; private set; }
         public double PingMs { get; private set; }
         public double JitterMs { get; private set; }
 
-        // Ping measurement state
+        // Ping measurement
         private System.Collections.Generic.List<double> _pingTimes = new System.Collections.Generic.List<double>();
         private TaskCompletionSource<bool> _pongReceived;
+        private long _pingStartTicks;
 
         /// <summary>
         /// Event fired when speed test progress updates.
@@ -50,7 +62,7 @@ namespace VRWorkspace.Streaming
         /// <summary>
         /// Legacy event for backward compatibility.
         /// </summary>
-        public event Action<string, double> OnProgress; // direction, progressPercent
+        public event Action<string, double> OnProgress;
 
         public SpeedTestClient(ClientWebSocket ws, CancellationToken ct)
         {
@@ -58,40 +70,40 @@ namespace VRWorkspace.Streaming
             _ct = ct;
         }
 
-        #region Client-Initiated Speed Test (NEW)
+        #region Client-Initiated Speed Test (Rewritten)
 
         /// <summary>
-        /// Client chủ động thực hiện speed test.
-        /// Trả về SpeedTestResult với các giá trị đo được.
+        /// Run complete speed test. Returns result with bandwidth, ping, jitter.
+        /// Rewritten to match browser's accuracy.
         /// </summary>
         public async Task<SpeedTestResult> RunSpeedTestAsync()
         {
-            Debug.Log("[SpeedTest] Client-initiated speed test starting...");
+            Debug.Log("[SpeedTest] Client-initiated speed test starting (browser-matched version)...");
 
             var result = new SpeedTestResult();
 
-            // 1. Ping test (5 samples)
+            // 1. Ping test (5 samples with high-resolution timing)
             Debug.Log("[SpeedTest] Running ping test...");
             await MeasurePingAsync();
             result.PingMs = PingMs;
             result.JitterMs = JitterMs;
             Debug.Log($"[SpeedTest] Ping: {PingMs:F1}ms, Jitter: {JitterMs:F1}ms");
 
-            // 2. Bandwidth test (download only) - Request Server to send data
-            Debug.Log("[SpeedTest] Running bandwidth test...");
-            await SendTextAsync("{\"type\":\"speedtest_request\",\"direction\":\"download\",\"durationMs\":2000}");
-            result.BandwidthMbps = await MeasureDownloadAsync(2000);
+            // 2. Bandwidth test (4 seconds with warmup)
+            Debug.Log($"[SpeedTest] Running bandwidth test ({SPEED_TEST_DURATION_MS}ms with {WARMUP_PERIOD_MS}ms warmup)...");
+            var culture = System.Globalization.CultureInfo.InvariantCulture;
+            var requestJson = "{\"type\":\"speedtest_request\",\"direction\":\"download\",\"durationMs\":" + SPEED_TEST_DURATION_MS + "}";
+            await SendTextAsync(requestJson);
+            result.BandwidthMbps = await MeasureDownloadAsync();
             Debug.Log($"[SpeedTest] Bandwidth: {result.BandwidthMbps:F1} Mbps");
 
-            // 3. Send final results to Server (no upload test)
-            // Use InvariantCulture with explicit ToString() to ensure decimal point (not comma) in JSON
-            var culture = System.Globalization.CultureInfo.InvariantCulture;
+            // 3. Send final results to server
             var bandwidthStr = result.BandwidthMbps.ToString("F2", culture);
             var pingStr = result.PingMs.ToString("F2", culture);
             var jitterStr = result.JitterMs.ToString("F2", culture);
             var resultMsg = "{\"type\":\"speedtest_result\",\"bandwidthMbps\":" + bandwidthStr + ",\"pingMs\":" + pingStr + ",\"jitterMs\":" + jitterStr + "}";
             await SendTextAsync(resultMsg);
-            Debug.Log($"[SpeedTest] Sent speedtest_result to server: {resultMsg}");
+            Debug.Log($"[SpeedTest] Sent speedtest_result to server");
 
             BandwidthMbps = result.BandwidthMbps;
 
@@ -99,32 +111,32 @@ namespace VRWorkspace.Streaming
         }
 
         /// <summary>
-        /// Measure ping with 5 samples.
+        /// Measure ping with high-resolution Stopwatch timing.
         /// </summary>
         private async Task MeasurePingAsync()
         {
             _pingTimes.Clear();
-            const int samples = 5;
 
-            for (int i = 0; i < samples; i++)
+            for (int i = 0; i < PING_SAMPLES; i++)
             {
                 try
                 {
                     _pongReceived = new TaskCompletionSource<bool>();
-                    var sw = Stopwatch.StartNew();
+                    _pingStartTicks = _masterTimer.ElapsedTicks;
 
-                    await SendTextAsync("ping");
+                    // Fire-and-forget send (like browser)
+                    _ = SendTextAsync("ping");
 
                     // Wait for pong with timeout
-                    using var cts = new CancellationTokenSource(2000);
+                    using var cts = new CancellationTokenSource(PING_TIMEOUT_MS);
                     cts.Token.Register(() => _pongReceived?.TrySetResult(false));
 
-                    await _pongReceived.Task;
-                    sw.Stop();
+                    var success = await _pongReceived.Task;
 
-                    if (_pongReceived.Task.Result)
+                    if (success)
                     {
-                        _pingTimes.Add(sw.Elapsed.TotalMilliseconds);
+                        // Already calculated in HandlePong() with high-res timing
+                        // _pingTimes was already updated
                     }
                 }
                 catch (Exception ex)
@@ -132,11 +144,13 @@ namespace VRWorkspace.Streaming
                     Debug.LogWarning($"[SpeedTest] Ping sample {i + 1} failed: {ex.Message}");
                 }
 
-                await Task.Delay(100, _ct);
+                // Small delay between samples (but don't block)
+                await Task.Delay(50, _ct);
             }
 
             if (_pingTimes.Count > 0)
             {
+                // Calculate average
                 double sum = 0;
                 foreach (var t in _pingTimes) sum += t;
                 PingMs = sum / _pingTimes.Count;
@@ -151,189 +165,169 @@ namespace VRWorkspace.Streaming
                     }
                     JitterMs = jitterSum / (_pingTimes.Count - 1);
                 }
-                else
-                {
-                    JitterMs = 0;
-                }
             }
         }
 
         /// <summary>
-        /// Called when pong message is received.
+        /// Called when pong message is received - high-resolution timing.
         /// </summary>
         public void HandlePong()
         {
+            var now = _masterTimer.ElapsedTicks;
+            if (_pingStartTicks > 0)
+            {
+                // Calculate RTT with microsecond precision
+                double rttMs = (now - _pingStartTicks) * 1000.0 / Stopwatch.Frequency;
+                _pingTimes.Add(rttMs);
+                _pingStartTicks = 0;
+            }
             _pongReceived?.TrySetResult(true);
         }
 
         /// <summary>
-        /// Measure bandwidth (download speed). Server sends binary data after speedtest_request.
-        /// This runs in parallel with ReceiveLoop - binary data is collected via HandleBinaryData.
+        /// Measure bandwidth - event-driven, no polling.
         /// </summary>
-        private async Task<double> MeasureDownloadAsync(int durationMs)
+        private async Task<double> MeasureDownloadAsync()
         {
+            // Reset state
             _bytesReceived = 0;
-            _durationMs = durationMs;
-            _stopwatch = Stopwatch.StartNew();
+            _warmupComplete = false;
+            _measurementStartTicks = 0;
             _isRunning = true;
             _currentDirection = "bandwidth";
+            _durationMs = SPEED_TEST_DURATION_MS;
 
-            // Reset improved tracking state
-            _firstByteReceived = false;
-            _speedTestEndReceived = false;
-            _dataTransferStopwatch = null;
-            _speedTestEndTcs = new TaskCompletionSource<bool>();
+            // Create completion source for event-driven pattern
+            _bandwidthComplete = new TaskCompletionSource<double>();
 
             OnSpeedProgress?.Invoke("bandwidth", 0, 0);
             OnProgress?.Invoke("bandwidth", 0);
 
-            // Wait for either speedtest_end message or timeout
-            // This ensures we measure actual data transfer time, not including startup latency
-            var maxWaitMs = durationMs + 2000; // Allow extra time for network latency
-            var startTime = DateTime.UtcNow;
+            // Wait for completion (triggered by HandleSpeedTestEnd) or timeout
+            var totalTimeoutMs = SPEED_TEST_DURATION_MS + 3000; // Extra 3s for network latency
 
-            while ((DateTime.UtcNow - startTime).TotalMilliseconds < maxWaitMs && !_speedTestEndReceived)
-            {
-                // Use a shorter timeout to check for completion more frequently
-                var remainingMs = maxWaitMs - (int)(DateTime.UtcNow - startTime).TotalMilliseconds;
-                var waitMs = Math.Min(100, Math.Max(10, remainingMs));
-
-                try
-                {
-                    await Task.WhenAny(_speedTestEndTcs.Task, Task.Delay(waitMs, _ct));
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
-
-                // Calculate current speed and update UI using actual data transfer time
-                if (_firstByteReceived && _dataTransferStopwatch != null)
-                {
-                    double elapsedSec = _dataTransferStopwatch.Elapsed.TotalSeconds;
-                    if (elapsedSec > 0.1) // Only calculate after at least 100ms of data transfer
-                    {
-                        double currentMbps = (_bytesReceived * 8.0) / (elapsedSec * 1_000_000);
-                        int progress = (int)Math.Min(100, (elapsedSec * 1000 * 100) / durationMs);
-
-                        OnSpeedProgress?.Invoke("bandwidth", currentMbps, progress);
-                        OnProgress?.Invoke("bandwidth", progress);
-                    }
-                }
-            }
+            var completed = await Task.WhenAny(
+                _bandwidthComplete.Task,
+                Task.Delay(totalTimeoutMs, _ct)
+            );
 
             _isRunning = false;
 
-            // Calculate final speed using actual data transfer time (from first byte to end)
-            double seconds;
-            if (_firstByteReceived && _dataTransferStopwatch != null)
+            // Get result
+            double mbps;
+            if (_bandwidthComplete.Task.IsCompleted && !_bandwidthComplete.Task.IsFaulted)
             {
-                _dataTransferStopwatch.Stop();
-                seconds = _dataTransferStopwatch.Elapsed.TotalSeconds;
-                Debug.Log($"[SpeedTest] Actual data transfer time: {seconds:F2}s (total elapsed: {_stopwatch.Elapsed.TotalSeconds:F2}s)");
+                mbps = _bandwidthComplete.Task.Result;
             }
             else
             {
-                // Fallback to total elapsed time if no data received
-                _stopwatch.Stop();
-                seconds = _stopwatch.Elapsed.TotalSeconds;
+                // Timeout - calculate from what we received
+                mbps = CalculateBandwidth();
+                Debug.LogWarning($"[SpeedTest] Timeout waiting for speedtest_end, calculated: {mbps:F1} Mbps");
             }
-
-            double mbps = seconds > 0 ? (_bytesReceived * 8.0) / (seconds * 1_000_000) : 0;
 
             OnSpeedProgress?.Invoke("bandwidth", mbps, 100);
             OnProgress?.Invoke("bandwidth", 100);
 
-            Debug.Log($"[SpeedTest] Final: {_bytesReceived} bytes in {seconds:F2}s = {mbps:F1} Mbps");
-
             return mbps;
         }
 
         /// <summary>
-        /// Measure upload speed by sending binary data to server.
+        /// Calculate bandwidth from collected data.
         /// </summary>
-        private async Task<double> MeasureUploadAsync(int durationMs)
+        private double CalculateBandwidth()
         {
-            _isRunning = true;
-            _currentDirection = "upload";
+            if (_measurementStartTicks == 0 || _bytesReceived == 0)
+                return 0;
 
-            OnSpeedProgress?.Invoke("upload", 0, 0);
-            OnProgress?.Invoke("upload", 0);
+            var elapsedTicks = _masterTimer.ElapsedTicks - _measurementStartTicks;
+            var elapsedSeconds = elapsedTicks / (double)Stopwatch.Frequency;
 
-            // Wait for server ready signal
-            await Task.Delay(100, _ct);
+            if (elapsedSeconds <= 0)
+                return 0;
 
-            var chunk = new byte[64 * 1024]; // 64KB chunks
-            new System.Random().NextBytes(chunk);
+            return (_bytesReceived * 8.0) / (elapsedSeconds * 1_000_000);
+        }
 
-            var stopwatch = Stopwatch.StartNew();
-            long bytesSent = 0;
+        /// <summary>
+        /// Handle binary data received during bandwidth test.
+        /// Uses warmup period for accurate measurement.
+        /// </summary>
+        public void HandleBinaryData(byte[] data, int length)
+        {
+            if (!_isRunning || _currentDirection != "bandwidth") return;
 
-            while (stopwatch.ElapsedMilliseconds < durationMs && !_ct.IsCancellationRequested)
+            var now = _masterTimer.ElapsedTicks;
+
+            // First chunk - start warmup timer
+            if (_measurementStartTicks == 0)
             {
-                try
-                {
-                    await _ws.SendAsync(
-                        new ArraySegment<byte>(chunk),
-                        WebSocketMessageType.Binary,
-                        true,
-                        _ct);
-                    bytesSent += chunk.Length;
-
-                    // Calculate current speed and update UI
-                    double elapsedSec = stopwatch.Elapsed.TotalSeconds;
-                    double currentMbps = elapsedSec > 0 ? (bytesSent * 8.0) / (elapsedSec * 1_000_000) : 0;
-                    int progress = (int)Math.Min(100, (stopwatch.ElapsedMilliseconds * 100) / durationMs);
-
-                    OnSpeedProgress?.Invoke("upload", currentMbps, progress);
-                    OnProgress?.Invoke("upload", progress);
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogWarning($"[SpeedTest] Upload error: {ex.Message}");
-                    break;
-                }
+                _measurementStartTicks = now;
+                Debug.Log("[SpeedTest] First byte received - starting warmup...");
             }
 
-            stopwatch.Stop();
-            _isRunning = false;
+            var elapsedMs = (now - _measurementStartTicks) * 1000.0 / Stopwatch.Frequency;
 
-            // Send end marker
-            var endMsg = $"{{\"type\":\"speedtest_end\",\"direction\":\"upload\",\"totalBytes\":{bytesSent},\"durationMs\":{stopwatch.ElapsedMilliseconds}}}";
-            await SendTextAsync(endMsg);
+            // Only count bytes after warmup period
+            if (elapsedMs >= WARMUP_PERIOD_MS)
+            {
+                if (!_warmupComplete)
+                {
+                    _warmupComplete = true;
+                    _measurementStartTicks = now; // Reset timing for actual measurement
+                    _bytesReceived = 0;           // Reset byte count
+                    Debug.Log("[SpeedTest] Warmup complete - starting measurement");
+                }
+                _bytesReceived += length;
 
-            double seconds = stopwatch.Elapsed.TotalSeconds;
-            double mbps = seconds > 0 ? (bytesSent * 8.0) / (seconds * 1_000_000) : 0;
+                // Calculate progress and current speed
+                var measureElapsedMs = (now - _measurementStartTicks) * 1000.0 / Stopwatch.Frequency;
+                var measurementDuration = _durationMs - WARMUP_PERIOD_MS;
+                int progress = (int)Math.Min(100, (measureElapsedMs / measurementDuration) * 100);
 
-            OnSpeedProgress?.Invoke("upload", mbps, 100);
-            OnProgress?.Invoke("upload", 100);
+                if (measureElapsedMs > 100) // Only after 100ms of actual measurement
+                {
+                    var currentMbps = CalculateBandwidth();
+                    OnSpeedProgress?.Invoke("bandwidth", currentMbps, progress);
+                    OnProgress?.Invoke("bandwidth", progress);
+                }
+            }
+        }
 
-            return mbps;
+        /// <summary>
+        /// Called when speedtest_end message is received from server.
+        /// Triggers completion of bandwidth measurement.
+        /// </summary>
+        public void HandleSpeedTestEnd()
+        {
+            if (!_isRunning) return;
+
+            var mbps = CalculateBandwidth();
+            Debug.Log($"[SpeedTest] speedtest_end received - Final: {_bytesReceived} bytes = {mbps:F1} Mbps");
+
+            _bandwidthComplete?.TrySetResult(mbps);
         }
 
         #endregion
 
-        #region Server-Initiated Speed Test (Legacy)
+        #region Legacy Support
 
         /// <summary>
-        /// Handle speedtest_start message from server.
-        /// Returns a Task that completes when upload test is done (for upload direction).
+        /// Handle speedtest_start message from server (legacy).
         /// </summary>
         public async Task HandleSpeedTestStartAsync(string direction, int chunkSize, int durationMs)
         {
-            Debug.Log($"[SpeedTest] Starting {direction} test (chunk={chunkSize}, duration={durationMs}ms)");
+            Debug.Log($"[SpeedTest] Legacy speedtest_start: {direction} (chunk={chunkSize}, duration={durationMs}ms)");
 
             _currentDirection = direction;
-            _chunkSize = chunkSize;
             _durationMs = durationMs;
             _bytesReceived = 0;
-            _stopwatch = Stopwatch.StartNew();
+            _measurementStartTicks = 0;
+            _warmupComplete = false;
             _isRunning = true;
 
             OnProgress?.Invoke(direction, 0);
 
-            // For upload direction, we need to start sending data
-            // Run in background to not block the receive loop
             if (direction == "upload")
             {
                 _ = RunUploadTestAsync(chunkSize, durationMs);
@@ -341,82 +335,38 @@ namespace VRWorkspace.Streaming
         }
 
         /// <summary>
-        /// Handle speedtest_start message from server (sync version for download).
+        /// Handle speedtest_start message from server (sync version).
         /// </summary>
         public void HandleSpeedTestStart(string direction, int chunkSize, int durationMs)
         {
-            Debug.Log($"[SpeedTest] Starting {direction} test (chunk={chunkSize}, duration={durationMs}ms)");
+            Debug.Log($"[SpeedTest] Legacy speedtest_start (sync): {direction}");
 
             _currentDirection = direction;
-            _chunkSize = chunkSize;
             _durationMs = durationMs;
             _bytesReceived = 0;
-            _stopwatch = Stopwatch.StartNew();
+            _measurementStartTicks = 0;
+            _warmupComplete = false;
             _isRunning = true;
 
             OnProgress?.Invoke(direction, 0);
         }
 
         /// <summary>
-        /// Handle binary data received during bandwidth test.
-        /// </summary>
-        public void HandleBinaryData(byte[] data, int length)
-        {
-            if (!_isRunning || _currentDirection != "bandwidth") return;
-
-            // Start timing from when first byte is received
-            // This excludes network latency for the request message
-            if (!_firstByteReceived)
-            {
-                _firstByteReceived = true;
-                _dataTransferStopwatch = Stopwatch.StartNew();
-                Debug.Log($"[SpeedTest] First byte received after {_stopwatch.ElapsedMilliseconds}ms");
-            }
-
-            _bytesReceived += length;
-
-            // Calculate progress using actual data transfer time
-            if (_dataTransferStopwatch != null)
-            {
-                double elapsed = _dataTransferStopwatch.ElapsedMilliseconds;
-                double progress = Math.Min(100, (elapsed / _durationMs) * 100);
-                OnProgress?.Invoke("bandwidth", progress);
-            }
-        }
-
-        /// <summary>
-        /// Called when speedtest_end message is received from server.
-        /// This signals that all data has been sent.
-        /// </summary>
-        public void HandleSpeedTestEnd()
-        {
-            _speedTestEndReceived = true;
-            _speedTestEndTcs?.TrySetResult(true);
-            Debug.Log($"[SpeedTest] speedtest_end received, total bytes: {_bytesReceived}");
-        }
-
-        /// <summary>
-        /// Handle speedtest_end message from server.
-        /// Returns the measured speed in Mbps.
+        /// Handle speedtest_end message from server (legacy async).
         /// </summary>
         public async Task<double> HandleSpeedTestEndAsync(string direction, long serverBytes, long serverDurationMs)
         {
             if (!_isRunning) return 0;
 
-            _stopwatch.Stop();
             _isRunning = false;
+            var mbps = CalculateBandwidth();
 
-            double seconds = _stopwatch.Elapsed.TotalSeconds;
-            double mbps = (_bytesReceived * 8.0) / (seconds * 1_000_000);
-
-            Debug.Log($"[SpeedTest] {direction} complete: {_bytesReceived} bytes in {seconds:F2}s = {mbps:F1} Mbps");
+            Debug.Log($"[SpeedTest] Legacy {direction} complete: {_bytesReceived} bytes = {mbps:F1} Mbps");
             Debug.Log($"[SpeedTest] Server reported: {serverBytes} bytes in {serverDurationMs}ms");
 
             if (direction == "download")
             {
                 BandwidthMbps = mbps;
-
-                // Send acknowledgment with client-measured speed
                 await SendAckAsync(mbps);
             }
 
@@ -425,7 +375,7 @@ namespace VRWorkspace.Streaming
         }
 
         /// <summary>
-        /// Handle upload test - send binary chunks to server.
+        /// Handle upload test (legacy).
         /// </summary>
         public async Task RunUploadTestAsync(int chunkSize, int durationMs)
         {
@@ -435,16 +385,17 @@ namespace VRWorkspace.Streaming
             _isRunning = true;
             OnProgress?.Invoke("upload", 0);
 
-            // Generate random chunk
             var chunk = new byte[chunkSize];
             new System.Random().NextBytes(chunk);
 
-            var stopwatch = Stopwatch.StartNew();
+            var startTicks = _masterTimer.ElapsedTicks;
             long bytesSent = 0;
 
-            // Send chunks for durationMs
-            while (stopwatch.ElapsedMilliseconds < durationMs && !_ct.IsCancellationRequested)
+            while (!_ct.IsCancellationRequested)
             {
+                var elapsedMs = (_masterTimer.ElapsedTicks - startTicks) * 1000.0 / Stopwatch.Frequency;
+                if (elapsedMs >= durationMs) break;
+
                 try
                 {
                     await _ws.SendAsync(
@@ -454,8 +405,7 @@ namespace VRWorkspace.Streaming
                         _ct);
                     bytesSent += chunk.Length;
 
-                    // Update progress
-                    double progress = Math.Min(100, (stopwatch.ElapsedMilliseconds / (double)durationMs) * 100);
+                    int progress = (int)Math.Min(100, (elapsedMs / durationMs) * 100);
                     OnProgress?.Invoke("upload", progress);
                 }
                 catch (Exception ex)
@@ -465,23 +415,21 @@ namespace VRWorkspace.Streaming
                 }
             }
 
-            stopwatch.Stop();
             _isRunning = false;
 
-            // Send end marker
-            var endMsg = $"{{\"type\":\"speedtest_end\",\"direction\":\"upload\",\"totalBytes\":{bytesSent},\"durationMs\":{stopwatch.ElapsedMilliseconds}}}";
+            var totalElapsedMs = (_masterTimer.ElapsedTicks - startTicks) * 1000.0 / Stopwatch.Frequency;
+            var endMsg = $"{{\"type\":\"speedtest_end\",\"direction\":\"upload\",\"totalBytes\":{bytesSent},\"durationMs\":{(long)totalElapsedMs}}}";
             await SendTextAsync(endMsg);
 
-            // Calculate speed (legacy - upload test no longer used in new flow)
-            double seconds = stopwatch.Elapsed.TotalSeconds;
-            double uploadMbps = (bytesSent * 8.0) / (seconds * 1_000_000);
+            var seconds = totalElapsedMs / 1000.0;
+            var uploadMbps = seconds > 0 ? (bytesSent * 8.0) / (seconds * 1_000_000) : 0;
 
             Debug.Log($"[SpeedTest] Upload complete: {bytesSent} bytes in {seconds:F2}s = {uploadMbps:F1} Mbps");
             OnProgress?.Invoke("upload", 100);
         }
 
         /// <summary>
-        /// Send pong response for ping measurement.
+        /// Send pong response (legacy).
         /// </summary>
         public async Task SendPongAsync()
         {
@@ -496,7 +444,7 @@ namespace VRWorkspace.Streaming
         }
 
         /// <summary>
-        /// Send speed test acknowledgment.
+        /// Send speed test acknowledgment (legacy).
         /// </summary>
         private async Task SendAckAsync(double clientMbps)
         {
@@ -506,12 +454,13 @@ namespace VRWorkspace.Streaming
             await SendTextAsync(ack);
         }
 
+        #endregion
+
+        #region Utilities
+
         private async Task SendTextAsync(string text)
         {
             if (_ws.State != WebSocketState.Open) return;
-
-            // Debug: Log what we're sending
-            Debug.Log($"[SpeedTest] SendTextAsync: \"{text}\" (len={text.Length})");
 
             var bytes = Encoding.UTF8.GetBytes(text);
             await _ws.SendAsync(
@@ -539,7 +488,7 @@ namespace VRWorkspace.Streaming
     /// </summary>
     public class SpeedTestResult
     {
-        public double BandwidthMbps { get; set; } // Download speed only (upload test removed)
+        public double BandwidthMbps { get; set; }
         public double PingMs { get; set; }
         public double JitterMs { get; set; }
     }

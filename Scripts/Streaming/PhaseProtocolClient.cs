@@ -346,13 +346,12 @@ namespace VRWorkspace.Streaming
                             break;
 
                         case "answer":
-                            Debug.Log($"[PhaseProtocol] >>> Handling answer for monitor {json.GetInt("monitorIndex")}");
-                            await HandleAnswerAsync(json);
-                            Debug.Log($"[PhaseProtocol] <<< Finished answer handler");
+                            // Fire-and-forget (like browser) - don't block message loop
+                            _ = HandleAnswerAsync(json);
                             break;
 
                         case "candidate":
-                            Debug.Log($"[PhaseProtocol] >>> Handling candidate for monitor {json.GetInt("monitorIndex")}");
+                            // Synchronous, minimal logging
                             HandleCandidate(json);
                             break;
 
@@ -921,183 +920,263 @@ namespace VRWorkspace.Streaming
             }
         }
 
+        /// <summary>
+        /// Create PeerConnections using PARALLEL pattern (like browser).
+        /// Falls back to sequential if parallel fails (for Android compatibility).
+        /// REWRITTEN to match browser performance.
+        /// </summary>
         private async Task CreatePeerConnectionsAsync(int count)
         {
-            Debug.Log($"[PhaseProtocol] Creating {count} PeerConnections");
+            Debug.Log($"[PhaseProtocol] Creating {count} PeerConnections (parallel mode)");
 
-            // Set expected count BEFORE creating any PCs, so CheckIceComplete knows to wait for all
             _expectedMonitorCount = count;
 
-            // ICE servers for better NAT traversal and connection stability
-            var iceServers = new RTCIceServer[]
+#if UNITY_ANDROID && !UNITY_EDITOR
+            Debug.Log("[PhaseProtocol] Android detected - using parallel with fallback");
+#endif
+
+            // Try parallel first (like browser) - all PCs created at once
+            var parallelSuccess = await TryParallelPCCreationAsync(count);
+
+            if (!parallelSuccess)
             {
-                // Google STUN servers (free, reliable)
-                new RTCIceServer { urls = new[] { "stun:stun.l.google.com:19302" } },
-                new RTCIceServer { urls = new[] { "stun:stun1.l.google.com:19302" } },
-            };
+                Debug.LogWarning("[PhaseProtocol] Parallel creation incomplete, falling back to sequential...");
+                await CreatePeerConnectionsSequentialAsync(count);
+            }
+        }
+
+        /// <summary>
+        /// Create all PCs in parallel like browser does.
+        /// Returns true if all PCs got answers within timeout.
+        /// </summary>
+        private async Task<bool> TryParallelPCCreationAsync(int count)
+        {
+            var tasks = new List<Task>();
+
+            // Create all PCs simultaneously (like browser's tight loop)
+            for (int i = 0; i < count; i++)
+            {
+                int idx = i;
+                tasks.Add(CreateSinglePCAsync(idx));
+            }
+
+            // Wait for all PC creation tasks to complete (offer sent)
+            await Task.WhenAll(tasks);
+            Debug.Log($"[PhaseProtocol] All {count} offers sent in parallel");
+
+            // Now wait for answers with a single timeout for ALL PCs (10s total)
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            const int TOTAL_ANSWER_TIMEOUT_MS = 10000; // 10 seconds for ALL answers
+
+            while (sw.ElapsedMilliseconds < TOTAL_ANSWER_TIMEOUT_MS)
+            {
+                int answersReceived;
+                lock (_lock)
+                {
+                    answersReceived = _peerConnections.Count(p => p.AnswerSet);
+                }
+
+                if (answersReceived >= count)
+                {
+                    Debug.Log($"[PhaseProtocol] All {count} answers received in {sw.ElapsedMilliseconds}ms (parallel success)");
+                    return true;
+                }
+
+                await Task.Delay(50); // Check every 50ms
+            }
+
+            // Check final state
+            int finalAnswers;
+            lock (_lock)
+            {
+                finalAnswers = _peerConnections.Count(p => p.AnswerSet);
+            }
+
+            Debug.LogWarning($"[PhaseProtocol] Parallel timeout: {finalAnswers}/{count} answers received");
+            return finalAnswers >= count;
+        }
+
+        /// <summary>
+        /// Create a single PC with offer - used by parallel creation.
+        /// Fire-and-forget pattern - doesn't wait for answer.
+        /// </summary>
+        private async Task CreateSinglePCAsync(int idx)
+        {
+            // EMPTY ICE servers (like browser) - no STUN lookup delay!
+            // Browser: new RTCPeerConnection({ iceServers: [], iceCandidatePoolSize: 0 })
+            var cfg = new RTCConfiguration { iceServers = new RTCIceServer[0] };
+            var pc = new RTCPeerConnection(ref cfg);
+            var wrapper = new PCWrapper { Index = idx, PC = pc };
+
+            // Add video transceiver
+            var trans = pc.AddTransceiver(TrackKind.Video, new RTCRtpTransceiverInit { direction = RTCRtpTransceiverDirection.RecvOnly });
+            SetCodecPreferences(trans, idx);
+
+            // Event handlers
+            SetupPCEventHandlers(pc, wrapper, idx);
+
+            lock (_lock) { _peerConnections.Add(wrapper); }
+
+            // Create offer (don't use polling - use await pattern)
+            var offerOp = pc.CreateOffer();
+            while (!offerOp.IsDone)
+                await Task.Yield();
+
+            if (offerOp.IsError)
+            {
+                Debug.LogError($"[PhaseProtocol] PC{idx} CreateOffer failed");
+                return;
+            }
+
+            var offer = offerOp.Desc;
+            var setLocalOp = pc.SetLocalDescription(ref offer);
+            while (!setLocalOp.IsDone)
+                await Task.Yield();
+
+            if (setLocalOp.IsError)
+            {
+                Debug.LogError($"[PhaseProtocol] PC{idx} SetLocal failed");
+                return;
+            }
+
+            // Fire-and-forget send (like browser)
+            _ = SendTextAsync($"{{\"type\":\"offer\",\"monitorIndex\":{idx},\"sdp\":\"{EscapeJsonString(offer.sdp)}\"}}");
+            Debug.Log($"[PhaseProtocol] PC{idx} offer sent (parallel)");
+        }
+
+        /// <summary>
+        /// Sequential fallback for Android or when parallel fails.
+        /// </summary>
+        private async Task CreatePeerConnectionsSequentialAsync(int count)
+        {
+            Debug.Log($"[PhaseProtocol] Sequential fallback for {count} PCs");
+
+            // Clear any partial results from parallel attempt
+            lock (_lock)
+            {
+                foreach (var w in _peerConnections)
+                {
+                    try { w.PC?.Dispose(); } catch { }
+                }
+                _peerConnections.Clear();
+            }
 
             for (int i = 0; i < count; i++)
             {
-                var cfg = new RTCConfiguration { iceServers = iceServers };
-                var pc = new RTCPeerConnection(ref cfg);
-                var wrapper = new PCWrapper { Index = i, PC = pc };
+                int idx = i;
+                await CreateSinglePCAsync(idx);
 
-                int idx = i; // Capture for closures
-
-                // Add video transceiver with codec preference based on negotiated codec
-                var trans = pc.AddTransceiver(TrackKind.Video, new RTCRtpTransceiverInit { direction = RTCRtpTransceiverDirection.RecvOnly });
-                var caps = RTCRtpReceiver.GetCapabilities(TrackKind.Video);
-
-                // Set codec preferences based on selected codec
-                RTCRtpCodecCapability[] preferredCodecs;
-                if (_selectedCodec == VideoCodec.H265)
-                {
-                    // H.265 preferred: HEVC first, then H.264
-                    var h265 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("H265", StringComparison.OrdinalIgnoreCase) ||
-                                                       (c.mimeType ?? "").Contains("HEVC", StringComparison.OrdinalIgnoreCase)).ToArray();
-                    var h264 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("H264", StringComparison.OrdinalIgnoreCase)).ToArray();
-                    preferredCodecs = h265.Concat(h264).Concat(caps.codecs.Except(h265).Except(h264)).ToArray();
-                    Debug.Log($"[PhaseProtocol] PC{idx} using HEVC codec preference ({h265.Length} HEVC codecs found)");
-                }
-                else
-                {
-                    // H.264 preferred
-                    var h264 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("H264", StringComparison.OrdinalIgnoreCase)).ToArray();
-                    preferredCodecs = h264.Concat(caps.codecs.Except(h264)).ToArray();
-                    Debug.Log($"[PhaseProtocol] PC{idx} using H.264 codec preference");
-                }
-                trans.SetCodecPreferences(preferredCodecs);
-
-                pc.OnIceConnectionChange = s =>
-                {
-                    Debug.Log($"[PhaseProtocol] PC{idx} ICE: {s}");
-                    if (s == RTCIceConnectionState.Connected)
-                    {
-                        Debug.Log($"[PhaseProtocol] PC{idx} ICE connected");
-                    }
-                };
-                pc.OnConnectionStateChange = s =>
-                {
-                    Debug.Log($"[PhaseProtocol] PC{idx} State: {s}");
-                    if (s == RTCPeerConnectionState.Connected)
-                    {
-                        Debug.Log($"[PhaseProtocol] PC{idx} PC connected");
-                        wrapper.LastConnectedTime = DateTime.UtcNow;
-                        wrapper.IsReconnecting = false;
-                        wrapper.ReconnectAttempts = 0; // Reset on successful connection
-                    }
-                    else if (s == RTCPeerConnectionState.Failed || s == RTCPeerConnectionState.Disconnected)
-                    {
-                        Debug.LogWarning($"[PhaseProtocol] PC{idx} connection lost");
-                        // Client-side auto-heal: Attempt reconnect if we're still streaming
-                        if (_stateMachine.IsStreaming && !wrapper.IsReconnecting)
-                        {
-                            wrapper.IsReconnecting = true;
-                            Debug.Log($"[PhaseProtocol] PC{idx} initiating client-side auto-heal...");
-                            _ = AutoHealMonitorAsync(idx);
-                        }
-                    }
-                };
-
-                // ICE candidates
-                pc.OnIceCandidate = cand =>
-                {
-                    if (string.IsNullOrEmpty(cand.Candidate))
-                    {
-                        Debug.Log($"[PhaseProtocol] PC{idx} ICE gathering complete");
-                        _ = SendTextAsync($"{{\"type\":\"end_of_candidates\",\"monitorIndex\":{idx}}}");
-                        return;
-                    }
-
-                    string msg = cand.Candidate;
-                    if (_skipTcpIceCandidates && (msg.Contains(" tcp ", StringComparison.OrdinalIgnoreCase) || msg.Contains("tcptype", StringComparison.OrdinalIgnoreCase)))
-                    {
-                        Debug.Log($"[PhaseProtocol] PC{idx} Skipped TCP candidate");
-                        return;
-                    }
-
-                    // Normalize format
-                    string rawCandidate = msg.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase)
-                        ? msg.Substring("candidate:".Length)
-                        : msg;
-
-                    Debug.Log($"[PhaseProtocol] PC{idx} Sending ICE: {rawCandidate.Substring(0, Math.Min(60, rawCandidate.Length))}...");
-                    _ = SendTextAsync($"{{\"type\":\"candidate\",\"monitorIndex\":{idx},\"candidate\":\"{EscapeJsonString(rawCandidate)}\"}}");
-                };
-
-                // Track received
-                pc.OnTrack = e =>
-                {
-                    if (e.Track is VideoStreamTrack v)
-                    {
-                        wrapper.VideoTrack = v;
-                        wrapper.LastFrameTime = DateTime.UtcNow; // Initialize
-                        v.OnVideoReceived += tex =>
-                        {
-                            wrapper.Texture = tex;
-                            wrapper.LastFrameTime = DateTime.UtcNow;
-                            wrapper.FrameCount++;
-                            OnVideoTextureReceived?.Invoke(idx, tex);
-                        };
-                        Debug.Log($"[PhaseProtocol] PC{idx} received video track");
-                    }
-                };
-
-                lock (_lock) { _peerConnections.Add(wrapper); }
-
-                // Create and send offer - use Task.Delay(10) like v1 for consistent async behavior
-                var offerOp = pc.CreateOffer();
+                // Wait for answer before next PC (sequential)
                 var sw = System.Diagnostics.Stopwatch.StartNew();
-                while (!offerOp.IsDone && sw.ElapsedMilliseconds < 5000)
-                    await Task.Delay(10);
-
-                if (!offerOp.IsDone || offerOp.IsError)
+                PCWrapper wrapper;
+                lock (_lock)
                 {
-                    Debug.LogError($"[PhaseProtocol] PC{idx} CreateOffer failed");
-                    continue;
+                    wrapper = _peerConnections.FirstOrDefault(p => p.Index == idx);
                 }
 
-                var offer = offerOp.Desc;
-                var setLocalOp = pc.SetLocalDescription(ref offer);
-                sw.Restart();
-                while (!setLocalOp.IsDone && sw.ElapsedMilliseconds < 5000)
-                    await Task.Delay(10);
-
-                if (!setLocalOp.IsDone || setLocalOp.IsError)
+                if (wrapper != null)
                 {
-                    Debug.LogError($"[PhaseProtocol] PC{idx} SetLocal failed");
-                    continue;
-                }
-
-                await SendTextAsync($"{{\"type\":\"offer\",\"monitorIndex\":{idx},\"sdp\":\"{EscapeJsonString(offer.sdp)}\"}}");
-                Debug.Log($"[PhaseProtocol] PC{idx} offer sent");
-
-                // SEQUENTIAL FIX: Wait for answer before creating next PC
-                // Reduced timeouts to match browser's faster connection pattern
-                if (i < count - 1) // Don't wait after last PC
-                {
-                    Debug.Log($"[PhaseProtocol] PC{idx} waiting for answer before creating next PC...");
-
-                    // Wait for answer to be set (max 5 seconds - reduced from 10s)
-                    sw.Restart();
                     while (!wrapper.AnswerSet && sw.ElapsedMilliseconds < 5000)
-                    {
-                        await Task.Delay(20); // Faster polling (20ms vs 50ms)
-                    }
+                        await Task.Delay(50);
 
-                    if (!wrapper.AnswerSet)
-                    {
-                        Debug.LogWarning($"[PhaseProtocol] PC{idx} answer timeout after 5s, continuing anyway");
-                    }
+                    if (wrapper.AnswerSet)
+                        Debug.Log($"[PhaseProtocol] PC{idx} answer received (sequential)");
                     else
-                    {
-                        Debug.Log($"[PhaseProtocol] PC{idx} answer received, brief wait before next PC...");
-                        // Just a brief delay for stability (200ms vs 500ms)
-                        // Don't wait for full ICE connection - let it happen in parallel like browser
-                        await Task.Delay(200);
-                    }
+                        Debug.LogWarning($"[PhaseProtocol] PC{idx} answer timeout (sequential)");
                 }
             }
+        }
+
+        /// <summary>
+        /// Set codec preferences for a transceiver.
+        /// </summary>
+        private void SetCodecPreferences(RTCRtpTransceiver trans, int idx)
+        {
+            var caps = RTCRtpReceiver.GetCapabilities(TrackKind.Video);
+            RTCRtpCodecCapability[] preferredCodecs;
+
+            if (_selectedCodec == VideoCodec.H265)
+            {
+                var h265 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("H265", StringComparison.OrdinalIgnoreCase) ||
+                                                   (c.mimeType ?? "").Contains("HEVC", StringComparison.OrdinalIgnoreCase)).ToArray();
+                var h264 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("H264", StringComparison.OrdinalIgnoreCase)).ToArray();
+                preferredCodecs = h265.Concat(h264).Concat(caps.codecs.Except(h265).Except(h264)).ToArray();
+            }
+            else
+            {
+                var h264 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("H264", StringComparison.OrdinalIgnoreCase)).ToArray();
+                preferredCodecs = h264.Concat(caps.codecs.Except(h264)).ToArray();
+            }
+            trans.SetCodecPreferences(preferredCodecs);
+        }
+
+        /// <summary>
+        /// Setup event handlers for a PeerConnection.
+        /// </summary>
+        private void SetupPCEventHandlers(RTCPeerConnection pc, PCWrapper wrapper, int idx)
+        {
+            pc.OnIceConnectionChange = s =>
+            {
+                Debug.Log($"[PhaseProtocol] PC{idx} ICE: {s}");
+            };
+
+            pc.OnConnectionStateChange = s =>
+            {
+                Debug.Log($"[PhaseProtocol] PC{idx} State: {s}");
+                if (s == RTCPeerConnectionState.Connected)
+                {
+                    wrapper.LastConnectedTime = DateTime.UtcNow;
+                    wrapper.IsReconnecting = false;
+                    wrapper.ReconnectAttempts = 0;
+                }
+                else if (s == RTCPeerConnectionState.Failed || s == RTCPeerConnectionState.Disconnected)
+                {
+                    if (_stateMachine.IsStreaming && !wrapper.IsReconnecting)
+                    {
+                        wrapper.IsReconnecting = true;
+                        Debug.Log($"[PhaseProtocol] PC{idx} initiating auto-heal...");
+                        _ = AutoHealMonitorAsync(idx);
+                    }
+                }
+            };
+
+            // ICE candidates - fire-and-forget (like browser)
+            pc.OnIceCandidate = cand =>
+            {
+                if (string.IsNullOrEmpty(cand.Candidate))
+                {
+                    _ = SendTextAsync($"{{\"type\":\"end_of_candidates\",\"monitorIndex\":{idx}}}");
+                    return;
+                }
+
+                string msg = cand.Candidate;
+                if (_skipTcpIceCandidates && (msg.Contains(" tcp ", StringComparison.OrdinalIgnoreCase) || msg.Contains("tcptype", StringComparison.OrdinalIgnoreCase)))
+                    return;
+
+                string rawCandidate = msg.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase)
+                    ? msg.Substring("candidate:".Length)
+                    : msg;
+
+                _ = SendTextAsync($"{{\"type\":\"candidate\",\"monitorIndex\":{idx},\"candidate\":\"{EscapeJsonString(rawCandidate)}\"}}");
+            };
+
+            // Track received
+            pc.OnTrack = e =>
+            {
+                if (e.Track is VideoStreamTrack v)
+                {
+                    wrapper.VideoTrack = v;
+                    wrapper.LastFrameTime = DateTime.UtcNow;
+                    v.OnVideoReceived += tex =>
+                    {
+                        wrapper.Texture = tex;
+                        wrapper.LastFrameTime = DateTime.UtcNow;
+                        wrapper.FrameCount++;
+                        OnVideoTextureReceived?.Invoke(idx, tex);
+                    };
+                    Debug.Log($"[PhaseProtocol] PC{idx} received video track");
+                }
+            };
         }
 
         private async Task HandleAnswerAsync(SimpleJson json)
