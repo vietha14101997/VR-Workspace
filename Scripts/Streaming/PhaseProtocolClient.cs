@@ -377,6 +377,10 @@ namespace VRWorkspace.Streaming
                             _speedTest?.HandlePong();
                             break;
 
+                        case "frameTiming":
+                            // Diagnostic message from server - ignore (or could be used for frame timing analysis)
+                            break;
+
                         case null:
                         case "":
                             Debug.LogWarning($"[PhaseProtocol] Empty/null type! Raw message: {text.Substring(0, Math.Min(300, text.Length))}");
@@ -501,52 +505,45 @@ namespace VRWorkspace.Streaming
         /// <summary>
         /// Check if Android MediaCodec supports HEVC decoding.
         /// This is a fallback when native plugin is unavailable.
+        /// Uses fast path: check for known HEVC decoder directly instead of iterating all codecs.
         /// </summary>
         private bool CheckMediaCodecHevcSupport()
         {
             try
             {
-                // Query MediaCodecList for HEVC decoder
-                using (var mediaCodecList = new AndroidJavaClass("android.media.MediaCodecList"))
+                Debug.Log("[PhaseProtocol] CheckMediaCodecHevcSupport: Starting fast path check...");
+
+                // Fast path: Try to create HEVC decoder directly (much faster than iterating all codecs)
+                using (var mediaCodec = new AndroidJavaClass("android.media.MediaCodec"))
                 {
-                    int codecCount = mediaCodecList.CallStatic<int>("getCodecCount");
-                    Debug.Log($"[PhaseProtocol] MediaCodecList has {codecCount} codecs");
-
-                    for (int i = 0; i < codecCount; i++)
+                    try
                     {
-                        using (var codecInfo = mediaCodecList.CallStatic<AndroidJavaObject>("getCodecInfoAt", i))
+                        // Try to create decoder for video/hevc - if it succeeds, HEVC is supported
+                        using (var decoder = mediaCodec.CallStatic<AndroidJavaObject>("createDecoderByType", "video/hevc"))
                         {
-                            if (codecInfo == null) continue;
-
-                            // Skip encoders, we need decoder
-                            bool isEncoder = codecInfo.Call<bool>("isEncoder");
-                            if (isEncoder) continue;
-
-                            // Check supported types
-                            string[] types = codecInfo.Call<string[]>("getSupportedTypes");
-                            if (types == null) continue;
-
-                            foreach (var type in types)
+                            if (decoder != null)
                             {
-                                // HEVC MIME types: video/hevc, video/x-hevc
-                                if (type != null && (type.Contains("hevc") || type.Contains("HEVC")))
-                                {
-                                    string codecName = codecInfo.Call<string>("getName") ?? "unknown";
-                                    Debug.Log($"[PhaseProtocol] Found HEVC decoder: {codecName} ({type})");
-                                    return true;
-                                }
+                                string name = decoder.Call<string>("getName") ?? "unknown";
+                                Debug.Log($"[PhaseProtocol] HEVC decoder available: {name}");
+                                decoder.Call("release");
+                                return true;
                             }
                         }
                     }
+                    catch (Exception createEx)
+                    {
+                        Debug.Log($"[PhaseProtocol] No HEVC decoder available: {createEx.Message}");
+                    }
                 }
 
-                Debug.Log("[PhaseProtocol] No HEVC decoder found in MediaCodecList");
+                Debug.Log("[PhaseProtocol] HEVC decoder not found via fast path");
                 return false;
             }
             catch (Exception ex)
             {
                 Debug.LogWarning($"[PhaseProtocol] MediaCodec HEVC check failed: {ex.Message}");
-                // On error, assume HEVC is supported if API >= 21 (most devices have it)
+                // On error, assume HEVC is supported if API >= 21 (most modern devices have it)
+                Debug.Log("[PhaseProtocol] Assuming HEVC support due to error (API >= 21 fallback)");
                 return true;
             }
         }
@@ -593,23 +590,50 @@ namespace VRWorkspace.Streaming
             OnHardwareInfoReceived?.Invoke(_hardwareInfo);
 
             // Get client codec capabilities
-            var clientCapability = GetClientCodecCapability();
-            Debug.Log($"[PhaseProtocol] Client codecs: [{string.Join(", ", clientCapability.supportedCodecs)}], prefers: {clientCapability.preferredCodec}, HEVC: {clientCapability.supportsHevc}");
+            Debug.Log("[PhaseProtocol] Getting client codec capabilities...");
+            ClientCodecCapability clientCapability;
+            try
+            {
+                clientCapability = GetClientCodecCapability();
+                Debug.Log($"[PhaseProtocol] Client codecs: [{string.Join(", ", clientCapability.supportedCodecs)}], prefers: {clientCapability.preferredCodec}, HEVC: {clientCapability.supportsHevc}");
+            }
+            catch (Exception capEx)
+            {
+                Debug.LogError($"[PhaseProtocol] GetClientCodecCapability failed: {capEx.Message}");
+                // Fallback to H264 only
+                clientCapability = new ClientCodecCapability
+                {
+                    supportedCodecs = new[] { "H264" },
+                    preferredCodec = "H264",
+                    supportsHevc = false,
+                    deviceModel = SystemInfo.deviceModel,
+                    apiLevel = 0
+                };
+            }
 
             // Send acknowledgment with client codec capabilities
+            // NOTE: Build JSON manually because SimpleJson.Serialize doesn't work with anonymous objects on Android IL2CPP
             Debug.Log("[PhaseProtocol] Sending hardware_info_ack with codec capabilities");
-            await SendJsonAsync(new
+            try
             {
-                type = "hardware_info_ack",
-                clientCodecs = new
-                {
-                    supportedCodecs = clientCapability.supportedCodecs,
-                    preferredCodec = clientCapability.preferredCodec,
-                    supportsHevc = clientCapability.supportsHevc,
-                    deviceModel = clientCapability.deviceModel,
-                    apiLevel = clientCapability.apiLevel
-                }
-            });
+                var codecsArray = string.Join(",", clientCapability.supportedCodecs.Select(c => $"\"{c}\""));
+                var supportsHevcStr = clientCapability.supportsHevc.ToString().ToLower();
+                var hardwareAckJson = $"{{\"type\":\"hardware_info_ack\",\"clientCodecs\":{{" +
+                    $"\"supportedCodecs\":[{codecsArray}]," +
+                    $"\"preferredCodec\":\"{clientCapability.preferredCodec}\"," +
+                    $"\"supportsHevc\":{supportsHevcStr}," +
+                    $"\"deviceModel\":\"{EscapeJsonString(clientCapability.deviceModel)}\"," +
+                    $"\"apiLevel\":{clientCapability.apiLevel}" +
+                    $"}}}}";
+                Debug.Log($"[PhaseProtocol] hardware_info_ack JSON: {hardwareAckJson}");
+                await SendTextAsync(hardwareAckJson);
+                Debug.Log("[PhaseProtocol] hardware_info_ack sent successfully");
+            }
+            catch (Exception sendEx)
+            {
+                Debug.LogError($"[PhaseProtocol] Failed to send hardware_info_ack: {sendEx.Message}");
+                throw;
+            }
 
             // NEW FLOW: Client initiates speed test
             _stateMachine.TryTransition(ConnectionPhase.SpeedTesting);
@@ -1493,6 +1517,19 @@ namespace VRWorkspace.Streaming
             {
                 Debug.LogWarning($"[PhaseProtocol] Send error: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Escape special characters in a string for JSON.
+        /// </summary>
+        private string EscapeJsonString(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            return s.Replace("\\", "\\\\")
+                    .Replace("\"", "\\\"")
+                    .Replace("\n", "\\n")
+                    .Replace("\r", "\\r")
+                    .Replace("\t", "\\t");
         }
 
         private string FixSdp(string sdp)
