@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
+using Interlocked = System.Threading.Interlocked;
 
 namespace VRWorkspace.Streaming
 {
@@ -30,11 +31,11 @@ namespace VRWorkspace.Streaming
         private volatile bool _isRunning;
         private string _currentDirection;
         private int _durationMs;
-        private long _bytesReceived;
+        private long _bytesReceived; // Thread-safe via Interlocked
 
         // Improved measurement - event-driven instead of polling
-        private long _measurementStartTicks;
-        private bool _warmupComplete;
+        private long _measurementStartTicks; // Thread-safe via Interlocked
+        private volatile bool _warmupComplete; // Volatile for thread visibility
         private TaskCompletionSource<double> _bandwidthComplete;
 
         // Constants - tuned for accurate measurement
@@ -189,10 +190,10 @@ namespace VRWorkspace.Streaming
         /// </summary>
         private async Task<double> MeasureDownloadAsync()
         {
-            // Reset state
-            _bytesReceived = 0;
+            // Reset state using Interlocked for thread safety
+            Interlocked.Exchange(ref _bytesReceived, 0);
             _warmupComplete = false;
-            _measurementStartTicks = 0;
+            Interlocked.Exchange(ref _measurementStartTicks, 0);
             _isRunning = true;
             _currentDirection = "bandwidth";
             _durationMs = SPEED_TEST_DURATION_MS;
@@ -233,20 +234,40 @@ namespace VRWorkspace.Streaming
         }
 
         /// <summary>
-        /// Calculate bandwidth from collected data.
+        /// Calculate bandwidth from collected data (main thread version).
         /// </summary>
         private double CalculateBandwidth()
         {
-            if (_measurementStartTicks == 0 || _bytesReceived == 0)
+            var startTicks = Interlocked.Read(ref _measurementStartTicks);
+            var bytes = Interlocked.Read(ref _bytesReceived);
+
+            if (startTicks == 0 || bytes == 0)
                 return 0;
 
-            var elapsedTicks = _masterTimer.ElapsedTicks - _measurementStartTicks;
+            var elapsedTicks = _masterTimer.ElapsedTicks - startTicks;
             var elapsedSeconds = elapsedTicks / (double)Stopwatch.Frequency;
 
             if (elapsedSeconds <= 0)
                 return 0;
 
-            return (_bytesReceived * 8.0) / (elapsedSeconds * 1_000_000);
+            return (bytes * 8.0) / (elapsedSeconds * 1_000_000);
+        }
+
+        /// <summary>
+        /// Calculate bandwidth - thread-safe version for use from WebSocket callback.
+        /// </summary>
+        private double CalculateBandwidthThreadSafe()
+        {
+            var startTicks = Interlocked.Read(ref _measurementStartTicks);
+            var bytes = Interlocked.Read(ref _bytesReceived);
+
+            if (startTicks == 0 || bytes == 0)
+                return 0;
+
+            var elapsedTicks = _masterTimer.ElapsedTicks - startTicks;
+            var elapsedSeconds = elapsedTicks / (double)Stopwatch.Frequency;
+
+            return elapsedSeconds > 0 ? (bytes * 8.0) / (elapsedSeconds * 1_000_000) : 0;
         }
 
         /// <summary>
@@ -260,8 +281,8 @@ namespace VRWorkspace.Streaming
         }
 
         /// <summary>
-        /// Record bytes received during bandwidth test - OPTIMIZED version.
-        /// No memory allocation, just counts bytes.
+        /// Record bytes received during bandwidth test - THREAD-SAFE version.
+        /// Uses Interlocked operations for atomic access from WebSocket callback thread.
         /// </summary>
         public void RecordBytesReceived(int byteCount)
         {
@@ -269,14 +290,19 @@ namespace VRWorkspace.Streaming
 
             var now = _masterTimer.ElapsedTicks;
 
-            // First chunk - start warmup timer
-            if (_measurementStartTicks == 0)
+            // Atomic compare-and-swap for first chunk detection
+            // Only the first call will set _measurementStartTicks from 0 to now
+            var startTicks = Interlocked.Read(ref _measurementStartTicks);
+            if (startTicks == 0)
             {
-                _measurementStartTicks = now;
-                Debug.Log("[SpeedTest] First byte received - starting warmup...");
+                if (Interlocked.CompareExchange(ref _measurementStartTicks, now, 0) == 0)
+                {
+                    Debug.Log("[SpeedTest] First byte received - starting warmup...");
+                }
+                startTicks = Interlocked.Read(ref _measurementStartTicks);
             }
 
-            var elapsedMs = (now - _measurementStartTicks) * 1000.0 / Stopwatch.Frequency;
+            var elapsedMs = (now - startTicks) * 1000.0 / Stopwatch.Frequency;
 
             // Only count bytes after warmup period
             if (elapsedMs >= WARMUP_PERIOD_MS)
@@ -284,20 +310,21 @@ namespace VRWorkspace.Streaming
                 if (!_warmupComplete)
                 {
                     _warmupComplete = true;
-                    _measurementStartTicks = now; // Reset timing for actual measurement
-                    _bytesReceived = 0;           // Reset byte count
+                    Interlocked.Exchange(ref _measurementStartTicks, now); // Reset timing atomically
+                    Interlocked.Exchange(ref _bytesReceived, 0);           // Reset byte count atomically
                     Debug.Log("[SpeedTest] Warmup complete - starting measurement");
                 }
-                _bytesReceived += byteCount;
+                Interlocked.Add(ref _bytesReceived, byteCount); // Atomic add
 
                 // Calculate progress and current speed
-                var measureElapsedMs = (now - _measurementStartTicks) * 1000.0 / Stopwatch.Frequency;
+                var measureStartTicks = Interlocked.Read(ref _measurementStartTicks);
+                var measureElapsedMs = (now - measureStartTicks) * 1000.0 / Stopwatch.Frequency;
                 var measurementDuration = _durationMs - WARMUP_PERIOD_MS;
                 int progress = (int)Math.Min(100, (measureElapsedMs / measurementDuration) * 100);
 
                 if (measureElapsedMs > 100) // Only after 100ms of actual measurement
                 {
-                    var currentMbps = CalculateBandwidth();
+                    var currentMbps = CalculateBandwidthThreadSafe();
                     OnSpeedProgress?.Invoke("bandwidth", currentMbps, progress);
                     OnProgress?.Invoke("bandwidth", progress);
                 }
@@ -331,8 +358,8 @@ namespace VRWorkspace.Streaming
 
             _currentDirection = direction;
             _durationMs = durationMs;
-            _bytesReceived = 0;
-            _measurementStartTicks = 0;
+            Interlocked.Exchange(ref _bytesReceived, 0);
+            Interlocked.Exchange(ref _measurementStartTicks, 0);
             _warmupComplete = false;
             _isRunning = true;
 
@@ -353,8 +380,8 @@ namespace VRWorkspace.Streaming
 
             _currentDirection = direction;
             _durationMs = durationMs;
-            _bytesReceived = 0;
-            _measurementStartTicks = 0;
+            Interlocked.Exchange(ref _bytesReceived, 0);
+            Interlocked.Exchange(ref _measurementStartTicks, 0);
             _warmupComplete = false;
             _isRunning = true;
 

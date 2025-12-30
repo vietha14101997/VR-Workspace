@@ -37,6 +37,13 @@ public class RTTInfoSidePanel : MonoBehaviour
     private RectTransform _container;
     private Dictionary<string, TextMeshProUGUI> _valueTexts = new Dictionary<string, TextMeshProUGUI>();
     private bool _isBuilt = false;
+
+    // UI Pooling - reuse objects instead of destroy/recreate to reduce GC
+    private List<GameObject> _rowPool = new List<GameObject>();
+    private int _activeRowCount = 0;
+    private GameObject _titleObj;
+    private TextMeshProUGUI _titleText;
+    private GameObject _separatorObj;
     #endregion
 
     #region Properties
@@ -228,57 +235,126 @@ public class RTTInfoSidePanel : MonoBehaviour
     #endregion
 
     #region Content Building
+    /// <summary>
+    /// Reset content for reuse - disables pooled objects instead of destroying.
+    /// This reduces GC allocation and improves performance.
+    /// </summary>
     private void ClearContent()
     {
         _valueTexts.Clear();
+        _activeRowCount = 0;
 
-        for (int i = transform.childCount - 1; i >= 0; i--)
+        // Disable pooled rows instead of destroying
+        foreach (var row in _rowPool)
         {
-            if (Application.isPlaying)
-                Destroy(transform.GetChild(i).gameObject);
-            else
-                DestroyImmediate(transform.GetChild(i).gameObject);
+            if (row != null) row.SetActive(false);
         }
+
+        // Hide title and separator (will be reactivated when needed)
+        if (_titleObj != null) _titleObj.SetActive(false);
+        if (_separatorObj != null) _separatorObj.SetActive(false);
     }
 
     private void AddTitle(string title)
     {
-        GameObject titleObj = new GameObject("Title");
-        titleObj.transform.SetParent(transform, false);
+        // Reuse existing title object if available
+        if (_titleObj != null)
+        {
+            _titleObj.SetActive(true);
+            _titleObj.transform.SetAsLastSibling(); // Ensure correct order
+            _titleText.text = title;
+            _titleText.color = themeColor;
+        }
+        else
+        {
+            // Create new title object (first time only)
+            _titleObj = new GameObject("Title");
+            _titleObj.transform.SetParent(transform, false);
 
-        RectTransform rt = titleObj.AddComponent<RectTransform>();
-        rt.sizeDelta = new Vector2(0, titleFontSize + 20);
+            RectTransform rt = _titleObj.AddComponent<RectTransform>();
+            rt.sizeDelta = new Vector2(0, titleFontSize + 20);
 
-        TextMeshProUGUI txt = titleObj.AddComponent<TextMeshProUGUI>();
-        txt.text = title;
-        txt.fontSize = titleFontSize;
-        txt.color = themeColor;
-        txt.alignment = TextAlignmentOptions.Center;
-        txt.fontStyle = FontStyles.Bold;
-        txt.raycastTarget = false;
-        if (customFont != null) txt.font = customFont;
+            _titleText = _titleObj.AddComponent<TextMeshProUGUI>();
+            _titleText.text = title;
+            _titleText.fontSize = titleFontSize;
+            _titleText.color = themeColor;
+            _titleText.alignment = TextAlignmentOptions.Center;
+            _titleText.fontStyle = FontStyles.Bold;
+            _titleText.raycastTarget = false;
+            if (customFont != null) _titleText.font = customFont;
+        }
 
         AddSeparator();
     }
 
     private void AddSeparator()
     {
-        GameObject sepObj = new GameObject("Separator");
-        sepObj.transform.SetParent(transform, false);
+        // Reuse existing separator if available
+        if (_separatorObj != null)
+        {
+            _separatorObj.SetActive(true);
+            _separatorObj.transform.SetAsLastSibling(); // Ensure correct order
+            var img = _separatorObj.GetComponent<Image>();
+            if (img != null) img.color = new Color(themeColor.r, themeColor.g, themeColor.b, 0.5f);
+        }
+        else
+        {
+            // Create new separator (first time only)
+            _separatorObj = new GameObject("Separator");
+            _separatorObj.transform.SetParent(transform, false);
 
-        RectTransform rt = sepObj.AddComponent<RectTransform>();
-        rt.sizeDelta = new Vector2(0, 4);
+            RectTransform rt = _separatorObj.AddComponent<RectTransform>();
+            rt.sizeDelta = new Vector2(0, 4);
 
-        Image img = sepObj.AddComponent<Image>();
-        img.color = new Color(themeColor.r, themeColor.g, themeColor.b, 0.5f);
-        img.raycastTarget = false;
+            Image img = _separatorObj.AddComponent<Image>();
+            img.color = new Color(themeColor.r, themeColor.g, themeColor.b, 0.5f);
+            img.raycastTarget = false;
 
-        var layoutElem = sepObj.AddComponent<LayoutElement>();
-        layoutElem.preferredHeight = 4;
-        layoutElem.flexibleWidth = 1;
+            var layoutElem = _separatorObj.AddComponent<LayoutElement>();
+            layoutElem.preferredHeight = 4;
+            layoutElem.flexibleWidth = 1;
+        }
     }
 
     private void AddInfoRow(string label, string value, Color? valueColor = null)
+    {
+        GameObject rowObj;
+        TextMeshProUGUI labelTxt;
+        TextMeshProUGUI valueTxt;
+
+        // Try to reuse pooled row
+        if (_activeRowCount < _rowPool.Count)
+        {
+            rowObj = _rowPool[_activeRowCount];
+            rowObj.SetActive(true);
+            rowObj.transform.SetAsLastSibling(); // Ensure correct order
+
+            // Get cached text components
+            labelTxt = rowObj.transform.Find("Label")?.GetComponent<TextMeshProUGUI>();
+            valueTxt = rowObj.transform.Find("Value")?.GetComponent<TextMeshProUGUI>();
+
+            if (labelTxt != null && valueTxt != null)
+            {
+                labelTxt.text = label;
+                valueTxt.text = value;
+                valueTxt.color = valueColor ?? Color.white;
+                _valueTexts[label] = valueTxt;
+                _activeRowCount++;
+                return;
+            }
+        }
+
+        // Create new row (pool miss or first time)
+        rowObj = CreateInfoRowObject(label, value, valueColor, out valueTxt);
+        _rowPool.Add(rowObj);
+        _valueTexts[label] = valueTxt;
+        _activeRowCount++;
+    }
+
+    /// <summary>
+    /// Create a new info row object. Called when pool is empty.
+    /// </summary>
+    private GameObject CreateInfoRowObject(string label, string value, Color? valueColor, out TextMeshProUGUI valueTxt)
     {
         GameObject rowObj = new GameObject($"Row_{label}");
         rowObj.transform.SetParent(transform, false);
@@ -319,7 +395,7 @@ public class RTTInfoSidePanel : MonoBehaviour
         RectTransform valueRT = valueObj.AddComponent<RectTransform>();
         valueRT.sizeDelta = new Vector2(350, 0);
 
-        TextMeshProUGUI valueTxt = valueObj.AddComponent<TextMeshProUGUI>();
+        valueTxt = valueObj.AddComponent<TextMeshProUGUI>();
         valueTxt.text = value;
         valueTxt.fontSize = valueFontSize;
         valueTxt.color = valueColor ?? Color.white;
@@ -333,7 +409,7 @@ public class RTTInfoSidePanel : MonoBehaviour
         var valueLayout = valueObj.AddComponent<LayoutElement>();
         valueLayout.flexibleWidth = 1;
 
-        _valueTexts[label] = valueTxt;
+        return rowObj;
     }
     #endregion
 

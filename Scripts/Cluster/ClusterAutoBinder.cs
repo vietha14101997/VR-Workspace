@@ -2,7 +2,9 @@ using UnityEngine;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using VRWorkspace.Core;
 using VRWorkspace.Streaming;
+using VRWorkspace.ViewModels;
 
 /// <summary>
 /// Multi-Track mode only implementation:
@@ -55,7 +57,8 @@ public class ClusterAutoBinder : MonoBehaviour
     // Cursor tracking - only ONE cursor should be visible across all panels
     private int _activeCursorPanelIndex = -1;
 
-    // V2 Protocol - Phased connection state
+    // V2 Protocol - Phased connection state (kept for backward compatibility)
+    [Obsolete("Use ConnectionPhase from VRWorkspace.Streaming instead")]
     public enum ConnectionState
     {
         Disconnected,
@@ -67,28 +70,39 @@ public class ClusterAutoBinder : MonoBehaviour
         Error
     }
 
+    // ViewModel for state management (MVVM pattern)
+    private ConnectionViewModel _viewModel;
+
+    // Legacy state (mapped from ViewModel)
     private ConnectionState _connectionState = ConnectionState.Disconnected;
     public ConnectionState CurrentState => _connectionState;
 
-    // V2 Protocol data (received from server)
-    public ServerHardwareInfo HardwareInfo { get; private set; }
-    public NetworkTestResult NetworkInfo { get; private set; }
-    public SuggestedStreamConfig SuggestedConfig { get; private set; }
+    // V2 Protocol data (now proxied from ViewModel)
+    public ServerHardwareInfo HardwareInfo => _viewModel?.HardwareInfo.Value;
+    public NetworkTestResult NetworkInfo => _viewModel?.NetworkInfo.Value;
+    public SuggestedStreamConfig SuggestedConfig => _viewModel?.SuggestedConfig.Value;
 
-    // Events for UI integration
+    // Legacy events for UI integration (kept for backward compatibility)
+    [Obsolete("Subscribe to ConnectionViewModel.Phase.OnChanged instead")]
     public event Action<ConnectionState> OnStateChanged;
+    [Obsolete("Subscribe to ConnectionViewModel.HardwareInfo.OnChanged instead")]
     public event Action<ServerHardwareInfo> OnHardwareInfoReceived;
+    [Obsolete("Subscribe to ConnectionViewModel.NetworkInfo.OnChanged instead")]
     public event Action<NetworkTestResult> OnNetworkInfoReceived;
+    [Obsolete("Subscribe to ConnectionViewModel.SuggestedConfig.OnChanged instead")]
     public event Action<SuggestedStreamConfig> OnSuggestedConfigReceived;
     public event Action<string, int, string> OnConfigProgress; // step, progress%, message
     public event Action<string, double, int> OnSpeedTestProgress; // direction, currentMbps, progress%
     public event Action<string> OnError;
 
-    public bool IsStreaming => _isStreaming;
-    public bool IsConnected => _connectionState >= ConnectionState.Connected;
+    public bool IsStreaming => _viewModel?.IsStreaming.Value ?? _isStreaming;
+    public bool IsConnected => _viewModel?.IsConnected.Value ?? (_connectionState >= ConnectionState.Connected);
 
     void Start()
     {
+        // Initialize ViewModel via ServiceLocator
+        InitializeViewModel();
+
         if (autoStart)
         {
             if (useV2Protocol)
@@ -101,6 +115,73 @@ public class ClusterAutoBinder : MonoBehaviour
                 // V1: Start streaming immediately
                 StartStreaming();
             }
+        }
+    }
+
+    /// <summary>
+    /// Initialize ConnectionViewModel and subscribe to its events.
+    /// </summary>
+    private void InitializeViewModel()
+    {
+        // Get or create ViewModel via ServiceLocator
+        if (!ServiceLocator.TryGet<ConnectionViewModel>(out _viewModel))
+        {
+            _viewModel = new ConnectionViewModel();
+            ServiceLocator.Register(_viewModel);
+        }
+
+        // Subscribe to ViewModel events to forward to legacy events
+        _viewModel.Phase.OnChanged += OnViewModelPhaseChanged;
+        _viewModel.HardwareInfo.OnChanged += info => OnHardwareInfoReceived?.Invoke(info);
+        _viewModel.NetworkInfo.OnChanged += info => OnNetworkInfoReceived?.Invoke(info);
+        _viewModel.SuggestedConfig.OnChanged += config => OnSuggestedConfigReceived?.Invoke(config);
+        _viewModel.ErrorMessage.OnChanged += OnViewModelError;
+
+        Debug.Log("[ClusterAutoBinder] ViewModel initialized");
+    }
+
+    /// <summary>
+    /// Handle phase changes from ViewModel and map to legacy ConnectionState.
+    /// </summary>
+    private void OnViewModelPhaseChanged(ConnectionPhase phase)
+    {
+        // Map ConnectionPhase to legacy ConnectionState
+        var newState = phase switch
+        {
+            ConnectionPhase.Disconnected => ConnectionState.Disconnected,
+            ConnectionPhase.Connecting => ConnectionState.Connecting,
+            ConnectionPhase.AwaitingHardwareInfo => ConnectionState.Connecting,
+            ConnectionPhase.SpeedTesting => ConnectionState.Connecting,
+            ConnectionPhase.AwaitingNetworkInfo => ConnectionState.Connecting,
+            ConnectionPhase.AwaitingSuggestedConfig => ConnectionState.Connecting,
+            ConnectionPhase.ConfiguringSettings => ConnectionState.Connected,
+            ConnectionPhase.SendingDisplayConfig => ConnectionState.SettingUp,
+            ConnectionPhase.AwaitingSetupComplete => ConnectionState.SettingUp,
+            ConnectionPhase.ICENegotiating => ConnectionState.SettingUp,
+            ConnectionPhase.ReadyToStream => ConnectionState.Ready,
+            ConnectionPhase.StartingStream => ConnectionState.Ready,
+            ConnectionPhase.Streaming => ConnectionState.Streaming,
+            ConnectionPhase.Reconnecting => ConnectionState.Connecting,
+            ConnectionPhase.Error => ConnectionState.Error,
+            _ => ConnectionState.Disconnected
+        };
+
+        if (_connectionState != newState)
+        {
+            _connectionState = newState;
+            OnStateChanged?.Invoke(newState);
+            Debug.Log($"[ClusterAutoBinder] State: {phase} -> {newState}");
+        }
+    }
+
+    /// <summary>
+    /// Handle error from ViewModel.
+    /// </summary>
+    private void OnViewModelError(string error)
+    {
+        if (!string.IsNullOrEmpty(error))
+        {
+            OnError?.Invoke(error);
         }
     }
 
@@ -130,112 +211,95 @@ public class ClusterAutoBinder : MonoBehaviour
 
     /// <summary>
     /// Step 1: Connect to server (Phase 1 - receive hardware info).
+    /// Uses ConnectionViewModel for state management.
     /// Button: "Connect" → After complete, button shows "Setup Remote"
     /// </summary>
     public async Task<bool> ConnectToServerAsync()
     {
-        if (_connectionState != ConnectionState.Disconnected)
+        // Ensure ViewModel is initialized
+        if (_viewModel == null) InitializeViewModel();
+
+        var currentPhase = _viewModel.Phase.Value;
+        if (currentPhase != ConnectionPhase.Disconnected && currentPhase != ConnectionPhase.Error)
         {
-            Debug.LogWarning($"[ClusterAutoBinder] Cannot connect from state: {_connectionState}");
+            Debug.LogWarning($"[ClusterAutoBinder] Cannot connect from phase: {currentPhase}");
             return false;
         }
 
-        SetState(ConnectionState.Connecting);
-        Debug.Log("[ClusterAutoBinder] Connecting to server (V2 protocol)...");
+        Debug.Log("[ClusterAutoBinder] Connecting to server (V2 protocol via ViewModel)...");
 
         // Quick validation first
         bool serverValid = await ValidateServerAsync();
         if (!serverValid)
         {
             Debug.LogError("[ClusterAutoBinder] Server validation failed - cannot reach server");
-            SetState(ConnectionState.Error);
-            OnError?.Invoke("Cannot reach server. Check host and port.");
+            _viewModel.ErrorMessage.Value = "Cannot reach server. Check host and port.";
             return false;
         }
 
         try
         {
-            // Create MultiPCStreamClient with V2 protocol
-            // IMPORTANT: Do NOT parent to this transform because WorldPanelClusterRig.KillChildren()
-            // will destroy all children when rebuilding panels, which would kill the WebSocket connection!
-            if (_multiPCClient == null)
-            {
-                var go = new GameObject("MultiPCStreamClient");
-                // Keep at scene root to survive panel rebuilds
-                _multiPCClient = go.AddComponent<MultiPCStreamClient>();
-            }
+            // Parse host and port from serverBase
+            var uri = new Uri(serverBase);
+            string host = uri.Host;
+            int port = uri.Port;
 
-            _multiPCClient.useV2Protocol = true;
-            _multiPCClient.autoAcceptSuggestedConfig = false; // We want manual control
-            _multiPCClient.autoStartConnection = false; // We'll connect manually after setting up
+            // Connect via ViewModel
+            await _viewModel.ConnectAsync(host, port);
 
-            // Subscribe to V2 events
-            _multiPCClient.OnHardwareInfoReceived += HandleHardwareInfo;
-            _multiPCClient.OnNetworkInfoReceived += HandleNetworkInfo;
-            _multiPCClient.OnSuggestedConfigReceived += HandleSuggestedConfig;
-            _multiPCClient.OnConfigProgress += HandleConfigProgress;
-            _multiPCClient.OnStreamingStarted += HandleStreamingStarted;
-            _multiPCClient.OnConnectionError += HandleError;
-            _multiPCClient.OnSpeedTestProgress += HandleSpeedTestProgress;
-            _multiPCClient.OnCursorPosition += HandleCursorPosition;
-
-            // Build signal URL
-            var wsBase = serverBase.Replace("http://", "ws://").Replace("https://", "wss://");
-            GenerateSignalPath();
-            _multiPCClient.signalUrl = $"{wsBase}/{signalPath}";
-
-            Debug.Log($"[ClusterAutoBinder] Signal URL: {_multiPCClient.signalUrl}");
-
-            // Manually start connection (after events are subscribed)
-            await _multiPCClient.ConnectV2Async();
-
-            // Wait for hardware info to be received (state changes to Connected)
+            // Wait for config phase (Phase 1 complete)
             float timeout = 30f;
             float elapsed = 0f;
-            while (_connectionState == ConnectionState.Connecting && elapsed < timeout)
+            while (elapsed < timeout)
             {
+                var phase = _viewModel.Phase.Value;
+                if (phase == ConnectionPhase.ConfiguringSettings ||
+                    phase == ConnectionPhase.Error ||
+                    phase == ConnectionPhase.Disconnected)
+                {
+                    break;
+                }
                 await Task.Delay(100);
                 elapsed += 0.1f;
             }
 
-            return _connectionState == ConnectionState.Connected;
+            return _viewModel.Phase.Value == ConnectionPhase.ConfiguringSettings;
         }
         catch (Exception ex)
         {
             Debug.LogError($"[ClusterAutoBinder] Connection failed: {ex.Message}");
-            SetState(ConnectionState.Error);
-            OnError?.Invoke(ex.Message);
+            _viewModel.ErrorMessage.Value = ex.Message;
             return false;
         }
     }
 
     /// <summary>
     /// Step 2: Setup remote (Phase 2 - configure server and ICE).
+    /// Uses ConnectionViewModel for state management.
     /// Button: "Setup Remote" → After complete, button shows "Start Remote"
     /// </summary>
     public async Task<bool> SetupRemoteAsync()
     {
-        Debug.Log($"[ClusterAutoBinder] SetupRemoteAsync called, current state: {_connectionState}");
-
-        if (_connectionState != ConnectionState.Connected)
+        if (_viewModel == null)
         {
-            Debug.LogWarning($"[ClusterAutoBinder] Cannot setup from state: {_connectionState}");
+            Debug.LogError("[ClusterAutoBinder] ViewModel is null!");
             return false;
         }
 
-        if (_multiPCClient == null)
+        var currentPhase = _viewModel.Phase.Value;
+        Debug.Log($"[ClusterAutoBinder] SetupRemoteAsync called, current phase: {currentPhase}");
+
+        if (currentPhase != ConnectionPhase.ConfiguringSettings)
         {
-            Debug.LogError("[ClusterAutoBinder] _multiPCClient is null!");
+            Debug.LogWarning($"[ClusterAutoBinder] Cannot setup from phase: {currentPhase}");
             return false;
         }
 
-        SetState(ConnectionState.SettingUp);
-        Debug.Log("[ClusterAutoBinder] Setting up remote...");
+        Debug.Log("[ClusterAutoBinder] Setting up remote via ViewModel...");
 
         try
         {
-            // Sử dụng giá trị từ properties (đã được set từ dropdown qua ApplyFormToBinder)
-            // bitrateKbps từ dropdown là bitrate MỖI MONITOR, nhân với số monitor để có tổng
+            // Build config from current settings
             int totalBitrateKbps = bitrateKbps * monitorCount;
 
             var config = new StreamingConfig
@@ -244,55 +308,62 @@ public class ClusterAutoBinder : MonoBehaviour
                 resolutionWidth = resolutionWidth,
                 resolutionHeight = resolutionHeight,
                 refreshRate = 60,
-                bitrateKbps = totalBitrateKbps,  // Total bitrate = per-monitor * monitors
+                bitrateKbps = totalBitrateKbps,
                 fps = fps
             };
 
-            Debug.Log($"[ClusterAutoBinder] Applying config: {config.monitors}mon @ {config.resolutionWidth}x{config.resolutionHeight}, {config.fps}fps, {bitrateKbps}kbps/mon = {totalBitrateKbps}kbps total");
-            Debug.Log("[ClusterAutoBinder] Calling _multiPCClient.ApplyConfigAsync...");
+            Debug.Log($"[ClusterAutoBinder] Applying config: {config.monitors}mon @ {config.resolutionWidth}x{config.resolutionHeight}, {config.fps}fps, {totalBitrateKbps}kbps total");
 
-            await _multiPCClient.ApplyConfigAsync(config);
-            Debug.Log("[ClusterAutoBinder] ApplyConfigAsync returned");
+            // Accept config via ViewModel
+            await _viewModel.AcceptConfigAsync(config);
 
-            // Wait for ICE to complete (state becomes Ready)
+            // Wait for ReadyToStream phase
             float timeout = 60f;
             float elapsed = 0f;
-            while (_connectionState == ConnectionState.SettingUp && elapsed < timeout)
+            while (elapsed < timeout)
             {
-                // Check if state machine reached ReadyToStream
-                if (_multiPCClient.StateMachine?.CurrentPhase == ConnectionPhase.ReadyToStream)
+                var phase = _viewModel.Phase.Value;
+                if (phase == ConnectionPhase.ReadyToStream ||
+                    phase == ConnectionPhase.Error ||
+                    phase == ConnectionPhase.Disconnected)
                 {
-                    SetState(ConnectionState.Ready);
                     break;
                 }
                 await Task.Delay(100);
                 elapsed += 0.1f;
             }
 
-            return _connectionState == ConnectionState.Ready;
+            return _viewModel.Phase.Value == ConnectionPhase.ReadyToStream;
         }
         catch (Exception ex)
         {
             Debug.LogError($"[ClusterAutoBinder] Setup failed: {ex.Message}");
-            SetState(ConnectionState.Error);
-            OnError?.Invoke(ex.Message);
+            _viewModel.ErrorMessage.Value = ex.Message;
             return false;
         }
     }
 
     /// <summary>
     /// Step 3: Start streaming (Phase 3).
+    /// Uses ConnectionViewModel for state management.
     /// Button: "Start Remote" → Hide menu, create rig, start receiving frames
     /// </summary>
     public async Task<bool> StartRemoteAsync()
     {
-        if (_connectionState != ConnectionState.Ready)
+        if (_viewModel == null)
         {
-            Debug.LogWarning($"[ClusterAutoBinder] Cannot start from state: {_connectionState}");
+            Debug.LogError("[ClusterAutoBinder] ViewModel is null!");
             return false;
         }
 
-        Debug.Log("[ClusterAutoBinder] Starting remote streaming...");
+        var currentPhase = _viewModel.Phase.Value;
+        if (currentPhase != ConnectionPhase.ReadyToStream)
+        {
+            Debug.LogWarning($"[ClusterAutoBinder] Cannot start from phase: {currentPhase}");
+            return false;
+        }
+
+        Debug.Log("[ClusterAutoBinder] Starting remote streaming via ViewModel...");
 
         try
         {
@@ -304,24 +375,17 @@ public class ClusterAutoBinder : MonoBehaviour
                 rig.BuildWithPanelCount(monitorCount);
             }
 
-            // Assign panels to MultiPCStreamClient
-            if (rig != null && rig.panels != null)
-            {
-                _multiPCClient.panels = rig.panels.ToArray();
-            }
+            // Start streaming via ViewModel
+            await _viewModel.StartStreamingAsync();
 
-            // Start streaming
-            await _multiPCClient.StartStreamingV2Async();
-
-            // State will change to Streaming via event handler
+            // State will change to Streaming via ViewModel
             _isStreaming = true;
             return true;
         }
         catch (Exception ex)
         {
             Debug.LogError($"[ClusterAutoBinder] Start streaming failed: {ex.Message}");
-            SetState(ConnectionState.Error);
-            OnError?.Invoke(ex.Message);
+            _viewModel.ErrorMessage.Value = ex.Message;
             return false;
         }
     }
@@ -342,35 +406,40 @@ public class ClusterAutoBinder : MonoBehaviour
         Debug.Log($"[ClusterAutoBinder] Applied suggested config: {monitorCount}mon @ {resolutionWidth}x{resolutionHeight}, {fps}fps, {bitrateKbps}kbps");
     }
 
+    /// <summary>
+    /// Legacy state setter. State is now managed by ViewModel.
+    /// </summary>
+    [Obsolete("State is now managed by ConnectionViewModel")]
     private void SetState(ConnectionState newState)
     {
         if (_connectionState == newState) return;
         var oldState = _connectionState;
         _connectionState = newState;
-        Debug.Log($"[ClusterAutoBinder] State: {oldState} -> {newState}");
+        Debug.Log($"[ClusterAutoBinder] Legacy SetState: {oldState} -> {newState}");
         OnStateChanged?.Invoke(newState);
     }
 
+    // Legacy handlers - kept for backward compatibility with MultiPCStreamClient direct usage
+    // These are only used in V1 legacy mode
+
+    [Obsolete("Use ViewModel event handlers instead")]
     private void HandleHardwareInfo(ServerHardwareInfo info)
     {
-        HardwareInfo = info;
-        Debug.Log($"[ClusterAutoBinder] Received hardware info: {info.deviceName}, {info.gpu}");
+        Debug.Log($"[ClusterAutoBinder] Legacy: Received hardware info: {info.deviceName}, {info.gpu}");
         OnHardwareInfoReceived?.Invoke(info);
     }
 
+    [Obsolete("Use ViewModel event handlers instead")]
     private void HandleNetworkInfo(NetworkTestResult info)
     {
-        NetworkInfo = info;
-        Debug.Log($"[ClusterAutoBinder] Received network info: {info.connectionType}, {info.pingMs:F1}ms, {info.bandwidthMbps:F0}Mbps");
+        Debug.Log($"[ClusterAutoBinder] Legacy: Received network info: {info.connectionType}, {info.pingMs:F1}ms, {info.bandwidthMbps:F0}Mbps");
         OnNetworkInfoReceived?.Invoke(info);
     }
 
+    [Obsolete("Use ViewModel event handlers instead")]
     private void HandleSuggestedConfig(SuggestedStreamConfig config)
     {
-        SuggestedConfig = config;
-        Debug.Log($"[ClusterAutoBinder] Received suggested config: {config.monitors}mon @ {config.resolutionWidth}x{config.resolutionHeight}");
-
-        // Phase 1 complete - we have all info
+        Debug.Log($"[ClusterAutoBinder] Legacy: Received suggested config: {config.monitors}mon @ {config.resolutionWidth}x{config.resolutionHeight}");
         SetState(ConnectionState.Connected);
         OnSuggestedConfigReceived?.Invoke(config);
     }
@@ -381,16 +450,18 @@ public class ClusterAutoBinder : MonoBehaviour
         OnConfigProgress?.Invoke(step, progress, message);
     }
 
+    [Obsolete("Use ViewModel event handlers instead")]
     private void HandleStreamingStarted()
     {
-        Debug.Log("[ClusterAutoBinder] Streaming started!");
+        Debug.Log("[ClusterAutoBinder] Legacy: Streaming started!");
         SetState(ConnectionState.Streaming);
         _isStreaming = true;
     }
 
+    [Obsolete("Use ViewModel event handlers instead")]
     private void HandleError(string error)
     {
-        Debug.LogError($"[ClusterAutoBinder] Error: {error}");
+        Debug.LogError($"[ClusterAutoBinder] Legacy error: {error}");
         SetState(ConnectionState.Error);
         OnError?.Invoke(error);
     }
@@ -509,9 +580,17 @@ public class ClusterAutoBinder : MonoBehaviour
 
     /// <summary>
     /// Stop streaming and cleanup.
+    /// Uses ViewModel for proper state management.
     /// </summary>
-    public void StopStreaming()
+    public async void StopStreaming()
     {
+        // Stop via ViewModel if available
+        if (_viewModel != null)
+        {
+            await _viewModel.DisconnectAsync();
+        }
+
+        // Legacy cleanup for MultiPCStreamClient
         if (_multiPCClient != null)
         {
             // Unsubscribe events
@@ -534,11 +613,6 @@ public class ClusterAutoBinder : MonoBehaviour
         }
 
         _isStreaming = false;
-        SetState(ConnectionState.Disconnected);
-        HardwareInfo = null;
-        NetworkInfo = null;
-        SuggestedConfig = null;
-
         Debug.Log("[ClusterAutoBinder] Streaming stopped");
     }
 
@@ -576,6 +650,13 @@ public class ClusterAutoBinder : MonoBehaviour
 
     void OnDestroy()
     {
+        // Unsubscribe from ViewModel events
+        if (_viewModel != null)
+        {
+            _viewModel.Phase.OnChanged -= OnViewModelPhaseChanged;
+            _viewModel.ErrorMessage.OnChanged -= OnViewModelError;
+        }
+
         StopStreaming();
     }
 

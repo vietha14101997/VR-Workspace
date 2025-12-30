@@ -60,7 +60,9 @@ namespace VRWorkspace.Streaming
             public VideoStreamTrack VideoTrack;
             public Texture Texture;
             public bool AnswerSet;
-            public List<string> PendingIce = new List<string>();
+            public bool OfferSent; // Flag to track if offer has been sent (for ICE candidate ordering)
+            public List<string> PendingIce = new List<string>(); // ICE candidates received before answer
+            public List<string> QueuedCandidates = new List<string>(); // Local candidates queued before offer sent
             public bool IsReconnecting; // Prevent duplicate reconnect attempts
             public DateTime LastConnectedTime;
             public int ReconnectAttempts; // Track consecutive reconnect attempts
@@ -1050,9 +1052,21 @@ namespace VRWorkspace.Streaming
                 return;
             }
 
-            // Fire-and-forget send (like browser)
-            _ = SendTextAsync($"{{\"type\":\"offer\",\"monitorIndex\":{idx},\"sdp\":\"{EscapeJsonString(offer.sdp)}\"}}");
+            // Send offer first
+            await SendTextAsync($"{{\"type\":\"offer\",\"monitorIndex\":{idx},\"sdp\":\"{EscapeJsonString(offer.sdp)}\"}}");
             Debug.Log($"[PhaseProtocol] PC{idx} offer sent (parallel)");
+
+            // Mark offer as sent and flush queued candidates
+            wrapper.OfferSent = true;
+            if (wrapper.QueuedCandidates.Count > 0)
+            {
+                Debug.Log($"[PhaseProtocol] PC{idx} flushing {wrapper.QueuedCandidates.Count} queued ICE candidates");
+                foreach (var candJson in wrapper.QueuedCandidates)
+                {
+                    _ = SendTextAsync(candJson);
+                }
+                wrapper.QueuedCandidates.Clear();
+            }
         }
 
         /// <summary>
@@ -1151,12 +1165,14 @@ namespace VRWorkspace.Streaming
                 }
             };
 
-            // ICE candidates - fire-and-forget (like browser)
+            // ICE candidates - queue until offer is sent (fixes candidate-before-offer bug)
             pc.OnIceCandidate = cand =>
             {
                 if (string.IsNullOrEmpty(cand.Candidate))
                 {
-                    _ = SendTextAsync($"{{\"type\":\"end_of_candidates\",\"monitorIndex\":{idx}}}");
+                    // Only send end_of_candidates if offer was already sent
+                    if (wrapper.OfferSent)
+                        _ = SendTextAsync($"{{\"type\":\"end_of_candidates\",\"monitorIndex\":{idx}}}");
                     return;
                 }
 
@@ -1168,7 +1184,18 @@ namespace VRWorkspace.Streaming
                     ? msg.Substring("candidate:".Length)
                     : msg;
 
-                _ = SendTextAsync($"{{\"type\":\"candidate\",\"monitorIndex\":{idx},\"candidate\":\"{EscapeJsonString(rawCandidate)}\"}}");
+                string candidateJson = $"{{\"type\":\"candidate\",\"monitorIndex\":{idx},\"candidate\":\"{EscapeJsonString(rawCandidate)}\"}}";
+
+                // Queue candidate if offer not sent yet, otherwise send immediately
+                if (!wrapper.OfferSent)
+                {
+                    wrapper.QueuedCandidates.Add(candidateJson);
+                    Debug.Log($"[PhaseProtocol] PC{idx} queued ICE candidate (offer not sent yet)");
+                }
+                else
+                {
+                    _ = SendTextAsync(candidateJson);
+                }
             };
 
             // Track received
@@ -1194,6 +1221,12 @@ namespace VRWorkspace.Streaming
         {
             var monitorIndex = json.GetInt("monitorIndex");
             var rawSdp = json.GetString("sdp") ?? "";
+
+            // Debug: Show raw SDP info (first 200 chars, escape control chars for visibility)
+            var rawPreview = rawSdp.Length > 200 ? rawSdp.Substring(0, 200) : rawSdp;
+            rawPreview = rawPreview.Replace("\r", "\\r").Replace("\n", "\\n");
+            Debug.Log($"[PhaseProtocol] PC{monitorIndex} raw SDP preview: {rawPreview}");
+
             var sdp = FixSdp(rawSdp);
 
             Debug.Log($"[PhaseProtocol] PC{monitorIndex} received answer (SDP: {rawSdp.Length} -> {sdp.Length} bytes)");
@@ -1244,6 +1277,9 @@ namespace VRWorkspace.Streaming
                 {
                     var errorMsg = setRemoteOp.IsError ? setRemoteOp.Error.message ?? "unknown" : "timeout";
                     Debug.LogError($"[PhaseProtocol] PC{monitorIndex} SetRemoteDescription failed: {errorMsg}");
+
+                    // Debug: Log full SDP on error for analysis
+                    Debug.LogError($"[PhaseProtocol] PC{monitorIndex} Failed SDP (full):\n{sdp}");
                     return;
                 }
 
@@ -1260,6 +1296,8 @@ namespace VRWorkspace.Streaming
             catch (Exception ex)
             {
                 Debug.LogError($"[PhaseProtocol] PC{monitorIndex} HandleAnswerAsync error: {ex.Message}");
+                // Log full SDP for debugging
+                Debug.LogError($"[PhaseProtocol] PC{monitorIndex} Exception SDP (full):\n{sdp}");
             }
         }
 
@@ -1458,10 +1496,15 @@ namespace VRWorkspace.Streaming
                 }
             };
 
-            // ICE candidates
+            // ICE candidates - queue until offer is sent (same fix as initial connection)
             pc.OnIceCandidate = cand =>
             {
-                if (string.IsNullOrEmpty(cand.Candidate)) return;
+                if (string.IsNullOrEmpty(cand.Candidate))
+                {
+                    if (wrapper.OfferSent)
+                        _ = SendTextAsync($"{{\"type\":\"end_of_candidates\",\"monitorIndex\":{idx}}}");
+                    return;
+                }
 
                 string msg = cand.Candidate;
                 if (_skipTcpIceCandidates && (msg.Contains(" tcp ", StringComparison.OrdinalIgnoreCase) || msg.Contains("tcptype", StringComparison.OrdinalIgnoreCase)))
@@ -1471,7 +1514,17 @@ namespace VRWorkspace.Streaming
                     ? msg.Substring("candidate:".Length)
                     : msg;
 
-                _ = SendTextAsync($"{{\"type\":\"candidate\",\"monitorIndex\":{idx},\"candidate\":\"{EscapeJsonString(rawCandidate)}\"}}");
+                string candidateJson = $"{{\"type\":\"candidate\",\"monitorIndex\":{idx},\"candidate\":\"{EscapeJsonString(rawCandidate)}\"}}";
+
+                if (!wrapper.OfferSent)
+                {
+                    wrapper.QueuedCandidates.Add(candidateJson);
+                    Debug.Log($"[PhaseProtocol] PC{idx} queued ICE candidate on reconnect (offer not sent yet)");
+                }
+                else
+                {
+                    _ = SendTextAsync(candidateJson);
+                }
             };
 
             // Track received
@@ -1498,6 +1551,10 @@ namespace VRWorkspace.Streaming
                 _peerConnections[monitorIndex] = wrapper;
             }
 
+            // Reset state for new offer
+            wrapper.OfferSent = false;
+            wrapper.QueuedCandidates.Clear();
+
             // Create and send new offer
             var offerOp = pc.CreateOffer();
             var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -1522,8 +1579,21 @@ namespace VRWorkspace.Streaming
                 return;
             }
 
+            // Send offer first
             await SendTextAsync($"{{\"type\":\"offer\",\"monitorIndex\":{idx},\"sdp\":\"{EscapeJsonString(offer.sdp)}\"}}");
             Debug.Log($"[PhaseProtocol] PC{idx} reconnect offer sent");
+
+            // Mark offer as sent and flush queued candidates
+            wrapper.OfferSent = true;
+            if (wrapper.QueuedCandidates.Count > 0)
+            {
+                Debug.Log($"[PhaseProtocol] PC{idx} flushing {wrapper.QueuedCandidates.Count} queued ICE candidates on reconnect");
+                foreach (var candJson in wrapper.QueuedCandidates)
+                {
+                    _ = SendTextAsync(candJson);
+                }
+                wrapper.QueuedCandidates.Clear();
+            }
         }
 
         /// <summary>
@@ -1797,46 +1867,104 @@ namespace VRWorkspace.Streaming
         /// <summary>
         /// Fix SDP to be compatible with Unity WebRTC.
         /// SIMPLIFIED to match browser implementation - only 2 essential transformations:
-        /// 1. SAVP → SAVPF (required for DTLS-SRTP)
-        /// 2. Remove embedded ICE candidates (server sends them separately via trickle ICE)
+        /// 1. Normalize line endings to \r\n (SDP standard RFC 4566)
+        /// 2. SAVP → SAVPF (required for DTLS-SRTP)
+        /// 3. Remove embedded ICE candidates (server sends them separately via trickle ICE)
         /// </summary>
         private string FixSdp(string sdp)
         {
             if (string.IsNullOrEmpty(sdp)) return sdp;
 
+            // Fix 0: Normalize line endings to \r\n (SDP standard)
+            // Unity WebRTC is strict about line endings - must be consistent CRLF
+            sdp = sdp.Replace("\r\n", "\n").Replace("\r", "\n");
+            var lines = sdp.Split('\n');
+
             // Fix 1: SAVP → SAVPF (browser does this too)
             // Use regex-like replacement with word boundary to avoid SAVPFF bug
-            if (sdp.Contains("UDP/TLS/RTP/SAVP") && !sdp.Contains("UDP/TLS/RTP/SAVPF"))
+            var processedLines = new List<string>();
+            int removedCount = 0;
+
+            foreach (var line in lines)
             {
-                sdp = sdp.Replace("UDP/TLS/RTP/SAVP", "UDP/TLS/RTP/SAVPF");
+                // Skip empty lines (SDP shouldn't have empty lines)
+                if (string.IsNullOrEmpty(line))
+                    continue;
+
+                // Trim trailing whitespace but preserve line content
+                var trimmedLine = line.TrimEnd();
+                if (string.IsNullOrEmpty(trimmedLine))
+                    continue;
+
+                // Fix 2: Remove embedded ICE candidates (browser does this too)
+                // Match browser behavior: check startsWith directly
+                if (trimmedLine.StartsWith("a=candidate:"))
+                {
+                    removedCount++;
+                    continue;
+                }
+
+                // Fix SAVP → SAVPF for m= lines
+                string fixedLine = trimmedLine;
+                if (trimmedLine.StartsWith("m=") && trimmedLine.Contains("UDP/TLS/RTP/SAVP") && !trimmedLine.Contains("UDP/TLS/RTP/SAVPF"))
+                {
+                    fixedLine = trimmedLine.Replace("UDP/TLS/RTP/SAVP", "UDP/TLS/RTP/SAVPF");
+                }
+
+                processedLines.Add(fixedLine);
             }
 
-            // Fix 2: Remove embedded ICE candidates (browser does this too)
-            // Server sends candidates separately via trickle ICE
-            var lines = sdp.Split('\n');
-            var filtered = lines.Where(l => !l.TrimStart().StartsWith("a=candidate:")).ToArray();
-
-            int removedCount = lines.Length - filtered.Length;
             if (removedCount > 0)
             {
                 Debug.Log($"[PhaseProtocol] FixSdp: Removed {removedCount} embedded ICE candidates");
             }
 
-            return string.Join("\n", filtered);
+            // Join with CRLF as per RFC 4566 (SDP standard)
+            // Unity WebRTC may be stricter than browser about line endings
+            var result = string.Join("\r\n", processedLines);
+
+            // Ensure trailing CRLF (some WebRTC implementations require it)
+            if (!result.EndsWith("\r\n"))
+            {
+                result += "\r\n";
+            }
+
+            // Debug: Log first few lines of fixed SDP
+            var previewLines = processedLines.Take(5);
+            Debug.Log($"[PhaseProtocol] FixSdp result preview: {string.Join(" | ", previewLines)}");
+            Debug.Log($"[PhaseProtocol] FixSdp total lines: {processedLines.Count}, result length: {result.Length}");
+
+            return result;
         }
+
+        private int _pollCount = 0;
 
         /// <summary>
         /// Update textures (call from Update loop).
         /// </summary>
         public void PollTextures()
         {
+            _pollCount++;
+
             lock (_lock)
             {
                 foreach (var wrapper in _peerConnections)
                 {
                     try
                     {
-                        var tex = wrapper.VideoTrack?.Texture;
+                        var track = wrapper.VideoTrack;
+                        var tex = track?.Texture;
+
+                        // Debug log periodically (every ~60 polls for first PC only)
+                        if (wrapper.Index == 0 && _pollCount % 60 == 1)
+                        {
+                            Debug.Log($"[PhaseProtocol] PollTextures PC{wrapper.Index}: " +
+                                $"track={(track != null ? "valid" : "null")}, " +
+                                $"tex={(tex != null ? $"{tex.width}x{tex.height}" : "null")}, " +
+                                $"cached={(wrapper.Texture != null ? "set" : "null")}, " +
+                                $"frames={wrapper.FrameCount}, polls={_pollCount}");
+                        }
+
                         if (tex != null && tex.width > 0) wrapper.Texture = tex;
                     }
                     catch { }
