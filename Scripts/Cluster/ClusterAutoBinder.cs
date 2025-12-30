@@ -521,6 +521,11 @@ public class ClusterAutoBinder : MonoBehaviour
         // Assign all panels to the multi-PC client
         _multiPCClient.panels = panels.ToArray();
 
+        // Subscribe to events
+        _multiPCClient.OnConfigProgress += HandleConfigProgress;
+        _multiPCClient.OnSpeedTestProgress += HandleSpeedTestProgress;
+        _multiPCClient.OnCursorPosition += HandleCursorPosition;
+
         Debug.Log($"[ClusterAutoBinder] MultiPC client created, url={_multiPCClient.signalUrl}, V2={useV2Protocol}");
         Debug.Log($"[ClusterAutoBinder] Bound {panels.Count} panels to {panels.Count} PeerConnections");
     }

@@ -453,6 +453,9 @@ namespace VRWorkspace.Streaming
 
         /// <summary>
         /// Get client codec capabilities for negotiation.
+        /// IMPORTANT: Unity WebRTC only supports H.264 decoding, NOT H.265/HEVC.
+        /// HevcDecoderPlugin checks Android MediaCodec support, but that's not used by WebRTC.
+        /// Always report H.264 only for WebRTC compatibility.
         /// </summary>
         private ClientCodecCapability GetClientCodecCapability()
         {
@@ -460,7 +463,7 @@ namespace VRWorkspace.Streaming
             {
                 supportedCodecs = new[] { "H264" },
                 preferredCodec = "H264",
-                supportsHevc = false,
+                supportsHevc = false,  // Unity WebRTC does NOT support H.265 decoding
                 deviceModel = SystemInfo.deviceModel,
                 apiLevel = 0
             };
@@ -468,61 +471,43 @@ namespace VRWorkspace.Streaming
 #if UNITY_ANDROID && !UNITY_EDITOR
             try
             {
-                // Get Android API level
+                // Get Android API level for diagnostics
                 using (var version = new AndroidJavaClass("android.os.Build$VERSION"))
                 {
                     capability.apiLevel = version.GetStatic<int>("SDK_INT");
                 }
                 Debug.Log($"[PhaseProtocol] Android API level: {capability.apiLevel}, device: {capability.deviceModel}");
 
-                // Check HEVC decoder availability via native plugin
+                // NOTE: HevcDecoderPlugin checks MediaCodec HEVC support, but Unity WebRTC
+                // has its own built-in decoder that only supports H.264.
+                // We keep this check for diagnostics only.
                 bool pluginAvailable = false;
                 try
                 {
                     pluginAvailable = HevcDecoderPlugin.IsAvailable();
-                    Debug.Log($"[PhaseProtocol] HevcDecoderPlugin.IsAvailable() = {pluginAvailable}");
+                    Debug.Log($"[PhaseProtocol] HevcDecoderPlugin.IsAvailable() = {pluginAvailable} (not used by WebRTC)");
                 }
                 catch (Exception pluginEx)
                 {
                     Debug.LogWarning($"[PhaseProtocol] HevcDecoderPlugin check failed: {pluginEx.Message}");
                 }
 
-                // HEVC detection with fallback:
-                // 1. If native plugin reports available -> use HEVC
-                // 2. If plugin fails but Android API >= 21 -> assume HEVC available (MediaCodec supports it)
-                // Note: Android 5.0 (API 21) introduced hardware HEVC decoding in MediaCodec
-                if (pluginAvailable)
-                {
-                    capability.supportsHevc = true;
-                    capability.supportedCodecs = new[] { "H265", "H264" };
-                    capability.preferredCodec = "H265";
-                    Debug.Log("[PhaseProtocol] Client supports HEVC via native plugin");
-                }
-                else if (capability.apiLevel >= 21)
-                {
-                    // Fallback: Android 5.0+ has MediaCodec HEVC support
-                    // Use system MediaCodec check as fallback
-                    bool mediaCodecHevc = CheckMediaCodecHevcSupport();
-                    if (mediaCodecHevc)
-                    {
-                        capability.supportsHevc = true;
-                        capability.supportedCodecs = new[] { "H265", "H264" };
-                        capability.preferredCodec = "H265";
-                        Debug.Log($"[PhaseProtocol] Client supports HEVC via MediaCodec fallback (API {capability.apiLevel})");
-                    }
-                    else
-                    {
-                        Debug.Log($"[PhaseProtocol] MediaCodec HEVC not available despite API {capability.apiLevel}");
-                    }
-                }
-                else
-                {
-                    Debug.Log($"[PhaseProtocol] HEVC not available: plugin={pluginAvailable}, API={capability.apiLevel}");
-                }
+                // DISABLED: Unity WebRTC does NOT support H.265 decoding
+                // Even though Android MediaCodec supports HEVC, WebRTC VideoStreamTrack
+                // can only decode H.264. Enabling HEVC causes frames=0 on Android.
+                //
+                // To enable HEVC in the future, we would need to:
+                // 1. Bypass WebRTC VideoStreamTrack for video
+                // 2. Receive raw H.265 NAL units via DataChannel
+                // 3. Decode manually using HevcDecoderPlugin
+                // 4. Create texture from decoded YUV data
+                //
+                // For now, always use H.264 for maximum compatibility.
+                Debug.Log($"[PhaseProtocol] Using H.264 only (Unity WebRTC limitation). MediaCodec HEVC={pluginAvailable}");
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[PhaseProtocol] Failed to check HEVC capability: {ex.Message}");
+                Debug.LogWarning($"[PhaseProtocol] Failed to get device info: {ex.Message}");
             }
 #else
             Debug.Log("[PhaseProtocol] Non-Android platform, using H.264 only");
