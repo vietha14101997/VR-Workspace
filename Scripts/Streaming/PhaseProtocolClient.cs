@@ -250,6 +250,69 @@ namespace VRWorkspace.Streaming
             catch { }
         }
 
+        #region Latency Control
+
+        // Latency tracking for skip_to_live
+        private DateTime _lastSkipToLiveTime = DateTime.MinValue;
+        private const float SkipToLiveCooldownSeconds = 2.0f; // Don't spam skip requests
+        private const float FrameGapThresholdMs = 500f; // If no frames for 500ms, consider it stalled
+
+        /// <summary>
+        /// Event fired when skip_to_live is acknowledged by server.
+        /// </summary>
+        public event Action OnSkipToLiveAck;
+
+        /// <summary>
+        /// Request server to skip buffered frames and send fresh keyframe.
+        /// Use when detecting accumulated latency.
+        /// </summary>
+        public void SkipToLive()
+        {
+            if (_ws?.State != WebSocketState.Open || !_stateMachine.IsStreaming) return;
+
+            // Cooldown to avoid spamming
+            if ((DateTime.UtcNow - _lastSkipToLiveTime).TotalSeconds < SkipToLiveCooldownSeconds)
+                return;
+
+            _lastSkipToLiveTime = DateTime.UtcNow;
+
+            try
+            {
+                Debug.Log("[PhaseProtocol] Sending skip_to_live request for latency recovery");
+                _ = SendTextAsync("{\"type\":\"skip_to_live\"}");
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// Check for latency issues and request skip_to_live if needed.
+        /// Called from PollTextures to detect frame gaps.
+        /// </summary>
+        private void CheckLatencyAndSkip()
+        {
+            if (!_stateMachine.IsStreaming) return;
+
+            lock (_lock)
+            {
+                foreach (var wrapper in _peerConnections)
+                {
+                    if (wrapper.LastFrameTime == default) continue;
+
+                    // Check if frame gap exceeds threshold
+                    var timeSinceFrame = (DateTime.UtcNow - wrapper.LastFrameTime).TotalMilliseconds;
+                    if (timeSinceFrame > FrameGapThresholdMs && wrapper.FrameCount > 10)
+                    {
+                        // Frame stall detected - request skip to live
+                        Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} frame gap {timeSinceFrame:F0}ms - requesting skip_to_live");
+                        SkipToLive();
+                        break; // Only send once per poll
+                    }
+                }
+            }
+        }
+
+        #endregion
+
         /// <summary>
         /// Main receive loop for WebSocket messages.
         /// </summary>
@@ -427,6 +490,12 @@ namespace VRWorkspace.Streaming
 
                         case "frameTiming":
                             // Diagnostic message from server - ignore (or could be used for frame timing analysis)
+                            break;
+
+                        case "skip_to_live_ack":
+                            // Server acknowledged skip_to_live request - stream should recover now
+                            Debug.Log("[PhaseProtocol] skip_to_live acknowledged by server");
+                            OnSkipToLiveAck?.Invoke();
                             break;
 
                         case null:
@@ -1988,7 +2057,8 @@ namespace VRWorkspace.Streaming
 
         /// <summary>
         /// Update textures (call from Update loop).
-        /// Also updates LastFrameTime for frame stall detection.
+        /// NOTE: LastFrameTime is updated in OnVideoReceived callback, not here.
+        /// This method only caches the texture reference and checks for latency issues.
         /// </summary>
         public void PollTextures()
         {
@@ -2006,27 +2076,30 @@ namespace VRWorkspace.Streaming
                         // Debug log periodically (every ~60 polls for first PC only)
                         if (wrapper.Index == 0 && _pollCount % 60 == 1)
                         {
+                            var timeSinceFrame = wrapper.LastFrameTime != default
+                                ? (DateTime.UtcNow - wrapper.LastFrameTime).TotalMilliseconds
+                                : -1;
                             Debug.Log($"[PhaseProtocol] PollTextures PC{wrapper.Index}: " +
                                 $"track={(track != null ? "valid" : "null")}, " +
                                 $"tex={(tex != null ? $"{tex.width}x{tex.height}" : "null")}, " +
                                 $"cached={(wrapper.Texture != null ? "set" : "null")}, " +
-                                $"frames={wrapper.FrameCount}, polls={_pollCount}");
+                                $"frames={wrapper.FrameCount}, lastFrame={timeSinceFrame:F0}ms ago");
                         }
 
                         if (tex != null && tex.width > 0)
                         {
                             wrapper.Texture = tex;
-
-                            // Always update LastFrameTime when texture is valid
-                            // Unity WebRTC reuses the same Texture2D object (updates content in place)
-                            // so we can't detect "new frames" by texture reference change
-                            wrapper.LastFrameTime = DateTime.UtcNow;
-                            wrapper.FrameCount++;
+                            // NOTE: Don't update LastFrameTime here!
+                            // It's updated in OnVideoReceived callback when new frame data arrives.
+                            // Updating here would break frame gap detection.
                         }
                     }
                     catch { }
                 }
             }
+
+            // Check for latency issues and request skip_to_live if needed
+            CheckLatencyAndSkip();
         }
 
         private void Cleanup()

@@ -238,6 +238,17 @@ namespace VRWorkspace.ViewModels
             _client?.RequestKeyframe(monitorIndex);
         }
 
+        /// <summary>
+        /// Request server to skip buffered frames and send fresh keyframe.
+        /// Used for latency recovery when stream delay accumulates.
+        /// Note: This is called automatically by PollTextures() when frame gap is detected,
+        /// but can also be called manually.
+        /// </summary>
+        public void SkipToLive()
+        {
+            _client?.SkipToLive();
+        }
+
         #endregion
 
         #region Private Methods
