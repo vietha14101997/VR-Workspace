@@ -39,6 +39,7 @@ namespace VRWorkspace.Streaming
         private readonly List<PCWrapper> _peerConnections = new List<PCWrapper>();
         private bool _skipTcpIceCandidates = true;
         private int _expectedMonitorCount; // Track expected count for CheckIceComplete
+        private TaskCompletionSource<bool> _allAnswersReceivedTcs; // Event-driven answer waiting
 
         // Events
         public event Action<ServerHardwareInfo> OnHardwareInfoReceived;
@@ -69,6 +70,7 @@ namespace VRWorkspace.Streaming
             public const int MaxReconnectAttempts = 5; // Max attempts before giving up
             public DateTime LastFrameTime; // Track when last video frame was received
             public int FrameCount; // Count frames for monitoring
+            public TaskCompletionSource<bool> AnswerReceivedTcs; // For event-driven sequential mode
         }
 
         // Public properties
@@ -961,9 +963,15 @@ namespace VRWorkspace.Streaming
         /// <summary>
         /// Create all PCs in parallel like browser does.
         /// Returns true if all PCs got answers within timeout.
+        /// Uses event-driven TaskCompletionSource instead of polling for lower latency.
         /// </summary>
         private async Task<bool> TryParallelPCCreationAsync(int count)
         {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+
+            // Initialize event-driven answer waiting
+            _allAnswersReceivedTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
             var tasks = new List<Task>();
 
             // Create all PCs simultaneously (like browser's tight loop)
@@ -975,37 +983,36 @@ namespace VRWorkspace.Streaming
 
             // Wait for all PC creation tasks to complete (offer sent)
             await Task.WhenAll(tasks);
-            Debug.Log($"[PhaseProtocol] All {count} offers sent in parallel");
+            Debug.Log($"[PhaseProtocol] All {count} offers sent in parallel ({sw.ElapsedMilliseconds}ms)");
 
-            // Now wait for answers with a single timeout for ALL PCs (10s total)
-            var sw = System.Diagnostics.Stopwatch.StartNew();
+            // Event-driven wait for answers (no polling!) with timeout
             const int TOTAL_ANSWER_TIMEOUT_MS = 10000; // 10 seconds for ALL answers
 
-            while (sw.ElapsedMilliseconds < TOTAL_ANSWER_TIMEOUT_MS)
+            try
             {
-                int answersReceived;
-                lock (_lock)
-                {
-                    answersReceived = _peerConnections.Count(p => p.AnswerSet);
-                }
+                // Wait for TCS to be signaled OR timeout
+                var timeoutTask = Task.Delay(TOTAL_ANSWER_TIMEOUT_MS);
+                var completedTask = await Task.WhenAny(_allAnswersReceivedTcs.Task, timeoutTask);
 
-                if (answersReceived >= count)
+                if (completedTask == _allAnswersReceivedTcs.Task)
                 {
-                    Debug.Log($"[PhaseProtocol] All {count} answers received in {sw.ElapsedMilliseconds}ms (parallel success)");
+                    Debug.Log($"[PhaseProtocol] All {count} answers received in {sw.ElapsedMilliseconds}ms (event-driven success)");
                     return true;
                 }
-
-                await Task.Delay(50); // Check every 50ms
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[PhaseProtocol] Answer waiting exception: {ex.Message}");
             }
 
-            // Check final state
+            // Check final state on timeout
             int finalAnswers;
             lock (_lock)
             {
                 finalAnswers = _peerConnections.Count(p => p.AnswerSet);
             }
 
-            Debug.LogWarning($"[PhaseProtocol] Parallel timeout: {finalAnswers}/{count} answers received");
+            Debug.LogWarning($"[PhaseProtocol] Parallel timeout after {sw.ElapsedMilliseconds}ms: {finalAnswers}/{count} answers received");
             return finalAnswers >= count;
         }
 
@@ -1019,7 +1026,12 @@ namespace VRWorkspace.Streaming
             // Browser: new RTCPeerConnection({ iceServers: [], iceCandidatePoolSize: 0 })
             var cfg = new RTCConfiguration { iceServers = new RTCIceServer[0] };
             var pc = new RTCPeerConnection(ref cfg);
-            var wrapper = new PCWrapper { Index = idx, PC = pc };
+            var wrapper = new PCWrapper
+            {
+                Index = idx,
+                PC = pc,
+                AnswerReceivedTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously)
+            };
 
             // Add video transceiver
             var trans = pc.AddTransceiver(TrackKind.Video, new RTCRtpTransceiverInit { direction = RTCRtpTransceiverDirection.RecvOnly });
@@ -1071,6 +1083,7 @@ namespace VRWorkspace.Streaming
 
         /// <summary>
         /// Sequential fallback for Android or when parallel fails.
+        /// Uses event-driven TaskCompletionSource instead of polling for lower latency.
         /// </summary>
         private async Task CreatePeerConnectionsSequentialAsync(int count)
         {
@@ -1089,25 +1102,26 @@ namespace VRWorkspace.Streaming
             for (int i = 0; i < count; i++)
             {
                 int idx = i;
+                var sw = System.Diagnostics.Stopwatch.StartNew();
                 await CreateSinglePCAsync(idx);
 
-                // Wait for answer before next PC (sequential)
-                var sw = System.Diagnostics.Stopwatch.StartNew();
+                // Get wrapper for this PC
                 PCWrapper wrapper;
                 lock (_lock)
                 {
                     wrapper = _peerConnections.FirstOrDefault(p => p.Index == idx);
                 }
 
-                if (wrapper != null)
+                if (wrapper?.AnswerReceivedTcs != null)
                 {
-                    while (!wrapper.AnswerSet && sw.ElapsedMilliseconds < 5000)
-                        await Task.Delay(50);
+                    // Event-driven wait for answer (no polling!) with 5s timeout
+                    var timeoutTask = Task.Delay(5000);
+                    var completedTask = await Task.WhenAny(wrapper.AnswerReceivedTcs.Task, timeoutTask);
 
-                    if (wrapper.AnswerSet)
-                        Debug.Log($"[PhaseProtocol] PC{idx} answer received (sequential)");
+                    if (completedTask == wrapper.AnswerReceivedTcs.Task)
+                        Debug.Log($"[PhaseProtocol] PC{idx} answer received in {sw.ElapsedMilliseconds}ms (sequential event-driven)");
                     else
-                        Debug.LogWarning($"[PhaseProtocol] PC{idx} answer timeout (sequential)");
+                        Debug.LogWarning($"[PhaseProtocol] PC{idx} answer timeout after {sw.ElapsedMilliseconds}ms (sequential)");
                 }
             }
         }
@@ -1286,6 +1300,12 @@ namespace VRWorkspace.Streaming
                 wrapper.AnswerSet = true;
                 Debug.Log($"[PhaseProtocol] PC{monitorIndex} answer set OK ({sw.ElapsedMilliseconds}ms)");
 
+                // Signal per-wrapper TCS for sequential mode (immediate response)
+                wrapper.AnswerReceivedTcs?.TrySetResult(true);
+
+                // Signal event-driven waiting if all answers received (parallel mode)
+                SignalIfAllAnswersReceived();
+
                 // Process pending ICE candidates
                 foreach (var cand in wrapper.PendingIce)
                     AddIceCandidate(wrapper, cand);
@@ -1298,6 +1318,28 @@ namespace VRWorkspace.Streaming
                 Debug.LogError($"[PhaseProtocol] PC{monitorIndex} HandleAnswerAsync error: {ex.Message}");
                 // Log full SDP for debugging
                 Debug.LogError($"[PhaseProtocol] PC{monitorIndex} Exception SDP (full):\n{sdp}");
+            }
+        }
+
+        /// <summary>
+        /// Signal TaskCompletionSource when all expected answers are received.
+        /// Called from HandleAnswerAsync for event-driven answer waiting (eliminates polling latency).
+        /// </summary>
+        private void SignalIfAllAnswersReceived()
+        {
+            if (_allAnswersReceivedTcs == null || _allAnswersReceivedTcs.Task.IsCompleted)
+                return;
+
+            int answersReceived;
+            lock (_lock)
+            {
+                answersReceived = _peerConnections.Count(p => p.AnswerSet);
+            }
+
+            if (answersReceived >= _expectedMonitorCount)
+            {
+                Debug.Log($"[PhaseProtocol] All {_expectedMonitorCount} answers received, signaling TCS");
+                _allAnswersReceivedTcs.TrySetResult(true);
             }
         }
 

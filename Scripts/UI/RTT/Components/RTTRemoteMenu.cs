@@ -24,9 +24,6 @@ public class RTTRemoteMenu : MonoBehaviour
     public Color accentColor = new Color(0.8f, 0.4f, 1f);
     public TMP_FontAsset customFont;
 
-    [Header("V2 Protocol")]
-    [Tooltip("Reference to ClusterAutoBinder for V2 protocol phased connection")]
-    public ClusterAutoBinder clusterBinder;
     #endregion
 
     #region Events
@@ -218,35 +215,6 @@ public class RTTRemoteMenu : MonoBehaviour
         HandlePhaseChanged(_viewModel.Phase.Value);
 
         Debug.Log("[RTTRemoteMenu] Bound to ConnectionViewModel");
-    }
-
-    /// <summary>
-    /// Legacy binding to ClusterAutoBinder for backward compatibility.
-    /// Will be removed after full migration.
-    /// </summary>
-    [Obsolete("Use BindToViewModel instead")]
-    public void BindToClusterBinder()
-    {
-        if (clusterBinder == null) return;
-
-        // Unsubscribe first in case of rebinding
-        clusterBinder.OnStateChanged -= HandleConnectionStateChangedLegacy;
-        clusterBinder.OnSuggestedConfigReceived -= ApplySuggestedConfig;
-        clusterBinder.OnHardwareInfoReceived -= HandleHardwareInfoReceived;
-        clusterBinder.OnNetworkInfoReceived -= HandleNetworkInfoReceived;
-        clusterBinder.OnSpeedTestProgress -= HandleSpeedTestProgress;
-
-        // Subscribe
-        clusterBinder.OnStateChanged += HandleConnectionStateChangedLegacy;
-        clusterBinder.OnSuggestedConfigReceived += ApplySuggestedConfig;
-        clusterBinder.OnHardwareInfoReceived += HandleHardwareInfoReceived;
-        clusterBinder.OnNetworkInfoReceived += HandleNetworkInfoReceived;
-        clusterBinder.OnSpeedTestProgress += HandleSpeedTestProgress;
-
-        // Update current state
-        HandleConnectionStateChangedLegacy(clusterBinder.CurrentState);
-
-        Debug.Log("[RTTRemoteMenu] Bound to ClusterAutoBinder (legacy)");
     }
     #endregion
 
@@ -524,62 +492,6 @@ public class RTTRemoteMenu : MonoBehaviour
     }
 
     /// <summary>
-    /// Legacy: Apply form values to ClusterAutoBinder.
-    /// </summary>
-    [Obsolete("Use BuildConfigFromForm instead")]
-    private void ApplyFormToBinder()
-    {
-        if (clusterBinder == null) return;
-
-        // Host and Port
-        string host = Host;
-        string port = Port;
-        if (!string.IsNullOrEmpty(host) && !string.IsNullOrEmpty(port))
-        {
-            clusterBinder.serverBase = $"http://{host}:{port}";
-        }
-
-        // Monitors
-        clusterBinder.monitorCount = MonitorIndex + 1;
-
-        // Resolution - clean "(Recommended)" suffix
-        var resolution = RemotePreferences.CleanValue(Resolution);
-        if (!string.IsNullOrEmpty(resolution))
-        {
-            var parts = resolution.Replace(" ", "").Split('x');
-            if (parts.Length == 2 && int.TryParse(parts[0], out int w) && int.TryParse(parts[1], out int h))
-            {
-                clusterBinder.resolutionWidth = w;
-                clusterBinder.resolutionHeight = h;
-            }
-        }
-
-        // Bitrate - clean "(Recommended)" suffix
-        var bitrate = RemotePreferences.CleanValue(Bitrate);
-        if (!string.IsNullOrEmpty(bitrate))
-        {
-            var numStr = bitrate.Replace(" ", "").Replace("Mbps", "").Replace("mbps", "");
-            if (int.TryParse(numStr, out int mbps))
-            {
-                clusterBinder.bitrateKbps = mbps * 1000;
-            }
-        }
-
-        // FPS - clean "(Recommended)" suffix
-        var fps = RemotePreferences.CleanValue(FPS);
-        if (!string.IsNullOrEmpty(fps))
-        {
-            var numStr = fps.Replace(" ", "").Replace("FPS", "").Replace("fps", "");
-            if (int.TryParse(numStr, out int fpsVal))
-            {
-                clusterBinder.fps = fpsVal;
-            }
-        }
-
-        Debug.Log($"[RTTRemoteMenu] Applied to binder: {clusterBinder.serverBase}, {clusterBinder.monitorCount}mon, {clusterBinder.resolutionWidth}x{clusterBinder.resolutionHeight}, {clusterBinder.bitrateKbps}kbps, {clusterBinder.fps}fps");
-    }
-
-    /// <summary>
     /// Update button text.
     /// </summary>
     public void UpdateButtonText(string text)
@@ -696,27 +608,6 @@ public class RTTRemoteMenu : MonoBehaviour
     {
         // Update is handled in HandleSpeedTestProgressValue
         _lastReportedMbps = mbps;
-    }
-
-    /// <summary>
-    /// Legacy: Handle connection state change from ClusterAutoBinder.
-    /// </summary>
-    [Obsolete("Use HandlePhaseChanged instead")]
-    private void HandleConnectionStateChangedLegacy(ClusterAutoBinder.ConnectionState state)
-    {
-        // Map legacy state to ConnectionPhase
-        ConnectionPhase phase = state switch
-        {
-            ClusterAutoBinder.ConnectionState.Disconnected => ConnectionPhase.Disconnected,
-            ClusterAutoBinder.ConnectionState.Connecting => ConnectionPhase.Connecting,
-            ClusterAutoBinder.ConnectionState.Connected => ConnectionPhase.ConfiguringSettings,
-            ClusterAutoBinder.ConnectionState.SettingUp => ConnectionPhase.SendingDisplayConfig,
-            ClusterAutoBinder.ConnectionState.Ready => ConnectionPhase.ReadyToStream,
-            ClusterAutoBinder.ConnectionState.Streaming => ConnectionPhase.Streaming,
-            ClusterAutoBinder.ConnectionState.Error => ConnectionPhase.Error,
-            _ => ConnectionPhase.Disconnected
-        };
-        HandlePhaseChanged(phase);
     }
 
     /// <summary>
@@ -1609,16 +1500,6 @@ public class RTTRemoteMenu : MonoBehaviour
             _viewModel.SpeedTestProgress.OnChanged -= HandleSpeedTestProgressValue;
             _viewModel.CurrentBandwidth.OnChanged -= HandleBandwidthChanged;
             _viewModel.ErrorMessage.OnChanged -= HandleErrorMessage;
-        }
-
-        // Legacy: Unsubscribe from ClusterAutoBinder events
-        if (clusterBinder != null)
-        {
-            clusterBinder.OnStateChanged -= HandleConnectionStateChangedLegacy;
-            clusterBinder.OnSuggestedConfigReceived -= ApplySuggestedConfig;
-            clusterBinder.OnHardwareInfoReceived -= HandleHardwareInfoReceived;
-            clusterBinder.OnNetworkInfoReceived -= HandleNetworkInfoReceived;
-            clusterBinder.OnSpeedTestProgress -= HandleSpeedTestProgress;
         }
 
         // Destroy side panels

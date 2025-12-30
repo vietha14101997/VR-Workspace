@@ -152,7 +152,7 @@ public class RTTMainMenuController : MonoBehaviour
         if (iconSettings == null) iconSettings = Resources.Load<Sprite>("icon_settings");
         if (iconQuit == null) iconQuit = Resources.Load<Sprite>("icon_quit");
 
-        Debug.Log($"[RTTMainMenuController] Icons loaded - Remote:{iconRemote != null}, Browser:{iconBrowser != null}, Media:{iconMedia != null}");
+        Debug.Log($"[RTTMainMenuController] Icons loaded - Remote:{iconRemote != null}, Browser:{iconBrowser != null}, Media:{iconMedia != null}, Files:{iconFiles != null}");
     }
 
     private Color GetMenuButtonColor(int index)
