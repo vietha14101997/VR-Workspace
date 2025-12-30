@@ -15,7 +15,6 @@ public class RTTRemoteMenuController : MonoBehaviour
     #region Private Fields
     private RTTRemoteMenu _remoteMenuInstance;
     private GameObject _menuObject;
-    private ClusterAutoBinder _clusterBinder;
     #endregion
 
     #region Events
@@ -61,17 +60,6 @@ public class RTTRemoteMenuController : MonoBehaviour
         _remoteMenuInstance.accentColor = accentColor;
         _remoteMenuInstance.customFont = font;
 
-        // Setup V2 protocol with pipeline
-        if (connectionPipeline != null)
-        {
-            _clusterBinder = connectionPipeline.SetupV2Protocol(transform);
-            if (_clusterBinder != null)
-            {
-                _remoteMenuInstance.clusterBinder = _clusterBinder;
-                Debug.Log("[RTTRemoteMenuController] ClusterAutoBinder assigned for V2 protocol");
-            }
-        }
-
         // Subscribe to events
         _remoteMenuInstance.OnBackClicked += HandleBackClicked;
         _remoteMenuInstance.OnConnectClicked += HandleConnectClicked;
@@ -115,7 +103,6 @@ public class RTTRemoteMenuController : MonoBehaviour
             _remoteMenuInstance = null;
         }
 
-        _clusterBinder = null;
         _menuObject = null;
     }
 

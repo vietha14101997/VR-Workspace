@@ -8,10 +8,20 @@ using Random = UnityEngine.Random;
 /// </summary>
 public class FloatingDataAnim : MonoBehaviour
 {
+    /// <summary>
+    /// Global toggle to enable/disable all FloatingDataAnim effects.
+    /// Set to false to temporarily disable all floating data animations.
+    /// </summary>
+    public static bool IsEnabled = true; // Temporarily disabled
+
     public float speed;
     public Vector2 range;
     private RectTransform _rt;
     private Vector2 _dir;
+
+    // Throttle dirty notifications to reduce render overhead
+    private float _lastNotifyTime;
+    private const float NOTIFY_INTERVAL = 0.1f; // 100ms = 10 FPS dirty updates max
 
     /// <summary>
     /// Event called when animation updates (for RTT dirty flag optimization)
@@ -57,7 +67,7 @@ public class FloatingDataAnim : MonoBehaviour
 
     void Update()
     {
-        if (_rt == null) return;
+        if (!IsEnabled || _rt == null) return;
         _rt.anchoredPosition += _dir * speed * Time.deltaTime;
 
         float halfW = range.x / 2f + 50f;
@@ -69,7 +79,12 @@ public class FloatingDataAnim : MonoBehaviour
         if (_rt.anchoredPosition.x > halfW) _rt.anchoredPosition = new Vector2(-halfW, Random.Range(-halfH, halfH));
         else if (_rt.anchoredPosition.x < -halfW) _rt.anchoredPosition = new Vector2(halfW, Random.Range(-halfH, halfH));
 
-        // Notify RTT panels to mark dirty
-        OnAnimationUpdate?.Invoke();
+        // Throttle dirty notifications to reduce render overhead
+        // Only notify at NOTIFY_INTERVAL (10 FPS) instead of every frame
+        if (Time.time - _lastNotifyTime >= NOTIFY_INTERVAL)
+        {
+            _lastNotifyTime = Time.time;
+            OnAnimationUpdate?.Invoke();
+        }
     }
 }

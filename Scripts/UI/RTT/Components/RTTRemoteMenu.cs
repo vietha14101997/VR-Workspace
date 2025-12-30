@@ -4,7 +4,9 @@ using TMPro;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using VRWorkspace.Core;
 using VRWorkspace.Streaming;
+using VRWorkspace.ViewModels;
 
 /// <summary>
 /// RTT-based Remote Desktop connection menu.
@@ -22,9 +24,6 @@ public class RTTRemoteMenu : MonoBehaviour
     public Color accentColor = new Color(0.8f, 0.4f, 1f);
     public TMP_FontAsset customFont;
 
-    [Header("V2 Protocol")]
-    [Tooltip("Reference to ClusterAutoBinder for V2 protocol phased connection")]
-    public ClusterAutoBinder clusterBinder;
     #endregion
 
     #region Events
@@ -33,7 +32,7 @@ public class RTTRemoteMenu : MonoBehaviour
     public event Action OnQRClicked;
     public event Action OnSetupClicked;
     public event Action OnStartClicked;
-    public event Action<ClusterAutoBinder.ConnectionState> OnConnectionStateChanged;
+    public event Action<ConnectionPhase> OnConnectionStateChanged;
     #endregion
 
     #region Private Fields
@@ -49,7 +48,10 @@ public class RTTRemoteMenu : MonoBehaviour
     // Connect button reference for dynamic text change
     private GameObject _connectButton;
     private TextMeshProUGUI _connectButtonText;
-    private ClusterAutoBinder.ConnectionState _currentState = ClusterAutoBinder.ConnectionState.Disconnected;
+    private ConnectionPhase _currentPhase = ConnectionPhase.Disconnected;
+
+    // ViewModel reference (via ServiceLocator or created locally)
+    private ConnectionViewModel _viewModel;
 
     // QR button reference for locking
     private GameObject _qrButton;
@@ -183,35 +185,36 @@ public class RTTRemoteMenu : MonoBehaviour
         // Load saved host/port from preferences
         LoadSavedHostPort();
 
-        // Subscribe to ClusterAutoBinder events if available
-        BindToClusterBinder();
+        // Bind to ViewModel for MVVM-based state management
+        BindToViewModel();
     }
 
     /// <summary>
-    /// Bind to ClusterAutoBinder events for V2 protocol.
+    /// Bind to ConnectionViewModel for MVVM-based state management.
+    /// All events fire on main thread via ObservableProperty.
     /// </summary>
-    public void BindToClusterBinder()
+    public void BindToViewModel()
     {
-        if (clusterBinder == null) return;
+        // Get or create ViewModel via ServiceLocator
+        if (!ServiceLocator.TryGet<ConnectionViewModel>(out _viewModel))
+        {
+            _viewModel = new ConnectionViewModel();
+            ServiceLocator.Register(_viewModel);
+        }
 
-        // Unsubscribe first in case of rebinding
-        clusterBinder.OnStateChanged -= HandleConnectionStateChanged;
-        clusterBinder.OnSuggestedConfigReceived -= ApplySuggestedConfig;
-        clusterBinder.OnHardwareInfoReceived -= HandleHardwareInfoReceived;
-        clusterBinder.OnNetworkInfoReceived -= HandleNetworkInfoReceived;
-        clusterBinder.OnSpeedTestProgress -= HandleSpeedTestProgress;
+        // Subscribe to observable properties (auto main thread marshalling)
+        _viewModel.Phase.OnChanged += HandlePhaseChanged;
+        _viewModel.HardwareInfo.OnChanged += HandleHardwareInfoReceived;
+        _viewModel.NetworkInfo.OnChanged += HandleNetworkInfoReceived;
+        _viewModel.SuggestedConfig.OnChanged += ApplySuggestedConfig;
+        _viewModel.SpeedTestProgress.OnChanged += HandleSpeedTestProgressValue;
+        _viewModel.CurrentBandwidth.OnChanged += HandleBandwidthChanged;
+        _viewModel.ErrorMessage.OnChanged += HandleErrorMessage;
 
-        // Subscribe
-        clusterBinder.OnStateChanged += HandleConnectionStateChanged;
-        clusterBinder.OnSuggestedConfigReceived += ApplySuggestedConfig;
-        clusterBinder.OnHardwareInfoReceived += HandleHardwareInfoReceived;
-        clusterBinder.OnNetworkInfoReceived += HandleNetworkInfoReceived;
-        clusterBinder.OnSpeedTestProgress += HandleSpeedTestProgress;
+        // Update UI with current state
+        HandlePhaseChanged(_viewModel.Phase.Value);
 
-        // Update current state
-        HandleConnectionStateChanged(clusterBinder.CurrentState);
-
-        Debug.Log("[RTTRemoteMenu] Bound to ClusterAutoBinder");
+        Debug.Log("[RTTRemoteMenu] Bound to ConnectionViewModel");
     }
     #endregion
 
@@ -350,152 +353,142 @@ public class RTTRemoteMenu : MonoBehaviour
     }
 
     /// <summary>
-    /// Handle connect button click based on current state.
+    /// Handle connect button click based on current phase.
+    /// Uses ConnectionViewModel for state management.
     /// </summary>
     private async void OnConnectButtonClicked()
     {
-        Debug.Log($"[RTTRemoteMenu] Button clicked! clusterBinder={clusterBinder != null}, useV2={clusterBinder?.useV2Protocol}, currentState={_currentState}");
+        Debug.Log($"[RTTRemoteMenu] Button clicked! viewModel={_viewModel != null}, currentPhase={_currentPhase}");
 
-        // If no binder or not using V2, use legacy event
-        if (clusterBinder == null || !clusterBinder.useV2Protocol)
+        // If no ViewModel, use legacy event
+        if (_viewModel == null)
         {
-            Debug.Log("[RTTRemoteMenu] Using legacy event (no binder or V2 disabled)");
+            Debug.Log("[RTTRemoteMenu] Using legacy event (no ViewModel)");
             OnConnectClicked?.Invoke();
             return;
         }
 
-        switch (_currentState)
+        switch (_currentPhase)
         {
-            case ClusterAutoBinder.ConnectionState.Disconnected:
+            case ConnectionPhase.Disconnected:
+            case ConnectionPhase.Error:
                 // Step 1: Connect
                 Debug.Log("[RTTRemoteMenu] Connecting...");
                 UpdateButtonText("CONNECTING...");
 
-                // Khóa 2 InputText và QR button khi bắt đầu kết nối
+                // Lock inputs during connection
                 VRInputFieldFactory.SetInteractable(_hostInput, false);
                 VRInputFieldFactory.SetInteractable(_portInput, false);
                 VRButtonFactory.SetInteractable(_qrButton, false);
 
-                // Apply form values to binder
-                ApplyFormToBinder();
-
-                bool connected = await clusterBinder.ConnectToServerAsync();
-                if (!connected)
+                // Build connection URL from form
+                string host = Host;
+                string port = Port;
+                if (!string.IsNullOrEmpty(host) && !string.IsNullOrEmpty(port))
                 {
-                    UpdateButtonText("CONNECT");
-                    // Mở khóa 2 InputText và QR button nếu kết nối thất bại
-                    VRInputFieldFactory.SetInteractable(_hostInput, true);
-                    VRInputFieldFactory.SetInteractable(_portInput, true);
-                    VRButtonFactory.SetInteractable(_qrButton, true);
-                    Debug.LogError("[RTTRemoteMenu] Connection failed");
+                    if (int.TryParse(port, out int portNum))
+                    {
+                        await _viewModel.ConnectAsync(host, portNum);
+                    }
                 }
-                // State change will trigger button text update via event
                 break;
 
-            case ClusterAutoBinder.ConnectionState.Connected:
-                // Step 2: Setup
-                Debug.Log("[RTTRemoteMenu] State is Connected, calling SetupRemoteAsync...");
+            case ConnectionPhase.ConfiguringSettings:
+                // Step 2: Accept config and proceed to Phase 2
+                Debug.Log("[RTTRemoteMenu] Setting up remote...");
                 UpdateButtonText("SETTING UP...");
 
-                // Save user selections before sending to server
+                // Save user selections
                 SaveCurrentSelections();
 
-                // Apply selected values (not suggested) to binder
-                ApplyFormToBinder();
-
-                OnSetupClicked?.Invoke();
-
-                Debug.Log("[RTTRemoteMenu] Awaiting SetupRemoteAsync...");
-                bool setup = await clusterBinder.SetupRemoteAsync();
-                Debug.Log($"[RTTRemoteMenu] SetupRemoteAsync returned: {setup}");
-                if (!setup)
+                // Build config from form dropdowns and send to server
+                var config = BuildConfigFromForm();
+                if (config != null)
                 {
-                    UpdateButtonText("SETUP REMOTE");
-                    Debug.LogError("[RTTRemoteMenu] Setup failed");
+                    OnSetupClicked?.Invoke();
+                    await _viewModel.AcceptConfigAsync(config);
                 }
                 break;
 
-            case ClusterAutoBinder.ConnectionState.Ready:
-                // Step 3: Start
+            case ConnectionPhase.ReadyToStream:
+                // Step 3: Start streaming
                 Debug.Log("[RTTRemoteMenu] Starting remote...");
                 UpdateButtonText("STARTING...");
                 OnStartClicked?.Invoke();
 
-                bool started = await clusterBinder.StartRemoteAsync();
-                if (started)
-                {
-                    // Hide menu after successful start
-                    // This will be handled by external code via OnStartClicked event
-                }
+                await _viewModel.StartStreamingAsync();
                 break;
 
-            case ClusterAutoBinder.ConnectionState.Streaming:
+            case ConnectionPhase.Streaming:
                 // Already streaming - could offer disconnect
                 Debug.Log("[RTTRemoteMenu] Already streaming");
-                break;
-
-            case ClusterAutoBinder.ConnectionState.Error:
-                // Reset and try again
-                clusterBinder.StopStreaming();
-                UpdateButtonText("CONNECT");
                 break;
         }
     }
 
     /// <summary>
-    /// Apply form values to ClusterAutoBinder.
-    /// Cleans "(Recommended)" suffix from dropdown values.
+    /// Build StreamingConfig from form dropdown values.
+    /// Returns config with user-selected values, falling back to suggested values if needed.
     /// </summary>
-    private void ApplyFormToBinder()
+    private StreamingConfig BuildConfigFromForm()
     {
-        if (clusterBinder == null) return;
+        if (_viewModel == null || _viewModel.SuggestedConfig.Value == null) return null;
 
-        // Host and Port
-        string host = Host;
-        string port = Port;
-        if (!string.IsNullOrEmpty(host) && !string.IsNullOrEmpty(port))
-        {
-            clusterBinder.serverBase = $"http://{host}:{port}";
-        }
+        // Get current suggested config as fallback
+        var suggested = _viewModel.SuggestedConfig.Value;
 
-        // Monitors
-        clusterBinder.monitorCount = MonitorIndex + 1;
-
-        // Resolution - clean "(Recommended)" suffix
+        // Parse Resolution from dropdown
         var resolution = RemotePreferences.CleanValue(Resolution);
+        int resW = suggested.resolutionWidth;
+        int resH = suggested.resolutionHeight;
         if (!string.IsNullOrEmpty(resolution))
         {
             var parts = resolution.Replace(" ", "").Split('x');
             if (parts.Length == 2 && int.TryParse(parts[0], out int w) && int.TryParse(parts[1], out int h))
             {
-                clusterBinder.resolutionWidth = w;
-                clusterBinder.resolutionHeight = h;
+                resW = w;
+                resH = h;
             }
         }
 
-        // Bitrate - clean "(Recommended)" suffix
+        // Parse Bitrate from dropdown
+        int bitrateKbps = suggested.bitrateKbps;
         var bitrate = RemotePreferences.CleanValue(Bitrate);
         if (!string.IsNullOrEmpty(bitrate))
         {
             var numStr = bitrate.Replace(" ", "").Replace("Mbps", "").Replace("mbps", "");
             if (int.TryParse(numStr, out int mbps))
             {
-                clusterBinder.bitrateKbps = mbps * 1000;
+                bitrateKbps = mbps * 1000;
             }
         }
 
-        // FPS - clean "(Recommended)" suffix
+        // Parse FPS
+        int fpsVal = suggested.fps;
         var fps = RemotePreferences.CleanValue(FPS);
         if (!string.IsNullOrEmpty(fps))
         {
             var numStr = fps.Replace(" ", "").Replace("FPS", "").Replace("fps", "");
-            if (int.TryParse(numStr, out int fpsVal))
+            if (int.TryParse(numStr, out int f))
             {
-                clusterBinder.fps = fpsVal;
+                fpsVal = f;
             }
         }
 
-        Debug.Log($"[RTTRemoteMenu] Applied to binder: {clusterBinder.serverBase}, {clusterBinder.monitorCount}mon, {clusterBinder.resolutionWidth}x{clusterBinder.resolutionHeight}, {clusterBinder.bitrateKbps}kbps, {clusterBinder.fps}fps");
+        // Create config from user selections
+        var config = new StreamingConfig
+        {
+            monitors = MonitorIndex + 1,
+            resolutionWidth = resW,
+            resolutionHeight = resH,
+            bitrateKbps = bitrateKbps,
+            fps = fpsVal,
+            refreshRate = suggested.refreshRate,
+            selectedCodec = suggested.selectedCodec
+        };
+
+        Debug.Log($"[RTTRemoteMenu] BuildConfigFromForm: {config.monitors}mon @ {config.resolutionWidth}x{config.resolutionHeight}, {config.fps}fps, {config.bitrateKbps}kbps");
+        return config;
     }
 
     /// <summary>
@@ -510,58 +503,111 @@ public class RTTRemoteMenu : MonoBehaviour
     }
 
     /// <summary>
-    /// Handle connection state change from ClusterAutoBinder.
+    /// Handle phase change from ConnectionViewModel.
+    /// All calls are guaranteed to be on main thread via ObservableProperty.
     /// </summary>
-    public void HandleConnectionStateChanged(ClusterAutoBinder.ConnectionState state)
+    private void HandlePhaseChanged(ConnectionPhase phase)
     {
-        Debug.Log($"[RTTRemoteMenu] HandleConnectionStateChanged: {_currentState} -> {state}");
-        _currentState = state;
-        OnConnectionStateChanged?.Invoke(state);
+        Debug.Log($"[RTTRemoteMenu] HandlePhaseChanged: {_currentPhase} -> {phase}");
+        _currentPhase = phase;
+        OnConnectionStateChanged?.Invoke(phase);
 
-        switch (state)
+        switch (phase)
         {
-            case ClusterAutoBinder.ConnectionState.Disconnected:
+            case ConnectionPhase.Disconnected:
                 UpdateButtonText("CONNECT");
-                // Reset to disabled state
                 InitializeDropdownsDisabled();
-                // Mở khóa input fields để user có thể sửa host/port
                 VRInputFieldFactory.SetInteractable(_hostInput, true);
                 VRInputFieldFactory.SetInteractable(_portInput, true);
-                // Mở khóa QR button
                 VRButtonFactory.SetInteractable(_qrButton, true);
                 HideSidePanels();
                 break;
 
-            case ClusterAutoBinder.ConnectionState.Connecting:
+            case ConnectionPhase.Connecting:
                 UpdateButtonText("CONNECTING...");
-                // Hiển thị panels ngay khi bắt đầu kết nối với loading state
                 ShowSidePanels();
                 break;
 
-            case ClusterAutoBinder.ConnectionState.Connected:
-                UpdateButtonText("SETUP REMOTE");
-                // Panels đã hiển thị rồi từ Connecting state, không cần gọi lại
+            case ConnectionPhase.AwaitingHardwareInfo:
+            case ConnectionPhase.SpeedTesting:
+            case ConnectionPhase.AwaitingNetworkInfo:
+            case ConnectionPhase.AwaitingSuggestedConfig:
+                UpdateButtonText("CONNECTING...");
                 break;
 
-            case ClusterAutoBinder.ConnectionState.SettingUp:
+            case ConnectionPhase.ConfiguringSettings:
+                UpdateButtonText("SETUP REMOTE");
+                break;
+
+            case ConnectionPhase.SendingDisplayConfig:
+            case ConnectionPhase.AwaitingSetupComplete:
                 UpdateButtonText("SETTING UP...");
-                // Khóa tất cả dropdowns và input fields
                 LockAllInputs();
                 break;
 
-            case ClusterAutoBinder.ConnectionState.Ready:
+            case ConnectionPhase.ICENegotiating:
+                UpdateButtonText("NEGOTIATING...");
+                break;
+
+            case ConnectionPhase.ReadyToStream:
                 UpdateButtonText("START REMOTE");
                 break;
 
-            case ClusterAutoBinder.ConnectionState.Streaming:
+            case ConnectionPhase.StartingStream:
+                UpdateButtonText("STARTING...");
+                break;
+
+            case ConnectionPhase.Streaming:
                 UpdateButtonText("STREAMING");
                 break;
 
-            case ClusterAutoBinder.ConnectionState.Error:
+            case ConnectionPhase.Reconnecting:
+                UpdateButtonText("RECONNECTING...");
+                break;
+
+            case ConnectionPhase.Error:
                 UpdateButtonText("RETRY");
+                VRInputFieldFactory.SetInteractable(_hostInput, true);
+                VRInputFieldFactory.SetInteractable(_portInput, true);
+                VRButtonFactory.SetInteractable(_qrButton, true);
                 HideSidePanels();
                 break;
         }
+    }
+
+    /// <summary>
+    /// Handle error message from ViewModel.
+    /// </summary>
+    private void HandleErrorMessage(string error)
+    {
+        if (!string.IsNullOrEmpty(error))
+        {
+            Debug.LogError($"[RTTRemoteMenu] Error: {error}");
+            // Could show error UI here
+        }
+    }
+
+    /// <summary>
+    /// Handle speed test progress value change.
+    /// </summary>
+    private void HandleSpeedTestProgressValue(int progress)
+    {
+        if (_networkInfoPanel == null) return;
+
+        if (progress >= 100)
+        {
+            double bandwidth = _viewModel?.CurrentBandwidth.Value ?? 0;
+            _networkInfoPanel.UpdateSpeedTestProgress("bandwidth", bandwidth, progress);
+        }
+    }
+
+    /// <summary>
+    /// Handle bandwidth change.
+    /// </summary>
+    private void HandleBandwidthChanged(double mbps)
+    {
+        // Update is handled in HandleSpeedTestProgressValue
+        _lastReportedMbps = mbps;
     }
 
     /// <summary>
@@ -1444,14 +1490,16 @@ public class RTTRemoteMenu : MonoBehaviour
             _qrScannerManager.OnCancelled -= OnQRScanCancelled;
         }
 
-        // Unsubscribe from ClusterAutoBinder events
-        if (clusterBinder != null)
+        // Unsubscribe from ViewModel events
+        if (_viewModel != null)
         {
-            clusterBinder.OnStateChanged -= HandleConnectionStateChanged;
-            clusterBinder.OnSuggestedConfigReceived -= ApplySuggestedConfig;
-            clusterBinder.OnHardwareInfoReceived -= HandleHardwareInfoReceived;
-            clusterBinder.OnNetworkInfoReceived -= HandleNetworkInfoReceived;
-            clusterBinder.OnSpeedTestProgress -= HandleSpeedTestProgress;
+            _viewModel.Phase.OnChanged -= HandlePhaseChanged;
+            _viewModel.HardwareInfo.OnChanged -= HandleHardwareInfoReceived;
+            _viewModel.NetworkInfo.OnChanged -= HandleNetworkInfoReceived;
+            _viewModel.SuggestedConfig.OnChanged -= ApplySuggestedConfig;
+            _viewModel.SpeedTestProgress.OnChanged -= HandleSpeedTestProgressValue;
+            _viewModel.CurrentBandwidth.OnChanged -= HandleBandwidthChanged;
+            _viewModel.ErrorMessage.OnChanged -= HandleErrorMessage;
         }
 
         // Destroy side panels

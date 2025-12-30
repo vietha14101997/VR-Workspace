@@ -10,7 +10,7 @@ using System.Collections.Generic;
 [Serializable]
 public class RTTMenuItem
 {
-    public string id;           // Unique identifier (e.g., "remote", "browser")
+    public string id;           // Unique identifier (e.g., "remote", "media")
     public string label;        // Display name
     public Sprite icon;         // Optional - auto-loads from Resources if null
     public Color color = new Color(0f, 0.9f, 1f); // Button theme color
@@ -72,7 +72,7 @@ public class RTTMainMenu : MonoBehaviour
 
     #region Preset Loaders
     /// <summary>
-    /// Load the default 6 menu items: Remote, Browser, Media, Files, Settings, Quit.
+    /// Load the default 5 menu items: Remote, Media, Files, Settings, Quit.
     /// </summary>
     public void LoadDefaultItems()
     {
@@ -82,7 +82,6 @@ public class RTTMainMenu : MonoBehaviour
         Color purple = new Color(0.76f, 0.36f, 1f);
 
         menuItems.Add(new RTTMenuItem("remote", "Remote Desktop", null, cyan));
-        menuItems.Add(new RTTMenuItem("browser", "Browser", null, cyan));
         menuItems.Add(new RTTMenuItem("media", "Media", null, purple));
         menuItems.Add(new RTTMenuItem("files", "Files", null, cyan));
         menuItems.Add(new RTTMenuItem("settings", "Settings", null, purple));

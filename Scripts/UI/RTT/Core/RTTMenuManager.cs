@@ -1,6 +1,11 @@
 using UnityEngine;
 using System.Collections;
 using TMPro;
+using Unity.WebRTC;
+using VRWorkspace.Utils;
+using VRWorkspace.Streaming;
+using VRWorkspace.Core;
+using VRWorkspace.ViewModels;
 
 /// <summary>
 /// Manages menu state and navigation between different menu screens.
@@ -28,11 +33,20 @@ public class RTTMenuManager : MonoBehaviour
     [Header("Auto Init")]
     [Tooltip("Automatically show main menu on start")]
     [SerializeField] private bool autoShowMainMenu = true;
+
+    [Header("Streaming Panels")]
+    [Tooltip("Optional panel prefab for cluster rig (if null, default panels will be created)")]
+    [SerializeField] private WorldPanelPlus panelPrefab;
     #endregion
 
     #region Private Fields
     private MenuState _currentState = MenuState.MainMenu;
     private GameObject _currentMenuContent;
+    private ConnectionViewModel _viewModel;
+    private Coroutine _textureUpdateCoroutine;
+    private Coroutine _webrtcUpdateCoroutine;
+    private WorldPanelClusterRig _clusterRig;
+    private int _activeCursorPanelIndex = -1;
     #endregion
 
     #region Events
@@ -113,6 +127,33 @@ public class RTTMenuManager : MonoBehaviour
 
     private void OnDestroy()
     {
+        // Stop texture update coroutine
+        if (_textureUpdateCoroutine != null)
+        {
+            StopCoroutine(_textureUpdateCoroutine);
+            _textureUpdateCoroutine = null;
+        }
+
+        // Stop WebRTC update coroutine
+        if (_webrtcUpdateCoroutine != null)
+        {
+            StopCoroutine(_webrtcUpdateCoroutine);
+            _webrtcUpdateCoroutine = null;
+        }
+
+        // Destroy dynamically created cluster rig
+        if (_clusterRig != null)
+        {
+            Destroy(_clusterRig.gameObject);
+            _clusterRig = null;
+        }
+
+        // Unsubscribe from cursor events
+        if (_viewModel != null)
+        {
+            _viewModel.OnCursorPositionChanged -= HandleCursorPosition;
+        }
+
         // Unsubscribe from events
         if (mainMenuController != null)
         {
@@ -275,11 +316,199 @@ public class RTTMenuManager : MonoBehaviour
 
     private void HandleRemoteStartClicked()
     {
-        Debug.Log("[RTTMenuManager] Remote Start clicked - hiding menu");
+        Debug.Log("[RTTMenuManager] Remote Start clicked - hiding menu and showing cluster panels");
+
+        // Hide menu
         if (menuFrame != null)
         {
             menuFrame.gameObject.SetActive(false);
         }
+
+        // Get ViewModel from ServiceLocator
+        if (!ServiceLocator.TryGet<ConnectionViewModel>(out _viewModel))
+        {
+            Debug.LogWarning("[RTTMenuManager] ConnectionViewModel not found in ServiceLocator");
+            return;
+        }
+
+        // Subscribe to cursor position updates
+        _viewModel.OnCursorPositionChanged += HandleCursorPosition;
+
+        // Check if applied config is available (this is what was actually sent to server)
+        if (_viewModel.AppliedConfig.Value == null)
+        {
+            Debug.LogWarning("[RTTMenuManager] AppliedConfig is null, falling back to SuggestedConfig");
+            if (_viewModel.SuggestedConfig.Value == null)
+            {
+                Debug.LogError("[RTTMenuManager] No config available");
+                return;
+            }
+        }
+
+        // Use AppliedConfig (the actual config sent to server), fallback to SuggestedConfig
+        int monitorCount = _viewModel.AppliedConfig.Value?.monitors ?? _viewModel.SuggestedConfig.Value.monitors;
+        Debug.Log($"[RTTMenuManager] Creating cluster rig with {monitorCount} panels (from AppliedConfig)");
+
+        // Create WorldPanelClusterRig dynamically
+        CreateClusterRig(monitorCount);
+
+        // Start WebRTC update coroutine (REQUIRED for video frame decoding)
+        if (_webrtcUpdateCoroutine == null)
+        {
+            _webrtcUpdateCoroutine = StartCoroutine(WebRTC.Update());
+            Debug.Log("[RTTMenuManager] Started WebRTC.Update() coroutine");
+        }
+
+        // Start texture update coroutine
+        if (_textureUpdateCoroutine != null)
+        {
+            StopCoroutine(_textureUpdateCoroutine);
+        }
+        _textureUpdateCoroutine = StartCoroutine(UpdatePanelTextures());
+    }
+
+    /// <summary>
+    /// Dynamically create a WorldPanelClusterRig with the specified number of panels.
+    /// </summary>
+    private void CreateClusterRig(int panelCount)
+    {
+        // Destroy existing cluster rig if any
+        if (_clusterRig != null)
+        {
+            Destroy(_clusterRig.gameObject);
+            _clusterRig = null;
+        }
+
+        // Create new GameObject for cluster rig
+        var clusterGO = new GameObject("StreamingClusterRig");
+        _clusterRig = clusterGO.AddComponent<WorldPanelClusterRig>();
+
+        // Assign panel prefab if available
+        if (panelPrefab != null)
+        {
+            _clusterRig.panelPrefab = panelPrefab;
+        }
+
+        // Build the cluster with specified panel count
+        _clusterRig.BuildWithPanelCount(panelCount);
+
+        // Subscribe to cursor events for immediate keyframe requests on user interaction
+        SubscribeToPanelCursorEvents();
+
+        Debug.Log($"[RTTMenuManager] Created WorldPanelClusterRig with {panelCount} panels");
+    }
+
+    /// <summary>
+    /// Subscribe to cursor events on all panels to request keyframes on user interaction.
+    /// This ensures visual feedback (right-click menus, drag selections, etc.) appears immediately.
+    /// </summary>
+    private void SubscribeToPanelCursorEvents()
+    {
+        if (_clusterRig == null || _clusterRig.panels == null) return;
+
+        for (int i = 0; i < _clusterRig.panels.Count; i++)
+        {
+            var panel = _clusterRig.panels[i];
+            if (panel == null) continue;
+
+            panel.EnsureCursor();
+            if (panel.cursor == null) continue;
+
+            int monitorIndex = i; // Capture for closure
+
+            // Request keyframe on click down (button press, selection start)
+            panel.cursor.onClickDown += () =>
+            {
+                if (_viewModel != null)
+                {
+                    _viewModel.RequestKeyframe(monitorIndex);
+                    Debug.Log($"[RTTMenuManager] Requested keyframe on click down (monitor {monitorIndex})");
+                }
+            };
+
+            // Request keyframe on click up (button release, menu appear)
+            panel.cursor.onClickUp += () =>
+            {
+                if (_viewModel != null)
+                {
+                    _viewModel.RequestKeyframe(monitorIndex);
+                    Debug.Log($"[RTTMenuManager] Requested keyframe on click up (monitor {monitorIndex})");
+                }
+            };
+        }
+
+        Debug.Log($"[RTTMenuManager] Subscribed to cursor events on {_clusterRig.panels.Count} panels");
+    }
+
+    /// <summary>
+    /// Coroutine to continuously update panel textures from streaming.
+    /// </summary>
+    private IEnumerator UpdatePanelTextures()
+    {
+        Debug.Log("[RTTMenuManager] Starting texture update coroutine");
+
+        // Wait for streaming to actually start (IsStreaming becomes true)
+        float waitTimeout = 30f; // Max 30 seconds wait
+        float waitElapsed = 0f;
+        while (_viewModel != null && !_viewModel.IsStreaming.Value && waitElapsed < waitTimeout)
+        {
+            waitElapsed += Time.deltaTime;
+            if ((int)(waitElapsed * 10) % 10 == 0) // Log every ~1 second
+            {
+                Debug.Log($"[RTTMenuManager] Waiting for streaming to start... ({waitElapsed:F1}s)");
+            }
+            yield return null;
+        }
+
+        if (_viewModel == null || !_viewModel.IsStreaming.Value)
+        {
+            Debug.LogWarning($"[RTTMenuManager] Streaming did not start within {waitTimeout}s, coroutine exiting");
+            yield break;
+        }
+
+        Debug.Log("[RTTMenuManager] Streaming started, beginning texture updates");
+
+        int frameCount = 0;
+        int logInterval = 60; // Log every 60 frames (about 1 second)
+
+        while (_viewModel != null && _viewModel.IsStreaming.Value)
+        {
+            // Poll textures from WebRTC
+            _viewModel.PollTextures();
+
+            // Update panel textures
+            if (_clusterRig != null && _clusterRig.panels != null)
+            {
+                for (int i = 0; i < _clusterRig.panels.Count; i++)
+                {
+                    var panel = _clusterRig.panels[i];
+                    if (panel != null)
+                    {
+                        var texture = _viewModel.GetTexture(i);
+
+                        // Debug log periodically
+                        if (frameCount % logInterval == 0 && i == 0)
+                        {
+                            Debug.Log($"[RTTMenuManager] Panel{i} texture poll: " +
+                                $"texture={(texture != null ? $"{texture.width}x{texture.height}" : "null")}, " +
+                                $"current={(panel.contentTexture != null ? "set" : "null")}");
+                        }
+
+                        if (texture != null && panel.contentTexture != texture)
+                        {
+                            panel.contentTexture = texture;
+                            panel.Apply();
+                            Debug.Log($"[RTTMenuManager] Panel{i} texture updated: {texture.width}x{texture.height}");
+                        }
+                    }
+                }
+            }
+
+            frameCount++;
+            yield return null; // Update every frame
+        }
+
+        Debug.Log("[RTTMenuManager] Texture update coroutine stopped (IsStreaming became false)");
     }
 
     private void HandleQuit()
@@ -290,6 +519,65 @@ public class RTTMenuManager : MonoBehaviour
 #else
         Application.Quit();
 #endif
+    }
+
+    /// <summary>
+    /// Handle cursor position update from server and sync with panel cursor.
+    /// Only ONE cursor is visible across all panels at any time.
+    /// </summary>
+    private void HandleCursorPosition(int monitorIndex, float u, float v, bool visible)
+    {
+        if (_clusterRig == null || _clusterRig.panels == null)
+            return;
+
+        // If cursor is not visible or monitorIndex is invalid, hide all cursors
+        if (!visible || monitorIndex < 0 || monitorIndex >= _clusterRig.panels.Count)
+        {
+            HideAllCursors();
+            _activeCursorPanelIndex = -1;
+            return;
+        }
+
+        // If cursor moved to a different panel, hide cursor on old panel
+        if (_activeCursorPanelIndex != monitorIndex && _activeCursorPanelIndex >= 0 && _activeCursorPanelIndex < _clusterRig.panels.Count)
+        {
+            var oldPanel = _clusterRig.panels[_activeCursorPanelIndex];
+            if (oldPanel != null && oldPanel.cursor != null)
+            {
+                oldPanel.cursor.SetVisible(false);
+            }
+        }
+
+        // Update cursor on new panel
+        var panel = _clusterRig.panels[monitorIndex];
+        if (panel == null) return;
+
+        panel.EnsureCursor();
+        if (panel.cursor == null) return;
+
+        // Convert from top-left origin (Windows) to bottom-left origin (Unity UV)
+        // Server sends v where 0 = top, 1 = bottom
+        // Unity cursor expects v where 0 = bottom, 1 = top
+        float unityV = 1f - v;
+        panel.cursor.SetUV(u, unityV, silent: true);
+        panel.cursor.SetVisible(true);
+
+        _activeCursorPanelIndex = monitorIndex;
+    }
+
+    /// <summary>
+    /// Hide cursors on all panels.
+    /// </summary>
+    private void HideAllCursors()
+    {
+        if (_clusterRig == null || _clusterRig.panels == null) return;
+        foreach (var panel in _clusterRig.panels)
+        {
+            if (panel != null && panel.cursor != null)
+            {
+                panel.cursor.SetVisible(false);
+            }
+        }
     }
     #endregion
 }

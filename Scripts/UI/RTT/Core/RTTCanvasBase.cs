@@ -45,6 +45,7 @@ public abstract class RTTCanvasBase : MonoBehaviour
     protected bool _isDirty = true;
     protected int _framesSinceLastRender = 0;
     protected float _lastDirtyTime;
+    protected bool _continuousRender = false; // For animated content that needs constant updates
 
     // State tracking
     protected bool _isInitialized = false;
@@ -493,6 +494,22 @@ public abstract class RTTCanvasBase : MonoBehaviour
     }
 
     /// <summary>
+    /// Enable/disable continuous rendering for animated content.
+    /// When enabled, the panel renders every frame regardless of dirty state.
+    /// Use this for panels with constant animation instead of marking dirty every frame.
+    /// </summary>
+    public virtual void SetContinuousRender(bool continuous)
+    {
+        _continuousRender = continuous;
+        if (continuous) MarkDirty();
+    }
+
+    /// <summary>
+    /// Check if continuous render is enabled
+    /// </summary>
+    public bool IsContinuousRender => _continuousRender;
+
+    /// <summary>
     /// Handle dirty flag rendering logic in LateUpdate
     /// </summary>
     protected virtual void HandleDirtyRendering()
@@ -507,7 +524,8 @@ public abstract class RTTCanvasBase : MonoBehaviour
         _framesSinceLastRender++;
 
         // Check if we should render
-        bool shouldRender = _isDirty ||
+        // Continuous render mode always renders (for animated content)
+        bool shouldRender = _isDirty || _continuousRender ||
             (config.maxFrameSkip > 0 && _framesSinceLastRender >= config.maxFrameSkip);
 
         if (shouldRender)
