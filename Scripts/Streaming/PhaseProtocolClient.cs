@@ -231,6 +231,26 @@ namespace VRWorkspace.Streaming
         }
 
         /// <summary>
+        /// Request server to send a keyframe immediately.
+        /// Call this when user interacts (click, drag, etc.) for instant visual update.
+        /// </summary>
+        /// <param name="monitorIndex">Monitor index, or -1 for all monitors</param>
+        public void RequestKeyframe(int monitorIndex = -1)
+        {
+            if (_ws?.State != WebSocketState.Open || !_stateMachine.IsStreaming) return;
+
+            try
+            {
+                string json = monitorIndex >= 0
+                    ? $"{{\"type\":\"request_keyframe\",\"monitorIndex\":{monitorIndex}}}"
+                    : "{\"type\":\"request_keyframe\"}";
+
+                _ = SendTextAsync(json);
+            }
+            catch { }
+        }
+
+        /// <summary>
         /// Main receive loop for WebSocket messages.
         /// </summary>
         private int _msgCounter = 0;
@@ -1968,6 +1988,7 @@ namespace VRWorkspace.Streaming
 
         /// <summary>
         /// Update textures (call from Update loop).
+        /// Also updates LastFrameTime for frame stall detection.
         /// </summary>
         public void PollTextures()
         {
@@ -1992,7 +2013,16 @@ namespace VRWorkspace.Streaming
                                 $"frames={wrapper.FrameCount}, polls={_pollCount}");
                         }
 
-                        if (tex != null && tex.width > 0) wrapper.Texture = tex;
+                        if (tex != null && tex.width > 0)
+                        {
+                            wrapper.Texture = tex;
+
+                            // Always update LastFrameTime when texture is valid
+                            // Unity WebRTC reuses the same Texture2D object (updates content in place)
+                            // so we can't detect "new frames" by texture reference change
+                            wrapper.LastFrameTime = DateTime.UtcNow;
+                            wrapper.FrameCount++;
+                        }
                     }
                     catch { }
                 }

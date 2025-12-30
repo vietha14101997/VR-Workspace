@@ -64,6 +64,16 @@ namespace VRWorkspace.ViewModels
 
         #endregion
 
+        #region Events
+
+        /// <summary>
+        /// Cursor position update from server.
+        /// Parameters: monitorIndex, u (0-1), v (0-1), visible
+        /// </summary>
+        public event Action<int, float, float, bool> OnCursorPositionChanged;
+
+        #endregion
+
         #region Commands
 
         public ObservableCommand ConnectCommand { get; }
@@ -218,6 +228,16 @@ namespace VRWorkspace.ViewModels
             _client?.PollTextures();
         }
 
+        /// <summary>
+        /// Request server to send a keyframe immediately.
+        /// Call this when user interacts (click, drag, etc.) for instant visual update.
+        /// </summary>
+        /// <param name="monitorIndex">Monitor index, or -1 for all monitors</param>
+        public void RequestKeyframe(int monitorIndex = -1)
+        {
+            _client?.RequestKeyframe(monitorIndex);
+        }
+
         #endregion
 
         #region Private Methods
@@ -318,6 +338,12 @@ namespace VRWorkspace.ViewModels
                 Phase.Value = ConnectionPhase.Disconnected;
                 IsConnected.Value = false;
                 IsStreaming.Value = false;
+            };
+
+            _client.OnCursorPosition += (monitorIndex, u, v, visible) =>
+            {
+                // Forward cursor position to UI (already on main thread from PhaseProtocolClient)
+                OnCursorPositionChanged?.Invoke(monitorIndex, u, v, visible);
             };
 
             _client.OnSpeedTestProgress += (direction, mbps, progress) =>

@@ -46,6 +46,7 @@ public class RTTMenuManager : MonoBehaviour
     private Coroutine _textureUpdateCoroutine;
     private Coroutine _webrtcUpdateCoroutine;
     private WorldPanelClusterRig _clusterRig;
+    private int _activeCursorPanelIndex = -1;
     #endregion
 
     #region Events
@@ -145,6 +146,12 @@ public class RTTMenuManager : MonoBehaviour
         {
             Destroy(_clusterRig.gameObject);
             _clusterRig = null;
+        }
+
+        // Unsubscribe from cursor events
+        if (_viewModel != null)
+        {
+            _viewModel.OnCursorPositionChanged -= HandleCursorPosition;
         }
 
         // Unsubscribe from events
@@ -324,6 +331,9 @@ public class RTTMenuManager : MonoBehaviour
             return;
         }
 
+        // Subscribe to cursor position updates
+        _viewModel.OnCursorPositionChanged += HandleCursorPosition;
+
         // Check if applied config is available (this is what was actually sent to server)
         if (_viewModel.AppliedConfig.Value == null)
         {
@@ -382,7 +392,52 @@ public class RTTMenuManager : MonoBehaviour
         // Build the cluster with specified panel count
         _clusterRig.BuildWithPanelCount(panelCount);
 
+        // Subscribe to cursor events for immediate keyframe requests on user interaction
+        SubscribeToPanelCursorEvents();
+
         Debug.Log($"[RTTMenuManager] Created WorldPanelClusterRig with {panelCount} panels");
+    }
+
+    /// <summary>
+    /// Subscribe to cursor events on all panels to request keyframes on user interaction.
+    /// This ensures visual feedback (right-click menus, drag selections, etc.) appears immediately.
+    /// </summary>
+    private void SubscribeToPanelCursorEvents()
+    {
+        if (_clusterRig == null || _clusterRig.panels == null) return;
+
+        for (int i = 0; i < _clusterRig.panels.Count; i++)
+        {
+            var panel = _clusterRig.panels[i];
+            if (panel == null) continue;
+
+            panel.EnsureCursor();
+            if (panel.cursor == null) continue;
+
+            int monitorIndex = i; // Capture for closure
+
+            // Request keyframe on click down (button press, selection start)
+            panel.cursor.onClickDown += () =>
+            {
+                if (_viewModel != null)
+                {
+                    _viewModel.RequestKeyframe(monitorIndex);
+                    Debug.Log($"[RTTMenuManager] Requested keyframe on click down (monitor {monitorIndex})");
+                }
+            };
+
+            // Request keyframe on click up (button release, menu appear)
+            panel.cursor.onClickUp += () =>
+            {
+                if (_viewModel != null)
+                {
+                    _viewModel.RequestKeyframe(monitorIndex);
+                    Debug.Log($"[RTTMenuManager] Requested keyframe on click up (monitor {monitorIndex})");
+                }
+            };
+        }
+
+        Debug.Log($"[RTTMenuManager] Subscribed to cursor events on {_clusterRig.panels.Count} panels");
     }
 
     /// <summary>
@@ -464,6 +519,65 @@ public class RTTMenuManager : MonoBehaviour
 #else
         Application.Quit();
 #endif
+    }
+
+    /// <summary>
+    /// Handle cursor position update from server and sync with panel cursor.
+    /// Only ONE cursor is visible across all panels at any time.
+    /// </summary>
+    private void HandleCursorPosition(int monitorIndex, float u, float v, bool visible)
+    {
+        if (_clusterRig == null || _clusterRig.panels == null)
+            return;
+
+        // If cursor is not visible or monitorIndex is invalid, hide all cursors
+        if (!visible || monitorIndex < 0 || monitorIndex >= _clusterRig.panels.Count)
+        {
+            HideAllCursors();
+            _activeCursorPanelIndex = -1;
+            return;
+        }
+
+        // If cursor moved to a different panel, hide cursor on old panel
+        if (_activeCursorPanelIndex != monitorIndex && _activeCursorPanelIndex >= 0 && _activeCursorPanelIndex < _clusterRig.panels.Count)
+        {
+            var oldPanel = _clusterRig.panels[_activeCursorPanelIndex];
+            if (oldPanel != null && oldPanel.cursor != null)
+            {
+                oldPanel.cursor.SetVisible(false);
+            }
+        }
+
+        // Update cursor on new panel
+        var panel = _clusterRig.panels[monitorIndex];
+        if (panel == null) return;
+
+        panel.EnsureCursor();
+        if (panel.cursor == null) return;
+
+        // Convert from top-left origin (Windows) to bottom-left origin (Unity UV)
+        // Server sends v where 0 = top, 1 = bottom
+        // Unity cursor expects v where 0 = bottom, 1 = top
+        float unityV = 1f - v;
+        panel.cursor.SetUV(u, unityV, silent: true);
+        panel.cursor.SetVisible(true);
+
+        _activeCursorPanelIndex = monitorIndex;
+    }
+
+    /// <summary>
+    /// Hide cursors on all panels.
+    /// </summary>
+    private void HideAllCursors()
+    {
+        if (_clusterRig == null || _clusterRig.panels == null) return;
+        foreach (var panel in _clusterRig.panels)
+        {
+            if (panel != null && panel.cursor != null)
+            {
+                panel.cursor.SetVisible(false);
+            }
+        }
     }
     #endregion
 }
