@@ -30,6 +30,33 @@ public class VRGazeReticle : MonoBehaviour
     [Tooltip("Bật/tắt tính năng Dwell Click")]
     public bool dwellClickEnabled = true;
 
+    [Header("Head Stabilization")]
+    [Tooltip("Bật/tắt tính năng ổn định đầu (giảm rung lắc)")]
+    public bool headStabilizationEnabled = true;
+
+    [Tooltip("Hệ số smoothing khi đứng yên (thấp = mượt hơn)")]
+    [Range(0.7f, 0.95f)]
+    public float stillSmoothingFactor = 0.80f;
+
+    [Tooltip("Hệ số smoothing khi quay đầu (cao = responsive hơn)")]
+    [Range(0.9f, 0.99f)]
+    public float movingSmoothingFactor = 0.97f;
+
+    [Tooltip("Ngưỡng vận tốc góc (độ/giây) coi là 'đứng yên'")]
+    [Range(1f, 10f)]
+    public float stillThreshold = 5f;
+
+    [Tooltip("Ngưỡng vận tốc góc (độ/giây) coi là 'quay nhanh'")]
+    [Range(15f, 60f)]
+    public float fastThreshold = 35f;
+
+    [Tooltip("Cường độ chỉnh drift (cao = nhanh hơn nhưng có thể gây khó chịu)")]
+    [Range(0.01f, 0.1f)]
+    public float driftCorrectionStrength = 0.03f;
+
+    [Tooltip("Bật/tắt chỉnh drift bằng accelerometer")]
+    public bool driftCorrectionEnabled = true;
+
     private Image _reticleImage;
     private Camera _cam;
     private RectTransform _canvasRT;
@@ -65,6 +92,12 @@ public class VRGazeReticle : MonoBehaviour
     private RTTHitResult _lastRTTHit;
     private bool _isHoveringRTT = false;
 
+    // Head Stabilization State
+    private Quaternion _stabilizedRotation;
+    private Vector3 _previousEuler;
+    private float _currentSmoothingFactor;
+    private bool _stabilizationInitialized = false;
+
     // Singleton access helper (optional, or use FindObjectOfType)
     public static VRGazeReticle Instance { get; private set; }
 
@@ -93,6 +126,9 @@ public class VRGazeReticle : MonoBehaviour
         CreateReticle();
         _pointerData = new PointerEventData(EventSystem.current);
         _lastGazeDirection = _cam.transform.forward;
+
+        // Initialize head stabilization
+        InitializeStabilization();
     }
 
     void CreateReticle()
@@ -253,8 +289,9 @@ public class VRGazeReticle : MonoBehaviour
     {
         _isRecentering = false;
         if (_recenterGroup != null) _recenterGroup.SetActive(false);
-        
-        // Restore standard reticle state based on current gaze next frame
+
+        // Reset stabilization after recenter to sync with new orientation
+        ResetStabilization();
     }
 
     void Update()
@@ -1030,6 +1067,118 @@ public class VRGazeReticle : MonoBehaviour
         tex.Apply();
         return Sprite.Create(tex, new Rect(0,0,res,res), new Vector2(0.5f,0.5f));
     }
+
+    #region Head Stabilization
+
+    void InitializeStabilization()
+    {
+        if (_cam != null && headStabilizationEnabled)
+        {
+            _stabilizedRotation = _cam.transform.rotation;
+            _previousEuler = _cam.transform.eulerAngles;
+            _currentSmoothingFactor = stillSmoothingFactor;
+            _stabilizationInitialized = true;
+        }
+    }
+
+    void LateUpdate()
+    {
+        if (headStabilizationEnabled && _stabilizationInitialized && !_isRecentering)
+        {
+            ApplyHeadStabilization();
+        }
+    }
+
+    void ApplyHeadStabilization()
+    {
+        if (_cam == null) return;
+
+        // Get raw rotation from TrackedPoseDriver
+        Quaternion rawRotation = _cam.transform.rotation;
+
+        // Calculate angular velocity for adaptive smoothing
+        Vector3 currentEuler = rawRotation.eulerAngles;
+        Vector3 deltaEuler = DeltaAngles(_previousEuler, currentEuler);
+        float angularSpeed = deltaEuler.magnitude / Time.deltaTime;
+
+        // Adaptive smoothing factor based on movement speed
+        _currentSmoothingFactor = CalculateAdaptiveSmoothingFactor(angularSpeed);
+
+        // Apply complementary filter (Slerp between previous stabilized and new raw)
+        _stabilizedRotation = Quaternion.Slerp(_stabilizedRotation, rawRotation, _currentSmoothingFactor);
+
+        // Apply drift correction if enabled
+        if (driftCorrectionEnabled)
+        {
+            ApplyDriftCorrection(ref _stabilizedRotation);
+        }
+
+        // Apply stabilized rotation to camera
+        _cam.transform.rotation = _stabilizedRotation;
+
+        // Store for next frame
+        _previousEuler = currentEuler;
+    }
+
+    float CalculateAdaptiveSmoothingFactor(float angularSpeed)
+    {
+        if (angularSpeed >= fastThreshold)
+            return movingSmoothingFactor;
+        if (angularSpeed <= stillThreshold)
+            return stillSmoothingFactor;
+
+        // Linear interpolation between still and fast thresholds
+        float t = (angularSpeed - stillThreshold) / (fastThreshold - stillThreshold);
+        return Mathf.Lerp(stillSmoothingFactor, movingSmoothingFactor, t);
+    }
+
+    void ApplyDriftCorrection(ref Quaternion rotation)
+    {
+        // Get accelerometer data (gravity direction when still)
+        Vector3 accel = Input.acceleration;
+        float accelMagnitude = accel.magnitude;
+
+        // Only apply correction when accelerometer reading is valid (near 1g)
+        if (accelMagnitude < 0.8f || accelMagnitude > 1.2f)
+            return;
+
+        // Accelerometer gives "down" direction in device space
+        // Convert to "up" and normalize
+        Vector3 accelUp = -accel.normalized;
+
+        // Get current up from stabilized rotation
+        Vector3 currentUp = rotation * Vector3.up;
+
+        // Calculate correction rotation
+        Quaternion correction = Quaternion.FromToRotation(currentUp, accelUp);
+
+        // Apply gradual correction
+        float correctionStep = driftCorrectionStrength * Time.deltaTime;
+        rotation = Quaternion.Slerp(Quaternion.identity, correction, correctionStep) * rotation;
+    }
+
+    Vector3 DeltaAngles(Vector3 from, Vector3 to)
+    {
+        return new Vector3(
+            Mathf.DeltaAngle(from.x, to.x),
+            Mathf.DeltaAngle(from.y, to.y),
+            Mathf.DeltaAngle(from.z, to.z)
+        );
+    }
+
+    /// <summary>
+    /// Reset stabilization state. Call this after recentering.
+    /// </summary>
+    public void ResetStabilization()
+    {
+        if (_cam != null)
+        {
+            _stabilizedRotation = _cam.transform.rotation;
+            _previousEuler = _cam.transform.eulerAngles;
+        }
+    }
+
+    #endregion
 
     #region Custom Cursor API
     private Color _defaultColor;
