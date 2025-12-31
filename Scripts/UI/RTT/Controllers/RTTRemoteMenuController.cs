@@ -113,6 +113,7 @@ public class RTTRemoteMenuController : MonoBehaviour
 
     /// <summary>
     /// Cleanup resources and unsubscribe from events.
+    /// Fully disconnects and resets connection state so reopening starts fresh.
     /// </summary>
     public void Cleanup()
     {
@@ -124,9 +125,23 @@ public class RTTRemoteMenuController : MonoBehaviour
             _remoteMenuInstance = null;
         }
 
-        // Unsubscribe from ViewModel events
+        // Stop streaming and disconnect from server
+        if (connectionPipeline != null)
+        {
+            connectionPipeline.StopStreaming();
+        }
+
+        // Reset ViewModel state synchronously FIRST (so next menu opens clean)
+        // Then fire-and-forget the actual server disconnect (without state reset)
         if (_viewModel != null)
         {
+            // Reset state immediately (synchronous) - this ensures next menu opens with clean state
+            _viewModel.ResetState();
+
+            // Fire and forget just stopping the client (no state reset to avoid race condition)
+            _ = _viewModel.StopClientAsync();
+
+            // Unsubscribe from ViewModel events
             _viewModel.OnStartWithProgress -= HandleStartWithProgress;
             _viewModel.OnAllMonitorsReady -= HandleAllMonitorsReady;
             _viewModel.ServerSetupProgress.OnChanged -= HandleServerSetupProgress;
@@ -138,7 +153,15 @@ public class RTTRemoteMenuController : MonoBehaviour
         CleanupProgressOverlays();
         _isStreamingActive = false;
 
+        // Destroy ClusterRig
+        if (_clusterRig != null)
+        {
+            Destroy(_clusterRig.gameObject);
+            _clusterRig = null;
+        }
+
         _menuObject = null;
+        Debug.Log("[RTTRemoteMenuController] Cleanup complete - connection state reset");
     }
 
     /// <summary>

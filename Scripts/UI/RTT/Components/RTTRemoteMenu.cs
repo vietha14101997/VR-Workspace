@@ -372,6 +372,29 @@ public class RTTRemoteMenu : MonoBehaviour
         {
             case ConnectionPhase.Disconnected:
             case ConnectionPhase.Error:
+                // Validate host and port first
+                string host = Host;
+                string port = Port;
+
+                if (string.IsNullOrEmpty(host) || string.IsNullOrEmpty(port))
+                {
+                    Debug.LogWarning("[RTTRemoteMenu] Host or port is empty");
+                    return;
+                }
+
+                if (!int.TryParse(port, out int portNum) || portNum <= 0 || portNum > 65535)
+                {
+                    Debug.LogWarning($"[RTTRemoteMenu] Invalid port: {port}");
+                    return;
+                }
+
+                // Validate host format (IP address or hostname)
+                if (!IsValidHost(host))
+                {
+                    Debug.LogWarning($"[RTTRemoteMenu] Invalid host format: {host}");
+                    return;
+                }
+
                 // Step 1: Connect
                 Debug.Log("[RTTRemoteMenu] Connecting...");
                 UpdateButtonText("CONNECTING...");
@@ -381,16 +404,7 @@ public class RTTRemoteMenu : MonoBehaviour
                 VRInputFieldFactory.SetInteractable(_portInput, false);
                 VRButtonFactory.SetInteractable(_qrButton, false);
 
-                // Build connection URL from form
-                string host = Host;
-                string port = Port;
-                if (!string.IsNullOrEmpty(host) && !string.IsNullOrEmpty(port))
-                {
-                    if (int.TryParse(port, out int portNum))
-                    {
-                        await _viewModel.ConnectAsync(host, portNum);
-                    }
-                }
+                await _viewModel.ConnectAsync(host, portNum);
                 break;
 
             case ConnectionPhase.ConfiguringSettings:
@@ -544,7 +558,7 @@ public class RTTRemoteMenu : MonoBehaviour
 
             case ConnectionPhase.Connecting:
                 UpdateButtonText("CONNECTING...");
-                ShowSidePanels();
+                // Side panels will show when hardware_info is received via HandleHardwareInfoReceived
                 break;
 
             case ConnectionPhase.AwaitingHardwareInfo:
@@ -585,7 +599,9 @@ public class RTTRemoteMenu : MonoBehaviour
                 break;
 
             case ConnectionPhase.Error:
-                UpdateButtonText("RETRY");
+                // Treat Error same as Disconnected - show CONNECT, not RETRY
+                UpdateButtonText("CONNECT");
+                InitializeDropdownsDisabled();
                 VRInputFieldFactory.SetInteractable(_hostInput, true);
                 VRInputFieldFactory.SetInteractable(_portInput, true);
                 VRButtonFactory.SetInteractable(_qrButton, true);
@@ -596,6 +612,38 @@ public class RTTRemoteMenu : MonoBehaviour
                 _cachedSuggestedConfig = null;
                 break;
         }
+    }
+
+    /// <summary>
+    /// Validate host format (IP address or hostname).
+    /// </summary>
+    private bool IsValidHost(string host)
+    {
+        if (string.IsNullOrWhiteSpace(host)) return false;
+
+        // Check for valid IP address
+        if (System.Net.IPAddress.TryParse(host, out _))
+        {
+            return true;
+        }
+
+        // Check for valid hostname (alphanumeric, dots, hyphens only)
+        // Must not start or end with dot/hyphen
+        if (host.StartsWith(".") || host.StartsWith("-") ||
+            host.EndsWith(".") || host.EndsWith("-"))
+        {
+            return false;
+        }
+
+        foreach (char c in host)
+        {
+            if (!char.IsLetterOrDigit(c) && c != '.' && c != '-')
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /// <summary>

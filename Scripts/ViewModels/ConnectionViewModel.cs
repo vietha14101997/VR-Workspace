@@ -115,6 +115,12 @@ namespace VRWorkspace.ViewModels
         private readonly Dictionary<int, Texture> _textures = new Dictionary<int, Texture>();
         private bool _disposed;
 
+        /// <summary>
+        /// Generation counter to invalidate stale event handlers from old clients.
+        /// Incremented each time a new client is created.
+        /// </summary>
+        private int _clientGeneration = 0;
+
         #endregion
 
         #region Constructor
@@ -158,11 +164,16 @@ namespace VRWorkspace.ViewModels
         }
 
         /// <summary>
-        /// Disconnect from the server.
+        /// Disconnect from the server and reset all state.
         /// </summary>
         public async Task DisconnectAsync()
         {
-            if (_client == null) return;
+            if (_client == null)
+            {
+                // Even without client, reset state to ensure clean slate
+                ResetAllState();
+                return;
+            }
 
             try
             {
@@ -175,10 +186,93 @@ namespace VRWorkspace.ViewModels
             finally
             {
                 CleanupClient();
-                Phase.Value = ConnectionPhase.Disconnected;
-                IsConnected.Value = false;
-                IsStreaming.Value = false;
+                ResetAllState();
             }
+        }
+
+        /// <summary>
+        /// Reset all observable properties to initial state.
+        /// Call this synchronously when closing app to ensure clean slate.
+        /// </summary>
+        public void ResetState()
+        {
+            ResetAllState();
+        }
+
+        /// <summary>
+        /// Stop the client connection without resetting state.
+        /// Use this when state has already been reset synchronously via ResetState().
+        /// This prevents race conditions where async disconnect overwrites new connection state.
+        /// </summary>
+        public async Task StopClientAsync()
+        {
+            // Capture the client reference NOW to avoid race conditions
+            // If ConnectInternalAsync creates a new client while we're awaiting,
+            // we should only stop/dispose the OLD client, not the new one
+            var clientToStop = _client;
+            if (clientToStop == null) return;
+
+            // Clear _client immediately so ConnectInternalAsync doesn't see stale reference
+            _client = null;
+
+            try
+            {
+                await clientToStop.StopAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[ConnectionViewModel] StopClient error: {ex.Message}");
+            }
+            finally
+            {
+                // Dispose the captured client, NOT _client (which may be new)
+                try
+                {
+                    clientToStop.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[ConnectionViewModel] StopClient dispose error: {ex.Message}");
+                }
+                _textures.Clear();
+                // Note: Do NOT reset state here - caller already did ResetState() synchronously
+            }
+        }
+
+        /// <summary>
+        /// Reset all observable properties to initial state.
+        /// Called on disconnect to ensure clean slate when reopening app.
+        /// </summary>
+        private void ResetAllState()
+        {
+            // Connection state
+            Phase.Value = ConnectionPhase.Disconnected;
+            IsConnected.Value = false;
+            IsStreaming.Value = false;
+            ErrorMessage.Value = string.Empty;
+
+            // Phase 1 data
+            HardwareInfo.Value = null;
+            NetworkInfo.Value = null;
+            SpeedTestProgress.Value = 0;
+            CurrentBandwidth.Value = 0;
+
+            // Config data
+            SuggestedConfig.Value = null;
+            AppliedConfig.Value = null;
+            ConfigProgress.Value = string.Empty;
+
+            // Monitor data
+            Monitors.Clear();
+            VideoTextures.Value = new Dictionary<int, Texture>();
+
+            // Progress tracking
+            ServerSetupProgress.Value = 0;
+            MonitorIceProgress.Value = new Dictionary<int, int>();
+            ReadyMonitorCount.Value = 0;
+            TotalMonitorCount.Value = 0;
+
+            Debug.Log("[ConnectionViewModel] All state reset to initial values");
         }
 
         /// <summary>
@@ -325,6 +419,9 @@ namespace VRWorkspace.ViewModels
             // Cleanup previous connection
             CleanupClient();
 
+            // Increment generation to invalidate old event handlers
+            _clientGeneration++;
+
             // Create new client
             _client = new PhaseProtocolClient();
             SubscribeToEvents();
@@ -350,34 +447,42 @@ namespace VRWorkspace.ViewModels
         {
             if (_client == null) return;
 
+            // Capture current generation to detect stale events from old clients
+            int subscribedGeneration = _clientGeneration;
+
             // All these events fire on background threads
             // ObservableProperty automatically marshals to main thread
 
             _client.OnHardwareInfoReceived += info =>
             {
+                if (_clientGeneration != subscribedGeneration) return; // Stale event
                 HardwareInfo.Value = info;
                 Phase.Value = ConnectionPhase.SpeedTesting;
             };
 
             _client.OnNetworkInfoReceived += info =>
             {
+                if (_clientGeneration != subscribedGeneration) return;
                 NetworkInfo.Value = info;
                 SpeedTestProgress.Value = 100;
             };
 
             _client.OnSuggestedConfigReceived += config =>
             {
+                if (_clientGeneration != subscribedGeneration) return;
                 SuggestedConfig.Value = config;
                 Phase.Value = ConnectionPhase.ConfiguringSettings;
             };
 
             _client.OnConfigProgress += (step, progress, message) =>
             {
+                if (_clientGeneration != subscribedGeneration) return;
                 ConfigProgress.Value = $"{step}: {message} ({progress}%)";
             };
 
             _client.OnConfigComplete += monitors =>
             {
+                if (_clientGeneration != subscribedGeneration) return;
                 Monitors.Clear();
                 foreach (var m in monitors)
                 {
@@ -388,29 +493,35 @@ namespace VRWorkspace.ViewModels
 
             _client.OnReadyToStream += () =>
             {
+                if (_clientGeneration != subscribedGeneration) return;
                 Phase.Value = ConnectionPhase.ReadyToStream;
             };
 
             _client.OnVideoTextureReceived += (idx, tex) =>
             {
+                if (_clientGeneration != subscribedGeneration) return;
                 _textures[idx] = tex;
                 VideoTextures.SetAndNotify(new Dictionary<int, Texture>(_textures));
             };
 
             _client.OnStreamingStarted += () =>
             {
+                if (_clientGeneration != subscribedGeneration) return;
                 Phase.Value = ConnectionPhase.Streaming;
                 IsStreaming.Value = true;
             };
 
             _client.OnError += message =>
             {
+                if (_clientGeneration != subscribedGeneration) return;
                 ErrorMessage.Value = message;
+                Phase.Value = ConnectionPhase.Error;
                 Debug.LogError($"[ConnectionViewModel] Error: {message}");
             };
 
             _client.OnDisconnected += () =>
             {
+                if (_clientGeneration != subscribedGeneration) return; // Ignore stale disconnect events!
                 Phase.Value = ConnectionPhase.Disconnected;
                 IsConnected.Value = false;
                 IsStreaming.Value = false;
@@ -418,12 +529,14 @@ namespace VRWorkspace.ViewModels
 
             _client.OnCursorPosition += (monitorIndex, u, v, visible) =>
             {
+                if (_clientGeneration != subscribedGeneration) return;
                 // Forward cursor position to UI (already on main thread from PhaseProtocolClient)
                 OnCursorPositionChanged?.Invoke(monitorIndex, u, v, visible);
             };
 
             _client.OnSpeedTestProgress += (direction, mbps, progress) =>
             {
+                if (_clientGeneration != subscribedGeneration) return;
                 if (direction == "bandwidth")
                 {
                     CurrentBandwidth.Value = mbps;
@@ -434,11 +547,13 @@ namespace VRWorkspace.ViewModels
             // Progress tracking events for new flow
             _client.OnServerSetupProgress += progress =>
             {
+                if (_clientGeneration != subscribedGeneration) return;
                 ServerSetupProgress.Value = progress;
             };
 
             _client.OnMonitorIceProgress += (idx, progress) =>
             {
+                if (_clientGeneration != subscribedGeneration) return;
                 var dict = new Dictionary<int, int>(MonitorIceProgress.Value);
                 dict[idx] = progress;
                 MonitorIceProgress.SetAndNotify(dict);
@@ -446,12 +561,14 @@ namespace VRWorkspace.ViewModels
 
             _client.OnMonitorIceComplete += idx =>
             {
+                if (_clientGeneration != subscribedGeneration) return;
                 ReadyMonitorCount.Value = ReadyMonitorCount.Value + 1;
                 Debug.Log($"[ConnectionViewModel] Monitor {idx} ICE complete. Ready: {ReadyMonitorCount.Value}/{TotalMonitorCount.Value}");
             };
 
             _client.OnAllMonitorsReady += async () =>
             {
+                if (_clientGeneration != subscribedGeneration) return;
                 Debug.Log("[ConnectionViewModel] All monitors ready, firing OnAllMonitorsReady");
                 OnAllMonitorsReady?.Invoke();
 
@@ -462,8 +579,11 @@ namespace VRWorkspace.ViewModels
                 while (Phase.Value != ConnectionPhase.ReadyToStream && waitCount < maxWait)
                 {
                     await Task.Delay(100);
+                    if (_clientGeneration != subscribedGeneration) return; // Check after await
                     waitCount++;
                 }
+
+                if (_clientGeneration != subscribedGeneration) return; // Stale after wait
 
                 bool useForce = Phase.Value != ConnectionPhase.ReadyToStream;
                 if (useForce)
@@ -473,6 +593,8 @@ namespace VRWorkspace.ViewModels
 
                 // Wait 2 seconds showing "Connecting..."
                 await Task.Delay(2000);
+
+                if (_clientGeneration != subscribedGeneration) return; // Stale after delay
 
                 // Auto-start streaming (use force if phase didn't transition)
                 Debug.Log($"[ConnectionViewModel] Auto-starting streaming (force={useForce})...");
