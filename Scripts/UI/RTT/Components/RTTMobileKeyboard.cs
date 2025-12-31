@@ -139,7 +139,11 @@ public class RTTMobileKeyboard : RTTCanvasBase
 
     protected override void Start()
     {
-        base.Start();
+        // IMPORTANT: Do NOT call base.Start() here!
+        // base.Start() calls Initialize() which creates RenderTexture, Camera, etc.
+        // We want to defer initialization until Show() is called to avoid resource contention
+        // with other RTT panels (like side panels in RemoteMenu).
+        // Initialize() will be called in Show() via EnsureInitialized check.
 
         // Ensure instance is set (in case Awake wasn't called due to inactive)
         if (_instance == null)
@@ -1915,6 +1919,11 @@ public class RTTMobileKeyboard : RTTCanvasBase
         {
             Initialize();
         }
+        // If initialized but RenderTexture was released (via releaseResourcesOnHide), recreate it
+        else if (_renderTexture == null)
+        {
+            RecreateRenderTexture();
+        }
 
         SetVisible(true); // Reset visibility state after Hide()
         CurrentlyOpenKeyboard = this;
@@ -1938,6 +1947,10 @@ public class RTTMobileKeyboard : RTTCanvasBase
         Debug.Log("[RTTMobileKeyboard] Shown");
     }
 
+    [Header("Resource Management")]
+    [Tooltip("Release RenderTexture when hidden to free GPU memory. Helps with resource contention on mobile.")]
+    [SerializeField] private bool releaseResourcesOnHide = true;
+
     public new void Hide()
     {
         base.Hide(); // Call base to properly set visibility
@@ -1948,7 +1961,61 @@ public class RTTMobileKeyboard : RTTCanvasBase
 
         OnClosePressed?.Invoke();
 
+        // Release RenderTexture to free GPU memory for other panels
+        // This is especially important on mobile devices with limited resources
+        if (releaseResourcesOnHide && _renderTexture != null)
+        {
+            _renderTexture.Release();
+            Destroy(_renderTexture);
+            _renderTexture = null;
+
+            // Also disable camera since it has no target anymore
+            if (_uiCamera != null)
+                _uiCamera.enabled = false;
+
+            Debug.Log("[RTTMobileKeyboard] RenderTexture released on hide");
+        }
+
         Debug.Log("[RTTMobileKeyboard] Hidden");
+    }
+
+    /// <summary>
+    /// Recreate RenderTexture after it was released.
+    /// Reuses existing Camera, Canvas, and DisplayQuad.
+    /// </summary>
+    private void RecreateRenderTexture()
+    {
+        if (_renderTexture != null) return; // Already exists
+
+        var resolution = GetResolution();
+        int depthBits = GetMobileCompatibleDepthBits();
+        int antiAliasing = GetMobileCompatibleAntiAliasing();
+        RenderTextureFormat format = GetMobileCompatibleFormat();
+
+        _renderTexture = new RenderTexture(resolution.x, resolution.y, depthBits, format);
+        _renderTexture.antiAliasing = antiAliasing;
+        _renderTexture.filterMode = FilterMode.Bilinear;
+        _renderTexture.useMipMap = false;
+        _renderTexture.autoGenerateMips = false;
+        _renderTexture.name = $"RTT_{GetType().Name}_{GetInstanceID()}";
+
+        if (!_renderTexture.Create())
+        {
+            Debug.LogError("[RTTMobileKeyboard] Failed to recreate RenderTexture");
+            return;
+        }
+
+        // Update references
+        if (_uiCamera != null)
+        {
+            _uiCamera.targetTexture = _renderTexture;
+            _uiCamera.enabled = true;
+        }
+
+        if (_quadMaterial != null)
+            _quadMaterial.mainTexture = _renderTexture;
+
+        Debug.Log("[RTTMobileKeyboard] RenderTexture recreated");
     }
 
     public void SwitchToInputField(TMP_InputField newInputField)

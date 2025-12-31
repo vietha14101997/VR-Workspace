@@ -77,6 +77,18 @@ public abstract class RTTCanvasBase : MonoBehaviour
     public Vector2Int CurrentResolution => _renderTexture != null
         ? new Vector2Int(_renderTexture.width, _renderTexture.height)
         : Vector2Int.zero;
+
+    /// <summary>
+    /// Force initialization if not already initialized.
+    /// Use this when Start() may not have been called (e.g., GameObject was disabled before first frame).
+    /// </summary>
+    public void EnsureInitialized()
+    {
+        if (!_isInitialized)
+        {
+            Initialize();
+        }
+    }
     #endregion
 
     #region Lifecycle

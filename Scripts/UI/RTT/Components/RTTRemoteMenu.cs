@@ -1114,12 +1114,6 @@ public class RTTRemoteMenu : MonoBehaviour
     {
         Debug.Log($"[RTTRemoteMenu] CreateSidePanelContent started for {type}");
 
-        // Wait for frame to be initialized (Start() must run first)
-        // ContentContainer is created in Initialize() before IsInitialized is set
-        // Add timeout protection to avoid infinite wait
-        int maxWait = 300; // ~5 seconds at 60fps (increased from 100)
-        int waitCount = 0;
-
         // Check if frame reference is valid
         if (frame == null)
         {
@@ -1127,15 +1121,26 @@ public class RTTRemoteMenu : MonoBehaviour
             yield break;
         }
 
-        while ((!frame.IsInitialized || frame.ContentContainer == null) && waitCount < maxWait)
+        // Wait one frame to allow Start() to be called normally
+        yield return null;
+
+        // If frame is still not initialized after first frame, force initialize it
+        // This handles cases where the frame's GameObject was disabled before Start() could run
+        if (!frame.IsInitialized)
         {
-            // Log every 30 frames to track progress
+            Debug.Log($"[RTTRemoteMenu] Frame not initialized for {type}, calling EnsureInitialized()");
+            frame.EnsureInitialized();
+        }
+
+        // Wait for ContentContainer to be valid (should be immediate after Initialize)
+        int maxWait = 60; // ~1 second timeout
+        int waitCount = 0;
+
+        while (frame.ContentContainer == null && waitCount < maxWait)
+        {
             if (waitCount % 30 == 0)
             {
-                bool frameExists = frame != null;
-                bool isInit = frameExists && frame.IsInitialized;
-                bool hasContainer = frameExists && frame.ContentContainer != null;
-                Debug.Log($"[RTTRemoteMenu] Waiting for {type}: frame={frameExists}, IsInit={isInit}, HasContainer={hasContainer}, wait={waitCount}");
+                Debug.Log($"[RTTRemoteMenu] Waiting for {type} ContentContainer: IsInit={frame.IsInitialized}, wait={waitCount}");
             }
             yield return null;
             waitCount++;

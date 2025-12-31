@@ -1175,6 +1175,15 @@ public class RTTManager : MonoBehaviour
 
         CreateAppContent(instance);
 
+        // Wait for child components (including side panel RTTMenuFrames) to initialize
+        // Side panels are created in CreateAppContent → RTTRemoteMenu.BuildUI → CreateSidePanels
+        // They need their Start() to be called before we can disable the frame
+        // Start() is called on the next frame after Awake(), so we need to wait
+        for (int i = 0; i < 5; i++)
+        {
+            yield return null;
+        }
+
         instance.Frame.transform.position = mainMenuFrame.transform.position;
         instance.Frame.gameObject.SetActive(false);
         instance.Frame.MarkDirty();
