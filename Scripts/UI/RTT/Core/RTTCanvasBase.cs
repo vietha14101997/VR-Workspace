@@ -445,6 +445,10 @@ public abstract class RTTCanvasBase : MonoBehaviour
         _quadCollider.size = new Vector3(1, 1, 0.01f);
         _quadCollider.center = Vector3.zero;
         _quadCollider.isTrigger = true;
+
+        // Respect pre-set visibility (if SetVisible(false) was called before Initialize)
+        _displayQuad.enabled = _isVisible;
+        _quadCollider.enabled = _isVisible;
     }
 
     /// <summary>
