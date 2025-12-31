@@ -394,29 +394,30 @@ public class RTTRemoteMenu : MonoBehaviour
                 break;
 
             case ConnectionPhase.ConfiguringSettings:
-                // Step 2: Accept config and proceed to Phase 2
-                Debug.Log("[RTTRemoteMenu] Setting up remote...");
-                UpdateButtonText("SETTING UP...");
+                // NEW FLOW: Start button clicked - create ClusterRig and show progress
+                Debug.Log("[RTTRemoteMenu] Starting with progress UI...");
+                UpdateButtonText("STARTING...");
 
                 // Save user selections
                 SaveCurrentSelections();
 
-                // Build config from form dropdowns and send to server
+                // Hide menu immediately
+                HideMenu();
+
+                // Build config from form dropdowns and start new flow
                 var config = BuildConfigFromForm();
                 if (config != null)
                 {
                     OnSetupClicked?.Invoke();
-                    await _viewModel.AcceptConfigAsync(config);
+                    // Use new flow that creates ClusterRig and shows progress
+                    await _viewModel.StartWithProgressAsync(config);
                 }
                 break;
 
             case ConnectionPhase.ReadyToStream:
-                // Step 3: Start streaming
-                Debug.Log("[RTTRemoteMenu] Starting remote...");
-                UpdateButtonText("STARTING...");
-                OnStartClicked?.Invoke();
-
-                await _viewModel.StartStreamingAsync();
+                // This case is no longer used - auto-start handles streaming
+                // Kept for backward compatibility
+                Debug.Log("[RTTRemoteMenu] ReadyToStream - auto-start handles this now");
                 break;
 
             case ConnectionPhase.Streaming:
@@ -503,6 +504,20 @@ public class RTTRemoteMenu : MonoBehaviour
     }
 
     /// <summary>
+    /// Hide the menu frame and side panels.
+    /// Called when START is clicked in new flow.
+    /// </summary>
+    public void HideMenu()
+    {
+        if (_menuFrame != null)
+        {
+            _menuFrame.gameObject.SetActive(false);
+        }
+        HideSidePanels();
+        Debug.Log("[RTTRemoteMenu] Menu hidden");
+    }
+
+    /// <summary>
     /// Handle phase change from ConnectionViewModel.
     /// All calls are guaranteed to be on main thread via ObservableProperty.
     /// </summary>
@@ -536,7 +551,7 @@ public class RTTRemoteMenu : MonoBehaviour
                 break;
 
             case ConnectionPhase.ConfiguringSettings:
-                UpdateButtonText("SETUP REMOTE");
+                UpdateButtonText("START");
                 break;
 
             case ConnectionPhase.SendingDisplayConfig:
@@ -956,7 +971,7 @@ public class RTTRemoteMenu : MonoBehaviour
 
     /// <summary>
     /// Save current dropdown selections and host/port to preferences.
-    /// Called when SETUP REMOTE is clicked.
+    /// Called when START is clicked (previously SETUP REMOTE).
     /// </summary>
     private void SaveCurrentSelections()
     {
@@ -1072,8 +1087,8 @@ public class RTTRemoteMenu : MonoBehaviour
         frameRef.SetContentMargins(40f, 40f, 30f, 30f);
         frameRef.SetFloatingDataEnabled(true, 10); // Fewer particles for smaller panel
 
-        // Start hidden
-        frameRef.gameObject.SetActive(false);
+        // DON'T disable here - let Start() run first so ContentContainer is created
+        // The coroutine will hide it after initialization
 
         // Wait for frame to initialize, then create content
         StartCoroutine(CreateSidePanelContent(frameRef, type));
@@ -1081,17 +1096,33 @@ public class RTTRemoteMenu : MonoBehaviour
 
     /// <summary>
     /// Coroutine to create side panel content after frame is initialized.
+    /// IMPORTANT: Content must be created WHILE frame is active, then frame can be hidden.
     /// </summary>
     private IEnumerator CreateSidePanelContent(RTTMenuFrame frame, RTTInfoSidePanel.PanelType type)
     {
-        // Wait for frame's ContentContainer to be ready
-        while (frame.ContentContainer == null)
+        // Wait for frame to be initialized (Start() must run first)
+        // ContentContainer is created in Initialize() before IsInitialized is set
+        // Add timeout protection to avoid infinite wait
+        int maxWait = 100; // ~1.6 seconds at 60fps
+        int waitCount = 0;
+        while ((!frame.IsInitialized || frame.ContentContainer == null) && waitCount < maxWait)
         {
             yield return null;
+            waitCount++;
         }
+
+        // Verify ContentContainer is valid
+        if (frame.ContentContainer == null)
+        {
+            Debug.LogError($"[RTTRemoteMenu] ContentContainer is NULL for {type} after {waitCount} frames!");
+            yield break;
+        }
+
+        Debug.Log($"[RTTRemoteMenu] Frame initialized for {type} after {waitCount} frames");
         yield return null; // Extra frame for layout
 
-        // Create RTTInfoSidePanel as content
+        // Create RTTInfoSidePanel as content WHILE frame is still active
+        // This ensures UI components are properly initialized
         GameObject contentObj = new GameObject($"InfoPanel_{type}");
         var panel = contentObj.AddComponent<RTTInfoSidePanel>();
         panel.ThemeColor = themeColor;
@@ -1100,6 +1131,9 @@ public class RTTRemoteMenu : MonoBehaviour
         // Build panel content inside frame's container
         panel.BuildUI(frame.ContentContainer, type, themeColor, customFont);
 
+        // Force layout rebuild to ensure content is positioned correctly
+        UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(frame.ContentContainer);
+
         // Subscribe to content changes to trigger RTT re-render
         panel.OnContentChanged += () => frame.MarkDirty();
 
@@ -1107,17 +1141,48 @@ public class RTTRemoteMenu : MonoBehaviour
         if (type == RTTInfoSidePanel.PanelType.HardwareInfo)
         {
             _hardwareInfoPanel = panel;
-            // Show loading state immediately so user sees placeholder text
-            panel.ShowLoadingState();
+            // Apply cached data if it arrived before panel was ready
+            if (_cachedHardwareInfo != null)
+            {
+                panel.SetHardwareInfo(_cachedHardwareInfo);
+                Debug.Log($"[RTTRemoteMenu] Applied cached hardware info to panel");
+            }
+            else
+            {
+                // Show loading state immediately so user sees placeholder text
+                panel.ShowLoadingState();
+            }
         }
         else
         {
             _networkInfoPanel = panel;
-            // Show speed test loading state for network panel
-            panel.ShowSpeedTestLoadingState();
+            // Apply cached data if it arrived before panel was ready
+            if (_cachedNetworkInfo != null)
+            {
+                panel.SetNetworkInfo(_cachedNetworkInfo);
+                Debug.Log($"[RTTRemoteMenu] Applied cached network info to panel");
+            }
+            else
+            {
+                // Show speed test loading state for network panel
+                panel.ShowSpeedTestLoadingState();
+            }
         }
 
-        Debug.Log($"[RTTRemoteMenu] Side panel content created for {type} with loading state");
+        // Force another layout rebuild after content is set
+        UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(frame.ContentContainer);
+
+        // Mark dirty to render the content
+        frame.MarkDirty();
+
+        // Wait multiple frames to ensure rendering completes
+        yield return null; // Let render happen
+        yield return null; // Extra safety frame
+
+        // NOW hide the frame (after content is created and rendered)
+        frame.gameObject.SetActive(false);
+
+        Debug.Log($"[RTTRemoteMenu] Side panel content created for {type}, frame hidden");
     }
 
     /// <summary>

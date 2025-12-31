@@ -40,6 +40,7 @@ namespace VRWorkspace.Streaming
         private bool _skipTcpIceCandidates = true;
         private int _expectedMonitorCount; // Track expected count for CheckIceComplete
         private TaskCompletionSource<bool> _allAnswersReceivedTcs; // Event-driven answer waiting
+        private bool _streamingStartedFired; // Track if OnStreamingStarted was already fired
 
         // Events
         public event Action<ServerHardwareInfo> OnHardwareInfoReceived;
@@ -53,6 +54,12 @@ namespace VRWorkspace.Streaming
         public event Action<string> OnError;
         public event Action OnDisconnected;
         public event Action<int, float, float, bool> OnCursorPosition; // monitorIndex, u, v, visible
+
+        // Progress tracking events for UI
+        public event Action<int> OnServerSetupProgress;         // 0-100 server setup progress
+        public event Action<int, int> OnMonitorIceProgress;     // monitorIndex, progress (0-100)
+        public event Action<int> OnMonitorIceComplete;          // monitorIndex when ICE connected
+        public event Action OnAllMonitorsReady;                 // all monitors ICE connected
 
         private class PCWrapper
         {
@@ -188,10 +195,28 @@ namespace VRWorkspace.Streaming
         /// </summary>
         public async Task StartStreamingAsync()
         {
-            if (!_stateMachine.IsInPhase(ConnectionPhase.ReadyToStream))
+            await StartStreamingAsync(false);
+        }
+
+        /// <summary>
+        /// Proceed from Phase 2 to Phase 3 (start streaming).
+        /// </summary>
+        /// <param name="force">If true, bypass phase check (used for auto-start after ICE ready)</param>
+        public async Task StartStreamingAsync(bool force)
+        {
+            var currentPhase = _stateMachine.CurrentPhase;
+            bool canStart = currentPhase == ConnectionPhase.ReadyToStream ||
+                           currentPhase == ConnectionPhase.ICENegotiating;
+
+            if (!canStart && !force)
             {
-                Debug.LogWarning($"[PhaseProtocol] Cannot start streaming from {_stateMachine.CurrentPhase}");
+                Debug.LogWarning($"[PhaseProtocol] Cannot start streaming from {currentPhase}");
                 return;
+            }
+
+            if (force && currentPhase != ConnectionPhase.ReadyToStream)
+            {
+                Debug.Log($"[PhaseProtocol] Force starting streaming from {currentPhase}");
             }
 
             Debug.Log("[PhaseProtocol] Starting streaming (Phase 3)");
@@ -962,6 +987,9 @@ namespace VRWorkspace.Streaming
 
             Debug.Log($"[PhaseProtocol] Config progress: {step} {progress}% - {message}");
             OnConfigProgress?.Invoke(step, progress, message);
+
+            // Fire server setup progress for UI (0-100)
+            OnServerSetupProgress?.Invoke(progress);
         }
 
         private Task HandleConfigCompleteAsync(SimpleJson json)
@@ -1231,6 +1259,24 @@ namespace VRWorkspace.Streaming
             pc.OnIceConnectionChange = s =>
             {
                 Debug.Log($"[PhaseProtocol] PC{idx} ICE: {s}");
+
+                // Fire ICE progress events for UI
+                int progress = s switch
+                {
+                    RTCIceConnectionState.New => 0,
+                    RTCIceConnectionState.Checking => 30,
+                    RTCIceConnectionState.Connected => 100,
+                    RTCIceConnectionState.Completed => 100,
+                    _ => 0
+                };
+                OnMonitorIceProgress?.Invoke(idx, progress);
+
+                // Fire complete event when connected
+                if (s == RTCIceConnectionState.Connected || s == RTCIceConnectionState.Completed)
+                {
+                    OnMonitorIceComplete?.Invoke(idx);
+                    CheckAllMonitorsConnected();
+                }
             };
 
             pc.OnConnectionStateChange = s =>
@@ -1298,6 +1344,17 @@ namespace VRWorkspace.Streaming
                         wrapper.Texture = tex;
                         wrapper.LastFrameTime = DateTime.UtcNow;
                         wrapper.FrameCount++;
+
+                        // Fire OnStreamingStarted on first frame if not already fired
+                        // This is a backup mechanism in case streaming_started message is delayed/lost
+                        if (!_streamingStartedFired)
+                        {
+                            _streamingStartedFired = true;
+                            Debug.Log($"[PhaseProtocol] PC{idx} received first frame, firing OnStreamingStarted as backup");
+                            _stateMachine.TryTransition(ConnectionPhase.Streaming);
+                            OnStreamingStarted?.Invoke();
+                        }
+
                         OnVideoTextureReceived?.Invoke(idx, tex);
                     };
                     Debug.Log($"[PhaseProtocol] PC{idx} received video track");
@@ -1655,6 +1712,16 @@ namespace VRWorkspace.Streaming
                         wrapper.Texture = tex;
                         wrapper.LastFrameTime = DateTime.UtcNow;
                         wrapper.FrameCount++;
+
+                        // Fire OnStreamingStarted on first frame if not already fired
+                        if (!_streamingStartedFired)
+                        {
+                            _streamingStartedFired = true;
+                            Debug.Log($"[PhaseProtocol] PC{idx} received first frame (reconnected), firing OnStreamingStarted");
+                            _stateMachine.TryTransition(ConnectionPhase.Streaming);
+                            OnStreamingStarted?.Invoke();
+                        }
+
                         OnVideoTextureReceived?.Invoke(idx, tex);
                     };
                     Debug.Log($"[PhaseProtocol] PC{idx} received video track (reconnected)");
@@ -1709,6 +1776,30 @@ namespace VRWorkspace.Streaming
                     _ = SendTextAsync(candJson);
                 }
                 wrapper.QueuedCandidates.Clear();
+            }
+        }
+
+        /// <summary>
+        /// Check if all monitors are connected and fire OnAllMonitorsReady event.
+        /// </summary>
+        private void CheckAllMonitorsConnected()
+        {
+            lock (_lock)
+            {
+                if (_expectedMonitorCount <= 0) return;
+
+                int connected = _peerConnections.Count(p =>
+                    p.PC != null &&
+                    (p.PC.IceConnectionState == RTCIceConnectionState.Connected ||
+                     p.PC.IceConnectionState == RTCIceConnectionState.Completed));
+
+                Debug.Log($"[PhaseProtocol] CheckAllMonitorsConnected: {connected}/{_expectedMonitorCount}");
+
+                if (connected >= _expectedMonitorCount)
+                {
+                    Debug.Log("[PhaseProtocol] All monitors connected, firing OnAllMonitorsReady");
+                    OnAllMonitorsReady?.Invoke();
+                }
             }
         }
 
@@ -1777,7 +1868,7 @@ namespace VRWorkspace.Streaming
 
         private void HandleStreamingStarted(SimpleJson json)
         {
-            Debug.Log("[PhaseProtocol] Streaming started!");
+            Debug.Log("[PhaseProtocol] Streaming started (server message)!");
             _stateMachine.TryTransition(ConnectionPhase.Streaming);
 
             // Acquire Android power locks for stable streaming
@@ -1791,7 +1882,12 @@ namespace VRWorkspace.Streaming
             // Start frame stall monitor to detect frozen streams
             _ = FrameStallMonitorAsync(_cts.Token);
 
-            OnStreamingStarted?.Invoke();
+            // Only fire event if not already fired (could be triggered by first frame)
+            if (!_streamingStartedFired)
+            {
+                _streamingStartedFired = true;
+                OnStreamingStarted?.Invoke();
+            }
         }
 
         /// <summary>
@@ -2115,6 +2211,9 @@ namespace VRWorkspace.Streaming
                 _peerConnections.Clear();
                 _expectedMonitorCount = 0;
             }
+
+            // Reset streaming state
+            _streamingStartedFired = false;
 
             try { _ws?.Abort(); _ws?.Dispose(); } catch { }
             _ws = null;

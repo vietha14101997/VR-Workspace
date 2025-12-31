@@ -62,6 +62,18 @@ namespace VRWorkspace.ViewModels
         /// <summary>Video textures per monitor</summary>
         public ObservableProperty<Dictionary<int, Texture>> VideoTextures { get; } = new(new Dictionary<int, Texture>());
 
+        /// <summary>Server setup progress (0-100)</summary>
+        public ObservableProperty<int> ServerSetupProgress { get; } = new(0);
+
+        /// <summary>Per-monitor ICE progress (monitorIndex -> 0-100)</summary>
+        public ObservableProperty<Dictionary<int, int>> MonitorIceProgress { get; } = new(new Dictionary<int, int>());
+
+        /// <summary>Number of monitors that are fully ready</summary>
+        public ObservableProperty<int> ReadyMonitorCount { get; } = new(0);
+
+        /// <summary>Total number of monitors expected</summary>
+        public ObservableProperty<int> TotalMonitorCount { get; } = new(0);
+
         #endregion
 
         #region Events
@@ -71,6 +83,18 @@ namespace VRWorkspace.ViewModels
         /// Parameters: monitorIndex, u (0-1), v (0-1), visible
         /// </summary>
         public event Action<int, float, float, bool> OnCursorPositionChanged;
+
+        /// <summary>
+        /// Fired when START button is clicked with new flow.
+        /// Creates ClusterRig and shows progress UI immediately.
+        /// </summary>
+        public event Action<StreamingConfig> OnStartWithProgress;
+
+        /// <summary>
+        /// Fired when all monitors are ready (ICE connected).
+        /// UI should show "Connecting..." and wait for auto-start.
+        /// </summary>
+        public event Action OnAllMonitorsReady;
 
         #endregion
 
@@ -197,8 +221,49 @@ namespace VRWorkspace.ViewModels
         /// </summary>
         public async Task StartStreamingAsync()
         {
+            await StartStreamingAsync(false);
+        }
+
+        /// <summary>
+        /// Start streaming (Phase 3).
+        /// </summary>
+        /// <param name="force">If true, bypass phase check (used for auto-start)</param>
+        public async Task StartStreamingAsync(bool force)
+        {
             if (_client == null) return;
-            await _client.StartStreamingAsync();
+            await _client.StartStreamingAsync(force);
+        }
+
+        /// <summary>
+        /// New flow: Start with progress tracking.
+        /// 1. Fires OnStartWithProgress to create ClusterRig immediately
+        /// 2. Sends display_config (Phase 2)
+        /// 3. Progress tracked via events
+        /// 4. Auto-starts streaming when all monitors ready
+        /// </summary>
+        public async Task StartWithProgressAsync(StreamingConfig config)
+        {
+            if (_client == null) return;
+
+            // Store the applied config
+            AppliedConfig.Value = config;
+            TotalMonitorCount.Value = config.monitors;
+
+            // Reset progress
+            ServerSetupProgress.Value = 0;
+            MonitorIceProgress.Value = new Dictionary<int, int>();
+            ReadyMonitorCount.Value = 0;
+
+            Debug.Log($"[ConnectionViewModel] StartWithProgressAsync: {config.monitors} monitors");
+
+            // Fire event to create ClusterRig and show progress UI
+            OnStartWithProgress?.Invoke(config);
+
+            // Start Phase 2 (sends display_config, does ICE negotiation)
+            await _client.ProceedToPhase2Async(config);
+
+            // Progress updates come via events from PhaseProtocolClient
+            // Auto-start is handled by OnAllMonitorsReady subscription in SubscribeToEvents()
         }
 
         /// <summary>
@@ -364,6 +429,54 @@ namespace VRWorkspace.ViewModels
                     CurrentBandwidth.Value = mbps;
                     SpeedTestProgress.Value = progress;
                 }
+            };
+
+            // Progress tracking events for new flow
+            _client.OnServerSetupProgress += progress =>
+            {
+                ServerSetupProgress.Value = progress;
+            };
+
+            _client.OnMonitorIceProgress += (idx, progress) =>
+            {
+                var dict = new Dictionary<int, int>(MonitorIceProgress.Value);
+                dict[idx] = progress;
+                MonitorIceProgress.SetAndNotify(dict);
+            };
+
+            _client.OnMonitorIceComplete += idx =>
+            {
+                ReadyMonitorCount.Value = ReadyMonitorCount.Value + 1;
+                Debug.Log($"[ConnectionViewModel] Monitor {idx} ICE complete. Ready: {ReadyMonitorCount.Value}/{TotalMonitorCount.Value}");
+            };
+
+            _client.OnAllMonitorsReady += async () =>
+            {
+                Debug.Log("[ConnectionViewModel] All monitors ready, firing OnAllMonitorsReady");
+                OnAllMonitorsReady?.Invoke();
+
+                // Wait for phase to become ReadyToStream (server confirms ICE ready)
+                // This ensures proper state transitions
+                int waitCount = 0;
+                const int maxWait = 30; // 3 seconds max
+                while (Phase.Value != ConnectionPhase.ReadyToStream && waitCount < maxWait)
+                {
+                    await Task.Delay(100);
+                    waitCount++;
+                }
+
+                bool useForce = Phase.Value != ConnectionPhase.ReadyToStream;
+                if (useForce)
+                {
+                    Debug.LogWarning($"[ConnectionViewModel] Timeout waiting for ReadyToStream, current phase: {Phase.Value}, using force start");
+                }
+
+                // Wait 2 seconds showing "Connecting..."
+                await Task.Delay(2000);
+
+                // Auto-start streaming (use force if phase didn't transition)
+                Debug.Log($"[ConnectionViewModel] Auto-starting streaming (force={useForce})...");
+                await StartStreamingAsync(useForce);
             };
         }
 
