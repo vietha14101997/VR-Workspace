@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 
 /// <summary>
@@ -243,10 +244,57 @@ public class RTTMainMenu : MonoBehaviour
 
         string itemId = item.id; // Capture for closure
 
-        VRButtonFactory.CreateButton(transform, config, () =>
+        // Create button and capture reference
+        GameObject buttonObj = VRButtonFactory.CreateButton(transform, config, null);
+
+        // Get animation component for hover control
+        VRButtonAnimation anim = buttonObj.GetComponentInChildren<VRButtonAnimation>();
+
+        // Wire click handler with hover clear and animation wait
+        var button = buttonObj.GetComponentInChildren<UnityEngine.UI.Button>();
+        if (button != null)
         {
+            button.onClick.AddListener(() =>
+            {
+                // Start coroutine to wait for hover animation before executing action
+                StartCoroutine(ExecuteAfterHoverClear(anim, itemId));
+            });
+        }
+    }
+
+    /// <summary>
+    /// Reset hover state immediately and execute action.
+    /// Starts async preparation immediately, then opens after hover animation.
+    /// </summary>
+    private IEnumerator ExecuteAfterHoverClear(VRButtonAnimation anim, string itemId)
+    {
+        // Start preparing the app frame immediately (in background)
+        // This hides the initialization lag during hover animation
+        if (RTTManager.Instance != null)
+        {
+            RTTManager.Instance.PrepareApp(itemId);
+        }
+
+        // Reset hover state immediately (snap to default, no animation)
+        // This ensures button is in correct state when returning to menu
+        if (anim != null)
+        {
+            anim.ResetHoverState(immediate: true);
+        }
+
+        // Wait for hover reset animation + small delay for visual feedback
+        yield return new WaitForSeconds(0.08f);
+
+        // Now open the prepared app (will wait if still preparing)
+        if (RTTManager.Instance != null)
+        {
+            RTTManager.Instance.OpenPreparedApp(itemId);
+        }
+        else
+        {
+            // Fallback to event if no AppManager
             OnMenuItemClicked?.Invoke(itemId);
-        });
+        }
     }
     #endregion
 

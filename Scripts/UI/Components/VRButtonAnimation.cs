@@ -208,7 +208,49 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
             }
         }
     }
-    
+
+    /// <summary>
+    /// Reset hover state completely (clears both isHovered and forceHover).
+    /// Optionally snap to default state immediately without animation.
+    /// </summary>
+    /// <param name="immediate">If true, snap to default state without animation</param>
+    public void ResetHoverState(bool immediate = false)
+    {
+        _isHovered = false;
+        _forceHover = false;
+
+        // Restore original border shader
+        if (_borderMaterial != null && _originalBorderShader != null)
+        {
+            _borderMaterial.shader = _originalBorderShader;
+            UpdateBorderProperties();
+        }
+
+        if (immediate)
+        {
+            // Snap to default state immediately (no animation)
+            _currentHoverAmount = 0f;
+            _currentValidScale = 1f;
+            _currentPop = 0f;
+
+            if (targetVisuals != null)
+            {
+                targetVisuals.localPosition = Vector3.zero;
+                targetVisuals.localScale = Vector3.one;
+            }
+
+            // Reset material hover amounts
+            if (_borderMaterial != null && _borderMaterial.HasProperty("_HoverAmount"))
+            {
+                _borderMaterial.SetFloat("_HoverAmount", 0f);
+            }
+            if (_backgroundMaterial != null && _backgroundMaterial.HasProperty("_HoverAmount"))
+            {
+                _backgroundMaterial.SetFloat("_HoverAmount", 0f);
+            }
+        }
+    }
+
     public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData)
     {
         // Trigger ripple effect

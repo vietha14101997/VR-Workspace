@@ -38,10 +38,10 @@ namespace VRWorkspace.Streaming
         private volatile bool _warmupComplete; // Volatile for thread visibility
         private TaskCompletionSource<double> _bandwidthComplete;
 
-        // Constants - tuned for accurate measurement
-        private const int SPEED_TEST_DURATION_MS = 4000;  // 4 seconds (was 2s)
-        private const int WARMUP_PERIOD_MS = 500;         // First 500ms = warmup
-        private const int PING_SAMPLES = 5;
+        // Constants - matching web client for consistency
+        private const int SPEED_TEST_DURATION_MS = 2000;  // 2 seconds (same as web client)
+        private const int WARMUP_PERIOD_MS = 0;           // No warmup (same as web client)
+        private const int PING_SAMPLES = 3;
         private const int PING_TIMEOUT_MS = 2000;
 
         // Results
@@ -145,8 +145,8 @@ namespace VRWorkspace.Streaming
                     Debug.LogWarning($"[SpeedTest] Ping sample {i + 1} failed: {ex.Message}");
                 }
 
-                // Small delay between samples (but don't block)
-                await Task.Delay(50, _ct);
+                // Small delay between samples (reduced from 50ms for faster test)
+                await Task.Delay(20, _ct);
             }
 
             if (_pingTimes.Count > 0)

@@ -85,6 +85,7 @@ public class RTTTaskbar : RTTCanvasBase
     private GameObject _passthroughButton;
     private List<GameObject> _appButtons = new List<GameObject>();
     private int _activeAppButtonIndex = 0;
+    private Dictionary<int, Action> _appSlotCallbacks = new Dictionary<int, Action>();
 
     // State
     private bool _isPassthroughOn = false;
@@ -235,11 +236,9 @@ public class RTTTaskbar : RTTCanvasBase
             _glassMaterial.SetFloat("_EdgePadding", edgePad);
             _glassMaterial.SetFloat("_Aspect", aspect);
 
-            // Match RTTMobileKeyboard colors for consistent glass effect
-            Color cyanDeepSeaBlue = new Color(0.0f, 0.55f, 0.65f, 0.35f);
-            Color deepSeaBluePurple = new Color(0.30f, 0.12f, 0.50f, 0.32f);
-            _glassMaterial.SetColor("_ColorA", cyanDeepSeaBlue);
-            _glassMaterial.SetColor("_ColorB", deepSeaBluePurple);
+            // Use theme colors with fallback
+            _glassMaterial.SetColor("_ColorA", GetGlassColorA());
+            _glassMaterial.SetColor("_ColorB", GetGlassColorB());
             _glassMaterial.SetFloat("_GradientOffset", 0f);
             _glassMaterial.SetFloat("_GradientAngle", -10f);
             _glassMaterial.SetFloat("_CyanRatio", 0.7f);
@@ -304,11 +303,9 @@ public class RTTTaskbar : RTTCanvasBase
             _borderMaterial.SetFloat("_Layer4Width", 0.27f);
             _borderMaterial.SetFloat("_Layer4Alpha", 0.3f);
 
-            // Colors matching VRTaskbar
-            Color cyanColor = new Color(0.3f, 1f, 1f, 1f);
-            Color purpleColor = new Color(1f, 0.4f, 1f, 1f);
-            _borderMaterial.SetColor("_ColorA", cyanColor);
-            _borderMaterial.SetColor("_ColorB", purpleColor);
+            // Use theme colors with fallback
+            _borderMaterial.SetColor("_ColorA", GetGlowColorA());
+            _borderMaterial.SetColor("_ColorB", GetGlowColorB());
             _borderMaterial.SetFloat("_GradientMode", 2f);
             _borderMaterial.SetFloat("_GradientAngle", -10f);
 
@@ -439,9 +436,14 @@ public class RTTTaskbar : RTTCanvasBase
             var btn = CreateAppButton(section.transform, slotIcon, slotName, btnColor, capturedIndex);
             _appButtons.Add(btn);
 
-            // Set placeholder alpha
-            if (i != 0)
+            if (i == 0)
             {
+                // Home button: Wire to HandleHomeClick for RTTManager integration
+                RewireHomeButton(btn);
+            }
+            else
+            {
+                // App slots: Hidden by default, will be shown when RegisterApp() is called
                 var cg = btn.GetComponent<CanvasGroup>();
                 if (cg != null) cg.alpha = 0f;
             }
@@ -1062,16 +1064,76 @@ public class RTTTaskbar : RTTCanvasBase
 
     private void UpdateAllAppButtonColors()
     {
-        // Note: VRButtonAnimation manages colors through shader materials internally
-        // Active state visual feedback is handled by the button's material system
+        Color cyanColor = new Color(0f, 0.9f, 1f);
+        Color purpleColor = new Color(0.9f, 0.3f, 1f);
+
         for (int i = 0; i < _appButtons.Count; i++)
         {
             bool isActive = (i == _activeAppButtonIndex);
-            var anim = _appButtons[i].GetComponentInChildren<VRButtonAnimation>();
-            if (anim != null)
+            var btn = _appButtons[i];
+            if (btn == null) continue;
+
+            // For bare icon buttons (frameless), change icon color directly
+            // Structure: Container > Btn_icon > HitArea > Visuals > Content > Icon
+            SetBareIconButtonColor(btn, isActive ? purpleColor : cyanColor);
+        }
+
+        // Re-render RTT canvas after color changes
+        MarkDirty();
+    }
+
+    /// <summary>
+    /// Set color for a bare icon button (changes icon and glow shadows).
+    /// </summary>
+    private void SetBareIconButtonColor(GameObject container, Color color)
+    {
+        // Find Icon image in the button hierarchy
+        // Structure: Container > Btn_X > HitArea > Visuals > Content > Icon
+        Transform iconTransform = null;
+
+        // Try to find through hierarchy
+        foreach (Transform child in container.transform)
+        {
+            // Child is the actual button (Btn_X)
+            var hitArea = child.Find("HitArea");
+            if (hitArea != null)
             {
-                // Force hover state for active button to show visual highlight
-                anim.SetForceHover(isActive);
+                var visuals = hitArea.Find("Visuals");
+                if (visuals != null)
+                {
+                    var content = visuals.Find("Content");
+                    if (content != null)
+                    {
+                        iconTransform = content.Find("Icon");
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (iconTransform == null) return;
+
+        // Update icon color
+        Image iconImg = iconTransform.GetComponent<Image>();
+        if (iconImg != null)
+        {
+            iconImg.color = Color.Lerp(color, Color.white, 0.9f);
+
+            // Update shadow glow colors
+            Shadow[] shadows = iconTransform.GetComponents<Shadow>();
+            if (shadows.Length >= 4)
+            {
+                // Layer 1 - Sharp inner halo
+                Color glowCol = Color.Lerp(color, Color.white, 0.7f);
+                glowCol.a = 0.4f;
+                shadows[0].effectColor = glowCol;
+                shadows[1].effectColor = glowCol;
+
+                // Layer 2 - Soft outer bloom
+                Color bloomCol = Color.Lerp(color, Color.white, 0.8f);
+                bloomCol.a = 0.15f;
+                shadows[2].effectColor = bloomCol;
+                shadows[3].effectColor = bloomCol;
             }
         }
     }
@@ -1110,6 +1172,192 @@ public class RTTTaskbar : RTTCanvasBase
     }
     #endregion
 
+    #region App Slot Management
+    /// <summary>
+    /// Register an app in a specific slot with icon and click callback.
+    /// Used by RTTManager to show app icons in taskbar.
+    /// </summary>
+    /// <param name="slotIndex">Slot index (1-3, 0 is reserved for Home)</param>
+    /// <param name="icon">App icon to display</param>
+    /// <param name="onClick">Callback when slot is clicked</param>
+    public void RegisterApp(int slotIndex, Sprite icon, Action onClick)
+    {
+        Debug.Log($"[RTTTaskbar] RegisterApp called - slotIndex={slotIndex}, icon={(icon != null ? icon.name : "NULL")}, _appButtons.Count={_appButtons.Count}");
+
+        if (slotIndex < 1 || slotIndex >= _appButtons.Count)
+        {
+            Debug.LogWarning($"[RTTTaskbar] Invalid slot index: {slotIndex} (must be 1 to {_appButtons.Count - 1})");
+            return;
+        }
+
+        var slot = _appButtons[slotIndex];
+        if (slot == null)
+        {
+            Debug.LogWarning($"[RTTTaskbar] _appButtons[{slotIndex}] is null!");
+            return;
+        }
+
+        // Store callback
+        _appSlotCallbacks[slotIndex] = onClick;
+
+        // Show the slot
+        var cg = slot.GetComponent<CanvasGroup>();
+        if (cg != null)
+        {
+            cg.alpha = 1f;
+            Debug.Log($"[RTTTaskbar] Set slot {slotIndex} alpha to 1");
+        }
+        else
+        {
+            Debug.LogWarning($"[RTTTaskbar] Slot {slotIndex} has no CanvasGroup!");
+        }
+
+        // Set icon by recreating the button content
+        SetSlotIcon(slot, icon, slotIndex);
+
+        MarkDirty();
+        Debug.Log($"[RTTTaskbar] Registered app in slot {slotIndex} complete");
+    }
+
+    /// <summary>
+    /// Unregister an app from a slot, hiding it.
+    /// </summary>
+    /// <param name="slotIndex">Slot index to unregister</param>
+    public void UnregisterApp(int slotIndex)
+    {
+        if (slotIndex < 1 || slotIndex >= _appButtons.Count)
+            return;
+
+        var slot = _appButtons[slotIndex];
+        if (slot == null) return;
+
+        // Remove callback
+        _appSlotCallbacks.Remove(slotIndex);
+
+        // Hide the slot
+        var cg = slot.GetComponent<CanvasGroup>();
+        if (cg != null) cg.alpha = 0f;
+
+        // If this slot was selected, go home
+        if (_activeAppButtonIndex == slotIndex)
+        {
+            SelectAppButton(0);
+            // Trigger home callback
+            RTTManager appManager = RTTManager.Instance;
+            if (appManager != null)
+            {
+                appManager.SwitchToHome();
+            }
+        }
+
+        MarkDirty();
+        Debug.Log($"[RTTTaskbar] Unregistered app from slot {slotIndex}");
+    }
+
+    /// <summary>
+    /// Change the active slot selection (purple highlight).
+    /// </summary>
+    /// <param name="index">Slot index to select</param>
+    public void SelectSlot(int index)
+    {
+        Debug.Log($"[RTTTaskbar] SelectSlot({index}) called, current active: {_activeAppButtonIndex}");
+        SelectAppButton(index);
+    }
+
+    /// <summary>
+    /// Set or update the icon for a slot.
+    /// </summary>
+    private void SetSlotIcon(GameObject slot, Sprite icon, int slotIndex)
+    {
+        Debug.Log($"[RTTTaskbar] SetSlotIcon - slot={slot.name}, icon={(icon != null ? icon.name : "NULL")}, slotIndex={slotIndex}");
+
+        // Remove existing button content (use DestroyImmediate to avoid timing issues)
+        int oldChildCount = slot.transform.childCount;
+        for (int i = slot.transform.childCount - 1; i >= 0; i--)
+        {
+            if (Application.isPlaying)
+                Destroy(slot.transform.GetChild(i).gameObject);
+            else
+                DestroyImmediate(slot.transform.GetChild(i).gameObject);
+        }
+        Debug.Log($"[RTTTaskbar] SetSlotIcon - removed {oldChildCount} old children");
+
+        if (icon == null)
+        {
+            Debug.LogWarning($"[RTTTaskbar] SetSlotIcon - icon is NULL, returning early");
+            return;
+        }
+
+        Color cyanColor = new Color(0f, 0.9f, 1f);
+
+        // Create new icon button
+        var iconBtn = VRButtonFactory.CreateBareIconButton(
+            slot.transform, buttonSize, icon, cyanColor,
+            () =>
+            {
+                // Call registered callback or default to selection
+                if (_appSlotCallbacks.ContainsKey(slotIndex))
+                {
+                    _appSlotCallbacks[slotIndex]?.Invoke();
+                }
+                else
+                {
+                    SelectAppButton(slotIndex);
+                }
+                MarkDirty();
+            },
+            0.05f, 0.6f
+        );
+        iconBtn.transform.SetAsFirstSibling();
+
+        // Fix RTT raycast: Set button layer to UI
+        SetLayerRecursively(iconBtn, LayerMask.NameToLayer("UI"));
+
+        Debug.Log($"[RTTTaskbar] SetSlotIcon - created iconBtn={iconBtn.name}, slot.childCount now={slot.transform.childCount}");
+
+        // Apply correct color based on active state
+        Color purpleColor = new Color(0.9f, 0.3f, 1f);
+        if (slotIndex == _activeAppButtonIndex)
+        {
+            SetBareIconButtonColor(slot, purpleColor);
+        }
+    }
+
+    /// <summary>
+    /// Handle Home button click - switches to MainMenu via RTTManager.
+    /// </summary>
+    private void HandleHomeClick()
+    {
+        RTTManager appManager = RTTManager.Instance;
+        if (appManager != null)
+        {
+            appManager.SwitchToHome();
+        }
+        else
+        {
+            // Fallback if AppManager not initialized
+            SelectAppButton(0);
+        }
+        MarkDirty();
+    }
+
+    /// <summary>
+    /// Rewire Home button to use HandleHomeClick instead of default behavior.
+    /// </summary>
+    private void RewireHomeButton(GameObject homeBtn)
+    {
+        var button = homeBtn.GetComponentInChildren<UnityEngine.UI.Button>();
+        if (button != null)
+        {
+            button.onClick.RemoveAllListeners();
+            button.onClick.AddListener(() =>
+            {
+                HandleHomeClick();
+            });
+        }
+    }
+    #endregion
+
     #region Icons
     private void LoadIcons()
     {
@@ -1133,6 +1381,88 @@ public class RTTTaskbar : RTTCanvasBase
             Debug.LogWarning($"[RTTTaskbar] Failed to load icon: icon_{name} from Resources");
         }
         return sprite;
+    }
+    #endregion
+
+    #region Theme Support
+    /// <summary>
+    /// Apply current theme colors to glass and border materials.
+    /// </summary>
+    protected override void ApplyCurrentTheme()
+    {
+        var theme = GetTheme();
+        if (theme == null) return;
+
+        // Apply glass colors
+        if (_glassMaterial != null)
+        {
+            _glassMaterial.SetColor("_ColorA", theme.glassColorA);
+            _glassMaterial.SetColor("_ColorB", theme.glassColorB);
+            _glassMaterial.SetFloat("_GlassAlpha", theme.glassAlpha);
+        }
+
+        // Apply border colors
+        if (_borderMaterial != null)
+        {
+            _borderMaterial.SetColor("_ColorA", theme.glowColorA);
+            _borderMaterial.SetColor("_ColorB", theme.glowColorB);
+        }
+
+        MarkDirty();
+    }
+
+    /// <summary>
+    /// Get glass color A with fallback to theme.
+    /// </summary>
+    private Color GetGlassColorA()
+    {
+        var theme = GetTheme();
+        return theme?.glassColorA ?? new Color(0.0f, 0.55f, 0.65f, 0.35f);
+    }
+
+    /// <summary>
+    /// Get glass color B with fallback to theme.
+    /// </summary>
+    private Color GetGlassColorB()
+    {
+        var theme = GetTheme();
+        return theme?.glassColorB ?? new Color(0.30f, 0.12f, 0.50f, 0.32f);
+    }
+
+    /// <summary>
+    /// Get glow color A with fallback to theme.
+    /// </summary>
+    private Color GetGlowColorA()
+    {
+        var theme = GetTheme();
+        return theme?.glowColorA ?? new Color(0.3f, 1f, 1f, 1f);
+    }
+
+    /// <summary>
+    /// Get glow color B with fallback to theme.
+    /// </summary>
+    private Color GetGlowColorB()
+    {
+        var theme = GetTheme();
+        return theme?.glowColorB ?? new Color(1f, 0.4f, 1f, 1f);
+    }
+
+    /// <summary>
+    /// Get primary color with fallback.
+    /// </summary>
+    private Color GetPrimaryColor()
+    {
+        var theme = GetTheme();
+        return theme?.primaryColor ?? new Color(0f, 0.9f, 1f);
+    }
+
+    /// <summary>
+    /// Get accent color with fallback.
+    /// </summary>
+    private Color GetAccentColor()
+    {
+        var theme = GetTheme();
+        return theme?.accentColor ?? new Color(0.9f, 0.3f, 1f);
     }
     #endregion
 

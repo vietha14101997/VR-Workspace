@@ -101,6 +101,15 @@ public abstract class RTTCanvasBase : MonoBehaviour
         {
             SetVisible(true);
         }
+
+        // Subscribe to theme changes
+        if (RTTManager.Instance != null)
+        {
+            RTTManager.Instance.OnThemeChanged += OnThemeChanged;
+            RTTManager.Instance.OnFontChanged += OnFontChanged;
+            // Apply current theme when enabled
+            ApplyCurrentTheme();
+        }
     }
 
     protected virtual void OnDisable()
@@ -108,6 +117,13 @@ public abstract class RTTCanvasBase : MonoBehaviour
         if (_isInitialized)
         {
             SetVisible(false);
+        }
+
+        // Unsubscribe from theme changes
+        if (RTTManager.Instance != null)
+        {
+            RTTManager.Instance.OnThemeChanged -= OnThemeChanged;
+            RTTManager.Instance.OnFontChanged -= OnFontChanged;
         }
     }
 
@@ -471,10 +487,12 @@ public abstract class RTTCanvasBase : MonoBehaviour
     /// </summary>
     protected virtual Material CreateQuadMaterial()
     {
-        // Try to find Unlit/Transparent shader
-        var shader = Shader.Find("Unlit/Transparent");
+        // Use Sprites/Default shader which supports color alpha multiplication for fade transitions
+        var shader = Shader.Find("Sprites/Default");
         if (shader == null)
             shader = Shader.Find("UI/Default");
+        if (shader == null)
+            shader = Shader.Find("Unlit/Transparent");
 
         var mat = new Material(shader);
         mat.name = $"RTTQuadMaterial_{GetType().Name}";
@@ -738,6 +756,65 @@ public abstract class RTTCanvasBase : MonoBehaviour
     /// Called after canvas is set up.
     /// </summary>
     protected abstract void BuildUI();
+    #endregion
+
+    #region Theme Support
+    /// <summary>
+    /// Called when theme changes. Override in subclasses to apply theme colors.
+    /// </summary>
+    protected virtual void OnThemeChanged()
+    {
+        ApplyCurrentTheme();
+    }
+
+    /// <summary>
+    /// Called when font changes. Override in subclasses to apply font.
+    /// </summary>
+    protected virtual void OnFontChanged()
+    {
+        ApplyCurrentFont();
+    }
+
+    /// <summary>
+    /// Apply current theme colors to this panel.
+    /// Override in subclasses to implement theme application.
+    /// </summary>
+    protected virtual void ApplyCurrentTheme()
+    {
+        // Base implementation does nothing.
+        // Subclasses should override to apply theme colors to their materials/UI elements.
+        // Example:
+        // var theme = RTTManager.Instance?.Theme;
+        // if (theme == null) return;
+        // _glassMaterial?.SetColor("_ColorA", theme.glassColorA);
+        // MarkDirty();
+    }
+
+    /// <summary>
+    /// Apply current font to this panel.
+    /// Override in subclasses to implement font application.
+    /// </summary>
+    protected virtual void ApplyCurrentFont()
+    {
+        // Base implementation does nothing.
+        // Subclasses should override to apply font to their text elements.
+    }
+
+    /// <summary>
+    /// Helper to get current theme config with null safety.
+    /// </summary>
+    protected RTTThemeConfig GetTheme()
+    {
+        return RTTManager.Instance?.Theme;
+    }
+
+    /// <summary>
+    /// Helper to get current font with null safety.
+    /// </summary>
+    protected TMPro.TMP_FontAsset GetFont()
+    {
+        return RTTManager.Instance?.Font;
+    }
     #endregion
 
     #region Debug

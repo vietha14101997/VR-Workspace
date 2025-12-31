@@ -32,6 +32,84 @@ public static class VRButtonFactory
 {
     private static Sprite _pixelSprite;
 
+    #region Theme Support
+
+    /// <summary>
+    /// Get primary color from theme or fallback
+    /// </summary>
+    public static Color GetPrimaryColor()
+    {
+        return RTTManager.Instance?.Theme?.primaryColor ?? new Color(0f, 0.9f, 1f);
+    }
+
+    /// <summary>
+    /// Get accent color from theme or fallback
+    /// </summary>
+    public static Color GetAccentColor()
+    {
+        return RTTManager.Instance?.Theme?.accentColor ?? new Color(0.76f, 0.36f, 1f);
+    }
+
+    /// <summary>
+    /// Get alternating color (primary/accent) from theme
+    /// </summary>
+    public static Color GetAlternatingColor(int index)
+    {
+        return RTTManager.Instance?.GetAlternatingColor(index) ??
+            (index % 2 == 0 ? GetPrimaryColor() : GetAccentColor());
+    }
+
+    /// <summary>
+    /// Get button active color from theme
+    /// </summary>
+    public static Color GetButtonActiveColor()
+    {
+        return RTTManager.Instance?.Theme?.buttonActiveColor ?? new Color(0.9f, 0.3f, 1f);
+    }
+
+    /// <summary>
+    /// Get button inactive color from theme
+    /// </summary>
+    public static Color GetButtonInactiveColor()
+    {
+        return RTTManager.Instance?.Theme?.buttonInactiveColor ?? new Color(0f, 0.9f, 1f);
+    }
+
+    /// <summary>
+    /// Get connect button colors from theme
+    /// </summary>
+    public static void GetConnectButtonColors(out Color colorA, out Color colorB, out Color colorC)
+    {
+        var theme = RTTManager.Instance?.Theme;
+        if (theme != null)
+        {
+            colorA = theme.connectColorA;
+            colorB = theme.connectColorB;
+            colorC = theme.connectColorC;
+        }
+        else
+        {
+            colorA = new Color(0.2f, 0.9f, 1f);
+            colorB = new Color(0.1f, 0.4f, 0.8f);
+            colorC = new Color(0.7f, 0.3f, 1f);
+        }
+    }
+
+    /// <summary>
+    /// Get effective color for a button config.
+    /// Uses theme color if useThemeColors is true, otherwise uses specified themeColor.
+    /// </summary>
+    private static Color GetEffectiveColor(ButtonConfig config)
+    {
+        if (config.useThemeColors)
+        {
+            return GetPrimaryColor();
+        }
+        return config.themeColor;
+    }
+
+    #endregion
+
     /// <summary>
     /// Cấu hình cho Button
     /// </summary>
@@ -41,6 +119,7 @@ public static class VRButtonFactory
         public string label = "Button";
         public Sprite icon;
         public Color themeColor = new Color(0f, 0.9f, 1f);
+        public bool useThemeColors = false; // If true, use colors from RTTThemeConfig
         public float width = 200f;
         public float height = 80f;
         public int fontSize = 40;
@@ -389,9 +468,21 @@ public static class VRButtonFactory
             mat.SetFloat("_Aspect", aspect);
 
             // Gradient colors (3-color: 35% Cyan -> 35% Deep Sea Blue -> 30% Purple)
-            mat.SetColor("_ColorA", config.connectColorA);
-            mat.SetColor("_ColorB", config.connectColorB);
-            mat.SetColor("_ColorC", config.connectColorC);
+            // Use theme colors if configured
+            Color colorA, colorB, colorC;
+            if (config.useThemeColors)
+            {
+                GetConnectButtonColors(out colorA, out colorB, out colorC);
+            }
+            else
+            {
+                colorA = config.connectColorA;
+                colorB = config.connectColorB;
+                colorC = config.connectColorC;
+            }
+            mat.SetColor("_ColorA", colorA);
+            mat.SetColor("_ColorB", colorB);
+            mat.SetColor("_ColorC", colorC);
             mat.SetFloat("_GradientAngle", 0f);
             mat.SetFloat("_MidPoint1", 0.35f);  // Cyan zone ends at 35%
             mat.SetFloat("_MidPoint2", 0.70f);  // Blue zone ends at 70% (35%+35%)

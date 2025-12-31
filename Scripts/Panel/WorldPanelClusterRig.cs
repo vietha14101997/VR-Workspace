@@ -2,6 +2,26 @@ using UnityEngine;
 using System.Collections.Generic;
 
 /// <summary>
+/// Layout mode for panel positioning in cluster
+/// </summary>
+public enum ClusterLayoutMode
+{
+    /// <summary>
+    /// Dynamic: panels spread evenly across the arc based on count
+    /// </summary>
+    Dynamic,
+
+    /// <summary>
+    /// FixedThreeSlot: panels are placed in fixed positions as if always 3-panel system
+    /// - 1 panel: center slot only
+    /// - 2 panels: center + right slots (left empty)
+    /// - 3 panels: all three slots filled
+    /// Maximum 3 panels in this mode
+    /// </summary>
+    FixedThreeSlot
+}
+
+/// <summary>
 /// Manages a cluster of WorldPanelPlus panels arranged in an arc.
 /// Handles dynamic panel creation, positioning, and neighbor linking.
 /// Optionally applies seamless ClusterPanelVisual for connected appearance.
@@ -13,6 +33,8 @@ public class WorldPanelClusterRig : MonoBehaviour
     public WorldPanelPlus panelPrefab;
 
     [Header("Layout")]
+    [Tooltip("Dynamic: panels spread evenly. FixedThreeSlot: panels use fixed 3-slot positions (max 3 panels)")]
+    public ClusterLayoutMode layoutMode = ClusterLayoutMode.FixedThreeSlot;
     public float distanceFromCamera = 2.0f;
     [Tooltip("Extra gap in meters between panel edges (0 = edges touch)")]
     [Range(0f, 0.1f)] public float edgeGapMeters = 0f;
@@ -59,7 +81,10 @@ public class WorldPanelClusterRig : MonoBehaviour
     public void BuildWithPanelCount(int count)
     {
         if (count < 1) count = 1;
-        if (count > 6) count = 6;
+
+        // FixedThreeSlot mode only supports max 3 panels
+        int maxPanels = layoutMode == ClusterLayoutMode.FixedThreeSlot ? 3 : 6;
+        if (count > maxPanels) count = maxPanels;
 
         // Ensure cluster is inside VirtualObjects parent and has correct layer
         EnsureVirtualObjectsParent();
@@ -150,11 +175,36 @@ public class WorldPanelClusterRig : MonoBehaviour
         float angleDeg = boardAngleDeg + gapAngleDeg;
 
         int count = _panels.Count;
-        for (int i = 0; i < count; i++)
+
+        if (layoutMode == ClusterLayoutMode.FixedThreeSlot)
         {
-            float offset = i - (count - 1) / 2f;
-            float yawDeg = offset * angleDeg;
-            PlacePanelOnArc(_panels[i], yawDeg, cam, camFwd, camUp);
+            // FixedThreeSlot: panels are placed in fixed 3-slot positions
+            // Slot positions: -1 (left), 0 (center), 1 (right)
+            // 1 panel:  center only       → slot 0
+            // 2 panels: center + right    → slots 0, 1
+            // 3 panels: left + center + right → slots -1, 0, 1
+            int[] slotOffsets = count switch
+            {
+                1 => new[] { 0 },
+                2 => new[] { 0, 1 },
+                _ => new[] { -1, 0, 1 }
+            };
+
+            for (int i = 0; i < count; i++)
+            {
+                float yawDeg = slotOffsets[i] * angleDeg;
+                PlacePanelOnArc(_panels[i], yawDeg, cam, camFwd, camUp);
+            }
+        }
+        else
+        {
+            // Dynamic mode: panels spread evenly across the arc
+            for (int i = 0; i < count; i++)
+            {
+                float offset = i - (count - 1) / 2f;
+                float yawDeg = offset * angleDeg;
+                PlacePanelOnArc(_panels[i], yawDeg, cam, camFwd, camUp);
+            }
         }
     }
 

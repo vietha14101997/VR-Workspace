@@ -305,7 +305,25 @@ public class RTTRaycastManager : MonoBehaviour
 
         var target = _currentHit.hitUIElement;
 
-        // Try Button first
+        // Try VRInputFieldTrigger first (for VR keyboard support)
+        // This needs to be checked before Button because InputField clicks should open keyboard
+        var inputFieldTrigger = target.GetComponent<VRInputFieldTrigger>();
+        if (inputFieldTrigger == null)
+            inputFieldTrigger = target.GetComponentInParent<VRInputFieldTrigger>();
+
+        if (inputFieldTrigger != null && inputFieldTrigger.InputField != null && inputFieldTrigger.InputField.interactable)
+        {
+            // Execute click on the trigger to show keyboard
+            ExecuteEvents.Execute(inputFieldTrigger.gameObject, _pointerEventData, ExecuteEvents.pointerClickHandler);
+            _currentHit.panel?.MarkDirty();
+
+            if (logHitInfo)
+                Debug.Log($"[RTTRaycast] Clicked InputField: {inputFieldTrigger.name}");
+
+            return true;
+        }
+
+        // Try Button
         var button = target.GetComponentInParent<Button>();
         if (button != null && button.interactable)
         {
@@ -565,6 +583,15 @@ public class RTTRaycastManager : MonoBehaviour
 
         ExecuteEvents.Execute(target, _pointerEventData, ExecuteEvents.pointerEnterHandler);
 
+        // Also trigger VRInputFieldTrigger if present (for text cursor)
+        var inputFieldTrigger = target.GetComponent<VRInputFieldTrigger>();
+        if (inputFieldTrigger == null)
+            inputFieldTrigger = target.GetComponentInParent<VRInputFieldTrigger>();
+        if (inputFieldTrigger != null)
+        {
+            inputFieldTrigger.OnPointerEnter(null);
+        }
+
         // Also trigger VRButtonAnimation if present
         var buttonAnim = target.GetComponent<VRButtonAnimation>();
         if (buttonAnim != null)
@@ -635,6 +662,15 @@ public class RTTRaycastManager : MonoBehaviour
         if (target == null) return;
 
         ExecuteEvents.Execute(target, _pointerEventData, ExecuteEvents.pointerExitHandler);
+
+        // Also trigger VRInputFieldTrigger if present (to reset text cursor)
+        var inputFieldTrigger = target.GetComponent<VRInputFieldTrigger>();
+        if (inputFieldTrigger == null)
+            inputFieldTrigger = target.GetComponentInParent<VRInputFieldTrigger>();
+        if (inputFieldTrigger != null)
+        {
+            inputFieldTrigger.OnPointerExit(null);
+        }
 
         // Also trigger VRButtonAnimation if present
         var buttonAnim = target.GetComponent<VRButtonAnimation>();

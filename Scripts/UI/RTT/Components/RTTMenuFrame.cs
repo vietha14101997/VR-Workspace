@@ -4,7 +4,7 @@ using UnityEngine.UI;
 /// <summary>
 /// RTT-based Menu Frame with glass effect, glowing borders, and floating data particles.
 /// This class is responsible ONLY for creating the visual frame UI.
-/// Menu logic is handled by RTTMenuManager and its controllers.
+/// Menu logic is handled by RTTManager and its controllers.
 /// </summary>
 public class RTTMenuFrame : RTTCanvasBase
 {
@@ -245,11 +245,9 @@ public class RTTMenuFrame : RTTCanvasBase
             _glassMaterial.SetFloat("_EdgePadding", edgePad);
             _glassMaterial.SetFloat("_Aspect", aspect);
 
-            // Transparent gradient: 32% Cyan, 42% Deep Sea Blue, 26% Purple with frosted glass effect
-            Color cyanDeepSeaBlue = new Color(0.0f, 0.55f, 0.65f, 0.35f);
-            Color deepSeaBluePurple = new Color(0.30f, 0.12f, 0.50f, 0.32f);
-            _glassMaterial.SetColor("_ColorA", cyanDeepSeaBlue);
-            _glassMaterial.SetColor("_ColorB", deepSeaBluePurple);
+            // Use theme colors with fallback
+            _glassMaterial.SetColor("_ColorA", GetGlassColorA());
+            _glassMaterial.SetColor("_ColorB", GetGlassColorB());
             _glassMaterial.SetFloat("_GradientOffset", 0f);
             _glassMaterial.SetFloat("_GradientAngle", -10f);
             _glassMaterial.SetFloat("_CyanRatio", 0.7f);
@@ -324,10 +322,9 @@ public class RTTMenuFrame : RTTCanvasBase
             _borderMaterial.SetFloat("_Layer4Width", 0.09f);
             _borderMaterial.SetFloat("_Layer4Alpha", 0.3f);
 
-            Color cyanColor = new Color(0.3f, 1f, 1f, 1f);
-            Color purpleColor = new Color(1f, 0.4f, 1f, 1f);
-            _borderMaterial.SetColor("_ColorA", cyanColor);
-            _borderMaterial.SetColor("_ColorB", purpleColor);
+            // Use theme colors with fallback
+            _borderMaterial.SetColor("_ColorA", GetGlowColorA());
+            _borderMaterial.SetColor("_ColorB", GetGlowColorB());
             _borderMaterial.SetFloat("_GradientMode", 2f);
             _borderMaterial.SetFloat("_GradientAngle", -10f);
             _borderMaterial.SetFloat("_GlassAlpha", 0.02f);
@@ -651,6 +648,82 @@ public class RTTMenuFrame : RTTCanvasBase
             logicalWidth - contentMarginLeft - contentMarginRight,
             LogicalHeight - contentMarginTop - contentMarginBottom
         );
+    }
+    #endregion
+
+    #region Theme Support
+    /// <summary>
+    /// Apply current theme colors to glass and border materials.
+    /// </summary>
+    protected override void ApplyCurrentTheme()
+    {
+        var theme = GetTheme();
+        if (theme == null) return;
+
+        // Apply glass colors
+        if (_glassMaterial != null)
+        {
+            _glassMaterial.SetColor("_ColorA", theme.glassColorA);
+            _glassMaterial.SetColor("_ColorB", theme.glassColorB);
+            _glassMaterial.SetFloat("_GlassAlpha", theme.glassAlpha);
+            _glassMaterial.SetFloat("_GradientAngle", theme.glassGradientAngle);
+            _glassMaterial.SetFloat("_CyanRatio", theme.glassGradientRatio);
+            _glassMaterial.SetFloat("_FresnelPower", theme.glassFresnelPower);
+            _glassMaterial.SetFloat("_FresnelStrength", theme.glassFresnelStrength);
+        }
+
+        // Apply border colors
+        if (_borderMaterial != null)
+        {
+            _borderMaterial.SetColor("_ColorA", theme.glowColorA);
+            _borderMaterial.SetColor("_ColorB", theme.glowColorB);
+            _borderMaterial.SetFloat("_Layer1Width", theme.glowLayer1Width);
+            _borderMaterial.SetFloat("_Layer1Alpha", theme.glowLayer1Alpha);
+            _borderMaterial.SetFloat("_Layer2Width", theme.glowLayer2Width);
+            _borderMaterial.SetFloat("_Layer2Alpha", theme.glowLayer2Alpha);
+            _borderMaterial.SetFloat("_Layer3Width", theme.glowLayer3Width);
+            _borderMaterial.SetFloat("_Layer3Alpha", theme.glowLayer3Alpha);
+            _borderMaterial.SetFloat("_Layer4Width", theme.glowLayer4Width);
+            _borderMaterial.SetFloat("_Layer4Alpha", theme.glowLayer4Alpha);
+        }
+
+        MarkDirty();
+    }
+
+    /// <summary>
+    /// Get glass color A with fallback to theme.
+    /// </summary>
+    private Color GetGlassColorA()
+    {
+        var theme = GetTheme();
+        return theme?.glassColorA ?? new Color(0.0f, 0.55f, 0.65f, 0.35f);
+    }
+
+    /// <summary>
+    /// Get glass color B with fallback to theme.
+    /// </summary>
+    private Color GetGlassColorB()
+    {
+        var theme = GetTheme();
+        return theme?.glassColorB ?? new Color(0.30f, 0.12f, 0.50f, 0.32f);
+    }
+
+    /// <summary>
+    /// Get glow color A with fallback to theme.
+    /// </summary>
+    private Color GetGlowColorA()
+    {
+        var theme = GetTheme();
+        return theme?.glowColorA ?? new Color(0.3f, 1f, 1f, 1f);
+    }
+
+    /// <summary>
+    /// Get glow color B with fallback to theme.
+    /// </summary>
+    private Color GetGlowColorB()
+    {
+        var theme = GetTheme();
+        return theme?.glowColorB ?? new Color(1f, 0.4f, 1f, 1f);
     }
     #endregion
 

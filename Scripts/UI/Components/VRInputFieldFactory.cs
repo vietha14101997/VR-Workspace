@@ -126,9 +126,9 @@ public static class VRInputFieldFactory
         hitRT.offsetMin = Vector2.zero;
         hitRT.offsetMax = Vector2.zero;
 
-        // Transparent image cho UI raycast
+        // Nearly transparent image for UI raycast (needs minimal alpha to ensure raycasting works)
         Image hitImg = hitArea.AddComponent<Image>();
-        hitImg.color = Color.clear;
+        hitImg.color = new Color(0f, 0f, 0f, 0.004f); // Minimal alpha, visually invisible but raycastable
 
         // BoxCollider cho VR raycast
         BoxCollider col = hitArea.AddComponent<BoxCollider>();

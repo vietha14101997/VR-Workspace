@@ -202,6 +202,81 @@ public class RTTMobileKeyboard : RTTCanvasBase
     }
     #endregion
 
+    #region Theme Support
+    /// <summary>
+    /// Apply current theme to keyboard materials.
+    /// Called when theme changes at runtime.
+    /// </summary>
+    protected override void ApplyCurrentTheme()
+    {
+        var theme = GetTheme();
+        if (theme == null) return;
+
+        // Update glass material
+        if (_glassMaterial != null)
+        {
+            _glassMaterial.SetColor("_ColorA", theme.glassColorA);
+            _glassMaterial.SetColor("_ColorB", theme.glassColorB);
+            _glassMaterial.SetFloat("_GlassAlpha", theme.glassAlpha);
+        }
+
+        // Update border material
+        if (_borderMaterial != null)
+        {
+            _borderMaterial.SetColor("_ColorA", theme.glowColorA);
+            _borderMaterial.SetColor("_ColorB", theme.glowColorB);
+            _borderMaterial.SetFloat("_Layer1Width", theme.glowLayer1Width);
+            _borderMaterial.SetFloat("_Layer1Alpha", theme.glowLayer1Alpha);
+            _borderMaterial.SetFloat("_Layer2Width", theme.glowLayer2Width);
+            _borderMaterial.SetFloat("_Layer2Alpha", theme.glowLayer2Alpha);
+            _borderMaterial.SetFloat("_Layer3Width", theme.glowLayer3Width);
+            _borderMaterial.SetFloat("_Layer3Alpha", theme.glowLayer3Alpha);
+            _borderMaterial.SetFloat("_Layer4Width", theme.glowLayer4Width);
+            _borderMaterial.SetFloat("_Layer4Alpha", theme.glowLayer4Alpha);
+        }
+
+        // Update theme color for keys
+        themeColor = theme.primaryColor;
+
+        MarkDirty();
+    }
+
+    private Color GetGlassColorA()
+    {
+        return GetTheme()?.glassColorA ?? new Color(0.0f, 0.55f, 0.65f, 0.35f);
+    }
+
+    private Color GetGlassColorB()
+    {
+        return GetTheme()?.glassColorB ?? new Color(0.30f, 0.12f, 0.50f, 0.32f);
+    }
+
+    private float GetGlassAlpha()
+    {
+        return GetTheme()?.glassAlpha ?? 0.65f;
+    }
+
+    private Color GetGlowColorA()
+    {
+        return GetTheme()?.glowColorA ?? themeColor;
+    }
+
+    private Color GetGlowColorB()
+    {
+        return GetTheme()?.glowColorB ?? new Color(0.9f, 0.3f, 1f);
+    }
+
+    private Color GetPrimaryColor()
+    {
+        return GetTheme()?.primaryColor ?? themeColor;
+    }
+
+    private Color GetAccentColor()
+    {
+        return GetTheme()?.accentColor ?? new Color(0.76f, 0.36f, 1f);
+    }
+    #endregion
+
     #region RTTCanvasBase Overrides
     protected override Vector2Int GetResolution()
     {
@@ -297,12 +372,10 @@ public class RTTMobileKeyboard : RTTCanvasBase
             _glassMaterial.SetFloat("_CornerRadius", bgCornerRadius);
             _glassMaterial.SetFloat("_EdgePadding", edgePad);
             _glassMaterial.SetFloat("_Aspect", aspect);
-            // Transparent gradient: 32% Cyan, 42% Deep Sea Blue, 26% Purple with frosted glass effect
-            // ColorA: Cyan blended with Deep Sea Blue (top area)
-            _glassMaterial.SetColor("_ColorA", new Color(0.0f, 0.55f, 0.65f, 0.35f));
-            // ColorB: Deep Sea Blue blended with Purple (bottom area)
-            _glassMaterial.SetColor("_ColorB", new Color(0.30f, 0.12f, 0.50f, 0.32f));
-            _glassMaterial.SetFloat("_GlassAlpha", 0.65f);
+            // Use theme colors for glass gradient
+            _glassMaterial.SetColor("_ColorA", GetGlassColorA());
+            _glassMaterial.SetColor("_ColorB", GetGlassColorB());
+            _glassMaterial.SetFloat("_GlassAlpha", GetGlassAlpha());
 
             img.material = _glassMaterial;
             img.color = Color.white;
@@ -347,17 +420,19 @@ public class RTTMobileKeyboard : RTTCanvasBase
             _borderMaterial.SetFloat("_CornerRadius", cornerRadius);
             _borderMaterial.SetFloat("_EdgePadding", edgePad);
             _borderMaterial.SetFloat("_Aspect", aspect);
-            _borderMaterial.SetColor("_ColorA", themeColor);
-            _borderMaterial.SetColor("_ColorB", new Color(0.9f, 0.3f, 1f));
-            // Glow layers - match MenuFrame style
-            _borderMaterial.SetFloat("_Layer1Width", 0.01f);
-            _borderMaterial.SetFloat("_Layer1Alpha", 1.5f);
-            _borderMaterial.SetFloat("_Layer2Width", 0.02f);
-            _borderMaterial.SetFloat("_Layer2Alpha", 1.0f);
-            _borderMaterial.SetFloat("_Layer3Width", 0.045f);
-            _borderMaterial.SetFloat("_Layer3Alpha", 0.6f);
-            _borderMaterial.SetFloat("_Layer4Width", 0.09f);
-            _borderMaterial.SetFloat("_Layer4Alpha", 0.3f);
+            // Use theme colors for glow
+            _borderMaterial.SetColor("_ColorA", GetGlowColorA());
+            _borderMaterial.SetColor("_ColorB", GetGlowColorB());
+            // Glow layers - use theme settings or defaults
+            var theme = GetTheme();
+            _borderMaterial.SetFloat("_Layer1Width", theme?.glowLayer1Width ?? 0.01f);
+            _borderMaterial.SetFloat("_Layer1Alpha", theme?.glowLayer1Alpha ?? 1.5f);
+            _borderMaterial.SetFloat("_Layer2Width", theme?.glowLayer2Width ?? 0.02f);
+            _borderMaterial.SetFloat("_Layer2Alpha", theme?.glowLayer2Alpha ?? 1.0f);
+            _borderMaterial.SetFloat("_Layer3Width", theme?.glowLayer3Width ?? 0.045f);
+            _borderMaterial.SetFloat("_Layer3Alpha", theme?.glowLayer3Alpha ?? 0.6f);
+            _borderMaterial.SetFloat("_Layer4Width", theme?.glowLayer4Width ?? 0.09f);
+            _borderMaterial.SetFloat("_Layer4Alpha", theme?.glowLayer4Alpha ?? 0.3f);
             borderImg.material = _borderMaterial;
         }
     }

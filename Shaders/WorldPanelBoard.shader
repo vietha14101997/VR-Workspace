@@ -119,29 +119,40 @@ Shader "Unlit/WorldPanelBoard"
             float RoundRectSDF(float2 pMeters, float2 halfSize, float r, float4 edgeMask)
             {
                 // Determine which corner we're in based on position
-                // TopLeft: x<0, y>0 -> needs Left(x) AND Top(z) visible
-                // TopRight: x>0, y>0 -> needs Right(y) AND Top(z) visible
-                // BottomLeft: x<0, y<0 -> needs Left(x) AND Bottom(w) visible
-                // BottomRight: x>0, y<0 -> needs Right(y) AND Bottom(w) visible
+                // Use <= and >= to avoid gaps at center lines (x=0 or y=0)
+                // TopLeft: x<=0, y>=0 -> needs Left(x) AND Top(z) visible
+                // TopRight: x>=0, y>=0 -> needs Right(y) AND Top(z) visible
+                // BottomLeft: x<=0, y<=0 -> needs Left(x) AND Bottom(w) visible
+                // BottomRight: x>=0, y<=0 -> needs Right(y) AND Bottom(w) visible
 
+                // Default corner radius for interior pixels (far from corners)
                 float cornerRadius = r;
 
-                // Check which quadrant we're in and apply appropriate corner radius
-                if (pMeters.x < 0 && pMeters.y > 0) // Top-Left
+                // Only modify corner radius when actually near a corner
+                // Distance threshold: only apply corner logic when close to edges
+                float edgeThresholdX = halfSize.x - r * 2.0;
+                float edgeThresholdY = halfSize.y - r * 2.0;
+                bool nearCorner = abs(pMeters.x) > edgeThresholdX && abs(pMeters.y) > edgeThresholdY;
+
+                if (nearCorner)
                 {
-                    cornerRadius = (edgeMask.x > 0.5 && edgeMask.z > 0.5) ? r : 0.0;
-                }
-                else if (pMeters.x > 0 && pMeters.y > 0) // Top-Right
-                {
-                    cornerRadius = (edgeMask.y > 0.5 && edgeMask.z > 0.5) ? r : 0.0;
-                }
-                else if (pMeters.x < 0 && pMeters.y < 0) // Bottom-Left
-                {
-                    cornerRadius = (edgeMask.x > 0.5 && edgeMask.w > 0.5) ? r : 0.0;
-                }
-                else if (pMeters.x > 0 && pMeters.y < 0) // Bottom-Right
-                {
-                    cornerRadius = (edgeMask.y > 0.5 && edgeMask.w > 0.5) ? r : 0.0;
+                    // Check which quadrant we're in and apply appropriate corner radius
+                    if (pMeters.x <= 0 && pMeters.y >= 0) // Top-Left
+                    {
+                        cornerRadius = (edgeMask.x > 0.5 && edgeMask.z > 0.5) ? r : 0.0;
+                    }
+                    else if (pMeters.x >= 0 && pMeters.y >= 0) // Top-Right
+                    {
+                        cornerRadius = (edgeMask.y > 0.5 && edgeMask.z > 0.5) ? r : 0.0;
+                    }
+                    else if (pMeters.x <= 0 && pMeters.y <= 0) // Bottom-Left
+                    {
+                        cornerRadius = (edgeMask.x > 0.5 && edgeMask.w > 0.5) ? r : 0.0;
+                    }
+                    else if (pMeters.x >= 0 && pMeters.y <= 0) // Bottom-Right
+                    {
+                        cornerRadius = (edgeMask.y > 0.5 && edgeMask.w > 0.5) ? r : 0.0;
+                    }
                 }
 
                 // co lại nửa kích thước để chừa chỗ cho bán kính

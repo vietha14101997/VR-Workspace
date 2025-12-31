@@ -3,6 +3,7 @@ using TMPro;
 
 /// <summary>
 /// Controls the main menu lifecycle including creation, event handling, and destruction.
+/// Now supports RTTAppRegistry for app definitions and RTTThemeConfig for colors.
 /// </summary>
 public class RTTMainMenuController : MonoBehaviour
 {
@@ -16,7 +17,7 @@ public class RTTMainMenuController : MonoBehaviour
     [Header("Menu Font")]
     [SerializeField] private TMP_FontAsset menuFont;
 
-    [Header("Menu Colors")]
+    [Header("Fallback Colors (used when no theme available)")]
     [SerializeField] private Color[] menuButtonColors = new Color[] {
         new Color(0.0f, 0.9f, 1.0f, 1.0f),  // Cyan
         new Color(0.0f, 0.9f, 1.0f, 1.0f),  // Cyan
@@ -26,13 +27,17 @@ public class RTTMainMenuController : MonoBehaviour
         new Color(0.0f, 0.9f, 1.0f, 1.0f),  // Cyan
     };
 
-    [Header("Menu Icons")]
+    [Header("Fallback Icons (used when not in registry)")]
     [SerializeField] private Sprite iconRemote;
     [SerializeField] private Sprite iconBrowser;
     [SerializeField] private Sprite iconMedia;
     [SerializeField] private Sprite iconFiles;
     [SerializeField] private Sprite iconSettings;
     [SerializeField] private Sprite iconQuit;
+
+    [Header("Use Registry")]
+    [Tooltip("If true, use RTTAppRegistry for app definitions. If false, use hardcoded items.")]
+    [SerializeField] private bool useAppRegistry = true;
     #endregion
 
     #region Private Fields
@@ -53,6 +58,7 @@ public class RTTMainMenuController : MonoBehaviour
     #region Public API
     /// <summary>
     /// Create the main menu in the specified container.
+    /// Uses RTTAppRegistry if available, otherwise falls back to hardcoded items.
     /// </summary>
     public GameObject CreateMenu(RectTransform container, float containerW, float containerH)
     {
@@ -62,7 +68,7 @@ public class RTTMainMenuController : MonoBehaviour
             return null;
         }
 
-        // Load icons if not assigned
+        // Load icons if not assigned (fallback)
         LoadMenuIcons();
 
         // Create menu container
@@ -75,21 +81,36 @@ public class RTTMainMenuController : MonoBehaviour
         menuRT.offsetMin = Vector2.zero;
         menuRT.offsetMax = Vector2.zero;
 
+        // Get font from RTTManager if available
+        var manager = RTTManager.Instance;
+        var font = manager?.Font ?? menuFont;
+
+        // Get layout from AppRegistry if available
+        var registry = manager?.AppRegistry;
+        int cols = registry?.menuColumns ?? menuColumns;
+        float spacing = registry?.menuSpacing ?? menuSpacing.x;
+        float aspect = registry?.buttonAspectRatio ?? menuButtonAspect;
+
         // Create RTTMainMenu component
         _mainMenuInstance = _menuObject.AddComponent<RTTMainMenu>();
-        _mainMenuInstance.CustomFont = menuFont;
+        _mainMenuInstance.CustomFont = font;
         _mainMenuInstance.FontSize = menuFontSize;
-        _mainMenuInstance.Columns = menuColumns;
-        _mainMenuInstance.Spacing = menuSpacing;
-        _mainMenuInstance.ButtonAspect = menuButtonAspect;
+        _mainMenuInstance.Columns = cols;
+        _mainMenuInstance.Spacing = new Vector2(spacing, spacing * 1.5f);
+        _mainMenuInstance.ButtonAspect = aspect;
 
-        // Add menu items
-        _mainMenuInstance.AddItem("remote", "Remote Desktop", iconRemote, GetMenuButtonColor(0));
-        _mainMenuInstance.AddItem("browser", "Browser", iconBrowser, GetMenuButtonColor(1));
-        _mainMenuInstance.AddItem("media", "Media", iconMedia, GetMenuButtonColor(2));
-        _mainMenuInstance.AddItem("files", "Files", iconFiles, GetMenuButtonColor(3));
-        _mainMenuInstance.AddItem("settings", "Settings", iconSettings, GetMenuButtonColor(4));
-        _mainMenuInstance.AddItem("quit", "Quit", iconQuit, GetMenuButtonColor(5));
+        // Add menu items from Registry or fallback
+        // Use registry only if it exists AND has enabled apps
+        bool hasRegistryApps = useAppRegistry && registry != null && registry.EnabledAppCount > 0;
+        if (hasRegistryApps)
+        {
+            AddItemsFromRegistry(registry, manager?.Theme);
+        }
+        else
+        {
+            AddHardcodedItems();
+            Debug.Log("[RTTMainMenuController] Using hardcoded items (registry empty or disabled)");
+        }
 
         // Subscribe to menu item clicks
         _mainMenuInstance.OnMenuItemClicked += HandleMenuItemClicked;
@@ -97,8 +118,70 @@ public class RTTMainMenuController : MonoBehaviour
         // Build the UI
         _mainMenuInstance.BuildUI(container, containerW, containerH);
 
-        Debug.Log("[RTTMainMenuController] Main Menu created");
+        Debug.Log($"[RTTMainMenuController] Main Menu created (useRegistry={hasRegistryApps}, itemCount={_mainMenuInstance.MenuItems.Count})");
         return _menuObject;
+    }
+
+    /// <summary>
+    /// Add menu items from RTTAppRegistry.
+    /// </summary>
+    private void AddItemsFromRegistry(RTTAppRegistry registry, RTTThemeConfig theme)
+    {
+        var apps = registry.GetSortedEnabledApps();
+        for (int i = 0; i < apps.Count; i++)
+        {
+            var app = apps[i];
+
+            // Get icon from registry or fallback
+            Sprite icon = app.icon ?? registry.GetIcon(app.id) ?? GetFallbackIcon(app.id);
+
+            // Get color from theme or app custom color
+            Color color;
+            if (app.useThemeColor && theme != null)
+            {
+                color = theme.GetAlternatingColor(i);
+            }
+            else if (!app.useThemeColor)
+            {
+                color = app.customColor;
+            }
+            else
+            {
+                color = GetMenuButtonColor(i);
+            }
+
+            _mainMenuInstance.AddItem(app.id, app.displayName, icon, color);
+        }
+    }
+
+    /// <summary>
+    /// Add hardcoded menu items (fallback when no registry).
+    /// </summary>
+    private void AddHardcodedItems()
+    {
+        _mainMenuInstance.AddItem("remote", "Remote Desktop", iconRemote, GetMenuButtonColor(0));
+        _mainMenuInstance.AddItem("browser", "Browser", iconBrowser, GetMenuButtonColor(1));
+        _mainMenuInstance.AddItem("media", "Media", iconMedia, GetMenuButtonColor(2));
+        _mainMenuInstance.AddItem("files", "Files", iconFiles, GetMenuButtonColor(3));
+        _mainMenuInstance.AddItem("settings", "Settings", iconSettings, GetMenuButtonColor(4));
+        _mainMenuInstance.AddItem("quit", "Quit", iconQuit, GetMenuButtonColor(5));
+    }
+
+    /// <summary>
+    /// Get fallback icon by app ID.
+    /// </summary>
+    private Sprite GetFallbackIcon(string appId)
+    {
+        switch (appId)
+        {
+            case "remote": return iconRemote;
+            case "browser": return iconBrowser;
+            case "media": return iconMedia;
+            case "files": return iconFiles;
+            case "settings": return iconSettings;
+            case "quit": return iconQuit;
+            default: return null;
+        }
     }
 
     /// <summary>
@@ -121,7 +204,7 @@ public class RTTMainMenuController : MonoBehaviour
             _mainMenuInstance = null;
         }
 
-        // Note: _menuObject is destroyed by RTTMenuManager
+        // Note: _menuObject is destroyed by RTTManager
         _menuObject = null;
     }
 

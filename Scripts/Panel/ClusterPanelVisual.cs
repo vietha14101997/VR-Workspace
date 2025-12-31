@@ -104,6 +104,24 @@ public class ClusterPanelVisual : MonoBehaviour
         _panel = GetComponent<WorldPanelPlus>();
     }
 
+    void OnEnable()
+    {
+        // Subscribe to theme changes
+        if (RTTManager.Instance != null)
+        {
+            RTTManager.Instance.OnThemeChanged += OnThemeChanged;
+        }
+    }
+
+    void OnDisable()
+    {
+        // Unsubscribe from theme changes
+        if (RTTManager.Instance != null)
+        {
+            RTTManager.Instance.OnThemeChanged -= OnThemeChanged;
+        }
+    }
+
     void OnDestroy()
     {
         CleanupVisuals();
@@ -619,9 +637,9 @@ public class ClusterPanelVisual : MonoBehaviour
         _backgroundMaterial.SetFloat("_ClusterUVOffset", _clusterUVOffset);
         _backgroundMaterial.SetFloat("_ClusterUVScale", _clusterUVScale);
 
-        // Glass colors (matching RTTMenuFrame)
-        _backgroundMaterial.SetColor("_ColorA", glassColorA);
-        _backgroundMaterial.SetColor("_ColorB", glassColorB);
+        // Glass colors - use theme colors with fallback to serialized values
+        _backgroundMaterial.SetColor("_ColorA", GetGlassColorA());
+        _backgroundMaterial.SetColor("_ColorB", GetGlassColorB());
 
         // Glass effect settings (matching RTTMenuFrame)
         _backgroundMaterial.SetFloat("_GlassAlpha", glassAlpha);
@@ -651,9 +669,9 @@ public class ClusterPanelVisual : MonoBehaviour
         _borderMaterial.SetFloat("_ClusterUVOffset", _clusterUVOffset);
         _borderMaterial.SetFloat("_ClusterUVScale", _clusterUVScale);
 
-        // Glow colors (matching RTTMenuFrame)
-        _borderMaterial.SetColor("_ColorA", glowColorA);
-        _borderMaterial.SetColor("_ColorB", glowColorB);
+        // Glow colors - use theme colors with fallback to serialized values
+        _borderMaterial.SetColor("_ColorA", GetGlowColorA());
+        _borderMaterial.SetColor("_ColorB", GetGlowColorB());
 
         // Glow layer widths and alphas (matching RTTMenuFrame)
         _borderMaterial.SetFloat("_Layer1Width", layer1Width);
@@ -673,6 +691,84 @@ public class ClusterPanelVisual : MonoBehaviour
         // Content margins for edge fading
         _borderMaterial.SetFloat("_MarginH", contentMarginHorizontal);
         _borderMaterial.SetFloat("_MarginV", contentMarginVertical);
+    }
+
+    #endregion
+
+    #region Theme Support
+
+    /// <summary>
+    /// Handle theme change event from RTTManager
+    /// </summary>
+    private void OnThemeChanged()
+    {
+        ApplyThemeColors();
+    }
+
+    /// <summary>
+    /// Apply theme colors to materials
+    /// </summary>
+    public void ApplyThemeColors()
+    {
+        var theme = RTTManager.Instance?.Theme;
+        if (theme == null) return;
+
+        // Update glass colors from theme
+        glassColorA = theme.glassColorA;
+        glassColorB = theme.glassColorB;
+        glassAlpha = theme.glassAlpha;
+        fresnelPower = theme.glassFresnelPower;
+        fresnelStrength = theme.glassFresnelStrength;
+        gradientAngle = theme.glassGradientAngle;
+
+        // Update glow colors from theme
+        glowColorA = theme.glowColorA;
+        glowColorB = theme.glowColorB;
+
+        // Update glow layers from theme
+        layer1Width = theme.glowLayer1Width;
+        layer1Alpha = theme.glowLayer1Alpha;
+        layer2Width = theme.glowLayer2Width;
+        layer2Alpha = theme.glowLayer2Alpha;
+        layer3Width = theme.glowLayer3Width;
+        layer3Alpha = theme.glowLayer3Alpha;
+        layer4Width = theme.glowLayer4Width;
+        layer4Alpha = theme.glowLayer4Alpha;
+
+        // Apply to materials
+        ApplyVisualSettings();
+    }
+
+    /// <summary>
+    /// Get theme-aware glass color A with fallback
+    /// </summary>
+    private Color GetGlassColorA()
+    {
+        return RTTManager.Instance?.Theme?.glassColorA ?? glassColorA;
+    }
+
+    /// <summary>
+    /// Get theme-aware glass color B with fallback
+    /// </summary>
+    private Color GetGlassColorB()
+    {
+        return RTTManager.Instance?.Theme?.glassColorB ?? glassColorB;
+    }
+
+    /// <summary>
+    /// Get theme-aware glow color A with fallback
+    /// </summary>
+    private Color GetGlowColorA()
+    {
+        return RTTManager.Instance?.Theme?.glowColorA ?? glowColorA;
+    }
+
+    /// <summary>
+    /// Get theme-aware glow color B with fallback
+    /// </summary>
+    private Color GetGlowColorB()
+    {
+        return RTTManager.Instance?.Theme?.glowColorB ?? glowColorB;
     }
 
     #endregion
