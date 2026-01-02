@@ -281,6 +281,7 @@ namespace VRWorkspace.Streaming
         private DateTime _lastSkipToLiveTime = DateTime.MinValue;
         private const float SkipToLiveCooldownSeconds = 2.0f; // Don't spam skip requests
         private const float FrameGapThresholdMs = 500f; // If no frames for 500ms, consider it stalled
+        private const float MonitorDriftThresholdMs = 200f; // If monitors are >200ms apart, consider drift
 
         /// <summary>
         /// Event fired when skip_to_live is acknowledged by server.
@@ -291,7 +292,8 @@ namespace VRWorkspace.Streaming
         /// Request server to skip buffered frames and send fresh keyframe.
         /// Use when detecting accumulated latency.
         /// </summary>
-        public void SkipToLive()
+        /// <param name="monitorIndex">Monitor index to sync, or -1 for all monitors</param>
+        public void SkipToLive(int monitorIndex = -1)
         {
             if (_ws?.State != WebSocketState.Open || !_stateMachine.IsStreaming) return;
 
@@ -303,15 +305,18 @@ namespace VRWorkspace.Streaming
 
             try
             {
-                Debug.Log("[PhaseProtocol] Sending skip_to_live request for latency recovery");
-                _ = SendTextAsync("{\"type\":\"skip_to_live\"}");
+                string msg = monitorIndex >= 0
+                    ? $"{{\"type\":\"skip_to_live\",\"monitor\":{monitorIndex}}}"
+                    : "{\"type\":\"skip_to_live\"}";
+                Debug.Log($"[PhaseProtocol] Sending skip_to_live (monitor={monitorIndex}) for latency recovery");
+                _ = SendTextAsync(msg);
             }
             catch { }
         }
 
         /// <summary>
         /// Check for latency issues and request skip_to_live if needed.
-        /// Called from PollTextures to detect frame gaps.
+        /// Called from PollTextures to detect frame gaps and monitor drift.
         /// </summary>
         private void CheckLatencyAndSkip()
         {
@@ -319,18 +324,47 @@ namespace VRWorkspace.Streaming
 
             lock (_lock)
             {
+                // Track min/max frame times for drift detection
+                DateTime minFrameTime = DateTime.MaxValue;
+                DateTime maxFrameTime = DateTime.MinValue;
+                int laggingMonitor = -1;
+                int minFrameMonitor = -1;
+
                 foreach (var wrapper in _peerConnections)
                 {
                     if (wrapper.LastFrameTime == default) continue;
 
-                    // Check if frame gap exceeds threshold
+                    // Check if frame gap exceeds threshold (stall detection)
                     var timeSinceFrame = (DateTime.UtcNow - wrapper.LastFrameTime).TotalMilliseconds;
                     if (timeSinceFrame > FrameGapThresholdMs && wrapper.FrameCount > 10)
                     {
-                        // Frame stall detected - request skip to live
+                        // Frame stall detected - request skip to live for this monitor
                         Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} frame gap {timeSinceFrame:F0}ms - requesting skip_to_live");
-                        SkipToLive();
-                        break; // Only send once per poll
+                        SkipToLive(wrapper.Index);
+                        return; // Only send once per poll
+                    }
+
+                    // Track for drift detection
+                    if (wrapper.LastFrameTime < minFrameTime)
+                    {
+                        minFrameTime = wrapper.LastFrameTime;
+                        laggingMonitor = wrapper.Index;
+                    }
+                    if (wrapper.LastFrameTime > maxFrameTime)
+                    {
+                        maxFrameTime = wrapper.LastFrameTime;
+                        minFrameMonitor = wrapper.Index;
+                    }
+                }
+
+                // Drift detection: if monitors are >200ms apart, the older one is lagging
+                if (_peerConnections.Count > 1 && minFrameTime != DateTime.MaxValue && maxFrameTime != DateTime.MinValue)
+                {
+                    var drift = (maxFrameTime - minFrameTime).TotalMilliseconds;
+                    if (drift > MonitorDriftThresholdMs && laggingMonitor >= 0)
+                    {
+                        Debug.LogWarning($"[PhaseProtocol] Monitor drift detected: PC{laggingMonitor} is {drift:F0}ms behind PC{minFrameMonitor} - requesting skip_to_live");
+                        SkipToLive(laggingMonitor);
                     }
                 }
             }
