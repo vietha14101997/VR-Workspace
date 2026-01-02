@@ -78,6 +78,13 @@ namespace VRWorkspace.Streaming
             public DateTime LastFrameTime; // Track when last video frame was received
             public int FrameCount; // Count frames for monitoring
             public TaskCompletionSource<bool> AnswerReceivedTcs; // For event-driven sequential mode
+
+            // FPS feedback tracking (for adaptive encoding)
+            public int RenderedFrameCount;           // Frames actually rendered this window
+            public int DroppedFrameCount;            // Frames dropped (received but not rendered)
+            public DateTime FpsWindowStart = DateTime.UtcNow; // Start of measurement window
+            public DateTime LastFpsFeedbackSent;     // Throttle feedback sending
+            public float LastReportedEffectiveFps;   // For change detection
         }
 
         // Public properties
@@ -283,6 +290,11 @@ namespace VRWorkspace.Streaming
         private const float FrameGapThresholdMs = 500f; // If no frames for 500ms, consider it stalled
         private const float MonitorDriftThresholdMs = 200f; // If monitors are >200ms apart, consider drift
 
+        // FPS Feedback constants (for adaptive encoding)
+        private const float FPS_FEEDBACK_INTERVAL_SECONDS = 1.0f;  // Send feedback every 1s
+        private const float FPS_CHANGE_THRESHOLD = 5.0f;           // Report if FPS differs by 5+
+        private const int FPS_WINDOW_FRAMES = 30;                  // Minimum frames before calculating
+
         /// <summary>
         /// Event fired when skip_to_live is acknowledged by server.
         /// </summary>
@@ -368,6 +380,66 @@ namespace VRWorkspace.Streaming
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Calculate effective FPS and send feedback to server periodically.
+        /// Called from PollTextures to enable server-side adaptive encoding.
+        /// </summary>
+        private void SendFpsFeedbackIfNeeded()
+        {
+            if (!_stateMachine.IsStreaming) return;
+
+            lock (_lock)
+            {
+                foreach (var wrapper in _peerConnections)
+                {
+                    // Skip if not enough time has passed
+                    if ((DateTime.UtcNow - wrapper.LastFpsFeedbackSent).TotalSeconds < FPS_FEEDBACK_INTERVAL_SECONDS)
+                        continue;
+
+                    // Skip if not enough frames to calculate
+                    if (wrapper.RenderedFrameCount < FPS_WINDOW_FRAMES)
+                        continue;
+
+                    // Calculate effective FPS
+                    double windowSeconds = (DateTime.UtcNow - wrapper.FpsWindowStart).TotalSeconds;
+                    if (windowSeconds <= 0) continue;
+
+                    float effectiveFps = (float)(wrapper.RenderedFrameCount / windowSeconds);
+
+                    // Only send if FPS changed significantly (avoid spam)
+                    if (Math.Abs(effectiveFps - wrapper.LastReportedEffectiveFps) < FPS_CHANGE_THRESHOLD
+                        && wrapper.LastReportedEffectiveFps > 0)
+                    {
+                        // Reset window but don't send
+                        ResetFpsWindow(wrapper);
+                        continue;
+                    }
+
+                    // Send feedback
+                    wrapper.LastFpsFeedbackSent = DateTime.UtcNow;
+                    wrapper.LastReportedEffectiveFps = effectiveFps;
+
+                    string json = $"{{\"type\":\"fps_feedback\",\"monitorIndex\":{wrapper.Index}," +
+                        $"\"effectiveFps\":{effectiveFps:F1}," +
+                        $"\"renderedFrames\":{wrapper.RenderedFrameCount}," +
+                        $"\"droppedFrames\":{wrapper.DroppedFrameCount}}}";
+
+                    _ = SendTextAsync(json);
+                    Debug.Log($"[PhaseProtocol] FPS feedback: m{wrapper.Index} = {effectiveFps:F1} fps");
+
+                    // Reset window
+                    ResetFpsWindow(wrapper);
+                }
+            }
+        }
+
+        private void ResetFpsWindow(PCWrapper wrapper)
+        {
+            wrapper.RenderedFrameCount = 0;
+            wrapper.DroppedFrameCount = 0;
+            wrapper.FpsWindowStart = DateTime.UtcNow;
         }
 
         #endregion
@@ -1378,6 +1450,7 @@ namespace VRWorkspace.Streaming
                         wrapper.Texture = tex;
                         wrapper.LastFrameTime = DateTime.UtcNow;
                         wrapper.FrameCount++;
+                        wrapper.RenderedFrameCount++; // For adaptive FPS feedback
 
                         // Fire OnStreamingStarted on first frame if not already fired
                         // This is a backup mechanism in case streaming_started message is delayed/lost
@@ -1744,6 +1817,7 @@ namespace VRWorkspace.Streaming
                         wrapper.Texture = tex;
                         wrapper.LastFrameTime = DateTime.UtcNow;
                         wrapper.FrameCount++;
+                        wrapper.RenderedFrameCount++; // For adaptive FPS feedback
 
                         // Fire OnStreamingStarted on first frame if not already fired
                         if (!_streamingStartedFired)
@@ -2228,6 +2302,9 @@ namespace VRWorkspace.Streaming
 
             // Check for latency issues and request skip_to_live if needed
             CheckLatencyAndSkip();
+
+            // Send FPS feedback to server for adaptive encoding
+            SendFpsFeedbackIfNeeded();
         }
 
         private void Cleanup()
