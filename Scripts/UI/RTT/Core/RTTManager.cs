@@ -287,11 +287,13 @@ public class RTTManager : MonoBehaviour
                 mainMenuController = gameObject.AddComponent<RTTMainMenuController>();
         }
 
+        // Note: Don't auto-create RTTRemoteMenuController here
+        // It will be created per-app in CreateRemoteMenuContent() when needed
+        // This prevents having an uninitialized controller running Update()
         if (remoteMenuController == null)
         {
             remoteMenuController = GetComponentInChildren<RTTRemoteMenuController>();
-            if (remoteMenuController == null)
-                remoteMenuController = gameObject.AddComponent<RTTRemoteMenuController>();
+            // Don't AddComponent here - let CreateRemoteMenuContent handle it
         }
 
         if (frameParent == null && mainMenuFrame != null)
@@ -933,6 +935,9 @@ public class RTTManager : MonoBehaviour
     {
         foreach (var kvp in new Dictionary<string, RTTAppInstance>(_preparingApps))
         {
+            // Destroy controller first (it's not a child of frame anymore)
+            if (kvp.Value.Controller != null && kvp.Value.Controller.gameObject != null)
+                Destroy(kvp.Value.Controller.gameObject);
             if (kvp.Value.Frame != null)
                 Destroy(kvp.Value.Frame.gameObject);
             Debug.Log($"[RTTManager] Cancelled preparation for: {kvp.Key}");
@@ -994,6 +999,9 @@ public class RTTManager : MonoBehaviour
                 try { cleanupMethod.Invoke(app.Controller, null); }
                 catch (Exception e) { Debug.LogWarning($"[RTTManager] Cleanup failed: {e.Message}"); }
             }
+            // Destroy controller GameObject (it's not a child of frame anymore)
+            if (app.Controller.gameObject != null)
+                Destroy(app.Controller.gameObject);
         }
 
         if (app.Frame != null)
@@ -1498,8 +1506,10 @@ public class RTTManager : MonoBehaviour
     {
         Debug.Log($"[RTTManager] Creating RemoteMenu content...");
 
+        // Create controller as sibling to frame, NOT child
+        // This ensures controller stays active when frame is hidden during streaming
         GameObject controllerObj = new GameObject($"RemoteMenuController_{instance.AppId}");
-        controllerObj.transform.SetParent(instance.Frame.transform);
+        controllerObj.transform.SetParent(this.transform); // Parent to RTTManager, not frame
         var controller = controllerObj.AddComponent<RTTRemoteMenuController>();
 
         var containerSize = instance.Frame.GetContentSize();
