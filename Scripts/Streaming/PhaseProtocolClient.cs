@@ -673,17 +673,20 @@ namespace VRWorkspace.Streaming
 
         /// <summary>
         /// Get client codec capabilities for negotiation.
-        /// IMPORTANT: Unity WebRTC only supports H.264 decoding, NOT H.265/HEVC.
-        /// HevcDecoderPlugin checks Android MediaCodec support, but that's not used by WebRTC.
-        /// Always report H.264 only for WebRTC compatibility.
+        /// Unity WebRTC supports H.264, VP9, and VP8 decoding natively.
+        /// H.265/HEVC is NOT supported by Unity WebRTC VideoStreamTrack.
         /// </summary>
         private ClientCodecCapability GetClientCodecCapability()
         {
+            // Unity WebRTC supports H264, VP9, VP8 natively
+            // Priority: H264 (hardware) > VP9 (better quality) > VP8 (fallback)
             var capability = new ClientCodecCapability
             {
-                supportedCodecs = new[] { "H264" },
+                supportedCodecs = new[] { "H264", "VP9", "VP8" },
                 preferredCodec = "H264",
                 supportsHevc = false,  // Unity WebRTC does NOT support H.265 decoding
+                supportsVP9 = true,    // Unity WebRTC supports VP9 natively
+                supportsVP8 = true,    // Unity WebRTC supports VP8 natively
                 deviceModel = SystemInfo.deviceModel,
                 apiLevel = 0
             };
@@ -699,7 +702,7 @@ namespace VRWorkspace.Streaming
                 Debug.Log($"[PhaseProtocol] Android API level: {capability.apiLevel}, device: {capability.deviceModel}");
 
                 // NOTE: HevcDecoderPlugin checks MediaCodec HEVC support, but Unity WebRTC
-                // has its own built-in decoder that only supports H.264.
+                // has its own built-in decoder that only supports H.264, VP9, VP8.
                 // We keep this check for diagnostics only.
                 bool pluginAvailable = false;
                 try
@@ -712,25 +715,14 @@ namespace VRWorkspace.Streaming
                     Debug.LogWarning($"[PhaseProtocol] HevcDecoderPlugin check failed: {pluginEx.Message}");
                 }
 
-                // DISABLED: Unity WebRTC does NOT support H.265 decoding
-                // Even though Android MediaCodec supports HEVC, WebRTC VideoStreamTrack
-                // can only decode H.264. Enabling HEVC causes frames=0 on Android.
-                //
-                // To enable HEVC in the future, we would need to:
-                // 1. Bypass WebRTC VideoStreamTrack for video
-                // 2. Receive raw H.265 NAL units via DataChannel
-                // 3. Decode manually using HevcDecoderPlugin
-                // 4. Create texture from decoded YUV data
-                //
-                // For now, always use H.264 for maximum compatibility.
-                Debug.Log($"[PhaseProtocol] Using H.264 only (Unity WebRTC limitation). MediaCodec HEVC={pluginAvailable}");
+                Debug.Log($"[PhaseProtocol] Client codecs: H264, VP9, VP8 (Unity WebRTC native). MediaCodec HEVC={pluginAvailable}");
             }
             catch (Exception ex)
             {
                 Debug.LogWarning($"[PhaseProtocol] Failed to get device info: {ex.Message}");
             }
 #else
-            Debug.Log("[PhaseProtocol] Non-Android platform, using H.264 only");
+            Debug.Log("[PhaseProtocol] Client codecs: H264, VP9, VP8 (Unity WebRTC native)");
 #endif
 
             return capability;
@@ -1056,9 +1048,13 @@ namespace VRWorkspace.Streaming
             };
 
             // Update selected codec based on server's decision
-            _selectedCodec = _suggestedConfig.selectedCodec.Equals("H265", StringComparison.OrdinalIgnoreCase)
-                ? VideoCodec.H265
-                : VideoCodec.H264;
+            _selectedCodec = _suggestedConfig.selectedCodec.ToUpperInvariant() switch
+            {
+                "H265" => VideoCodec.H265,
+                "VP9" => VideoCodec.VP9,
+                "VP8" => VideoCodec.VP8,
+                _ => VideoCodec.H264  // Default to H264
+            };
 
             Debug.Log($"[PhaseProtocol] Suggested: {_suggestedConfig.monitors}mon @ {_suggestedConfig.resolutionWidth}x{_suggestedConfig.resolutionHeight}, {_suggestedConfig.fps}fps, {_suggestedConfig.bitrateKbps}kbps");
             Debug.Log($"[PhaseProtocol] Selected codec: {_suggestedConfig.selectedCodec}");
@@ -1144,28 +1140,254 @@ namespace VRWorkspace.Streaming
         }
 
         /// <summary>
-        /// Create PeerConnections using PARALLEL pattern (like browser).
-        /// Falls back to sequential if parallel fails (for Android compatibility).
-        /// REWRITTEN to match browser performance.
+        /// Create PeerConnections - now uses SINGLE-PC MULTI-TRACK mode.
+        /// Creates ONE PeerConnection with N video transceivers (one per monitor).
+        /// Benefits: 1 ICE negotiation, 1 DTLS handshake, better bandwidth sharing.
         /// </summary>
         private async Task CreatePeerConnectionsAsync(int count)
         {
-            Debug.Log($"[PhaseProtocol] Creating {count} PeerConnections (parallel mode)");
+            Debug.Log($"[PhaseProtocol] Creating SINGLE PeerConnection with {count} video transceivers (Single-PC Multi-Track mode)");
 
             _expectedMonitorCount = count;
 
-#if UNITY_ANDROID && !UNITY_EDITOR
-            Debug.Log("[PhaseProtocol] Android detected - using parallel with fallback");
-#endif
+            // Initialize event-driven answer waiting
+            _allAnswersReceivedTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            // Try parallel first (like browser) - all PCs created at once
-            var parallelSuccess = await TryParallelPCCreationAsync(count);
+            // Create single PC with N transceivers
+            await CreateSinglePCMultiTrackAsync(count);
+        }
 
-            if (!parallelSuccess)
+        /// <summary>
+        /// Create a single PeerConnection with N video transceivers.
+        /// Produces a single offer with N m= sections.
+        /// </summary>
+        private async Task CreateSinglePCMultiTrackAsync(int count)
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            Debug.Log($"[PhaseProtocol] CreateSinglePCMultiTrackAsync: Creating PeerConnection for {count} monitors...");
+
+            // EMPTY ICE servers - no STUN for LAN mode
+            var cfg = new RTCConfiguration { iceServers = new RTCIceServer[0] };
+            var pc = new RTCPeerConnection(ref cfg);
+            Debug.Log($"[PhaseProtocol] PeerConnection created: {pc != null}, SignalingState={pc?.SignalingState}");
+
+            // Create wrapper for each track (for texture/frame tracking)
+            var trackWrappers = new List<PCWrapper>();
+            for (int i = 0; i < count; i++)
             {
-                Debug.LogWarning("[PhaseProtocol] Parallel creation incomplete, falling back to sequential...");
-                await CreatePeerConnectionsSequentialAsync(count);
+                var wrapper = new PCWrapper
+                {
+                    Index = i,
+                    PC = pc, // All wrappers share the same PC
+                    AnswerReceivedTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously)
+                };
+                trackWrappers.Add(wrapper);
             }
+
+            // Add N video transceivers (RecvOnly)
+            var transceivers = new List<RTCRtpTransceiver>();
+            for (int i = 0; i < count; i++)
+            {
+                var trans = pc.AddTransceiver(TrackKind.Video, new RTCRtpTransceiverInit { direction = RTCRtpTransceiverDirection.RecvOnly });
+                SetCodecPreferences(trans, i);
+                transceivers.Add(trans);
+                Debug.Log($"[PhaseProtocol] Added transceiver {i} for monitor {i}");
+            }
+
+            // Setup event handlers for single PC
+            SetupSinglePCEventHandlers(pc, trackWrappers, transceivers);
+
+            // Store wrappers
+            lock (_lock)
+            {
+                _peerConnections.Clear();
+                _peerConnections.AddRange(trackWrappers);
+            }
+
+            // Create offer (contains N m= sections)
+            var offerOp = pc.CreateOffer();
+            while (!offerOp.IsDone)
+                await Task.Yield();
+
+            if (offerOp.IsError)
+            {
+                Debug.LogError("[PhaseProtocol] Single-PC CreateOffer failed");
+                return;
+            }
+
+            var offer = offerOp.Desc;
+            var setLocalOp = pc.SetLocalDescription(ref offer);
+            while (!setLocalOp.IsDone)
+                await Task.Yield();
+
+            if (setLocalOp.IsError)
+            {
+                Debug.LogError("[PhaseProtocol] Single-PC SetLocal failed");
+                return;
+            }
+
+            // Mark all wrappers as offer sent
+            foreach (var w in trackWrappers)
+                w.OfferSent = true;
+
+            // Send SINGLE offer (no monitorIndex)
+            await SendTextAsync($"{{\"type\":\"offer\",\"monitorIndex\":0,\"sdp\":\"{EscapeJsonString(offer.sdp)}\"}}");
+            Debug.Log($"[PhaseProtocol] Single-PC offer sent with {count} m= sections ({sw.ElapsedMilliseconds}ms)");
+
+            // Wait for answer with timeout
+            const int ANSWER_TIMEOUT_MS = 10000;
+            try
+            {
+                var timeoutTask = Task.Delay(ANSWER_TIMEOUT_MS);
+                var completedTask = await Task.WhenAny(_allAnswersReceivedTcs.Task, timeoutTask);
+
+                if (completedTask == _allAnswersReceivedTcs.Task)
+                {
+                    Debug.Log($"[PhaseProtocol] Single-PC answer received in {sw.ElapsedMilliseconds}ms");
+                }
+                else
+                {
+                    Debug.LogWarning($"[PhaseProtocol] Single-PC answer timeout after {sw.ElapsedMilliseconds}ms");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[PhaseProtocol] Answer waiting exception: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Setup event handlers for Single-PC Multi-Track mode.
+        /// Maps tracks to monitors via transceiver index.
+        /// </summary>
+        private void SetupSinglePCEventHandlers(RTCPeerConnection pc, List<PCWrapper> trackWrappers, List<RTCRtpTransceiver> transceivers)
+        {
+            Debug.Log($"[PhaseProtocol] Setting up Single-PC event handlers for {trackWrappers.Count} tracks");
+
+            pc.OnIceConnectionChange = s =>
+            {
+                Debug.Log($"[PhaseProtocol] Single-PC ICE: {s}");
+
+                // Fire progress for all monitors
+                int progress = s switch
+                {
+                    RTCIceConnectionState.New => 0,
+                    RTCIceConnectionState.Checking => 30,
+                    RTCIceConnectionState.Connected => 100,
+                    RTCIceConnectionState.Completed => 100,
+                    _ => 0
+                };
+                for (int i = 0; i < trackWrappers.Count; i++)
+                    OnMonitorIceProgress?.Invoke(i, progress);
+
+                if (s == RTCIceConnectionState.Connected || s == RTCIceConnectionState.Completed)
+                {
+                    for (int i = 0; i < trackWrappers.Count; i++)
+                        OnMonitorIceComplete?.Invoke(i);
+                    CheckAllMonitorsConnected();
+                }
+            };
+
+            pc.OnConnectionStateChange = s =>
+            {
+                Debug.Log($"[PhaseProtocol] Single-PC State: {s}");
+                if (s == RTCPeerConnectionState.Connected)
+                {
+                    foreach (var w in trackWrappers)
+                    {
+                        w.LastConnectedTime = DateTime.UtcNow;
+                        w.IsReconnecting = false;
+                        w.ReconnectAttempts = 0;
+                    }
+                }
+                else if (s == RTCPeerConnectionState.Failed || s == RTCPeerConnectionState.Disconnected)
+                {
+                    if (_stateMachine.IsStreaming && !trackWrappers[0].IsReconnecting)
+                    {
+                        trackWrappers[0].IsReconnecting = true;
+                        Debug.Log("[PhaseProtocol] Single-PC initiating full reconnect...");
+                        // TODO: Implement full reconnect for single-PC mode
+                    }
+                }
+            };
+
+            // ICE candidates - single connection, no monitorIndex
+            pc.OnIceCandidate = cand =>
+            {
+                if (string.IsNullOrEmpty(cand.Candidate))
+                {
+                    Debug.Log("[PhaseProtocol] Single-PC local ICE gathering complete (empty candidate)");
+                    if (trackWrappers[0].OfferSent)
+                        _ = SendTextAsync("{\"type\":\"end_of_candidates\",\"monitorIndex\":0}");
+                    return;
+                }
+
+                string msg = cand.Candidate;
+                Debug.Log($"[PhaseProtocol] Single-PC local ICE candidate: {msg.Substring(0, Math.Min(60, msg.Length))}...");
+
+                if (_skipTcpIceCandidates && (msg.Contains(" tcp ", StringComparison.OrdinalIgnoreCase) || msg.Contains("tcptype", StringComparison.OrdinalIgnoreCase)))
+                {
+                    Debug.Log("[PhaseProtocol] Skipping TCP candidate");
+                    return;
+                }
+
+                string rawCandidate = msg.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase)
+                    ? msg.Substring("candidate:".Length)
+                    : msg;
+
+                _ = SendTextAsync($"{{\"type\":\"candidate\",\"monitorIndex\":0,\"candidate\":\"{EscapeJsonString(rawCandidate)}\"}}");
+            };
+
+            // Track received - map to monitor via transceiver
+            pc.OnTrack = e =>
+            {
+                Debug.Log($"[PhaseProtocol] Single-PC OnTrack: kind={e.Track?.Kind}, enabled={e.Track?.Enabled}");
+
+                if (e.Track is VideoStreamTrack v)
+                {
+                    // Find which transceiver this track belongs to
+                    int trackIndex = -1;
+                    for (int i = 0; i < transceivers.Count; i++)
+                    {
+                        if (transceivers[i] == e.Transceiver)
+                        {
+                            trackIndex = i;
+                            break;
+                        }
+                    }
+
+                    if (trackIndex < 0 || trackIndex >= trackWrappers.Count)
+                    {
+                        Debug.LogWarning($"[PhaseProtocol] Received track for unknown transceiver, mid={e.Transceiver?.Mid}");
+                        return;
+                    }
+
+                    var wrapper = trackWrappers[trackIndex];
+                    wrapper.VideoTrack = v;
+                    wrapper.LastFrameTime = DateTime.UtcNow;
+
+                    int idx = trackIndex; // Capture for closure
+                    v.OnVideoReceived += tex =>
+                    {
+                        wrapper.Texture = tex;
+                        wrapper.LastFrameTime = DateTime.UtcNow;
+                        wrapper.FrameCount++;
+                        wrapper.RenderedFrameCount++;
+
+                        if (!_streamingStartedFired)
+                        {
+                            _streamingStartedFired = true;
+                            Debug.Log($"[PhaseProtocol] Track {idx} received first frame, firing OnStreamingStarted");
+                            _stateMachine.TryTransition(ConnectionPhase.Streaming);
+                            OnStreamingStarted?.Invoke();
+                        }
+
+                        OnVideoTextureReceived?.Invoke(idx, tex);
+                    };
+
+                    Debug.Log($"[PhaseProtocol] Track {trackIndex} received video, mid={e.Transceiver?.Mid}");
+                }
+            };
         }
 
         /// <summary>
@@ -1336,24 +1558,47 @@ namespace VRWorkspace.Streaming
 
         /// <summary>
         /// Set codec preferences for a transceiver.
+        /// Priority: Selected codec → H264 → VP9 → VP8 → others
         /// </summary>
         private void SetCodecPreferences(RTCRtpTransceiver trans, int idx)
         {
             var caps = RTCRtpReceiver.GetCapabilities(TrackKind.Video);
+
+            // Get all codec groups
+            var h265 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("H265", StringComparison.OrdinalIgnoreCase) ||
+                                               (c.mimeType ?? "").Contains("HEVC", StringComparison.OrdinalIgnoreCase)).ToArray();
+            var h264 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("H264", StringComparison.OrdinalIgnoreCase)).ToArray();
+            var vp9 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("VP9", StringComparison.OrdinalIgnoreCase)).ToArray();
+            var vp8 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("VP8", StringComparison.OrdinalIgnoreCase)).ToArray();
+            var others = caps.codecs.Except(h265).Except(h264).Except(vp9).Except(vp8).ToArray();
+
             RTCRtpCodecCapability[] preferredCodecs;
 
-            if (_selectedCodec == VideoCodec.H265)
+            switch (_selectedCodec)
             {
-                var h265 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("H265", StringComparison.OrdinalIgnoreCase) ||
-                                                   (c.mimeType ?? "").Contains("HEVC", StringComparison.OrdinalIgnoreCase)).ToArray();
-                var h264 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("H264", StringComparison.OrdinalIgnoreCase)).ToArray();
-                preferredCodecs = h265.Concat(h264).Concat(caps.codecs.Except(h265).Except(h264)).ToArray();
+                case VideoCodec.H265:
+                    // H265 → H264 → VP9 → VP8 → others
+                    preferredCodecs = h265.Concat(h264).Concat(vp9).Concat(vp8).Concat(others).ToArray();
+                    break;
+
+                case VideoCodec.VP9:
+                    // VP9 → H264 → VP8 → others (skip H265 as not supported)
+                    preferredCodecs = vp9.Concat(h264).Concat(vp8).Concat(others).ToArray();
+                    break;
+
+                case VideoCodec.VP8:
+                    // VP8 → H264 → VP9 → others
+                    preferredCodecs = vp8.Concat(h264).Concat(vp9).Concat(others).ToArray();
+                    break;
+
+                case VideoCodec.H264:
+                default:
+                    // H264 → VP9 → VP8 → others
+                    preferredCodecs = h264.Concat(vp9).Concat(vp8).Concat(others).ToArray();
+                    break;
             }
-            else
-            {
-                var h264 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("H264", StringComparison.OrdinalIgnoreCase)).ToArray();
-                preferredCodecs = h264.Concat(caps.codecs.Except(h264)).ToArray();
-            }
+
+            Debug.Log($"[PhaseProtocol] PC{idx} codec preferences: {_selectedCodec} first, total {preferredCodecs.Length} codecs");
             trans.SetCodecPreferences(preferredCodecs);
         }
 
@@ -1503,12 +1748,14 @@ namespace VRWorkspace.Streaming
             try
             {
                 // Check PC is in correct state
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} SignalingState={wrapper.PC.SignalingState}, IceState={wrapper.PC.IceConnectionState}");
                 if (wrapper.PC.SignalingState != RTCSignalingState.HaveLocalOffer)
                 {
                     Debug.LogError($"[PhaseProtocol] PC{monitorIndex} wrong state: {wrapper.PC.SignalingState}");
                     return;
                 }
 
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} calling SetRemoteDescription (SDP len={sdp.Length})...");
                 var answer = new RTCSessionDescription { type = RTCSdpType.Answer, sdp = sdp };
                 var setRemoteOp = wrapper.PC.SetRemoteDescription(ref answer);
 
@@ -1518,12 +1765,20 @@ namespace VRWorkspace.Streaming
                     return;
                 }
 
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} SetRemoteDescription called, waiting for completion...");
+
                 // Wait for operation to complete (max 5 seconds)
                 var sw = System.Diagnostics.Stopwatch.StartNew();
+                int waitCount = 0;
                 while (!setRemoteOp.IsDone && sw.ElapsedMilliseconds < 5000)
                 {
                     await Task.Delay(10);
+                    waitCount++;
+                    if (waitCount % 100 == 0) // Log every 1 second
+                        Debug.Log($"[PhaseProtocol] PC{monitorIndex} still waiting... {sw.ElapsedMilliseconds}ms, IsDone={setRemoteOp.IsDone}, IsError={setRemoteOp.IsError}");
                 }
+
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} SetRemoteDescription wait done: IsDone={setRemoteOp.IsDone}, IsError={setRemoteOp.IsError}, elapsed={sw.ElapsedMilliseconds}ms");
 
                 if (!setRemoteOp.IsDone || setRemoteOp.IsError)
                 {
@@ -1538,8 +1793,27 @@ namespace VRWorkspace.Streaming
                 wrapper.AnswerSet = true;
                 Debug.Log($"[PhaseProtocol] PC{monitorIndex} answer set OK ({sw.ElapsedMilliseconds}ms)");
 
-                // Signal per-wrapper TCS for sequential mode (immediate response)
-                wrapper.AnswerReceivedTcs?.TrySetResult(true);
+                // Single-PC mode: Mark ALL wrappers as AnswerSet (they share the same PC)
+                // This is safe because all wrappers point to the same PC
+                lock (_lock)
+                {
+                    bool isSinglePCMode = _peerConnections.Count > 1 &&
+                                          _peerConnections.All(w => w.PC == wrapper.PC);
+                    if (isSinglePCMode)
+                    {
+                        Debug.Log("[PhaseProtocol] Single-PC mode: marking all wrappers as AnswerSet");
+                        foreach (var w in _peerConnections)
+                        {
+                            w.AnswerSet = true;
+                            w.AnswerReceivedTcs?.TrySetResult(true);
+                        }
+                    }
+                    else
+                    {
+                        // Legacy per-PC mode
+                        wrapper.AnswerReceivedTcs?.TrySetResult(true);
+                    }
+                }
 
                 // Signal event-driven waiting if all answers received (parallel mode)
                 SignalIfAllAnswersReceived();
@@ -1602,9 +1876,15 @@ namespace VRWorkspace.Streaming
             }
 
             if (wrapper.AnswerSet)
+            {
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} adding remote ICE candidate (AnswerSet=true)");
                 AddIceCandidate(wrapper, candStr);
+            }
             else
+            {
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} queuing remote ICE candidate (AnswerSet=false, pending={wrapper.PendingIce.Count + 1})");
                 wrapper.PendingIce.Add(candStr);
+            }
         }
 
         private void HandleEndOfCandidates(SimpleJson json)
@@ -1728,23 +2008,9 @@ namespace VRWorkspace.Streaming
 
             // Add video transceiver with codec preference based on negotiated codec
             var trans = pc.AddTransceiver(TrackKind.Video, new RTCRtpTransceiverInit { direction = RTCRtpTransceiverDirection.RecvOnly });
-            var caps = RTCRtpReceiver.GetCapabilities(TrackKind.Video);
 
-            // Set codec preferences based on selected codec
-            RTCRtpCodecCapability[] preferredCodecs;
-            if (_selectedCodec == VideoCodec.H265)
-            {
-                var h265 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("H265", StringComparison.OrdinalIgnoreCase) ||
-                                                   (c.mimeType ?? "").Contains("HEVC", StringComparison.OrdinalIgnoreCase)).ToArray();
-                var h264 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("H264", StringComparison.OrdinalIgnoreCase)).ToArray();
-                preferredCodecs = h265.Concat(h264).Concat(caps.codecs.Except(h265).Except(h264)).ToArray();
-            }
-            else
-            {
-                var h264 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("H264", StringComparison.OrdinalIgnoreCase)).ToArray();
-                preferredCodecs = h264.Concat(caps.codecs.Except(h264)).ToArray();
-            }
-            trans.SetCodecPreferences(preferredCodecs);
+            // Use the shared codec preferences method
+            SetCodecPreferences(trans, idx);
 
             // Connection state handlers
             pc.OnIceConnectionChange = s =>

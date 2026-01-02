@@ -591,12 +591,7 @@ namespace VRWorkspace.ViewModels
                     Debug.LogWarning($"[ConnectionViewModel] Timeout waiting for ReadyToStream, current phase: {Phase.Value}, using force start");
                 }
 
-                // Wait 2 seconds showing "Connecting..."
-                await Task.Delay(2000);
-
-                if (_clientGeneration != subscribedGeneration) return; // Stale after delay
-
-                // Auto-start streaming (use force if phase didn't transition)
+                // Auto-start streaming immediately (server already streaming via early capture)
                 Debug.Log($"[ConnectionViewModel] Auto-starting streaming (force={useForce})...");
                 await StartStreamingAsync(useForce);
             };

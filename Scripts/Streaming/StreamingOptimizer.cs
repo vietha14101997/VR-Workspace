@@ -8,8 +8,10 @@ namespace VRWorkspace.Streaming
     /// </summary>
     public enum VideoCodec
     {
-        H264,
-        H265
+        H264,   // AVC - Hardware accelerated
+        H265,   // HEVC - Better compression
+        VP9,    // libvpx-vp9 (fallback)
+        VP8     // libvpx (final fallback)
     }
 
     /// <summary>
@@ -29,9 +31,11 @@ namespace VRWorkspace.Streaming
         public MonitorInfo[] monitors;
 
         // Codec capability fields
-        public string[] supportedCodecs;    // ["H264", "H265"]
-        public string preferredCodec;       // "H265" or "H264"
-        public bool supportsHevc;           // Quick check for HEVC support
+        public string[] supportedCodecs;    // ["H264", "H265", "VP9", "VP8"]
+        public string preferredCodec;       // Preferred codec
+        public bool supportsHevc;           // H.265 support
+        public bool supportsVP9;            // VP9 support (libvpx-vp9)
+        public bool supportsVP8;            // VP8 support (libvpx)
     }
 
     /// <summary>
@@ -40,9 +44,11 @@ namespace VRWorkspace.Streaming
     [Serializable]
     public class ClientCodecCapability
     {
-        public string[] supportedCodecs;    // Codecs client can decode
+        public string[] supportedCodecs;    // Codecs client can decode (H264, VP9, VP8)
         public string preferredCodec;       // Client's preferred codec
         public bool supportsHevc;           // HEVC hardware decoder available
+        public bool supportsVP9;            // VP9 decoding support (Unity WebRTC native)
+        public bool supportsVP8;            // VP8 decoding support (Unity WebRTC native)
         public string deviceModel;          // Android device model
         public int apiLevel;                // Android API level
     }
