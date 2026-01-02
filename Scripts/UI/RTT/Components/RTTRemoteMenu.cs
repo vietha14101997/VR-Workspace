@@ -1134,9 +1134,8 @@ public class RTTRemoteMenu : MonoBehaviour
         // Calculate logical width based on aspect ratio (same resolution density as main panel)
         float logicalWidthPixels = (sideWidth / _menuFrame.PanelWidth) * _menuFrame.LogicalWidthValue;
 
-        // Create RTTMenuFrame for the side panel
-        frameRef = RTTMenuFrame.Create(_menuFrame.transform, sideWidth, sideHeight, logicalWidthPixels, false);
-        frameRef.gameObject.name = name;
+        // Create RTTMenuFrame for the side panel with unique name
+        frameRef = RTTMenuFrame.Create(_menuFrame.transform, sideWidth, sideHeight, logicalWidthPixels, false, name);
         frameRef.transform.position = panelPos;
         frameRef.transform.rotation = panelRot;
         frameRef.transform.localScale = Vector3.one;
@@ -1762,7 +1761,7 @@ public class RTTRemoteMenu : MonoBehaviour
 
     private void OnDisable()
     {
-        Debug.LogWarning("[RTTRemoteMenu] OnDisable called - coroutines will be paused!");
+        // Normal behavior during preparation - coroutines will be paused and resumed on enable
     }
 
     private void OnEnable()

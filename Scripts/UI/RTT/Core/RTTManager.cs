@@ -847,7 +847,8 @@ public class RTTManager : MonoBehaviour
         if (_activeApps.ContainsKey(appId)) return true;
         if (!_preparingApps.ContainsKey(appId)) return false;
         var instance = _preparingApps[appId];
-        return instance.Frame != null && instance.Frame.ContentContainer != null;
+        // Use IsPrepared flag to ensure preparation is fully complete (including SetActive(false))
+        return instance.IsPrepared;
     }
 
     public void OpenPreparedApp(string appId)
@@ -1072,13 +1073,14 @@ public class RTTManager : MonoBehaviour
         else if (useScaleTransition && transitionOutDuration > 0)
             yield return StartCoroutine(AnimateFrameScale(mainMenuFrame.transform, 1f, 0.9f, transitionOutDuration, true));
 
-        // Create frame
+        // Create frame with unique name based on app ID
         instance.Frame = RTTMenuFrame.Create(
             frameParent,
             mainMenuFrame.PanelWidth,
             mainMenuFrame.PanelHeight,
             mainMenuFrame.LogicalWidthValue,
-            isPrimaryFrame: false
+            isPrimaryFrame: false,
+            name: $"RTTMenuFrame_{instance.AppId}"
         );
 
         instance.Frame.transform.position = mainMenuFrame.transform.position;
@@ -1110,6 +1112,8 @@ public class RTTManager : MonoBehaviour
         mainMenuFrame.gameObject.SetActive(false);
         ResetFrameAlpha(mainMenuFrame);
 
+        instance.Frame.SetVisible(true); // Ensure DisplayQuad is visible
+        ResetFrameAlpha(instance.Frame); // Reset material alpha in case of previous fade
         instance.Frame.SetPrimary(true);
         instance.IsVisible = true;
         _currentVisibleAppId = instance.AppId;
@@ -1147,12 +1151,14 @@ public class RTTManager : MonoBehaviour
             yield break;
         }
 
+        // Create frame with unique name based on app ID
         instance.Frame = RTTMenuFrame.Create(
             frameParent,
             mainMenuFrame.PanelWidth,
             mainMenuFrame.PanelHeight,
             mainMenuFrame.LogicalWidthValue,
-            isPrimaryFrame: false
+            isPrimaryFrame: false,
+            name: $"RTTMenuFrame_{instance.AppId}"
         );
 
         instance.Frame.transform.position = mainMenuFrame.transform.position + Vector3.up * 1000f;
@@ -1186,9 +1192,23 @@ public class RTTManager : MonoBehaviour
             yield return null;
         }
 
+        // Ensure frame is fully initialized before disabling
+        if (!instance.Frame.IsInitialized)
+        {
+            Debug.LogWarning($"[RTTManager] Frame not initialized after 5 frames, calling EnsureInitialized()");
+            instance.Frame.EnsureInitialized();
+        }
+
         instance.Frame.transform.position = mainMenuFrame.transform.position;
+
+        // Reset alpha to 1 before disabling (in case any fade was applied)
+        ResetFrameAlpha(instance.Frame);
+
         instance.Frame.gameObject.SetActive(false);
         instance.Frame.MarkDirty();
+
+        // Mark as fully prepared AFTER SetActive(false) to prevent race condition
+        instance.IsPrepared = true;
 
         Debug.Log($"[RTTManager] App {instance.AppId} prepared");
     }
@@ -1200,6 +1220,8 @@ public class RTTManager : MonoBehaviour
         if (targetApp.Frame != null)
         {
             targetApp.Frame.gameObject.SetActive(true);
+            targetApp.Frame.SetVisible(true); // Ensure DisplayQuad is visible
+            ResetFrameAlpha(targetApp.Frame); // Reset material alpha in case of previous fade
             targetApp.Frame.SetPrimary(true);
             targetApp.IsVisible = true;
         }
@@ -1228,6 +1250,8 @@ public class RTTManager : MonoBehaviour
         if (targetApp.Frame != null)
         {
             targetApp.Frame.gameObject.SetActive(true);
+            targetApp.Frame.SetVisible(true); // Ensure DisplayQuad is visible
+            ResetFrameAlpha(targetApp.Frame); // Reset material alpha in case of previous fade
             targetApp.Frame.SetPrimary(true);
             targetApp.IsVisible = true;
 
@@ -1261,6 +1285,7 @@ public class RTTManager : MonoBehaviour
         if (mainMenuFrame != null)
         {
             mainMenuFrame.gameObject.SetActive(true);
+            mainMenuFrame.SetVisible(true); // Ensure DisplayQuad is visible
             mainMenuFrame.SetPrimary(true);
         }
         // Show the persistent Main Menu content
@@ -1292,6 +1317,7 @@ public class RTTManager : MonoBehaviour
         if (mainMenuFrame != null)
         {
             mainMenuFrame.gameObject.SetActive(true);
+            mainMenuFrame.SetVisible(true); // Ensure DisplayQuad is visible
             mainMenuFrame.SetPrimary(true);
 
             if (useFadeTransition)
@@ -1337,6 +1363,17 @@ public class RTTManager : MonoBehaviour
         ResetFrameAlpha(mainMenuFrame);
 
         instance.Frame.gameObject.SetActive(true);
+
+        // Force rebuild Canvas layout after re-enabling
+        var canvas = instance.Frame.GetCanvas();
+        if (canvas != null)
+        {
+            UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(canvas.GetComponent<RectTransform>());
+        }
+
+        instance.Frame.SetVisible(true); // Ensure DisplayQuad is visible
+        ResetFrameAlpha(instance.Frame); // Reset material alpha in case of previous fade
+        instance.Frame.MarkDirty(); // Force re-render
         instance.Frame.SetPrimary(true);
         instance.IsVisible = true;
         _currentVisibleAppId = instance.AppId;
@@ -1385,6 +1422,7 @@ public class RTTManager : MonoBehaviour
         if (mainMenuFrame != null)
         {
             mainMenuFrame.gameObject.SetActive(true);
+            mainMenuFrame.SetVisible(true); // Ensure DisplayQuad is visible
             mainMenuFrame.SetPrimary(true);
 
             if (useFadeTransition)

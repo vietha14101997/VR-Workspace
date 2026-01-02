@@ -590,20 +590,40 @@ public abstract class RTTCanvasBase : MonoBehaviour
     /// </summary>
     public virtual void SetVisible(bool visible)
     {
-        if (_isVisible == visible) return;
-
+        // Always apply visibility to fix race conditions
+        // This ensures DisplayQuad is always in correct state even if _isVisible flag is wrong
+        bool wasVisible = _isVisible;
         _isVisible = visible;
 
         if (_displayQuad != null)
+        {
             _displayQuad.enabled = visible;
+        }
+        else if (visible)
+        {
+            // Only warn if trying to show but quad is null
+            Debug.LogWarning($"[RTTCanvasBase] {gameObject.name}.SetVisible(true): _displayQuad is NULL!");
+        }
 
         if (_quadCollider != null)
             _quadCollider.enabled = visible;
 
-        if (_uiCamera != null && !visible)
-            _uiCamera.enabled = false;
+        // Enable/disable UICamera based on visibility
+        if (_uiCamera != null)
+        {
+            if (visible)
+            {
+                // Force enable camera to render at least one frame
+                _uiCamera.enabled = true;
+            }
+            else
+            {
+                _uiCamera.enabled = false;
+            }
+        }
 
-        OnVisibilityChanged?.Invoke(visible);
+        if (wasVisible != visible)
+            OnVisibilityChanged?.Invoke(visible);
 
         if (visible)
             MarkDirty();
