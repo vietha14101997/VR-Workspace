@@ -125,14 +125,6 @@ public class RTTManager : MonoBehaviour
     private bool _isTransitioning = false;
     #endregion
 
-    #region Streaming Fields
-    private ConnectionViewModel _viewModel;
-    private Coroutine _textureUpdateCoroutine;
-    private Coroutine _webrtcUpdateCoroutine;
-    private WorldPanelClusterRig _clusterRig;
-    private int _activeCursorPanelIndex = -1;
-    #endregion
-
     #region Events
     /// <summary>Fired when theme configuration changes</summary>
     public event Action OnThemeChanged;
@@ -234,16 +226,6 @@ public class RTTManager : MonoBehaviour
         // Unsubscribe from theme property changes
         RTTThemeConfig.OnAnyThemePropertyChanged -= HandleThemePropertyChanged;
 
-        // Stop coroutines
-        if (_textureUpdateCoroutine != null) StopCoroutine(_textureUpdateCoroutine);
-        if (_webrtcUpdateCoroutine != null) StopCoroutine(_webrtcUpdateCoroutine);
-
-        // Cleanup cluster rig
-        if (_clusterRig != null) Destroy(_clusterRig.gameObject);
-
-        // Unsubscribe events
-        if (_viewModel != null) _viewModel.OnCursorPositionChanged -= HandleCursorPosition;
-
         UnsubscribeFromControllerEvents();
 
         // Cleanup active apps
@@ -305,23 +287,14 @@ public class RTTManager : MonoBehaviour
         if (mainMenuController != null)
             mainMenuController.OnMenuItemClicked += HandleMainMenuItemClicked;
 
-        if (remoteMenuController != null)
-        {
-            remoteMenuController.OnBackClicked += ReturnToMainMenu;
-            remoteMenuController.OnStartClicked += HandleRemoteStartClicked;
-        }
+        // Note: Per-app controllers are created dynamically in CreateRemoteMenuContent
+        // and handle their own events via RTTRemoteMenuController
     }
 
     private void UnsubscribeFromControllerEvents()
     {
         if (mainMenuController != null)
             mainMenuController.OnMenuItemClicked -= HandleMainMenuItemClicked;
-
-        if (remoteMenuController != null)
-        {
-            remoteMenuController.OnBackClicked -= ReturnToMainMenu;
-            remoteMenuController.OnStartClicked -= HandleRemoteStartClicked;
-        }
     }
 
     private IEnumerator WaitAndShowMainMenu()
@@ -734,38 +707,6 @@ public class RTTManager : MonoBehaviour
 
         // Open app
         OpenApp(itemId);
-    }
-
-    private void HandleRemoteStartClicked()
-    {
-        Debug.Log("[RTTManager] Remote Start clicked - hiding menu and showing cluster panels");
-
-        if (mainMenuFrame != null)
-            mainMenuFrame.gameObject.SetActive(false);
-
-        if (!ServiceLocator.TryGet<ConnectionViewModel>(out _viewModel))
-        {
-            Debug.LogWarning("[RTTManager] ConnectionViewModel not found");
-            return;
-        }
-
-        _viewModel.OnCursorPositionChanged += HandleCursorPosition;
-
-        if (_viewModel.AppliedConfig.Value == null && _viewModel.SuggestedConfig.Value == null)
-        {
-            Debug.LogError("[RTTManager] No config available");
-            return;
-        }
-
-        int monitorCount = _viewModel.AppliedConfig.Value?.monitors ?? _viewModel.SuggestedConfig.Value.monitors;
-        CreateClusterRig(monitorCount);
-
-        if (_webrtcUpdateCoroutine == null)
-            _webrtcUpdateCoroutine = StartCoroutine(WebRTC.Update());
-
-        if (_textureUpdateCoroutine != null)
-            StopCoroutine(_textureUpdateCoroutine);
-        _textureUpdateCoroutine = StartCoroutine(UpdatePanelTextures());
     }
 
     private void HandleQuit()
@@ -1578,136 +1519,6 @@ public class RTTManager : MonoBehaviour
         var displayQuad = frame.GetDisplayQuad();
         if (displayQuad?.material != null)
             displayQuad.material.color = new Color(1f, 1f, 1f, 1f);
-    }
-    #endregion
-
-    #region Streaming - Cluster Rig
-    private void CreateClusterRig(int panelCount)
-    {
-        if (_clusterRig != null)
-        {
-            Destroy(_clusterRig.gameObject);
-            _clusterRig = null;
-        }
-
-        var clusterGO = new GameObject("StreamingClusterRig");
-        _clusterRig = clusterGO.AddComponent<WorldPanelClusterRig>();
-
-        if (panelPrefab != null)
-            _clusterRig.panelPrefab = panelPrefab;
-
-        _clusterRig.BuildWithPanelCount(panelCount);
-        SubscribeToPanelCursorEvents();
-
-        Debug.Log($"[RTTManager] Created cluster rig with {panelCount} panels");
-    }
-
-    private void SubscribeToPanelCursorEvents()
-    {
-        if (_clusterRig == null || _clusterRig.panels == null) return;
-
-        for (int i = 0; i < _clusterRig.panels.Count; i++)
-        {
-            var panel = _clusterRig.panels[i];
-            if (panel == null) continue;
-
-            panel.EnsureCursor();
-            if (panel.cursor == null) continue;
-
-            int monitorIndex = i;
-
-            panel.cursor.onClickDown += () =>
-            {
-                _viewModel?.RequestKeyframe(monitorIndex);
-            };
-
-            panel.cursor.onClickUp += () =>
-            {
-                _viewModel?.RequestKeyframe(monitorIndex);
-            };
-        }
-    }
-
-    private IEnumerator UpdatePanelTextures()
-    {
-        float waitTimeout = 30f;
-        float waitElapsed = 0f;
-        while (_viewModel != null && !_viewModel.IsStreaming.Value && waitElapsed < waitTimeout)
-        {
-            waitElapsed += Time.deltaTime;
-            yield return null;
-        }
-
-        if (_viewModel == null || !_viewModel.IsStreaming.Value)
-        {
-            Debug.LogWarning("[RTTManager] Streaming did not start");
-            yield break;
-        }
-
-        while (_viewModel != null && _viewModel.IsStreaming.Value)
-        {
-            _viewModel.PollTextures();
-
-            if (_clusterRig != null && _clusterRig.panels != null)
-            {
-                for (int i = 0; i < _clusterRig.panels.Count; i++)
-                {
-                    var panel = _clusterRig.panels[i];
-                    if (panel != null)
-                    {
-                        var texture = _viewModel.GetTexture(i);
-                        if (texture != null && panel.contentTexture != texture)
-                        {
-                            panel.contentTexture = texture;
-                            panel.Apply();
-                        }
-                    }
-                }
-            }
-
-            yield return null;
-        }
-    }
-
-    private void HandleCursorPosition(int monitorIndex, float u, float v, bool visible)
-    {
-        if (_clusterRig == null || _clusterRig.panels == null) return;
-
-        if (!visible || monitorIndex < 0 || monitorIndex >= _clusterRig.panels.Count)
-        {
-            HideAllCursors();
-            _activeCursorPanelIndex = -1;
-            return;
-        }
-
-        if (_activeCursorPanelIndex != monitorIndex && _activeCursorPanelIndex >= 0 && _activeCursorPanelIndex < _clusterRig.panels.Count)
-        {
-            var oldPanel = _clusterRig.panels[_activeCursorPanelIndex];
-            if (oldPanel?.cursor != null)
-                oldPanel.cursor.SetVisible(false);
-        }
-
-        var panel = _clusterRig.panels[monitorIndex];
-        if (panel == null) return;
-
-        panel.EnsureCursor();
-        if (panel.cursor == null) return;
-
-        float unityV = 1f - v;
-        panel.cursor.SetUV(u, unityV, silent: true);
-        panel.cursor.SetVisible(true);
-
-        _activeCursorPanelIndex = monitorIndex;
-    }
-
-    private void HideAllCursors()
-    {
-        if (_clusterRig == null || _clusterRig.panels == null) return;
-        foreach (var panel in _clusterRig.panels)
-        {
-            if (panel?.cursor != null)
-                panel.cursor.SetVisible(false);
-        }
     }
     #endregion
 }

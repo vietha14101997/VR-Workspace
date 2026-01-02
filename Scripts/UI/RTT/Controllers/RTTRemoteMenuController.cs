@@ -30,10 +30,6 @@ public class RTTRemoteMenuController : MonoBehaviour
 
     // Cursor tracking
     private int _activeCursorPanelIndex = -1;
-
-    // Instance tracking for debugging
-    private static int _instanceCounter = 0;
-    private int _instanceId;
     #endregion
 
     #region Events
@@ -45,32 +41,6 @@ public class RTTRemoteMenuController : MonoBehaviour
     #region Properties
     public RTTRemoteMenu RemoteMenuInstance => _remoteMenuInstance;
     public RemoteConnectionPipeline ConnectionPipeline => connectionPipeline;
-    #endregion
-
-    #region Unity Lifecycle
-    private void Awake()
-    {
-        _instanceId = ++_instanceCounter;
-        Debug.Log($"[RTTRemoteMenuController#{_instanceId}] Awake - instance created on {gameObject.name}");
-    }
-
-    private void OnEnable()
-    {
-        Debug.Log($"[RTTRemoteMenuController#{_instanceId}] OnEnable - parent={transform.parent?.name ?? "null"}, " +
-            $"parentActive={transform.parent?.gameObject.activeInHierarchy ?? false}");
-    }
-
-    private void OnDisable()
-    {
-        Debug.LogWarning($"[RTTRemoteMenuController#{_instanceId}] OnDisable - CONTROLLER DISABLED! " +
-            $"parent={transform.parent?.name ?? "null"}, " +
-            $"parentActive={transform.parent?.gameObject.activeInHierarchy ?? false}");
-    }
-
-    private void OnDestroy()
-    {
-        Debug.LogWarning($"[RTTRemoteMenuController#{_instanceId}] OnDestroy - CONTROLLER DESTROYED!");
-    }
     #endregion
 
     #region Public API
@@ -124,14 +94,12 @@ public class RTTRemoteMenuController : MonoBehaviour
             _viewModel.MonitorIceProgress.OnChanged += HandleMonitorIceProgress;
             _viewModel.IsStreaming.OnChanged += HandleStreamingStateChanged;
             _viewModel.OnCursorPositionChanged += HandleCursorPosition;
-            Debug.Log($"[RTTRemoteMenuController#{_instanceId}] Subscribed to ConnectionViewModel events");
         }
         else
         {
-            Debug.LogError($"[RTTRemoteMenuController#{_instanceId}] ConnectionViewModel is NULL after BuildUI!");
+            Debug.LogError("[RTTRemoteMenuController] ConnectionViewModel is NULL after BuildUI!");
         }
 
-        Debug.Log($"[RTTRemoteMenuController#{_instanceId}] Remote Menu created");
         return _menuObject;
     }
 
@@ -149,7 +117,6 @@ public class RTTRemoteMenuController : MonoBehaviour
         if (connectionPipeline == null)
         {
             connectionPipeline = gameObject.AddComponent<RemoteConnectionPipeline>();
-            Debug.Log("[RTTRemoteMenuController] Created RemoteConnectionPipeline");
         }
     }
 
@@ -177,10 +144,7 @@ public class RTTRemoteMenuController : MonoBehaviour
         // Then fire-and-forget the actual server disconnect (without state reset)
         if (_viewModel != null)
         {
-            // Reset state immediately (synchronous) - this ensures next menu opens with clean state
             _viewModel.ResetState();
-
-            // Fire and forget just stopping the client (no state reset to avoid race condition)
             _ = _viewModel.StopClientAsync();
 
             // Unsubscribe from ViewModel events
@@ -215,96 +179,49 @@ public class RTTRemoteMenuController : MonoBehaviour
         }
 
         _menuObject = null;
-        Debug.Log("[RTTRemoteMenuController] Cleanup complete - connection state reset");
     }
 
     /// <summary>
     /// Poll textures from ViewModel and apply to panels when streaming.
-    /// Changed to poll earlier (during ICE negotiation) since OnStreamingStarted may not fire reliably.
     /// </summary>
-    private int _debugLogCounter = 0;
-    private int _updateCallCount = 0;
-
     void Update()
     {
-        try
+        if (_viewModel == null || _clusterRig == null) return;
+
+        // Poll when ICE is connected or later
+        var phase = _viewModel.Phase.Value;
+        bool shouldPoll = _isStreamingActive ||
+            phase == ConnectionPhase.ICENegotiating ||
+            phase == ConnectionPhase.ReadyToStream ||
+            phase == ConnectionPhase.StartingStream ||
+            phase == ConnectionPhase.Streaming;
+
+        if (!shouldPoll) return;
+
+        // Poll textures from WebRTC
+        _viewModel.PollTextures();
+
+        // Apply textures to panels
+        var panels = _clusterRig.panels;
+        if (panels == null || panels.Count == 0) return;
+
+        for (int i = 0; i < panels.Count; i++)
         {
-            _updateCallCount++;
+            var panel = panels[i];
+            if (panel == null) continue;
 
-            // Log every 60 frames (~1 second) to check if Update is being called
-            if (_updateCallCount % 60 == 1)
+            var tex = _viewModel.GetTexture(i);
+            if (tex != null && panel.contentTexture != tex)
             {
-                var phaseForLog = _viewModel?.Phase?.Value.ToString() ?? "N/A";
-                var panelsInfo = _clusterRig?.panels != null ? $"Count={_clusterRig.panels.Count}" : "NULL";
-                Debug.Log($"[RTTRemoteMenuController#{_instanceId}] Update #{_updateCallCount}, " +
-                    $"vm={(_viewModel != null ? "OK" : "NULL")}, " +
-                    $"rig={(_clusterRig != null ? "OK" : "NULL")}, " +
-                    $"phase={phaseForLog}, streaming={_isStreamingActive}, " +
-                    $"panels={panelsInfo}, " +
-                    $"goActive={gameObject.activeInHierarchy}");
-            }
+                panel.contentTexture = tex;
+                panel.Apply();
 
-            if (_viewModel == null || _clusterRig == null) return;
-
-            // Poll when ICE is connected or later, not just when streaming flag is set
-            // This ensures textures are applied as soon as they're available from WebRTC
-            var phase = _viewModel.Phase.Value;
-            bool shouldPoll = _isStreamingActive ||
-                phase == ConnectionPhase.ICENegotiating ||
-                phase == ConnectionPhase.ReadyToStream ||
-                phase == ConnectionPhase.StartingStream ||
-                phase == ConnectionPhase.Streaming;
-
-            if (!shouldPoll) return;
-
-            // Poll textures from WebRTC
-            _viewModel.PollTextures();
-
-            // Apply textures to panels
-            var panels = _clusterRig.panels;
-            if (panels == null || panels.Count == 0)
-            {
-                Debug.LogWarning($"[RTTRemoteMenuController#{_instanceId}] Panels null or empty! panels={(panels == null ? "NULL" : $"Count={panels.Count}")}");
-                return;
-            }
-
-            // Debug log every 60 frames
-            _debugLogCounter++;
-            bool shouldLog = _debugLogCounter % 60 == 1;
-
-            for (int i = 0; i < panels.Count; i++)
-            {
-                var panel = panels[i];
-                if (panel == null) continue;
-
-                var tex = _viewModel.GetTexture(i);
-
-                // Debug: Log texture status periodically
-                if (shouldLog && i == 0)
+                // Hide progress overlay when first texture arrives
+                if (i < _progressOverlays.Count && _progressOverlays[i] != null && _progressOverlays[i].gameObject.activeSelf)
                 {
-                    Debug.Log($"[RTTRemoteMenuController#{_instanceId}] TexturePoll: phase={phase}, " +
-                        $"tex={tex?.GetType().Name ?? "null"}, " +
-                        $"size={(tex != null ? $"{tex.width}x{tex.height}" : "N/A")}, " +
-                        $"currentTex={(panel.contentTexture != null ? "set" : "null")}");
-                }
-
-                if (tex != null && panel.contentTexture != tex)
-                {
-                    panel.contentTexture = tex;
-                    panel.Apply();
-
-                    // Hide progress overlay when first texture arrives
-                    if (i < _progressOverlays.Count && _progressOverlays[i] != null && _progressOverlays[i].gameObject.activeSelf)
-                    {
-                        _progressOverlays[i].Hide();
-                        Debug.Log($"[RTTRemoteMenuController#{_instanceId}] Panel {i} received first texture, hiding overlay");
-                    }
+                    _progressOverlays[i].Hide();
                 }
             }
-        }
-        catch (System.Exception ex)
-        {
-            Debug.LogError($"[RTTRemoteMenuController#{_instanceId}] Update EXCEPTION: {ex.Message}\n{ex.StackTrace}");
         }
     }
 
@@ -360,23 +277,17 @@ public class RTTRemoteMenuController : MonoBehaviour
     #region Private Methods
     private void HandleBackClicked()
     {
-        Debug.Log("[RTTRemoteMenuController] Back clicked");
         OnBackClicked?.Invoke();
     }
 
     private void HandleConnectClicked()
     {
-        Debug.Log("[RTTRemoteMenuController] Connect clicked");
-
-        // Start streaming with current settings
         StartStreaming();
-
         OnConnectClicked?.Invoke();
     }
 
     private void HandleStartClicked()
     {
-        Debug.Log("[RTTRemoteMenuController] Start clicked");
         OnStartClicked?.Invoke();
     }
 
@@ -385,31 +296,23 @@ public class RTTRemoteMenuController : MonoBehaviour
     /// </summary>
     private void HandleStartWithProgress(StreamingConfig config)
     {
-        Debug.Log($"[RTTRemoteMenuController#{_instanceId}] StartWithProgress: {config.monitors} monitors");
-
         // Get or create ClusterRig via RemoteConnectionPipeline
         EnsureConnectionPipeline();
-        Debug.Log($"[RTTRemoteMenuController#{_instanceId}] connectionPipeline={(connectionPipeline != null ? "OK" : "NULL")}");
 
         _clusterRig = connectionPipeline.GetOrCreateClusterRig();
-        Debug.Log($"[RTTRemoteMenuController#{_instanceId}] _clusterRig={((_clusterRig != null) ? $"OK ({_clusterRig.name})" : "NULL")}");
-        Debug.Log($"[RTTRemoteMenuController#{_instanceId}] _viewModel={((_viewModel != null) ? "OK" : "NULL")}");
-
         if (_clusterRig == null)
         {
-            Debug.LogError($"[RTTRemoteMenuController#{_instanceId}] Failed to create ClusterRig!");
+            Debug.LogError("[RTTRemoteMenuController] Failed to create ClusterRig!");
             return;
         }
 
         // Build cluster with the specified monitor count
         _clusterRig.BuildWithPanelCount(config.monitors);
-        Debug.Log($"[RTTRemoteMenuController#{_instanceId}] After BuildWithPanelCount: panels.Count={_clusterRig.panels?.Count ?? -1}");
 
         // Start WebRTC update loop if not already running
         if (_webrtcUpdateCoroutine == null)
         {
             _webrtcUpdateCoroutine = StartCoroutine(WebRTC.Update());
-            Debug.Log($"[RTTRemoteMenuController#{_instanceId}] Started WebRTC.Update() coroutine");
         }
 
         // Configure ClusterAutoBinder for V2 protocol
@@ -439,8 +342,6 @@ public class RTTRemoteMenuController : MonoBehaviour
             overlay.Initialize(panel);
             _progressOverlays.Add(overlay);
         }
-
-        Debug.Log($"[RTTRemoteMenuController] Created {_progressOverlays.Count} progress overlays");
     }
 
     /// <summary>
@@ -448,7 +349,6 @@ public class RTTRemoteMenuController : MonoBehaviour
     /// </summary>
     private void HandleServerSetupProgress(int progress)
     {
-        // Update all overlays with shared server progress
         foreach (var overlay in _progressOverlays)
         {
             if (overlay != null)
@@ -477,8 +377,6 @@ public class RTTRemoteMenuController : MonoBehaviour
     /// </summary>
     private void HandleAllMonitorsReady()
     {
-        Debug.Log("[RTTRemoteMenuController] All monitors ready, showing Connecting...");
-
         foreach (var overlay in _progressOverlays)
         {
             if (overlay != null)
@@ -497,9 +395,6 @@ public class RTTRemoteMenuController : MonoBehaviour
 
         if (isStreaming)
         {
-            Debug.Log($"[RTTRemoteMenuController#{_instanceId}] Streaming started, _clusterRig={(_clusterRig != null ? "OK" : "NULL")}, " +
-                $"panels={(_clusterRig?.panels != null ? $"Count={_clusterRig.panels.Count}" : "NULL")}");
-
             foreach (var overlay in _progressOverlays)
             {
                 if (overlay != null)
@@ -507,10 +402,6 @@ public class RTTRemoteMenuController : MonoBehaviour
                     overlay.Hide();
                 }
             }
-        }
-        else
-        {
-            Debug.Log($"[RTTRemoteMenuController#{_instanceId}] Streaming stopped");
         }
     }
 
