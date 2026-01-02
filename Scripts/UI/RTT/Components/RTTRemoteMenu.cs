@@ -31,7 +31,9 @@ public class RTTRemoteMenu : MonoBehaviour
     public event Action OnConnectClicked;
     public event Action OnQRClicked;
     public event Action OnSetupClicked;
+#pragma warning disable CS0067 // Event is never used - exposed for external subscribers
     public event Action OnStartClicked;
+#pragma warning restore CS0067
     public event Action<ConnectionPhase> OnConnectionStateChanged;
     #endregion
 

@@ -1545,7 +1545,6 @@ namespace VRWorkspace.Streaming
 
         private void CheckIceComplete()
         {
-            bool allReady = false;
             bool shouldSendProceed = false;
 
             lock (_lock)
@@ -1559,7 +1558,6 @@ namespace VRWorkspace.Streaming
                 // This prevents proceeding too early when creating PCs sequentially
                 if (created >= expected && created > 0 && _peerConnections.All(p => p.AnswerSet))
                 {
-                    allReady = true;
                     if (_stateMachine.CurrentPhase == ConnectionPhase.ICENegotiating)
                     {
                         Debug.Log($"[PhaseProtocol] All {expected} PeerConnections ready, transitioning to ReadyToStream");

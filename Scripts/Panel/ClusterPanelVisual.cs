@@ -64,8 +64,10 @@ public class ClusterPanelVisual : MonoBehaviour
     [SerializeField] private float layer4Alpha = 0.3f;
 
     [Header("Shimmer")]
+#pragma warning disable CS0414 // Fields are assigned but never used - exposed for future shimmer implementation
     [SerializeField] private float shimmerSpeed = 0.4f;
     [SerializeField] private float shimmerIntensity = 0.2f;
+#pragma warning restore CS0414
 
     [Header("Layer Offsets")]
     [Tooltip("Z offset for background behind the board")]

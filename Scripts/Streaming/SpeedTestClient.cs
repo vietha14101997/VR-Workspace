@@ -351,8 +351,11 @@ namespace VRWorkspace.Streaming
 
         /// <summary>
         /// Handle speedtest_start message from server (legacy).
+        /// Returns Task for API compatibility but runs synchronously.
         /// </summary>
+#pragma warning disable CS1998 // Async method lacks 'await' - intentional for API compatibility
         public async Task HandleSpeedTestStartAsync(string direction, int chunkSize, int durationMs)
+#pragma warning restore CS1998
         {
             Debug.Log($"[SpeedTest] Legacy speedtest_start: {direction} (chunk={chunkSize}, duration={durationMs}ms)");
 

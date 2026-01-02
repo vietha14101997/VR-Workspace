@@ -61,7 +61,9 @@ public class RTTManager : MonoBehaviour
     #region Panel Management Config
     [Header("Panel Management")]
     [Tooltip("Maximum number of panels that can render in a single frame")]
+#pragma warning disable CS0414 // Field is assigned but never used - exposed for Inspector configuration
     [SerializeField] private int maxConcurrentRenders = 3;
+#pragma warning restore CS0414
 
     [Tooltip("Enable performance logging to console")]
     [SerializeField] private bool enablePerformanceLogging = false;
