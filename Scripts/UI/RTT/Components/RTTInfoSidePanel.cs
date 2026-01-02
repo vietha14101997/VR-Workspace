@@ -77,13 +77,31 @@ public class RTTInfoSidePanel : MonoBehaviour
     /// </summary>
     public void BuildUI(RectTransform container)
     {
+        Debug.Log($"[RTTInfoSidePanel] BuildUI started for {panelType}, container={container?.name ?? "NULL"}");
+
+        if (container == null)
+        {
+            Debug.LogError($"[RTTInfoSidePanel] BuildUI failed: container is NULL for {panelType}!");
+            return;
+        }
+
         _container = container;
 
         // Setup RectTransform
         RectTransform rt = GetComponent<RectTransform>();
         if (rt == null) rt = gameObject.AddComponent<RectTransform>();
 
-        rt.SetParent(container, false);
+        // Check if already parented correctly (parent might be set before BuildUI)
+        if (transform.parent != container)
+        {
+            Debug.Log($"[RTTInfoSidePanel] Setting parent from {transform.parent?.name ?? "NULL"} to {container.name}");
+            rt.SetParent(container, false);
+        }
+        else
+        {
+            Debug.Log($"[RTTInfoSidePanel] Already parented to {container.name}");
+        }
+
         rt.anchorMin = Vector2.zero;
         rt.anchorMax = Vector2.one;
         rt.offsetMin = Vector2.zero;
@@ -103,7 +121,7 @@ public class RTTInfoSidePanel : MonoBehaviour
         layout.padding = new RectOffset(20, 20, 40, 40);
 
         _isBuilt = true;
-        Debug.Log($"[RTTInfoSidePanel] Built for type: {panelType}");
+        Debug.Log($"[RTTInfoSidePanel] Built for type: {panelType}, _isBuilt={_isBuilt}, parent={transform.parent?.name}");
     }
 
     /// <summary>
@@ -111,7 +129,13 @@ public class RTTInfoSidePanel : MonoBehaviour
     /// </summary>
     public void ShowLoadingState()
     {
-        if (!_isBuilt) return;
+        Debug.Log($"[RTTInfoSidePanel] ShowLoadingState called for {panelType}, _isBuilt={_isBuilt}");
+
+        if (!_isBuilt)
+        {
+            Debug.LogWarning($"[RTTInfoSidePanel] ShowLoadingState skipped - not built yet for {panelType}");
+            return;
+        }
 
         ClearContent();
 
@@ -184,7 +208,19 @@ public class RTTInfoSidePanel : MonoBehaviour
     /// </summary>
     public void ShowSpeedTestLoadingState()
     {
-        if (panelType != PanelType.NetworkInfo) return;
+        Debug.Log($"[RTTInfoSidePanel] ShowSpeedTestLoadingState called for {panelType}, _isBuilt={_isBuilt}");
+
+        if (panelType != PanelType.NetworkInfo)
+        {
+            Debug.LogWarning($"[RTTInfoSidePanel] ShowSpeedTestLoadingState called on wrong panel type: {panelType}");
+            return;
+        }
+
+        if (!_isBuilt)
+        {
+            Debug.LogWarning($"[RTTInfoSidePanel] ShowSpeedTestLoadingState skipped - not built yet");
+            return;
+        }
 
         ClearContent();
         _valueTexts.Clear();

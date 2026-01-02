@@ -1,5 +1,10 @@
 using UnityEngine;
 using TMPro;
+using System.Collections.Generic;
+using Unity.WebRTC;
+using VRWorkspace.Core;
+using VRWorkspace.ViewModels;
+using VRWorkspace.Streaming;
 
 /// <summary>
 /// Controls the remote menu lifecycle including creation, event handling,
@@ -15,6 +20,16 @@ public class RTTRemoteMenuController : MonoBehaviour
     #region Private Fields
     private RTTRemoteMenu _remoteMenuInstance;
     private GameObject _menuObject;
+
+    // Progress flow fields
+    private ConnectionViewModel _viewModel;
+    private WorldPanelClusterRig _clusterRig;
+    private List<PanelProgressOverlay> _progressOverlays = new List<PanelProgressOverlay>();
+    private bool _isStreamingActive = false;
+    private Coroutine _webrtcUpdateCoroutine;
+
+    // Cursor tracking
+    private int _activeCursorPanelIndex = -1;
     #endregion
 
     #region Events
@@ -66,9 +81,25 @@ public class RTTRemoteMenuController : MonoBehaviour
         _remoteMenuInstance.OnStartClicked += HandleStartClicked;
 
         // Build the remote menu UI
+        // NOTE: BuildUI() calls BindToViewModel() which registers ConnectionViewModel with ServiceLocator
         _remoteMenuInstance.BuildUI(_menuObject.transform, containerW, containerH);
 
-        Debug.Log("[RTTRemoteMenuController] Remote Menu created");
+        // Get ViewModel AFTER BuildUI() - it's now guaranteed to be registered
+        _viewModel = ServiceLocator.Get<ConnectionViewModel>();
+        if (_viewModel != null)
+        {
+            _viewModel.OnStartWithProgress += HandleStartWithProgress;
+            _viewModel.OnAllMonitorsReady += HandleAllMonitorsReady;
+            _viewModel.ServerSetupProgress.OnChanged += HandleServerSetupProgress;
+            _viewModel.MonitorIceProgress.OnChanged += HandleMonitorIceProgress;
+            _viewModel.IsStreaming.OnChanged += HandleStreamingStateChanged;
+            _viewModel.OnCursorPositionChanged += HandleCursorPosition;
+        }
+        else
+        {
+            Debug.LogError("[RTTRemoteMenuController] ConnectionViewModel is NULL after BuildUI!");
+        }
+
         return _menuObject;
     }
 
@@ -86,12 +117,12 @@ public class RTTRemoteMenuController : MonoBehaviour
         if (connectionPipeline == null)
         {
             connectionPipeline = gameObject.AddComponent<RemoteConnectionPipeline>();
-            Debug.Log("[RTTRemoteMenuController] Created RemoteConnectionPipeline");
         }
     }
 
     /// <summary>
     /// Cleanup resources and unsubscribe from events.
+    /// Fully disconnects and resets connection state so reopening starts fresh.
     /// </summary>
     public void Cleanup()
     {
@@ -103,7 +134,95 @@ public class RTTRemoteMenuController : MonoBehaviour
             _remoteMenuInstance = null;
         }
 
+        // Stop streaming and disconnect from server
+        if (connectionPipeline != null)
+        {
+            connectionPipeline.StopStreaming();
+        }
+
+        // Reset ViewModel state synchronously FIRST (so next menu opens clean)
+        // Then fire-and-forget the actual server disconnect (without state reset)
+        if (_viewModel != null)
+        {
+            _viewModel.ResetState();
+            _ = _viewModel.StopClientAsync();
+
+            // Unsubscribe from ViewModel events
+            _viewModel.OnStartWithProgress -= HandleStartWithProgress;
+            _viewModel.OnAllMonitorsReady -= HandleAllMonitorsReady;
+            _viewModel.ServerSetupProgress.OnChanged -= HandleServerSetupProgress;
+            _viewModel.MonitorIceProgress.OnChanged -= HandleMonitorIceProgress;
+            _viewModel.IsStreaming.OnChanged -= HandleStreamingStateChanged;
+            _viewModel.OnCursorPositionChanged -= HandleCursorPosition;
+        }
+
+        // Hide cursors before cleanup
+        HideAllCursors();
+        _activeCursorPanelIndex = -1;
+
+        // Cleanup progress overlays
+        CleanupProgressOverlays();
+        _isStreamingActive = false;
+
+        // Stop WebRTC update coroutine
+        if (_webrtcUpdateCoroutine != null)
+        {
+            StopCoroutine(_webrtcUpdateCoroutine);
+            _webrtcUpdateCoroutine = null;
+        }
+
+        // Destroy ClusterRig
+        if (_clusterRig != null)
+        {
+            Destroy(_clusterRig.gameObject);
+            _clusterRig = null;
+        }
+
         _menuObject = null;
+    }
+
+    /// <summary>
+    /// Poll textures from ViewModel and apply to panels when streaming.
+    /// </summary>
+    void Update()
+    {
+        if (_viewModel == null || _clusterRig == null) return;
+
+        // Poll when ICE is connected or later
+        var phase = _viewModel.Phase.Value;
+        bool shouldPoll = _isStreamingActive ||
+            phase == ConnectionPhase.ICENegotiating ||
+            phase == ConnectionPhase.ReadyToStream ||
+            phase == ConnectionPhase.StartingStream ||
+            phase == ConnectionPhase.Streaming;
+
+        if (!shouldPoll) return;
+
+        // Poll textures from WebRTC
+        _viewModel.PollTextures();
+
+        // Apply textures to panels
+        var panels = _clusterRig.panels;
+        if (panels == null || panels.Count == 0) return;
+
+        for (int i = 0; i < panels.Count; i++)
+        {
+            var panel = panels[i];
+            if (panel == null) continue;
+
+            var tex = _viewModel.GetTexture(i);
+            if (tex != null && panel.contentTexture != tex)
+            {
+                panel.contentTexture = tex;
+                panel.Apply();
+
+                // Hide progress overlay when first texture arrives
+                if (i < _progressOverlays.Count && _progressOverlays[i] != null && _progressOverlays[i].gameObject.activeSelf)
+                {
+                    _progressOverlays[i].Hide();
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -158,24 +277,196 @@ public class RTTRemoteMenuController : MonoBehaviour
     #region Private Methods
     private void HandleBackClicked()
     {
-        Debug.Log("[RTTRemoteMenuController] Back clicked");
         OnBackClicked?.Invoke();
     }
 
     private void HandleConnectClicked()
     {
-        Debug.Log("[RTTRemoteMenuController] Connect clicked");
-
-        // Start streaming with current settings
         StartStreaming();
-
         OnConnectClicked?.Invoke();
     }
 
     private void HandleStartClicked()
     {
-        Debug.Log("[RTTRemoteMenuController] Start clicked");
         OnStartClicked?.Invoke();
+    }
+
+    /// <summary>
+    /// Handle new flow: Create ClusterRig and attach progress overlays.
+    /// </summary>
+    private void HandleStartWithProgress(StreamingConfig config)
+    {
+        // Get or create ClusterRig via RemoteConnectionPipeline
+        EnsureConnectionPipeline();
+
+        _clusterRig = connectionPipeline.GetOrCreateClusterRig();
+        if (_clusterRig == null)
+        {
+            Debug.LogError("[RTTRemoteMenuController] Failed to create ClusterRig!");
+            return;
+        }
+
+        // Build cluster with the specified monitor count
+        _clusterRig.BuildWithPanelCount(config.monitors);
+
+        // Start WebRTC update loop if not already running
+        if (_webrtcUpdateCoroutine == null)
+        {
+            _webrtcUpdateCoroutine = StartCoroutine(WebRTC.Update());
+        }
+
+        // Configure ClusterAutoBinder for V2 protocol
+        var binder = _clusterRig.GetComponent<ClusterAutoBinder>();
+        if (binder == null)
+        {
+            binder = _clusterRig.gameObject.AddComponent<ClusterAutoBinder>();
+        }
+
+        // Configure binder with settings from menu
+        var settings = GetConnectionSettings();
+        binder.autoStart = false;
+        binder.useV2Protocol = true;
+        binder.serverBase = $"http://{settings.host}:{settings.port}";
+        binder.rig = _clusterRig;
+        binder.monitorCount = config.monitors;
+        binder.resolutionWidth = config.resolutionWidth;
+        binder.resolutionHeight = config.resolutionHeight;
+        binder.bitrateKbps = config.bitrateKbps;
+        binder.fps = config.fps;
+
+        // Attach progress overlays to each panel
+        CleanupProgressOverlays();
+        foreach (var panel in _clusterRig.panels)
+        {
+            var overlay = panel.gameObject.AddComponent<PanelProgressOverlay>();
+            overlay.Initialize(panel);
+            _progressOverlays.Add(overlay);
+        }
+    }
+
+    /// <summary>
+    /// Handle server setup progress updates.
+    /// </summary>
+    private void HandleServerSetupProgress(int progress)
+    {
+        foreach (var overlay in _progressOverlays)
+        {
+            if (overlay != null)
+            {
+                overlay.SetServerProgress(progress);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Handle per-monitor ICE progress updates.
+    /// </summary>
+    private void HandleMonitorIceProgress(Dictionary<int, int> progressDict)
+    {
+        for (int i = 0; i < _progressOverlays.Count; i++)
+        {
+            if (_progressOverlays[i] != null && progressDict.TryGetValue(i, out int progress))
+            {
+                _progressOverlays[i].SetIceProgress(progress);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Handle all monitors ready - show "Connecting..." state.
+    /// </summary>
+    private void HandleAllMonitorsReady()
+    {
+        foreach (var overlay in _progressOverlays)
+        {
+            if (overlay != null)
+            {
+                overlay.ShowConnecting();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Handle streaming state change - hide overlays when streaming starts.
+    /// </summary>
+    private void HandleStreamingStateChanged(bool isStreaming)
+    {
+        _isStreamingActive = isStreaming;
+
+        if (isStreaming)
+        {
+            foreach (var overlay in _progressOverlays)
+            {
+                if (overlay != null)
+                {
+                    overlay.Hide();
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Cleanup all progress overlays.
+    /// </summary>
+    private void CleanupProgressOverlays()
+    {
+        foreach (var overlay in _progressOverlays)
+        {
+            if (overlay != null)
+            {
+                Destroy(overlay);
+            }
+        }
+        _progressOverlays.Clear();
+    }
+
+    /// <summary>
+    /// Handle cursor position updates from server.
+    /// </summary>
+    private void HandleCursorPosition(int monitorIndex, float u, float v, bool visible)
+    {
+        if (_clusterRig == null || _clusterRig.panels == null) return;
+
+        if (!visible || monitorIndex < 0 || monitorIndex >= _clusterRig.panels.Count)
+        {
+            HideAllCursors();
+            _activeCursorPanelIndex = -1;
+            return;
+        }
+
+        // Hide cursor on previous panel if switching monitors
+        if (_activeCursorPanelIndex != monitorIndex && _activeCursorPanelIndex >= 0 && _activeCursorPanelIndex < _clusterRig.panels.Count)
+        {
+            var oldPanel = _clusterRig.panels[_activeCursorPanelIndex];
+            if (oldPanel?.cursor != null)
+                oldPanel.cursor.SetVisible(false);
+        }
+
+        var panel = _clusterRig.panels[monitorIndex];
+        if (panel == null) return;
+
+        panel.EnsureCursor();
+        if (panel.cursor == null) return;
+
+        // Unity V is inverted (0 at bottom, 1 at top)
+        float unityV = 1f - v;
+        panel.cursor.SetUV(u, unityV, silent: true);
+        panel.cursor.SetVisible(true);
+
+        _activeCursorPanelIndex = monitorIndex;
+    }
+
+    /// <summary>
+    /// Hide cursors on all panels.
+    /// </summary>
+    private void HideAllCursors()
+    {
+        if (_clusterRig == null || _clusterRig.panels == null) return;
+        foreach (var panel in _clusterRig.panels)
+        {
+            if (panel?.cursor != null)
+                panel.cursor.SetVisible(false);
+        }
     }
     #endregion
 }

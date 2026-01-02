@@ -31,7 +31,9 @@ public class RTTRemoteMenu : MonoBehaviour
     public event Action OnConnectClicked;
     public event Action OnQRClicked;
     public event Action OnSetupClicked;
+#pragma warning disable CS0067 // Event is never used - exposed for external subscribers
     public event Action OnStartClicked;
+#pragma warning restore CS0067
     public event Action<ConnectionPhase> OnConnectionStateChanged;
     #endregion
 
@@ -372,6 +374,29 @@ public class RTTRemoteMenu : MonoBehaviour
         {
             case ConnectionPhase.Disconnected:
             case ConnectionPhase.Error:
+                // Validate host and port first
+                string host = Host;
+                string port = Port;
+
+                if (string.IsNullOrEmpty(host) || string.IsNullOrEmpty(port))
+                {
+                    Debug.LogWarning("[RTTRemoteMenu] Host or port is empty");
+                    return;
+                }
+
+                if (!int.TryParse(port, out int portNum) || portNum <= 0 || portNum > 65535)
+                {
+                    Debug.LogWarning($"[RTTRemoteMenu] Invalid port: {port}");
+                    return;
+                }
+
+                // Validate host format (IP address or hostname)
+                if (!IsValidHost(host))
+                {
+                    Debug.LogWarning($"[RTTRemoteMenu] Invalid host format: {host}");
+                    return;
+                }
+
                 // Step 1: Connect
                 Debug.Log("[RTTRemoteMenu] Connecting...");
                 UpdateButtonText("CONNECTING...");
@@ -381,42 +406,34 @@ public class RTTRemoteMenu : MonoBehaviour
                 VRInputFieldFactory.SetInteractable(_portInput, false);
                 VRButtonFactory.SetInteractable(_qrButton, false);
 
-                // Build connection URL from form
-                string host = Host;
-                string port = Port;
-                if (!string.IsNullOrEmpty(host) && !string.IsNullOrEmpty(port))
-                {
-                    if (int.TryParse(port, out int portNum))
-                    {
-                        await _viewModel.ConnectAsync(host, portNum);
-                    }
-                }
+                await _viewModel.ConnectAsync(host, portNum);
                 break;
 
             case ConnectionPhase.ConfiguringSettings:
-                // Step 2: Accept config and proceed to Phase 2
-                Debug.Log("[RTTRemoteMenu] Setting up remote...");
-                UpdateButtonText("SETTING UP...");
+                // NEW FLOW: Start button clicked - create ClusterRig and show progress
+                Debug.Log("[RTTRemoteMenu] Starting with progress UI...");
+                UpdateButtonText("STARTING...");
 
                 // Save user selections
                 SaveCurrentSelections();
 
-                // Build config from form dropdowns and send to server
+                // Hide menu immediately
+                HideMenu();
+
+                // Build config from form dropdowns and start new flow
                 var config = BuildConfigFromForm();
                 if (config != null)
                 {
                     OnSetupClicked?.Invoke();
-                    await _viewModel.AcceptConfigAsync(config);
+                    // Use new flow that creates ClusterRig and shows progress
+                    await _viewModel.StartWithProgressAsync(config);
                 }
                 break;
 
             case ConnectionPhase.ReadyToStream:
-                // Step 3: Start streaming
-                Debug.Log("[RTTRemoteMenu] Starting remote...");
-                UpdateButtonText("STARTING...");
-                OnStartClicked?.Invoke();
-
-                await _viewModel.StartStreamingAsync();
+                // This case is no longer used - auto-start handles streaming
+                // Kept for backward compatibility
+                Debug.Log("[RTTRemoteMenu] ReadyToStream - auto-start handles this now");
                 break;
 
             case ConnectionPhase.Streaming:
@@ -503,6 +520,20 @@ public class RTTRemoteMenu : MonoBehaviour
     }
 
     /// <summary>
+    /// Hide the menu frame and side panels.
+    /// Called when START is clicked in new flow.
+    /// </summary>
+    public void HideMenu()
+    {
+        if (_menuFrame != null)
+        {
+            _menuFrame.gameObject.SetActive(false);
+        }
+        HideSidePanels();
+        Debug.Log("[RTTRemoteMenu] Menu hidden");
+    }
+
+    /// <summary>
     /// Handle phase change from ConnectionViewModel.
     /// All calls are guaranteed to be on main thread via ObservableProperty.
     /// </summary>
@@ -521,11 +552,15 @@ public class RTTRemoteMenu : MonoBehaviour
                 VRInputFieldFactory.SetInteractable(_portInput, true);
                 VRButtonFactory.SetInteractable(_qrButton, true);
                 HideSidePanels();
+                // Clear cached data to prevent stale data on next connection
+                _cachedHardwareInfo = null;
+                _cachedNetworkInfo = null;
+                _cachedSuggestedConfig = null;
                 break;
 
             case ConnectionPhase.Connecting:
                 UpdateButtonText("CONNECTING...");
-                ShowSidePanels();
+                // Side panels will show when hardware_info is received via HandleHardwareInfoReceived
                 break;
 
             case ConnectionPhase.AwaitingHardwareInfo:
@@ -536,7 +571,7 @@ public class RTTRemoteMenu : MonoBehaviour
                 break;
 
             case ConnectionPhase.ConfiguringSettings:
-                UpdateButtonText("SETUP REMOTE");
+                UpdateButtonText("START");
                 break;
 
             case ConnectionPhase.SendingDisplayConfig:
@@ -566,13 +601,51 @@ public class RTTRemoteMenu : MonoBehaviour
                 break;
 
             case ConnectionPhase.Error:
-                UpdateButtonText("RETRY");
+                // Treat Error same as Disconnected - show CONNECT, not RETRY
+                UpdateButtonText("CONNECT");
+                InitializeDropdownsDisabled();
                 VRInputFieldFactory.SetInteractable(_hostInput, true);
                 VRInputFieldFactory.SetInteractable(_portInput, true);
                 VRButtonFactory.SetInteractable(_qrButton, true);
                 HideSidePanels();
+                // Clear cached data on error
+                _cachedHardwareInfo = null;
+                _cachedNetworkInfo = null;
+                _cachedSuggestedConfig = null;
                 break;
         }
+    }
+
+    /// <summary>
+    /// Validate host format (IP address or hostname).
+    /// </summary>
+    private bool IsValidHost(string host)
+    {
+        if (string.IsNullOrWhiteSpace(host)) return false;
+
+        // Check for valid IP address
+        if (System.Net.IPAddress.TryParse(host, out _))
+        {
+            return true;
+        }
+
+        // Check for valid hostname (alphanumeric, dots, hyphens only)
+        // Must not start or end with dot/hyphen
+        if (host.StartsWith(".") || host.StartsWith("-") ||
+            host.EndsWith(".") || host.EndsWith("-"))
+        {
+            return false;
+        }
+
+        foreach (char c in host)
+        {
+            if (!char.IsLetterOrDigit(c) && c != '.' && c != '-')
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -956,7 +1029,7 @@ public class RTTRemoteMenu : MonoBehaviour
 
     /// <summary>
     /// Save current dropdown selections and host/port to preferences.
-    /// Called when SETUP REMOTE is clicked.
+    /// Called when START is clicked (previously SETUP REMOTE).
     /// </summary>
     private void SaveCurrentSelections()
     {
@@ -1061,96 +1134,270 @@ public class RTTRemoteMenu : MonoBehaviour
         // Calculate logical width based on aspect ratio (same resolution density as main panel)
         float logicalWidthPixels = (sideWidth / _menuFrame.PanelWidth) * _menuFrame.LogicalWidthValue;
 
-        // Create RTTMenuFrame for the side panel
-        frameRef = RTTMenuFrame.Create(_menuFrame.transform, sideWidth, sideHeight, logicalWidthPixels, false);
-        frameRef.gameObject.name = name;
+        // Create RTTMenuFrame for the side panel with unique name
+        frameRef = RTTMenuFrame.Create(_menuFrame.transform, sideWidth, sideHeight, logicalWidthPixels, false, name);
         frameRef.transform.position = panelPos;
         frameRef.transform.rotation = panelRot;
         frameRef.transform.localScale = Vector3.one;
+
+        // IMMEDIATELY set invisible BEFORE Start() runs
+        // This sets _isVisible = false, so when SetupDisplayQuad() creates the quad, it will be hidden
+        frameRef.SetVisible(false);
 
         // Configure frame appearance (smaller margins for side panels)
         frameRef.SetContentMargins(40f, 40f, 30f, 30f);
         frameRef.SetFloatingDataEnabled(true, 10); // Fewer particles for smaller panel
 
-        // Start hidden
-        frameRef.gameObject.SetActive(false);
+        // Frame will stay hidden until ShowSidePanels() is called on successful connect
 
         // Wait for frame to initialize, then create content
+        _sidePanelCoroutinesStarted = true;
         StartCoroutine(CreateSidePanelContent(frameRef, type));
     }
 
     /// <summary>
     /// Coroutine to create side panel content after frame is initialized.
+    /// IMPORTANT: Content must be created WHILE frame is active, then frame can be hidden.
     /// </summary>
     private IEnumerator CreateSidePanelContent(RTTMenuFrame frame, RTTInfoSidePanel.PanelType type)
     {
-        // Wait for frame's ContentContainer to be ready
-        while (frame.ContentContainer == null)
+        Debug.Log($"[RTTRemoteMenu] CreateSidePanelContent started for {type}");
+
+        // Check if frame reference is valid
+        if (frame == null)
         {
-            yield return null;
+            Debug.LogError($"[RTTRemoteMenu] Frame reference is NULL for {type} at coroutine start!");
+            yield break;
         }
-        yield return null; // Extra frame for layout
 
-        // Create RTTInfoSidePanel as content
-        GameObject contentObj = new GameObject($"InfoPanel_{type}");
-        var panel = contentObj.AddComponent<RTTInfoSidePanel>();
-        panel.ThemeColor = themeColor;
-        panel.CustomFont = customFont;
+        // Wait one frame to allow Start() to be called normally
+        yield return null;
 
-        // Build panel content inside frame's container
-        panel.BuildUI(frame.ContentContainer, type, themeColor, customFont);
-
-        // Subscribe to content changes to trigger RTT re-render
-        panel.OnContentChanged += () => frame.MarkDirty();
-
-        // Assign to the appropriate field based on type and show loading state immediately
-        if (type == RTTInfoSidePanel.PanelType.HardwareInfo)
+        // If frame is still not initialized after first frame, force initialize it
+        // This handles cases where the frame's GameObject was disabled before Start() could run
+        if (!frame.IsInitialized)
         {
-            _hardwareInfoPanel = panel;
-            // Show loading state immediately so user sees placeholder text
-            panel.ShowLoadingState();
+            Debug.Log($"[RTTRemoteMenu] Frame not initialized for {type}, calling EnsureInitialized()");
+            frame.EnsureInitialized();
+        }
+
+        // Wait for ContentContainer to be valid (should be immediate after Initialize)
+        int maxWait = 60; // ~1 second timeout
+        int waitCount = 0;
+
+        while (frame.ContentContainer == null && waitCount < maxWait)
+        {
+            if (waitCount % 30 == 0)
+            {
+                Debug.Log($"[RTTRemoteMenu] Waiting for {type} ContentContainer: IsInit={frame.IsInitialized}, wait={waitCount}");
+            }
+            yield return null;
+            waitCount++;
+
+            // Check if frame was destroyed during wait
+            if (frame == null)
+            {
+                Debug.LogError($"[RTTRemoteMenu] Frame was DESTROYED while waiting for {type} at frame {waitCount}!");
+                yield break;
+            }
+        }
+
+        // Verify ContentContainer is valid
+        if (frame.ContentContainer == null)
+        {
+            Debug.LogError($"[RTTRemoteMenu] ContentContainer is NULL for {type} after {waitCount} frames! IsInitialized={frame.IsInitialized}");
+            yield break;
+        }
+
+        Debug.Log($"[RTTRemoteMenu] Frame initialized for {type} after {waitCount} frames, ContentContainer valid");
+
+        // Frame is already hidden via SetVisible(false) in PlaceSidePanelFlat
+        // Wait extra frames for layout to settle
+        yield return null;
+        yield return null;
+
+        // Double-check ContentContainer is still valid after yield
+        if (frame.ContentContainer == null)
+        {
+            Debug.LogError($"[RTTRemoteMenu] ContentContainer became NULL after yield for {type}!");
+            yield break;
+        }
+
+        // Create RTTInfoSidePanel as content WHILE frame is still active
+        // This ensures UI components are properly initialized
+        // IMPORTANT: Create as child of ContentContainer directly to avoid parenting issues
+        GameObject contentObj = null;
+        RTTInfoSidePanel panel = null;
+
+        try
+        {
+            contentObj = new GameObject($"InfoPanel_{type}");
+
+            // Set parent IMMEDIATELY after creation before adding any components
+            contentObj.transform.SetParent(frame.ContentContainer, false);
+
+            Debug.Log($"[RTTRemoteMenu] Created InfoPanel_{type}, parent set to ContentContainer");
+
+            panel = contentObj.AddComponent<RTTInfoSidePanel>();
+            panel.ThemeColor = themeColor;
+            panel.CustomFont = customFont;
+
+            // Build panel content inside frame's container
+            // Note: BuildUI will call SetParent again but that's OK since parent is already correct
+            panel.BuildUI(frame.ContentContainer, type, themeColor, customFont);
+
+            // Verify panel was built correctly
+            if (contentObj.transform.parent != frame.ContentContainer)
+            {
+                Debug.LogError($"[RTTRemoteMenu] InfoPanel_{type} has wrong parent after BuildUI! Expected ContentContainer, got {contentObj.transform.parent?.name ?? "null"}");
+                // Force correct parent
+                contentObj.transform.SetParent(frame.ContentContainer, false);
+            }
+
+            Debug.Log($"[RTTRemoteMenu] InfoPanel_{type} BuildUI completed, parent={contentObj.transform.parent?.name}");
+
+            // Force layout rebuild to ensure content is positioned correctly
+            UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(frame.ContentContainer);
+
+            // Subscribe to content changes to trigger RTT re-render
+            panel.OnContentChanged += () => frame.MarkDirty();
+
+            // Assign to the appropriate field based on type and show loading state immediately
+            if (type == RTTInfoSidePanel.PanelType.HardwareInfo)
+            {
+                _hardwareInfoPanel = panel;
+                // Apply cached data if it arrived before panel was ready
+                if (_cachedHardwareInfo != null)
+                {
+                    panel.SetHardwareInfo(_cachedHardwareInfo);
+                    Debug.Log($"[RTTRemoteMenu] Applied cached hardware info to panel");
+                }
+                else
+                {
+                    // Show loading state immediately so user sees placeholder text
+                    panel.ShowLoadingState();
+                }
+            }
+            else
+            {
+                _networkInfoPanel = panel;
+                // Apply cached data if it arrived before panel was ready
+                if (_cachedNetworkInfo != null)
+                {
+                    panel.SetNetworkInfo(_cachedNetworkInfo);
+                    Debug.Log($"[RTTRemoteMenu] Applied cached network info to panel");
+                }
+                else
+                {
+                    // Show speed test loading state for network panel
+                    panel.ShowSpeedTestLoadingState();
+                }
+            }
+
+            // Force another layout rebuild after content is set
+            UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(frame.ContentContainer);
+
+            // Mark dirty to render the content
+            frame.MarkDirty();
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"[RTTRemoteMenu] Exception creating InfoPanel_{type}: {ex.Message}\n{ex.StackTrace}");
+            if (contentObj != null) Destroy(contentObj);
+            yield break;
+        }
+
+        // Wait multiple frames to ensure rendering completes
+        yield return null; // Let render happen
+        yield return null; // Extra safety frame
+
+        // Only hide if NOT currently connecting/connected
+        // If user already clicked Connect, keep the frame visible
+        bool shouldHide = _currentPhase == ConnectionPhase.Disconnected ||
+                          _currentPhase == ConnectionPhase.Error;
+
+        if (shouldHide)
+        {
+            frame.gameObject.SetActive(false);
+            Debug.Log($"[RTTRemoteMenu] Side panel content created for {type}, frame hidden (not connecting)");
         }
         else
         {
-            _networkInfoPanel = panel;
-            // Show speed test loading state for network panel
-            panel.ShowSpeedTestLoadingState();
+            // Keep visible since we're in connecting state
+            frame.SetVisible(true);
+
+            // Show appropriate content based on cached data
+            if (type == RTTInfoSidePanel.PanelType.HardwareInfo)
+            {
+                if (_cachedHardwareInfo != null)
+                    panel.SetHardwareInfo(_cachedHardwareInfo);
+                else
+                    panel.ShowLoadingState();
+            }
+            else
+            {
+                if (_cachedNetworkInfo != null)
+                    panel.SetNetworkInfo(_cachedNetworkInfo);
+                else
+                    panel.ShowSpeedTestLoadingState();
+            }
+
+            Debug.Log($"[RTTRemoteMenu] Side panel content created for {type}, keeping visible (connecting)");
         }
 
-        Debug.Log($"[RTTRemoteMenu] Side panel content created for {type} with loading state");
+        Debug.Log($"[RTTRemoteMenu] Side panel content created for {type}. ContentContainer children count: {frame.ContentContainer.childCount}");
     }
 
     /// <summary>
-    /// Ensure both panels are visible. Shows loading state for panels that aren't active yet.
+    /// Ensure both panels are visible with cached data or loading state.
     /// Called when any info is received to ensure both panels show together.
     /// </summary>
     private void EnsureBothPanelsVisible()
     {
-        // Show hardware frame with loading state if not already active
+        // Show hardware frame if not already active
         if (_hardwareFrame != null && !_hardwareFrame.gameObject.activeSelf)
         {
-            Debug.Log("[RTTRemoteMenu] EnsureBothPanelsVisible: Showing hardware frame with loading state");
+            Debug.Log("[RTTRemoteMenu] EnsureBothPanelsVisible: Showing hardware frame");
             _hardwareFrame.gameObject.SetActive(true);
+            _hardwareFrame.SetVisible(true); // Re-enable DisplayQuad
             if (_hardwareInfoPanel != null)
             {
-                _hardwareInfoPanel.ShowLoadingState();
+                // Use cached data if available
+                if (_cachedHardwareInfo != null)
+                {
+                    _hardwareInfoPanel.SetHardwareInfo(_cachedHardwareInfo);
+                }
+                else
+                {
+                    _hardwareInfoPanel.ShowLoadingState();
+                }
             }
         }
 
-        // Show network frame with loading state if not already active
+        // Show network frame if not already active
         if (_networkFrame != null && !_networkFrame.gameObject.activeSelf)
         {
-            Debug.Log("[RTTRemoteMenu] EnsureBothPanelsVisible: Showing network frame with loading state");
+            Debug.Log("[RTTRemoteMenu] EnsureBothPanelsVisible: Showing network frame");
             _networkFrame.gameObject.SetActive(true);
+            _networkFrame.SetVisible(true); // Re-enable DisplayQuad
             if (_networkInfoPanel != null)
             {
-                _networkInfoPanel.ShowLoadingState();
+                // Use cached data if available
+                if (_cachedNetworkInfo != null)
+                {
+                    _networkInfoPanel.SetNetworkInfo(_cachedNetworkInfo);
+                }
+                else
+                {
+                    _networkInfoPanel.ShowSpeedTestLoadingState();
+                }
             }
         }
     }
 
     /// <summary>
-    /// Show side panels with loading state (data will be filled when received).
+    /// Show side panels with current data or loading state.
+    /// Uses cached data if available, otherwise shows loading state.
     /// </summary>
     private void ShowSidePanels()
     {
@@ -1158,11 +1405,21 @@ public class RTTRemoteMenu : MonoBehaviour
 
         if (_hardwareFrame != null)
         {
-            Debug.Log("[RTTRemoteMenu] Activating hardware frame with loading state");
+            Debug.Log("[RTTRemoteMenu] Activating hardware frame");
             _hardwareFrame.gameObject.SetActive(true);
+            _hardwareFrame.SetVisible(true); // Re-enable DisplayQuad
             if (_hardwareInfoPanel != null)
             {
-                _hardwareInfoPanel.ShowLoadingState();
+                // Use cached data if available, otherwise show loading state
+                if (_cachedHardwareInfo != null)
+                {
+                    _hardwareInfoPanel.SetHardwareInfo(_cachedHardwareInfo);
+                    Debug.Log("[RTTRemoteMenu] Applied cached hardware info");
+                }
+                else
+                {
+                    _hardwareInfoPanel.ShowLoadingState();
+                }
             }
         }
         else
@@ -1172,11 +1429,21 @@ public class RTTRemoteMenu : MonoBehaviour
 
         if (_networkFrame != null)
         {
-            Debug.Log("[RTTRemoteMenu] Activating network frame with speed test loading state");
+            Debug.Log("[RTTRemoteMenu] Activating network frame");
             _networkFrame.gameObject.SetActive(true);
+            _networkFrame.SetVisible(true); // Re-enable DisplayQuad
             if (_networkInfoPanel != null)
             {
-                _networkInfoPanel.ShowSpeedTestLoadingState();
+                // Use cached data if available, otherwise show loading state
+                if (_cachedNetworkInfo != null)
+                {
+                    _networkInfoPanel.SetNetworkInfo(_cachedNetworkInfo);
+                    Debug.Log("[RTTRemoteMenu] Applied cached network info");
+                }
+                else
+                {
+                    _networkInfoPanel.ShowSpeedTestLoadingState();
+                }
             }
         }
         else
@@ -1184,7 +1451,7 @@ public class RTTRemoteMenu : MonoBehaviour
             Debug.LogError("[RTTRemoteMenu] Network frame is NULL!");
         }
 
-        Debug.Log("[RTTRemoteMenu] Side panels shown with loading state");
+        Debug.Log("[RTTRemoteMenu] Side panels shown");
     }
 
     /// <summary>
@@ -1207,15 +1474,25 @@ public class RTTRemoteMenu : MonoBehaviour
 
     /// <summary>
     /// Hide side panels (hides the frames which contain the panels).
+    /// Uses SetVisible(false) to hide DisplayQuad while keeping GameObject active.
     /// </summary>
     private void HideSidePanels()
     {
         if (_hardwareFrame != null)
+        {
+            _hardwareFrame.SetVisible(false);
             _hardwareFrame.gameObject.SetActive(false);
-        if (_networkFrame != null)
-            _networkFrame.gameObject.SetActive(false);
+            Debug.Log("[RTTRemoteMenu] Hardware frame hidden");
+        }
 
-        Debug.Log("[RTTRemoteMenu] Side panels hidden");
+        if (_networkFrame != null)
+        {
+            _networkFrame.SetVisible(false);
+            _networkFrame.gameObject.SetActive(false);
+            Debug.Log("[RTTRemoteMenu] Network frame hidden");
+        }
+
+        Debug.Log("[RTTRemoteMenu] HideSidePanels completed");
     }
     #endregion
 
@@ -1479,9 +1756,39 @@ public class RTTRemoteMenu : MonoBehaviour
     }
     #endregion
 
+    #region Lifecycle
+    private bool _sidePanelCoroutinesStarted = false;
+
+    private void OnDisable()
+    {
+        // Normal behavior during preparation - coroutines will be paused and resumed on enable
+    }
+
+    private void OnEnable()
+    {
+        Debug.Log("[RTTRemoteMenu] OnEnable called");
+
+        // Restart side panel coroutines if they were interrupted before completion
+        // Coroutines don't automatically resume after disable/enable in Unity
+        if (_sidePanelCoroutinesStarted && _hardwareFrame != null && _hardwareInfoPanel == null)
+        {
+            Debug.Log("[RTTRemoteMenu] Restarting Hardware panel coroutine (was interrupted)");
+            StartCoroutine(CreateSidePanelContent(_hardwareFrame, RTTInfoSidePanel.PanelType.HardwareInfo));
+        }
+
+        if (_sidePanelCoroutinesStarted && _networkFrame != null && _networkInfoPanel == null)
+        {
+            Debug.Log("[RTTRemoteMenu] Restarting Network panel coroutine (was interrupted)");
+            StartCoroutine(CreateSidePanelContent(_networkFrame, RTTInfoSidePanel.PanelType.NetworkInfo));
+        }
+    }
+    #endregion
+
     #region Cleanup
     private void OnDestroy()
     {
+        Debug.Log("[RTTRemoteMenu] OnDestroy called - this will stop all coroutines including CreateSidePanelContent!");
+
         DisableHorizontalSeparators();
 
         if (_qrScannerManager != null)

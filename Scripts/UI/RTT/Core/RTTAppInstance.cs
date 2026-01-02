@@ -41,10 +41,17 @@ public class RTTAppInstance
     /// </summary>
     public Sprite Icon { get; set; }
 
+    /// <summary>
+    /// Whether this app has finished preparing (frame created, content loaded, ready to show)
+    /// This is set to true AFTER SetActive(false) in PrepareAppFrameAsync
+    /// </summary>
+    public bool IsPrepared { get; set; }
+
     public RTTAppInstance(string appId)
     {
         AppId = appId;
         IsVisible = false;
+        IsPrepared = false;
         TaskbarSlotIndex = -1;
     }
 }

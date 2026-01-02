@@ -77,6 +77,18 @@ public abstract class RTTCanvasBase : MonoBehaviour
     public Vector2Int CurrentResolution => _renderTexture != null
         ? new Vector2Int(_renderTexture.width, _renderTexture.height)
         : Vector2Int.zero;
+
+    /// <summary>
+    /// Force initialization if not already initialized.
+    /// Use this when Start() may not have been called (e.g., GameObject was disabled before first frame).
+    /// </summary>
+    public void EnsureInitialized()
+    {
+        if (!_isInitialized)
+        {
+            Initialize();
+        }
+    }
     #endregion
 
     #region Lifecycle
@@ -445,6 +457,10 @@ public abstract class RTTCanvasBase : MonoBehaviour
         _quadCollider.size = new Vector3(1, 1, 0.01f);
         _quadCollider.center = Vector3.zero;
         _quadCollider.isTrigger = true;
+
+        // Respect pre-set visibility (if SetVisible(false) was called before Initialize)
+        _displayQuad.enabled = _isVisible;
+        _quadCollider.enabled = _isVisible;
     }
 
     /// <summary>
@@ -574,20 +590,40 @@ public abstract class RTTCanvasBase : MonoBehaviour
     /// </summary>
     public virtual void SetVisible(bool visible)
     {
-        if (_isVisible == visible) return;
-
+        // Always apply visibility to fix race conditions
+        // This ensures DisplayQuad is always in correct state even if _isVisible flag is wrong
+        bool wasVisible = _isVisible;
         _isVisible = visible;
 
         if (_displayQuad != null)
+        {
             _displayQuad.enabled = visible;
+        }
+        else if (visible)
+        {
+            // Only warn if trying to show but quad is null
+            Debug.LogWarning($"[RTTCanvasBase] {gameObject.name}.SetVisible(true): _displayQuad is NULL!");
+        }
 
         if (_quadCollider != null)
             _quadCollider.enabled = visible;
 
-        if (_uiCamera != null && !visible)
-            _uiCamera.enabled = false;
+        // Enable/disable UICamera based on visibility
+        if (_uiCamera != null)
+        {
+            if (visible)
+            {
+                // Force enable camera to render at least one frame
+                _uiCamera.enabled = true;
+            }
+            else
+            {
+                _uiCamera.enabled = false;
+            }
+        }
 
-        OnVisibilityChanged?.Invoke(visible);
+        if (wasVisible != visible)
+            OnVisibilityChanged?.Invoke(visible);
 
         if (visible)
             MarkDirty();

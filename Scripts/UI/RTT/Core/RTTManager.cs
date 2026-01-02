@@ -61,7 +61,9 @@ public class RTTManager : MonoBehaviour
     #region Panel Management Config
     [Header("Panel Management")]
     [Tooltip("Maximum number of panels that can render in a single frame")]
+#pragma warning disable CS0414 // Field is assigned but never used - exposed for Inspector configuration
     [SerializeField] private int maxConcurrentRenders = 3;
+#pragma warning restore CS0414
 
     [Tooltip("Enable performance logging to console")]
     [SerializeField] private bool enablePerformanceLogging = false;
@@ -121,14 +123,6 @@ public class RTTManager : MonoBehaviour
     private string _currentVisibleAppId = null;
     private string _pendingOpenAppId = null;
     private bool _isTransitioning = false;
-    #endregion
-
-    #region Streaming Fields
-    private ConnectionViewModel _viewModel;
-    private Coroutine _textureUpdateCoroutine;
-    private Coroutine _webrtcUpdateCoroutine;
-    private WorldPanelClusterRig _clusterRig;
-    private int _activeCursorPanelIndex = -1;
     #endregion
 
     #region Events
@@ -232,16 +226,6 @@ public class RTTManager : MonoBehaviour
         // Unsubscribe from theme property changes
         RTTThemeConfig.OnAnyThemePropertyChanged -= HandleThemePropertyChanged;
 
-        // Stop coroutines
-        if (_textureUpdateCoroutine != null) StopCoroutine(_textureUpdateCoroutine);
-        if (_webrtcUpdateCoroutine != null) StopCoroutine(_webrtcUpdateCoroutine);
-
-        // Cleanup cluster rig
-        if (_clusterRig != null) Destroy(_clusterRig.gameObject);
-
-        // Unsubscribe events
-        if (_viewModel != null) _viewModel.OnCursorPositionChanged -= HandleCursorPosition;
-
         UnsubscribeFromControllerEvents();
 
         // Cleanup active apps
@@ -285,11 +269,13 @@ public class RTTManager : MonoBehaviour
                 mainMenuController = gameObject.AddComponent<RTTMainMenuController>();
         }
 
+        // Note: Don't auto-create RTTRemoteMenuController here
+        // It will be created per-app in CreateRemoteMenuContent() when needed
+        // This prevents having an uninitialized controller running Update()
         if (remoteMenuController == null)
         {
             remoteMenuController = GetComponentInChildren<RTTRemoteMenuController>();
-            if (remoteMenuController == null)
-                remoteMenuController = gameObject.AddComponent<RTTRemoteMenuController>();
+            // Don't AddComponent here - let CreateRemoteMenuContent handle it
         }
 
         if (frameParent == null && mainMenuFrame != null)
@@ -301,23 +287,14 @@ public class RTTManager : MonoBehaviour
         if (mainMenuController != null)
             mainMenuController.OnMenuItemClicked += HandleMainMenuItemClicked;
 
-        if (remoteMenuController != null)
-        {
-            remoteMenuController.OnBackClicked += ReturnToMainMenu;
-            remoteMenuController.OnStartClicked += HandleRemoteStartClicked;
-        }
+        // Note: Per-app controllers are created dynamically in CreateRemoteMenuContent
+        // and handle their own events via RTTRemoteMenuController
     }
 
     private void UnsubscribeFromControllerEvents()
     {
         if (mainMenuController != null)
             mainMenuController.OnMenuItemClicked -= HandleMainMenuItemClicked;
-
-        if (remoteMenuController != null)
-        {
-            remoteMenuController.OnBackClicked -= ReturnToMainMenu;
-            remoteMenuController.OnStartClicked -= HandleRemoteStartClicked;
-        }
     }
 
     private IEnumerator WaitAndShowMainMenu()
@@ -732,38 +709,6 @@ public class RTTManager : MonoBehaviour
         OpenApp(itemId);
     }
 
-    private void HandleRemoteStartClicked()
-    {
-        Debug.Log("[RTTManager] Remote Start clicked - hiding menu and showing cluster panels");
-
-        if (mainMenuFrame != null)
-            mainMenuFrame.gameObject.SetActive(false);
-
-        if (!ServiceLocator.TryGet<ConnectionViewModel>(out _viewModel))
-        {
-            Debug.LogWarning("[RTTManager] ConnectionViewModel not found");
-            return;
-        }
-
-        _viewModel.OnCursorPositionChanged += HandleCursorPosition;
-
-        if (_viewModel.AppliedConfig.Value == null && _viewModel.SuggestedConfig.Value == null)
-        {
-            Debug.LogError("[RTTManager] No config available");
-            return;
-        }
-
-        int monitorCount = _viewModel.AppliedConfig.Value?.monitors ?? _viewModel.SuggestedConfig.Value.monitors;
-        CreateClusterRig(monitorCount);
-
-        if (_webrtcUpdateCoroutine == null)
-            _webrtcUpdateCoroutine = StartCoroutine(WebRTC.Update());
-
-        if (_textureUpdateCoroutine != null)
-            StopCoroutine(_textureUpdateCoroutine);
-        _textureUpdateCoroutine = StartCoroutine(UpdatePanelTextures());
-    }
-
     private void HandleQuit()
     {
         Debug.Log("[RTTManager] Quit clicked");
@@ -845,7 +790,8 @@ public class RTTManager : MonoBehaviour
         if (_activeApps.ContainsKey(appId)) return true;
         if (!_preparingApps.ContainsKey(appId)) return false;
         var instance = _preparingApps[appId];
-        return instance.Frame != null && instance.Frame.ContentContainer != null;
+        // Use IsPrepared flag to ensure preparation is fully complete (including SetActive(false))
+        return instance.IsPrepared;
     }
 
     public void OpenPreparedApp(string appId)
@@ -930,6 +876,9 @@ public class RTTManager : MonoBehaviour
     {
         foreach (var kvp in new Dictionary<string, RTTAppInstance>(_preparingApps))
         {
+            // Destroy controller first (it's not a child of frame anymore)
+            if (kvp.Value.Controller != null && kvp.Value.Controller.gameObject != null)
+                Destroy(kvp.Value.Controller.gameObject);
             if (kvp.Value.Frame != null)
                 Destroy(kvp.Value.Frame.gameObject);
             Debug.Log($"[RTTManager] Cancelled preparation for: {kvp.Key}");
@@ -991,6 +940,9 @@ public class RTTManager : MonoBehaviour
                 try { cleanupMethod.Invoke(app.Controller, null); }
                 catch (Exception e) { Debug.LogWarning($"[RTTManager] Cleanup failed: {e.Message}"); }
             }
+            // Destroy controller GameObject (it's not a child of frame anymore)
+            if (app.Controller.gameObject != null)
+                Destroy(app.Controller.gameObject);
         }
 
         if (app.Frame != null)
@@ -1070,13 +1022,14 @@ public class RTTManager : MonoBehaviour
         else if (useScaleTransition && transitionOutDuration > 0)
             yield return StartCoroutine(AnimateFrameScale(mainMenuFrame.transform, 1f, 0.9f, transitionOutDuration, true));
 
-        // Create frame
+        // Create frame with unique name based on app ID
         instance.Frame = RTTMenuFrame.Create(
             frameParent,
             mainMenuFrame.PanelWidth,
             mainMenuFrame.PanelHeight,
             mainMenuFrame.LogicalWidthValue,
-            isPrimaryFrame: false
+            isPrimaryFrame: false,
+            name: $"RTTMenuFrame_{instance.AppId}"
         );
 
         instance.Frame.transform.position = mainMenuFrame.transform.position;
@@ -1108,6 +1061,8 @@ public class RTTManager : MonoBehaviour
         mainMenuFrame.gameObject.SetActive(false);
         ResetFrameAlpha(mainMenuFrame);
 
+        instance.Frame.SetVisible(true); // Ensure DisplayQuad is visible
+        ResetFrameAlpha(instance.Frame); // Reset material alpha in case of previous fade
         instance.Frame.SetPrimary(true);
         instance.IsVisible = true;
         _currentVisibleAppId = instance.AppId;
@@ -1145,12 +1100,14 @@ public class RTTManager : MonoBehaviour
             yield break;
         }
 
+        // Create frame with unique name based on app ID
         instance.Frame = RTTMenuFrame.Create(
             frameParent,
             mainMenuFrame.PanelWidth,
             mainMenuFrame.PanelHeight,
             mainMenuFrame.LogicalWidthValue,
-            isPrimaryFrame: false
+            isPrimaryFrame: false,
+            name: $"RTTMenuFrame_{instance.AppId}"
         );
 
         instance.Frame.transform.position = mainMenuFrame.transform.position + Vector3.up * 1000f;
@@ -1175,9 +1132,32 @@ public class RTTManager : MonoBehaviour
 
         CreateAppContent(instance);
 
+        // Wait for child components (including side panel RTTMenuFrames) to initialize
+        // Side panels are created in CreateAppContent → RTTRemoteMenu.BuildUI → CreateSidePanels
+        // They need their Start() to be called before we can disable the frame
+        // Start() is called on the next frame after Awake(), so we need to wait
+        for (int i = 0; i < 5; i++)
+        {
+            yield return null;
+        }
+
+        // Ensure frame is fully initialized before disabling
+        if (!instance.Frame.IsInitialized)
+        {
+            Debug.LogWarning($"[RTTManager] Frame not initialized after 5 frames, calling EnsureInitialized()");
+            instance.Frame.EnsureInitialized();
+        }
+
         instance.Frame.transform.position = mainMenuFrame.transform.position;
+
+        // Reset alpha to 1 before disabling (in case any fade was applied)
+        ResetFrameAlpha(instance.Frame);
+
         instance.Frame.gameObject.SetActive(false);
         instance.Frame.MarkDirty();
+
+        // Mark as fully prepared AFTER SetActive(false) to prevent race condition
+        instance.IsPrepared = true;
 
         Debug.Log($"[RTTManager] App {instance.AppId} prepared");
     }
@@ -1189,6 +1169,8 @@ public class RTTManager : MonoBehaviour
         if (targetApp.Frame != null)
         {
             targetApp.Frame.gameObject.SetActive(true);
+            targetApp.Frame.SetVisible(true); // Ensure DisplayQuad is visible
+            ResetFrameAlpha(targetApp.Frame); // Reset material alpha in case of previous fade
             targetApp.Frame.SetPrimary(true);
             targetApp.IsVisible = true;
         }
@@ -1217,6 +1199,8 @@ public class RTTManager : MonoBehaviour
         if (targetApp.Frame != null)
         {
             targetApp.Frame.gameObject.SetActive(true);
+            targetApp.Frame.SetVisible(true); // Ensure DisplayQuad is visible
+            ResetFrameAlpha(targetApp.Frame); // Reset material alpha in case of previous fade
             targetApp.Frame.SetPrimary(true);
             targetApp.IsVisible = true;
 
@@ -1250,6 +1234,7 @@ public class RTTManager : MonoBehaviour
         if (mainMenuFrame != null)
         {
             mainMenuFrame.gameObject.SetActive(true);
+            mainMenuFrame.SetVisible(true); // Ensure DisplayQuad is visible
             mainMenuFrame.SetPrimary(true);
         }
         // Show the persistent Main Menu content
@@ -1281,6 +1266,7 @@ public class RTTManager : MonoBehaviour
         if (mainMenuFrame != null)
         {
             mainMenuFrame.gameObject.SetActive(true);
+            mainMenuFrame.SetVisible(true); // Ensure DisplayQuad is visible
             mainMenuFrame.SetPrimary(true);
 
             if (useFadeTransition)
@@ -1326,6 +1312,17 @@ public class RTTManager : MonoBehaviour
         ResetFrameAlpha(mainMenuFrame);
 
         instance.Frame.gameObject.SetActive(true);
+
+        // Force rebuild Canvas layout after re-enabling
+        var canvas = instance.Frame.GetCanvas();
+        if (canvas != null)
+        {
+            UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(canvas.GetComponent<RectTransform>());
+        }
+
+        instance.Frame.SetVisible(true); // Ensure DisplayQuad is visible
+        ResetFrameAlpha(instance.Frame); // Reset material alpha in case of previous fade
+        instance.Frame.MarkDirty(); // Force re-render
         instance.Frame.SetPrimary(true);
         instance.IsVisible = true;
         _currentVisibleAppId = instance.AppId;
@@ -1374,6 +1371,7 @@ public class RTTManager : MonoBehaviour
         if (mainMenuFrame != null)
         {
             mainMenuFrame.gameObject.SetActive(true);
+            mainMenuFrame.SetVisible(true); // Ensure DisplayQuad is visible
             mainMenuFrame.SetPrimary(true);
 
             if (useFadeTransition)
@@ -1449,8 +1447,10 @@ public class RTTManager : MonoBehaviour
     {
         Debug.Log($"[RTTManager] Creating RemoteMenu content...");
 
+        // Create controller as sibling to frame, NOT child
+        // This ensures controller stays active when frame is hidden during streaming
         GameObject controllerObj = new GameObject($"RemoteMenuController_{instance.AppId}");
-        controllerObj.transform.SetParent(instance.Frame.transform);
+        controllerObj.transform.SetParent(this.transform); // Parent to RTTManager, not frame
         var controller = controllerObj.AddComponent<RTTRemoteMenuController>();
 
         var containerSize = instance.Frame.GetContentSize();
@@ -1519,136 +1519,6 @@ public class RTTManager : MonoBehaviour
         var displayQuad = frame.GetDisplayQuad();
         if (displayQuad?.material != null)
             displayQuad.material.color = new Color(1f, 1f, 1f, 1f);
-    }
-    #endregion
-
-    #region Streaming - Cluster Rig
-    private void CreateClusterRig(int panelCount)
-    {
-        if (_clusterRig != null)
-        {
-            Destroy(_clusterRig.gameObject);
-            _clusterRig = null;
-        }
-
-        var clusterGO = new GameObject("StreamingClusterRig");
-        _clusterRig = clusterGO.AddComponent<WorldPanelClusterRig>();
-
-        if (panelPrefab != null)
-            _clusterRig.panelPrefab = panelPrefab;
-
-        _clusterRig.BuildWithPanelCount(panelCount);
-        SubscribeToPanelCursorEvents();
-
-        Debug.Log($"[RTTManager] Created cluster rig with {panelCount} panels");
-    }
-
-    private void SubscribeToPanelCursorEvents()
-    {
-        if (_clusterRig == null || _clusterRig.panels == null) return;
-
-        for (int i = 0; i < _clusterRig.panels.Count; i++)
-        {
-            var panel = _clusterRig.panels[i];
-            if (panel == null) continue;
-
-            panel.EnsureCursor();
-            if (panel.cursor == null) continue;
-
-            int monitorIndex = i;
-
-            panel.cursor.onClickDown += () =>
-            {
-                _viewModel?.RequestKeyframe(monitorIndex);
-            };
-
-            panel.cursor.onClickUp += () =>
-            {
-                _viewModel?.RequestKeyframe(monitorIndex);
-            };
-        }
-    }
-
-    private IEnumerator UpdatePanelTextures()
-    {
-        float waitTimeout = 30f;
-        float waitElapsed = 0f;
-        while (_viewModel != null && !_viewModel.IsStreaming.Value && waitElapsed < waitTimeout)
-        {
-            waitElapsed += Time.deltaTime;
-            yield return null;
-        }
-
-        if (_viewModel == null || !_viewModel.IsStreaming.Value)
-        {
-            Debug.LogWarning("[RTTManager] Streaming did not start");
-            yield break;
-        }
-
-        while (_viewModel != null && _viewModel.IsStreaming.Value)
-        {
-            _viewModel.PollTextures();
-
-            if (_clusterRig != null && _clusterRig.panels != null)
-            {
-                for (int i = 0; i < _clusterRig.panels.Count; i++)
-                {
-                    var panel = _clusterRig.panels[i];
-                    if (panel != null)
-                    {
-                        var texture = _viewModel.GetTexture(i);
-                        if (texture != null && panel.contentTexture != texture)
-                        {
-                            panel.contentTexture = texture;
-                            panel.Apply();
-                        }
-                    }
-                }
-            }
-
-            yield return null;
-        }
-    }
-
-    private void HandleCursorPosition(int monitorIndex, float u, float v, bool visible)
-    {
-        if (_clusterRig == null || _clusterRig.panels == null) return;
-
-        if (!visible || monitorIndex < 0 || monitorIndex >= _clusterRig.panels.Count)
-        {
-            HideAllCursors();
-            _activeCursorPanelIndex = -1;
-            return;
-        }
-
-        if (_activeCursorPanelIndex != monitorIndex && _activeCursorPanelIndex >= 0 && _activeCursorPanelIndex < _clusterRig.panels.Count)
-        {
-            var oldPanel = _clusterRig.panels[_activeCursorPanelIndex];
-            if (oldPanel?.cursor != null)
-                oldPanel.cursor.SetVisible(false);
-        }
-
-        var panel = _clusterRig.panels[monitorIndex];
-        if (panel == null) return;
-
-        panel.EnsureCursor();
-        if (panel.cursor == null) return;
-
-        float unityV = 1f - v;
-        panel.cursor.SetUV(u, unityV, silent: true);
-        panel.cursor.SetVisible(true);
-
-        _activeCursorPanelIndex = monitorIndex;
-    }
-
-    private void HideAllCursors()
-    {
-        if (_clusterRig == null || _clusterRig.panels == null) return;
-        foreach (var panel in _clusterRig.panels)
-        {
-            if (panel?.cursor != null)
-                panel.cursor.SetVisible(false);
-        }
     }
     #endregion
 }

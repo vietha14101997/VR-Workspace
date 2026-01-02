@@ -40,6 +40,7 @@ namespace VRWorkspace.Streaming
         private bool _skipTcpIceCandidates = true;
         private int _expectedMonitorCount; // Track expected count for CheckIceComplete
         private TaskCompletionSource<bool> _allAnswersReceivedTcs; // Event-driven answer waiting
+        private bool _streamingStartedFired; // Track if OnStreamingStarted was already fired
 
         // Events
         public event Action<ServerHardwareInfo> OnHardwareInfoReceived;
@@ -53,6 +54,12 @@ namespace VRWorkspace.Streaming
         public event Action<string> OnError;
         public event Action OnDisconnected;
         public event Action<int, float, float, bool> OnCursorPosition; // monitorIndex, u, v, visible
+
+        // Progress tracking events for UI
+        public event Action<int> OnServerSetupProgress;         // 0-100 server setup progress
+        public event Action<int, int> OnMonitorIceProgress;     // monitorIndex, progress (0-100)
+        public event Action<int> OnMonitorIceComplete;          // monitorIndex when ICE connected
+        public event Action OnAllMonitorsReady;                 // all monitors ICE connected
 
         private class PCWrapper
         {
@@ -71,6 +78,13 @@ namespace VRWorkspace.Streaming
             public DateTime LastFrameTime; // Track when last video frame was received
             public int FrameCount; // Count frames for monitoring
             public TaskCompletionSource<bool> AnswerReceivedTcs; // For event-driven sequential mode
+
+            // FPS feedback tracking (for adaptive encoding)
+            public int RenderedFrameCount;           // Frames actually rendered this window
+            public int DroppedFrameCount;            // Frames dropped (received but not rendered)
+            public DateTime FpsWindowStart = DateTime.UtcNow; // Start of measurement window
+            public DateTime LastFpsFeedbackSent;     // Throttle feedback sending
+            public float LastReportedEffectiveFps;   // For change detection
         }
 
         // Public properties
@@ -188,10 +202,28 @@ namespace VRWorkspace.Streaming
         /// </summary>
         public async Task StartStreamingAsync()
         {
-            if (!_stateMachine.IsInPhase(ConnectionPhase.ReadyToStream))
+            await StartStreamingAsync(false);
+        }
+
+        /// <summary>
+        /// Proceed from Phase 2 to Phase 3 (start streaming).
+        /// </summary>
+        /// <param name="force">If true, bypass phase check (used for auto-start after ICE ready)</param>
+        public async Task StartStreamingAsync(bool force)
+        {
+            var currentPhase = _stateMachine.CurrentPhase;
+            bool canStart = currentPhase == ConnectionPhase.ReadyToStream ||
+                           currentPhase == ConnectionPhase.ICENegotiating;
+
+            if (!canStart && !force)
             {
-                Debug.LogWarning($"[PhaseProtocol] Cannot start streaming from {_stateMachine.CurrentPhase}");
+                Debug.LogWarning($"[PhaseProtocol] Cannot start streaming from {currentPhase}");
                 return;
+            }
+
+            if (force && currentPhase != ConnectionPhase.ReadyToStream)
+            {
+                Debug.Log($"[PhaseProtocol] Force starting streaming from {currentPhase}");
             }
 
             Debug.Log("[PhaseProtocol] Starting streaming (Phase 3)");
@@ -256,6 +288,12 @@ namespace VRWorkspace.Streaming
         private DateTime _lastSkipToLiveTime = DateTime.MinValue;
         private const float SkipToLiveCooldownSeconds = 2.0f; // Don't spam skip requests
         private const float FrameGapThresholdMs = 500f; // If no frames for 500ms, consider it stalled
+        private const float MonitorDriftThresholdMs = 200f; // If monitors are >200ms apart, consider drift
+
+        // FPS Feedback constants (for adaptive encoding)
+        private const float FPS_FEEDBACK_INTERVAL_SECONDS = 1.0f;  // Send feedback every 1s
+        private const float FPS_CHANGE_THRESHOLD = 5.0f;           // Report if FPS differs by 5+
+        private const int FPS_WINDOW_FRAMES = 30;                  // Minimum frames before calculating
 
         /// <summary>
         /// Event fired when skip_to_live is acknowledged by server.
@@ -266,7 +304,8 @@ namespace VRWorkspace.Streaming
         /// Request server to skip buffered frames and send fresh keyframe.
         /// Use when detecting accumulated latency.
         /// </summary>
-        public void SkipToLive()
+        /// <param name="monitorIndex">Monitor index to sync, or -1 for all monitors</param>
+        public void SkipToLive(int monitorIndex = -1)
         {
             if (_ws?.State != WebSocketState.Open || !_stateMachine.IsStreaming) return;
 
@@ -278,15 +317,18 @@ namespace VRWorkspace.Streaming
 
             try
             {
-                Debug.Log("[PhaseProtocol] Sending skip_to_live request for latency recovery");
-                _ = SendTextAsync("{\"type\":\"skip_to_live\"}");
+                string msg = monitorIndex >= 0
+                    ? $"{{\"type\":\"skip_to_live\",\"monitor\":{monitorIndex}}}"
+                    : "{\"type\":\"skip_to_live\"}";
+                Debug.Log($"[PhaseProtocol] Sending skip_to_live (monitor={monitorIndex}) for latency recovery");
+                _ = SendTextAsync(msg);
             }
             catch { }
         }
 
         /// <summary>
         /// Check for latency issues and request skip_to_live if needed.
-        /// Called from PollTextures to detect frame gaps.
+        /// Called from PollTextures to detect frame gaps and monitor drift.
         /// </summary>
         private void CheckLatencyAndSkip()
         {
@@ -294,21 +336,110 @@ namespace VRWorkspace.Streaming
 
             lock (_lock)
             {
+                // Track min/max frame times for drift detection
+                DateTime minFrameTime = DateTime.MaxValue;
+                DateTime maxFrameTime = DateTime.MinValue;
+                int laggingMonitor = -1;
+                int minFrameMonitor = -1;
+
                 foreach (var wrapper in _peerConnections)
                 {
                     if (wrapper.LastFrameTime == default) continue;
 
-                    // Check if frame gap exceeds threshold
+                    // Check if frame gap exceeds threshold (stall detection)
                     var timeSinceFrame = (DateTime.UtcNow - wrapper.LastFrameTime).TotalMilliseconds;
                     if (timeSinceFrame > FrameGapThresholdMs && wrapper.FrameCount > 10)
                     {
-                        // Frame stall detected - request skip to live
+                        // Frame stall detected - request skip to live for this monitor
                         Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} frame gap {timeSinceFrame:F0}ms - requesting skip_to_live");
-                        SkipToLive();
-                        break; // Only send once per poll
+                        SkipToLive(wrapper.Index);
+                        return; // Only send once per poll
+                    }
+
+                    // Track for drift detection
+                    if (wrapper.LastFrameTime < minFrameTime)
+                    {
+                        minFrameTime = wrapper.LastFrameTime;
+                        laggingMonitor = wrapper.Index;
+                    }
+                    if (wrapper.LastFrameTime > maxFrameTime)
+                    {
+                        maxFrameTime = wrapper.LastFrameTime;
+                        minFrameMonitor = wrapper.Index;
+                    }
+                }
+
+                // Drift detection: if monitors are >200ms apart, the older one is lagging
+                if (_peerConnections.Count > 1 && minFrameTime != DateTime.MaxValue && maxFrameTime != DateTime.MinValue)
+                {
+                    var drift = (maxFrameTime - minFrameTime).TotalMilliseconds;
+                    if (drift > MonitorDriftThresholdMs && laggingMonitor >= 0)
+                    {
+                        Debug.LogWarning($"[PhaseProtocol] Monitor drift detected: PC{laggingMonitor} is {drift:F0}ms behind PC{minFrameMonitor} - requesting skip_to_live");
+                        SkipToLive(laggingMonitor);
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Calculate effective FPS and send feedback to server periodically.
+        /// Called from PollTextures to enable server-side adaptive encoding.
+        /// </summary>
+        private void SendFpsFeedbackIfNeeded()
+        {
+            if (!_stateMachine.IsStreaming) return;
+
+            lock (_lock)
+            {
+                foreach (var wrapper in _peerConnections)
+                {
+                    // Skip if not enough time has passed
+                    if ((DateTime.UtcNow - wrapper.LastFpsFeedbackSent).TotalSeconds < FPS_FEEDBACK_INTERVAL_SECONDS)
+                        continue;
+
+                    // Skip if not enough frames to calculate
+                    if (wrapper.RenderedFrameCount < FPS_WINDOW_FRAMES)
+                        continue;
+
+                    // Calculate effective FPS
+                    double windowSeconds = (DateTime.UtcNow - wrapper.FpsWindowStart).TotalSeconds;
+                    if (windowSeconds <= 0) continue;
+
+                    float effectiveFps = (float)(wrapper.RenderedFrameCount / windowSeconds);
+
+                    // Only send if FPS changed significantly (avoid spam)
+                    if (Math.Abs(effectiveFps - wrapper.LastReportedEffectiveFps) < FPS_CHANGE_THRESHOLD
+                        && wrapper.LastReportedEffectiveFps > 0)
+                    {
+                        // Reset window but don't send
+                        ResetFpsWindow(wrapper);
+                        continue;
+                    }
+
+                    // Send feedback
+                    wrapper.LastFpsFeedbackSent = DateTime.UtcNow;
+                    wrapper.LastReportedEffectiveFps = effectiveFps;
+
+                    string json = $"{{\"type\":\"fps_feedback\",\"monitorIndex\":{wrapper.Index}," +
+                        $"\"effectiveFps\":{effectiveFps:F1}," +
+                        $"\"renderedFrames\":{wrapper.RenderedFrameCount}," +
+                        $"\"droppedFrames\":{wrapper.DroppedFrameCount}}}";
+
+                    _ = SendTextAsync(json);
+                    Debug.Log($"[PhaseProtocol] FPS feedback: m{wrapper.Index} = {effectiveFps:F1} fps");
+
+                    // Reset window
+                    ResetFpsWindow(wrapper);
+                }
+            }
+        }
+
+        private void ResetFpsWindow(PCWrapper wrapper)
+        {
+            wrapper.RenderedFrameCount = 0;
+            wrapper.DroppedFrameCount = 0;
+            wrapper.FpsWindowStart = DateTime.UtcNow;
         }
 
         #endregion
@@ -962,6 +1093,9 @@ namespace VRWorkspace.Streaming
 
             Debug.Log($"[PhaseProtocol] Config progress: {step} {progress}% - {message}");
             OnConfigProgress?.Invoke(step, progress, message);
+
+            // Fire server setup progress for UI (0-100)
+            OnServerSetupProgress?.Invoke(progress);
         }
 
         private Task HandleConfigCompleteAsync(SimpleJson json)
@@ -1231,6 +1365,24 @@ namespace VRWorkspace.Streaming
             pc.OnIceConnectionChange = s =>
             {
                 Debug.Log($"[PhaseProtocol] PC{idx} ICE: {s}");
+
+                // Fire ICE progress events for UI
+                int progress = s switch
+                {
+                    RTCIceConnectionState.New => 0,
+                    RTCIceConnectionState.Checking => 30,
+                    RTCIceConnectionState.Connected => 100,
+                    RTCIceConnectionState.Completed => 100,
+                    _ => 0
+                };
+                OnMonitorIceProgress?.Invoke(idx, progress);
+
+                // Fire complete event when connected
+                if (s == RTCIceConnectionState.Connected || s == RTCIceConnectionState.Completed)
+                {
+                    OnMonitorIceComplete?.Invoke(idx);
+                    CheckAllMonitorsConnected();
+                }
             };
 
             pc.OnConnectionStateChange = s =>
@@ -1298,6 +1450,18 @@ namespace VRWorkspace.Streaming
                         wrapper.Texture = tex;
                         wrapper.LastFrameTime = DateTime.UtcNow;
                         wrapper.FrameCount++;
+                        wrapper.RenderedFrameCount++; // For adaptive FPS feedback
+
+                        // Fire OnStreamingStarted on first frame if not already fired
+                        // This is a backup mechanism in case streaming_started message is delayed/lost
+                        if (!_streamingStartedFired)
+                        {
+                            _streamingStartedFired = true;
+                            Debug.Log($"[PhaseProtocol] PC{idx} received first frame, firing OnStreamingStarted as backup");
+                            _stateMachine.TryTransition(ConnectionPhase.Streaming);
+                            OnStreamingStarted?.Invoke();
+                        }
+
                         OnVideoTextureReceived?.Invoke(idx, tex);
                     };
                     Debug.Log($"[PhaseProtocol] PC{idx} received video track");
@@ -1488,7 +1652,6 @@ namespace VRWorkspace.Streaming
 
         private void CheckIceComplete()
         {
-            bool allReady = false;
             bool shouldSendProceed = false;
 
             lock (_lock)
@@ -1502,7 +1665,6 @@ namespace VRWorkspace.Streaming
                 // This prevents proceeding too early when creating PCs sequentially
                 if (created >= expected && created > 0 && _peerConnections.All(p => p.AnswerSet))
                 {
-                    allReady = true;
                     if (_stateMachine.CurrentPhase == ConnectionPhase.ICENegotiating)
                     {
                         Debug.Log($"[PhaseProtocol] All {expected} PeerConnections ready, transitioning to ReadyToStream");
@@ -1655,6 +1817,17 @@ namespace VRWorkspace.Streaming
                         wrapper.Texture = tex;
                         wrapper.LastFrameTime = DateTime.UtcNow;
                         wrapper.FrameCount++;
+                        wrapper.RenderedFrameCount++; // For adaptive FPS feedback
+
+                        // Fire OnStreamingStarted on first frame if not already fired
+                        if (!_streamingStartedFired)
+                        {
+                            _streamingStartedFired = true;
+                            Debug.Log($"[PhaseProtocol] PC{idx} received first frame (reconnected), firing OnStreamingStarted");
+                            _stateMachine.TryTransition(ConnectionPhase.Streaming);
+                            OnStreamingStarted?.Invoke();
+                        }
+
                         OnVideoTextureReceived?.Invoke(idx, tex);
                     };
                     Debug.Log($"[PhaseProtocol] PC{idx} received video track (reconnected)");
@@ -1709,6 +1882,30 @@ namespace VRWorkspace.Streaming
                     _ = SendTextAsync(candJson);
                 }
                 wrapper.QueuedCandidates.Clear();
+            }
+        }
+
+        /// <summary>
+        /// Check if all monitors are connected and fire OnAllMonitorsReady event.
+        /// </summary>
+        private void CheckAllMonitorsConnected()
+        {
+            lock (_lock)
+            {
+                if (_expectedMonitorCount <= 0) return;
+
+                int connected = _peerConnections.Count(p =>
+                    p.PC != null &&
+                    (p.PC.IceConnectionState == RTCIceConnectionState.Connected ||
+                     p.PC.IceConnectionState == RTCIceConnectionState.Completed));
+
+                Debug.Log($"[PhaseProtocol] CheckAllMonitorsConnected: {connected}/{_expectedMonitorCount}");
+
+                if (connected >= _expectedMonitorCount)
+                {
+                    Debug.Log("[PhaseProtocol] All monitors connected, firing OnAllMonitorsReady");
+                    OnAllMonitorsReady?.Invoke();
+                }
             }
         }
 
@@ -1777,7 +1974,7 @@ namespace VRWorkspace.Streaming
 
         private void HandleStreamingStarted(SimpleJson json)
         {
-            Debug.Log("[PhaseProtocol] Streaming started!");
+            Debug.Log("[PhaseProtocol] Streaming started (server message)!");
             _stateMachine.TryTransition(ConnectionPhase.Streaming);
 
             // Acquire Android power locks for stable streaming
@@ -1791,7 +1988,12 @@ namespace VRWorkspace.Streaming
             // Start frame stall monitor to detect frozen streams
             _ = FrameStallMonitorAsync(_cts.Token);
 
-            OnStreamingStarted?.Invoke();
+            // Only fire event if not already fired (could be triggered by first frame)
+            if (!_streamingStartedFired)
+            {
+                _streamingStartedFired = true;
+                OnStreamingStarted?.Invoke();
+            }
         }
 
         /// <summary>
@@ -2100,6 +2302,9 @@ namespace VRWorkspace.Streaming
 
             // Check for latency issues and request skip_to_live if needed
             CheckLatencyAndSkip();
+
+            // Send FPS feedback to server for adaptive encoding
+            SendFpsFeedbackIfNeeded();
         }
 
         private void Cleanup()
@@ -2115,6 +2320,9 @@ namespace VRWorkspace.Streaming
                 _peerConnections.Clear();
                 _expectedMonitorCount = 0;
             }
+
+            // Reset streaming state
+            _streamingStartedFired = false;
 
             try { _ws?.Abort(); _ws?.Dispose(); } catch { }
             _ws = null;

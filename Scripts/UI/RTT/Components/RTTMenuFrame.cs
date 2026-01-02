@@ -500,10 +500,12 @@ public class RTTMenuFrame : RTTCanvasBase
     /// <summary>
     /// Factory method to create a configured RTTMenuFrame.
     /// </summary>
+    /// <param name="name">Optional custom name for the GameObject (default: "RTTMenuFrame")</param>
     public static RTTMenuFrame Create(Transform parent, float widthMeters, float heightMeters,
-        float logicalWidthPixels = 1920f, bool isPrimaryFrame = false)
+        float logicalWidthPixels = 1920f, bool isPrimaryFrame = false, string name = null)
     {
-        GameObject frameObj = new GameObject("RTTMenuFrame");
+        string frameName = string.IsNullOrEmpty(name) ? "RTTMenuFrame" : name;
+        GameObject frameObj = new GameObject(frameName);
         frameObj.transform.SetParent(parent, false);
         frameObj.transform.localPosition = Vector3.zero;
         frameObj.transform.localRotation = Quaternion.identity;
@@ -518,10 +520,11 @@ public class RTTMenuFrame : RTTCanvasBase
     /// <summary>
     /// Factory method with color configuration.
     /// </summary>
+    /// <param name="name">Optional custom name for the GameObject (default: "RTTMenuFrame")</param>
     public static RTTMenuFrame Create(Transform parent, float widthMeters, float heightMeters,
-        float logicalWidthPixels, Color borderColorA, Color borderColorB, bool isPrimaryFrame = false)
+        float logicalWidthPixels, Color borderColorA, Color borderColorB, bool isPrimaryFrame = false, string name = null)
     {
-        RTTMenuFrame frame = Create(parent, widthMeters, heightMeters, logicalWidthPixels, isPrimaryFrame);
+        RTTMenuFrame frame = Create(parent, widthMeters, heightMeters, logicalWidthPixels, isPrimaryFrame, name);
         frame.glowColorA = borderColorA;
         frame.glowColorB = borderColorB;
         return frame;
