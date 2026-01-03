@@ -283,10 +283,11 @@ public class ClusterVisualCurved : MonoBehaviour
         Vector3 centerOffset = CalculatePanelCenterOffset();
 
         // Background layer (behind content)
+        // Use expanded mesh so background fills up to border line (shader clips via SDF)
         _backgroundObject = CreateLayerObject("ClusterBackground_Curved", backgroundZOffset, centerOffset);
         _backgroundMeshFilter = _backgroundObject.GetComponent<MeshFilter>();
         _backgroundRenderer = _backgroundObject.GetComponent<MeshRenderer>();
-        _backgroundMeshFilter.sharedMesh = _curvedMesh;
+        _backgroundMeshFilter.sharedMesh = _expandedMesh;
 
         // Content layer (middle)
         _contentObject = CreateLayerObject("ClusterContent_Curved", 0f, centerOffset);
@@ -376,10 +377,11 @@ public class ClusterVisualCurved : MonoBehaviour
             _backgroundMaterial = new Material(shader);
         }
 
-        // Calculate cluster dimensions using board width (matches mesh generation)
-        float boardWidth = _cachedPanelWidth * (1f - 2f * contentMarginH);
-        float clusterWidth = _cachedPanelCount * boardWidth;
-        float clusterHeight = _cachedPanelHeight;
+        // Calculate cluster dimensions matching expanded mesh generation formula:
+        // Mesh: (panelCount * panelWidth + glowExpansion*2) * (1 - 2*marginH)
+        float totalPanelWidth = _cachedPanelCount * _cachedPanelWidth + glowExpansion * 2f;
+        float clusterWidth = totalPanelWidth * (1f - 2f * contentMarginH);
+        float clusterHeight = _cachedPanelHeight + glowExpansion * 2f;
 
         _backgroundMaterial.SetFloat("_ClusterWidth", clusterWidth);
         _backgroundMaterial.SetFloat("_ClusterHeight", clusterHeight);
@@ -460,9 +462,10 @@ public class ClusterVisualCurved : MonoBehaviour
             _borderMaterial = new Material(shader);
         }
 
-        // Use board width + glow expansion (matches expanded mesh generation)
-        float boardWidth = _cachedPanelWidth * (1f - 2f * contentMarginH);
-        float clusterWidth = _cachedPanelCount * boardWidth + glowExpansion * 2f;
+        // Calculate cluster dimensions matching expanded mesh generation formula:
+        // Mesh: (panelCount * panelWidth + glowExpansion*2) * (1 - 2*marginH)
+        float totalPanelWidth = _cachedPanelCount * _cachedPanelWidth + glowExpansion * 2f;
+        float clusterWidth = totalPanelWidth * (1f - 2f * contentMarginH);
         float clusterHeight = _cachedPanelHeight + glowExpansion * 2f;
 
         _borderMaterial.SetFloat("_ClusterWidth", clusterWidth);
