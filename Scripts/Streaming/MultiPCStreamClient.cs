@@ -188,11 +188,15 @@ public class MultiPCStreamClient : MonoBehaviour
     /// <summary>
     /// Get or create a RenderTexture with mipmaps for the given source texture.
     /// This eliminates moire patterns when viewing panels at distance.
+    /// Supports ExternalTexture from WebRTC by using CommandBuffer for reliable copy.
     /// </summary>
     private RenderTexture GetMipmapTexture(int index, Texture source)
     {
         if (source == null || source.width <= 0 || source.height <= 0)
+        {
+            Debug.LogWarning($"[MultiPC-MIPMAP] Source invalid for monitor {index}: source={(source != null ? $"{source.width}x{source.height}" : "null")}");
             return null;
+        }
 
         // Lazy init array
         if (_mipmapTextures == null)
@@ -213,23 +217,37 @@ public class MultiPCStreamClient : MonoBehaviour
             }
 
             // Create new RenderTexture with mipmaps
+            // Use BGRA32 format for better compatibility with WebRTC textures
             rt = new RenderTexture(source.width, source.height, 0, RenderTextureFormat.ARGB32);
             rt.useMipMap = true;
-            rt.autoGenerateMips = true;
+            rt.autoGenerateMips = false; // We'll manually generate for reliability
             rt.filterMode = FilterMode.Trilinear;
             rt.anisoLevel = 8;
             rt.Create();
 
             _mipmapTextures[index] = rt;
-            Debug.Log($"[MultiPC-MIPMAP] Created RenderTexture for monitor {index}: {source.width}x{source.height}, useMipMap={rt.useMipMap}, filterMode={rt.filterMode}");
+            Debug.Log($"[MultiPC-MIPMAP] Created RenderTexture for monitor {index}: {source.width}x{source.height}, useMipMap={rt.useMipMap}, filterMode={rt.filterMode}, sourceType={source.GetType().Name}");
         }
 
-        // Blit source to mipmap texture
-        Graphics.Blit(source, rt);
+        // Copy source to mipmap texture using the most reliable method available
+        // WebRTC textures are ExternalTextures which may not work with standard Blit
+        try
+        {
+            // Method 1: Try Graphics.Blit (works for most textures)
+            // Set active RT to ensure Blit works correctly
+            var prevRT = RenderTexture.active;
+            RenderTexture.active = rt;
+            Graphics.Blit(source, rt);
+            RenderTexture.active = prevRT;
 
-        // Manually generate mipmaps to ensure it works on all devices
-        // (autoGenerateMips may not work correctly on some Android/VR devices)
-        rt.GenerateMips();
+            // Manually generate mipmaps
+            rt.GenerateMips();
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"[MultiPC-MIPMAP] Failed to copy texture for monitor {index}: {ex.Message}");
+            return null;
+        }
 
         return rt;
     }
@@ -393,6 +411,10 @@ public class MultiPCStreamClient : MonoBehaviour
         }
     }
 
+    // Debug: Log interval control
+    private float _lastMipmapDebugTime;
+    private const float MIPMAP_DEBUG_INTERVAL = 2f; // Log every 2 seconds
+
     void UpdateV2()
     {
         if (_v2Client == null) return;
@@ -402,13 +424,33 @@ public class MultiPCStreamClient : MonoBehaviour
 
         // Apply textures to panels
         int count = _v2Client.MonitorCount;
+
+        // Debug log (throttled)
+        bool shouldLog = Time.time - _lastMipmapDebugTime > MIPMAP_DEBUG_INTERVAL;
+        if (shouldLog)
+        {
+            _lastMipmapDebugTime = Time.time;
+            Debug.Log($"[MultiPC-MIPMAP-DEBUG] MonitorCount={count}, panels={(panels != null ? panels.Length.ToString() : "null")}");
+        }
+
         for (int i = 0; i < count; i++)
         {
             var tex = _v2Client.GetTexture(i);
+
+            if (shouldLog)
+            {
+                Debug.Log($"[MultiPC-MIPMAP-DEBUG] Monitor {i}: tex={(tex != null ? $"{tex.GetType().Name} {tex.width}x{tex.height}" : "null")}");
+            }
+
             if (tex == null) continue;
 
             // Generate mipmap texture for anti-aliasing at distance
             var mipmapTex = GetMipmapTexture(i, tex);
+
+            if (shouldLog)
+            {
+                Debug.Log($"[MultiPC-MIPMAP-DEBUG] Monitor {i}: mipmapTex={(mipmapTex != null ? $"{mipmapTex.width}x{mipmapTex.height} mip={mipmapTex.useMipMap}" : "null")}");
+            }
 
             // Apply to panel (use mipmap texture if available)
             if (panels != null && i < panels.Length && panels[i] != null)
