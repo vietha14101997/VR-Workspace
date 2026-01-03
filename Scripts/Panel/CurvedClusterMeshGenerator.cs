@@ -42,10 +42,13 @@ public static class CurvedClusterMeshGenerator
         // Calculate board width (panel minus margins) - matches WorldPanelClusterRig positioning
         // This ensures mesh arc angle matches actual panel arrangement
         float boardWidth = panelWidth * (1f - 2f * contentMarginH);
-        float totalBoardWidth = panelCount * boardWidth;
 
-        // Total arc angle based on board widths (where content meets)
-        float totalArcAngleRad = 2f * Mathf.Atan(totalBoardWidth / 2f / arcRadius);
+        // IMPORTANT: Arc angle calculation must match WorldPanelClusterRig.LayoutFromCamera()
+        // Each panel occupies an arc angle of 2*atan(boardWidth/2/radius)
+        // Total arc = sum of individual panel angles, NOT atan(totalWidth/2/radius)
+        // Using atan(totalWidth) gives wrong result because atan(A+B) != atan(A) + atan(B)
+        float boardAngleRad = 2f * Mathf.Atan(boardWidth / 2f / arcRadius);
+        float totalArcAngleRad = panelCount * boardAngleRad;
 
         int totalHorizontalSegments = panelCount * segmentsPerPanel;
         int vertexCountX = totalHorizontalSegments + 1;

@@ -21,7 +21,7 @@ public class ClusterVisualCurved : MonoBehaviour
     [SerializeField] private float glowExpansion = 0.05f;
     [SerializeField] private float contentMarginH = 0.04f;
     [SerializeField] private float contentMarginV = 0.045f;
-    [SerializeField] private float blendZoneWidth = 0.05f;
+    [SerializeField] private float blendZoneWidth = 0f;
 
     [Header("Glass Colors")]
     [SerializeField] private Color glassColorA = new Color(0f, 0.55f, 0.65f, 0.35f);
@@ -271,6 +271,16 @@ public class ClusterVisualCurved : MonoBehaviour
         _cachedPanelWidth = panelWidth;
         _cachedPanelHeight = panelHeight;
         _cachedArcRadius = arcRadius;
+
+        // Debug: Log mesh generation parameters with correct arc angle calculation
+        float boardWidth = panelWidth * (1f - 2f * contentMarginH);
+        float boardAngleRad = 2f * Mathf.Atan(boardWidth / 2f / arcRadius);
+        float totalArcAngleRad = panelCount * boardAngleRad;
+        float arcLength = totalArcAngleRad * arcRadius;
+        Debug.Log($"[ClusterVisualCurved] Mesh Gen - panelWidth: {panelWidth:F3}m, panelHeight: {panelHeight:F3}m, " +
+            $"panelCount: {panelCount}, arcRadius: {arcRadius:F2}m, marginH: {contentMarginH}");
+        Debug.Log($"[ClusterVisualCurved] Arc angle per panel: {boardAngleRad * Mathf.Rad2Deg:F1}°, " +
+            $"Total arc angle: {totalArcAngleRad * Mathf.Rad2Deg:F1}°, Arc length: {arcLength:F3}m");
     }
 
     #endregion
@@ -354,6 +364,32 @@ public class ClusterVisualCurved : MonoBehaviour
 
     #region Material Application
 
+    /// <summary>
+    /// Calculate arc-based dimensions for shader.
+    /// Must match CurvedClusterMeshGenerator's arc angle calculation.
+    /// </summary>
+    private void CalculateArcDimensions(bool expanded, out float arcWidth, out float height)
+    {
+        float boardWidth = _cachedPanelWidth * (1f - 2f * contentMarginH);
+
+        if (expanded)
+        {
+            // For expanded mesh, add glow expansion to board width per panel
+            boardWidth += (glowExpansion * 2f / _cachedPanelCount);
+        }
+
+        // Arc angle per panel: 2 * atan(boardWidth / 2 / radius)
+        // This matches WorldPanelClusterRig.LayoutFromCamera() and CurvedClusterMeshGenerator.Generate()
+        float boardAngleRad = 2f * Mathf.Atan(boardWidth / 2f / _cachedArcRadius);
+        float totalArcAngleRad = _cachedPanelCount * boardAngleRad;
+
+        // Arc length = angle * radius (this is the "unrolled" width of the curved mesh)
+        arcWidth = totalArcAngleRad * _cachedArcRadius;
+
+        // Height doesn't change with arc (it's perpendicular to the arc plane)
+        height = expanded ? _cachedPanelHeight + glowExpansion * 2f : _cachedPanelHeight;
+    }
+
     private void ApplyMaterials()
     {
         ApplyBackgroundMaterial();
@@ -377,11 +413,8 @@ public class ClusterVisualCurved : MonoBehaviour
             _backgroundMaterial = new Material(shader);
         }
 
-        // Calculate cluster dimensions matching expanded mesh generation formula:
-        // Mesh: (panelCount * panelWidth + glowExpansion*2) * (1 - 2*marginH)
-        float totalPanelWidth = _cachedPanelCount * _cachedPanelWidth + glowExpansion * 2f;
-        float clusterWidth = totalPanelWidth * (1f - 2f * contentMarginH);
-        float clusterHeight = _cachedPanelHeight + glowExpansion * 2f;
+        // Calculate arc-based dimensions (expanded mesh for background)
+        CalculateArcDimensions(expanded: true, out float clusterWidth, out float clusterHeight);
 
         _backgroundMaterial.SetFloat("_ClusterWidth", clusterWidth);
         _backgroundMaterial.SetFloat("_ClusterHeight", clusterHeight);
@@ -422,10 +455,8 @@ public class ClusterVisualCurved : MonoBehaviour
             _contentMaterial = new Material(shader);
         }
 
-        // Use board width (matches mesh generation)
-        float boardWidth = _cachedPanelWidth * (1f - 2f * contentMarginH);
-        float clusterWidth = _cachedPanelCount * boardWidth;
-        float clusterHeight = _cachedPanelHeight;
+        // Calculate arc-based dimensions (non-expanded mesh for content)
+        CalculateArcDimensions(expanded: false, out float clusterWidth, out float clusterHeight);
 
         _contentMaterial.SetInt("_PanelCount", _cachedPanelCount);
         _contentMaterial.SetFloat("_ClusterWidth", clusterWidth);
@@ -462,11 +493,8 @@ public class ClusterVisualCurved : MonoBehaviour
             _borderMaterial = new Material(shader);
         }
 
-        // Calculate cluster dimensions matching expanded mesh generation formula:
-        // Mesh: (panelCount * panelWidth + glowExpansion*2) * (1 - 2*marginH)
-        float totalPanelWidth = _cachedPanelCount * _cachedPanelWidth + glowExpansion * 2f;
-        float clusterWidth = totalPanelWidth * (1f - 2f * contentMarginH);
-        float clusterHeight = _cachedPanelHeight + glowExpansion * 2f;
+        // Calculate arc-based dimensions (expanded mesh for border)
+        CalculateArcDimensions(expanded: true, out float clusterWidth, out float clusterHeight);
 
         _borderMaterial.SetFloat("_ClusterWidth", clusterWidth);
         _borderMaterial.SetFloat("_ClusterHeight", clusterHeight);

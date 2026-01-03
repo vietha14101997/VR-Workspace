@@ -226,11 +226,20 @@ Shader "Custom/ClusterContentCurved"
             fixed4 frag(v2f i) : SV_Target
             {
                 float2 localPos = i.localPos;
-                float panelFrac = i.panelInfo.x;
-                int panelIndex = (int)i.panelInfo.y;
 
-                // Clamp panel index to valid range
-                panelIndex = clamp(panelIndex, 0, _PanelCount - 1);
+                // IMPORTANT: Calculate panelIndex and panelFrac from globalUV instead of using
+                // interpolated values from vertex shader. GPU interpolation of panelIndex causes
+                // incorrect panel assignment at boundaries (e.g., 0.5 between panel 0 and 1).
+                float panelIndexFloat = i.globalUV.x * _PanelCount;
+                int panelIndex = clamp((int)floor(panelIndexFloat), 0, _PanelCount - 1);
+                float panelFrac = panelIndexFloat - float(panelIndex);
+
+                // Handle edge case at UV = 1.0
+                if (i.globalUV.x >= 0.9999)
+                {
+                    panelIndex = _PanelCount - 1;
+                    panelFrac = 1.0;
+                }
 
                 // === ROUNDED CORNERS (outer only) ===
                 float2 halfSize = float2(_ClusterWidth, _ClusterHeight) * 0.5;
@@ -249,6 +258,9 @@ Shader "Custom/ClusterContentCurved"
                 // the mesh is already sized using boardWidth (panelWidth minus margins).
                 // Margins are handled by the mesh geometry itself.
 
+                // Build panelUV from calculated values (not interpolated from vertex shader)
+                float2 panelUV = float2(panelFrac, i.globalUV.y);
+
                 // === BLEND ZONE CALCULATION ===
                 // panelFrac goes 0-1 within each panel
                 // Blend at boundaries (near 0 and near 1)
@@ -261,8 +273,8 @@ Shader "Custom/ClusterContentCurved"
                     float blend = panelFrac / _BlendZone;
                     blend = smoothstep(0.0, 1.0, blend);
 
-                    float4 leftColor = SamplePanel(panelIndex - 1, float2(1.0, i.panelUV.y));
-                    float4 rightColor = SamplePanel(panelIndex, i.panelUV);
+                    float4 leftColor = SamplePanel(panelIndex - 1, float2(1.0, panelUV.y));
+                    float4 rightColor = SamplePanel(panelIndex, panelUV);
 
                     finalColor = lerp(leftColor, rightColor, blend);
                 }
@@ -272,15 +284,15 @@ Shader "Custom/ClusterContentCurved"
                     float blend = (panelFrac - (1.0 - _BlendZone)) / _BlendZone;
                     blend = smoothstep(0.0, 1.0, blend);
 
-                    float4 leftColor = SamplePanel(panelIndex, i.panelUV);
-                    float4 rightColor = SamplePanel(panelIndex + 1, float2(0.0, i.panelUV.y));
+                    float4 leftColor = SamplePanel(panelIndex, panelUV);
+                    float4 rightColor = SamplePanel(panelIndex + 1, float2(0.0, panelUV.y));
 
                     finalColor = lerp(leftColor, rightColor, blend);
                 }
                 else
                 {
                     // Center - just sample current panel
-                    finalColor = SamplePanel(panelIndex, i.panelUV);
+                    finalColor = SamplePanel(panelIndex, panelUV);
                 }
 
                 finalColor.a *= alphaMask;

@@ -237,10 +237,21 @@ public class WorldPanelClusterRig : MonoBehaviour
     {
         _panels.Clear();
 
+        // Load sample textures for testing curved mode
+        Texture2D[] sampleTextures = LoadSampleTextures();
+
         for (int i = 0; i < count; i++)
         {
             string name = $"Panel_{i}";
             var p = CreateOne(name);
+
+            // Assign sample texture for visual testing (cycle through available samples)
+            if (sampleTextures.Length > 0)
+            {
+                p.contentTexture = sampleTextures[i % sampleTextures.Length];
+                p.Apply(); // Apply to update board texture
+            }
+
             _panels.Add(p);
         }
 
@@ -255,6 +266,32 @@ public class WorldPanelClusterRig : MonoBehaviour
                 _panels[i].Apply();
             }
         }
+    }
+
+    /// <summary>
+    /// Load sample textures from Resources for visual testing
+    /// </summary>
+    Texture2D[] LoadSampleTextures()
+    {
+        var textures = new System.Collections.Generic.List<Texture2D>();
+
+        // Try to load sample_1 and sample_2 from Resources/WorldPanelPlus/
+        var sample1 = Resources.Load<Texture2D>("WorldPanelPlus/sample_1");
+        var sample2 = Resources.Load<Texture2D>("WorldPanelPlus/sample_2");
+
+        if (sample1 != null) textures.Add(sample1);
+        if (sample2 != null) textures.Add(sample2);
+
+        if (textures.Count == 0)
+        {
+            Debug.LogWarning("[WorldPanelClusterRig] No sample textures found in Resources/WorldPanelPlus/");
+        }
+        else
+        {
+            Debug.Log($"[WorldPanelClusterRig] Loaded {textures.Count} sample textures for testing");
+        }
+
+        return textures.ToArray();
     }
 
     WorldPanelPlus CreateOne(string name)
