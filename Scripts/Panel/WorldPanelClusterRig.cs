@@ -49,7 +49,7 @@ public class WorldPanelClusterRig : MonoBehaviour
     [Tooltip("Enable seamless glass background and glowing border across all panels")]
     public bool enableClusterVisuals = true;
     [Tooltip("Use curved mesh visual (true) or per-panel visual (false). Curved provides true seamless appearance.")]
-    public bool useCurvedVisual = false;
+    public bool useCurvedVisual = true;
 
     private ClusterVisualCurved _curvedVisual;
 
