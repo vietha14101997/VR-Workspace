@@ -217,15 +217,19 @@ public class MultiPCStreamClient : MonoBehaviour
             rt.useMipMap = true;
             rt.autoGenerateMips = true;
             rt.filterMode = FilterMode.Trilinear;
-            rt.anisoLevel = 4;
+            rt.anisoLevel = 8;
             rt.Create();
 
             _mipmapTextures[index] = rt;
             Debug.Log($"[MultiPC] Created mipmap RenderTexture for monitor {index}: {source.width}x{source.height}");
         }
 
-        // Blit source to mipmap texture (auto-generates mipmaps)
+        // Blit source to mipmap texture
         Graphics.Blit(source, rt);
+
+        // Manually generate mipmaps to ensure it works on all devices
+        // (autoGenerateMips may not work correctly on some Android/VR devices)
+        rt.GenerateMips();
 
         return rt;
     }
