@@ -30,6 +30,11 @@ public class RTTRemoteMenuController : MonoBehaviour
 
     // Cursor tracking
     private int _activeCursorPanelIndex = -1;
+
+    // Mipmap textures for anti-aliasing at distance
+    private RenderTexture[] _mipmapTextures;
+    private float _lastMipmapDebugTime;
+    private const float MIPMAP_DEBUG_INTERVAL = 2f;
     #endregion
 
     #region Events
@@ -164,6 +169,9 @@ public class RTTRemoteMenuController : MonoBehaviour
         CleanupProgressOverlays();
         _isStreamingActive = false;
 
+        // Cleanup mipmap textures
+        CleanupMipmapTextures();
+
         // Stop WebRTC update coroutine
         if (_webrtcUpdateCoroutine != null)
         {
@@ -183,6 +191,7 @@ public class RTTRemoteMenuController : MonoBehaviour
 
     /// <summary>
     /// Poll textures from ViewModel and apply to panels when streaming.
+    /// Uses mipmap textures to eliminate aliasing artifacts at distance.
     /// </summary>
     void Update()
     {
@@ -205,15 +214,34 @@ public class RTTRemoteMenuController : MonoBehaviour
         var panels = _clusterRig.panels;
         if (panels == null || panels.Count == 0) return;
 
+        // Debug log (throttled)
+        bool shouldLog = Time.time - _lastMipmapDebugTime > MIPMAP_DEBUG_INTERVAL;
+        if (shouldLog)
+        {
+            _lastMipmapDebugTime = Time.time;
+            Debug.Log($"[RTTRemote-MIPMAP] Polling {panels.Count} panels, phase={phase}");
+        }
+
         for (int i = 0; i < panels.Count; i++)
         {
             var panel = panels[i];
             if (panel == null) continue;
 
             var tex = _viewModel.GetTexture(i);
-            if (tex != null && panel.contentTexture != tex)
+            if (tex == null) continue;
+
+            // Generate mipmap texture for anti-aliasing at distance
+            var mipmapTex = GetMipmapTexture(i, tex);
+            var finalTex = mipmapTex != null ? (Texture)mipmapTex : tex;
+
+            if (shouldLog)
             {
-                panel.contentTexture = tex;
+                Debug.Log($"[RTTRemote-MIPMAP] Panel {i}: src={tex.GetType().Name} {tex.width}x{tex.height}, mipmap={(mipmapTex != null ? "OK" : "null")}");
+            }
+
+            if (panel.contentTexture != finalTex)
+            {
+                panel.contentTexture = finalTex;
                 panel.Apply();
 
                 // Hide progress overlay when first texture arrives
@@ -223,6 +251,67 @@ public class RTTRemoteMenuController : MonoBehaviour
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Get or create a RenderTexture with mipmaps for anti-aliasing.
+    /// This eliminates moire/aliasing artifacts when viewing panels at distance.
+    /// </summary>
+    private RenderTexture GetMipmapTexture(int index, Texture source)
+    {
+        if (source == null || source.width <= 0 || source.height <= 0)
+        {
+            return null;
+        }
+
+        // Lazy init array
+        if (_mipmapTextures == null)
+            _mipmapTextures = new RenderTexture[16]; // Max 16 monitors
+
+        if (index < 0 || index >= _mipmapTextures.Length)
+            return null;
+
+        // Check if we need to create or resize
+        var rt = _mipmapTextures[index];
+        if (rt == null || rt.width != source.width || rt.height != source.height)
+        {
+            // Cleanup old
+            if (rt != null)
+            {
+                rt.Release();
+                Destroy(rt);
+            }
+
+            // Create new RenderTexture with mipmaps
+            rt = new RenderTexture(source.width, source.height, 0, RenderTextureFormat.ARGB32);
+            rt.useMipMap = true;
+            rt.autoGenerateMips = false; // Manual generation for reliability
+            rt.filterMode = FilterMode.Trilinear;
+            rt.anisoLevel = 8;
+            rt.Create();
+
+            _mipmapTextures[index] = rt;
+            Debug.Log($"[RTTRemote-MIPMAP] Created mipmap RT for panel {index}: {source.width}x{source.height}, sourceType={source.GetType().Name}");
+        }
+
+        // Copy source to mipmap texture
+        try
+        {
+            var prevRT = RenderTexture.active;
+            RenderTexture.active = rt;
+            Graphics.Blit(source, rt);
+            RenderTexture.active = prevRT;
+
+            // Generate mipmaps
+            rt.GenerateMips();
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"[RTTRemote-MIPMAP] Failed to copy texture for panel {index}: {ex.Message}");
+            return null;
+        }
+
+        return rt;
     }
 
     /// <summary>
@@ -418,6 +507,24 @@ public class RTTRemoteMenuController : MonoBehaviour
             }
         }
         _progressOverlays.Clear();
+    }
+
+    /// <summary>
+    /// Cleanup mipmap RenderTextures.
+    /// </summary>
+    private void CleanupMipmapTextures()
+    {
+        if (_mipmapTextures == null) return;
+
+        foreach (var rt in _mipmapTextures)
+        {
+            if (rt != null)
+            {
+                rt.Release();
+                Destroy(rt);
+            }
+        }
+        _mipmapTextures = null;
     }
 
     /// <summary>
