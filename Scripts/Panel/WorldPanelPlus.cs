@@ -323,7 +323,8 @@ public class WorldPanelPlus : MonoBehaviour
                 mr.sharedMaterial.mainTexture = GetSafeTex(contentTexture);
 
                 // Apply texture quality settings for video streaming
-                if (contentTexture != null && contentTexture != Texture2D.blackTexture)
+                // Skip for RenderTexture - already configured with mipmaps by MultiPCStreamClient
+                if (contentTexture != null && contentTexture != Texture2D.blackTexture && !(contentTexture is RenderTexture))
                 {
                     contentTexture.filterMode = textureFilterMode;
                     contentTexture.anisoLevel = anisoLevel;

@@ -221,7 +221,7 @@ public class MultiPCStreamClient : MonoBehaviour
             rt.Create();
 
             _mipmapTextures[index] = rt;
-            Debug.Log($"[MultiPC] Created mipmap RenderTexture for monitor {index}: {source.width}x{source.height}");
+            Debug.Log($"[MultiPC-MIPMAP] Created RenderTexture for monitor {index}: {source.width}x{source.height}, useMipMap={rt.useMipMap}, filterMode={rt.filterMode}");
         }
 
         // Blit source to mipmap texture
