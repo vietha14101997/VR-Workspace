@@ -42,6 +42,10 @@ namespace VRWorkspace.Streaming
         private TaskCompletionSource<bool> _allAnswersReceivedTcs; // Event-driven answer waiting
         private bool _streamingStartedFired; // Track if OnStreamingStarted was already fired
 
+        // Frame timing sync (for latency calculation)
+        private long _serverClockOffset; // Difference between client and server time (ms)
+        private float _lastServerTargetFps = 60f; // Last known target FPS from server
+
         // Events
         public event Action<ServerHardwareInfo> OnHardwareInfoReceived;
         public event Action<NetworkTestResult> OnNetworkInfoReceived;
@@ -54,6 +58,8 @@ namespace VRWorkspace.Streaming
         public event Action<string> OnError;
         public event Action OnDisconnected;
         public event Action<int, float, float, bool> OnCursorPosition; // monitorIndex, u, v, visible
+        public event Action<int, float> OnFpsAdjusted; // monitorIndex, targetFps - server adjusted encoding FPS
+        public event Action<long, long> OnFrameTimingReceived; // serverTime, clockOffset - for latency calculation
 
         // Progress tracking events for UI
         public event Action<int> OnServerSetupProgress;         // 0-100 server setup progress
@@ -96,6 +102,8 @@ namespace VRWorkspace.Streaming
         public int MonitorCount => _peerConnections.Count;
         public bool IsConnected => _ws?.State == WebSocketState.Open;
         public bool IsStreaming => _stateMachine.IsStreaming;
+        public long ServerClockOffset => _serverClockOffset; // For external latency calculations
+        public float ServerTargetFps => _lastServerTargetFps; // Current target FPS from server
 
         /// <summary>
         /// Get video texture for a specific monitor.
@@ -620,7 +628,13 @@ namespace VRWorkspace.Streaming
                             break;
 
                         case "frameTiming":
-                            // Diagnostic message from server - ignore (or could be used for frame timing analysis)
+                            // Server frame timing for clock sync and latency calculation
+                            HandleFrameTiming(json);
+                            break;
+
+                        case "fps_adjusted":
+                            // Server response to fps_feedback - indicates encoding FPS was adjusted
+                            HandleFpsAdjusted(json);
                             break;
 
                         case "skip_to_live_ack":
@@ -1306,7 +1320,7 @@ namespace VRWorkspace.Streaming
                     {
                         trackWrappers[0].IsReconnecting = true;
                         Debug.Log("[PhaseProtocol] Single-PC initiating full reconnect...");
-                        // TODO: Implement full reconnect for single-PC mode
+                        _ = ReconnectSinglePCAsync();
                     }
                 }
             };
@@ -2152,6 +2166,51 @@ namespace VRWorkspace.Streaming
         }
 
         /// <summary>
+        /// Reconnect Single-PC Multi-Track mode by recreating the PeerConnection with all transceivers.
+        /// Called when the shared PeerConnection fails or disconnects during streaming.
+        /// </summary>
+        private async Task ReconnectSinglePCAsync()
+        {
+            // Don't reconnect if application is shutting down
+            if (_cts == null || _cts.IsCancellationRequested) return;
+
+            // Get current monitor count
+            int count;
+            RTCPeerConnection oldPc;
+            lock (_lock)
+            {
+                count = _peerConnections.Count;
+                if (count == 0)
+                {
+                    Debug.LogWarning("[PhaseProtocol] ReconnectSinglePC: No monitors to reconnect");
+                    return;
+                }
+                oldPc = _peerConnections[0].PC;
+            }
+
+            Debug.Log($"[PhaseProtocol] ReconnectSinglePC: Reconnecting {count} monitors...");
+
+            // Close old PeerConnection
+            try
+            {
+                oldPc?.Close();
+                oldPc?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[PhaseProtocol] Error closing old PC: {ex.Message}");
+            }
+
+            // Reset answer TCS for new session
+            _allAnswersReceivedTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            // Recreate everything using the same method as initial connection
+            await CreateSinglePCMultiTrackAsync(count);
+
+            Debug.Log("[PhaseProtocol] ReconnectSinglePC: Reconnection initiated, waiting for answer...");
+        }
+
+        /// <summary>
         /// Check if all monitors are connected and fire OnAllMonitorsReady event.
         /// </summary>
         private void CheckAllMonitorsConnected()
@@ -2341,6 +2400,41 @@ namespace VRWorkspace.Streaming
 
             // Invoke event for ClusterAutoBinder to handle
             OnCursorPosition?.Invoke(monitorIndex, u, v, visible);
+        }
+
+        /// <summary>
+        /// Handle frame timing message from server for clock synchronization.
+        /// Used to calculate latency and sync client/server clocks.
+        /// </summary>
+        private void HandleFrameTiming(SimpleJson json)
+        {
+            long serverTime = json.GetLong("serverTime");
+            if (serverTime <= 0) return;
+
+            long clientTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            _serverClockOffset = clientTime - serverTime;
+
+            // Also available: currentFrame, recentFrames[] for advanced frame analysis
+            // var currentFrame = json.GetLong("currentFrame");
+            // var recentFrames = json.GetArray("recentFrames");
+
+            OnFrameTimingReceived?.Invoke(serverTime, _serverClockOffset);
+        }
+
+        /// <summary>
+        /// Handle FPS adjusted message from server.
+        /// Server sends this in response to fps_feedback to indicate encoding FPS was changed.
+        /// </summary>
+        private void HandleFpsAdjusted(SimpleJson json)
+        {
+            int monitorIndex = json.GetInt("monitorIndex");
+            double targetFpsD = json.GetDouble("targetFps");
+            float targetFps = targetFpsD > 0 ? (float)targetFpsD : 60f;
+
+            _lastServerTargetFps = targetFps;
+            Debug.Log($"[PhaseProtocol] Server adjusted FPS: monitor {monitorIndex} → {targetFps:F1} fps");
+
+            OnFpsAdjusted?.Invoke(monitorIndex, targetFps);
         }
 
         // === Error Handler ===
