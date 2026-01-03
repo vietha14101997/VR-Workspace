@@ -35,7 +35,7 @@ public class WorldPanelClusterRig : MonoBehaviour
     [Header("Layout")]
     [Tooltip("Dynamic: panels spread evenly. FixedThreeSlot: panels use fixed 3-slot positions (max 3 panels)")]
     public ClusterLayoutMode layoutMode = ClusterLayoutMode.FixedThreeSlot;
-    public float distanceFromCamera = 2.0f;
+    public float distanceFromCamera = 1.5f;
     [Tooltip("Extra gap in meters between panel edges (0 = edges touch)")]
     [Range(0f, 0.1f)] public float edgeGapMeters = 0f;
     [Tooltip("Whether panels should face directly toward camera (true) or have limited tilt (false)")]
@@ -44,7 +44,7 @@ public class WorldPanelClusterRig : MonoBehaviour
     public bool faceCameraYawOnly = true;
     [Tooltip("Overlap amount (in meters) between adjacent panels to eliminate seams")]
     [Range(0f, 0.01f)] public float panelOverlap = 0.01f;
-
+1
     [Header("Cluster Visuals")]
     [Tooltip("Enable seamless glass background and glowing border across all panels")]
     public bool enableClusterVisuals = true;
