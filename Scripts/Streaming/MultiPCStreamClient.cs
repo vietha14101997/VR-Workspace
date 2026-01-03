@@ -106,7 +106,10 @@ public class MultiPCStreamClient : MonoBehaviour
     private ClientWebSocket _ws;
     private CancellationTokenSource _cts;
     private readonly List<PCWrapper> _pcs = new();
-    
+
+    // Mipmap RenderTextures for anti-aliasing at distance
+    private RenderTexture[] _mipmapTextures;
+
     private class PCWrapper
     {
         public int Index;
@@ -180,6 +183,51 @@ public class MultiPCStreamClient : MonoBehaviour
         }
         catch { }
         return panels?.Length > 0 ? panels.Length : 2;
+    }
+
+    /// <summary>
+    /// Get or create a RenderTexture with mipmaps for the given source texture.
+    /// This eliminates moire patterns when viewing panels at distance.
+    /// </summary>
+    private RenderTexture GetMipmapTexture(int index, Texture source)
+    {
+        if (source == null || source.width <= 0 || source.height <= 0)
+            return null;
+
+        // Lazy init array
+        if (_mipmapTextures == null)
+            _mipmapTextures = new RenderTexture[16]; // Max 16 monitors
+
+        if (index < 0 || index >= _mipmapTextures.Length)
+            return null;
+
+        // Check if we need to create or resize
+        var rt = _mipmapTextures[index];
+        if (rt == null || rt.width != source.width || rt.height != source.height)
+        {
+            // Cleanup old
+            if (rt != null)
+            {
+                rt.Release();
+                Destroy(rt);
+            }
+
+            // Create new RenderTexture with mipmaps
+            rt = new RenderTexture(source.width, source.height, 0, RenderTextureFormat.ARGB32);
+            rt.useMipMap = true;
+            rt.autoGenerateMips = true;
+            rt.filterMode = FilterMode.Trilinear;
+            rt.anisoLevel = 4;
+            rt.Create();
+
+            _mipmapTextures[index] = rt;
+            Debug.Log($"[MultiPC] Created mipmap RenderTexture for monitor {index}: {source.width}x{source.height}");
+        }
+
+        // Blit source to mipmap texture (auto-generates mipmaps)
+        Graphics.Blit(source, rt);
+
+        return rt;
     }
 
     async void Start()
@@ -329,14 +377,13 @@ public class MultiPCStreamClient : MonoBehaviour
 
             if (wrapper.Texture == null) continue;
 
-            // Apply texture quality settings for VR clarity
-            wrapper.Texture.filterMode = FilterMode.Trilinear;
-            wrapper.Texture.anisoLevel = 8;
+            // Generate mipmap texture for anti-aliasing at distance
+            var mipmapTex = GetMipmapTexture(i, wrapper.Texture);
 
-            // Apply to panel
+            // Apply to panel (use mipmap texture if available)
             if (panels != null && i < panels.Length && panels[i] != null)
             {
-                panels[i].contentTexture = wrapper.Texture;
+                panels[i].contentTexture = mipmapTex != null ? mipmapTex : wrapper.Texture;
                 panels[i].Apply();
             }
         }
@@ -356,13 +403,13 @@ public class MultiPCStreamClient : MonoBehaviour
             var tex = _v2Client.GetTexture(i);
             if (tex == null) continue;
 
-            // Apply texture quality settings for VR clarity
-            tex.filterMode = FilterMode.Trilinear;
-            tex.anisoLevel = 8;
+            // Generate mipmap texture for anti-aliasing at distance
+            var mipmapTex = GetMipmapTexture(i, tex);
 
+            // Apply to panel (use mipmap texture if available)
             if (panels != null && i < panels.Length && panels[i] != null)
             {
-                panels[i].contentTexture = tex;
+                panels[i].contentTexture = mipmapTex != null ? mipmapTex : tex;
                 panels[i].Apply();
             }
         }
@@ -909,6 +956,19 @@ public class MultiPCStreamClient : MonoBehaviour
         {
             try { _v2Client.Dispose(); } catch { }
             _v2Client = null;
+        }
+
+        // Mipmap textures cleanup
+        if (_mipmapTextures != null)
+        {
+            foreach (var rt in _mipmapTextures)
+            {
+                if (rt != null)
+                {
+                    try { rt.Release(); Destroy(rt); } catch { }
+                }
+            }
+            _mipmapTextures = null;
         }
 
         // V1 Protocol cleanup
