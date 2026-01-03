@@ -186,8 +186,11 @@ public class MultiPCStreamClient : MonoBehaviour
     {
         Application.runInBackground = true; // Prevent throttling when not focused (critical for same-machine testing)
         StartCoroutine(WebRTC.Update());
-        QualitySettings.vSyncCount = 0;
-        Application.targetFrameRate = -1; // Uncapped for lower input latency
+        // IMPORTANT: Enable VSync to prevent screen tearing (diagonal stripe artifacts)
+        // VSync=1 synchronizes frame presentation with display refresh
+        // This eliminates mid-frame texture update artifacts
+        QualitySettings.vSyncCount = 1;
+        Application.targetFrameRate = 60; // Lock to 60fps for smooth streaming
         _cts = new CancellationTokenSource();
 
         // V2 Protocol: Wait for manual connection if autoStartConnection is false

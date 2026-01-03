@@ -9,7 +9,7 @@ public class APBootstrap : MonoBehaviour
     void Awake()
     {
         Application.targetFrameRate = 60;      // Cardboard/stream: giữ 60 cho ổn định
-        QualitySettings.vSyncCount = 0;        // tránh vSync cản targetFrameRate
+        QualitySettings.vSyncCount = 1;        // BẬT vSync để tránh tearing (sọc chéo)
         Screen.sleepTimeout = SleepTimeout.NeverSleep;
 
         // Initialize Android streaming helper for Wi-Fi Lock, Wake Lock, etc.

@@ -29,6 +29,14 @@ public class WorldPanelPlus : MonoBehaviour
     [Tooltip("Anisotropic filtering level (1-16). Higher = sharper at angles.")]
     [Range(1, 16)] public int anisoLevel = 8;
 
+    [Header("Video Sharpening (disable if image has artifacts)")]
+    [Tooltip("Enable shader-based sharpening. Disable if you see color artifacts or noise.")]
+    public bool enableSharpening = false;  // Default OFF - thử nghiệm cho chất lượng tốt hơn
+    [Tooltip("Sharpening strength (0-2). Higher = sharper but may cause artifacts.")]
+    [Range(0, 2)] public float sharpnessStrength = 0.5f;
+    [Tooltip("Chroma boost to reduce YUV 4:2:0 color bleeding (0-1).")]
+    [Range(0, 1)] public float chromaSharpness = 0.3f;
+
     [Header("Cursor")]
     public bool cursorEnable = true;
     public float cursorSpeedPerPixel = 0.0015f;
@@ -404,6 +412,14 @@ public class WorldPanelPlus : MonoBehaviour
                 _panelMat.SetFloat("_CornerRadius", boardCornerRadius);
             if (_panelMat.HasProperty("_EdgeFeather"))
                 _panelMat.SetFloat("_EdgeFeather", 0.003f);
+
+            // Video sharpening controls
+            if (_panelMat.HasProperty("_EnableSharpening"))
+                _panelMat.SetFloat("_EnableSharpening", enableSharpening ? 1f : 0f);
+            if (_panelMat.HasProperty("_Sharpness"))
+                _panelMat.SetFloat("_Sharpness", sharpnessStrength);
+            if (_panelMat.HasProperty("_ChromaSharpness"))
+                _panelMat.SetFloat("_ChromaSharpness", chromaSharpness);
         }
 
         if (_panelMat.HasProperty("_Surface")) _panelMat.SetFloat("_Surface", 1f);

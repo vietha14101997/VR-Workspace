@@ -25,11 +25,12 @@ Shader "Unlit/WorldPanelBoard"
         _EdgeMask ("Edge Mask (L,R,T,B)", Vector) = (1,1,1,1)
 
         // Video streaming quality enhancement
+        // NOTE: Sharpening disabled by default - can cause artifacts on some devices
         [Header(Streaming Quality)]
         _Sharpness ("Sharpness", Range(0, 2)) = 0.5
         _SharpnessRadius ("Sharpness Radius", Range(0.5, 3)) = 1.0
         _ChromaSharpness ("Chroma Sharpness", Range(0, 1)) = 0.3
-        _EnableSharpening ("Enable Sharpening", Float) = 1
+        _EnableSharpening ("Enable Sharpening", Float) = 0
     }
 
     SubShader
