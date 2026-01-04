@@ -97,6 +97,7 @@ namespace VRWorkspace.Streaming
             public IntPtr LastTexturePtr; // Track texture pointer for change detection
             public bool TexturePtrDetectionWorking; // True if we've detected texture ptr changes
             public DateTime FirstTextureTime; // When we first got a texture (for grace period)
+            public int RealFrameCount; // Count ONLY when texture pointer actually changes (for freeze detection)
             public TaskCompletionSource<bool> AnswerReceivedTcs; // For event-driven sequential mode
 
             // FPS feedback tracking (for adaptive encoding)
@@ -312,6 +313,21 @@ namespace VRWorkspace.Streaming
         private const float SkipToLiveCooldownSeconds = 2.0f; // Don't spam skip requests
         private const float FrameGapThresholdMs = 500f; // If no frames for 500ms, consider it stalled
         private const float MonitorDriftThresholdMs = 500f; // If monitors are >500ms apart, consider drift (was 200ms - too aggressive)
+
+        // Decoder freeze detection - compare server frame count with client rendered frames
+        // This catches cases where WebRTC texture is valid but decoder has stopped producing new pixels
+        private long _lastServerFrame = 0;           // currentFrame from last frameTiming message
+        private long _lastServerFrameTime = 0;       // When we received _lastServerFrame
+        private int _clientFramesAtLastCheck = 0;    // Total client rendered frames at check time
+        private int _realFramesAtLastCheck = 0;      // Real texture pointer changes (not fallback)
+        private const int DecoderFreezeThresholdFrames = 90;  // ~3s at 30fps: if server advances 90+ frames but client 0, decoder frozen
+        private const float DecoderFreezeCheckIntervalMs = 3000f; // Check every 3 seconds
+
+        // Preventive keyframe request for fallback mode
+        // When texture pointer detection doesn't work, we can't tell if decoder is frozen
+        // So we periodically request keyframes to "unstick" a potentially frozen decoder
+        private DateTime _lastPreventiveKeyframeTime = DateTime.MinValue;
+        private const float PreventiveKeyframeIntervalSeconds = 15f; // Request keyframe every 15s in fallback mode (aggressive to handle frozen decoders)
 
         // FPS Feedback constants (for adaptive encoding)
         private const float FPS_FEEDBACK_INTERVAL_SECONDS = 1.0f;  // Send feedback every 1s
@@ -2660,7 +2676,124 @@ namespace VRWorkspace.Streaming
                 }
             }
 
+            // === Decoder freeze detection ===
+            // Two detection modes:
+            // 1. When TexturePtrDetection works: Compare real frames (texture pointer changes) with server frames
+            // 2. Fallback mode: Can't detect real frames, so send preventive keyframes periodically
+            long currentFrame = json.GetLong("currentFrame");
+            if (currentFrame > 0)
+            {
+                long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                bool inFallbackMode = IsAnyMonitorInFallbackMode();
+
+                // Initialize on first frameTiming
+                if (_lastServerFrame == 0)
+                {
+                    _lastServerFrame = currentFrame;
+                    _lastServerFrameTime = now;
+                    _clientFramesAtLastCheck = GetTotalRenderedFrames();
+                    _realFramesAtLastCheck = GetTotalRealFrames();
+                }
+                else if (now - _lastServerFrameTime >= DecoderFreezeCheckIntervalMs)
+                {
+                    // Time to check for freeze
+                    long serverFrameAdvance = currentFrame - _lastServerFrame;
+                    int currentRealFrames = GetTotalRealFrames();
+                    int realFrameAdvance = currentRealFrames - _realFramesAtLastCheck;
+
+                    if (!inFallbackMode)
+                    {
+                        // Mode 1: TexturePtrDetection works - use real frames for reliable freeze detection
+                        Debug.Log($"[PhaseProtocol] Freeze check (ptr mode): server +{serverFrameAdvance}, client real +{realFrameAdvance}");
+
+                        // Freeze detected: server advanced many frames but client decoded none
+                        if (serverFrameAdvance >= DecoderFreezeThresholdFrames && realFrameAdvance < 5)
+                        {
+                            Debug.LogWarning($"[PhaseProtocol] DECODER FREEZE DETECTED! Server sent {serverFrameAdvance} frames but client decoded only {realFrameAdvance}. Requesting keyframe...");
+
+                            // Request keyframe to reset decoder
+                            SkipToLive(-1);
+                            _metrics.RecordStall();
+                        }
+                    }
+                    else
+                    {
+                        // Mode 2: Fallback mode - can't detect real frames, use preventive keyframes
+                        Debug.Log($"[PhaseProtocol] Freeze check (fallback mode): server +{serverFrameAdvance}, preventive keyframe check");
+
+                        var timeSinceLastPreventive = (DateTime.UtcNow - _lastPreventiveKeyframeTime).TotalSeconds;
+                        if (timeSinceLastPreventive >= PreventiveKeyframeIntervalSeconds)
+                        {
+                            Debug.Log($"[PhaseProtocol] Fallback mode: Sending preventive keyframe request (last was {timeSinceLastPreventive:F0}s ago)");
+                            RequestKeyframe(-1); // Request keyframe for all monitors
+                            _lastPreventiveKeyframeTime = DateTime.UtcNow;
+                        }
+                    }
+
+                    // Reset check state
+                    _lastServerFrame = currentFrame;
+                    _lastServerFrameTime = now;
+                    _clientFramesAtLastCheck = GetTotalRenderedFrames();
+                    _realFramesAtLastCheck = currentRealFrames;
+                }
+            }
+
             OnFrameTimingReceived?.Invoke(serverTime, _serverClockOffset);
+        }
+
+        /// <summary>
+        /// Get total rendered frames across all monitors (for freeze detection).
+        /// </summary>
+        private int GetTotalRenderedFrames()
+        {
+            int total = 0;
+            lock (_lock)
+            {
+                foreach (var wrapper in _peerConnections)
+                {
+                    total += wrapper.RenderedFrameCount;
+                }
+            }
+            return total;
+        }
+
+        /// <summary>
+        /// Get total REAL frames (texture pointer changes only, no fallback) for reliable freeze detection.
+        /// </summary>
+        private int GetTotalRealFrames()
+        {
+            int total = 0;
+            lock (_lock)
+            {
+                foreach (var wrapper in _peerConnections)
+                {
+                    total += wrapper.RealFrameCount;
+                }
+            }
+            return total;
+        }
+
+        /// <summary>
+        /// Check if any monitor is in fallback mode (can't detect real frames).
+        /// </summary>
+        private bool IsAnyMonitorInFallbackMode()
+        {
+            lock (_lock)
+            {
+                foreach (var wrapper in _peerConnections)
+                {
+                    // In fallback if: has texture but TexturePtrDetectionWorking is false after grace period
+                    if (wrapper.Texture != null && !wrapper.TexturePtrDetectionWorking)
+                    {
+                        var timeSinceFirstTexture = DateTime.UtcNow - wrapper.FirstTextureTime;
+                        if (timeSinceFirstTexture.TotalMilliseconds > 2000)
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
         }
 
         /// <summary>
@@ -2952,6 +3085,7 @@ namespace VRWorkspace.Streaming
                                     // Only count as new frame if we had a previous pointer (not first frame)
                                     wrapper.FrameCount++;
                                     wrapper.RenderedFrameCount++;
+                                    wrapper.RealFrameCount++; // Real frame for freeze detection
                                     wrapper.TexturePtrDetectionWorking = true; // Detection method confirmed working
 
                                     // Debug log first 10 frames and every 300 frames after
