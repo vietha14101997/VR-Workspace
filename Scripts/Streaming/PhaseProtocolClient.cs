@@ -46,6 +46,12 @@ namespace VRWorkspace.Streaming
         private long _serverClockOffset; // Difference between client and server time (ms)
         private float _lastServerTargetFps = 60f; // Last known target FPS from server
 
+        // Streaming metrics for real-time monitoring
+        private readonly StreamingMetrics _metrics = new StreamingMetrics();
+        private long _lastPingSentTime;
+        private long _lastPongReceivedTime;
+        private int _missedPongCount;
+
         // Events
         public event Action<ServerHardwareInfo> OnHardwareInfoReceived;
         public event Action<NetworkTestResult> OnNetworkInfoReceived;
@@ -66,6 +72,11 @@ namespace VRWorkspace.Streaming
         public event Action<int, int> OnMonitorIceProgress;     // monitorIndex, progress (0-100)
         public event Action<int> OnMonitorIceComplete;          // monitorIndex when ICE connected
         public event Action OnAllMonitorsReady;                 // all monitors ICE connected
+
+        // Connection health and reconnection events
+        public event Action OnConnectionHealthCritical;         // Server not responding, trigger reconnect
+        public event Action<string[]> OnReconnectFailed;        // Max attempts reached, show dialog with options
+        public event Action OnSessionReconnectRequested;        // Full session restart requested
 
         private class PCWrapper
         {
@@ -104,6 +115,7 @@ namespace VRWorkspace.Streaming
         public bool IsStreaming => _stateMachine.IsStreaming;
         public long ServerClockOffset => _serverClockOffset; // For external latency calculations
         public float ServerTargetFps => _lastServerTargetFps; // Current target FPS from server
+        public StreamingMetrics Metrics => _metrics; // Real-time streaming metrics
 
         /// <summary>
         /// Get video texture for a specific monitor.
@@ -454,8 +466,10 @@ namespace VRWorkspace.Streaming
 
         /// <summary>
         /// Main receive loop for WebSocket messages.
+        /// Includes timeout detection for hung connections.
         /// </summary>
         private int _msgCounter = 0;
+        private const int RECEIVE_TIMEOUT_MS = 30000; // 30s timeout for receive operations
 
         private async Task ReceiveLoopAsync(CancellationToken ct)
         {
@@ -465,8 +479,31 @@ namespace VRWorkspace.Streaming
             {
                 while (_ws.State == WebSocketState.Open && !ct.IsCancellationRequested)
                 {
-                    // First receive to determine message type
-                    var firstResult = await _ws.ReceiveAsync(new ArraySegment<byte>(buffer), ct);
+                    WebSocketReceiveResult firstResult;
+
+                    try
+                    {
+                        // Add timeout to receive operation
+                        using var timeoutCts = new CancellationTokenSource(RECEIVE_TIMEOUT_MS);
+                        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
+
+                        // First receive to determine message type
+                        firstResult = await _ws.ReceiveAsync(new ArraySegment<byte>(buffer), linkedCts.Token);
+                    }
+                    catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                    {
+                        // Timeout occurred - check connection health
+                        Debug.LogWarning("[PhaseProtocol] WebSocket receive timeout - checking connection health");
+
+                        if (_missedPongCount > 0)
+                        {
+                            Debug.LogError("[PhaseProtocol] Connection appears dead - triggering reconnect");
+                            OnConnectionHealthCritical?.Invoke();
+                        }
+
+                        // Continue loop to retry receive
+                        continue;
+                    }
 
                     if (firstResult.MessageType == WebSocketMessageType.Close)
                     {
@@ -623,7 +660,9 @@ namespace VRWorkspace.Streaming
                             break;
 
                         case "pong":
-                            // Notify speed test client for ping measurement
+                            // Handle pong for RTT calculation and keepalive
+                            HandlePongMessage(text);
+                            // Also notify speed test client for ping measurement
                             _speedTest?.HandlePong();
                             break;
 
@@ -2040,10 +2079,17 @@ namespace VRWorkspace.Streaming
                     wrapper.LastConnectedTime = DateTime.UtcNow;
                     wrapper.IsReconnecting = false;
                     wrapper.ReconnectAttempts = 0; // Reset on successful reconnection
+                    _metrics.ResetStallCount();
+                    _metrics.ResetIceDisconnectCount();
+
+                    // Send reconnect acknowledgment to server
+                    _ = SendTextAsync($"{{\"type\":\"reconnect_ack\",\"monitorIndex\":{idx}}}");
                 }
                 else if (s == RTCPeerConnectionState.Failed || s == RTCPeerConnectionState.Disconnected)
                 {
                     Debug.LogWarning($"[PhaseProtocol] PC{idx} connection lost again after reconnect");
+                    _metrics.RecordIceDisconnect();
+
                     // Auto-heal again if still streaming
                     if (_stateMachine.IsStreaming && !wrapper.IsReconnecting)
                     {
@@ -2248,12 +2294,14 @@ namespace VRWorkspace.Streaming
                 wrapper = _peerConnections[monitorIndex];
             }
 
-            // Check max attempts
+            // Check max attempts - trigger dialog instead of just giving up
             if (wrapper.ReconnectAttempts >= PCWrapper.MaxReconnectAttempts)
             {
-                Debug.LogError($"[PhaseProtocol] PC{monitorIndex} auto-heal: max attempts ({PCWrapper.MaxReconnectAttempts}) reached, giving up");
+                Debug.LogError($"[PhaseProtocol] PC{monitorIndex} auto-heal: max attempts ({PCWrapper.MaxReconnectAttempts}) reached");
                 wrapper.IsReconnecting = false;
-                OnError?.Invoke($"Monitor {monitorIndex} reconnect failed after {PCWrapper.MaxReconnectAttempts} attempts");
+
+                // Instead of just giving up, trigger dialog for user to decide
+                OnReconnectFailed?.Invoke(new[] { "Retry", "Restart Session", "Disconnect" });
                 return;
             }
 
@@ -2295,6 +2343,90 @@ namespace VRWorkspace.Streaming
             }
         }
 
+        /// <summary>
+        /// Reconnect entire session - preserves user config but re-runs Phase 2 (ICE negotiation).
+        /// Called when individual track reconnects have failed and user chooses "Restart Session".
+        /// </summary>
+        public async Task ReconnectSessionAsync()
+        {
+            Debug.Log("[PhaseProtocol] Starting full session reconnect...");
+
+            // 1. Close all PeerConnections
+            lock (_lock)
+            {
+                foreach (var wrapper in _peerConnections)
+                {
+                    try
+                    {
+                        wrapper.PC?.Close();
+                        wrapper.PC?.Dispose();
+                    }
+                    catch { }
+                }
+                _peerConnections.Clear();
+            }
+
+            // 2. Reset metrics
+            _metrics.ResetAll();
+            _streamingStartedFired = false;
+
+            // 3. Transition to reconnecting state
+            _stateMachine.TryTransition(ConnectionPhase.Reconnecting);
+
+            // 4. Re-run Phase 2 (ICE negotiation) with preserved config
+            if (_userConfig != null && _ws?.State == WebSocketState.Open)
+            {
+                Debug.Log("[PhaseProtocol] Requesting Phase 2 restart with existing config");
+
+                // Send restart request to server
+                await SendTextAsync("{\"type\":\"restart_phase2\"}");
+
+                // Server will respond with setup_complete, then we do ICE again
+                OnSessionReconnectRequested?.Invoke();
+            }
+            else
+            {
+                Debug.LogError("[PhaseProtocol] Cannot reconnect - no config or WebSocket closed");
+                _stateMachine.ForceTransition(ConnectionPhase.Error, "Reconnect failed - no connection");
+                OnError?.Invoke("Cannot reconnect - connection lost");
+            }
+        }
+
+        /// <summary>
+        /// Retry track reconnect after user clicks "Retry" in dialog.
+        /// Resets attempt counters and restarts auto-heal for all monitors.
+        /// </summary>
+        public void RetryReconnect()
+        {
+            Debug.Log("[PhaseProtocol] User requested retry - resetting reconnect counters");
+
+            lock (_lock)
+            {
+                foreach (var wrapper in _peerConnections)
+                {
+                    wrapper.ReconnectAttempts = 0;
+                    wrapper.IsReconnecting = false;
+                }
+            }
+
+            // Trigger auto-heal for any disconnected monitors
+            List<PCWrapper> wrappers;
+            lock (_lock)
+            {
+                wrappers = _peerConnections.ToList();
+            }
+
+            foreach (var wrapper in wrappers)
+            {
+                var state = wrapper.PC?.ConnectionState ?? RTCPeerConnectionState.Closed;
+                if (state != RTCPeerConnectionState.Connected && !wrapper.IsReconnecting)
+                {
+                    wrapper.IsReconnecting = true;
+                    _ = AutoHealMonitorAsync(wrapper.Index);
+                }
+            }
+        }
+
         // === Phase 3 Handlers ===
 
         private void HandleStreamingStarted(SimpleJson json)
@@ -2328,9 +2460,9 @@ namespace VRWorkspace.Streaming
         /// </summary>
         private async Task FrameStallMonitorAsync(CancellationToken ct)
         {
-            const int CHECK_INTERVAL_MS = 2000; // Check every 2 seconds
-            const int STALL_THRESHOLD_MS = 5000; // Consider stalled if no frames for 5 seconds
-            const int INITIAL_GRACE_PERIOD_MS = 10000; // Wait 10 seconds before monitoring
+            const int CHECK_INTERVAL_MS = 1000; // Check every 1 second (was 2s)
+            const int STALL_THRESHOLD_MS = 3000; // Consider stalled if no frames for 3 seconds (was 5s)
+            const int INITIAL_GRACE_PERIOD_MS = 5000; // Wait 5 seconds before monitoring (was 10s)
 
             Debug.Log("[PhaseProtocol] Frame stall monitor started");
 
@@ -2403,6 +2535,42 @@ namespace VRWorkspace.Streaming
         }
 
         /// <summary>
+        /// Handle pong message from server for RTT calculation.
+        /// Supports both simple "pong" and sequenced "pong:timestamp" formats.
+        /// </summary>
+        private void HandlePongMessage(string text)
+        {
+            var pongTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            _lastPongReceivedTime = pongTime;
+            _missedPongCount = 0;
+            _metrics.ResetMissedPongCount();
+
+            // Check for sequenced pong: "pong:timestamp" or JSON with timestamp
+            if (text.Contains(":"))
+            {
+                // Try to parse from text format "pong:timestamp"
+                var parts = text.Split(':');
+                if (parts.Length >= 2 && long.TryParse(parts[1].Trim(), out long sentTime))
+                {
+                    double rttMs = pongTime - sentTime;
+                    if (rttMs > 0 && rttMs < 10000) // Sanity check
+                    {
+                        _metrics.RecordPing(rttMs);
+                    }
+                }
+            }
+            else if (_lastPingSentTime > 0)
+            {
+                // Use last sent ping time for simple pong
+                double rttMs = pongTime - _lastPingSentTime;
+                if (rttMs > 0 && rttMs < 10000)
+                {
+                    _metrics.RecordPing(rttMs);
+                }
+            }
+        }
+
+        /// <summary>
         /// Handle frame timing message from server for clock synchronization.
         /// Used to calculate latency and sync client/server clocks.
         /// </summary>
@@ -2414,9 +2582,35 @@ namespace VRWorkspace.Streaming
             long clientTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             _serverClockOffset = clientTime - serverTime;
 
-            // Also available: currentFrame, recentFrames[] for advanced frame analysis
-            // var currentFrame = json.GetLong("currentFrame");
-            // var recentFrames = json.GetArray("recentFrames");
+            // Calculate frame latency using recentFrames data
+            var recentFrames = json.GetArray("recentFrames");
+            if (recentFrames != null && recentFrames.Count > 0)
+            {
+                try
+                {
+                    // Get the latest frame from the array
+                    var latest = recentFrames[recentFrames.Count - 1] as Dictionary<string, object>;
+                    if (latest != null && latest.TryGetValue("captureTime", out var captureTimeObj))
+                    {
+                        long captureTime = Convert.ToInt64(captureTimeObj);
+
+                        // Frame latency = (server processing time) + (network delay)
+                        // server processing time = serverTime - captureTime
+                        // network delay = estimated as ping/2 (one-way delay)
+                        double owd = _metrics.CurrentPingMs > 0 ? _metrics.CurrentPingMs / 2.0 : 0;
+                        double frameLatency = (serverTime - captureTime) + owd;
+
+                        if (frameLatency > 0 && frameLatency < 2000) // Sanity check
+                        {
+                            _metrics.RecordFrameTiming(serverTime, captureTime);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[PhaseProtocol] Error parsing frame timing: {ex.Message}");
+                }
+            }
 
             OnFrameTimingReceived?.Invoke(serverTime, _serverClockOffset);
         }
@@ -2499,18 +2693,67 @@ namespace VRWorkspace.Streaming
 
         // === Utilities ===
 
+        /// <summary>
+        /// Aggressive keepalive loop: 2s ping interval, 6s timeout.
+        /// Detects server disconnection and triggers reconnect.
+        /// </summary>
         private async Task KeepaliveLoopAsync(CancellationToken ct)
         {
-            await Task.Delay(2000, ct);
+            const int PING_INTERVAL_MS = 2000;  // Aggressive: 2s
+            const int PONG_TIMEOUT_MS = 6000;   // 6s timeout
+            const int MAX_MISSED_PONGS = 3;     // After 3 missed pongs, trigger critical
+
+            // Initialize timestamp
+            _lastPongReceivedTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+            await Task.Delay(1000, ct);
+
             while (_ws?.State == WebSocketState.Open && !ct.IsCancellationRequested)
             {
                 try
                 {
-                    await SendTextAsync("ping");
+                    // Check for missed pongs
+                    var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                    var timeSinceLastPong = now - _lastPongReceivedTime;
+
+                    if (_lastPongReceivedTime > 0 && timeSinceLastPong > PONG_TIMEOUT_MS)
+                    {
+                        _missedPongCount++;
+                        _metrics.RecordMissedPong();
+                        Debug.LogWarning($"[PhaseProtocol] Pong timeout! {timeSinceLastPong}ms since last pong, missed: {_missedPongCount}");
+
+                        if (_missedPongCount >= MAX_MISSED_PONGS)
+                        {
+                            Debug.LogError("[PhaseProtocol] Server not responding - triggering reconnect");
+                            OnConnectionHealthCritical?.Invoke();
+
+                            // Try to trigger auto-heal for all monitors
+                            List<PCWrapper> wrappers;
+                            lock (_lock)
+                            {
+                                wrappers = _peerConnections.ToList();
+                            }
+                            foreach (var wrapper in wrappers)
+                            {
+                                if (!wrapper.IsReconnecting)
+                                {
+                                    wrapper.IsReconnecting = true;
+                                    _ = AutoHealMonitorAsync(wrapper.Index);
+                                }
+                            }
+                        }
+                    }
+
+                    // Send ping with timestamp for RTT calculation
+                    _lastPingSentTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                    await SendTextAsync($"ping:{_lastPingSentTime}");
                 }
-                catch { }
-                // More aggressive keepalive (3s) for better connection stability on mobile
-                await Task.Delay(3000, ct);
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[PhaseProtocol] Keepalive error: {ex.Message}");
+                }
+
+                await Task.Delay(PING_INTERVAL_MS, ct);
             }
         }
 
