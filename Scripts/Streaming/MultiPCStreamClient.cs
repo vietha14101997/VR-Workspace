@@ -1,10 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Net.WebSockets;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Linq;
 using Unity.WebRTC;
 using UnityEngine;
 using VRWorkspace.Streaming;
@@ -22,13 +19,8 @@ public enum DecoderMode
 }
 
 /// <summary>
-/// Multi-PC WebRTC stream client: Creates N PeerConnections (one per monitor).
-/// Uses multiplexed signaling over single WebSocket:
-/// - offer:N:sdp, answer:N:sdp, candidate:N:candidate
-///
-/// Supports two protocols:
-/// - V1 (legacy): Direct WebRTC signaling
-/// - V2 (new): 3-phase connection with hardware info, speed test, and suggested config
+/// Multi-PC WebRTC stream client using V2 protocol (3-phase connection).
+/// Creates N PeerConnections (one per monitor) via PhaseProtocolClient.
 ///
 /// Decoder modes:
 /// - WebRTC: Use WebRTC internal decoder (H.264)
@@ -51,8 +43,9 @@ public class MultiPCStreamClient : MonoBehaviour
     public bool autoDetectLAN = true;
 
     [Header("Protocol")]
-    [Tooltip("Use V2 protocol with 3-phase connection (hardware info, speed test, suggested config)")]
-    public bool useV2Protocol = false;
+    [Tooltip("Deprecated: V2 protocol is now always used")]
+    [System.Obsolete("V2 protocol is now always used. This field is kept for API compatibility.")]
+    public bool useV2Protocol = true;
 
     [Tooltip("Auto-accept suggested config in V2 mode (skip user review)")]
     public bool autoAcceptSuggestedConfig = true;
@@ -96,37 +89,20 @@ public class MultiPCStreamClient : MonoBehaviour
     /// <summary>
     /// Selected video codec for this session.
     /// </summary>
-    public VideoCodec SelectedCodec => useV2Protocol ? (_v2Client?.SelectedCodec ?? VideoCodec.H264) : _selectedCodec;
+    public VideoCodec SelectedCodec => _v2Client?.SelectedCodec ?? VideoCodec.H264;
 
     /// <summary>
     /// Check if using native HEVC decoder.
     /// </summary>
     public bool IsUsingNativeHevc => _decoderMode == DecoderMode.NativeHevc;
 
-    private ClientWebSocket _ws;
     private CancellationTokenSource _cts;
-    private readonly List<PCWrapper> _pcs = new();
 
     // Mipmap RenderTextures for anti-aliasing at distance
     private RenderTexture[] _mipmapTextures;
 
-    private class PCWrapper
-    {
-        public int Index;
-        public RTCPeerConnection PC;
-        public VideoStreamTrack VideoTrack;
-        public Texture Texture;
-        public bool AnswerSet;
-        public List<string> PendingIce = new();
-    }
-
-    public int MonitorCount => useV2Protocol ? (_v2Client?.MonitorCount ?? 0) : _pcs.Count;
-    public Texture GetTexture(int index)
-    {
-        if (useV2Protocol)
-            return _v2Client?.GetTexture(index);
-        return index >= 0 && index < _pcs.Count ? _pcs[index].Texture : null;
-    }
+    public int MonitorCount => _v2Client?.MonitorCount ?? 0;
+    public Texture GetTexture(int index) => _v2Client?.GetTexture(index);
 
     /// <summary>
     /// Check if currently streaming (V2 only).
@@ -134,9 +110,9 @@ public class MultiPCStreamClient : MonoBehaviour
     public bool IsStreaming => _v2Client?.IsStreaming ?? false;
 
     /// <summary>
-    /// Check if connected (V2 only).
+    /// Check if connected.
     /// </summary>
-    public bool IsConnected => useV2Protocol ? (_v2Client?.IsConnected ?? false) : (_ws?.State == WebSocketState.Open);
+    public bool IsConnected => _v2Client?.IsConnected ?? false;
 
     static bool IsPrivateHost(string host)
     {
@@ -263,159 +239,21 @@ public class MultiPCStreamClient : MonoBehaviour
         Application.targetFrameRate = 60; // Lock to 60fps for smooth streaming
         _cts = new CancellationTokenSource();
 
-        // V2 Protocol: Wait for manual connection if autoStartConnection is false
-        if (useV2Protocol)
+        // Wait for manual connection if autoStartConnection is false
+        if (!autoStartConnection)
         {
-            if (!autoStartConnection)
-            {
-                Debug.Log("[MultiPC] V2 protocol - waiting for manual ConnectV2Async() call");
-                return;
-            }
-            Debug.Log("[MultiPC] Using V2 protocol (3-phase connection)");
-            await StartV2ProtocolAsync();
+            Debug.Log("[MultiPC] Waiting for manual ConnectV2Async() call");
             return;
         }
-
-        // V1 Protocol (legacy)
-        int monitors = GetExpectedMonitors();
-        Debug.Log($"[MultiPC] Using V1 protocol, creating {monitors} PeerConnections");
-
-        // Create N PeerConnections
-        for (int i = 0; i < monitors; i++)
-        {
-            var cfg = new RTCConfiguration { iceServers = Array.Empty<RTCIceServer>() };
-            var pc = new RTCPeerConnection(ref cfg);
-            var wrapper = new PCWrapper { Index = i, PC = pc };
-            _pcs.Add(wrapper);
-
-            int idx = i; // Capture for closures
-
-            // Add video transceiver
-            var trans = pc.AddTransceiver(TrackKind.Video, new RTCRtpTransceiverInit { direction = RTCRtpTransceiverDirection.RecvOnly });
-            var caps = RTCRtpReceiver.GetCapabilities(TrackKind.Video);
-            var h264 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("H264", StringComparison.OrdinalIgnoreCase)).ToArray();
-            trans.SetCodecPreferences(h264.Concat(caps.codecs.Except(h264)).ToArray());
-
-            pc.OnIceConnectionChange = s => Debug.Log($"[MultiPC] PC{idx} ICE: {s}");
-            pc.OnConnectionStateChange = s => 
-            {
-                Debug.Log($"[MultiPC] PC{idx} State: {s}");
-                
-                // Stop if we are shutting down intentionally
-                if (_cts.IsCancellationRequested) return;
-
-                if (s == RTCPeerConnectionState.Failed || s == RTCPeerConnectionState.Disconnected)
-                {
-                    Debug.Log($"[MultiPC] PC{idx} connection lost ({s}). Triggering client-side auto-reconnect...");
-                    _ = ReconnectMonitor(idx);
-                }
-            };
-
-            // ICE candidates - send with index prefix (matching PCStreamClient format)
-            pc.OnIceCandidate = cand =>
-            {
-                if (string.IsNullOrEmpty(cand.Candidate)) 
-                {
-                    Debug.Log($"[MultiPC] PC{idx} ICE gathering complete");
-                    return;
-                }
-                
-                string msg = cand.Candidate;
-                
-                // Skip TCP candidates (matching browser behavior)
-                if (skipTcpIceCandidates && (msg.Contains(" tcp ", StringComparison.OrdinalIgnoreCase) || msg.Contains("tcptype", StringComparison.OrdinalIgnoreCase)))
-                {
-                    Debug.Log($"[MultiPC] PC{idx} Skipped TCP candidate");
-                    return;
-                }
-                
-                // Normalize candidate format
-                if (!msg.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase))
-                    msg = "candidate:" + msg;
-                
-                // Handle double-prefix edge case
-                if (msg.StartsWith("candidate:candidate:", StringComparison.OrdinalIgnoreCase))
-                    msg = msg.Substring("candidate:".Length);
-                
-                // Extract raw candidate (without "candidate:" prefix)
-                string rawCandidate = msg.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase) 
-                    ? msg.Substring("candidate:".Length) 
-                    : msg;
-                
-                // Send format: candidate:{monitorIndex}:{rawCandidate}
-                string toSend = $"candidate:{idx}:{rawCandidate}";
-                Debug.Log($"[MultiPC] PC{idx} Sending ICE: {toSend.Substring(0, Math.Min(80, toSend.Length))}...");
-                SendWs(toSend);
-            };
-
-            // Track received
-            pc.OnTrack = e =>
-            {
-                if (e.Track is VideoStreamTrack v)
-                {
-                    wrapper.VideoTrack = v;
-                    v.OnVideoReceived += tex => wrapper.Texture = tex;
-                    Debug.Log($"[MultiPC] PC{idx} received video track");
-
-                    // Jitter Buffer Control for Low Latency
-                    // Find the receiver for this track and set delay hint
-                    foreach (var receiver in pc.GetReceivers())
-                    {
-                        if (receiver.Track != null && receiver.Track.Id == v.Id)
-                        {
-                            // Error CS1061: JitterBufferDelayHint not available in this Unity WebRTC version.
-                            // receiver.JitterBufferDelayHint = 0.05; // 50ms target delay
-                            // Debug.Log($"[MultiPC] PC{idx} Set JitterBufferDelayHint=0.05s for track {v.Id}");
-                            break;
-                        }
-                    }
-                }
-            };
-        }
-
-        await ConnectAndSignal();
-    }
-
-    void Update()
-    {
-        if (useV2Protocol)
-        {
-            UpdateV2();
-            return;
-        }
-
-        // V1 Protocol: Poll textures and apply to panels
-        for (int i = 0; i < _pcs.Count; i++)
-        {
-            var wrapper = _pcs[i];
-
-            // Poll texture directly (Android workaround)
-            try
-            {
-                var tex = wrapper.VideoTrack?.Texture;
-                if (tex != null && tex.width > 0) wrapper.Texture = tex;
-            }
-            catch { }
-
-            if (wrapper.Texture == null) continue;
-
-            // Generate mipmap texture for anti-aliasing at distance
-            var mipmapTex = GetMipmapTexture(i, wrapper.Texture);
-
-            // Apply to panel (use mipmap texture if available)
-            if (panels != null && i < panels.Length && panels[i] != null)
-            {
-                panels[i].contentTexture = mipmapTex != null ? mipmapTex : wrapper.Texture;
-                panels[i].Apply();
-            }
-        }
+        Debug.Log("[MultiPC] Starting V2 protocol (3-phase connection)");
+        await StartV2ProtocolAsync();
     }
 
     // Debug: Log interval control
     private float _lastMipmapDebugTime;
     private const float MIPMAP_DEBUG_INTERVAL = 2f; // Log every 2 seconds
 
-    void UpdateV2()
+    void Update()
     {
         if (_v2Client == null) return;
 
@@ -689,309 +527,6 @@ public class MultiPCStreamClient : MonoBehaviour
 #endif
     }
 
-    async Task ConnectAndSignal()
-    {
-        string url = BuildOptimizedSignalUrl();
-        Debug.Log($"[MultiPC] Connecting to {url}");
-        _ws = new ClientWebSocket();
-        _ws.Options.KeepAliveInterval = TimeSpan.FromSeconds(30);
-        await _ws.ConnectAsync(new Uri(url), _cts.Token);
-        Debug.Log("[MultiPC] WebSocket connected");
-
-        // Send offers for all PCs
-        foreach (var wrapper in _pcs)
-        {
-            var offerOp = wrapper.PC.CreateOffer();
-            while (!offerOp.IsDone) await Task.Yield();
-            if (offerOp.IsError) { Debug.LogError($"[MultiPC] PC{wrapper.Index} CreateOffer failed"); continue; }
-
-            var offer = offerOp.Desc;
-            var setLocalOp = wrapper.PC.SetLocalDescription(ref offer);
-            while (!setLocalOp.IsDone) await Task.Yield();
-            if (setLocalOp.IsError) { Debug.LogError($"[MultiPC] PC{wrapper.Index} SetLocal failed"); continue; }
-
-            SendWs($"offer:{wrapper.Index}:{offer.sdp}");
-            Debug.Log($"[MultiPC] Sent offer for PC{wrapper.Index}");
-        }
-
-        // Start ping keepalive
-        StartCoroutine(PingKeepalive());
-
-        // RX loop
-        var buf = new byte[256 * 1024];
-        while (_ws.State == WebSocketState.Open)
-        {
-            var ms = new System.IO.MemoryStream();
-            WebSocketReceiveResult res;
-            do
-            {
-                res = await _ws.ReceiveAsync(new ArraySegment<byte>(buf), _cts.Token);
-                if (res.MessageType == WebSocketMessageType.Close) return;
-                ms.Write(buf, 0, res.Count);
-            } while (!res.EndOfMessage);
-
-            var text = Encoding.UTF8.GetString(ms.ToArray());
-            if (string.IsNullOrWhiteSpace(text)) continue;
-
-            // answer:N:sdp
-            if (text.StartsWith("answer:", StringComparison.OrdinalIgnoreCase))
-            {
-                var rest = text.Substring(7);
-                var colonIdx = rest.IndexOf(':');
-                if (colonIdx > 0 && int.TryParse(rest.Substring(0, colonIdx), out int monIdx))
-                {
-                    var sdp = FixSdp(rest.Substring(colonIdx + 1));
-                    if (monIdx >= 0 && monIdx < _pcs.Count)
-                    {
-                        var wrapper = _pcs[monIdx];
-                        var answer = new RTCSessionDescription { type = RTCSdpType.Answer, sdp = sdp };
-                        var setRemoteOp = wrapper.PC.SetRemoteDescription(ref answer);
-                        var sw = System.Diagnostics.Stopwatch.StartNew();
-                        while (!setRemoteOp.IsDone && sw.ElapsedMilliseconds < 5000) await Task.Delay(10);
-                        
-                        if (!setRemoteOp.IsDone || setRemoteOp.IsError)
-                        {
-                            Debug.LogError($"[MultiPC] PC{monIdx} SetRemote failed");
-                            continue;
-                        }
-                        
-                        wrapper.AnswerSet = true;
-                        Debug.Log($"[MultiPC] PC{monIdx} answer set");
-
-                        // Process pending ICE
-                        foreach (var cand in wrapper.PendingIce)
-                            AddIce(wrapper, cand);
-                        wrapper.PendingIce.Clear();
-                    }
-                }
-                continue;
-            }
-
-            // candidate:N:candidate
-            if (text.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase))
-            {
-                var rest = text.Substring(10);
-                var colonIdx = rest.IndexOf(':');
-                if (colonIdx > 0 && int.TryParse(rest.Substring(0, colonIdx), out int monIdx))
-                {
-                    var candStr = rest.Substring(colonIdx + 1);
-                    
-                    // Skip TCP candidates (matching browser behavior)
-                    if (skipTcpIceCandidates && (candStr.Contains(" tcp ", StringComparison.OrdinalIgnoreCase) || candStr.Contains("tcptype", StringComparison.OrdinalIgnoreCase)))
-                    {
-                        Debug.Log($"[MultiPC] PC{monIdx} Skipped remote TCP candidate");
-                        continue;
-                    }
-                    
-                    // Log received candidate
-                    bool isHost = candStr.Contains(" typ host ", StringComparison.OrdinalIgnoreCase);
-                    Debug.Log($"[MultiPC] PC{monIdx} Received {(isHost ? "HOST" : "SRFLX")} ICE: {candStr.Substring(0, Math.Min(60, candStr.Length))}...");
-                    
-                    if (monIdx >= 0 && monIdx < _pcs.Count)
-                    {
-                        var wrapper = _pcs[monIdx];
-                        if (wrapper.AnswerSet)
-                            AddIce(wrapper, candStr);
-                        else
-                            wrapper.PendingIce.Add(candStr);
-                    }
-                }
-                continue;
-            }
-
-            if (text.Equals("pong", StringComparison.OrdinalIgnoreCase)) continue;
-
-            // reconnect:N - Server requests re-offer for monitor N (abnormal close recovery)
-            if (text.StartsWith("reconnect:", StringComparison.OrdinalIgnoreCase))
-            {
-                var rest = text.Substring(10);
-                if (int.TryParse(rest.Trim(), out int monIdx) && monIdx >= 0 && monIdx < _pcs.Count)
-                {
-                    Debug.Log($"[MultiPC] Server requested reconnect for PC{monIdx}");
-                    await ReconnectMonitor(monIdx);
-                }
-                continue;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Reconnect a specific monitor by recreating PeerConnection and sending new offer
-    /// </summary>
-    async Task ReconnectMonitor(int monitorIndex)
-    {
-        // Don't reconnect if application is quoting/disconnecting
-        if (_cts == null || _cts.IsCancellationRequested) return;
-
-        if (monitorIndex < 0 || monitorIndex >= _pcs.Count) return;
-        
-        var oldWrapper = _pcs[monitorIndex];
-        Debug.Log($"[MultiPC] Reconnecting PC{monitorIndex}...");
-        
-        // Close old PC
-        try { oldWrapper.PC?.Close(); oldWrapper.PC?.Dispose(); } catch { }
-        
-        // Create new PeerConnection
-        var cfg = new RTCConfiguration { iceServers = Array.Empty<RTCIceServer>() };
-        var pc = new RTCPeerConnection(ref cfg);
-        var wrapper = new PCWrapper { Index = monitorIndex, PC = pc };
-        
-        int idx = monitorIndex;
-        
-        // Add video transceiver
-        var trans = pc.AddTransceiver(TrackKind.Video, new RTCRtpTransceiverInit { direction = RTCRtpTransceiverDirection.RecvOnly });
-        var caps = RTCRtpReceiver.GetCapabilities(TrackKind.Video);
-        var h264 = caps.codecs.Where(c => (c.mimeType ?? "").Contains("H264", StringComparison.OrdinalIgnoreCase)).ToArray();
-        trans.SetCodecPreferences(h264.Concat(caps.codecs.Except(h264)).ToArray());
-
-        pc.OnIceConnectionChange = s => Debug.Log($"[MultiPC] PC{idx} ICE: {s}");
-        pc.OnConnectionStateChange = s => Debug.Log($"[MultiPC] PC{idx} State: {s}");
-
-        // ICE candidates
-        pc.OnIceCandidate = cand =>
-        {
-            if (string.IsNullOrEmpty(cand.Candidate)) return;
-            
-            string msg = cand.Candidate;
-            if (skipTcpIceCandidates && (msg.Contains(" tcp ", StringComparison.OrdinalIgnoreCase) || msg.Contains("tcptype", StringComparison.OrdinalIgnoreCase)))
-                return;
-            
-            if (!msg.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase))
-                msg = "candidate:" + msg;
-            if (msg.StartsWith("candidate:candidate:", StringComparison.OrdinalIgnoreCase))
-                msg = msg.Substring("candidate:".Length);
-            
-            string rawCandidate = msg.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase) 
-                ? msg.Substring("candidate:".Length) : msg;
-            
-            SendWs($"candidate:{idx}:{rawCandidate}");
-        };
-
-        // Track received
-        pc.OnTrack = e =>
-        {
-            if (e.Track is VideoStreamTrack v)
-            {
-                wrapper.VideoTrack = v;
-                v.OnVideoReceived += tex => wrapper.Texture = tex;
-                Debug.Log($"[MultiPC] PC{idx} received video track (reconnected)");
-            }
-        };
-        
-        // Replace wrapper
-        _pcs[monitorIndex] = wrapper;
-        
-        // Create and send new offer
-        var offerOp = pc.CreateOffer();
-        while (!offerOp.IsDone) await Task.Yield();
-        if (offerOp.IsError) { Debug.LogError($"[MultiPC] PC{idx} CreateOffer failed on reconnect"); return; }
-
-        var offer = offerOp.Desc;
-        var setLocalOp = pc.SetLocalDescription(ref offer);
-        while (!setLocalOp.IsDone) await Task.Yield();
-        if (setLocalOp.IsError) { Debug.LogError($"[MultiPC] PC{idx} SetLocal failed on reconnect"); return; }
-
-        SendWs($"offer:{idx}:{offer.sdp}");
-        Debug.Log($"[MultiPC] PC{idx} reconnect offer sent");
-    }
-
-    void AddIce(PCWrapper wrapper, string candStr)
-    {
-        try
-        {
-            // Normalize: remove double-prefix if present
-            if (candStr.StartsWith("candidate:candidate:", StringComparison.OrdinalIgnoreCase))
-                candStr = candStr.Substring("candidate:".Length);
-            
-            // Ensure proper format
-            var fullCand = candStr.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase) ? candStr : "candidate:" + candStr;
-            
-            wrapper.PC.AddIceCandidate(new RTCIceCandidate(new RTCIceCandidateInit { candidate = fullCand, sdpMLineIndex = 0, sdpMid = "0" }));
-            Debug.Log($"[MultiPC] PC{wrapper.Index} Added ICE candidate");
-        }
-        catch (Exception ex)
-        {
-            Debug.LogWarning($"[MultiPC] PC{wrapper.Index} AddICE error: {ex.Message}");
-            
-            // Fallback: try without prefix
-            try
-            {
-                var rawCand = candStr.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase) ? candStr.Substring("candidate:".Length) : candStr;
-                wrapper.PC.AddIceCandidate(new RTCIceCandidate(new RTCIceCandidateInit { candidate = rawCand, sdpMLineIndex = 0, sdpMid = "0" }));
-                Debug.Log($"[MultiPC] PC{wrapper.Index} Added ICE candidate (fallback format)");
-            }
-            catch { }
-        }
-    }
-
-    void SendWs(string msg)
-    {
-        if (_ws?.State == WebSocketState.Open)
-        {
-            try { _ = _ws.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(msg)), WebSocketMessageType.Text, true, _cts.Token); }
-            catch { }
-        }
-    }
-
-    string FixSdp(string sdp)
-    {
-        if (string.IsNullOrEmpty(sdp)) return sdp;
-        
-        // 1. Fix SAVP -> SAVPF
-        sdp = sdp.Replace("UDP/TLS/RTP/SAVP", "UDP/TLS/RTP/SAVPF");
-        
-        // 2. Fix 0.0.0.0 in connection line
-        if (sdp.Contains("IP4 0.0.0.0"))
-        {
-            Debug.Log("[MultiPC] Fixing SDP: IP4 0.0.0.0 -> IP4 127.0.0.1");
-            sdp = sdp.Replace("IP4 0.0.0.0", "IP4 127.0.0.1");
-        }
-
-        // 3. Answer SDP must have setup:active or setup:passive, NOT actpass!
-        if (sdp.Contains("a=setup:actpass"))
-        {
-            Debug.Log("[MultiPC] FixSdp: Converting a=setup:actpass -> a=setup:active");
-            sdp = sdp.Replace("a=setup:actpass", "a=setup:active");
-        }
-        
-        // 3. Remove embedded candidates and fix ice-options
-        var lines = sdp.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
-        var filtered = new List<string>();
-        
-        foreach (var rawLine in lines)
-        {
-            var line = rawLine.Trim();
-            if (string.IsNullOrWhiteSpace(line)) continue;
-            
-            // Skip embedded candidates
-            if (line.StartsWith("a=candidate:", StringComparison.OrdinalIgnoreCase))
-                continue;
-            
-            // Fix ice-options: remove 'ice2' 
-            if (line.StartsWith("a=ice-options:", StringComparison.OrdinalIgnoreCase) && line.Contains("ice2"))
-            {
-                line = line.Replace("ice2,", "").Replace(",ice2", "").Replace("ice2", "trickle");
-            }
-            
-            filtered.Add(line);
-        }
-        
-        sdp = string.Join("\r\n", filtered);
-        if (!sdp.EndsWith("\r\n")) sdp += "\r\n";
-        
-        return sdp;
-    }
-
-    System.Collections.IEnumerator PingKeepalive()
-    {
-        yield return new WaitForSeconds(2);
-        while (_ws?.State == WebSocketState.Open && !_cts.Token.IsCancellationRequested)
-        {
-            SendWs("ping");
-            yield return new WaitForSeconds(5);
-        }
-    }
-
     void OnDisable() => Cleanup();
     void OnDestroy() => Cleanup();
 
@@ -1017,13 +552,6 @@ public class MultiPCStreamClient : MonoBehaviour
             _mipmapTextures = null;
         }
 
-        // V1 Protocol cleanup
         try { _cts?.Cancel(); } catch { }
-        foreach (var w in _pcs)
-        {
-            try { w.PC?.Close(); w.PC?.Dispose(); } catch { }
-        }
-        _pcs.Clear();
-        try { _ws?.Abort(); _ws?.Dispose(); } catch { }
     }
 }

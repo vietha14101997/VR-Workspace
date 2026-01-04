@@ -7,15 +7,12 @@ using VRWorkspace.Streaming;
 using VRWorkspace.ViewModels;
 
 /// <summary>
-/// Multi-Track mode only implementation:
+/// Multi-Track mode implementation using V2 protocol:
 /// - Server sends N separate video tracks (one per monitor)
 /// - Each panel receives its own stream (1920x1080)
 /// - Fixes Android MediaCodec issues with ultra-wide resolutions
 /// - Signal path is auto-generated from Stream Configuration
-///
-/// Supports two connection modes:
-/// - Legacy (V1): Direct WebRTC connection
-/// - Phased (V2): 3-phase connection with hardware info, speed test, and auto-optimization
+/// - Uses 3-phase connection with hardware info, speed test, and auto-optimization
 /// </summary>
 public class ClusterAutoBinder : MonoBehaviour
 {
@@ -42,7 +39,8 @@ public class ClusterAutoBinder : MonoBehaviour
     public bool autoStart = false;
 
     [Header("Protocol")]
-    [Tooltip("Use V2 protocol with 3-phase connection")]
+    [Tooltip("Deprecated: V2 protocol is now always used")]
+    [System.Obsolete("V2 protocol is now always used. This field is kept for API compatibility.")]
     public bool useV2Protocol = true;
 
     [Header("Layout Info (auto-calculated, not shown)")]
@@ -77,16 +75,8 @@ public class ClusterAutoBinder : MonoBehaviour
 
         if (autoStart)
         {
-            if (useV2Protocol)
-            {
-                // V2: Start phased connection automatically
-                _ = ConnectToServerAsync();
-            }
-            else
-            {
-                // V1: Start streaming immediately
-                StartStreaming();
-            }
+            // Start phased connection automatically (V2 protocol)
+            _ = ConnectToServerAsync();
         }
     }
 
@@ -353,10 +343,10 @@ public class ClusterAutoBinder : MonoBehaviour
 
     #endregion
 
-    #region V1 Protocol - Legacy Direct Connection
+    #region Streaming Control
 
     /// <summary>
-    /// Start streaming with current configuration (V1 legacy mode).
+    /// Start streaming with current configuration.
     /// Can be called manually after configuring the binder properties.
     /// </summary>
     public void StartStreaming()
@@ -417,10 +407,7 @@ public class ClusterAutoBinder : MonoBehaviour
             _multiPCClient.OnConfigProgress -= HandleConfigProgress;
             _multiPCClient.OnSpeedTestProgress -= HandleSpeedTestProgress;
 
-            if (_multiPCClient.useV2Protocol)
-            {
-                _ = _multiPCClient.StopV2Async();
-            }
+            _ = _multiPCClient.StopV2Async();
 
             Destroy(_multiPCClient.gameObject);
             _multiPCClient = null;
@@ -453,7 +440,6 @@ public class ClusterAutoBinder : MonoBehaviour
 
         var wsBase = serverBase.Replace("http://", "ws://").Replace("https://", "wss://");
         _multiPCClient.signalUrl = $"{wsBase}/{signalPath}";
-        _multiPCClient.useV2Protocol = useV2Protocol;
 
         // Assign all panels to the multi-PC client
         _multiPCClient.panels = panels.ToArray();
@@ -462,7 +448,7 @@ public class ClusterAutoBinder : MonoBehaviour
         _multiPCClient.OnConfigProgress += HandleConfigProgress;
         _multiPCClient.OnSpeedTestProgress += HandleSpeedTestProgress;
 
-        Debug.Log($"[ClusterAutoBinder] MultiPC client created, url={_multiPCClient.signalUrl}, V2={useV2Protocol}");
+        Debug.Log($"[ClusterAutoBinder] MultiPC client created, url={_multiPCClient.signalUrl}");
         Debug.Log($"[ClusterAutoBinder] Bound {panels.Count} panels to {panels.Count} PeerConnections");
     }
 
@@ -488,14 +474,8 @@ public class ClusterAutoBinder : MonoBehaviour
             bitratePerMonitor = Mathf.Max(bitratePerMonitor, 2000);
         }
 
-        // Generate signal path for multi-track mode
-        signalPath = $"signal?mode=multitrack&monitors={monitorCount}&resW={resolutionWidth}&resH={resolutionHeight}&kbps={bitratePerMonitor}&fps={fps}&zerolat=1&lan=1";
-
-        // Add protocol version for V2
-        if (useV2Protocol)
-        {
-            signalPath += "&protocol=v2";
-        }
+        // Generate signal path for multi-track mode (V2 protocol)
+        signalPath = $"signal?mode=multitrack&monitors={monitorCount}&resW={resolutionWidth}&resH={resolutionHeight}&kbps={bitratePerMonitor}&fps={fps}&zerolat=1&lan=1&protocol=v2";
     }
 
     void CalculateLayoutInfo()
