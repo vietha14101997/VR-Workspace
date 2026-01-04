@@ -95,6 +95,8 @@ namespace VRWorkspace.Streaming
             public DateTime LastFrameTime; // Track when last video frame was received
             public int FrameCount; // Count frames for monitoring
             public IntPtr LastTexturePtr; // Track texture pointer for change detection
+            public bool TexturePtrDetectionWorking; // True if we've detected texture ptr changes
+            public DateTime FirstTextureTime; // When we first got a texture (for grace period)
             public TaskCompletionSource<bool> AnswerReceivedTcs; // For event-driven sequential mode
 
             // FPS feedback tracking (for adaptive encoding)
@@ -2336,17 +2338,29 @@ namespace VRWorkspace.Streaming
                 return;
             }
 
-            // Check if PC is still disconnected
-            var state = wrapper.PC?.ConnectionState ?? RTCPeerConnectionState.Closed;
-            if (state == RTCPeerConnectionState.Connected)
+            // Check if frames are now flowing (frame stall recovered naturally)
+            var timeSinceFrame = DateTime.UtcNow - wrapper.LastFrameTime;
+            if (timeSinceFrame.TotalMilliseconds < 2000) // Frames flowing within last 2s
             {
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal: already recovered, skip reconnect");
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal: frames recovered ({timeSinceFrame.TotalMilliseconds:F0}ms since last frame), skip reconnect");
                 wrapper.IsReconnecting = false;
                 wrapper.ReconnectAttempts = 0; // Reset on success
                 return;
             }
 
-            Debug.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal: PC still {state}, initiating reconnect...");
+            // Check PC connection state
+            var state = wrapper.PC?.ConnectionState ?? RTCPeerConnectionState.Closed;
+
+            // If PC is connected but frames stalled, we still need to reconnect
+            // This handles the case where WebRTC connection is fine but video stopped
+            if (state == RTCPeerConnectionState.Connected)
+            {
+                Debug.LogWarning($"[PhaseProtocol] PC{monitorIndex} auto-heal: PC Connected but frames stalled for {timeSinceFrame.TotalMilliseconds:F0}ms - forcing reconnect");
+            }
+            else
+            {
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal: PC state={state}, initiating reconnect...");
+            }
 
             try
             {
@@ -2922,15 +2936,52 @@ namespace VRWorkspace.Streaming
                                     // Only count as new frame if we had a previous pointer (not first frame)
                                     wrapper.FrameCount++;
                                     wrapper.RenderedFrameCount++;
+                                    wrapper.TexturePtrDetectionWorking = true; // Detection method confirmed working
 
-                                    // Debug log occasionally
-                                    if (wrapper.FrameCount % 100 == 0)
+                                    // Debug log first 10 frames and every 300 frames after
+                                    if (wrapper.FrameCount <= 10 || wrapper.FrameCount % 300 == 0)
                                     {
-                                        Debug.Log($"[PhaseProtocol] PC{wrapper.Index} texture ptr change detected, frames={wrapper.FrameCount}");
+                                        Debug.Log($"[PhaseProtocol] PC{wrapper.Index} texture ptr CHANGED: {wrapper.LastTexturePtr:X} -> {currentPtr:X}, frames={wrapper.FrameCount}");
                                     }
+                                }
+                                else
+                                {
+                                    Debug.Log($"[PhaseProtocol] PC{wrapper.Index} first texture ptr: {currentPtr:X}");
+                                    wrapper.FirstTextureTime = DateTime.UtcNow;
                                 }
                                 wrapper.LastTexturePtr = currentPtr;
                                 wrapper.LastFrameTime = DateTime.UtcNow;
+                            }
+                            else if (wrapper.LastTexturePtr != IntPtr.Zero && track != null)
+                            {
+                                // Texture pointer unchanged - check if detection method is working
+                                var timeSinceFirstTexture = DateTime.UtcNow - wrapper.FirstTextureTime;
+                                var timeSinceLastFrame = DateTime.UtcNow - wrapper.LastFrameTime;
+
+                                if (!wrapper.TexturePtrDetectionWorking && timeSinceFirstTexture.TotalMilliseconds > 10000)
+                                {
+                                    // 10 seconds passed but never detected a ptr change
+                                    // Fallback: Unity WebRTC might be reusing texture, assume frames are coming
+                                    if (_pollCount % 300 == 0)
+                                    {
+                                        Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} texture ptr detection NOT working after {timeSinceFirstTexture.TotalSeconds:F0}s - using fallback");
+                                    }
+                                    wrapper.LastFrameTime = DateTime.UtcNow;
+                                    if (_pollCount % 6 == 0)
+                                    {
+                                        wrapper.FrameCount++;
+                                        wrapper.RenderedFrameCount++;
+                                    }
+                                }
+                                else if (wrapper.TexturePtrDetectionWorking)
+                                {
+                                    // Detection method is working but no change - frames may have stopped
+                                    // Log warning if no frame update for extended time
+                                    if (wrapper.Index == 0 && _pollCount % 120 == 0 && timeSinceLastFrame.TotalMilliseconds > 1000)
+                                    {
+                                        Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} no texture ptr change for {timeSinceLastFrame.TotalMilliseconds:F0}ms, frames={wrapper.FrameCount}");
+                                    }
+                                }
                             }
 
                             wrapper.Texture = tex;
