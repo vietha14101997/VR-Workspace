@@ -94,6 +94,7 @@ namespace VRWorkspace.Streaming
             public const int MaxReconnectAttempts = 5; // Max attempts before giving up
             public DateTime LastFrameTime; // Track when last video frame was received
             public int FrameCount; // Count frames for monitoring
+            public IntPtr LastTexturePtr; // Track texture pointer for change detection
             public TaskCompletionSource<bool> AnswerReceivedTcs; // For event-driven sequential mode
 
             // FPS feedback tracking (for adaptive encoding)
@@ -1738,19 +1739,32 @@ namespace VRWorkspace.Streaming
                 }
             };
 
-            // Track received
+            // Track received - may be called multiple times for multi-track Single-PC mode
             pc.OnTrack = e =>
             {
                 if (e.Track is VideoStreamTrack v)
                 {
+                    var mid = e.Transceiver?.Mid ?? "null";
+                    var trackId = v.Id ?? "unknown";
+                    Debug.Log($"[PhaseProtocol] PC{idx} OnTrack: mid={mid}, trackId={trackId}");
+
                     wrapper.VideoTrack = v;
                     wrapper.LastFrameTime = DateTime.UtcNow;
+
+                    // Capture mid for callback logging
+                    var capturedMid = mid;
                     v.OnVideoReceived += tex =>
                     {
                         wrapper.Texture = tex;
                         wrapper.LastFrameTime = DateTime.UtcNow;
                         wrapper.FrameCount++;
                         wrapper.RenderedFrameCount++; // For adaptive FPS feedback
+
+                        // Debug: Log callback trigger (first few frames only)
+                        if (wrapper.FrameCount <= 3)
+                        {
+                            Debug.Log($"[PhaseProtocol] PC{idx} OnVideoReceived mid={capturedMid}, frame={wrapper.FrameCount}, tex={tex?.width}x{tex?.height}");
+                        }
 
                         // Fire OnStreamingStarted on first frame if not already fired
                         // This is a backup mechanism in case streaming_started message is delayed/lost
@@ -1764,7 +1778,7 @@ namespace VRWorkspace.Streaming
 
                         OnVideoTextureReceived?.Invoke(idx, tex);
                     };
-                    Debug.Log($"[PhaseProtocol] PC{idx} received video track");
+                    Debug.Log($"[PhaseProtocol] PC{idx} received video track, mid={mid}");
                 }
             };
         }
@@ -2897,10 +2911,29 @@ namespace VRWorkspace.Streaming
 
                         if (tex != null && tex.width > 0)
                         {
+                            // WORKAROUND: Unity WebRTC may not trigger OnVideoReceived for every frame
+                            // Detect texture change by comparing native texture pointer
+                            var currentPtr = tex.GetNativeTexturePtr();
+                            if (currentPtr != IntPtr.Zero && currentPtr != wrapper.LastTexturePtr)
+                            {
+                                // Texture pointer changed - frame was updated internally
+                                if (wrapper.LastTexturePtr != IntPtr.Zero)
+                                {
+                                    // Only count as new frame if we had a previous pointer (not first frame)
+                                    wrapper.FrameCount++;
+                                    wrapper.RenderedFrameCount++;
+
+                                    // Debug log occasionally
+                                    if (wrapper.FrameCount % 100 == 0)
+                                    {
+                                        Debug.Log($"[PhaseProtocol] PC{wrapper.Index} texture ptr change detected, frames={wrapper.FrameCount}");
+                                    }
+                                }
+                                wrapper.LastTexturePtr = currentPtr;
+                                wrapper.LastFrameTime = DateTime.UtcNow;
+                            }
+
                             wrapper.Texture = tex;
-                            // NOTE: Don't update LastFrameTime here!
-                            // It's updated in OnVideoReceived callback when new frame data arrives.
-                            // Updating here would break frame gap detection.
                         }
                     }
                     catch { }
