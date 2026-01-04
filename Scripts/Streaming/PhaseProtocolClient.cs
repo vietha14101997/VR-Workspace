@@ -694,6 +694,13 @@ namespace VRWorkspace.Streaming
                             OnSkipToLiveAck?.Invoke();
                             break;
 
+                        case "reconnect_required":
+                            // Server detected connection failure (e.g., DTLS timeout) and requires full reconnect
+                            Debug.LogWarning("[PhaseProtocol] Server requested reconnect - DTLS/connection failed");
+                            // Trigger full session reconnect
+                            _ = ReconnectSessionAsync();
+                            break;
+
                         case null:
                         case "":
                             Debug.LogWarning($"[PhaseProtocol] Empty/null type! Raw message: {text.Substring(0, Math.Min(300, text.Length))}");
