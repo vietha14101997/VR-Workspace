@@ -703,9 +703,11 @@ namespace VRWorkspace.Streaming
                 // This matches browser behavior which sends pong synchronously
                 _ = SendTextAsync("pong");
             }
-            else if (text.Equals("pong", StringComparison.OrdinalIgnoreCase))
+            else if (text.Equals("pong", StringComparison.OrdinalIgnoreCase) ||
+                     text.StartsWith("pong:", StringComparison.OrdinalIgnoreCase))
             {
-                // Notify speed test client for ping measurement
+                // Handle pong for RTT calculation (supports "pong" and "pong:timestamp")
+                HandlePongMessage(text);
                 _speedTest?.HandlePong();
             }
             else
