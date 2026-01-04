@@ -311,7 +311,7 @@ namespace VRWorkspace.Streaming
         private DateTime _lastSkipToLiveTime = DateTime.MinValue;
         private const float SkipToLiveCooldownSeconds = 2.0f; // Don't spam skip requests
         private const float FrameGapThresholdMs = 500f; // If no frames for 500ms, consider it stalled
-        private const float MonitorDriftThresholdMs = 200f; // If monitors are >200ms apart, consider drift
+        private const float MonitorDriftThresholdMs = 500f; // If monitors are >500ms apart, consider drift (was 200ms - too aggressive)
 
         // FPS Feedback constants (for adaptive encoding)
         private const float FPS_FEEDBACK_INTERVAL_SECONDS = 1.0f;  // Send feedback every 1s
@@ -374,7 +374,11 @@ namespace VRWorkspace.Streaming
                     if (timeSinceFrame > FrameGapThresholdMs && wrapper.FrameCount > 10)
                     {
                         // Frame stall detected - request skip to live for this monitor
-                        Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} frame gap {timeSinceFrame:F0}ms - requesting skip_to_live");
+                        // Only log when actually sending (respects cooldown)
+                        if ((DateTime.UtcNow - _lastSkipToLiveTime).TotalSeconds >= SkipToLiveCooldownSeconds)
+                        {
+                            Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} frame gap {timeSinceFrame:F0}ms - skip_to_live");
+                        }
                         SkipToLive(wrapper.Index);
                         return; // Only send once per poll
                     }
@@ -392,13 +396,18 @@ namespace VRWorkspace.Streaming
                     }
                 }
 
-                // Drift detection: if monitors are >200ms apart, the older one is lagging
+                // Drift detection: if monitors are >500ms apart, the older one is lagging
+                // Only log when we're actually going to send skip_to_live (respects cooldown)
                 if (_peerConnections.Count > 1 && minFrameTime != DateTime.MaxValue && maxFrameTime != DateTime.MinValue)
                 {
                     var drift = (maxFrameTime - minFrameTime).TotalMilliseconds;
                     if (drift > MonitorDriftThresholdMs && laggingMonitor >= 0)
                     {
-                        Debug.LogWarning($"[PhaseProtocol] Monitor drift detected: PC{laggingMonitor} is {drift:F0}ms behind PC{minFrameMonitor} - requesting skip_to_live");
+                        // Check cooldown before logging to avoid spam
+                        if ((DateTime.UtcNow - _lastSkipToLiveTime).TotalSeconds >= SkipToLiveCooldownSeconds)
+                        {
+                            Debug.LogWarning($"[PhaseProtocol] Monitor drift: PC{laggingMonitor} is {drift:F0}ms behind - skip_to_live");
+                        }
                         SkipToLive(laggingMonitor);
                     }
                 }
@@ -2956,16 +2965,13 @@ namespace VRWorkspace.Streaming
                             {
                                 // Texture pointer unchanged - check if detection method is working
                                 var timeSinceFirstTexture = DateTime.UtcNow - wrapper.FirstTextureTime;
-                                var timeSinceLastFrame = DateTime.UtcNow - wrapper.LastFrameTime;
 
-                                if (!wrapper.TexturePtrDetectionWorking && timeSinceFirstTexture.TotalMilliseconds > 10000)
+                                // IMPORTANT: Grace period (2s) must be LESS than STALL_THRESHOLD_MS (3s)
+                                // Otherwise stall detection triggers before fallback activates!
+                                if (!wrapper.TexturePtrDetectionWorking && timeSinceFirstTexture.TotalMilliseconds > 2000)
                                 {
-                                    // 10 seconds passed but never detected a ptr change
-                                    // Fallback: Unity WebRTC might be reusing texture, assume frames are coming
-                                    if (_pollCount % 300 == 0)
-                                    {
-                                        Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} texture ptr detection NOT working after {timeSinceFirstTexture.TotalSeconds:F0}s - using fallback");
-                                    }
+                                    // 2 seconds passed but never detected a ptr change
+                                    // Fallback: Unity WebRTC reuses texture pointer, assume frames are coming
                                     wrapper.LastFrameTime = DateTime.UtcNow;
                                     if (_pollCount % 6 == 0)
                                     {
@@ -2973,15 +2979,8 @@ namespace VRWorkspace.Streaming
                                         wrapper.RenderedFrameCount++;
                                     }
                                 }
-                                else if (wrapper.TexturePtrDetectionWorking)
-                                {
-                                    // Detection method is working but no change - frames may have stopped
-                                    // Log warning if no frame update for extended time
-                                    if (wrapper.Index == 0 && _pollCount % 120 == 0 && timeSinceLastFrame.TotalMilliseconds > 1000)
-                                    {
-                                        Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} no texture ptr change for {timeSinceLastFrame.TotalMilliseconds:F0}ms, frames={wrapper.FrameCount}");
-                                    }
-                                }
+                                // else: TexturePtrDetectionWorking=true means we expect ptr changes
+                                // Don't update LastFrameTime - let stall detection work
                             }
 
                             wrapper.Texture = tex;
