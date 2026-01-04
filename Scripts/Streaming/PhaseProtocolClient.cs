@@ -496,8 +496,10 @@ namespace VRWorkspace.Streaming
                     wrapper.LastFpsFeedbackSent = DateTime.UtcNow;
                     wrapper.LastReportedEffectiveFps = effectiveFps;
 
+                    // Use InvariantCulture to ensure decimal separator is always '.' (not ',' on some devices)
+                    string fpsStr = effectiveFps.ToString("F1", System.Globalization.CultureInfo.InvariantCulture);
                     string json = $"{{\"type\":\"fps_feedback\",\"monitorIndex\":{wrapper.Index}," +
-                        $"\"effectiveFps\":{effectiveFps:F1}," +
+                        $"\"effectiveFps\":{fpsStr}," +
                         $"\"renderedFrames\":{wrapper.RenderedFrameCount}," +
                         $"\"droppedFrames\":{wrapper.DroppedFrameCount}}}";
 
