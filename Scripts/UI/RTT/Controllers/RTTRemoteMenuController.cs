@@ -414,7 +414,6 @@ public class RTTRemoteMenuController : MonoBehaviour
         // Configure binder with settings from menu
         var settings = GetConnectionSettings();
         binder.autoStart = false;
-        binder.useV2Protocol = true;
         binder.serverBase = $"http://{settings.host}:{settings.port}";
         binder.rig = _clusterRig;
         binder.monitorCount = config.monitors;

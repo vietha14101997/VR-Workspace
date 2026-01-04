@@ -146,9 +146,8 @@ public class RemoteConnectionPipeline : MonoBehaviour
 
         binder.autoStart = false;
         binder.rig = rig;
-        binder.useV2Protocol = true;
 
-        Debug.Log("[RemoteConnectionPipeline] ClusterAutoBinder setup for V2 protocol");
+        Debug.Log("[RemoteConnectionPipeline] ClusterAutoBinder setup");
         return binder;
     }
     #endregion

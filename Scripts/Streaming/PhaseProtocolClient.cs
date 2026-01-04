@@ -2588,21 +2588,23 @@ namespace VRWorkspace.Streaming
             {
                 try
                 {
-                    // Get the latest frame from the array
-                    var latest = recentFrames[recentFrames.Count - 1] as Dictionary<string, object>;
-                    if (latest != null && latest.TryGetValue("captureTime", out var captureTimeObj))
+                    // Get the latest frame from the array (returns SimpleJson)
+                    var latest = recentFrames[recentFrames.Count - 1];
+                    if (latest != null)
                     {
-                        long captureTime = Convert.ToInt64(captureTimeObj);
-
-                        // Frame latency = (server processing time) + (network delay)
-                        // server processing time = serverTime - captureTime
-                        // network delay = estimated as ping/2 (one-way delay)
-                        double owd = _metrics.CurrentPingMs > 0 ? _metrics.CurrentPingMs / 2.0 : 0;
-                        double frameLatency = (serverTime - captureTime) + owd;
-
-                        if (frameLatency > 0 && frameLatency < 2000) // Sanity check
+                        long captureTime = latest.GetLong("captureTime");
+                        if (captureTime > 0)
                         {
-                            _metrics.RecordFrameTiming(serverTime, captureTime);
+                            // Frame latency = (server processing time) + (network delay)
+                            // server processing time = serverTime - captureTime
+                            // network delay = estimated as ping/2 (one-way delay)
+                            double owd = _metrics.CurrentPingMs > 0 ? _metrics.CurrentPingMs / 2.0 : 0;
+                            double frameLatency = (serverTime - captureTime) + owd;
+
+                            if (frameLatency > 0 && frameLatency < 2000) // Sanity check
+                            {
+                                _metrics.RecordFrameTiming(serverTime, captureTime);
+                            }
                         }
                     }
                 }
