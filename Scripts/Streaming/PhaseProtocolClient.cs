@@ -291,9 +291,18 @@ namespace VRWorkspace.Streaming
         /// Call this when user interacts (click, drag, etc.) for instant visual update.
         /// </summary>
         /// <param name="monitorIndex">Monitor index, or -1 for all monitors</param>
-        public void RequestKeyframe(int monitorIndex = -1)
+        public async void RequestKeyframe(int monitorIndex = -1)
         {
-            if (_ws?.State != WebSocketState.Open || !_stateMachine.IsStreaming) return;
+            if (_ws?.State != WebSocketState.Open)
+            {
+                Debug.LogWarning($"[PhaseProtocol] RequestKeyframe skipped: ws={_ws?.State}");
+                return;
+            }
+            if (!_stateMachine.IsStreaming)
+            {
+                Debug.LogWarning($"[PhaseProtocol] RequestKeyframe skipped: not streaming (state={_stateMachine?.CurrentPhase})");
+                return;
+            }
 
             try
             {
@@ -301,9 +310,14 @@ namespace VRWorkspace.Streaming
                     ? $"{{\"type\":\"request_keyframe\",\"monitorIndex\":{monitorIndex}}}"
                     : "{\"type\":\"request_keyframe\"}";
 
-                _ = SendTextAsync(json);
+                Debug.Log($"[PhaseProtocol] Sending request_keyframe: {json}");
+                await SendTextAsync(json);
+                Debug.Log($"[PhaseProtocol] request_keyframe SENT successfully");
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[PhaseProtocol] RequestKeyframe failed: {ex.Message}");
+            }
         }
 
         #region Latency Control
@@ -344,9 +358,18 @@ namespace VRWorkspace.Streaming
         /// Use when detecting accumulated latency.
         /// </summary>
         /// <param name="monitorIndex">Monitor index to sync, or -1 for all monitors</param>
-        public void SkipToLive(int monitorIndex = -1)
+        public async void SkipToLive(int monitorIndex = -1)
         {
-            if (_ws?.State != WebSocketState.Open || !_stateMachine.IsStreaming) return;
+            if (_ws?.State != WebSocketState.Open)
+            {
+                Debug.LogWarning($"[PhaseProtocol] SkipToLive skipped: ws={_ws?.State}");
+                return;
+            }
+            if (!_stateMachine.IsStreaming)
+            {
+                Debug.LogWarning($"[PhaseProtocol] SkipToLive skipped: not streaming");
+                return;
+            }
 
             // Cooldown to avoid spamming
             if ((DateTime.UtcNow - _lastSkipToLiveTime).TotalSeconds < SkipToLiveCooldownSeconds)
@@ -360,9 +383,13 @@ namespace VRWorkspace.Streaming
                     ? $"{{\"type\":\"skip_to_live\",\"monitor\":{monitorIndex}}}"
                     : "{\"type\":\"skip_to_live\"}";
                 Debug.Log($"[PhaseProtocol] Sending skip_to_live (monitor={monitorIndex}) for latency recovery");
-                _ = SendTextAsync(msg);
+                await SendTextAsync(msg);
+                Debug.Log($"[PhaseProtocol] skip_to_live SENT successfully");
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[PhaseProtocol] SkipToLive failed: {ex.Message}");
+            }
         }
 
         /// <summary>
