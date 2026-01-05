@@ -353,6 +353,15 @@ namespace VRWorkspace.Streaming
         private DateTime _lastSkipToLiveTime = DateTime.MinValue;
         private const float SkipToLiveCooldownSeconds = 2.0f; // Don't spam skip requests
 
+        // === RTT-based aggressive skip thresholds ===
+        // When RTT is extremely high, client is falling behind and needs immediate recovery
+        private const double RTT_EXTREME_THRESHOLD_MS = 5000.0; // 5s RTT = bypass cooldown, skip immediately
+        private const double RTT_HIGH_THRESHOLD_MS = 3000.0;    // 3s RTT = trigger skip (with cooldown)
+        private const float EFFECTIVE_FPS_CRISIS_RATIO = 0.25f; // Skip if FPS < 25% of target
+        private const float PACKET_LOSS_CRISIS_THRESHOLD = 0.20f; // Skip if >20% packet loss
+        private DateTime _lastExtremeSkipTime = DateTime.MinValue;
+        private const float ExtremeSkipCooldownSeconds = 5.0f; // Don't spam extreme skips
+
         // Decoder freeze detection - compare server frame count with client rendered frames
         // This catches cases where WebRTC texture is valid but decoder has stopped producing new pixels
         private long _lastServerFrame = 0;           // currentFrame from last frameTiming message
@@ -418,10 +427,82 @@ namespace VRWorkspace.Streaming
         /// <summary>
         /// Check for latency issues and request skip_to_live if needed.
         /// Called from PollTextures to detect frame gaps and monitor drift.
+        ///
+        /// Detection modes (prioritized):
+        /// 1. RTT-based: When RTT is extremely high (>5s), skip immediately bypassing cooldown
+        /// 2. RTT-based: When RTT is high (>3s), skip with normal cooldown
+        /// 3. FPS crisis: When effective FPS < 25% of target, skip
+        /// 4. Frame gap: When no frames received for threshold time
+        /// 5. Monitor drift: When monitors are out of sync
         /// </summary>
         private void CheckLatencyAndSkip()
         {
             if (!_stateMachine.IsStreaming) return;
+
+            // === RTT-based aggressive skip (highest priority) ===
+            // When RTT is extremely high, the client is watching frames that are already stale.
+            // Frames are still arriving, but they're 5-7 seconds old. Need to skip immediately.
+            double currentRtt = _metrics.CurrentPingMs;
+
+            if (currentRtt >= RTT_EXTREME_THRESHOLD_MS)
+            {
+                // CRITICAL: RTT is 5+ seconds. Client is severely behind.
+                // Use separate longer cooldown for extreme skips (5s vs 2s for normal)
+                if ((DateTime.UtcNow - _lastExtremeSkipTime).TotalSeconds >= ExtremeSkipCooldownSeconds)
+                {
+                    Debug.LogWarning($"[PhaseProtocol] EXTREME RTT detected: {currentRtt:F0}ms - IMMEDIATE skip_to_live (bypass normal cooldown)");
+                    _lastExtremeSkipTime = DateTime.UtcNow;
+                    _lastSkipToLiveTime = DateTime.UtcNow;
+                    SkipToLiveImmediate(-1);
+                }
+                return;
+            }
+
+            if (currentRtt >= RTT_HIGH_THRESHOLD_MS)
+            {
+                // HIGH RTT: 3-5 seconds. Client is falling behind.
+                // Use normal cooldown to avoid spam, but definitely skip
+                if ((DateTime.UtcNow - _lastSkipToLiveTime).TotalSeconds >= SkipToLiveCooldownSeconds)
+                {
+                    Debug.LogWarning($"[PhaseProtocol] HIGH RTT detected: {currentRtt:F0}ms - skip_to_live");
+                    SkipToLive(-1);
+                }
+                return;
+            }
+
+            // === Effective FPS crisis detection ===
+            // If we're only getting 25% of expected frames, something is very wrong
+            float targetFps = _lastServerTargetFps > 0 ? _lastServerTargetFps : 60f;
+            float effectiveFps = _metrics.EffectiveFps;
+            if (effectiveFps > 0 && effectiveFps < targetFps * EFFECTIVE_FPS_CRISIS_RATIO)
+            {
+                // Only trigger if we have at least some data (avoid false positives on startup)
+                int totalRendered = GetTotalRenderedFrames();
+                if (totalRendered > 30) // At least 30 frames received
+                {
+                    if ((DateTime.UtcNow - _lastSkipToLiveTime).TotalSeconds >= SkipToLiveCooldownSeconds)
+                    {
+                        Debug.LogWarning($"[PhaseProtocol] FPS CRISIS: {effectiveFps:F1}/{targetFps:F0} fps ({effectiveFps/targetFps*100:F0}%) - skip_to_live");
+                        SkipToLive(-1);
+                    }
+                    return;
+                }
+            }
+
+            // === Packet loss crisis detection ===
+            // High sustained packet loss means we're missing too much data to maintain coherent video
+            float packetLoss = _metrics.AveragePacketLossRate;
+            if (packetLoss >= PACKET_LOSS_CRISIS_THRESHOLD)
+            {
+                if ((DateTime.UtcNow - _lastSkipToLiveTime).TotalSeconds >= SkipToLiveCooldownSeconds)
+                {
+                    Debug.LogWarning($"[PhaseProtocol] PACKET LOSS CRISIS: {packetLoss:P0} loss rate - skip_to_live + keyframe");
+                    SkipToLive(-1);
+                    // Also request keyframe because lost packets likely corrupted decoder state
+                    RequestKeyframe(-1);
+                }
+                return;
+            }
 
             lock (_lock)
             {
@@ -477,6 +558,37 @@ namespace VRWorkspace.Streaming
                         SkipToLive(laggingMonitor);
                     }
                 }
+            }
+        }
+
+        /// <summary>
+        /// Skip to live immediately, bypassing normal cooldown.
+        /// Used for critical situations like extreme RTT (>5s).
+        /// </summary>
+        private async void SkipToLiveImmediate(int monitorIndex)
+        {
+            if (_ws?.State != WebSocketState.Open || !_stateMachine.IsStreaming)
+                return;
+
+            try
+            {
+                string msg = monitorIndex >= 0
+                    ? $"{{\"type\":\"skip_to_live\",\"monitor\":{monitorIndex},\"urgent\":true}}"
+                    : "{\"type\":\"skip_to_live\",\"urgent\":true}";
+                Debug.Log($"[PhaseProtocol] URGENT skip_to_live (bypassing cooldown)");
+                await SendTextAsync(msg);
+
+                // Also request keyframe to ensure clean recovery
+                await Task.Delay(50); // Small delay to let server process skip first
+                string keyframeMsg = monitorIndex >= 0
+                    ? $"{{\"type\":\"request_keyframe\",\"monitorIndex\":{monitorIndex}}}"
+                    : "{\"type\":\"request_keyframe\"}";
+                await SendTextAsync(keyframeMsg);
+                Debug.Log($"[PhaseProtocol] Follow-up keyframe request sent");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[PhaseProtocol] SkipToLiveImmediate failed: {ex.Message}");
             }
         }
 
