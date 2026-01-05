@@ -7,6 +7,15 @@ using VRWorkspace.Streaming;
 using VRWorkspace.ViewModels;
 
 /// <summary>
+/// Connection mode for ClusterAutoBinder.
+/// </summary>
+public enum ConnectionMode
+{
+    WiFi,   // Connect via WiFi (requires QR code scan or manual IP)
+    USB     // Connect via USB ADB reverse port forwarding (localhost)
+}
+
+/// <summary>
 /// Multi-Track mode implementation using V2 protocol:
 /// - Server sends N separate video tracks (one per monitor)
 /// - Each panel receives its own stream (1920x1080)
@@ -37,6 +46,13 @@ public class ClusterAutoBinder : MonoBehaviour
     [Header("Auto Start")]
     [Tooltip("If true, automatically start streaming on Start(). If false, call StartStreaming() manually.")]
     public bool autoStart = false;
+
+    [Header("Connection Mode")]
+    [Tooltip("USB mode uses localhost via ADB reverse port forwarding (more stable, lower latency)")]
+    public ConnectionMode connectionMode = ConnectionMode.WiFi;
+
+    [Tooltip("Port for USB mode (default 8288)")]
+    public int usbPort = 8288;
 
     [Header("Protocol")]
     [Tooltip("Deprecated: V2 protocol is now always used")]
@@ -140,6 +156,12 @@ public class ClusterAutoBinder : MonoBehaviour
     /// </summary>
     public async Task<bool> ConnectToServerAsync()
     {
+        // Use USB mode if configured
+        if (connectionMode == ConnectionMode.USB)
+        {
+            return await ConnectUSBAsync();
+        }
+
         // Ensure ViewModel is initialized
         if (_viewModel == null) InitializeViewModel();
 
@@ -150,7 +172,7 @@ public class ClusterAutoBinder : MonoBehaviour
             return false;
         }
 
-        Debug.Log("[ClusterAutoBinder] Connecting to server (V2 protocol via ViewModel)...");
+        Debug.Log("[ClusterAutoBinder] Connecting to server via WiFi (V2 protocol)...");
 
         // Quick validation first
         bool serverValid = await ValidateServerAsync();
@@ -168,26 +190,11 @@ public class ClusterAutoBinder : MonoBehaviour
             string host = uri.Host;
             int port = uri.Port;
 
-            // Connect via ViewModel
+            // Connect via ViewModel (WiFi mode)
             await _viewModel.ConnectAsync(host, port);
 
             // Wait for config phase (Phase 1 complete)
-            float timeout = 30f;
-            float elapsed = 0f;
-            while (elapsed < timeout)
-            {
-                var phase = _viewModel.Phase.Value;
-                if (phase == ConnectionPhase.ConfiguringSettings ||
-                    phase == ConnectionPhase.Error ||
-                    phase == ConnectionPhase.Disconnected)
-                {
-                    break;
-                }
-                await Task.Delay(100);
-                elapsed += 0.1f;
-            }
-
-            return _viewModel.Phase.Value == ConnectionPhase.ConfiguringSettings;
+            return await WaitForConfigPhaseAsync();
         }
         catch (Exception ex)
         {
@@ -195,6 +202,66 @@ public class ClusterAutoBinder : MonoBehaviour
             _viewModel.ErrorMessage.Value = ex.Message;
             return false;
         }
+    }
+
+    /// <summary>
+    /// Connect to server via USB (ADB reverse port forwarding).
+    /// More stable and lower latency than WiFi.
+    /// </summary>
+    public async Task<bool> ConnectUSBAsync()
+    {
+        // Ensure ViewModel is initialized
+        if (_viewModel == null) InitializeViewModel();
+
+        var currentPhase = _viewModel.Phase.Value;
+        if (currentPhase != ConnectionPhase.Disconnected && currentPhase != ConnectionPhase.Error)
+        {
+            Debug.LogWarning($"[ClusterAutoBinder] Cannot connect from phase: {currentPhase}");
+            return false;
+        }
+
+        Debug.Log($"[ClusterAutoBinder] Connecting to server via USB (localhost:{usbPort})...");
+
+        // For USB mode, we don't need server validation - ADB reverse handles connectivity
+        // If the tunnel isn't set up, connection will fail directly
+
+        try
+        {
+            // Connect via ViewModel (USB mode)
+            await _viewModel.ConnectUSBAsync(usbPort);
+
+            // Wait for config phase (Phase 1 complete)
+            return await WaitForConfigPhaseAsync();
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[ClusterAutoBinder] USB connection failed: {ex.Message}");
+            _viewModel.ErrorMessage.Value = $"USB connection failed. Ensure USB Debugging is enabled and ADB reverse is set up.\n{ex.Message}";
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Wait for the connection to reach ConfiguringSettings phase.
+    /// </summary>
+    private async Task<bool> WaitForConfigPhaseAsync()
+    {
+        float timeout = 30f;
+        float elapsed = 0f;
+        while (elapsed < timeout)
+        {
+            var phase = _viewModel.Phase.Value;
+            if (phase == ConnectionPhase.ConfiguringSettings ||
+                phase == ConnectionPhase.Error ||
+                phase == ConnectionPhase.Disconnected)
+            {
+                break;
+            }
+            await Task.Delay(100);
+            elapsed += 0.1f;
+        }
+
+        return _viewModel.Phase.Value == ConnectionPhase.ConfiguringSettings;
     }
 
     /// <summary>

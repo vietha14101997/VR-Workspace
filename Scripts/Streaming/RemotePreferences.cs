@@ -16,7 +16,8 @@ namespace VRWorkspace.Streaming
         public string bitrate = "";
         public string fps = "";
         public string lastHost = "";
-        public string lastPort = "";
+        public string lastPort = "8288";    // default port
+        public bool usbMode = false;        // USB connection mode (via ADB reverse)
 
         private static string FilePath => Path.Combine(
             Application.persistentDataPath, "remote_preferences.json");

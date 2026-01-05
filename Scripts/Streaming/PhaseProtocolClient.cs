@@ -349,9 +349,33 @@ namespace VRWorkspace.Streaming
         private float DecoderFreezeCheckIntervalMs => _isWiFiConnection ? WIFI_DECODER_FREEZE_CHECK_INTERVAL_MS : BASE_DECODER_FREEZE_CHECK_INTERVAL_MS;
         private float PreventiveKeyframeIntervalSeconds => _isWiFiConnection ? CalculateAdaptiveKeyframeInterval() : BASE_PREVENTIVE_KEYFRAME_INTERVAL_SECONDS;
 
-        // Latency tracking for skip_to_live
+        // Latency tracking for skip_to_live with adaptive cooldown
         private DateTime _lastSkipToLiveTime = DateTime.MinValue;
-        private const float SkipToLiveCooldownSeconds = 2.0f; // Don't spam skip requests
+        private int _consecutiveSkipCount = 0;  // Track consecutive skips for adaptive cooldown
+        private DateTime _skipCountResetTime = DateTime.MinValue;
+        private const float BASE_SKIP_COOLDOWN_SECONDS = 2.0f;    // Base cooldown
+        private const float MAX_SKIP_COOLDOWN_SECONDS = 10.0f;    // Max cooldown when spamming
+        private const int SKIP_COUNT_THRESHOLD = 5;               // After 5 skips in 30s, increase cooldown
+
+        private float SkipToLiveCooldownSeconds
+        {
+            get
+            {
+                // Reset counter if 30 seconds have passed since last skip
+                if ((DateTime.UtcNow - _skipCountResetTime).TotalSeconds > 30.0)
+                {
+                    _consecutiveSkipCount = 0;
+                }
+                // Adaptive cooldown: increase if we're skipping too frequently
+                if (_consecutiveSkipCount >= SKIP_COUNT_THRESHOLD)
+                {
+                    // Gradually increase cooldown up to max
+                    float multiplier = 1 + (_consecutiveSkipCount - SKIP_COUNT_THRESHOLD) * 0.5f;
+                    return Math.Min(MAX_SKIP_COOLDOWN_SECONDS, BASE_SKIP_COOLDOWN_SECONDS * multiplier);
+                }
+                return BASE_SKIP_COOLDOWN_SECONDS;
+            }
+        }
 
         // === RTT-based aggressive skip thresholds ===
         // When RTT is extremely high, client is falling behind and needs immediate recovery
@@ -403,11 +427,19 @@ namespace VRWorkspace.Streaming
                 return;
             }
 
-            // Cooldown to avoid spamming
+            // Cooldown to avoid spamming (adaptive based on skip frequency)
             if ((DateTime.UtcNow - _lastSkipToLiveTime).TotalSeconds < SkipToLiveCooldownSeconds)
                 return;
 
             _lastSkipToLiveTime = DateTime.UtcNow;
+            _consecutiveSkipCount++;
+            _skipCountResetTime = DateTime.UtcNow;
+
+            // Log if cooldown is increased due to spam
+            if (_consecutiveSkipCount >= SKIP_COUNT_THRESHOLD)
+            {
+                Debug.LogWarning($"[PhaseProtocol] skip_to_live frequency high ({_consecutiveSkipCount} in 30s), cooldown now {SkipToLiveCooldownSeconds:F1}s");
+            }
 
             try
             {
@@ -2685,8 +2717,8 @@ namespace VRWorkspace.Streaming
                 return;
             }
 
-            // Exponential backoff: 2s, 4s, 8s, 16s, 32s
-            int delayMs = 2000 * (1 << wrapper.ReconnectAttempts);
+            // Fast linear backoff for VR: 500ms, 1s, 1.5s, 2s, 2.5s (VR needs fast recovery)
+            int delayMs = 500 + (wrapper.ReconnectAttempts * 500);
             wrapper.ReconnectAttempts++;
             Debug.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal: attempt {wrapper.ReconnectAttempts}/{PCWrapper.MaxReconnectAttempts}, waiting {delayMs}ms...");
             await Task.Delay(delayMs);

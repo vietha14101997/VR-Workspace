@@ -8,6 +8,15 @@ using VRWorkspace.Streaming;
 namespace VRWorkspace.ViewModels
 {
     /// <summary>
+    /// Transport mode for connection (USB vs WiFi).
+    /// </summary>
+    public enum TransportMode
+    {
+        WiFi,   // Default: Connect via WiFi network
+        USB     // Connect via USB ADB reverse port forwarding
+    }
+
+    /// <summary>
     /// ViewModel for connection/streaming functionality.
     /// Wraps PhaseProtocolClient and provides observable properties for UI binding.
     ///
@@ -112,6 +121,7 @@ namespace VRWorkspace.ViewModels
         private PhaseProtocolClient _client;
         private string _currentHost;
         private int _currentPort;
+        private TransportMode _transportMode = TransportMode.WiFi;
         private readonly Dictionary<int, Texture> _textures = new Dictionary<int, Texture>();
         private bool _disposed;
 
@@ -160,8 +170,28 @@ namespace VRWorkspace.ViewModels
         {
             _currentHost = host;
             _currentPort = port;
+            _transportMode = TransportMode.WiFi;
             await ConnectCommand.ExecuteAsync();
         }
+
+        /// <summary>
+        /// Connect to server via USB (ADB reverse port forwarding).
+        /// Uses localhost:port since ADB reverse tunnel makes server accessible locally.
+        /// </summary>
+        /// <param name="port">Server port (default 8288)</param>
+        public async Task ConnectUSBAsync(int port = 8288)
+        {
+            _currentHost = "127.0.0.1";  // USB mode uses localhost via ADB reverse
+            _currentPort = port;
+            _transportMode = TransportMode.USB;
+            Debug.Log($"[ConnectionViewModel] Connecting via USB (localhost:{port})");
+            await ConnectCommand.ExecuteAsync();
+        }
+
+        /// <summary>
+        /// Current transport mode (USB or WiFi).
+        /// </summary>
+        public TransportMode CurrentTransport => _transportMode;
 
         /// <summary>
         /// Disconnect from the server and reset all state.
@@ -431,7 +461,10 @@ namespace VRWorkspace.ViewModels
 
             try
             {
-                var url = $"ws://{_currentHost}:{_currentPort}/signal";
+                // Build URL with transport parameter for USB mode
+                var transportParam = _transportMode == TransportMode.USB ? "&transport=usb" : "";
+                var url = $"ws://{_currentHost}:{_currentPort}/signal?protocol=v2{transportParam}";
+                Debug.Log($"[ConnectionViewModel] Connecting to {url} (transport={_transportMode})");
                 await _client.ConnectAsync(url);
                 IsConnected.Value = true;
             }
