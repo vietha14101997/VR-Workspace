@@ -322,11 +322,36 @@ namespace VRWorkspace.Streaming
 
         #region Latency Control
 
+        // === WiFi Tolerance Configuration ===
+        // WiFi connections have higher jitter and occasional packet bursts
+        // Adjust thresholds to avoid false positives on WiFi
+        private bool _isWiFiConnection = false;
+
+        // Base thresholds (for LAN/Ethernet - low latency, stable connection)
+        private const float BASE_FRAME_GAP_THRESHOLD_MS = 500f;
+        private const float BASE_MONITOR_DRIFT_THRESHOLD_MS = 500f;
+        private const int BASE_DECODER_FREEZE_THRESHOLD_FRAMES = 90;
+        private const float BASE_DECODER_FREEZE_CHECK_INTERVAL_MS = 3000f;
+        private const float BASE_PREVENTIVE_KEYFRAME_INTERVAL_SECONDS = 15f;
+
+        // WiFi thresholds (more tolerant - allow for jitter and burst loss)
+        private const float WIFI_FRAME_GAP_THRESHOLD_MS = 1500f;           // 1.5s for WiFi (was 500ms)
+        private const float WIFI_MONITOR_DRIFT_THRESHOLD_MS = 1000f;       // 1s drift allowed (was 500ms)
+        private const int WIFI_DECODER_FREEZE_THRESHOLD_FRAMES = 120;      // ~4s at 30fps (was 90)
+        private const float WIFI_DECODER_FREEZE_CHECK_INTERVAL_MS = 5000f; // Check every 5s (was 3s)
+        private const float WIFI_PREVENTIVE_KEYFRAME_MIN_INTERVAL = 10f;   // Minimum 10s
+        private const float WIFI_PREVENTIVE_KEYFRAME_MAX_INTERVAL = 30f;   // Maximum 30s on stable
+
+        // Active thresholds - computed properties based on connection type
+        private float FrameGapThresholdMs => _isWiFiConnection ? WIFI_FRAME_GAP_THRESHOLD_MS : BASE_FRAME_GAP_THRESHOLD_MS;
+        private float MonitorDriftThresholdMs => _isWiFiConnection ? WIFI_MONITOR_DRIFT_THRESHOLD_MS : BASE_MONITOR_DRIFT_THRESHOLD_MS;
+        private int DecoderFreezeThresholdFrames => _isWiFiConnection ? WIFI_DECODER_FREEZE_THRESHOLD_FRAMES : BASE_DECODER_FREEZE_THRESHOLD_FRAMES;
+        private float DecoderFreezeCheckIntervalMs => _isWiFiConnection ? WIFI_DECODER_FREEZE_CHECK_INTERVAL_MS : BASE_DECODER_FREEZE_CHECK_INTERVAL_MS;
+        private float PreventiveKeyframeIntervalSeconds => _isWiFiConnection ? CalculateAdaptiveKeyframeInterval() : BASE_PREVENTIVE_KEYFRAME_INTERVAL_SECONDS;
+
         // Latency tracking for skip_to_live
         private DateTime _lastSkipToLiveTime = DateTime.MinValue;
         private const float SkipToLiveCooldownSeconds = 2.0f; // Don't spam skip requests
-        private const float FrameGapThresholdMs = 500f; // If no frames for 500ms, consider it stalled
-        private const float MonitorDriftThresholdMs = 500f; // If monitors are >500ms apart, consider drift (was 200ms - too aggressive)
 
         // Decoder freeze detection - compare server frame count with client rendered frames
         // This catches cases where WebRTC texture is valid but decoder has stopped producing new pixels
@@ -334,14 +359,12 @@ namespace VRWorkspace.Streaming
         private long _lastServerFrameTime = 0;       // When we received _lastServerFrame
         private int _clientFramesAtLastCheck = 0;    // Total client rendered frames at check time
         private int _realFramesAtLastCheck = 0;      // Real texture pointer changes (not fallback)
-        private const int DecoderFreezeThresholdFrames = 90;  // ~3s at 30fps: if server advances 90+ frames but client 0, decoder frozen
-        private const float DecoderFreezeCheckIntervalMs = 3000f; // Check every 3 seconds
 
         // Preventive keyframe request for fallback mode
         // When texture pointer detection doesn't work, we can't tell if decoder is frozen
         // So we periodically request keyframes to "unstick" a potentially frozen decoder
         private DateTime _lastPreventiveKeyframeTime = DateTime.MinValue;
-        private const float PreventiveKeyframeIntervalSeconds = 15f; // Request keyframe every 15s in fallback mode (aggressive to handle frozen decoders)
+        private int _freezeCount = 0; // Track consecutive freeze detections for graduated response
 
         // FPS Feedback constants (for adaptive encoding)
         private const float FPS_FEEDBACK_INTERVAL_SECONDS = 1.0f;  // Send feedback every 1s
@@ -496,6 +519,12 @@ namespace VRWorkspace.Streaming
                     wrapper.LastFpsFeedbackSent = DateTime.UtcNow;
                     wrapper.LastReportedEffectiveFps = effectiveFps;
 
+                    // Update global metrics with effective FPS (use max across all monitors for buffer status)
+                    if (effectiveFps > _metrics.EffectiveFps || _metrics.EffectiveFps == 0)
+                    {
+                        _metrics.RecordEffectiveFps(effectiveFps);
+                    }
+
                     // Use InvariantCulture to ensure decimal separator is always '.' (not ',' on some devices)
                     string fpsStr = effectiveFps.ToString("F1", System.Globalization.CultureInfo.InvariantCulture);
                     string json = $"{{\"type\":\"fps_feedback\",\"monitorIndex\":{wrapper.Index}," +
@@ -518,6 +547,100 @@ namespace VRWorkspace.Streaming
             wrapper.DroppedFrameCount = 0;
             wrapper.FpsWindowStart = DateTime.UtcNow;
         }
+
+        #region Quality Feedback for Adaptive Bitrate
+
+        // Quality feedback timing (for adaptive bitrate decisions)
+        private DateTime _lastQualityFeedbackTime = DateTime.MinValue;
+        private const float QUALITY_FEEDBACK_INTERVAL_SECONDS = 3.0f; // Send comprehensive feedback every 3 seconds
+        private int _pollCount = 0; // For occasional logging
+
+        /// <summary>
+        /// Send comprehensive quality feedback to server for adaptive bitrate decisions.
+        /// Includes: RTT, jitter, packet loss, effective FPS, buffer status, per-monitor frame counts.
+        /// Called from PollTextures.
+        /// </summary>
+        private void SendQualityFeedbackIfNeeded()
+        {
+            if (!_stateMachine.IsStreaming) return;
+            if ((DateTime.UtcNow - _lastQualityFeedbackTime).TotalSeconds < QUALITY_FEEDBACK_INTERVAL_SECONDS) return;
+
+            _lastQualityFeedbackTime = DateTime.UtcNow;
+            _pollCount++;
+
+            var culture = System.Globalization.CultureInfo.InvariantCulture;
+
+            // Build monitors array JSON and calculate totals
+            var monitorsJson = new StringBuilder();
+            monitorsJson.Append("[");
+            bool first = true;
+            int totalRendered = 0;
+            int totalDropped = 0;
+
+            lock (_lock)
+            {
+                foreach (var wrapper in _peerConnections)
+                {
+                    if (!first) monitorsJson.Append(",");
+                    first = false;
+
+                    monitorsJson.Append($"{{\"index\":{wrapper.Index},");
+                    monitorsJson.Append($"\"renderedFrames\":{wrapper.RenderedFrameCount},");
+                    monitorsJson.Append($"\"realFrames\":{wrapper.RealFrameCount},");
+                    monitorsJson.Append($"\"droppedFrames\":{wrapper.DroppedFrameCount},");
+                    monitorsJson.Append($"\"texturePtrWorking\":{(wrapper.TexturePtrDetectionWorking ? "true" : "false")}}}");
+
+                    totalRendered += wrapper.RenderedFrameCount;
+                    totalDropped += wrapper.DroppedFrameCount;
+                }
+            }
+            monitorsJson.Append("]");
+
+            // Update metrics with frame counts for buffer status calculation
+            _metrics.RecordFrameCounts(totalRendered, totalDropped);
+
+            // Get buffer status description (now considers dropped frames)
+            string bufferStatus = _metrics.GetBufferStatusDescription();
+
+            // Build comprehensive feedback JSON
+            string feedbackJson = $"{{\"type\":\"quality_feedback\"," +
+                $"\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}," +
+                $"\"rttMs\":{_metrics.CurrentPingMs.ToString("F1", culture)}," +
+                $"\"avgRttMs\":{_metrics.AveragePingMs.ToString("F1", culture)}," +
+                $"\"jitterMs\":{_metrics.JitterMs.ToString("F1", culture)}," +
+                $"\"packetLossRate\":{_metrics.PacketLossRate.ToString("F4", culture)}," +
+                $"\"avgPacketLossRate\":{_metrics.AveragePacketLossRate.ToString("F4", culture)}," +
+                $"\"effectiveFps\":{_metrics.EffectiveFps.ToString("F1", culture)}," +
+                $"\"targetFps\":{_lastServerTargetFps.ToString("F1", culture)}," +
+                $"\"frameLatencyMs\":{_metrics.FrameLatencyMs.ToString("F1", culture)}," +
+                $"\"bufferStatus\":\"{bufferStatus}\"," +
+                $"\"connectionHealth\":{_metrics.HealthScore}," +
+                $"\"isWiFi\":{(_isWiFiConnection ? "true" : "false")}," +
+                $"\"monitors\":{monitorsJson}}}";
+
+            _ = SendTextAsync(feedbackJson);
+
+            // Log occasionally for debugging (every ~20 polls = ~60 seconds)
+            if (_pollCount % 20 == 0)
+            {
+                Debug.Log($"[PhaseProtocol] Quality feedback: RTT={_metrics.CurrentPingMs:F0}ms, " +
+                    $"jitter={_metrics.JitterMs:F1}ms, loss={_metrics.PacketLossRate:P1}, " +
+                    $"fps={_metrics.EffectiveFps:F0}/{_lastServerTargetFps:F0}, health={_metrics.HealthScore}, " +
+                    $"buffer={bufferStatus}");
+            }
+        }
+
+        /// <summary>
+        /// Event fired when server adjusts bitrate based on quality feedback.
+        /// </summary>
+        public event Action<int, int, string> OnBitrateAdjusted; // monitorIndex, bitrateKbps, reason
+
+        /// <summary>
+        /// Event fired when server sends quality recommendation.
+        /// </summary>
+        public event Action<string, string> OnQualityRecommendation; // recommendation, reason
+
+        #endregion
 
         #endregion
 
@@ -731,6 +854,16 @@ namespace VRWorkspace.Streaming
                         case "fps_adjusted":
                             // Server response to fps_feedback - indicates encoding FPS was adjusted
                             HandleFpsAdjusted(json);
+                            break;
+
+                        case "bitrate_adjusted":
+                            // Server response to quality_feedback - bitrate was changed for adaptive streaming
+                            HandleBitrateAdjusted(json);
+                            break;
+
+                        case "quality_recommendation":
+                            // Server recommendation based on sustained quality analysis
+                            HandleQualityRecommendation(json);
                             break;
 
                         case "skip_to_live_ack":
@@ -1142,10 +1275,66 @@ namespace VRWorkspace.Streaming
 
             Debug.Log($"[PhaseProtocol] Network: {_networkInfo.connectionType}, Ping: {_networkInfo.pingMs:F1}ms, BW: {_networkInfo.bandwidthMbps:F0}Mbps");
 
+            // Detect WiFi connection and update thresholds
+            UpdateConnectionType(_networkInfo.connectionType, _networkInfo.jitterMs);
+
             bool transitioned = _stateMachine.TryTransition(ConnectionPhase.AwaitingSuggestedConfig);
             Debug.Log($"[PhaseProtocol] Transition to AwaitingSuggestedConfig: {transitioned}, new phase: {_stateMachine.CurrentPhase}");
 
             OnNetworkInfoReceived?.Invoke(_networkInfo);
+        }
+
+        /// <summary>
+        /// Update connection type and adjust thresholds accordingly.
+        /// Called after network_info message received.
+        /// </summary>
+        private void UpdateConnectionType(string connectionType, double jitterMs)
+        {
+            // Detect WiFi based on connection type string OR high jitter
+            // High jitter (>10ms) typically indicates WiFi even if type is unknown
+            _isWiFiConnection = connectionType?.ToLower().Contains("wifi") == true ||
+                                connectionType?.ToLower().Contains("wireless") == true ||
+                                jitterMs > 10.0;
+
+            // Update metrics with connection info
+            _metrics.ConnectionType = connectionType ?? "Unknown";
+            _metrics.IsWiFiConnection = _isWiFiConnection;
+
+            Debug.Log($"[PhaseProtocol] Connection type: {connectionType}, WiFi mode: {_isWiFiConnection}");
+            Debug.Log($"[PhaseProtocol] Active thresholds - FrameGap: {FrameGapThresholdMs}ms, MonitorDrift: {MonitorDriftThresholdMs}ms, FreezeThreshold: {DecoderFreezeThresholdFrames} frames");
+        }
+
+        /// <summary>
+        /// Calculate adaptive preventive keyframe interval based on connection quality.
+        /// Better connection = longer interval (less wasteful).
+        /// </summary>
+        private float CalculateAdaptiveKeyframeInterval()
+        {
+            float interval = WIFI_PREVENTIVE_KEYFRAME_MAX_INTERVAL;
+
+            // Reduce interval if packet loss is high
+            if (_metrics.PacketLossRate > 0.05f)
+                interval = Math.Min(interval, 15f);
+            if (_metrics.PacketLossRate > 0.1f)
+                interval = Math.Min(interval, 10f);
+
+            // Reduce interval if jitter is high
+            if (_metrics.JitterMs > 30)
+                interval = Math.Min(interval, 15f);
+            if (_metrics.JitterMs > 50)
+                interval = Math.Min(interval, 10f);
+
+            // Reduce interval if health is low
+            if (_metrics.HealthScore < 50)
+                interval = Math.Min(interval, 12f);
+            if (_metrics.HealthScore < 30)
+                interval = Math.Min(interval, 8f);
+
+            // Use base interval for LAN connections
+            if (!_isWiFiConnection)
+                interval = BASE_PREVENTIVE_KEYFRAME_INTERVAL_SECONDS;
+
+            return Math.Max(WIFI_PREVENTIVE_KEYFRAME_MIN_INTERVAL, interval);
         }
 
         private void HandleSuggestedConfig(SimpleJson json)
@@ -2733,22 +2922,55 @@ namespace VRWorkspace.Streaming
                     if (!inFallbackMode)
                     {
                         // Mode 1: TexturePtrDetection works - use real frames for reliable freeze detection
-                        Debug.Log($"[PhaseProtocol] Freeze check (ptr mode): server +{serverFrameAdvance}, client real +{realFrameAdvance}");
+                        Debug.Log($"[PhaseProtocol] Freeze check (ptr mode): server +{serverFrameAdvance}, client real +{realFrameAdvance}, loss={_metrics.PacketLossRate:P1}");
 
                         // Freeze detected: server advanced many frames but client decoded none
                         if (serverFrameAdvance >= DecoderFreezeThresholdFrames && realFrameAdvance < 5)
                         {
-                            Debug.LogWarning($"[PhaseProtocol] DECODER FREEZE DETECTED! Server sent {serverFrameAdvance} frames but client decoded only {realFrameAdvance}. Requesting keyframe...");
+                            // WiFi-aware: Skip freeze handling if packet loss is very high
+                            // The network will recover naturally once adaptive bitrate reduces quality
+                            if (_isWiFiConnection && _metrics.PacketLossRate > 0.30f)
+                            {
+                                Debug.Log($"[PhaseProtocol] Freeze check SKIP: High packet loss ({_metrics.PacketLossRate:P0}), waiting for ABR adjustment");
+                            }
+                            else
+                            {
+                                _freezeCount++;
+                                Debug.LogWarning($"[PhaseProtocol] DECODER FREEZE #{_freezeCount}! Server sent {serverFrameAdvance} frames but client decoded only {realFrameAdvance}");
 
-                            // Request keyframe to reset decoder
-                            SkipToLive(-1);
-                            _metrics.RecordStall();
+                                // Graduated response:
+                                // First freeze -> SkipToLive (lighter, just sync to latest)
+                                // Repeated freeze within short time -> RequestKeyframe (force fresh IDR)
+                                if (_freezeCount <= 1)
+                                {
+                                    Debug.Log($"[PhaseProtocol] Response: SkipToLive (light recovery)");
+                                    SkipToLive(-1);
+                                }
+                                else
+                                {
+                                    Debug.Log($"[PhaseProtocol] Response: RequestKeyframe (heavy recovery, freeze #{_freezeCount})");
+                                    RequestKeyframe(-1);
+                                    // Reset freeze count after heavy recovery
+                                    if (_freezeCount >= 3)
+                                        _freezeCount = 0;
+                                }
+                                _metrics.RecordStall();
+                            }
+                        }
+                        else if (realFrameAdvance >= 10)
+                        {
+                            // Good frame flow, reset freeze count
+                            if (_freezeCount > 0)
+                            {
+                                Debug.Log($"[PhaseProtocol] Freeze recovery confirmed, resetting freeze count (was {_freezeCount})");
+                                _freezeCount = 0;
+                            }
                         }
                     }
                     else
                     {
                         // Mode 2: Fallback mode - can't detect real frames, use preventive keyframes
-                        Debug.Log($"[PhaseProtocol] Freeze check (fallback mode): server +{serverFrameAdvance}, preventive keyframe check");
+                        Debug.Log($"[PhaseProtocol] Freeze check (fallback mode): server +{serverFrameAdvance}, interval={PreventiveKeyframeIntervalSeconds:F0}s");
 
                         var timeSinceLastPreventive = (DateTime.UtcNow - _lastPreventiveKeyframeTime).TotalSeconds;
                         if (timeSinceLastPreventive >= PreventiveKeyframeIntervalSeconds)
@@ -2839,6 +3061,37 @@ namespace VRWorkspace.Streaming
             Debug.Log($"[PhaseProtocol] Server adjusted FPS: monitor {monitorIndex} → {targetFps:F1} fps");
 
             OnFpsAdjusted?.Invoke(monitorIndex, targetFps);
+        }
+
+        /// <summary>
+        /// Handle bitrate adjustment notification from server.
+        /// Server sends this in response to quality_feedback when bitrate was changed.
+        /// </summary>
+        private void HandleBitrateAdjusted(SimpleJson json)
+        {
+            int monitorIndex = json.GetInt("monitorIndex");
+            int bitrateKbps = json.GetInt("bitrateKbps");
+            string reason = json.GetString("reason") ?? "adaptive";
+
+            Debug.Log($"[PhaseProtocol] Server adjusted bitrate: monitor {monitorIndex} → {bitrateKbps} kbps ({reason})");
+
+            // Fire event for UI update if needed
+            OnBitrateAdjusted?.Invoke(monitorIndex, bitrateKbps, reason);
+        }
+
+        /// <summary>
+        /// Handle quality recommendation from server.
+        /// Server may suggest resolution/fps changes based on sustained poor quality.
+        /// </summary>
+        private void HandleQualityRecommendation(SimpleJson json)
+        {
+            string recommendation = json.GetString("recommendation") ?? ""; // e.g., "reduce_fps", "reduce_resolution", "reduce_bitrate"
+            string reason = json.GetString("reason") ?? "";
+
+            Debug.Log($"[PhaseProtocol] Server quality recommendation: {recommendation} - {reason}");
+
+            // Fire event for UI/settings to handle
+            OnQualityRecommendation?.Invoke(recommendation, reason);
         }
 
         // === Error Handler ===
@@ -3068,8 +3321,6 @@ namespace VRWorkspace.Streaming
             return result;
         }
 
-        private int _pollCount = 0;
-
         /// <summary>
         /// Update textures (call from Update loop).
         /// NOTE: LastFrameTime is updated in OnVideoReceived callback, not here.
@@ -3165,6 +3416,9 @@ namespace VRWorkspace.Streaming
 
             // Send FPS feedback to server for adaptive encoding
             SendFpsFeedbackIfNeeded();
+
+            // Send comprehensive quality feedback for adaptive bitrate
+            SendQualityFeedbackIfNeeded();
         }
 
         private void Cleanup()

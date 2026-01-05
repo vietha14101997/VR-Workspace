@@ -13,6 +13,7 @@ namespace VRWorkspace.Streaming
         // Constants
         private const int MAX_PING_SAMPLES = 20;
         private const int MAX_LATENCY_SAMPLES = 20;
+        private const int MAX_LOSS_SAMPLES = 10;
 
         // Ping samples (rolling window)
         private readonly List<double> _pingSamples = new List<double>();
@@ -20,6 +21,9 @@ namespace VRWorkspace.Streaming
 
         // Latency samples
         private readonly List<double> _latencySamples = new List<double>();
+
+        // Packet loss samples (rolling window)
+        private readonly List<float> _lossRateSamples = new List<float>();
 
         // Counters for health score
         private int _missedPongCount;
@@ -52,6 +56,41 @@ namespace VRWorkspace.Streaming
 
         /// <summary>Average frame latency over recent samples.</summary>
         public double AverageFrameLatencyMs { get; private set; }
+
+        // === Packet Loss (for adaptive bitrate) ===
+
+        /// <summary>Current packet loss rate (0.0 to 1.0) from last window.</summary>
+        public float PacketLossRate { get; private set; }
+
+        /// <summary>Average packet loss rate over recent windows.</summary>
+        public float AveragePacketLossRate { get; private set; }
+
+        // === Effective FPS ===
+
+        /// <summary>Effective FPS (actually decoded frames per second).</summary>
+        public float EffectiveFps { get; private set; }
+
+        /// <summary>Target FPS from server configuration.</summary>
+        public float TargetFps { get; set; } = 60f;
+
+        // === Buffer Status ===
+
+        /// <summary>Estimated buffer fullness (0.0 = empty, 1.0 = full).</summary>
+        public float BufferFullness { get; private set; } = 0.5f;
+
+        /// <summary>Total dropped frames across all monitors (for distinguishing network issues vs static content).</summary>
+        public int TotalDroppedFrames { get; private set; }
+
+        /// <summary>Total rendered frames across all monitors.</summary>
+        public int TotalRenderedFrames { get; private set; }
+
+        // === Connection Type ===
+
+        /// <summary>Connection type detected during speed test (e.g., "WiFi", "Ethernet", "Unknown").</summary>
+        public string ConnectionType { get; set; } = "Unknown";
+
+        /// <summary>True if connection is detected as WiFi (used for threshold adjustment).</summary>
+        public bool IsWiFiConnection { get; set; }
 
         // === Connection Health ===
 
@@ -191,6 +230,93 @@ namespace VRWorkspace.Streaming
         }
 
         /// <summary>
+        /// Record packet loss rate from RtpDepacketizer.
+        /// </summary>
+        /// <param name="lossRate">Loss rate from 0.0 to 1.0.</param>
+        public void RecordPacketLoss(float lossRate)
+        {
+            if (lossRate < 0 || lossRate > 1) return;
+
+            PacketLossRate = lossRate;
+
+            // Add to rolling window
+            _lossRateSamples.Add(lossRate);
+            while (_lossRateSamples.Count > MAX_LOSS_SAMPLES)
+            {
+                _lossRateSamples.RemoveAt(0);
+            }
+
+            // Calculate average
+            AveragePacketLossRate = _lossRateSamples.Count > 0 ? _lossRateSamples.Average() : 0f;
+
+            OnMetricsUpdated?.Invoke(this);
+        }
+
+        /// <summary>
+        /// Record effective FPS (actually decoded frames).
+        /// </summary>
+        /// <param name="fps">Frames per second actually decoded and displayed.</param>
+        public void RecordEffectiveFps(float fps)
+        {
+            if (fps >= 0 && fps <= 240) // Reasonable range
+            {
+                EffectiveFps = fps;
+                OnMetricsUpdated?.Invoke(this);
+            }
+        }
+
+        /// <summary>
+        /// Update buffer status estimation.
+        /// </summary>
+        /// <param name="fullness">Buffer fullness from 0.0 (empty) to 1.0 (full).</param>
+        public void RecordBufferStatus(float fullness)
+        {
+            BufferFullness = Math.Max(0f, Math.Min(1f, fullness));
+        }
+
+        /// <summary>
+        /// Record frame counts for dropped frame tracking.
+        /// Used to distinguish network issues (high drops) from static content (low drops).
+        /// </summary>
+        public void RecordFrameCounts(int totalRendered, int totalDropped)
+        {
+            TotalRenderedFrames = totalRendered;
+            TotalDroppedFrames = totalDropped;
+        }
+
+        /// <summary>
+        /// Get buffer status description based on current metrics.
+        /// </summary>
+        public string GetBufferStatusDescription()
+        {
+            if (PacketLossRate > 0.05f) return "lossy";
+            if (FrameLatencyMs > 200) return "high_latency";
+
+            // Only report starving if:
+            // 1. We have valid FPS data (EffectiveFps > 0)
+            // 2. FPS is significantly below target
+            // 3. There are actual dropped frames (network issue, not static content)
+            // Low FPS with no dropped frames = static content optimization, which is normal
+            if (EffectiveFps > 0 && EffectiveFps < TargetFps * 0.7f)
+            {
+                // Check if there are significant dropped frames (>5% drop rate)
+                int totalFrames = TotalRenderedFrames + TotalDroppedFrames;
+                bool hasSignificantDrops = totalFrames > 0 &&
+                                          TotalDroppedFrames > 0 &&
+                                          (float)TotalDroppedFrames / totalFrames > 0.05f;
+
+                if (hasSignificantDrops)
+                {
+                    return "starving";
+                }
+                // Low FPS but no drops = static content, report as healthy
+            }
+
+            if (BufferFullness > 0.8f) return "overflow";
+            return "healthy";
+        }
+
+        /// <summary>
         /// Reset a counter when the issue is resolved.
         /// </summary>
         public void ResetMissedPongCount()
@@ -224,6 +350,7 @@ namespace VRWorkspace.Streaming
         {
             _pingSamples.Clear();
             _latencySamples.Clear();
+            _lossRateSamples.Clear();
             _lastPingMs = 0;
             _missedPongCount = 0;
             _stallCount = 0;
@@ -236,6 +363,10 @@ namespace VRWorkspace.Streaming
             JitterMs = 0;
             FrameLatencyMs = 0;
             AverageFrameLatencyMs = 0;
+            PacketLossRate = 0;
+            AveragePacketLossRate = 0;
+            EffectiveFps = 0;
+            BufferFullness = 0.5f;
             HealthScore = 100;
         }
 
