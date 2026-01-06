@@ -340,27 +340,6 @@ public class RTTRemoteMenuController : MonoBehaviour
         );
     }
 
-    /// <summary>
-    /// Start streaming with current settings.
-    /// </summary>
-    public void StartStreaming()
-    {
-        if (connectionPipeline == null)
-        {
-            Debug.LogWarning("[RTTRemoteMenuController] ConnectionPipeline not assigned");
-            return;
-        }
-
-        var settings = GetConnectionSettings();
-        connectionPipeline.StartStreaming(
-            settings.host,
-            settings.port,
-            settings.monitors,
-            settings.resolution,
-            settings.bitrate,
-            settings.fps
-        );
-    }
     #endregion
 
     #region Private Methods
@@ -371,7 +350,7 @@ public class RTTRemoteMenuController : MonoBehaviour
 
     private void HandleConnectClicked()
     {
-        StartStreaming();
+        // Streaming is handled by RTTRemoteMenu → ConnectionViewModel → PhaseProtocolClient
         OnConnectClicked?.Invoke();
     }
 
@@ -403,24 +382,6 @@ public class RTTRemoteMenuController : MonoBehaviour
         {
             _webrtcUpdateCoroutine = StartCoroutine(WebRTC.Update());
         }
-
-        // Configure ClusterAutoBinder for V2 protocol
-        var binder = _clusterRig.GetComponent<ClusterAutoBinder>();
-        if (binder == null)
-        {
-            binder = _clusterRig.gameObject.AddComponent<ClusterAutoBinder>();
-        }
-
-        // Configure binder with settings from menu
-        var settings = GetConnectionSettings();
-        binder.autoStart = false;
-        binder.serverBase = $"http://{settings.host}:{settings.port}";
-        binder.rig = _clusterRig;
-        binder.monitorCount = config.monitors;
-        binder.resolutionWidth = config.resolutionWidth;
-        binder.resolutionHeight = config.resolutionHeight;
-        binder.bitrateKbps = config.bitrateKbps;
-        binder.fps = config.fps;
 
         // Attach progress overlays to each panel
         CleanupProgressOverlays();

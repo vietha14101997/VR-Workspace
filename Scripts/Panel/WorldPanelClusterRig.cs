@@ -34,7 +34,7 @@ public class WorldPanelClusterRig : MonoBehaviour
 
     [Header("Layout")]
     [Tooltip("Dynamic: panels spread evenly. FixedThreeSlot: panels use fixed 3-slot positions (max 3 panels)")]
-    public ClusterLayoutMode layoutMode = ClusterLayoutMode.Dynamic;
+    public ClusterLayoutMode layoutMode = ClusterLayoutMode.FixedThreeSlot;
     public float distanceFromCamera = 2.0f;
     [Tooltip("Extra gap in meters between panel edges (0 = edges touch)")]
     [Range(0f, 0.1f)] public float edgeGapMeters = 0f;

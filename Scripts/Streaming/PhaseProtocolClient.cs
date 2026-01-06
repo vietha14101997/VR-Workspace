@@ -2954,7 +2954,7 @@ namespace VRWorkspace.Streaming
             float v = json.GetFloat("v");
             bool visible = json.GetBool("visible");
 
-            // Invoke event for ClusterAutoBinder to handle
+            // Invoke event for ConnectionViewModel to handle
             OnCursorPosition?.Invoke(monitorIndex, u, v, visible);
         }
 
