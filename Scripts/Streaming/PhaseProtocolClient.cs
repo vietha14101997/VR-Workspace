@@ -1353,11 +1353,45 @@ namespace VRWorkspace.Streaming
 
         /// <summary>
         /// Run speed test in background so receive loop can continue processing binary data.
+        /// USB Mode: Skip speedtest entirely - server will measure USB latency via ICMP.
         /// </summary>
         private async Task RunSpeedTestInBackgroundAsync()
         {
             try
             {
+                // USB Mode: Skip WebSocket speedtest - it gives misleading results over USB
+                // Server will measure actual USB latency using ICMP ping to gateway
+                if (_isUsbMode)
+                {
+                    Debug.Log("[PhaseProtocol] USB Mode: Skipping WebSocket speedtest, using USB defaults");
+                    
+                    // Use default USB values - server will provide accurate ICMP latency later
+                    _networkInfo = new NetworkTestResult
+                    {
+                        pingMs = 0.5,           // Placeholder - server will measure actual ICMP latency
+                        jitterMs = 0.1,         // USB has minimal jitter
+                        bandwidthMbps = 480,    // USB 2.0 theoretical max (server will update if USB 3.0)
+                        connectionType = "USB",
+                        isUsbMode = true,
+                        usbLatencyMs = 0.5,     // Will be updated by server
+                        usbVersion = "USB 2.0", // Will be updated by server
+                        usbEstimatedBandwidthMbps = 480
+                    };
+                    
+                    // Send minimal speedtest result to server so it knows we're ready
+                    // Server will calculate config based on USB detection, not these values
+                    await SendSpeedTestResultAsync(_networkInfo.pingMs, _networkInfo.jitterMs, _networkInfo.bandwidthMbps);
+                    
+                    // Fire event for UI to show USB mode immediately
+                    OnNetworkInfoReceived?.Invoke(_networkInfo);
+                    Debug.Log("[PhaseProtocol] USB Mode: Sent default values, waiting for server USB latency measurement");
+                    
+                    // Wait for suggested_config from Server (Server will measure USB latency)
+                    _stateMachine.TryTransition(ConnectionPhase.AwaitingSuggestedConfig);
+                    return;
+                }
+                
+                // Standard WiFi/LAN: Run full speedtest
                 var speedResult = await _speedTest.RunSpeedTestAsync();
 
                 // Detect network adapter type
@@ -1384,6 +1418,16 @@ namespace VRWorkspace.Streaming
                 Debug.LogError($"[PhaseProtocol] Speed test failed: {ex.Message}");
                 OnError?.Invoke($"Speed test failed: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Send speedtest result to server.
+        /// </summary>
+        private async Task SendSpeedTestResultAsync(double pingMs, double jitterMs, double bandwidthMbps)
+        {
+            var json = $"{{\"type\":\"speedtest_result\",\"bandwidthMbps\":{bandwidthMbps:F1},\"pingMs\":{pingMs:F1},\"jitterMs\":{jitterMs:F1}}}";
+            await SendTextAsync(json);
+            Debug.Log($"[PhaseProtocol] Sent speedtest_result: {bandwidthMbps:F1}Mbps, {pingMs:F1}ms");
         }
 
         /// <summary>

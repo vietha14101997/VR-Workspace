@@ -190,17 +190,47 @@ public class RTTInfoSidePanel : MonoBehaviour
 
         ClearContent();
 
-        AddTitle("NETWORK INFO");
-        AddInfoRow("Ping", $"{info.pingMs:F1} ms");
-        AddInfoRow("Jitter", $"{info.jitterMs:F1} ms");
-        AddInfoRow("Bandwidth", $"{info.bandwidthMbps:F0} Mbps");
-        AddInfoRow("Type", info.connectionType ?? "Unknown");
+        // USB Mode: Display USB-specific metrics instead of WebSocket speedtest
+        if (info.isUsbMode)
+        {
+            AddTitle("USB NETWORKING");
+            
+            // Use USB-specific ICMP latency (much lower than WebSocket ping)
+            double displayPing = info.usbLatencyMs > 0 ? info.usbLatencyMs : info.pingMs;
+            AddInfoRow("Ping", $"{displayPing:F2} ms");
+            
+            // Use actual USB jitter from server measurement
+            AddInfoRow("Jitter", $"{info.jitterMs:F2} ms");
+            
+            // Show estimated USB bandwidth (not limited by TCP speedtest)
+            double displayBandwidth = info.usbEstimatedBandwidthMbps > 0 ? info.usbEstimatedBandwidthMbps : info.bandwidthMbps;
+            AddInfoRow("Bandwidth", $"{displayBandwidth:F0} Mbps");
+            
+            // Show USB version as type
+            string usbType = !string.IsNullOrEmpty(info.usbVersion) ? $"USB ({info.usbVersion})" : "USB Tethering";
+            AddInfoRow("Type", usbType);
+            
+            // USB is always excellent quality
+            AddInfoRow("Quality", "Excellent", GetQualityColor("Excellent"));
+            
+            Debug.Log($"[RTTInfoSidePanel] SetNetworkInfo USB Mode: {displayPing:F2}ms, {displayBandwidth:F0}Mbps, {info.usbVersion}");
+        }
+        else
+        {
+            // Standard WiFi/LAN display
+            AddTitle("NETWORK INFO");
+            AddInfoRow("Ping", $"{info.pingMs:F1} ms");
+            AddInfoRow("Jitter", $"{info.jitterMs:F1} ms");
+            AddInfoRow("Bandwidth", $"{info.bandwidthMbps:F0} Mbps");
+            AddInfoRow("Type", info.connectionType ?? "Unknown");
 
-        string quality = GetNetworkQuality(info);
-        AddInfoRow("Quality", quality, GetQualityColor(quality));
+            string quality = GetNetworkQuality(info);
+            AddInfoRow("Quality", quality, GetQualityColor(quality));
+            
+            Debug.Log($"[RTTInfoSidePanel] SetNetworkInfo: {info.pingMs:F1}ms");
+        }
 
         OnContentChanged?.Invoke();
-        Debug.Log($"[RTTInfoSidePanel] SetNetworkInfo: {info.pingMs:F1}ms");
     }
 
     /// <summary>
