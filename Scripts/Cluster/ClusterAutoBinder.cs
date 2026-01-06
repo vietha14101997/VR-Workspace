@@ -54,6 +54,9 @@ public class ClusterAutoBinder : MonoBehaviour
     [Tooltip("Port for USB mode (default 8288)")]
     public int usbPort = 8288;
 
+    [Tooltip("USB Tethering IP (required for USB mode, get from QR scan)")]
+    public string usbTetheringIP;
+
     [Header("Protocol")]
     [Tooltip("Deprecated: V2 protocol is now always used")]
     [System.Obsolete("V2 protocol is now always used. This field is kept for API compatibility.")]
@@ -159,7 +162,12 @@ public class ClusterAutoBinder : MonoBehaviour
         // Use USB mode if configured
         if (connectionMode == ConnectionMode.USB)
         {
-            return await ConnectUSBAsync();
+            if (string.IsNullOrEmpty(usbTetheringIP))
+            {
+                Debug.LogError("[ClusterAutoBinder] USB mode requires usbTetheringIP to be set");
+                return false;
+            }
+            return await ConnectUSBAsync(usbTetheringIP);
         }
 
         // Ensure ViewModel is initialized
@@ -210,10 +218,10 @@ public class ClusterAutoBinder : MonoBehaviour
     /// NOTE: This requires USB Tethering IP to be set. Use ConnectUSBAsync(usbTetheringIP) instead.
     /// </summary>
     [System.Obsolete("Use ConnectUSBAsync(string usbTetheringIP) instead")]
-    public async Task<bool> ConnectUSBAsync()
+    public Task<bool> ConnectUSBAsync()
     {
         Debug.LogError("[ClusterAutoBinder] USB mode requires USB Tethering IP. Use ConnectUSBAsync(usbTetheringIP) instead.");
-        return false;
+        return Task.FromResult(false);
     }
 
     /// <summary>
