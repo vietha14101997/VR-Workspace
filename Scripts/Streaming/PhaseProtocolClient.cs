@@ -470,13 +470,15 @@ namespace VRWorkspace.Streaming
         private DateTime _lastExtremeSkipTime = DateTime.MinValue;
         private const float ExtremeSkipCooldownSeconds = 5.0f; // Don't spam extreme skips
 
-        // === USB Mode Thresholds ===
-        // USB tethering is extremely stable (~1-2ms latency), so we use much more relaxed thresholds
+        // === Stable Connection Thresholds ===
+        // Apply warmup period to ALL connections to prevent false skip_to_live during stream initialization.
+        // Initial metrics (avgRtt, jitter) are often wrong due to stale data or calculation artifacts.
         // Main purpose: prevent false skip_to_live triggers that waste GPU on unnecessary keyframes
-        private const float USB_WARMUP_PERIOD_SECONDS = 5.0f;    // Don't check latency for first 5s of stream
-        private const int USB_MIN_FRAMES_BEFORE_CRISIS = 300;    // ~5 seconds at 60fps before FPS crisis check
-        private const float USB_FRAME_GAP_THRESHOLD_MS = 2000f;  // 2s gap for USB (very tolerant)
-        private const float USB_MONITOR_DRIFT_THRESHOLD_MS = 1500f; // 1.5s drift allowed for USB
+        private const float STREAMING_WARMUP_PERIOD_SECONDS = 10.0f;  // Don't check latency for first 10s of stream
+        private const int STABLE_MIN_FRAMES_BEFORE_CRISIS = 600;      // ~10 seconds at 60fps before FPS crisis check
+        private const float STABLE_FRAME_GAP_THRESHOLD_MS = 3000f;    // 3s gap for stable connections (very tolerant)
+        private const float STABLE_MONITOR_DRIFT_THRESHOLD_MS = 2000f; // 2s drift allowed for stable connections
+        private const double STABLE_CONNECTION_RTT_THRESHOLD = 100.0; // Consider connection "stable" if RTT < 100ms
         private DateTime _streamingStartTime = DateTime.MinValue; // Track when streaming actually started
 
         // Decoder freeze detection - compare server frame count with client rendered frames
@@ -573,41 +575,42 @@ namespace VRWorkspace.Streaming
 
             // Calculate time since streaming started
             double streamingDurationSeconds = (DateTime.UtcNow - _streamingStartTime).TotalSeconds;
-            bool isInWarmupPeriod = streamingDurationSeconds < USB_WARMUP_PERIOD_SECONDS;
+            bool isInWarmupPeriod = streamingDurationSeconds < STREAMING_WARMUP_PERIOD_SECONDS;
+            
+            // Determine connection stability based on current RTT and mode
+            // USB mode or low RTT (<100ms) = stable connection
+            double currentRtt = _metrics.CurrentPingMs;
             bool isUsbMode = _metrics.IsUsbMode || _isUsbMode;
+            bool isStableConnection = isUsbMode || (currentRtt > 0 && currentRtt < STABLE_CONNECTION_RTT_THRESHOLD);
 
-            // === USB Mode + Warmup Period Protection ===
-            // During warmup period, skip all checks except extreme RTT
-            // USB mode is extremely stable, so we only check for catastrophic failures
-            if (isInWarmupPeriod && isUsbMode)
+            // === Warmup Period Protection (applies to ALL connections) ===
+            // During warmup, only check for extreme RTT (catastrophic failure)
+            // This prevents false positives from stale/wrong metrics at stream start
+            if (isInWarmupPeriod)
             {
-                // Only check for extreme RTT during warmup (catastrophic failure)
-                double currentRtt = _metrics.CurrentPingMs;
+                // Only check for EXTREME RTT during warmup (catastrophic failure, >5 seconds)
                 if (currentRtt >= RTT_EXTREME_THRESHOLD_MS)
                 {
                     if ((DateTime.UtcNow - _lastExtremeSkipTime).TotalSeconds >= ExtremeSkipCooldownSeconds)
                     {
-                        Debug.LogWarning($"[PhaseProtocol] EXTREME RTT during USB warmup: {currentRtt:F0}ms - skip_to_live");
+                        Debug.LogWarning($"[PhaseProtocol] EXTREME RTT during warmup ({streamingDurationSeconds:F1}s): {currentRtt:F0}ms - skip_to_live");
                         _lastExtremeSkipTime = DateTime.UtcNow;
                         _lastSkipToLiveTime = DateTime.UtcNow;
                         SkipToLiveImmediate(-1);
                     }
                 }
-                return; // Skip all other checks during USB warmup
+                // Skip all other latency checks during warmup
+                return;
             }
 
             // === RTT-based aggressive skip (highest priority) ===
             // When RTT is extremely high, the client is watching frames that are already stale.
-            // Frames are still arriving, but they're 5-7 seconds old. Need to skip immediately.
-            double rtt = _metrics.CurrentPingMs;
-
-            if (rtt >= RTT_EXTREME_THRESHOLD_MS)
+            if (currentRtt >= RTT_EXTREME_THRESHOLD_MS)
             {
                 // CRITICAL: RTT is 5+ seconds. Client is severely behind.
-                // Use separate longer cooldown for extreme skips (5s vs 2s for normal)
                 if ((DateTime.UtcNow - _lastExtremeSkipTime).TotalSeconds >= ExtremeSkipCooldownSeconds)
                 {
-                    Debug.LogWarning($"[PhaseProtocol] EXTREME RTT detected: {rtt:F0}ms - IMMEDIATE skip_to_live (bypass normal cooldown)");
+                    Debug.LogWarning($"[PhaseProtocol] EXTREME RTT detected: {currentRtt:F0}ms - IMMEDIATE skip_to_live");
                     _lastExtremeSkipTime = DateTime.UtcNow;
                     _lastSkipToLiveTime = DateTime.UtcNow;
                     SkipToLiveImmediate(-1);
@@ -615,35 +618,32 @@ namespace VRWorkspace.Streaming
                 return;
             }
 
-            // Skip HIGH RTT check for USB mode (USB latency is always <10ms)
-            if (!isUsbMode && rtt >= RTT_HIGH_THRESHOLD_MS)
+            // Skip HIGH RTT check for stable connections (USB or low latency WiFi)
+            if (!isStableConnection && currentRtt >= RTT_HIGH_THRESHOLD_MS)
             {
                 // HIGH RTT: 3-5 seconds. Client is falling behind.
-                // Use normal cooldown to avoid spam, but definitely skip
                 if ((DateTime.UtcNow - _lastSkipToLiveTime).TotalSeconds >= SkipToLiveCooldownSeconds)
                 {
-                    Debug.LogWarning($"[PhaseProtocol] HIGH RTT detected: {rtt:F0}ms - skip_to_live");
+                    Debug.LogWarning($"[PhaseProtocol] HIGH RTT detected: {currentRtt:F0}ms - skip_to_live");
                     SkipToLive(-1);
                 }
                 return;
             }
 
             // === Effective FPS crisis detection ===
-            // If we're only getting 25% of expected frames, something is very wrong
-            // For USB mode: require more frames before triggering (USB takes longer to stabilize)
+            // For stable connections: require more frames before triggering (takes longer to stabilize)
             float targetFps = _lastServerTargetFps > 0 ? _lastServerTargetFps : 60f;
             float effectiveFps = _metrics.EffectiveFps;
-            int minFramesForCrisis = isUsbMode ? USB_MIN_FRAMES_BEFORE_CRISIS : 30;
+            int minFramesForCrisis = isStableConnection ? STABLE_MIN_FRAMES_BEFORE_CRISIS : 60;
             
             if (effectiveFps > 0 && effectiveFps < targetFps * EFFECTIVE_FPS_CRISIS_RATIO)
             {
-                // Only trigger if we have at least some data (avoid false positives on startup)
                 int totalRendered = GetTotalRenderedFrames();
                 if (totalRendered > minFramesForCrisis)
                 {
                     if ((DateTime.UtcNow - _lastSkipToLiveTime).TotalSeconds >= SkipToLiveCooldownSeconds)
                     {
-                        Debug.LogWarning($"[PhaseProtocol] FPS CRISIS: {effectiveFps:F1}/{targetFps:F0} fps ({effectiveFps/targetFps*100:F0}%) - skip_to_live");
+                        Debug.LogWarning($"[PhaseProtocol] FPS CRISIS: {effectiveFps:F1}/{targetFps:F0} fps - skip_to_live");
                         SkipToLive(-1);
                     }
                     return;
@@ -651,50 +651,44 @@ namespace VRWorkspace.Streaming
             }
 
             // === Packet loss crisis detection ===
-            // High sustained packet loss means we're missing too much data to maintain coherent video
-            // Note: USB mode should have 0% packet loss, so this rarely triggers
+            // Stable connections should have 0% packet loss, so this rarely triggers for them
             float packetLoss = _metrics.AveragePacketLossRate;
             if (packetLoss >= PACKET_LOSS_CRISIS_THRESHOLD)
             {
                 if ((DateTime.UtcNow - _lastSkipToLiveTime).TotalSeconds >= SkipToLiveCooldownSeconds)
                 {
-                    Debug.LogWarning($"[PhaseProtocol] PACKET LOSS CRISIS: {packetLoss:P0} loss rate - skip_to_live + keyframe");
+                    Debug.LogWarning($"[PhaseProtocol] PACKET LOSS CRISIS: {packetLoss:P0} - skip_to_live + keyframe");
                     SkipToLive(-1);
-                    // Also request keyframe because lost packets likely corrupted decoder state
                     RequestKeyframe(-1);
                 }
                 return;
             }
 
             // === Frame gap and monitor drift detection ===
-            // Use USB-specific thresholds if in USB mode
-            float frameGapThreshold = isUsbMode ? USB_FRAME_GAP_THRESHOLD_MS : FrameGapThresholdMs;
-            float driftThreshold = isUsbMode ? USB_MONITOR_DRIFT_THRESHOLD_MS : MonitorDriftThresholdMs;
+            // Use relaxed thresholds for stable connections
+            float frameGapThreshold = isStableConnection ? STABLE_FRAME_GAP_THRESHOLD_MS : FrameGapThresholdMs;
+            float driftThreshold = isStableConnection ? STABLE_MONITOR_DRIFT_THRESHOLD_MS : MonitorDriftThresholdMs;
 
             lock (_lock)
             {
-                // Track min/max frame times for drift detection
                 DateTime minFrameTime = DateTime.MaxValue;
                 DateTime maxFrameTime = DateTime.MinValue;
                 int laggingMonitor = -1;
-                int minFrameMonitor = -1;
 
                 foreach (var wrapper in _peerConnections)
                 {
                     if (wrapper.LastFrameTime == default) continue;
 
-                    // Check if frame gap exceeds threshold (stall detection)
+                    // Frame gap detection (stall)
                     var timeSinceFrame = (DateTime.UtcNow - wrapper.LastFrameTime).TotalMilliseconds;
                     if (timeSinceFrame > frameGapThreshold && wrapper.FrameCount > 10)
                     {
-                        // Frame stall detected - request skip to live for this monitor
-                        // Only log when actually sending (respects cooldown)
                         if ((DateTime.UtcNow - _lastSkipToLiveTime).TotalSeconds >= SkipToLiveCooldownSeconds)
                         {
                             Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} frame gap {timeSinceFrame:F0}ms (threshold={frameGapThreshold:F0}ms) - skip_to_live");
                         }
                         SkipToLive(wrapper.Index);
-                        return; // Only send once per poll
+                        return;
                     }
 
                     // Track for drift detection
@@ -706,18 +700,15 @@ namespace VRWorkspace.Streaming
                     if (wrapper.LastFrameTime > maxFrameTime)
                     {
                         maxFrameTime = wrapper.LastFrameTime;
-                        minFrameMonitor = wrapper.Index;
                     }
                 }
 
-                // Drift detection: if monitors are out of sync, the older one is lagging
-                // Only log when we're actually going to send skip_to_live (respects cooldown)
+                // Monitor drift detection
                 if (_peerConnections.Count > 1 && minFrameTime != DateTime.MaxValue && maxFrameTime != DateTime.MinValue)
                 {
                     var drift = (maxFrameTime - minFrameTime).TotalMilliseconds;
                     if (drift > driftThreshold && laggingMonitor >= 0)
                     {
-                        // Check cooldown before logging to avoid spam
                         if ((DateTime.UtcNow - _lastSkipToLiveTime).TotalSeconds >= SkipToLiveCooldownSeconds)
                         {
                             Debug.LogWarning($"[PhaseProtocol] Monitor drift: PC{laggingMonitor} is {drift:F0}ms behind (threshold={driftThreshold:F0}ms) - skip_to_live");
