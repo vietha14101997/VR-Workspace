@@ -48,6 +48,10 @@ public class WorldPanelClusterRig : MonoBehaviour
     [Header("Cluster Visuals")]
     [Tooltip("Enable seamless glass background and glowing border across all panels")]
     public bool enableClusterVisuals = true;
+    [Tooltip("Use curved mesh visual (true) or per-panel visual (false). Curved provides true seamless appearance.")]
+    public bool useCurvedVisual = false;
+
+    private ClusterVisualCurved _curvedVisual;
 
     [Header("Visual Settings")]
     [SerializeField] private float cornerRadius = 0.04f;
@@ -233,10 +237,21 @@ public class WorldPanelClusterRig : MonoBehaviour
     {
         _panels.Clear();
 
+        // Load sample textures for testing curved mode
+        Texture2D[] sampleTextures = LoadSampleTextures();
+
         for (int i = 0; i < count; i++)
         {
             string name = $"Panel_{i}";
             var p = CreateOne(name);
+
+            // Assign sample texture for visual testing (cycle through available samples)
+            if (sampleTextures.Length > 0)
+            {
+                p.contentTexture = sampleTextures[i % sampleTextures.Length];
+                p.Apply(); // Apply to update board texture
+            }
+
             _panels.Add(p);
         }
 
@@ -251,6 +266,32 @@ public class WorldPanelClusterRig : MonoBehaviour
                 _panels[i].Apply();
             }
         }
+    }
+
+    /// <summary>
+    /// Load sample textures from Resources for visual testing
+    /// </summary>
+    Texture2D[] LoadSampleTextures()
+    {
+        var textures = new System.Collections.Generic.List<Texture2D>();
+
+        // Try to load sample_1 and sample_2 from Resources/WorldPanelPlus/
+        var sample1 = Resources.Load<Texture2D>("WorldPanelPlus/sample_1");
+        var sample2 = Resources.Load<Texture2D>("WorldPanelPlus/sample_2");
+
+        if (sample1 != null) textures.Add(sample1);
+        if (sample2 != null) textures.Add(sample2);
+
+        if (textures.Count == 0)
+        {
+            Debug.LogWarning("[WorldPanelClusterRig] No sample textures found in Resources/WorldPanelPlus/");
+        }
+        else
+        {
+            Debug.Log($"[WorldPanelClusterRig] Loaded {textures.Count} sample textures for testing");
+        }
+
+        return textures.ToArray();
     }
 
     WorldPanelPlus CreateOne(string name)
@@ -314,6 +355,85 @@ public class WorldPanelClusterRig : MonoBehaviour
     /// </summary>
     void ApplyClusterVisuals()
     {
+        if (useCurvedVisual)
+        {
+            ApplyCurvedVisual();
+        }
+        else
+        {
+            ApplyPerPanelVisuals();
+        }
+    }
+
+    /// <summary>
+    /// Apply curved mesh visual for true seamless appearance
+    /// </summary>
+    void ApplyCurvedVisual()
+    {
+        // Remove any per-panel visuals
+        foreach (var visual in _panelVisuals)
+        {
+            if (visual != null)
+            {
+                if (Application.isPlaying)
+                    Destroy(visual);
+                else
+                    DestroyImmediate(visual);
+            }
+        }
+        _panelVisuals.Clear();
+
+        // Hide individual panel boards and remove per-panel visuals
+        foreach (var panel in _panels)
+        {
+            if (panel == null) continue;
+
+            // Remove ClusterPanelVisual if exists
+            var existingVisual = panel.GetComponent<ClusterPanelVisual>();
+            if (existingVisual != null)
+            {
+                if (Application.isPlaying)
+                    Destroy(existingVisual);
+                else
+                    DestroyImmediate(existingVisual);
+            }
+
+            // Hide the panel's board - curved visual will render content
+            // Use SetVisible(false) which properly sets boardVisible AND disables renderer/collider
+            // This prevents Apply() from re-enabling the renderer
+            panel.SetVisible(false);
+        }
+
+        // Get or create ClusterVisualCurved
+        _curvedVisual = GetComponent<ClusterVisualCurved>();
+        if (_curvedVisual == null)
+        {
+            _curvedVisual = gameObject.AddComponent<ClusterVisualCurved>();
+        }
+
+        // Initialize curved visual
+        _curvedVisual.Initialize();
+
+        // Apply colors
+        _curvedVisual.SetGlowColors(glowColorA, glowColorB);
+        _curvedVisual.SetGlassColors(glassColorA, glassColorB);
+    }
+
+    /// <summary>
+    /// Apply per-panel visual (original approach with EdgeMask)
+    /// </summary>
+    void ApplyPerPanelVisuals()
+    {
+        // Remove curved visual if present
+        if (_curvedVisual != null)
+        {
+            if (Application.isPlaying)
+                Destroy(_curvedVisual);
+            else
+                DestroyImmediate(_curvedVisual);
+            _curvedVisual = null;
+        }
+
         _panelVisuals.Clear();
 
         int count = _panels.Count;
@@ -321,6 +441,10 @@ public class WorldPanelClusterRig : MonoBehaviour
         {
             var panel = _panels[i];
             if (panel == null) continue;
+
+            // Re-enable board visibility (may have been disabled by curved visual mode)
+            // Use SetVisible(true) which properly sets boardVisible AND enables renderer/collider
+            panel.SetVisible(true);
 
             // Get or add ClusterPanelVisual component
             var visual = panel.GetComponent<ClusterPanelVisual>();
@@ -365,18 +489,38 @@ public class WorldPanelClusterRig : MonoBehaviour
     {
         if (!enableClusterVisuals) return;
 
-        foreach (var visual in _panelVisuals)
+        if (useCurvedVisual && _curvedVisual != null)
         {
-            if (visual != null)
+            _curvedVisual.SetGlowColors(glowColorA, glowColorB);
+            _curvedVisual.SetGlassColors(glassColorA, glassColorB);
+            _curvedVisual.UpdateContentTextures();
+        }
+        else
+        {
+            foreach (var visual in _panelVisuals)
             {
-                ApplyVisualSettings(visual);
-                visual.UpdateSize();
+                if (visual != null)
+                {
+                    ApplyVisualSettings(visual);
+                    visual.UpdateSize();
+                }
             }
         }
     }
 
     void KillChildren()
     {
+        // Cleanup curved visual
+        if (_curvedVisual != null)
+        {
+#if UNITY_EDITOR
+            DestroyImmediate(_curvedVisual);
+#else
+            Destroy(_curvedVisual);
+#endif
+            _curvedVisual = null;
+        }
+
 #if UNITY_EDITOR
         for (int i = transform.childCount - 1; i >= 0; i--)
             DestroyImmediate(transform.GetChild(i).gameObject);

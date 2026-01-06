@@ -8,6 +8,15 @@ using VRWorkspace.Streaming;
 namespace VRWorkspace.ViewModels
 {
     /// <summary>
+    /// Transport mode for connection (USB vs WiFi).
+    /// </summary>
+    public enum TransportMode
+    {
+        WiFi,   // Default: Connect via WiFi network
+        USB     // Connect via USB Tethering
+    }
+
+    /// <summary>
     /// ViewModel for connection/streaming functionality.
     /// Wraps PhaseProtocolClient and provides observable properties for UI binding.
     ///
@@ -112,6 +121,7 @@ namespace VRWorkspace.ViewModels
         private PhaseProtocolClient _client;
         private string _currentHost;
         private int _currentPort;
+        private TransportMode _transportMode = TransportMode.WiFi;
         private readonly Dictionary<int, Texture> _textures = new Dictionary<int, Texture>();
         private bool _disposed;
 
@@ -160,8 +170,34 @@ namespace VRWorkspace.ViewModels
         {
             _currentHost = host;
             _currentPort = port;
+            _transportMode = TransportMode.WiFi;
             await ConnectCommand.ExecuteAsync();
         }
+
+        /// <summary>
+        /// Connect to server via USB Tethering (full TCP+UDP over USB cable).
+        /// </summary>
+        /// <param name="port">Server port (default 8288)</param>
+        /// <param name="usbTetheringIP">USB Tethering IP (required)</param>
+        public async Task ConnectUSBAsync(int port = 8288, string usbTetheringIP = null)
+        {
+            if (string.IsNullOrEmpty(usbTetheringIP))
+            {
+                Debug.LogError("[ConnectionViewModel] USB Tethering IP is required for USB mode");
+                return;
+            }
+
+            _currentHost = usbTetheringIP;
+            _currentPort = port;
+            _transportMode = TransportMode.USB;
+            Debug.Log($"[ConnectionViewModel] Connecting via USB Tethering ({usbTetheringIP}:{port})");
+            await ConnectCommand.ExecuteAsync();
+        }
+
+        /// <summary>
+        /// Current transport mode (USB or WiFi).
+        /// </summary>
+        public TransportMode CurrentTransport => _transportMode;
 
         /// <summary>
         /// Disconnect from the server and reset all state.
@@ -424,6 +460,19 @@ namespace VRWorkspace.ViewModels
 
             // Create new client
             _client = new PhaseProtocolClient();
+
+            // Set USB Mode BEFORE connecting - this affects ICE candidate filtering
+            // When USB Mode is ON, only ICE candidates from the USB Tethering subnet are sent
+            if (_transportMode == TransportMode.USB)
+            {
+                _client.SetUsbMode(true, _currentHost);
+                Debug.Log($"[ConnectionViewModel] USB Mode: ICE filtering to subnet of {_currentHost}");
+            }
+            else
+            {
+                _client.SetUsbMode(false, null);
+            }
+
             SubscribeToEvents();
 
             Phase.Value = ConnectionPhase.Connecting;
@@ -431,7 +480,10 @@ namespace VRWorkspace.ViewModels
 
             try
             {
-                var url = $"ws://{_currentHost}:{_currentPort}/signal";
+                // Build URL with transport parameter for USB mode
+                var transportParam = _transportMode == TransportMode.USB ? "&transport=usb" : "";
+                var url = $"ws://{_currentHost}:{_currentPort}/signal?protocol=v2{transportParam}";
+                Debug.Log($"[ConnectionViewModel] Connecting to {url} (transport={_transportMode})");
                 await _client.ConnectAsync(url);
                 IsConnected.Value = true;
             }
@@ -463,7 +515,10 @@ namespace VRWorkspace.ViewModels
             _client.OnNetworkInfoReceived += info =>
             {
                 if (_clientGeneration != subscribedGeneration) return;
-                NetworkInfo.Value = info;
+                // Use SetAndNotify instead of Value = because the same object reference
+                // may be passed multiple times with updated properties (e.g., USB latency update)
+                // EqualityComparer sees same reference as equal and won't fire OnChanged
+                NetworkInfo.SetAndNotify(info);
                 SpeedTestProgress.Value = 100;
             };
 
@@ -591,12 +646,7 @@ namespace VRWorkspace.ViewModels
                     Debug.LogWarning($"[ConnectionViewModel] Timeout waiting for ReadyToStream, current phase: {Phase.Value}, using force start");
                 }
 
-                // Wait 2 seconds showing "Connecting..."
-                await Task.Delay(2000);
-
-                if (_clientGeneration != subscribedGeneration) return; // Stale after delay
-
-                // Auto-start streaming (use force if phase didn't transition)
+                // Auto-start streaming immediately (server already streaming via early capture)
                 Debug.Log($"[ConnectionViewModel] Auto-starting streaming (force={useForce})...");
                 await StartStreamingAsync(useForce);
             };

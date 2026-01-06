@@ -40,7 +40,10 @@ public class RTTRemoteMenu : MonoBehaviour
     #region Private Fields
     // UI References
     private GameObject _hostInput;
-    private GameObject _portInput;
+    private GameObject _usbModeToggle;  // USB mode checkbox (replaces port input)
+    private bool _isUsbMode = false;    // Current USB mode state
+    private string _usbTetheringIP = null;  // USB Tethering IP from QR scan (for full USB streaming)
+    private const int DEFAULT_PORT = 8288;
     private GameObject _monitorsDropdown;
     private GameObject _resolutionDropdown;
     private GameObject _bitrateDropdown;
@@ -96,8 +99,16 @@ public class RTTRemoteMenu : MonoBehaviour
     #endregion
 
     #region Public Accessors (Easy Form Data Access)
-    public string Host => VRInputFieldFactory.GetValue(_hostInput);
-    public string Port => VRInputFieldFactory.GetValue(_portInput);
+    /// <summary>
+    /// Get connection host based on mode:
+    /// - USB Mode: Use USB Tethering IP (full TCP+UDP over USB cable)
+    /// - WiFi Mode: Use manual host input
+    /// </summary>
+    public string Host => _isUsbMode && HasUsbTetheringIP ? _usbTetheringIP : VRInputFieldFactory.GetValue(_hostInput);
+    public string Port => DEFAULT_PORT.ToString();
+    public bool IsUsbMode => _isUsbMode;
+    public string UsbTetheringIP => _usbTetheringIP;
+    public bool HasUsbTetheringIP => !string.IsNullOrEmpty(_usbTetheringIP);
     public int MonitorIndex => VRDropdownFactory.GetSelectedIndex(_monitorsDropdown);
     public string Resolution => VRDropdownFactory.GetSelectedValue(_resolutionDropdown);
     public string Bitrate => VRDropdownFactory.GetSelectedValue(_bitrateDropdown);
@@ -245,25 +256,192 @@ public class RTTRemoteMenu : MonoBehaviour
     {
         var row = CreateContainer(parent, "InputRow", x, y, w, h);
 
-        float hostW = (w - gapX) * 0.5f;
-        float portW = (w - gapX) * 0.5f;
+        float hostW = (w - gapX) * 0.6f;  // Host takes more space now
+        float toggleW = (w - gapX) * 0.4f;
 
         // Host Input
         _hostInput = VRInputFieldFactory.CreateLabeledInputField(
             row.transform, hostW,
             "Host", "192.168.1.7", accentColor,
-            onEndEdit: (value) => Debug.Log("Host: " + value),
+            onEndEdit: null,
             labelFontSize: LABEL_FONT_SIZE, inputFontSize: INPUT_FONT_SIZE, font: customFont);
         PositionElement(_hostInput, 0, 0);
 
-        // Port Input
-        _portInput = VRInputFieldFactory.CreateLabeledInputField(
-            row.transform, portW,
-            "Port", "8288", themeColor,
-            onEndEdit: (value) => Debug.Log("Port: " + value),
-            labelFontSize: LABEL_FONT_SIZE, inputFontSize: INPUT_FONT_SIZE, font: customFont,
-            contentType: TMP_InputField.ContentType.IntegerNumber);
-        PositionElement(_portInput, hostW + gapX, 0);
+        // USB Mode Toggle (replaces Port input)
+        _usbModeToggle = CreateUsbModeToggle(row.transform, toggleW, h);
+        PositionElement(_usbModeToggle, hostW + gapX, 0);
+    }
+
+    /// <summary>
+    /// Create USB Mode toggle checkbox with label.
+    /// When enabled, connects via USB Tethering IP.
+    /// </summary>
+    private GameObject CreateUsbModeToggle(Transform parent, float width, float height)
+    {
+        var container = new GameObject("UsbModeToggle");
+        container.transform.SetParent(parent, false);
+        var rt = container.AddComponent<RectTransform>();
+        rt.sizeDelta = new Vector2(width, height);
+
+        // Layout: Label on top, toggle button below
+        float labelH = height * 0.35f;
+        float toggleH = height * 0.65f;
+
+        // Label "USB Mode"
+        var labelObj = new GameObject("Label");
+        labelObj.transform.SetParent(container.transform, false);
+        var labelRT = labelObj.AddComponent<RectTransform>();
+        labelRT.anchorMin = new Vector2(0, 0.65f);
+        labelRT.anchorMax = new Vector2(1, 1);
+        labelRT.offsetMin = Vector2.zero;
+        labelRT.offsetMax = Vector2.zero;
+
+        var labelTMP = labelObj.AddComponent<TextMeshProUGUI>();
+        labelTMP.text = "USB Mode";
+        labelTMP.fontSize = LABEL_FONT_SIZE;
+        labelTMP.color = themeColor;
+        labelTMP.alignment = TextAlignmentOptions.Left;
+        labelTMP.fontStyle = FontStyles.Bold;
+        labelTMP.raycastTarget = false;
+        if (customFont) labelTMP.font = customFont;
+
+        // Toggle button container
+        var toggleContainer = new GameObject("ToggleContainer");
+        toggleContainer.transform.SetParent(container.transform, false);
+        var toggleContainerRT = toggleContainer.AddComponent<RectTransform>();
+        toggleContainerRT.anchorMin = new Vector2(0, 0);
+        toggleContainerRT.anchorMax = new Vector2(1, 0.6f);
+        toggleContainerRT.offsetMin = Vector2.zero;
+        toggleContainerRT.offsetMax = Vector2.zero;
+
+        // Checkbox button (toggle style)
+        float checkboxSize = toggleH * 0.7f;
+        var checkboxConfig = new VRButtonFactory.ButtonConfig
+        {
+            label = "",
+            themeColor = themeColor,
+            width = checkboxSize,
+            height = checkboxSize,
+            iconOnly = true,
+            iconSize = checkboxSize * 0.6f,
+            cornerRadius = 0.15f,
+            backgroundAlpha = 0.15f,
+            borderWidth = 0.04f,
+            popAmount = 0.02f
+        };
+
+        var checkboxBtn = VRButtonFactory.CreateButton(toggleContainer.transform, checkboxConfig, OnUsbModeToggleClicked);
+        var checkboxRT = checkboxBtn.GetComponent<RectTransform>();
+        checkboxRT.anchorMin = new Vector2(0, 0.5f);
+        checkboxRT.anchorMax = new Vector2(0, 0.5f);
+        checkboxRT.pivot = new Vector2(0, 0.5f);
+        checkboxRT.anchoredPosition = Vector2.zero;
+
+        // Checkmark indicator (icon, hidden by default)
+        var checkmark = new GameObject("Checkmark");
+        checkmark.transform.SetParent(checkboxBtn.transform, false);
+        var checkmarkRT = checkmark.AddComponent<RectTransform>();
+        checkmarkRT.anchorMin = new Vector2(0.15f, 0.15f);
+        checkmarkRT.anchorMax = new Vector2(0.85f, 0.85f);
+        checkmarkRT.offsetMin = Vector2.zero;
+        checkmarkRT.offsetMax = Vector2.zero;
+
+        var checkmarkImg = checkmark.AddComponent<Image>();
+        checkmarkImg.sprite = Resources.Load<Sprite>("icon_check_mark");
+        checkmarkImg.color = Color.white;  // Use white to show icon at full brightness
+        checkmarkImg.preserveAspect = true;
+        checkmarkImg.raycastTarget = false;
+        checkmark.SetActive(false); // Hidden by default
+
+        // Status label next to checkbox
+        var statusObj = new GameObject("Status");
+        statusObj.transform.SetParent(toggleContainer.transform, false);
+        var statusRT = statusObj.AddComponent<RectTransform>();
+        statusRT.anchorMin = new Vector2(0, 0);
+        statusRT.anchorMax = new Vector2(1, 1);
+        statusRT.offsetMin = new Vector2(checkboxSize + 15f, 0);
+        statusRT.offsetMax = Vector2.zero;
+
+        var statusTMP = statusObj.AddComponent<TextMeshProUGUI>();
+        statusTMP.text = "USB Tethering";
+        statusTMP.fontSize = INPUT_FONT_SIZE * 0.85f;
+        statusTMP.color = themeColor;
+        statusTMP.alignment = TextAlignmentOptions.Left;
+        statusTMP.verticalAlignment = VerticalAlignmentOptions.Middle;
+        statusTMP.raycastTarget = false;
+        if (customFont) statusTMP.font = customFont;
+
+        return container;
+    }
+
+    /// <summary>
+    /// Handle USB mode toggle click.
+    /// </summary>
+    private void OnUsbModeToggleClicked()
+    {
+        _isUsbMode = !_isUsbMode;
+        UpdateUsbModeToggleVisual();
+
+        // When USB mode is enabled, disable host input (will use USB Tethering IP)
+        VRInputFieldFactory.SetInteractable(_hostInput, !_isUsbMode);
+
+        Debug.Log($"[RTTRemoteMenu] USB Mode: {_isUsbMode}");
+    }
+
+    /// <summary>
+    /// Update USB mode toggle visual state.
+    /// </summary>
+    private void UpdateUsbModeToggleVisual()
+    {
+        if (_usbModeToggle == null) return;
+
+        // Find checkmark and update visibility (direct child of Btn_)
+        var checkmark = _usbModeToggle.transform.Find("ToggleContainer/Btn_/Checkmark");
+        if (checkmark != null)
+        {
+            checkmark.gameObject.SetActive(_isUsbMode);
+        }
+
+        // Update status text color
+        var statusTMP = _usbModeToggle.transform.Find("ToggleContainer/Status")?.GetComponent<TextMeshProUGUI>();
+        if (statusTMP != null)
+        {
+            statusTMP.color = themeColor;  // Always bright
+        }
+
+        // Update background alpha based on state
+        var visuals = _usbModeToggle.transform.Find("ToggleContainer/Btn_/HitArea/Visuals/Background");
+        if (visuals != null)
+        {
+            var img = visuals.GetComponent<Image>();
+            if (img != null && img.material != null)
+            {
+                img.material.SetFloat("_GlassAlpha", _isUsbMode ? 0.35f : 0.15f);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Update USB mode label to show USB Tethering IP.
+    /// </summary>
+    private void UpdateUsbModeLabel()
+    {
+        if (_usbModeToggle == null) return;
+
+        var statusTMP = _usbModeToggle.transform.Find("ToggleContainer/Status")?.GetComponent<TextMeshProUGUI>();
+        if (statusTMP != null)
+        {
+            if (!string.IsNullOrEmpty(_usbTetheringIP))
+            {
+                statusTMP.text = $"USB: {_usbTetheringIP}";
+                statusTMP.color = _isUsbMode ? themeColor : new Color(0.4f, 0.8f, 0.4f);  // Green tint
+            }
+            else
+            {
+                statusTMP.text = "USB Tethering";
+                statusTMP.color = themeColor;  // Always bright
+            }
+        }
     }
     #endregion
 
@@ -295,7 +473,7 @@ public class RTTRemoteMenu : MonoBehaviour
             grid.transform, cellW,
             "Resolution", LoadIcon("resolution"), accentColor,
             resolutionOptions, 3,
-            onValueChanged: (index, value) => Debug.Log("Resolution: " + value),
+            onValueChanged: null,
             labelFontSize: DROPDOWN_LABEL_FONT_SIZE, valueFontSize: DROPDOWN_VALUE_FONT_SIZE, font: customFont);
         PositionElement(_resolutionDropdown, cellW + gapX, row1Y);
 
@@ -304,7 +482,7 @@ public class RTTRemoteMenu : MonoBehaviour
             grid.transform, cellW,
             "Bitrate", LoadIcon("bitrate"), accentColor,
             bitrateOptions, 2,
-            onValueChanged: (index, value) => Debug.Log("Bitrate: " + value),
+            onValueChanged: null,
             labelFontSize: DROPDOWN_LABEL_FONT_SIZE, valueFontSize: DROPDOWN_VALUE_FONT_SIZE, font: customFont);
         PositionElement(_bitrateDropdown, 0, 0);
 
@@ -312,7 +490,7 @@ public class RTTRemoteMenu : MonoBehaviour
             grid.transform, cellW,
             "FPS", LoadIcon("fps"), themeColor,
             fpsOptions, 2,
-            onValueChanged: (index, value) => Debug.Log("FPS: " + value),
+            onValueChanged: null,
             labelFontSize: DROPDOWN_LABEL_FONT_SIZE, valueFontSize: DROPDOWN_VALUE_FONT_SIZE, font: customFont);
         PositionElement(_fpsDropdown, cellW + gapX, 0);
     }
@@ -374,7 +552,30 @@ public class RTTRemoteMenu : MonoBehaviour
         {
             case ConnectionPhase.Disconnected:
             case ConnectionPhase.Error:
-                // Validate host and port first
+                // USB Mode: Requires USB Tethering IP from QR scan
+                if (_isUsbMode)
+                {
+                    if (!HasUsbTetheringIP)
+                    {
+                        Debug.LogWarning("[RTTRemoteMenu] USB mode requires USB Tethering. Scan QR code first.");
+                        // Show error feedback to user
+                        ShowTemporaryButtonText("SCAN QR FIRST!", 2f);
+                        return;
+                    }
+
+                    Debug.Log($"[RTTRemoteMenu] Connecting via USB Tethering ({_usbTetheringIP})...");
+                    UpdateButtonText("CONNECTING...");
+
+                    // Lock inputs during connection
+                    VRInputFieldFactory.SetInteractable(_hostInput, false);
+                    SetUsbToggleInteractable(false);
+                    VRButtonFactory.SetInteractable(_qrButton, false);
+
+                    await _viewModel.ConnectUSBAsync(DEFAULT_PORT, _usbTetheringIP);
+                    break;
+                }
+
+                // WiFi Mode: Validate host and port
                 string host = Host;
                 string port = Port;
 
@@ -398,12 +599,12 @@ public class RTTRemoteMenu : MonoBehaviour
                 }
 
                 // Step 1: Connect
-                Debug.Log("[RTTRemoteMenu] Connecting...");
+                Debug.Log("[RTTRemoteMenu] Connecting via WiFi...");
                 UpdateButtonText("CONNECTING...");
 
                 // Lock inputs during connection
                 VRInputFieldFactory.SetInteractable(_hostInput, false);
-                VRInputFieldFactory.SetInteractable(_portInput, false);
+                SetUsbToggleInteractable(false);
                 VRButtonFactory.SetInteractable(_qrButton, false);
 
                 await _viewModel.ConnectAsync(host, portNum);
@@ -520,6 +721,25 @@ public class RTTRemoteMenu : MonoBehaviour
     }
 
     /// <summary>
+    /// Show temporary button text, then revert to original after delay.
+    /// </summary>
+    private async void ShowTemporaryButtonText(string text, float duration)
+    {
+        if (_connectButtonText == null) return;
+
+        string originalText = _connectButtonText.text;
+        _connectButtonText.text = text;
+
+        await System.Threading.Tasks.Task.Delay((int)(duration * 1000));
+
+        // Only revert if text hasn't changed
+        if (_connectButtonText != null && _connectButtonText.text == text)
+        {
+            _connectButtonText.text = originalText;
+        }
+    }
+
+    /// <summary>
     /// Hide the menu frame and side panels.
     /// Called when START is clicked in new flow.
     /// </summary>
@@ -548,8 +768,8 @@ public class RTTRemoteMenu : MonoBehaviour
             case ConnectionPhase.Disconnected:
                 UpdateButtonText("CONNECT");
                 InitializeDropdownsDisabled();
-                VRInputFieldFactory.SetInteractable(_hostInput, true);
-                VRInputFieldFactory.SetInteractable(_portInput, true);
+                VRInputFieldFactory.SetInteractable(_hostInput, !_isUsbMode);  // Disabled when USB mode
+                SetUsbToggleInteractable(true);
                 VRButtonFactory.SetInteractable(_qrButton, true);
                 HideSidePanels();
                 // Clear cached data to prevent stale data on next connection
@@ -604,8 +824,8 @@ public class RTTRemoteMenu : MonoBehaviour
                 // Treat Error same as Disconnected - show CONNECT, not RETRY
                 UpdateButtonText("CONNECT");
                 InitializeDropdownsDisabled();
-                VRInputFieldFactory.SetInteractable(_hostInput, true);
-                VRInputFieldFactory.SetInteractable(_portInput, true);
+                VRInputFieldFactory.SetInteractable(_hostInput, !_isUsbMode);  // Disabled when USB mode
+                SetUsbToggleInteractable(true);
                 VRButtonFactory.SetInteractable(_qrButton, true);
                 HideSidePanels();
                 // Clear cached data on error
@@ -984,9 +1204,9 @@ public class RTTRemoteMenu : MonoBehaviour
         VRDropdownFactory.SetInteractable(_bitrateDropdown, false);
         VRDropdownFactory.SetInteractable(_fpsDropdown, false);
 
-        // Khóa 2 input fields
+        // Khóa host input và USB toggle
         VRInputFieldFactory.SetInteractable(_hostInput, false);
-        VRInputFieldFactory.SetInteractable(_portInput, false);
+        SetUsbToggleInteractable(false);
 
         // Khóa QR button
         VRButtonFactory.SetInteractable(_qrButton, false);
@@ -1005,9 +1225,9 @@ public class RTTRemoteMenu : MonoBehaviour
         VRDropdownFactory.SetInteractable(_bitrateDropdown, true);
         VRDropdownFactory.SetInteractable(_fpsDropdown, true);
 
-        // Mở khóa 2 input fields
-        VRInputFieldFactory.SetInteractable(_hostInput, true);
-        VRInputFieldFactory.SetInteractable(_portInput, true);
+        // Mở khóa host input (only if not USB mode) và USB toggle
+        VRInputFieldFactory.SetInteractable(_hostInput, !_isUsbMode);
+        SetUsbToggleInteractable(true);
 
         // Mở khóa QR button
         VRButtonFactory.SetInteractable(_qrButton, true);
@@ -1016,19 +1236,39 @@ public class RTTRemoteMenu : MonoBehaviour
     }
 
     /// <summary>
-    /// Load saved host/port from preferences and apply to inputs.
+    /// Set USB toggle interactable state.
+    /// </summary>
+    private void SetUsbToggleInteractable(bool interactable)
+    {
+        if (_usbModeToggle == null) return;
+
+        // Find checkbox button inside toggle
+        var checkboxBtn = _usbModeToggle.transform.Find("ToggleContainer/Btn_");
+        if (checkboxBtn != null)
+        {
+            VRButtonFactory.SetInteractable(checkboxBtn.gameObject, interactable);
+        }
+    }
+
+    /// <summary>
+    /// Load saved host and USB mode from preferences and apply to inputs.
     /// </summary>
     private void LoadSavedHostPort()
     {
         var prefs = RemotePreferences.Load();
         if (!string.IsNullOrEmpty(prefs.lastHost))
             VRInputFieldFactory.SetValue(_hostInput, prefs.lastHost);
-        if (!string.IsNullOrEmpty(prefs.lastPort))
-            VRInputFieldFactory.SetValue(_portInput, prefs.lastPort);
+
+        // Load USB mode state
+        _isUsbMode = prefs.usbMode;
+        UpdateUsbModeToggleVisual();
+
+        // Disable host input if USB mode is enabled
+        VRInputFieldFactory.SetInteractable(_hostInput, !_isUsbMode);
     }
 
     /// <summary>
-    /// Save current dropdown selections and host/port to preferences.
+    /// Save current dropdown selections and host/USB mode to preferences.
     /// Called when START is clicked (previously SETUP REMOTE).
     /// </summary>
     private void SaveCurrentSelections()
@@ -1039,11 +1279,12 @@ public class RTTRemoteMenu : MonoBehaviour
             resolution = RemotePreferences.CleanValue(Resolution),
             bitrate = RemotePreferences.CleanValue(Bitrate),
             fps = RemotePreferences.CleanValue(FPS),
-            lastHost = Host,
-            lastPort = Port
+            lastHost = VRInputFieldFactory.GetValue(_hostInput),  // Save actual host input value
+            lastPort = Port,
+            usbMode = _isUsbMode
         };
         prefs.Save();
-        Debug.Log($"[RTTRemoteMenu] Saved preferences: {prefs.monitors}mon, {prefs.resolution}, {prefs.bitrate}, {prefs.fps}");
+        Debug.Log($"[RTTRemoteMenu] Saved preferences: {prefs.monitors}mon, {prefs.resolution}, {prefs.bitrate}, {prefs.fps}, USB={prefs.usbMode}");
     }
     #endregion
 
@@ -1680,53 +1921,34 @@ public class RTTRemoteMenu : MonoBehaviour
     #region Set Config (Fill Form)
     /// <summary>
     /// Fill the form with values from a QRScannerConfig.
+    /// Bind IP based on current USB Mode state.
     /// </summary>
     public void SetConfig(QRScannerConfig config)
     {
         if (config == null) return;
 
-        // Host & Port
-        if (!string.IsNullOrEmpty(config.host))
-            VRInputFieldFactory.SetValue(_hostInput, config.host);
+        Debug.Log($"[RTTRemoteMenu] QR Config received: {config}");
 
-        if (!string.IsNullOrEmpty(config.port))
-            VRInputFieldFactory.SetValue(_portInput, config.port);
-
-        // Resolution
-        if (!string.IsNullOrEmpty(config.resolution))
+        // Store USB Tethering IP if available
+        if (config.HasUsbIP)
         {
-            int index = FindOptionIndex(
-                new[] { "1920 x 1080", "1600 x 900", "1366 x 768", "1280 x 720" },
-                config.resolution);
-            if (index >= 0)
-                VRDropdownFactory.SetSelectedIndex(_resolutionDropdown, index);
+            _usbTetheringIP = config.usbIP;
+            UpdateUsbModeLabel();
+            Debug.Log($"[RTTRemoteMenu] USB IP available: {_usbTetheringIP}");
         }
 
-        // Bitrate
-        if (!string.IsNullOrEmpty(config.bitrate))
+        // Set Host based on USB Mode state
+        // If USB Mode is ON and USB IP available → use USB IP
+        // Otherwise → use WiFi IP
+        string hostToUse = (_isUsbMode && config.HasUsbIP) ? config.usbIP : config.ip;
+
+        if (!string.IsNullOrEmpty(hostToUse))
         {
-            int index = FindOptionIndex(
-                new[] { "5 Mbps", "10 Mbps", "20 Mbps", "30 Mbps", "50 Mbps" },
-                config.bitrate);
-            if (index >= 0)
-                VRDropdownFactory.SetSelectedIndex(_bitrateDropdown, index);
+            VRInputFieldFactory.SetValue(_hostInput, hostToUse);
+            Debug.Log($"[RTTRemoteMenu] Host set to: {hostToUse} (USB Mode: {_isUsbMode})");
         }
 
-        // FPS
-        if (!string.IsNullOrEmpty(config.fps))
-        {
-            int index = FindOptionIndex(
-                new[] { "30 FPS", "45 FPS", "60 FPS" },
-                config.fps);
-            if (index >= 0)
-                VRDropdownFactory.SetSelectedIndex(_fpsDropdown, index);
-        }
-
-        // Monitors
-        if (config.monitors >= 1 && config.monitors <= 3)
-        {
-            VRDropdownFactory.SetSelectedIndex(_monitorsDropdown, config.monitors - 1);
-        }
+        // Note: Port from QR is ignored - using fixed DEFAULT_PORT (8288)
     }
 
     private int FindOptionIndex(string[] options, string value)

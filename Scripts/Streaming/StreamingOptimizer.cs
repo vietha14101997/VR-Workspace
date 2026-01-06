@@ -8,8 +8,10 @@ namespace VRWorkspace.Streaming
     /// </summary>
     public enum VideoCodec
     {
-        H264,
-        H265
+        H264,   // AVC - Hardware accelerated
+        H265,   // HEVC - Better compression
+        VP9,    // libvpx-vp9 (fallback)
+        VP8     // libvpx (final fallback)
     }
 
     /// <summary>
@@ -29,9 +31,11 @@ namespace VRWorkspace.Streaming
         public MonitorInfo[] monitors;
 
         // Codec capability fields
-        public string[] supportedCodecs;    // ["H264", "H265"]
-        public string preferredCodec;       // "H265" or "H264"
-        public bool supportsHevc;           // Quick check for HEVC support
+        public string[] supportedCodecs;    // ["H264", "H265", "VP9", "VP8"]
+        public string preferredCodec;       // Preferred codec
+        public bool supportsHevc;           // H.265 support
+        public bool supportsVP9;            // VP9 support (libvpx-vp9)
+        public bool supportsVP8;            // VP8 support (libvpx)
     }
 
     /// <summary>
@@ -40,9 +44,11 @@ namespace VRWorkspace.Streaming
     [Serializable]
     public class ClientCodecCapability
     {
-        public string[] supportedCodecs;    // Codecs client can decode
+        public string[] supportedCodecs;    // Codecs client can decode (H264, VP9, VP8)
         public string preferredCodec;       // Client's preferred codec
         public bool supportsHevc;           // HEVC hardware decoder available
+        public bool supportsVP9;            // VP9 decoding support (Unity WebRTC native)
+        public bool supportsVP8;            // VP8 decoding support (Unity WebRTC native)
         public string deviceModel;          // Android device model
         public int apiLevel;                // Android API level
     }
@@ -69,7 +75,20 @@ namespace VRWorkspace.Streaming
         public double pingMs;
         public double jitterMs;
         public double bandwidthMbps;
-        public string connectionType; // LAN, WiFi, Internet
+        public string connectionType; // LAN, WiFi, Internet, USB
+
+        // USB Tethering (RNDIS) specific fields
+        /// <summary>True if connection is via USB Tethering.</summary>
+        public bool isUsbMode;
+
+        /// <summary>USB-specific ICMP latency in ms (typically < 1ms).</summary>
+        public double usbLatencyMs;
+
+        /// <summary>USB interface version: "USB 2.0" or "USB 3.0".</summary>
+        public string usbVersion;
+
+        /// <summary>Estimated bandwidth for USB mode in Mbps.</summary>
+        public double usbEstimatedBandwidthMbps;
     }
 
     /// <summary>
@@ -86,6 +105,7 @@ namespace VRWorkspace.Streaming
         public int refreshRate = 60;
         public string reason;
         public string selectedCodec = "H264";  // Codec negotiated for streaming
+        public string connectionType = "Unknown";  // USB, WiFi, LAN, Internet
     }
 
     /// <summary>
@@ -309,6 +329,11 @@ namespace VRWorkspace.Streaming
         /// </summary>
         public static string GetConnectionQuality(NetworkTestResult network)
         {
+            // USB connection is always excellent quality (stable, high bandwidth potential)
+            // TCP speedtest can't measure true USB 3.0 bandwidth, but UDP streaming can use it
+            if (network.connectionType == "USB")
+                return "Excellent (USB)";
+
             if (network.pingMs < 5 && network.bandwidthMbps > 500)
                 return "Excellent (LAN)";
             if (network.pingMs < 20 && network.bandwidthMbps > 100)

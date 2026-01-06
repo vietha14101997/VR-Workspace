@@ -190,17 +190,92 @@ public class RTTInfoSidePanel : MonoBehaviour
 
         ClearContent();
 
-        AddTitle("NETWORK INFO");
-        AddInfoRow("Ping", $"{info.pingMs:F1} ms");
-        AddInfoRow("Jitter", $"{info.jitterMs:F1} ms");
-        AddInfoRow("Bandwidth", $"{info.bandwidthMbps:F0} Mbps");
-        AddInfoRow("Type", info.connectionType ?? "Unknown");
+        // USB Mode: Display USB-specific metrics instead of WebSocket speedtest
+        if (info.isUsbMode)
+        {
+            Debug.Log("[RTTInfoSidePanel] *** USB Mode UI BUILD v4 ***");
+            AddTitle("USB NETWORKING");
+            
+            // Helper to check if value is valid (not -1 placeholder)
+            bool hasServerData = info.usbLatencyMs > 0 || info.usbEstimatedBandwidthMbps > 0;
+            
+            // Ping: Use USB ICMP latency if available, otherwise show "--"
+            if (info.usbLatencyMs > 0)
+            {
+                AddInfoRow("Ping", $"{info.usbLatencyMs:F2} ms");
+            }
+            else if (info.pingMs >= 0)
+            {
+                AddInfoRow("Ping", $"{info.pingMs:F2} ms");
+            }
+            else
+            {
+                AddInfoRow("Ping", "--");
+            }
+            
+            // Jitter: Show if valid, otherwise "--"
+            if (info.jitterMs >= 0)
+            {
+                AddInfoRow("Jitter", $"{info.jitterMs:F2} ms");
+            }
+            else
+            {
+                AddInfoRow("Jitter", "--");
+            }
+            
+            // Bandwidth: Use USB estimated if available, otherwise "--"
+            if (info.usbEstimatedBandwidthMbps > 0)
+            {
+                AddInfoRow("Bandwidth", $"{info.usbEstimatedBandwidthMbps:F0} Mbps");
+            }
+            else if (info.bandwidthMbps > 0)
+            {
+                AddInfoRow("Bandwidth", $"{info.bandwidthMbps:F0} Mbps");
+            }
+            else
+            {
+                AddInfoRow("Bandwidth", "--");
+            }
+            
+            // USB Type: Show version if available
+            if (!string.IsNullOrEmpty(info.usbVersion))
+            {
+                AddInfoRow("Type", $"USB ({info.usbVersion})");
+            }
+            else
+            {
+                AddInfoRow("Type", "USB");
+            }
+            
+            // Quality: Excellent when we have server data, otherwise Measuring...
+            if (hasServerData)
+            {
+                AddInfoRow("Quality", "Excellent", GetQualityColor("Excellent"));
+            }
+            else
+            {
+                AddInfoRow("Quality", "Measuring...");
+            }
+            
+            Debug.Log($"[RTTInfoSidePanel] SetNetworkInfo USB Mode: hasServerData={hasServerData}");
+            Debug.Log($"[RTTInfoSidePanel]   usbLatencyMs={info.usbLatencyMs}, jitterMs={info.jitterMs}, usbEstimatedBandwidthMbps={info.usbEstimatedBandwidthMbps}, usbVersion={info.usbVersion}");
+        }
+        else
+        {
+            // Standard WiFi/LAN display
+            AddTitle("NETWORK INFO");
+            AddInfoRow("Ping", $"{info.pingMs:F1} ms");
+            AddInfoRow("Jitter", $"{info.jitterMs:F1} ms");
+            AddInfoRow("Bandwidth", $"{info.bandwidthMbps:F0} Mbps");
+            AddInfoRow("Type", info.connectionType ?? "Unknown");
 
-        string quality = GetNetworkQuality(info);
-        AddInfoRow("Quality", quality, GetQualityColor(quality));
+            string quality = GetNetworkQuality(info);
+            AddInfoRow("Quality", quality, GetQualityColor(quality));
+            
+            Debug.Log($"[RTTInfoSidePanel] SetNetworkInfo: {info.pingMs:F1}ms");
+        }
 
         OnContentChanged?.Invoke();
-        Debug.Log($"[RTTInfoSidePanel] SetNetworkInfo: {info.pingMs:F1}ms");
     }
 
     /// <summary>
@@ -452,6 +527,15 @@ public class RTTInfoSidePanel : MonoBehaviour
     #region Helpers
     private string GetNetworkQuality(NetworkTestResult info)
     {
+        // USB connection is always excellent quality (stable, high bandwidth potential)
+        // TCP speedtest can't measure true USB 3.0 bandwidth, but UDP streaming can use it
+        if (info.connectionType == "USB")
+            return "Excellent";
+
+        // LAN connections with very low ping
+        if (info.pingMs < 5 && info.bandwidthMbps > 500)
+            return "Excellent";
+
         if (info.pingMs < 20 && info.bandwidthMbps > 100) return "Excellent";
         if (info.pingMs < 50 && info.bandwidthMbps > 50) return "Good";
         if (info.pingMs < 100 && info.bandwidthMbps > 20) return "Fair";

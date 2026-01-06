@@ -51,6 +51,35 @@ namespace VRWorkspace.Native
         public int FragmentsReceived { get; private set; }
         public int SequenceErrors { get; private set; }
 
+        // Packet loss tracking for adaptive bitrate feedback
+        private int _packetsLostInWindow;
+        private int _packetsReceivedInWindow;
+        private DateTime _windowStartTime = DateTime.UtcNow;
+        private const float LOSS_WINDOW_SECONDS = 2.0f; // Calculate loss rate every 2 seconds
+
+        /// <summary>
+        /// Current packet loss rate in the recent window (0.0 to 1.0).
+        /// Updated every LOSS_WINDOW_SECONDS.
+        /// </summary>
+        public float PacketLossRate { get; private set; }
+
+        /// <summary>
+        /// Number of packets lost in the last completed window.
+        /// </summary>
+        public int PacketsLostInLastWindow { get; private set; }
+
+        /// <summary>
+        /// Number of consecutive sequence errors (resets on successful sequence).
+        /// High values indicate sustained packet loss.
+        /// </summary>
+        public int ConsecutiveSequenceErrors { get; private set; }
+
+        /// <summary>
+        /// Event fired when packet loss rate is updated (every LOSS_WINDOW_SECONDS).
+        /// Parameters: lossRate (0.0-1.0), packetsLost
+        /// </summary>
+        public event Action<float, int> OnPacketLossUpdated;
+
         /// <summary>
         /// Process an RTP packet and extract NAL units.
         /// </summary>
@@ -79,15 +108,47 @@ namespace VRWorkspace.Native
                 ushort expectedSeq = (ushort)((_lastSequenceNumber + 1) & 0xFFFF);
                 if (header.SequenceNumber != expectedSeq)
                 {
+                    // Calculate gap size (handle wraparound for 16-bit sequence)
+                    int gap = (header.SequenceNumber - expectedSeq) & 0xFFFF;
+                    if (gap > 0x8000) gap = 0x10000 - gap; // Handle backward wraparound
+
                     SequenceErrors++;
-                    Debug.LogWarning($"{TAG} Sequence gap: expected {expectedSeq}, got {header.SequenceNumber}");
+                    ConsecutiveSequenceErrors++;
+                    _packetsLostInWindow += Math.Max(1, gap - 1); // Count lost packets in gap
+
+                    Debug.LogWarning($"{TAG} Sequence gap: expected {expectedSeq}, got {header.SequenceNumber}, lost ~{gap} packets (consecutive={ConsecutiveSequenceErrors})");
 
                     // Reset fragment state on sequence error
                     _fragment = new FragmentState();
                 }
+                else
+                {
+                    // Successful sequence - reset consecutive error count
+                    ConsecutiveSequenceErrors = 0;
+                }
             }
             _lastSequenceNumber = header.SequenceNumber;
             _firstPacket = false;
+
+            // Track packets received in current window
+            _packetsReceivedInWindow++;
+
+            // Check if window expired - calculate and report loss rate
+            float secondsSinceWindowStart = (float)(DateTime.UtcNow - _windowStartTime).TotalSeconds;
+            if (secondsSinceWindowStart >= LOSS_WINDOW_SECONDS)
+            {
+                int totalPackets = _packetsReceivedInWindow + _packetsLostInWindow;
+                PacketLossRate = totalPackets > 0 ? (float)_packetsLostInWindow / totalPackets : 0f;
+                PacketsLostInLastWindow = _packetsLostInWindow;
+
+                // Fire event for metrics aggregation
+                OnPacketLossUpdated?.Invoke(PacketLossRate, PacketsLostInLastWindow);
+
+                // Reset window
+                _packetsReceivedInWindow = 0;
+                _packetsLostInWindow = 0;
+                _windowStartTime = DateTime.UtcNow;
+            }
 
             // Get payload (skip RTP header + CSRC)
             int payloadOffset = RTP_HEADER_SIZE + (header.CsrcCount * 4);
@@ -313,6 +374,14 @@ namespace VRWorkspace.Native
             _fragment = new FragmentState();
             _firstPacket = true;
             _lastSequenceNumber = 0;
+
+            // Reset packet loss tracking
+            _packetsLostInWindow = 0;
+            _packetsReceivedInWindow = 0;
+            _windowStartTime = DateTime.UtcNow;
+            PacketLossRate = 0f;
+            PacketsLostInLastWindow = 0;
+            ConsecutiveSequenceErrors = 0;
         }
 
         /// <summary>
