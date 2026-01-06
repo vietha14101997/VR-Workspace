@@ -193,37 +193,72 @@ public class RTTInfoSidePanel : MonoBehaviour
         // USB Mode: Display USB-specific metrics instead of WebSocket speedtest
         if (info.isUsbMode)
         {
+            Debug.Log("[RTTInfoSidePanel] *** USB Mode UI BUILD v4 ***");
             AddTitle("USB NETWORKING");
             
-            // Use USB-specific ICMP latency (much lower than WebSocket ping)
-            double displayPing = info.usbLatencyMs > 0 ? info.usbLatencyMs : info.pingMs;
-            AddInfoRow("Ping", $"{displayPing:F2} ms");
+            // Helper to check if value is valid (not -1 placeholder)
+            bool hasServerData = info.usbLatencyMs > 0 || info.usbEstimatedBandwidthMbps > 0;
             
-            // Use actual USB jitter from server measurement
-            AddInfoRow("Jitter", $"{info.jitterMs:F2} ms");
+            // Ping: Use USB ICMP latency if available, otherwise show "--"
+            if (info.usbLatencyMs > 0)
+            {
+                AddInfoRow("Ping", $"{info.usbLatencyMs:F2} ms");
+            }
+            else if (info.pingMs >= 0)
+            {
+                AddInfoRow("Ping", $"{info.pingMs:F2} ms");
+            }
+            else
+            {
+                AddInfoRow("Ping", "--");
+            }
             
-            // Show estimated USB bandwidth - prioritize server value, fallback to sensible defaults
-            // USB speedtest via TCP is unreliable, so we use USB version-based estimates
-            double displayBandwidth = 480; // Default USB 2.0 bandwidth
+            // Jitter: Show if valid, otherwise "--"
+            if (info.jitterMs >= 0)
+            {
+                AddInfoRow("Jitter", $"{info.jitterMs:F2} ms");
+            }
+            else
+            {
+                AddInfoRow("Jitter", "--");
+            }
+            
+            // Bandwidth: Use USB estimated if available, otherwise "--"
             if (info.usbEstimatedBandwidthMbps > 0)
             {
-                displayBandwidth = info.usbEstimatedBandwidthMbps;
+                AddInfoRow("Bandwidth", $"{info.usbEstimatedBandwidthMbps:F0} Mbps");
             }
-            else if (info.bandwidthMbps > 100) // If speedtest measured > 100 Mbps, use it
+            else if (info.bandwidthMbps > 0)
             {
-                displayBandwidth = info.bandwidthMbps;
+                AddInfoRow("Bandwidth", $"{info.bandwidthMbps:F0} Mbps");
             }
-            AddInfoRow("Bandwidth", $"{displayBandwidth:F0} Mbps");
+            else
+            {
+                AddInfoRow("Bandwidth", "--");
+            }
             
-            // Show USB version as type
-            string usbType = !string.IsNullOrEmpty(info.usbVersion) ? $"USB ({info.usbVersion})" : "USB Tethering";
-            AddInfoRow("Type", usbType);
+            // USB Type: Show version if available
+            if (!string.IsNullOrEmpty(info.usbVersion))
+            {
+                AddInfoRow("Type", $"USB ({info.usbVersion})");
+            }
+            else
+            {
+                AddInfoRow("Type", "USB");
+            }
             
-            // USB is always excellent quality
-            AddInfoRow("Quality", "Excellent", GetQualityColor("Excellent"));
+            // Quality: Excellent when we have server data, otherwise Measuring...
+            if (hasServerData)
+            {
+                AddInfoRow("Quality", "Excellent", GetQualityColor("Excellent"));
+            }
+            else
+            {
+                AddInfoRow("Quality", "Measuring...");
+            }
             
-            Debug.Log($"[RTTInfoSidePanel] SetNetworkInfo USB Mode: ping={displayPing:F2}ms, jitter={info.jitterMs:F2}ms, bw={displayBandwidth:F0}Mbps, version={info.usbVersion}");
-            Debug.Log($"[RTTInfoSidePanel]   Raw values: usbLatencyMs={info.usbLatencyMs}, usbEstimatedBandwidthMbps={info.usbEstimatedBandwidthMbps}, bandwidthMbps={info.bandwidthMbps}");
+            Debug.Log($"[RTTInfoSidePanel] SetNetworkInfo USB Mode: hasServerData={hasServerData}");
+            Debug.Log($"[RTTInfoSidePanel]   usbLatencyMs={info.usbLatencyMs}, jitterMs={info.jitterMs}, usbEstimatedBandwidthMbps={info.usbEstimatedBandwidthMbps}, usbVersion={info.usbVersion}");
         }
         else
         {

@@ -1363,28 +1363,28 @@ namespace VRWorkspace.Streaming
                 // Server will measure actual USB latency using ICMP ping to gateway
                 if (_isUsbMode)
                 {
-                    Debug.Log("[PhaseProtocol] USB Mode: Skipping WebSocket speedtest, using USB defaults [BUILD 2026-01-06 v2]");
+                    Debug.Log("[PhaseProtocol] USB Mode: Skipping WebSocket speedtest, waiting for server values [BUILD 2026-01-06 v4]");
                     
-                    // Use default USB values - server will provide accurate ICMP latency later
+                    // Use INVALID values (-1) to indicate "waiting for server"
+                    // UI will show "--" until real values arrive from server
                     _networkInfo = new NetworkTestResult
                     {
-                        pingMs = 0.5,           // Placeholder - server will measure actual ICMP latency
-                        jitterMs = 0.1,         // USB has minimal jitter
-                        bandwidthMbps = 480,    // USB 2.0 theoretical max (server will update if USB 3.0)
+                        pingMs = -1,              // Invalid - will be set by server
+                        jitterMs = -1,            // Invalid - will be set by server  
+                        bandwidthMbps = -1,       // Invalid - will be set by server
                         connectionType = "USB",
                         isUsbMode = true,
-                        usbLatencyMs = 0.5,     // Will be updated by server
-                        usbVersion = "USB 2.0", // Will be updated by server
-                        usbEstimatedBandwidthMbps = 480
+                        usbLatencyMs = -1,        // Invalid - will be set by server
+                        usbVersion = null,        // Null - will be set by server
+                        usbEstimatedBandwidthMbps = -1  // Invalid - will be set by server
                     };
                     
-                    // Send minimal speedtest result to server so it knows we're ready
-                    // Server will calculate config based on USB detection, not these values
-                    await SendSpeedTestResultAsync(_networkInfo.pingMs, _networkInfo.jitterMs, _networkInfo.bandwidthMbps);
+                    // Send speedtest result to server (use 480 as placeholder for server calculation)
+                    await SendSpeedTestResultAsync(0.5, 0.1, 480);
                     
-                    // Fire event for UI to show USB mode immediately
+                    // Fire event for UI to show "waiting" state
                     OnNetworkInfoReceived?.Invoke(_networkInfo);
-                    Debug.Log("[PhaseProtocol] USB Mode: Sent default values, waiting for server USB latency measurement");
+                    Debug.Log("[PhaseProtocol] USB Mode: Sent speedtest, waiting for server USB measurement");
                     
                     // Wait for suggested_config from Server (Server will measure USB latency)
                     _stateMachine.TryTransition(ConnectionPhase.AwaitingSuggestedConfig);
@@ -1655,6 +1655,10 @@ namespace VRWorkspace.Streaming
                     string usbVersion = networkInfo.GetString("usbVersion");
                     double usbEstimatedBandwidthMbps = networkInfo.GetDouble("usbEstimatedBandwidthMbps");
 
+                    Debug.Log($"[PhaseProtocol] *** PARSED networkInfo from server ***");
+                    Debug.Log($"[PhaseProtocol]   pingMs={pingMs}, jitterMs={jitterMs}, bandwidthMbps={bandwidthMbps}");
+                    Debug.Log($"[PhaseProtocol]   isUsbMode={isUsbMode}, usbLatencyMs={usbLatencyMs}, usbVersion={usbVersion}, usbEstimatedBandwidthMbps={usbEstimatedBandwidthMbps}");
+
                     if (pingMs > 0) _networkInfo.pingMs = pingMs;
                     if (jitterMs >= 0) _networkInfo.jitterMs = jitterMs;
                     if (bandwidthMbps > 0) _networkInfo.bandwidthMbps = bandwidthMbps;
@@ -1664,7 +1668,7 @@ namespace VRWorkspace.Streaming
                     // Handle USB Mode - set metrics with USB-specific latency info
                     if (isUsbMode)
                     {
-                        Debug.Log($"[PhaseProtocol] USB Mode detected by server:");
+                        Debug.Log($"[PhaseProtocol] *** USB Mode ACTIVATED from server ***");
                         Debug.Log($"[PhaseProtocol]   ICMP Latency: {usbLatencyMs:F2}ms (vs WebSocket ping: {pingMs:F1}ms)");
                         Debug.Log($"[PhaseProtocol]   USB Version: {usbVersion}");
                         Debug.Log($"[PhaseProtocol]   Estimated Bandwidth: {usbEstimatedBandwidthMbps:F0}Mbps");
@@ -1676,11 +1680,26 @@ namespace VRWorkspace.Streaming
                         _networkInfo.usbLatencyMs = usbLatencyMs;
                         _networkInfo.usbVersion = usbVersion;
                         _networkInfo.usbEstimatedBandwidthMbps = usbEstimatedBandwidthMbps;
+                        
+                        Debug.Log($"[PhaseProtocol] *** _networkInfo AFTER USB update ***");
+                        Debug.Log($"[PhaseProtocol]   isUsbMode={_networkInfo.isUsbMode}");
+                        Debug.Log($"[PhaseProtocol]   usbLatencyMs={_networkInfo.usbLatencyMs}");
+                        Debug.Log($"[PhaseProtocol]   usbVersion={_networkInfo.usbVersion}");
+                        Debug.Log($"[PhaseProtocol]   usbEstimatedBandwidthMbps={_networkInfo.usbEstimatedBandwidthMbps}");
                     }
+                }
+                else
+                {
+                    Debug.LogWarning("[PhaseProtocol] networkInfo object is NULL in suggested_config!");
                 }
 
                 // Fire event again so UI can update with new connectionType
+                Debug.Log($"[PhaseProtocol] *** FIRING OnNetworkInfoReceived event with USB data ***");
                 OnNetworkInfoReceived?.Invoke(_networkInfo);
+            }
+            else
+            {
+                Debug.LogWarning($"[PhaseProtocol] Skipping networkInfo update: _networkInfo={_networkInfo != null}, connectionType={connectionType}");
             }
 
             // Update selected codec based on server's decision
