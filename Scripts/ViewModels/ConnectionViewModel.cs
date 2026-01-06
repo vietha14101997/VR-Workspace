@@ -13,7 +13,7 @@ namespace VRWorkspace.ViewModels
     public enum TransportMode
     {
         WiFi,   // Default: Connect via WiFi network
-        USB     // Connect via USB ADB reverse port forwarding
+        USB     // Connect via USB Tethering
     }
 
     /// <summary>
@@ -175,16 +175,22 @@ namespace VRWorkspace.ViewModels
         }
 
         /// <summary>
-        /// Connect to server via USB (ADB reverse port forwarding).
-        /// Uses localhost:port since ADB reverse tunnel makes server accessible locally.
+        /// Connect to server via USB Tethering (full TCP+UDP over USB cable).
         /// </summary>
         /// <param name="port">Server port (default 8288)</param>
-        public async Task ConnectUSBAsync(int port = 8288)
+        /// <param name="usbTetheringIP">USB Tethering IP (required)</param>
+        public async Task ConnectUSBAsync(int port = 8288, string usbTetheringIP = null)
         {
-            _currentHost = "127.0.0.1";  // USB mode uses localhost via ADB reverse
+            if (string.IsNullOrEmpty(usbTetheringIP))
+            {
+                Debug.LogError("[ConnectionViewModel] USB Tethering IP is required for USB mode");
+                return;
+            }
+
+            _currentHost = usbTetheringIP;
             _currentPort = port;
             _transportMode = TransportMode.USB;
-            Debug.Log($"[ConnectionViewModel] Connecting via USB (localhost:{port})");
+            Debug.Log($"[ConnectionViewModel] Connecting via USB Tethering ({usbTetheringIP}:{port})");
             await ConnectCommand.ExecuteAsync();
         }
 

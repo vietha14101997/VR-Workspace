@@ -42,6 +42,7 @@ public class RTTRemoteMenu : MonoBehaviour
     private GameObject _hostInput;
     private GameObject _usbModeToggle;  // USB mode checkbox (replaces port input)
     private bool _isUsbMode = false;    // Current USB mode state
+    private string _usbTetheringIP = null;  // USB Tethering IP from QR scan (for full USB streaming)
     private const int DEFAULT_PORT = 8288;
     private GameObject _monitorsDropdown;
     private GameObject _resolutionDropdown;
@@ -98,9 +99,16 @@ public class RTTRemoteMenu : MonoBehaviour
     #endregion
 
     #region Public Accessors (Easy Form Data Access)
-    public string Host => _isUsbMode ? "127.0.0.1" : VRInputFieldFactory.GetValue(_hostInput);
+    /// <summary>
+    /// Get connection host based on mode:
+    /// - USB Mode: Use USB Tethering IP (full TCP+UDP over USB cable)
+    /// - WiFi Mode: Use manual host input
+    /// </summary>
+    public string Host => _isUsbMode && HasUsbTetheringIP ? _usbTetheringIP : VRInputFieldFactory.GetValue(_hostInput);
     public string Port => DEFAULT_PORT.ToString();
     public bool IsUsbMode => _isUsbMode;
+    public string UsbTetheringIP => _usbTetheringIP;
+    public bool HasUsbTetheringIP => !string.IsNullOrEmpty(_usbTetheringIP);
     public int MonitorIndex => VRDropdownFactory.GetSelectedIndex(_monitorsDropdown);
     public string Resolution => VRDropdownFactory.GetSelectedValue(_resolutionDropdown);
     public string Bitrate => VRDropdownFactory.GetSelectedValue(_bitrateDropdown);
@@ -266,7 +274,7 @@ public class RTTRemoteMenu : MonoBehaviour
 
     /// <summary>
     /// Create USB Mode toggle checkbox with label.
-    /// When enabled, connects to localhost:8288 via ADB reverse tunnel.
+    /// When enabled, connects via USB Tethering IP.
     /// </summary>
     private GameObject CreateUsbModeToggle(Transform parent, float width, float height)
     {
@@ -355,9 +363,9 @@ public class RTTRemoteMenu : MonoBehaviour
         statusRT.offsetMax = Vector2.zero;
 
         var statusTMP = statusObj.AddComponent<TextMeshProUGUI>();
-        statusTMP.text = "Cable via ADB";
+        statusTMP.text = "USB Tethering";
         statusTMP.fontSize = INPUT_FONT_SIZE * 0.85f;
-        statusTMP.color = new Color(0.6f, 0.6f, 0.6f);
+        statusTMP.color = themeColor;
         statusTMP.alignment = TextAlignmentOptions.Left;
         statusTMP.verticalAlignment = VerticalAlignmentOptions.Middle;
         statusTMP.raycastTarget = false;
@@ -374,7 +382,7 @@ public class RTTRemoteMenu : MonoBehaviour
         _isUsbMode = !_isUsbMode;
         UpdateUsbModeToggleVisual();
 
-        // When USB mode is enabled, disable host input (will use localhost)
+        // When USB mode is enabled, disable host input (will use USB Tethering IP)
         VRInputFieldFactory.SetInteractable(_hostInput, !_isUsbMode);
 
         Debug.Log($"[RTTRemoteMenu] USB Mode: {_isUsbMode}");
@@ -398,7 +406,7 @@ public class RTTRemoteMenu : MonoBehaviour
         var statusTMP = _usbModeToggle.transform.Find("ToggleContainer/Status")?.GetComponent<TextMeshProUGUI>();
         if (statusTMP != null)
         {
-            statusTMP.color = _isUsbMode ? themeColor : new Color(0.6f, 0.6f, 0.6f);
+            statusTMP.color = themeColor;  // Always bright
         }
 
         // Update background alpha based on state
@@ -409,6 +417,29 @@ public class RTTRemoteMenu : MonoBehaviour
             if (img != null && img.material != null)
             {
                 img.material.SetFloat("_GlassAlpha", _isUsbMode ? 0.35f : 0.15f);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Update USB mode label to show USB Tethering IP.
+    /// </summary>
+    private void UpdateUsbModeLabel()
+    {
+        if (_usbModeToggle == null) return;
+
+        var statusTMP = _usbModeToggle.transform.Find("ToggleContainer/Status")?.GetComponent<TextMeshProUGUI>();
+        if (statusTMP != null)
+        {
+            if (!string.IsNullOrEmpty(_usbTetheringIP))
+            {
+                statusTMP.text = $"USB: {_usbTetheringIP}";
+                statusTMP.color = _isUsbMode ? themeColor : new Color(0.4f, 0.8f, 0.4f);  // Green tint
+            }
+            else
+            {
+                statusTMP.text = "USB Tethering";
+                statusTMP.color = themeColor;  // Always bright
             }
         }
     }
@@ -521,10 +552,16 @@ public class RTTRemoteMenu : MonoBehaviour
         {
             case ConnectionPhase.Disconnected:
             case ConnectionPhase.Error:
-                // USB Mode: Use localhost via ADB reverse tunnel
+                // USB Mode: Requires USB Tethering IP from QR scan
                 if (_isUsbMode)
                 {
-                    Debug.Log("[RTTRemoteMenu] Connecting via USB mode...");
+                    if (!HasUsbTetheringIP)
+                    {
+                        Debug.LogWarning("[RTTRemoteMenu] USB mode requires USB Tethering. Scan QR code first.");
+                        return;
+                    }
+
+                    Debug.Log($"[RTTRemoteMenu] Connecting via USB Tethering ({_usbTetheringIP})...");
                     UpdateButtonText("CONNECTING...");
 
                     // Lock inputs during connection
@@ -532,7 +569,7 @@ public class RTTRemoteMenu : MonoBehaviour
                     SetUsbToggleInteractable(false);
                     VRButtonFactory.SetInteractable(_qrButton, false);
 
-                    await _viewModel.ConnectUSBAsync(DEFAULT_PORT);
+                    await _viewModel.ConnectUSBAsync(DEFAULT_PORT, _usbTetheringIP);
                     break;
                 }
 
@@ -1868,9 +1905,18 @@ public class RTTRemoteMenu : MonoBehaviour
     {
         if (config == null) return;
 
-        // Host (Port is fixed at 8288)
-        if (!string.IsNullOrEmpty(config.host))
-            VRInputFieldFactory.SetValue(_hostInput, config.host);
+        // Host (Port is fixed at 8288) - use GetHost() to support both "host" and "ip" fields
+        var hostValue = config.GetHost();
+        if (!string.IsNullOrEmpty(hostValue))
+            VRInputFieldFactory.SetValue(_hostInput, hostValue);
+
+        // USB Tethering IP (for full TCP+UDP over USB cable)
+        if (config.HasUsbTetheringIP)
+        {
+            _usbTetheringIP = config.usbIP;
+            Debug.Log($"[RTTRemoteMenu] USB Tethering IP from QR: {_usbTetheringIP}");
+            UpdateUsbModeLabel();
+        }
 
         // Note: Port from QR is ignored - using fixed DEFAULT_PORT (8288)
 

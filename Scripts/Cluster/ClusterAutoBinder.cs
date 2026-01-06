@@ -12,7 +12,7 @@ using VRWorkspace.ViewModels;
 public enum ConnectionMode
 {
     WiFi,   // Connect via WiFi (requires QR code scan or manual IP)
-    USB     // Connect via USB ADB reverse port forwarding (localhost)
+    USB     // Connect via USB Tethering
 }
 
 /// <summary>
@@ -48,7 +48,7 @@ public class ClusterAutoBinder : MonoBehaviour
     public bool autoStart = false;
 
     [Header("Connection Mode")]
-    [Tooltip("USB mode uses localhost via ADB reverse port forwarding (more stable, lower latency)")]
+    [Tooltip("USB mode uses USB Tethering (more stable, lower latency)")]
     public ConnectionMode connectionMode = ConnectionMode.WiFi;
 
     [Tooltip("Port for USB mode (default 8288)")]
@@ -205,11 +205,30 @@ public class ClusterAutoBinder : MonoBehaviour
     }
 
     /// <summary>
-    /// Connect to server via USB (ADB reverse port forwarding).
+    /// Connect to server via USB Tethering.
     /// More stable and lower latency than WiFi.
+    /// NOTE: This requires USB Tethering IP to be set. Use ConnectUSBAsync(usbTetheringIP) instead.
     /// </summary>
+    [System.Obsolete("Use ConnectUSBAsync(string usbTetheringIP) instead")]
     public async Task<bool> ConnectUSBAsync()
     {
+        Debug.LogError("[ClusterAutoBinder] USB mode requires USB Tethering IP. Use ConnectUSBAsync(usbTetheringIP) instead.");
+        return false;
+    }
+
+    /// <summary>
+    /// Connect to server via USB Tethering.
+    /// More stable and lower latency than WiFi.
+    /// </summary>
+    /// <param name="usbTetheringIP">USB Tethering IP (e.g., 192.168.42.1)</param>
+    public async Task<bool> ConnectUSBAsync(string usbTetheringIP)
+    {
+        if (string.IsNullOrEmpty(usbTetheringIP))
+        {
+            Debug.LogError("[ClusterAutoBinder] USB Tethering IP is required");
+            return false;
+        }
+
         // Ensure ViewModel is initialized
         if (_viewModel == null) InitializeViewModel();
 
@@ -220,15 +239,12 @@ public class ClusterAutoBinder : MonoBehaviour
             return false;
         }
 
-        Debug.Log($"[ClusterAutoBinder] Connecting to server via USB (localhost:{usbPort})...");
-
-        // For USB mode, we don't need server validation - ADB reverse handles connectivity
-        // If the tunnel isn't set up, connection will fail directly
+        Debug.Log($"[ClusterAutoBinder] Connecting to server via USB Tethering ({usbTetheringIP}:{usbPort})...");
 
         try
         {
-            // Connect via ViewModel (USB mode)
-            await _viewModel.ConnectUSBAsync(usbPort);
+            // Connect via ViewModel (USB Tethering mode)
+            await _viewModel.ConnectUSBAsync(usbPort, usbTetheringIP);
 
             // Wait for config phase (Phase 1 complete)
             return await WaitForConfigPhaseAsync();
@@ -236,7 +252,7 @@ public class ClusterAutoBinder : MonoBehaviour
         catch (Exception ex)
         {
             Debug.LogError($"[ClusterAutoBinder] USB connection failed: {ex.Message}");
-            _viewModel.ErrorMessage.Value = $"USB connection failed. Ensure USB Debugging is enabled and ADB reverse is set up.\n{ex.Message}";
+            _viewModel.ErrorMessage.Value = $"USB connection failed. Ensure USB Tethering is enabled.\n{ex.Message}";
             return false;
         }
     }
