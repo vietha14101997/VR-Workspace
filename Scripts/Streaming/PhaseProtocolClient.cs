@@ -1595,12 +1595,35 @@ namespace VRWorkspace.Streaming
                     double pingMs = networkInfo.GetDouble("pingMs");
                     double jitterMs = networkInfo.GetDouble("jitterMs");
                     double bandwidthMbps = networkInfo.GetDouble("bandwidthMbps");
+                    
+                    // Parse USB-specific fields
+                    bool isUsbMode = networkInfo.GetBool("isUsbMode");
+                    double usbLatencyMs = networkInfo.GetDouble("usbLatencyMs");
+                    string usbVersion = networkInfo.GetString("usbVersion");
+                    double usbEstimatedBandwidthMbps = networkInfo.GetDouble("usbEstimatedBandwidthMbps");
 
                     if (pingMs > 0) _networkInfo.pingMs = pingMs;
                     if (jitterMs >= 0) _networkInfo.jitterMs = jitterMs;
                     if (bandwidthMbps > 0) _networkInfo.bandwidthMbps = bandwidthMbps;
 
                     Debug.Log($"[PhaseProtocol] Updated networkInfo from server: {pingMs:F1}ms, {bandwidthMbps:F1}Mbps");
+                    
+                    // Handle USB Mode - set metrics with USB-specific latency info
+                    if (isUsbMode)
+                    {
+                        Debug.Log($"[PhaseProtocol] USB Mode detected by server:");
+                        Debug.Log($"[PhaseProtocol]   ICMP Latency: {usbLatencyMs:F2}ms (vs WebSocket ping: {pingMs:F1}ms)");
+                        Debug.Log($"[PhaseProtocol]   USB Version: {usbVersion}");
+                        Debug.Log($"[PhaseProtocol]   Estimated Bandwidth: {usbEstimatedBandwidthMbps:F0}Mbps");
+                        
+                        _metrics.SetUsbMode(true, usbLatencyMs, usbVersion, usbEstimatedBandwidthMbps);
+                        
+                        // Store USB info in network result for UI
+                        _networkInfo.isUsbMode = true;
+                        _networkInfo.usbLatencyMs = usbLatencyMs;
+                        _networkInfo.usbVersion = usbVersion;
+                        _networkInfo.usbEstimatedBandwidthMbps = usbEstimatedBandwidthMbps;
+                    }
                 }
 
                 // Fire event again so UI can update with new connectionType

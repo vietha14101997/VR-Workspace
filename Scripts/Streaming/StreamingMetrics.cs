@@ -92,6 +92,20 @@ namespace VRWorkspace.Streaming
         /// <summary>True if connection is detected as WiFi (used for threshold adjustment).</summary>
         public bool IsWiFiConnection { get; set; }
 
+        // === USB Mode (RNDIS Tethering) ===
+
+        /// <summary>True if connection is via USB Tethering (RNDIS). Expects very low latency.</summary>
+        public bool IsUsbMode { get; private set; }
+
+        /// <summary>USB-specific ICMP latency in milliseconds (typically < 1ms).</summary>
+        public double UsbLatencyMs { get; private set; }
+
+        /// <summary>USB interface version: "USB 2.0", "USB 3.0", or null.</summary>
+        public string UsbVersion { get; private set; }
+
+        /// <summary>Estimated bandwidth for USB mode in Mbps.</summary>
+        public double UsbEstimatedBandwidthMbps { get; private set; }
+
         // === Connection Health ===
 
         /// <summary>Connection health score (0-100). Below 30 is critical.</summary>
@@ -266,6 +280,28 @@ namespace VRWorkspace.Streaming
         }
 
         /// <summary>
+        /// Set USB mode information received from server.
+        /// USB mode has different latency expectations (< 1ms typical).
+        /// </summary>
+        /// <param name="isUsbMode">True if USB tethering detected.</param>
+        /// <param name="usbLatencyMs">USB ICMP latency in ms.</param>
+        /// <param name="usbVersion">USB interface version.</param>
+        /// <param name="usbBandwidthMbps">Estimated USB bandwidth.</param>
+        public void SetUsbMode(bool isUsbMode, double usbLatencyMs = 0, string usbVersion = null, double usbBandwidthMbps = 0)
+        {
+            IsUsbMode = isUsbMode;
+            UsbLatencyMs = usbLatencyMs;
+            UsbVersion = usbVersion;
+            UsbEstimatedBandwidthMbps = usbBandwidthMbps;
+
+            if (isUsbMode)
+            {
+                ConnectionType = "USB";
+                UnityEngine.Debug.Log($"[StreamingMetrics] USB Mode: latency={usbLatencyMs:F2}ms, version={usbVersion}, bandwidth={usbBandwidthMbps}Mbps");
+            }
+        }
+
+        /// <summary>
         /// Update buffer status estimation.
         /// </summary>
         /// <param name="fullness">Buffer fullness from 0.0 (empty) to 1.0 (full).</param>
@@ -397,8 +433,9 @@ namespace VRWorkspace.Streaming
         /// </summary>
         public override string ToString()
         {
+            string usbInfo = IsUsbMode ? $", USB: {UsbLatencyMs:F2}ms ({UsbVersion})" : "";
             return $"Ping: {CurrentPingMs:F1}ms (avg: {AveragePingMs:F1}ms), Jitter: {JitterMs:F1}ms, " +
-                   $"Latency: {FrameLatencyMs:F1}ms, Health: {HealthScore}%";
+                   $"Latency: {FrameLatencyMs:F1}ms, Health: {HealthScore}%{usbInfo}";
         }
     }
 }

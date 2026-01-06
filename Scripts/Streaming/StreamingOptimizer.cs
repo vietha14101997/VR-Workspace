@@ -75,7 +75,20 @@ namespace VRWorkspace.Streaming
         public double pingMs;
         public double jitterMs;
         public double bandwidthMbps;
-        public string connectionType; // LAN, WiFi, Internet
+        public string connectionType; // LAN, WiFi, Internet, USB
+
+        // USB Tethering (RNDIS) specific fields
+        /// <summary>True if connection is via USB Tethering.</summary>
+        public bool isUsbMode;
+
+        /// <summary>USB-specific ICMP latency in ms (typically < 1ms).</summary>
+        public double usbLatencyMs;
+
+        /// <summary>USB interface version: "USB 2.0" or "USB 3.0".</summary>
+        public string usbVersion;
+
+        /// <summary>Estimated bandwidth for USB mode in Mbps.</summary>
+        public double usbEstimatedBandwidthMbps;
     }
 
     /// <summary>
