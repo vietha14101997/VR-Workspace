@@ -1363,7 +1363,7 @@ namespace VRWorkspace.Streaming
                 // Server will measure actual USB latency using ICMP ping to gateway
                 if (_isUsbMode)
                 {
-                    Debug.Log("[PhaseProtocol] USB Mode: Skipping WebSocket speedtest, using USB defaults");
+                    Debug.Log("[PhaseProtocol] USB Mode: Skipping WebSocket speedtest, using USB defaults [BUILD 2026-01-06 v2]");
                     
                     // Use default USB values - server will provide accurate ICMP latency later
                     _networkInfo = new NetworkTestResult
