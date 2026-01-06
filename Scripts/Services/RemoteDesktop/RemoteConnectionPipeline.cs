@@ -17,7 +17,9 @@ public class RemoteConnectionPipeline : MonoBehaviour
 
     #region Events
     public event System.Action<bool> OnConnectionStatusChanged;
+#pragma warning disable CS0067 // Event is never used - exposed for external subscribers
     public event System.Action<string> OnConnectionError;
+#pragma warning restore CS0067
     #endregion
 
     #region Properties

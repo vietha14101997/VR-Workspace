@@ -214,13 +214,9 @@ public class RTTRemoteMenuController : MonoBehaviour
         var panels = _clusterRig.panels;
         if (panels == null || panels.Count == 0) return;
 
-        // Debug log (throttled)
-        bool shouldLog = Time.time - _lastMipmapDebugTime > MIPMAP_DEBUG_INTERVAL;
-        if (shouldLog)
-        {
-            _lastMipmapDebugTime = Time.time;
-            Debug.Log($"[RTTRemote-MIPMAP] Polling {panels.Count} panels, phase={phase}");
-        }
+        // Debug log disabled to reduce RAM usage
+        // Set PhaseProtocolClient.VerboseLogging = true to enable
+        bool shouldLog = false; // Time.time - _lastMipmapDebugTime > MIPMAP_DEBUG_INTERVAL;
 
         for (int i = 0; i < panels.Count; i++)
         {

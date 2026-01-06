@@ -263,7 +263,7 @@ public class RTTRemoteMenu : MonoBehaviour
         _hostInput = VRInputFieldFactory.CreateLabeledInputField(
             row.transform, hostW,
             "Host", "192.168.1.7", accentColor,
-            onEndEdit: (value) => Debug.Log("Host: " + value),
+            onEndEdit: null,
             labelFontSize: LABEL_FONT_SIZE, inputFontSize: INPUT_FONT_SIZE, font: customFont);
         PositionElement(_hostInput, 0, 0);
 
@@ -473,7 +473,7 @@ public class RTTRemoteMenu : MonoBehaviour
             grid.transform, cellW,
             "Resolution", LoadIcon("resolution"), accentColor,
             resolutionOptions, 3,
-            onValueChanged: (index, value) => Debug.Log("Resolution: " + value),
+            onValueChanged: null,
             labelFontSize: DROPDOWN_LABEL_FONT_SIZE, valueFontSize: DROPDOWN_VALUE_FONT_SIZE, font: customFont);
         PositionElement(_resolutionDropdown, cellW + gapX, row1Y);
 
@@ -482,7 +482,7 @@ public class RTTRemoteMenu : MonoBehaviour
             grid.transform, cellW,
             "Bitrate", LoadIcon("bitrate"), accentColor,
             bitrateOptions, 2,
-            onValueChanged: (index, value) => Debug.Log("Bitrate: " + value),
+            onValueChanged: null,
             labelFontSize: DROPDOWN_LABEL_FONT_SIZE, valueFontSize: DROPDOWN_VALUE_FONT_SIZE, font: customFont);
         PositionElement(_bitrateDropdown, 0, 0);
 
@@ -490,7 +490,7 @@ public class RTTRemoteMenu : MonoBehaviour
             grid.transform, cellW,
             "FPS", LoadIcon("fps"), themeColor,
             fpsOptions, 2,
-            onValueChanged: (index, value) => Debug.Log("FPS: " + value),
+            onValueChanged: null,
             labelFontSize: DROPDOWN_LABEL_FONT_SIZE, valueFontSize: DROPDOWN_VALUE_FONT_SIZE, font: customFont);
         PositionElement(_fpsDropdown, cellW + gapX, 0);
     }

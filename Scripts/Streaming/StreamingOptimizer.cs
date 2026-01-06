@@ -92,6 +92,7 @@ namespace VRWorkspace.Streaming
         public int refreshRate = 60;
         public string reason;
         public string selectedCodec = "H264";  // Codec negotiated for streaming
+        public string connectionType = "Unknown";  // USB, WiFi, LAN, Internet
     }
 
     /// <summary>
@@ -315,6 +316,11 @@ namespace VRWorkspace.Streaming
         /// </summary>
         public static string GetConnectionQuality(NetworkTestResult network)
         {
+            // USB connection is always excellent quality (stable, high bandwidth potential)
+            // TCP speedtest can't measure true USB 3.0 bandwidth, but UDP streaming can use it
+            if (network.connectionType == "USB")
+                return "Excellent (USB)";
+
             if (network.pingMs < 5 && network.bandwidthMbps > 500)
                 return "Excellent (LAN)";
             if (network.pingMs < 20 && network.bandwidthMbps > 100)

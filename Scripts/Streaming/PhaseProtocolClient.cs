@@ -17,6 +17,9 @@ namespace VRWorkspace.Streaming
     /// </summary>
     public class PhaseProtocolClient : IDisposable
     {
+        // Logging control - set to false to reduce RAM usage from frequent logs
+        public static bool VerboseLogging = false;
+
         // Connection
         private ClientWebSocket _ws;
         private CancellationTokenSource _cts;
@@ -768,7 +771,8 @@ namespace VRWorkspace.Streaming
                         : 0;
                     float avgFps = totalSeconds > 0 ? (float)(wrapper.TotalFramesReceived / totalSeconds) : 0;
 
-                    Debug.Log($"[Decode FPS] Mon{wrapper.Index}: {effectiveFps:F1} fps (window), total={wrapper.TotalFramesReceived} frames in {totalSeconds:F1}s = {avgFps:F1} avg fps");
+                    if (VerboseLogging)
+                        Debug.Log($"[Decode FPS] Mon{wrapper.Index}: {effectiveFps:F1} fps (window), total={wrapper.TotalFramesReceived} frames in {totalSeconds:F1}s = {avgFps:F1} avg fps");
 
                     // Reset window
                     ResetFpsWindow(wrapper);
@@ -993,79 +997,62 @@ namespace VRWorkspace.Streaming
                     var json = SimpleJson.Parse(text);
                     // Handle both "type" (camelCase) and "Type" (PascalCase) from server
                     var type = json.GetString("type") ?? json.GetString("Type");
-                    if (type != "cursor_position")
-                        Debug.Log($"[PhaseProtocol] Parsed type='{type}' from message len={text.Length}");
 
                     switch (type)
                     {
                         case "hardware_info":
-                            Debug.Log("[PhaseProtocol] >>> Handling hardware_info");
                             await HandleHardwareInfoAsync(json);
                             break;
 
                         case "speedtest_start":
-                            Debug.Log("[PhaseProtocol] >>> Handling speedtest_start");
                             await HandleSpeedTestStartAsync(json);
                             break;
 
                         case "speedtest_end":
-                            Debug.Log("[PhaseProtocol] >>> Handling speedtest_end");
                             await HandleSpeedTestEndAsync(json);
                             break;
 
                         case "network_info":
-                            Debug.Log("[PhaseProtocol] >>> Handling network_info");
                             HandleNetworkInfo(json);
                             break;
 
                         case "suggested_config":
-                            Debug.Log("[PhaseProtocol] >>> Handling suggested_config");
                             HandleSuggestedConfig(json);
                             break;
 
                         case "config_progress":
-                            Debug.Log("[PhaseProtocol] >>> Handling config_progress");
                             HandleConfigProgress(json);
                             break;
 
                         case "config_complete":
-                            Debug.Log("[PhaseProtocol] >>> Handling config_complete");
                             await HandleConfigCompleteAsync(json);
-                            Debug.Log("[PhaseProtocol] <<< Finished config_complete");
                             break;
 
                         case "answer":
-                            // Fire-and-forget (like browser) - don't block message loop
                             _ = HandleAnswerAsync(json);
                             break;
 
                         case "candidate":
-                            // Synchronous, minimal logging
                             HandleCandidate(json);
                             break;
 
                         case "end_of_candidates":
-                            Debug.Log("[PhaseProtocol] >>> Handling end_of_candidates");
                             HandleEndOfCandidates(json);
                             break;
 
                         case "ice_ready":
-                            Debug.Log("[PhaseProtocol] >>> Handling ice_ready");
                             HandleIceReady(json);
                             break;
 
                         case "streaming_started":
-                            Debug.Log("[PhaseProtocol] >>> Handling streaming_started");
                             HandleStreamingStarted(json);
                             break;
 
                         case "cursor_position":
-                            // Don't log every cursor update (too noisy)
                             HandleCursorPosition(json);
                             break;
 
                         case "error":
-                            Debug.Log("[PhaseProtocol] >>> Handling error");
                             HandleError(json);
                             break;
 
@@ -1578,6 +1565,9 @@ namespace VRWorkspace.Streaming
 
             var resolution = json.GetObject("resolution");
 
+            // Parse connectionType from server (USB, WiFi, LAN, Internet)
+            string connectionType = json.GetString("connectionType") ?? "Unknown";
+
             _suggestedConfig = new SuggestedStreamConfig
             {
                 monitors = json.GetInt("monitors"),
@@ -1587,8 +1577,35 @@ namespace VRWorkspace.Streaming
                 fps = json.GetInt("fps"),
                 refreshRate = json.GetInt("refreshRate"),
                 reason = json.GetString("reason") ?? "",
-                selectedCodec = json.GetString("selectedCodec") ?? "H264"
+                selectedCodec = json.GetString("selectedCodec") ?? "H264",
+                connectionType = connectionType
             };
+
+            // Update _networkInfo.connectionType with server's transport type
+            // Server knows if we're on USB tethering, which TCP speedtest can't detect
+            if (_networkInfo != null && !string.IsNullOrEmpty(connectionType) && connectionType != "Unknown")
+            {
+                _networkInfo.connectionType = connectionType;
+                Debug.Log($"[PhaseProtocol] Updated networkInfo.connectionType to: {connectionType}");
+
+                // Also update network info from server if provided (more accurate)
+                var networkInfo = json.GetObject("networkInfo");
+                if (networkInfo != null)
+                {
+                    double pingMs = networkInfo.GetDouble("pingMs");
+                    double jitterMs = networkInfo.GetDouble("jitterMs");
+                    double bandwidthMbps = networkInfo.GetDouble("bandwidthMbps");
+
+                    if (pingMs > 0) _networkInfo.pingMs = pingMs;
+                    if (jitterMs >= 0) _networkInfo.jitterMs = jitterMs;
+                    if (bandwidthMbps > 0) _networkInfo.bandwidthMbps = bandwidthMbps;
+
+                    Debug.Log($"[PhaseProtocol] Updated networkInfo from server: {pingMs:F1}ms, {bandwidthMbps:F1}Mbps");
+                }
+
+                // Fire event again so UI can update with new connectionType
+                OnNetworkInfoReceived?.Invoke(_networkInfo);
+            }
 
             // Update selected codec based on server's decision
             _selectedCodec = _suggestedConfig.selectedCodec.ToUpperInvariant() switch
@@ -1601,6 +1618,7 @@ namespace VRWorkspace.Streaming
 
             Debug.Log($"[PhaseProtocol] Suggested: {_suggestedConfig.monitors}mon @ {_suggestedConfig.resolutionWidth}x{_suggestedConfig.resolutionHeight}, {_suggestedConfig.fps}fps, {_suggestedConfig.bitrateKbps}kbps");
             Debug.Log($"[PhaseProtocol] Selected codec: {_suggestedConfig.selectedCodec}");
+            Debug.Log($"[PhaseProtocol] Connection type: {connectionType}");
             Debug.Log($"[PhaseProtocol] Reason: {_suggestedConfig.reason}");
 
             // Handle race condition: suggested_config may arrive while still in SpeedTesting phase
@@ -3184,7 +3202,8 @@ namespace VRWorkspace.Streaming
                     if (!inFallbackMode)
                     {
                         // Mode 1: TexturePtrDetection works - use real frames for reliable freeze detection
-                        Debug.Log($"[PhaseProtocol] Freeze check (ptr mode): server +{serverFrameAdvance}, client real +{realFrameAdvance}, loss={_metrics.PacketLossRate:P1}");
+                        if (VerboseLogging)
+                            Debug.Log($"[PhaseProtocol] Freeze check (ptr mode): server +{serverFrameAdvance}, client real +{realFrameAdvance}, loss={_metrics.PacketLossRate:P1}");
 
                         // Freeze detected: server advanced many frames but client decoded none
                         if (serverFrameAdvance >= DecoderFreezeThresholdFrames && realFrameAdvance < 5)
@@ -3193,7 +3212,8 @@ namespace VRWorkspace.Streaming
                             // The network will recover naturally once adaptive bitrate reduces quality
                             if (_isWiFiConnection && _metrics.PacketLossRate > 0.30f)
                             {
-                                Debug.Log($"[PhaseProtocol] Freeze check SKIP: High packet loss ({_metrics.PacketLossRate:P0}), waiting for ABR adjustment");
+                                if (VerboseLogging)
+                                    Debug.Log($"[PhaseProtocol] Freeze check SKIP: High packet loss ({_metrics.PacketLossRate:P0}), waiting for ABR adjustment");
                             }
                             else
                             {
@@ -3205,12 +3225,12 @@ namespace VRWorkspace.Streaming
                                 // Repeated freeze within short time -> RequestKeyframe (force fresh IDR)
                                 if (_freezeCount <= 1)
                                 {
-                                    Debug.Log($"[PhaseProtocol] Response: SkipToLive (light recovery)");
+                                    if (VerboseLogging) Debug.Log($"[PhaseProtocol] Response: SkipToLive (light recovery)");
                                     SkipToLive(-1);
                                 }
                                 else
                                 {
-                                    Debug.Log($"[PhaseProtocol] Response: RequestKeyframe (heavy recovery, freeze #{_freezeCount})");
+                                    if (VerboseLogging) Debug.Log($"[PhaseProtocol] Response: RequestKeyframe (heavy recovery, freeze #{_freezeCount})");
                                     RequestKeyframe(-1);
                                     // Reset freeze count after heavy recovery
                                     if (_freezeCount >= 3)
@@ -3224,7 +3244,7 @@ namespace VRWorkspace.Streaming
                             // Good frame flow, reset freeze count
                             if (_freezeCount > 0)
                             {
-                                Debug.Log($"[PhaseProtocol] Freeze recovery confirmed, resetting freeze count (was {_freezeCount})");
+                                if (VerboseLogging) Debug.Log($"[PhaseProtocol] Freeze recovery confirmed, resetting freeze count (was {_freezeCount})");
                                 _freezeCount = 0;
                             }
                         }
@@ -3232,12 +3252,13 @@ namespace VRWorkspace.Streaming
                     else
                     {
                         // Mode 2: Fallback mode - can't detect real frames, use preventive keyframes
-                        Debug.Log($"[PhaseProtocol] Freeze check (fallback mode): server +{serverFrameAdvance}, interval={PreventiveKeyframeIntervalSeconds:F0}s");
+                        if (VerboseLogging)
+                            Debug.Log($"[PhaseProtocol] Freeze check (fallback mode): server +{serverFrameAdvance}, interval={PreventiveKeyframeIntervalSeconds:F0}s");
 
                         var timeSinceLastPreventive = (DateTime.UtcNow - _lastPreventiveKeyframeTime).TotalSeconds;
                         if (timeSinceLastPreventive >= PreventiveKeyframeIntervalSeconds)
                         {
-                            Debug.Log($"[PhaseProtocol] Fallback mode: Sending preventive keyframe request (last was {timeSinceLastPreventive:F0}s ago)");
+                            if (VerboseLogging) Debug.Log($"[PhaseProtocol] Fallback mode: Sending preventive keyframe request (last was {timeSinceLastPreventive:F0}s ago)");
                             RequestKeyframe(-1); // Request keyframe for all monitors
                             _lastPreventiveKeyframeTime = DateTime.UtcNow;
                         }
@@ -3601,8 +3622,8 @@ namespace VRWorkspace.Streaming
                         var track = wrapper.VideoTrack;
                         var tex = track?.Texture;
 
-                        // Debug log periodically (every ~60 polls for first PC only)
-                        if (wrapper.Index == 0 && _pollCount % 60 == 1)
+                        // Debug log periodically (every ~60 polls for first PC only) - disabled by default
+                        if (VerboseLogging && wrapper.Index == 0 && _pollCount % 60 == 1)
                         {
                             var timeSinceFrame = wrapper.LastFrameTime != default
                                 ? (DateTime.UtcNow - wrapper.LastFrameTime).TotalMilliseconds
@@ -3630,15 +3651,16 @@ namespace VRWorkspace.Streaming
                                     wrapper.RealFrameCount++; // Real frame for freeze detection
                                     wrapper.TexturePtrDetectionWorking = true; // Detection method confirmed working
 
-                                    // Debug log first 10 frames and every 300 frames after
-                                    if (wrapper.FrameCount <= 10 || wrapper.FrameCount % 300 == 0)
+                                    // Debug log first 10 frames and every 300 frames after - disabled by default
+                                    if (VerboseLogging && (wrapper.FrameCount <= 10 || wrapper.FrameCount % 300 == 0))
                                     {
                                         Debug.Log($"[PhaseProtocol] PC{wrapper.Index} texture ptr CHANGED: {wrapper.LastTexturePtr:X} -> {currentPtr:X}, frames={wrapper.FrameCount}");
                                     }
                                 }
                                 else
                                 {
-                                    Debug.Log($"[PhaseProtocol] PC{wrapper.Index} first texture ptr: {currentPtr:X}");
+                                    if (VerboseLogging)
+                                        Debug.Log($"[PhaseProtocol] PC{wrapper.Index} first texture ptr: {currentPtr:X}");
                                     wrapper.FirstTextureTime = DateTime.UtcNow;
                                 }
                                 wrapper.LastTexturePtr = currentPtr;

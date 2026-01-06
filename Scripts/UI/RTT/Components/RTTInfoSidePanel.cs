@@ -452,6 +452,15 @@ public class RTTInfoSidePanel : MonoBehaviour
     #region Helpers
     private string GetNetworkQuality(NetworkTestResult info)
     {
+        // USB connection is always excellent quality (stable, high bandwidth potential)
+        // TCP speedtest can't measure true USB 3.0 bandwidth, but UDP streaming can use it
+        if (info.connectionType == "USB")
+            return "Excellent";
+
+        // LAN connections with very low ping
+        if (info.pingMs < 5 && info.bandwidthMbps > 500)
+            return "Excellent";
+
         if (info.pingMs < 20 && info.bandwidthMbps > 100) return "Excellent";
         if (info.pingMs < 50 && info.bandwidthMbps > 50) return "Good";
         if (info.pingMs < 100 && info.bandwidthMbps > 20) return "Fair";
