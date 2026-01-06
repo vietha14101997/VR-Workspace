@@ -1425,13 +1425,18 @@ namespace VRWorkspace.Streaming
         /// </summary>
         private async Task SendSpeedTestResultAsync(double pingMs, double jitterMs, double bandwidthMbps)
         {
-            // Use InvariantCulture to ensure decimal point '.' instead of comma ','
-            var json = string.Format(
-                System.Globalization.CultureInfo.InvariantCulture,
-                "{{\"type\":\"speedtest_result\",\"bandwidthMbps\":{0:F1},\"pingMs\":{1:F1},\"jitterMs\":{2:F1}}}",
-                bandwidthMbps, pingMs, jitterMs);
+            // Use explicit ToString with InvariantCulture for each value
+            // This is more reliable on Android IL2CPP than string.Format with format specifiers
+            var culture = System.Globalization.CultureInfo.InvariantCulture;
+            var bwStr = bandwidthMbps.ToString("F1", culture);
+            var pingStr = pingMs.ToString("F1", culture);
+            var jitterStr = jitterMs.ToString("F1", culture);
+            
+            var json = "{\"type\":\"speedtest_result\",\"bandwidthMbps\":" + bwStr + 
+                       ",\"pingMs\":" + pingStr + 
+                       ",\"jitterMs\":" + jitterStr + "}";
             await SendTextAsync(json);
-            Debug.Log($"[PhaseProtocol] Sent speedtest_result: {bandwidthMbps:F1}Mbps, {pingMs:F1}ms");
+            Debug.Log($"[PhaseProtocol] Sent speedtest_result: {bwStr}Mbps, {pingStr}ms, jitter={jitterStr}ms");
         }
 
         /// <summary>
