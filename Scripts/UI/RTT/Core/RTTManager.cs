@@ -8,6 +8,9 @@ using VRWorkspace.Utils;
 using VRWorkspace.Streaming;
 using VRWorkspace.Core;
 using VRWorkspace.ViewModels;
+#if UNITY_ANDROID && !UNITY_EDITOR
+using Google.XR.Cardboard;
+#endif
 
 /// <summary>
 /// Unified RTT Manager - consolidates RTTManager, RTTMenuManager, and RTTAppManager.
@@ -93,6 +96,12 @@ public class RTTManager : MonoBehaviour
 
     [Header("Auto Init")]
     [SerializeField] private bool autoShowMainMenu = true;
+
+    [Header("Auto Recenter")]
+    [Tooltip("Automatically recenter objects in front of user when app starts")]
+    [SerializeField] private bool autoRecenterOnStart = true;
+    [Tooltip("Delay in seconds before auto-recenter (allows camera tracking to stabilize)")]
+    [SerializeField] private float autoRecenterDelay = 0.5f;
     #endregion
 
     #region Panel Management Fields
@@ -115,6 +124,7 @@ public class RTTManager : MonoBehaviour
     // Persistent Main Menu - created once, never destroyed
     private GameObject _mainMenuContent;
     private bool _mainMenuInitialized = false;
+    private bool _hasAutoRecentered = false;
     #endregion
 
     #region App Lifecycle Fields
@@ -306,6 +316,115 @@ public class RTTManager : MonoBehaviour
         // Create the Main Menu once - it will never be destroyed
         CreatePersistentMainMenu();
         Debug.Log("[RTTManager] Main Menu initialized (persistent, cannot be closed)");
+
+        // Auto-recenter after camera stabilizes
+        if (autoRecenterOnStart && !_hasAutoRecentered)
+        {
+            StartCoroutine(AutoRecenterRoutine());
+        }
+    }
+
+    /// <summary>
+    /// Auto-recenter routine that waits for camera to stabilize then recenters all objects.
+    /// No visual countdown - performs instant recenter.
+    /// </summary>
+    private IEnumerator AutoRecenterRoutine()
+    {
+        // Wait for camera tracking to stabilize
+        yield return new WaitForSeconds(autoRecenterDelay);
+
+        // Perform instant recenter
+        PerformInstantRecenter();
+        _hasAutoRecentered = true;
+
+        Debug.Log("[RTTManager] Auto-recenter completed");
+    }
+
+    /// <summary>
+    /// Perform instant recenter without animation.
+    /// Moves all VirtualObjects to face the camera.
+    /// Also calls Cardboard API Recenter on Android to reset headset tracking.
+    /// </summary>
+    public void PerformInstantRecenter()
+    {
+        // Call Cardboard API Recenter on Android to reset headset tracking
+#if UNITY_ANDROID && !UNITY_EDITOR
+        try
+        {
+            Api.Recenter();
+            Debug.Log("[RTTManager] Cardboard API Recenter called");
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[RTTManager] Cardboard Recenter failed: {e.Message}");
+        }
+#endif
+
+        Camera cam = Camera.main;
+        if (cam == null) return;
+
+        // Find VirtualObjects parent
+        GameObject virtualObjectsParent = GameObject.Find("VirtualObjects");
+        if (virtualObjectsParent == null)
+        {
+            Debug.LogWarning("[RTTManager] VirtualObjects parent not found for recenter");
+            return;
+        }
+
+        RTTMenuFrame primary = RTTMenuFrame.PrimaryInstance;
+        if (primary == null)
+        {
+            Debug.LogWarning("[RTTManager] No primary RTTMenuFrame found for recenter");
+            return;
+        }
+
+        // Store pivot point (primary's position and rotation)
+        Vector3 pivotPos = primary.transform.position;
+        Quaternion pivotRot = primary.transform.rotation;
+
+        // Collect all children and their relative transforms
+        var children = new List<Transform>();
+        var relativePositions = new List<Vector3>();
+        var relativeRotations = new List<Quaternion>();
+
+        foreach (Transform child in virtualObjectsParent.transform)
+        {
+            children.Add(child);
+            // Calculate position relative to pivot
+            Vector3 relPos = Quaternion.Inverse(pivotRot) * (child.position - pivotPos);
+            relativePositions.Add(relPos);
+            // Calculate rotation relative to pivot
+            Quaternion relRot = Quaternion.Inverse(pivotRot) * child.rotation;
+            relativeRotations.Add(relRot);
+        }
+
+        // Calculate new pivot position and rotation (facing camera)
+        Vector3 camForward = cam.transform.forward;
+        camForward.y = 0;
+        if (camForward.sqrMagnitude < 0.001f) camForward = Vector3.forward;
+        camForward.Normalize();
+
+        Vector3 camPos = cam.transform.position;
+        // Maintain horizontal distance from camera
+        float hDist = Vector2.Distance(
+            new Vector2(pivotPos.x, pivotPos.z),
+            new Vector2(camPos.x, camPos.z)
+        );
+
+        Vector3 newPivotPos = camPos + camForward * hDist;
+        newPivotPos.y = pivotPos.y; // Preserve Y position
+        Quaternion newPivotRot = Quaternion.LookRotation(camForward);
+
+        // Apply new transforms to all children
+        for (int i = 0; i < children.Count; i++)
+        {
+            Transform child = children[i];
+            // Restore relative position and rotation with new pivot
+            child.position = newPivotPos + newPivotRot * relativePositions[i];
+            child.rotation = newPivotRot * relativeRotations[i];
+        }
+
+        Debug.Log($"[RTTManager] Instant recenter: moved {children.Count} objects to face camera");
     }
 
     /// <summary>
