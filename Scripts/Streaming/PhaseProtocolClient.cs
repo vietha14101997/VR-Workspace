@@ -1425,7 +1425,11 @@ namespace VRWorkspace.Streaming
         /// </summary>
         private async Task SendSpeedTestResultAsync(double pingMs, double jitterMs, double bandwidthMbps)
         {
-            var json = $"{{\"type\":\"speedtest_result\",\"bandwidthMbps\":{bandwidthMbps:F1},\"pingMs\":{pingMs:F1},\"jitterMs\":{jitterMs:F1}}}";
+            // Use InvariantCulture to ensure decimal point '.' instead of comma ','
+            var json = string.Format(
+                System.Globalization.CultureInfo.InvariantCulture,
+                "{{\"type\":\"speedtest_result\",\"bandwidthMbps\":{0:F1},\"pingMs\":{1:F1},\"jitterMs\":{2:F1}}}",
+                bandwidthMbps, pingMs, jitterMs);
             await SendTextAsync(json);
             Debug.Log($"[PhaseProtocol] Sent speedtest_result: {bandwidthMbps:F1}Mbps, {pingMs:F1}ms");
         }
