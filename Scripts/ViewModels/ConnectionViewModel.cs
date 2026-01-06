@@ -460,6 +460,19 @@ namespace VRWorkspace.ViewModels
 
             // Create new client
             _client = new PhaseProtocolClient();
+
+            // Set USB Mode BEFORE connecting - this affects ICE candidate filtering
+            // When USB Mode is ON, only ICE candidates from the USB Tethering subnet are sent
+            if (_transportMode == TransportMode.USB)
+            {
+                _client.SetUsbMode(true, _currentHost);
+                Debug.Log($"[ConnectionViewModel] USB Mode: ICE filtering to subnet of {_currentHost}");
+            }
+            else
+            {
+                _client.SetUsbMode(false, null);
+            }
+
             SubscribeToEvents();
 
             Phase.Value = ConnectionPhase.Connecting;

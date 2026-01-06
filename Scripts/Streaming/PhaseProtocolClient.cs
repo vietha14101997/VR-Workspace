@@ -52,6 +52,10 @@ namespace VRWorkspace.Streaming
         private long _lastPongReceivedTime;
         private int _missedPongCount;
 
+        // USB Mode - when enabled, only use USB Tethering interface for ICE
+        private bool _isUsbMode = false;
+        private string _usbServerIP = null;  // Server's USB Tethering IP (for subnet filtering)
+
         // Events
         public event Action<ServerHardwareInfo> OnHardwareInfoReceived;
         public event Action<NetworkTestResult> OnNetworkInfoReceived;
@@ -106,6 +110,10 @@ namespace VRWorkspace.Streaming
             public DateTime FpsWindowStart = DateTime.UtcNow; // Start of measurement window
             public DateTime LastFpsFeedbackSent;     // Throttle feedback sending
             public float LastReportedEffectiveFps;   // For change detection
+
+            // Cumulative counters for pipeline comparison (never reset)
+            public long TotalFramesReceived;         // Total frames from OnVideoReceived (decode output)
+            public DateTime StreamStartTime;         // When first frame received
         }
 
         // Public properties
@@ -120,6 +128,79 @@ namespace VRWorkspace.Streaming
         public long ServerClockOffset => _serverClockOffset; // For external latency calculations
         public float ServerTargetFps => _lastServerTargetFps; // Current target FPS from server
         public StreamingMetrics Metrics => _metrics; // Real-time streaming metrics
+        public bool IsUsbMode => _isUsbMode; // Current USB mode state
+
+        /// <summary>
+        /// Set USB Mode for ICE candidate filtering.
+        /// When USB Mode is enabled, only ICE candidates from the USB Tethering subnet are sent.
+        /// This ensures WebRTC media goes exclusively over the USB cable.
+        /// </summary>
+        /// <param name="isUsb">True to enable USB-only mode</param>
+        /// <param name="serverIP">Server's USB Tethering IP (e.g., "192.168.110.168")</param>
+        public void SetUsbMode(bool isUsb, string serverIP = null)
+        {
+            _isUsbMode = isUsb;
+            _usbServerIP = serverIP;
+            Debug.Log($"[PhaseProtocol] USB Mode: {_isUsbMode}, Server IP: {_usbServerIP ?? "null"}");
+        }
+
+        /// <summary>
+        /// Check if an ICE candidate should be sent based on USB mode.
+        /// In USB mode, only candidates from the same subnet as the server are allowed.
+        /// </summary>
+        private bool ShouldSendIceCandidate(string candidateStr)
+        {
+            if (!_isUsbMode)
+                return true; // WiFi mode: send all candidates
+
+            if (string.IsNullOrEmpty(_usbServerIP))
+            {
+                Debug.LogWarning("[PhaseProtocol] USB mode but no server IP set, sending candidate anyway");
+                return true;
+            }
+
+            // Parse IP from ICE candidate string
+            // Format: "candidate:foundation component protocol priority ip port typ type ..."
+            // Example: "3193877933 1 udp 2122260223 192.168.110.118 47799 typ host"
+            var parts = candidateStr.Split(' ');
+            if (parts.Length < 5)
+                return false;
+
+            string candidateIP = parts[4]; // IP is the 5th field (index 4)
+
+            // Check if candidate IP is in the same /24 subnet as server
+            // This ensures we only use the USB Tethering interface
+            string serverSubnet = GetSubnet24(_usbServerIP);
+            string candidateSubnet = GetSubnet24(candidateIP);
+
+            bool isSameSubnet = serverSubnet == candidateSubnet;
+
+            if (!isSameSubnet)
+            {
+                Debug.Log($"[PhaseProtocol] USB Mode: Filtering out non-USB candidate: {candidateIP} (server subnet: {serverSubnet})");
+            }
+            else
+            {
+                Debug.Log($"[PhaseProtocol] USB Mode: Allowing USB candidate: {candidateIP}");
+            }
+
+            return isSameSubnet;
+        }
+
+        /// <summary>
+        /// Get /24 subnet prefix from IP address (e.g., "192.168.110.168" → "192.168.110")
+        /// </summary>
+        private string GetSubnet24(string ip)
+        {
+            if (string.IsNullOrEmpty(ip))
+                return "";
+
+            int lastDot = ip.LastIndexOf('.');
+            if (lastDot <= 0)
+                return ip;
+
+            return ip.Substring(0, lastDot);
+        }
 
         /// <summary>
         /// Get video texture for a specific monitor.
@@ -671,13 +752,23 @@ namespace VRWorkspace.Streaming
 
                     // Use InvariantCulture to ensure decimal separator is always '.' (not ',' on some devices)
                     string fpsStr = effectiveFps.ToString("F1", System.Globalization.CultureInfo.InvariantCulture);
+
+                    // Include total frames in feedback for pipeline comparison
                     string json = $"{{\"type\":\"fps_feedback\",\"monitorIndex\":{wrapper.Index}," +
                         $"\"effectiveFps\":{fpsStr}," +
                         $"\"renderedFrames\":{wrapper.RenderedFrameCount}," +
+                        $"\"totalFrames\":{wrapper.TotalFramesReceived}," +
                         $"\"droppedFrames\":{wrapper.DroppedFrameCount}}}";
 
                     _ = SendTextAsync(json);
-                    Debug.Log($"[PhaseProtocol] FPS feedback: m{wrapper.Index} = {effectiveFps:F1} fps");
+
+                    // Calculate average FPS since stream start for pipeline comparison
+                    double totalSeconds = wrapper.StreamStartTime != DateTime.MinValue
+                        ? (DateTime.UtcNow - wrapper.StreamStartTime).TotalSeconds
+                        : 0;
+                    float avgFps = totalSeconds > 0 ? (float)(wrapper.TotalFramesReceived / totalSeconds) : 0;
+
+                    Debug.Log($"[Decode FPS] Mon{wrapper.Index}: {effectiveFps:F1} fps (window), total={wrapper.TotalFramesReceived} frames in {totalSeconds:F1}s = {avgFps:F1} avg fps");
 
                     // Reset window
                     ResetFpsWindow(wrapper);
@@ -1787,6 +1878,10 @@ namespace VRWorkspace.Streaming
                     ? msg.Substring("candidate:".Length)
                     : msg;
 
+                // USB Mode: Filter out non-USB candidates (only allow same subnet as server)
+                if (!ShouldSendIceCandidate(rawCandidate))
+                    return;
+
                 _ = SendTextAsync($"{{\"type\":\"candidate\",\"monitorIndex\":0,\"candidate\":\"{EscapeJsonString(rawCandidate)}\"}}");
             };
 
@@ -1825,6 +1920,11 @@ namespace VRWorkspace.Streaming
                         wrapper.LastFrameTime = DateTime.UtcNow;
                         wrapper.FrameCount++;
                         wrapper.RenderedFrameCount++;
+                        wrapper.TotalFramesReceived++; // Cumulative counter (never reset)
+
+                        // Track stream start time
+                        if (wrapper.StreamStartTime == DateTime.MinValue)
+                            wrapper.StreamStartTime = DateTime.UtcNow;
 
                         if (!_streamingStartedFired)
                         {
@@ -2121,6 +2221,10 @@ namespace VRWorkspace.Streaming
                     ? msg.Substring("candidate:".Length)
                     : msg;
 
+                // USB Mode: Filter out non-USB candidates (only allow same subnet as server)
+                if (!ShouldSendIceCandidate(rawCandidate))
+                    return;
+
                 string candidateJson = $"{{\"type\":\"candidate\",\"monitorIndex\":{idx},\"candidate\":\"{EscapeJsonString(rawCandidate)}\"}}";
 
                 // Queue candidate if offer not sent yet, otherwise send immediately
@@ -2155,6 +2259,11 @@ namespace VRWorkspace.Streaming
                         wrapper.LastFrameTime = DateTime.UtcNow;
                         wrapper.FrameCount++;
                         wrapper.RenderedFrameCount++; // For adaptive FPS feedback
+                        wrapper.TotalFramesReceived++; // Cumulative counter (never reset)
+
+                        // Track stream start time
+                        if (wrapper.StreamStartTime == DateTime.MinValue)
+                            wrapper.StreamStartTime = DateTime.UtcNow;
 
                         // Debug: Log callback trigger (first few frames only)
                         if (wrapper.FrameCount <= 3)
@@ -2530,6 +2639,10 @@ namespace VRWorkspace.Streaming
                     ? msg.Substring("candidate:".Length)
                     : msg;
 
+                // USB Mode: Filter out non-USB candidates (only allow same subnet as server)
+                if (!ShouldSendIceCandidate(rawCandidate))
+                    return;
+
                 string candidateJson = $"{{\"type\":\"candidate\",\"monitorIndex\":{idx},\"candidate\":\"{EscapeJsonString(rawCandidate)}\"}}";
 
                 if (!wrapper.OfferSent)
@@ -2556,6 +2669,11 @@ namespace VRWorkspace.Streaming
                         wrapper.LastFrameTime = DateTime.UtcNow;
                         wrapper.FrameCount++;
                         wrapper.RenderedFrameCount++; // For adaptive FPS feedback
+                        wrapper.TotalFramesReceived++; // Cumulative counter (never reset)
+
+                        // Track stream start time
+                        if (wrapper.StreamStartTime == DateTime.MinValue)
+                            wrapper.StreamStartTime = DateTime.UtcNow;
 
                         // Fire OnStreamingStarted on first frame if not already fired
                         if (!_streamingStartedFired)
