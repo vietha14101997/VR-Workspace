@@ -558,6 +558,8 @@ public class RTTRemoteMenu : MonoBehaviour
                     if (!HasUsbTetheringIP)
                     {
                         Debug.LogWarning("[RTTRemoteMenu] USB mode requires USB Tethering. Scan QR code first.");
+                        // Show error feedback to user
+                        ShowTemporaryButtonText("SCAN QR FIRST!", 2f);
                         return;
                     }
 
@@ -715,6 +717,25 @@ public class RTTRemoteMenu : MonoBehaviour
         if (_connectButtonText != null)
         {
             _connectButtonText.text = text;
+        }
+    }
+
+    /// <summary>
+    /// Show temporary button text, then revert to original after delay.
+    /// </summary>
+    private async void ShowTemporaryButtonText(string text, float duration)
+    {
+        if (_connectButtonText == null) return;
+
+        string originalText = _connectButtonText.text;
+        _connectButtonText.text = text;
+
+        await System.Threading.Tasks.Task.Delay((int)(duration * 1000));
+
+        // Only revert if text hasn't changed
+        if (_connectButtonText != null && _connectButtonText.text == text)
+        {
+            _connectButtonText.text = originalText;
         }
     }
 
@@ -1900,61 +1921,34 @@ public class RTTRemoteMenu : MonoBehaviour
     #region Set Config (Fill Form)
     /// <summary>
     /// Fill the form with values from a QRScannerConfig.
+    /// Bind IP based on current USB Mode state.
     /// </summary>
     public void SetConfig(QRScannerConfig config)
     {
         if (config == null) return;
 
-        // Host (Port is fixed at 8288) - use GetHost() to support both "host" and "ip" fields
-        var hostValue = config.GetHost();
-        if (!string.IsNullOrEmpty(hostValue))
-            VRInputFieldFactory.SetValue(_hostInput, hostValue);
+        Debug.Log($"[RTTRemoteMenu] QR Config received: {config}");
 
-        // USB Tethering IP (for full TCP+UDP over USB cable)
-        if (config.HasUsbTetheringIP)
+        // Store USB Tethering IP if available
+        if (config.HasUsbIP)
         {
             _usbTetheringIP = config.usbIP;
-            Debug.Log($"[RTTRemoteMenu] USB Tethering IP from QR: {_usbTetheringIP}");
             UpdateUsbModeLabel();
+            Debug.Log($"[RTTRemoteMenu] USB IP available: {_usbTetheringIP}");
+        }
+
+        // Set Host based on USB Mode state
+        // If USB Mode is ON and USB IP available → use USB IP
+        // Otherwise → use WiFi IP
+        string hostToUse = (_isUsbMode && config.HasUsbIP) ? config.usbIP : config.ip;
+
+        if (!string.IsNullOrEmpty(hostToUse))
+        {
+            VRInputFieldFactory.SetValue(_hostInput, hostToUse);
+            Debug.Log($"[RTTRemoteMenu] Host set to: {hostToUse} (USB Mode: {_isUsbMode})");
         }
 
         // Note: Port from QR is ignored - using fixed DEFAULT_PORT (8288)
-
-        // Resolution
-        if (!string.IsNullOrEmpty(config.resolution))
-        {
-            int index = FindOptionIndex(
-                new[] { "1920 x 1080", "1600 x 900", "1366 x 768", "1280 x 720" },
-                config.resolution);
-            if (index >= 0)
-                VRDropdownFactory.SetSelectedIndex(_resolutionDropdown, index);
-        }
-
-        // Bitrate
-        if (!string.IsNullOrEmpty(config.bitrate))
-        {
-            int index = FindOptionIndex(
-                new[] { "5 Mbps", "10 Mbps", "20 Mbps", "30 Mbps", "50 Mbps" },
-                config.bitrate);
-            if (index >= 0)
-                VRDropdownFactory.SetSelectedIndex(_bitrateDropdown, index);
-        }
-
-        // FPS
-        if (!string.IsNullOrEmpty(config.fps))
-        {
-            int index = FindOptionIndex(
-                new[] { "30 FPS", "45 FPS", "60 FPS" },
-                config.fps);
-            if (index >= 0)
-                VRDropdownFactory.SetSelectedIndex(_fpsDropdown, index);
-        }
-
-        // Monitors
-        if (config.monitors >= 1 && config.monitors <= 3)
-        {
-            VRDropdownFactory.SetSelectedIndex(_monitorsDropdown, config.monitors - 1);
-        }
     }
 
     private int FindOptionIndex(string[] options, string value)

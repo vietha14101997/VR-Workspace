@@ -7,6 +7,13 @@ using System.Collections;
 using UnityEngine.Android;
 #endif
 
+// ZXing for QR decoding - install via: https://github.com/micjahn/ZXing.Net
+// Download zxing.unity.dll and place in Assets/Plugins/
+#if ZXING_AVAILABLE
+using ZXing;
+using ZXing.Common;
+#endif
+
 /// <summary>
 /// RTT-based QR Scanner with camera passthrough using shader-based rendering.
 /// Uses a Quad with CameraPassthroughRounded shader for camera display,
@@ -395,7 +402,44 @@ public class RTTQRScanner : MonoBehaviour
 
     private string TryDecodeQR()
     {
-        // TODO: Implement ZXing decode when library is added
+#if ZXING_AVAILABLE
+        try
+        {
+            // Get pixels from webcam texture
+            Color32[] pixels = _webCamTexture.GetPixels32();
+            int width = _webCamTexture.width;
+            int height = _webCamTexture.height;
+
+            // Create ZXing barcode reader
+            var barcodeReader = new BarcodeReader
+            {
+                AutoRotate = true,
+                Options = new DecodingOptions
+                {
+                    TryHarder = true,
+                    PossibleFormats = new[] { BarcodeFormat.QR_CODE }
+                }
+            };
+
+            // Decode
+            var result = barcodeReader.Decode(pixels, width, height);
+            if (result != null)
+            {
+                Debug.Log($"[RTTQRScanner] QR Decoded: {result.Text}");
+                return result.Text;
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[RTTQRScanner] Decode error: {e.Message}");
+        }
+#else
+        // ZXing not available - log warning once
+        if (_webCamTexture.didUpdateThisFrame && Time.frameCount % 300 == 0)
+        {
+            Debug.LogWarning("[RTTQRScanner] ZXing library not installed. Add ZXING_AVAILABLE to Scripting Define Symbols after installing ZXing.Net");
+        }
+#endif
         return null;
     }
 
