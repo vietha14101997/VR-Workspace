@@ -202,8 +202,17 @@ public class RTTInfoSidePanel : MonoBehaviour
             // Use actual USB jitter from server measurement
             AddInfoRow("Jitter", $"{info.jitterMs:F2} ms");
             
-            // Show estimated USB bandwidth (not limited by TCP speedtest)
-            double displayBandwidth = info.usbEstimatedBandwidthMbps > 0 ? info.usbEstimatedBandwidthMbps : info.bandwidthMbps;
+            // Show estimated USB bandwidth - prioritize server value, fallback to sensible defaults
+            // USB speedtest via TCP is unreliable, so we use USB version-based estimates
+            double displayBandwidth = 480; // Default USB 2.0 bandwidth
+            if (info.usbEstimatedBandwidthMbps > 0)
+            {
+                displayBandwidth = info.usbEstimatedBandwidthMbps;
+            }
+            else if (info.bandwidthMbps > 100) // If speedtest measured > 100 Mbps, use it
+            {
+                displayBandwidth = info.bandwidthMbps;
+            }
             AddInfoRow("Bandwidth", $"{displayBandwidth:F0} Mbps");
             
             // Show USB version as type
@@ -213,7 +222,8 @@ public class RTTInfoSidePanel : MonoBehaviour
             // USB is always excellent quality
             AddInfoRow("Quality", "Excellent", GetQualityColor("Excellent"));
             
-            Debug.Log($"[RTTInfoSidePanel] SetNetworkInfo USB Mode: {displayPing:F2}ms, {displayBandwidth:F0}Mbps, {info.usbVersion}");
+            Debug.Log($"[RTTInfoSidePanel] SetNetworkInfo USB Mode: ping={displayPing:F2}ms, jitter={info.jitterMs:F2}ms, bw={displayBandwidth:F0}Mbps, version={info.usbVersion}");
+            Debug.Log($"[RTTInfoSidePanel]   Raw values: usbLatencyMs={info.usbLatencyMs}, usbEstimatedBandwidthMbps={info.usbEstimatedBandwidthMbps}, bandwidthMbps={info.bandwidthMbps}");
         }
         else
         {
