@@ -404,6 +404,14 @@ namespace VRWorkspace.Streaming
             EffectiveFps = 0;
             BufferFullness = 0.5f;
             HealthScore = 100;
+            
+            // Reset frame counts
+            TotalDroppedFrames = 0;
+            TotalRenderedFrames = 0;
+            
+            // Note: USB mode fields are NOT reset here because they are set 
+            // during suggested_config phase and should persist for the session.
+            // They will be updated when a new connection is established.
         }
 
         /// <summary>

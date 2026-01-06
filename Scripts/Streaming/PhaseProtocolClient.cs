@@ -470,6 +470,15 @@ namespace VRWorkspace.Streaming
         private DateTime _lastExtremeSkipTime = DateTime.MinValue;
         private const float ExtremeSkipCooldownSeconds = 5.0f; // Don't spam extreme skips
 
+        // === USB Mode Thresholds ===
+        // USB tethering is extremely stable (~1-2ms latency), so we use much more relaxed thresholds
+        // Main purpose: prevent false skip_to_live triggers that waste GPU on unnecessary keyframes
+        private const float USB_WARMUP_PERIOD_SECONDS = 5.0f;    // Don't check latency for first 5s of stream
+        private const int USB_MIN_FRAMES_BEFORE_CRISIS = 300;    // ~5 seconds at 60fps before FPS crisis check
+        private const float USB_FRAME_GAP_THRESHOLD_MS = 2000f;  // 2s gap for USB (very tolerant)
+        private const float USB_MONITOR_DRIFT_THRESHOLD_MS = 1500f; // 1.5s drift allowed for USB
+        private DateTime _streamingStartTime = DateTime.MinValue; // Track when streaming actually started
+
         // Decoder freeze detection - compare server frame count with client rendered frames
         // This catches cases where WebRTC texture is valid but decoder has stopped producing new pixels
         private long _lastServerFrame = 0;           // currentFrame from last frameTiming message
@@ -555,18 +564,50 @@ namespace VRWorkspace.Streaming
         {
             if (!_stateMachine.IsStreaming) return;
 
+            // Initialize streaming start time if not set
+            if (_streamingStartTime == DateTime.MinValue)
+            {
+                _streamingStartTime = DateTime.UtcNow;
+                Debug.Log("[PhaseProtocol] Streaming started - latency checks will begin after warmup period");
+            }
+
+            // Calculate time since streaming started
+            double streamingDurationSeconds = (DateTime.UtcNow - _streamingStartTime).TotalSeconds;
+            bool isInWarmupPeriod = streamingDurationSeconds < USB_WARMUP_PERIOD_SECONDS;
+            bool isUsbMode = _metrics.IsUsbMode || _isUsbMode;
+
+            // === USB Mode + Warmup Period Protection ===
+            // During warmup period, skip all checks except extreme RTT
+            // USB mode is extremely stable, so we only check for catastrophic failures
+            if (isInWarmupPeriod && isUsbMode)
+            {
+                // Only check for extreme RTT during warmup (catastrophic failure)
+                double currentRtt = _metrics.CurrentPingMs;
+                if (currentRtt >= RTT_EXTREME_THRESHOLD_MS)
+                {
+                    if ((DateTime.UtcNow - _lastExtremeSkipTime).TotalSeconds >= ExtremeSkipCooldownSeconds)
+                    {
+                        Debug.LogWarning($"[PhaseProtocol] EXTREME RTT during USB warmup: {currentRtt:F0}ms - skip_to_live");
+                        _lastExtremeSkipTime = DateTime.UtcNow;
+                        _lastSkipToLiveTime = DateTime.UtcNow;
+                        SkipToLiveImmediate(-1);
+                    }
+                }
+                return; // Skip all other checks during USB warmup
+            }
+
             // === RTT-based aggressive skip (highest priority) ===
             // When RTT is extremely high, the client is watching frames that are already stale.
             // Frames are still arriving, but they're 5-7 seconds old. Need to skip immediately.
-            double currentRtt = _metrics.CurrentPingMs;
+            double rtt = _metrics.CurrentPingMs;
 
-            if (currentRtt >= RTT_EXTREME_THRESHOLD_MS)
+            if (rtt >= RTT_EXTREME_THRESHOLD_MS)
             {
                 // CRITICAL: RTT is 5+ seconds. Client is severely behind.
                 // Use separate longer cooldown for extreme skips (5s vs 2s for normal)
                 if ((DateTime.UtcNow - _lastExtremeSkipTime).TotalSeconds >= ExtremeSkipCooldownSeconds)
                 {
-                    Debug.LogWarning($"[PhaseProtocol] EXTREME RTT detected: {currentRtt:F0}ms - IMMEDIATE skip_to_live (bypass normal cooldown)");
+                    Debug.LogWarning($"[PhaseProtocol] EXTREME RTT detected: {rtt:F0}ms - IMMEDIATE skip_to_live (bypass normal cooldown)");
                     _lastExtremeSkipTime = DateTime.UtcNow;
                     _lastSkipToLiveTime = DateTime.UtcNow;
                     SkipToLiveImmediate(-1);
@@ -574,13 +615,14 @@ namespace VRWorkspace.Streaming
                 return;
             }
 
-            if (currentRtt >= RTT_HIGH_THRESHOLD_MS)
+            // Skip HIGH RTT check for USB mode (USB latency is always <10ms)
+            if (!isUsbMode && rtt >= RTT_HIGH_THRESHOLD_MS)
             {
                 // HIGH RTT: 3-5 seconds. Client is falling behind.
                 // Use normal cooldown to avoid spam, but definitely skip
                 if ((DateTime.UtcNow - _lastSkipToLiveTime).TotalSeconds >= SkipToLiveCooldownSeconds)
                 {
-                    Debug.LogWarning($"[PhaseProtocol] HIGH RTT detected: {currentRtt:F0}ms - skip_to_live");
+                    Debug.LogWarning($"[PhaseProtocol] HIGH RTT detected: {rtt:F0}ms - skip_to_live");
                     SkipToLive(-1);
                 }
                 return;
@@ -588,13 +630,16 @@ namespace VRWorkspace.Streaming
 
             // === Effective FPS crisis detection ===
             // If we're only getting 25% of expected frames, something is very wrong
+            // For USB mode: require more frames before triggering (USB takes longer to stabilize)
             float targetFps = _lastServerTargetFps > 0 ? _lastServerTargetFps : 60f;
             float effectiveFps = _metrics.EffectiveFps;
+            int minFramesForCrisis = isUsbMode ? USB_MIN_FRAMES_BEFORE_CRISIS : 30;
+            
             if (effectiveFps > 0 && effectiveFps < targetFps * EFFECTIVE_FPS_CRISIS_RATIO)
             {
                 // Only trigger if we have at least some data (avoid false positives on startup)
                 int totalRendered = GetTotalRenderedFrames();
-                if (totalRendered > 30) // At least 30 frames received
+                if (totalRendered > minFramesForCrisis)
                 {
                     if ((DateTime.UtcNow - _lastSkipToLiveTime).TotalSeconds >= SkipToLiveCooldownSeconds)
                     {
@@ -607,6 +652,7 @@ namespace VRWorkspace.Streaming
 
             // === Packet loss crisis detection ===
             // High sustained packet loss means we're missing too much data to maintain coherent video
+            // Note: USB mode should have 0% packet loss, so this rarely triggers
             float packetLoss = _metrics.AveragePacketLossRate;
             if (packetLoss >= PACKET_LOSS_CRISIS_THRESHOLD)
             {
@@ -619,6 +665,11 @@ namespace VRWorkspace.Streaming
                 }
                 return;
             }
+
+            // === Frame gap and monitor drift detection ===
+            // Use USB-specific thresholds if in USB mode
+            float frameGapThreshold = isUsbMode ? USB_FRAME_GAP_THRESHOLD_MS : FrameGapThresholdMs;
+            float driftThreshold = isUsbMode ? USB_MONITOR_DRIFT_THRESHOLD_MS : MonitorDriftThresholdMs;
 
             lock (_lock)
             {
@@ -634,13 +685,13 @@ namespace VRWorkspace.Streaming
 
                     // Check if frame gap exceeds threshold (stall detection)
                     var timeSinceFrame = (DateTime.UtcNow - wrapper.LastFrameTime).TotalMilliseconds;
-                    if (timeSinceFrame > FrameGapThresholdMs && wrapper.FrameCount > 10)
+                    if (timeSinceFrame > frameGapThreshold && wrapper.FrameCount > 10)
                     {
                         // Frame stall detected - request skip to live for this monitor
                         // Only log when actually sending (respects cooldown)
                         if ((DateTime.UtcNow - _lastSkipToLiveTime).TotalSeconds >= SkipToLiveCooldownSeconds)
                         {
-                            Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} frame gap {timeSinceFrame:F0}ms - skip_to_live");
+                            Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} frame gap {timeSinceFrame:F0}ms (threshold={frameGapThreshold:F0}ms) - skip_to_live");
                         }
                         SkipToLive(wrapper.Index);
                         return; // Only send once per poll
@@ -659,17 +710,17 @@ namespace VRWorkspace.Streaming
                     }
                 }
 
-                // Drift detection: if monitors are >500ms apart, the older one is lagging
+                // Drift detection: if monitors are out of sync, the older one is lagging
                 // Only log when we're actually going to send skip_to_live (respects cooldown)
                 if (_peerConnections.Count > 1 && minFrameTime != DateTime.MaxValue && maxFrameTime != DateTime.MinValue)
                 {
                     var drift = (maxFrameTime - minFrameTime).TotalMilliseconds;
-                    if (drift > MonitorDriftThresholdMs && laggingMonitor >= 0)
+                    if (drift > driftThreshold && laggingMonitor >= 0)
                     {
                         // Check cooldown before logging to avoid spam
                         if ((DateTime.UtcNow - _lastSkipToLiveTime).TotalSeconds >= SkipToLiveCooldownSeconds)
                         {
-                            Debug.LogWarning($"[PhaseProtocol] Monitor drift: PC{laggingMonitor} is {drift:F0}ms behind - skip_to_live");
+                            Debug.LogWarning($"[PhaseProtocol] Monitor drift: PC{laggingMonitor} is {drift:F0}ms behind (threshold={driftThreshold:F0}ms) - skip_to_live");
                         }
                         SkipToLive(laggingMonitor);
                     }
@@ -3816,6 +3867,10 @@ namespace VRWorkspace.Streaming
 
             // Reset streaming state
             _streamingStartedFired = false;
+            _streamingStartTime = DateTime.MinValue; // Reset for next session warmup
+            
+            // Reset metrics to avoid stale data affecting next session
+            _metrics.ResetAll();
 
             try { _ws?.Abort(); _ws?.Dispose(); } catch { }
             _ws = null;
