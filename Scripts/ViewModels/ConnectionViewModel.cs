@@ -515,7 +515,10 @@ namespace VRWorkspace.ViewModels
             _client.OnNetworkInfoReceived += info =>
             {
                 if (_clientGeneration != subscribedGeneration) return;
-                NetworkInfo.Value = info;
+                // Use SetAndNotify instead of Value = because the same object reference
+                // may be passed multiple times with updated properties (e.g., USB latency update)
+                // EqualityComparer sees same reference as equal and won't fire OnChanged
+                NetworkInfo.SetAndNotify(info);
                 SpeedTestProgress.Value = 100;
             };
 
