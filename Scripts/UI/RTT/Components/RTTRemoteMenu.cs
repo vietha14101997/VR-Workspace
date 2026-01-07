@@ -45,7 +45,7 @@ public class RTTRemoteMenu : MonoBehaviour
     private string _usbTetheringIP = null;  // USB Tethering IP from QR scan (for full USB streaming)
     private const int DEFAULT_PORT = 8288;
     private GameObject _monitorsDropdown;
-    private GameObject _resolutionDropdown;
+    private GameObject _styleDropdown;
     private GameObject _bitrateDropdown;
     private GameObject _fpsDropdown;
     private GameObject _bodyContainer;
@@ -93,7 +93,7 @@ public class RTTRemoteMenu : MonoBehaviour
 
     // Default dropdown options (without Recommended suffix)
     private static readonly string[] MONITOR_OPTIONS = { "1 Monitor", "2 Monitors", "3 Monitors" };
-    private static readonly string[] RESOLUTION_OPTIONS = { "1280 x 720", "1366 x 768", "1600 x 900", "1920 x 1080" };
+    private static readonly string[] STYLE_OPTIONS = { "Flat Planar", "Curved Surround" };
     private static readonly string[] BITRATE_OPTIONS = { "5 Mbps", "10 Mbps", "15 Mbps", "20 Mbps", "30 Mbps" };
     private static readonly string[] FPS_OPTIONS = { "30 FPS", "45 FPS", "60 FPS" };
     #endregion
@@ -110,7 +110,8 @@ public class RTTRemoteMenu : MonoBehaviour
     public string UsbTetheringIP => _usbTetheringIP;
     public bool HasUsbTetheringIP => !string.IsNullOrEmpty(_usbTetheringIP);
     public int MonitorIndex => VRDropdownFactory.GetSelectedIndex(_monitorsDropdown);
-    public string Resolution => VRDropdownFactory.GetSelectedValue(_resolutionDropdown);
+    public string Style => VRDropdownFactory.GetSelectedValue(_styleDropdown);
+    public int StyleIndex => VRDropdownFactory.GetSelectedIndex(_styleDropdown);
     public string Bitrate => VRDropdownFactory.GetSelectedValue(_bitrateDropdown);
     public string FPS => VRDropdownFactory.GetSelectedValue(_fpsDropdown);
     #endregion
@@ -454,8 +455,8 @@ public class RTTRemoteMenu : MonoBehaviour
 
         // Dropdown options
         var monitorOptions = new List<string> { "1 Monitor", "2 Monitors", "3 Monitors" };
-        var resolutionOptions = new List<string> { "1280 x 720", "1366 x 768", "1600 x 900", "1920 x 1080" };
-        var bitrateOptions = new List<string> { "5 Mbps", "10 Mbps", "20 Mbps", "30 Mbps", "50 Mbps" };
+        var styleOptions = new List<string> { "Flat Planar", "Curved Surround" };
+        var bitrateOptions = new List<string> { "10 Mbps", "15 Mbps", "20 Mbps", "25 Mbps", "30 Mbps" };
         var fpsOptions = new List<string> { "30 FPS", "45 FPS", "60 FPS" };
 
         // Row 1 (top)
@@ -469,20 +470,21 @@ public class RTTRemoteMenu : MonoBehaviour
             labelFontSize: DROPDOWN_LABEL_FONT_SIZE, valueFontSize: DROPDOWN_VALUE_FONT_SIZE, font: customFont);
         PositionElement(_monitorsDropdown, 0, row1Y);
 
-        _resolutionDropdown = VRDropdownFactory.CreateIconDropdown(
+        // Style dropdown (replaces Resolution): Flat Planar = FixedThreeSlot + flat, Curved Surround = Dynamic + curved
+        _styleDropdown = VRDropdownFactory.CreateIconDropdown(
             grid.transform, cellW,
-            "Resolution", LoadIcon("resolution"), accentColor,
-            resolutionOptions, 3,
-            onValueChanged: null,
+            "Style", LoadIcon("resolution"), accentColor,  // Reusing resolution icon for now
+            styleOptions, 0,  // Default: Flat Planar
+            onValueChanged: HandleStyleChanged,
             labelFontSize: DROPDOWN_LABEL_FONT_SIZE, valueFontSize: DROPDOWN_VALUE_FONT_SIZE, font: customFont);
-        PositionElement(_resolutionDropdown, cellW + gapX, row1Y);
+        PositionElement(_styleDropdown, cellW + gapX, row1Y);
 
-        // Row 2 (bottom)
+        // Row 2 (bottom) - Total Bitrate (distributed across all monitors)
         _bitrateDropdown = VRDropdownFactory.CreateIconDropdown(
             grid.transform, cellW,
-            "Bitrate", LoadIcon("bitrate"), accentColor,
+            "Total Bitrate", LoadIcon("bitrate"), accentColor,
             bitrateOptions, 2,
-            onValueChanged: null,
+            onValueChanged: HandleBitrateChanged,
             labelFontSize: DROPDOWN_LABEL_FONT_SIZE, valueFontSize: DROPDOWN_VALUE_FONT_SIZE, font: customFont);
         PositionElement(_bitrateDropdown, 0, 0);
 
@@ -490,7 +492,7 @@ public class RTTRemoteMenu : MonoBehaviour
             grid.transform, cellW,
             "FPS", LoadIcon("fps"), themeColor,
             fpsOptions, 2,
-            onValueChanged: null,
+            onValueChanged: HandleFpsChanged,
             labelFontSize: DROPDOWN_LABEL_FONT_SIZE, valueFontSize: DROPDOWN_VALUE_FONT_SIZE, font: customFont);
         PositionElement(_fpsDropdown, cellW + gapX, 0);
     }
@@ -647,6 +649,7 @@ public class RTTRemoteMenu : MonoBehaviour
     /// <summary>
     /// Build StreamingConfig from form dropdown values.
     /// Returns config with user-selected values, falling back to suggested values if needed.
+    /// Note: Resolution is now fixed at server's suggested value (server handles capture/resize).
     /// </summary>
     private StreamingConfig BuildConfigFromForm()
     {
@@ -655,21 +658,11 @@ public class RTTRemoteMenu : MonoBehaviour
         // Get current suggested config as fallback
         var suggested = _viewModel.SuggestedConfig.Value;
 
-        // Parse Resolution from dropdown
-        var resolution = RemotePreferences.CleanValue(Resolution);
+        // Resolution is fixed from server (server captures at native and resizes to max 1440x810)
         int resW = suggested.resolutionWidth;
         int resH = suggested.resolutionHeight;
-        if (!string.IsNullOrEmpty(resolution))
-        {
-            var parts = resolution.Replace(" ", "").Split('x');
-            if (parts.Length == 2 && int.TryParse(parts[0], out int w) && int.TryParse(parts[1], out int h))
-            {
-                resW = w;
-                resH = h;
-            }
-        }
 
-        // Parse Bitrate from dropdown
+        // Parse Total Bitrate from dropdown (this is total for all monitors)
         int bitrateKbps = suggested.bitrateKbps;
         var bitrate = RemotePreferences.CleanValue(Bitrate);
         if (!string.IsNullOrEmpty(bitrate))
@@ -694,20 +687,22 @@ public class RTTRemoteMenu : MonoBehaviour
         }
 
         // Create config from user selections
+        // bitrateKbps is TOTAL for all monitors - server will divide by monitor count
         var config = new StreamingConfig
         {
             monitors = MonitorIndex + 1,
             resolutionWidth = resW,
             resolutionHeight = resH,
-            bitrateKbps = bitrateKbps,
+            bitrateKbps = bitrateKbps,  // TOTAL bitrate for all monitors
             fps = fpsVal,
             refreshRate = suggested.refreshRate,
             selectedCodec = suggested.selectedCodec
         };
 
-        Debug.Log($"[RTTRemoteMenu] BuildConfigFromForm: {config.monitors}mon @ {config.resolutionWidth}x{config.resolutionHeight}, {config.fps}fps, {config.bitrateKbps}kbps");
+        Debug.Log($"[RTTRemoteMenu] BuildConfigFromForm: {config.monitors}mon @ {config.resolutionWidth}x{config.resolutionHeight}, {config.fps}fps, {config.bitrateKbps}kbps (total)");
         return config;
     }
+
 
     /// <summary>
     /// Update button text.
@@ -971,16 +966,11 @@ public class RTTRemoteMenu : MonoBehaviour
         var monitorOptions = BuildOptionsWithRecommended(MONITOR_OPTIONS, suggestedMonitorIndex);
         VRDropdownFactory.SetOptions(_monitorsDropdown, monitorOptions, suggestedMonitorIndex);
 
-        // === Resolution ===
-        string suggestedResolution = $"{config.resolutionWidth} x {config.resolutionHeight}";
-        int suggestedResIndex = FindOptionIndex(RESOLUTION_OPTIONS, suggestedResolution);
-        if (suggestedResIndex < 0)
-        {
-            Debug.LogWarning($"[RTTRemoteMenu] Resolution '{suggestedResolution}' not found, defaulting to 1920x1080");
-            suggestedResIndex = 3; // Default to 1920x1080
-        }
-        var resolutionOptions = BuildOptionsWithRecommended(RESOLUTION_OPTIONS, suggestedResIndex);
-        VRDropdownFactory.SetOptions(_resolutionDropdown, resolutionOptions, suggestedResIndex);
+        // === Style ===
+        // Style dropdown uses simple 2 options, no "Recommended" logic needed
+        // Just ensure it's enabled with the options already set in CreateGrid
+        var styleOptions = new List<string>(STYLE_OPTIONS);
+        VRDropdownFactory.SetOptions(_styleDropdown, styleOptions, 0);  // Default: Flat Planar
 
         // === Bitrate ===
         int bitrateMbps = config.bitrateKbps / 1000;
@@ -1011,7 +1001,7 @@ public class RTTRemoteMenu : MonoBehaviour
         VRDropdownFactory.SetOptions(_fpsDropdown, fpsOptions, suggestedFpsIndex);
 
         Debug.Log($"[RTTRemoteMenu] Applied suggested config: {config.monitors}mon @ {config.resolutionWidth}x{config.resolutionHeight}, {config.fps}fps, {config.bitrateKbps}kbps");
-        Debug.Log($"[RTTRemoteMenu] Selected indices: Mon={suggestedMonitorIndex}, Res={suggestedResIndex}, Bitrate={suggestedBitrateIndex}, FPS={suggestedFpsIndex}");
+        Debug.Log($"[RTTRemoteMenu] Selected indices: Mon={suggestedMonitorIndex}, Bitrate={suggestedBitrateIndex}, FPS={suggestedFpsIndex}");
     }
 
     /// <summary>
@@ -1047,7 +1037,7 @@ public class RTTRemoteMenu : MonoBehaviour
 
     /// <summary>
     /// Handle Monitors dropdown selection changed.
-    /// Recalculates suggested config for Resolution, Bitrate, FPS based on new monitor count.
+    /// Recalculates suggested config for Bitrate, FPS based on new monitor count.
     /// </summary>
     private void HandleMonitorSelectionChanged(int index, string value)
     {
@@ -1065,15 +1055,92 @@ public class RTTRemoteMenu : MonoBehaviour
     }
 
     /// <summary>
+    /// Handle Style dropdown selection changed.
+    /// Applies Flat Planar or Curved Surround style to WorldPanelClusterRig immediately.
+    /// </summary>
+    private void HandleStyleChanged(int index, string value)
+    {
+        Debug.Log($"[RTTRemoteMenu] Style changed: index={index}, value={value}");
+
+        bool isCurvedSurround = index == 1;  // 0=Flat Planar, 1=Curved Surround
+
+        // Find WorldPanelClusterRig and apply style change
+        var clusterRig = FindObjectOfType<WorldPanelClusterRig>();
+        if (clusterRig != null)
+        {
+            clusterRig.SetStyle(isCurvedSurround);
+            Debug.Log($"[RTTRemoteMenu] Applied style: {(isCurvedSurround ? "Curved Surround" : "Flat Planar")}");
+        }
+        else
+        {
+            Debug.Log("[RTTRemoteMenu] WorldPanelClusterRig not found - style will apply on next stream start");
+        }
+    }
+
+    /// <summary>
+    /// Handle FPS dropdown selection changed.
+    /// Sends update_config to server if currently streaming.
+    /// </summary>
+    private void HandleFpsChanged(int index, string value)
+    {
+        Debug.Log($"[RTTRemoteMenu] FPS changed: index={index}, value={value}");
+
+        // Parse FPS value
+        int fpsVal = 60; // default
+        if (!string.IsNullOrEmpty(value))
+        {
+            var numStr = value.Replace(" ", "").Replace("FPS", "").Replace("fps", "");
+            if (int.TryParse(numStr, out int f))
+            {
+                fpsVal = f;
+            }
+        }
+
+        // If streaming, send update_config
+        if (_currentPhase == ConnectionPhase.Streaming && _viewModel != null)
+        {
+            _ = _viewModel.UpdateConfigAsync(fpsVal, null);
+            Debug.Log($"[RTTRemoteMenu] Sent update_config: fps={fpsVal}");
+        }
+    }
+
+    /// <summary>
+    /// Handle Bitrate dropdown selection changed.
+    /// Sends update_config to server if currently streaming.
+    /// </summary>
+    private void HandleBitrateChanged(int index, string value)
+    {
+        Debug.Log($"[RTTRemoteMenu] Bitrate changed: index={index}, value={value}");
+
+        // Parse Bitrate value (total for all monitors)
+        int bitrateKbps = 20000; // default
+        if (!string.IsNullOrEmpty(value))
+        {
+            var numStr = value.Replace(" ", "").Replace("Mbps", "").Replace("mbps", "");
+            if (int.TryParse(numStr, out int mbps))
+            {
+                bitrateKbps = mbps * 1000;
+            }
+        }
+
+        // If streaming, send update_config
+        if (_currentPhase == ConnectionPhase.Streaming && _viewModel != null)
+        {
+            _ = _viewModel.UpdateConfigAsync(null, bitrateKbps);
+            Debug.Log($"[RTTRemoteMenu] Sent update_config: bitrateKbps={bitrateKbps} (total)");
+        }
+    }
+
+
+    /// <summary>
     /// Recalculate suggested config based on selected monitor count.
-    /// Updates Resolution, Bitrate, FPS dropdowns with new "(Recommended)" positions.
+    /// Updates Bitrate, FPS dropdowns with new "(Recommended)" positions.
     /// </summary>
     private void RecalculateSuggestionsForMonitorCount(int monitorCount)
     {
         if (_cachedNetworkInfo == null || _cachedHardwareInfo == null) return;
 
-        // Get current selections before updating options
-        int currentResIndex = VRDropdownFactory.GetSelectedIndex(_resolutionDropdown);
+        // Get current selections before updating options (only bitrate and FPS need recalculation)
         int currentBitrateIndex = VRDropdownFactory.GetSelectedIndex(_bitrateDropdown);
         int currentFpsIndex = VRDropdownFactory.GetSelectedIndex(_fpsDropdown);
 
@@ -1107,27 +1174,9 @@ public class RTTRemoteMenu : MonoBehaviour
         else if (suggestedBitrateKbps >= 7500) suggestedBitrateIndex = 1; // 10 Mbps
         else suggestedBitrateIndex = 0; // 5 Mbps
 
-        // === Calculate recommended Resolution based on GPU VRAM and monitor count ===
-        // More monitors = potentially lower resolution to reduce GPU load
-        int suggestedResIndex;
-        if (_cachedHardwareInfo.gpuVramGB >= 8 && monitorCount <= 2)
-        {
-            suggestedResIndex = 3; // 1920x1080
-        }
-        else if (_cachedHardwareInfo.gpuVramGB >= 6 || (_cachedHardwareInfo.gpuVramGB >= 4 && monitorCount == 1))
-        {
-            suggestedResIndex = 2; // 1600x900
-        }
-        else if (_cachedHardwareInfo.gpuVramGB >= 4 || monitorCount == 1)
-        {
-            suggestedResIndex = 1; // 1366x768
-        }
-        else
-        {
-            suggestedResIndex = 0; // 1280x720
-        }
-
-        // === Calculate recommended FPS based on encoder and ping ===
+        // === Calculate recommended FPS based on ping and VRAM ===
+        // More monitors = potentially lower FPS to reduce encoder load
+        // Lower VRAM = lower FPS
         int suggestedFpsIndex;
         if (_cachedHardwareInfo.hwAccelEnabled && _cachedNetworkInfo.pingMs < 20)
         {
@@ -1142,12 +1191,6 @@ public class RTTRemoteMenu : MonoBehaviour
             suggestedFpsIndex = 0; // 30 FPS
         }
 
-        // === Update dropdowns with new "(Recommended)" values ===
-        // AUTO-SELECT recommended values when Monitor count changes
-
-        // Resolution - auto-select recommended
-        var resolutionOptions = BuildOptionsWithRecommended(RESOLUTION_OPTIONS, suggestedResIndex);
-        VRDropdownFactory.SetOptions(_resolutionDropdown, resolutionOptions, suggestedResIndex);
 
         // Bitrate - auto-select recommended
         var bitrateOptions = BuildOptionsWithRecommended(BITRATE_OPTIONS, suggestedBitrateIndex);
@@ -1157,7 +1200,7 @@ public class RTTRemoteMenu : MonoBehaviour
         var fpsOptions = BuildOptionsWithRecommended(FPS_OPTIONS, suggestedFpsIndex);
         VRDropdownFactory.SetOptions(_fpsDropdown, fpsOptions, suggestedFpsIndex);
 
-        Debug.Log($"[RTTRemoteMenu] Auto-selected for {monitorCount} monitors: Res={RESOLUTION_OPTIONS[suggestedResIndex]}, Bitrate={BITRATE_OPTIONS[suggestedBitrateIndex]}, FPS={FPS_OPTIONS[suggestedFpsIndex]}");
+        Debug.Log($"[RTTRemoteMenu] Auto-selected for {monitorCount} monitors: Bitrate={BITRATE_OPTIONS[suggestedBitrateIndex]}, FPS={FPS_OPTIONS[suggestedFpsIndex]}");
     }
     #endregion
 
@@ -1171,15 +1214,16 @@ public class RTTRemoteMenu : MonoBehaviour
         var placeholder = new List<string> { "----" };
 
         VRDropdownFactory.SetOptions(_monitorsDropdown, placeholder, 0);
-        VRDropdownFactory.SetOptions(_resolutionDropdown, placeholder, 0);
+        VRDropdownFactory.SetOptions(_styleDropdown, new List<string> { "Flat Planar", "Curved Surround" }, 0);
         VRDropdownFactory.SetOptions(_bitrateDropdown, placeholder, 0);
         VRDropdownFactory.SetOptions(_fpsDropdown, placeholder, 0);
 
         VRDropdownFactory.SetInteractable(_monitorsDropdown, false);
-        VRDropdownFactory.SetInteractable(_resolutionDropdown, false);
+        VRDropdownFactory.SetInteractable(_styleDropdown, false);  // Style follows same lock logic
         VRDropdownFactory.SetInteractable(_bitrateDropdown, false);
         VRDropdownFactory.SetInteractable(_fpsDropdown, false);
     }
+
 
     /// <summary>
     /// Enable all dropdowns for interaction.
@@ -1187,7 +1231,7 @@ public class RTTRemoteMenu : MonoBehaviour
     private void EnableDropdowns()
     {
         VRDropdownFactory.SetInteractable(_monitorsDropdown, true);
-        VRDropdownFactory.SetInteractable(_resolutionDropdown, true);
+        VRDropdownFactory.SetInteractable(_styleDropdown, true);
         VRDropdownFactory.SetInteractable(_bitrateDropdown, true);
         VRDropdownFactory.SetInteractable(_fpsDropdown, true);
     }
@@ -1200,7 +1244,7 @@ public class RTTRemoteMenu : MonoBehaviour
     {
         // Khóa 4 dropdowns
         VRDropdownFactory.SetInteractable(_monitorsDropdown, false);
-        VRDropdownFactory.SetInteractable(_resolutionDropdown, false);
+        VRDropdownFactory.SetInteractable(_styleDropdown, false);
         VRDropdownFactory.SetInteractable(_bitrateDropdown, false);
         VRDropdownFactory.SetInteractable(_fpsDropdown, false);
 
@@ -1221,7 +1265,7 @@ public class RTTRemoteMenu : MonoBehaviour
     {
         // Mở khóa 4 dropdowns
         VRDropdownFactory.SetInteractable(_monitorsDropdown, true);
-        VRDropdownFactory.SetInteractable(_resolutionDropdown, true);
+        VRDropdownFactory.SetInteractable(_styleDropdown, true);
         VRDropdownFactory.SetInteractable(_bitrateDropdown, true);
         VRDropdownFactory.SetInteractable(_fpsDropdown, true);
 
@@ -1276,7 +1320,7 @@ public class RTTRemoteMenu : MonoBehaviour
         var prefs = new RemotePreferences
         {
             monitors = MonitorIndex,
-            resolution = RemotePreferences.CleanValue(Resolution),
+            resolution = Style,  // Now stores style ("Flat Planar" or "Curved Surround")
             bitrate = RemotePreferences.CleanValue(Bitrate),
             fps = RemotePreferences.CleanValue(FPS),
             lastHost = VRInputFieldFactory.GetValue(_hostInput),  // Save actual host input value
@@ -1284,7 +1328,7 @@ public class RTTRemoteMenu : MonoBehaviour
             usbMode = _isUsbMode
         };
         prefs.Save();
-        Debug.Log($"[RTTRemoteMenu] Saved preferences: {prefs.monitors}mon, {prefs.resolution}, {prefs.bitrate}, {prefs.fps}, USB={prefs.usbMode}");
+        Debug.Log($"[RTTRemoteMenu] Saved preferences: {prefs.monitors}mon, style={prefs.resolution}, {prefs.bitrate}, {prefs.fps}, USB={prefs.usbMode}");
     }
     #endregion
 

@@ -321,20 +321,21 @@ public class RTTRemoteMenuController : MonoBehaviour
     /// <summary>
     /// Get connection settings from the remote menu.
     /// </summary>
-    public (string host, string port, int monitors, string resolution, string bitrate, string fps) GetConnectionSettings()
+    public (string host, string port, int monitors, string style, string bitrate, string fps) GetConnectionSettings()
     {
         if (_remoteMenuInstance == null)
-            return ("localhost", "8080", 1, "1920 x 1080", "20 Mbps", "60 FPS");
+            return ("localhost", "8080", 1, "Flat Planar", "20 Mbps", "60 FPS");
 
         return (
             _remoteMenuInstance.Host,
             _remoteMenuInstance.Port,
             _remoteMenuInstance.MonitorIndex + 1,
-            _remoteMenuInstance.Resolution,
+            _remoteMenuInstance.Style,
             _remoteMenuInstance.Bitrate,
             _remoteMenuInstance.FPS
         );
     }
+
 
     #endregion
 

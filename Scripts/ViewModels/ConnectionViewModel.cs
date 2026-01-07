@@ -444,7 +444,25 @@ namespace VRWorkspace.ViewModels
             _client?.SkipToLive();
         }
 
+        /// <summary>
+        /// Update streaming configuration during Phase 3 (Streaming).
+        /// Sends update_config message to server for dynamic FPS/Bitrate changes.
+        /// </summary>
+        /// <param name="fps">New target FPS (null = no change)</param>
+        /// <param name="bitrateKbps">New TOTAL bitrate in kbps for all monitors (null = no change)</param>
+        public async Task UpdateConfigAsync(int? fps, int? bitrateKbps)
+        {
+            if (_client == null || Phase.Value != ConnectionPhase.Streaming)
+            {
+                Debug.LogWarning($"[ConnectionViewModel] UpdateConfigAsync: Not streaming (phase={Phase.Value})");
+                return;
+            }
+
+            await _client.UpdateConfigAsync(fps, bitrateKbps);
+        }
+
         #endregion
+
 
         #region Private Methods
 

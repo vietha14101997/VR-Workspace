@@ -552,6 +552,44 @@ namespace VRWorkspace.Streaming
         }
 
         /// <summary>
+        /// Update streaming configuration dynamically during Phase 3.
+        /// Sends update_config message to server for FPS/Bitrate changes.
+        /// </summary>
+        /// <param name="fps">New target FPS (null = no change)</param>
+        /// <param name="bitrateKbps">New TOTAL bitrate in kbps for all monitors (null = no change)</param>
+        public async Task UpdateConfigAsync(int? fps, int? bitrateKbps)
+        {
+            if (_ws?.State != WebSocketState.Open)
+            {
+                Debug.LogWarning($"[PhaseProtocol] UpdateConfigAsync skipped: ws={_ws?.State}");
+                return;
+            }
+            if (!_stateMachine.IsStreaming)
+            {
+                Debug.LogWarning($"[PhaseProtocol] UpdateConfigAsync skipped: not streaming");
+                return;
+            }
+
+            try
+            {
+                // Build JSON with nullable fields
+                var parts = new List<string> { "\"type\":\"update_config\"" };
+                if (fps.HasValue)
+                    parts.Add($"\"fps\":{fps.Value}");
+                if (bitrateKbps.HasValue)
+                    parts.Add($"\"bitrateKbps\":{bitrateKbps.Value}");
+
+                string json = "{" + string.Join(",", parts) + "}";
+                Debug.Log($"[PhaseProtocol] Sending update_config: {json}");
+                await SendTextAsync(json);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[PhaseProtocol] UpdateConfigAsync failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Check for latency issues and request skip_to_live if needed.
         /// Called from PollTextures to detect frame gaps and monitor drift.
         ///

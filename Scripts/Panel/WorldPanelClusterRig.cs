@@ -145,6 +145,54 @@ public class WorldPanelClusterRig : MonoBehaviour
         BuildWithPanelCount(3);
     }
 
+    /// <summary>
+    /// Set panel cluster style dynamically (can be called during streaming).
+    /// Does NOT recreate panels - only updates layout mode and visual settings.
+    /// </summary>
+    /// <param name="isCurvedSurround">True for Curved Surround (Dynamic + curved), false for Flat Planar (FixedThreeSlot + flat)</param>
+    public void SetStyle(bool isCurvedSurround)
+    {
+        var oldLayoutMode = layoutMode;
+        var oldCurved = useCurvedVisual;
+
+        if (isCurvedSurround)
+        {
+            layoutMode = ClusterLayoutMode.Dynamic;
+            useCurvedVisual = true;
+        }
+        else
+        {
+            layoutMode = ClusterLayoutMode.FixedThreeSlot;
+            useCurvedVisual = false;
+        }
+
+        // Only update if something changed
+        if (oldLayoutMode != layoutMode || oldCurved != useCurvedVisual)
+        {
+            Debug.Log($"[WorldPanelClusterRig] Style changed: {(isCurvedSurround ? "Curved Surround" : "Flat Planar")} " +
+                $"(layout={layoutMode}, curved={useCurvedVisual})");
+
+            // Refresh layout and visuals
+            RefreshLayoutAndVisuals();
+        }
+    }
+
+    /// <summary>
+    /// Refresh layout and visuals without recreating panels.
+    /// Used for style switching during streaming.
+    /// </summary>
+    private void RefreshLayoutAndVisuals()
+    {
+        // Re-layout panels based on new mode
+        LayoutFromCamera();
+
+        // Re-apply cluster visuals
+        if (enableClusterVisuals)
+        {
+            ApplyClusterVisuals();
+        }
+    }
+
     void Update()
     {
         if (!Application.isPlaying && _panels.Count > 0) LayoutFromCamera();
