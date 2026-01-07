@@ -321,20 +321,21 @@ public class RTTRemoteMenuController : MonoBehaviour
     /// <summary>
     /// Get connection settings from the remote menu.
     /// </summary>
-    public (string host, string port, int monitors, string resolution, string bitrate, string fps) GetConnectionSettings()
+    public (string host, string port, int monitors, string style, string bitrate, string fps) GetConnectionSettings()
     {
         if (_remoteMenuInstance == null)
-            return ("localhost", "8080", 1, "1920 x 1080", "20 Mbps", "60 FPS");
+            return ("localhost", "8080", 1, "Flat Planar", "20 Mbps", "60 FPS");
 
         return (
             _remoteMenuInstance.Host,
             _remoteMenuInstance.Port,
             _remoteMenuInstance.MonitorIndex + 1,
-            _remoteMenuInstance.Resolution,
+            _remoteMenuInstance.Style,
             _remoteMenuInstance.Bitrate,
             _remoteMenuInstance.FPS
         );
     }
+
 
     #endregion
 
@@ -372,6 +373,15 @@ public class RTTRemoteMenuController : MonoBehaviour
 
         // Build cluster with the specified monitor count
         _clusterRig.BuildWithPanelCount(config.monitors);
+
+        // Apply style from RTTRemoteMenu (Flat Planar or Curved Surround)
+        if (_remoteMenuInstance != null)
+        {
+            int styleIndex = _remoteMenuInstance.StyleIndex; // 0=Flat Planar, 1=Curved Surround
+            bool isCurvedSurround = (styleIndex == 1);
+            _clusterRig.SetStyle(isCurvedSurround);
+            Debug.Log($"[RTTRemoteMenuController] Applied style: {(isCurvedSurround ? "Curved Surround" : "Flat Planar")}");
+        }
 
         // Start WebRTC update loop if not already running
         if (_webrtcUpdateCoroutine == null)
