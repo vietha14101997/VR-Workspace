@@ -374,6 +374,15 @@ public class RTTRemoteMenuController : MonoBehaviour
         // Build cluster with the specified monitor count
         _clusterRig.BuildWithPanelCount(config.monitors);
 
+        // Apply style from RTTRemoteMenu (Flat Planar or Curved Surround)
+        if (_remoteMenuInstance != null)
+        {
+            int styleIndex = _remoteMenuInstance.StyleIndex; // 0=Flat Planar, 1=Curved Surround
+            bool isCurvedSurround = (styleIndex == 1);
+            _clusterRig.SetStyle(isCurvedSurround);
+            Debug.Log($"[RTTRemoteMenuController] Applied style: {(isCurvedSurround ? "Curved Surround" : "Flat Planar")}");
+        }
+
         // Start WebRTC update loop if not already running
         if (_webrtcUpdateCoroutine == null)
         {
