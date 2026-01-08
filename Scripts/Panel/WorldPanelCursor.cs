@@ -9,6 +9,10 @@ public class WorldPanelCursor : MonoBehaviour
     public float sizeMeters = 0.035f;        // kích thước con trỏ (m)
     public float zOffset = 0.001f;           // nổi lên khỏi mặt board một chút
 
+    [Header("Behavior")]
+    public bool faceCamera = false;  // User request: disable camera dependency
+    public bool invertNormal = true; // Standard Quad front is -Z
+
     [Header("State (readonly)")]
     [Range(0, 1)] public float u = 0.5f;      // UV.x trong [0..1]
     [Range(0, 1)] public float v = 0.5f;      // UV.y trong [0..1]
@@ -127,13 +131,17 @@ public class WorldPanelCursor : MonoBehaviour
 
         // 3) Lấy pháp tuyến bề mặt (hướng "mặt trước" của Board)
         Vector3 n = _board.forward;
+        if (invertNormal) n = -n;
 
-        // 4) Bảo đảm đẩy TỚI camera (nếu pháp tuyến đang quay lưng camera thì đảo dấu)
-        Camera cam = Camera.main;
-        if (cam)
+        // 4) Bảo đảm đẩy TỚI camera (nếu enabled)
+        if (faceCamera)
         {
-            Vector3 toCam = cam.transform.position - worldPoint;
-            if (Vector3.Dot(n, toCam) < 0f) n = -n;
+            Camera cam = Camera.main;
+            if (cam)
+            {
+                Vector3 toCam = cam.transform.position - worldPoint;
+                if (Vector3.Dot(n, toCam) < 0f) n = -n;
+            }
         }
 
         // 5) Đặt vị trí thế giới và xoay "ốp" theo mặt Board
