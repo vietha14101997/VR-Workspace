@@ -77,6 +77,7 @@ public class RTTManager : MonoBehaviour
 
     #region Menu/App References
     [Header("Menu References")]
+    [SerializeField] private RTTMenu menu;
     [SerializeField] private RTTMenuFrame mainMenuFrame;
     [SerializeField] private RTTTaskbar taskbar;
 
@@ -167,6 +168,7 @@ public class RTTManager : MonoBehaviour
     public MenuState CurrentMenuState => _currentMenuState;
     public bool IsMainMenuActive => _currentMenuState == MenuState.MainMenu;
     public bool IsRemoteMenuActive => _currentMenuState == MenuState.RemoteMenu;
+    public RTTMenu Menu => menu;
     public RTTMenuFrame MenuFrame => mainMenuFrame;
     public RTTMainMenuController MainMenuController => mainMenuController;
     public RTTRemoteMenuController RemoteMenuController => remoteMenuController;
@@ -266,8 +268,19 @@ public class RTTManager : MonoBehaviour
 
     private void AutoFindReferences()
     {
+        // Find RTTMenu container first
+        if (menu == null)
+            menu = RTTMenu.Instance ?? FindObjectOfType<RTTMenu>();
+
         if (mainMenuFrame == null)
-            mainMenuFrame = RTTMenuFrame.PrimaryInstance ?? FindObjectOfType<RTTMenuFrame>();
+        {
+            // Try to get from RTTMenu first
+            if (menu != null)
+                mainMenuFrame = menu.MainFrame;
+            // Fallback to static instance or FindObjectOfType
+            if (mainMenuFrame == null)
+                mainMenuFrame = RTTMenuFrame.PrimaryInstance ?? FindObjectOfType<RTTMenuFrame>();
+        }
 
         if (taskbar == null)
             taskbar = RTTTaskbar.Instance ?? FindObjectOfType<RTTTaskbar>();
@@ -288,8 +301,14 @@ public class RTTManager : MonoBehaviour
             // Don't AddComponent here - let CreateRemoteMenuContent handle it
         }
 
-        if (frameParent == null && mainMenuFrame != null)
-            frameParent = mainMenuFrame.transform.parent;
+        // Set frameParent to RTTMenu if available, otherwise fallback to mainMenuFrame's parent
+        if (frameParent == null)
+        {
+            if (menu != null)
+                frameParent = menu.transform;
+            else if (mainMenuFrame != null)
+                frameParent = mainMenuFrame.transform.parent;
+        }
     }
 
     private void SubscribeToControllerEvents()
@@ -715,7 +734,7 @@ public class RTTManager : MonoBehaviour
         if (mainMenuFrame != null)
         {
             mainMenuFrame.gameObject.SetActive(true);
-            mainMenuFrame.SetPrimary(true);
+            mainMenuFrame.SetAsPrimaryFrame();
         }
 
         _currentMenuState = MenuState.MainMenu;
@@ -999,7 +1018,12 @@ public class RTTManager : MonoBehaviour
             if (kvp.Value.Controller != null && kvp.Value.Controller.gameObject != null)
                 Destroy(kvp.Value.Controller.gameObject);
             if (kvp.Value.Frame != null)
-                Destroy(kvp.Value.Frame.gameObject);
+            {
+                if (menu != null)
+                    menu.DestroyFrame(kvp.Value.Frame);
+                else
+                    Destroy(kvp.Value.Frame.gameObject);
+            }
             Debug.Log($"[RTTManager] Cancelled preparation for: {kvp.Key}");
         }
         _preparingApps.Clear();
@@ -1036,7 +1060,7 @@ public class RTTManager : MonoBehaviour
             if (mainMenuFrame != null)
             {
                 mainMenuFrame.gameObject.SetActive(true);
-                mainMenuFrame.SetPrimary(true);
+                mainMenuFrame.SetAsPrimaryFrame();
             }
 
             // Show the persistent Main Menu content
@@ -1065,7 +1089,13 @@ public class RTTManager : MonoBehaviour
         }
 
         if (app.Frame != null)
-            Destroy(app.Frame.gameObject);
+        {
+            // Use RTTMenu.DestroyFrame if available to properly track frame removal
+            if (menu != null)
+                menu.DestroyFrame(app.Frame);
+            else
+                Destroy(app.Frame.gameObject);
+        }
 
         if (taskbar != null && app.TaskbarSlotIndex > 0)
             taskbar.UnregisterApp(app.TaskbarSlotIndex);
@@ -1142,14 +1172,26 @@ public class RTTManager : MonoBehaviour
             yield return StartCoroutine(AnimateFrameScale(mainMenuFrame.transform, 1f, 0.9f, transitionOutDuration, true));
 
         // Create frame with unique name based on app ID
-        instance.Frame = RTTMenuFrame.Create(
-            frameParent,
-            mainMenuFrame.PanelWidth,
-            mainMenuFrame.PanelHeight,
-            mainMenuFrame.LogicalWidthValue,
-            isPrimaryFrame: false,
-            name: $"RTTMenuFrame_{instance.AppId}"
-        );
+        if (menu != null)
+        {
+            instance.Frame = menu.CreateAppFrame(
+                instance.AppId,
+                mainMenuFrame.PanelWidth,
+                mainMenuFrame.PanelHeight,
+                mainMenuFrame.LogicalWidthValue
+            );
+        }
+        else
+        {
+            // Fallback for when RTTMenu is not available
+            instance.Frame = RTTMenuFrame.Create(
+                frameParent,
+                mainMenuFrame.PanelWidth,
+                mainMenuFrame.PanelHeight,
+                mainMenuFrame.LogicalWidthValue,
+                name: $"RTTMenuFrame_{instance.AppId}"
+            );
+        }
 
         instance.Frame.transform.position = mainMenuFrame.transform.position;
         instance.Frame.transform.rotation = mainMenuFrame.transform.rotation;
@@ -1182,7 +1224,7 @@ public class RTTManager : MonoBehaviour
 
         instance.Frame.SetVisible(true); // Ensure DisplayQuad is visible
         ResetFrameAlpha(instance.Frame); // Reset material alpha in case of previous fade
-        instance.Frame.SetPrimary(true);
+        instance.Frame.SetAsPrimaryFrame();
         instance.IsVisible = true;
         _currentVisibleAppId = instance.AppId;
 
@@ -1220,14 +1262,26 @@ public class RTTManager : MonoBehaviour
         }
 
         // Create frame with unique name based on app ID
-        instance.Frame = RTTMenuFrame.Create(
-            frameParent,
-            mainMenuFrame.PanelWidth,
-            mainMenuFrame.PanelHeight,
-            mainMenuFrame.LogicalWidthValue,
-            isPrimaryFrame: false,
-            name: $"RTTMenuFrame_{instance.AppId}"
-        );
+        if (menu != null)
+        {
+            instance.Frame = menu.CreateAppFrame(
+                instance.AppId,
+                mainMenuFrame.PanelWidth,
+                mainMenuFrame.PanelHeight,
+                mainMenuFrame.LogicalWidthValue
+            );
+        }
+        else
+        {
+            // Fallback for when RTTMenu is not available
+            instance.Frame = RTTMenuFrame.Create(
+                frameParent,
+                mainMenuFrame.PanelWidth,
+                mainMenuFrame.PanelHeight,
+                mainMenuFrame.LogicalWidthValue,
+                name: $"RTTMenuFrame_{instance.AppId}"
+            );
+        }
 
         instance.Frame.transform.position = mainMenuFrame.transform.position + Vector3.up * 1000f;
         instance.Frame.transform.rotation = mainMenuFrame.transform.rotation;
@@ -1242,7 +1296,13 @@ public class RTTManager : MonoBehaviour
 
         if (instance.Frame.ContentContainer == null)
         {
-            if (instance.Frame != null) Destroy(instance.Frame.gameObject);
+            if (instance.Frame != null)
+            {
+                if (menu != null)
+                    menu.DestroyFrame(instance.Frame);
+                else
+                    Destroy(instance.Frame.gameObject);
+            }
             _preparingApps.Remove(instance.AppId);
             yield break;
         }
@@ -1290,7 +1350,7 @@ public class RTTManager : MonoBehaviour
             targetApp.Frame.gameObject.SetActive(true);
             targetApp.Frame.SetVisible(true); // Ensure DisplayQuad is visible
             ResetFrameAlpha(targetApp.Frame); // Reset material alpha in case of previous fade
-            targetApp.Frame.SetPrimary(true);
+            targetApp.Frame.SetAsPrimaryFrame();
             targetApp.IsVisible = true;
         }
         _currentVisibleAppId = appId;
@@ -1320,7 +1380,7 @@ public class RTTManager : MonoBehaviour
             targetApp.Frame.gameObject.SetActive(true);
             targetApp.Frame.SetVisible(true); // Ensure DisplayQuad is visible
             ResetFrameAlpha(targetApp.Frame); // Reset material alpha in case of previous fade
-            targetApp.Frame.SetPrimary(true);
+            targetApp.Frame.SetAsPrimaryFrame();
             targetApp.IsVisible = true;
 
             if (useFadeTransition)
@@ -1354,7 +1414,7 @@ public class RTTManager : MonoBehaviour
         {
             mainMenuFrame.gameObject.SetActive(true);
             mainMenuFrame.SetVisible(true); // Ensure DisplayQuad is visible
-            mainMenuFrame.SetPrimary(true);
+            mainMenuFrame.SetAsPrimaryFrame();
         }
         // Show the persistent Main Menu content
         if (_mainMenuContent != null)
@@ -1386,7 +1446,7 @@ public class RTTManager : MonoBehaviour
         {
             mainMenuFrame.gameObject.SetActive(true);
             mainMenuFrame.SetVisible(true); // Ensure DisplayQuad is visible
-            mainMenuFrame.SetPrimary(true);
+            mainMenuFrame.SetAsPrimaryFrame();
 
             if (useFadeTransition)
             {
@@ -1442,7 +1502,7 @@ public class RTTManager : MonoBehaviour
         instance.Frame.SetVisible(true); // Ensure DisplayQuad is visible
         ResetFrameAlpha(instance.Frame); // Reset material alpha in case of previous fade
         instance.Frame.MarkDirty(); // Force re-render
-        instance.Frame.SetPrimary(true);
+        instance.Frame.SetAsPrimaryFrame();
         instance.IsVisible = true;
         _currentVisibleAppId = instance.AppId;
 
@@ -1491,7 +1551,7 @@ public class RTTManager : MonoBehaviour
         {
             mainMenuFrame.gameObject.SetActive(true);
             mainMenuFrame.SetVisible(true); // Ensure DisplayQuad is visible
-            mainMenuFrame.SetPrimary(true);
+            mainMenuFrame.SetAsPrimaryFrame();
 
             if (useFadeTransition)
             {

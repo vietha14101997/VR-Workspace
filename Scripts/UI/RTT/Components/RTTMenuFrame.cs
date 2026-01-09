@@ -14,10 +14,6 @@ public class RTTMenuFrame : RTTCanvasBase
     #endregion
 
     #region Configuration
-    [Header("Primary Frame")]
-    [Tooltip("Only one RTTMenuFrame can be primary at a time")]
-    [SerializeField] private bool isPrimary = true;
-
     [Header("Panel Size (meters)")]
     [Tooltip("Physical width in meters")]
     [SerializeField] private float panelWidth = 1.6f;
@@ -100,12 +96,8 @@ public class RTTMenuFrame : RTTCanvasBase
     {
         base.Start();
 
-        // Register as primary
-        if (isPrimary)
-        {
-            SetAsPrimary();
-        }
-        else if (_primaryInstance == null)
+        // If no primary exists, register this as primary
+        if (_primaryInstance == null)
         {
             SetAsPrimary();
         }
@@ -130,12 +122,15 @@ public class RTTMenuFrame : RTTCanvasBase
     #region Primary Instance
     private void SetAsPrimary()
     {
-        if (_primaryInstance != null && _primaryInstance != this)
-        {
-            _primaryInstance.isPrimary = false;
-        }
         _primaryInstance = this;
-        isPrimary = true;
+    }
+
+    /// <summary>
+    /// Explicitly set this frame as primary (only one primary at a time).
+    /// </summary>
+    public void SetAsPrimaryFrame()
+    {
+        _primaryInstance = this;
     }
     #endregion
 
@@ -465,17 +460,6 @@ public class RTTMenuFrame : RTTCanvasBase
         contentMarginBottom = marginBottom;
     }
 
-    /// <summary>
-    /// Set whether this frame is primary (only one primary at a time).
-    /// </summary>
-    public void SetPrimary(bool primary)
-    {
-        isPrimary = primary;
-        if (primary)
-        {
-            SetAsPrimary();
-        }
-    }
 
     /// <summary>
     /// Enable or disable floating data particle effects.
@@ -502,7 +486,7 @@ public class RTTMenuFrame : RTTCanvasBase
     /// </summary>
     /// <param name="name">Optional custom name for the GameObject (default: "RTTMenuFrame")</param>
     public static RTTMenuFrame Create(Transform parent, float widthMeters, float heightMeters,
-        float logicalWidthPixels = 1920f, bool isPrimaryFrame = false, string name = null)
+        float logicalWidthPixels = 1920f, string name = null)
     {
         string frameName = string.IsNullOrEmpty(name) ? "RTTMenuFrame" : name;
         GameObject frameObj = new GameObject(frameName);
@@ -512,7 +496,6 @@ public class RTTMenuFrame : RTTCanvasBase
 
         RTTMenuFrame frame = frameObj.AddComponent<RTTMenuFrame>();
         frame.Configure(widthMeters, heightMeters, logicalWidthPixels);
-        frame.SetPrimary(isPrimaryFrame);
 
         return frame;
     }
@@ -522,9 +505,9 @@ public class RTTMenuFrame : RTTCanvasBase
     /// </summary>
     /// <param name="name">Optional custom name for the GameObject (default: "RTTMenuFrame")</param>
     public static RTTMenuFrame Create(Transform parent, float widthMeters, float heightMeters,
-        float logicalWidthPixels, Color borderColorA, Color borderColorB, bool isPrimaryFrame = false, string name = null)
+        float logicalWidthPixels, Color borderColorA, Color borderColorB, string name = null)
     {
-        RTTMenuFrame frame = Create(parent, widthMeters, heightMeters, logicalWidthPixels, isPrimaryFrame, name);
+        RTTMenuFrame frame = Create(parent, widthMeters, heightMeters, logicalWidthPixels, name);
         frame.glowColorA = borderColorA;
         frame.glowColorB = borderColorB;
         return frame;

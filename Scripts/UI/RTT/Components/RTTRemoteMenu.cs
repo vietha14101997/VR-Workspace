@@ -1420,7 +1420,7 @@ public class RTTRemoteMenu : MonoBehaviour
         float logicalWidthPixels = (sideWidth / _menuFrame.PanelWidth) * _menuFrame.LogicalWidthValue;
 
         // Create RTTMenuFrame for the side panel with unique name
-        frameRef = RTTMenuFrame.Create(_menuFrame.transform, sideWidth, sideHeight, logicalWidthPixels, false, name);
+        frameRef = RTTMenuFrame.Create(_menuFrame.transform, sideWidth, sideHeight, logicalWidthPixels, name);
         frameRef.transform.position = panelPos;
         frameRef.transform.rotation = panelRot;
         frameRef.transform.localScale = Vector3.one;
