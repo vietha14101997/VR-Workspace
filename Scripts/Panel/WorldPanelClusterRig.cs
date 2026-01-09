@@ -108,6 +108,154 @@ public class WorldPanelClusterRig : MonoBehaviour
     }
 
     /// <summary>
+    /// Get the world size of the cluster based on panel bounds.
+    /// Returns Vector2 (width, height) in world units.
+    /// </summary>
+    public Vector2 GetWorldSize()
+    {
+        if (_panels == null || _panels.Count == 0)
+        {
+            return Vector2.zero;
+        }
+
+        // Calculate bounds from all panels
+        Bounds combinedBounds = new Bounds();
+        bool first = true;
+
+        foreach (var panel in _panels)
+        {
+            if (panel == null) continue;
+
+            // Get panel's world bounds
+            Bounds panelBounds = new Bounds(panel.transform.position, Vector3.zero);
+
+            // Use panel's width and height
+            float halfWidth = panel.width / 2f;
+            float halfHeight = panel.height / 2f;
+
+            // Expand bounds based on panel's local axes
+            Vector3 right = panel.transform.right * halfWidth;
+            Vector3 up = panel.transform.up * halfHeight;
+
+            panelBounds.Encapsulate(panel.transform.position + right + up);
+            panelBounds.Encapsulate(panel.transform.position + right - up);
+            panelBounds.Encapsulate(panel.transform.position - right + up);
+            panelBounds.Encapsulate(panel.transform.position - right - up);
+
+            if (first)
+            {
+                combinedBounds = panelBounds;
+                first = false;
+            }
+            else
+            {
+                combinedBounds.Encapsulate(panelBounds);
+            }
+        }
+
+        // Return width (x) and height (y)
+        return new Vector2(combinedBounds.size.x, combinedBounds.size.y);
+    }
+
+    /// <summary>
+    /// Get the combined bounds of all panels in world space.
+    /// </summary>
+    public Bounds GetWorldBounds()
+    {
+        Bounds combinedBounds = new Bounds(transform.position, Vector3.zero);
+
+        if (_panels == null || _panels.Count == 0)
+        {
+            return combinedBounds;
+        }
+
+        bool first = true;
+        foreach (var panel in _panels)
+        {
+            if (panel == null) continue;
+
+            // Get panel's world bounds
+            Bounds panelBounds = new Bounds(panel.transform.position, Vector3.zero);
+
+            float halfWidth = panel.width / 2f;
+            float halfHeight = panel.height / 2f;
+
+            Vector3 right = panel.transform.right * halfWidth;
+            Vector3 up = panel.transform.up * halfHeight;
+
+            panelBounds.Encapsulate(panel.transform.position + right + up);
+            panelBounds.Encapsulate(panel.transform.position + right - up);
+            panelBounds.Encapsulate(panel.transform.position - right + up);
+            panelBounds.Encapsulate(panel.transform.position - right - up);
+
+            if (first)
+            {
+                combinedBounds = panelBounds;
+                first = false;
+            }
+            else
+            {
+                combinedBounds.Encapsulate(panelBounds);
+            }
+        }
+
+        return combinedBounds;
+    }
+
+    /// <summary>
+    /// Get bounds for taskbar follow positioning.
+    /// - FixedThreeSlot: Returns bounds of center panel only
+    /// - Dynamic: Returns combined bounds of all panels
+    /// </summary>
+    public Bounds GetFollowBounds()
+    {
+        if (_panels == null || _panels.Count == 0)
+        {
+            return new Bounds(transform.position, Vector3.zero);
+        }
+
+        // FixedThreeSlot mode: use center panel bounds
+        if (layoutMode == ClusterLayoutMode.FixedThreeSlot)
+        {
+            // In FixedThreeSlot:
+            // 1 panel: index 0 is center
+            // 2 panels: index 0 is center, index 1 is right
+            // 3 panels: index 0 is left, index 1 is center, index 2 is right
+            int centerIndex = _panels.Count == 3 ? 1 : 0;
+            var centerPanel = _panels[centerIndex];
+
+            if (centerPanel != null)
+            {
+                return GetPanelBounds(centerPanel);
+            }
+        }
+
+        // Dynamic mode: use combined bounds of all panels
+        return GetWorldBounds();
+    }
+
+    /// <summary>
+    /// Get bounds of a single panel.
+    /// </summary>
+    private Bounds GetPanelBounds(WorldPanelPlus panel)
+    {
+        Bounds bounds = new Bounds(panel.transform.position, Vector3.zero);
+
+        float halfWidth = panel.width / 2f;
+        float halfHeight = panel.height / 2f;
+
+        Vector3 right = panel.transform.right * halfWidth;
+        Vector3 up = panel.transform.up * halfHeight;
+
+        bounds.Encapsulate(panel.transform.position + right + up);
+        bounds.Encapsulate(panel.transform.position + right - up);
+        bounds.Encapsulate(panel.transform.position - right + up);
+        bounds.Encapsulate(panel.transform.position - right - up);
+
+        return bounds;
+    }
+
+    /// <summary>
     /// Ensures the cluster rig is placed inside a VirtualObjects parent and has the correct layer
     /// </summary>
     void EnsureVirtualObjectsParent()

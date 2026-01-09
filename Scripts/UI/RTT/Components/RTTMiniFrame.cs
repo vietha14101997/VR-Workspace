@@ -56,8 +56,8 @@ public class RTTMiniFrame : RTTCanvasBase
 
     [Header("Position Tracking")]
     [SerializeField] private Transform followTarget;
-    [SerializeField] private float spacingMultiplier = 0.1f; // multiplier of taskbar height for gap (0.1 = small gap)
-    [SerializeField] private bool faceOnInit = true; // Face camera on initialization and continuously
+    [SerializeField] private float spacingMultiplier = 1f;
+    [SerializeField] private bool faceOnInit = true;
     #endregion
 
     #region Private Fields
@@ -104,6 +104,11 @@ public class RTTMiniFrame : RTTCanvasBase
     public float ButtonSpacing => buttonSpacing;
     public int Section1Capacity => section1Capacity;
     public int Section2Capacity => section2Capacity;
+
+    /// <summary>
+    /// Get the network text component for custom content (e.g., latency display).
+    /// </summary>
+    public TextMeshProUGUI GetNetworkText() => _networkText;
     #endregion
 
     #region Lifecycle
@@ -784,8 +789,10 @@ public class RTTMiniFrame : RTTCanvasBase
     {
         if (followTarget == null) return;
 
-        // Get target bounds (try RTTCanvasBase first, then RTTMenu, then renderer)
+        // Get target bounds (try RTTCanvasBase first, then RTTMenu, then WorldPanelClusterRig, then renderer)
         float targetHalfHeight = 0f;
+        Vector3 targetCenter = followTarget.position;
+
         var targetRTT = followTarget.GetComponent<RTTCanvasBase>();
         if (targetRTT != null)
         {
@@ -801,11 +808,26 @@ public class RTTMiniFrame : RTTCanvasBase
             }
             else
             {
-                // Fallback: try to get from renderer bounds
-                var renderer = followTarget.GetComponent<Renderer>();
-                if (renderer != null)
+                // Try WorldPanelClusterRig (for Remote Desktop streaming)
+                var clusterRig = followTarget.GetComponent<WorldPanelClusterRig>();
+                if (clusterRig != null)
                 {
-                    targetHalfHeight = renderer.bounds.extents.y;
+                    // GetFollowBounds returns:
+                    // - FixedThreeSlot: center panel bounds (taskbar under center monitor)
+                    // - Dynamic: combined bounds (taskbar under entire cluster)
+                    Bounds bounds = clusterRig.GetFollowBounds();
+                    targetHalfHeight = bounds.extents.y;
+                    targetCenter = bounds.center;
+                }
+                else
+                {
+                    // Fallback: try to get from renderer bounds
+                    var renderer = followTarget.GetComponent<Renderer>();
+                    if (renderer != null)
+                    {
+                        targetHalfHeight = renderer.bounds.extents.y;
+                        targetCenter = renderer.bounds.center;
+                    }
                 }
             }
         }
@@ -817,10 +839,10 @@ public class RTTMiniFrame : RTTCanvasBase
         float gap = physicalHeight * spacingMultiplier;
         float totalOffset = targetHalfHeight + myHalfHeight + gap;
 
-        // Calculate position below follow target in LOCAL space of followTarget
-        // This ensures RTTMiniFrame stays below followTarget even when it's rotated
+        // Calculate position below follow target center
+        // Use world down direction for consistency with curved panels
         Vector3 localDown = followTarget.TransformDirection(Vector3.down);
-        transform.position = followTarget.position + localDown * totalOffset;
+        transform.position = targetCenter + localDown * totalOffset;
 
         // Face towards camera independently
         FaceCamera();

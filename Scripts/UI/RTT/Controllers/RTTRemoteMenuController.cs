@@ -28,6 +28,9 @@ public class RTTRemoteMenuController : MonoBehaviour
     private bool _isStreamingActive = false;
     private Coroutine _webrtcUpdateCoroutine;
 
+    // Remote taskbar (follows ClusterRig during streaming)
+    private RTTRemoteTaskbar _remoteTaskbar;
+
     // Cursor tracking
     private int _activeCursorPanelIndex = -1;
 
@@ -46,6 +49,7 @@ public class RTTRemoteMenuController : MonoBehaviour
     #region Properties
     public RTTRemoteMenu RemoteMenuInstance => _remoteMenuInstance;
     public RemoteConnectionPipeline ConnectionPipeline => connectionPipeline;
+    public RTTRemoteTaskbar RemoteTaskbar => _remoteTaskbar;
     #endregion
 
     #region Public API
@@ -169,6 +173,9 @@ public class RTTRemoteMenuController : MonoBehaviour
         CleanupProgressOverlays();
         _isStreamingActive = false;
 
+        // Cleanup remote taskbar
+        CleanupRemoteTaskbar();
+
         // Cleanup mipmap textures
         CleanupMipmapTextures();
 
@@ -185,6 +192,9 @@ public class RTTRemoteMenuController : MonoBehaviour
             Destroy(_clusterRig.gameObject);
             _clusterRig = null;
         }
+
+        // Show main menu and taskbar after cleanup
+        ShowMainMenuAndTaskbar();
 
         _menuObject = null;
     }
@@ -396,6 +406,198 @@ public class RTTRemoteMenuController : MonoBehaviour
             var overlay = panel.gameObject.AddComponent<PanelProgressOverlay>();
             overlay.Initialize(panel);
             _progressOverlays.Add(overlay);
+        }
+
+        // Create Remote Taskbar that follows ClusterRig
+        CreateRemoteTaskbar();
+
+        // Hide main menu and taskbar when ClusterRig appears
+        HideMainMenuAndTaskbar();
+    }
+
+    /// <summary>
+    /// Hide RTTMenuFrame and RTTTaskbar when entering streaming mode.
+    /// </summary>
+    private void HideMainMenuAndTaskbar()
+    {
+        // Hide RTTMenuFrame (primary instance)
+        RTTMenuFrame menuFrame = RTTMenuFrame.PrimaryInstance;
+        if (menuFrame != null)
+        {
+            menuFrame.Hide();
+            Debug.Log("[RTTRemoteMenuController] Hidden RTTMenuFrame");
+        }
+
+        // Hide RTTTaskbar
+        RTTTaskbar taskbar = RTTTaskbar.Instance;
+        if (taskbar != null)
+        {
+            taskbar.Hide();
+            Debug.Log("[RTTRemoteMenuController] Hidden RTTTaskbar");
+        }
+    }
+
+    /// <summary>
+    /// Show RTTMenuFrame and RTTTaskbar when exiting streaming mode.
+    /// </summary>
+    private void ShowMainMenuAndTaskbar()
+    {
+        // Show RTTMenuFrame
+        RTTMenuFrame menuFrame = RTTMenuFrame.PrimaryInstance;
+        if (menuFrame != null)
+        {
+            menuFrame.Show();
+            Debug.Log("[RTTRemoteMenuController] Shown RTTMenuFrame");
+        }
+
+        // Show RTTTaskbar
+        RTTTaskbar taskbar = RTTTaskbar.Instance;
+        if (taskbar != null)
+        {
+            taskbar.Show();
+            Debug.Log("[RTTRemoteMenuController] Shown RTTTaskbar");
+        }
+    }
+
+    /// <summary>
+    /// Create RTTRemoteTaskbar that follows the ClusterRig.
+    /// </summary>
+    private void CreateRemoteTaskbar()
+    {
+        if (_clusterRig == null) return;
+
+        // Cleanup existing taskbar
+        CleanupRemoteTaskbar();
+
+        // Create taskbar object
+        GameObject taskbarObj = new GameObject("RTTRemoteTaskbar");
+
+        // Parent to VirtualObjects if exists, otherwise to ClusterRig parent
+        GameObject virtualObjects = GameObject.Find("VirtualObjects");
+        if (virtualObjects != null)
+        {
+            taskbarObj.transform.SetParent(virtualObjects.transform, false);
+        }
+        else
+        {
+            taskbarObj.transform.SetParent(_clusterRig.transform.parent, false);
+        }
+
+        // Add RTTMiniFrame first (required component)
+        RTTMiniFrame frame = taskbarObj.AddComponent<RTTMiniFrame>();
+        frame.Configure(
+            sec1Capacity: 5,    // Back, Bitrate, FPS, Passthrough, Recenter
+            sec2Capacity: 4,    // Zoom + 3 monitor slots
+            btnSize: 90f,
+            btnSpacing: 12f,
+            height: 128f
+        );
+
+        // Add RTTRemoteTaskbar controller
+        _remoteTaskbar = taskbarObj.AddComponent<RTTRemoteTaskbar>();
+        _remoteTaskbar.SetFollowTarget(_clusterRig);
+
+        // Subscribe to taskbar events
+        _remoteTaskbar.OnMenuRequested += HandleTaskbarMenuRequest;
+        _remoteTaskbar.OnDisconnectRequested += HandleTaskbarDisconnect;
+
+        Debug.Log("[RTTRemoteMenuController] Created RTTRemoteTaskbar following ClusterRig");
+    }
+
+    /// <summary>
+    /// Handle taskbar menu request (first back press).
+    /// Hides ClusterRig and RTTRemoteTaskbar, shows RTTMenuFrame and RTTTaskbar.
+    /// Does NOT fire OnBackClicked to avoid closing the app.
+    /// </summary>
+    private void HandleTaskbarMenuRequest()
+    {
+        Debug.Log("[RTTRemoteMenuController] Taskbar menu requested - returning to RemoteMenu");
+
+        // Hide RTTRemoteTaskbar
+        if (_remoteTaskbar != null)
+        {
+            _remoteTaskbar.Hide();
+        }
+
+        // Hide ClusterRig
+        if (_clusterRig != null)
+        {
+            _clusterRig.gameObject.SetActive(false);
+        }
+
+        // Show RTTMenuFrame and RTTTaskbar
+        ShowMainMenuAndTaskbar();
+
+        // Note: Do NOT fire OnBackClicked here - it would close the app
+        // OnBackClicked is only for when user actually wants to exit RemoteDesktop
+    }
+
+    /// <summary>
+    /// Handle taskbar disconnect request.
+    /// Disconnects and returns to main menu.
+    /// </summary>
+    private void HandleTaskbarDisconnect()
+    {
+        Debug.Log("[RTTRemoteMenuController] Taskbar disconnect requested");
+
+        // Cleanup and disconnect (ShowMainMenuAndTaskbar is called in Cleanup)
+        Cleanup();
+
+        // Switch to home menu
+        RTTManager appManager = RTTManager.Instance;
+        if (appManager != null)
+        {
+            appManager.SwitchToHome();
+        }
+    }
+
+    /// <summary>
+    /// Resume streaming from RTTRemoteMenu overlay.
+    /// Hides menu and taskbar, shows ClusterRig and RTTRemoteTaskbar again.
+    /// </summary>
+    public void ResumeStreaming()
+    {
+        Debug.Log("[RTTRemoteMenuController] Resuming streaming");
+
+        // Hide RTTMenuFrame
+        RTTMenuFrame menuFrame = RTTMenuFrame.PrimaryInstance;
+        if (menuFrame != null)
+        {
+            menuFrame.Hide();
+        }
+
+        // Hide RTTTaskbar
+        RTTTaskbar taskbar = RTTTaskbar.Instance;
+        if (taskbar != null)
+        {
+            taskbar.Hide();
+        }
+
+        // Show ClusterRig
+        if (_clusterRig != null)
+        {
+            _clusterRig.gameObject.SetActive(true);
+        }
+
+        // Show RTTRemoteTaskbar
+        if (_remoteTaskbar != null)
+        {
+            _remoteTaskbar.Show();
+            _remoteTaskbar.OnMenuDismissed(); // Reset back button state
+        }
+    }
+
+    /// <summary>
+    /// Cleanup remote taskbar.
+    /// </summary>
+    private void CleanupRemoteTaskbar()
+    {
+        if (_remoteTaskbar != null)
+        {
+            _remoteTaskbar.OnMenuRequested -= HandleTaskbarMenuRequest;
+            _remoteTaskbar.OnDisconnectRequested -= HandleTaskbarDisconnect;
+            Destroy(_remoteTaskbar.gameObject);
+            _remoteTaskbar = null;
         }
     }
 

@@ -445,6 +445,15 @@ namespace VRWorkspace.ViewModels
         }
 
         /// <summary>
+        /// Get streaming metrics (latency, jitter, FPS, etc.).
+        /// Returns null if not connected.
+        /// </summary>
+        public StreamingMetrics GetMetrics()
+        {
+            return _client?.Metrics;
+        }
+
+        /// <summary>
         /// Update streaming configuration during Phase 3 (Streaming).
         /// Sends update_config message to server for dynamic FPS/Bitrate changes.
         /// </summary>
