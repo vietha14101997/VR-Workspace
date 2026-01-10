@@ -245,17 +245,12 @@ public class RTTTaskbar : MonoBehaviour
                 iconImg.color = Color.Lerp(targetColor, Color.white, 0.9f);
 
                 Shadow[] shadows = iconTransform.GetComponents<Shadow>();
-                if (shadows.Length >= 4)
+                if (shadows.Length >= 2)
                 {
                     Color glowCol = Color.Lerp(targetColor, Color.white, 0.7f);
                     glowCol.a = 0.4f;
                     shadows[0].effectColor = glowCol;
                     shadows[1].effectColor = glowCol;
-
-                    Color bloomCol = Color.Lerp(targetColor, Color.white, 0.8f);
-                    bloomCol.a = 0.15f;
-                    shadows[2].effectColor = bloomCol;
-                    shadows[3].effectColor = bloomCol;
                 }
             }
         }
@@ -473,17 +468,12 @@ public class RTTTaskbar : MonoBehaviour
             iconImg.color = Color.Lerp(color, Color.white, 0.9f);
 
             Shadow[] shadows = iconTransform.GetComponents<Shadow>();
-            if (shadows.Length >= 4)
+            if (shadows.Length >= 2)
             {
                 Color glowCol = Color.Lerp(color, Color.white, 0.7f);
                 glowCol.a = 0.4f;
                 shadows[0].effectColor = glowCol;
                 shadows[1].effectColor = glowCol;
-
-                Color bloomCol = Color.Lerp(color, Color.white, 0.8f);
-                bloomCol.a = 0.15f;
-                shadows[2].effectColor = bloomCol;
-                shadows[3].effectColor = bloomCol;
             }
         }
     }

@@ -35,6 +35,8 @@ public class RTTRemoteMenu : MonoBehaviour
     public event Action OnStartClicked;
 #pragma warning restore CS0067
     public event Action<ConnectionPhase> OnConnectionStateChanged;
+    public event Action OnDisconnectClicked;
+    public event Action OnResumeClicked;
     #endregion
 
     #region Private Fields
@@ -54,6 +56,11 @@ public class RTTRemoteMenu : MonoBehaviour
     private GameObject _connectButton;
     private TextMeshProUGUI _connectButtonText;
     private ConnectionPhase _currentPhase = ConnectionPhase.Disconnected;
+
+    // Streaming mode buttons (shown when streaming, hidden otherwise)
+    private GameObject _streamingButtonsContainer;
+    private GameObject _disconnectButton;
+    private GameObject _resumeButton;
 
     // ViewModel reference (via ServiceLocator or created locally)
     private ConnectionViewModel _viewModel;
@@ -94,7 +101,7 @@ public class RTTRemoteMenu : MonoBehaviour
     // Default dropdown options (without Recommended suffix)
     private static readonly string[] MONITOR_OPTIONS = { "1 Monitor", "2 Monitors", "3 Monitors" };
     private static readonly string[] STYLE_OPTIONS = { "Flat Planar", "Curved Surround" };
-    private static readonly string[] BITRATE_OPTIONS = { "5 Mbps", "10 Mbps", "15 Mbps", "20 Mbps", "30 Mbps" };
+    private static readonly string[] BITRATE_OPTIONS = { "10 Mbps", "15 Mbps", "20 Mbps", "25 Mbps", "30 Mbps" };
     private static readonly string[] FPS_OPTIONS = { "30 FPS", "45 FPS", "60 FPS" };
     #endregion
 
@@ -224,6 +231,11 @@ public class RTTRemoteMenu : MonoBehaviour
         _viewModel.SpeedTestProgress.OnChanged += HandleSpeedTestProgressValue;
         _viewModel.CurrentBandwidth.OnChanged += HandleBandwidthChanged;
         _viewModel.ErrorMessage.OnChanged += HandleErrorMessage;
+
+        // Subscribe to progress events for button text updates
+        _viewModel.ServerSetupProgress.OnChanged += HandleServerSetupProgressForButton;
+        _viewModel.MonitorIceProgress.OnChanged += HandleMonitorIceProgressForButton;
+        _viewModel.OnAllMonitorsReady += HandleAllMonitorsReadyForButton;
 
         // Update UI with current state
         HandlePhaseChanged(_viewModel.Phase.Value);
@@ -501,6 +513,7 @@ public class RTTRemoteMenu : MonoBehaviour
     #region Connect Button
     private void CreateConnectButton(Transform parent, float w, float h)
     {
+        // Main connect button
         var config = new VRButtonFactory.ButtonConfig
         {
             label = "CONNECT",
@@ -532,6 +545,159 @@ public class RTTRemoteMenu : MonoBehaviour
         rt.anchorMax = new Vector2(0.5f, 0);
         rt.pivot = new Vector2(0.5f, 0);
         rt.anchoredPosition = Vector2.zero;
+
+        // Create streaming buttons container (hidden by default)
+        CreateStreamingButtons(parent, w, h);
+    }
+
+    /// <summary>
+    /// Create DISCONNECT and RESUME buttons for streaming mode.
+    /// These are hidden by default and shown when streaming is active.
+    /// Buttons are positioned to align with Bitrate and FPS dropdowns.
+    /// </summary>
+    private void CreateStreamingButtons(Transform parent, float totalWidth, float h)
+    {
+        // Container for streaming buttons - use full parent width for positioning
+        _streamingButtonsContainer = new GameObject("StreamingButtons");
+        _streamingButtonsContainer.transform.SetParent(parent, false);
+
+        // Get parent width to calculate dropdown positions
+        RectTransform parentRT = parent.GetComponent<RectTransform>();
+        float parentWidth = parentRT != null ? parentRT.sizeDelta.x : totalWidth;
+
+        RectTransform containerRT = _streamingButtonsContainer.AddComponent<RectTransform>();
+        containerRT.anchorMin = new Vector2(0.5f, 0);
+        containerRT.anchorMax = new Vector2(0.5f, 0);
+        containerRT.pivot = new Vector2(0.5f, 0);
+        containerRT.anchoredPosition = Vector2.zero;
+        containerRT.sizeDelta = new Vector2(parentWidth, h);
+
+        // Calculate dropdown cell positions (same as CreateGrid)
+        float gapX = 20f; // Approximate gap between dropdowns
+        float cellW = (parentWidth - gapX) / 2f;
+        float buttonWidth = cellW * 0.8f; // Button slightly smaller than dropdown
+
+        // Calculate center positions relative to container center
+        float parentCenterX = parentWidth / 2f;
+        float bitrateCenterX = cellW / 2f;  // Center of left cell
+        float fpsCenterX = cellW + gapX + cellW / 2f;  // Center of right cell
+
+        // DISCONNECT button (under Bitrate) - colorB (deeper blue)
+        Color disconnectColorB = new Color(0.1f, 0.5f, 0.85f); // connectColorB from original
+        var disconnectConfig = new VRButtonFactory.ButtonConfig
+        {
+            label = "DISCONNECT",
+            themeColor = disconnectColorB,
+            width = buttonWidth,
+            height = h,
+            fontSize = 36,
+            font = customFont,
+            textOnly = true,
+            backgroundAlpha = 0.85f,
+            cornerRadius = 0.15f,
+            edgePadding = 0.08f,
+            popAmount = 0.05f,
+            useConnectButtonShader = true,
+            connectColorA = disconnectColorB,
+            connectColorB = new Color(0.05f, 0.3f, 0.6f),
+            connectColorC = new Color(0.2f, 0.6f, 0.9f)
+        };
+
+        _disconnectButton = VRButtonFactory.CreateButton(_streamingButtonsContainer.transform, disconnectConfig, OnDisconnectButtonClicked);
+        RectTransform disconnectRT = _disconnectButton.GetComponent<RectTransform>();
+        disconnectRT.anchorMin = new Vector2(0.5f, 0.5f);
+        disconnectRT.anchorMax = new Vector2(0.5f, 0.5f);
+        disconnectRT.pivot = new Vector2(0.5f, 0.5f);
+        disconnectRT.anchoredPosition = new Vector2(bitrateCenterX - parentCenterX, 0);
+
+        // RESUME button (under FPS) - colorA (themeColor)
+        var resumeConfig = new VRButtonFactory.ButtonConfig
+        {
+            label = "RESUME",
+            themeColor = themeColor, // connectColorA
+            width = buttonWidth,
+            height = h,
+            fontSize = 36,
+            font = customFont,
+            textOnly = true,
+            backgroundAlpha = 0.85f,
+            cornerRadius = 0.15f,
+            edgePadding = 0.08f,
+            popAmount = 0.05f,
+            useConnectButtonShader = true,
+            connectColorA = themeColor,
+            connectColorB = new Color(themeColor.r * 0.6f, themeColor.g * 0.6f, themeColor.b * 0.6f),
+            connectColorC = accentColor
+        };
+
+        _resumeButton = VRButtonFactory.CreateButton(_streamingButtonsContainer.transform, resumeConfig, OnResumeButtonClicked);
+        RectTransform resumeRT = _resumeButton.GetComponent<RectTransform>();
+        resumeRT.anchorMin = new Vector2(0.5f, 0.5f);
+        resumeRT.anchorMax = new Vector2(0.5f, 0.5f);
+        resumeRT.pivot = new Vector2(0.5f, 0.5f);
+        resumeRT.anchoredPosition = new Vector2(fpsCenterX - parentCenterX, 0);
+
+        // Hide streaming buttons by default
+        _streamingButtonsContainer.SetActive(false);
+    }
+
+    /// <summary>
+    /// Handle DISCONNECT button click.
+    /// Disconnects from server and resets menu to initial state.
+    /// </summary>
+    private async void OnDisconnectButtonClicked()
+    {
+        Debug.Log("[RTTRemoteMenu] DISCONNECT clicked");
+
+        // Fire event for controller to handle
+        OnDisconnectClicked?.Invoke();
+
+        // Disconnect via ViewModel
+        if (_viewModel != null)
+        {
+            await _viewModel.DisconnectAsync();
+        }
+
+        // Switch back to connect button
+        ShowConnectButton();
+    }
+
+    /// <summary>
+    /// Handle RESUME button click.
+    /// Returns to the ClusterRig/streaming view.
+    /// </summary>
+    private void OnResumeButtonClicked()
+    {
+        Debug.Log("[RTTRemoteMenu] RESUME clicked");
+
+        // Fire event for controller to handle (hide menu, show ClusterRig)
+        OnResumeClicked?.Invoke();
+    }
+
+    /// <summary>
+    /// Show streaming buttons (DISCONNECT + RESUME) and hide connect button.
+    /// Called when streaming is active and menu is shown.
+    /// </summary>
+    public void ShowStreamingButtons()
+    {
+        if (_connectButton != null)
+            _connectButton.SetActive(false);
+
+        if (_streamingButtonsContainer != null)
+            _streamingButtonsContainer.SetActive(true);
+    }
+
+    /// <summary>
+    /// Show connect button and hide streaming buttons.
+    /// Called when disconnected or not streaming.
+    /// </summary>
+    public void ShowConnectButton()
+    {
+        if (_streamingButtonsContainer != null)
+            _streamingButtonsContainer.SetActive(false);
+
+        if (_connectButton != null)
+            _connectButton.SetActive(true);
     }
 
     /// <summary>
@@ -613,22 +779,28 @@ public class RTTRemoteMenu : MonoBehaviour
                 break;
 
             case ConnectionPhase.ConfiguringSettings:
-                // NEW FLOW: Start button clicked - create ClusterRig and show progress
-                Debug.Log("[RTTRemoteMenu] Starting with progress UI...");
-                UpdateButtonText("STARTING...");
+                // NEW FLOW: Start button clicked - show progress on button, don't create ClusterRig yet
+                Debug.Log("[RTTRemoteMenu] Starting with button progress...");
+
+                // Build config from form dropdowns BEFORE locking inputs
+                // This ensures we read the correct values from dropdowns
+                var config = BuildConfigFromForm();
 
                 // Save user selections
                 SaveCurrentSelections();
 
-                // Hide menu immediately
-                HideMenu();
+                // Lock all inputs but keep menu visible
+                LockAllInputs();
 
-                // Build config from form dropdowns and start new flow
-                var config = BuildConfigFromForm();
+                // Reset and show initial progress immediately
+                ResetButtonProgress();
+                UpdateButtonText("Server Setup... 0%");
+
                 if (config != null)
                 {
                     OnSetupClicked?.Invoke();
-                    // Use new flow that creates ClusterRig and shows progress
+                    // Start connection - progress will be shown on button text
+                    // ClusterRig will be created later when streaming is ready
                     await _viewModel.StartWithProgressAsync(config);
                 }
                 break;
@@ -664,14 +836,25 @@ public class RTTRemoteMenu : MonoBehaviour
 
         // Parse Total Bitrate from dropdown (this is total for all monitors)
         int bitrateKbps = suggested.bitrateKbps;
-        var bitrate = RemotePreferences.CleanValue(Bitrate);
+        var bitrateRaw = Bitrate;
+        var bitrate = RemotePreferences.CleanValue(bitrateRaw);
+        Debug.Log($"[RTTRemoteMenu] BuildConfigFromForm: Bitrate raw='{bitrateRaw}', cleaned='{bitrate}', suggested={suggested.bitrateKbps}");
         if (!string.IsNullOrEmpty(bitrate))
         {
             var numStr = bitrate.Replace(" ", "").Replace("Mbps", "").Replace("mbps", "");
             if (int.TryParse(numStr, out int mbps))
             {
                 bitrateKbps = mbps * 1000;
+                Debug.Log($"[RTTRemoteMenu] BuildConfigFromForm: Parsed bitrate={mbps} Mbps -> {bitrateKbps} kbps");
             }
+            else
+            {
+                Debug.LogWarning($"[RTTRemoteMenu] BuildConfigFromForm: Failed to parse bitrate from '{numStr}', using suggested={suggested.bitrateKbps}");
+            }
+        }
+        else
+        {
+            Debug.LogWarning($"[RTTRemoteMenu] BuildConfigFromForm: Bitrate empty, using suggested={suggested.bitrateKbps}");
         }
 
         // Parse FPS
@@ -761,6 +944,8 @@ public class RTTRemoteMenu : MonoBehaviour
         switch (phase)
         {
             case ConnectionPhase.Disconnected:
+                // Show connect button (hide streaming buttons)
+                ShowConnectButton();
                 UpdateButtonText("CONNECT");
                 InitializeDropdownsDisabled();
                 VRInputFieldFactory.SetInteractable(_hostInput, !_isUsbMode);  // Disabled when USB mode
@@ -771,6 +956,8 @@ public class RTTRemoteMenu : MonoBehaviour
                 _cachedHardwareInfo = null;
                 _cachedNetworkInfo = null;
                 _cachedSuggestedConfig = null;
+                // Reset button progress tracking
+                ResetButtonProgress();
                 break;
 
             case ConnectionPhase.Connecting:
@@ -791,12 +978,10 @@ public class RTTRemoteMenu : MonoBehaviour
 
             case ConnectionPhase.SendingDisplayConfig:
             case ConnectionPhase.AwaitingSetupComplete:
-                UpdateButtonText("SETTING UP...");
-                LockAllInputs();
-                break;
-
             case ConnectionPhase.ICENegotiating:
-                UpdateButtonText("NEGOTIATING...");
+                // Don't set fixed text here - let progress handlers update with percentages
+                // Progress handlers will show: "Server Setup... X%" or "Connecting... X%"
+                LockAllInputs();
                 break;
 
             case ConnectionPhase.ReadyToStream:
@@ -808,7 +993,10 @@ public class RTTRemoteMenu : MonoBehaviour
                 break;
 
             case ConnectionPhase.Streaming:
-                UpdateButtonText("STREAMING");
+                // Show streaming buttons (DISCONNECT + RESUME) instead of connect button
+                ShowStreamingButtons();
+                // Hide side panels when streaming starts (menu is hidden by controller)
+                HideSidePanels();
                 break;
 
             case ConnectionPhase.Reconnecting:
@@ -817,6 +1005,7 @@ public class RTTRemoteMenu : MonoBehaviour
 
             case ConnectionPhase.Error:
                 // Treat Error same as Disconnected - show CONNECT, not RETRY
+                ShowConnectButton();
                 UpdateButtonText("CONNECT");
                 InitializeDropdownsDisabled();
                 VRInputFieldFactory.SetInteractable(_hostInput, !_isUsbMode);  // Disabled when USB mode
@@ -827,6 +1016,8 @@ public class RTTRemoteMenu : MonoBehaviour
                 _cachedHardwareInfo = null;
                 _cachedNetworkInfo = null;
                 _cachedSuggestedConfig = null;
+                // Reset button progress tracking
+                ResetButtonProgress();
                 break;
         }
     }
@@ -897,6 +1088,93 @@ public class RTTRemoteMenu : MonoBehaviour
         // Update is handled in HandleSpeedTestProgressValue
         _lastReportedMbps = mbps;
     }
+
+    #region Button Progress Handlers
+    private int _buttonServerProgress = 0;
+    private int _buttonIceProgress = 0;
+
+    /// <summary>
+    /// Handle server setup progress for button text updates.
+    /// Server progress maps to 0-50% of display.
+    /// </summary>
+    private void HandleServerSetupProgressForButton(int progress)
+    {
+        _buttonServerProgress = Mathf.Clamp(progress, 0, 100);
+        UpdateButtonProgressText();
+    }
+
+    /// <summary>
+    /// Handle ICE progress for button text updates.
+    /// ICE progress maps to 50-100% of display.
+    /// </summary>
+    private void HandleMonitorIceProgressForButton(Dictionary<int, int> progressDict)
+    {
+        // Calculate average ICE progress across all monitors
+        if (progressDict.Count == 0) return;
+
+        int totalProgress = 0;
+        foreach (var kvp in progressDict)
+        {
+            totalProgress += kvp.Value;
+        }
+        _buttonIceProgress = totalProgress / progressDict.Count;
+        UpdateButtonProgressText();
+    }
+
+    /// <summary>
+    /// Handle all monitors ready - show "CONNECTED" on button.
+    /// </summary>
+    private void HandleAllMonitorsReadyForButton()
+    {
+        UpdateButtonText("CONNECTED");
+    }
+
+    /// <summary>
+    /// Update button text with current progress.
+    /// Progress: 0-50% = Server Setup, 50-100% = ICE/PC
+    /// Note: ConfiguringSettings is included because ConnectionViewModel doesn't set
+    /// SendingDisplayConfig/AwaitingSetupComplete phases - it jumps from ConfiguringSettings to ICENegotiating.
+    /// </summary>
+    private void UpdateButtonProgressText()
+    {
+        // Only update if we're in the right phase (after START is clicked)
+        // Note: Phase goes ConfiguringSettings -> ICENegotiating (skips SendingDisplayConfig/AwaitingSetupComplete)
+        if (_currentPhase != ConnectionPhase.ConfiguringSettings &&
+            _currentPhase != ConnectionPhase.SendingDisplayConfig &&
+            _currentPhase != ConnectionPhase.AwaitingSetupComplete &&
+            _currentPhase != ConnectionPhase.ICENegotiating)
+        {
+            return;
+        }
+
+        int displayProgress;
+        string status;
+
+        if (_buttonServerProgress < 100)
+        {
+            // Server setup phase: 0-50%
+            displayProgress = _buttonServerProgress / 2;
+            status = "Server Setup";
+        }
+        else
+        {
+            // ICE phase: 50-100%
+            displayProgress = 50 + (_buttonIceProgress / 2);
+            status = _buttonIceProgress < 100 ? "Connecting" : "Ready";
+        }
+
+        UpdateButtonText($"{status}... {displayProgress}%");
+    }
+
+    /// <summary>
+    /// Reset button progress tracking.
+    /// </summary>
+    private void ResetButtonProgress()
+    {
+        _buttonServerProgress = 0;
+        _buttonIceProgress = 0;
+    }
+    #endregion
 
     /// <summary>
     /// Handle hardware info received from server.
@@ -2073,6 +2351,11 @@ public class RTTRemoteMenu : MonoBehaviour
             _viewModel.SpeedTestProgress.OnChanged -= HandleSpeedTestProgressValue;
             _viewModel.CurrentBandwidth.OnChanged -= HandleBandwidthChanged;
             _viewModel.ErrorMessage.OnChanged -= HandleErrorMessage;
+
+            // Unsubscribe button progress events
+            _viewModel.ServerSetupProgress.OnChanged -= HandleServerSetupProgressForButton;
+            _viewModel.MonitorIceProgress.OnChanged -= HandleMonitorIceProgressForButton;
+            _viewModel.OnAllMonitorsReady -= HandleAllMonitorsReadyForButton;
         }
 
         // Destroy side panels

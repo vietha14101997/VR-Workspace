@@ -662,19 +662,6 @@ public static class VRButtonFactory
         Shadow shadow2 = iconObj.AddComponent<Shadow>();
         shadow2.effectColor = glowCol;
         shadow2.effectDistance = new Vector2(-s1, s1);
-
-        // Glow Layer 2 - Soft outer bloom
-        Color bloomCol = Color.Lerp(col, Color.white, 0.8f);
-        bloomCol.a = 0.15f;
-        float s2 = 5f;
-
-        Shadow shadow3 = iconObj.AddComponent<Shadow>();
-        shadow3.effectColor = bloomCol;
-        shadow3.effectDistance = new Vector2(s2, -s2);
-
-        Shadow shadow4 = iconObj.AddComponent<Shadow>();
-        shadow4.effectColor = bloomCol;
-        shadow4.effectDistance = new Vector2(-s2, s2);
     }
 
     private static void CreateText(Transform parent, string text, int fontSize, TMP_FontAsset font, Color col, bool addGlow)
@@ -772,18 +759,6 @@ public static class VRButtonFactory
         shadow2.effectColor = glowCol;
         shadow2.effectDistance = new Vector2(-s1, s1);
 
-        Color bloomCol = Color.Lerp(col, Color.white, 0.8f);
-        bloomCol.a = 0.15f;
-        float s2 = 5f;
-
-        Shadow shadow3 = iconObj.AddComponent<Shadow>();
-        shadow3.effectColor = bloomCol;
-        shadow3.effectDistance = new Vector2(s2, -s2);
-
-        Shadow shadow4 = iconObj.AddComponent<Shadow>();
-        shadow4.effectColor = bloomCol;
-        shadow4.effectDistance = new Vector2(-s2, s2);
-
         // Text ở bên phải icon
         GameObject txtObj = new GameObject("TextTMP");
         txtObj.transform.SetParent(parent, false);
@@ -839,6 +814,42 @@ public static class VRButtonFactory
             CanvasGroup cg = visuals.GetComponent<CanvasGroup>();
             if (cg == null) cg = visuals.gameObject.AddComponent<CanvasGroup>();
             cg.alpha = interactable ? 1f : 0.4f;
+        }
+    }
+
+    /// <summary>
+    /// Thay đổi glow color của BareIconButton
+    /// Updates icon tint and shadow glow colors
+    /// </summary>
+    public static void SetBareIconButtonGlowColor(GameObject wrapper, Color newColor)
+    {
+        if (wrapper == null) return;
+
+        // Find Icon in hierarchy: wrapper > HitArea > Visuals > Content > Icon
+        Transform visuals = wrapper.transform.Find("HitArea/Visuals");
+        if (visuals == null) return;
+
+        Transform content = visuals.Find("Content");
+        if (content == null) return;
+
+        Transform iconTransform = content.Find("Icon");
+        if (iconTransform == null) return;
+
+        // Update icon tint color
+        Image iconImg = iconTransform.GetComponent<Image>();
+        if (iconImg != null)
+        {
+            iconImg.color = Color.Lerp(newColor, Color.white, 0.9f);
+        }
+
+        // Update shadow glow colors
+        Color glowCol = Color.Lerp(newColor, Color.white, 0.7f);
+        glowCol.a = 0.4f;
+
+        Shadow[] shadows = iconTransform.GetComponents<Shadow>();
+        foreach (var shadow in shadows)
+        {
+            shadow.effectColor = glowCol;
         }
     }
 }

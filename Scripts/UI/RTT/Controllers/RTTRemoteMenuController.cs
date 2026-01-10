@@ -28,6 +28,9 @@ public class RTTRemoteMenuController : MonoBehaviour
     private bool _isStreamingActive = false;
     private Coroutine _webrtcUpdateCoroutine;
 
+    // Delayed ClusterRig creation - store config until streaming is ready
+    private StreamingConfig _pendingConfig;
+
     // Remote taskbar (follows ClusterRig during streaming)
     private RTTRemoteTaskbar _remoteTaskbar;
 
@@ -88,6 +91,8 @@ public class RTTRemoteMenuController : MonoBehaviour
         _remoteMenuInstance.OnBackClicked += HandleBackClicked;
         _remoteMenuInstance.OnConnectClicked += HandleConnectClicked;
         _remoteMenuInstance.OnStartClicked += HandleStartClicked;
+        _remoteMenuInstance.OnDisconnectClicked += HandleDisconnectClicked;
+        _remoteMenuInstance.OnResumeClicked += HandleResumeClicked;
 
         // Build the remote menu UI
         // NOTE: BuildUI() calls BindToViewModel() which registers ConnectionViewModel with ServiceLocator
@@ -140,6 +145,8 @@ public class RTTRemoteMenuController : MonoBehaviour
             _remoteMenuInstance.OnBackClicked -= HandleBackClicked;
             _remoteMenuInstance.OnConnectClicked -= HandleConnectClicked;
             _remoteMenuInstance.OnStartClicked -= HandleStartClicked;
+            _remoteMenuInstance.OnDisconnectClicked -= HandleDisconnectClicked;
+            _remoteMenuInstance.OnResumeClicked -= HandleResumeClicked;
             _remoteMenuInstance = null;
         }
 
@@ -169,9 +176,10 @@ public class RTTRemoteMenuController : MonoBehaviour
         HideAllCursors();
         _activeCursorPanelIndex = -1;
 
-        // Cleanup progress overlays
+        // Cleanup progress overlays and pending config
         CleanupProgressOverlays();
         _isStreamingActive = false;
+        _pendingConfig = null;
 
         // Cleanup remote taskbar
         CleanupRemoteTaskbar();
@@ -367,31 +375,85 @@ public class RTTRemoteMenuController : MonoBehaviour
     }
 
     /// <summary>
-    /// Handle new flow: Create ClusterRig and attach progress overlays.
+    /// Handle DISCONNECT button click.
+    /// Cleanup ClusterRig and remote taskbar, reset to initial state.
+    /// </summary>
+    private void HandleDisconnectClicked()
+    {
+        Debug.Log("[RTTRemoteMenuController] DISCONNECT clicked - cleaning up streaming resources");
+
+        // Hide cursors before cleanup
+        HideAllCursors();
+        _activeCursorPanelIndex = -1;
+
+        // Cleanup ClusterRig
+        if (_clusterRig != null)
+        {
+            Destroy(_clusterRig.gameObject);
+            _clusterRig = null;
+        }
+
+        // Cleanup remote taskbar
+        CleanupRemoteTaskbar();
+
+        // Cleanup mipmap textures
+        CleanupMipmapTextures();
+
+        // Reset streaming state
+        _isStreamingActive = false;
+        _pendingConfig = null;
+
+        // Stop WebRTC update coroutine
+        if (_webrtcUpdateCoroutine != null)
+        {
+            StopCoroutine(_webrtcUpdateCoroutine);
+            _webrtcUpdateCoroutine = null;
+        }
+
+        // Show main menu and taskbar again
+        ShowMainMenuAndTaskbar();
+
+        Debug.Log("[RTTRemoteMenuController] Streaming resources cleaned up, menu reset");
+    }
+
+    /// <summary>
+    /// Handle RESUME button click.
+    /// Hide menu and return to ClusterRig/streaming view.
+    /// </summary>
+    private void HandleResumeClicked()
+    {
+        Debug.Log("[RTTRemoteMenuController] RESUME clicked - returning to streaming view");
+
+        // Hide menu and taskbar
+        HideMainMenuAndTaskbar();
+
+        // ClusterRig should already be visible
+        if (_clusterRig != null)
+        {
+            _clusterRig.gameObject.SetActive(true);
+        }
+
+        // Show remote taskbar if it exists
+        if (_remoteTaskbar != null)
+        {
+            _remoteTaskbar.gameObject.SetActive(true);
+        }
+    }
+
+    /// <summary>
+    /// Handle new flow: Store config and start WebRTC update loop.
+    /// ClusterRig will be created when streaming actually starts.
+    /// Progress is shown on RTTRemoteMenu button text instead of panel overlays.
     /// </summary>
     private void HandleStartWithProgress(StreamingConfig config)
     {
-        // Get or create ClusterRig via RemoteConnectionPipeline
+        Debug.Log($"[RTTRemoteMenuController] HandleStartWithProgress: {config.monitors} monitors - waiting for streaming ready");
+
+        // Store config for later ClusterRig creation
+        _pendingConfig = config;
+
+        // Ensure connection pipeline exists
         EnsureConnectionPipeline();
-
-        _clusterRig = connectionPipeline.GetOrCreateClusterRig();
-        if (_clusterRig == null)
-        {
-            Debug.LogError("[RTTRemoteMenuController] Failed to create ClusterRig!");
-            return;
-        }
-
-        // Build cluster with the specified monitor count
-        _clusterRig.BuildWithPanelCount(config.monitors);
-
-        // Apply style from RTTRemoteMenu (Flat Planar or Curved Surround)
-        if (_remoteMenuInstance != null)
-        {
-            int styleIndex = _remoteMenuInstance.StyleIndex; // 0=Flat Planar, 1=Curved Surround
-            bool isCurvedSurround = (styleIndex == 1);
-            _clusterRig.SetStyle(isCurvedSurround);
-            Debug.Log($"[RTTRemoteMenuController] Applied style: {(isCurvedSurround ? "Curved Surround" : "Flat Planar")}");
-        }
 
         // Start WebRTC update loop if not already running
         if (_webrtcUpdateCoroutine == null)
@@ -399,20 +461,9 @@ public class RTTRemoteMenuController : MonoBehaviour
             _webrtcUpdateCoroutine = StartCoroutine(WebRTC.Update());
         }
 
-        // Attach progress overlays to each panel
-        CleanupProgressOverlays();
-        foreach (var panel in _clusterRig.panels)
-        {
-            var overlay = panel.gameObject.AddComponent<PanelProgressOverlay>();
-            overlay.Initialize(panel);
-            _progressOverlays.Add(overlay);
-        }
-
-        // Create Remote Taskbar that follows ClusterRig
-        CreateRemoteTaskbar();
-
-        // Hide main menu and taskbar when ClusterRig appears
-        HideMainMenuAndTaskbar();
+        // NOTE: ClusterRig is NOT created yet
+        // Menu stays visible with button showing progress text
+        // ClusterRig will be created when IsStreaming becomes true
     }
 
     /// <summary>
@@ -486,8 +537,8 @@ public class RTTRemoteMenuController : MonoBehaviour
         // Add RTTMiniFrame first (required component)
         RTTMiniFrame frame = taskbarObj.AddComponent<RTTMiniFrame>();
         frame.Configure(
-            sec1Capacity: 5,    // Back, Bitrate, FPS, Passthrough, Recenter
-            sec2Capacity: 4,    // Zoom + 3 monitor slots
+            sec1Capacity: 6,    // Back, Bitrate, FPS, Zoom, Passthrough, Recenter
+            sec2Capacity: 3,    // 3 monitor slots
             btnSize: 90f,
             btnSpacing: 12f,
             height: 128f
@@ -603,63 +654,90 @@ public class RTTRemoteMenuController : MonoBehaviour
 
     /// <summary>
     /// Handle server setup progress updates.
+    /// NOTE: Progress is now shown on RTTRemoteMenu button text, not overlays.
+    /// This handler is kept for future use if needed.
     /// </summary>
     private void HandleServerSetupProgress(int progress)
     {
-        foreach (var overlay in _progressOverlays)
-        {
-            if (overlay != null)
-            {
-                overlay.SetServerProgress(progress);
-            }
-        }
+        // Progress is handled by RTTRemoteMenu button text
+        // Overlays are no longer used in the new flow
     }
 
     /// <summary>
     /// Handle per-monitor ICE progress updates.
+    /// NOTE: Progress is now shown on RTTRemoteMenu button text, not overlays.
+    /// This handler is kept for future use if needed.
     /// </summary>
     private void HandleMonitorIceProgress(Dictionary<int, int> progressDict)
     {
-        for (int i = 0; i < _progressOverlays.Count; i++)
-        {
-            if (_progressOverlays[i] != null && progressDict.TryGetValue(i, out int progress))
-            {
-                _progressOverlays[i].SetIceProgress(progress);
-            }
-        }
+        // Progress is handled by RTTRemoteMenu button text
+        // Overlays are no longer used in the new flow
     }
 
     /// <summary>
-    /// Handle all monitors ready - show "Connecting..." state.
+    /// Handle all monitors ready.
+    /// NOTE: In the new flow, streaming auto-starts and ClusterRig is created
+    /// when HandleStreamingStateChanged is called.
     /// </summary>
     private void HandleAllMonitorsReady()
     {
-        foreach (var overlay in _progressOverlays)
-        {
-            if (overlay != null)
-            {
-                overlay.ShowConnecting();
-            }
-        }
+        // Streaming will auto-start via ConnectionViewModel
+        // ClusterRig will be created when IsStreaming becomes true
+        Debug.Log("[RTTRemoteMenuController] All monitors ready - waiting for streaming to start");
     }
 
     /// <summary>
-    /// Handle streaming state change - hide overlays when streaming starts.
+    /// Handle streaming state change - create ClusterRig when streaming starts.
+    /// This is the NEW flow: ClusterRig is created only when streaming is ready,
+    /// not when START is clicked. This avoids showing default/sample textures.
     /// </summary>
     private void HandleStreamingStateChanged(bool isStreaming)
     {
         _isStreamingActive = isStreaming;
 
-        if (isStreaming)
+        if (isStreaming && _pendingConfig != null)
         {
-            foreach (var overlay in _progressOverlays)
-            {
-                if (overlay != null)
-                {
-                    overlay.Hide();
-                }
-            }
+            // Create ClusterRig now that streaming is ready
+            CreateClusterRigForStreaming(_pendingConfig);
+            _pendingConfig = null;
         }
+    }
+
+    /// <summary>
+    /// Create ClusterRig when streaming is ready.
+    /// No progress overlays or sample textures - video will be applied directly.
+    /// </summary>
+    private void CreateClusterRigForStreaming(StreamingConfig config)
+    {
+        Debug.Log($"[RTTRemoteMenuController] Creating ClusterRig for streaming: {config.monitors} monitors");
+
+        // Get or create ClusterRig via RemoteConnectionPipeline
+        _clusterRig = connectionPipeline.GetOrCreateClusterRig();
+        if (_clusterRig == null)
+        {
+            Debug.LogError("[RTTRemoteMenuController] Failed to create ClusterRig!");
+            return;
+        }
+
+        // Build cluster with the specified monitor count (skip sample textures)
+        _clusterRig.BuildWithPanelCount(config.monitors, skipSampleTextures: true);
+
+        // Apply style from RTTRemoteMenu (Flat Planar or Curved Surround)
+        if (_remoteMenuInstance != null)
+        {
+            int styleIndex = _remoteMenuInstance.StyleIndex; // 0=Flat Planar, 1=Curved Surround
+            bool isCurvedSurround = (styleIndex == 1);
+            _clusterRig.SetStyle(isCurvedSurround);
+            Debug.Log($"[RTTRemoteMenuController] Applied style: {(isCurvedSurround ? "Curved Surround" : "Flat Planar")}");
+        }
+
+        // Create Remote Taskbar that follows ClusterRig
+        CreateRemoteTaskbar();
+
+        // Hide main menu and taskbar when ClusterRig appears
+        HideMainMenuAndTaskbar();
+
+        Debug.Log("[RTTRemoteMenuController] ClusterRig created and visible - streaming active");
     }
 
     /// <summary>

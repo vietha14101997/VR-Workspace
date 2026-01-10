@@ -82,7 +82,9 @@ public class WorldPanelClusterRig : MonoBehaviour
     /// <summary>
     /// Build cluster with specified number of panels
     /// </summary>
-    public void BuildWithPanelCount(int count)
+    /// <param name="count">Number of panels to create</param>
+    /// <param name="skipSampleTextures">If true, don't assign sample textures to panels (used when streaming will provide textures)</param>
+    public void BuildWithPanelCount(int count, bool skipSampleTextures = false)
     {
         if (count < 1) count = 1;
 
@@ -94,7 +96,7 @@ public class WorldPanelClusterRig : MonoBehaviour
         EnsureVirtualObjectsParent();
 
         KillChildren();
-        CreatePanels(count);
+        CreatePanels(count, skipSampleTextures);
         LinkNeighbors();
         LayoutFromCamera();
 
@@ -104,7 +106,8 @@ public class WorldPanelClusterRig : MonoBehaviour
         }
 
         Debug.Log($"[WorldPanelClusterRig] Built {count} panels" +
-            (enableClusterVisuals ? " with cluster visuals" : ""));
+            (enableClusterVisuals ? " with cluster visuals" : "") +
+            (skipSampleTextures ? " (no sample textures)" : ""));
     }
 
     /// <summary>
@@ -429,12 +432,12 @@ public class WorldPanelClusterRig : MonoBehaviour
         p.transform.SetPositionAndRotation(pos, rot);
     }
 
-    void CreatePanels(int count)
+    void CreatePanels(int count, bool skipSampleTextures = false)
     {
         _panels.Clear();
 
-        // Load sample textures for testing curved mode
-        Texture2D[] sampleTextures = LoadSampleTextures();
+        // Load sample textures for testing curved mode (unless skipped)
+        Texture2D[] sampleTextures = skipSampleTextures ? new Texture2D[0] : LoadSampleTextures();
 
         for (int i = 0; i < count; i++)
         {
@@ -442,6 +445,7 @@ public class WorldPanelClusterRig : MonoBehaviour
             var p = CreateOne(name);
 
             // Assign sample texture for visual testing (cycle through available samples)
+            // Skip if streaming will provide textures
             if (sampleTextures.Length > 0)
             {
                 p.contentTexture = sampleTextures[i % sampleTextures.Length];

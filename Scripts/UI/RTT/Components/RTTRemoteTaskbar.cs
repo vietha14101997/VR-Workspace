@@ -31,6 +31,17 @@ public class RTTRemoteTaskbar : MonoBehaviour
     [SerializeField] private Sprite iconRecenter;
     [SerializeField] private Sprite iconZoom;
     [SerializeField] private Sprite iconMonitor;
+
+    // Dynamic icons for bitrate (10, 15, 20, 25, 30 Mbps)
+    private Dictionary<int, Sprite> _bitrateIcons = new Dictionary<int, Sprite>();
+
+    // Screen icons (screen_1, screen_2, screen_3)
+    private Dictionary<int, Sprite> _screenIcons = new Dictionary<int, Sprite>();
+
+    // Screen button states (all ON by default)
+    private Dictionary<int, bool> _screenStates = new Dictionary<int, bool>();
+    // Dynamic icons for FPS (30, 45, 60)
+    private Dictionary<int, Sprite> _fpsIcons = new Dictionary<int, Sprite>();
     #endregion
 
     #region Events
@@ -47,8 +58,8 @@ public class RTTRemoteTaskbar : MonoBehaviour
     private GameObject _bitrateButton;
     private GameObject _fpsButton;
     private GameObject _passthroughButton;
-    private TextMeshProUGUI _bitrateText;
-    private TextMeshProUGUI _fpsText;
+    private int _currentBitrateMbps = 20;
+    private int _currentFps = 60;
 
     // Section 2 references
     private GameObject _zoomButton;
@@ -123,13 +134,19 @@ public class RTTRemoteTaskbar : MonoBehaviour
             return;
         }
 
-        // Subscribe to config changes
+        // Subscribe to current bitrate/fps changes (these update when user changes settings)
+        _viewModel.CurrentBitrateKbps.OnChanged += OnBitrateChanged;
+        _viewModel.CurrentFps.OnChanged += OnFpsChanged;
+
+        // Subscribe to config changes for monitor count
         _viewModel.AppliedConfig.OnChanged += OnConfigChanged;
 
         // Initial update
+        UpdateBitrateIcon(_viewModel.CurrentBitrateKbps.Value);
+        UpdateFpsIcon(_viewModel.CurrentFps.Value);
         if (_viewModel.AppliedConfig.Value != null)
         {
-            OnConfigChanged(_viewModel.AppliedConfig.Value);
+            UpdateMonitorSlotVisibility(_viewModel.AppliedConfig.Value.monitors);
         }
     }
 
@@ -137,19 +154,31 @@ public class RTTRemoteTaskbar : MonoBehaviour
     {
         if (_viewModel != null)
         {
+            _viewModel.CurrentBitrateKbps.OnChanged -= OnBitrateChanged;
+            _viewModel.CurrentFps.OnChanged -= OnFpsChanged;
             _viewModel.AppliedConfig.OnChanged -= OnConfigChanged;
         }
+    }
+
+    private void OnBitrateChanged(int bitrateKbps)
+    {
+        UpdateBitrateIcon(bitrateKbps);
+        _miniFrame?.MarkDirty();
+    }
+
+    private void OnFpsChanged(int fps)
+    {
+        UpdateFpsIcon(fps);
+        _miniFrame?.MarkDirty();
     }
 
     private void OnConfigChanged(StreamingConfig config)
     {
         if (config == null) return;
 
-        UpdateBitrateDisplay(config.bitrateKbps);
-        UpdateFpsDisplay(config.fps);
+        // Only update monitor count from config (bitrate/fps come from CurrentBitrateKbps/CurrentFps)
         UpdateMonitorSlotVisibility(config.monitors);
-
-        _miniFrame.MarkDirty();
+        _miniFrame?.MarkDirty();
     }
     #endregion
 
@@ -164,18 +193,21 @@ public class RTTRemoteTaskbar : MonoBehaviour
         // 1. Back button
         _backButton = CreateIconButton(section1, iconBack, "Back", _cyanColor, buttonSize, OnBackClicked);
 
-        // 2. Bitrate display button
-        _bitrateButton = CreateDisplayButton(section1, "Bitrate", buttonSize);
-        _bitrateText = GetOrCreateValueText(_bitrateButton, "-- Mbps");
+        // 2. Bitrate display button (icon only, changes based on selected bitrate)
+        var defaultBitrateIcon = GetBitrateIcon(_currentBitrateMbps);
+        _bitrateButton = CreateDisplayIconButton(section1, defaultBitrateIcon, "Bitrate", _cyanColor, buttonSize);
 
-        // 3. FPS display button
-        _fpsButton = CreateDisplayButton(section1, "FPS", buttonSize);
-        _fpsText = GetOrCreateValueText(_fpsButton, "--");
+        // 3. FPS display button (icon only, changes based on selected FPS)
+        var defaultFpsIcon = GetFpsIcon(_currentFps);
+        _fpsButton = CreateDisplayIconButton(section1, defaultFpsIcon, "FPS", _cyanColor, buttonSize);
 
-        // 4. Passthrough toggle
+        // 4. Zoom display button (icon only)
+        _zoomButton = CreateDisplayIconButton(section1, iconZoom, "Zoom", _cyanColor, buttonSize);
+
+        // 5. Passthrough toggle
         _passthroughButton = CreateIconButton(section1, iconPassthrough, "Passthrough", _cyanColor, buttonSize, TogglePassthrough);
 
-        // 5. Recenter
+        // 6. Recenter
         CreateIconButton(section1, iconRecenter, "Recenter", _cyanColor, buttonSize, RecenterObject);
     }
 
@@ -195,7 +227,7 @@ public class RTTRemoteTaskbar : MonoBehaviour
     }
     #endregion
 
-    #region Section 2 - Zoom & Monitor Slots
+    #region Section 2 - Screen Toggle Buttons
     private void AddSection2Slots()
     {
         var section2 = _miniFrame.GetSection2Container();
@@ -203,44 +235,80 @@ public class RTTRemoteTaskbar : MonoBehaviour
 
         float buttonSize = _miniFrame.ButtonSize;
 
-        // Slot 0: Zoom (always visible)
-        _zoomButton = CreateDisplayButton(section2, "Zoom", buttonSize);
-        var zoomIcon = CreateIconInButton(_zoomButton, iconZoom, buttonSize);
-        GetOrCreateValueText(_zoomButton, "1.0x");
-
-        // Slots 1-3: Monitor indicators (dynamic visibility)
+        // Screen toggle buttons (dynamic visibility based on monitor count)
         _monitorSlots.Clear();
+        _screenStates.Clear();
+
         for (int i = 0; i < 3; i++)
         {
-            var slot = CreateMonitorSlot(section2, i + 1, buttonSize);
-            _monitorSlots.Add(slot);
+            int screenNumber = i + 1;
+            _screenStates[screenNumber] = true; // All ON by default
 
-            // Initially hidden
-            var cg = slot.GetComponent<CanvasGroup>();
+            var btn = CreateScreenToggleButton(section2, screenNumber, buttonSize);
+            _monitorSlots.Add(btn);
+
+            // Initially hidden (will be shown based on monitor count)
+            var cg = btn.GetComponent<CanvasGroup>();
             if (cg != null) cg.alpha = 0f;
         }
     }
 
-    private GameObject CreateMonitorSlot(Transform parent, int monitorNumber, float buttonSize)
+    private GameObject CreateScreenToggleButton(Transform parent, int screenNumber, float buttonSize)
     {
-        GameObject slot = new GameObject($"MonitorSlot_{monitorNumber}");
-        slot.transform.SetParent(parent, false);
+        // Get screen icon for this number
+        Sprite screenIcon = _screenIcons.TryGetValue(screenNumber, out var icon) ? icon : iconMonitor;
 
-        RectTransform rt = slot.AddComponent<RectTransform>();
-        rt.sizeDelta = new Vector2(buttonSize, buttonSize);
+        // Default state is ON (purple color)
+        bool isOn = _screenStates.TryGetValue(screenNumber, out var state) ? state : true;
+        Color btnColor = isOn ? _purpleColor : _cyanColor;
 
-        CanvasGroup cg = slot.AddComponent<CanvasGroup>();
+        int capturedNumber = screenNumber;
 
-        // Background with glow effect
-        CreateIconInButton(slot, iconMonitor, buttonSize);
+        // Create toggle button using VRButtonFactory
+        var btn = VRButtonFactory.CreateBareIconButton(
+            parent, buttonSize, screenIcon, btnColor,
+            () => OnScreenToggleClicked(capturedNumber),
+            0.05f, 0.6f
+        );
 
-        // Monitor number text
-        var numberText = GetOrCreateValueText(slot, monitorNumber.ToString());
-        numberText.fontSize = 32f;
-        numberText.fontStyle = FontStyles.Bold;
+        btn.name = $"ScreenBtn_{screenNumber}";
 
-        SetLayerRecursively(slot, LayerMask.NameToLayer("UI"));
-        return slot;
+        // Add CanvasGroup for visibility control
+        var cg = btn.GetComponent<CanvasGroup>();
+        if (cg == null) cg = btn.AddComponent<CanvasGroup>();
+
+        SetLayerRecursively(btn, LayerMask.NameToLayer("UI"));
+        return btn;
+    }
+
+    private void OnScreenToggleClicked(int screenNumber)
+    {
+        // Toggle state
+        bool newState = !(_screenStates.TryGetValue(screenNumber, out var current) ? current : true);
+        _screenStates[screenNumber] = newState;
+
+        // Update button appearance
+        UpdateScreenButtonAppearance(screenNumber);
+
+        Debug.Log($"[RTTRemoteTaskbar] Screen {screenNumber} toggled: {(newState ? "ON" : "OFF")}");
+
+        // TODO: Notify ClusterRig to show/hide this monitor panel
+        _miniFrame?.MarkDirty();
+    }
+
+    private void UpdateScreenButtonAppearance(int screenNumber)
+    {
+        int index = screenNumber - 1;
+        if (index < 0 || index >= _monitorSlots.Count) return;
+
+        var btn = _monitorSlots[index];
+        if (btn == null) return;
+
+        bool isOn = _screenStates.TryGetValue(screenNumber, out var state) ? state : true;
+        Color targetColor = isOn ? _purpleColor : _cyanColor;
+
+        // Update glow color
+        VRButtonFactory.SetBareIconButtonGlowColor(btn, targetColor);
     }
 
     private void UpdateMonitorSlotVisibility(int monitorCount)
@@ -250,12 +318,39 @@ public class RTTRemoteTaskbar : MonoBehaviour
             var slot = _monitorSlots[i];
             if (slot == null) continue;
 
+            int screenNumber = i + 1;
+            bool isVisible = (i < monitorCount);
+
             var cg = slot.GetComponent<CanvasGroup>();
             if (cg != null)
             {
-                cg.alpha = (i < monitorCount) ? 1f : 0f;
+                cg.alpha = isVisible ? 1f : 0f;
+            }
+
+            // Reset state to ON when becoming visible
+            if (isVisible && !_screenStates.ContainsKey(screenNumber))
+            {
+                _screenStates[screenNumber] = true;
+                UpdateScreenButtonAppearance(screenNumber);
             }
         }
+    }
+
+    /// <summary>
+    /// Get the current state of a screen button.
+    /// </summary>
+    public bool IsScreenOn(int screenNumber)
+    {
+        return _screenStates.TryGetValue(screenNumber, out var state) ? state : true;
+    }
+
+    /// <summary>
+    /// Set the state of a screen button.
+    /// </summary>
+    public void SetScreenState(int screenNumber, bool isOn)
+    {
+        _screenStates[screenNumber] = isOn;
+        UpdateScreenButtonAppearance(screenNumber);
     }
     #endregion
 
@@ -269,6 +364,8 @@ public class RTTRemoteTaskbar : MonoBehaviour
         {
             _latencyText.text = "-- ms";
             _latencyText.fontSize = 24f;
+            _latencyText.enableWordWrapping = false;  // Single line
+            _latencyText.overflowMode = TMPro.TextOverflowModes.Overflow;
         }
     }
 
@@ -307,30 +404,80 @@ public class RTTRemoteTaskbar : MonoBehaviour
         if (metrics != null)
         {
             UpdateLatencyDisplay(metrics.CurrentPingMs);
-
-            // Update FPS from effective FPS if available
-            if (metrics.EffectiveFps > 0)
-            {
-                if (_fpsText != null)
-                {
-                    _fpsText.text = $"{Mathf.RoundToInt(metrics.EffectiveFps)}";
-                }
-            }
         }
     }
 
-    private void UpdateBitrateDisplay(int bitrateKbps)
+    private void UpdateBitrateIcon(int bitrateKbps)
     {
-        if (_bitrateText == null) return;
-
         int mbps = bitrateKbps / 1000;
-        _bitrateText.text = $"{mbps} Mbps";
+        if (mbps == _currentBitrateMbps) return;
+
+        _currentBitrateMbps = mbps;
+        var icon = GetBitrateIcon(mbps);
+        if (icon != null)
+        {
+            SetBareIconButtonIcon(_bitrateButton, icon);
+        }
     }
 
-    private void UpdateFpsDisplay(int fps)
+    private void UpdateFpsIcon(int fps)
     {
-        if (_fpsText == null) return;
-        _fpsText.text = $"{fps}";
+        if (fps == _currentFps) return;
+
+        _currentFps = fps;
+        var icon = GetFpsIcon(fps);
+        if (icon != null)
+        {
+            SetBareIconButtonIcon(_fpsButton, icon);
+        }
+    }
+
+    private Sprite GetBitrateIcon(int mbps)
+    {
+        // Snap to nearest valid option: 10, 15, 20, 25, 30
+        int[] validOptions = { 10, 15, 20, 25, 30 };
+        int nearest = validOptions[0];
+        int minDiff = Mathf.Abs(mbps - nearest);
+
+        foreach (int opt in validOptions)
+        {
+            int diff = Mathf.Abs(mbps - opt);
+            if (diff < minDiff)
+            {
+                minDiff = diff;
+                nearest = opt;
+            }
+        }
+
+        if (_bitrateIcons.TryGetValue(nearest, out Sprite icon))
+        {
+            return icon;
+        }
+        return _bitrateIcons.ContainsKey(20) ? _bitrateIcons[20] : null;
+    }
+
+    private Sprite GetFpsIcon(int fps)
+    {
+        // Snap to nearest valid option: 30, 45, 60
+        int[] validOptions = { 30, 45, 60 };
+        int nearest = validOptions[0];
+        int minDiff = Mathf.Abs(fps - nearest);
+
+        foreach (int opt in validOptions)
+        {
+            int diff = Mathf.Abs(fps - opt);
+            if (diff < minDiff)
+            {
+                minDiff = diff;
+                nearest = opt;
+            }
+        }
+
+        if (_fpsIcons.TryGetValue(nearest, out Sprite icon))
+        {
+            return icon;
+        }
+        return _fpsIcons.ContainsKey(60) ? _fpsIcons[60] : null;
     }
     #endregion
 
@@ -539,29 +686,21 @@ public class RTTRemoteTaskbar : MonoBehaviour
         return btn;
     }
 
-    private GameObject CreateDisplayButton(Transform parent, string name, float buttonSize)
+    /// <summary>
+    /// Create a BareIconButton for display-only purposes (no click action).
+    /// Icon is positioned at top, value text will be added below.
+    /// </summary>
+    private GameObject CreateDisplayIconButton(Transform parent, Sprite icon, string name, Color glowColor, float buttonSize)
     {
-        GameObject btn = new GameObject($"Display_{name}");
-        btn.transform.SetParent(parent, false);
+        var btn = VRButtonFactory.CreateBareIconButton(
+            parent, buttonSize, icon, glowColor,
+            null,  // No click action - display only
+            0.05f, 0.6f
+        );
 
-        RectTransform rt = btn.AddComponent<RectTransform>();
-        rt.sizeDelta = new Vector2(buttonSize, buttonSize);
-
-        // Add background for visibility
-        GameObject bgObj = new GameObject("Background");
-        bgObj.transform.SetParent(btn.transform, false);
-
-        Image bgImg = bgObj.AddComponent<Image>();
-        bgImg.color = new Color(0.1f, 0.1f, 0.15f, 0.5f);
-        bgImg.raycastTarget = false;
-
-        RectTransform bgRt = bgObj.GetComponent<RectTransform>();
-        bgRt.anchorMin = Vector2.zero;
-        bgRt.anchorMax = Vector2.one;
-        bgRt.offsetMin = Vector2.zero;
-        bgRt.offsetMax = Vector2.zero;
-
+        btn.name = $"Display_{name}";
         SetLayerRecursively(btn, LayerMask.NameToLayer("UI"));
+
         return btn;
     }
 
@@ -622,27 +761,10 @@ public class RTTRemoteTaskbar : MonoBehaviour
 
     private void SetBareIconButtonColor(GameObject container, Color color)
     {
-        Transform iconTransform = null;
+        if (container == null) return;
 
-        // Find icon in VRButtonFactory structure
-        foreach (Transform child in container.transform)
-        {
-            var hitArea = child.Find("HitArea");
-            if (hitArea != null)
-            {
-                var visuals = hitArea.Find("Visuals");
-                if (visuals != null)
-                {
-                    var content = visuals.Find("Content");
-                    if (content != null)
-                    {
-                        iconTransform = content.Find("Icon");
-                        break;
-                    }
-                }
-            }
-        }
-
+        // Find icon in VRButtonFactory structure: container > HitArea > Visuals > Content > Icon
+        Transform iconTransform = container.transform.Find("HitArea/Visuals/Content/Icon");
         if (iconTransform == null) return;
 
         Image iconImg = iconTransform.GetComponent<Image>();
@@ -651,18 +773,37 @@ public class RTTRemoteTaskbar : MonoBehaviour
             iconImg.color = Color.Lerp(color, Color.white, 0.9f);
 
             Shadow[] shadows = iconTransform.GetComponents<Shadow>();
-            if (shadows.Length >= 4)
+            if (shadows.Length >= 2)
             {
                 Color glowCol = Color.Lerp(color, Color.white, 0.7f);
                 glowCol.a = 0.4f;
                 shadows[0].effectColor = glowCol;
                 shadows[1].effectColor = glowCol;
-
-                Color bloomCol = Color.Lerp(color, Color.white, 0.8f);
-                bloomCol.a = 0.15f;
-                shadows[2].effectColor = bloomCol;
-                shadows[3].effectColor = bloomCol;
             }
+        }
+    }
+
+    /// <summary>
+    /// Update the icon sprite of a BareIconButton.
+    /// Structure: Wrapper > HitArea > Visuals > Content > Icon
+    /// </summary>
+    private void SetBareIconButtonIcon(GameObject container, Sprite newIcon)
+    {
+        if (container == null || newIcon == null) return;
+
+        // Find icon in VRButtonFactory structure: container > HitArea > Visuals > Content > Icon
+        Transform iconTransform = container.transform.Find("HitArea/Visuals/Content/Icon");
+
+        if (iconTransform == null)
+        {
+            Debug.LogWarning($"[RTTRemoteTaskbar] SetBareIconButtonIcon: Icon not found in {container.name}");
+            return;
+        }
+
+        Image iconImg = iconTransform.GetComponent<Image>();
+        if (iconImg != null)
+        {
+            iconImg.sprite = newIcon;
         }
     }
 
@@ -724,13 +865,50 @@ public class RTTRemoteTaskbar : MonoBehaviour
     #region Icons
     private void LoadIcons()
     {
+        // Static icons
         if (iconBack == null) iconBack = LoadIcon("back");
         if (iconPassthrough == null) iconPassthrough = LoadIcon("passthrough");
         if (iconRecenter == null) iconRecenter = LoadIcon("recenter");
         if (iconZoom == null) iconZoom = LoadIcon("zoom");
         if (iconMonitor == null) iconMonitor = LoadIcon("monitor");
 
+        // Dynamic bitrate icons (10, 15, 20, 25, 30 Mbps)
+        // Naming: icon_{bitrate}_mbps (e.g., icon_10_mbps, icon_20_mbps)
+        int[] bitrateOptions = { 10, 15, 20, 25, 30 };
+        foreach (int mbps in bitrateOptions)
+        {
+            var icon = LoadIcon($"{mbps}_mbps");
+            if (icon != null)
+            {
+                _bitrateIcons[mbps] = icon;
+            }
+        }
+
+        // Dynamic FPS icons (30, 45, 60)
+        // Naming: icon_{fps}_fps (e.g., icon_30_fps, icon_60_fps)
+        int[] fpsOptions = { 30, 45, 60 };
+        foreach (int fps in fpsOptions)
+        {
+            var icon = LoadIcon($"{fps}_fps");
+            if (icon != null)
+            {
+                _fpsIcons[fps] = icon;
+            }
+        }
+
+        // Screen icons (1, 2, 3)
+        // Naming: icon_screen_{number} (e.g., icon_screen_1, icon_screen_2)
+        for (int i = 1; i <= 3; i++)
+        {
+            var icon = LoadIcon($"screen_{i}");
+            if (icon != null)
+            {
+                _screenIcons[i] = icon;
+            }
+        }
+
         Debug.Log($"[RTTRemoteTaskbar] Icons loaded - Back:{iconBack != null}, Passthrough:{iconPassthrough != null}, Recenter:{iconRecenter != null}, Zoom:{iconZoom != null}, Monitor:{iconMonitor != null}");
+        Debug.Log($"[RTTRemoteTaskbar] Bitrate icons: {_bitrateIcons.Count}/5, FPS icons: {_fpsIcons.Count}/3, Screen icons: {_screenIcons.Count}/3");
     }
 
     private static Sprite LoadIcon(string name)

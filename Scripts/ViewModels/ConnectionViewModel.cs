@@ -83,6 +83,12 @@ namespace VRWorkspace.ViewModels
         /// <summary>Total number of monitors expected</summary>
         public ObservableProperty<int> TotalMonitorCount { get; } = new(0);
 
+        /// <summary>Current bitrate in kbps (updated when config changes)</summary>
+        public ObservableProperty<int> CurrentBitrateKbps { get; } = new(20000);
+
+        /// <summary>Current FPS (updated when config changes)</summary>
+        public ObservableProperty<int> CurrentFps { get; } = new(60);
+
         #endregion
 
         #region Events
@@ -308,6 +314,10 @@ namespace VRWorkspace.ViewModels
             ReadyMonitorCount.Value = 0;
             TotalMonitorCount.Value = 0;
 
+            // Current streaming config
+            CurrentBitrateKbps.Value = 20000;
+            CurrentFps.Value = 60;
+
             Debug.Log("[ConnectionViewModel] All state reset to initial values");
         }
 
@@ -379,12 +389,16 @@ namespace VRWorkspace.ViewModels
             AppliedConfig.Value = config;
             TotalMonitorCount.Value = config.monitors;
 
+            // Set current bitrate/fps from config
+            CurrentBitrateKbps.Value = config.bitrateKbps;
+            CurrentFps.Value = config.fps;
+
             // Reset progress
             ServerSetupProgress.Value = 0;
             MonitorIceProgress.Value = new Dictionary<int, int>();
             ReadyMonitorCount.Value = 0;
 
-            Debug.Log($"[ConnectionViewModel] StartWithProgressAsync: {config.monitors} monitors");
+            Debug.Log($"[ConnectionViewModel] StartWithProgressAsync: {config.monitors} monitors, {config.bitrateKbps}kbps, {config.fps}fps");
 
             // Fire event to create ClusterRig and show progress UI
             OnStartWithProgress?.Invoke(config);
@@ -468,6 +482,18 @@ namespace VRWorkspace.ViewModels
             }
 
             await _client.UpdateConfigAsync(fps, bitrateKbps);
+
+            // Update current values after sending to server
+            if (bitrateKbps.HasValue)
+            {
+                CurrentBitrateKbps.Value = bitrateKbps.Value;
+                Debug.Log($"[ConnectionViewModel] Updated CurrentBitrateKbps: {bitrateKbps.Value}");
+            }
+            if (fps.HasValue)
+            {
+                CurrentFps.Value = fps.Value;
+                Debug.Log($"[ConnectionViewModel] Updated CurrentFps: {fps.Value}");
+            }
         }
 
         #endregion
