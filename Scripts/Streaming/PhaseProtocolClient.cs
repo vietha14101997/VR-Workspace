@@ -371,6 +371,68 @@ namespace VRWorkspace.Streaming
         }
 
         /// <summary>
+        /// Pause streaming - server stops capture/encode but keeps connection.
+        /// Use when going back to menu during streaming.
+        /// </summary>
+        public async Task PauseStreamingAsync()
+        {
+            if (_ws?.State != WebSocketState.Open)
+            {
+                Debug.LogWarning("[PhaseProtocol] PauseStreaming skipped: WebSocket not open");
+                return;
+            }
+
+            if (!_stateMachine.IsStreaming)
+            {
+                Debug.LogWarning($"[PhaseProtocol] PauseStreaming skipped: not streaming (state={_stateMachine?.CurrentPhase})");
+                return;
+            }
+
+            try
+            {
+                Debug.Log("[PhaseProtocol] Sending pause_streaming");
+                await SendTextAsync("{\"type\":\"pause_streaming\"}");
+                _isStreamingPaused = true;
+                Debug.Log("[PhaseProtocol] pause_streaming sent - frame detection suppressed");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[PhaseProtocol] PauseStreaming failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Resume streaming - server restarts capture/encode.
+        /// Use when returning from menu to continue streaming.
+        /// </summary>
+        public async Task ResumeStreamingAsync()
+        {
+            if (_ws?.State != WebSocketState.Open)
+            {
+                Debug.LogWarning("[PhaseProtocol] ResumeStreaming skipped: WebSocket not open");
+                return;
+            }
+
+            if (!_stateMachine.IsStreaming)
+            {
+                Debug.LogWarning($"[PhaseProtocol] ResumeStreaming skipped: not streaming (state={_stateMachine?.CurrentPhase})");
+                return;
+            }
+
+            try
+            {
+                _isStreamingPaused = false;
+                Debug.Log("[PhaseProtocol] Sending resume_streaming");
+                await SendTextAsync("{\"type\":\"resume_streaming\"}");
+                Debug.Log("[PhaseProtocol] resume_streaming sent - frame detection resumed");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[PhaseProtocol] ResumeStreaming failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Request server to send a keyframe immediately.
         /// Call this when user interacts (click, drag, etc.) for instant visual update.
         /// </summary>
@@ -405,6 +467,16 @@ namespace VRWorkspace.Streaming
         }
 
         #region Latency Control
+
+        // === Streaming Pause State ===
+        // When paused, server stops sending frames but connection is maintained.
+        // Suppress frame gap/freeze detection to avoid log spam.
+        private volatile bool _isStreamingPaused = false;
+
+        /// <summary>
+        /// Indicates if streaming is paused (server not sending frames).
+        /// </summary>
+        public bool IsStreamingPaused => _isStreamingPaused;
 
         // === WiFi Tolerance Configuration ===
         // WiFi connections have higher jitter and occasional packet bursts
@@ -603,6 +675,9 @@ namespace VRWorkspace.Streaming
         private void CheckLatencyAndSkip()
         {
             if (!_stateMachine.IsStreaming) return;
+
+            // Skip all latency checks when streaming is paused (server not sending frames)
+            if (_isStreamingPaused) return;
 
             // Initialize streaming start time if not set
             if (_streamingStartTime == DateTime.MinValue)
@@ -3350,6 +3425,13 @@ namespace VRWorkspace.Streaming
             }
 
             // === Decoder freeze detection ===
+            // Skip freeze detection when streaming is paused (server not sending frames)
+            if (_isStreamingPaused)
+            {
+                OnFrameTimingReceived?.Invoke(serverTime, _serverClockOffset);
+                return;
+            }
+
             // Two detection modes:
             // 1. When TexturePtrDetection works: Compare real frames (texture pointer changes) with server frames
             // 2. Fallback mode: Can't detect real frames, so send preventive keyframes periodically
@@ -3897,7 +3979,8 @@ namespace VRWorkspace.Streaming
             // Reset streaming state
             _streamingStartedFired = false;
             _streamingStartTime = DateTime.MinValue; // Reset for next session warmup
-            
+            _isStreamingPaused = false; // Reset pause state for next session
+
             // Reset metrics to avoid stale data affecting next session
             _metrics.ResetAll();
 

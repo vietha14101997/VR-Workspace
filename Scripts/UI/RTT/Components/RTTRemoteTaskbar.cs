@@ -12,8 +12,8 @@ using VRWorkspace.Streaming;
 /// RTTRemoteTaskbar - Taskbar for Remote Desktop streaming mode.
 /// Follows WorldPanelClusterRig and displays streaming metrics.
 ///
-/// Section 1: Back, Bitrate (display), FPS (display), Passthrough, Recenter
-/// Section 2: Zoom (display), Monitor 1-3 (dynamic display)
+/// Section 1: Back, Bitrate (display), FPS (display), Passthrough, Recenter, Zoom (display)
+/// Section 2: Monitor 1-3 (dynamic display)
 /// Section 3: Latency text (replaces WiFi icon)
 /// </summary>
 [RequireComponent(typeof(RTTMiniFrame))]

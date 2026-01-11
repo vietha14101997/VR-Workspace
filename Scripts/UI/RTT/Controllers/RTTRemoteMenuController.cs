@@ -419,10 +419,17 @@ public class RTTRemoteMenuController : MonoBehaviour
     /// <summary>
     /// Handle RESUME button click.
     /// Hide menu and return to ClusterRig/streaming view.
+    /// Sends resume_streaming to server to restart capture/encode.
     /// </summary>
-    private void HandleResumeClicked()
+    private async void HandleResumeClicked()
     {
         Debug.Log("[RTTRemoteMenuController] RESUME clicked - returning to streaming view");
+
+        // Resume streaming on server (restart capture/encode)
+        if (_viewModel != null)
+        {
+            await _viewModel.ResumeStreamingAsync();
+        }
 
         // Hide menu and taskbar
         HideMainMenuAndTaskbar();
@@ -558,11 +565,18 @@ public class RTTRemoteMenuController : MonoBehaviour
     /// <summary>
     /// Handle taskbar menu request (first back press).
     /// Hides ClusterRig and RTTRemoteTaskbar, shows RTTMenuFrame and RTTTaskbar.
+    /// Sends pause_streaming to server to stop capture/encode but keep connection.
     /// Does NOT fire OnBackClicked to avoid closing the app.
     /// </summary>
-    private void HandleTaskbarMenuRequest()
+    private async void HandleTaskbarMenuRequest()
     {
         Debug.Log("[RTTRemoteMenuController] Taskbar menu requested - returning to RemoteMenu");
+
+        // Pause streaming on server (stop capture/encode, keep connection)
+        if (_viewModel != null)
+        {
+            await _viewModel.PauseStreamingAsync();
+        }
 
         // Hide RTTRemoteTaskbar
         if (_remoteTaskbar != null)

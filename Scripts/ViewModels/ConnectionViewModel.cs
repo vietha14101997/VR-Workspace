@@ -233,6 +233,36 @@ namespace VRWorkspace.ViewModels
         }
 
         /// <summary>
+        /// Pause streaming - server stops capture/encode but keeps connection.
+        /// Use when going back to menu during streaming.
+        /// </summary>
+        public async Task PauseStreamingAsync()
+        {
+            if (_client == null)
+            {
+                Debug.LogWarning("[ConnectionViewModel] PauseStreaming: No client");
+                return;
+            }
+
+            await _client.PauseStreamingAsync();
+        }
+
+        /// <summary>
+        /// Resume streaming - server restarts capture/encode.
+        /// Use when returning from menu to continue streaming.
+        /// </summary>
+        public async Task ResumeStreamingAsync()
+        {
+            if (_client == null)
+            {
+                Debug.LogWarning("[ConnectionViewModel] ResumeStreaming: No client");
+                return;
+            }
+
+            await _client.ResumeStreamingAsync();
+        }
+
+        /// <summary>
         /// Reset all observable properties to initial state.
         /// Call this synchronously when closing app to ensure clean slate.
         /// </summary>
