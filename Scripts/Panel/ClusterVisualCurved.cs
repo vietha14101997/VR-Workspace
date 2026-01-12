@@ -149,6 +149,7 @@ public class ClusterVisualCurved : MonoBehaviour
     /// </summary>
     public void Rebuild()
     {
+        Debug.Log("[ClusterVisualCurved] Rebuild() called");
         Initialize();
     }
 
@@ -245,7 +246,11 @@ public class ClusterVisualCurved : MonoBehaviour
 
         // Get enabled panel count and reference panel
         int enabledCount = _clusterRig.GetEnabledPanelCount();
-        if (enabledCount == 0) return;
+        if (enabledCount == 0)
+        {
+            Debug.LogWarning("[ClusterVisualCurved] GenerateMeshes: No enabled panels, skipping");
+            return;
+        }
 
         var enabledIndices = _clusterRig.GetEnabledPanelIndices();
         var panels = _clusterRig.panels;
@@ -258,6 +263,9 @@ public class ClusterVisualCurved : MonoBehaviour
         float panelWidth = refPanel.width;
         float panelHeight = refPanel.height;
         float arcRadius = _clusterRig.distanceFromCamera;
+
+        Debug.Log($"[ClusterVisualCurved] GenerateMeshes: totalPanels={panels.Count}, enabledCount={enabledCount}, " +
+            $"enabledIndices=[{string.Join(",", enabledIndices)}], panelWidth={panelWidth:F3}m");
 
         // Generate main mesh
         _curvedMesh = CurvedClusterMeshGenerator.Generate(

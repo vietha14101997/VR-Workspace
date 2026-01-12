@@ -315,8 +315,9 @@ public class WorldPanelClusterRig : MonoBehaviour
             }
         }
 
-        // Recalculate layout
-        LayoutFromCamera();
+        // Reposition enabled panels WITHOUT moving the cluster itself
+        // This keeps the cluster and taskbar in their current positions
+        LayoutPanelsInPlace();
 
         // Rebuild cluster visuals (mesh regeneration needed for panel count change)
         if (enableClusterVisuals)
@@ -545,6 +546,92 @@ public class WorldPanelClusterRig : MonoBehaviour
                 PlacePanelOnArc(enabledPanels[i], yawDeg, cam, camFwd, camUp);
             }
         }
+    }
+
+    /// <summary>
+    /// Reposition enabled panels within the cluster WITHOUT moving the cluster itself.
+    /// Used when enabling/disabling panels to keep cluster and taskbar in place.
+    /// </summary>
+    void LayoutPanelsInPlace()
+    {
+        if (_panels.Count == 0) return;
+
+        // Use cluster's current position and rotation (don't move it)
+        Vector3 clusterCenter = transform.position;
+        Vector3 clusterFwd = transform.forward;
+        Vector3 clusterUp = Vector3.up;
+
+        var refPanel = _panels[_panels.Count / 2];
+        float panelWidth = refPanel ? refPanel.width : 1f;
+
+        // Use Board width for spacing
+        float boardWidth = panelWidth * (1f - 2f * contentMarginHorizontal);
+        float boardAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(boardWidth / 2f / distanceFromCamera);
+        float gapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(edgeGapMeters / 2f / distanceFromCamera);
+        float angleDeg = boardAngleDeg + gapAngleDeg;
+
+        // Collect enabled panels
+        var enabledPanels = new List<WorldPanelPlus>();
+        for (int i = 0; i < _panels.Count; i++)
+        {
+            bool isEnabled = i < _panelEnabledStates.Count ? _panelEnabledStates[i] : true;
+            if (isEnabled && _panels[i] != null)
+            {
+                enabledPanels.Add(_panels[i]);
+            }
+        }
+
+        int enabledCount = enabledPanels.Count;
+        if (enabledCount == 0) return;
+
+        if (layoutMode == ClusterLayoutMode.FixedThreeSlot)
+        {
+            int[] slotOffsets = enabledCount switch
+            {
+                1 => new[] { 0 },
+                2 => new[] { 0, 1 },
+                _ => new[] { -1, 0, 1 }
+            };
+
+            for (int i = 0; i < enabledCount; i++)
+            {
+                float yawDeg = slotOffsets[i] * angleDeg;
+                PlacePanelOnArcInPlace(enabledPanels[i], yawDeg, clusterCenter, clusterFwd, clusterUp);
+            }
+        }
+        else
+        {
+            for (int i = 0; i < enabledCount; i++)
+            {
+                float offset = i - (enabledCount - 1) / 2f;
+                float yawDeg = offset * angleDeg;
+                PlacePanelOnArcInPlace(enabledPanels[i], yawDeg, clusterCenter, clusterFwd, clusterUp);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Place a panel on the arc relative to cluster center (not camera).
+    /// </summary>
+    void PlacePanelOnArcInPlace(WorldPanelPlus p, float yawDeg, Vector3 clusterCenter, Vector3 clusterFwd, Vector3 clusterUp)
+    {
+        if (!p) return;
+
+        Quaternion yaw = Quaternion.AngleAxis(yawDeg, clusterUp);
+        Vector3 dir = yaw * clusterFwd;
+        Vector3 pos = clusterCenter + dir * distanceFromCamera - clusterFwd * distanceFromCamera;
+
+        Quaternion rot;
+        if (panelsFaceCamera)
+        {
+            rot = Quaternion.LookRotation(dir, clusterUp);
+        }
+        else
+        {
+            rot = Quaternion.LookRotation(-clusterFwd, clusterUp);
+        }
+
+        p.transform.SetPositionAndRotation(pos, rot);
     }
 
     void PlacePanelOnArc(WorldPanelPlus p, float yawDeg, Camera cam, Vector3 camFwd, Vector3 camUp)
@@ -853,14 +940,76 @@ public class WorldPanelClusterRig : MonoBehaviour
     {
         if (!enableClusterVisuals) return;
 
-        if (useCurvedVisual && _curvedVisual != null)
+        // Try to get curved visual reference if null (might exist but not referenced)
+        if (_curvedVisual == null)
         {
+            _curvedVisual = GetComponent<ClusterVisualCurved>();
+        }
+
+        // Always rebuild curved visual if it exists (regardless of useCurvedVisual flag)
+        // This handles cases where the visual was created but flag changed
+        if (_curvedVisual != null)
+        {
+            Debug.Log($"[WorldPanelClusterRig] RebuildClusterVisuals: Rebuilding curved visual, enabledPanels={GetEnabledPanelCount()}");
             _curvedVisual.Rebuild();
+        }
+        else if (useCurvedVisual)
+        {
+            // Curved visual requested but doesn't exist - create it
+            Debug.Log("[WorldPanelClusterRig] RebuildClusterVisuals: Creating new curved visual");
+            ApplyCurvedVisual();
         }
         else
         {
-            // For non-curved visuals, refresh is sufficient
-            RefreshClusterVisuals();
+            // For per-panel visuals, need to reconfigure positions for enabled panels
+            Debug.Log($"[WorldPanelClusterRig] RebuildClusterVisuals: Rebuilding per-panel visuals, enabledPanels={GetEnabledPanelCount()}");
+            RebuildPerPanelVisuals();
+        }
+    }
+
+    /// <summary>
+    /// Rebuild per-panel visuals with updated positions (for Flat Planar mode)
+    /// Called when panels are enabled/disabled to update EdgeMask and gradient mapping
+    /// </summary>
+    void RebuildPerPanelVisuals()
+    {
+        var enabledIndices = GetEnabledPanelIndices();
+        int enabledCount = enabledIndices.Count;
+
+        // Update each enabled panel's visual position
+        for (int i = 0; i < enabledIndices.Count; i++)
+        {
+            int panelIndex = enabledIndices[i];
+            var panel = _panels[panelIndex];
+            if (panel == null) continue;
+
+            var visual = panel.GetComponent<ClusterPanelVisual>();
+            if (visual != null)
+            {
+                // Make sure visual is visible
+                visual.gameObject.SetActive(true);
+                // Reconfigure position in cluster (updates EdgeMask)
+                visual.SetClusterPosition(i, enabledCount);
+                visual.UpdateSize();
+            }
+        }
+
+        // Make sure disabled panels' visuals are hidden
+        for (int i = 0; i < _panels.Count; i++)
+        {
+            bool isEnabled = i < _panelEnabledStates.Count ? _panelEnabledStates[i] : true;
+            if (!isEnabled)
+            {
+                var panel = _panels[i];
+                if (panel != null)
+                {
+                    var visual = panel.GetComponent<ClusterPanelVisual>();
+                    if (visual != null)
+                    {
+                        visual.gameObject.SetActive(false);
+                    }
+                }
+            }
         }
     }
 
