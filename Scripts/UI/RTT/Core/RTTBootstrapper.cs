@@ -16,7 +16,7 @@ public class RTTBootstrapper : MonoBehaviour
     [Header("Taskbar Settings")]
     [SerializeField] private int section1Capacity = 4;
     [SerializeField] private int section2Capacity = 4;
-    [SerializeField] private float taskbarSpacingMultiplier = 1f;
+    [SerializeField] private float taskbarSpacingMultiplier = 1.1f;
 
     [Header("Visual")]
     [ColorUsage(true, true)]

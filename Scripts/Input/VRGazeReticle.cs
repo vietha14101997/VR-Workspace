@@ -509,6 +509,10 @@ public class VRGazeReticle : MonoBehaviour
         bool hasOpenDropdown = VRDropdown.CurrentlyOpenDropdown != null;
         bool isDropdownOption = hasOpenDropdown && VRDropdown.CurrentlyOpenDropdown.IsPartOfDropdownPanel(target);
 
+        // Check if expansion panel is open
+        bool hasOpenExpansion = RTTTaskbarExpansion.CurrentlyOpenExpansion != null;
+        bool isExpansionOption = hasOpenExpansion && RTTTaskbarExpansion.CurrentlyOpenExpansion.IsPartOfExpansionPanel(target);
+
         // Check if RTT keyboard is open
         bool hasOpenKeyboard = RTTMobileKeyboard.CurrentlyOpenKeyboard != null;
         bool isKeyboardPart = hasOpenKeyboard && RTTMobileKeyboard.CurrentlyOpenKeyboard.IsPartOfKeyboard(target);
@@ -524,8 +528,8 @@ public class VRGazeReticle : MonoBehaviour
         // Check if target is dwellable
         bool isDwellableTarget = IsDwellable(target);
 
-        // If no dropdown/keyboard open and target is not dwellable, skip
-        if (!hasOpenDropdown && !hasOpenKeyboard && !isDwellableTarget)
+        // If no dropdown/keyboard/expansion open and target is not dwellable, skip
+        if (!hasOpenDropdown && !hasOpenKeyboard && !hasOpenExpansion && !isDwellableTarget)
         {
             ResetDwellState();
             return;
@@ -656,6 +660,36 @@ public class VRGazeReticle : MonoBehaviour
                 return;
             }
 
+            // Priority 3: Handle expansion panel click-outside
+            if (hasOpenExpansion)
+            {
+                if (isExpansionOption)
+                {
+                    // Target is an expansion option - perform normal click via RTTRaycastManager
+                    if (RTTRaycastManager.Instance != null)
+                    {
+                        RTTRaycastManager.Instance.SendClick();
+                    }
+                }
+                else if (isDwellableTarget)
+                {
+                    // Target is a dwellable button (could be expansion trigger) - perform click
+                    // The button's click handler will decide whether to toggle/switch expansion
+                    if (RTTRaycastManager.Instance != null)
+                    {
+                        RTTRaycastManager.Instance.SendClick();
+                    }
+                }
+                else
+                {
+                    // Target is NOT part of the expansion and not a button - close expansion panel
+                    RTTTaskbarExpansion.CurrentlyOpenExpansion.Hide();
+                    // Mark RTT panel dirty for re-render
+                    _lastRTTHit.panel?.MarkDirty();
+                }
+                return;
+            }
+
             // Normal click - use RTTRaycastManager to send click
             if (RTTRaycastManager.Instance != null)
             {
@@ -669,6 +703,10 @@ public class VRGazeReticle : MonoBehaviour
         // Check if dropdown is open - allow dwell on ANY object to close it
         bool hasOpenDropdown = VRDropdown.CurrentlyOpenDropdown != null;
         bool isDropdownOption = hasOpenDropdown && VRDropdown.CurrentlyOpenDropdown.IsPartOfDropdownPanel(target);
+
+        // Check if expansion panel is open
+        bool hasOpenExpansion = RTTTaskbarExpansion.CurrentlyOpenExpansion != null;
+        bool isExpansionOption = hasOpenExpansion && RTTTaskbarExpansion.CurrentlyOpenExpansion.IsPartOfExpansionPanel(target);
 
         // Check if keyboard is open (RTTMobileKeyboard only)
         bool hasOpenKeyboard = RTTMobileKeyboard.CurrentlyOpenKeyboard != null;
@@ -684,8 +722,8 @@ public class VRGazeReticle : MonoBehaviour
 
         bool isDwellableTarget = IsDwellable(target);
 
-        // If no dropdown/keyboard open and target is not dwellable, skip
-        if (!hasOpenDropdown && !hasOpenKeyboard && !isDwellableTarget)
+        // If no dropdown/keyboard/expansion open and target is not dwellable, skip
+        if (!hasOpenDropdown && !hasOpenKeyboard && !hasOpenExpansion && !isDwellableTarget)
         {
             ResetDwellState();
             return;
@@ -799,6 +837,28 @@ public class VRGazeReticle : MonoBehaviour
                 {
                     // Target is NOT part of the dropdown - close dropdown instead of clicking
                     VRDropdown.CurrentlyOpenDropdown.CloseDropdown();
+                }
+                return;
+            }
+
+            // Priority 3: Handle expansion panel click-outside
+            if (hasOpenExpansion)
+            {
+                if (isExpansionOption)
+                {
+                    // Target is an expansion option - perform normal click
+                    HandlePointerClick(target, normalizedHitPoint);
+                }
+                else if (isDwellableTarget)
+                {
+                    // Target is a dwellable button (could be expansion trigger) - perform click
+                    // The button's click handler will decide whether to toggle/switch expansion
+                    HandlePointerClick(target, normalizedHitPoint);
+                }
+                else
+                {
+                    // Target is NOT part of the expansion and not a button - close expansion panel
+                    RTTTaskbarExpansion.CurrentlyOpenExpansion.Hide();
                 }
                 return;
             }

@@ -56,7 +56,7 @@ public class RTTMiniFrame : RTTCanvasBase
 
     [Header("Position Tracking")]
     [SerializeField] private Transform followTarget;
-    [SerializeField] private float spacingMultiplier = 1f;
+    [SerializeField] private float spacingMultiplier = 1.1f;
     [SerializeField] private bool faceOnInit = true;
     #endregion
 

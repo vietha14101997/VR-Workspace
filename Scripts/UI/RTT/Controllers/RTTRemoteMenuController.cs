@@ -443,7 +443,8 @@ public class RTTRemoteMenuController : MonoBehaviour
         // Show remote taskbar if it exists
         if (_remoteTaskbar != null)
         {
-            _remoteTaskbar.gameObject.SetActive(true);
+            _remoteTaskbar.Show();
+            _remoteTaskbar.OnMenuDismissed(); // Reset back button state
         }
     }
 

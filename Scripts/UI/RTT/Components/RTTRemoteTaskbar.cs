@@ -68,6 +68,9 @@ public class RTTRemoteTaskbar : MonoBehaviour
     // Section 3 reference
     private TextMeshProUGUI _latencyText;
 
+    // Expansion panel
+    private RTTTaskbarExpansion _expansionPanel;
+
     // State
     private bool _isPassthroughOn = false;
 
@@ -103,6 +106,9 @@ public class RTTRemoteTaskbar : MonoBehaviour
         AddSection2Slots();
         SetupLatencyDisplay();
 
+        // Create expansion panel
+        CreateExpansionPanel();
+
         // Bind to ViewModel
         BindToViewModel();
 
@@ -116,6 +122,7 @@ public class RTTRemoteTaskbar : MonoBehaviour
     {
         if (_instance == this) _instance = null;
         UnbindFromViewModel();
+        CleanupExpansionPanel();
     }
 
     private void LateUpdate()
@@ -163,12 +170,26 @@ public class RTTRemoteTaskbar : MonoBehaviour
     private void OnBitrateChanged(int bitrateKbps)
     {
         UpdateBitrateIcon(bitrateKbps);
+
+        // Sync expansion panel
+        if (_expansionPanel != null)
+        {
+            _expansionPanel.SetCurrentBitrate(bitrateKbps / 1000);
+        }
+
         _miniFrame?.MarkDirty();
     }
 
     private void OnFpsChanged(int fps)
     {
         UpdateFpsIcon(fps);
+
+        // Sync expansion panel
+        if (_expansionPanel != null)
+        {
+            _expansionPanel.SetCurrentFps(fps);
+        }
+
         _miniFrame?.MarkDirty();
     }
 
@@ -193,13 +214,13 @@ public class RTTRemoteTaskbar : MonoBehaviour
         // 1. Back button
         _backButton = CreateIconButton(section1, iconBack, "Back", _cyanColor, buttonSize, OnBackClicked);
 
-        // 2. Bitrate display button (icon only, changes based on selected bitrate)
+        // 2. Bitrate button (clickable to show expansion panel)
         var defaultBitrateIcon = GetBitrateIcon(_currentBitrateMbps);
-        _bitrateButton = CreateDisplayIconButton(section1, defaultBitrateIcon, "Bitrate", _cyanColor, buttonSize);
+        _bitrateButton = CreateIconButton(section1, defaultBitrateIcon, "Bitrate", _cyanColor, buttonSize, OnBitrateClicked);
 
-        // 3. FPS display button (icon only, changes based on selected FPS)
+        // 3. FPS button (clickable to show expansion panel)
         var defaultFpsIcon = GetFpsIcon(_currentFps);
-        _fpsButton = CreateDisplayIconButton(section1, defaultFpsIcon, "FPS", _cyanColor, buttonSize);
+        _fpsButton = CreateIconButton(section1, defaultFpsIcon, "FPS", _cyanColor, buttonSize, OnFpsClicked);
 
         // 4. Zoom display button (icon only)
         _zoomButton = CreateDisplayIconButton(section1, iconZoom, "Zoom", _cyanColor, buttonSize);
@@ -218,12 +239,169 @@ public class RTTRemoteTaskbar : MonoBehaviour
         _miniFrame.MarkDirty();
     }
 
+    private void OnBitrateClicked()
+    {
+        if (_expansionPanel == null) return;
+
+        // Toggle behavior: if already showing Bitrate options, hide it
+        if (_expansionPanel.IsVisible && _expansionPanel.CurrentType == RTTTaskbarExpansion.ExpansionType.Bitrate)
+        {
+            Debug.Log("[RTTRemoteTaskbar] Bitrate clicked - hiding expansion panel (toggle)");
+            _expansionPanel.Hide();
+        }
+        else
+        {
+            // Show bitrate options (will auto-close if showing FPS options)
+            Debug.Log("[RTTRemoteTaskbar] Bitrate clicked - showing expansion panel");
+            Vector3? buttonWorldPos = GetButtonWorldPosition(_bitrateButton);
+            _expansionPanel.ShowBitrateOptions(_currentBitrateMbps, buttonWorldPos);
+        }
+        _miniFrame.MarkDirty();
+    }
+
+    private void OnFpsClicked()
+    {
+        if (_expansionPanel == null) return;
+
+        // Toggle behavior: if already showing FPS options, hide it
+        if (_expansionPanel.IsVisible && _expansionPanel.CurrentType == RTTTaskbarExpansion.ExpansionType.Fps)
+        {
+            Debug.Log("[RTTRemoteTaskbar] FPS clicked - hiding expansion panel (toggle)");
+            _expansionPanel.Hide();
+        }
+        else
+        {
+            // Show FPS options (will auto-close if showing Bitrate options)
+            Debug.Log("[RTTRemoteTaskbar] FPS clicked - showing expansion panel");
+            Vector3? buttonWorldPos = GetButtonWorldPosition(_fpsButton);
+            _expansionPanel.ShowFpsOptions(_currentFps, buttonWorldPos);
+        }
+        _miniFrame.MarkDirty();
+    }
+
+    /// <summary>
+    /// Get world position of a button in the RTT canvas.
+    /// Uses RectTransformUtility to get accurate bounds even with layout groups.
+    /// </summary>
+    private Vector3? GetButtonWorldPosition(GameObject button)
+    {
+        if (button == null || _miniFrame == null) return null;
+
+        var buttonRT = button.GetComponent<RectTransform>();
+        if (buttonRT == null) return null;
+
+        // Get miniframe's canvas to calculate relative bounds
+        var miniFrameCanvas = _miniFrame.GetCanvas();
+        if (miniFrameCanvas == null) return null;
+
+        var canvasRT = miniFrameCanvas.GetComponent<RectTransform>();
+        if (canvasRT == null) return null;
+
+        // Get bounds of button relative to canvas center
+        Bounds bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(canvasRT, buttonRT);
+
+        // Get miniframe's world size and resolution
+        Vector2 worldSize = _miniFrame.GetWorldSize();
+        Vector2 resolution = new Vector2(_miniFrame.TotalWidth, _miniFrame.TotalHeight);
+
+        // Convert pixels to meters (relative to miniframe center)
+        float pixelToMeter = worldSize.x / resolution.x;
+        float localX = bounds.center.x * pixelToMeter;
+        float localY = bounds.center.y * pixelToMeter;
+
+        // Transform to world space
+        Vector3 localRight = _miniFrame.transform.TransformDirection(Vector3.right);
+        Vector3 localUp = _miniFrame.transform.TransformDirection(Vector3.up);
+
+        Vector3 worldPos = _miniFrame.transform.position + localRight * localX + localUp * localY;
+        return worldPos;
+    }
+
     /// <summary>
     /// Call this when menu is dismissed to reset any state.
     /// </summary>
     public void OnMenuDismissed()
     {
         // Reserved for future use
+    }
+    #endregion
+
+    #region Expansion Panel
+    private void CreateExpansionPanel()
+    {
+        // Create expansion panel as sibling to taskbar
+        GameObject expansionObj = new GameObject("RTTTaskbarExpansion");
+        expansionObj.transform.SetParent(transform.parent, false);
+
+        _expansionPanel = expansionObj.AddComponent<RTTTaskbarExpansion>();
+        _expansionPanel.SetFollowTarget(transform);
+
+        // Subscribe to events
+        _expansionPanel.OnBitrateSelected += OnExpansionBitrateSelected;
+        _expansionPanel.OnFpsSelected += OnExpansionFpsSelected;
+
+        Debug.Log("[RTTRemoteTaskbar] Expansion panel created");
+    }
+
+    private void CleanupExpansionPanel()
+    {
+        if (_expansionPanel != null)
+        {
+            _expansionPanel.OnBitrateSelected -= OnExpansionBitrateSelected;
+            _expansionPanel.OnFpsSelected -= OnExpansionFpsSelected;
+
+            if (Application.isPlaying)
+                Destroy(_expansionPanel.gameObject);
+            else
+                DestroyImmediate(_expansionPanel.gameObject);
+
+            _expansionPanel = null;
+        }
+    }
+
+    private void OnExpansionBitrateSelected(int mbps)
+    {
+        Debug.Log($"[RTTRemoteTaskbar] Bitrate selected from expansion: {mbps} Mbps");
+
+        // Update ViewModel via UpdateConfigAsync
+        if (_viewModel != null)
+        {
+            int bitrateKbps = mbps * 1000;
+            // Fire and forget - the async update will trigger OnBitrateChanged
+            _ = _viewModel.UpdateConfigAsync(null, bitrateKbps);
+        }
+
+        _miniFrame.MarkDirty();
+    }
+
+    private void OnExpansionFpsSelected(int fps)
+    {
+        Debug.Log($"[RTTRemoteTaskbar] FPS selected from expansion: {fps}");
+
+        // Update ViewModel via UpdateConfigAsync
+        if (_viewModel != null)
+        {
+            // Fire and forget - the async update will trigger OnFpsChanged
+            _ = _viewModel.UpdateConfigAsync(fps, null);
+        }
+
+        _miniFrame.MarkDirty();
+    }
+
+    /// <summary>
+    /// Get the expansion panel reference.
+    /// </summary>
+    public RTTTaskbarExpansion GetExpansionPanel() => _expansionPanel;
+
+    /// <summary>
+    /// Hide the expansion panel if visible.
+    /// </summary>
+    public void HideExpansionPanel()
+    {
+        if (_expansionPanel != null && _expansionPanel.IsVisible)
+        {
+            _expansionPanel.Hide();
+        }
     }
     #endregion
 

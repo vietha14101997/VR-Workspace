@@ -91,6 +91,8 @@ public class RTTRemoteMenu : MonoBehaviour
     private RTTMenuFrame _menuFrame;
     private float _containerWidth;
     private float _containerHeight;
+    private float _contentW;   // Content width (same as grid width)
+    private float _gridGapX;   // Store grid gapX for button alignment
 
     // Font sizes
     private const int LABEL_FONT_SIZE = 40;
@@ -148,6 +150,7 @@ public class RTTRemoteMenu : MonoBehaviour
 
         // Build layout
         float contentW = containerWidth * 0.875f;
+        _contentW = contentW; // Store for streaming buttons alignment
 
         // Calculate heights from font sizes
         float inputH = VRInputFieldFactory.CalculateHeight(INPUT_FONT_SIZE, true);
@@ -463,6 +466,9 @@ public class RTTRemoteMenu : MonoBehaviour
     {
         var grid = CreateContainer(parent, "Grid", x, y, w, h);
 
+        // Store gapX for button alignment in CreateStreamingButtons
+        _gridGapX = gapX;
+
         float cellW = (w - gapX) / 2f;
 
         // Dropdown options
@@ -557,37 +563,36 @@ public class RTTRemoteMenu : MonoBehaviour
     /// </summary>
     private void CreateStreamingButtons(Transform parent, float totalWidth, float h)
     {
-        // Container for streaming buttons - use full parent width for positioning
+        // Container for streaming buttons - use same width as grid (contentW)
         _streamingButtonsContainer = new GameObject("StreamingButtons");
         _streamingButtonsContainer.transform.SetParent(parent, false);
 
-        // Get parent width to calculate dropdown positions
-        RectTransform parentRT = parent.GetComponent<RectTransform>();
-        float parentWidth = parentRT != null ? parentRT.sizeDelta.x : totalWidth;
+        // Use _contentW (same as grid width) for proper alignment
+        float containerWidth = _contentW;
 
         RectTransform containerRT = _streamingButtonsContainer.AddComponent<RectTransform>();
         containerRT.anchorMin = new Vector2(0.5f, 0);
         containerRT.anchorMax = new Vector2(0.5f, 0);
         containerRT.pivot = new Vector2(0.5f, 0);
         containerRT.anchoredPosition = Vector2.zero;
-        containerRT.sizeDelta = new Vector2(parentWidth, h);
+        containerRT.sizeDelta = new Vector2(containerWidth, h);
 
-        // Calculate dropdown cell positions (same as CreateGrid)
-        float gapX = 20f; // Approximate gap between dropdowns
-        float cellW = (parentWidth - gapX) / 2f;
-        float buttonWidth = cellW * 0.8f; // Button slightly smaller than dropdown
+        // Calculate cell positions exactly like CreateGrid
+        float gapX = _gridGapX;
+        float cellW = (containerWidth - gapX) / 2f;
+        float buttonWidth = cellW; // Same width as dropdown
 
         // Calculate center positions relative to container center
-        float parentCenterX = parentWidth / 2f;
+        float containerCenterX = containerWidth / 2f;
         float bitrateCenterX = cellW / 2f;  // Center of left cell
         float fpsCenterX = cellW + gapX + cellW / 2f;  // Center of right cell
 
-        // DISCONNECT button (under Bitrate) - colorB (deeper blue)
-        Color disconnectColorB = new Color(0.1f, 0.5f, 0.85f); // connectColorB from original
+        // DISCONNECT button (under Bitrate) - Light deep sea blue
+        Color lightDeepSeaBlue = new Color(0.3f, 0.6f, 0.8f); // Light deep sea blue
         var disconnectConfig = new VRButtonFactory.ButtonConfig
         {
             label = "DISCONNECT",
-            themeColor = disconnectColorB,
+            themeColor = lightDeepSeaBlue,
             width = buttonWidth,
             height = h,
             fontSize = 36,
@@ -598,9 +603,9 @@ public class RTTRemoteMenu : MonoBehaviour
             edgePadding = 0.08f,
             popAmount = 0.05f,
             useConnectButtonShader = true,
-            connectColorA = disconnectColorB,
-            connectColorB = new Color(0.05f, 0.3f, 0.6f),
-            connectColorC = new Color(0.2f, 0.6f, 0.9f)
+            connectColorA = lightDeepSeaBlue,
+            connectColorB = new Color(0.15f, 0.4f, 0.6f), // Darker deep sea blue
+            connectColorC = new Color(0.5f, 0.75f, 0.95f) // Lighter deep sea blue
         };
 
         _disconnectButton = VRButtonFactory.CreateButton(_streamingButtonsContainer.transform, disconnectConfig, OnDisconnectButtonClicked);
@@ -608,13 +613,13 @@ public class RTTRemoteMenu : MonoBehaviour
         disconnectRT.anchorMin = new Vector2(0.5f, 0.5f);
         disconnectRT.anchorMax = new Vector2(0.5f, 0.5f);
         disconnectRT.pivot = new Vector2(0.5f, 0.5f);
-        disconnectRT.anchoredPosition = new Vector2(bitrateCenterX - parentCenterX, 0);
+        disconnectRT.anchoredPosition = new Vector2(bitrateCenterX - containerCenterX, 0);
 
-        // RESUME button (under FPS) - colorA (themeColor)
+        // RESUME button (under FPS) - Same colors as CONNECT button
         var resumeConfig = new VRButtonFactory.ButtonConfig
         {
             label = "RESUME",
-            themeColor = themeColor, // connectColorA
+            themeColor = themeColor,
             width = buttonWidth,
             height = h,
             fontSize = 36,
@@ -626,7 +631,7 @@ public class RTTRemoteMenu : MonoBehaviour
             popAmount = 0.05f,
             useConnectButtonShader = true,
             connectColorA = themeColor,
-            connectColorB = new Color(themeColor.r * 0.6f, themeColor.g * 0.6f, themeColor.b * 0.6f),
+            connectColorB = new Color(0.1f, 0.5f, 0.85f), // Same as CONNECT
             connectColorC = accentColor
         };
 
@@ -635,7 +640,7 @@ public class RTTRemoteMenu : MonoBehaviour
         resumeRT.anchorMin = new Vector2(0.5f, 0.5f);
         resumeRT.anchorMax = new Vector2(0.5f, 0.5f);
         resumeRT.pivot = new Vector2(0.5f, 0.5f);
-        resumeRT.anchoredPosition = new Vector2(fpsCenterX - parentCenterX, 0);
+        resumeRT.anchoredPosition = new Vector2(fpsCenterX - containerCenterX, 0);
 
         // Hide streaming buttons by default
         _streamingButtonsContainer.SetActive(false);
