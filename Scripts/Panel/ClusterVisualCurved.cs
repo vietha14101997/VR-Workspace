@@ -153,16 +153,26 @@ public class ClusterVisualCurved : MonoBehaviour
     }
 
     /// <summary>
-    /// Update content textures from panels
+    /// Update content textures from panels (only enabled panels)
     /// </summary>
     public void UpdateContentTextures()
     {
         if (_contentMaterial == null || _clusterRig == null) return;
 
+        var enabledIndices = _clusterRig.GetEnabledPanelIndices();
         var panels = _clusterRig.panels;
-        for (int i = 0; i < panels.Count && i < 6; i++)
+
+        // Clear all textures first
+        for (int i = 0; i < 6; i++)
         {
-            var panel = panels[i];
+            _contentMaterial.SetTexture($"_Content{i}", Texture2D.blackTexture);
+        }
+
+        // Set textures for enabled panels only
+        for (int i = 0; i < enabledIndices.Count && i < 6; i++)
+        {
+            int panelIndex = enabledIndices[i];
+            var panel = panels[panelIndex];
             if (panel != null)
             {
                 // Get content texture directly from panel's contentTexture field
@@ -172,7 +182,7 @@ public class ClusterVisualCurved : MonoBehaviour
             }
         }
 
-        _contentMaterial.SetInt("_PanelCount", panels.Count);
+        _contentMaterial.SetInt("_PanelCount", enabledIndices.Count);
     }
 
     /// <summary>
@@ -233,10 +243,18 @@ public class ClusterVisualCurved : MonoBehaviour
     {
         if (_clusterRig == null || _clusterRig.panels.Count == 0) return;
 
-        var panels = _clusterRig.panels;
-        var refPanel = panels[panels.Count / 2];
+        // Get enabled panel count and reference panel
+        int enabledCount = _clusterRig.GetEnabledPanelCount();
+        if (enabledCount == 0) return;
 
-        int panelCount = panels.Count;
+        var enabledIndices = _clusterRig.GetEnabledPanelIndices();
+        var panels = _clusterRig.panels;
+
+        // Get reference panel from enabled panels (middle one)
+        int refIndex = enabledIndices[enabledIndices.Count / 2];
+        var refPanel = panels[refIndex];
+
+        int panelCount = enabledCount;
         float panelWidth = refPanel.width;
         float panelHeight = refPanel.height;
         float arcRadius = _clusterRig.distanceFromCamera;
@@ -313,7 +331,7 @@ public class ClusterVisualCurved : MonoBehaviour
     }
 
     /// <summary>
-    /// Calculate offset to center mesh on actual panel positions
+    /// Calculate offset to center mesh on actual panel positions (only enabled panels)
     /// The mesh is generated centered at angle=0, but panels might be offset (e.g., FixedThreeSlot mode)
     /// </summary>
     private Vector3 CalculatePanelCenterOffset()
@@ -321,12 +339,17 @@ public class ClusterVisualCurved : MonoBehaviour
         if (_clusterRig == null || _clusterRig.panels.Count == 0)
             return Vector3.zero;
 
+        var enabledIndices = _clusterRig.GetEnabledPanelIndices();
+        if (enabledIndices.Count == 0)
+            return Vector3.zero;
+
         var panels = _clusterRig.panels;
 
-        // Calculate center of all panels in local space
+        // Calculate center of enabled panels only in local space
         Vector3 localCenter = Vector3.zero;
-        foreach (var panel in panels)
+        foreach (int idx in enabledIndices)
         {
+            var panel = panels[idx];
             if (panel != null)
             {
                 // Get panel position relative to cluster rig
@@ -334,7 +357,7 @@ public class ClusterVisualCurved : MonoBehaviour
                 localCenter += localPos;
             }
         }
-        localCenter /= panels.Count;
+        localCenter /= enabledIndices.Count;
 
         // The mesh is centered at origin, so offset it to match panel center
         // Only use X offset (horizontal centering), keep Y and Z at 0

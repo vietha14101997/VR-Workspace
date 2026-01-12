@@ -71,6 +71,9 @@ public class RTTRemoteTaskbar : MonoBehaviour
     // Expansion panel
     private RTTTaskbarExpansion _expansionPanel;
 
+    // ClusterRig reference for panel enable/disable
+    private WorldPanelClusterRig _clusterRig;
+
     // State
     private bool _isPassthroughOn = false;
 
@@ -235,6 +238,7 @@ public class RTTRemoteTaskbar : MonoBehaviour
     private void OnBackClicked()
     {
         Debug.Log("[RTTRemoteTaskbar] Back pressed - showing menu");
+        HideExpansionPanel();
         OnMenuRequested?.Invoke();
         _miniFrame.MarkDirty();
     }
@@ -470,7 +474,30 @@ public class RTTRemoteTaskbar : MonoBehaviour
 
         Debug.Log($"[RTTRemoteTaskbar] Screen {screenNumber} toggled: {(newState ? "ON" : "OFF")}");
 
-        // TODO: Notify ClusterRig to show/hide this monitor panel
+        // screenNumber is 1-based, panelIndex is 0-based
+        int panelIndex = screenNumber - 1;
+
+        // Notify ClusterRig to show/hide this monitor panel
+        if (_clusterRig != null)
+        {
+            _clusterRig.SetPanelEnabled(panelIndex, newState);
+        }
+
+        // Notify server to pause/resume this monitor's stream
+        if (_viewModel != null)
+        {
+            if (newState)
+            {
+                // Screen ON - resume streaming for this monitor
+                _ = _viewModel.ResumeMonitorAsync(panelIndex);
+            }
+            else
+            {
+                // Screen OFF - pause streaming for this monitor
+                _ = _viewModel.PauseMonitorAsync(panelIndex);
+            }
+        }
+
         _miniFrame?.MarkDirty();
     }
 
@@ -523,12 +550,34 @@ public class RTTRemoteTaskbar : MonoBehaviour
     }
 
     /// <summary>
-    /// Set the state of a screen button.
+    /// Set the state of a screen button and update panel visibility.
     /// </summary>
     public void SetScreenState(int screenNumber, bool isOn)
     {
         _screenStates[screenNumber] = isOn;
         UpdateScreenButtonAppearance(screenNumber);
+
+        // screenNumber is 1-based, panelIndex is 0-based
+        int panelIndex = screenNumber - 1;
+
+        // Update ClusterRig panel visibility
+        if (_clusterRig != null)
+        {
+            _clusterRig.SetPanelEnabled(panelIndex, isOn);
+        }
+
+        // Notify server to pause/resume this monitor's stream
+        if (_viewModel != null)
+        {
+            if (isOn)
+            {
+                _ = _viewModel.ResumeMonitorAsync(panelIndex);
+            }
+            else
+            {
+                _ = _viewModel.PauseMonitorAsync(panelIndex);
+            }
+        }
     }
     #endregion
 
@@ -1007,14 +1056,22 @@ public class RTTRemoteTaskbar : MonoBehaviour
         if (_miniFrame != null && target != null)
         {
             _miniFrame.SetFollowTarget(target);
+
+            // Try to get ClusterRig reference for panel enable/disable
+            if (_clusterRig == null && target != null)
+            {
+                _clusterRig = target.GetComponent<WorldPanelClusterRig>();
+            }
         }
     }
 
     /// <summary>
     /// Set the follow target (WorldPanelClusterRig overload).
+    /// Also stores reference for panel enable/disable functionality.
     /// </summary>
     public void SetFollowTarget(WorldPanelClusterRig clusterRig)
     {
+        _clusterRig = clusterRig;
         if (clusterRig != null)
         {
             SetFollowTarget(clusterRig.transform);

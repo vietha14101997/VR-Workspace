@@ -433,6 +433,68 @@ namespace VRWorkspace.Streaming
         }
 
         /// <summary>
+        /// Pause a specific monitor's streaming.
+        /// Server stops encoding for that monitor but keeps connection alive.
+        /// </summary>
+        /// <param name="monitorIndex">Index of the monitor to pause (0-based)</param>
+        public async Task PauseMonitorAsync(int monitorIndex)
+        {
+            if (_ws?.State != WebSocketState.Open)
+            {
+                Debug.LogWarning("[PhaseProtocol] PauseMonitor skipped: WebSocket not open");
+                return;
+            }
+
+            if (!_stateMachine.IsStreaming)
+            {
+                Debug.LogWarning($"[PhaseProtocol] PauseMonitor skipped: not streaming (state={_stateMachine?.CurrentPhase})");
+                return;
+            }
+
+            try
+            {
+                string json = $"{{\"type\":\"pause_monitor\",\"monitorIndex\":{monitorIndex}}}";
+                Debug.Log($"[PhaseProtocol] Sending pause_monitor: index={monitorIndex}");
+                await SendTextAsync(json);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[PhaseProtocol] PauseMonitor failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Resume a specific monitor's streaming.
+        /// Server restarts encoding for that monitor and sends keyframe.
+        /// </summary>
+        /// <param name="monitorIndex">Index of the monitor to resume (0-based)</param>
+        public async Task ResumeMonitorAsync(int monitorIndex)
+        {
+            if (_ws?.State != WebSocketState.Open)
+            {
+                Debug.LogWarning("[PhaseProtocol] ResumeMonitor skipped: WebSocket not open");
+                return;
+            }
+
+            if (!_stateMachine.IsStreaming)
+            {
+                Debug.LogWarning($"[PhaseProtocol] ResumeMonitor skipped: not streaming (state={_stateMachine?.CurrentPhase})");
+                return;
+            }
+
+            try
+            {
+                string json = $"{{\"type\":\"resume_monitor\",\"monitorIndex\":{monitorIndex}}}";
+                Debug.Log($"[PhaseProtocol] Sending resume_monitor: index={monitorIndex}");
+                await SendTextAsync(json);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[PhaseProtocol] ResumeMonitor failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Request server to send a keyframe immediately.
         /// Call this when user interacts (click, drag, etc.) for instant visual update.
         /// </summary>

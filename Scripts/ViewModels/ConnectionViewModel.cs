@@ -263,6 +263,38 @@ namespace VRWorkspace.ViewModels
         }
 
         /// <summary>
+        /// Pause streaming for a specific monitor - server stops capture/encode for this monitor only.
+        /// Use when toggling off a monitor button in taskbar.
+        /// </summary>
+        /// <param name="monitorIndex">Zero-based monitor index</param>
+        public async Task PauseMonitorAsync(int monitorIndex)
+        {
+            if (_client == null)
+            {
+                Debug.LogWarning("[ConnectionViewModel] PauseMonitor: No client");
+                return;
+            }
+
+            await _client.PauseMonitorAsync(monitorIndex);
+        }
+
+        /// <summary>
+        /// Resume streaming for a specific monitor - server restarts capture/encode for this monitor.
+        /// Use when toggling on a monitor button in taskbar.
+        /// </summary>
+        /// <param name="monitorIndex">Zero-based monitor index</param>
+        public async Task ResumeMonitorAsync(int monitorIndex)
+        {
+            if (_client == null)
+            {
+                Debug.LogWarning("[ConnectionViewModel] ResumeMonitor: No client");
+                return;
+            }
+
+            await _client.ResumeMonitorAsync(monitorIndex);
+        }
+
+        /// <summary>
         /// Reset all observable properties to initial state.
         /// Call this synchronously when closing app to ensure clean slate.
         /// </summary>

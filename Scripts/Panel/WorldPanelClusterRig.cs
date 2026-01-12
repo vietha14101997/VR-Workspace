@@ -77,6 +77,12 @@ public class WorldPanelClusterRig : MonoBehaviour
     [SerializeField, HideInInspector]
     private List<ClusterPanelVisual> _panelVisuals = new List<ClusterPanelVisual>();
 
+    // Track enabled/disabled state per panel (true = enabled, false = disabled)
+    private List<bool> _panelEnabledStates = new List<bool>();
+
+    // Event fired when panel enabled state changes
+    public event System.Action<int, bool> OnPanelEnabledChanged;
+
     Camera Cam => Application.isPlaying ? Camera.main : FindObjectOfType<Camera>();
 
     /// <summary>
@@ -111,7 +117,7 @@ public class WorldPanelClusterRig : MonoBehaviour
     }
 
     /// <summary>
-    /// Get the world size of the cluster based on panel bounds.
+    /// Get the world size of the cluster based on enabled panel bounds.
     /// Returns Vector2 (width, height) in world units.
     /// </summary>
     public Vector2 GetWorldSize()
@@ -121,13 +127,18 @@ public class WorldPanelClusterRig : MonoBehaviour
             return Vector2.zero;
         }
 
-        // Calculate bounds from all panels
+        // Calculate bounds from enabled panels only
         Bounds combinedBounds = new Bounds();
         bool first = true;
 
-        foreach (var panel in _panels)
+        for (int i = 0; i < _panels.Count; i++)
         {
+            var panel = _panels[i];
             if (panel == null) continue;
+
+            // Skip disabled panels
+            bool isEnabled = i < _panelEnabledStates.Count ? _panelEnabledStates[i] : true;
+            if (!isEnabled) continue;
 
             // Get panel's world bounds
             Bounds panelBounds = new Bounds(panel.transform.position, Vector3.zero);
@@ -161,7 +172,7 @@ public class WorldPanelClusterRig : MonoBehaviour
     }
 
     /// <summary>
-    /// Get the combined bounds of all panels in world space.
+    /// Get the combined bounds of enabled panels in world space.
     /// </summary>
     public Bounds GetWorldBounds()
     {
@@ -173,9 +184,14 @@ public class WorldPanelClusterRig : MonoBehaviour
         }
 
         bool first = true;
-        foreach (var panel in _panels)
+        for (int i = 0; i < _panels.Count; i++)
         {
+            var panel = _panels[i];
             if (panel == null) continue;
+
+            // Skip disabled panels
+            bool isEnabled = i < _panelEnabledStates.Count ? _panelEnabledStates[i] : true;
+            if (!isEnabled) continue;
 
             // Get panel's world bounds
             Bounds panelBounds = new Bounds(panel.transform.position, Vector3.zero);
@@ -257,6 +273,114 @@ public class WorldPanelClusterRig : MonoBehaviour
 
         return bounds;
     }
+
+    #region Panel Enable/Disable
+
+    /// <summary>
+    /// Enable or disable a specific panel by index.
+    /// Disabled panels are hidden and excluded from layout.
+    /// </summary>
+    /// <param name="panelIndex">Index of the panel (0-based, corresponds to monitor index)</param>
+    /// <param name="enabled">True to enable, false to disable</param>
+    public void SetPanelEnabled(int panelIndex, bool enabled)
+    {
+        if (panelIndex < 0 || panelIndex >= _panels.Count)
+        {
+            Debug.LogWarning($"[WorldPanelClusterRig] SetPanelEnabled: Invalid index {panelIndex}");
+            return;
+        }
+
+        // Ensure state list is properly sized
+        while (_panelEnabledStates.Count < _panels.Count)
+        {
+            _panelEnabledStates.Add(true);
+        }
+
+        bool wasEnabled = _panelEnabledStates[panelIndex];
+        if (wasEnabled == enabled) return; // No change
+
+        _panelEnabledStates[panelIndex] = enabled;
+
+        var panel = _panels[panelIndex];
+        if (panel != null)
+        {
+            // Hide/show the panel
+            panel.SetVisible(enabled);
+
+            // Also handle ClusterPanelVisual if present
+            var visual = panel.GetComponent<ClusterPanelVisual>();
+            if (visual != null)
+            {
+                visual.gameObject.SetActive(enabled);
+            }
+        }
+
+        // Recalculate layout
+        LayoutFromCamera();
+
+        // Rebuild cluster visuals (mesh regeneration needed for panel count change)
+        if (enableClusterVisuals)
+        {
+            RebuildClusterVisuals();
+        }
+
+        // Fire event
+        OnPanelEnabledChanged?.Invoke(panelIndex, enabled);
+
+        Debug.Log($"[WorldPanelClusterRig] Panel {panelIndex} {(enabled ? "enabled" : "disabled")}. " +
+            $"Enabled panels: {GetEnabledPanelCount()}/{_panels.Count}");
+    }
+
+    /// <summary>
+    /// Check if a panel is enabled.
+    /// </summary>
+    public bool IsPanelEnabled(int panelIndex)
+    {
+        if (panelIndex < 0 || panelIndex >= _panels.Count) return false;
+        if (panelIndex >= _panelEnabledStates.Count) return true; // Default enabled
+        return _panelEnabledStates[panelIndex];
+    }
+
+    /// <summary>
+    /// Get the number of currently enabled panels.
+    /// </summary>
+    public int GetEnabledPanelCount()
+    {
+        int count = 0;
+        for (int i = 0; i < _panels.Count; i++)
+        {
+            bool isEnabled = i < _panelEnabledStates.Count ? _panelEnabledStates[i] : true;
+            if (isEnabled) count++;
+        }
+        return count;
+    }
+
+    /// <summary>
+    /// Get all enabled panel indices.
+    /// </summary>
+    public List<int> GetEnabledPanelIndices()
+    {
+        var result = new List<int>();
+        for (int i = 0; i < _panels.Count; i++)
+        {
+            bool isEnabled = i < _panelEnabledStates.Count ? _panelEnabledStates[i] : true;
+            if (isEnabled) result.Add(i);
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Enable all panels.
+    /// </summary>
+    public void EnableAllPanels()
+    {
+        for (int i = 0; i < _panels.Count; i++)
+        {
+            SetPanelEnabled(i, true);
+        }
+    }
+
+    #endregion
 
     /// <summary>
     /// Ensures the cluster rig is placed inside a VirtualObjects parent and has the correct layer
@@ -377,36 +501,48 @@ public class WorldPanelClusterRig : MonoBehaviour
 
         float angleDeg = boardAngleDeg + gapAngleDeg;
 
-        int count = _panels.Count;
+        // Collect enabled panels
+        var enabledPanels = new List<WorldPanelPlus>();
+        var enabledIndices = new List<int>();
+        for (int i = 0; i < _panels.Count; i++)
+        {
+            bool isEnabled = i < _panelEnabledStates.Count ? _panelEnabledStates[i] : true;
+            if (isEnabled && _panels[i] != null)
+            {
+                enabledPanels.Add(_panels[i]);
+                enabledIndices.Add(i);
+            }
+        }
+
+        int enabledCount = enabledPanels.Count;
+        if (enabledCount == 0) return;
 
         if (layoutMode == ClusterLayoutMode.FixedThreeSlot)
         {
-            // FixedThreeSlot: panels are placed in fixed 3-slot positions
+            // FixedThreeSlot: enabled panels are placed in fixed 3-slot positions
             // Slot positions: -1 (left), 0 (center), 1 (right)
-            // 1 panel:  center only       → slot 0
-            // 2 panels: center + right    → slots 0, 1
-            // 3 panels: left + center + right → slots -1, 0, 1
-            int[] slotOffsets = count switch
+            // Layout based on enabled panel count
+            int[] slotOffsets = enabledCount switch
             {
                 1 => new[] { 0 },
                 2 => new[] { 0, 1 },
                 _ => new[] { -1, 0, 1 }
             };
 
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < enabledCount; i++)
             {
                 float yawDeg = slotOffsets[i] * angleDeg;
-                PlacePanelOnArc(_panels[i], yawDeg, cam, camFwd, camUp);
+                PlacePanelOnArc(enabledPanels[i], yawDeg, cam, camFwd, camUp);
             }
         }
         else
         {
-            // Dynamic mode: panels spread evenly across the arc
-            for (int i = 0; i < count; i++)
+            // Dynamic mode: enabled panels spread evenly across the arc
+            for (int i = 0; i < enabledCount; i++)
             {
-                float offset = i - (count - 1) / 2f;
+                float offset = i - (enabledCount - 1) / 2f;
                 float yawDeg = offset * angleDeg;
-                PlacePanelOnArc(_panels[i], yawDeg, cam, camFwd, camUp);
+                PlacePanelOnArc(enabledPanels[i], yawDeg, cam, camFwd, camUp);
             }
         }
     }
@@ -435,6 +571,7 @@ public class WorldPanelClusterRig : MonoBehaviour
     void CreatePanels(int count, bool skipSampleTextures = false)
     {
         _panels.Clear();
+        _panelEnabledStates.Clear();
 
         // Load sample textures for testing curved mode (unless skipped)
         Texture2D[] sampleTextures = skipSampleTextures ? new Texture2D[0] : LoadSampleTextures();
@@ -453,6 +590,7 @@ public class WorldPanelClusterRig : MonoBehaviour
             }
 
             _panels.Add(p);
+            _panelEnabledStates.Add(true); // All panels enabled by default
         }
 
         // Sync sizes from first panel
@@ -705,6 +843,24 @@ public class WorldPanelClusterRig : MonoBehaviour
                     visual.UpdateSize();
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// Rebuild cluster visuals (call after enabling/disabling panels to regenerate meshes)
+    /// </summary>
+    public void RebuildClusterVisuals()
+    {
+        if (!enableClusterVisuals) return;
+
+        if (useCurvedVisual && _curvedVisual != null)
+        {
+            _curvedVisual.Rebuild();
+        }
+        else
+        {
+            // For non-curved visuals, refresh is sufficient
+            RefreshClusterVisuals();
         }
     }
 

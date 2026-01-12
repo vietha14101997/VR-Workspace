@@ -34,7 +34,7 @@ public class RTTTaskbarExpansion : RTTCanvasBase
 
     [Header("Position")]
     [SerializeField] private Transform followTarget;
-    [SerializeField] private float gapAboveTaskbar = 0.0025f; // Reduced to half
+    [SerializeField] private float gapAboveTaskbar = 0.002f;
     #endregion
 
     #region Types
@@ -301,6 +301,9 @@ public class RTTTaskbarExpansion : RTTCanvasBase
         worldWidth = _totalWidth * PixelToMeter;
         worldHeight = frameHeight * PixelToMeter;
 
+        // Resize quad and canvas to match new size
+        ResizeQuadAndCanvas();
+
         // Show
         gameObject.SetActive(true);
         _isVisible = true;
@@ -308,12 +311,35 @@ public class RTTTaskbarExpansion : RTTCanvasBase
         // Set static reference
         CurrentlyOpenExpansion = this;
 
-        // Rebuild content
-        RebuildContent();
+        // Rebuild UI completely (glass panel aspect ratio needs updating)
+        RebuildUI();
 
         MarkDirty();
 
-        Debug.Log($"[RTTTaskbarExpansion] Showing {type} options, width={_totalWidth}px");
+        Debug.Log($"[RTTTaskbarExpansion] Showing {type} options, width={_totalWidth}px, worldWidth={worldWidth}m");
+    }
+
+    /// <summary>
+    /// Resize the display quad and canvas to match current worldWidth/worldHeight.
+    /// </summary>
+    private void ResizeQuadAndCanvas()
+    {
+        Vector2Int resolution = GetResolution();
+
+        // Resize render texture (this also updates camera, material, canvas scaler, camera ortho size)
+        ResizeRenderTexture(resolution.x, resolution.y);
+
+        // Resize display quad
+        if (_displayQuad != null)
+        {
+            _displayQuad.transform.localScale = new Vector3(worldWidth, worldHeight, 1f);
+        }
+
+        // Resize quad collider
+        if (_quadCollider != null)
+        {
+            _quadCollider.size = new Vector3(1f, 1f, 0.01f);
+        }
     }
 
     private void RecalculateSize(ExpansionType type)
@@ -331,6 +357,18 @@ public class RTTTaskbarExpansion : RTTCanvasBase
             {
                 Destroy(child.gameObject);
             }
+        }
+
+        // Cleanup old materials to avoid memory leak
+        if (_glassMaterial != null)
+        {
+            Destroy(_glassMaterial);
+            _glassMaterial = null;
+        }
+        if (_borderMaterial != null)
+        {
+            Destroy(_borderMaterial);
+            _borderMaterial = null;
         }
 
         // Clear references
