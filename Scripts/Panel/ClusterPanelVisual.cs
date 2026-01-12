@@ -81,7 +81,7 @@ public class ClusterPanelVisual : MonoBehaviour
 
     [Header("Junction Overlap")]
     [Tooltip("Overlap amount (in meters) at panel junctions for seamless appearance")]
-    [SerializeField] private float junctionOverlap = 0.01f;
+    [SerializeField] private float junctionOverlap = 0.03f;
 
     // Runtime references
     private Material _backgroundMaterial;
