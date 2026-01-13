@@ -62,16 +62,19 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
     private Mesh _expandedMesh;
 
     private GameObject _backgroundObject;
+    private GameObject _contentObject;
     private GameObject _borderObject;
-    // NOTE: No _contentObject - boards render content directly!
 
     private MeshFilter _backgroundMeshFilter;
+    private MeshFilter _contentMeshFilter;
     private MeshFilter _borderMeshFilter;
 
     private MeshRenderer _backgroundRenderer;
+    private MeshRenderer _contentRenderer;
     private MeshRenderer _borderRenderer;
 
     private Material _backgroundMaterial;
+    private Material _contentMaterial;
     private Material _borderMaterial;
 
     // Cached cluster parameters
@@ -108,6 +111,15 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
         Cleanup();
     }
 
+    void Update()
+    {
+        // Update content textures each frame (for streaming video)
+        if (Application.isPlaying && _contentMaterial != null)
+        {
+            UpdateContentTextures();
+        }
+    }
+
     #endregion
 
     #region Public API
@@ -134,6 +146,7 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
         GenerateMeshes();
         CreateVisualLayers();
         ApplyMaterials();
+        UpdateContentTextures();
 
         Debug.Log("[ClusterVisualFlatPlanar] Initialize() completed successfully");
     }
@@ -195,6 +208,39 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
         glassColorA = colorA;
         glassColorB = colorB;
         ApplyBackgroundMaterial();
+    }
+
+    /// <summary>
+    /// Update content textures from panels (only enabled panels).
+    /// Called every frame to sync streaming video content.
+    /// </summary>
+    public void UpdateContentTextures()
+    {
+        if (_contentMaterial == null || _clusterRig == null) return;
+
+        var enabledIndices = _clusterRig.GetEnabledPanelIndices();
+        var panels = _clusterRig.panels;
+
+        // Clear all textures first
+        for (int i = 0; i < 6; i++)
+        {
+            _contentMaterial.SetTexture($"_Content{i}", Texture2D.blackTexture);
+        }
+
+        // Set textures for enabled panels only
+        for (int i = 0; i < enabledIndices.Count && i < 6; i++)
+        {
+            int panelIndex = enabledIndices[i];
+            var panel = panels[panelIndex];
+            if (panel != null)
+            {
+                // Get content texture directly from panel's contentTexture field
+                Texture contentTex = panel.contentTexture;
+                _contentMaterial.SetTexture($"_Content{i}", contentTex ?? Texture2D.blackTexture);
+            }
+        }
+
+        _contentMaterial.SetInt("_PanelCount", enabledIndices.Count);
     }
 
     #endregion
@@ -291,22 +337,25 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
         // No offset needed - just place at origin with Z offsets for layering
         Vector3 noOffset = Vector3.zero;
 
-        // Background layer (behind content boards)
+        // Background layer (behind content)
         _backgroundObject = CreateLayerObject("ClusterBackground_FlatPlanar", backgroundZOffset, noOffset);
         _backgroundMeshFilter = _backgroundObject.GetComponent<MeshFilter>();
         _backgroundRenderer = _backgroundObject.GetComponent<MeshRenderer>();
         _backgroundMeshFilter.sharedMesh = _expandedMesh;
 
-        // NOTE: No content layer - panel boards render content directly!
-        // This is the key difference from ClusterVisualCurved
+        // Content layer (middle) - unified content mesh for seamless appearance
+        _contentObject = CreateLayerObject("ClusterContent_FlatPlanar", 0f, noOffset);
+        _contentMeshFilter = _contentObject.GetComponent<MeshFilter>();
+        _contentRenderer = _contentObject.GetComponent<MeshRenderer>();
+        _contentMeshFilter.sharedMesh = _flatPlanarMesh;
 
-        // Border layer (in front of content boards)
+        // Border layer (in front of content)
         _borderObject = CreateLayerObject("ClusterBorder_FlatPlanar", borderZOffset, noOffset);
         _borderMeshFilter = _borderObject.GetComponent<MeshFilter>();
         _borderRenderer = _borderObject.GetComponent<MeshRenderer>();
         _borderMeshFilter.sharedMesh = _expandedMesh;
 
-        Debug.Log($"[ClusterVisualFlatPlanar] Created visual layers: background={_backgroundObject.name}, border={_borderObject.name}");
+        Debug.Log($"[ClusterVisualFlatPlanar] Created visual layers: background, content, border");
     }
 
     /// <summary>
@@ -405,6 +454,7 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
     private void ApplyMaterials()
     {
         ApplyBackgroundMaterial();
+        ApplyContentMaterial();
         ApplyBorderMaterial();
     }
 
@@ -463,6 +513,49 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
 
         Debug.Log($"[ClusterVisualFlatPlanar] Background material applied: shader={_backgroundMaterial.shader.name}, " +
             $"clusterWidth={_backgroundMaterial.GetFloat("_ClusterWidth"):F2}, clusterHeight={_backgroundMaterial.GetFloat("_ClusterHeight"):F2}");
+    }
+
+    private void ApplyContentMaterial()
+    {
+        if (_contentRenderer == null)
+        {
+            Debug.LogError("[ClusterVisualFlatPlanar] ApplyContentMaterial: _contentRenderer is null!");
+            return;
+        }
+
+        var shader = Shader.Find("Custom/ClusterContentFlatPlanar");
+        if (shader == null)
+        {
+            Debug.LogError("[ClusterVisualFlatPlanar] ClusterContentFlatPlanar shader not found!");
+            return;
+        }
+
+        if (_contentMaterial == null)
+        {
+            _contentMaterial = new Material(shader);
+        }
+
+        // Calculate dimensions (non-expanded mesh for content)
+        CalculateFlatPlanarDimensions(expanded: false, out float clusterWidth, out float clusterHeight);
+
+        _contentMaterial.SetInt("_PanelCount", _cachedPanelCount);
+        _contentMaterial.SetFloat("_ClusterWidth", clusterWidth);
+        _contentMaterial.SetFloat("_ClusterHeight", clusterHeight);
+
+        // Use minimal corner radius for content - background/border already provide visual corners
+        // This prevents content from being clipped too aggressively
+        _contentMaterial.SetFloat("_CornerRadius", 0.01f);
+        _contentMaterial.SetFloat("_EdgePadding", 0f);
+
+        _contentMaterial.SetFloat("_Sharpness", 0.5f);
+        _contentMaterial.SetFloat("_SharpnessRadius", 1.0f);
+        _contentMaterial.SetFloat("_ChromaSharpness", 0.3f);
+        _contentMaterial.SetFloat("_EnableSharpening", 1f);
+
+        _contentMaterial.renderQueue = 3000;
+        _contentRenderer.sharedMaterial = _contentMaterial;
+
+        Debug.Log($"[ClusterVisualFlatPlanar] Content material applied: shader={_contentMaterial.shader.name}");
     }
 
     private void ApplyBorderMaterial()
@@ -543,6 +636,15 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
             _backgroundMaterial = null;
         }
 
+        if (_contentMaterial != null)
+        {
+            if (Application.isPlaying)
+                Destroy(_contentMaterial);
+            else
+                DestroyImmediate(_contentMaterial);
+            _contentMaterial = null;
+        }
+
         if (_borderMaterial != null)
         {
             if (Application.isPlaying)
@@ -581,6 +683,15 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
             _backgroundObject = null;
         }
 
+        if (_contentObject != null)
+        {
+            if (Application.isPlaying)
+                Destroy(_contentObject);
+            else
+                DestroyImmediate(_contentObject);
+            _contentObject = null;
+        }
+
         if (_borderObject != null)
         {
             if (Application.isPlaying)
@@ -591,8 +702,10 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
         }
 
         _backgroundMeshFilter = null;
+        _contentMeshFilter = null;
         _borderMeshFilter = null;
         _backgroundRenderer = null;
+        _contentRenderer = null;
         _borderRenderer = null;
 
         _cachedPanelCount = -1;

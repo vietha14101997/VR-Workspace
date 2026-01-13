@@ -236,6 +236,16 @@ public class ClusterVisualCurved : MonoBehaviour
         ApplyBackgroundMaterial();
     }
 
+    /// <summary>
+    /// Set corner settings (radius and padding)
+    /// </summary>
+    public void SetCornerSettings(float radius, float padding)
+    {
+        cornerRadius = radius;
+        edgePadding = padding;
+        ApplyMaterials(); // Update all materials
+    }
+
     #endregion
 
     #region Mesh Generation
@@ -401,7 +411,9 @@ public class ClusterVisualCurved : MonoBehaviour
     /// </summary>
     private void CalculateArcDimensions(bool expanded, out float arcWidth, out float height)
     {
-        float boardWidth = _cachedPanelWidth * (1f - 2f * contentMarginH);
+        // UPDATE: Use full panel width to match Generator change.
+        // This ensures the shader receives dimensions consistent with the larger mesh.
+        float boardWidth = _cachedPanelWidth;
 
         if (expanded)
         {
@@ -494,10 +506,12 @@ public class ClusterVisualCurved : MonoBehaviour
         _contentMaterial.SetFloat("_ClusterHeight", clusterHeight);
         _contentMaterial.SetFloat("_BlendZone", blendZoneWidth);
 
-        _contentMaterial.SetFloat("_CornerRadius", cornerRadius);
-        _contentMaterial.SetFloat("_EdgePadding", edgePadding);
-        _contentMaterial.SetFloat("_MarginH", contentMarginH);
-        _contentMaterial.SetFloat("_MarginV", contentMarginV);
+        _contentMaterial.SetFloat("_BlendZone", blendZoneWidth);
+
+        // Use minimal corner radius for content - background/border already provide visual corners
+        // This prevents content from being clipped too aggressively (e.g. taskbar date/time)
+        _contentMaterial.SetFloat("_CornerRadius", 0.01f);
+        _contentMaterial.SetFloat("_EdgePadding", 0f); // content fills the board area
 
         _contentMaterial.SetFloat("_Sharpness", 0.5f);
         _contentMaterial.SetFloat("_SharpnessRadius", 1.0f);

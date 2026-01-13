@@ -2151,6 +2151,7 @@ public class RTTRemoteMenu : MonoBehaviour
             horizontalLayout = hasIcon && hasText,
             iconSize = hasIcon && !hasText ? 44f : 44f,
             iconPadding = hasIcon && hasText ? 64f : 28f,
+            spacing = hasIcon && hasText ? 36f : 18f,
             backgroundAlpha = 0.08f,
             borderWidth = 0.04f,
             popAmount = 0.0125f

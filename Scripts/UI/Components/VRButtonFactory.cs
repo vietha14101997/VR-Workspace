@@ -131,6 +131,7 @@ public static class VRButtonFactory
         public bool horizontalLayout = false; // Icon trái, Text phải (như nút Back)
         public float iconSize = 44f;
         public float iconPadding = 28f;
+        public float spacing = 18f;
 
         // Visual settings
         public float cornerRadius = 0.12f;
@@ -722,32 +723,35 @@ public static class VRButtonFactory
     /// <summary>
     /// Tạo layout ngang: Icon bên trái, Text bên phải
     /// </summary>
+    /// <summary>
+    /// Tạo layout ngang: Icon bên trái, Text bên phải
+    /// Uses HorizontalLayoutGroup to center the specific combination of Icon + Text
+    /// </summary>
     private static void CreateHorizontalIconText(Transform parent, ButtonConfig config)
     {
-        Color col = config.themeColor;
+        // Use HorizontalLayoutGroup to center the content (Icon + Spacing + Text)
+        HorizontalLayoutGroup layout = parent.gameObject.AddComponent<HorizontalLayoutGroup>();
+        layout.childAlignment = TextAnchor.MiddleCenter;
+        layout.spacing = config.spacing;
+        layout.childControlWidth = false; // We set sizes manually
+        layout.childControlHeight = false;
+        layout.childForceExpandWidth = false;
+        layout.childForceExpandHeight = false;
 
-        // Icon ở bên trái
+        // Icon Object
         GameObject iconObj = new GameObject("Icon");
         iconObj.transform.SetParent(parent, false);
         RectTransform iconRT = iconObj.AddComponent<RectTransform>();
-
-        float iconCenterX = config.iconPadding + config.iconSize / 2f;
-        float iconAnchorX = iconCenterX / config.width;
-        float iconHalfSize = (config.iconSize / 2f) / config.height;
-
-        iconRT.anchorMin = new Vector2(iconAnchorX - iconHalfSize * (config.height / config.width), 0.5f - iconHalfSize);
-        iconRT.anchorMax = new Vector2(iconAnchorX + iconHalfSize * (config.height / config.width), 0.5f + iconHalfSize);
-        iconRT.offsetMin = Vector2.zero;
-        iconRT.offsetMax = Vector2.zero;
+        iconRT.sizeDelta = new Vector2(config.iconSize, config.iconSize);
 
         Image iconImg = iconObj.AddComponent<Image>();
         iconImg.sprite = config.icon;
         iconImg.preserveAspect = true;
         iconImg.raycastTarget = false;
-        iconImg.color = Color.Lerp(col, Color.white, 0.9f);
+        iconImg.color = Color.Lerp(config.themeColor, Color.white, 0.9f);
 
         // Icon glow effects
-        Color glowCol = Color.Lerp(col, Color.white, 0.7f);
+        Color glowCol = Color.Lerp(config.themeColor, Color.white, 0.7f);
         glowCol.a = 0.4f;
         float s1 = 2f;
 
@@ -759,17 +763,10 @@ public static class VRButtonFactory
         shadow2.effectColor = glowCol;
         shadow2.effectDistance = new Vector2(-s1, s1);
 
-        // Text ở bên phải icon
+        // Text Object
         GameObject txtObj = new GameObject("TextTMP");
         txtObj.transform.SetParent(parent, false);
-        RectTransform txtRT = txtObj.AddComponent<RectTransform>();
-
-        float textStartX = (iconCenterX + config.iconSize / 2f + 18f) / config.width;
-        txtRT.anchorMin = new Vector2(textStartX, 0f);
-        txtRT.anchorMax = new Vector2(1f, 1f);
-        txtRT.offsetMin = Vector2.zero;
-        txtRT.offsetMax = Vector2.zero;
-
+        
         TextMeshProUGUI txt = txtObj.AddComponent<TextMeshProUGUI>();
         txt.text = config.label;
         txt.fontSize = config.fontSize;
@@ -779,6 +776,11 @@ public static class VRButtonFactory
         txt.fontStyle = FontStyles.Bold;
         txt.raycastTarget = false;
         if (config.font != null) txt.font = config.font;
+
+        // Auto-size text to fit content so LayoutGroup knows width
+        ContentSizeFitter csf = txtObj.AddComponent<ContentSizeFitter>();
+        csf.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+        csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
     }
 
     private static Sprite GetPixelSprite()

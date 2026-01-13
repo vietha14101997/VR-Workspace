@@ -40,8 +40,9 @@ public static class CurvedClusterMeshGenerator
         if (arcRadius < 0.1f) arcRadius = 0.1f;
 
         // Calculate board width (panel minus margins) - matches WorldPanelClusterRig positioning
-        // This ensures mesh arc angle matches actual panel arrangement
-        float boardWidth = panelWidth * (1f - 2f * contentMarginH);
+        // UPDATE: Now using full panel width to ensure consistent physical size with Flat Planar mode,
+        // and to prevent the cluster from appearing "short". Content margins are handled by shader masking.
+        float boardWidth = panelWidth;
 
         // IMPORTANT: Arc angle calculation must match WorldPanelClusterRig.LayoutFromCamera()
         // Each panel occupies an arc angle of 2*atan(boardWidth/2/radius)
@@ -208,7 +209,7 @@ public static class CurvedClusterMeshGenerator
         out float totalArcAngle)
     {
         // Use board width (matches panel positioning in WorldPanelClusterRig)
-        float boardWidth = panelWidth * (1f - 2f * contentMarginH);
+        float boardWidth = panelWidth;
         totalWidth = panelCount * boardWidth;
         totalArcAngle = 2f * Mathf.Rad2Deg * Mathf.Atan(totalWidth / 2f / arcRadius);
     }

@@ -813,6 +813,17 @@ public class WorldPanelClusterRig : MonoBehaviour
     /// </summary>
     void ApplyCurvedVisual()
     {
+        // Remove flat planar visual if present (check component explicitly in case ref is null)
+        if (_flatPlanarVisual == null) _flatPlanarVisual = GetComponent<ClusterVisualFlatPlanar>();
+        if (_flatPlanarVisual != null)
+        {
+            if (Application.isPlaying)
+                Destroy(_flatPlanarVisual);
+            else
+                DestroyImmediate(_flatPlanarVisual);
+            _flatPlanarVisual = null;
+        }
+
         // Remove any per-panel visuals
         foreach (var visual in _panelVisuals)
         {
@@ -860,6 +871,8 @@ public class WorldPanelClusterRig : MonoBehaviour
         // Apply colors
         _curvedVisual.SetGlowColors(glowColorA, glowColorB);
         _curvedVisual.SetGlassColors(glassColorA, glassColorB);
+        // Sync corner settings to ensure consistent look with Flat Planar mode
+        _curvedVisual.SetCornerSettings(cornerRadius, edgePadding);
     }
 
     /// <summary>
@@ -868,7 +881,8 @@ public class WorldPanelClusterRig : MonoBehaviour
     /// </summary>
     void ApplyFlatPlanarVisual()
     {
-        // Remove curved visual if present
+        // Remove curved visual if present (check component explicitly in case ref is null)
+        if (_curvedVisual == null) _curvedVisual = GetComponent<ClusterVisualCurved>();
         if (_curvedVisual != null)
         {
             if (Application.isPlaying)
@@ -906,22 +920,14 @@ public class WorldPanelClusterRig : MonoBehaviour
             }
         }
 
-        // Configure each board: FULL size
-        // IMPORTANT: Respect enabled state - only show enabled panels
-        // NOTE: Do NOT modify board material properties here - boards keep their original corner radius
-        for (int i = 0; i < _panels.Count; i++)
+        // Hide individual panel boards - unified content layer will render content
+        // This eliminates the seam between panels
+        foreach (var panel in _panels)
         {
-            var panel = _panels[i];
             if (panel == null) continue;
 
-            // Check if this panel is enabled (respect disabled state)
-            bool isEnabled = i < _panelEnabledStates.Count ? _panelEnabledStates[i] : true;
-            
-            // Set visibility based on enabled state
-            panel.SetVisible(isEnabled);
-
-            // Board uses FULL panel size - no margin reduction
-            panel.board.localScale = new Vector3(panel.width, panel.height, 1f);
+            // Hide the panel's board - unified content layer renders all content
+            panel.SetVisible(false);
         }
 
         // Get or create ClusterVisualFlatPlanar for background/border
@@ -938,7 +944,7 @@ public class WorldPanelClusterRig : MonoBehaviour
         _flatPlanarVisual.SetGlowColors(glowColorA, glowColorB);
         _flatPlanarVisual.SetGlassColors(glassColorA, glassColorB);
 
-        Debug.Log($"[WorldPanelClusterRig] Applied Flat Planar: boards at full size, no corner radius");
+        Debug.Log($"[WorldPanelClusterRig] Applied Flat Planar: unified content layer, boards hidden");
     }
 
     /// <summary>
@@ -1017,6 +1023,7 @@ public class WorldPanelClusterRig : MonoBehaviour
         {
             _curvedVisual.SetGlowColors(glowColorA, glowColorB);
             _curvedVisual.SetGlassColors(glassColorA, glassColorB);
+            _curvedVisual.SetCornerSettings(cornerRadius, edgePadding);
             _curvedVisual.UpdateContentTextures();
         }
         else if (!useCurvedVisual && _flatPlanarVisual != null)
@@ -1062,6 +1069,16 @@ public class WorldPanelClusterRig : MonoBehaviour
             if (_curvedVisual != null)
             {
                 Debug.Log($"[WorldPanelClusterRig] RebuildClusterVisuals: Rebuilding curved visual, enabledPanels={GetEnabledPanelCount()}");
+                
+                // Ensure flat visual is removed
+                if (_flatPlanarVisual == null) _flatPlanarVisual = GetComponent<ClusterVisualFlatPlanar>();
+                if (_flatPlanarVisual != null)
+                {
+                    if (Application.isPlaying) Destroy(_flatPlanarVisual);
+                    else DestroyImmediate(_flatPlanarVisual);
+                    _flatPlanarVisual = null;
+                }
+
                 _curvedVisual.Rebuild();
             }
             else
