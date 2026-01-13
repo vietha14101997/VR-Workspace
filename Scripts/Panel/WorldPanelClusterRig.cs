@@ -914,12 +914,17 @@ public class WorldPanelClusterRig : MonoBehaviour
         }
 
         // Configure each board: FULL size, NO corner radius
-        foreach (var panel in _panels)
+        // IMPORTANT: Respect enabled state - only show enabled panels
+        for (int i = 0; i < _panels.Count; i++)
         {
+            var panel = _panels[i];
             if (panel == null) continue;
 
-            // Re-enable board visibility
-            panel.SetVisible(true);
+            // Check if this panel is enabled (respect disabled state)
+            bool isEnabled = i < _panelEnabledStates.Count ? _panelEnabledStates[i] : true;
+            
+            // Set visibility based on enabled state
+            panel.SetVisible(isEnabled);
 
             // Board uses FULL panel size - no margin reduction
             panel.board.localScale = new Vector3(panel.width, panel.height, 1f);
