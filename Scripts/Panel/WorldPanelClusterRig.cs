@@ -516,12 +516,12 @@ public class WorldPanelClusterRig : MonoBehaviour
         float overlapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(panelOverlap / 2f / distanceFromCamera);
         float angleDeg = boardAngleDeg + gapAngleDeg - overlapAngleDeg;
 
-        // Use ALL panels for layout calculation to ensure stable positioning
-        // even when some monitors are disabled. This prevents the rig from re-centering.
-        // We clone the list to avoid modifying the original list reference if downstream code modifies it
-        var enabledPanels = new List<WorldPanelPlus>(_panels);
-        // The 'enabledIndices' list is no longer needed if we are laying out all panels.
-        // The 'enabledCount' will now refer to the total number of panels.
+        // Create list of ONLY enabled panels to allow reflow into primary slots
+        var enabledPanels = new List<WorldPanelPlus>();
+        for (int i = 0; i < _panels.Count; i++)
+        {
+            if (IsPanelEnabled(i)) enabledPanels.Add(_panels[i]);
+        }
 
         int enabledCount = enabledPanels.Count;
         if (enabledCount == 0) return;
@@ -592,10 +592,12 @@ public class WorldPanelClusterRig : MonoBehaviour
         float overlapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(panelOverlap / 2f / distanceFromCamera);
         float angleDeg = boardAngleDeg + gapAngleDeg - overlapAngleDeg;
 
-        // Use ALL panels for layout calculation to ensure stable positioning
-        // even when some monitors are disabled. This prevents the rig from re-centering.
-        // We clone the list to avoid modifying the original list reference if downstream code modifies it
-        var enabledPanels = new List<WorldPanelPlus>(_panels);
+        // Create list of ONLY enabled panels to allow reflow into primary slots
+        var enabledPanels = new List<WorldPanelPlus>();
+        for (int i = 0; i < _panels.Count; i++)
+        {
+            if (IsPanelEnabled(i)) enabledPanels.Add(_panels[i]);
+        }
 
         int enabledCount = enabledPanels.Count;
         if (enabledCount == 0) return;

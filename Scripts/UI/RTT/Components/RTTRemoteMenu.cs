@@ -654,6 +654,19 @@ public class RTTRemoteMenu : MonoBehaviour
     {
         Debug.Log("[RTTRemoteMenu] DISCONNECT clicked");
 
+        // Lock Resume button (Dim + Lock)
+        if (_resumeButton != null) VRButtonFactory.SetInteractable(_resumeButton, false);
+
+        // Lock Disconnect button BUT keep it bright (lit)
+        // We only disable the Button component to prevent clicks, avoiding VRButtonFactory.SetInteractable which dims it
+        var disconnectBtnComp = _disconnectButton?.GetComponentInChildren<Button>();
+        if (disconnectBtnComp != null) disconnectBtnComp.interactable = false;
+
+        // Change text to DISCONNECTING...
+        var disconnectText = _disconnectButton?.GetComponentInChildren<TextMeshProUGUI>();
+        string originalText = "DISCONNECT";
+        if (disconnectText != null) disconnectText.text = "DISCONNECTING...";
+
         // Fire event for controller to handle
         OnDisconnectClicked?.Invoke();
 
@@ -661,6 +674,23 @@ public class RTTRemoteMenu : MonoBehaviour
         if (_viewModel != null)
         {
             await _viewModel.DisconnectAsync();
+        }
+
+        // Change text to DISCONNECTED
+        if (disconnectText != null) disconnectText.text = "DISCONNECTED";
+
+        // Short delay to show the success state
+        await System.Threading.Tasks.Task.Delay(1000);
+
+        // Reset state for next time
+        if (disconnectText != null) disconnectText.text = originalText;
+        
+        // Restore buttons
+        if (_resumeButton != null) VRButtonFactory.SetInteractable(_resumeButton, true);
+        if (_disconnectButton != null) 
+        {
+            // Restore interactivity fully (ensure alpha is 1 in case it was modified elsewhere)
+            VRButtonFactory.SetInteractable(_disconnectButton, true); 
         }
 
         // Switch back to connect button
