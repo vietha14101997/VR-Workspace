@@ -43,7 +43,7 @@ public class WorldPanelClusterRig : MonoBehaviour
     public float verticalOffset = 0f;
     public bool faceCameraYawOnly = true;
     [Tooltip("Overlap amount (in meters) between adjacent panels to eliminate seams")]
-    [Range(0f, 0.01f)] public float panelOverlap = 0.01f;
+    [Range(0f, 0.01f)] public float panelOverlap = 0.0015f;
 
     [Header("Cluster Visuals")]
     [Tooltip("Enable seamless glass background and glowing border across all panels")]
@@ -512,8 +512,9 @@ public class WorldPanelClusterRig : MonoBehaviour
 
         float boardAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(spacingWidth / 2f / distanceFromCamera);
         float gapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(edgeGapMeters / 2f / distanceFromCamera);
-
-        float angleDeg = boardAngleDeg + gapAngleDeg;
+        // Apply overlap to eliminate seams between adjacent panels
+        float overlapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(panelOverlap / 2f / distanceFromCamera);
+        float angleDeg = boardAngleDeg + gapAngleDeg - overlapAngleDeg;
 
         // Collect enabled panels
         var enabledPanels = new List<WorldPanelPlus>();
@@ -593,7 +594,9 @@ public class WorldPanelClusterRig : MonoBehaviour
         }
         float boardAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(spacingWidth / 2f / distanceFromCamera);
         float gapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(edgeGapMeters / 2f / distanceFromCamera);
-        float angleDeg = boardAngleDeg + gapAngleDeg;
+        // Apply overlap to eliminate seams between adjacent panels
+        float overlapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(panelOverlap / 2f / distanceFromCamera);
+        float angleDeg = boardAngleDeg + gapAngleDeg - overlapAngleDeg;
 
         // Collect enabled panels
         var enabledPanels = new List<WorldPanelPlus>();
@@ -913,8 +916,9 @@ public class WorldPanelClusterRig : MonoBehaviour
             }
         }
 
-        // Configure each board: FULL size, NO corner radius
+        // Configure each board: FULL size
         // IMPORTANT: Respect enabled state - only show enabled panels
+        // NOTE: Do NOT modify board material properties here - boards keep their original corner radius
         for (int i = 0; i < _panels.Count; i++)
         {
             var panel = _panels[i];
@@ -928,37 +932,6 @@ public class WorldPanelClusterRig : MonoBehaviour
 
             // Board uses FULL panel size - no margin reduction
             panel.board.localScale = new Vector3(panel.width, panel.height, 1f);
-            
-            // Remove ALL corner radius from board - critical for seamless edge-to-edge
-            var boardRenderer = panel.board.GetComponent<MeshRenderer>();
-            if (boardRenderer != null && boardRenderer.sharedMaterial != null)
-            {
-                var mat = boardRenderer.sharedMaterial;
-                
-                // Set corner radius to 0
-                if (mat.HasProperty("_CornerRadius"))
-                {
-                    mat.SetFloat("_CornerRadius", 0f);
-                }
-                
-                // Update PanelSize to match actual board size
-                if (mat.HasProperty("_PanelSize"))
-                {
-                    mat.SetVector("_PanelSize", new Vector4(panel.width, panel.height, 0, 0));
-                }
-                
-                // EdgeMask all visible (but with radius=0, corners are square)
-                if (mat.HasProperty("_EdgeMask"))
-                {
-                    mat.SetVector("_EdgeMask", new Vector4(1, 1, 1, 1));
-                }
-                
-                // Disable edge feather if present
-                if (mat.HasProperty("_EdgeFeather"))
-                {
-                    mat.SetFloat("_EdgeFeather", 0f);
-                }
-            }
         }
 
         // Get or create ClusterVisualFlatPlanar for background/border

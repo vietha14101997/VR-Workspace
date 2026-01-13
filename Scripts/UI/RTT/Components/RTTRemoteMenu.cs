@@ -1922,6 +1922,11 @@ public class RTTRemoteMenu : MonoBehaviour
     /// </summary>
     private void EnsureBothPanelsVisible()
     {
+        // Don't show side panels if disconnected or error
+        if (_currentPhase == ConnectionPhase.Disconnected || _currentPhase == ConnectionPhase.Error)
+        {
+            return;
+        }
         // Show hardware frame if not already active
         if (_hardwareFrame != null && !_hardwareFrame.gameObject.activeSelf)
         {
@@ -1969,6 +1974,13 @@ public class RTTRemoteMenu : MonoBehaviour
     /// </summary>
     private void ShowSidePanels()
     {
+        // Don't show side panels if disconnected or error
+        if (_currentPhase == ConnectionPhase.Disconnected || _currentPhase == ConnectionPhase.Error)
+        {
+            Debug.Log($"[RTTRemoteMenu] ShowSidePanels blocked due to phase {_currentPhase}");
+            return;
+        }
+
         Debug.Log($"[RTTRemoteMenu] ShowSidePanels called, hardware frame: {_hardwareFrame != null}, network frame: {_networkFrame != null}");
 
         if (_hardwareFrame != null)
