@@ -66,11 +66,8 @@ public class WorldPanelClusterRig : MonoBehaviour
     [Tooltip("Size (in meters) the Visual mesh expands beyond Board bounds. Use 0 for same size as Board.")]
     [Range(0f, 0.3f)]
     [SerializeField] private float visualExpansion = 0.075f;
-    [Tooltip("Overlap amount (in meters) at panel junctions for seamless appearance")]
-    [SerializeField] private float junctionOverlap = 0.03f;
     [Tooltip("Content margin ratio (content is inset by this fraction)")]
     [SerializeField] private float contentMarginHorizontal = 0.04f;
-    [SerializeField] private float contentMarginVertical = 0.045f;
     [ColorUsage(true, true)]
     [SerializeField] private Color glowColorA = new Color(0.3f, 1f, 1f, 1f);
     [ColorUsage(true, true)]
