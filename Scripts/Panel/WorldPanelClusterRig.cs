@@ -201,8 +201,12 @@ public class WorldPanelClusterRig : MonoBehaviour
             // Get panel's world bounds
             Bounds panelBounds = new Bounds(panel.transform.position, Vector3.zero);
 
-            float halfWidth = panel.width / 2f;
-            float halfHeight = panel.height / 2f;
+            // Include visual expansion
+            float expandedWidth = panel.width + (visualExpansion * 2f);
+            float expandedHeight = panel.height + (visualExpansion * 2f);
+
+            float halfWidth = expandedWidth / 2f;
+            float halfHeight = expandedHeight / 2f;
 
             Vector3 right = panel.transform.right * halfWidth;
             Vector3 up = panel.transform.up * halfHeight;
@@ -265,8 +269,13 @@ public class WorldPanelClusterRig : MonoBehaviour
     {
         Bounds bounds = new Bounds(panel.transform.position, Vector3.zero);
 
-        float halfWidth = panel.width / 2f;
-        float halfHeight = panel.height / 2f;
+        // Include visual expansion in bounds calculation so taskbar
+        // positions relative to the outer visual edge, not just the board content
+        float expandedWidth = panel.width + (visualExpansion * 2f);
+        float expandedHeight = panel.height + (visualExpansion * 2f);
+
+        float halfWidth = expandedWidth / 2f;
+        float halfHeight = expandedHeight / 2f;
 
         Vector3 right = panel.transform.right * halfWidth;
         Vector3 up = panel.transform.up * halfHeight;
