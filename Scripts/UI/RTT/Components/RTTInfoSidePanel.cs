@@ -528,9 +528,28 @@ public class RTTInfoSidePanel : MonoBehaviour
         valueTxt.alignment = TextAlignmentOptions.Left;
         valueTxt.fontStyle = FontStyles.Bold;
         valueTxt.raycastTarget = false;
-        valueTxt.enableWordWrapping = true;
-        valueTxt.overflowMode = TextOverflowModes.Overflow;
+        valueTxt.fontStyle = FontStyles.Bold;
         if (customFont != null) valueTxt.font = customFont;
+
+        // Wrap settings based on panel type: 
+        // NetworkInfo values (Ping, Mbps) should be single line.
+        // HardwareInfo values (CPU, GPU names) should wrap.
+        if (panelType == PanelType.NetworkInfo)
+        {
+            valueTxt.enableWordWrapping = false;
+            valueTxt.overflowMode = TextOverflowModes.Ellipsis;
+            
+            // Enable auto-sizing to shrink text instead of cutting it off
+            valueTxt.enableAutoSizing = true;
+            valueTxt.fontSizeMin = 20;
+            valueTxt.fontSizeMax = valueFontSize;
+        }
+        else
+        {
+            valueTxt.enableWordWrapping = true;
+            valueTxt.overflowMode = TextOverflowModes.Overflow;
+            valueTxt.enableAutoSizing = false;
+        }
 
         var valueLayout = valueObj.AddComponent<LayoutElement>();
         valueLayout.flexibleWidth = 1;
