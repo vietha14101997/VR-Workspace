@@ -252,6 +252,21 @@ namespace VRWorkspace.Streaming
 
                 // Create speed test handler
                 _speedTest = new SpeedTestClient(_ws, ct);
+                
+                // Forward ping results immediately for fresher UI
+                _speedTest.OnPingJitterResult += (ping, jitter) => 
+                {
+                   if (_networkInfo == null) _networkInfo = new NetworkTestResult();
+                   _networkInfo.pingMs = ping;
+                   _networkInfo.jitterMs = jitter;
+                   
+                   if (string.IsNullOrEmpty(_networkInfo.connectionType))
+                   {
+                       _networkInfo.connectionType = _isUsbMode ? "USB" : "WiFi";
+                   }
+                   
+                   OnNetworkInfoReceived?.Invoke(_networkInfo);
+                };
 
                 // Start receive loop
                 _ = ReceiveLoopAsync(ct);

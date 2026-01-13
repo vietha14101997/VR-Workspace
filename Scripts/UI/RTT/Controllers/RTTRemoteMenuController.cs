@@ -558,7 +558,7 @@ public class RTTRemoteMenuController : MonoBehaviour
 
         // Subscribe to taskbar events
         _remoteTaskbar.OnMenuRequested += HandleTaskbarMenuRequest;
-        _remoteTaskbar.OnDisconnectRequested += HandleTaskbarDisconnect;
+
 
         Debug.Log("[RTTRemoteMenuController] Created RTTRemoteTaskbar following ClusterRig");
     }
@@ -598,24 +598,7 @@ public class RTTRemoteMenuController : MonoBehaviour
         // OnBackClicked is only for when user actually wants to exit RemoteDesktop
     }
 
-    /// <summary>
-    /// Handle taskbar disconnect request.
-    /// Disconnects and returns to main menu.
-    /// </summary>
-    private void HandleTaskbarDisconnect()
-    {
-        Debug.Log("[RTTRemoteMenuController] Taskbar disconnect requested");
 
-        // Cleanup and disconnect (ShowMainMenuAndTaskbar is called in Cleanup)
-        Cleanup();
-
-        // Switch to home menu
-        RTTManager appManager = RTTManager.Instance;
-        if (appManager != null)
-        {
-            appManager.SwitchToHome();
-        }
-    }
 
     /// <summary>
     /// Resume streaming from RTTRemoteMenu overlay.
@@ -661,7 +644,7 @@ public class RTTRemoteMenuController : MonoBehaviour
         if (_remoteTaskbar != null)
         {
             _remoteTaskbar.OnMenuRequested -= HandleTaskbarMenuRequest;
-            _remoteTaskbar.OnDisconnectRequested -= HandleTaskbarDisconnect;
+
             Destroy(_remoteTaskbar.gameObject);
             _remoteTaskbar = null;
         }

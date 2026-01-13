@@ -26,7 +26,7 @@ public class ClusterVisualCurved : MonoBehaviour
     [Header("Glass Colors")]
     [SerializeField] private Color glassColorA = new Color(0f, 0.55f, 0.65f, 0.35f);
     [SerializeField] private Color glassColorB = new Color(0.30f, 0.12f, 0.50f, 0.32f);
-    [SerializeField] private float glassAlpha = 0.65f;
+    [SerializeField] private float glassAlpha = 0.15f;
     [SerializeField] private float fresnelPower = 2.2f;
     [SerializeField] private float fresnelStrength = 0.12f;
     [SerializeField] private float gradientAngle = -10f;
@@ -196,7 +196,7 @@ public class ClusterVisualCurved : MonoBehaviour
 
         glassColorA = theme.glassColorA;
         glassColorB = theme.glassColorB;
-        glassAlpha = theme.glassAlpha;
+        glassAlpha = 0.15f; // Sync with RTTMenuFrame (0.15f) instead of theme.glassAlpha
         fresnelPower = theme.glassFresnelPower;
         fresnelStrength = theme.glassFresnelStrength;
         gradientAngle = theme.glassGradientAngle;

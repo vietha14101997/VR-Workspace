@@ -82,7 +82,7 @@ public class RTTTaskbarExpansion : RTTCanvasBase
     private readonly Color _purpleColor = new Color(0.9f, 0.3f, 1f);
 
     // State
-    private bool _isVisible = false;
+    private new bool _isVisible = false;
 
     // Trigger button world position (for X-axis alignment)
     private Vector3 _triggerButtonWorldPos;
@@ -90,7 +90,7 @@ public class RTTTaskbarExpansion : RTTCanvasBase
     #endregion
 
     #region Properties
-    public bool IsVisible => _isVisible;
+    public new bool IsVisible => _isVisible;
     public ExpansionType CurrentType => _currentType;
     #endregion
 
@@ -199,7 +199,7 @@ public class RTTTaskbarExpansion : RTTCanvasBase
     /// <summary>
     /// Hide the expansion panel.
     /// </summary>
-    public void Hide()
+    public new void Hide()
     {
         _isVisible = false;
         _currentType = ExpansionType.None;

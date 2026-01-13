@@ -22,13 +22,12 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
     [SerializeField] private float cornerRadius = 0.04f;
     [SerializeField] private float edgePadding = 0.009f;
     [SerializeField] private float glowExpansion = 0.05f;
-    [SerializeField] private float contentMarginH = 0.04f;
-    [SerializeField] private float contentMarginV = 0.045f;
+
 
     [Header("Glass Colors")]
     [SerializeField] private Color glassColorA = new Color(0f, 0.55f, 0.65f, 0.35f);
     [SerializeField] private Color glassColorB = new Color(0.30f, 0.12f, 0.50f, 0.32f);
-    [SerializeField] private float glassAlpha = 0.65f;
+    [SerializeField] private float glassAlpha = 0.15f;
     [SerializeField] private float fresnelPower = 2.2f;
     [SerializeField] private float fresnelStrength = 0.12f;
     [SerializeField] private float gradientAngle = -10f;
@@ -158,7 +157,7 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
 
         glassColorA = theme.glassColorA;
         glassColorB = theme.glassColorB;
-        glassAlpha = theme.glassAlpha;
+        glassAlpha = 0.15f; // Sync with RTTMenuFrame (0.15f) instead of theme.glassAlpha
         fresnelPower = theme.glassFresnelPower;
         fresnelStrength = theme.glassFresnelStrength;
         gradientAngle = theme.glassGradientAngle;
@@ -377,7 +376,7 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
         // In Flat Planar mode, we use full panel width (margin = 0)
         // This matches the mesh generation in GenerateMeshes() where meshMarginH = 0
         float meshMarginH = 0f;
-        float meshMarginV = 0f;
+
         
         float boardWidth = _cachedPanelWidth * (1f - 2f * meshMarginH); // = _cachedPanelWidth
 

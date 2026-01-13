@@ -46,7 +46,7 @@ public class RTTRemoteTaskbar : MonoBehaviour
 
     #region Events
     public event Action OnMenuRequested;
-    public event Action OnDisconnectRequested;
+
     #endregion
 
     #region Private Fields

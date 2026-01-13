@@ -30,7 +30,7 @@ public class RTTInfoSidePanel : MonoBehaviour
     [SerializeField] private int titleFontSize = 48;
     [SerializeField] private int labelFontSize = 36;
     [SerializeField] private int valueFontSize = 40;
-    [SerializeField] private float lineSpacing = 80f;
+
     #endregion
 
     #region Private Fields
@@ -270,11 +270,20 @@ public class RTTInfoSidePanel : MonoBehaviour
             AddTitle("NETWORK INFO");
             AddInfoRow("Ping", $"{info.pingMs:F1} ms");
             AddInfoRow("Jitter", $"{info.jitterMs:F1} ms");
-            AddInfoRow("Bandwidth", $"{info.bandwidthMbps:F0} Mbps");
             AddInfoRow("Type", info.connectionType ?? "Unknown");
 
-            string quality = GetNetworkQuality(info);
-            AddInfoRow("Quality", quality, GetQualityColor(quality));
+            // Handle partial results (e.g. Ping done, Bandwidth pending)
+            if (info.bandwidthMbps > 0)
+            {
+                AddInfoRow("Bandwidth", $"{info.bandwidthMbps:F0} Mbps");
+                string quality = GetNetworkQuality(info);
+                AddInfoRow("Quality", quality, GetQualityColor(quality));
+            }
+            else
+            {
+                AddInfoRow("Bandwidth", "Waiting...");
+                AddInfoRow("Quality", "Waiting...");
+            }
             
             Debug.Log($"[RTTInfoSidePanel] SetNetworkInfo: {info.pingMs:F1}ms");
         }
