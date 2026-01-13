@@ -216,7 +216,11 @@ public static class FlatPlanarMeshGenerator
 
     /// <summary>
     /// Generate mesh with glow expansion for border/background layers.
-    /// Expands the panel faces outward and the fold areas accordingly.
+    /// IMPORTANT: Horizontal expansion is only applied to OUTER edges (not adjacent panel edges).
+    /// - First panel: expand LEFT only (right edge touches next panel)
+    /// - Last panel: expand RIGHT only (left edge touches previous panel)  
+    /// - Middle panels: NO horizontal expansion (both edges touch other panels)
+    /// - All panels: expand TOP and BOTTOM (vertical outer edges)
     /// </summary>
     public static Mesh GenerateWithGlowExpansion(
         int panelCount,
@@ -234,15 +238,16 @@ public static class FlatPlanarMeshGenerator
         if (foldSegments < 2) foldSegments = 2;
         if (verticalSegments < 1) verticalSegments = 1;
 
-        // Expanded board dimensions
-        float boardWidth = panelWidth * (1f - 2f * contentMarginH) + glowExpansion * 2f;
-        float boardHeight = panelHeight * (1f - 2f * contentMarginV) + glowExpansion * 2f;
-        float halfBoardWidth = boardWidth / 2f;
-        float halfBoardHeight = boardHeight / 2f;
+        // Base board dimensions (before expansion)
+        float baseBoardWidth = panelWidth * (1f - 2f * contentMarginH);
+        float baseBoardHeight = panelHeight * (1f - 2f * contentMarginV);
+        
+        // Vertical expansion applies to ALL panels (top and bottom are outer edges)
+        float expandedBoardHeight = baseBoardHeight + glowExpansion * 2f;
+        float halfBaseBoardWidth = baseBoardWidth / 2f;
 
-        // Yaw angle per panel (use original margins for positioning)
-        float originalBoardWidth = panelWidth * (1f - 2f * contentMarginH);
-        float boardAngleRad = 2f * Mathf.Atan(originalBoardWidth / 2f / arcRadius);
+        // Yaw angle per panel (use original dimensions for positioning)
+        float boardAngleRad = 2f * Mathf.Atan(baseBoardWidth / 2f / arcRadius);
         float boardAngleDeg = boardAngleRad * Mathf.Rad2Deg;
 
         float[] panelYaws = GetPanelYaws(panelCount, boardAngleDeg);
@@ -254,9 +259,16 @@ public static class FlatPlanarMeshGenerator
         List<Vector2> uv2 = new List<Vector2>();
         List<int> triangles = new List<int>();
 
-        float totalWidth = panelCount * boardWidth;
+        // Calculate total width for UV mapping - only outmost edges have expansion
+        float totalWidth = 0f;
+        for (int i = 0; i < panelCount; i++)
+        {
+            float leftExpand = (i == 0) ? glowExpansion : 0f;
+            float rightExpand = (i == panelCount - 1) ? glowExpansion : 0f;
+            totalWidth += baseBoardWidth + leftExpand + rightExpand;
+        }
         int foldCount = panelCount - 1;
-        float foldWidth = 0.02f + glowExpansion;
+        float foldWidth = 0.02f; // Small fold between panels
         totalWidth += foldCount * foldWidth;
 
         float accumulatedU = 0f;
@@ -274,23 +286,38 @@ public static class FlatPlanarMeshGenerator
             Vector3 panelNormal = new Vector3(-Mathf.Sin(panelYawRad), 0f, -Mathf.Cos(panelYawRad));
             Vector3 panelCenter = new Vector3(panelCenterX, 0f, panelCenterZ);
 
+            // Calculate per-panel horizontal expansion
+            // - First panel (index 0): expand left only
+            // - Last panel (index panelCount-1): expand right only
+            // - Middle panels: no horizontal expansion
+            bool isFirst = (panelIdx == 0);
+            bool isLast = (panelIdx == panelCount - 1);
+            
+            float expandLeft = isFirst ? glowExpansion : 0f;
+            float expandRight = isLast ? glowExpansion : 0f;
+            
+            // This panel's total width including expansion
+            float thisPanelWidth = baseBoardWidth + expandLeft + expandRight;
+
             int baseVertex = vertices.Count;
             float panelUStart = accumulatedU / totalWidth;
-            float panelUEnd = (accumulatedU + boardWidth) / totalWidth;
+            float panelUEnd = (accumulatedU + thisPanelWidth) / totalWidth;
 
             for (int vy = 0; vy <= verticalSegments; vy++)
             {
                 float vt = (float)vy / verticalSegments;
-                float yOffset = (vt - 0.5f) * boardHeight;
+                float yOffset = (vt - 0.5f) * expandedBoardHeight;
 
-                Vector3 leftPos = panelCenter + panelRight * (-halfBoardWidth) + panelUp * yOffset;
+                // Left edge: expand outward only if first panel
+                Vector3 leftPos = panelCenter + panelRight * (-halfBaseBoardWidth - expandLeft) + panelUp * yOffset;
                 vertices.Add(leftPos);
                 normals.Add(panelNormal);
                 uv0.Add(new Vector2(panelUStart, vt));
                 uv1.Add(new Vector2(0f, vt));
                 uv2.Add(new Vector2(0f, panelIdx));
 
-                Vector3 rightPos = panelCenter + panelRight * halfBoardWidth + panelUp * yOffset;
+                // Right edge: expand outward only if last panel
+                Vector3 rightPos = panelCenter + panelRight * (halfBaseBoardWidth + expandRight) + panelUp * yOffset;
                 vertices.Add(rightPos);
                 normals.Add(panelNormal);
                 uv0.Add(new Vector2(panelUEnd, vt));
@@ -314,7 +341,7 @@ public static class FlatPlanarMeshGenerator
                 triangles.Add(br);
             }
 
-            accumulatedU += boardWidth;
+            accumulatedU += thisPanelWidth;
 
             if (panelIdx < panelCount - 1)
             {
@@ -327,16 +354,18 @@ public static class FlatPlanarMeshGenerator
                 for (int vy = 0; vy <= verticalSegments; vy++)
                 {
                     float vt = (float)vy / verticalSegments;
-                    float yOffset = (vt - 0.5f) * boardHeight;
+                    float yOffset = (vt - 0.5f) * expandedBoardHeight;
 
-                    Vector3 startPos = panelCenter + panelRight * halfBoardWidth + panelUp * yOffset;
+                    // Fold starts from current panel's right edge (no expansion - it touches next panel)
+                    Vector3 startPos = panelCenter + panelRight * halfBaseBoardWidth + panelUp * yOffset;
 
                     float nextYawRad = nextPanelYawDeg * Mathf.Deg2Rad;
                     float nextCenterX = Mathf.Sin(nextYawRad) * arcRadius;
                     float nextCenterZ = Mathf.Cos(nextYawRad) * arcRadius - arcRadius;
                     Vector3 nextRight = new Vector3(Mathf.Cos(nextYawRad), 0f, -Mathf.Sin(nextYawRad));
                     Vector3 nextCenter = new Vector3(nextCenterX, 0f, nextCenterZ);
-                    Vector3 endPos = nextCenter + nextRight * (-halfBoardWidth) + panelUp * yOffset;
+                    // Fold ends at next panel's left edge (no expansion - it touches current panel)
+                    Vector3 endPos = nextCenter + nextRight * (-halfBaseBoardWidth) + panelUp * yOffset;
 
                     for (int seg = 0; seg <= foldSegments; seg++)
                     {
