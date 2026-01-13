@@ -465,40 +465,49 @@ public class RTTRemoteTaskbar : MonoBehaviour
 
     private void OnScreenToggleClicked(int screenNumber)
     {
-        // Toggle state
-        bool newState = !(_screenStates.TryGetValue(screenNumber, out var current) ? current : true);
-        _screenStates[screenNumber] = newState;
+        bool currentState = IsScreenOn(screenNumber);
+        bool newState = !currentState;
 
-        // Update button appearance
-        UpdateScreenButtonAppearance(screenNumber);
-
-        Debug.Log($"[RTTRemoteTaskbar] Screen {screenNumber} toggled: {(newState ? "ON" : "OFF")}");
-
-        // screenNumber is 1-based, panelIndex is 0-based
-        int panelIndex = screenNumber - 1;
-
-        // Notify ClusterRig to show/hide this monitor panel
-        if (_clusterRig != null)
+        // Restriction Check: Only applied when trying to turn a screen OFF
+        if (!newState)
         {
-            _clusterRig.SetPanelEnabled(panelIndex, newState);
+            // Calculate configured and enabled counts
+            int configuredCount = 0;
+            int enabledCount = 0;
+
+            for (int i = 0; i < _monitorSlots.Count; i++)
+            {
+                var slot = _monitorSlots[i];
+                if (slot == null) continue;
+
+                // Check visibility to determine if configured/active in current mode
+                var cg = slot.GetComponent<CanvasGroup>();
+                bool isConfigured = cg != null && cg.alpha > 0.5f;
+
+                if (isConfigured)
+                {
+                    configuredCount++;
+                    if (IsScreenOn(i + 1)) enabledCount++;
+                }
+            }
+
+            // Rule 1: Cannot turn off the last monitor
+            if (enabledCount <= 1)
+            {
+                Debug.Log($"[RTTRemoteTaskbar] Cannot turn off Screen {screenNumber}: It is the last active monitor.");
+                return;
+            }
+
+            // Rule 2: Cannot turn off Center Monitor (2) when using 3 Monitors
+            if (configuredCount == 3 && screenNumber == 2)
+            {
+                Debug.Log($"[RTTRemoteTaskbar] Cannot turn off Screen {screenNumber}: Center monitor is locked in 3-monitor mode.");
+                return;
+            }
         }
 
-        // Notify server to pause/resume this monitor's stream
-        if (_viewModel != null)
-        {
-            if (newState)
-            {
-                // Screen ON - resume streaming for this monitor
-                _ = _viewModel.ResumeMonitorAsync(panelIndex);
-            }
-            else
-            {
-                // Screen OFF - pause streaming for this monitor
-                _ = _viewModel.PauseMonitorAsync(panelIndex);
-            }
-        }
-
-        _miniFrame?.MarkDirty();
+        // Apply state change
+        SetScreenState(screenNumber, newState);
     }
 
     private void UpdateScreenButtonAppearance(int screenNumber)
