@@ -1827,6 +1827,9 @@ public class RTTRemoteMenu : MonoBehaviour
             // Force layout rebuild to ensure content is positioned correctly
             UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(frame.ContentContainer);
 
+            // Set alpha to match main menu (0.15f) instead of default (0.65f)
+            frame.SetGlassAlpha(0.15f);
+
             // Subscribe to content changes to trigger RTT re-render
             panel.OnContentChanged += () => frame.MarkDirty();
 
