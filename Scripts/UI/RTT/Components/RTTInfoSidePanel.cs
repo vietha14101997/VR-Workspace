@@ -30,7 +30,7 @@ public class RTTInfoSidePanel : MonoBehaviour
     [SerializeField] private int titleFontSize = 48;
     [SerializeField] private int labelFontSize = 36;
     [SerializeField] private int valueFontSize = 40;
-    [SerializeField] private float lineSpacing = 80f;
+
     #endregion
 
     #region Private Fields
@@ -44,6 +44,7 @@ public class RTTInfoSidePanel : MonoBehaviour
     private GameObject _titleObj;
     private TextMeshProUGUI _titleText;
     private GameObject _separatorObj;
+    private float _calculatedLabelWidth = 200f; // Default value, will be recalculated
     #endregion
 
     #region Properties
@@ -112,13 +113,16 @@ public class RTTInfoSidePanel : MonoBehaviour
         var layout = gameObject.GetComponent<VerticalLayoutGroup>();
         if (layout == null) layout = gameObject.AddComponent<VerticalLayoutGroup>();
 
-        layout.spacing = lineSpacing;
+        layout.spacing = 30f; // Reduced from 80f to allow space for multiline text
         layout.childAlignment = TextAnchor.UpperCenter;
         layout.childControlWidth = true;
-        layout.childControlHeight = false;
+        layout.childControlHeight = true; // Enable height control so rows expand with content
         layout.childForceExpandWidth = true;
         layout.childForceExpandHeight = false;
-        layout.padding = new RectOffset(20, 20, 40, 40);
+        layout.padding = new RectOffset(40, 40, 40, 40);
+
+        // Pre-calculate label width based on content
+        CalculateMaxLabelWidth();
 
         _isBuilt = true;
         Debug.Log($"[RTTInfoSidePanel] Built for type: {panelType}, _isBuilt={_isBuilt}, parent={transform.parent?.name}");
@@ -266,11 +270,20 @@ public class RTTInfoSidePanel : MonoBehaviour
             AddTitle("NETWORK INFO");
             AddInfoRow("Ping", $"{info.pingMs:F1} ms");
             AddInfoRow("Jitter", $"{info.jitterMs:F1} ms");
-            AddInfoRow("Bandwidth", $"{info.bandwidthMbps:F0} Mbps");
             AddInfoRow("Type", info.connectionType ?? "Unknown");
 
-            string quality = GetNetworkQuality(info);
-            AddInfoRow("Quality", quality, GetQualityColor(quality));
+            // Handle partial results (e.g. Ping done, Bandwidth pending)
+            if (info.bandwidthMbps > 0)
+            {
+                AddInfoRow("Bandwidth", $"{info.bandwidthMbps:F0} Mbps");
+                string quality = GetNetworkQuality(info);
+                AddInfoRow("Quality", quality, GetQualityColor(quality));
+            }
+            else
+            {
+                AddInfoRow("Bandwidth", "Waiting...");
+                AddInfoRow("Quality", "Waiting...");
+            }
             
             Debug.Log($"[RTTInfoSidePanel] SetNetworkInfo: {info.pingMs:F1}ms");
         }
@@ -385,6 +398,10 @@ public class RTTInfoSidePanel : MonoBehaviour
             RectTransform rt = _titleObj.AddComponent<RectTransform>();
             rt.sizeDelta = new Vector2(0, titleFontSize + 20);
 
+            var le = _titleObj.AddComponent<LayoutElement>();
+            le.minHeight = titleFontSize + 20;
+            le.flexibleHeight = 0; // Don't expand vertically
+
             _titleText = _titleObj.AddComponent<TextMeshProUGUI>();
             _titleText.text = title;
             _titleText.fontSize = titleFontSize;
@@ -471,33 +488,40 @@ public class RTTInfoSidePanel : MonoBehaviour
         rowObj.transform.SetParent(transform, false);
 
         RectTransform rt = rowObj.AddComponent<RectTransform>();
-        rt.sizeDelta = new Vector2(0, valueFontSize + 16);
+        // Height is controlled by parent layout
+        // rt.sizeDelta = new Vector2(0, valueFontSize + 16);
 
         HorizontalLayoutGroup hlg = rowObj.AddComponent<HorizontalLayoutGroup>();
         hlg.spacing = 10;
         hlg.childAlignment = TextAnchor.MiddleLeft;
-        hlg.childControlWidth = false;
+        hlg.childControlWidth = true; // Allow layout to resize children (Label/Value) to fit row width
         hlg.childControlHeight = true;
         hlg.childForceExpandWidth = false;
         hlg.childForceExpandHeight = false;
+
+        // Add LayoutElement to allow row to expand vertically and fill extra space
+        var rowLE = rowObj.AddComponent<LayoutElement>();
+        rowLE.flexibleHeight = 1f;
 
         // Label
         GameObject labelObj = new GameObject("Label");
         labelObj.transform.SetParent(rowObj.transform, false);
 
         RectTransform labelRT = labelObj.AddComponent<RectTransform>();
-        labelRT.sizeDelta = new Vector2(200, 0);
+        labelRT.sizeDelta = new Vector2(_calculatedLabelWidth, 0);
 
         TextMeshProUGUI labelTxt = labelObj.AddComponent<TextMeshProUGUI>();
         labelTxt.text = label;
         labelTxt.fontSize = labelFontSize;
         labelTxt.color = Color.white;
         labelTxt.alignment = TextAlignmentOptions.Left;
+        labelTxt.fontStyle = FontStyles.Bold;
         labelTxt.raycastTarget = false;
         if (customFont != null) labelTxt.font = customFont;
 
         var labelLayout = labelObj.AddComponent<LayoutElement>();
-        labelLayout.preferredWidth = 200;
+        labelLayout.minWidth = _calculatedLabelWidth;
+        labelLayout.preferredWidth = _calculatedLabelWidth;
 
         // Value
         GameObject valueObj = new GameObject("Value");
@@ -513,12 +537,32 @@ public class RTTInfoSidePanel : MonoBehaviour
         valueTxt.alignment = TextAlignmentOptions.Left;
         valueTxt.fontStyle = FontStyles.Bold;
         valueTxt.raycastTarget = false;
-        valueTxt.enableWordWrapping = true;
-        valueTxt.overflowMode = TextOverflowModes.Overflow;
+        valueTxt.fontStyle = FontStyles.Bold;
         if (customFont != null) valueTxt.font = customFont;
+
+        // Wrap settings based on panel type: 
+        // NetworkInfo values (Ping, Mbps) should be single line.
+        // HardwareInfo values (CPU, GPU names) should wrap.
+        if (panelType == PanelType.NetworkInfo)
+        {
+            valueTxt.enableWordWrapping = false;
+            valueTxt.overflowMode = TextOverflowModes.Ellipsis;
+            
+            // Enable auto-sizing to shrink text instead of cutting it off
+            valueTxt.enableAutoSizing = true;
+            valueTxt.fontSizeMin = 20;
+            valueTxt.fontSizeMax = valueFontSize;
+        }
+        else
+        {
+            valueTxt.enableWordWrapping = true;
+            valueTxt.overflowMode = TextOverflowModes.Overflow;
+            valueTxt.enableAutoSizing = false;
+        }
 
         var valueLayout = valueObj.AddComponent<LayoutElement>();
         valueLayout.flexibleWidth = 1;
+        valueLayout.minHeight = valueFontSize;
 
         return rowObj;
     }
@@ -553,4 +597,17 @@ public class RTTInfoSidePanel : MonoBehaviour
         };
     }
     #endregion
+
+    private void CalculateMaxLabelWidth()
+    {
+        // Approximation to avoid runtime layout/instantiation issues inside BuildUI
+        // Hardware Max: "Device" -> ~130px
+        // Network Max: "Bandwidth" -> ~200px
+        
+        float baseWidth = (panelType == PanelType.HardwareInfo) ? 130f : 200f;
+        
+        _calculatedLabelWidth = baseWidth + 25f; // Add user requested padding
+        
+        Debug.Log($"[RTTInfoSidePanel] Calculated max label width for {panelType}: {_calculatedLabelWidth} (Base: {baseWidth} + 25)");
+    }
 }

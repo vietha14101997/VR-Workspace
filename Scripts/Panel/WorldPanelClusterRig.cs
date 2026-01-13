@@ -43,7 +43,7 @@ public class WorldPanelClusterRig : MonoBehaviour
     public float verticalOffset = 0f;
     public bool faceCameraYawOnly = true;
     [Tooltip("Overlap amount (in meters) between adjacent panels to eliminate seams")]
-    [Range(0f, 0.01f)] public float panelOverlap = 0.01f;
+    [Range(0f, 0.01f)] public float panelOverlap = 0.0015f;
 
     [Header("Cluster Visuals")]
     [Tooltip("Enable seamless glass background and glowing border across all panels")]
@@ -52,6 +52,7 @@ public class WorldPanelClusterRig : MonoBehaviour
     public bool useCurvedVisual = false;
 
     private ClusterVisualCurved _curvedVisual;
+    private ClusterVisualFlatPlanar _flatPlanarVisual;
 
     [Header("Visual Settings")]
     [SerializeField] private float cornerRadius = 0.04f;
@@ -59,7 +60,7 @@ public class WorldPanelClusterRig : MonoBehaviour
     [Tooltip("Extra size (in meters) for glow overflow on outer edges")]
     [SerializeField] private float glowExpansion = 0.05f;
     [Tooltip("Overlap amount (in meters) at panel junctions for seamless appearance")]
-    [SerializeField] private float junctionOverlap = 0.01f;
+    [SerializeField] private float junctionOverlap = 0.03f;
     [Tooltip("Content margin ratio (content is inset by this fraction)")]
     [SerializeField] private float contentMarginHorizontal = 0.04f;
     [SerializeField] private float contentMarginVertical = 0.045f;
@@ -494,25 +495,32 @@ public class WorldPanelClusterRig : MonoBehaviour
         var refPanel = _panels[_panels.Count / 2];
         float panelWidth = refPanel ? refPanel.width : 1f;
 
-        // Use Board width (panel minus margins) for spacing so Board edges touch
-        float boardWidth = panelWidth * (1f - 2f * contentMarginHorizontal);
+        // For Flat Planar mode (FixedThreeSlot + !useCurvedVisual), use FULL panel width for spacing
+        // because boards are NOT scaled down by margins - they fill the entire panel area
+        // For Curved mode, use board width (panel minus margins) for spacing
+        float spacingWidth;
+        if (layoutMode == ClusterLayoutMode.FixedThreeSlot && !useCurvedVisual)
+        {
+            // Flat Planar: use full panel width so full-size boards touch edge-to-edge
+            spacingWidth = panelWidth;
+        }
+        else
+        {
+            // Curved mode: use board width (panel minus margins) for spacing so Board edges touch
+            spacingWidth = panelWidth * (1f - 2f * contentMarginHorizontal);
+        }
 
-        float boardAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(boardWidth / 2f / distanceFromCamera);
+        float boardAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(spacingWidth / 2f / distanceFromCamera);
         float gapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(edgeGapMeters / 2f / distanceFromCamera);
+        // Apply overlap to eliminate seams between adjacent panels
+        float overlapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(panelOverlap / 2f / distanceFromCamera);
+        float angleDeg = boardAngleDeg + gapAngleDeg - overlapAngleDeg;
 
-        float angleDeg = boardAngleDeg + gapAngleDeg;
-
-        // Collect enabled panels
+        // Create list of ONLY enabled panels to allow reflow into primary slots
         var enabledPanels = new List<WorldPanelPlus>();
-        var enabledIndices = new List<int>();
         for (int i = 0; i < _panels.Count; i++)
         {
-            bool isEnabled = i < _panelEnabledStates.Count ? _panelEnabledStates[i] : true;
-            if (isEnabled && _panels[i] != null)
-            {
-                enabledPanels.Add(_panels[i]);
-                enabledIndices.Add(i);
-            }
+            if (IsPanelEnabled(i)) enabledPanels.Add(_panels[i]);
         }
 
         int enabledCount = enabledPanels.Count;
@@ -564,21 +572,31 @@ public class WorldPanelClusterRig : MonoBehaviour
         var refPanel = _panels[_panels.Count / 2];
         float panelWidth = refPanel ? refPanel.width : 1f;
 
-        // Use Board width for spacing
-        float boardWidth = panelWidth * (1f - 2f * contentMarginHorizontal);
-        float boardAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(boardWidth / 2f / distanceFromCamera);
+        // For Flat Planar mode (FixedThreeSlot + !useCurvedVisual), use FULL panel width for spacing
+        // because boards are NOT scaled down by margins - they fill the entire panel area
+        // For Curved mode, use board width (panel minus margins) for spacing
+        float spacingWidth;
+        if (layoutMode == ClusterLayoutMode.FixedThreeSlot && !useCurvedVisual)
+        {
+            // Flat Planar: use full panel width so full-size boards touch edge-to-edge
+            spacingWidth = panelWidth;
+        }
+        else
+        {
+            // Curved mode: use board width (panel minus margins) for spacing so Board edges touch
+            spacingWidth = panelWidth * (1f - 2f * contentMarginHorizontal);
+        }
+        float boardAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(spacingWidth / 2f / distanceFromCamera);
         float gapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(edgeGapMeters / 2f / distanceFromCamera);
-        float angleDeg = boardAngleDeg + gapAngleDeg;
+        // Apply overlap to eliminate seams between adjacent panels
+        float overlapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(panelOverlap / 2f / distanceFromCamera);
+        float angleDeg = boardAngleDeg + gapAngleDeg - overlapAngleDeg;
 
-        // Collect enabled panels
+        // Create list of ONLY enabled panels to allow reflow into primary slots
         var enabledPanels = new List<WorldPanelPlus>();
         for (int i = 0; i < _panels.Count; i++)
         {
-            bool isEnabled = i < _panelEnabledStates.Count ? _panelEnabledStates[i] : true;
-            if (isEnabled && _panels[i] != null)
-            {
-                enabledPanels.Add(_panels[i]);
-            }
+            if (IsPanelEnabled(i)) enabledPanels.Add(_panels[i]);
         }
 
         int enabledCount = enabledPanels.Count;
@@ -786,7 +804,7 @@ public class WorldPanelClusterRig : MonoBehaviour
         }
         else
         {
-            ApplyPerPanelVisuals();
+            ApplyFlatPlanarVisual();
         }
     }
 
@@ -845,7 +863,88 @@ public class WorldPanelClusterRig : MonoBehaviour
     }
 
     /// <summary>
+    /// Apply flat planar visual - boards stay at FULL size with NO corner radius.
+    /// ClusterVisualFlatPlanar creates the background/border mesh separately.
+    /// </summary>
+    void ApplyFlatPlanarVisual()
+    {
+        // Remove curved visual if present
+        if (_curvedVisual != null)
+        {
+            if (Application.isPlaying)
+                Destroy(_curvedVisual);
+            else
+                DestroyImmediate(_curvedVisual);
+            _curvedVisual = null;
+        }
+
+        // Remove any per-panel visuals (ClusterPanelVisual)
+        foreach (var visual in _panelVisuals)
+        {
+            if (visual != null)
+            {
+                if (Application.isPlaying)
+                    Destroy(visual);
+                else
+                    DestroyImmediate(visual);
+            }
+        }
+        _panelVisuals.Clear();
+
+        // Remove ClusterPanelVisual components from panels
+        foreach (var panel in _panels)
+        {
+            if (panel == null) continue;
+            
+            var existingVisual = panel.GetComponent<ClusterPanelVisual>();
+            if (existingVisual != null)
+            {
+                if (Application.isPlaying)
+                    Destroy(existingVisual);
+                else
+                    DestroyImmediate(existingVisual);
+            }
+        }
+
+        // Configure each board: FULL size
+        // IMPORTANT: Respect enabled state - only show enabled panels
+        // NOTE: Do NOT modify board material properties here - boards keep their original corner radius
+        for (int i = 0; i < _panels.Count; i++)
+        {
+            var panel = _panels[i];
+            if (panel == null) continue;
+
+            // Check if this panel is enabled (respect disabled state)
+            bool isEnabled = i < _panelEnabledStates.Count ? _panelEnabledStates[i] : true;
+            
+            // Set visibility based on enabled state
+            panel.SetVisible(isEnabled);
+
+            // Board uses FULL panel size - no margin reduction
+            panel.board.localScale = new Vector3(panel.width, panel.height, 1f);
+        }
+
+        // Get or create ClusterVisualFlatPlanar for background/border
+        _flatPlanarVisual = GetComponent<ClusterVisualFlatPlanar>();
+        if (_flatPlanarVisual == null)
+        {
+            _flatPlanarVisual = gameObject.AddComponent<ClusterVisualFlatPlanar>();
+        }
+
+        // Initialize flat planar visual
+        _flatPlanarVisual.Initialize();
+
+        // Apply colors
+        _flatPlanarVisual.SetGlowColors(glowColorA, glowColorB);
+        _flatPlanarVisual.SetGlassColors(glassColorA, glassColorB);
+
+        Debug.Log($"[WorldPanelClusterRig] Applied Flat Planar: boards at full size, no corner radius");
+    }
+
+    /// <summary>
     /// Apply per-panel visual (original approach with EdgeMask)
+    /// NOTE: This method is kept for backwards compatibility but is no longer used.
+    /// Flat Planar mode now uses ApplyFlatPlanarVisual() with seamless mesh.
     /// </summary>
     void ApplyPerPanelVisuals()
     {
@@ -920,8 +1019,15 @@ public class WorldPanelClusterRig : MonoBehaviour
             _curvedVisual.SetGlassColors(glassColorA, glassColorB);
             _curvedVisual.UpdateContentTextures();
         }
-        else
+        else if (!useCurvedVisual && _flatPlanarVisual != null)
         {
+            // Flat Planar mode - update ClusterVisualFlatPlanar
+            _flatPlanarVisual.SetGlowColors(glowColorA, glowColorB);
+            _flatPlanarVisual.SetGlassColors(glassColorA, glassColorB);
+        }
+        else if (_panelVisuals.Count > 0)
+        {
+            // Fallback: Per-panel visuals (legacy)
             foreach (var visual in _panelVisuals)
             {
                 if (visual != null)
@@ -940,30 +1046,35 @@ public class WorldPanelClusterRig : MonoBehaviour
     {
         if (!enableClusterVisuals) return;
 
-        // Try to get curved visual reference if null (might exist but not referenced)
+        // Try to get visual references if null (might exist but not referenced)
         if (_curvedVisual == null)
         {
             _curvedVisual = GetComponent<ClusterVisualCurved>();
         }
-
-        // Always rebuild curved visual if it exists (regardless of useCurvedVisual flag)
-        // This handles cases where the visual was created but flag changed
-        if (_curvedVisual != null)
+        if (_flatPlanarVisual == null)
         {
-            Debug.Log($"[WorldPanelClusterRig] RebuildClusterVisuals: Rebuilding curved visual, enabledPanels={GetEnabledPanelCount()}");
-            _curvedVisual.Rebuild();
+            _flatPlanarVisual = GetComponent<ClusterVisualFlatPlanar>();
         }
-        else if (useCurvedVisual)
+
+        if (useCurvedVisual)
         {
-            // Curved visual requested but doesn't exist - create it
-            Debug.Log("[WorldPanelClusterRig] RebuildClusterVisuals: Creating new curved visual");
-            ApplyCurvedVisual();
+            // Curved Surround mode
+            if (_curvedVisual != null)
+            {
+                Debug.Log($"[WorldPanelClusterRig] RebuildClusterVisuals: Rebuilding curved visual, enabledPanels={GetEnabledPanelCount()}");
+                _curvedVisual.Rebuild();
+            }
+            else
+            {
+                Debug.Log("[WorldPanelClusterRig] RebuildClusterVisuals: Creating new curved visual");
+                ApplyCurvedVisual();
+            }
         }
         else
         {
-            // For per-panel visuals, need to reconfigure positions for enabled panels
-            Debug.Log($"[WorldPanelClusterRig] RebuildClusterVisuals: Rebuilding per-panel visuals, enabledPanels={GetEnabledPanelCount()}");
-            RebuildPerPanelVisuals();
+            // Flat Planar mode - rebuild ClusterVisualFlatPlanar
+            Debug.Log($"[WorldPanelClusterRig] RebuildClusterVisuals: Rebuilding flat planar visual, enabledPanels={GetEnabledPanelCount()}");
+            ApplyFlatPlanarVisual();
         }
     }
 
@@ -1024,6 +1135,17 @@ public class WorldPanelClusterRig : MonoBehaviour
             Destroy(_curvedVisual);
 #endif
             _curvedVisual = null;
+        }
+
+        // Cleanup flat planar visual
+        if (_flatPlanarVisual != null)
+        {
+#if UNITY_EDITOR
+            DestroyImmediate(_flatPlanarVisual);
+#else
+            Destroy(_flatPlanarVisual);
+#endif
+            _flatPlanarVisual = null;
         }
 
 #if UNITY_EDITOR

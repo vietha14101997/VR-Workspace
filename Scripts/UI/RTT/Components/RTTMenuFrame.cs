@@ -713,6 +713,18 @@ public class RTTMenuFrame : RTTCanvasBase
     }
     #endregion
 
+    /// <summary>
+    /// Explicitly set glass alpha transparency.
+    /// Default is usually 0.65f, USB mode is 0.35f, Main Menu is 0.15f.
+    /// </summary>
+    public void SetGlassAlpha(float alpha)
+    {
+        if (_glassMaterial != null)
+        {
+            _glassMaterial.SetFloat("_GlassAlpha", alpha);
+        }
+    }
+
     #region Sprite Helpers
     private Sprite GetPixelSprite()
     {

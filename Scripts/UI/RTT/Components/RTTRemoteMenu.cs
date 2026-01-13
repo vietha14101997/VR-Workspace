@@ -654,6 +654,19 @@ public class RTTRemoteMenu : MonoBehaviour
     {
         Debug.Log("[RTTRemoteMenu] DISCONNECT clicked");
 
+        // Lock Resume button (Dim + Lock)
+        if (_resumeButton != null) VRButtonFactory.SetInteractable(_resumeButton, false);
+
+        // Lock Disconnect button BUT keep it bright (lit)
+        // We only disable the Button component to prevent clicks, avoiding VRButtonFactory.SetInteractable which dims it
+        var disconnectBtnComp = _disconnectButton?.GetComponentInChildren<Button>();
+        if (disconnectBtnComp != null) disconnectBtnComp.interactable = false;
+
+        // Change text to DISCONNECTING...
+        var disconnectText = _disconnectButton?.GetComponentInChildren<TextMeshProUGUI>();
+        string originalText = "DISCONNECT";
+        if (disconnectText != null) disconnectText.text = "DISCONNECTING...";
+
         // Fire event for controller to handle
         OnDisconnectClicked?.Invoke();
 
@@ -661,6 +674,23 @@ public class RTTRemoteMenu : MonoBehaviour
         if (_viewModel != null)
         {
             await _viewModel.DisconnectAsync();
+        }
+
+        // Change text to DISCONNECTED
+        if (disconnectText != null) disconnectText.text = "DISCONNECTED";
+
+        // Short delay to show the success state
+        await System.Threading.Tasks.Task.Delay(1000);
+
+        // Reset state for next time
+        if (disconnectText != null) disconnectText.text = originalText;
+        
+        // Restore buttons
+        if (_resumeButton != null) VRButtonFactory.SetInteractable(_resumeButton, true);
+        if (_disconnectButton != null) 
+        {
+            // Restore interactivity fully (ensure alpha is 1 in case it was modified elsewhere)
+            VRButtonFactory.SetInteractable(_disconnectButton, true); 
         }
 
         // Switch back to connect button
@@ -1827,6 +1857,9 @@ public class RTTRemoteMenu : MonoBehaviour
             // Force layout rebuild to ensure content is positioned correctly
             UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(frame.ContentContainer);
 
+            // Set alpha to match main menu (0.15f) instead of default (0.65f)
+            frame.SetGlassAlpha(0.15f);
+
             // Subscribe to content changes to trigger RTT re-render
             panel.OnContentChanged += () => frame.MarkDirty();
 
@@ -1922,6 +1955,11 @@ public class RTTRemoteMenu : MonoBehaviour
     /// </summary>
     private void EnsureBothPanelsVisible()
     {
+        // Don't show side panels if disconnected or error
+        if (_currentPhase == ConnectionPhase.Disconnected || _currentPhase == ConnectionPhase.Error)
+        {
+            return;
+        }
         // Show hardware frame if not already active
         if (_hardwareFrame != null && !_hardwareFrame.gameObject.activeSelf)
         {
@@ -1969,6 +2007,13 @@ public class RTTRemoteMenu : MonoBehaviour
     /// </summary>
     private void ShowSidePanels()
     {
+        // Don't show side panels if disconnected or error
+        if (_currentPhase == ConnectionPhase.Disconnected || _currentPhase == ConnectionPhase.Error)
+        {
+            Debug.Log($"[RTTRemoteMenu] ShowSidePanels blocked due to phase {_currentPhase}");
+            return;
+        }
+
         Debug.Log($"[RTTRemoteMenu] ShowSidePanels called, hardware frame: {_hardwareFrame != null}, network frame: {_networkFrame != null}");
 
         if (_hardwareFrame != null)

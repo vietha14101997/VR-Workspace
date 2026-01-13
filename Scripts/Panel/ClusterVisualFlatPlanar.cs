@@ -1,17 +1,20 @@
 using UnityEngine;
-using System.Collections.Generic;
 
 /// <summary>
-/// Manages seamless curved visual for WorldPanelClusterRig.
-/// Creates a single curved mesh with unified background, border, and content layers.
-/// Provides true seamless appearance without panel junctions.
+/// Manages seamless flat planar visual for WorldPanelClusterRig.
+/// Creates a single mesh with flat panel faces and curved folds at junctions.
+/// Provides seamless appearance without per-panel visual artifacts.
+///
+/// Key difference from ClusterVisualCurved:
+/// - NO content layer - individual panel boards remain visible and render content
+/// - Only creates Background and Border layers using the flat planar mesh
 /// </summary>
 [ExecuteAlways]
-public class ClusterVisualCurved : MonoBehaviour
+public class ClusterVisualFlatPlanar : MonoBehaviour
 {
     [Header("Mesh Settings")]
-    [Tooltip("Horizontal segments per panel (higher = smoother curve)")]
-    [SerializeField] private int segmentsPerPanel = 12;
+    [Tooltip("Segments per fold curve (higher = smoother fold)")]
+    [SerializeField] private int foldSegments = 6;
     [Tooltip("Vertical segments")]
     [SerializeField] private int verticalSegments = 2;
 
@@ -19,9 +22,7 @@ public class ClusterVisualCurved : MonoBehaviour
     [SerializeField] private float cornerRadius = 0.04f;
     [SerializeField] private float edgePadding = 0.009f;
     [SerializeField] private float glowExpansion = 0.05f;
-    [SerializeField] private float contentMarginH = 0.04f;
-    [SerializeField] private float contentMarginV = 0.045f;
-    [SerializeField] private float blendZoneWidth = 0f;
+
 
     [Header("Glass Colors")]
     [SerializeField] private Color glassColorA = new Color(0f, 0.55f, 0.65f, 0.35f);
@@ -57,23 +58,20 @@ public class ClusterVisualCurved : MonoBehaviour
 
     // Runtime references
     private WorldPanelClusterRig _clusterRig;
-    private Mesh _curvedMesh;
+    private Mesh _flatPlanarMesh;
     private Mesh _expandedMesh;
 
     private GameObject _backgroundObject;
-    private GameObject _contentObject;
     private GameObject _borderObject;
+    // NOTE: No _contentObject - boards render content directly!
 
     private MeshFilter _backgroundMeshFilter;
-    private MeshFilter _contentMeshFilter;
     private MeshFilter _borderMeshFilter;
 
     private MeshRenderer _backgroundRenderer;
-    private MeshRenderer _contentRenderer;
     private MeshRenderer _borderRenderer;
 
     private Material _backgroundMaterial;
-    private Material _contentMaterial;
     private Material _borderMaterial;
 
     // Cached cluster parameters
@@ -110,84 +108,47 @@ public class ClusterVisualCurved : MonoBehaviour
         Cleanup();
     }
 
-    void Update()
-    {
-        // Update content textures each frame (for streaming video)
-        if (Application.isPlaying && _contentMaterial != null)
-        {
-            UpdateContentTextures();
-        }
-    }
-
     #endregion
 
     #region Public API
 
     /// <summary>
-    /// Initialize the curved visual system
+    /// Initialize the flat planar visual system.
     /// </summary>
     public void Initialize()
     {
+        Debug.Log("[ClusterVisualFlatPlanar] Initialize() called");
+
         if (_clusterRig == null)
             _clusterRig = GetComponent<WorldPanelClusterRig>();
 
         if (_clusterRig == null || _clusterRig.panels.Count == 0)
         {
-            Debug.LogWarning("[ClusterVisualCurved] No cluster rig or panels found");
+            Debug.LogWarning("[ClusterVisualFlatPlanar] No cluster rig or panels found");
             return;
         }
+
+        Debug.Log($"[ClusterVisualFlatPlanar] Initializing for {_clusterRig.panels.Count} panels");
 
         Cleanup();
         GenerateMeshes();
         CreateVisualLayers();
         ApplyMaterials();
-        UpdateContentTextures();
+
+        Debug.Log("[ClusterVisualFlatPlanar] Initialize() completed successfully");
     }
 
     /// <summary>
-    /// Rebuild the visual when cluster configuration changes
+    /// Rebuild the visual when cluster configuration changes.
     /// </summary>
     public void Rebuild()
     {
-        Debug.Log("[ClusterVisualCurved] Rebuild() called");
+        Debug.Log("[ClusterVisualFlatPlanar] Rebuild() called");
         Initialize();
     }
 
     /// <summary>
-    /// Update content textures from panels (only enabled panels)
-    /// </summary>
-    public void UpdateContentTextures()
-    {
-        if (_contentMaterial == null || _clusterRig == null) return;
-
-        var enabledIndices = _clusterRig.GetEnabledPanelIndices();
-        var panels = _clusterRig.panels;
-
-        // Clear all textures first
-        for (int i = 0; i < 6; i++)
-        {
-            _contentMaterial.SetTexture($"_Content{i}", Texture2D.blackTexture);
-        }
-
-        // Set textures for enabled panels only
-        for (int i = 0; i < enabledIndices.Count && i < 6; i++)
-        {
-            int panelIndex = enabledIndices[i];
-            var panel = panels[panelIndex];
-            if (panel != null)
-            {
-                // Get content texture directly from panel's contentTexture field
-                // This is more reliable than reading from board renderer (which may be hidden)
-                Texture contentTex = panel.contentTexture;
-                _contentMaterial.SetTexture($"_Content{i}", contentTex ?? Texture2D.blackTexture);
-            }
-        }
-
-        _contentMaterial.SetInt("_PanelCount", enabledIndices.Count);
-    }
-
-    /// <summary>
-    /// Apply theme colors from RTTManager
+    /// Apply theme colors from RTTManager.
     /// </summary>
     public void ApplyThemeColors()
     {
@@ -217,7 +178,7 @@ public class ClusterVisualCurved : MonoBehaviour
     }
 
     /// <summary>
-    /// Set glow colors
+    /// Set glow colors.
     /// </summary>
     public void SetGlowColors(Color colorA, Color colorB)
     {
@@ -227,7 +188,7 @@ public class ClusterVisualCurved : MonoBehaviour
     }
 
     /// <summary>
-    /// Set glass colors
+    /// Set glass colors.
     /// </summary>
     public void SetGlassColors(Color colorA, Color colorB)
     {
@@ -248,7 +209,7 @@ public class ClusterVisualCurved : MonoBehaviour
         int enabledCount = _clusterRig.GetEnabledPanelCount();
         if (enabledCount == 0)
         {
-            Debug.LogWarning("[ClusterVisualCurved] GenerateMeshes: No enabled panels, skipping");
+            Debug.LogWarning("[ClusterVisualFlatPlanar] GenerateMeshes: No enabled panels, skipping");
             return;
         }
 
@@ -264,32 +225,38 @@ public class ClusterVisualCurved : MonoBehaviour
         float panelHeight = refPanel.height;
         float arcRadius = _clusterRig.distanceFromCamera;
 
-        Debug.Log($"[ClusterVisualCurved] GenerateMeshes: totalPanels={panels.Count}, enabledCount={enabledCount}, " +
+        Debug.Log($"[ClusterVisualFlatPlanar] GenerateMeshes: totalPanels={panels.Count}, enabledCount={enabledCount}, " +
             $"enabledIndices=[{string.Join(",", enabledIndices)}], panelWidth={panelWidth:F3}m");
 
-        // Generate main mesh
-        _curvedMesh = CurvedClusterMeshGenerator.Generate(
+        // IMPORTANT: For Flat Planar mode, use ZERO margins for mesh generation
+        // This makes the visual mesh match full panel dimensions (not reduced by margins)
+        // Panels are also positioned using full width, so edges touch edge-to-edge
+        float meshMarginH = 0f;  // No horizontal margin reduction
+        float meshMarginV = 0f;  // No vertical margin reduction
+
+        // Generate main mesh using FlatPlanarMeshGenerator (full panel size)
+        _flatPlanarMesh = FlatPlanarMeshGenerator.Generate(
             panelCount,
             panelWidth,
             panelHeight,
             arcRadius,
-            segmentsPerPanel,
+            foldSegments,
             verticalSegments,
-            contentMarginH,
-            contentMarginV
+            meshMarginH,
+            meshMarginV
         );
 
-        // Generate expanded mesh for border (with glow expansion)
-        _expandedMesh = CurvedClusterMeshGenerator.GenerateWithGlowExpansion(
+        // Generate expanded mesh for border (full panel size + glow expansion)
+        _expandedMesh = FlatPlanarMeshGenerator.GenerateWithGlowExpansion(
             panelCount,
             panelWidth,
             panelHeight,
             arcRadius,
             glowExpansion,
-            segmentsPerPanel,
+            foldSegments,
             verticalSegments,
-            contentMarginH,
-            contentMarginV
+            meshMarginH,
+            meshMarginV
         );
 
         // Cache parameters
@@ -298,15 +265,12 @@ public class ClusterVisualCurved : MonoBehaviour
         _cachedPanelHeight = panelHeight;
         _cachedArcRadius = arcRadius;
 
-        // Debug: Log mesh generation parameters with correct arc angle calculation
-        float boardWidth = panelWidth * (1f - 2f * contentMarginH);
-        float boardAngleRad = 2f * Mathf.Atan(boardWidth / 2f / arcRadius);
-        float totalArcAngleRad = panelCount * boardAngleRad;
-        float arcLength = totalArcAngleRad * arcRadius;
-        Debug.Log($"[ClusterVisualCurved] Mesh Gen - panelWidth: {panelWidth:F3}m, panelHeight: {panelHeight:F3}m, " +
-            $"panelCount: {panelCount}, arcRadius: {arcRadius:F2}m, marginH: {contentMarginH}");
-        Debug.Log($"[ClusterVisualCurved] Arc angle per panel: {boardAngleRad * Mathf.Rad2Deg:F1}°, " +
-            $"Total arc angle: {totalArcAngleRad * Mathf.Rad2Deg:F1}°, Arc length: {arcLength:F3}m");
+        // Debug: Log mesh generation info (using full panel width, no margin reduction)
+        float boardAngleRad = 2f * Mathf.Atan(panelWidth / 2f / arcRadius);
+        float boardAngleDeg = boardAngleRad * Mathf.Rad2Deg;
+        Debug.Log($"[ClusterVisualFlatPlanar] Mesh Gen - panelWidth: {panelWidth:F3}m, panelHeight: {panelHeight:F3}m, " +
+            $"panelCount: {panelCount}, arcRadius: {arcRadius:F2}m, meshMarginH: {meshMarginH} (full width)");
+        Debug.Log($"[ClusterVisualFlatPlanar] Yaw angle per panel: {boardAngleDeg:F1}°, foldSegments: {foldSegments}");
     }
 
     #endregion
@@ -315,32 +279,39 @@ public class ClusterVisualCurved : MonoBehaviour
 
     private void CreateVisualLayers()
     {
-        // Calculate offset to center the mesh on actual panel positions
-        Vector3 centerOffset = CalculatePanelCenterOffset();
+        if (_expandedMesh == null)
+        {
+            Debug.LogError("[ClusterVisualFlatPlanar] CreateVisualLayers: _expandedMesh is null!");
+            return;
+        }
 
-        // Background layer (behind content)
-        // Use expanded mesh so background fills up to border line (shader clips via SDF)
-        _backgroundObject = CreateLayerObject("ClusterBackground_Curved", backgroundZOffset, centerOffset);
+        Debug.Log($"[ClusterVisualFlatPlanar] CreateVisualLayers: expandedMesh.bounds={_expandedMesh.bounds}");
+
+        // Mesh is already generated in ClusterRig local space matching exact panel positions
+        // No offset needed - just place at origin with Z offsets for layering
+        Vector3 noOffset = Vector3.zero;
+
+        // Background layer (behind content boards)
+        _backgroundObject = CreateLayerObject("ClusterBackground_FlatPlanar", backgroundZOffset, noOffset);
         _backgroundMeshFilter = _backgroundObject.GetComponent<MeshFilter>();
         _backgroundRenderer = _backgroundObject.GetComponent<MeshRenderer>();
         _backgroundMeshFilter.sharedMesh = _expandedMesh;
 
-        // Content layer (middle)
-        _contentObject = CreateLayerObject("ClusterContent_Curved", 0f, centerOffset);
-        _contentMeshFilter = _contentObject.GetComponent<MeshFilter>();
-        _contentRenderer = _contentObject.GetComponent<MeshRenderer>();
-        _contentMeshFilter.sharedMesh = _curvedMesh;
+        // NOTE: No content layer - panel boards render content directly!
+        // This is the key difference from ClusterVisualCurved
 
-        // Border layer (in front, with expanded mesh)
-        _borderObject = CreateLayerObject("ClusterBorder_Curved", borderZOffset, centerOffset);
+        // Border layer (in front of content boards)
+        _borderObject = CreateLayerObject("ClusterBorder_FlatPlanar", borderZOffset, noOffset);
         _borderMeshFilter = _borderObject.GetComponent<MeshFilter>();
         _borderRenderer = _borderObject.GetComponent<MeshRenderer>();
         _borderMeshFilter.sharedMesh = _expandedMesh;
+
+        Debug.Log($"[ClusterVisualFlatPlanar] Created visual layers: background={_backgroundObject.name}, border={_borderObject.name}");
     }
 
     /// <summary>
-    /// Calculate offset to center mesh on actual panel positions (only enabled panels)
-    /// The mesh is generated centered at angle=0, but panels might be offset (e.g., FixedThreeSlot mode)
+    /// Calculate offset to center mesh on actual panel positions (only enabled panels).
+    /// The mesh is generated centered at angle=0, but panels might be offset (e.g., FixedThreeSlot mode).
     /// </summary>
     private Vector3 CalculatePanelCenterOffset()
     {
@@ -396,12 +367,18 @@ public class ClusterVisualCurved : MonoBehaviour
     #region Material Application
 
     /// <summary>
-    /// Calculate arc-based dimensions for shader.
-    /// Must match CurvedClusterMeshGenerator's arc angle calculation.
+    /// Calculate dimensions for shader.
+    /// Uses unrolled width similar to arc length calculation.
+    /// IMPORTANT: Flat Planar mode uses margin = 0 (full panel size), matching mesh generation.
     /// </summary>
-    private void CalculateArcDimensions(bool expanded, out float arcWidth, out float height)
+    private void CalculateFlatPlanarDimensions(bool expanded, out float clusterWidth, out float clusterHeight)
     {
-        float boardWidth = _cachedPanelWidth * (1f - 2f * contentMarginH);
+        // In Flat Planar mode, we use full panel width (margin = 0)
+        // This matches the mesh generation in GenerateMeshes() where meshMarginH = 0
+        float meshMarginH = 0f;
+
+        
+        float boardWidth = _cachedPanelWidth * (1f - 2f * meshMarginH); // = _cachedPanelWidth
 
         if (expanded)
         {
@@ -409,34 +386,48 @@ public class ClusterVisualCurved : MonoBehaviour
             boardWidth += (glowExpansion * 2f / _cachedPanelCount);
         }
 
-        // Arc angle per panel: 2 * atan(boardWidth / 2 / radius)
-        // This matches WorldPanelClusterRig.LayoutFromCamera() and CurvedClusterMeshGenerator.Generate()
-        float boardAngleRad = 2f * Mathf.Atan(boardWidth / 2f / _cachedArcRadius);
-        float totalArcAngleRad = _cachedPanelCount * boardAngleRad;
+        // Calculate total unrolled width (panel widths + fold arc lengths)
+        FlatPlanarMeshGenerator.CalculateClusterDimensions(
+            _cachedPanelCount,
+            expanded ? _cachedPanelWidth + (glowExpansion * 2f / _cachedPanelCount) : _cachedPanelWidth,
+            _cachedPanelHeight,
+            _cachedArcRadius,
+            meshMarginH,  // Use 0 margin to match mesh generation
+            out clusterWidth,
+            out float _
+        );
 
-        // Arc length = angle * radius (this is the "unrolled" width of the curved mesh)
-        arcWidth = totalArcAngleRad * _cachedArcRadius;
-
-        // Height doesn't change with arc (it's perpendicular to the arc plane)
-        height = expanded ? _cachedPanelHeight + glowExpansion * 2f : _cachedPanelHeight;
+        // Height doesn't change (perpendicular to arc plane)
+        // Use full panel height (no margin reduction)
+        clusterHeight = expanded ? _cachedPanelHeight + glowExpansion * 2f : _cachedPanelHeight;
     }
 
     private void ApplyMaterials()
     {
         ApplyBackgroundMaterial();
-        ApplyContentMaterial();
         ApplyBorderMaterial();
     }
 
     private void ApplyBackgroundMaterial()
     {
-        if (_backgroundRenderer == null) return;
+        if (_backgroundRenderer == null)
+        {
+            Debug.LogError("[ClusterVisualFlatPlanar] ApplyBackgroundMaterial: _backgroundRenderer is null!");
+            return;
+        }
 
+        // Reuse ClusterBackgroundCurved shader (compatible with flat planar UV mapping)
         var shader = Shader.Find("Custom/ClusterBackgroundCurved");
         if (shader == null)
         {
-            Debug.LogWarning("[ClusterVisualCurved] ClusterBackgroundCurved shader not found");
-            return;
+            Debug.LogError("[ClusterVisualFlatPlanar] ClusterBackgroundCurved shader not found! Using fallback.");
+            // Try standard shader as fallback
+            shader = Shader.Find("Standard");
+            if (shader == null)
+            {
+                Debug.LogError("[ClusterVisualFlatPlanar] Even Standard shader not found!");
+                return;
+            }
         }
 
         if (_backgroundMaterial == null)
@@ -444,8 +435,8 @@ public class ClusterVisualCurved : MonoBehaviour
             _backgroundMaterial = new Material(shader);
         }
 
-        // Calculate arc-based dimensions (expanded mesh for background)
-        CalculateArcDimensions(expanded: true, out float clusterWidth, out float clusterHeight);
+        // Calculate dimensions (expanded mesh for background)
+        CalculateFlatPlanarDimensions(expanded: true, out float clusterWidth, out float clusterHeight);
 
         _backgroundMaterial.SetFloat("_ClusterWidth", clusterWidth);
         _backgroundMaterial.SetFloat("_ClusterHeight", clusterHeight);
@@ -463,59 +454,30 @@ public class ClusterVisualCurved : MonoBehaviour
         _backgroundMaterial.SetFloat("_FresnelPower", fresnelPower);
         _backgroundMaterial.SetFloat("_FresnelStrength", fresnelStrength);
 
-        _backgroundMaterial.SetFloat("_MarginH", contentMarginH);
-        _backgroundMaterial.SetFloat("_MarginV", contentMarginV);
+        // Flat Planar mode uses margin = 0 (full panel size)
+        _backgroundMaterial.SetFloat("_MarginH", 0f);
+        _backgroundMaterial.SetFloat("_MarginV", 0f);
 
         _backgroundMaterial.renderQueue = 2999;
         _backgroundRenderer.sharedMaterial = _backgroundMaterial;
-    }
 
-    private void ApplyContentMaterial()
-    {
-        if (_contentRenderer == null) return;
-
-        var shader = Shader.Find("Custom/ClusterContentCurved");
-        if (shader == null)
-        {
-            Debug.LogWarning("[ClusterVisualCurved] ClusterContentCurved shader not found");
-            return;
-        }
-
-        if (_contentMaterial == null)
-        {
-            _contentMaterial = new Material(shader);
-        }
-
-        // Calculate arc-based dimensions (non-expanded mesh for content)
-        CalculateArcDimensions(expanded: false, out float clusterWidth, out float clusterHeight);
-
-        _contentMaterial.SetInt("_PanelCount", _cachedPanelCount);
-        _contentMaterial.SetFloat("_ClusterWidth", clusterWidth);
-        _contentMaterial.SetFloat("_ClusterHeight", clusterHeight);
-        _contentMaterial.SetFloat("_BlendZone", blendZoneWidth);
-
-        _contentMaterial.SetFloat("_CornerRadius", cornerRadius);
-        _contentMaterial.SetFloat("_EdgePadding", edgePadding);
-        _contentMaterial.SetFloat("_MarginH", contentMarginH);
-        _contentMaterial.SetFloat("_MarginV", contentMarginV);
-
-        _contentMaterial.SetFloat("_Sharpness", 0.5f);
-        _contentMaterial.SetFloat("_SharpnessRadius", 1.0f);
-        _contentMaterial.SetFloat("_ChromaSharpness", 0.3f);
-        _contentMaterial.SetFloat("_EnableSharpening", 1f);
-
-        _contentMaterial.renderQueue = 3000;
-        _contentRenderer.sharedMaterial = _contentMaterial;
+        Debug.Log($"[ClusterVisualFlatPlanar] Background material applied: shader={_backgroundMaterial.shader.name}, " +
+            $"clusterWidth={_backgroundMaterial.GetFloat("_ClusterWidth"):F2}, clusterHeight={_backgroundMaterial.GetFloat("_ClusterHeight"):F2}");
     }
 
     private void ApplyBorderMaterial()
     {
-        if (_borderRenderer == null) return;
+        if (_borderRenderer == null)
+        {
+            Debug.LogError("[ClusterVisualFlatPlanar] ApplyBorderMaterial: _borderRenderer is null!");
+            return;
+        }
 
+        // Reuse ClusterBorderCurved shader
         var shader = Shader.Find("Custom/ClusterBorderCurved");
         if (shader == null)
         {
-            Debug.LogWarning("[ClusterVisualCurved] ClusterBorderCurved shader not found");
+            Debug.LogWarning("[ClusterVisualFlatPlanar] ClusterBorderCurved shader not found");
             return;
         }
 
@@ -524,8 +486,8 @@ public class ClusterVisualCurved : MonoBehaviour
             _borderMaterial = new Material(shader);
         }
 
-        // Calculate arc-based dimensions (expanded mesh for border)
-        CalculateArcDimensions(expanded: true, out float clusterWidth, out float clusterHeight);
+        // Calculate dimensions (expanded mesh for border)
+        CalculateFlatPlanarDimensions(expanded: true, out float clusterWidth, out float clusterHeight);
 
         _borderMaterial.SetFloat("_ClusterWidth", clusterWidth);
         _borderMaterial.SetFloat("_ClusterHeight", clusterHeight);
@@ -552,6 +514,8 @@ public class ClusterVisualCurved : MonoBehaviour
 
         _borderMaterial.renderQueue = 3001;
         _borderRenderer.sharedMaterial = _borderMaterial;
+
+        Debug.Log($"[ClusterVisualFlatPlanar] Border material applied: shader={_borderMaterial.shader.name}");
     }
 
     #endregion
@@ -579,15 +543,6 @@ public class ClusterVisualCurved : MonoBehaviour
             _backgroundMaterial = null;
         }
 
-        if (_contentMaterial != null)
-        {
-            if (Application.isPlaying)
-                Destroy(_contentMaterial);
-            else
-                DestroyImmediate(_contentMaterial);
-            _contentMaterial = null;
-        }
-
         if (_borderMaterial != null)
         {
             if (Application.isPlaying)
@@ -598,13 +553,13 @@ public class ClusterVisualCurved : MonoBehaviour
         }
 
         // Cleanup meshes
-        if (_curvedMesh != null)
+        if (_flatPlanarMesh != null)
         {
             if (Application.isPlaying)
-                Destroy(_curvedMesh);
+                Destroy(_flatPlanarMesh);
             else
-                DestroyImmediate(_curvedMesh);
-            _curvedMesh = null;
+                DestroyImmediate(_flatPlanarMesh);
+            _flatPlanarMesh = null;
         }
 
         if (_expandedMesh != null)
@@ -626,15 +581,6 @@ public class ClusterVisualCurved : MonoBehaviour
             _backgroundObject = null;
         }
 
-        if (_contentObject != null)
-        {
-            if (Application.isPlaying)
-                Destroy(_contentObject);
-            else
-                DestroyImmediate(_contentObject);
-            _contentObject = null;
-        }
-
         if (_borderObject != null)
         {
             if (Application.isPlaying)
@@ -645,10 +591,8 @@ public class ClusterVisualCurved : MonoBehaviour
         }
 
         _backgroundMeshFilter = null;
-        _contentMeshFilter = null;
         _borderMeshFilter = null;
         _backgroundRenderer = null;
-        _contentRenderer = null;
         _borderRenderer = null;
 
         _cachedPanelCount = -1;

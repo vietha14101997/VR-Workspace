@@ -65,6 +65,12 @@ namespace VRWorkspace.Streaming
         /// </summary>
         public event Action<string, double> OnProgress;
 
+        /// <summary>
+        /// Event fired when ping test completes (before bandwidth test).
+        /// Parameters: pingMs, jitterMs
+        /// </summary>
+        public event Action<double, double> OnPingJitterResult;
+
         public SpeedTestClient(ClientWebSocket ws, CancellationToken ct)
         {
             _ws = ws;
@@ -89,6 +95,9 @@ namespace VRWorkspace.Streaming
             result.PingMs = PingMs;
             result.JitterMs = JitterMs;
             Debug.Log($"[SpeedTest] Ping: {PingMs:F1}ms, Jitter: {JitterMs:F1}ms");
+
+            // Fire event so UI can update immediately
+            OnPingJitterResult?.Invoke(PingMs, JitterMs);
 
             // 2. Bandwidth test (4 seconds with warmup)
             Debug.Log($"[SpeedTest] Running bandwidth test ({SPEED_TEST_DURATION_MS}ms with {WARMUP_PERIOD_MS}ms warmup)...");
