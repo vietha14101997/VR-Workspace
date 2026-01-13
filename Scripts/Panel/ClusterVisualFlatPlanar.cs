@@ -55,6 +55,11 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
     [Header("Z Offsets")]
     [SerializeField] private float backgroundZOffset = 0.002f;
     [SerializeField] private float borderZOffset = -0.002f;
+    
+    // Runtime overrides
+    private float _overrideBorderWidth = 0.025f;
+    private float _overrideLightSize = 0.01f;
+    private float frameMargin = 0.0f; // Added frameMargin
 
     // Runtime references
     private WorldPanelClusterRig _clusterRig;
@@ -82,6 +87,11 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
     private float _cachedPanelWidth;
     private float _cachedPanelHeight;
     private float _cachedArcRadius;
+    
+    // Cached expansion values
+    private float _expansionW;
+    private float _expansionH;
+    private float _visualExpansion = 0.1f; // Override from ClusterRig
 
     #region Lifecycle
 
@@ -211,6 +221,67 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
     }
 
     /// <summary>
+    /// Set corner settings (radius and padding)
+    /// </summary>
+    public void SetCornerSettings(float radius, float padding)
+    {
+        cornerRadius = radius;
+        edgePadding = padding;
+        ApplyMaterials();
+    }
+
+    /// <summary>
+    /// Set border display settings
+    /// </summary>
+    public void SetBorderSettings(float width, float lightSize)
+    {
+        _overrideBorderWidth = width;
+        _overrideLightSize = lightSize;
+        ApplyBorderMaterial();
+    }
+
+    public void SetGlowExpansion(float expansion)
+    {
+        bool changed = Mathf.Abs(glowExpansion - expansion) > 0.001f;
+        glowExpansion = expansion;
+
+        if (changed && (_flatPlanarMesh != null || _expandedMesh != null))
+        {
+            GenerateMeshes();
+        }
+        ApplyMaterials();
+    }
+
+    /// <summary>
+    /// Update frame margin (solid glass extension)
+    /// </summary>
+    public void SetFrameMargin(float margin)
+    {
+        frameMargin = margin;
+        // Requires mesh rebuild
+        if (_flatPlanarMesh != null || _expandedMesh != null)
+        {
+            GenerateMeshes();
+            ApplyMaterials();
+        }
+    }
+
+    /// <summary>
+    /// Set the visual expansion size (how much Visual mesh extends beyond Board bounds)
+    /// </summary>
+    public void SetVisualExpansion(float expansion)
+    {
+        bool changed = Mathf.Abs(_visualExpansion - expansion) > 0.001f;
+        _visualExpansion = expansion;
+        
+        if (changed && (_flatPlanarMesh != null || _expandedMesh != null))
+        {
+            GenerateMeshes();
+            ApplyMaterials();
+        }
+    }
+
+    /// <summary>
     /// Update content textures from panels (only enabled panels).
     /// Called every frame to sync streaming video content.
     /// </summary>
@@ -274,11 +345,22 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
         Debug.Log($"[ClusterVisualFlatPlanar] GenerateMeshes: totalPanels={panels.Count}, enabledCount={enabledCount}, " +
             $"enabledIndices=[{string.Join(",", enabledIndices)}], panelWidth={panelWidth:F3}m");
 
+        // Cache parameters FIRST (before generating any mesh that depends on them)
+        // This ensures consistency with ClusterVisualCurved.cs pattern
+        _cachedPanelCount = panelCount;
+        _cachedPanelWidth = panelWidth;
+        _cachedPanelHeight = panelHeight;
+        _cachedArcRadius = arcRadius;
+
         // IMPORTANT: For Flat Planar mode, use ZERO margins for mesh generation
         // This makes the visual mesh match full panel dimensions (not reduced by margins)
         // Panels are also positioned using full width, so edges touch edge-to-edge
         float meshMarginH = 0f;  // No horizontal margin reduction
         float meshMarginV = 0f;  // No vertical margin reduction
+        
+        // Get gap and overlap values from ClusterRig to match panel positioning exactly
+        float gapMeters = _clusterRig.edgeGapMeters;
+        float overlapMeters = _clusterRig.panelOverlap;
 
         // Generate main mesh using FlatPlanarMeshGenerator (full panel size)
         _flatPlanarMesh = FlatPlanarMeshGenerator.Generate(
@@ -289,34 +371,46 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
             foldSegments,
             verticalSegments,
             meshMarginH,
-            meshMarginV
+            meshMarginV,
+            gapMeters,
+            overlapMeters
         );
 
-        // Generate expanded mesh for border (full panel size + glow expansion)
+
+        // Use visual expansion from ClusterRig (direct control instead of calculated ratio)
+        // _visualExpansion is set via SetVisualExpansion() from WorldPanelClusterRig
+        _expansionW = _visualExpansion;
+        _expansionH = _visualExpansion;
+        float expansion = _visualExpansion;
+
+        // Generate expanded mesh for border using GenerateWithGlowExpansion()
+        // IMPORTANT: This function keeps panel angles consistent with original panels!
+        // It only expands the outer edges (not changing panel angles)
         _expandedMesh = FlatPlanarMeshGenerator.GenerateWithGlowExpansion(
             panelCount,
             panelWidth,
             panelHeight,
             arcRadius,
-            glowExpansion,
+            expansion,  // Expansion amount for outer edges (from _visualExpansion)
             foldSegments,
             verticalSegments,
             meshMarginH,
-            meshMarginV
+            meshMarginV,
+            gapMeters,
+            overlapMeters
         );
-
-        // Cache parameters
-        _cachedPanelCount = panelCount;
-        _cachedPanelWidth = panelWidth;
-        _cachedPanelHeight = panelHeight;
-        _cachedArcRadius = arcRadius;
 
         // Debug: Log mesh generation info (using full panel width, no margin reduction)
         float boardAngleRad = 2f * Mathf.Atan(panelWidth / 2f / arcRadius);
         float boardAngleDeg = boardAngleRad * Mathf.Rad2Deg;
         Debug.Log($"[ClusterVisualFlatPlanar] Mesh Gen - panelWidth: {panelWidth:F3}m, panelHeight: {panelHeight:F3}m, " +
             $"panelCount: {panelCount}, arcRadius: {arcRadius:F2}m, meshMarginH: {meshMarginH} (full width)");
-        Debug.Log($"[ClusterVisualFlatPlanar] Yaw angle per panel: {boardAngleDeg:F1}°, foldSegments: {foldSegments}");
+        Debug.Log($"[ClusterVisualFlatPlanar] Yaw angle per panel: {boardAngleDeg:F1}°, foldSegments: {foldSegments}, gap: {gapMeters:F4}m, overlap: {overlapMeters:F4}m");
+
+        // IMPORTANT: Update existing MeshFilters if they exist
+        if (_contentMeshFilter != null) _contentMeshFilter.sharedMesh = _flatPlanarMesh;
+        if (_backgroundMeshFilter != null) _backgroundMeshFilter.sharedMesh = _expandedMesh;
+        if (_borderMeshFilter != null) _borderMeshFilter.sharedMesh = _expandedMesh;
     }
 
     #endregion
@@ -425,20 +519,25 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
         // In Flat Planar mode, we use full panel width (margin = 0)
         // This matches the mesh generation in GenerateMeshes() where meshMarginH = 0
         float meshMarginH = 0f;
-
         
         float boardWidth = _cachedPanelWidth * (1f - 2f * meshMarginH); // = _cachedPanelWidth
 
+        // Size increase to add if expanded
+        float widthAdd = 0f;
+        float heightAdd = 0f;
+
         if (expanded)
         {
-            // For expanded mesh, add glow expansion to board width per panel
-            boardWidth += (glowExpansion * 2f / _cachedPanelCount);
+            // Use the calculated expansion from GenerateMeshes
+            widthAdd = _expansionW * 2f;
+            heightAdd = _expansionH * 2f;
+            
+            boardWidth += widthAdd;
         }
 
-        // Calculate total unrolled width (panel widths + fold arc lengths)
         FlatPlanarMeshGenerator.CalculateClusterDimensions(
             _cachedPanelCount,
-            expanded ? _cachedPanelWidth + (glowExpansion * 2f / _cachedPanelCount) : _cachedPanelWidth,
+            _cachedPanelWidth + widthAdd, // Width per panel includes expansion
             _cachedPanelHeight,
             _cachedArcRadius,
             meshMarginH,  // Use 0 margin to match mesh generation
@@ -447,8 +546,8 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
         );
 
         // Height doesn't change (perpendicular to arc plane)
-        // Use full panel height (no margin reduction)
-        clusterHeight = expanded ? _cachedPanelHeight + glowExpansion * 2f : _cachedPanelHeight;
+        // Use full panel height + expansion
+        clusterHeight = expanded ? _cachedPanelHeight + heightAdd : _cachedPanelHeight;
     }
 
     private void ApplyMaterials()
@@ -493,6 +592,9 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
         _backgroundMaterial.SetFloat("_ArcRadius", _cachedArcRadius);
 
         _backgroundMaterial.SetFloat("_CornerRadius", cornerRadius);
+        // Important: Use base edgePadding only.
+        // The mesh is already expanded by 15%, so the border draws at the outer edge naturally.
+        // We do NOT add glowExpansion here anymore.
         _backgroundMaterial.SetFloat("_EdgePadding", edgePadding);
 
         _backgroundMaterial.SetColor("_ColorA", glassColorA);
@@ -586,6 +688,8 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
         _borderMaterial.SetFloat("_ClusterHeight", clusterHeight);
 
         _borderMaterial.SetFloat("_CornerRadius", cornerRadius);
+
+        // Important: Use base edgePadding only
         _borderMaterial.SetFloat("_EdgePadding", edgePadding);
 
         _borderMaterial.SetFloat("_Layer1Width", layer1Width);
@@ -601,9 +705,13 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
         _borderMaterial.SetColor("_ColorB", glowColorB);
         _borderMaterial.SetFloat("_GradientAngle", gradientAngle);
 
+        // Parametrized border settings
+        _borderMaterial.SetFloat("_BorderWidth", _overrideBorderWidth);
+        _borderMaterial.SetFloat("_LightSize", _overrideLightSize);
+
         _borderMaterial.SetFloat("_ShimmerSpeed", shimmerSpeed);
         _borderMaterial.SetFloat("_ShimmerIntensity", shimmerIntensity);
-        _borderMaterial.SetFloat("_LightSize", 0.15f);
+        // _LightSize was 0.15f hardcoded, now dynamic
 
         _borderMaterial.renderQueue = 3001;
         _borderRenderer.sharedMaterial = _borderMaterial;

@@ -22,6 +22,7 @@ public class ClusterVisualCurved : MonoBehaviour
     [SerializeField] private float contentMarginH = 0.04f;
     [SerializeField] private float contentMarginV = 0.045f;
     [SerializeField] private float blendZoneWidth = 0f;
+    [SerializeField] private float frameMargin = 0f; // Limit solid frame extension
 
     [Header("Glass Colors")]
     [SerializeField] private Color glassColorA = new Color(0f, 0.55f, 0.65f, 0.35f);
@@ -54,6 +55,10 @@ public class ClusterVisualCurved : MonoBehaviour
     [Header("Z Offsets")]
     [SerializeField] private float backgroundZOffset = 0.002f;
     [SerializeField] private float borderZOffset = -0.002f;
+    
+    // Runtime overrides
+    private float _overrideBorderWidth = 0.025f;
+    private float _overrideLightSize = 0.01f;
 
     // Runtime references
     private WorldPanelClusterRig _clusterRig;
@@ -75,12 +80,17 @@ public class ClusterVisualCurved : MonoBehaviour
     private Material _backgroundMaterial;
     private Material _contentMaterial;
     private Material _borderMaterial;
-
+    
     // Cached cluster parameters
     private int _cachedPanelCount = -1;
     private float _cachedPanelWidth;
     private float _cachedPanelHeight;
     private float _cachedArcRadius;
+
+    // Cached expansion values
+    private float _expansionW;
+    private float _expansionH;
+    private float _visualExpansion = 0.1f; // Override from ClusterRig
 
     #region Lifecycle
 
@@ -245,6 +255,60 @@ public class ClusterVisualCurved : MonoBehaviour
         edgePadding = padding;
         ApplyMaterials(); // Update all materials
     }
+    
+    /// <summary>
+    /// Set border display settings
+    /// </summary>
+    public void SetBorderSettings(float width, float lightSize)
+    {
+        _overrideBorderWidth = width;
+        _overrideLightSize = lightSize;
+        ApplyBorderMaterial();
+    }
+
+    /// <summary>
+    /// Update glow expansion value from rig
+    /// </summary>
+    public void SetGlowExpansion(float expansion)
+    {
+        bool changed = Mathf.Abs(glowExpansion - expansion) > 0.001f;
+        glowExpansion = expansion;
+        
+        if (changed && (_curvedMesh != null || _expandedMesh != null))
+        {
+            GenerateMeshes();
+        }
+        ApplyMaterials(); 
+    }
+
+    /// <summary>
+    /// Update frame margin (solid glass extension)
+    /// </summary>
+    public void SetFrameMargin(float margin)
+    {
+        frameMargin = margin;
+        // Requires mesh rebuild
+        if (_curvedMesh != null || _expandedMesh != null)
+        {
+            GenerateMeshes();
+            ApplyMaterials();
+        }
+    }
+
+    /// <summary>
+    /// Set the visual expansion size (how much Visual mesh extends beyond Board bounds)
+    /// </summary>
+    public void SetVisualExpansion(float expansion)
+    {
+        bool changed = Mathf.Abs(_visualExpansion - expansion) > 0.001f;
+        _visualExpansion = expansion;
+        
+        if (changed && (_curvedMesh != null || _expandedMesh != null))
+        {
+            GenerateMeshes();
+            ApplyMaterials();
+        }
+    }
 
     #endregion
 
@@ -277,7 +341,17 @@ public class ClusterVisualCurved : MonoBehaviour
         Debug.Log($"[ClusterVisualCurved] GenerateMeshes: totalPanels={panels.Count}, enabledCount={enabledCount}, " +
             $"enabledIndices=[{string.Join(",", enabledIndices)}], panelWidth={panelWidth:F3}m");
 
-        // Generate main mesh
+        // Cache parameters FIRST (before generating any mesh that depends on them)
+        _cachedPanelCount = panelCount;
+        _cachedPanelWidth = panelWidth;
+        _cachedPanelHeight = panelHeight;
+        _cachedArcRadius = arcRadius;
+
+        // Get gap and overlap values from ClusterRig to match panel positioning exactly
+        float gapMeters = _clusterRig.edgeGapMeters;
+        float overlapMeters = _clusterRig.panelOverlap;
+
+        // Generate main mesh (content layer - matches panel size exactly)
         _curvedMesh = CurvedClusterMeshGenerator.Generate(
             panelCount,
             panelWidth,
@@ -286,27 +360,34 @@ public class ClusterVisualCurved : MonoBehaviour
             segmentsPerPanel,
             verticalSegments,
             contentMarginH,
-            contentMarginV
+            contentMarginV,
+            gapMeters,
+            overlapMeters
         );
 
-        // Generate expanded mesh for border (with glow expansion)
+        // Use visual expansion from ClusterRig (direct control instead of calculated ratio)
+        // _visualExpansion is set via SetVisualExpansion() from WorldPanelClusterRig
+        _expansionW = _visualExpansion;
+        _expansionH = _visualExpansion;
+        float expansion = _visualExpansion;
+
+        // Generate expanded mesh for background/border using GenerateWithGlowExpansion()
+        // IMPORTANT: This function keeps arc angles consistent with original panels!
+        // It expands dimensions without changing the arc angle calculation
         _expandedMesh = CurvedClusterMeshGenerator.GenerateWithGlowExpansion(
             panelCount,
             panelWidth,
             panelHeight,
             arcRadius,
-            glowExpansion,
+            expansion,  // Expansion amount for outer edges (from _visualExpansion)
             segmentsPerPanel,
             verticalSegments,
             contentMarginH,
-            contentMarginV
+            contentMarginV,
+            gapMeters,
+            overlapMeters
         );
-
-        // Cache parameters
-        _cachedPanelCount = panelCount;
-        _cachedPanelWidth = panelWidth;
-        _cachedPanelHeight = panelHeight;
-        _cachedArcRadius = arcRadius;
+        _expandedMesh.name = "ClusterVisualCurved_Expanded";
 
         // Debug: Log mesh generation parameters with correct arc angle calculation
         float boardWidth = panelWidth * (1f - 2f * contentMarginH);
@@ -316,7 +397,12 @@ public class ClusterVisualCurved : MonoBehaviour
         Debug.Log($"[ClusterVisualCurved] Mesh Gen - panelWidth: {panelWidth:F3}m, panelHeight: {panelHeight:F3}m, " +
             $"panelCount: {panelCount}, arcRadius: {arcRadius:F2}m, marginH: {contentMarginH}");
         Debug.Log($"[ClusterVisualCurved] Arc angle per panel: {boardAngleRad * Mathf.Rad2Deg:F1}°, " +
-            $"Total arc angle: {totalArcAngleRad * Mathf.Rad2Deg:F1}°, Arc length: {arcLength:F3}m");
+            $"Total arc angle: {totalArcAngleRad * Mathf.Rad2Deg:F1}°, Arc length: {arcLength:F3}m, gap: {gapMeters:F4}m, overlap: {overlapMeters:F4}m");
+
+        // IMPORTANT: Update existing MeshFilters if they exist
+        if (_contentMeshFilter != null) _contentMeshFilter.sharedMesh = _curvedMesh;
+        if (_backgroundMeshFilter != null) _backgroundMeshFilter.sharedMesh = _expandedMesh;
+        if (_borderMeshFilter != null) _borderMeshFilter.sharedMesh = _expandedMesh;
     }
 
     #endregion
@@ -413,12 +499,19 @@ public class ClusterVisualCurved : MonoBehaviour
     {
         // UPDATE: Use full panel width to match Generator change.
         // This ensures the shader receives dimensions consistent with the larger mesh.
+        
         float boardWidth = _cachedPanelWidth;
+        float heightVal = _cachedPanelHeight;
 
         if (expanded)
         {
-            // For expanded mesh, add glow expansion to board width per panel
-            boardWidth += (glowExpansion * 2f / _cachedPanelCount);
+            // Add the calculated expansion
+            boardWidth += (_expansionW * 2f); // Width per panel expansion? 
+            // Warning: _expansionW is per panel? Yes, calculated from panelWidth.
+            // But wait, the mesh generator uses (panelWidth + expansion * 2).
+            // So here we should match that.
+            
+             heightVal += (_expansionH * 2f);
         }
 
         // Arc angle per panel: 2 * atan(boardWidth / 2 / radius)
@@ -430,7 +523,7 @@ public class ClusterVisualCurved : MonoBehaviour
         arcWidth = totalArcAngleRad * _cachedArcRadius;
 
         // Height doesn't change with arc (it's perpendicular to the arc plane)
-        height = expanded ? _cachedPanelHeight + glowExpansion * 2f : _cachedPanelHeight;
+        height = heightVal;
     }
 
     private void ApplyMaterials()
@@ -464,6 +557,8 @@ public class ClusterVisualCurved : MonoBehaviour
         _backgroundMaterial.SetFloat("_ArcRadius", _cachedArcRadius);
 
         _backgroundMaterial.SetFloat("_CornerRadius", cornerRadius);
+        // Important: Use base edgePadding only.
+        // Mesh expanded by 15%, border draws at outer edge.
         _backgroundMaterial.SetFloat("_EdgePadding", edgePadding);
 
         _backgroundMaterial.SetColor("_ColorA", glassColorA);
@@ -545,6 +640,7 @@ public class ClusterVisualCurved : MonoBehaviour
         _borderMaterial.SetFloat("_ClusterHeight", clusterHeight);
 
         _borderMaterial.SetFloat("_CornerRadius", cornerRadius);
+        // Important: Use base edgePadding only
         _borderMaterial.SetFloat("_EdgePadding", edgePadding);
 
         _borderMaterial.SetFloat("_Layer1Width", layer1Width);
@@ -560,9 +656,14 @@ public class ClusterVisualCurved : MonoBehaviour
         _borderMaterial.SetColor("_ColorB", glowColorB);
         _borderMaterial.SetFloat("_GradientAngle", gradientAngle);
 
+        // Parametrized border settings
+        _borderMaterial.SetFloat("_BorderWidth", _overrideBorderWidth);
+        _borderMaterial.SetFloat("_LightSize", _overrideLightSize);
+
         _borderMaterial.SetFloat("_ShimmerSpeed", shimmerSpeed);
         _borderMaterial.SetFloat("_ShimmerIntensity", shimmerIntensity);
-        _borderMaterial.SetFloat("_LightSize", 0.15f);
+        // _LightGlow defaults if not set? RTTMenuFrame uses 0.008f. 
+        // We typically don't set it here unless added, let's stick to LightSize which controls main look.
 
         _borderMaterial.renderQueue = 3001;
         _borderRenderer.sharedMaterial = _borderMaterial;

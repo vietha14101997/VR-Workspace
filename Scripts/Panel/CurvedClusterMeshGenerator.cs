@@ -32,7 +32,9 @@ public static class CurvedClusterMeshGenerator
         int segmentsPerPanel = 12,
         int verticalSegments = 2,
         float contentMarginH = 0.04f,
-        float contentMarginV = 0.045f)
+        float contentMarginV = 0.045f,
+        float gapMeters = 0f,
+        float overlapMeters = 0f)
     {
         if (panelCount < 1) panelCount = 1;
         if (segmentsPerPanel < 2) segmentsPerPanel = 2;
@@ -48,8 +50,12 @@ public static class CurvedClusterMeshGenerator
         // Each panel occupies an arc angle of 2*atan(boardWidth/2/radius)
         // Total arc = sum of individual panel angles, NOT atan(totalWidth/2/radius)
         // Using atan(totalWidth) gives wrong result because atan(A+B) != atan(A) + atan(B)
+        // Must include gap and overlap to match exact panel positions!
         float boardAngleRad = 2f * Mathf.Atan(boardWidth / 2f / arcRadius);
-        float totalArcAngleRad = panelCount * boardAngleRad;
+        float gapAngleRad = 2f * Mathf.Atan(gapMeters / 2f / arcRadius);
+        float overlapAngleRad = 2f * Mathf.Atan(overlapMeters / 2f / arcRadius);
+        float anglePerPanelRad = boardAngleRad + gapAngleRad - overlapAngleRad;
+        float totalArcAngleRad = panelCount * anglePerPanelRad;
 
         int totalHorizontalSegments = panelCount * segmentsPerPanel;
         int vertexCountX = totalHorizontalSegments + 1;
@@ -175,7 +181,9 @@ public static class CurvedClusterMeshGenerator
         int segmentsPerPanel = 12,
         int verticalSegments = 2,
         float contentMarginH = 0.04f,
-        float contentMarginV = 0.045f)
+        float contentMarginV = 0.045f,
+        float gapMeters = 0f,
+        float overlapMeters = 0f)
     {
         // Generate base mesh with expanded dimensions
         float expandedWidth = panelWidth + (glowExpansion * 2f / panelCount); // Distribute expansion
@@ -189,7 +197,9 @@ public static class CurvedClusterMeshGenerator
             segmentsPerPanel,
             verticalSegments,
             contentMarginH,
-            contentMarginV
+            contentMarginV,
+            gapMeters,
+            overlapMeters
         );
 
         mesh.name = $"CurvedClusterMesh_{panelCount}Panels_Expanded";

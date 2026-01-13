@@ -24,7 +24,7 @@ public enum ClusterLayoutMode
 /// <summary>
 /// Manages a cluster of WorldPanelPlus panels arranged in an arc.
 /// Handles dynamic panel creation, positioning, and neighbor linking.
-/// Optionally applies seamless ClusterPanelVisual for connected appearance.
+/// Uses ClusterVisualCurved or ClusterVisualFlatPlanar for seamless visual appearance.
 /// </summary>
 [ExecuteAlways]
 public class WorldPanelClusterRig : MonoBehaviour
@@ -57,8 +57,15 @@ public class WorldPanelClusterRig : MonoBehaviour
     [Header("Visual Settings")]
     [SerializeField] private float cornerRadius = 0.04f;
     [SerializeField] private float edgePadding = 0.009f;
+    [SerializeField] private float borderWidth = 0.025f; // Matches RTTMenuFrame
+    [SerializeField] private float lightSize = 0.01f;    // Matches RTTMenuFrame
     [Tooltip("Extra size (in meters) for glow overflow on outer edges")]
-    [SerializeField] private float glowExpansion = 0.05f;
+    [SerializeField] private float glowExpansion = 0.1f;
+    [Tooltip("Size of the solid visual frame extending beyond content (in meters)")]
+    [SerializeField] private float frameMargin = 0.12f; // ~15% extension (Increased from 0.06f)
+    [Tooltip("Size (in meters) the Visual mesh expands beyond Board bounds. Use 0 for same size as Board.")]
+    [Range(0f, 0.3f)]
+    [SerializeField] private float visualExpansion = 0.075f;
     [Tooltip("Overlap amount (in meters) at panel junctions for seamless appearance")]
     [SerializeField] private float junctionOverlap = 0.03f;
     [Tooltip("Content margin ratio (content is inset by this fraction)")]
@@ -74,9 +81,6 @@ public class WorldPanelClusterRig : MonoBehaviour
     [Header("Dynamic Panels")]
     [SerializeField] private List<WorldPanelPlus> _panels = new List<WorldPanelPlus>();
     public List<WorldPanelPlus> panels => _panels;
-
-    [SerializeField, HideInInspector]
-    private List<ClusterPanelVisual> _panelVisuals = new List<ClusterPanelVisual>();
 
     // Track enabled/disabled state per panel (true = enabled, false = disabled)
     private List<bool> _panelEnabledStates = new List<bool>();
@@ -307,13 +311,6 @@ public class WorldPanelClusterRig : MonoBehaviour
         {
             // Hide/show the panel
             panel.SetVisible(enabled);
-
-            // Also handle ClusterPanelVisual if present
-            var visual = panel.GetComponent<ClusterPanelVisual>();
-            if (visual != null)
-            {
-                visual.gameObject.SetActive(enabled);
-            }
         }
 
         // Reposition enabled panels WITHOUT moving the cluster itself
@@ -824,33 +821,10 @@ public class WorldPanelClusterRig : MonoBehaviour
             _flatPlanarVisual = null;
         }
 
-        // Remove any per-panel visuals
-        foreach (var visual in _panelVisuals)
-        {
-            if (visual != null)
-            {
-                if (Application.isPlaying)
-                    Destroy(visual);
-                else
-                    DestroyImmediate(visual);
-            }
-        }
-        _panelVisuals.Clear();
-
-        // Hide individual panel boards and remove per-panel visuals
+        // Hide individual panel boards - curved visual will render content
         foreach (var panel in _panels)
         {
             if (panel == null) continue;
-
-            // Remove ClusterPanelVisual if exists
-            var existingVisual = panel.GetComponent<ClusterPanelVisual>();
-            if (existingVisual != null)
-            {
-                if (Application.isPlaying)
-                    Destroy(existingVisual);
-                else
-                    DestroyImmediate(existingVisual);
-            }
 
             // Hide the panel's board - curved visual will render content
             // Use SetVisible(false) which properly sets boardVisible AND disables renderer/collider
@@ -871,8 +845,12 @@ public class WorldPanelClusterRig : MonoBehaviour
         // Apply colors
         _curvedVisual.SetGlowColors(glowColorA, glowColorB);
         _curvedVisual.SetGlassColors(glassColorA, glassColorB);
-        // Sync corner settings to ensure consistent look with Flat Planar mode
+        // Sync corner & border settings
         _curvedVisual.SetCornerSettings(cornerRadius, edgePadding);
+        _curvedVisual.SetBorderSettings(borderWidth, lightSize);
+        _curvedVisual.SetFrameMargin(frameMargin);
+        _curvedVisual.SetGlowExpansion(glowExpansion);
+        _curvedVisual.SetVisualExpansion(visualExpansion);
     }
 
     /// <summary>
@@ -890,34 +868,6 @@ public class WorldPanelClusterRig : MonoBehaviour
             else
                 DestroyImmediate(_curvedVisual);
             _curvedVisual = null;
-        }
-
-        // Remove any per-panel visuals (ClusterPanelVisual)
-        foreach (var visual in _panelVisuals)
-        {
-            if (visual != null)
-            {
-                if (Application.isPlaying)
-                    Destroy(visual);
-                else
-                    DestroyImmediate(visual);
-            }
-        }
-        _panelVisuals.Clear();
-
-        // Remove ClusterPanelVisual components from panels
-        foreach (var panel in _panels)
-        {
-            if (panel == null) continue;
-            
-            var existingVisual = panel.GetComponent<ClusterPanelVisual>();
-            if (existingVisual != null)
-            {
-                if (Application.isPlaying)
-                    Destroy(existingVisual);
-                else
-                    DestroyImmediate(existingVisual);
-            }
         }
 
         // Hide individual panel boards - unified content layer will render content
@@ -943,72 +893,13 @@ public class WorldPanelClusterRig : MonoBehaviour
         // Apply colors
         _flatPlanarVisual.SetGlowColors(glowColorA, glowColorB);
         _flatPlanarVisual.SetGlassColors(glassColorA, glassColorB);
+        _flatPlanarVisual.SetCornerSettings(cornerRadius, edgePadding); // Ensure Flat Planar also gets settings
+        _flatPlanarVisual.SetBorderSettings(borderWidth, lightSize);
+        _flatPlanarVisual.SetFrameMargin(frameMargin);
+        _flatPlanarVisual.SetGlowExpansion(glowExpansion);
+        _flatPlanarVisual.SetVisualExpansion(visualExpansion);
 
         Debug.Log($"[WorldPanelClusterRig] Applied Flat Planar: unified content layer, boards hidden");
-    }
-
-    /// <summary>
-    /// Apply per-panel visual (original approach with EdgeMask)
-    /// NOTE: This method is kept for backwards compatibility but is no longer used.
-    /// Flat Planar mode now uses ApplyFlatPlanarVisual() with seamless mesh.
-    /// </summary>
-    void ApplyPerPanelVisuals()
-    {
-        // Remove curved visual if present
-        if (_curvedVisual != null)
-        {
-            if (Application.isPlaying)
-                Destroy(_curvedVisual);
-            else
-                DestroyImmediate(_curvedVisual);
-            _curvedVisual = null;
-        }
-
-        _panelVisuals.Clear();
-
-        int count = _panels.Count;
-        for (int i = 0; i < count; i++)
-        {
-            var panel = _panels[i];
-            if (panel == null) continue;
-
-            // Re-enable board visibility (may have been disabled by curved visual mode)
-            // Use SetVisible(true) which properly sets boardVisible AND enables renderer/collider
-            panel.SetVisible(true);
-
-            // Get or add ClusterPanelVisual component
-            var visual = panel.GetComponent<ClusterPanelVisual>();
-            if (visual == null)
-            {
-                visual = panel.gameObject.AddComponent<ClusterPanelVisual>();
-            }
-
-            // Configure position in cluster
-            visual.SetClusterPosition(i, count);
-
-            // Initialize visuals
-            visual.Initialize();
-
-            // Apply custom settings via serialized fields reflection or direct access
-            ApplyVisualSettings(visual);
-
-            _panelVisuals.Add(visual);
-        }
-    }
-
-    /// <summary>
-    /// Apply visual settings from rig to individual panel visual
-    /// </summary>
-    void ApplyVisualSettings(ClusterPanelVisual visual)
-    {
-        if (visual == null) return;
-
-        visual.SetGlowColors(glowColorA, glowColorB);
-        visual.SetGlassColors(glassColorA, glassColorB);
-        visual.SetCornerSettings(cornerRadius, edgePadding);
-        visual.SetGlowExpansion(glowExpansion);
-        visual.SetJunctionOverlap(junctionOverlap);
-        visual.SetContentMargins(contentMarginHorizontal, contentMarginVertical);
     }
 
     /// <summary>
@@ -1024,6 +915,10 @@ public class WorldPanelClusterRig : MonoBehaviour
             _curvedVisual.SetGlowColors(glowColorA, glowColorB);
             _curvedVisual.SetGlassColors(glassColorA, glassColorB);
             _curvedVisual.SetCornerSettings(cornerRadius, edgePadding);
+            _curvedVisual.SetBorderSettings(borderWidth, lightSize);
+            _curvedVisual.SetFrameMargin(frameMargin);
+            _curvedVisual.SetGlowExpansion(glowExpansion);
+            _curvedVisual.SetVisualExpansion(visualExpansion);
             _curvedVisual.UpdateContentTextures();
         }
         else if (!useCurvedVisual && _flatPlanarVisual != null)
@@ -1031,18 +926,11 @@ public class WorldPanelClusterRig : MonoBehaviour
             // Flat Planar mode - update ClusterVisualFlatPlanar
             _flatPlanarVisual.SetGlowColors(glowColorA, glowColorB);
             _flatPlanarVisual.SetGlassColors(glassColorA, glassColorB);
-        }
-        else if (_panelVisuals.Count > 0)
-        {
-            // Fallback: Per-panel visuals (legacy)
-            foreach (var visual in _panelVisuals)
-            {
-                if (visual != null)
-                {
-                    ApplyVisualSettings(visual);
-                    visual.UpdateSize();
-                }
-            }
+            _flatPlanarVisual.SetCornerSettings(cornerRadius, edgePadding);
+            _flatPlanarVisual.SetBorderSettings(borderWidth, lightSize);
+            _flatPlanarVisual.SetFrameMargin(frameMargin);
+            _flatPlanarVisual.SetGlowExpansion(glowExpansion);
+            _flatPlanarVisual.SetVisualExpansion(visualExpansion);
         }
     }
 
@@ -1095,52 +983,6 @@ public class WorldPanelClusterRig : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Rebuild per-panel visuals with updated positions (for Flat Planar mode)
-    /// Called when panels are enabled/disabled to update EdgeMask and gradient mapping
-    /// </summary>
-    void RebuildPerPanelVisuals()
-    {
-        var enabledIndices = GetEnabledPanelIndices();
-        int enabledCount = enabledIndices.Count;
-
-        // Update each enabled panel's visual position
-        for (int i = 0; i < enabledIndices.Count; i++)
-        {
-            int panelIndex = enabledIndices[i];
-            var panel = _panels[panelIndex];
-            if (panel == null) continue;
-
-            var visual = panel.GetComponent<ClusterPanelVisual>();
-            if (visual != null)
-            {
-                // Make sure visual is visible
-                visual.gameObject.SetActive(true);
-                // Reconfigure position in cluster (updates EdgeMask)
-                visual.SetClusterPosition(i, enabledCount);
-                visual.UpdateSize();
-            }
-        }
-
-        // Make sure disabled panels' visuals are hidden
-        for (int i = 0; i < _panels.Count; i++)
-        {
-            bool isEnabled = i < _panelEnabledStates.Count ? _panelEnabledStates[i] : true;
-            if (!isEnabled)
-            {
-                var panel = _panels[i];
-                if (panel != null)
-                {
-                    var visual = panel.GetComponent<ClusterPanelVisual>();
-                    if (visual != null)
-                    {
-                        visual.gameObject.SetActive(false);
-                    }
-                }
-            }
-        }
-    }
-
     void KillChildren()
     {
         // Cleanup curved visual
@@ -1173,7 +1015,6 @@ public class WorldPanelClusterRig : MonoBehaviour
             Destroy(transform.GetChild(i).gameObject);
 #endif
         _panels.Clear();
-        _panelVisuals.Clear();
     }
 
 #if UNITY_EDITOR
@@ -1182,6 +1023,12 @@ public class WorldPanelClusterRig : MonoBehaviour
         if (_panels.Count > 0)
         {
             LayoutFromCamera();
+        }
+
+        // Auto-refresh visuals when inspector values change
+        if (enableClusterVisuals)
+        {
+            RefreshClusterVisuals();
         }
     }
 #endif

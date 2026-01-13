@@ -21,7 +21,9 @@ public static class FlatPlanarMeshGenerator
         int foldSegments = 6,
         int verticalSegments = 2,
         float contentMarginH = 0.04f,
-        float contentMarginV = 0.045f)
+        float contentMarginV = 0.045f,
+        float gapMeters = 0f,
+        float overlapMeters = 0f)
     {
         if (panelCount < 1) panelCount = 1;
         if (panelCount > 3) panelCount = 3;
@@ -35,11 +37,14 @@ public static class FlatPlanarMeshGenerator
         float halfBoardHeight = boardHeight / 2f;
 
         // Yaw angle per panel (matches WorldPanelClusterRig positioning)
+        // Must include gap and overlap to match exact panel positions!
         float boardAngleRad = 2f * Mathf.Atan(boardWidth / 2f / arcRadius);
-        float boardAngleDeg = boardAngleRad * Mathf.Rad2Deg;
+        float gapAngleRad = 2f * Mathf.Atan(gapMeters / 2f / arcRadius);
+        float overlapAngleRad = 2f * Mathf.Atan(overlapMeters / 2f / arcRadius);
+        float angleDeg = (boardAngleRad + gapAngleRad - overlapAngleRad) * Mathf.Rad2Deg;
 
         // Get panel yaw angles based on FixedThreeSlot layout
-        float[] panelYaws = GetPanelYaws(panelCount, boardAngleDeg);
+        float[] panelYaws = GetPanelYaws(panelCount, angleDeg);
 
         // Build mesh data
         List<Vector3> vertices = new List<Vector3>();
@@ -231,7 +236,9 @@ public static class FlatPlanarMeshGenerator
         int foldSegments = 6,
         int verticalSegments = 2,
         float contentMarginH = 0.04f,
-        float contentMarginV = 0.045f)
+        float contentMarginV = 0.045f,
+        float gapMeters = 0f,
+        float overlapMeters = 0f)
     {
         if (panelCount < 1) panelCount = 1;
         if (panelCount > 3) panelCount = 3;
@@ -247,10 +254,13 @@ public static class FlatPlanarMeshGenerator
         float halfBaseBoardWidth = baseBoardWidth / 2f;
 
         // Yaw angle per panel (use original dimensions for positioning)
+        // Must include gap and overlap to match exact panel positions!
         float boardAngleRad = 2f * Mathf.Atan(baseBoardWidth / 2f / arcRadius);
-        float boardAngleDeg = boardAngleRad * Mathf.Rad2Deg;
+        float gapAngleRad = 2f * Mathf.Atan(gapMeters / 2f / arcRadius);
+        float overlapAngleRad = 2f * Mathf.Atan(overlapMeters / 2f / arcRadius);
+        float angleDeg = (boardAngleRad + gapAngleRad - overlapAngleRad) * Mathf.Rad2Deg;
 
-        float[] panelYaws = GetPanelYaws(panelCount, boardAngleDeg);
+        float[] panelYaws = GetPanelYaws(panelCount, angleDeg);
 
         List<Vector3> vertices = new List<Vector3>();
         List<Vector3> normals = new List<Vector3>();
