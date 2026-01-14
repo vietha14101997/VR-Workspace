@@ -1596,9 +1596,11 @@ public class RTTManager : MonoBehaviour
             case RTTAppRegistry.AppType.Remote:
                 CreateRemoteMenuContent(instance);
                 break;
+            case RTTAppRegistry.AppType.Files:
+                CreateFilesMenuContent(instance);
+                break;
             case RTTAppRegistry.AppType.Browser:
             case RTTAppRegistry.AppType.Media:
-            case RTTAppRegistry.AppType.Files:
             case RTTAppRegistry.AppType.Settings:
                 Debug.Log($"[RTTManager] {appType} app not yet implemented");
                 break;
@@ -1634,6 +1636,33 @@ public class RTTManager : MonoBehaviour
 
         var containerSize = instance.Frame.GetContentSize();
 
+        instance.MenuContent = controller.CreateMenu(
+            instance.Frame.ContentContainer,
+            containerSize.x,
+            containerSize.y,
+            primaryFont,
+            PrimaryColor,
+            AccentColor
+        );
+
+        instance.Controller = controller;
+        controller.OnBackClicked += () => CloseApp(instance.AppId);
+
+        instance.Frame.MarkDirty();
+    }
+
+    private void CreateFilesMenuContent(RTTAppInstance instance)
+    {
+        Debug.Log($"[RTTManager] Creating FileManager content...");
+
+        // Create controller
+        GameObject controllerObj = new GameObject($"FileManagerController_{instance.AppId}");
+        controllerObj.transform.SetParent(this.transform);
+        var controller = controllerObj.AddComponent<RTTFileManagerController>();
+
+        var containerSize = instance.Frame.GetContentSize();
+
+        // Create View via Controller
         instance.MenuContent = controller.CreateMenu(
             instance.Frame.ContentContainer,
             containerSize.x,
