@@ -99,6 +99,15 @@ public class RTTFileManagerController : MonoBehaviour
         
         UpdateView(true); // true = full reload
         UpdateDetailView(); // Update detail to show current folder
+        _view.UpdateBreadcrumbs(_currentPath);
+    }
+
+    public void RefreshCurrentFolder()
+    {
+        Debug.Log("[Controller] Refreshing current folder...");
+        // Reload files (Mock logic: just re-fetch)
+        _currentDirectoryFiles = MockDataService.GetFiles(_currentPath);
+        SearchFiles(_currentSearchQuery); // Re-apply search/filter
     }
     
     /// <summary>

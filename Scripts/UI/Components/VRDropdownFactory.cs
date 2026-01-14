@@ -80,7 +80,7 @@ public static class VRDropdownFactory
         public string layerName = "VirtualObjects";
 
         // Tính chiều cao box từ font size
-        public float BoxHeight => valueFontSize * FONT_TO_BOX_RATIO;
+        public float BoxHeight => valueFontSize * (string.IsNullOrEmpty(label) ? 1.8f : FONT_TO_BOX_RATIO);
 
         // Tính icon size từ font size
         public float IconSize => valueFontSize * FONT_TO_ICON_RATIO * 0.95f;
@@ -437,6 +437,7 @@ public static class VRDropdownFactory
         cRT.offsetMax = Vector2.zero;
 
         bool hasIcon = config.icon != null;
+        bool hasLabel = !string.IsNullOrEmpty(config.label);
         float iconSize = config.IconSize;
 
         // Layout: 1/3 trái cho icon, 2/3 phải cho content
@@ -461,7 +462,7 @@ public static class VRDropdownFactory
             iconRT.anchorMin = new Vector2(0.5f, 0.5f);
             iconRT.anchorMax = new Vector2(0.5f, 0.5f);
             iconRT.pivot = new Vector2(0.5f, 0.5f);
-            iconRT.anchoredPosition = new Vector2(0, iconSize * 0.06f);
+            iconRT.anchoredPosition = new Vector2(0, hasLabel ? iconSize * 0.06f : 0); // Center if no label
             iconRT.sizeDelta = new Vector2(iconSize, iconSize);
 
             Image iconImg = iconObj.AddComponent<Image>();
@@ -505,35 +506,50 @@ public static class VRDropdownFactory
         contentZoneRT.offsetMin = new Vector2(CONTENT_PADDING, 0f);
         contentZoneRT.offsetMax = new Vector2(-CONTENT_PADDING, 0f);
 
-        // Nửa trên: Title (Label) - đẩy lên trên để cách xa value
-        GameObject labelObj = new GameObject("Label");
-        labelObj.transform.SetParent(contentZone.transform, false);
-        RectTransform labelRT = labelObj.AddComponent<RectTransform>();
-        labelRT.anchorMin = new Vector2(0f, 0.55f);
-        labelRT.anchorMax = new Vector2(1f, 1f);
-        labelRT.offsetMin = new Vector2(0f, 0f);
-        labelRT.offsetMax = new Vector2(0f, -8f);
+        if (hasLabel)
+        {
+            // Nửa trên: Title (Label) - đẩy lên trên để cách xa value
+            GameObject labelObj = new GameObject("Label");
+            labelObj.transform.SetParent(contentZone.transform, false);
+            RectTransform labelRT = labelObj.AddComponent<RectTransform>();
+            labelRT.anchorMin = new Vector2(0f, 0.55f);
+            labelRT.anchorMax = new Vector2(1f, 1f);
+            labelRT.offsetMin = new Vector2(0f, 0f);
+            labelRT.offsetMax = new Vector2(0f, -8f);
 
-        TextMeshProUGUI labelTxt = labelObj.AddComponent<TextMeshProUGUI>();
-        labelTxt.text = config.label;
-        labelTxt.fontSize = config.labelFontSize;
-        labelTxt.color = new Color(1f, 1f, 1f, 1f);
-        labelTxt.alignment = TextAlignmentOptions.BottomLeft;
-        labelTxt.verticalAlignment = VerticalAlignmentOptions.Bottom;
-        labelTxt.fontStyle = FontStyles.Bold;
-        labelTxt.raycastTarget = false;
-        labelTxt.enableWordWrapping = false;
-        labelTxt.overflowMode = TextOverflowModes.Ellipsis;
-        if (config.font != null) labelTxt.font = config.font;
+            TextMeshProUGUI labelTxt = labelObj.AddComponent<TextMeshProUGUI>();
+            labelTxt.text = config.label;
+            labelTxt.fontSize = config.labelFontSize;
+            labelTxt.color = new Color(1f, 1f, 1f, 1f);
+            labelTxt.alignment = TextAlignmentOptions.BottomLeft;
+            labelTxt.verticalAlignment = VerticalAlignmentOptions.Bottom;
+            labelTxt.fontStyle = FontStyles.Bold;
+            labelTxt.raycastTarget = false;
+            labelTxt.enableWordWrapping = false;
+            labelTxt.overflowMode = TextOverflowModes.Ellipsis;
+            if (config.font != null) labelTxt.font = config.font;
+        }
 
-        // Nửa dưới: Container cho Value + Arrow - đẩy xuống để cách xa label
+        // Nửa dưới (hoặc Full nếu no label): Container cho Value + Arrow
         GameObject bottomRow = new GameObject("BottomRow");
         bottomRow.transform.SetParent(contentZone.transform, false);
         RectTransform bottomRowRT = bottomRow.AddComponent<RectTransform>();
-        bottomRowRT.anchorMin = Vector2.zero;
-        bottomRowRT.anchorMax = new Vector2(1f, 0.45f);
-        bottomRowRT.offsetMin = new Vector2(0f, 8f);
-        bottomRowRT.offsetMax = new Vector2(0f, 0f);
+        
+        if (hasLabel)
+        {
+            bottomRowRT.anchorMin = Vector2.zero;
+            bottomRowRT.anchorMax = new Vector2(1f, 0.45f);
+            bottomRowRT.offsetMin = new Vector2(0f, 8f);
+            bottomRowRT.offsetMax = new Vector2(0f, 0f);
+        }
+        else
+        {
+            // Full height, centered
+            bottomRowRT.anchorMin = Vector2.zero;
+            bottomRowRT.anchorMax = Vector2.one;
+            bottomRowRT.offsetMin = Vector2.zero;
+            bottomRowRT.offsetMax = Vector2.zero;
+        }
 
         // Value text - chiếm hầu hết nửa dưới, chừa chỗ cho arrow
         GameObject valueObj = new GameObject("Value");
@@ -549,21 +565,42 @@ public static class VRDropdownFactory
         valueTxt.text = defaultValue;
         valueTxt.fontSize = config.valueFontSize;
         valueTxt.color = Color.white;
-        // valueTxt.fontStyle = FontStyles.Bold;
-        valueTxt.alignment = TextAlignmentOptions.Left;
-        valueTxt.verticalAlignment = VerticalAlignmentOptions.Top;
+        valueTxt.fontStyle = FontStyles.Bold;
+        if (hasLabel)
+        {
+            valueTxt.alignment = TextAlignmentOptions.Left;
+            valueTxt.verticalAlignment = VerticalAlignmentOptions.Top;
+        }
+        else
+        {
+            valueTxt.alignment = TextAlignmentOptions.Left;
+            valueTxt.verticalAlignment = VerticalAlignmentOptions.Middle;
+        }
         valueTxt.raycastTarget = false;
         valueTxt.enableWordWrapping = false;
         valueTxt.overflowMode = TextOverflowModes.Ellipsis;
         if (config.font != null) valueTxt.font = config.font;
 
-        // Arrow indicator - cố định ở cạnh phải, sát cạnh trên của BottomRow
+        // Arrow indicator - cố định ở cạnh phải
         GameObject arrowObj = new GameObject("Arrow");
         arrowObj.transform.SetParent(bottomRow.transform, false);
         RectTransform arrowRT = arrowObj.AddComponent<RectTransform>();
-        arrowRT.anchorMin = new Vector2(1f, 1f);
-        arrowRT.anchorMax = new Vector2(1f, 1f);
-        arrowRT.pivot = new Vector2(1f, 1f);
+        
+        if (hasLabel)
+        {
+            // Top-right alignment for 2-row layout
+            arrowRT.anchorMin = new Vector2(1f, 1f);
+            arrowRT.anchorMax = new Vector2(1f, 1f);
+            arrowRT.pivot = new Vector2(1f, 1f);
+        }
+        else
+        {
+            // Middle-right alignment for single-row layout
+            arrowRT.anchorMin = new Vector2(1f, 0.5f);
+            arrowRT.anchorMax = new Vector2(1f, 0.5f);
+            arrowRT.pivot = new Vector2(1f, 0.5f);
+        }
+        
         arrowRT.anchoredPosition = Vector2.zero;
         arrowRT.sizeDelta = new Vector2(ARROW_WIDTH, 0f);
 
@@ -625,11 +662,15 @@ public static class VRDropdownFactory
         int visibleCount = Mathf.Min(config.options.Count, config.maxVisibleOptions);
         float panelHeight = visibleCount * optionHeight + 20f;
 
-        panelRT.anchorMin = new Vector2(0f, 0f);
-        panelRT.anchorMax = new Vector2(1f, 0f);
+        panelRT.anchorMin = new Vector2(0.5f, 0f);
+        panelRT.anchorMax = new Vector2(0.5f, 0f);
         panelRT.pivot = new Vector2(0.5f, 1f);
-        panelRT.anchoredPosition = new Vector2(0, -25f);
-        panelRT.sizeDelta = new Vector2(0, panelHeight);
+        panelRT.anchoredPosition = new Vector2(0, -15f); // Reduced gap slightly
+        
+        // Ensure panel is wide enough for options (e.g. "Date Modified")
+        // Even if the button is narrow (220f).
+        float panelWidth = Mathf.Max(config.width, 320f); 
+        panelRT.sizeDelta = new Vector2(panelWidth, panelHeight);
 
         // Add Canvas FIRST to handle sorting without breaking VR raycast
         Canvas panelCanvas = panel.AddComponent<Canvas>();
@@ -1161,7 +1202,7 @@ public static class VRDropdownFactory
         }
     }
 
-    private static Sprite GetPixelSprite()
+    public static Sprite GetPixelSprite()
     {
         if (_pixelSprite != null) return _pixelSprite;
         Texture2D tex = new Texture2D(2, 2);
@@ -1172,9 +1213,10 @@ public static class VRDropdownFactory
     }
 
     /// <summary>
-    /// Tạo sprite mũi tên xuống màu trắng để có thể tint với bất kỳ màu nào
+    /// Tạo sprite mũi tên xuống màu trắng để có thể tint với bất kỳ màu nào.
+    /// Public to allow reuse by other dropdown-like UI components.
     /// </summary>
-    private static Sprite GetArrowSprite()
+    public static Sprite GetArrowSprite()
     {
         if (_arrowSprite != null) return _arrowSprite;
 
