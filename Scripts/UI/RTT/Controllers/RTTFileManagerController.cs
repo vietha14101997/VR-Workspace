@@ -30,7 +30,7 @@ public class RTTFileManagerController : MonoBehaviour
     private MockFile? _hoveredFile = null;
     
     private int _currentPage = 1;
-    private int _pageSize = 10; // 2 Rows x 5 Cols
+    private int _pageSize = 15; // 3 Rows x 5 Cols (15 items)
     #endregion
 
     #region Public API
@@ -136,10 +136,7 @@ public class RTTFileManagerController : MonoBehaviour
     
     public void ChangePage(int delta)
     {
-        // Calculate total pages based on FILTERED count
-        int totalFiles = _filteredFiles.Count;
-        int totalPages = Mathf.CeilToInt((float)totalFiles / _pageSize);
-        if (totalPages < 1) totalPages = 1;
+        int totalPages = CalculateTotalPages();
         
         int newPage = _currentPage + delta;
         
@@ -152,9 +149,7 @@ public class RTTFileManagerController : MonoBehaviour
 
     public void GoToPage(int pageNumber)
     {
-        int totalFiles = _filteredFiles.Count;
-        int totalPages = Mathf.CeilToInt((float)totalFiles / _pageSize);
-        if (totalPages < 1) totalPages = 1;
+        int totalPages = CalculateTotalPages();
 
         if (pageNumber >= 1 && pageNumber <= totalPages)
         {
@@ -163,12 +158,20 @@ public class RTTFileManagerController : MonoBehaviour
         }
     }
 
+    private int CalculateTotalPages()
+    {
+        int totalFiles = _filteredFiles.Count;
+        if (totalFiles == 0) return 1;
+        int size = Mathf.Max(1, _pageSize);
+        return Mathf.CeilToInt((float)totalFiles / size);
+    }
+
     private void UpdateView(bool fullReload)
     {
         // Calculate pages logic
         int totalFiles = _filteredFiles.Count;
-        int totalPages = Mathf.CeilToInt((float)totalFiles / _pageSize);
-        if (totalPages < 1) totalPages = 1;
+        int totalPages = CalculateTotalPages();
+        Debug.Log($"[RTTFileManagerController] UpdateView: Total Files={totalFiles}, PageSize={_pageSize}, CalcPages={totalPages}");
         
         // Clamp page
         _currentPage = Mathf.Clamp(_currentPage, 1, totalPages);
@@ -182,6 +185,7 @@ public class RTTFileManagerController : MonoBehaviour
             }
             
             // Update Pagination state
+            Debug.Log($"[RTTFileManagerController] Calling UpdatePagination: Current={_currentPage}, Total={totalPages}");
             _view.UpdatePagination(_currentPage, totalPages);
             
             // Scroll grid to current page row

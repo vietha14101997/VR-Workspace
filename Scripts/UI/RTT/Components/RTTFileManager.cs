@@ -107,14 +107,14 @@ public class RTTFileManager : MonoBehaviour
     {
         if (_menuFrame == null) return;
 
-        // 1. Setup Center Grid (Main Frame Content)
-        StartCoroutine(CreateCenterGrid());
+        // 1. Create Pagination (Phase 4) - Create first to ensure it's ready for invalidation in OnViewReady
+        CreatePagination();
 
         // 2. Create Side Panels
         CreateSidePanels();
 
-        // 3. Create Pagination (Phase 4)
-        CreatePagination();
+        // 3. Setup Center Grid (Main Frame Content)
+        StartCoroutine(CreateCenterGrid());
     }
     
     private void CreatePagination()
