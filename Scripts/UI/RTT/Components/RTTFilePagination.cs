@@ -48,11 +48,18 @@ public class RTTFilePagination : RTTCanvasBase
     #endregion
     
     #region Lifecycle
+    private bool _initialized = false;
+    private Coroutine _fadeCoroutine = null;
+    private const float FADE_DURATION = 0.15f; // Match RTTManager's transitionInDuration
+
     public void Initialize(RTTFileManagerController controller, Transform targetFrame)
     {
+        // CRITICAL: Disable object BEFORE creating any visuals to prevent flicker
+        gameObject.SetActive(false);
+
         _controller = controller;
         followTarget = targetFrame;
-        
+
         // Width Calculation: 4/3 of target RTTMiniFrame width
         if (targetFrame != null)
         {
@@ -64,20 +71,122 @@ public class RTTFilePagination : RTTCanvasBase
                 buttonSize = targetMiniFrame.ButtonSize; // Sync button size
             }
         }
-        
+
         // Initial setup
         worldWidth = frameWidth * PixelToMeter;
         worldHeight = frameHeight * PixelToMeter;
-        
-        // Initial build
+
+        // Build UI while object is inactive (won't render)
         ResizeRenderTexture((int)frameWidth, (int)frameHeight);
         RebuildUI();
-        
-        // Ensure some initial state
         UpdateDisplay();
-        
-        // Ensure visible
+
+        // Set initial alpha to 0 for fade-in animation
+        SetQuadAlpha(0f);
+
+        _initialized = true;
+        // Object stays inactive until Show() is called
+    }
+
+    public void Show()
+    {
+        // Cancel any pending fade
+        if (_fadeCoroutine != null)
+        {
+            StopCoroutine(_fadeCoroutine);
+            _fadeCoroutine = null;
+        }
+
+        // Ensure alpha is 0 before activating to prevent any flash
+        SetQuadAlpha(0f);
+
         gameObject.SetActive(true);
+
+        // Re-apply alpha=0 after activation (in case OnEnable changed it)
+        SetQuadAlpha(0f);
+
+        // Fade in with animation
+        _fadeCoroutine = StartCoroutine(FadeIn());
+    }
+
+    private System.Collections.IEnumerator FadeIn()
+    {
+        // No delay - fade in together with the frame for synchronized appearance
+        float elapsed = 0f;
+
+        while (elapsed < FADE_DURATION)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / FADE_DURATION);
+            // Ease out for smooth appearance
+            float alpha = 1f - Mathf.Pow(1f - t, 2f);
+            SetQuadAlpha(alpha);
+            yield return null;
+        }
+
+        SetQuadAlpha(1f);
+        _fadeCoroutine = null;
+    }
+
+    private System.Collections.IEnumerator FadeOut()
+    {
+        float elapsed = 0f;
+        float startAlpha = GetQuadAlpha();
+
+        while (elapsed < FADE_DURATION)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / FADE_DURATION);
+            float alpha = Mathf.Lerp(startAlpha, 0f, t);
+            SetQuadAlpha(alpha);
+            yield return null;
+        }
+
+        SetQuadAlpha(0f);
+        gameObject.SetActive(false);
+        _fadeCoroutine = null;
+    }
+
+    private void SetQuadAlpha(float alpha)
+    {
+        var quad = GetDisplayQuad();
+        if (quad != null && quad.material != null)
+        {
+            Color c = quad.material.color;
+            c.a = alpha;
+            quad.material.color = c;
+        }
+    }
+
+    private float GetQuadAlpha()
+    {
+        var quad = GetDisplayQuad();
+        if (quad != null && quad.material != null)
+        {
+            return quad.material.color.a;
+        }
+        return 1f;
+    }
+
+    public void Hide()
+    {
+        // Cancel any pending fade
+        if (_fadeCoroutine != null)
+        {
+            StopCoroutine(_fadeCoroutine);
+            _fadeCoroutine = null;
+        }
+
+        // Fade out with animation
+        if (gameObject.activeInHierarchy)
+        {
+            _fadeCoroutine = StartCoroutine(FadeOut());
+        }
+        else
+        {
+            SetQuadAlpha(0f);
+            gameObject.SetActive(false);
+        }
     }
     
     protected override void OnDestroy()

@@ -312,23 +312,64 @@ public static class FileSystemService
         {
             if (string.IsNullOrEmpty(_rootPath))
             {
-                // Determine root path based on platform
-#if UNITY_ANDROID && !UNITY_EDITOR
-                // Android external storage
-                _rootPath = "/sdcard";
-#elif UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
-                // Windows - use user's home directory
-                _rootPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-#elif UNITY_STANDALONE_OSX || UNITY_EDITOR_OSX
-                // macOS - use user's home directory
-                _rootPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-#else
-                // Fallback to persistent data path
-                _rootPath = Application.persistentDataPath;
-#endif
+                _rootPath = GetPlatformRootPath();
+                Debug.Log($"[FileSystemService] Root path set to: {_rootPath}");
             }
             return _rootPath;
         }
+    }
+
+    private static string GetPlatformRootPath()
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        // Android - Get internal storage path via Android API
+        try
+        {
+            using (AndroidJavaClass environment = new AndroidJavaClass("android.os.Environment"))
+            {
+                // Get external storage directory (shared storage accessible to user)
+                using (AndroidJavaObject externalDir = environment.CallStatic<AndroidJavaObject>("getExternalStorageDirectory"))
+                {
+                    string path = externalDir.Call<string>("getAbsolutePath");
+                    if (!string.IsNullOrEmpty(path) && Directory.Exists(path))
+                    {
+                        return path;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[FileSystemService] Failed to get Android storage path: {ex.Message}");
+        }
+
+        // Fallback for Android - try common paths
+        string[] androidPaths = new string[]
+        {
+            "/storage/emulated/0",  // Primary internal storage
+            "/sdcard",               // Legacy path (symlink)
+            Application.persistentDataPath
+        };
+
+        foreach (string path in androidPaths)
+        {
+            if (Directory.Exists(path))
+            {
+                return path;
+            }
+        }
+
+        return Application.persistentDataPath;
+#elif UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+        // Windows - use user's home directory
+        return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+#elif UNITY_STANDALONE_OSX || UNITY_EDITOR_OSX
+        // macOS - use user's home directory
+        return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+#else
+        // Fallback to persistent data path
+        return Application.persistentDataPath;
+#endif
     }
 
     public static string GetAbsolutePath(string relativePath)

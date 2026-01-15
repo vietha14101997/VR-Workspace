@@ -23,10 +23,13 @@ public class RTTFileManager : MonoBehaviour
     private RTTMenuFrame _menuFrame; // Main Center Frame (Parent)
     private RTTMenuFrame _leftFrame;
     private RTTMenuFrame _rightFrame;
-    
+
     private RTTFileSidePanel _sidePanel;
     private RTTFileGrid _fileGrid;
     private RTTFilePagination _pagination;
+
+    // Flag to track if initial setup is complete (used to prevent premature Show in OnEnable)
+    private bool _viewReady = false;
     #endregion
 
     #region Initialization
@@ -80,6 +83,9 @@ public class RTTFileManager : MonoBehaviour
     
     public void Cleanup()
     {
+        // Reset state for potential recreation
+        _viewReady = false;
+
         // Destroy side panels when main app is closed
         if (_leftFrame != null) Destroy(_leftFrame.gameObject);
         if (_rightFrame != null) Destroy(_rightFrame.gameObject);
@@ -88,10 +94,13 @@ public class RTTFileManager : MonoBehaviour
     
     private void OnEnable()
     {
-        // Restore visibility of external components when this view is re-enabled
+        // Only restore external components after initial setup is complete (app switching)
+        // During initial setup, CreateCenterGrid() handles showing pagination
+        if (!_viewReady) return;
+
         if (_leftFrame != null) _leftFrame.gameObject.SetActive(true);
         if (_rightFrame != null) _rightFrame.gameObject.SetActive(true);
-        if (_pagination != null) _pagination.gameObject.SetActive(true);
+        if (_pagination != null) _pagination.Show();
     }
 
     private void OnDisable()
@@ -99,7 +108,7 @@ public class RTTFileManager : MonoBehaviour
         // Hide external components when this view is disabled (e.g. app switch)
         if (_leftFrame != null) _leftFrame.gameObject.SetActive(false);
         if (_rightFrame != null) _rightFrame.gameObject.SetActive(false);
-        if (_pagination != null) _pagination.gameObject.SetActive(false);
+        if (_pagination != null) _pagination.Hide();
     }
 
     private void OnDestroy()
@@ -255,7 +264,16 @@ public class RTTFileManager : MonoBehaviour
         // Render Order
         headerObj.transform.SetAsLastSibling();
         bodyObj.transform.SetAsFirstSibling();
-        
+
+        // Show pagination now that the main view is ready
+        if (_pagination != null)
+        {
+            _pagination.Show();
+        }
+
+        // Mark setup complete - enables OnEnable/OnDisable to manage visibility for app switching
+        _viewReady = true;
+
         _controller.OnViewReady();
     }
 
