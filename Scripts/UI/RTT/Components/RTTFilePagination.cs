@@ -52,6 +52,18 @@ public class RTTFilePagination : RTTCanvasBase
     private Coroutine _fadeCoroutine = null;
     private const float FADE_DURATION = 0.15f; // Match RTTManager's transitionInDuration
 
+    protected override void OnEnable()
+    {
+        base.OnEnable();
+
+        // CRITICAL: If Show() was NOT called, this OnEnable is from app switching
+        // Force alpha to 0 immediately to prevent flash before fade animation starts
+        if (_initialized)
+        {
+            SetQuadAlpha(0f);
+        }
+    }
+
     public void Initialize(RTTFileManagerController controller, Transform targetFrame)
     {
         // CRITICAL: Disable object BEFORE creating any visuals to prevent flicker
@@ -97,23 +109,23 @@ public class RTTFilePagination : RTTCanvasBase
             _fadeCoroutine = null;
         }
 
-        // Ensure alpha is 0 before activating to prevent any flash
+        // CRITICAL: Set alpha to 0 BEFORE activating to prevent flash
+        // This handles the case where object is already active (OnEnable won't fire)
         SetQuadAlpha(0f);
 
+        // Activate the object
         gameObject.SetActive(true);
 
-        // Re-apply alpha=0 after activation (in case OnEnable changed it)
+        // Double-check alpha is 0 after activation (in case OnEnable changed something)
         SetQuadAlpha(0f);
 
-        // Fade in with animation
+        // Start fade in animation
         _fadeCoroutine = StartCoroutine(FadeIn());
     }
 
     private System.Collections.IEnumerator FadeIn()
     {
-        // No delay - fade in together with the frame for synchronized appearance
         float elapsed = 0f;
-
         while (elapsed < FADE_DURATION)
         {
             elapsed += Time.deltaTime;
@@ -125,25 +137,6 @@ public class RTTFilePagination : RTTCanvasBase
         }
 
         SetQuadAlpha(1f);
-        _fadeCoroutine = null;
-    }
-
-    private System.Collections.IEnumerator FadeOut()
-    {
-        float elapsed = 0f;
-        float startAlpha = GetQuadAlpha();
-
-        while (elapsed < FADE_DURATION)
-        {
-            elapsed += Time.deltaTime;
-            float t = Mathf.Clamp01(elapsed / FADE_DURATION);
-            float alpha = Mathf.Lerp(startAlpha, 0f, t);
-            SetQuadAlpha(alpha);
-            yield return null;
-        }
-
-        SetQuadAlpha(0f);
-        gameObject.SetActive(false);
         _fadeCoroutine = null;
     }
 
@@ -177,16 +170,10 @@ public class RTTFilePagination : RTTCanvasBase
             _fadeCoroutine = null;
         }
 
-        // Fade out with animation
-        if (gameObject.activeInHierarchy)
-        {
-            _fadeCoroutine = StartCoroutine(FadeOut());
-        }
-        else
-        {
-            SetQuadAlpha(0f);
-            gameObject.SetActive(false);
-        }
+        // Immediately hide - no fade out to prevent race conditions during app switching
+        // The frame transition already handles visual continuity
+        SetQuadAlpha(0f);
+        gameObject.SetActive(false);
     }
     
     protected override void OnDestroy()

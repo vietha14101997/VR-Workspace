@@ -265,13 +265,9 @@ public class RTTFileManager : MonoBehaviour
         headerObj.transform.SetAsLastSibling();
         bodyObj.transform.SetAsFirstSibling();
 
-        // Show pagination now that the main view is ready
-        if (_pagination != null)
-        {
-            _pagination.Show();
-        }
-
         // Mark setup complete - enables OnEnable/OnDisable to manage visibility for app switching
+        // NOTE: Do NOT show pagination here - it will be shown by OnEnable() when the frame is actually displayed
+        // During preparation, the frame is at +1000 units but pagination is at normal position (near taskbar)
         _viewReady = true;
 
         _controller.OnViewReady();
