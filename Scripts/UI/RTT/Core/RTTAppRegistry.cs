@@ -245,14 +245,14 @@ public class RTTAppRegistry : ScriptableObject
             },
             new AppDefinition
             {
-                id = "files",
-                displayName = "Files",
+                id = "folder",
+                displayName = "File Manager",
                 menuPosition = 3,
                 useThemeColor = false,
                 customColor = new Color(0.76f, 0.36f, 1f),
                 isEnabled = true,
                 appType = AppType.Files,
-                description = "File manager"
+                description = "File Manager"
             },
             new AppDefinition
             {

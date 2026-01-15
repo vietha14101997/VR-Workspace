@@ -137,9 +137,9 @@ public static class VRButtonFactory
         public float cornerRadius = 0.12f;
         public float edgePadding = 0.06f;  // Match Space key value for Android compatibility
         public float backgroundAlpha = 0.08f;
-        public float borderWidth = 0.005f;
-        public float glowWidth = 0.03f;
-        public float glowIntensity = 2.5f;
+        public float borderWidth = 0.035f; // Increased 40% (was 0.025f)
+        public float glowWidth = 0.06f;    // Wider glow
+        public float glowIntensity = 3.5f; // Brighter glow
 
         // Animation
         public float popAmount = 0.05f;
@@ -350,7 +350,7 @@ public static class VRButtonFactory
             font = font,
             textOnly = true,
             enablePulse = enablePulse,
-            glowIntensity = enablePulse ? 5f : 2.5f,
+            glowIntensity = enablePulse ? 5f : 3.5f,
             popAmount = 0.05f
         };
         return CreateButton(parent, config, onClick);
@@ -376,7 +376,7 @@ public static class VRButtonFactory
             iconSize = iconSize,
             iconPadding = 28f,
             backgroundAlpha = 0.28f,
-            borderWidth = 0.03f,
+            borderWidth = 0.042f, // Increased 40% (was 0.03f)
             popAmount = 0.0125f
         };
         return CreateButton(parent, config, onClick);
@@ -464,7 +464,7 @@ public static class VRButtonFactory
 
             // Border settings
             mat.SetFloat("_EdgePadding", config.edgePadding);
-            mat.SetFloat("_BorderWidth", 0.02f);
+            mat.SetFloat("_BorderWidth", 0.028f); // Increased 40% (was 0.02f)
             mat.SetFloat("_CornerRadius", config.cornerRadius);
             mat.SetFloat("_Aspect", aspect);
 

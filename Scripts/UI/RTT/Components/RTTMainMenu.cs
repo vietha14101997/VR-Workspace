@@ -84,7 +84,7 @@ public class RTTMainMenu : MonoBehaviour
 
         menuItems.Add(new RTTMenuItem("remote", "Remote Desktop", null, cyan));
         menuItems.Add(new RTTMenuItem("media", "Media", null, purple));
-        menuItems.Add(new RTTMenuItem("files", "Files", null, cyan));
+        menuItems.Add(new RTTMenuItem("folder", "File Manager", null, cyan));
         menuItems.Add(new RTTMenuItem("settings", "Settings", null, purple));
         menuItems.Add(new RTTMenuItem("quit", "Quit", null, cyan));
     }
