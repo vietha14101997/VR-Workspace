@@ -238,12 +238,12 @@ public class RTTFilePagination : RTTCanvasBase
              _glassMaterial.SetFloat("_EdgePadding", 0.0f);
              _glassMaterial.SetFloat("_Aspect", frameWidth / frameHeight);
              
-             // Colors and Parameters
-             _glassMaterial.SetColor("_ColorA", new Color(0.0f, 0.55f, 0.65f, 0.35f));
-             _glassMaterial.SetColor("_ColorB", new Color(0.30f, 0.12f, 0.50f, 0.32f));
-             
+             // Colors and Parameters - Brighter to match MenuFrame/MiniFrame
+             _glassMaterial.SetColor("_ColorA", new Color(0.15f, 0.65f, 0.75f, 0.28f));
+             _glassMaterial.SetColor("_ColorB", new Color(0.40f, 0.22f, 0.60f, 0.25f));
+
              _glassMaterial.SetFloat("_CyanRatio", 0.7f);
-             _glassMaterial.SetFloat("_GlassAlpha", 0.65f);
+             _glassMaterial.SetFloat("_GlassAlpha", 0.55f);
              _glassMaterial.SetFloat("_FresnelPower", 2.2f);
              _glassMaterial.SetFloat("_FresnelStrength", 0.12f);
              
