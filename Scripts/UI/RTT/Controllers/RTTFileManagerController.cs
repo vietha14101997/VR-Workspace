@@ -1,6 +1,7 @@
 using UnityEngine;
 using System;
 using System.Collections.Generic;
+using System.IO;
 
 /// <summary>
 /// Controller for the File Manager app.
@@ -24,13 +25,17 @@ public class RTTFileManagerController : MonoBehaviour
     private List<MockFile> _currentDirectoryFiles = new List<MockFile>();
     private List<MockFile> _filteredFiles = new List<MockFile>();
     private string _currentSearchQuery = "";
-    
+
     // Selection/Hover State
     private MockFile? _selectedFile = null;
     private MockFile? _hoveredFile = null;
-    
+
     private int _currentPage = 1;
     private int _pageSize = 10; // 2 Rows x 5 Cols (10 items) - Matches RTTFileManager ScrollToPage(2)
+
+    // Sort State
+    private string _sortBy = "Name";
+    private bool _sortAscending = true;
     #endregion
 
     #region Public API
@@ -83,20 +88,23 @@ public class RTTFileManagerController : MonoBehaviour
         Debug.Log($"[Controller] Navigating to: {path}");
         _currentPath = path;
         _currentSearchQuery = ""; // Reset search state
-        
+
         // Load all files for this path
-        _currentDirectoryFiles = MockDataService.GetFiles(path);
-        
+        _currentDirectoryFiles = FileSystemService.GetFiles(path);
+
         // Reset filter to show all
         _filteredFiles = new List<MockFile>(_currentDirectoryFiles);
-        
+
+        // Apply current sort
+        ApplySort();
+
         // Reset to page 1
         _currentPage = 1;
-        
+
         // Reset selection/hover on nav
         _selectedFile = null;
         _hoveredFile = null;
-        
+
         UpdateView(true); // true = full reload
         UpdateDetailView(); // Update detail to show current folder
         _view.UpdateBreadcrumbs(_currentPath);
@@ -106,14 +114,14 @@ public class RTTFileManagerController : MonoBehaviour
     {
         Debug.Log("[Controller] Refreshing current folder...");
         // Reload files (Mock logic: just re-fetch)
-        _currentDirectoryFiles = MockDataService.GetFiles(_currentPath);
+        _currentDirectoryFiles = FileSystemService.GetFiles(_currentPath);
         SearchFiles(_currentSearchQuery); // Re-apply search/filter
     }
     
     public void SearchFiles(string query)
     {
         _currentSearchQuery = query;
-        
+
         if (string.IsNullOrEmpty(query))
         {
             _filteredFiles = new List<MockFile>(_currentDirectoryFiles);
@@ -122,9 +130,70 @@ public class RTTFileManagerController : MonoBehaviour
         {
             _filteredFiles = _currentDirectoryFiles.FindAll(f => f.Name.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0);
         }
-        
+
+        ApplySort(); // Apply current sort after filtering
         _currentPage = 1;
         UpdateView(true);
+    }
+
+    public void SetSortOptions(string sortBy, bool ascending)
+    {
+        Debug.Log($"[Controller] Sort by: {sortBy}, Ascending: {ascending}");
+        _sortBy = sortBy;
+        _sortAscending = ascending;
+
+        ApplySort();
+        _currentPage = 1;
+        UpdateView(true);
+    }
+
+    private void ApplySort()
+    {
+        // Always put folders first, then sort within each group
+        var folders = _filteredFiles.FindAll(f => f.IsFolder);
+        var files = _filteredFiles.FindAll(f => !f.IsFolder);
+
+        folders = SortList(folders);
+        files = SortList(files);
+
+        _filteredFiles.Clear();
+        _filteredFiles.AddRange(folders);
+        _filteredFiles.AddRange(files);
+    }
+
+    private List<MockFile> SortList(List<MockFile> list)
+    {
+        switch (_sortBy)
+        {
+            case "Name":
+                list.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+                break;
+            case "Type":
+                list.Sort((a, b) => string.Compare(a.Type, b.Type, StringComparison.OrdinalIgnoreCase));
+                break;
+            case "Created":
+                list.Sort((a, b) => a.Created.CompareTo(b.Created));
+                break;
+            case "Modified":
+                list.Sort((a, b) => a.Modified.CompareTo(b.Modified));
+                break;
+            case "Size":
+                list.Sort((a, b) => a.Size.CompareTo(b.Size));
+                break;
+            case "Duration":
+                list.Sort((a, b) => a.Duration.CompareTo(b.Duration));
+                break;
+            default:
+                list.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+                break;
+        }
+
+        if (!_sortAscending)
+        {
+            list.Reverse();
+        }
+
+        return list;
     }
     
     public void ChangePage(int delta)
@@ -225,22 +294,199 @@ public struct MockFile
     public string Name;
     public string Path;
     public bool IsFolder;
+    public string Type;           // File extension or "Folder"
+    public DateTime Created;
+    public DateTime Modified;
+    public long Size;             // Bytes
+    public TimeSpan Duration;     // For media files
 }
 
-public static class MockDataService
+public static class FileSystemService
 {
+    // Root path for file browsing
+    private static string _rootPath;
+
+    public static string RootPath
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(_rootPath))
+            {
+                // Determine root path based on platform
+#if UNITY_ANDROID && !UNITY_EDITOR
+                // Android external storage
+                _rootPath = "/sdcard";
+#elif UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+                // Windows - use user's home directory
+                _rootPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+#elif UNITY_STANDALONE_OSX || UNITY_EDITOR_OSX
+                // macOS - use user's home directory
+                _rootPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+#else
+                // Fallback to persistent data path
+                _rootPath = Application.persistentDataPath;
+#endif
+            }
+            return _rootPath;
+        }
+    }
+
+    public static string GetAbsolutePath(string relativePath)
+    {
+        if (relativePath == "root" || string.IsNullOrEmpty(relativePath))
+        {
+            return RootPath;
+        }
+
+        // If path starts with "root/", replace with actual root
+        if (relativePath.StartsWith("root/"))
+        {
+            return Path.Combine(RootPath, relativePath.Substring(5));
+        }
+
+        // If already absolute path, return as is
+        if (Path.IsPathRooted(relativePath))
+        {
+            return relativePath;
+        }
+
+        return Path.Combine(RootPath, relativePath);
+    }
+
     public static List<MockFile> GetFiles(string path)
     {
         var list = new List<MockFile>();
-        list.Add(new MockFile { Name = "DCIM", Path = path + "/DCIM", IsFolder = true });
-        list.Add(new MockFile { Name = "Documents", Path = path + "/Documents", IsFolder = true });
-        list.Add(new MockFile { Name = "Download", Path = path + "/Download", IsFolder = true });
-        list.Add(new MockFile { Name = "Music", Path = path + "/Music", IsFolder = true });
+        string absolutePath = GetAbsolutePath(path);
 
-        for (int i = 1; i <= 150; i++)
+        Debug.Log($"[FileSystemService] Reading directory: {absolutePath}");
+
+        try
         {
-            list.Add(new MockFile { Name = $"Image_{i:00}.jpg", Path = path + $"/Image_{i:00}.jpg", IsFolder = false });
+            if (!Directory.Exists(absolutePath))
+            {
+                Debug.LogWarning($"[FileSystemService] Directory not found: {absolutePath}");
+                return list;
+            }
+
+            // Get directories
+            string[] directories = Directory.GetDirectories(absolutePath);
+            foreach (string dirPath in directories)
+            {
+                try
+                {
+                    DirectoryInfo dirInfo = new DirectoryInfo(dirPath);
+
+                    // Skip hidden and system directories
+                    if ((dirInfo.Attributes & FileAttributes.Hidden) != 0 ||
+                        (dirInfo.Attributes & FileAttributes.System) != 0)
+                    {
+                        continue;
+                    }
+
+                    list.Add(new MockFile
+                    {
+                        Name = dirInfo.Name,
+                        Path = dirPath,
+                        IsFolder = true,
+                        Type = "Folder",
+                        Created = dirInfo.CreationTime,
+                        Modified = dirInfo.LastWriteTime,
+                        Size = 0,
+                        Duration = TimeSpan.Zero
+                    });
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    // Skip directories we can't access
+                    continue;
+                }
+            }
+
+            // Get files
+            string[] files = Directory.GetFiles(absolutePath);
+            foreach (string filePath in files)
+            {
+                try
+                {
+                    FileInfo fileInfo = new FileInfo(filePath);
+
+                    // Skip hidden and system files
+                    if ((fileInfo.Attributes & FileAttributes.Hidden) != 0 ||
+                        (fileInfo.Attributes & FileAttributes.System) != 0)
+                    {
+                        continue;
+                    }
+
+                    string extension = fileInfo.Extension.TrimStart('.').ToLower();
+                    if (string.IsNullOrEmpty(extension)) extension = "file";
+
+                    list.Add(new MockFile
+                    {
+                        Name = fileInfo.Name,
+                        Path = filePath,
+                        IsFolder = false,
+                        Type = extension,
+                        Created = fileInfo.CreationTime,
+                        Modified = fileInfo.LastWriteTime,
+                        Size = fileInfo.Length,
+                        Duration = GetMediaDuration(filePath, extension)
+                    });
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    // Skip files we can't access
+                    continue;
+                }
+            }
         }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[FileSystemService] Error reading directory: {ex.Message}");
+        }
+
+        Debug.Log($"[FileSystemService] Found {list.Count} items ({list.FindAll(f => f.IsFolder).Count} folders, {list.FindAll(f => !f.IsFolder).Count} files)");
         return list;
+    }
+
+    private static TimeSpan GetMediaDuration(string filePath, string extension)
+    {
+        // Media duration would require additional libraries
+        // For now, return zero - can be extended later with NAudio, FFmpeg, etc.
+        return TimeSpan.Zero;
+    }
+
+    public static string GetParentPath(string path)
+    {
+        string absolutePath = GetAbsolutePath(path);
+
+        // Don't go above root
+        if (absolutePath == RootPath || string.IsNullOrEmpty(absolutePath))
+        {
+            return "root";
+        }
+
+        string parentPath = Directory.GetParent(absolutePath)?.FullName;
+
+        if (string.IsNullOrEmpty(parentPath) || parentPath == RootPath)
+        {
+            return "root";
+        }
+
+        return parentPath;
+    }
+
+    public static string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        int order = 0;
+        double size = bytes;
+
+        while (size >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            size /= 1024;
+        }
+
+        return $"{size:0.##} {sizes[order]}";
     }
 }

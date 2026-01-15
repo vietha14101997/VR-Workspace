@@ -451,20 +451,27 @@ public class RTTFileManager : MonoBehaviour
         _isGridView = isGrid;
         Debug.Log($"[RTTFileManager] Display mode: {(isGrid ? "Grid" : "List")}");
         RefreshViewOptionsPopup();
+        // TODO: Implement Grid/List view switch
     }
-    
+
     private void SetSortBy(string sortBy)
     {
         _currentSortBy = sortBy;
         Debug.Log($"[RTTFileManager] Sort by: {sortBy}");
         RefreshViewOptionsPopup();
+
+        // Call controller to apply sort
+        _controller?.SetSortOptions(_currentSortBy, _isAscending);
     }
-    
+
     private void ToggleSortOrder()
     {
         _isAscending = !_isAscending;
         Debug.Log($"[RTTFileManager] Order: {(_isAscending ? "Ascending" : "Descending")}");
         RefreshViewOptionsPopup();
+
+        // Call controller to apply sort
+        _controller?.SetSortOptions(_currentSortBy, _isAscending);
     }
     
     private void RefreshViewOptionsPopup()
@@ -653,47 +660,69 @@ public class RTTFileManager : MonoBehaviour
     public void UpdateBreadcrumbs(string path)
     {
         if (_breadcrumbContainer == null) return;
-        
+
         foreach (Transform child in _breadcrumbContainer) Destroy(child.gameObject);
 
         if (string.IsNullOrEmpty(path)) return;
 
-        // Path splitting logic
-        string[] parts = path.Split(new char[] { '/', '\\' }, System.StringSplitOptions.RemoveEmptyEntries);
-        
-        // Accumulate path for click actions
-        // Assuming path is relative to some root or is absolute? 
-        // For now, assume parts build up the path the Controller understands.
-        string currentAccumulatedPath = "";
-        
-        for (int i = 0; i < parts.Length; i++)
+        // Get root path and create relative path for display
+        string rootPath = FileSystemService.RootPath;
+        string displayPath = path;
+
+        // Create list of breadcrumb items
+        var breadcrumbs = new List<(string name, string fullPath)>();
+
+        // Always add "Home" as first breadcrumb
+        breadcrumbs.Add(("Home", "root"));
+
+        // If path is not root, add subfolders
+        if (path != "root" && !string.IsNullOrEmpty(path))
         {
-            string part = parts[i];
-            if (i == 0) currentAccumulatedPath = part;
-            else currentAccumulatedPath += "/" + part;
-            
-            string targetPath = currentAccumulatedPath; 
-            
-            bool isLast = (i == parts.Length - 1);
+            // Make path relative to root for display
+            if (path.StartsWith(rootPath))
+            {
+                displayPath = path.Substring(rootPath.Length).TrimStart('/', '\\');
+            }
+
+            if (!string.IsNullOrEmpty(displayPath))
+            {
+                string[] parts = displayPath.Split(new char[] { '/', '\\' }, System.StringSplitOptions.RemoveEmptyEntries);
+                string currentPath = rootPath;
+
+                foreach (string part in parts)
+                {
+                    currentPath = System.IO.Path.Combine(currentPath, part);
+                    breadcrumbs.Add((part, currentPath));
+                }
+            }
+        }
+
+        // Create breadcrumb buttons
+        for (int i = 0; i < breadcrumbs.Count; i++)
+        {
+            var (name, fullPath) = breadcrumbs[i];
+            string targetPath = fullPath; // Capture for lambda
+
+            bool isLast = (i == breadcrumbs.Count - 1);
             Color btnColor = isLast ? _accentColor : _primaryColor;
-            
+
             GameObject btn = VRButtonFactory.CreateHorizontalIconTextButton(
-                _breadcrumbContainer, 
-                0, 
-                40f, 
-                part, 
-                null, 
+                _breadcrumbContainer,
+                0,
+                40f,
+                name,
+                null,
                 btnColor,
                 () => _controller?.NavigateTo(targetPath),
                 18,
                 _font
             );
-            
+
             LayoutElement le = btn.GetComponent<LayoutElement>();
             if (le == null) le = btn.AddComponent<LayoutElement>();
-            le.preferredWidth =  (part.Length * 12f) + 40f; 
+            le.preferredWidth = (name.Length * 12f) + 40f;
             le.preferredHeight = 40f;
-            
+
             if (!isLast)
             {
                 CreateBreadcrumbSeparator();
