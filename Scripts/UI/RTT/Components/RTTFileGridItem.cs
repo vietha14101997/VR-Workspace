@@ -1,31 +1,42 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using TMPro;
 
 /// <summary>
 /// Represents a single file or folder item in the Grid View.
+/// Handles visuals for Idle (Transparent), Hover (Semi-transparent), and Selected (Highlighted) states.
 /// </summary>
-public class RTTFileGridItem : MonoBehaviour
+public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
 {
     private Image _iconImage;
     private TextMeshProUGUI _nameText;
-    private Button _button;
-    
+    private Image _bgImage;
+
     public string FilePath { get; private set; }
     public bool IsFolder { get; private set; }
-    
+
     private System.Action<RTTFileGridItem> _onClickCallback;
+    private System.Action<RTTFileGridItem> _onDoubleClickCallback;
     private System.Action<RTTFileGridItem, bool> _onHoverCallback;
 
-    public void Initialize(string name, bool isFolder, string path, 
-                           System.Action<RTTFileGridItem> onClick, 
+    private bool _isSelected = false;
+    private bool _isHovered = false;
+
+    private float _lastClickTime = 0f;
+    private const float DOUBLE_CLICK_THRESHOLD = 0.3f;
+
+    public void Initialize(string name, bool isFolder, string path,
+                           System.Action<RTTFileGridItem> onClick,
+                           System.Action<RTTFileGridItem> onDoubleClick,
                            System.Action<RTTFileGridItem, bool> onHover)
     {
         FilePath = path;
         IsFolder = isFolder;
         _onClickCallback = onClick;
+        _onDoubleClickCallback = onDoubleClick;
         _onHoverCallback = onHover;
-        
+
         // Setup Visuals
         BuildUI(name, isFolder);
     }
@@ -35,10 +46,10 @@ public class RTTFileGridItem : MonoBehaviour
         // 1. Setup Layout
         var layout = gameObject.AddComponent<VerticalLayoutGroup>();
         layout.childAlignment = TextAnchor.MiddleCenter;
-        layout.spacing = 30f; // Increased spacing (3x)
+        layout.spacing = 30f; 
         layout.padding = new RectOffset(10, 10, 10, 10);
         layout.childControlWidth = true;
-        layout.childControlHeight = true; // FORCE layout group to control children height (applying LayoutElements)
+        layout.childControlHeight = true; 
         layout.childForceExpandWidth = true;
         layout.childForceExpandHeight = false;
 
@@ -47,31 +58,16 @@ public class RTTFileGridItem : MonoBehaviour
         iconObj.transform.SetParent(transform, false);
         _iconImage = iconObj.AddComponent<Image>();
         _iconImage.preserveAspect = true;
-        
-        // Load Icon based on type
-        if (isFolder)
-        {
-            SetSprite("icon_folder");
-        }
-        else
-        {
-            if (IsImageFile(name))
-            {
-               // Try to load preview, fallback to generic file
-               // For mock purposes, if we can't load real path, we stick to file icon or special media icon
-               // In a real app, this would be async.
-               SetSprite("icon_image"); // Use a specific image icon if available, or preview
-               // TODO: Actual file loading logic if paths were real
-            }
-            else
-            {
-                SetSprite("icon_file");
-            }
-        }
+        _iconImage.raycastTarget = false; // Prevent blocking parent raycast
 
-        // Icon Layout Constraint
+        // Load Icon
+        if (isFolder)
+            SetSprite("icon_folder");
+        else
+            SetSprite(IsImageFile(name) ? "icon_image" : "icon_file");
+
         var iconLE = iconObj.AddComponent<LayoutElement>();
-        iconLE.preferredHeight = 150f; // Increased 1.5x (was 100)
+        iconLE.preferredHeight = 150f;
         iconLE.preferredWidth = 150f;
         iconLE.flexibleHeight = 0;
 
@@ -79,44 +75,79 @@ public class RTTFileGridItem : MonoBehaviour
         GameObject textObj = new GameObject("Name");
         textObj.transform.SetParent(transform, false);
         _nameText = textObj.AddComponent<TextMeshProUGUI>();
+        _nameText.raycastTarget = false; 
         _nameText.text = name;
         _nameText.alignment = TextAlignmentOptions.Top;
-        _nameText.fontSize = 32; // Increased to 32
-        _nameText.fontStyle = FontStyles.Bold; // Bold
+        _nameText.fontSize = 32;
+        _nameText.fontStyle = FontStyles.Bold;
         _nameText.color = Color.white;
         _nameText.overflowMode = TextOverflowModes.Ellipsis;
         _nameText.enableWordWrapping = true;
         
-        // Text Layout Constraint
         var textLE = textObj.AddComponent<LayoutElement>();
-        textLE.preferredHeight = 90f; // Increased for 32px font (approx 2.5 lines)
+        textLE.preferredHeight = 90f;
         textLE.flexibleHeight = 0;
 
-        // 4. Button Interaction
-        _button = gameObject.AddComponent<Button>();
-        _button.onClick.AddListener(OnClick);
-        
-        // Transparent background for hit area
-        var bg = gameObject.AddComponent<Image>();
-        bg.color = new Color(1f, 1f, 1f, 0.05f); // Very faint background
-        _button.targetGraphic = bg;
-        
-        // 5. Hover Effect (Optional, using VRButtonAnimation if available or simple scale)
-        // For now simple scale script or similar is good, but let's stick to basic functionality first.
+        // 4. Background for interaction
+        _bgImage = gameObject.AddComponent<Image>();
+        _bgImage.color = Color.clear;
+        _bgImage.raycastTarget = true;
     }
 
-    private void OnClick()
+    public void OnPointerClick(PointerEventData eventData)
     {
-        _onClickCallback?.Invoke(this);
+        float currentTime = Time.time;
+        float timeSinceLastClick = currentTime - _lastClickTime;
+
+        if (timeSinceLastClick <= DOUBLE_CLICK_THRESHOLD)
+        {
+            // Double click - navigate into folder or open file
+            _onDoubleClickCallback?.Invoke(this);
+            _lastClickTime = 0f; // Reset to prevent triple-click
+        }
+        else
+        {
+            // Single click - select item
+            _onClickCallback?.Invoke(this);
+            _lastClickTime = currentTime;
+        }
+    }
+
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        _isHovered = true;
+        UpdateVisuals();
+        _onHoverCallback?.Invoke(this, true);
+    }
+
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        _isHovered = false;
+        UpdateVisuals();
+        _onHoverCallback?.Invoke(this, false);
     }
 
     public void SetSelected(bool selected)
     {
-        // Highlight logic
-        var bg = GetComponent<Image>();
-        if (bg != null)
+        _isSelected = selected;
+        UpdateVisuals();
+    }
+
+    private static readonly Color HighlightColor = new Color(0f, 0f, 0f, 0.27f);
+
+    private void UpdateVisuals()
+    {
+        if (_bgImage == null) return;
+
+        if (_isSelected || _isHovered)
         {
-            bg.color = selected ? new Color(1f, 1f, 1f, 0.2f) : new Color(1f, 1f, 1f, 0.05f);
+            // Hover & Selected share the same dark transparent background
+            _bgImage.color = HighlightColor;
+        }
+        else
+        {
+            // Idle State: Transparent
+            _bgImage.color = Color.clear;
         }
     }
 
@@ -129,7 +160,6 @@ public class RTTFileGridItem : MonoBehaviour
         }
         else if (resourceName == "icon_image")
         {
-             // Fallback if specific image icon missing, use file
              sprite = Resources.Load<Sprite>("icon_file");
              if (sprite != null) _iconImage.sprite = sprite;
         }

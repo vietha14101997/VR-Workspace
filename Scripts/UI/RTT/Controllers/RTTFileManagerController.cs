@@ -110,26 +110,19 @@ public class RTTFileManagerController : MonoBehaviour
         SearchFiles(_currentSearchQuery); // Re-apply search/filter
     }
     
-    /// <summary>
-    /// Filters the current file list based on query.
-    /// Called by Search Bar.
-    /// </summary>
     public void SearchFiles(string query)
     {
         _currentSearchQuery = query;
         
         if (string.IsNullOrEmpty(query))
         {
-            // Reset to full list
             _filteredFiles = new List<MockFile>(_currentDirectoryFiles);
         }
         else
         {
-            // Filter by name (case-insensitive)
             _filteredFiles = _currentDirectoryFiles.FindAll(f => f.Name.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0);
         }
         
-        // Reset pagination for new results
         _currentPage = 1;
         UpdateView(true);
     }
@@ -137,20 +130,18 @@ public class RTTFileManagerController : MonoBehaviour
     public void ChangePage(int delta)
     {
         int totalPages = CalculateTotalPages();
-        
         int newPage = _currentPage + delta;
         
         if (newPage >= 1 && newPage <= totalPages)
         {
             _currentPage = newPage;
-            UpdateView(false); // false = just scroll
+            UpdateView(false);
         }
     }
 
     public void GoToPage(int pageNumber)
     {
         int totalPages = CalculateTotalPages();
-
         if (pageNumber >= 1 && pageNumber <= totalPages)
         {
             _currentPage = pageNumber;
@@ -168,34 +159,26 @@ public class RTTFileManagerController : MonoBehaviour
 
     private void UpdateView(bool fullReload)
     {
-        // Calculate pages logic
-        int totalFiles = _filteredFiles.Count;
         int totalPages = CalculateTotalPages();
-        Debug.Log($"[RTTFileManagerController] UpdateView: Total Files={totalFiles}, PageSize={_pageSize}, CalcPages={totalPages}");
-        
-        // Clamp page
         _currentPage = Mathf.Clamp(_currentPage, 1, totalPages);
         
         if (_view != null)
         {
             if (fullReload)
             {
-                // Update Grid with filtered data
-                _view.UpdateGrid(_filteredFiles);
+                // Update Grid with selection state
+                string selectedPath = _selectedFile.HasValue ? _selectedFile.Value.Path : "";
+                _view.UpdateGrid(_filteredFiles, selectedPath);
             }
             
-            // Update Pagination state
-            Debug.Log($"[RTTFileManagerController] Calling UpdatePagination: Current={_currentPage}, Total={totalPages}");
             _view.UpdatePagination(_currentPage, totalPages);
-            
-            // Scroll grid to current page row
             _view.ScrollToPage(_currentPage);
         }
     }
 
     public void SelectFile(string path)
     {
-         Debug.Log($"[Controller] Selected file: {path}");
+         Debug.Log($"[Controller] Selected: {path}");
          _selectedFile = _currentDirectoryFiles.Find(f => f.Path == path);
          UpdateDetailView();
     }
@@ -219,7 +202,6 @@ public class RTTFileManagerController : MonoBehaviour
     {
         if (_view == null) return;
         
-        // Priority: Hover > Selected > Current Folder
         if (_hoveredFile.HasValue)
         {
             _view.UpdateDetail(_hoveredFile.Value, false);
@@ -230,18 +212,10 @@ public class RTTFileManagerController : MonoBehaviour
         }
         else
         {
-            // Fallback: Current Folder
             var folderInfo = new MockFile { Name = System.IO.Path.GetFileName(_currentPath), Path = _currentPath, IsFolder = true };
             if (string.IsNullOrEmpty(folderInfo.Name)) folderInfo.Name = "Root";
             _view.UpdateDetail(folderInfo, true);
         }
-    }
-    #endregion
-
-    #region Internal Services
-    private void Start()
-    {
-        // Wait for View to call OnViewReady
     }
     #endregion
 }
@@ -258,19 +232,15 @@ public static class MockDataService
     public static List<MockFile> GetFiles(string path)
     {
         var list = new List<MockFile>();
-        
-        // Always add some folders
         list.Add(new MockFile { Name = "DCIM", Path = path + "/DCIM", IsFolder = true });
         list.Add(new MockFile { Name = "Documents", Path = path + "/Documents", IsFolder = true });
         list.Add(new MockFile { Name = "Download", Path = path + "/Download", IsFolder = true });
         list.Add(new MockFile { Name = "Music", Path = path + "/Music", IsFolder = true });
 
-        // Add enough files to test pagination (e.g. 150 items)
         for (int i = 1; i <= 150; i++)
         {
             list.Add(new MockFile { Name = $"Image_{i:00}.jpg", Path = path + $"/Image_{i:00}.jpg", IsFolder = false });
         }
-        
         return list;
     }
 }

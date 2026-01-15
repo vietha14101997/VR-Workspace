@@ -43,6 +43,18 @@ public class RTTFileManager : MonoBehaviour
         _menuFrame = GetComponentInParent<RTTMenuFrame>();
     }
 
+    // This method seems to be intended for the controller, not the view.
+    // The view's responsibility is to display selection, not manage the selected file state directly.
+    // The UpdateGrid method already takes a selectedPath to update the view's selection.
+    // If a method is needed here, it would be to visually highlight a file.
+    // public void SelectFile(string path)
+    // {
+    //      Debug.Log($"[Controller] Selected: {path}");
+    //      // Find in current directory (works for both files and folders)
+    //      _selectedFile = _currentDirectoryFiles.Find(f => f.Path == path);
+    //      UpdateDetailView();
+    // }
+
     public void BuildUI()
     {
         Debug.Log("[RTTFileManager] Building UI...");
@@ -74,6 +86,22 @@ public class RTTFileManager : MonoBehaviour
         if (_pagination != null) Destroy(_pagination.gameObject);
     }
     
+    private void OnEnable()
+    {
+        // Restore visibility of external components when this view is re-enabled
+        if (_leftFrame != null) _leftFrame.gameObject.SetActive(true);
+        if (_rightFrame != null) _rightFrame.gameObject.SetActive(true);
+        if (_pagination != null) _pagination.gameObject.SetActive(true);
+    }
+
+    private void OnDisable()
+    {
+        // Hide external components when this view is disabled (e.g. app switch)
+        if (_leftFrame != null) _leftFrame.gameObject.SetActive(false);
+        if (_rightFrame != null) _rightFrame.gameObject.SetActive(false);
+        if (_pagination != null) _pagination.gameObject.SetActive(false);
+    }
+
     private void OnDestroy()
     {
         Cleanup();
@@ -716,16 +744,15 @@ public class RTTFileManager : MonoBehaviour
         }
     }
 
-    public void UpdateGrid(System.Collections.Generic.List<MockFile> files)
+    public void UpdateGrid(System.Collections.Generic.List<MockFile> files, string selectedPath = "")
     {
         if (_fileGrid != null)
         {
-            _fileGrid.Populate(files);
+            _fileGrid.Populate(files, selectedPath);
         }
         else
         {
             Debug.LogWarning("[RTTFileManager] FileGrid not ready yet!");
-            // Retry not needed if we follow OnViewReady flow, but keep for safety
         }
     }
 

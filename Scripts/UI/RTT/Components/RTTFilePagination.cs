@@ -25,11 +25,11 @@ public class RTTFilePagination : RTTCanvasBase
     #region Private Fields
     private const float PixelToMeter = 1.6f / 1920f;
 
-    // Shared hover effect colors
-    private static readonly Color HoverColorA = new Color(1f, 1f, 1f, 0.25f);
-    private static readonly Color HoverColorB = new Color(0.9f, 0.95f, 1f, 0.2f);
-    private static readonly Color TransparentColor = new Color(1f, 1f, 1f, 0f);
-    private const float HoverGlassAlpha = 0.5f;
+    // Shared highlight color for both hover and selected (dark transparent)
+    private static readonly Color HighlightColorA = new Color(0f, 0f, 0f, 0.27f);
+    private static readonly Color HighlightColorB = new Color(0f, 0f, 0f, 0.22f);
+    private static readonly Color TransparentColor = new Color(0f, 0f, 0f, 0f);
+    private const float HighlightGlassAlpha = 0.45f;
 
     private RTTFileManagerController _controller;
     private int _currentPage = 1;
@@ -39,6 +39,8 @@ public class RTTFilePagination : RTTCanvasBase
     private Sprite _pixelSprite;
 
     private Transform _stackPagingTransform;
+    private Transform _leftGroupTransform;
+    private Transform _rightGroupTransform;
     private List<GameObject> _pageButtons = new List<GameObject>();
     
     private Button _btnPrev;
@@ -183,9 +185,9 @@ public class RTTFilePagination : RTTCanvasBase
         // 2. Next Button (Anchored Right)
         _btnNext = CreateAnchorButton(container.transform, "icon_right_arrow", OnNextClicked, false);
         
-        // 3. Stack Paging (Centered)
+        // 3. Stack Paging (Centered - Now holds EVERYTHING to ensure even spacing)
         GameObject stackObj = new GameObject("StackPaging", typeof(RectTransform));
-        stackObj.layer = LayerMask.NameToLayer("UI"); // Ensure stack container is in UI layer
+        stackObj.layer = LayerMask.NameToLayer("UI");
         stackObj.transform.SetParent(container.transform, false);
         _stackPagingTransform = stackObj.transform;
         
@@ -194,24 +196,24 @@ public class RTTFilePagination : RTTCanvasBase
         stackRT.anchorMax = new Vector2(0.5f, 0.5f);
         stackRT.pivot = new Vector2(0.5f, 0.5f);
         stackRT.anchoredPosition = Vector2.zero;
-        stackRT.localScale = Vector3.one;
         
         HorizontalLayoutGroup stackLayout = stackObj.AddComponent<HorizontalLayoutGroup>();
         stackLayout.childAlignment = TextAnchor.MiddleCenter;
-        stackLayout.spacing = buttonSpacing;
+        stackLayout.spacing = buttonSpacing; // Uniform spacing for all items
         stackLayout.childControlWidth = false;
         stackLayout.childControlHeight = false;
         stackLayout.childForceExpandWidth = false;
         stackLayout.childForceExpandHeight = false;
-
-        // Auto-size width to fit buttons
+        
         ContentSizeFitter csf = stackObj.AddComponent<ContentSizeFitter>();
         csf.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
         csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         
-        // Force update display immediately to ensure content exists
+        // Force update display immediately
         UpdateDisplay();
     }
+
+    // Removed CreateSubGroup as it is no longer needed
 
     private Button CreateAnchorButton(Transform parent, string iconName, UnityEngine.Events.UnityAction onClick, bool isLeft)
     {
@@ -364,9 +366,10 @@ public class RTTFilePagination : RTTCanvasBase
 
         if (isActive)
         {
-            mat.SetColor("_ColorA", HoverColorA);
-            mat.SetColor("_ColorB", HoverColorB);
-            mat.SetFloat("_GlassAlpha", HoverGlassAlpha);
+            // Active/Selected state: same highlight color
+            mat.SetColor("_ColorA", HighlightColorA);
+            mat.SetColor("_ColorB", HighlightColorB);
+            mat.SetFloat("_GlassAlpha", HighlightGlassAlpha);
         }
         else
         {
@@ -510,66 +513,78 @@ public class RTTFilePagination : RTTCanvasBase
         _controller.ChangePage(1);
     }
     
+    private void ClearTransform(Transform t)
+    {
+        if (t == null) return;
+        for (int i = t.childCount - 1; i >= 0; i--)
+        {
+            Transform child = t.GetChild(i);
+            child.SetParent(null);
+            DestroyImmediate(child.gameObject);
+        }
+    }
+
     private void UpdateDisplay()
     {
         Debug.Log($"[RTTFilePagination] UpdateDisplay: TotalPages={_totalPages}");
         UpdateNavigationButtonsState(); // Sync nav buttons first
 
-        if (_stackPagingTransform == null) 
-        {
-            Debug.LogError("[RTTFilePagination] _stackPagingTransform is NULL");
-            return;
-        }
+        if (_stackPagingTransform == null) return;
 
         try 
         {
-            // 1. Destroy Existing (Using DestroyImmediate for clean sync)
-            int childCount = _stackPagingTransform.childCount;
-            for (int i = childCount - 1; i >= 0; i--)
-            {
-                Transform child = _stackPagingTransform.GetChild(i);
-                if (child != null) 
-                {
-                    child.SetParent(null); 
-                    DestroyImmediate(child.gameObject);
-                }
-            }
             _pageButtons.Clear();
             
-            // 2. Create New
-            // Limit to 9 buttons max
-            int maxButtons = 9;
+            // Clear all groups
+            ClearTransform(_stackPagingTransform);
+            // Left/Right groups are gone, only stack remains
+
+            int maxCentralButtons = 7;
             int startPage = 1;
             int endPage = _totalPages;
-            
-            if (_totalPages > maxButtons)
+
+            bool showStart = false;
+            bool showEnd = false;
+
+            if (_totalPages > maxCentralButtons)
             {
-                // Calculate window centered on current page
-                int halfWindow = maxButtons / 2;
+                int halfWindow = maxCentralButtons / 2;
                 startPage = Mathf.Max(1, _currentPage - halfWindow);
-                endPage = startPage + maxButtons - 1;
+                endPage = startPage + maxCentralButtons - 1;
                 
                 // Adjustment if near end
                 if (endPage > _totalPages)
                 {
                     endPage = _totalPages;
-                    startPage = Mathf.Max(1, endPage - maxButtons + 1);
+                    startPage = Mathf.Max(1, endPage - maxCentralButtons + 1);
                 }
+
+                if (startPage > 1) showStart = true;
+                if (endPage < _totalPages) showEnd = true;
             }
             
-            Debug.Log($"[RTTFilePagination] Creating Buttons: {startPage} to {endPage}");
-            
+            // 1. Render Left Group Elements (into Stack)
+            if (showStart)
+            {
+                CreatePageButton(_stackPagingTransform, 1, 1 == _currentPage);
+                if (startPage > 2) CreateEllipsisButton(_stackPagingTransform);
+            }
+
+            // 2. Render Central Stack Elements (into Stack)
             for (int i = startPage; i <= endPage; i++)
             {
-                int pageNum = i; 
-                GameObject btn = CreatePageButton(_stackPagingTransform, pageNum, pageNum == _currentPage);
-                if (btn != null)
-                {
-                    _pageButtons.Add(btn);
-                }
+                GameObject btn = CreatePageButton(_stackPagingTransform, i, i == _currentPage);
+                if (btn != null) _pageButtons.Add(btn);
+            }
+
+            // 3. Render Right Group Elements (into Stack)
+            if (showEnd)
+            {
+                if (endPage < _totalPages - 1) CreateEllipsisButton(_stackPagingTransform);
+                CreatePageButton(_stackPagingTransform, _totalPages, _totalPages == _currentPage);
             }
             
-            // 3. Force Layout Logic
+            // 4. Force Layout Logic
             Canvas.ForceUpdateCanvases();
             LayoutRebuilder.ForceRebuildLayoutImmediate(_stackPagingTransform as RectTransform);
         }
@@ -577,6 +592,36 @@ public class RTTFilePagination : RTTCanvasBase
         {
             Debug.LogError($"[RTTFilePagination] EXCEPTION: {e}");
         }
+    }
+    
+    private void CreateEllipsisButton(Transform parent)
+    {
+         GameObject btnObj = new GameObject("Ellipsis", typeof(RectTransform), typeof(Image));
+         btnObj.layer = LayerMask.NameToLayer("UI");
+         btnObj.transform.SetParent(parent, false);
+         btnObj.transform.localScale = Vector3.one;
+         
+         RectTransform rt = btnObj.GetComponent<RectTransform>();
+         rt.sizeDelta = new Vector2(buttonSize * 0.5f, buttonSize); // Narrower
+         
+         Image bg = btnObj.GetComponent<Image>();
+         bg.color = Color.clear; // Transparent
+         
+         GameObject textObj = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
+         textObj.transform.SetParent(btnObj.transform, false);
+         
+         RectTransform textRT = textObj.GetComponent<RectTransform>();
+         textRT.anchorMin = Vector2.zero;
+         textRT.anchorMax = Vector2.one;
+         textRT.offsetMin = Vector2.zero;
+         textRT.offsetMax = Vector2.zero;
+         
+         TextMeshProUGUI tmp = textObj.GetComponent<TextMeshProUGUI>();
+         tmp.text = "...";
+         tmp.fontSize = 40;
+         tmp.alignment = TextAlignmentOptions.Center;
+         tmp.color = new Color(1f, 1f, 1f, 0.5f);
+         tmp.fontStyle = FontStyles.Bold;
     }
     
     private void UpdateNavigationButtonsState()
@@ -674,25 +719,20 @@ public class PaginationButtonHover : MonoBehaviour, IPointerEnterHandler, IPoint
     {
         _material = mat;
 
-        // Original colors based on active state
-        _originalColorA = isActive ? new Color(1f, 1f, 1f, 0.25f) : new Color(1f, 1f, 1f, 0f);
-        _originalColorB = isActive ? new Color(0.9f, 0.95f, 1f, 0.2f) : new Color(1f, 1f, 1f, 0f);
-        _originalAlpha = isActive ? 0.5f : 0f;
+        // Shared highlight color for both hover and selected
+        Color highlightA = new Color(0f, 0f, 0f, 0.27f);
+        Color highlightB = new Color(0f, 0f, 0f, 0.22f);
+        float highlightAlpha = 0.45f;
 
-        if (isActive)
-        {
-            // Do not change appearance on hover if active (selected)
-            _hoverColorA = _originalColorA;
-            _hoverColorB = _originalColorB;
-            _hoverAlpha = _originalAlpha;
-        }
-        else
-        {
-            // Normal hover for inactive buttons
-            _hoverColorA = new Color(1f, 1f, 1f, 0.25f);
-            _hoverColorB = new Color(0.9f, 0.95f, 1f, 0.2f);
-            _hoverAlpha = 0.5f;
-        }
+        // Original colors based on active state
+        _originalColorA = isActive ? highlightA : new Color(0f, 0f, 0f, 0f);
+        _originalColorB = isActive ? highlightB : new Color(0f, 0f, 0f, 0f);
+        _originalAlpha = isActive ? highlightAlpha : 0f;
+
+        // Hover uses the same highlight color
+        _hoverColorA = highlightA;
+        _hoverColorB = highlightB;
+        _hoverAlpha = highlightAlpha;
     }
 
     public void OnPointerEnter(PointerEventData eventData)
