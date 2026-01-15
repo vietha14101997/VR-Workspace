@@ -150,6 +150,19 @@ public class RTTFileManagerController : MonoBehaviour
         }
     }
 
+    public void GoToPage(int pageNumber)
+    {
+        int totalFiles = _filteredFiles.Count;
+        int totalPages = Mathf.CeilToInt((float)totalFiles / _pageSize);
+        if (totalPages < 1) totalPages = 1;
+
+        if (pageNumber >= 1 && pageNumber <= totalPages)
+        {
+            _currentPage = pageNumber;
+            UpdateView(false);
+        }
+    }
+
     private void UpdateView(bool fullReload)
     {
         // Calculate pages logic

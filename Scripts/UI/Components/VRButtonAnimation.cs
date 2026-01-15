@@ -297,11 +297,14 @@ public class VRButtonAnimation : MonoBehaviour, UnityEngine.EventSystems.IPointe
             _savedGlowColor = _borderMaterial.GetColor("_GlowColor");
 
         // Save default layer widths for GlowingGlassBorder shader (used when hovering)
-        // These are the default values from the shader
-        _savedLayer1Width = 0.015f;
-        _savedLayer2Width = 0.04f;
-        _savedLayer3Width = 0.08f;
-        _savedLayer4Width = 0.15f;
+        // Calculate layer widths based on saved BorderWidth to maintain visual consistency
+        // Use a minimum base width of 0.03f if border width is missing or too small
+        float baseWidth = (_savedBorderWidth > 0.005f) ? _savedBorderWidth : 0.03f;
+        
+        _savedLayer1Width = baseWidth * 0.5f;  // Inner bright core
+        _savedLayer2Width = baseWidth * 1.2f;  // Main border body (slightly wider than static to glow)
+        _savedLayer3Width = baseWidth * 2.5f;  // Outer glow
+        _savedLayer4Width = baseWidth * 4.0f;  // Faint outer field
     }
 
     /// <summary>

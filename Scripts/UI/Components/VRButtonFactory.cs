@@ -137,9 +137,9 @@ public static class VRButtonFactory
         public float cornerRadius = 0.12f;
         public float edgePadding = 0.06f;  // Match Space key value for Android compatibility
         public float backgroundAlpha = 0.08f;
-        public float borderWidth = 0.035f; // Increased 40% (was 0.025f)
-        public float glowWidth = 0.06f;    // Wider glow
-        public float glowIntensity = 3.5f; // Brighter glow
+        public float borderWidth = 0.025f; 
+        public float glowWidth = 0.04f;    
+        public float glowIntensity = 2.5f;
 
         // Animation
         public float popAmount = 0.05f;

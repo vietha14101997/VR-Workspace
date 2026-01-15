@@ -260,16 +260,22 @@ public class RTTFileManager : MonoBehaviour
         Sprite arrowIcon = VRDropdownFactory.GetArrowSprite();
         
         // 1. Base Button (Text centered/left)
-        GameObject sortTrigger = VRButtonFactory.CreateTextButton(
-            rowRT,
-            _sortTriggerWidth,
-            68f, // Increased Height (was 54f)
-            _currentSortBy,
-            _primaryColor,
-            ToggleViewOptionsPopup,
-            24,
-            _font
-        );
+        // 1. Base Button (Text centered/left)
+        var sortConfig = new VRButtonFactory.ButtonConfig
+        {
+            label = _currentSortBy,
+            themeColor = _primaryColor,
+            width = _sortTriggerWidth,
+            height = 68f,
+            fontSize = 24,
+            font = _font,
+            textOnly = true,
+            borderWidth = 0.04f, // Custom thicker border (40%)
+            glowWidth = 0.08f,
+            glowIntensity = 4f,
+            popAmount = 0.05f
+        };
+        GameObject sortTrigger = VRButtonFactory.CreateButton(rowRT, sortConfig, ToggleViewOptionsPopup);
         
         // Adjust Text Alignment to Center (was Left)
         TextMeshProUGUI btnText = sortTrigger.GetComponentInChildren<TextMeshProUGUI>();
@@ -303,11 +309,23 @@ public class RTTFileManager : MonoBehaviour
 
         // Right: Edit Button (Icon)
         Sprite editIcon = Resources.Load<Sprite>("icon_edit");
-        GameObject editBtn = VRButtonFactory.CreateIconButton(
-            rowRT, 
-            68f, // Increased Size (was 54f)
-            editIcon, 
-            _primaryColor,
+        var editConfig = new VRButtonFactory.ButtonConfig
+        {
+            label = "Edit",
+            icon = editIcon,
+            themeColor = _primaryColor,
+            width = 68f,
+            height = 68f,
+            iconOnly = true, // Hide text
+            iconSize = 35.2f, // Reduced 20% (Default ~44)
+            borderWidth = 0.04f, // Custom thicker border (Increased to match Sort/Search)
+            glowWidth = 0.08f,
+            glowIntensity = 4f,
+            popAmount = 0.05f
+        };
+        GameObject editBtn = VRButtonFactory.CreateButton(
+            rowRT,
+            editConfig,
             () => Debug.Log("Edit Clicked")
         );
         RectTransform editRT = editBtn.GetComponent<RectTransform>();
@@ -445,11 +463,23 @@ public class RTTFileManager : MonoBehaviour
 
         // Right: Refresh Button (Icon)
         Sprite refreshIcon = Resources.Load<Sprite>("icon_refresh");
-        GameObject refreshBtn = VRButtonFactory.CreateIconButton(
+        var refreshConfig = new VRButtonFactory.ButtonConfig
+        {
+            label = "Refresh",
+            icon = refreshIcon,
+            themeColor = _accentColor,
+            width = 68f,
+            height = 68f,
+            iconOnly = true, // Hide text
+            iconSize = 35.2f, // Reduced 20% (Default ~44)
+            borderWidth = 0.04f, // Custom thicker border (Increased to match Sort/Search)
+            glowWidth = 0.08f,
+            glowIntensity = 4f,
+            popAmount = 0.05f
+        };
+        GameObject refreshBtn = VRButtonFactory.CreateButton(
             rowRT, 
-            68f, // Increased Size (was 54f)
-            refreshIcon, 
-            _accentColor,
+            refreshConfig, 
             () => _controller?.RefreshCurrentFolder()
         );
         RectTransform refreshRT = refreshBtn.GetComponent<RectTransform>();
@@ -520,9 +550,9 @@ public class RTTFileManager : MonoBehaviour
         config.font = _font;
         
         // Match Button Visuals (Sharper, Brighter Border)
-        config.borderWidth = 0.035f;  // Increased 40% (was 0.025f)
-        config.glowWidth = 0.06f;     // Match Button
-        config.glowIntensity = 3.5f;  // Match Button
+        config.borderWidth = 0.04f;  // Increased 40% (was 0.025f)
+        config.glowWidth = 0.08f;     // Match Button
+        config.glowIntensity = 4f;  // Match Button
         
         config.layerName = "UI";
         
