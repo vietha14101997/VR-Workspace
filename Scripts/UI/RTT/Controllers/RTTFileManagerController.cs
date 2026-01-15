@@ -30,7 +30,7 @@ public class RTTFileManagerController : MonoBehaviour
     private MockFile? _hoveredFile = null;
     
     private int _currentPage = 1;
-    private int _pageSize = 15; // 3 Rows x 5 Cols (15 items)
+    private int _pageSize = 10; // 2 Rows x 5 Cols (10 items) - Matches RTTFileManager ScrollToPage(2)
     #endregion
 
     #region Public API
@@ -265,8 +265,8 @@ public static class MockDataService
         list.Add(new MockFile { Name = "Download", Path = path + "/Download", IsFolder = true });
         list.Add(new MockFile { Name = "Music", Path = path + "/Music", IsFolder = true });
 
-        // Add enough files to test pagination (e.g. 50 items)
-        for (int i = 1; i <= 50; i++)
+        // Add enough files to test pagination (e.g. 150 items)
+        for (int i = 1; i <= 150; i++)
         {
             list.Add(new MockFile { Name = $"Image_{i:00}.jpg", Path = path + $"/Image_{i:00}.jpg", IsFolder = false });
         }

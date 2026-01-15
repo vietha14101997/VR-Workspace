@@ -113,35 +113,49 @@ public class RTTFileGrid : MonoBehaviour
     {
         if (_scrollRect == null || _contentRect == null) return;
         
+        // Ensure layout is up to date for accurate bounds
+        Canvas.ForceUpdateCanvases();
+        
         // Calculate Y position for the row
-        // Page 1 (index 0) = Row 0
-        // Page 2 (index 1) = Row (rowsPerPage)
-        
-        // Height of one row = CellHeight + SpacingY
         float rowHeight = _cellHeight + _spacingY;
-        
-        // Target Row Index
         int targetRow = (pageIndex - 1) * rowsPerPage;
-        
-        // Y Position (Content is Top-aligned, so Y increases downwards/negative)
-        // ScrollRect content position is usually positive to scroll down
         float targetY = targetRow * rowHeight;
         
-        // Clamp to max scroll info if needed, but ScrollRect handles content bounds
-        // Just set anchoredPosition
+        if (pageIndex == 1) targetY = 0; 
+
+        // Clamp logic to prevent overscroll
+        float contentHeight = _contentRect.rect.height;
+        float viewportHeight = _scrollRect.viewport.rect.height;
+        float maxScrollY = Mathf.Max(0, contentHeight - viewportHeight);
         
-        // We might need to consider top padding
-        targetY += _gridLayout.padding.top; // Adjust for padding? Usually 0 is top.
-        // If content is at Y=0, we see top. If we want row 1, we move content UP, so Y becomes Positive.
+        targetY = Mathf.Clamp(targetY, 0, maxScrollY);
         
-        // Wait, RectTransform coordinate system:
-        // Pivot (0.5, 1) Top Center.
-        // Initial Pos Y=0.
-        // To scroll down (see lower items), Content moves UP (Positive Y).
+        // Start Smooth Scroll
+        if (_scrollCoroutine != null) StopCoroutine(_scrollCoroutine);
+        _scrollCoroutine = StartCoroutine(SmoothScroll(targetY, 0.3f));
+    }
+
+    private Coroutine _scrollCoroutine;
+
+    private System.Collections.IEnumerator SmoothScroll(float targetY, float duration)
+    {
+        float time = 0;
+        float startY = _contentRect.anchoredPosition.y;
         
-        if (pageIndex == 1) targetY = 0; // Force top
+        while (time < duration)
+        {
+            time += Time.deltaTime;
+            float t = time / duration;
+            // Ease Out Cubic
+            t = 1f - Mathf.Pow(1f - t, 3);
+            
+            float newY = Mathf.Lerp(startY, targetY, t);
+            _contentRect.anchoredPosition = new Vector2(_contentRect.anchoredPosition.x, newY);
+            yield return null;
+        }
         
         _contentRect.anchoredPosition = new Vector2(_contentRect.anchoredPosition.x, targetY);
+        _scrollCoroutine = null;
     }
 
     private void OnItemHover(RTTFileGridItem item, bool isHover)

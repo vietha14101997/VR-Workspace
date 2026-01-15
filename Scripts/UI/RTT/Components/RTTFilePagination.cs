@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using TMPro;
 using System.Collections.Generic;
 
@@ -11,29 +12,37 @@ public class RTTFilePagination : RTTCanvasBase
 {
     #region Configuration
     [SerializeField] private float frameWidth = 400f; // Will be overwritten by code
-    [SerializeField] private float frameHeight = 128f; // Match RTTTaskbar height
+    [SerializeField] private float frameHeight = 115f; // 90% of RTTTaskbar height
     [SerializeField] private float contentPadding = 40f; // Doubled margin (was 20f)
     [SerializeField] private float buttonSize = 90f;
     [SerializeField] private float buttonSpacing = 10f;
     
     [Header("Position")]
     [SerializeField] private Transform followTarget; // The Main Menu Frame
-    [SerializeField] private float gapBelowFrame = 0.002f; 
+    [SerializeField] private float gapBelowFrame = 0.0065f;
     #endregion
 
     #region Private Fields
     private const float PixelToMeter = 1.6f / 1920f;
-    
+
+    // Shared hover effect colors
+    private static readonly Color HoverColorA = new Color(1f, 1f, 1f, 0.25f);
+    private static readonly Color HoverColorB = new Color(0.9f, 0.95f, 1f, 0.2f);
+    private static readonly Color TransparentColor = new Color(1f, 1f, 1f, 0f);
+    private const float HoverGlassAlpha = 0.5f;
+
     private RTTFileManagerController _controller;
     private int _currentPage = 1;
     private int _totalPages = 1;
 
     private Material _glassMaterial;
-    private Material _borderMaterial;
     private Sprite _pixelSprite;
 
     private Transform _stackPagingTransform;
     private List<GameObject> _pageButtons = new List<GameObject>();
+    
+    private Button _btnPrev;
+    private Button _btnNext;
     #endregion
     
     #region Lifecycle
@@ -49,7 +58,7 @@ public class RTTFilePagination : RTTCanvasBase
             if (targetMiniFrame != null)
             {
                 frameWidth = targetMiniFrame.TotalWidth * (4f / 3f);
-                frameHeight = targetMiniFrame.TotalHeight; // Sync height
+                frameHeight = targetMiniFrame.TotalHeight * 0.9f; // Reduced height by 10%
                 buttonSize = targetMiniFrame.ButtonSize; // Sync button size
             }
         }
@@ -72,7 +81,6 @@ public class RTTFilePagination : RTTCanvasBase
     protected override void OnDestroy()
     {
         if (_glassMaterial != null) Destroy(_glassMaterial);
-        if (_borderMaterial != null) Destroy(_borderMaterial);
         base.OnDestroy();
     }
     
@@ -127,8 +135,9 @@ public class RTTFilePagination : RTTCanvasBase
              _glassMaterial = new Material(glassShader);
              
              // Match RTTTaskbarExpansion settings for solid look
-             _glassMaterial.SetFloat("_CornerRadius", 0.12f);
-             _glassMaterial.SetFloat("_EdgePadding", 0.06f);
+             // CornerRadius = 0.5 để bo bán cầu 2 cạnh trái phải
+             _glassMaterial.SetFloat("_CornerRadius", 0.5f);
+             _glassMaterial.SetFloat("_EdgePadding", 0.0f);
              _glassMaterial.SetFloat("_Aspect", frameWidth / frameHeight);
              
              // Colors and Parameters
@@ -153,44 +162,6 @@ public class RTTFilePagination : RTTCanvasBase
         rt.offsetMin = Vector2.zero;
         rt.offsetMax = Vector2.zero;
         rt.SetAsFirstSibling();
-        
-        // Border
-        CreateGlowingBorder(bgObj.transform);
-    }
-
-    private void CreateGlowingBorder(Transform parent)
-    {
-         GameObject borderObj = new GameObject("Border", typeof(RectTransform), typeof(Image));
-         borderObj.layer = LayerMask.NameToLayer("UI");
-         borderObj.transform.SetParent(parent, false);
-         
-         RectTransform rt = borderObj.GetComponent<RectTransform>();
-         rt.anchorMin = Vector2.zero;
-         rt.anchorMax = Vector2.one;
-         rt.offsetMin = Vector2.zero;
-         rt.offsetMax = Vector2.zero;
-         
-         Image img = borderObj.GetComponent<Image>();
-         img.sprite = GetPixelSprite();
-         img.raycastTarget = false;
-         
-         Shader borderShader = Shader.Find("Custom/GlowingGlassBorder");
-         if (borderShader != null)
-         {
-             _borderMaterial = new Material(borderShader);
-             _borderMaterial.SetFloat("_Aspect", frameWidth / frameHeight);
-             _borderMaterial.SetFloat("_BorderWidth", 0.06f);
-             _borderMaterial.SetFloat("_CornerRadius", 0.12f);
-             
-            // Match TaskbarExpansion border settings
-            _borderMaterial.SetFloat("_Layer1Width", 0.03f);
-            _borderMaterial.SetFloat("_Layer1Alpha", 1.5f);
-            _borderMaterial.SetFloat("_Layer2Width", 0.06f);
-            _borderMaterial.SetFloat("_Layer2Alpha", 1.0f);
-            
-             img.material = _borderMaterial;
-         }
-         borderObj.transform.SetAsLastSibling();
     }
 
     private void CreateContent(RectTransform parent)
@@ -207,10 +178,10 @@ public class RTTFilePagination : RTTCanvasBase
         containerRT.localScale = Vector3.one;
         
         // 1. Previous Button (Anchored Left)
-        CreateAnchorButton(container.transform, "icon_left_arrow", OnPrevClicked, true);
+        _btnPrev = CreateAnchorButton(container.transform, "icon_left_arrow", OnPrevClicked, true);
         
         // 2. Next Button (Anchored Right)
-        CreateAnchorButton(container.transform, "icon_right_arrow", OnNextClicked, false);
+        _btnNext = CreateAnchorButton(container.transform, "icon_right_arrow", OnNextClicked, false);
         
         // 3. Stack Paging (Centered)
         GameObject stackObj = new GameObject("StackPaging", typeof(RectTransform));
@@ -242,17 +213,17 @@ public class RTTFilePagination : RTTCanvasBase
         UpdateDisplay();
     }
 
-    private void CreateAnchorButton(Transform parent, string iconName, UnityEngine.Events.UnityAction onClick, bool isLeft)
+    private Button CreateAnchorButton(Transform parent, string iconName, UnityEngine.Events.UnityAction onClick, bool isLeft)
     {
-        float navButtonSize = buttonSize * 0.8f; // Reduce by 20%
+        float iconSize = buttonSize * 0.6f; // Icon size inside button
 
-        // Wrapper for positioning
+        // Wrapper for positioning (same size as button)
         GameObject btnWrapper = new GameObject(isLeft ? "BtnPrev" : "BtnNext", typeof(RectTransform));
         btnWrapper.layer = LayerMask.NameToLayer("UI");
         btnWrapper.transform.SetParent(parent, false);
-        
+
         RectTransform rt = btnWrapper.GetComponent<RectTransform>();
-        
+
         if (isLeft)
         {
             rt.anchorMin = new Vector2(0, 0.5f);
@@ -267,27 +238,13 @@ public class RTTFilePagination : RTTCanvasBase
             rt.pivot = new Vector2(1, 0.5f);
             rt.anchoredPosition = new Vector2(-contentPadding, 0);
         }
-        rt.sizeDelta = new Vector2(navButtonSize, navButtonSize);
+        rt.sizeDelta = new Vector2(buttonSize, buttonSize); // Same size as page buttons
         rt.localScale = Vector3.one;
 
-        // Create actual button inside wrapper
-        CreateButton(btnWrapper.transform, iconName, onClick, navButtonSize);
-        
-        // Reset local position of the created button (VRButtonFactory might offset it?)
-        // CreateButton calls VRButtonFactory which makes a button as child of parent.
-        // We need to ensure that child is centered in wrapper.
-        if (btnWrapper.transform.childCount > 0)
-        {
-            RectTransform childRT = btnWrapper.transform.GetChild(0).GetComponent<RectTransform>();
-            if (childRT != null)
-            {
-                childRT.anchorMin = new Vector2(0.5f, 0.5f);
-                childRT.anchorMax = new Vector2(0.5f, 0.5f); 
-                childRT.pivot = new Vector2(0.5f, 0.5f);
-                childRT.anchoredPosition = Vector2.zero;
-                childRT.localScale = Vector3.one;
-            }
-        }
+        // Create button inside wrapper
+        // Shift icon 5% towards its side (Left or Right)
+        float offsetX = isLeft ? -(buttonSize * 0.05f) : (buttonSize * 0.05f);
+        return CreateButton(btnWrapper.transform, iconName, onClick, iconSize, new Vector2(offsetX, 0));
     }
     
     private void RebuildUI()
@@ -303,75 +260,199 @@ public class RTTFilePagination : RTTCanvasBase
         BuildUI();
     }
     
-    private void CreateButton(Transform parent, string iconName, UnityEngine.Events.UnityAction onClick, float size)
+    private Button CreateButton(Transform parent, string iconName, UnityEngine.Events.UnityAction onClick, float size, Vector2 iconOffset)
     {
-        // Simple Icon Button
-        var btn = VRButtonFactory.CreateBareIconButton(
-            parent, 
-            size, 
-            Resources.Load<Sprite>(iconName), 
-            Color.white, 
-            onClick
-        );
-        
-        // Debug fallback if icon missing
-        if (btn != null)
+        // Create simple button similar to page buttons (not using VRButtonFactory)
+        GameObject btnObj = new GameObject(iconName, typeof(RectTransform), typeof(Image), typeof(Button));
+        btnObj.layer = LayerMask.NameToLayer("UI");
+        btnObj.transform.SetParent(parent, false);
+        btnObj.transform.localScale = Vector3.one;
+
+        // Fill the parent wrapper completely to fix centering issue
+        RectTransform rt = btnObj.GetComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+
+        // Circular Background
+        Image bg = btnObj.GetComponent<Image>();
+        bg.sprite = GetPixelSprite();
+        bg.raycastTarget = true;
+
+        Material circleMat = CreateCircleButtonMaterial(false);
+        if (circleMat != null) bg.material = circleMat;
+
+        // Button click
+        Button btn = btnObj.GetComponent<Button>();
+        btn.transition = Selectable.Transition.None; // Disable default tint to avoid conflict with shader
+        btn.onClick.AddListener(onClick);
+
+        // Add hover effect
+        AddHoverEffect(btnObj, circleMat);
+
+        // Icon (centered using center anchors for proper alignment)
+        GameObject iconObj = new GameObject("Icon", typeof(RectTransform), typeof(Image));
+        iconObj.layer = LayerMask.NameToLayer("UI");
+        iconObj.transform.SetParent(btnObj.transform, false);
+
+        RectTransform iconRT = iconObj.GetComponent<RectTransform>();
+        iconRT.anchorMin = new Vector2(0.5f, 0.5f);
+        iconRT.anchorMax = new Vector2(0.5f, 0.5f);
+        iconRT.pivot = new Vector2(0.5f, 0.5f);
+        iconRT.anchoredPosition = iconOffset;
+        iconRT.sizeDelta = new Vector2(size, size);
+        iconRT.localScale = Vector3.one;
+
+        Image iconImg = iconObj.GetComponent<Image>();
+        iconImg.sprite = Resources.Load<Sprite>(iconName);
+        iconImg.color = Color.white;
+        iconImg.raycastTarget = false;
+        iconImg.preserveAspect = true; // Ensure icon content is centered within bounds
+
+        if (iconImg.sprite == null)
         {
-             // Check if icon image has sprite
-            Transform visuals = btn.transform.Find("HitArea/Visuals/Content/Icon");
-            if (visuals != null) {
-                var img = visuals.GetComponent<Image>();
-                if (img != null && img.sprite == null) {
-                    Debug.LogWarning($"[RTTFilePagination] Missing icon: {iconName}");
-                    img.color = Color.red; // Visual debug
-                }
-            }
+            Debug.LogWarning($"[RTTFilePagination] Missing icon: {iconName}");
+            iconImg.color = Color.red;
         }
+
+        return btn;
+    }
+
+    private void SetButtonState(Button btn, bool active)
+    {
+        if (btn == null) return;
+        btn.interactable = active;
+        
+        // Dim Icon
+        var icon = btn.transform.Find("Icon")?.GetComponent<Image>();
+        if (icon != null)
+        {
+             icon.color = active ? Color.white : new Color(1, 1, 1, 0.2f);
+        }
+        
+        // Disable Hover Component to prevent visual updates
+        var hover = btn.GetComponent<PaginationButtonHover>();
+        if (hover != null) hover.enabled = active;
+        
+        // Reset Background to transparent if disabled
+        if (!active)
+        {
+             Material mat = btn.GetComponent<Image>().material;
+             if (mat != null)
+             {
+                 mat.SetColor("_ColorA", TransparentColor);
+                 mat.SetColor("_ColorB", TransparentColor);
+                 mat.SetFloat("_GlassAlpha", 0f);
+             }
+        }
+    }
+
+    private Material CreateCircleButtonMaterial(bool isActive)
+    {
+        Shader circleShader = Shader.Find("Custom/GlassGradientBackgroundWide");
+        if (circleShader == null) return null;
+
+        Material mat = new Material(circleShader);
+        mat.SetFloat("_CornerRadius", 0.5f);
+        mat.SetFloat("_EdgePadding", 0.0f);
+        mat.SetFloat("_Aspect", 1f);
+        mat.SetFloat("_CyanRatio", 0.5f);
+        mat.SetFloat("_FresnelPower", 2.2f);
+        mat.SetFloat("_FresnelStrength", 0f);
+
+        if (isActive)
+        {
+            mat.SetColor("_ColorA", HoverColorA);
+            mat.SetColor("_ColorB", HoverColorB);
+            mat.SetFloat("_GlassAlpha", HoverGlassAlpha);
+        }
+        else
+        {
+            // Fully transparent initially
+            mat.SetColor("_ColorA", TransparentColor);
+            mat.SetColor("_ColorB", TransparentColor);
+            mat.SetFloat("_GlassAlpha", 0f);
+        }
+
+        return mat;
+    }
+
+    private void AddHoverEffect(GameObject target, Material circleMat)
+    {
+        if (circleMat == null) return;
+
+        // Use IPointerEnterHandler/IPointerExitHandler for VR compatibility
+        var hoverEffect = target.AddComponent<PaginationButtonHover>();
+        hoverEffect.Initialize(circleMat, false); // Arrow buttons are never "active"
+    }
+
+    private void AddPageButtonHoverEffect(GameObject target, Material circleMat, bool isActive)
+    {
+        if (circleMat == null) return;
+
+        // Use IPointerEnterHandler/IPointerExitHandler for VR compatibility
+        var hoverEffect = target.AddComponent<PaginationButtonHover>();
+        hoverEffect.Initialize(circleMat, isActive);
     }
     
     private GameObject CreatePageButton(Transform parent, int pageNumber, bool isActive)
     {
         GameObject btnObj = new GameObject($"Page_{pageNumber}", typeof(RectTransform), typeof(Image), typeof(Button));
-        btnObj.layer = LayerMask.NameToLayer("UI"); // Ensure visible to RTT Camera
+        btnObj.layer = LayerMask.NameToLayer("UI");
         btnObj.transform.SetParent(parent, false);
-        btnObj.transform.localScale = Vector3.one; // Ensure scale is 1
-        
+        btnObj.transform.localScale = Vector3.one;
+
         RectTransform rt = btnObj.GetComponent<RectTransform>();
         rt.sizeDelta = new Vector2(buttonSize, buttonSize);
-        
-        // Background (optional, for active state)
+
+        // Circular Background with shader
         Image bg = btnObj.GetComponent<Image>();
-        bg.sprite = null; // Use default white sprite
-        // Active: Like normal state (Faint Grey), Inactive: No background
-        Color activeColor = new Color(1f, 1f, 1f, 0.1f); 
-        Color inactiveColor = Color.clear; 
-        bg.color = isActive ? activeColor : inactiveColor;
-        
+        bg.sprite = GetPixelSprite();
+        bg.raycastTarget = true; // Ensure hover/click works
+
+        Material circleMat = CreateCircleButtonMaterial(isActive);
+        if (circleMat != null)
+        {
+            bg.material = circleMat;
+        }
+        else
+        {
+            // Fallback if no shader
+            bg.color = isActive ? new Color(1f, 1f, 1f, 0.2f) : Color.clear;
+        }
+
         // Button Logic
         Button btn = btnObj.GetComponent<Button>();
-        btn.onClick.AddListener(() => 
+        btn.transition = Selectable.Transition.None; // Disable default transition to avoid interference
+        btn.onClick.AddListener(() =>
         {
-            _controller.GoToPage(pageNumber); 
+            _controller.GoToPage(pageNumber);
         });
-        
+
+        // Hover Effect - apply to ALL buttons (even active)
+        AddPageButtonHoverEffect(btnObj, circleMat, isActive);
+
         // Text
         GameObject textObj = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
-        textObj.layer = LayerMask.NameToLayer("UI"); // Ensure text visible
+        textObj.layer = LayerMask.NameToLayer("UI");
         textObj.transform.SetParent(btnObj.transform, false);
-        
+
         RectTransform textRT = textObj.GetComponent<RectTransform>();
         textRT.anchorMin = Vector2.zero;
         textRT.anchorMax = Vector2.one;
         textRT.offsetMin = Vector2.zero;
         textRT.offsetMax = Vector2.zero;
         textRT.localScale = Vector3.one;
-        
+
         TextMeshProUGUI tmp = textObj.GetComponent<TextMeshProUGUI>();
         tmp.text = pageNumber.ToString();
         tmp.fontSize = 40;
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.color = Color.white;
         tmp.fontStyle = FontStyles.Bold;
+        tmp.raycastTarget = false; // CRITICAL: Disable raycast on text so it doesn't block hover events on the button
 
         return btnObj;
     }
@@ -410,6 +491,9 @@ public class RTTFilePagination : RTTCanvasBase
         {
              UpdateDisplay();
         }
+        
+        // Ensure nav buttons state is updated
+        UpdateNavigationButtonsState();
     }
     
     // Removed UpdateDisplayRoutine
@@ -429,6 +513,8 @@ public class RTTFilePagination : RTTCanvasBase
     private void UpdateDisplay()
     {
         Debug.Log($"[RTTFilePagination] UpdateDisplay: TotalPages={_totalPages}");
+        UpdateNavigationButtonsState(); // Sync nav buttons first
+
         if (_stackPagingTransform == null) 
         {
             Debug.LogError("[RTTFilePagination] _stackPagingTransform is NULL");
@@ -451,8 +537,25 @@ public class RTTFilePagination : RTTCanvasBase
             _pageButtons.Clear();
             
             // 2. Create New
+            // Limit to 9 buttons max
+            int maxButtons = 9;
             int startPage = 1;
-            int endPage = Mathf.Max(1, _totalPages);
+            int endPage = _totalPages;
+            
+            if (_totalPages > maxButtons)
+            {
+                // Calculate window centered on current page
+                int halfWindow = maxButtons / 2;
+                startPage = Mathf.Max(1, _currentPage - halfWindow);
+                endPage = startPage + maxButtons - 1;
+                
+                // Adjustment if near end
+                if (endPage > _totalPages)
+                {
+                    endPage = _totalPages;
+                    startPage = Mathf.Max(1, endPage - maxButtons + 1);
+                }
+            }
             
             Debug.Log($"[RTTFilePagination] Creating Buttons: {startPage} to {endPage}");
             
@@ -474,6 +577,15 @@ public class RTTFilePagination : RTTCanvasBase
         {
             Debug.LogError($"[RTTFilePagination] EXCEPTION: {e}");
         }
+    }
+    
+    private void UpdateNavigationButtonsState()
+    {
+        bool prevActive = _currentPage > 1;
+        bool nextActive = _currentPage < _totalPages;
+        
+        SetButtonState(_btnPrev, prevActive);
+        SetButtonState(_btnNext, nextActive);
     }
     
     private void UpdatePositionTracking()
@@ -542,4 +654,63 @@ public class RTTFilePagination : RTTCanvasBase
         return _pixelSprite;
     }
     #endregion
+}
+
+/// <summary>
+/// Helper component for pagination button hover effects.
+/// Uses IPointerEnterHandler/IPointerExitHandler for VR compatibility.
+/// </summary>
+public class PaginationButtonHover : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
+{
+    private Material _material;
+    private Color _originalColorA;
+    private Color _originalColorB;
+    private float _originalAlpha;
+    private Color _hoverColorA;
+    private Color _hoverColorB;
+    private float _hoverAlpha;
+
+    public void Initialize(Material mat, bool isActive)
+    {
+        _material = mat;
+
+        // Original colors based on active state
+        _originalColorA = isActive ? new Color(1f, 1f, 1f, 0.25f) : new Color(1f, 1f, 1f, 0f);
+        _originalColorB = isActive ? new Color(0.9f, 0.95f, 1f, 0.2f) : new Color(1f, 1f, 1f, 0f);
+        _originalAlpha = isActive ? 0.5f : 0f;
+
+        if (isActive)
+        {
+            // Do not change appearance on hover if active (selected)
+            _hoverColorA = _originalColorA;
+            _hoverColorB = _originalColorB;
+            _hoverAlpha = _originalAlpha;
+        }
+        else
+        {
+            // Normal hover for inactive buttons
+            _hoverColorA = new Color(1f, 1f, 1f, 0.25f);
+            _hoverColorB = new Color(0.9f, 0.95f, 1f, 0.2f);
+            _hoverAlpha = 0.5f;
+        }
+    }
+
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        // Respect interactable state
+        if (GetComponent<Button>() != null && !GetComponent<Button>().interactable) return;
+
+        if (_material == null) return;
+        _material.SetColor("_ColorA", _hoverColorA);
+        _material.SetColor("_ColorB", _hoverColorB);
+        _material.SetFloat("_GlassAlpha", _hoverAlpha);
+    }
+
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        if (_material == null) return;
+        _material.SetColor("_ColorA", _originalColorA);
+        _material.SetColor("_ColorB", _originalColorB);
+        _material.SetFloat("_GlassAlpha", _originalAlpha);
+    }
 }
