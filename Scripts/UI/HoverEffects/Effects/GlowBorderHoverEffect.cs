@@ -20,9 +20,6 @@ namespace VRWorkspace.UI.HoverEffects
         [Tooltip("Swap shader on hover for enhanced glow effect")]
         [SerializeField] private bool swapShader = true;
 
-        [Tooltip("Original shader name (when not hovered)")]
-        [SerializeField] private string normalShaderName = "Custom/GlowingElementBorder";
-
         [Tooltip("Hover shader name (when hovered)")]
         [SerializeField] private string hoverShaderName = "Custom/GlowingGlassBorder";
 

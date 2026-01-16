@@ -100,7 +100,7 @@ public class RTTFilePagination : RTTCanvasBase
         // Object stays inactive until Show() is called
     }
 
-    public void Show()
+    public new void Show()
     {
         // Cancel any pending fade
         if (_fadeCoroutine != null)
@@ -161,7 +161,7 @@ public class RTTFilePagination : RTTCanvasBase
         return 1f;
     }
 
-    public void Hide()
+    public new void Hide()
     {
         // Cancel any pending fade
         if (_fadeCoroutine != null)

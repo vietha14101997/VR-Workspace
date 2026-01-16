@@ -178,7 +178,7 @@ public static class VRInputFieldFactory
 
         // Add cursor change effect for text input
         hoverController.AddEffect(new CursorChangeHoverEffect()
-            .WithResourcePath("Textures/text_cursor"));
+            .WithResourcePath("icon_text_cursor"));
 
         // 10. VRButtonAnimation for ripple click effect
         VRButtonAnimation anim = hitArea.AddComponent<VRButtonAnimation>();
