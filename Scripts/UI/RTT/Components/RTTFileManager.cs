@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using TMPro;
 using System.Collections;
 using System.Collections.Generic;
@@ -297,6 +298,12 @@ public class RTTFileManager : MonoBehaviour
     private bool _isGridView = true;
     private Image _sortArrowImg; // Reference to arrow icon
 
+    // Ellipsis Popup References (for hidden breadcrumb folders)
+    private GameObject _ellipsisPopup;
+    private GameObject _ellipsisButton;
+    private List<(string name, string fullPath)> _hiddenFolders = new List<(string name, string fullPath)>();
+    private float _ellipsisPopupWidth; // Calculated width for popup
+
     private float _sortTriggerWidth = 200f; // Increased width (was 160f) to maintain aspect ratio with height
     
     private void CreateRow1(RectTransform parent)
@@ -554,16 +561,9 @@ public class RTTFileManager : MonoBehaviour
         crumbRT.offsetMin = new Vector2(20, 0); 
         crumbRT.offsetMax = new Vector2(-90, 0);
 
-        HorizontalLayoutGroup hlg = crumbContainer.AddComponent<HorizontalLayoutGroup>();
-        hlg.childControlWidth = false; // Use LayoutElement preferred sizes
-        hlg.childControlHeight = false; // Use fixed height
-        hlg.childForceExpandWidth = false;
-        hlg.childForceExpandHeight = false;
-        // Negative spacing to overlap buttons for chevron effect
-        // Reduced overlap to leave small gap between convex and concave edges
-        hlg.spacing = -68f * 0.45f;
-        hlg.childAlignment = TextAnchor.MiddleLeft;
-        hlg.padding = new RectOffset(0, 0, 0, 0); // No padding, buttons fill row height
+        // NOTE: NOT using HorizontalLayoutGroup to allow independent control of:
+        // - Visual position (left to right)
+        // - Sibling order (reversed, so left buttons have higher index = hit first by GraphicRaycaster)
     }
 
     private void CreateRow3(RectTransform parent)
@@ -712,10 +712,10 @@ public class RTTFileManager : MonoBehaviour
         string displayPath = path;
 
         // Create list of breadcrumb items
-        var breadcrumbs = new List<(string name, string fullPath)>();
+        var breadcrumbs = new List<(string name, string fullPath, bool isEllipsis)>();
 
         // Always add "Home" as first breadcrumb
-        breadcrumbs.Add(("Home", "root"));
+        breadcrumbs.Add(("Home", "root", false));
 
         // If path is not root, add subfolders
         if (path != "root" && !string.IsNullOrEmpty(path))
@@ -731,32 +731,105 @@ public class RTTFileManager : MonoBehaviour
                 string[] parts = displayPath.Split(new char[] { '/', '\\' }, System.StringSplitOptions.RemoveEmptyEntries);
                 string currentPath = rootPath;
 
+                var allFolders = new List<(string name, string fullPath)>();
                 foreach (string part in parts)
                 {
                     currentPath = System.IO.Path.Combine(currentPath, part);
-                    breadcrumbs.Add((part, currentPath));
+                    allFolders.Add((part, currentPath));
+                }
+
+                // Limit: Max 6 buttons total (Home + 5 folders OR Home + ... + 4 folders)
+                const int maxButtons = 6;
+                const int maxFoldersWithoutEllipsis = maxButtons - 1; // 5 folders after Home
+
+                if (allFolders.Count <= maxFoldersWithoutEllipsis)
+                {
+                    // No truncation needed
+                    _hiddenFolders.Clear();
+                    foreach (var folder in allFolders)
+                    {
+                        breadcrumbs.Add((folder.name, folder.fullPath, false));
+                    }
+                }
+                else
+                {
+                    // Need ellipsis: Home > ... > last 4 folders
+                    const int visibleFoldersAfterEllipsis = maxButtons - 2; // 4 folders after "..."
+
+                    // Store hidden folders for dropdown
+                    _hiddenFolders.Clear();
+                    int hiddenCount = allFolders.Count - visibleFoldersAfterEllipsis;
+                    for (int j = 0; j < hiddenCount; j++)
+                    {
+                        _hiddenFolders.Add((allFolders[j].name, allFolders[j].fullPath));
+                    }
+
+                    // Add "..." as second button (clickable - shows dropdown)
+                    breadcrumbs.Add(("...", "", true));
+
+                    // Add last N folders
+                    int startIndex = allFolders.Count - visibleFoldersAfterEllipsis;
+                    for (int j = startIndex; j < allFolders.Count; j++)
+                    {
+                        breadcrumbs.Add((allFolders[j].name, allFolders[j].fullPath, false));
+                    }
                 }
             }
         }
 
         // Create breadcrumb chevron buttons (connected style like reference image)
         // Strategy: All buttons are pill-shaped, left buttons overlap right buttons
-        // Use Canvas sortingOrder to control render order (higher = on top)
         float btnHeight = 68f; // Same height as sortTrigger button
         float btnWidth = _sortTriggerWidth * 1.25f;
         int totalCount = breadcrumbs.Count;
 
-        for (int i = 0; i < totalCount; i++)
+        // Create buttons in REVERSE order (right-to-left) for GraphicRaycaster priority
+        // Left buttons created LAST = higher sibling index = hit first
+        float overlapAmount = btnHeight * 0.45f; // Same as old HLG spacing
+        float effectiveWidth = btnWidth - overlapAmount;
+
+        // Cleanup old ellipsis popup if exists
+        if (_ellipsisPopup != null)
         {
-            var (name, fullPath) = breadcrumbs[i];
+            Destroy(_ellipsisPopup);
+            _ellipsisPopup = null;
+        }
+        _ellipsisButton = null;
+
+        // Calculate popup width: same as the "..." button width
+        _ellipsisPopupWidth = btnWidth;
+
+        for (int i = totalCount - 1; i >= 0; i--)
+        {
+            var (name, fullPath, isEllipsis) = breadcrumbs[i];
             string targetPath = fullPath;
             bool isLast = (i == totalCount - 1);
 
-            // zIndex: first button = 0 (front), last button = highest (back)
-            // So left button renders ON TOP of right button
             int zIndex = i;
+            GameObject btn = CreateBreadcrumbPillButton(name, targetPath, isLast, btnWidth, btnHeight, zIndex, totalCount, isEllipsis);
 
-            GameObject btn = CreateBreadcrumbPillButton(name, targetPath, isLast, btnWidth, btnHeight, zIndex, totalCount);
+            // Save reference to ellipsis button for popup
+            if (isEllipsis)
+            {
+                _ellipsisButton = btn;
+                CreateEllipsisPopup(btn.GetComponent<RectTransform>());
+            }
+
+            // Manual positioning (left-to-right visual order)
+            RectTransform btnRT = btn.GetComponent<RectTransform>();
+            btnRT.anchorMin = new Vector2(0, 0.5f);
+            btnRT.anchorMax = new Vector2(0, 0.5f);
+            btnRT.pivot = new Vector2(0, 0.5f);
+
+            // X position: each button offset by effectiveWidth (width - overlap)
+            float xPos = i * effectiveWidth;
+            btnRT.anchoredPosition = new Vector2(xPos, 0);
+
+            // Z-position for visual layering (left buttons closer to camera)
+            // This is secondary to sibling order but helps with any physics-based raycast
+            Vector3 pos = btnRT.localPosition;
+            pos.z = zIndex * -0.5f; // Lower zIndex = closer (more positive in local space toward camera)
+            btnRT.localPosition = pos;
         }
 
         Debug.Log($"[RTTFileManager] Created {breadcrumbs.Count} breadcrumbs for path: {path}");
@@ -767,8 +840,9 @@ public class RTTFileManager : MonoBehaviour
     /// Right side: convex rounded (pill end)
     /// Left side: concave curved (inward arc)
     /// </summary>
-    private GameObject CreateBreadcrumbPillButton(string label, string targetPath, bool isActive, float width, float height, int zIndex, int totalButtons)
+    private GameObject CreateBreadcrumbPillButton(string label, string targetPath, bool isActive, float width, float height, int zIndex, int totalButtons, bool isEllipsis = false)
     {
+        // Ellipsis uses primary color (clickable), active folder uses accent
         Color btnColor = isActive ? _accentColor : _primaryColor;
         string pathToNavigate = targetPath;
 
@@ -779,9 +853,7 @@ public class RTTFileManager : MonoBehaviour
         RectTransform btnRT = btnObj.AddComponent<RectTransform>();
         btnRT.sizeDelta = new Vector2(width, height);
 
-        // Z-position for render order (left buttons on top)
-        float zOffset = zIndex * 0.5f;
-        btnRT.localPosition = new Vector3(btnRT.localPosition.x, btnRT.localPosition.y, zOffset);
+        // NOTE: Z-position is set in UpdateBreadcrumbs after anchoredPosition is set
 
         // Background with appropriate shader
         Image bgImage = btnObj.AddComponent<Image>();
@@ -887,22 +959,39 @@ public class RTTFileManager : MonoBehaviour
         colors.pressedColor = new Color(0.85f, 0.85f, 0.85f);
         btn.colors = colors;
 
-        btn.onClick.AddListener(() => _controller?.NavigateTo(pathToNavigate));
-
-        // BoxCollider for VR raycast - adjusted to avoid overlap issues
-        BoxCollider col = btnObj.AddComponent<BoxCollider>();
-        if (isFirstButton)
+        if (!isEllipsis)
         {
-            // First button: full width collider
-            col.size = new Vector3(width, height, 0.1f);
-            col.center = new Vector3(0, 0, -0.05f);
+            // Normal breadcrumb: navigate to folder
+            btn.onClick.AddListener(() => _controller?.NavigateTo(pathToNavigate));
         }
         else
         {
-            // Chevron buttons: trim left side to avoid overlap with previous button
-            float trimLeft = curveR; // Trim concave area
-            col.size = new Vector3(width - trimLeft, height, 0.1f);
-            col.center = new Vector3(trimLeft * 0.5f, 0, -0.05f); // Shift center right
+            // Ellipsis: toggle dropdown showing hidden folders
+            btn.onClick.AddListener(ToggleEllipsisPopup);
+        }
+
+        // BoxCollider for all clickable buttons
+        BoxCollider col = btnObj.AddComponent<BoxCollider>();
+
+        // Calculate overlap amount
+        float overlapAmount = 68f * 0.45f; // ~30.6f
+        float safetyBuffer = 5f; // Extra buffer to ensure no overlap
+
+        if (isFirstButton)
+        {
+            // First button: trim RIGHT side where next button overlaps
+            float trimRight = overlapAmount + safetyBuffer;
+            col.size = new Vector3(width - trimRight, height, 0.1f);
+            col.center = new Vector3(-trimRight * 0.5f, 0, 0);
+        }
+        else
+        {
+            // Chevron buttons: trim LEFT side (overlap with previous) and RIGHT (overlap with next)
+            float trimLeft = overlapAmount + safetyBuffer;
+            float trimRight = (zIndex < totalButtons - 1) ? (overlapAmount + safetyBuffer) : 0;
+            float totalTrim = trimLeft + trimRight;
+            col.size = new Vector3(width - totalTrim, height, 0.1f);
+            col.center = new Vector3((trimLeft - trimRight) * 0.5f, 0, 0);
         }
 
         // Set layer
@@ -913,14 +1002,249 @@ public class RTTFileManager : MonoBehaviour
             textObj.layer = vrLayer;
         }
 
-        // LayoutElement for HorizontalLayoutGroup
-        LayoutElement le = btnObj.AddComponent<LayoutElement>();
-        le.preferredWidth = width;
-        le.preferredHeight = height;
-        le.minWidth = width;
-        le.flexibleWidth = 0;
+        // Add hover effect (change alpha like selected state) - only for non-active buttons
+        if (!isActive)
+        {
+            AddBreadcrumbHoverEffect(btnObj, bgImage, btnColor, isFirstButton);
+        }
 
         return btnObj;
+    }
+
+    /// <summary>
+    /// Adds hover effect to breadcrumb button using EventTrigger.
+    /// On hover: increases alpha to look like selected state.
+    /// </summary>
+    private void AddBreadcrumbHoverEffect(GameObject btnObj, Image bgImage, Color baseColor, bool isFirstButton)
+    {
+        EventTrigger trigger = btnObj.AddComponent<EventTrigger>();
+
+        // Hover values - first button needs lower multiplier due to shader differences
+        float normalAlpha = 0.2f;
+        float hoverAlpha = isFirstButton ? 0.3f : 0.4f; // First button uses less alpha increase
+
+        // PointerEnter - increase alpha
+        EventTrigger.Entry enterEntry = new EventTrigger.Entry();
+        enterEntry.eventID = EventTriggerType.PointerEnter;
+        enterEntry.callback.AddListener((data) =>
+        {
+            Material mat = bgImage.material;
+            if (mat == null) return;
+
+            if (isFirstButton)
+            {
+                // GlassGradientBackgroundWide shader - use same multipliers as normal but with accent color
+                Color colorA = new Color(_accentColor.r, _accentColor.g, _accentColor.b, hoverAlpha * 1.5f);
+                Color colorB = new Color(_accentColor.r, _accentColor.g, _accentColor.b, hoverAlpha * 0.5f);
+                mat.SetColor("_ColorA", colorA);
+                mat.SetColor("_ColorB", colorB);
+                mat.SetFloat("_GlassAlpha", hoverAlpha);
+            }
+            else
+            {
+                // ChevronBackground shader
+                mat.SetColor("_BackgroundColor", _accentColor);
+                mat.SetFloat("_BackgroundAlpha", hoverAlpha);
+            }
+        });
+        trigger.triggers.Add(enterEntry);
+
+        // PointerExit - restore normal alpha
+        EventTrigger.Entry exitEntry = new EventTrigger.Entry();
+        exitEntry.eventID = EventTriggerType.PointerExit;
+        exitEntry.callback.AddListener((data) =>
+        {
+            Material mat = bgImage.material;
+            if (mat == null) return;
+
+            if (isFirstButton)
+            {
+                // Restore to primary color
+                Color colorA = new Color(baseColor.r, baseColor.g, baseColor.b, normalAlpha * 1.5f);
+                Color colorB = new Color(baseColor.r, baseColor.g, baseColor.b, normalAlpha * 0.5f);
+                mat.SetColor("_ColorA", colorA);
+                mat.SetColor("_ColorB", colorB);
+                mat.SetFloat("_GlassAlpha", normalAlpha);
+            }
+            else
+            {
+                // Restore to primary color
+                mat.SetColor("_BackgroundColor", baseColor);
+                mat.SetFloat("_BackgroundAlpha", normalAlpha);
+            }
+        });
+        trigger.triggers.Add(exitEntry);
+    }
+
+    /// <summary>
+    /// Creates simple popup for ellipsis button showing hidden folders
+    /// Style: No border, glass background matching button, left-aligned text only
+    /// </summary>
+    private void CreateEllipsisPopup(RectTransform ellipsisButtonRT)
+    {
+        if (_hiddenFolders.Count == 0) return;
+
+        float itemHeight = 50f;
+        float verticalPadding = 12f;
+        float popupHeight = (_hiddenFolders.Count * itemHeight) + (verticalPadding * 2);
+
+        // Create popup container
+        _ellipsisPopup = new GameObject("EllipsisPopup");
+        _ellipsisPopup.transform.SetParent(_breadcrumbContainer, false);
+
+        RectTransform popupRT = _ellipsisPopup.AddComponent<RectTransform>();
+        popupRT.sizeDelta = new Vector2(_ellipsisPopupWidth, popupHeight);
+
+        // Position: anchor to left edge of ellipsis button, below it
+        popupRT.anchorMin = new Vector2(0, 0.5f);
+        popupRT.anchorMax = new Vector2(0, 0.5f);
+        popupRT.pivot = new Vector2(0, 1); // Top-left pivot
+
+        // Get ellipsis button position (it's at index 1, so xPos = 1 * effectiveWidth)
+        float btnHeight = 68f;
+        float overlapAmount = btnHeight * 0.45f;
+        float btnWidth = _sortTriggerWidth * 1.25f;
+        float effectiveWidth = btnWidth - overlapAmount;
+        float ellipsisX = effectiveWidth; // Index 1 position
+
+        popupRT.anchoredPosition = new Vector2(ellipsisX, -btnHeight / 2 - 8f);
+
+        // Background with strong glass effect (matching RTTPopupMenu style for better blur)
+        Image bgImage = _ellipsisPopup.AddComponent<Image>();
+        float aspect = _ellipsisPopupWidth / popupHeight;
+
+        Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
+        if (glassShader != null)
+        {
+            Material mat = new Material(glassShader);
+            mat.SetFloat("_Aspect", aspect);
+            mat.SetFloat("_CornerRadius", 0.06f); // Small rounded corners (matching sortTrigger button)
+            mat.SetFloat("_EdgePadding", 0.01f);
+
+            // Single color with transparent tint but high glass alpha for blur
+            Color glassColor = new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.15f);
+            mat.SetColor("_ColorA", glassColor);
+            mat.SetColor("_ColorB", glassColor); // Same color = no gradient
+            mat.SetFloat("_GlassAlpha", 0.45f); // High glass alpha for blur effect
+            mat.SetFloat("_FresnelPower", 2.2f);
+            mat.SetFloat("_FresnelStrength", 0.1f);
+
+            bgImage.material = mat;
+            bgImage.color = Color.white;
+        }
+        else
+        {
+            bgImage.color = new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.75f);
+        }
+
+        // Create folder items
+        for (int i = 0; i < _hiddenFolders.Count; i++)
+        {
+            var folder = _hiddenFolders[i];
+            CreateEllipsisPopupItem(folder.name, folder.fullPath, i, itemHeight, verticalPadding);
+        }
+
+        // Set layer
+        int vrLayer = LayerMask.NameToLayer("VirtualObjects");
+        if (vrLayer != -1)
+        {
+            SetLayerRecursively(_ellipsisPopup, vrLayer);
+        }
+
+        // Start hidden
+        _ellipsisPopup.SetActive(false);
+    }
+
+    /// <summary>
+    /// Creates a single item in the ellipsis popup
+    /// </summary>
+    private void CreateEllipsisPopupItem(string folderName, string folderPath, int index, float itemHeight, float verticalPadding)
+    {
+        float horizontalPadding = 20f;
+
+        GameObject itemObj = new GameObject($"Item_{folderName}");
+        itemObj.transform.SetParent(_ellipsisPopup.transform, false);
+
+        RectTransform itemRT = itemObj.AddComponent<RectTransform>();
+        itemRT.anchorMin = new Vector2(0, 1);
+        itemRT.anchorMax = new Vector2(1, 1);
+        itemRT.pivot = new Vector2(0.5f, 1);
+        itemRT.sizeDelta = new Vector2(0, itemHeight);
+        itemRT.anchoredPosition = new Vector2(0, -verticalPadding - (index * itemHeight));
+
+        // Background for hover effect (starts transparent)
+        Image btnBg = itemObj.AddComponent<Image>();
+        btnBg.color = Color.clear;
+        btnBg.raycastTarget = true;
+
+        // Button with no color transition (we handle hover via EventTrigger)
+        Button btn = itemObj.AddComponent<Button>();
+        btn.targetGraphic = btnBg;
+        btn.transition = Selectable.Transition.None;
+
+        string path = folderPath;
+        btn.onClick.AddListener(() => OnHiddenFolderSelected(path));
+
+        // Add hover effect via EventTrigger (ColorTint doesn't work with Color.clear)
+        Color hoverColor = new Color(0f, 0f, 0f, 0.27f); // Dark hover like gridItem
+        EventTrigger trigger = itemObj.AddComponent<EventTrigger>();
+
+        EventTrigger.Entry enterEntry = new EventTrigger.Entry();
+        enterEntry.eventID = EventTriggerType.PointerEnter;
+        enterEntry.callback.AddListener((data) => { btnBg.color = hoverColor; });
+        trigger.triggers.Add(enterEntry);
+
+        EventTrigger.Entry exitEntry = new EventTrigger.Entry();
+        exitEntry.eventID = EventTriggerType.PointerExit;
+        exitEntry.callback.AddListener((data) => { btnBg.color = Color.clear; });
+        trigger.triggers.Add(exitEntry);
+
+        // Text label (left aligned)
+        GameObject textObj = new GameObject("Text");
+        textObj.transform.SetParent(itemObj.transform, false);
+
+        RectTransform textRT = textObj.AddComponent<RectTransform>();
+        textRT.anchorMin = Vector2.zero;
+        textRT.anchorMax = Vector2.one;
+        textRT.offsetMin = new Vector2(horizontalPadding, 0);
+        textRT.offsetMax = new Vector2(-horizontalPadding, 0);
+
+        TextMeshProUGUI txt = textObj.AddComponent<TextMeshProUGUI>();
+        txt.text = folderName;
+        txt.font = _font;
+        txt.fontSize = 26;
+        txt.color = Color.white;
+        txt.alignment = TextAlignmentOptions.MidlineLeft; // Left aligned
+        txt.raycastTarget = false;
+
+        // BoxCollider for VR raycast
+        BoxCollider col = itemObj.AddComponent<BoxCollider>();
+        col.size = new Vector3(_ellipsisPopupWidth, itemHeight, 0.1f);
+        col.center = Vector3.zero;
+    }
+
+    /// <summary>
+    /// Toggle ellipsis popup visibility
+    /// </summary>
+    private void ToggleEllipsisPopup()
+    {
+        if (_ellipsisPopup == null) return;
+        _ellipsisPopup.SetActive(!_ellipsisPopup.activeSelf);
+    }
+
+    /// <summary>
+    /// Handle selection of a hidden folder from ellipsis popup
+    /// </summary>
+    private void OnHiddenFolderSelected(string path)
+    {
+        // Hide popup
+        if (_ellipsisPopup != null)
+        {
+            _ellipsisPopup.SetActive(false);
+        }
+
+        // Navigate to selected folder
+        _controller?.NavigateTo(path);
     }
 
     private void OnSearchValueChanged(string value)
