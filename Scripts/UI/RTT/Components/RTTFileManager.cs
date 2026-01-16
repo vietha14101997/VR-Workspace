@@ -791,7 +791,7 @@ public class RTTFileManager : MonoBehaviour
         bool isFirstButton = (zIndex == 0);
 
         // Glass background style (like MainMenu button hover state)
-        float glassAlpha = 0.35f; // Semi-transparent glass effect
+        float glassAlpha = 0.2f; // Semi-transparent glass effect
 
         if (isFirstButton)
         {
