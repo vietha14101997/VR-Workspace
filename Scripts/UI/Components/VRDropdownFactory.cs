@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections.Generic;
+using VRWorkspace.UI.HoverEffects;
 
 /// <summary>
 /// Factory class để tạo VR Dropdown với đầy đủ hiệu ứng:
@@ -153,22 +154,38 @@ public static class VRDropdownFactory
         btn.targetGraphic = bgImg;
         btn.transition = Selectable.Transition.None;
 
-        // 8. VRButtonAnimation cho hover effects
+        // 8. Hover effects - using unified HoverEffectController
+        HoverEffectController hoverController = hitArea.AddComponent<HoverEffectController>();
+        hoverController.TargetVisuals = visuals.transform;
+
+        // Add glow border and background effects
+        hoverController.AddEffect(new GlowBorderHoverEffect()
+            .WithShaderSwap(true)
+            .WithBorderMultiplier(1f));
+
+        hoverController.AddEffect(new BackgroundHoverEffect());
+
+        if (config.popAmount > 0)
+        {
+            hoverController.AddEffect(new ZPopHoverEffect()
+                .WithPopAmount(config.popAmount));
+        }
+
+        // 9. VRButtonAnimation for ripple click effect
         VRButtonAnimation anim = hitArea.AddComponent<VRButtonAnimation>();
         anim.targetVisuals = visuals.transform;
-        anim.popAmount = config.popAmount;
 
-        // 9. VRDropdown component TRƯỚC khi tạo panel
+        // 10. VRDropdown component TRƯỚC khi tạo panel
         VRDropdown dropdown = wrapper.AddComponent<VRDropdown>();
 
-        // 10. Dropdown Panel
+        // 11. Dropdown Panel
         GameObject dropdownPanel = CreateDropdownPanel(wrapper.transform, config, valueTxt, onValueChanged);
         dropdownPanel.SetActive(false);
 
-        // 11. Initialize dropdown component
+        // 12. Initialize dropdown component
         dropdown.Initialize(config.options, config.defaultIndex, valueTxt, dropdownPanel, onValueChanged);
 
-        // 12. Toggle dropdown on click (use ToggleDropdown to handle force hover)
+        // 13. Toggle dropdown on click (use ToggleDropdown to handle force hover)
         btn.onClick.AddListener(() =>
         {
             dropdown.ToggleDropdown();
@@ -1025,43 +1042,51 @@ public static class VRDropdownFactory
         }
         borderRT.anchoredPosition = new Vector2(0f, yOffset);
 
-        // Border image with GlowingGlassBorder shader
+        // Border image with GlowingElementBorder shader
         Image borderImg = borderObj.AddComponent<Image>();
         borderImg.sprite = GetPixelSprite();
         borderImg.raycastTarget = false;
-        borderImg.color = Color.clear; // Start invisible, VROptionHoverEffect will control alpha
-
-        // Add VROptionHoverEffect component for hover animation
-        // Pass config values for consistent border styling with panel
-        VROptionHoverEffect hoverEffect = option.AddComponent<VROptionHoverEffect>();
-        hoverEffect.borderImage = borderImg;
-        hoverEffect.glowColor = config.themeColor;
+        borderImg.color = Color.clear; // Start invisible, HoverEffectController will control alpha
 
         // Calculate shader parameters to match panel border visually
-        // Panel border uses parameters scaled by heightRatio
         float heightRatio = config.BoxHeight / panelHeight;
-        
-        // CRITICAL: Use SAME edgePadding as panel for horizontal alignment
-        // In shader, edge position = 0.5 - padding (independent of aspect)
-        // So same edgePadding = same horizontal edge position
-        hoverEffect.edgePadding = config.edgePadding * 3.5f / 3f;
-
-        // For cornerRadius, borderWidth, glowWidth - scale based on height ratio
-        // to maintain proportional appearance for the shorter option height
         float optionHeightRatio = optionHeight / panelHeight;
-        hoverEffect.cornerRadius = config.cornerRadius * heightRatio / optionHeightRatio;
-        hoverEffect.borderWidth = config.borderWidth * heightRatio / optionHeightRatio;
-        hoverEffect.glowWidth = config.glowWidth * heightRatio / optionHeightRatio;
-        hoverEffect.glowIntensity = config.glowIntensity;
+        float scaledEdgePadding = config.edgePadding * 3.5f / 3f;
+        float scaledCornerRadius = Mathf.Min(config.cornerRadius * heightRatio / optionHeightRatio, 0.4f);
+        float scaledBorderWidth = config.borderWidth * heightRatio / optionHeightRatio;
+        float scaledGlowWidth = config.glowWidth * heightRatio / optionHeightRatio;
 
-        // Clamp cornerRadius to prevent visual issues with short options
-        float maxCornerRadius = 0.4f; // Max 40% of height
-        hoverEffect.cornerRadius = Mathf.Min(hoverEffect.cornerRadius, maxCornerRadius);
+        // Setup border material
+        Shader glowShader = Shader.Find("Custom/GlowingElementBorder");
+        if (glowShader != null)
+        {
+            Material borderMat = new Material(glowShader);
+            float aspect = borderWidth / (adjustedBorderHeight + 10f);
+            borderMat.SetFloat("_Aspect", aspect);
+            borderMat.SetFloat("_EdgePadding", scaledEdgePadding);
+            borderMat.SetFloat("_CornerRadius", scaledCornerRadius);
+            borderMat.SetFloat("_BorderWidth", scaledBorderWidth);
+            borderMat.SetFloat("_GlowWidth", scaledGlowWidth);
+            borderMat.SetFloat("_GlowIntensity", config.glowIntensity);
+            Color glowCol = Color.Lerp(config.themeColor, Color.white, 0.75f);
+            borderMat.SetColor("_GlowColor", glowCol);
+            borderImg.material = borderMat;
+        }
 
-        // If selected, show subtle border
+        // Add HoverEffectController for hover animation
+        HoverEffectController hoverController = option.AddComponent<HoverEffectController>();
+        hoverController.TargetVisuals = option.transform;
+
+        // Add color effect to control border alpha
+        hoverController.AddEffect(new ColorHoverEffect()
+            .WithTargetChild("HoverBorder")
+            .WithHoverColor(Color.white)
+            .WithAlphaOnly(true));
+
+        // If selected, show border
         if (isSelected)
         {
-            hoverEffect.SetSelected(true);
+            hoverController.SetForceHover(true);
         }
 
         // BoxCollider cho VR raycast (non-RTT mode)
@@ -1198,7 +1223,7 @@ public static class VRDropdownFactory
         // Register option with hover effect
         if (dropdownComponent != null)
         {
-            dropdownComponent.RegisterOption(index, optBg, checkImg, config.themeColor, hoverEffect);
+            dropdownComponent.RegisterOption(index, optBg, checkImg, config.themeColor, hoverController);
         }
     }
 
@@ -1361,7 +1386,7 @@ public class VRDropdown : MonoBehaviour
     private TextMeshProUGUI _valueTxt;
     private GameObject _dropdownPanel;
     private System.Action<int, string> _onValueChanged;
-    private VRButtonAnimation _buttonAnimation;  // Reference to button animation for hover state
+    private HoverEffectController _hoverController;  // Reference to hover controller for dropdown button
 
     // For RTT mode: create a world-space floating panel to avoid RenderTexture clipping
     private RTTCanvasBase _rttCanvasBase;
@@ -1378,7 +1403,7 @@ public class VRDropdown : MonoBehaviour
         public Image background;
         public Image checkmark;
         public Color themeColor;
-        public VROptionHoverEffect hoverEffect;
+        public HoverEffectController hoverController;
     }
     private Dictionary<int, OptionRef> _optionRefs = new Dictionary<int, OptionRef>();
 
@@ -1397,22 +1422,22 @@ public class VRDropdown : MonoBehaviour
         _dropdownPanel = dropdownPanel;
         _onValueChanged = onValueChanged;
 
-        // Find VRButtonAnimation in HitArea child
+        // Find HoverEffectController in HitArea child
         var hitArea = transform.Find("HitArea");
         if (hitArea != null)
         {
-            _buttonAnimation = hitArea.GetComponent<VRButtonAnimation>();
+            _hoverController = hitArea.GetComponent<HoverEffectController>();
         }
     }
 
-    public void RegisterOption(int index, Image background, Image checkmark, Color themeColor, VROptionHoverEffect hoverEffect = null)
+    public void RegisterOption(int index, Image background, Image checkmark, Color themeColor, HoverEffectController hoverController = null)
     {
         _optionRefs[index] = new OptionRef
         {
             background = background,
             checkmark = checkmark,
             themeColor = themeColor,
-            hoverEffect = hoverEffect
+            hoverController = hoverController
         };
     }
 
@@ -1436,9 +1461,9 @@ public class VRDropdown : MonoBehaviour
                 kvp.Value.checkmark.color = Color.clear;
             }
             // Clear selected state for hover effect
-            if (kvp.Value.hoverEffect != null)
+            if (kvp.Value.hoverController != null)
             {
-                kvp.Value.hoverEffect.SetSelected(false);
+                kvp.Value.hoverController.SetForceHover(false);
             }
         }
 
@@ -1463,9 +1488,9 @@ public class VRDropdown : MonoBehaviour
                 optRef.checkmark.color = Color.white;
             }
             // Set selected state for hover effect
-            if (optRef.hoverEffect != null)
+            if (optRef.hoverController != null)
             {
-                optRef.hoverEffect.SetSelected(true);
+                optRef.hoverController.SetForceHover(true);
             }
         }
     }
@@ -1553,9 +1578,9 @@ public class VRDropdown : MonoBehaviour
         }
 
         // Release force hover when panel closes
-        if (_buttonAnimation != null)
+        if (_hoverController != null)
         {
-            _buttonAnimation.SetForceHover(false);
+            _hoverController.SetForceHover(false);
         }
         // Clear static reference
         if (CurrentlyOpenDropdown == this)
@@ -1588,9 +1613,9 @@ public class VRDropdown : MonoBehaviour
             }
         }
         // Force hover when panel opens
-        if (_buttonAnimation != null)
+        if (_hoverController != null)
         {
-            _buttonAnimation.SetForceHover(true);
+            _hoverController.SetForceHover(true);
         }
         // Set static reference
         CurrentlyOpenDropdown = this;
@@ -1793,14 +1818,14 @@ public class VRDropdown : MonoBehaviour
                     _onValueChanged?.Invoke(capturedIndex, displayValue);
                 });
 
-                // Fix Issue 1: Restore _isSelected state on cloned VROptionHoverEffect
-                // When panel is cloned, VROptionHoverEffect instances lose their selected state
-                VROptionHoverEffect hoverEffect = btn.GetComponent<VROptionHoverEffect>();
-                if (hoverEffect != null)
+                // Restore selected state on cloned HoverEffectController
+                // When panel is cloned, HoverEffectController instances lose their force hover state
+                HoverEffectController hoverController = btn.GetComponent<HoverEffectController>();
+                if (hoverController != null)
                 {
                     // Set selected state for the currently selected option
                     bool isSelected = (capturedIndex == _selectedIndex);
-                    hoverEffect.SetSelected(isSelected);
+                    hoverController.SetForceHover(isSelected);
                 }
 
                 optionIndex++;

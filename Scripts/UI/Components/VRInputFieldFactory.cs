@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using TMPro;
+using VRWorkspace.UI.HoverEffects;
 
 /// <summary>
 /// Factory class để tạo VR Input Field với đầy đủ hiệu ứng:
@@ -9,7 +10,7 @@ using TMPro;
 /// - Glowing border với hover effect
 /// - Label nhỏ phía trên trái (bên ngoài box)
 /// - Input text bên trong box
-/// - VRButtonAnimation cho hover effects
+/// - HoverEffectController cho hover effects (glow, z-pop, cursor change)
 /// - BoxCollider cho VR raycast
 /// - VRKeyboard integration cho virtual keyboard trong VR
 ///
@@ -158,13 +159,32 @@ public static class VRInputFieldFactory
         // 8. Content (InputField)
         TMP_InputField inputField = CreateInputContent(visuals.transform, config);
 
-        // 9. VRButtonAnimation cho hover effects
+        // 9. Hover effects - using unified HoverEffectController
+        HoverEffectController hoverController = hitArea.AddComponent<HoverEffectController>();
+        hoverController.TargetVisuals = visuals.transform;
+
+        // Add glow border effect (same multiplier as buttons for subtle effect)
+        hoverController.AddEffect(new GlowBorderHoverEffect()
+            .WithShaderSwap(true)
+            .WithBorderMultiplier(1f));
+
+        hoverController.AddEffect(new BackgroundHoverEffect());
+
+        if (config.popAmount > 0)
+        {
+            hoverController.AddEffect(new ZPopHoverEffect()
+                .WithPopAmount(config.popAmount));
+        }
+
+        // Add cursor change effect for text input
+        hoverController.AddEffect(new CursorChangeHoverEffect()
+            .WithResourcePath("Textures/text_cursor"));
+
+        // 10. VRButtonAnimation for ripple click effect
         VRButtonAnimation anim = hitArea.AddComponent<VRButtonAnimation>();
         anim.targetVisuals = visuals.transform;
-        anim.popAmount = config.popAmount;
-        anim.hoverBorderMultiplier = 2f; // Input fields have thicker border when hovering
 
-        // 10. Setup callbacks
+        // 11. Setup callbacks
         if (onValueChanged != null)
         {
             inputField.onValueChanged.AddListener((value) => onValueChanged(value));
@@ -174,7 +194,7 @@ public static class VRInputFieldFactory
             inputField.onEndEdit.AddListener((value) => onEndEdit(value));
         }
 
-        // 11. Setup VR Keyboard integration
+        // 12. Setup VR Keyboard integration
         // Add click handler to show VR keyboard when input field is clicked
         SetupVRKeyboardIntegration(hitArea, inputField);
 

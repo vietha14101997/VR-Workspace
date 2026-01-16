@@ -7,13 +7,12 @@ using TMPro;
 /// Trigger component for VR Input Fields.
 /// Handles click/pointer events to show VR keyboard.
 /// Blocks system keyboard input and redirects to virtual keyboard.
-/// Changes reticle to text cursor on hover.
+/// NOTE: Hover effect (cursor change) is now handled by HoverEffectController.
 /// </summary>
-public class VRInputFieldTrigger : MonoBehaviour, IPointerClickHandler, IPointerDownHandler, IPointerEnterHandler, IPointerExitHandler
+public class VRInputFieldTrigger : MonoBehaviour, IPointerClickHandler, IPointerDownHandler
 {
     private TMP_InputField _inputField;
     private bool _isInitialized = false;
-    private Sprite _textCursorSprite;
 
     /// <summary>
     /// Initialize with the target input field
@@ -22,9 +21,6 @@ public class VRInputFieldTrigger : MonoBehaviour, IPointerClickHandler, IPointer
     {
         _inputField = inputField;
         _isInitialized = true;
-
-        // Load text cursor icon from Resources
-        LoadTextCursorSprite();
 
         if (_inputField != null)
         {
@@ -40,20 +36,6 @@ public class VRInputFieldTrigger : MonoBehaviour, IPointerClickHandler, IPointer
             if (VRKeyboardManager.Instance != null)
             {
                 VRKeyboardManager.Instance.RegisterInputField(_inputField);
-            }
-        }
-    }
-
-    private void LoadTextCursorSprite()
-    {
-        _textCursorSprite = Resources.Load<Sprite>("icon_text_cursor");
-        if (_textCursorSprite == null)
-        {
-            // Try loading as Texture2D
-            Texture2D tex = Resources.Load<Texture2D>("icon_text_cursor");
-            if (tex != null)
-            {
-                _textCursorSprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
             }
         }
     }
@@ -192,31 +174,6 @@ public class VRInputFieldTrigger : MonoBehaviour, IPointerClickHandler, IPointer
 
         // Select the input field for visual feedback
         EventSystem.current?.SetSelectedGameObject(_inputField.gameObject);
-    }
-
-    /// <summary>
-    /// Handle pointer enter - change reticle to text cursor
-    /// </summary>
-    public void OnPointerEnter(PointerEventData eventData)
-    {
-        // Không đổi cursor nếu input field bị khóa
-        if (_inputField == null || !_inputField.interactable) return;
-
-        if (VRGazeReticle.Instance != null && _textCursorSprite != null)
-        {
-            VRGazeReticle.Instance.SetCursorSprite(_textCursorSprite);
-        }
-    }
-
-    /// <summary>
-    /// Handle pointer exit - reset reticle to default
-    /// </summary>
-    public void OnPointerExit(PointerEventData eventData)
-    {
-        if (VRGazeReticle.Instance != null)
-        {
-            VRGazeReticle.Instance.ResetCursorSprite();
-        }
     }
 
     /// <summary>

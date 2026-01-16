@@ -4,6 +4,7 @@ using TMPro;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using VRWorkspace.UI.HoverEffects;
 
 /// <summary>
 /// Menu item configuration for RTTMainMenu.
@@ -247,8 +248,8 @@ public class RTTMainMenu : MonoBehaviour
         // Create button and capture reference
         GameObject buttonObj = VRButtonFactory.CreateButton(transform, config, null);
 
-        // Get animation component for hover control
-        VRButtonAnimation anim = buttonObj.GetComponentInChildren<VRButtonAnimation>();
+        // Get hover controller for hover state control
+        HoverEffectController hoverController = buttonObj.GetComponentInChildren<HoverEffectController>();
 
         // Wire click handler with hover clear and animation wait
         var button = buttonObj.GetComponentInChildren<UnityEngine.UI.Button>();
@@ -257,7 +258,7 @@ public class RTTMainMenu : MonoBehaviour
             button.onClick.AddListener(() =>
             {
                 // Start coroutine to wait for hover animation before executing action
-                StartCoroutine(ExecuteAfterHoverClear(anim, itemId));
+                StartCoroutine(ExecuteAfterHoverClear(hoverController, itemId));
             });
         }
     }
@@ -266,7 +267,7 @@ public class RTTMainMenu : MonoBehaviour
     /// Reset hover state immediately and execute action.
     /// Starts async preparation immediately, then opens after hover animation.
     /// </summary>
-    private IEnumerator ExecuteAfterHoverClear(VRButtonAnimation anim, string itemId)
+    private IEnumerator ExecuteAfterHoverClear(HoverEffectController hoverController, string itemId)
     {
         // Start preparing the app frame immediately (in background)
         // This hides the initialization lag during hover animation
@@ -277,9 +278,9 @@ public class RTTMainMenu : MonoBehaviour
 
         // Reset hover state immediately (snap to default, no animation)
         // This ensures button is in correct state when returning to menu
-        if (anim != null)
+        if (hoverController != null)
         {
-            anim.ResetHoverState(immediate: true);
+            hoverController.ResetHoverState(immediate: true);
         }
 
         // Wait for hover reset animation + small delay for visual feedback

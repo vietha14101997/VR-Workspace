@@ -4,6 +4,7 @@ using UnityEngine.EventSystems;
 using TMPro;
 using System;
 using System.Collections.Generic;
+using VRWorkspace.UI.HoverEffects;
 
 /// <summary>
 /// RTT-based Mobile Virtual Keyboard.
@@ -2053,236 +2054,38 @@ public class RTTMobileKeyboard : RTTCanvasBase
 
     private void AddHoverEffect(GameObject keyObj, Color baseColor)
     {
-        // Use simple KeyHoverEffect - VRButtonAnimation breaks layout by modifying transform
-        var hover = keyObj.AddComponent<KeyHoverEffect>();
-        hover.Initialize(themeColor, this);
+        // Use HoverEffectController with GlowBorderHoverEffect
+        var hoverController = keyObj.AddComponent<HoverEffectController>();
+        hoverController.TargetVisuals = keyObj.transform;
+
+        // Add glow border effect with enhanced intensity for keyboard keys
+        hoverController.AddEffect(new GlowBorderHoverEffect()
+            .WithShaderSwap(true)
+            .WithGlowIntensity(5f)
+            .WithBorderMultiplier(1.5f)
+            .WithGlowColor(themeColor));
+
+        // Subscribe to hover state changes for RTT re-render
+        hoverController.OnHoverStateChanged += (isHovered) => MarkDirty();
     }
 
     private void AddSpaceHoverEffect(GameObject keyObj, Color baseColor, float edgePadding, float aspect)
     {
-        // Use SpaceKeyHoverEffect with aspect-adjusted parameters
-        var hover = keyObj.AddComponent<SpaceKeyHoverEffect>();
-        hover.Initialize(themeColor, this, edgePadding, aspect);
+        // Use HoverEffectController with GlowBorderHoverEffect for space key
+        var hoverController = keyObj.AddComponent<HoverEffectController>();
+        hoverController.TargetVisuals = keyObj.transform;
+
+        // Add glow border effect with enhanced intensity for space key
+        hoverController.AddEffect(new GlowBorderHoverEffect()
+            .WithShaderSwap(true)
+            .WithGlowIntensity(5f)
+            .WithBorderMultiplier(1.5f)
+            .WithGlowColor(themeColor));
+
+        // Subscribe to hover state changes for RTT re-render
+        hoverController.OnHoverStateChanged += (isHovered) => MarkDirty();
     }
     #endregion
-}
-
-/// <summary>
-/// Simple hover effect for keyboard keys. Only changes border glow, no transform modifications.
-/// RTTRaycastManager will call OnPointerEnter/Exit through ExecuteEvents.
-/// </summary>
-public class KeyHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
-{
-    private Material _borderMaterial;
-    private Color _hoverGlowColor;
-    private RTTMobileKeyboard _keyboard;
-    private Shader _originalShader;
-    private Shader _hoverShader;
-
-    // Saved properties
-    private float _savedAspect;
-    private float _savedCornerRadius;
-    private float _savedEdgePadding;
-    private float _savedBorderWidth;
-    private float _savedGlowWidth;
-    private float _savedGlowIntensity;
-    private Color _savedGlowColor;
-
-    public void Initialize(Color themeColor, RTTMobileKeyboard keyboard)
-    {
-        _keyboard = keyboard;
-        _hoverGlowColor = themeColor;
-        _hoverShader = Shader.Find("Custom/GlowingGlassBorder");
-
-        // Find border child
-        Transform borderTransform = transform.Find("Border");
-        if (borderTransform != null)
-        {
-            var borderImage = borderTransform.GetComponent<Image>();
-            if (borderImage != null && borderImage.material != null)
-            {
-                // Create material instance
-                _borderMaterial = new Material(borderImage.material);
-                borderImage.material = _borderMaterial;
-                _originalShader = _borderMaterial.shader;
-
-                // Save ALL original properties (including geometry)
-                if (_borderMaterial.HasProperty("_Aspect"))
-                    _savedAspect = _borderMaterial.GetFloat("_Aspect");
-                if (_borderMaterial.HasProperty("_CornerRadius"))
-                    _savedCornerRadius = _borderMaterial.GetFloat("_CornerRadius");
-                if (_borderMaterial.HasProperty("_EdgePadding"))
-                    _savedEdgePadding = _borderMaterial.GetFloat("_EdgePadding");
-                if (_borderMaterial.HasProperty("_BorderWidth"))
-                    _savedBorderWidth = _borderMaterial.GetFloat("_BorderWidth");
-                if (_borderMaterial.HasProperty("_GlowWidth"))
-                    _savedGlowWidth = _borderMaterial.GetFloat("_GlowWidth");
-                if (_borderMaterial.HasProperty("_GlowIntensity"))
-                    _savedGlowIntensity = _borderMaterial.GetFloat("_GlowIntensity");
-                if (_borderMaterial.HasProperty("_GlowColor"))
-                    _savedGlowColor = _borderMaterial.GetColor("_GlowColor");
-            }
-        }
-    }
-
-    public void OnPointerEnter(PointerEventData eventData)
-    {
-        if (_borderMaterial == null) return;
-
-        // Switch to hover shader for better glow effect
-        if (_hoverShader != null)
-            _borderMaterial.shader = _hoverShader;
-
-        // Restore geometry properties after shader change
-        _borderMaterial.SetFloat("_Aspect", _savedAspect);
-        _borderMaterial.SetFloat("_CornerRadius", _savedCornerRadius);
-        _borderMaterial.SetFloat("_EdgePadding", _savedEdgePadding);
-
-        // Apply hover effect
-        _borderMaterial.SetColor("_GlowColor", _hoverGlowColor);
-        _borderMaterial.SetFloat("_GlowIntensity", _savedGlowIntensity * 2f);
-        _borderMaterial.SetFloat("_GlowWidth", _savedGlowWidth * 2f);
-        _borderMaterial.SetFloat("_BorderWidth", _savedBorderWidth * 1.5f);
-
-        _keyboard?.MarkDirty();
-    }
-
-    public void OnPointerExit(PointerEventData eventData)
-    {
-        if (_borderMaterial == null) return;
-
-        // Restore original shader
-        if (_originalShader != null)
-            _borderMaterial.shader = _originalShader;
-
-        // Restore ALL properties
-        _borderMaterial.SetFloat("_Aspect", _savedAspect);
-        _borderMaterial.SetFloat("_CornerRadius", _savedCornerRadius);
-        _borderMaterial.SetFloat("_EdgePadding", _savedEdgePadding);
-        _borderMaterial.SetColor("_GlowColor", _savedGlowColor);
-        _borderMaterial.SetFloat("_GlowIntensity", _savedGlowIntensity);
-        _borderMaterial.SetFloat("_GlowWidth", _savedGlowWidth);
-        _borderMaterial.SetFloat("_BorderWidth", _savedBorderWidth);
-
-        _keyboard?.MarkDirty();
-    }
-
-    private void OnDestroy()
-    {
-        if (_borderMaterial != null)
-            Destroy(_borderMaterial);
-    }
-}
-
-/// <summary>
-/// Hover effect for Space key using wide element shader.
-/// Switches to GlowingGlassBorder on hover like KeyHoverEffect does.
-/// </summary>
-public class SpaceKeyHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
-{
-    private Material _borderMaterial;
-    private Color _hoverGlowColor;
-    private RTTMobileKeyboard _keyboard;
-    private float _spaceEdgePadding;
-    private float _spaceAspect;
-    private Shader _originalShader;
-    private Shader _hoverShader;
-
-    // Saved properties
-    private float _savedAspect;
-    private float _savedCornerRadius;
-    private float _savedEdgePadding;
-    private float _savedBorderWidth;
-    private float _savedGlowWidth;
-    private float _savedGlowIntensity;
-    private Color _savedGlowColor;
-
-    public void Initialize(Color themeColor, RTTMobileKeyboard keyboard, float edgePadding, float aspect)
-    {
-        _keyboard = keyboard;
-        _hoverGlowColor = themeColor;
-        _spaceEdgePadding = edgePadding;
-        _spaceAspect = aspect;
-        _hoverShader = Shader.Find("Custom/GlowingGlassBorderWide");
-
-        // Find border child
-        Transform borderTransform = transform.Find("Border");
-        if (borderTransform != null)
-        {
-            var borderImage = borderTransform.GetComponent<Image>();
-            if (borderImage != null && borderImage.material != null)
-            {
-                // Create material instance
-                _borderMaterial = new Material(borderImage.material);
-                borderImage.material = _borderMaterial;
-                _originalShader = _borderMaterial.shader;
-
-                // Save ALL original properties
-                if (_borderMaterial.HasProperty("_Aspect"))
-                    _savedAspect = _borderMaterial.GetFloat("_Aspect");
-                if (_borderMaterial.HasProperty("_CornerRadius"))
-                    _savedCornerRadius = _borderMaterial.GetFloat("_CornerRadius");
-                if (_borderMaterial.HasProperty("_EdgePadding"))
-                    _savedEdgePadding = _borderMaterial.GetFloat("_EdgePadding");
-                if (_borderMaterial.HasProperty("_BorderWidth"))
-                    _savedBorderWidth = _borderMaterial.GetFloat("_BorderWidth");
-                if (_borderMaterial.HasProperty("_GlowWidth"))
-                    _savedGlowWidth = _borderMaterial.GetFloat("_GlowWidth");
-                if (_borderMaterial.HasProperty("_GlowIntensity"))
-                    _savedGlowIntensity = _borderMaterial.GetFloat("_GlowIntensity");
-                if (_borderMaterial.HasProperty("_GlowColor"))
-                    _savedGlowColor = _borderMaterial.GetColor("_GlowColor");
-            }
-        }
-    }
-
-    public void OnPointerEnter(PointerEventData eventData)
-    {
-        if (_borderMaterial == null) return;
-
-        // Switch to hover shader for better glow effect (same as KeyHoverEffect)
-        if (_hoverShader != null)
-            _borderMaterial.shader = _hoverShader;
-
-        // Restore geometry properties after shader change
-        _borderMaterial.SetFloat("_Aspect", _savedAspect);
-        _borderMaterial.SetFloat("_CornerRadius", _savedCornerRadius);
-        _borderMaterial.SetFloat("_EdgePadding", _savedEdgePadding);
-
-        // Apply hover effect
-        _borderMaterial.SetColor("_GlowColor", _hoverGlowColor);
-        _borderMaterial.SetFloat("_GlowIntensity", _savedGlowIntensity * 2f);
-        _borderMaterial.SetFloat("_GlowWidth", _savedGlowWidth * 2f);
-        _borderMaterial.SetFloat("_BorderWidth", _savedBorderWidth * 1.5f);
-
-        _keyboard?.MarkDirty();
-    }
-
-    public void OnPointerExit(PointerEventData eventData)
-    {
-        if (_borderMaterial == null) return;
-
-        // Restore original shader
-        if (_originalShader != null)
-            _borderMaterial.shader = _originalShader;
-
-        // Restore ALL properties
-        _borderMaterial.SetFloat("_Aspect", _savedAspect);
-        _borderMaterial.SetFloat("_CornerRadius", _savedCornerRadius);
-        _borderMaterial.SetFloat("_EdgePadding", _savedEdgePadding);
-        _borderMaterial.SetColor("_GlowColor", _savedGlowColor);
-        _borderMaterial.SetFloat("_GlowIntensity", _savedGlowIntensity);
-        _borderMaterial.SetFloat("_GlowWidth", _savedGlowWidth);
-        _borderMaterial.SetFloat("_BorderWidth", _savedBorderWidth);
-
-        _keyboard?.MarkDirty();
-    }
-
-    private void OnDestroy()
-    {
-        if (_borderMaterial != null)
-            Destroy(_borderMaterial);
-    }
 }
 
 /// <summary>

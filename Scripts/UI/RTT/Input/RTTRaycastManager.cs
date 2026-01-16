@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using System.Collections.Generic;
+using VRWorkspace.UI.HoverEffects;
 
 /// <summary>
 /// Manages raycast from VR gaze/controller into RTT panels.
@@ -581,77 +582,14 @@ public class RTTRaycastManager : MonoBehaviour
     {
         if (target == null) return;
 
+        // Standard Unity pointer enter event
         ExecuteEvents.Execute(target, _pointerEventData, ExecuteEvents.pointerEnterHandler);
 
-        // Also trigger VRInputFieldTrigger if present (for text cursor)
-        var inputFieldTrigger = target.GetComponent<VRInputFieldTrigger>();
-        if (inputFieldTrigger == null)
-            inputFieldTrigger = target.GetComponentInParent<VRInputFieldTrigger>();
-        if (inputFieldTrigger != null)
-        {
-            inputFieldTrigger.OnPointerEnter(null);
-        }
-
-        // Also trigger VRButtonAnimation if present
-        var buttonAnim = target.GetComponent<VRButtonAnimation>();
-        if (buttonAnim != null)
-        {
-            buttonAnim.OnPointerEnter(null);
-        }
-        else
-        {
-            // Check parent for button animation (HitArea pattern)
-            buttonAnim = target.GetComponentInParent<VRButtonAnimation>();
-            buttonAnim?.OnPointerEnter(null);
-        }
-
-        // Also trigger VROptionHoverEffect if present (for dropdown options)
-        var optionHover = target.GetComponent<VROptionHoverEffect>();
-        if (optionHover != null)
-        {
-            optionHover.OnPointerEnter(null);
-        }
-        else
-        {
-            optionHover = target.GetComponentInParent<VROptionHoverEffect>();
-            optionHover?.OnPointerEnter(null);
-        }
-
-        // Also trigger KeyHoverEffect if present (for RTTMobileKeyboard)
-        var keyHover = target.GetComponent<KeyHoverEffect>();
-        if (keyHover != null)
-        {
-            keyHover.OnPointerEnter(null);
-        }
-        else
-        {
-            keyHover = target.GetComponentInParent<KeyHoverEffect>();
-            keyHover?.OnPointerEnter(null);
-        }
-
-        // Also trigger SpaceKeyHoverEffect if present (for Space key in RTTMobileKeyboard)
-        var spaceHover = target.GetComponent<SpaceKeyHoverEffect>();
-        if (spaceHover != null)
-        {
-            spaceHover.OnPointerEnter(null);
-        }
-        else
-        {
-            spaceHover = target.GetComponentInParent<SpaceKeyHoverEffect>();
-            spaceHover?.OnPointerEnter(null);
-        }
-
-        // Also trigger PreviewTextInteraction if present (for text cursor in preview)
-        var previewInteraction = target.GetComponent<PreviewTextInteraction>();
-        if (previewInteraction != null)
-        {
-            previewInteraction.OnPointerEnter(null);
-        }
-        else
-        {
-            previewInteraction = target.GetComponentInParent<PreviewTextInteraction>();
-            previewInteraction?.OnPointerEnter(null);
-        }
+        // Unified HoverEffectController - handles all hover effects
+        var hoverController = target.GetComponent<HoverEffectController>();
+        if (hoverController == null)
+            hoverController = target.GetComponentInParent<HoverEffectController>();
+        hoverController?.OnPointerEnter(null);
     }
 
     /// <summary>
@@ -661,76 +599,14 @@ public class RTTRaycastManager : MonoBehaviour
     {
         if (target == null) return;
 
+        // Standard Unity pointer exit event
         ExecuteEvents.Execute(target, _pointerEventData, ExecuteEvents.pointerExitHandler);
 
-        // Also trigger VRInputFieldTrigger if present (to reset text cursor)
-        var inputFieldTrigger = target.GetComponent<VRInputFieldTrigger>();
-        if (inputFieldTrigger == null)
-            inputFieldTrigger = target.GetComponentInParent<VRInputFieldTrigger>();
-        if (inputFieldTrigger != null)
-        {
-            inputFieldTrigger.OnPointerExit(null);
-        }
-
-        // Also trigger VRButtonAnimation if present
-        var buttonAnim = target.GetComponent<VRButtonAnimation>();
-        if (buttonAnim != null)
-        {
-            buttonAnim.OnPointerExit(null);
-        }
-        else
-        {
-            buttonAnim = target.GetComponentInParent<VRButtonAnimation>();
-            buttonAnim?.OnPointerExit(null);
-        }
-
-        // Also trigger VROptionHoverEffect if present (for dropdown options)
-        var optionHover = target.GetComponent<VROptionHoverEffect>();
-        if (optionHover != null)
-        {
-            optionHover.OnPointerExit(null);
-        }
-        else
-        {
-            optionHover = target.GetComponentInParent<VROptionHoverEffect>();
-            optionHover?.OnPointerExit(null);
-        }
-
-        // Also trigger KeyHoverEffect if present (for RTTMobileKeyboard)
-        var keyHover = target.GetComponent<KeyHoverEffect>();
-        if (keyHover != null)
-        {
-            keyHover.OnPointerExit(null);
-        }
-        else
-        {
-            keyHover = target.GetComponentInParent<KeyHoverEffect>();
-            keyHover?.OnPointerExit(null);
-        }
-
-        // Also trigger SpaceKeyHoverEffect if present (for Space key in RTTMobileKeyboard)
-        var spaceHover = target.GetComponent<SpaceKeyHoverEffect>();
-        if (spaceHover != null)
-        {
-            spaceHover.OnPointerExit(null);
-        }
-        else
-        {
-            spaceHover = target.GetComponentInParent<SpaceKeyHoverEffect>();
-            spaceHover?.OnPointerExit(null);
-        }
-
-        // Also trigger PreviewTextInteraction if present (for text cursor in preview)
-        var previewInteraction = target.GetComponent<PreviewTextInteraction>();
-        if (previewInteraction != null)
-        {
-            previewInteraction.OnPointerExit(null);
-        }
-        else
-        {
-            previewInteraction = target.GetComponentInParent<PreviewTextInteraction>();
-            previewInteraction?.OnPointerExit(null);
-        }
+        // Unified HoverEffectController - handles all hover effects
+        var hoverController = target.GetComponent<HoverEffectController>();
+        if (hoverController == null)
+            hoverController = target.GetComponentInParent<HoverEffectController>();
+        hoverController?.OnPointerExit(null);
     }
 
     /// <summary>

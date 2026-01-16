@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using VRWorkspace.UI.HoverEffects;
 
 /// <summary>
 /// Factory class để tạo VR Button với đầy đủ hiệu ứng:
@@ -258,11 +259,32 @@ public static class VRButtonFactory
             btn.onClick.AddListener(onClick);
         }
 
-        // 8. VRButtonAnimation cho hover effects
+        // 8. Hover effects - using unified HoverEffectController
+        HoverEffectController hoverController = hitArea.AddComponent<HoverEffectController>();
+        hoverController.TargetVisuals = visuals.transform;
+
+        // Add effects based on config
+        if (!config.frameless)
+        {
+            hoverController.AddEffect(new GlowBorderHoverEffect()
+                .WithShaderSwap(true)
+                .WithBorderMultiplier(1f));
+
+            hoverController.AddEffect(new BackgroundHoverEffect());
+        }
+
+        hoverController.AddEffect(new ScaleHoverEffect()
+            .WithHoverScale(1f + config.hoverScaleAmount));
+
+        if (config.popAmount > 0)
+        {
+            hoverController.AddEffect(new ZPopHoverEffect()
+                .WithPopAmount(config.popAmount));
+        }
+
+        // 9. VRButtonAnimation for ripple click effect
         VRButtonAnimation anim = hitArea.AddComponent<VRButtonAnimation>();
         anim.targetVisuals = visuals.transform;
-        anim.popAmount = config.popAmount;
-        anim.hoverScaleAmount = config.hoverScaleAmount;
 
         return wrapper;
     }
