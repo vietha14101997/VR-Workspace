@@ -1,4 +1,5 @@
 using UnityEngine;
+using TMPro;
 
 /// <summary>
 /// ScriptableObject for centralized RTT UI theme configuration.
@@ -7,6 +8,12 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "RTTTheme", menuName = "VR-Workspace/RTT Theme Config")]
 public class RTTThemeConfig : ScriptableObject
 {
+    #region Font
+    [Header("Typography")]
+    [Tooltip("Default font for all UI text (supports Vietnamese, Japanese, Korean, etc.)")]
+    public TMP_FontAsset font;
+    #endregion
+
     #region Primary Colors
     [Header("Primary Colors")]
     [Tooltip("Primary theme color (Cyan) - used for buttons, highlights, icons")]

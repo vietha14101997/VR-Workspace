@@ -281,7 +281,7 @@ public class RTTFileManager : MonoBehaviour
         _fileGrid = gridObj.AddComponent<RTTFileGrid>();
         // Calculate size based on BODY size
         float bodyHeight = panelHeight - headerOriginalHeight - bottomPadding;
-        _fileGrid.Initialize(_controller, contentSize.x, bodyHeight);
+        _fileGrid.Initialize(_controller, contentSize.x, bodyHeight, _font);
 
         // Set interaction callbacks
         _fileGrid.SetItemCallbacks(
@@ -1701,7 +1701,7 @@ public class RTTFileManager : MonoBehaviour
         rt.offsetMax = Vector2.zero;
 
         _fileDetail = contentObj.AddComponent<RTTFileDetail>();
-        _fileDetail.Initialize(_primaryColor, _accentColor);
+        _fileDetail.Initialize(_primaryColor, _accentColor, _font);
     }
     #endregion
 }

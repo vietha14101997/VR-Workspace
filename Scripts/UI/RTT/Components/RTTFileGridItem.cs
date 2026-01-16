@@ -25,10 +25,13 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
     // Visual state
     private static readonly Color HoverColor = new Color(0f, 0f, 0f, 0.3f);
     private static readonly Color NormalColor = Color.clear;
-    private bool _isHovered = false;
 
-    public void Initialize()
+    // Font
+    private TMP_FontAsset _font;
+
+    public void Initialize(TMP_FontAsset font = null)
     {
+        _font = font;
         BuildUI();
     }
 
@@ -63,8 +66,7 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
                 SetSprite(IsImageFile(name) ? "icon_image" : "icon_file");
         }
 
-        // Reset background and hover state
-        _isHovered = false;
+        // Reset background
         if (_bgImage != null)
             _bgImage.color = NormalColor;
     }
@@ -99,6 +101,7 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         GameObject textObj = new GameObject("Name");
         textObj.transform.SetParent(transform, false);
         _nameText = textObj.AddComponent<TextMeshProUGUI>();
+        if (_font != null) _nameText.font = _font;
         _nameText.raycastTarget = false;
         _nameText.text = "";
         _nameText.alignment = TextAlignmentOptions.Top;
@@ -127,7 +130,6 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
     #region Pointer Events
     public void OnPointerEnter(PointerEventData eventData)
     {
-        _isHovered = true;
         if (_bgImage != null)
             _bgImage.color = HoverColor;
 
@@ -136,7 +138,6 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
 
     public void OnPointerExit(PointerEventData eventData)
     {
-        _isHovered = false;
         if (_bgImage != null)
             _bgImage.color = NormalColor;
 
@@ -163,7 +164,6 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
     /// </summary>
     public void ClearHoverState()
     {
-        _isHovered = false;
         if (_bgImage != null)
             _bgImage.color = NormalColor;
     }

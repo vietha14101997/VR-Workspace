@@ -13,15 +13,17 @@ public class RTTFileDetail : MonoBehaviour
     private TextMeshProUGUI _nameText;
     private TextMeshProUGUI _infoText; // Type, Size, Date
     private GameObject _actionsContainer;
-    
+
     // Configuration
     private Color _primaryColor = Color.white;
     private Color _accentColor = new Color(0f, 0.9f, 1f);
+    private TMP_FontAsset _font;
 
-    public void Initialize(Color primary, Color accent)
+    public void Initialize(Color primary, Color accent, TMP_FontAsset font = null)
     {
         _primaryColor = primary;
         _accentColor = accent;
+        _font = font;
         BuildUI();
     }
 
@@ -48,19 +50,21 @@ public class RTTFileDetail : MonoBehaviour
         GameObject nameObj = new GameObject("DetailName");
         nameObj.transform.SetParent(transform, false);
         _nameText = nameObj.AddComponent<TextMeshProUGUI>();
+        if (_font != null) _nameText.font = _font;
         _nameText.fontSize = 32; // Larger font
         _nameText.fontWeight = FontWeight.Bold;
         _nameText.alignment = TextAlignmentOptions.Top;
         _nameText.color = _primaryColor;
         _nameText.enableWordWrapping = true;
-        
+
         RectTransform nameRT = nameObj.GetComponent<RectTransform>();
-        nameRT.sizeDelta = new Vector2(0, 100f); 
+        nameRT.sizeDelta = new Vector2(0, 100f);
 
         // 3. Metadata Info
         GameObject infoObj = new GameObject("DetailInfo");
         infoObj.transform.SetParent(transform, false);
         _infoText = infoObj.AddComponent<TextMeshProUGUI>();
+        if (_font != null) _infoText.font = _font;
         _infoText.fontSize = 24;
         _infoText.alignment = TextAlignmentOptions.Top;
         _infoText.color = new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.7f);

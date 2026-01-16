@@ -263,7 +263,7 @@ public class RTTFileList : MonoBehaviour
         text.fontSize = 22;
         text.fontStyle = FontStyles.Bold;
         text.color = Color.white;
-        text.alignment = TextAlignmentOptions.MidlineLeft;
+        text.alignment = TextAlignmentOptions.Center;
         text.raycastTarget = false;
 
         // Sort arrow

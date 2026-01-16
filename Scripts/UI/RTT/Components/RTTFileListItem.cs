@@ -29,7 +29,6 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
 
     #region State
     private TMP_FontAsset _font;
-    private bool _isHovered = false;
     #endregion
 
     #region Callbacks
@@ -147,7 +146,7 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
 
         _nameText = nameObj.AddComponent<TextMeshProUGUI>();
         _nameText.font = _font;
-        _nameText.fontSize = 26;
+        _nameText.fontSize = 32;
         _nameText.fontStyle = FontStyles.Bold;
         _nameText.color = Color.white;
         _nameText.alignment = TextAlignmentOptions.MidlineLeft;
@@ -170,9 +169,9 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
 
         TextMeshProUGUI text = textObj.AddComponent<TextMeshProUGUI>();
         text.font = _font;
-        text.fontSize = 20;
+        text.fontSize = 26;
         text.color = Color.white;
-        text.alignment = TextAlignmentOptions.MidlineLeft;
+        text.alignment = TextAlignmentOptions.Center;
         text.enableWordWrapping = false;
         text.overflowMode = TextOverflowModes.Ellipsis;
         text.richText = true;
@@ -241,15 +240,13 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
             _sizeText.text = "<b>" + FormatFileSize(file.Size) + "</b>";
         }
 
-        // Reset background and hover state
-        _isHovered = false;
+        // Reset background
         _background.color = NormalColor;
     }
 
     #region Pointer Events
     public void OnPointerEnter(PointerEventData eventData)
     {
-        _isHovered = true;
         if (_background != null)
             _background.color = HoverColor;
 
@@ -258,7 +255,6 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
 
     public void OnPointerExit(PointerEventData eventData)
     {
-        _isHovered = false;
         if (_background != null)
             _background.color = NormalColor;
 
@@ -285,7 +281,6 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
     /// </summary>
     public void ClearHoverState()
     {
-        _isHovered = false;
         if (_background != null)
             _background.color = NormalColor;
     }

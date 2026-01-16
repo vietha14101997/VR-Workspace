@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 using System;
 using System.Collections.Generic;
 
@@ -14,6 +15,7 @@ public class RTTFileGrid : MonoBehaviour
     private RTTFileManagerController _controller;
     private float _width;
     private float _height;
+    private TMP_FontAsset _font;
 
     private ScrollRect _scrollRect;
     private RectTransform _contentRect;
@@ -47,11 +49,12 @@ public class RTTFileGrid : MonoBehaviour
     private int _visibleRowCount;
     private int _bufferRows = 2;
 
-    public void Initialize(RTTFileManagerController controller, float w, float h)
+    public void Initialize(RTTFileManagerController controller, float w, float h, TMP_FontAsset font = null)
     {
         _controller = controller;
         _width = w;
         _height = h;
+        _font = font;
 
         BuildUI();
         CalculateGridMetrics();
@@ -170,7 +173,7 @@ public class RTTFileGrid : MonoBehaviour
         rect.sizeDelta = new Vector2(_cellWidth, _cellHeight);
 
         var gridItem = itemObj.AddComponent<RTTFileGridItem>();
-        gridItem.Initialize();
+        gridItem.Initialize(_font);
 
         // Set callbacks if already configured
         if (_onItemHoverEnter != null || _onItemHoverExit != null || _onItemClick != null)

@@ -151,7 +151,11 @@ public class RTTManager : MonoBehaviour
     public RTTConfig DefaultConfig => rttConfig;
     public RTTThemeConfig Theme => themeConfig;
     public RTTAppRegistry AppRegistry => appRegistry;
-    public TMP_FontAsset Font => primaryFont;
+
+    /// <summary>
+    /// Get the configured font. Priority: Theme font > Primary font fallback.
+    /// </summary>
+    public TMP_FontAsset Font => themeConfig?.font != null ? themeConfig.font : primaryFont;
 
     // Theme color shortcuts
     public Color PrimaryColor => themeConfig?.primaryColor ?? new Color(0f, 0.9f, 1f);
@@ -766,7 +770,7 @@ public class RTTManager : MonoBehaviour
                 mainMenuFrame.ContentContainer,
                 containerSize.x,
                 containerSize.y,
-                primaryFont,
+                Font,  // Uses theme font with fallback
                 PrimaryColor,
                 AccentColor
             );
@@ -1645,7 +1649,7 @@ public class RTTManager : MonoBehaviour
             instance.Frame.ContentContainer,
             containerSize.x,
             containerSize.y,
-            primaryFont,
+            Font,  // Uses theme font with fallback
             PrimaryColor,
             AccentColor
         );
@@ -1672,7 +1676,7 @@ public class RTTManager : MonoBehaviour
             instance.Frame.ContentContainer,
             containerSize.x,
             containerSize.y,
-            primaryFont,
+            Font,  // Uses theme font with fallback
             PrimaryColor,
             AccentColor
         );
