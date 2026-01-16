@@ -160,10 +160,17 @@ public class CameraPassthrough : MonoBehaviour
             
             // Wait for texture to be ready
             int attempts = 0;
-            while (!_tex.didUpdateThisFrame && attempts < 30)
+            while (_tex != null && !_tex.didUpdateThisFrame && attempts < 30)
             {
                 yield return new WaitForEndOfFrame();
                 attempts++;
+
+                // Check if texture was destroyed during wait
+                if (_tex == null)
+                {
+                    Debug.LogWarning("Webcam texture was destroyed during initialization");
+                    yield break;
+                }
             }
             
             if (attempts >= 30)

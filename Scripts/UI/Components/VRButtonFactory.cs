@@ -264,7 +264,8 @@ public static class VRButtonFactory
         hoverController.TargetVisuals = visuals.transform;
 
         // Add effects based on config
-        if (!config.frameless)
+        // Note: Connect button shader handles glow/border internally, skip GlowBorderHoverEffect
+        if (!config.frameless && !config.useConnectButtonShader)
         {
             hoverController.AddEffect(new GlowBorderHoverEffect()
                 .WithShaderSwap(true)

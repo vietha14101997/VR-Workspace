@@ -196,6 +196,11 @@ public class RTTManager : MonoBehaviour
         }
 
         _instance = this;
+
+        // Move to root if not already (DontDestroyOnLoad only works for root GameObjects)
+        if (transform.parent != null)
+            transform.SetParent(null);
+
         DontDestroyOnLoad(gameObject);
 
         _currentCameraDepth = startingCameraDepth;

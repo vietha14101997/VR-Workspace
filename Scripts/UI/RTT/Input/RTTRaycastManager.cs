@@ -101,6 +101,11 @@ public class RTTRaycastManager : MonoBehaviour
         }
 
         _instance = this;
+
+        // Move to root if not already (DontDestroyOnLoad only works for root GameObjects)
+        if (transform.parent != null)
+            transform.SetParent(null);
+
         DontDestroyOnLoad(gameObject);
 
         // Initialize pointer event data
@@ -328,25 +333,31 @@ public class RTTRaycastManager : MonoBehaviour
         var button = target.GetComponentInParent<Button>();
         if (button != null && button.interactable)
         {
+            string buttonName = button.name; // Cache name before click handler might destroy it
+
             // Execute click through EventSystem
             ExecuteEvents.Execute(button.gameObject, _pointerEventData, ExecuteEvents.pointerClickHandler);
 
-            // Trigger VRButtonRipple if exists
-            var ripple = button.GetComponentInChildren<VRButtonRipple>();
-            if (ripple != null)
+            // Button might be destroyed by click handler, check before accessing
+            if (button != null)
             {
-                Vector2 normalizedPos = new Vector2(
-                    _currentHit.uvCoordinate.x,
-                    _currentHit.uvCoordinate.y
-                );
-                ripple.TriggerRipple(normalizedPos);
+                // Trigger VRButtonRipple if exists
+                var ripple = button.GetComponentInChildren<VRButtonRipple>();
+                if (ripple != null)
+                {
+                    Vector2 normalizedPos = new Vector2(
+                        _currentHit.uvCoordinate.x,
+                        _currentHit.uvCoordinate.y
+                    );
+                    ripple.TriggerRipple(normalizedPos);
+                }
             }
 
             // Mark panel dirty for re-render
             _currentHit.panel?.MarkDirty();
 
             if (logHitInfo)
-                Debug.Log($"[RTTRaycast] Clicked: {button.name}");
+                Debug.Log($"[RTTRaycast] Clicked: {buttonName}");
 
             return true;
         }

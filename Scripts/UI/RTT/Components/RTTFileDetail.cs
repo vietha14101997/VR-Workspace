@@ -106,10 +106,9 @@ public class RTTFileDetail : MonoBehaviour
         {
             // Set color based on type
             _iconImage.color = file.IsFolder ? new Color(1f, 0.8f, 0.2f) : _primaryColor;
-            // Ideally load sprite/preview here
-            _iconImage.sprite = RTTTaskbar.LoadIcon(file.IsFolder ? "folder" : "file"); 
-            // Fallback if sprite null
-            if (_iconImage.sprite == null && file.IsFolder == false) _iconImage.sprite = RTTTaskbar.LoadIcon("settings"); // Placeholder
+            // Try to load icon, fallback to settings for files and home for folders
+            _iconImage.sprite = RTTTaskbar.LoadIcon(file.IsFolder ? "folder" : "file")
+                ?? RTTTaskbar.LoadIcon(file.IsFolder ? "home" : "settings");
         }
 
         // Expanded Info

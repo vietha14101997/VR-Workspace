@@ -33,6 +33,7 @@ namespace VRWorkspace.UI.HoverEffects
         private bool _isHovered = false;
         private List<IHoverEffect> _activeEffects = new List<IHoverEffect>();
         private bool _isInitialized = false;
+        private bool _warnedNoEffects = false; // Only warn once per instance
 
         // Events
         /// <summary>
@@ -140,8 +141,11 @@ namespace VRWorkspace.UI.HoverEffects
             _isHovered = true;
 
             #if UNITY_EDITOR
-            if (_activeEffects.Count == 0)
+            if (_activeEffects.Count == 0 && !_warnedNoEffects)
+            {
                 Debug.LogWarning($"[HoverEffectController] OnPointerEnter on {gameObject.name} but NO EFFECTS! TargetVisuals={_targetVisuals?.name}");
+                _warnedNoEffects = true; // Only warn once
+            }
             #endif
 
             foreach (var effect in _activeEffects)

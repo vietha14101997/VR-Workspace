@@ -671,12 +671,15 @@ public class RTTTaskbar : MonoBehaviour
         Debug.Log($"[RTTTaskbar] Icons loaded - Quit:{iconQuit != null}, Settings:{iconSettings != null}, Passthrough:{iconPassthrough != null}, Recenter:{iconRecenter != null}, Home:{iconHome != null}");
     }
 
+    private static HashSet<string> _warnedIcons = new HashSet<string>();
+
     public static Sprite LoadIcon(string name)
     {
         var sprite = Resources.Load<Sprite>($"icon_{name}");
-        if (sprite == null)
+        if (sprite == null && !_warnedIcons.Contains(name))
         {
             Debug.LogWarning($"[RTTTaskbar] Failed to load icon: icon_{name} from Resources");
+            _warnedIcons.Add(name);
         }
         return sprite;
     }
