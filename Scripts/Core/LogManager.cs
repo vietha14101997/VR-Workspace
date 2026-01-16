@@ -42,8 +42,9 @@ namespace VRWorkspace.Core
             // ALWAYS disable verbose Debug.Log to reduce RAM/CPU/heat
             // Only show errors in production, warnings+errors in editor
             #if UNITY_EDITOR
-            // In editor, show warnings and errors only (skip Debug.Log spam)
-            Debug.unityLogger.filterLogType = LogType.Warning;
+            // TEMP: Enable all logs for debugging breadcrumbs
+            Debug.unityLogger.filterLogType = LogType.Log;
+            // Original: Debug.unityLogger.filterLogType = LogType.Warning;
             #else
             // In builds (Quest, Android, etc), only show errors
             Debug.unityLogger.filterLogType = LogType.Error;

@@ -270,11 +270,14 @@ public class RTTFileManager : MonoBehaviour
         // During preparation, the frame is at +1000 units but pagination is at normal position (near taskbar)
         _viewReady = true;
 
+        Debug.Log($"[RTTFileManager] Before OnViewReady - breadcrumb container null: {_breadcrumbContainer == null}, instance: {GetInstanceID()}");
         _controller.OnViewReady();
     }
 
     private void CreateHeaderRows(RectTransform parent)
     {
+        Debug.Log($"[RTTFileManager] CreateHeaderRows started, instance: {GetInstanceID()}");
+
         // Row 1: Sort | Search | Edit
         CreateRow1(parent);
 
@@ -283,6 +286,8 @@ public class RTTFileManager : MonoBehaviour
 
         // Row 3: Hidden Placeholder
         CreateRow3(parent);
+
+        Debug.Log($"[RTTFileManager] CreateHeaderRows completed, breadcrumb null: {_breadcrumbContainer == null}");
     }
 
     // View Options Popup References
@@ -508,6 +513,7 @@ public class RTTFileManager : MonoBehaviour
 
     private void CreateRow2(RectTransform parent)
     {
+        Debug.Log("[RTTFileManager] CreateRow2 called");
         RectTransform rowRT = CreateRowContainer(parent, "Row2", -_singleRowHeight);
 
         // Right: Refresh Button (Icon)
@@ -538,7 +544,8 @@ public class RTTFileManager : MonoBehaviour
         GameObject crumbContainer = new GameObject("Breadcrumbs");
         crumbContainer.transform.SetParent(rowRT, false);
         _breadcrumbContainer = crumbContainer.transform;
-        
+        Debug.Log($"[RTTFileManager] Breadcrumb container set: {_breadcrumbContainer != null}, instance: {GetInstanceID()}");
+
         RectTransform crumbRT = crumbContainer.AddComponent<RectTransform>();
         crumbRT.anchorMin = new Vector2(0, 0);
         crumbRT.anchorMax = new Vector2(1, 1);
@@ -548,12 +555,15 @@ public class RTTFileManager : MonoBehaviour
         crumbRT.offsetMax = new Vector2(-90, 0);
 
         HorizontalLayoutGroup hlg = crumbContainer.AddComponent<HorizontalLayoutGroup>();
-        hlg.childControlWidth = true;
-        hlg.childControlHeight = false; // Buttons have fixed height
+        hlg.childControlWidth = false; // Use LayoutElement preferred sizes
+        hlg.childControlHeight = false; // Use fixed height
         hlg.childForceExpandWidth = false;
         hlg.childForceExpandHeight = false;
-        hlg.spacing = 10f;
+        // Negative spacing to overlap buttons for chevron effect
+        // Reduced overlap to leave small gap between convex and concave edges
+        hlg.spacing = -68f * 0.45f;
         hlg.childAlignment = TextAnchor.MiddleLeft;
+        hlg.padding = new RectOffset(0, 0, 0, 0); // No padding, buttons fill row height
     }
 
     private void CreateRow3(RectTransform parent)
@@ -673,7 +683,25 @@ public class RTTFileManager : MonoBehaviour
     // Breadcrumb Update Logic
     public void UpdateBreadcrumbs(string path)
     {
-        if (_breadcrumbContainer == null) return;
+        Debug.Log($"[RTTFileManager] UpdateBreadcrumbs called with path: {path}, container null: {_breadcrumbContainer == null}, instance: {GetInstanceID()}");
+
+        // Fallback: find breadcrumb container from hierarchy if reference is lost
+        if (_breadcrumbContainer == null)
+        {
+            Debug.LogWarning("[RTTFileManager] Breadcrumb container reference lost, searching in hierarchy...");
+            var row2 = _headerRT?.Find("Row2");
+            if (row2 != null)
+            {
+                _breadcrumbContainer = row2.Find("Breadcrumbs");
+                Debug.Log($"[RTTFileManager] Found breadcrumb container from hierarchy: {_breadcrumbContainer != null}");
+            }
+        }
+
+        if (_breadcrumbContainer == null)
+        {
+            Debug.LogWarning("[RTTFileManager] Breadcrumb container is null and could not be found!");
+            return;
+        }
 
         foreach (Transform child in _breadcrumbContainer) Destroy(child.gameObject);
 
@@ -711,53 +739,186 @@ public class RTTFileManager : MonoBehaviour
             }
         }
 
-        // Create breadcrumb buttons
-        for (int i = 0; i < breadcrumbs.Count; i++)
+        // Create breadcrumb chevron buttons (connected style like reference image)
+        // Strategy: All buttons are pill-shaped, left buttons overlap right buttons
+        // Use Canvas sortingOrder to control render order (higher = on top)
+        float btnHeight = 68f; // Same height as sortTrigger button
+        float btnWidth = _sortTriggerWidth * 1.25f;
+        int totalCount = breadcrumbs.Count;
+
+        for (int i = 0; i < totalCount; i++)
         {
             var (name, fullPath) = breadcrumbs[i];
-            string targetPath = fullPath; // Capture for lambda
+            string targetPath = fullPath;
+            bool isLast = (i == totalCount - 1);
 
-            bool isLast = (i == breadcrumbs.Count - 1);
-            Color btnColor = isLast ? _accentColor : _primaryColor;
+            // zIndex: first button = 0 (front), last button = highest (back)
+            // So left button renders ON TOP of right button
+            int zIndex = i;
 
-            GameObject btn = VRButtonFactory.CreateHorizontalIconTextButton(
-                _breadcrumbContainer,
-                0,
-                40f,
-                name,
-                null,
-                btnColor,
-                () => _controller?.NavigateTo(targetPath),
-                18,
-                _font
-            );
-
-            LayoutElement le = btn.GetComponent<LayoutElement>();
-            if (le == null) le = btn.AddComponent<LayoutElement>();
-            le.preferredWidth = (name.Length * 12f) + 40f;
-            le.preferredHeight = 40f;
-
-            if (!isLast)
-            {
-                CreateBreadcrumbSeparator();
-            }
+            GameObject btn = CreateBreadcrumbPillButton(name, targetPath, isLast, btnWidth, btnHeight, zIndex, totalCount);
         }
+
+        Debug.Log($"[RTTFileManager] Created {breadcrumbs.Count} breadcrumbs for path: {path}");
     }
     
-    private void CreateBreadcrumbSeparator()
+    /// <summary>
+    /// Creates a chevron-shaped breadcrumb button.
+    /// Right side: convex rounded (pill end)
+    /// Left side: concave curved (inward arc)
+    /// </summary>
+    private GameObject CreateBreadcrumbPillButton(string label, string targetPath, bool isActive, float width, float height, int zIndex, int totalButtons)
     {
-        GameObject sep = new GameObject("Sep");
-        sep.transform.SetParent(_breadcrumbContainer, false);
-        TextMeshProUGUI txt = sep.AddComponent<TextMeshProUGUI>();
-        txt.text = ">";
-        txt.color = Color.gray;
-        txt.fontSize = 18;
+        Color btnColor = isActive ? _accentColor : _primaryColor;
+        string pathToNavigate = targetPath;
+
+        // Button container
+        GameObject btnObj = new GameObject($"Crumb_{label}");
+        btnObj.transform.SetParent(_breadcrumbContainer, false);
+
+        RectTransform btnRT = btnObj.AddComponent<RectTransform>();
+        btnRT.sizeDelta = new Vector2(width, height);
+
+        // Z-position for render order (left buttons on top)
+        float zOffset = zIndex * 0.5f;
+        btnRT.localPosition = new Vector3(btnRT.localPosition.x, btnRT.localPosition.y, zOffset);
+
+        // Background with appropriate shader
+        Image bgImage = btnObj.AddComponent<Image>();
+        bgImage.raycastTarget = true;
+
+        float aspect = width / height;
+        bool isFirstButton = (zIndex == 0);
+
+        // Glass background style (like MainMenu button hover state)
+        float glassAlpha = 0.35f; // Semi-transparent glass effect
+
+        if (isFirstButton)
+        {
+            // First button: rounded shape matching chevron curve
+            Shader pillShader = Shader.Find("Custom/GlassGradientBackgroundWide");
+            if (pillShader != null)
+            {
+                Material mat = new Material(pillShader);
+                mat.SetFloat("_Aspect", aspect);
+                mat.SetFloat("_CornerRadius", 0.48f); // Full semicircle (halfH = 0.5 - padding)
+                mat.SetFloat("_EdgePadding", 0.02f);
+                // Gradient colors for glass effect
+                Color colorA = new Color(btnColor.r, btnColor.g, btnColor.b, glassAlpha * 1.5f);
+                Color colorB = new Color(btnColor.r, btnColor.g, btnColor.b, glassAlpha * 0.5f);
+                mat.SetColor("_ColorA", colorA);
+                mat.SetColor("_ColorB", colorB);
+                mat.SetFloat("_GlassAlpha", glassAlpha);
+                mat.SetFloat("_FresnelStrength", 0.15f); // Edge glow
+                bgImage.material = mat;
+                bgImage.color = Color.white;
+            }
+            else
+            {
+                bgImage.color = new Color(btnColor.r, btnColor.g, btnColor.b, glassAlpha);
+            }
+        }
+        else
+        {
+            // Subsequent buttons: chevron shape (convex right, concave left)
+            Shader chevronShader = Shader.Find("Custom/ChevronBackground");
+            if (chevronShader != null)
+            {
+                Material mat = new Material(chevronShader);
+                mat.SetFloat("_Aspect", aspect);
+                mat.SetFloat("_EdgePadding", 0.02f);
+                mat.SetColor("_BackgroundColor", btnColor);
+                mat.SetFloat("_BackgroundAlpha", glassAlpha);
+                bgImage.material = mat;
+                bgImage.color = Color.white;
+            }
+            else
+            {
+                bgImage.color = new Color(btnColor.r, btnColor.g, btnColor.b, glassAlpha);
+            }
+        }
+
+        // Text centered - constrained to visible area
+        GameObject textObj = new GameObject("Text");
+        textObj.transform.SetParent(btnObj.transform, false);
+
+        RectTransform textRT = textObj.AddComponent<RectTransform>();
+        textRT.anchorMin = Vector2.zero;
+        textRT.anchorMax = Vector2.one;
+
+        // Text padding based on shape
+        // Curve radius = halfHeight = height * 0.5 (full semicircle)
+        float curveR = height * 0.5f;
+        if (isFirstButton)
+        {
+            // Rounded rect: padding for both rounded corners
+            textRT.offsetMin = new Vector2(curveR * 0.85f, 0); // Left padding
+            textRT.offsetMax = new Vector2(-curveR * 0.75f, 0); // Right padding
+        }
+        else
+        {
+            // Chevron: small left (concave opens up space), normal right
+            textRT.offsetMin = new Vector2(curveR, 0); // Less left padding
+            textRT.offsetMax = new Vector2(-curveR * 0.7f, 0); // Right padding for convex
+        }
+
+        TextMeshProUGUI txt = textObj.AddComponent<TextMeshProUGUI>();
+        txt.text = label;
+        txt.fontSize = 22;
         txt.font = _font;
+        txt.color = Color.white;
         txt.alignment = TextAlignmentOptions.Center;
-        
-        LayoutElement le = sep.AddComponent<LayoutElement>();
-        le.preferredWidth = 20f;
-        le.preferredHeight = 40f;
+        txt.verticalAlignment = VerticalAlignmentOptions.Middle;
+        txt.fontStyle = FontStyles.Bold;
+        txt.raycastTarget = false;
+        txt.enableWordWrapping = false; // Single line
+        txt.overflowMode = TextOverflowModes.Ellipsis; // Show ... if too long
+
+        // Button component
+        Button btn = btnObj.AddComponent<Button>();
+        btn.targetGraphic = bgImage;
+        btn.transition = Selectable.Transition.ColorTint;
+
+        ColorBlock colors = btn.colors;
+        colors.normalColor = Color.white;
+        colors.highlightedColor = new Color(1.2f, 1.2f, 1.2f);
+        colors.pressedColor = new Color(0.85f, 0.85f, 0.85f);
+        btn.colors = colors;
+
+        btn.onClick.AddListener(() => _controller?.NavigateTo(pathToNavigate));
+
+        // BoxCollider for VR raycast - adjusted to avoid overlap issues
+        BoxCollider col = btnObj.AddComponent<BoxCollider>();
+        if (isFirstButton)
+        {
+            // First button: full width collider
+            col.size = new Vector3(width, height, 0.1f);
+            col.center = new Vector3(0, 0, -0.05f);
+        }
+        else
+        {
+            // Chevron buttons: trim left side to avoid overlap with previous button
+            float trimLeft = curveR; // Trim concave area
+            col.size = new Vector3(width - trimLeft, height, 0.1f);
+            col.center = new Vector3(trimLeft * 0.5f, 0, -0.05f); // Shift center right
+        }
+
+        // Set layer
+        int vrLayer = LayerMask.NameToLayer("VirtualObjects");
+        if (vrLayer != -1)
+        {
+            btnObj.layer = vrLayer;
+            textObj.layer = vrLayer;
+        }
+
+        // LayoutElement for HorizontalLayoutGroup
+        LayoutElement le = btnObj.AddComponent<LayoutElement>();
+        le.preferredWidth = width;
+        le.preferredHeight = height;
+        le.minWidth = width;
+        le.flexibleWidth = 0;
+
+        return btnObj;
     }
 
     private void OnSearchValueChanged(string value)

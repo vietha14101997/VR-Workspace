@@ -525,6 +525,7 @@ public class RTTFilePagination : RTTCanvasBase
         // Button Logic
         Button btn = btnObj.GetComponent<Button>();
         btn.transition = Selectable.Transition.None; // Disable default transition to avoid interference
+        btn.interactable = !isActive;
         btn.onClick.AddListener(() =>
         {
             _controller.GoToPage(pageNumber);

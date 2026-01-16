@@ -19,6 +19,7 @@ public class RTTFileGrid : MonoBehaviour
     private RectTransform _contentRect;
     
     private List<RTTFileGridItem> _items = new List<RTTFileGridItem>();
+    private RTTFileGridItem _lastSelectedItem;
     
     // Configuration
     private float _cellWidth = 310f; 
@@ -78,7 +79,7 @@ public class RTTFileGrid : MonoBehaviour
         _gridLayout.padding = new RectOffset(20, 20, 20, 60); 
         _gridLayout.startCorner = GridLayoutGroup.Corner.UpperLeft;
         _gridLayout.startAxis = GridLayoutGroup.Axis.Horizontal;
-        _gridLayout.childAlignment = TextAnchor.UpperCenter; 
+        _gridLayout.childAlignment = TextAnchor.UpperLeft; 
         
         var csf = content.AddComponent<ContentSizeFitter>();
         csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
@@ -92,6 +93,7 @@ public class RTTFileGrid : MonoBehaviour
             if (item != null) Destroy(item.gameObject);
         }
         _items.Clear();
+        _lastSelectedItem = null;
 
         // Create new items
         foreach (var file in files)
@@ -105,7 +107,9 @@ public class RTTFileGrid : MonoBehaviour
             // Restore selection state
             if (!string.IsNullOrEmpty(selectedPath))
             {
-                gridItem.SetSelected(file.Path == selectedPath);
+                bool isSelected = file.Path == selectedPath;
+                gridItem.SetSelected(isSelected);
+                if (isSelected) _lastSelectedItem = gridItem;
             }
             
             _items.Add(gridItem);
@@ -166,8 +170,15 @@ public class RTTFileGrid : MonoBehaviour
     {
         Debug.Log($"[RTTFileGrid] Single Click (Select): {item.FilePath}");
 
+        if (_lastSelectedItem == item && item.IsFolder)
+        {
+            _controller.NavigateTo(item.FilePath);
+            return;
+        }
+
         // Single click only selects
         _controller.SelectFile(item.FilePath);
+        _lastSelectedItem = item;
 
         foreach (var i in _items)
         {

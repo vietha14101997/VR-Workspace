@@ -1,95 +1,157 @@
+[MainThreadDispatcher] Initialized on thread 1
+
+[APBootstrap] AndroidStreamingHelper initialized
+
+Starting camera passthrough
+
+Found 1 camera devices
+
+Camera 0: Twitch Virtual Cam (front facing: True)
+
+Starting webcam texture: Twitch Virtual Cam at 1280x720
+
 DontDestroyOnLoad only works for root GameObjects or components on root GameObjects.
 UnityEngine.StackTraceUtility:ExtractStackTrace ()
-RTTManager:Awake () (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:197)
+RTTManager:Awake () (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:199)
 
 DontDestroyOnLoad only works for root GameObjects or components on root GameObjects.
 UnityEngine.StackTraceUtility:ExtractStackTrace ()
 RTTRaycastManager:Awake () (at Assets/VR-Workspace/Scripts/UI/RTT/Input/RTTRaycastManager.cs:103)
 
-[RemotePreferences] Failed to load: JSON parse error: The document is empty.
+[AndroidHelper] App resumed
+
+[RTTMenu] Created main frame
+
+[RTTBootstrapper] Created RTTMenu with RTTMenuFrame_main
+
+[RTTBootstrapper] RTTMenu oriented towards camera
+
+[RTTTaskbar] Icons loaded - Quit:True, Settings:True, Passthrough:True, Recenter:True, Home:True
+
+[RTTBootstrapper] Created RTTTaskbar following RTTMenu
+
+[RTTBootstrapper] RTTManager found, UI will be auto-detected
+
+[RTTBootstrapper] Initialization complete
+
+[RTTRaycastManager] Auto-initialized layer mask to VirtualObjects (layer 3)
+
+[RTTMenuFrame] UI built: 1920x1080 logical pixels
+
+[RTTMiniFrame] UI built: 1095.5x128 pixels
+
+[RTTMainMenuController] Icons loaded - Remote:True, Browser:True, Media:True, Files:False
+
+[RTTMainMenu] Built 6 items in 3x2 grid
+
+[RTTMainMenuController] Main Menu created (useRegistry=True, itemCount=6)
+
+[RTTManager] Main Menu initialized (persistent, cannot be closed)
+
+Restarting webcam texture as it was not playing
+
+Stopping camera passthrough
+
+Destroying webcam texture
+
+[RTTManager] Instant recenter: moved 3 objects to face camera
+
+[RTTManager] Auto-recenter completed
+
+[RTTMenu] Created app frame: folder
+
+[RTTManager] Preparing app: folder in slot 1
+
+[RTTManager] Creating FileManager content...
+
+[RTTFileManager] Building UI...
+
+[RTTFilePagination] UpdateDisplay: TotalPages=1
+
+[RTTCanvasBase] FileNavigationPanel.SetVisible(true): _displayQuad is NULL!
 UnityEngine.Debug:LogWarning (object)
-VRWorkspace.Streaming.RemotePreferences:Load () (at Assets/VR-Workspace/Scripts/Streaming/RemotePreferences.cs:46)
-RTTRemoteMenu:LoadSavedHostPort () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTRemoteMenu.cs:1302)
-RTTRemoteMenu:BuildUI (UnityEngine.Transform,single,single) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTRemoteMenu.cs:200)
-RTTRemoteMenuController:CreateMenu (UnityEngine.RectTransform,single,single,TMPro.TMP_FontAsset,UnityEngine.Color,UnityEngine.Color) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTRemoteMenuController.cs:90)
-RTTManager:CreateRemoteMenuContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:1577)
-RTTManager:CreateAppContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:1537)
-RTTManager/<PrepareAppFrameAsync>d__155:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:1252)
+RTTCanvasBase:SetVisible (bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTCanvasBase.cs:605)
+RTTFileManager:CreateSidePanels () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:918)
+RTTFileManager:CreatePanels () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:151)
+RTTFileManager:BuildUI () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:76)
+RTTFileManagerController:CreateMenu (UnityEngine.RectTransform,single,single,TMPro.TMP_FontAsset,UnityEngine.Color,UnityEngine.Color) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:61)
+RTTManager:CreateFilesMenuContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:1666)
+RTTManager:CreateAppContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:1600)
+RTTManager/<PrepareAppFrameAsync>d__158:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:1312)
 UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
 
-[StateMachine] Invalid transition: SpeedTesting -> AwaitingSuggestedConfig
+[RTTCanvasBase] FileDetailPanel.SetVisible(true): _displayQuad is NULL!
 UnityEngine.Debug:LogWarning (object)
-VRWorkspace.Streaming.ConnectionStateMachine:TryTransition (VRWorkspace.Streaming.ConnectionPhase,string) (at Assets/VR-Workspace/Scripts/Streaming/ConnectionStateMachine.cs:86)
-VRWorkspace.Streaming.PhaseProtocolClient/<RunSpeedTestInBackgroundAsync>d__201:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:1494)
-System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1<VRWorkspace.Streaming.SpeedTestResult>:SetResult (VRWorkspace.Streaming.SpeedTestResult)
-VRWorkspace.Streaming.SpeedTestClient/<RunSpeedTestAsync>d__36:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/SpeedTestClient.cs:112)
-System.Runtime.CompilerServices.AsyncTaskMethodBuilder:SetResult ()
-VRWorkspace.Streaming.SpeedTestClient/<SendTextAsync>d__51:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/SpeedTestClient.cs:511)
-UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+RTTCanvasBase:SetVisible (bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTCanvasBase.cs:605)
+RTTFileManager:CreateSidePanels () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:927)
+RTTFileManager:CreatePanels () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:151)
+RTTFileManager:BuildUI () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:76)
+RTTFileManagerController:CreateMenu (UnityEngine.RectTransform,single,single,TMPro.TMP_FontAsset,UnityEngine.Color,UnityEngine.Color) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:61)
+RTTManager:CreateFilesMenuContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:1666)
+RTTManager:CreateAppContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:1600)
+RTTManager/<PrepareAppFrameAsync>d__158:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:1312)
+UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
 
-[PhaseProtocol] Skipping networkInfo update: _networkInfo=True, connectionType=Unknown
-UnityEngine.Debug:LogWarning (object)
-VRWorkspace.Streaming.PhaseProtocolClient:HandleSuggestedConfig (VRWorkspace.Streaming.SimpleJson) (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:1782)
-VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__192:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:1100)
-System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__192> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__192&)
-VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
-VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__191:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:1047)
-UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+[RTTFileManager] CreateHeaderRows started, instance: -162736
 
-[PhaseProtocol] Pong timeout! 6180ms since last pong, missed: 1
-UnityEngine.Debug:LogWarning (object)
-VRWorkspace.Streaming.PhaseProtocolClient/<KeepaliveLoopAsync>d__248:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3644)
-UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+[RTTFileManager] CreateRow2 called
 
-[PhaseProtocol] Pong timeout! 8188ms since last pong, missed: 2
-UnityEngine.Debug:LogWarning (object)
-VRWorkspace.Streaming.PhaseProtocolClient/<KeepaliveLoopAsync>d__248:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3644)
-UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+[RTTFileManager] Breadcrumb container set: True, instance: -162736
 
-[PhaseProtocol] Pong timeout! 10205ms since last pong, missed: 3
-UnityEngine.Debug:LogWarning (object)
-VRWorkspace.Streaming.PhaseProtocolClient/<KeepaliveLoopAsync>d__248:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3644)
-UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+[RTTFileManager] CreateHeaderRows completed, breadcrumb null: True
 
-[PhaseProtocol] Pong timeout! 12238ms since last pong, missed: 4
-UnityEngine.Debug:LogWarning (object)
-VRWorkspace.Streaming.PhaseProtocolClient/<KeepaliveLoopAsync>d__248:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3644)
-UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+[RTTFileManager] Before OnViewReady - breadcrumb container null: True, instance: -162736
 
-[PhaseProtocol] Pong timeout! 14300ms since last pong, missed: 5
-UnityEngine.Debug:LogWarning (object)
-VRWorkspace.Streaming.PhaseProtocolClient/<KeepaliveLoopAsync>d__248:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3644)
-UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+[Controller] View is ready. Loading initial path.
 
-[ConnectionViewModel] Timeout waiting for ReadyToStream, current phase: Streaming, using force start
-UnityEngine.Debug:LogWarning (object)
-VRWorkspace.ViewModels.ConnectionViewModel/<>c__DisplayClass99_0/<<SubscribeToEvents>b__15>d:MoveNext () (at Assets/VR-Workspace/Scripts/ViewModels/ConnectionViewModel.cs:664)
-UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+[Controller] Navigating to: root
 
-[StateMachine] Invalid transition: Streaming -> StartingStream
-UnityEngine.Debug:LogWarning (object)
-VRWorkspace.Streaming.ConnectionStateMachine:TryTransition (VRWorkspace.Streaming.ConnectionPhase,string) (at Assets/VR-Workspace/Scripts/Streaming/ConnectionStateMachine.cs:86)
-VRWorkspace.Streaming.PhaseProtocolClient/<StartStreamingAsync>d__116:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:338)
-System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<StartStreamingAsync>d__116> (VRWorkspace.Streaming.PhaseProtocolClient/<StartStreamingAsync>d__116&)
-VRWorkspace.Streaming.PhaseProtocolClient:StartStreamingAsync (bool)
-VRWorkspace.ViewModels.ConnectionViewModel/<StartStreamingAsync>d__91:MoveNext () (at Assets/VR-Workspace/Scripts/ViewModels/ConnectionViewModel.cs:364)
-System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.ViewModels.ConnectionViewModel/<StartStreamingAsync>d__91> (VRWorkspace.ViewModels.ConnectionViewModel/<StartStreamingAsync>d__91&)
-VRWorkspace.ViewModels.ConnectionViewModel:StartStreamingAsync (bool)
-VRWorkspace.ViewModels.ConnectionViewModel/<>c__DisplayClass99_0/<<SubscribeToEvents>b__15>d:MoveNext () (at Assets/VR-Workspace/Scripts/ViewModels/ConnectionViewModel.cs:669)
-UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+[FileSystemService] Root path set to: C:\Users\Admin
 
-[PhaseProtocol] PC0 FRAME STALL detected! No frames for 3.3s (frames received: 1615)
-UnityEngine.Debug:LogWarning (object)
-VRWorkspace.Streaming.PhaseProtocolClient/<FrameStallMonitorAsync>d__236:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3230)
-UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+[FileSystemService] Reading directory: C:\Users\Admin
 
-[PhaseProtocol] PC1 FRAME STALL detected! No frames for 3.3s (frames received: 1615)
-UnityEngine.Debug:LogWarning (object)
-VRWorkspace.Streaming.PhaseProtocolClient/<FrameStallMonitorAsync>d__236:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3230)
-UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+[FileSystemService] Found 86 items (69 folders, 17 files)
 
-[PhaseProtocol] PC0 auto-heal: PC Connected but frames stalled for 3822ms - forcing reconnect
+[RTTFilePagination] SetPage Called: Current=1, TotalInput=9
+
+[RTTFilePagination] UpdateDisplay: TotalPages=9
+
+[RTTFileManager] UpdateBreadcrumbs called with path: root, container null: True, instance: -162736
+
+[RTTFileManager] Breadcrumb container is null!
 UnityEngine.Debug:LogWarning (object)
-VRWorkspace.Streaming.PhaseProtocolClient/<AutoHealMonitorAsync>d__232:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3063)
-UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+RTTFileManager:UpdateBreadcrumbs (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:688)
+RTTFileManagerController:NavigateTo (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:110)
+RTTFileManagerController:OnViewReady () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:83)
+RTTFileManager/<CreateCenterGrid>d__26:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:274)
+UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
+RTTFileManager:CreatePanels () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:154)
+RTTFileManager:BuildUI () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:76)
+RTTFileManagerController:CreateMenu (UnityEngine.RectTransform,single,single,TMPro.TMP_FontAsset,UnityEngine.Color,UnityEngine.Color) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:61)
+RTTManager:CreateFilesMenuContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:1666)
+RTTManager:CreateAppContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:1600)
+RTTManager/<PrepareAppFrameAsync>d__158:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:1312)
+UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
+
+[RTTFileManagerController] Menu created
+
+[RTTMenuFrame] UI built: 640x1080 logical pixels
+
+[RTTManager] App folder prepared
+
+[RTTTaskbar] RegisterApp called - slotIndex=1, icon=icon_folder, _appButtons.Count=4
+
+[RTTTaskbar] Set slot 1 alpha to 1
+
+[RTTTaskbar] SetSlotIcon - slot=AppBtn_AppSlot_1, icon=icon_folder, slotIndex=1
+
+[RTTTaskbar] SetSlotIcon - removed 0 old children
+
+[RTTTaskbar] SetSlotIcon - created iconBtn=Btn_icon_folder, slot.childCount now=1
+
+[RTTTaskbar] Registered app in slot 1 complete
+
+[RTTTaskbar] SelectSlot(1) called, current active: 0
+
+[RTTTaskbar] App button 1 selected
 
