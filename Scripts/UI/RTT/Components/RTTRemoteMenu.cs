@@ -252,9 +252,9 @@ public class RTTRemoteMenu : MonoBehaviour
     {
         var header = CreateContainer(parent, "Header", x, y, w, h);
 
-        // Back button
-        float backW = 280f;
-        CreateButton(header.transform, 0, 0, backW, h, "Back", LoadIcon("back"), themeColor,
+        // Close button
+        float closeSize = 100f;
+        CreateButton(header.transform, 0, (h - closeSize) / 2f, closeSize, closeSize, "", LoadIcon("close"), themeColor,
             () => OnBackClicked?.Invoke());
 
         // Title - centered

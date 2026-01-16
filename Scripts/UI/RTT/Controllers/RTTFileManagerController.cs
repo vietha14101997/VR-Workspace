@@ -31,7 +31,7 @@ public class RTTFileManagerController : MonoBehaviour
     private MockFile? _hoveredFile = null;
 
     private int _currentPage = 1;
-    private int _pageSize = 10; // 2 Rows x 5 Cols (10 items) - Matches RTTFileManager ScrollToPage(2)
+    private int _pageSize = 10; // Default: ~2 rows x 5 cols for grid view (will be recalculated by view)
 
     // Sort State
     private string _sortBy = "Name";
@@ -147,6 +147,20 @@ public class RTTFileManagerController : MonoBehaviour
         UpdateView(true);
     }
 
+    public void SetPageSize(int itemsPerPage)
+    {
+        if (_pageSize == itemsPerPage)
+        {
+            Debug.Log($"[Controller] SetPageSize: no change (already {_pageSize})");
+            return;
+        }
+
+        Debug.Log($"[Controller] Page size changed: {_pageSize} -> {itemsPerPage}");
+        _pageSize = Mathf.Max(1, itemsPerPage);
+        _currentPage = 1;
+        UpdateView(false); // Recalculate pagination
+    }
+
     private void ApplySort()
     {
         // Always put folders first, then sort within each group
@@ -223,7 +237,9 @@ public class RTTFileManagerController : MonoBehaviour
         int totalFiles = _filteredFiles.Count;
         if (totalFiles == 0) return 1;
         int size = Mathf.Max(1, _pageSize);
-        return Mathf.CeilToInt((float)totalFiles / size);
+        int totalPages = Mathf.CeilToInt((float)totalFiles / size);
+        Debug.Log($"[Controller] CalculateTotalPages: totalFiles={totalFiles}, pageSize={size}, totalPages={totalPages}");
+        return totalPages;
     }
 
     private void UpdateView(bool fullReload)
@@ -294,6 +310,7 @@ public struct MockFile
     public string Name;
     public string Path;
     public bool IsFolder;
+    public bool IsFolderEmpty;    // For folders: true if no children
     public string Type;           // File extension or "Folder"
     public DateTime Created;
     public DateTime Modified;
@@ -424,11 +441,30 @@ public static class FileSystemService
                         continue;
                     }
 
+                    // Check if folder is empty (has no visible children)
+                    bool isFolderEmpty = true;
+                    try
+                    {
+                        var entries = dirInfo.EnumerateFileSystemInfos();
+                        foreach (var entry in entries)
+                        {
+                            // Skip hidden/system entries
+                            if ((entry.Attributes & FileAttributes.Hidden) == 0 &&
+                                (entry.Attributes & FileAttributes.System) == 0)
+                            {
+                                isFolderEmpty = false;
+                                break;
+                            }
+                        }
+                    }
+                    catch { isFolderEmpty = true; } // If can't enumerate, treat as empty
+
                     list.Add(new MockFile
                     {
                         Name = dirInfo.Name,
                         Path = dirPath,
                         IsFolder = true,
+                        IsFolderEmpty = isFolderEmpty,
                         Type = "Folder",
                         Created = dirInfo.CreationTime,
                         Modified = dirInfo.LastWriteTime,

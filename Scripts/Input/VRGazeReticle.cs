@@ -90,10 +90,16 @@ public class VRGazeReticle : MonoBehaviour
 
     // RTT State
     private RTTHitResult _lastRTTHit;
-    private bool _isHoveringRTT = false;
 
     // Blocked target tracking (for popup close-on-click)
     private GameObject _blockedDwellTarget;
+
+    // Last clicked button tracking (prevents continuous clicking same button)
+    private GameObject _lastClickedButton;
+
+    // RTT click cooldown (prevents rapid clicks when popup rebuilds)
+    private float _lastRTTClickTime;
+    private const float kRTTClickCooldown = 0.3f;
 
     // Head Stabilization State
     private Quaternion _stabilizedRotation;
@@ -353,8 +359,6 @@ public class VRGazeReticle : MonoBehaviour
                 if (VRDropdown.CurrentlyOpenDropdown.IsPartOfDropdownPanel(hitObj))
                 {
                     // Process as standard physics hit for the dropdown
-                    _isHoveringRTT = false;
-
                     if (!_reticleImage.enabled) _reticleImage.enabled = true;
 
                     float dist = worldDropdownHit.distance;
@@ -398,8 +402,6 @@ public class VRGazeReticle : MonoBehaviour
 
             if (_lastRTTHit.isValid)
             {
-                _isHoveringRTT = true;
-
                 if (!_reticleImage.enabled) _reticleImage.enabled = true;
 
                 float dist = _lastRTTHit.distance;
@@ -448,8 +450,8 @@ public class VRGazeReticle : MonoBehaviour
 
                     if (_currentHitObj != hitObj)
                     {
-                        // Exit old non-RTT object if any
-                        if (_currentHitObj != null && !_isHoveringRTT)
+                        // Exit old object (both RTT and non-RTT)
+                        if (_currentHitObj != null)
                         {
                             HandlePointerExit(_currentHitObj);
                         }
@@ -479,7 +481,6 @@ public class VRGazeReticle : MonoBehaviour
         }
 
         // Fallback to standard physics raycast
-        _isHoveringRTT = false;
         RaycastHit hit;
 
         if (_layerMask != 0 && Physics.Raycast(ray, out hit, 100.0f, _layerMask))
@@ -572,6 +573,23 @@ public class VRGazeReticle : MonoBehaviour
     }
 
     /// <summary>
+    /// Send RTT click and remember the button to prevent continuous clicking
+    /// </summary>
+    void SendRTTClickAndLock(GameObject target)
+    {
+        if (RTTRaycastManager.Instance != null)
+        {
+            RTTRaycastManager.Instance.SendClick();
+        }
+
+        // Remember clicked button - will be cleared when reticle exits any button
+        _lastClickedButton = target;
+
+        // Record click time to prevent rapid clicks when popup rebuilds
+        _lastRTTClickTime = Time.time;
+    }
+
+    /// <summary>
     /// Process dwell click for RTT panels
     /// </summary>
     void ProcessDwellClickRTT(Vector3 currentGazeDir)
@@ -583,6 +601,18 @@ public class VRGazeReticle : MonoBehaviour
         }
 
         GameObject target = _lastRTTHit.hitUIElement;
+
+        // Skip if same button was just clicked (must move reticle away first)
+        if (_lastClickedButton != null && target == _lastClickedButton)
+        {
+            return;
+        }
+
+        // Skip if within cooldown period (prevents rapid clicks when popup rebuilds with new buttons)
+        if (Time.time - _lastRTTClickTime < kRTTClickCooldown)
+        {
+            return;
+        }
 
         // Check if dropdown is open - allow dwell on ANY object to close it
         bool hasOpenDropdown = VRDropdown.CurrentlyOpenDropdown != null;
@@ -720,10 +750,7 @@ public class VRGazeReticle : MonoBehaviour
                 if (isDropdownOption)
                 {
                     // Target is a dropdown option - perform normal click via RTTRaycastManager
-                    if (RTTRaycastManager.Instance != null)
-                    {
-                        RTTRaycastManager.Instance.SendClick();
-                    }
+                    SendRTTClickAndLock(target);
                 }
                 else if (targetDropdown != null && targetDropdown != VRDropdown.CurrentlyOpenDropdown)
                 {
@@ -749,19 +776,13 @@ public class VRGazeReticle : MonoBehaviour
                 if (isExpansionOption)
                 {
                     // Target is an expansion option - perform normal click via RTTRaycastManager
-                    if (RTTRaycastManager.Instance != null)
-                    {
-                        RTTRaycastManager.Instance.SendClick();
-                    }
+                    SendRTTClickAndLock(target);
                 }
                 else if (isDwellableTarget)
                 {
                     // Target is a dwellable button (could be expansion trigger) - perform click
                     // The button's click handler will decide whether to toggle/switch expansion
-                    if (RTTRaycastManager.Instance != null)
-                    {
-                        RTTRaycastManager.Instance.SendClick();
-                    }
+                    SendRTTClickAndLock(target);
                 }
                 else
                 {
@@ -776,22 +797,21 @@ public class VRGazeReticle : MonoBehaviour
             // Priority 4: Handle popup menu click-outside
             if (hasOpenPopup)
             {
-                if (isPopupOption)
+                if (isPopupOption && isDwellableTarget)
                 {
-                    // Target is part of popup - perform normal click via RTTRaycastManager
-                    if (RTTRaycastManager.Instance != null)
-                    {
-                        RTTRaycastManager.Instance.SendClick();
-                    }
+                    // Target is part of popup and dwellable - perform normal click via RTTRaycastManager
+                    SendRTTClickAndLock(target);
+                }
+                else if (isPopupOption)
+                {
+                    // Target is part of popup but NOT dwellable (e.g., selected button) - do nothing
+                    return;
                 }
                 else if (isDwellableTarget)
                 {
                     // Target is a dwellable button outside popup - close popup and perform click
                     RTTPopupMenu.CurrentlyOpenPopup.Hide();
-                    if (RTTRaycastManager.Instance != null)
-                    {
-                        RTTRaycastManager.Instance.SendClick();
-                    }
+                    SendRTTClickAndLock(target);
                     // Mark RTT panel dirty for re-render
                     _lastRTTHit.panel?.MarkDirty();
                 }
@@ -806,10 +826,7 @@ public class VRGazeReticle : MonoBehaviour
             }
 
             // Normal click - use RTTRaycastManager to send click
-            if (RTTRaycastManager.Instance != null)
-            {
-                RTTRaycastManager.Instance.SendClick();
-            }
+            SendRTTClickAndLock(target);
         }
     }
 
@@ -948,6 +965,12 @@ public class VRGazeReticle : MonoBehaviour
 
     void ProcessDwellClick(Vector3 currentGazeDir, GameObject target, RaycastHit hit)
     {
+        // Skip if same button was just clicked (must move reticle away first)
+        if (_lastClickedButton != null && target == _lastClickedButton)
+        {
+            return;
+        }
+
         // Check if dropdown is open - allow dwell on ANY object to close it
         bool hasOpenDropdown = VRDropdown.CurrentlyOpenDropdown != null;
         bool isDropdownOption = hasOpenDropdown && VRDropdown.CurrentlyOpenDropdown.IsPartOfDropdownPanel(target);
@@ -1239,6 +1262,10 @@ public class VRGazeReticle : MonoBehaviour
     {
         if (obj == null) return false;
 
+        // Check if button has VRButtonClickLock and is locked
+        VRButtonClickLock clickLock = VRButtonClickLock.FindOnButton(obj);
+        if (clickLock != null && clickLock.IsLocked) return false;
+
         // Kiểm tra có Button hoặc IPointerClickHandler không
         Button btn = obj.GetComponentInParent<Button>();
         if (btn != null && btn.interactable) return true;
@@ -1287,6 +1314,9 @@ public class VRGazeReticle : MonoBehaviour
 
         Selectable selectable = obj.GetComponentInParent<Selectable>();
         if (selectable) selectable.OnPointerExit(_pointerData);
+
+        // Clear last clicked button when exiting any button - allows clicking again
+        _lastClickedButton = null;
     }
 
     void HandlePointerClick(GameObject obj)
@@ -1313,6 +1343,9 @@ public class VRGazeReticle : MonoBehaviour
 
         // Fire PointerUp after click (for EventTrigger animations)
         ExecuteEvents.Execute(target, _pointerData, ExecuteEvents.pointerUpHandler);
+
+        // Remember clicked button - will be cleared when reticle exits any button
+        _lastClickedButton = obj;
     }
 
     void TriggerRippleEffect(GameObject obj, Vector2 normalizedHitPoint)

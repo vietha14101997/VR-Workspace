@@ -112,6 +112,11 @@ public class RTTPopupMenu : MonoBehaviour
     /// </summary>
     public static RTTPopupMenu CurrentlyOpenPopup { get; private set; }
 
+    /// <summary>
+    /// Event fired when popup is hidden (including from click-outside)
+    /// </summary>
+    public event System.Action OnHide;
+
     #endregion
     
     #region Factory Method
@@ -277,6 +282,9 @@ public class RTTPopupMenu : MonoBehaviour
         {
             CurrentlyOpenPopup = null;
         }
+
+        // Notify listeners that popup was hidden
+        OnHide?.Invoke();
     }
 
     /// <summary>
@@ -680,10 +688,17 @@ public class RTTPopupMenu : MonoBehaviour
         
         // Text only button base (Text is always centered)
         btn = VRButtonFactory.CreateTextButton(
-            parent as RectTransform, width, _config.buttonHeight, 
+            parent as RectTransform, width, _config.buttonHeight,
             data.text, btnColor,
             data.onClick, _config.fontSize, _config.font
         );
+
+        // Block dwell click for selected buttons (no need to click already selected option)
+        if (data.isSelected)
+        {
+            var clickLock = btn.AddComponent<VRButtonClickLock>();
+            clickLock.Lock();
+        }
 
         // Add Icon manually if present (Absolute positioning, left aligned)
         if (data.icon != null)

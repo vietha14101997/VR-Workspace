@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using TMPro;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -27,6 +28,7 @@ public class RTTFileManager : MonoBehaviour
 
     private RTTFileSidePanel _sidePanel;
     private RTTFileGrid _fileGrid;
+    private RTTFileList _fileList;
     private RTTFilePagination _pagination;
 
     // Flag to track if initial setup is complete (used to prevent premature Show in OnEnable)
@@ -273,6 +275,49 @@ public class RTTFileManager : MonoBehaviour
 
         Debug.Log($"[RTTFileManager] Before OnViewReady - breadcrumb container null: {_breadcrumbContainer == null}, instance: {GetInstanceID()}");
         _controller.OnViewReady();
+
+        // Initialize page size AFTER OnViewReady has loaded data (deferred to next frame for safety)
+        StartCoroutine(InitializePageSizeDeferred());
+    }
+
+    private IEnumerator InitializePageSizeDeferred()
+    {
+        // Wait one frame to ensure grid has populated
+        yield return null;
+
+        // Initialize page size based on view mode (use actual visible rows)
+        int itemsPerPage;
+        if (_isGridView)
+        {
+            if (_fileGrid != null)
+            {
+                int columnsPerRow = _fileGrid.GetColumnsPerRow();
+                int visibleRows = _fileGrid.GetVisibleRowsForPagination();
+                itemsPerPage = _fileGrid.GetItemsPerPage(visibleRows);
+                Debug.Log($"[RTTFileManager] InitializePageSizeDeferred(Grid): columnsPerRow={columnsPerRow}, visibleRows={visibleRows}, itemsPerPage={itemsPerPage}");
+            }
+            else
+            {
+                // Fallback: 2 rows x 5 columns (typical layout)
+                itemsPerPage = 10;
+                Debug.LogWarning($"[RTTFileManager] InitializePageSizeDeferred(Grid): fileGrid is null, using fallback itemsPerPage={itemsPerPage}");
+            }
+        }
+        else
+        {
+            // List view: use actual visible rows
+            if (_fileList != null)
+            {
+                itemsPerPage = _fileList.GetVisibleRowsForPagination();
+                Debug.Log($"[RTTFileManager] InitializePageSizeDeferred(List): visibleRows={itemsPerPage}");
+            }
+            else
+            {
+                itemsPerPage = 6;
+                Debug.LogWarning($"[RTTFileManager] InitializePageSizeDeferred(List): fileList is null, using fallback itemsPerPage={itemsPerPage}");
+            }
+        }
+        _controller?.SetPageSize(itemsPerPage);
     }
 
     private void CreateHeaderRows(RectTransform parent)
@@ -297,6 +342,7 @@ public class RTTFileManager : MonoBehaviour
     private bool _isAscending = true;
     private bool _isGridView = true;
     private Image _sortArrowImg; // Reference to arrow icon
+    private TextMeshProUGUI _sortTriggerText; // Reference to sort trigger text
 
     // Ellipsis Popup References (for hidden breadcrumb folders)
     private GameObject _ellipsisPopup;
@@ -309,12 +355,34 @@ public class RTTFileManager : MonoBehaviour
     private void CreateRow1(RectTransform parent)
     {
         RectTransform rowRT = CreateRowContainer(parent, "Row1", 0);
-        
-        // Left: View Options Trigger Button (Custom Layout: Text Left, Icon Right)
+
+        // Left: Close Button (Icon only, symmetric to Edit button)
+        Sprite closeIcon = Resources.Load<Sprite>("icon_close");
+        var closeConfig = new VRButtonFactory.ButtonConfig
+        {
+            label = "Close",
+            icon = closeIcon,
+            themeColor = _primaryColor,
+            width = 68f,
+            height = 68f,
+            iconOnly = true,
+            iconSize = 35.2f,
+            borderWidth = 0.04f,
+            glowWidth = 0.08f,
+            glowIntensity = 4f,
+            popAmount = 0.05f
+        };
+        GameObject closeBtn = VRButtonFactory.CreateButton(
+            rowRT,
+            closeConfig,
+            () => _controller?.HandleBack()
+        );
+        RectTransform closeRT = closeBtn.GetComponent<RectTransform>();
+        SetupRowElement(closeRT, new Vector2(0, 0.5f), new Vector2(20, 0)); // Left align
+
+        // View Options Trigger Button (Custom Layout: Text Left, Icon Right)
         Sprite arrowIcon = VRDropdownFactory.GetArrowSprite();
-        
-        // 1. Base Button (Text centered/left)
-        // 1. Base Button (Text centered/left)
+
         var sortConfig = new VRButtonFactory.ButtonConfig
         {
             label = _currentSortBy,
@@ -324,40 +392,48 @@ public class RTTFileManager : MonoBehaviour
             fontSize = 24,
             font = _font,
             textOnly = true,
-            borderWidth = 0.04f, // Custom thicker border (40%)
+            borderWidth = 0.04f,
             glowWidth = 0.08f,
             glowIntensity = 4f,
             popAmount = 0.05f
         };
         GameObject sortTrigger = VRButtonFactory.CreateButton(rowRT, sortConfig, ToggleViewOptionsPopup);
-        
-        // Adjust Text Alignment to Center (was Left)
-        TextMeshProUGUI btnText = sortTrigger.GetComponentInChildren<TextMeshProUGUI>();
-        if (btnText != null)
+
+        // Adjust Text Alignment to Center and save reference
+        _sortTriggerText = sortTrigger.GetComponentInChildren<TextMeshProUGUI>();
+        if (_sortTriggerText != null)
         {
-            btnText.alignment = TextAlignmentOptions.Center; // Centered
-            btnText.margin = Vector4.zero; // Remove left padding
+            _sortTriggerText.alignment = TextAlignmentOptions.Center;
+            _sortTriggerText.margin = Vector4.zero;
         }
 
-        // 2. Add Icon manually (Right aligned)
+        // Add Arrow Icon manually (Right aligned)
         GameObject iconObj = new GameObject("ArrowIcon");
         iconObj.transform.SetParent(sortTrigger.transform, false);
         _sortArrowImg = iconObj.AddComponent<Image>();
         _sortArrowImg.sprite = arrowIcon;
-        _sortArrowImg.color = Color.white; 
+        _sortArrowImg.color = Color.white;
         _sortArrowImg.raycastTarget = false;
 
         RectTransform iconRT = iconObj.GetComponent<RectTransform>();
         iconRT.anchorMin = new Vector2(1, 0.5f);
         iconRT.anchorMax = new Vector2(1, 0.5f);
-        iconRT.pivot = new Vector2(0.5f, 0.5f); // Pivot center for correct rotation
+        iconRT.pivot = new Vector2(0.5f, 0.5f);
         iconRT.sizeDelta = new Vector2(16f, 16f);
-        // Position: -25 (desired right gap) - 8 (half width) = -33
         iconRT.anchoredPosition = new Vector2(-33f, 0);
 
         RectTransform sortRT = sortTrigger.GetComponent<RectTransform>();
-        SetupRowElement(sortRT, new Vector2(0, 0.5f), new Vector2(20, 0)); // Left-Center align
-        
+        // Position centered between Close button and SearchBar
+        // Close button ends at: 20 + 68 = 88 from left
+        // SearchBar (width 990, centered) left edge from left: containerWidth/2 - 495
+        // Gap center from left = (88 + containerWidth/2 - 495) / 2 = containerWidth/4 - 203.5
+        // Convert to center-anchored: gapCenter - containerWidth/2 = -containerWidth/4 - 203.5
+        float gapCenterFromCenter = -_containerWidth / 4f - 203.5f;
+        sortRT.anchorMin = new Vector2(0.5f, 0.5f);
+        sortRT.anchorMax = new Vector2(0.5f, 0.5f);
+        sortRT.pivot = new Vector2(0.5f, 0.5f);
+        sortRT.anchoredPosition = new Vector2(gapCenterFromCenter, 0);
+
         // Create popup (using RTTPopupMenu) with Sort Button as parent
         CreateViewOptionsPopup(sortRT);
 
@@ -391,12 +467,32 @@ public class RTTFileManager : MonoBehaviour
     
     private void ToggleViewOptionsPopup()
     {
-        _viewOptionsPopup?.Toggle();
-        
-        // Rotate arrow based on visibility
+        if (_viewOptionsPopup == null) return;
+
+        if (_viewOptionsPopup.IsVisible)
+        {
+            _viewOptionsPopup.Hide();
+        }
+        else
+        {
+            // Rebuild content to reflect current state (in case changed by list header click)
+            BuildViewOptionsPopupContent();
+            _viewOptionsPopup.Show();
+        }
+        UpdateSortArrow();
+    }
+
+    private void OnViewOptionsPopupHide()
+    {
+        UpdateSortArrow();
+    }
+
+    private void UpdateSortArrow()
+    {
+        // Rotate arrow: up (180) when popup open, down (0) when closed
         if (_sortArrowImg != null)
         {
-            float targetZ = _viewOptionsPopup.IsVisible ? 180f : 0f;
+            float targetZ = (_viewOptionsPopup != null && _viewOptionsPopup.IsVisible) ? 180f : 0f;
             _sortArrowImg.rectTransform.localEulerAngles = new Vector3(0, 0, targetZ);
         }
     }
@@ -422,19 +518,21 @@ public class RTTFileManager : MonoBehaviour
         
         // Create popup using RTTPopupMenu
         _viewOptionsPopup = RTTPopupMenu.Create(parent, config);
-        
+
+        // Subscribe to OnHide to reset arrow when popup closes from click-outside
+        _viewOptionsPopup.OnHide += OnViewOptionsPopupHide;
+
         // Override Anchor to Bottom-Left of parent (Sort Button)
         // Sort Button Pivot is (0,0), so (0,0) relative to it is its Bottom-Left corner.
         _viewOptionsPopup.SetAnchor(Vector2.zero, Vector2.zero, new Vector2(0, 1));
-        
+
         // Build popup content
         BuildViewOptionsPopupContent();
         
         // Position the popup
-        // X = 0 (Aligned Left)
-        // Y = -Spacing - HalfButtonHeight (since Pivot is Center now, Anchor Bottom-Left might need offset correction or visual adjustment)
-        // Adjusting by extra -34f to ensure it clears the button visual completely if anchor logic is behaving unexpectedly with new Pivot.
-        _viewOptionsPopup.SetPosition(new Vector2(0, -34f - config.rowSpacing));
+        // sortTrigger uses center pivot (0.5, 0.5), so offset X by -width/2 to align popup left edge with button left edge
+        // Y = below the button
+        _viewOptionsPopup.SetPosition(new Vector2(-_sortTriggerWidth / 2f, -34f - config.rowSpacing));
     }
     
     private void BuildViewOptionsPopupContent()
@@ -474,17 +572,96 @@ public class RTTFileManager : MonoBehaviour
     
     private void SetDisplayMode(bool isGrid)
     {
+        if (_isGridView == isGrid) return; // No change
+
         _isGridView = isGrid;
         Debug.Log($"[RTTFileManager] Display mode: {(isGrid ? "Grid" : "List")}");
-        RefreshViewOptionsPopup();
-        // TODO: Implement Grid/List view switch
+
+        // Close popup after selection
+        _viewOptionsPopup?.Hide();
+
+        // Switch views
+        if (isGrid)
+        {
+            // Show Grid, Hide List
+            if (_fileGrid != null) _fileGrid.gameObject.SetActive(true);
+            if (_fileList != null) _fileList.gameObject.SetActive(false);
+        }
+        else
+        {
+            // Show List, Hide Grid
+            if (_fileGrid != null) _fileGrid.gameObject.SetActive(false);
+
+            // Create list view if not exists
+            if (_fileList == null)
+            {
+                CreateListView();
+            }
+            else
+            {
+                _fileList.gameObject.SetActive(true);
+            }
+        }
+
+        // Update page size based on view mode (use actual visible rows)
+        // Grid: visible rows × actual columns (calculated based on viewport)
+        // List: visible rows = items per page
+        int itemsPerPage;
+        if (isGrid)
+        {
+            if (_fileGrid != null)
+            {
+                int columnsPerRow = _fileGrid.GetColumnsPerRow();
+                int visibleRows = _fileGrid.GetVisibleRowsForPagination();
+                itemsPerPage = _fileGrid.GetItemsPerPage(visibleRows);
+                Debug.Log($"[RTTFileManager] SetDisplayMode(Grid): columnsPerRow={columnsPerRow}, visibleRows={visibleRows}, itemsPerPage={itemsPerPage}");
+            }
+            else
+            {
+                // Fallback for grid: 2 rows x 5 columns (typical layout)
+                itemsPerPage = 10;
+                Debug.LogWarning("[RTTFileManager] FileGrid is null, using default 10 items per page");
+            }
+        }
+        else
+        {
+            // List view: use actual visible rows
+            if (_fileList != null)
+            {
+                itemsPerPage = _fileList.GetVisibleRowsForPagination();
+                Debug.Log($"[RTTFileManager] SetDisplayMode(List): visibleRows={itemsPerPage}");
+            }
+            else
+            {
+                itemsPerPage = 6;
+                Debug.LogWarning("[RTTFileManager] FileList is null, using default 6 items per page");
+            }
+        }
+        _controller?.SetPageSize(itemsPerPage);
+
+        // Refresh content with current data
+        _controller?.RefreshCurrentFolder();
     }
 
     private void SetSortBy(string sortBy)
     {
         _currentSortBy = sortBy;
         Debug.Log($"[RTTFileManager] Sort by: {sortBy}");
-        RefreshViewOptionsPopup();
+
+        // Update sort trigger text
+        if (_sortTriggerText != null)
+        {
+            _sortTriggerText.text = sortBy;
+        }
+
+        // Update list view sort state if visible
+        if (!_isGridView && _fileList != null)
+        {
+            _fileList.UpdateSortState(_currentSortBy, _isAscending);
+        }
+
+        // Close popup after selection
+        _viewOptionsPopup?.Hide();
 
         // Call controller to apply sort
         _controller?.SetSortOptions(_currentSortBy, _isAscending);
@@ -494,7 +671,15 @@ public class RTTFileManager : MonoBehaviour
     {
         _isAscending = !_isAscending;
         Debug.Log($"[RTTFileManager] Order: {(_isAscending ? "Ascending" : "Descending")}");
-        RefreshViewOptionsPopup();
+
+        // Update list view sort state if visible
+        if (!_isGridView && _fileList != null)
+        {
+            _fileList.UpdateSortState(_currentSortBy, _isAscending);
+        }
+
+        // Close popup after toggle
+        _viewOptionsPopup?.Hide();
 
         // Call controller to apply sort
         _controller?.SetSortOptions(_currentSortBy, _isAscending);
@@ -508,7 +693,68 @@ public class RTTFileManager : MonoBehaviour
             _viewOptionsPopup.Show();
         }
     }
-    
+
+    private void CreateListView()
+    {
+        if (_bodyRT == null)
+        {
+            Debug.LogError("[RTTFileManager] Cannot create list view - body container not ready!");
+            return;
+        }
+
+        // Create list view in the same body container as grid
+        GameObject listObj = new GameObject("FileList");
+        listObj.transform.SetParent(_bodyRT, false);
+
+        RectTransform listRT = listObj.AddComponent<RectTransform>();
+        listRT.anchorMin = Vector2.zero;
+        listRT.anchorMax = Vector2.one;
+        listRT.offsetMin = Vector2.zero;
+        listRT.offsetMax = Vector2.zero;
+
+        _fileList = listObj.AddComponent<RTTFileList>();
+
+        // Calculate size based on body
+        Vector2 contentSize = _menuFrame.GetContentSize();
+        float headerOriginalHeight = _singleRowHeight * 2;
+        float bottomPadding = contentSize.y * 0.02f;
+        float bodyHeight = contentSize.y - headerOriginalHeight - bottomPadding;
+
+        _fileList.Initialize(_controller, contentSize.x, bodyHeight, _font, _primaryColor, _accentColor, OnListHeaderColumnClicked);
+        _fileList.UpdateSortState(_currentSortBy, _isAscending);
+
+        Debug.Log("[RTTFileManager] List view created");
+    }
+
+    private void OnListHeaderColumnClicked(string columnName)
+    {
+        // Toggle ascending/descending if clicking same column
+        if (_currentSortBy == columnName)
+        {
+            _isAscending = !_isAscending;
+        }
+        else
+        {
+            _currentSortBy = columnName;
+            _isAscending = true;
+        }
+
+        // Update sort trigger text
+        if (_sortTriggerText != null)
+        {
+            _sortTriggerText.text = _currentSortBy;
+        }
+
+        // Update list header arrows
+        if (_fileList != null)
+        {
+            _fileList.UpdateSortState(_currentSortBy, _isAscending);
+        }
+
+        // Apply sort
+        _controller?.SetSortOptions(_currentSortBy, _isAscending);
+    }
+
     private void SetLayerRecursively(GameObject obj, int layer)
     {
         obj.layer = layer;
@@ -961,6 +1207,13 @@ public class RTTFileManager : MonoBehaviour
         colors.pressedColor = new Color(0.85f, 0.85f, 0.85f);
         btn.colors = colors;
 
+        // Block dwell click for current folder (last breadcrumb) - keep visual normal
+        if (isActive && !isEllipsis)
+        {
+            var clickLock = btnObj.AddComponent<VRButtonClickLock>();
+            clickLock.Lock(); // Lock immediately - no need to click current folder
+        }
+
         if (!isEllipsis)
         {
             // Normal breadcrumb: navigate to folder
@@ -1225,22 +1478,42 @@ public class RTTFileManager : MonoBehaviour
     
     public void ScrollToPage(int page)
     {
-        if (_fileGrid != null)
+        if (_isGridView && _fileGrid != null)
         {
-             // Assume 2 rows per page
-             _fileGrid.ScrollToPage(page, 2);
+            int visibleRows = _fileGrid.GetVisibleRowsForPagination();
+            _fileGrid.ScrollToPage(page, visibleRows);
+        }
+        else if (!_isGridView && _fileList != null)
+        {
+            int visibleRows = _fileList.GetVisibleRowsForPagination();
+            _fileList.ScrollToPage(page, visibleRows);
         }
     }
 
     public void UpdateGrid(System.Collections.Generic.List<MockFile> files, string selectedPath = "")
     {
-        if (_fileGrid != null)
+        if (_isGridView)
         {
-            _fileGrid.Populate(files, selectedPath);
+            if (_fileGrid != null)
+            {
+                _fileGrid.Populate(files, selectedPath);
+            }
+            else
+            {
+                Debug.LogWarning("[RTTFileManager] FileGrid not ready yet!");
+            }
         }
         else
         {
-            Debug.LogWarning("[RTTFileManager] FileGrid not ready yet!");
+            if (_fileList != null)
+            {
+                _fileList.Populate(files, selectedPath);
+                _fileList.UpdateSortState(_currentSortBy, _isAscending);
+            }
+            else
+            {
+                Debug.LogWarning("[RTTFileManager] FileList not ready yet!");
+            }
         }
     }
 

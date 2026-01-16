@@ -1,12 +1,12 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
-using TMPro;
 
 /// <summary>
 /// Virtualized Grid View for File Manager.
 /// Only renders visible items + buffer to maintain performance with large directories.
 /// Uses object pooling to reuse RTTFileGridItem instances.
+/// Pure display component - interaction logic will be added separately.
 /// </summary>
 public class RTTFileGrid : MonoBehaviour
 {
@@ -20,7 +20,6 @@ public class RTTFileGrid : MonoBehaviour
 
     // Data
     private List<MockFile> _allFiles = new List<MockFile>();
-    private string _selectedPath;
 
     // Pool of reusable items
     private List<RTTFileGridItem> _itemPool = new List<RTTFileGridItem>();
@@ -42,9 +41,6 @@ public class RTTFileGrid : MonoBehaviour
     private int _visibleRowCount;
     private int _bufferRows = 2;
 
-    // Track last selected for double-click behavior
-    private RTTFileGridItem _lastSelectedItem;
-
     public void Initialize(RTTFileManagerController controller, float w, float h)
     {
         _controller = controller;
@@ -54,6 +50,16 @@ public class RTTFileGrid : MonoBehaviour
         BuildUI();
         CalculateGridMetrics();
         CreateItemPool();
+    }
+
+    /// <summary>
+    /// Returns items per page based on actual columns per row.
+    /// </summary>
+    public int GetItemsPerPage(int rowsPerPage)
+    {
+        int itemsPerPage = rowsPerPage * _columnsPerRow;
+        Debug.Log($"[RTTFileGrid] GetItemsPerPage: rowsPerPage={rowsPerPage}, columnsPerRow={_columnsPerRow}, result={itemsPerPage}");
+        return itemsPerPage;
     }
 
     private void BuildUI()
@@ -75,14 +81,11 @@ public class RTTFileGrid : MonoBehaviour
         _viewportRect.offsetMin = Vector2.zero;
         _viewportRect.offsetMax = Vector2.zero;
 
-        Image maskImg = viewport.AddComponent<Image>();
-        maskImg.color = Color.white;
-        Mask mask = viewport.AddComponent<Mask>();
-        mask.showMaskGraphic = false;
+        viewport.AddComponent<RectMask2D>();
 
         _scrollRect.viewport = _viewportRect;
 
-        // 3. Content (sized manually, no GridLayoutGroup)
+        // 3. Content
         GameObject content = new GameObject("Content");
         content.transform.SetParent(viewport.transform, false);
         _contentRect = content.AddComponent<RectTransform>();
@@ -100,6 +103,28 @@ public class RTTFileGrid : MonoBehaviour
         _columnsPerRow = Mathf.Max(1, Mathf.FloorToInt((availableWidth + _spacingX) / (_cellWidth + _spacingX)));
         _rowHeight = _cellHeight + _spacingY;
         _visibleRowCount = Mathf.CeilToInt(_height / _rowHeight) + 1;
+
+        Debug.Log($"[RTTFileGrid] CalculateGridMetrics: width={_width}, availableWidth={availableWidth}, columnsPerRow={_columnsPerRow}, cellWidth={_cellWidth}, spacingX={_spacingX}");
+    }
+
+    /// <summary>
+    /// Returns the calculated columns per row.
+    /// </summary>
+    public int GetColumnsPerRow()
+    {
+        return _columnsPerRow;
+    }
+
+    /// <summary>
+    /// Returns the number of complete rows that fit in the viewport for pagination purposes.
+    /// This excludes buffer rows and uses floor calculation for accurate page counting.
+    /// </summary>
+    public int GetVisibleRowsForPagination()
+    {
+        float availableHeight = _height - _paddingTop - _paddingBottom;
+        int visibleRows = Mathf.Max(1, Mathf.FloorToInt(availableHeight / _rowHeight));
+        Debug.Log($"[RTTFileGrid] GetVisibleRowsForPagination: height={_height}, availableHeight={availableHeight}, rowHeight={_rowHeight}, visibleRows={visibleRows}");
+        return visibleRows;
     }
 
     private void CreateItemPool()
@@ -123,7 +148,7 @@ public class RTTFileGrid : MonoBehaviour
         rect.sizeDelta = new Vector2(_cellWidth, _cellHeight);
 
         var gridItem = itemObj.AddComponent<RTTFileGridItem>();
-        gridItem.Initialize(OnItemClicked, OnItemDoubleClicked, OnItemHover);
+        gridItem.Initialize();
 
         return gridItem;
     }
@@ -131,8 +156,6 @@ public class RTTFileGrid : MonoBehaviour
     public void Populate(List<MockFile> files, string selectedPath = "")
     {
         _allFiles = files ?? new List<MockFile>();
-        _selectedPath = selectedPath;
-        _lastSelectedItem = null;
 
         // Hide all visible items
         foreach (var kvp in _visibleItems)
@@ -141,7 +164,7 @@ public class RTTFileGrid : MonoBehaviour
         }
         _visibleItems.Clear();
 
-        // Update content size based on total items
+        // Update content size
         UpdateContentSize();
 
         // Reset scroll position
@@ -168,7 +191,6 @@ public class RTTFileGrid : MonoBehaviour
     {
         if (_allFiles.Count == 0) return;
 
-        // Calculate visible range
         float scrollY = _contentRect.anchoredPosition.y;
         int firstVisibleRow = Mathf.Max(0, Mathf.FloorToInt((scrollY - _paddingTop) / _rowHeight) - _bufferRows);
         int lastVisibleRow = firstVisibleRow + _visibleRowCount + _bufferRows * 2;
@@ -176,7 +198,7 @@ public class RTTFileGrid : MonoBehaviour
         int firstVisibleIndex = firstVisibleRow * _columnsPerRow;
         int lastVisibleIndex = Mathf.Min((lastVisibleRow + 1) * _columnsPerRow - 1, _allFiles.Count - 1);
 
-        // Find items that are no longer visible and return to pool
+        // Find items no longer visible
         List<int> toRemove = new List<int>();
         foreach (var kvp in _visibleItems)
         {
@@ -216,7 +238,6 @@ public class RTTFileGrid : MonoBehaviour
             }
         }
 
-        // Pool exhausted, create new item
         var newItem = CreatePooledItem();
         _itemPool.Add(newItem);
         return newItem;
@@ -245,13 +266,8 @@ public class RTTFileGrid : MonoBehaviour
         rect.anchoredPosition = new Vector2(x, y);
 
         // Bind data
-        item.Bind(file.Name, file.IsFolder, file.Path);
+        item.Bind(file.Name, file.IsFolder, file.Path, file.IsFolderEmpty);
         item.gameObject.SetActive(true);
-
-        // Restore selection
-        bool isSelected = !string.IsNullOrEmpty(_selectedPath) && file.Path == _selectedPath;
-        item.SetSelected(isSelected);
-        if (isSelected) _lastSelectedItem = item;
     }
 
     public void ScrollToPage(int pageIndex, int rowsPerPage)
@@ -297,41 +313,37 @@ public class RTTFileGrid : MonoBehaviour
         _scrollCoroutine = null;
     }
 
-    private void OnItemHover(RTTFileGridItem item, bool isHover)
+    #region Public API for accessing items
+    /// <summary>
+    /// Get the visible item at a specific index
+    /// </summary>
+    public RTTFileGridItem GetVisibleItemAtIndex(int index)
     {
-        if (isHover) _controller.HoverFile(item.FilePath);
-        else _controller.UnhoverFile(item.FilePath);
+        if (_visibleItems.TryGetValue(index, out var item))
+        {
+            return item;
+        }
+        return null;
     }
 
-    private void OnItemClicked(RTTFileGridItem item)
+    /// <summary>
+    /// Get all currently visible items
+    /// </summary>
+    public IEnumerable<RTTFileGridItem> GetVisibleItems()
     {
-        Debug.Log($"[RTTFileGrid] Single Click (Select): {item.FilePath}");
-
-        if (_lastSelectedItem == item && item.IsFolder)
-        {
-            _controller.NavigateTo(item.FilePath);
-            return;
-        }
-
-        // Single click only selects
-        _controller.SelectFile(item.FilePath);
-        _selectedPath = item.FilePath;
-        _lastSelectedItem = item;
-
-        // Update selection visuals for all visible items
-        foreach (var kvp in _visibleItems)
-        {
-            kvp.Value.SetSelected(kvp.Value == item);
-        }
+        return _visibleItems.Values;
     }
 
-    private void OnItemDoubleClicked(RTTFileGridItem item)
+    /// <summary>
+    /// Get the file at a specific index
+    /// </summary>
+    public MockFile? GetFileAtIndex(int index)
     {
-        Debug.Log($"[RTTFileGrid] Double Click (Navigate): {item.FilePath}");
-
-        if (item.IsFolder)
+        if (index >= 0 && index < _allFiles.Count)
         {
-            _controller.NavigateTo(item.FilePath);
+            return _allFiles[index];
         }
+        return null;
     }
+    #endregion
 }

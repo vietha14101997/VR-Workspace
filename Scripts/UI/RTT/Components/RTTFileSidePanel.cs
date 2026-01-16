@@ -93,47 +93,29 @@ public class RTTFileSidePanel : MonoBehaviour
     {
         GameObject headerObj = new GameObject("Header");
         headerObj.transform.SetParent(transform, false);
-        
-        // Horizontal Layout for Header
-        var hLayout = headerObj.AddComponent<HorizontalLayoutGroup>();
-        hLayout.childAlignment = TextAnchor.MiddleLeft;
-        hLayout.spacing = 15f;
-        hLayout.childControlWidth = false;
-        hLayout.childControlHeight = false;
-        hLayout.childForceExpandWidth = false;
-        hLayout.childForceExpandHeight = false;
 
-        // Back Button (Icon Only or Small Text)
-        // Using CreateBareIconButton for minimal look, or specialized Back button
-        // User requested "Back Button... next is app name"
-        var backBtn = VRButtonFactory.CreateButton(headerObj.transform, new VRButtonFactory.ButtonConfig
-        {
-            label = "BACK",
-            themeColor = _primaryColor,
-            width = 80f,
-            height = 50f,
-            fontSize = 24,
-            font = _font,
-            textOnly = true, // Or use icon if available
-            backgroundAlpha = 0.2f, // Subtle background
-            cornerRadius = 0.1f
-        }, () => _controller?.HandleBack());
+        // Layout Element for header height
+        var headerLE = headerObj.AddComponent<LayoutElement>();
+        headerLE.minHeight = 50f;
+        headerLE.preferredHeight = 50f;
 
-        // App Title
+        // App Title (Centered)
         GameObject titleObj = new GameObject("AppTitle");
         titleObj.transform.SetParent(headerObj.transform, false);
+
+        RectTransform titleRT = titleObj.AddComponent<RectTransform>();
+        titleRT.anchorMin = Vector2.zero;
+        titleRT.anchorMax = Vector2.one;
+        titleRT.offsetMin = Vector2.zero;
+        titleRT.offsetMax = Vector2.zero;
+
         var titleTxt = titleObj.AddComponent<TextMeshProUGUI>();
         titleTxt.text = "File Manager";
         titleTxt.font = _font;
         titleTxt.fontSize = 32;
         titleTxt.color = Color.white;
         titleTxt.fontStyle = FontStyles.Bold;
-        titleTxt.alignment = TextAlignmentOptions.Left;
-        
-        // Auto-size title container
-        var csf = titleObj.AddComponent<ContentSizeFitter>();
-        csf.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-        csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        titleTxt.alignment = TextAlignmentOptions.Center;
     }
 
     private void CreateSpacer(float height)
