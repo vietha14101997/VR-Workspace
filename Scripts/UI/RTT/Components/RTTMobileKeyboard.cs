@@ -42,7 +42,7 @@ public class RTTMobileKeyboard : RTTCanvasBase
     [SerializeField] private float spacingMultiplier = 1.5f;
 #pragma warning restore 0414
     [SerializeField] private float widthRatioToFrame = 0.7f;
-    [SerializeField] private float verticalOffset = -0.075f; // Offset to move keyboard down (negative = lower)
+    [SerializeField] private float verticalOffset = -0.105f; // Offset to move keyboard down (negative = lower)
     #endregion
 
     #region Constants
@@ -178,6 +178,25 @@ public class RTTMobileKeyboard : RTTCanvasBase
         base.OnDestroy();
     }
 
+    /// <summary>
+    /// Override to use ZWrite shader so keyboard occludes other RTT panels behind it.
+    /// This prevents seeing Taskbar/TaskbarExpansion/Pagination through the keyboard.
+    /// </summary>
+    protected override Material CreateQuadMaterial()
+    {
+        var shader = Shader.Find("Custom/RTTQuadZWrite");
+        if (shader == null)
+        {
+            Debug.LogWarning("[RTTMobileKeyboard] RTTQuadZWrite shader not found, falling back to default");
+            return base.CreateQuadMaterial();
+        }
+
+        var mat = new Material(shader);
+        mat.name = "RTTQuadMaterial_Keyboard_ZWrite";
+        mat.renderQueue = 2990; // Render BEFORE other RTT panels (3000) so depth pre-pass blocks them
+        return mat;
+    }
+
     public override void MarkDirty()
     {
         base.MarkDirty();
@@ -226,6 +245,7 @@ public class RTTMobileKeyboard : RTTCanvasBase
         }
 
         // Update border material
+        // Layer 3 and 4 disabled to prevent glow extending beyond depth mask
         if (_borderMaterial != null)
         {
             _borderMaterial.SetColor("_ColorA", theme.glowColorA);
@@ -234,10 +254,10 @@ public class RTTMobileKeyboard : RTTCanvasBase
             _borderMaterial.SetFloat("_Layer1Alpha", theme.glowLayer1Alpha);
             _borderMaterial.SetFloat("_Layer2Width", theme.glowLayer2Width);
             _borderMaterial.SetFloat("_Layer2Alpha", theme.glowLayer2Alpha);
-            _borderMaterial.SetFloat("_Layer3Width", theme.glowLayer3Width);
-            _borderMaterial.SetFloat("_Layer3Alpha", theme.glowLayer3Alpha);
-            _borderMaterial.SetFloat("_Layer4Width", theme.glowLayer4Width);
-            _borderMaterial.SetFloat("_Layer4Alpha", theme.glowLayer4Alpha);
+            _borderMaterial.SetFloat("_Layer3Width", 0f);
+            _borderMaterial.SetFloat("_Layer3Alpha", 0f);
+            _borderMaterial.SetFloat("_Layer4Width", 0f);
+            _borderMaterial.SetFloat("_Layer4Alpha", 0f);
         }
 
         // Update theme color for keys
@@ -429,15 +449,16 @@ public class RTTMobileKeyboard : RTTCanvasBase
             _borderMaterial.SetColor("_ColorA", GetGlowColorA());
             _borderMaterial.SetColor("_ColorB", GetGlowColorB());
             // Glow layers - use theme settings or defaults
+            // Layer 3 and 4 disabled to prevent glow extending beyond depth mask
             var theme = GetTheme();
             _borderMaterial.SetFloat("_Layer1Width", theme?.glowLayer1Width ?? 0.01f);
             _borderMaterial.SetFloat("_Layer1Alpha", theme?.glowLayer1Alpha ?? 1.5f);
             _borderMaterial.SetFloat("_Layer2Width", theme?.glowLayer2Width ?? 0.02f);
             _borderMaterial.SetFloat("_Layer2Alpha", theme?.glowLayer2Alpha ?? 1.0f);
-            _borderMaterial.SetFloat("_Layer3Width", theme?.glowLayer3Width ?? 0.045f);
-            _borderMaterial.SetFloat("_Layer3Alpha", theme?.glowLayer3Alpha ?? 0.6f);
-            _borderMaterial.SetFloat("_Layer4Width", theme?.glowLayer4Width ?? 0.09f);
-            _borderMaterial.SetFloat("_Layer4Alpha", theme?.glowLayer4Alpha ?? 0.3f);
+            _borderMaterial.SetFloat("_Layer3Width", 0f);
+            _borderMaterial.SetFloat("_Layer3Alpha", 0f);
+            _borderMaterial.SetFloat("_Layer4Width", 0f);
+            _borderMaterial.SetFloat("_Layer4Alpha", 0f);
             borderImg.material = _borderMaterial;
         }
     }
