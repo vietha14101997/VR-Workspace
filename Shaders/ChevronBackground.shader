@@ -17,6 +17,10 @@ Shader "Custom/ChevronBackground"
         _BackgroundColor ("Background Color", Color) = (0, 0.9, 1, 1)
         _BackgroundAlpha ("Background Alpha", Range(0, 1)) = 1.0
 
+        [Header(Glow Effect)]
+        _EdgeGlow ("Edge Glow Strength", Range(0, 0.5)) = 0.15
+        _CenterGlow ("Center Glow Strength", Range(0, 0.5)) = 0.1
+
         [Header(Hover State)]
         _HoverAmount ("Hover Amount", Range(0, 1)) = 0
 
@@ -91,6 +95,8 @@ Shader "Custom/ChevronBackground"
             float _EdgePadding;
             fixed4 _BackgroundColor;
             float _BackgroundAlpha;
+            float _EdgeGlow;
+            float _CenterGlow;
             float _HoverAmount;
 
             // SDF for chevron shape
@@ -170,9 +176,19 @@ Shader "Custom/ChevronBackground"
                 // Hover effect
                 float hoverBrightness = 1.0 + _HoverAmount * 0.3;
 
-                // Final color
+                // Edge glow (fresnel-like) - brighter near edges
+                float edgeFactor = 1.0 - saturate(abs(dist) / 0.15);
+                float edgeGlow = edgeFactor * edgeFactor * _EdgeGlow;
+
+                // Center glow - subtle brightness in center
+                float2 centerDist = abs(uv - 0.5);
+                float centerFactor = 1.0 - saturate(length(centerDist) / 0.5);
+                float centerGlow = centerFactor * centerFactor * _CenterGlow;
+
+                // Final color with glow
                 fixed4 finalColor = _BackgroundColor;
                 finalColor.a = _BackgroundAlpha * alphaMask;
+                finalColor.rgb += edgeGlow + centerGlow;
                 finalColor.rgb *= hoverBrightness;
                 finalColor *= i.color;
 

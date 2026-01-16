@@ -829,6 +829,8 @@ public class RTTFileManager : MonoBehaviour
                 mat.SetFloat("_EdgePadding", 0.02f);
                 mat.SetColor("_BackgroundColor", btnColor);
                 mat.SetFloat("_BackgroundAlpha", glassAlpha);
+                mat.SetFloat("_EdgeGlow", 0.15f); // Edge glow
+                mat.SetFloat("_CenterGlow", 0.1f); // Center glow
                 bgImage.material = mat;
                 bgImage.color = Color.white;
             }
@@ -858,8 +860,8 @@ public class RTTFileManager : MonoBehaviour
         else
         {
             // Chevron: small left (concave opens up space), normal right
-            textRT.offsetMin = new Vector2(curveR, 0); // Less left padding
-            textRT.offsetMax = new Vector2(-curveR * 0.7f, 0); // Right padding for convex
+            textRT.offsetMin = new Vector2(curveR * 1.1f, 0); // Less left padding
+            textRT.offsetMax = new Vector2(-curveR * 0.6f, 0); // Right padding for convex
         }
 
         TextMeshProUGUI txt = textObj.AddComponent<TextMeshProUGUI>();
