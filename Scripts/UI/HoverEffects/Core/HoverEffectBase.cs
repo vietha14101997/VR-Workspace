@@ -13,8 +13,8 @@ namespace VRWorkspace.UI.HoverEffects
         public bool IsHovered { get; protected set; }
 
         [Header("Transition Settings")]
-        [Tooltip("Speed of hover transition (higher = faster)")]
-        [SerializeField] protected float transitionSpeed = 10f;
+        [Tooltip("Duration of hover transition in seconds (0 = instant)")]
+        [SerializeField] protected float transitionDuration = 0.15f;
 
         [Tooltip("Custom easing curve for the transition")]
         [SerializeField] protected AnimationCurve easingCurve;
@@ -22,6 +22,7 @@ namespace VRWorkspace.UI.HoverEffects
         protected HoverEffectController _controller;
         protected float _currentProgress = 0f;
         protected float _targetProgress = 0f;
+        protected float _rawProgress = 0f; // Linear progress before easing
 
         /// <summary>
         /// Default constructor - sets up default easing curve
@@ -37,6 +38,7 @@ namespace VRWorkspace.UI.HoverEffects
             _controller = controller;
             _currentProgress = 0f;
             _targetProgress = 0f;
+            _rawProgress = 0f;
 
             // Ensure easing curve exists
             if (easingCurve == null || easingCurve.keys.Length == 0)
@@ -59,14 +61,29 @@ namespace VRWorkspace.UI.HoverEffects
 
         public virtual void UpdateEffect(float deltaTime)
         {
-            // Smooth interpolation toward target
-            _currentProgress = Mathf.Lerp(_currentProgress, _targetProgress, deltaTime * transitionSpeed);
+            // Skip if already at target
+            if (Mathf.Approximately(_rawProgress, _targetProgress))
+            {
+                return;
+            }
 
-            // Apply easing curve
-            float easedProgress = easingCurve.Evaluate(_currentProgress);
+            // Linear interpolation using MoveTowards for predictable duration
+            if (transitionDuration > 0f)
+            {
+                float speed = 1f / transitionDuration;
+                _rawProgress = Mathf.MoveTowards(_rawProgress, _targetProgress, deltaTime * speed);
+            }
+            else
+            {
+                // Instant transition
+                _rawProgress = _targetProgress;
+            }
+
+            // Apply easing curve for smooth feel
+            _currentProgress = easingCurve.Evaluate(_rawProgress);
 
             // Apply the effect
-            ApplyEffect(easedProgress);
+            ApplyEffect(_currentProgress);
         }
 
         /// <summary>
@@ -77,8 +94,9 @@ namespace VRWorkspace.UI.HoverEffects
         public virtual void SetStateImmediate(bool hovered)
         {
             IsHovered = hovered;
-            _currentProgress = hovered ? 1f : 0f;
-            _targetProgress = _currentProgress;
+            _rawProgress = hovered ? 1f : 0f;
+            _currentProgress = _rawProgress;
+            _targetProgress = _rawProgress;
             ApplyEffect(_currentProgress);
         }
 
@@ -88,11 +106,11 @@ namespace VRWorkspace.UI.HoverEffects
         }
 
         /// <summary>
-        /// Set transition speed
+        /// Set transition duration in seconds
         /// </summary>
-        public void SetTransitionSpeed(float speed)
+        public void SetTransitionDuration(float duration)
         {
-            transitionSpeed = Mathf.Max(0.1f, speed);
+            transitionDuration = Mathf.Max(0f, duration);
         }
 
         /// <summary>
@@ -105,5 +123,18 @@ namespace VRWorkspace.UI.HoverEffects
                 easingCurve = curve;
             }
         }
+
+        #region Fluent API
+
+        /// <summary>
+        /// Set transition duration (fluent API)
+        /// </summary>
+        public T WithTransitionDuration<T>(float duration) where T : HoverEffectBase
+        {
+            transitionDuration = Mathf.Max(0f, duration);
+            return (T)this;
+        }
+
+        #endregion
     }
 }

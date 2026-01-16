@@ -1014,68 +1014,18 @@ public class RTTFileManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Adds hover effect to breadcrumb button using EventTrigger.
-    /// On hover: increases alpha to look like selected state.
+    /// Adds animated hover effect to breadcrumb button.
+    /// On hover: color transitions to accent color with smooth animation.
     /// </summary>
     private void AddBreadcrumbHoverEffect(GameObject btnObj, Image bgImage, Color baseColor, bool isFirstButton)
     {
-        EventTrigger trigger = btnObj.AddComponent<EventTrigger>();
-
         // Hover values - same alpha as selected state, only color changes
         float normalAlpha = 0.2f;
         float hoverAlpha = 0.2f; // Same as selected, color change is enough visual feedback
 
-        // PointerEnter - increase alpha
-        EventTrigger.Entry enterEntry = new EventTrigger.Entry();
-        enterEntry.eventID = EventTriggerType.PointerEnter;
-        enterEntry.callback.AddListener((data) =>
-        {
-            Material mat = bgImage.material;
-            if (mat == null) return;
-
-            if (isFirstButton)
-            {
-                // GlassGradientBackgroundWide shader - use same multipliers as normal but with accent color
-                Color colorA = new Color(_accentColor.r, _accentColor.g, _accentColor.b, hoverAlpha * 1.5f);
-                Color colorB = new Color(_accentColor.r, _accentColor.g, _accentColor.b, hoverAlpha * 0.5f);
-                mat.SetColor("_ColorA", colorA);
-                mat.SetColor("_ColorB", colorB);
-                mat.SetFloat("_GlassAlpha", hoverAlpha);
-            }
-            else
-            {
-                // ChevronBackground shader
-                mat.SetColor("_BackgroundColor", _accentColor);
-                mat.SetFloat("_BackgroundAlpha", hoverAlpha);
-            }
-        });
-        trigger.triggers.Add(enterEntry);
-
-        // PointerExit - restore normal alpha
-        EventTrigger.Entry exitEntry = new EventTrigger.Entry();
-        exitEntry.eventID = EventTriggerType.PointerExit;
-        exitEntry.callback.AddListener((data) =>
-        {
-            Material mat = bgImage.material;
-            if (mat == null) return;
-
-            if (isFirstButton)
-            {
-                // Restore to primary color
-                Color colorA = new Color(baseColor.r, baseColor.g, baseColor.b, normalAlpha * 1.5f);
-                Color colorB = new Color(baseColor.r, baseColor.g, baseColor.b, normalAlpha * 0.5f);
-                mat.SetColor("_ColorA", colorA);
-                mat.SetColor("_ColorB", colorB);
-                mat.SetFloat("_GlassAlpha", normalAlpha);
-            }
-            else
-            {
-                // Restore to primary color
-                mat.SetColor("_BackgroundColor", baseColor);
-                mat.SetFloat("_BackgroundAlpha", normalAlpha);
-            }
-        });
-        trigger.triggers.Add(exitEntry);
+        // Use BreadcrumbHoverAnimator for smooth animated transitions
+        BreadcrumbHoverAnimator animator = btnObj.AddComponent<BreadcrumbHoverAnimator>();
+        animator.Initialize(bgImage, baseColor, _accentColor, normalAlpha, hoverAlpha, isFirstButton);
     }
 
     /// <summary>

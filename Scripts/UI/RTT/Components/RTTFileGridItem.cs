@@ -26,6 +26,11 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
     private float _lastClickTime = 0f;
     private const float DOUBLE_CLICK_THRESHOLD = 0.3f;
 
+    // Animation
+    private const float HOVER_ANIMATION_DURATION = 0.15f;
+    private float _currentColorAlpha = 0f;
+    private float _targetColorAlpha = 0f;
+
     public void Initialize(System.Action<RTTFileGridItem> onClick,
                            System.Action<RTTFileGridItem> onDoubleClick,
                            System.Action<RTTFileGridItem, bool> onHover)
@@ -64,7 +69,11 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         _isSelected = false;
         _isHovered = false;
         _lastClickTime = 0f;
-        UpdateVisuals();
+
+        // Reset animation state immediately (no animation when rebinding)
+        _targetColorAlpha = 0f;
+        _currentColorAlpha = 0f;
+        ApplyBackgroundColor();
     }
 
     private void BuildUI(string name, bool isFolder)
@@ -161,6 +170,17 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
 
     private static readonly Color HighlightColor = new Color(0f, 0f, 0f, 0.27f);
 
+    private void Update()
+    {
+        // Animate color alpha
+        if (!Mathf.Approximately(_currentColorAlpha, _targetColorAlpha))
+        {
+            float speed = 1f / HOVER_ANIMATION_DURATION;
+            _currentColorAlpha = Mathf.MoveTowards(_currentColorAlpha, _targetColorAlpha, Time.unscaledDeltaTime * speed);
+            ApplyBackgroundColor();
+        }
+    }
+
     private void UpdateVisuals()
     {
         if (_bgImage == null) return;
@@ -168,13 +188,29 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         if (_isSelected || _isHovered)
         {
             // Hover & Selected share the same dark transparent background
-            _bgImage.color = HighlightColor;
+            _targetColorAlpha = HighlightColor.a;
         }
         else
         {
             // Idle State: Transparent
-            _bgImage.color = Color.clear;
+            _targetColorAlpha = 0f;
         }
+    }
+
+    private void ApplyBackgroundColor()
+    {
+        if (_bgImage == null) return;
+        _bgImage.color = new Color(HighlightColor.r, HighlightColor.g, HighlightColor.b, _currentColorAlpha);
+    }
+
+    /// <summary>
+    /// Set visual state immediately without animation (for pooling reset)
+    /// </summary>
+    public void SetVisualStateImmediate(bool highlighted)
+    {
+        _targetColorAlpha = highlighted ? HighlightColor.a : 0f;
+        _currentColorAlpha = _targetColorAlpha;
+        ApplyBackgroundColor();
     }
 
     private void SetSprite(string resourceName)

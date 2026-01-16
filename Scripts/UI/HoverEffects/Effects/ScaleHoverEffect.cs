@@ -101,6 +101,12 @@ namespace VRWorkspace.UI.HoverEffects
             return this;
         }
 
+        public ScaleHoverEffect WithTransitionDuration(float duration)
+        {
+            transitionDuration = Mathf.Max(0f, duration);
+            return this;
+        }
+
         #endregion
     }
 }

@@ -137,6 +137,13 @@ namespace VRWorkspace.UI.HoverEffects
             return this;
         }
 
+        // Note: Cursor changes are always instant, this is for API consistency
+        public CursorChangeHoverEffect WithTransitionDuration(float duration)
+        {
+            transitionDuration = Mathf.Max(0f, duration);
+            return this;
+        }
+
         #endregion
     }
 }
