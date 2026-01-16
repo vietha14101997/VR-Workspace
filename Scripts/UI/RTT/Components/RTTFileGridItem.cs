@@ -26,19 +26,45 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
     private float _lastClickTime = 0f;
     private const float DOUBLE_CLICK_THRESHOLD = 0.3f;
 
-    public void Initialize(string name, bool isFolder, string path,
-                           System.Action<RTTFileGridItem> onClick,
+    public void Initialize(System.Action<RTTFileGridItem> onClick,
                            System.Action<RTTFileGridItem> onDoubleClick,
                            System.Action<RTTFileGridItem, bool> onHover)
     {
-        FilePath = path;
-        IsFolder = isFolder;
         _onClickCallback = onClick;
         _onDoubleClickCallback = onDoubleClick;
         _onHoverCallback = onHover;
 
-        // Setup Visuals
-        BuildUI(name, isFolder);
+        // Setup Visuals (empty initially)
+        BuildUI("", true);
+    }
+
+    /// <summary>
+    /// Bind new data to this item (for virtualization/pooling).
+    /// Reuses existing UI components without rebuilding.
+    /// </summary>
+    public void Bind(string name, bool isFolder, string path)
+    {
+        FilePath = path;
+        IsFolder = isFolder;
+
+        // Update text
+        if (_nameText != null)
+            _nameText.text = name;
+
+        // Update icon
+        if (_iconImage != null)
+        {
+            if (isFolder)
+                SetSprite("icon_folder");
+            else
+                SetSprite(IsImageFile(name) ? "icon_image" : "icon_file");
+        }
+
+        // Reset selection state
+        _isSelected = false;
+        _isHovered = false;
+        _lastClickTime = 0f;
+        UpdateVisuals();
     }
 
     private void BuildUI(string name, bool isFolder)

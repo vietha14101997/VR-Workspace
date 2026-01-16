@@ -842,8 +842,11 @@ public class RTTFileManager : MonoBehaviour
     /// </summary>
     private GameObject CreateBreadcrumbPillButton(string label, string targetPath, bool isActive, float width, float height, int zIndex, int totalButtons, bool isEllipsis = false)
     {
-        // Ellipsis uses primary color (clickable), active folder uses accent
-        Color btnColor = isActive ? _accentColor : _primaryColor;
+        bool isFirstButton = (zIndex == 0);
+
+        // First button (Home) always uses primary color, never shows "selected" state
+        // Other buttons: accent if active (current folder), primary if not
+        Color btnColor = isFirstButton ? _primaryColor : (isActive ? _accentColor : _primaryColor);
         string pathToNavigate = targetPath;
 
         // Button container
@@ -860,7 +863,6 @@ public class RTTFileManager : MonoBehaviour
         bgImage.raycastTarget = true;
 
         float aspect = width / height;
-        bool isFirstButton = (zIndex == 0);
 
         // Glass background style (like MainMenu button hover state)
         float glassAlpha = 0.2f; // Semi-transparent glass effect
@@ -1019,9 +1021,9 @@ public class RTTFileManager : MonoBehaviour
     {
         EventTrigger trigger = btnObj.AddComponent<EventTrigger>();
 
-        // Hover values - first button needs lower multiplier due to shader differences
+        // Hover values - same alpha as selected state, only color changes
         float normalAlpha = 0.2f;
-        float hoverAlpha = isFirstButton ? 0.3f : 0.4f; // First button uses less alpha increase
+        float hoverAlpha = 0.2f; // Same as selected, color change is enough visual feedback
 
         // PointerEnter - increase alpha
         EventTrigger.Entry enterEntry = new EventTrigger.Entry();

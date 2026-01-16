@@ -4,29 +4,47 @@ using System.Collections.Generic;
 using TMPro;
 
 /// <summary>
-/// Grid View for File Manager.
-/// Displays a grid of files/folders in a ScrollView.
-/// Supports programmatic scrolling for Pagination.
+/// Virtualized Grid View for File Manager.
+/// Only renders visible items + buffer to maintain performance with large directories.
+/// Uses object pooling to reuse RTTFileGridItem instances.
 /// </summary>
 public class RTTFileGrid : MonoBehaviour
 {
     private RTTFileManagerController _controller;
     private float _width;
     private float _height;
-    
+
     private ScrollRect _scrollRect;
-    private GridLayoutGroup _gridLayout;
     private RectTransform _contentRect;
-    
-    private List<RTTFileGridItem> _items = new List<RTTFileGridItem>();
-    private RTTFileGridItem _lastSelectedItem;
-    
-    // Configuration
-    private float _cellWidth = 310f; 
-    private float _cellHeight = 320f; 
+    private RectTransform _viewportRect;
+
+    // Data
+    private List<MockFile> _allFiles = new List<MockFile>();
+    private string _selectedPath;
+
+    // Pool of reusable items
+    private List<RTTFileGridItem> _itemPool = new List<RTTFileGridItem>();
+    private Dictionary<int, RTTFileGridItem> _visibleItems = new Dictionary<int, RTTFileGridItem>();
+
+    // Grid configuration
+    private float _cellWidth = 310f;
+    private float _cellHeight = 320f;
     private float _spacingX = 30f;
     private float _spacingY = 30f;
-    
+    private float _paddingLeft = 20f;
+    private float _paddingRight = 20f;
+    private float _paddingTop = 20f;
+    private float _paddingBottom = 60f;
+
+    // Calculated values
+    private int _columnsPerRow;
+    private float _rowHeight;
+    private int _visibleRowCount;
+    private int _bufferRows = 2;
+
+    // Track last selected for double-click behavior
+    private RTTFileGridItem _lastSelectedItem;
+
     public void Initialize(RTTFileManagerController controller, float w, float h)
     {
         _controller = controller;
@@ -34,6 +52,8 @@ public class RTTFileGrid : MonoBehaviour
         _height = h;
 
         BuildUI();
+        CalculateGridMetrics();
+        CreateItemPool();
     }
 
     private void BuildUI()
@@ -44,96 +64,213 @@ public class RTTFileGrid : MonoBehaviour
         _scrollRect.vertical = true;
         _scrollRect.scrollSensitivity = 20f;
         _scrollRect.movementType = ScrollRect.MovementType.Elastic;
-        
+        _scrollRect.onValueChanged.AddListener(OnScrollChanged);
+
         // 2. Viewport
         GameObject viewport = new GameObject("Viewport");
         viewport.transform.SetParent(transform, false);
-        RectTransform vpRect = viewport.AddComponent<RectTransform>();
-        vpRect.anchorMin = Vector2.zero;
-        vpRect.anchorMax = Vector2.one;
-        vpRect.offsetMin = Vector2.zero;
-        vpRect.offsetMax = Vector2.zero;
-        
+        _viewportRect = viewport.AddComponent<RectTransform>();
+        _viewportRect.anchorMin = Vector2.zero;
+        _viewportRect.anchorMax = Vector2.one;
+        _viewportRect.offsetMin = Vector2.zero;
+        _viewportRect.offsetMax = Vector2.zero;
+
         Image maskImg = viewport.AddComponent<Image>();
         maskImg.color = Color.white;
         Mask mask = viewport.AddComponent<Mask>();
         mask.showMaskGraphic = false;
-        
-        _scrollRect.viewport = vpRect;
 
-        // 3. Content
+        _scrollRect.viewport = _viewportRect;
+
+        // 3. Content (sized manually, no GridLayoutGroup)
         GameObject content = new GameObject("Content");
         content.transform.SetParent(viewport.transform, false);
         _contentRect = content.AddComponent<RectTransform>();
         _contentRect.anchorMin = new Vector2(0, 1);
-        _contentRect.anchorMax = new Vector2(1, 1); 
+        _contentRect.anchorMax = new Vector2(1, 1);
         _contentRect.pivot = new Vector2(0.5f, 1);
-        _contentRect.sizeDelta = Vector2.zero; 
-        
-        _scrollRect.content = _contentRect;
+        _contentRect.sizeDelta = Vector2.zero;
 
-        // 4. Grid Layout
-        _gridLayout = content.AddComponent<GridLayoutGroup>();
-        _gridLayout.cellSize = new Vector2(_cellWidth, _cellHeight);
-        _gridLayout.spacing = new Vector2(_spacingX, _spacingY);
-        _gridLayout.padding = new RectOffset(20, 20, 20, 60); 
-        _gridLayout.startCorner = GridLayoutGroup.Corner.UpperLeft;
-        _gridLayout.startAxis = GridLayoutGroup.Axis.Horizontal;
-        _gridLayout.childAlignment = TextAnchor.UpperLeft; 
-        
-        var csf = content.AddComponent<ContentSizeFitter>();
-        csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        _scrollRect.content = _contentRect;
+    }
+
+    private void CalculateGridMetrics()
+    {
+        float availableWidth = _width - _paddingLeft - _paddingRight;
+        _columnsPerRow = Mathf.Max(1, Mathf.FloorToInt((availableWidth + _spacingX) / (_cellWidth + _spacingX)));
+        _rowHeight = _cellHeight + _spacingY;
+        _visibleRowCount = Mathf.CeilToInt(_height / _rowHeight) + 1;
+    }
+
+    private void CreateItemPool()
+    {
+        int poolSize = (_visibleRowCount + _bufferRows * 2) * _columnsPerRow;
+
+        for (int i = 0; i < poolSize; i++)
+        {
+            var item = CreatePooledItem();
+            item.gameObject.SetActive(false);
+            _itemPool.Add(item);
+        }
+    }
+
+    private RTTFileGridItem CreatePooledItem()
+    {
+        GameObject itemObj = new GameObject("PooledItem");
+        itemObj.transform.SetParent(_contentRect, false);
+
+        var rect = itemObj.AddComponent<RectTransform>();
+        rect.sizeDelta = new Vector2(_cellWidth, _cellHeight);
+
+        var gridItem = itemObj.AddComponent<RTTFileGridItem>();
+        gridItem.Initialize(OnItemClicked, OnItemDoubleClicked, OnItemHover);
+
+        return gridItem;
     }
 
     public void Populate(List<MockFile> files, string selectedPath = "")
     {
-        // Clear existing
-        foreach (var item in _items)
-        {
-            if (item != null) Destroy(item.gameObject);
-        }
-        _items.Clear();
+        _allFiles = files ?? new List<MockFile>();
+        _selectedPath = selectedPath;
         _lastSelectedItem = null;
 
-        // Create new items
-        foreach (var file in files)
+        // Hide all visible items
+        foreach (var kvp in _visibleItems)
         {
-            GameObject itemObj = new GameObject($"Item_{file.Name}");
-            itemObj.transform.SetParent(_contentRect, false);
-            
-            var gridItem = itemObj.AddComponent<RTTFileGridItem>();
-            gridItem.Initialize(file.Name, file.IsFolder, file.Path, OnItemClicked, OnItemDoubleClicked, OnItemHover);
-            
-            // Restore selection state
-            if (!string.IsNullOrEmpty(selectedPath))
+            kvp.Value.gameObject.SetActive(false);
+        }
+        _visibleItems.Clear();
+
+        // Update content size based on total items
+        UpdateContentSize();
+
+        // Reset scroll position
+        _scrollRect.verticalNormalizedPosition = 1f;
+
+        // Render visible items
+        UpdateVisibleItems();
+    }
+
+    private void UpdateContentSize()
+    {
+        int totalRows = Mathf.CeilToInt((float)_allFiles.Count / _columnsPerRow);
+        float contentHeight = _paddingTop + totalRows * _rowHeight - _spacingY + _paddingBottom;
+        contentHeight = Mathf.Max(contentHeight, _height);
+        _contentRect.sizeDelta = new Vector2(0, contentHeight);
+    }
+
+    private void OnScrollChanged(Vector2 normalizedPos)
+    {
+        UpdateVisibleItems();
+    }
+
+    private void UpdateVisibleItems()
+    {
+        if (_allFiles.Count == 0) return;
+
+        // Calculate visible range
+        float scrollY = _contentRect.anchoredPosition.y;
+        int firstVisibleRow = Mathf.Max(0, Mathf.FloorToInt((scrollY - _paddingTop) / _rowHeight) - _bufferRows);
+        int lastVisibleRow = firstVisibleRow + _visibleRowCount + _bufferRows * 2;
+
+        int firstVisibleIndex = firstVisibleRow * _columnsPerRow;
+        int lastVisibleIndex = Mathf.Min((lastVisibleRow + 1) * _columnsPerRow - 1, _allFiles.Count - 1);
+
+        // Find items that are no longer visible and return to pool
+        List<int> toRemove = new List<int>();
+        foreach (var kvp in _visibleItems)
+        {
+            if (kvp.Key < firstVisibleIndex || kvp.Key > lastVisibleIndex)
             {
-                bool isSelected = file.Path == selectedPath;
-                gridItem.SetSelected(isSelected);
-                if (isSelected) _lastSelectedItem = gridItem;
+                kvp.Value.gameObject.SetActive(false);
+                toRemove.Add(kvp.Key);
             }
-            
-            _items.Add(gridItem);
+        }
+        foreach (var idx in toRemove)
+        {
+            _visibleItems.Remove(idx);
+        }
+
+        // Show items that should be visible
+        for (int i = firstVisibleIndex; i <= lastVisibleIndex && i < _allFiles.Count; i++)
+        {
+            if (!_visibleItems.ContainsKey(i))
+            {
+                var item = GetPooledItem();
+                if (item != null)
+                {
+                    BindItemAtIndex(item, i);
+                    _visibleItems[i] = item;
+                }
+            }
         }
     }
-    
+
+    private RTTFileGridItem GetPooledItem()
+    {
+        foreach (var item in _itemPool)
+        {
+            if (!item.gameObject.activeSelf)
+            {
+                return item;
+            }
+        }
+
+        // Pool exhausted, create new item
+        var newItem = CreatePooledItem();
+        _itemPool.Add(newItem);
+        return newItem;
+    }
+
+    private void BindItemAtIndex(RTTFileGridItem item, int index)
+    {
+        var file = _allFiles[index];
+
+        // Calculate position
+        int row = index / _columnsPerRow;
+        int col = index % _columnsPerRow;
+
+        float x = _paddingLeft + col * (_cellWidth + _spacingX) + _cellWidth / 2f;
+        float y = -_paddingTop - row * _rowHeight - _cellHeight / 2f;
+
+        // Center the grid horizontally
+        float totalGridWidth = _columnsPerRow * _cellWidth + (_columnsPerRow - 1) * _spacingX;
+        float offsetX = (_width - totalGridWidth - _paddingLeft - _paddingRight) / 2f;
+        x += offsetX;
+
+        var rect = item.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0, 1);
+        rect.anchorMax = new Vector2(0, 1);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = new Vector2(x, y);
+
+        // Bind data
+        item.Bind(file.Name, file.IsFolder, file.Path);
+        item.gameObject.SetActive(true);
+
+        // Restore selection
+        bool isSelected = !string.IsNullOrEmpty(_selectedPath) && file.Path == _selectedPath;
+        item.SetSelected(isSelected);
+        if (isSelected) _lastSelectedItem = item;
+    }
+
     public void ScrollToPage(int pageIndex, int rowsPerPage)
     {
         if (_scrollRect == null || _contentRect == null) return;
-        
+
         Canvas.ForceUpdateCanvases();
-        
-        float rowHeight = _cellHeight + _spacingY;
+
         int targetRow = (pageIndex - 1) * rowsPerPage;
-        float targetY = targetRow * rowHeight;
-        
-        if (pageIndex == 1) targetY = 0; 
+        float targetY = _paddingTop + targetRow * _rowHeight;
+
+        if (pageIndex == 1) targetY = 0;
 
         float contentHeight = _contentRect.rect.height;
         float viewportHeight = _scrollRect.viewport.rect.height;
         float maxScrollY = Mathf.Max(0, contentHeight - viewportHeight);
-        
+
         targetY = Mathf.Clamp(targetY, 0, maxScrollY);
-        
+
         if (_scrollCoroutine != null) StopCoroutine(_scrollCoroutine);
         _scrollCoroutine = StartCoroutine(SmoothScroll(targetY, 0.3f));
     }
@@ -144,18 +281,18 @@ public class RTTFileGrid : MonoBehaviour
     {
         float time = 0;
         float startY = _contentRect.anchoredPosition.y;
-        
+
         while (time < duration)
         {
             time += Time.deltaTime;
             float t = time / duration;
             t = 1f - Mathf.Pow(1f - t, 3);
-            
+
             float newY = Mathf.Lerp(startY, targetY, t);
             _contentRect.anchoredPosition = new Vector2(_contentRect.anchoredPosition.x, newY);
             yield return null;
         }
-        
+
         _contentRect.anchoredPosition = new Vector2(_contentRect.anchoredPosition.x, targetY);
         _scrollCoroutine = null;
     }
@@ -178,11 +315,13 @@ public class RTTFileGrid : MonoBehaviour
 
         // Single click only selects
         _controller.SelectFile(item.FilePath);
+        _selectedPath = item.FilePath;
         _lastSelectedItem = item;
 
-        foreach (var i in _items)
+        // Update selection visuals for all visible items
+        foreach (var kvp in _visibleItems)
         {
-            if (i != null) i.SetSelected(i == item);
+            kvp.Value.SetSelected(kvp.Value == item);
         }
     }
 

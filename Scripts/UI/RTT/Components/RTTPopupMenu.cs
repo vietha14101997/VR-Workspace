@@ -90,22 +90,28 @@ public class RTTPopupMenu : MonoBehaviour
     
     private PopupConfig _config;
     private GameObject _popupObject;
+    private GameObject _blockerObject;
     private RectTransform _popupRT;
     private VerticalLayoutGroup _contentLayout;
     private List<PopupSection> _sections = new List<PopupSection>();
     private bool _isBuilt = false;
     private PopupSectionType _lastSectionType = PopupSectionType.SectionBlock;
-    
+
     private static Sprite _pixelSprite;
     private const float kBorderInset = 6f; // Visual border thickness offset
     
     #endregion
     
     #region Public Properties
-    
+
     public bool IsVisible => _popupObject != null && _popupObject.activeSelf;
     public RectTransform PopupRectTransform => _popupRT;
-    
+
+    /// <summary>
+    /// Static reference to currently open popup (for click-outside-to-close behavior)
+    /// </summary>
+    public static RTTPopupMenu CurrentlyOpenPopup { get; private set; }
+
     #endregion
     
     #region Factory Method
@@ -236,24 +242,43 @@ public class RTTPopupMenu : MonoBehaviour
         {
             Build();
         }
-        
+
         if (_popupObject != null)
         {
+            // Close any other open popup first
+            if (CurrentlyOpenPopup != null && CurrentlyOpenPopup != this)
+            {
+                CurrentlyOpenPopup.Hide();
+            }
+
+            // Show blocker first, then popup on top
+            if (_blockerObject != null) _blockerObject.SetActive(true);
             _popupObject.SetActive(true);
+            CurrentlyOpenPopup = this;
         }
     }
-    
+
     /// <summary>
     /// Hide the popup
     /// </summary>
     public void Hide()
     {
+        if (_blockerObject != null)
+        {
+            _blockerObject.SetActive(false);
+        }
+
         if (_popupObject != null)
         {
             _popupObject.SetActive(false);
         }
+
+        if (CurrentlyOpenPopup == this)
+        {
+            CurrentlyOpenPopup = null;
+        }
     }
-    
+
     /// <summary>
     /// Toggle popup visibility
     /// </summary>
@@ -261,6 +286,24 @@ public class RTTPopupMenu : MonoBehaviour
     {
         if (IsVisible) Hide();
         else Show();
+    }
+
+    /// <summary>
+    /// Check if a GameObject is part of this popup panel (for click-outside detection)
+    /// </summary>
+    public bool IsPartOfPopupPanel(GameObject obj)
+    {
+        if (obj == null || _popupObject == null) return false;
+
+        // Check if obj or any of its parents is the popup object
+        Transform current = obj.transform;
+        while (current != null)
+        {
+            if (current.gameObject == _popupObject || current.gameObject == gameObject)
+                return true;
+            current = current.parent;
+        }
+        return false;
     }
     
     /// <summary>
@@ -303,26 +346,30 @@ public class RTTPopupMenu : MonoBehaviour
     
     private void BuildPopupContainer()
     {
+        int layer = LayerMask.NameToLayer(_config.layerName);
+
+        // Create invisible blocker that covers entire parent area
+        CreateBlocker(layer);
+
         // Main popup container
         _popupObject = new GameObject("PopupContainer");
         _popupObject.transform.SetParent(transform, false);
-        
+
         // Set layer
-        int layer = LayerMask.NameToLayer(_config.layerName);
         if (layer != -1) _popupObject.layer = layer;
-        
+
         _popupRT = _popupObject.AddComponent<RectTransform>();
         _popupRT.anchorMin = new Vector2(0, 1);
         _popupRT.anchorMax = new Vector2(0, 1);
         _popupRT.pivot = new Vector2(0, 1);
         _popupRT.sizeDelta = new Vector2(_config.width, 100f); // Placeholder height
-        
+
         // Canvas for sorting
         Canvas canvas = _popupObject.AddComponent<Canvas>();
         canvas.overrideSorting = true;
         canvas.sortingOrder = 200;
         _popupObject.AddComponent<GraphicRaycaster>();
-        
+
         // Background with RTTMenuFrame style
         CreateBackground();
         
@@ -367,7 +414,50 @@ public class RTTPopupMenu : MonoBehaviour
     }
     
     private GameObject _contentContainer;
-    
+
+    private void CreateBlocker(int layer)
+    {
+        _blockerObject = new GameObject("PopupBlocker");
+        _blockerObject.transform.SetParent(transform, false);
+
+        if (layer != -1) _blockerObject.layer = layer;
+
+        // Cover entire parent area
+        RectTransform blockerRT = _blockerObject.AddComponent<RectTransform>();
+        blockerRT.anchorMin = Vector2.zero;
+        blockerRT.anchorMax = Vector2.one;
+        blockerRT.offsetMin = Vector2.zero;
+        blockerRT.offsetMax = Vector2.zero;
+
+        // Canvas for proper raycast handling (lower sorting order than popup)
+        Canvas blockerCanvas = _blockerObject.AddComponent<Canvas>();
+        blockerCanvas.overrideSorting = true;
+        blockerCanvas.sortingOrder = 199; // Below popup (200)
+        _blockerObject.AddComponent<GraphicRaycaster>();
+
+        // Invisible image for raycast blocking
+        GameObject blockerImgObj = new GameObject("BlockerImage");
+        blockerImgObj.transform.SetParent(_blockerObject.transform, false);
+        if (layer != -1) blockerImgObj.layer = layer;
+
+        RectTransform imgRT = blockerImgObj.AddComponent<RectTransform>();
+        imgRT.anchorMin = Vector2.zero;
+        imgRT.anchorMax = Vector2.one;
+        imgRT.offsetMin = Vector2.zero;
+        imgRT.offsetMax = Vector2.zero;
+
+        Image blockerImg = blockerImgObj.AddComponent<Image>();
+        blockerImg.color = Color.clear;
+        blockerImg.raycastTarget = true;
+
+        // Add button to handle click-to-close
+        Button blockerBtn = blockerImgObj.AddComponent<Button>();
+        blockerBtn.transition = Selectable.Transition.None;
+        blockerBtn.onClick.AddListener(Hide);
+
+        _blockerObject.SetActive(false);
+    }
+
     private void CreateBackground()
     {
         Image bgImg = _popupObject.AddComponent<Image>();
@@ -737,6 +827,12 @@ public class RTTPopupMenu : MonoBehaviour
     
     private void OnDestroy()
     {
+        // Clear static reference if this is the currently open popup
+        if (CurrentlyOpenPopup == this)
+        {
+            CurrentlyOpenPopup = null;
+        }
+
         if (_popupObject != null)
         {
             // Clean up material

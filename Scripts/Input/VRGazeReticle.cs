@@ -92,6 +92,9 @@ public class VRGazeReticle : MonoBehaviour
     private RTTHitResult _lastRTTHit;
     private bool _isHoveringRTT = false;
 
+    // Blocked target tracking (for popup close-on-click)
+    private GameObject _blockedDwellTarget;
+
     // Head Stabilization State
     private Quaternion _stabilizedRotation;
     private Vector3 _previousEuler;
@@ -415,21 +418,59 @@ public class VRGazeReticle : MonoBehaviour
 
                 // Handle hover state changes for RTT
                 GameObject hitObj = _lastRTTHit.hitUIElement;
-                if (_currentHitObj != hitObj)
+
+                // Check if popup is open - block hover on objects outside popup
+                bool hasOpenPopup = RTTPopupMenu.CurrentlyOpenPopup != null;
+                bool isInsidePopup = hasOpenPopup && RTTPopupMenu.CurrentlyOpenPopup.IsPartOfPopupPanel(hitObj);
+                bool blockInteraction = hasOpenPopup && !isInsidePopup;
+
+                if (blockInteraction)
                 {
-                    // Exit old non-RTT object if any
-                    if (_currentHitObj != null && !_isHoveringRTT)
+                    // Popup is open, target is outside popup
+                    // Block hover but track target for dwell-to-close
+                    if (_currentHitObj != null)
                     {
                         HandlePointerExit(_currentHitObj);
+                        _currentHitObj = null;
                     }
-                    _currentHitObj = hitObj;
-                    ResetDwellState();
+
+                    // Only reset dwell if blocked target changed
+                    if (_blockedDwellTarget != hitObj)
+                    {
+                        _blockedDwellTarget = hitObj;
+                        ResetDwellState();
+                    }
+                }
+                else
+                {
+                    // Normal hover processing (no popup or inside popup)
+                    _blockedDwellTarget = null;
+
+                    if (_currentHitObj != hitObj)
+                    {
+                        // Exit old non-RTT object if any
+                        if (_currentHitObj != null && !_isHoveringRTT)
+                        {
+                            HandlePointerExit(_currentHitObj);
+                        }
+
+                        _currentHitObj = hitObj;
+                        ResetDwellState();
+                    }
                 }
 
                 // Process dwell click for RTT
                 if (dwellClickEnabled && hitObj != null)
                 {
-                    ProcessDwellClickRTT(currentGazeDir);
+                    // If popup is open and clicking outside, only close popup (don't process normal click)
+                    if (blockInteraction)
+                    {
+                        ProcessPopupCloseOnlyRTT(currentGazeDir);
+                    }
+                    else
+                    {
+                        ProcessDwellClickRTT(currentGazeDir);
+                    }
                 }
 
                 _lastGazeDirection = currentGazeDir;
@@ -460,21 +501,58 @@ public class VRGazeReticle : MonoBehaviour
             }
 
             GameObject hitObj = hit.collider.gameObject;
-            if (_currentHitObj != hitObj)
+
+            // Check if popup is open - block hover on objects outside popup
+            bool hasOpenPopup = RTTPopupMenu.CurrentlyOpenPopup != null;
+            bool isInsidePopup = hasOpenPopup && RTTPopupMenu.CurrentlyOpenPopup.IsPartOfPopupPanel(hitObj);
+            bool blockInteraction = hasOpenPopup && !isInsidePopup;
+
+            if (blockInteraction)
             {
-                HandlePointerExit(_currentHitObj);
-                HandlePointerEnter(hitObj);
-                _currentHitObj = hitObj;
-                ResetDwellState(); // Reset khi đổi target
+                // Popup is open, target is outside popup
+                // Block hover but track target for dwell-to-close
+                if (_currentHitObj != null)
+                {
+                    HandlePointerExit(_currentHitObj);
+                    _currentHitObj = null;
+                }
+
+                // Only reset dwell if blocked target changed
+                if (_blockedDwellTarget != hitObj)
+                {
+                    _blockedDwellTarget = hitObj;
+                    ResetDwellState();
+                }
+            }
+            else
+            {
+                // Normal hover processing (no popup or inside popup)
+                _blockedDwellTarget = null;
+
+                if (_currentHitObj != hitObj)
+                {
+                    HandlePointerExit(_currentHitObj);
+                    HandlePointerEnter(hitObj);
+                    _currentHitObj = hitObj;
+                    ResetDwellState();
+                }
             }
 
             // Lưu hit info để sử dụng khi click
             _lastHit = hit;
 
             // Xử lý Dwell Click
-            if (dwellClickEnabled && _currentHitObj != null)
+            if (dwellClickEnabled && hitObj != null)
             {
-                ProcessDwellClick(currentGazeDir, hitObj, hit);
+                // If popup is open and clicking outside, only close popup
+                if (blockInteraction)
+                {
+                    ProcessPopupCloseOnly(currentGazeDir);
+                }
+                else
+                {
+                    ProcessDwellClick(currentGazeDir, hitObj, hit);
+                }
             }
         }
         else
@@ -486,6 +564,7 @@ public class VRGazeReticle : MonoBehaviour
                 HandlePointerExit(_currentHitObj);
                 _currentHitObj = null;
             }
+            _blockedDwellTarget = null;
             ResetDwellState();
         }
 
@@ -513,6 +592,10 @@ public class VRGazeReticle : MonoBehaviour
         bool hasOpenExpansion = RTTTaskbarExpansion.CurrentlyOpenExpansion != null;
         bool isExpansionOption = hasOpenExpansion && RTTTaskbarExpansion.CurrentlyOpenExpansion.IsPartOfExpansionPanel(target);
 
+        // Check if popup menu is open
+        bool hasOpenPopup = RTTPopupMenu.CurrentlyOpenPopup != null;
+        bool isPopupOption = hasOpenPopup && RTTPopupMenu.CurrentlyOpenPopup.IsPartOfPopupPanel(target);
+
         // Check if RTT keyboard is open
         bool hasOpenKeyboard = RTTMobileKeyboard.CurrentlyOpenKeyboard != null;
         bool isKeyboardPart = hasOpenKeyboard && RTTMobileKeyboard.CurrentlyOpenKeyboard.IsPartOfKeyboard(target);
@@ -528,8 +611,8 @@ public class VRGazeReticle : MonoBehaviour
         // Check if target is dwellable
         bool isDwellableTarget = IsDwellable(target);
 
-        // If no dropdown/keyboard/expansion open and target is not dwellable, skip
-        if (!hasOpenDropdown && !hasOpenKeyboard && !hasOpenExpansion && !isDwellableTarget)
+        // If no dropdown/keyboard/expansion/popup open and target is not dwellable, skip
+        if (!hasOpenDropdown && !hasOpenKeyboard && !hasOpenExpansion && !hasOpenPopup && !isDwellableTarget)
         {
             ResetDwellState();
             return;
@@ -690,11 +773,176 @@ public class VRGazeReticle : MonoBehaviour
                 return;
             }
 
+            // Priority 4: Handle popup menu click-outside
+            if (hasOpenPopup)
+            {
+                if (isPopupOption)
+                {
+                    // Target is part of popup - perform normal click via RTTRaycastManager
+                    if (RTTRaycastManager.Instance != null)
+                    {
+                        RTTRaycastManager.Instance.SendClick();
+                    }
+                }
+                else if (isDwellableTarget)
+                {
+                    // Target is a dwellable button outside popup - close popup and perform click
+                    RTTPopupMenu.CurrentlyOpenPopup.Hide();
+                    if (RTTRaycastManager.Instance != null)
+                    {
+                        RTTRaycastManager.Instance.SendClick();
+                    }
+                    // Mark RTT panel dirty for re-render
+                    _lastRTTHit.panel?.MarkDirty();
+                }
+                else
+                {
+                    // Target is NOT part of the popup and not a button - close popup
+                    RTTPopupMenu.CurrentlyOpenPopup.Hide();
+                    // Mark RTT panel dirty for re-render
+                    _lastRTTHit.panel?.MarkDirty();
+                }
+                return;
+            }
+
             // Normal click - use RTTRaycastManager to send click
             if (RTTRaycastManager.Instance != null)
             {
                 RTTRaycastManager.Instance.SendClick();
             }
+        }
+    }
+
+    /// <summary>
+    /// Special dwell handler when popup is open - ONLY closes popup, no other actions
+    /// </summary>
+    void ProcessPopupCloseOnlyRTT(Vector3 currentGazeDir)
+    {
+        // Calculate angle moved
+        float angleMoved = Vector3.Angle(_lastGazeDirection, currentGazeDir);
+
+        // Reset if moved too much
+        if (angleMoved > dwellMovementThreshold * Time.deltaTime * 10f)
+        {
+            ResetDwellState();
+            return;
+        }
+
+        // Already clicked
+        if (_dwellClickTriggered)
+        {
+            return;
+        }
+
+        // Accumulate stable time
+        _stableTime += Time.deltaTime;
+
+        // Phase 1: Wait for delay
+        if (_stableTime < dwellStartDelay)
+        {
+            return;
+        }
+
+        // Phase 2: Show progress ring
+        if (!_isDwelling)
+        {
+            _isDwelling = true;
+            if (_dwellRing != null)
+            {
+                _dwellRing.enabled = true;
+                _dwellRing.fillAmount = 0f;
+            }
+        }
+
+        // Calculate progress
+        float dwellElapsed = _stableTime - dwellStartDelay;
+        _dwellProgress = Mathf.Clamp01(dwellElapsed / dwellClickTime);
+
+        // Update visual
+        if (_dwellRing != null)
+        {
+            _dwellRing.fillAmount = _dwellProgress;
+        }
+
+        // Phase 3: Close popup when done (NO other action)
+        if (_dwellProgress >= 1f)
+        {
+            _dwellClickTriggered = true;
+
+            if (_dwellRing != null)
+            {
+                _dwellRing.enabled = false;
+            }
+
+            // Only close popup - do NOT send click to any object
+            RTTPopupMenu.CurrentlyOpenPopup?.Hide();
+            _lastRTTHit.panel?.MarkDirty();
+        }
+    }
+
+    /// <summary>
+    /// Special dwell handler for physics raycast when popup is open - ONLY closes popup
+    /// </summary>
+    void ProcessPopupCloseOnly(Vector3 currentGazeDir)
+    {
+        // Calculate angle moved
+        float angleMoved = Vector3.Angle(_lastGazeDirection, currentGazeDir);
+
+        // Reset if moved too much
+        if (angleMoved > dwellMovementThreshold * Time.deltaTime * 10f)
+        {
+            ResetDwellState();
+            return;
+        }
+
+        // Already clicked
+        if (_dwellClickTriggered)
+        {
+            return;
+        }
+
+        // Accumulate stable time
+        _stableTime += Time.deltaTime;
+
+        // Phase 1: Wait for delay
+        if (_stableTime < dwellStartDelay)
+        {
+            return;
+        }
+
+        // Phase 2: Show progress ring
+        if (!_isDwelling)
+        {
+            _isDwelling = true;
+            if (_dwellRing != null)
+            {
+                _dwellRing.enabled = true;
+                _dwellRing.fillAmount = 0f;
+            }
+        }
+
+        // Calculate progress
+        float dwellElapsed = _stableTime - dwellStartDelay;
+        _dwellProgress = Mathf.Clamp01(dwellElapsed / dwellClickTime);
+
+        // Update visual
+        if (_dwellRing != null)
+        {
+            _dwellRing.fillAmount = _dwellProgress;
+        }
+
+        // Phase 3: Close popup when done (NO other action)
+        if (_dwellProgress >= 1f)
+        {
+            _dwellClickTriggered = true;
+
+            if (_dwellRing != null)
+            {
+                _dwellRing.enabled = false;
+            }
+
+            // Only close popup - do NOT click any object
+            RTTPopupMenu.CurrentlyOpenPopup?.Hide();
         }
     }
 
@@ -707,6 +955,10 @@ public class VRGazeReticle : MonoBehaviour
         // Check if expansion panel is open
         bool hasOpenExpansion = RTTTaskbarExpansion.CurrentlyOpenExpansion != null;
         bool isExpansionOption = hasOpenExpansion && RTTTaskbarExpansion.CurrentlyOpenExpansion.IsPartOfExpansionPanel(target);
+
+        // Check if popup menu is open
+        bool hasOpenPopup = RTTPopupMenu.CurrentlyOpenPopup != null;
+        bool isPopupOption = hasOpenPopup && RTTPopupMenu.CurrentlyOpenPopup.IsPartOfPopupPanel(target);
 
         // Check if keyboard is open (RTTMobileKeyboard only)
         bool hasOpenKeyboard = RTTMobileKeyboard.CurrentlyOpenKeyboard != null;
@@ -722,8 +974,8 @@ public class VRGazeReticle : MonoBehaviour
 
         bool isDwellableTarget = IsDwellable(target);
 
-        // If no dropdown/keyboard/expansion open and target is not dwellable, skip
-        if (!hasOpenDropdown && !hasOpenKeyboard && !hasOpenExpansion && !isDwellableTarget)
+        // If no dropdown/keyboard/expansion/popup open and target is not dwellable, skip
+        if (!hasOpenDropdown && !hasOpenKeyboard && !hasOpenExpansion && !hasOpenPopup && !isDwellableTarget)
         {
             ResetDwellState();
             return;
@@ -863,6 +1115,28 @@ public class VRGazeReticle : MonoBehaviour
                 return;
             }
 
+            // Priority 4: Handle popup menu click-outside
+            if (hasOpenPopup)
+            {
+                if (isPopupOption)
+                {
+                    // Target is part of popup - perform normal click
+                    HandlePointerClick(target, normalizedHitPoint);
+                }
+                else if (isDwellableTarget)
+                {
+                    // Target is a dwellable button outside popup - close popup and perform click
+                    RTTPopupMenu.CurrentlyOpenPopup.Hide();
+                    HandlePointerClick(target, normalizedHitPoint);
+                }
+                else
+                {
+                    // Target is NOT part of the popup and not a button - close popup
+                    RTTPopupMenu.CurrentlyOpenPopup.Hide();
+                }
+                return;
+            }
+
             // No popup open - perform normal click
             if (isDwellableTarget)
             {
@@ -987,6 +1261,7 @@ public class VRGazeReticle : MonoBehaviour
         _isDwelling = false;
         _dwellClickTriggered = false;
         _dwellableTarget = null;
+        // Note: Don't reset _blockedDwellTarget here - it's managed separately in CheckGaze
 
         if (_dwellRing != null)
         {
