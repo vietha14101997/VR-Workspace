@@ -1,12 +1,14 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using TMPro;
+using System;
 
 /// <summary>
 /// Represents a single file or folder item in the Grid View.
-/// Pure display component - no interaction logic.
+/// Handles hover/click interactions and visual highlighting.
 /// </summary>
-public class RTTFileGridItem : MonoBehaviour
+public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
 {
     private Image _iconImage;
     private TextMeshProUGUI _nameText;
@@ -15,9 +17,29 @@ public class RTTFileGridItem : MonoBehaviour
     public string FilePath { get; private set; }
     public bool IsFolder { get; private set; }
 
+    // Callbacks
+    private Action<string> _onHoverEnter;
+    private Action<string> _onHoverExit;
+    private Action<string, bool> _onClick; // path, isFolder
+
+    // Visual state
+    private static readonly Color HoverColor = new Color(0f, 0f, 0f, 0.3f);
+    private static readonly Color NormalColor = Color.clear;
+    private bool _isHovered = false;
+
     public void Initialize()
     {
         BuildUI();
+    }
+
+    /// <summary>
+    /// Set callbacks for interaction events
+    /// </summary>
+    public void SetCallbacks(Action<string> onHoverEnter, Action<string> onHoverExit, Action<string, bool> onClick)
+    {
+        _onHoverEnter = onHoverEnter;
+        _onHoverExit = onHoverExit;
+        _onClick = onClick;
     }
 
     /// <summary>
@@ -41,9 +63,10 @@ public class RTTFileGridItem : MonoBehaviour
                 SetSprite(IsImageFile(name) ? "icon_image" : "icon_file");
         }
 
-        // Reset background
+        // Reset background and hover state
+        _isHovered = false;
         if (_bgImage != null)
-            _bgImage.color = Color.clear;
+            _bgImage.color = NormalColor;
     }
 
     private void BuildUI()
@@ -89,17 +112,42 @@ public class RTTFileGridItem : MonoBehaviour
         textLE.preferredHeight = 90f;
         textLE.flexibleHeight = 0;
 
-        // 4. Background (for potential highlighting by parent)
+        // 4. Background (for highlighting)
         _bgImage = gameObject.AddComponent<Image>();
         _bgImage.sprite = GetRoundedRectSprite();
         _bgImage.type = Image.Type.Sliced;
-        _bgImage.color = Color.clear;
+        _bgImage.color = NormalColor;
         _bgImage.raycastTarget = true;
 
         // NOTE: No BoxCollider needed - RTT uses GraphicRaycaster via panel's DisplayQuad collider
         // Adding BoxColliders to individual items causes raycast issues when items are in buffer zone
         // (outside visible RectMask2D area but still active for smooth scrolling)
     }
+
+    #region Pointer Events
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        _isHovered = true;
+        if (_bgImage != null)
+            _bgImage.color = HoverColor;
+
+        _onHoverEnter?.Invoke(FilePath);
+    }
+
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        _isHovered = false;
+        if (_bgImage != null)
+            _bgImage.color = NormalColor;
+
+        _onHoverExit?.Invoke(FilePath);
+    }
+
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        _onClick?.Invoke(FilePath, IsFolder);
+    }
+    #endregion
 
     #region Public API for parent to control visuals
     public void SetBackgroundColor(Color color)
@@ -109,18 +157,19 @@ public class RTTFileGridItem : MonoBehaviour
             _bgImage.color = color;
         }
     }
+
+    /// <summary>
+    /// Force clear hover state (used when item is recycled)
+    /// </summary>
+    public void ClearHoverState()
+    {
+        _isHovered = false;
+        if (_bgImage != null)
+            _bgImage.color = NormalColor;
+    }
     #endregion
 
     #region Helper Methods
-    private void SetLayerRecursively(GameObject obj, int layer)
-    {
-        obj.layer = layer;
-        foreach (Transform child in obj.transform)
-        {
-            SetLayerRecursively(child.gameObject, layer);
-        }
-    }
-
     // Cached rounded rectangle sprite
     private static Sprite _cachedRoundedSprite;
     private const int ROUNDED_RECT_SIZE = 64;

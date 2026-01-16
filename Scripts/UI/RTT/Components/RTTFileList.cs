@@ -49,6 +49,11 @@ public class RTTFileList : MonoBehaviour
     // Sort callback
     private Action<string> _onSortColumnClicked;
 
+    // Interaction callbacks
+    private Action<string> _onItemHoverEnter;
+    private Action<string> _onItemHoverExit;
+    private Action<string, bool> _onItemClick; // path, isFolder
+
     // Current sort state (for header arrows)
     private string _currentSortBy = "Name";
     private bool _isAscending = true;
@@ -69,6 +74,22 @@ public class RTTFileList : MonoBehaviour
         BuildUI();
         CalculateMetrics();
         CreateItemPool();
+    }
+
+    /// <summary>
+    /// Set callbacks for item interactions
+    /// </summary>
+    public void SetItemCallbacks(Action<string> onHoverEnter, Action<string> onHoverExit, Action<string, bool> onClick)
+    {
+        _onItemHoverEnter = onHoverEnter;
+        _onItemHoverExit = onHoverExit;
+        _onItemClick = onClick;
+
+        // Update existing items with callbacks
+        foreach (var item in _itemPool)
+        {
+            item.SetCallbacks(_onItemHoverEnter, _onItemHoverExit, _onItemClick);
+        }
     }
 
     private void BuildUI()
@@ -345,6 +366,12 @@ public class RTTFileList : MonoBehaviour
 
         var listItem = itemObj.AddComponent<RTTFileListItem>();
         listItem.Initialize(_font);
+
+        // Set callbacks if already configured
+        if (_onItemHoverEnter != null || _onItemHoverExit != null || _onItemClick != null)
+        {
+            listItem.SetCallbacks(_onItemHoverEnter, _onItemHoverExit, _onItemClick);
+        }
 
         return listItem;
     }

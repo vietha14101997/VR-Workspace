@@ -147,6 +147,16 @@ public class RTTFileManagerController : MonoBehaviour
         UpdateView(true);
     }
 
+    /// <summary>
+    /// Set sort options without triggering a refresh (for initialization)
+    /// </summary>
+    public void SetSortOptionsNoRefresh(string sortBy, bool ascending)
+    {
+        Debug.Log($"[Controller] SetSortOptionsNoRefresh: sortBy={sortBy}, ascending={ascending}");
+        _sortBy = sortBy;
+        _sortAscending = ascending;
+    }
+
     public void SetPageSize(int itemsPerPage)
     {
         if (_pageSize == itemsPerPage)

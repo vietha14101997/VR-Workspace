@@ -1,12 +1,13 @@
 using UnityEngine;
 using UnityEngine.UI;
+using System;
 using System.Collections.Generic;
 
 /// <summary>
 /// Virtualized Grid View for File Manager.
 /// Only renders visible items + buffer to maintain performance with large directories.
 /// Uses object pooling to reuse RTTFileGridItem instances.
-/// Pure display component - interaction logic will be added separately.
+/// Handles hover/click interactions through callbacks.
 /// </summary>
 public class RTTFileGrid : MonoBehaviour
 {
@@ -24,6 +25,11 @@ public class RTTFileGrid : MonoBehaviour
     // Pool of reusable items
     private List<RTTFileGridItem> _itemPool = new List<RTTFileGridItem>();
     private Dictionary<int, RTTFileGridItem> _visibleItems = new Dictionary<int, RTTFileGridItem>();
+
+    // Interaction callbacks
+    private Action<string> _onItemHoverEnter;
+    private Action<string> _onItemHoverExit;
+    private Action<string, bool> _onItemClick; // path, isFolder
 
     // Grid configuration
     private float _cellWidth = 310f;
@@ -50,6 +56,22 @@ public class RTTFileGrid : MonoBehaviour
         BuildUI();
         CalculateGridMetrics();
         CreateItemPool();
+    }
+
+    /// <summary>
+    /// Set callbacks for item interactions
+    /// </summary>
+    public void SetItemCallbacks(Action<string> onHoverEnter, Action<string> onHoverExit, Action<string, bool> onClick)
+    {
+        _onItemHoverEnter = onHoverEnter;
+        _onItemHoverExit = onHoverExit;
+        _onItemClick = onClick;
+
+        // Update existing items with callbacks
+        foreach (var item in _itemPool)
+        {
+            item.SetCallbacks(_onItemHoverEnter, _onItemHoverExit, _onItemClick);
+        }
     }
 
     /// <summary>
@@ -149,6 +171,12 @@ public class RTTFileGrid : MonoBehaviour
 
         var gridItem = itemObj.AddComponent<RTTFileGridItem>();
         gridItem.Initialize();
+
+        // Set callbacks if already configured
+        if (_onItemHoverEnter != null || _onItemHoverExit != null || _onItemClick != null)
+        {
+            gridItem.SetCallbacks(_onItemHoverEnter, _onItemHoverExit, _onItemClick);
+        }
 
         return gridItem;
     }

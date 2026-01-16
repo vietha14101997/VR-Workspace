@@ -65,6 +65,9 @@ public class RTTFileManager : MonoBehaviour
     {
         Debug.Log("[RTTFileManager] Building UI...");
 
+        // Load saved preferences
+        LoadViewPreferences();
+
         // Setup Main RectTransform
         RectTransform rt = GetComponent<RectTransform>();
         if (rt == null) rt = gameObject.AddComponent<RectTransform>();
@@ -72,7 +75,7 @@ public class RTTFileManager : MonoBehaviour
         // Create Back Button (Standard for all apps)
         // Moved to Side Panel as per new design requirements
         // CreateBackButton();
-        
+
         // Initialize 3-Panel Layout
         if (_menuFrame != null)
         {
@@ -82,6 +85,22 @@ public class RTTFileManager : MonoBehaviour
         {
             Debug.LogWarning("[RTTFileManager] Parent RTTMenuFrame not found, cannot create side panels correctly.");
         }
+    }
+
+    private void LoadViewPreferences()
+    {
+        _currentSortBy = PlayerPrefs.GetString(PREF_SORT_BY, "Name");
+        _isAscending = PlayerPrefs.GetInt(PREF_SORT_ASCENDING, 1) == 1;
+        _isGridView = PlayerPrefs.GetInt(PREF_IS_GRID_VIEW, 1) == 1;
+        Debug.Log($"[RTTFileManager] Loaded preferences: sortBy={_currentSortBy}, ascending={_isAscending}, gridView={_isGridView}");
+    }
+
+    private void SaveViewPreferences()
+    {
+        PlayerPrefs.SetString(PREF_SORT_BY, _currentSortBy);
+        PlayerPrefs.SetInt(PREF_SORT_ASCENDING, _isAscending ? 1 : 0);
+        PlayerPrefs.SetInt(PREF_IS_GRID_VIEW, _isGridView ? 1 : 0);
+        PlayerPrefs.Save();
     }
     
     public void Cleanup()
@@ -263,10 +282,25 @@ public class RTTFileManager : MonoBehaviour
         // Calculate size based on BODY size
         float bodyHeight = panelHeight - headerOriginalHeight - bottomPadding;
         _fileGrid.Initialize(_controller, contentSize.x, bodyHeight);
-        
+
+        // Set interaction callbacks
+        _fileGrid.SetItemCallbacks(
+            onHoverEnter: (path) => _controller?.HoverFile(path),
+            onHoverExit: (path) => _controller?.UnhoverFile(path),
+            onClick: (path, isFolder) => OnItemClicked(path, isFolder)
+        );
+
         // Render Order
         headerObj.transform.SetAsLastSibling();
         bodyObj.transform.SetAsFirstSibling();
+
+        // Apply saved view mode preference
+        if (!_isGridView)
+        {
+            // User prefers list view - create it and hide grid
+            _fileGrid.gameObject.SetActive(false);
+            CreateListView();
+        }
 
         // Mark setup complete - enables OnEnable/OnDisable to manage visibility for app switching
         // NOTE: Do NOT show pagination here - it will be shown by OnEnable() when the frame is actually displayed
@@ -274,6 +308,10 @@ public class RTTFileManager : MonoBehaviour
         _viewReady = true;
 
         Debug.Log($"[RTTFileManager] Before OnViewReady - breadcrumb container null: {_breadcrumbContainer == null}, instance: {GetInstanceID()}");
+
+        // Apply saved sort options to controller before loading data (without triggering refresh)
+        _controller?.SetSortOptionsNoRefresh(_currentSortBy, _isAscending);
+
         _controller.OnViewReady();
 
         // Initialize page size AFTER OnViewReady has loaded data (deferred to next frame for safety)
@@ -343,6 +381,11 @@ public class RTTFileManager : MonoBehaviour
     private bool _isGridView = true;
     private Image _sortArrowImg; // Reference to arrow icon
     private TextMeshProUGUI _sortTriggerText; // Reference to sort trigger text
+
+    // PlayerPrefs keys for saving view options
+    private const string PREF_SORT_BY = "FileManager_SortBy";
+    private const string PREF_SORT_ASCENDING = "FileManager_SortAscending";
+    private const string PREF_IS_GRID_VIEW = "FileManager_IsGridView";
 
     // Ellipsis Popup References (for hidden breadcrumb folders)
     private GameObject _ellipsisPopup;
@@ -641,6 +684,9 @@ public class RTTFileManager : MonoBehaviour
 
         // Refresh content with current data
         _controller?.RefreshCurrentFolder();
+
+        // Save preference
+        SaveViewPreferences();
     }
 
     private void SetSortBy(string sortBy)
@@ -665,6 +711,9 @@ public class RTTFileManager : MonoBehaviour
 
         // Call controller to apply sort
         _controller?.SetSortOptions(_currentSortBy, _isAscending);
+
+        // Save preference
+        SaveViewPreferences();
     }
 
     private void ToggleSortOrder()
@@ -683,8 +732,11 @@ public class RTTFileManager : MonoBehaviour
 
         // Call controller to apply sort
         _controller?.SetSortOptions(_currentSortBy, _isAscending);
+
+        // Save preference
+        SaveViewPreferences();
     }
-    
+
     private void RefreshViewOptionsPopup()
     {
         if (_viewOptionsPopup != null)
@@ -722,6 +774,13 @@ public class RTTFileManager : MonoBehaviour
 
         _fileList.Initialize(_controller, contentSize.x, bodyHeight, _font, _primaryColor, _accentColor, OnListHeaderColumnClicked);
         _fileList.UpdateSortState(_currentSortBy, _isAscending);
+
+        // Set interaction callbacks
+        _fileList.SetItemCallbacks(
+            onHoverEnter: (path) => _controller?.HoverFile(path),
+            onHoverExit: (path) => _controller?.UnhoverFile(path),
+            onClick: (path, isFolder) => OnItemClicked(path, isFolder)
+        );
 
         Debug.Log("[RTTFileManager] List view created");
     }
@@ -1456,6 +1515,23 @@ public class RTTFileManager : MonoBehaviour
 
         // Navigate to selected folder
         _controller?.NavigateTo(path);
+    }
+
+    /// <summary>
+    /// Called when a file or folder item is clicked
+    /// </summary>
+    private void OnItemClicked(string path, bool isFolder)
+    {
+        if (isFolder)
+        {
+            // Navigate into the folder
+            _controller?.NavigateTo(path);
+        }
+        else
+        {
+            // Select the file (could also open it in future)
+            _controller?.SelectFile(path);
+        }
     }
 
     private void OnSearchValueChanged(string value)

@@ -1,14 +1,15 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using TMPro;
 using System;
 
 /// <summary>
 /// Row item for File Manager List View.
 /// Displays file info in columns: Icon+Name, Type, Created, Modified, Duration, Size
-/// Pure display component - no interaction logic.
+/// Handles hover/click interactions and visual highlighting.
 /// </summary>
-public class RTTFileListItem : MonoBehaviour
+public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
 {
     #region Data
     public string FilePath { get; private set; }
@@ -28,10 +29,18 @@ public class RTTFileListItem : MonoBehaviour
 
     #region State
     private TMP_FontAsset _font;
+    private bool _isHovered = false;
+    #endregion
+
+    #region Callbacks
+    private Action<string> _onHoverEnter;
+    private Action<string> _onHoverExit;
+    private Action<string, bool> _onClick; // path, isFolder
     #endregion
 
     #region Colors
     private static readonly Color NormalColor = Color.clear;
+    private static readonly Color HoverColor = new Color(0f, 0f, 0f, 0.3f);
     #endregion
 
     #region Column Widths (percentages of total width)
@@ -47,13 +56,23 @@ public class RTTFileListItem : MonoBehaviour
         BuildUI();
     }
 
+    /// <summary>
+    /// Set callbacks for interaction events
+    /// </summary>
+    public void SetCallbacks(Action<string> onHoverEnter, Action<string> onHoverExit, Action<string, bool> onClick)
+    {
+        _onHoverEnter = onHoverEnter;
+        _onHoverExit = onHoverExit;
+        _onClick = onClick;
+    }
+
     private void BuildUI()
     {
         RectTransform rt = GetComponent<RectTransform>();
         float totalWidth = rt.sizeDelta.x;
         float height = rt.sizeDelta.y;
 
-        // Background (for potential highlighting by parent)
+        // Background (for highlighting)
         _background = gameObject.AddComponent<Image>();
         _background.color = NormalColor;
         _background.raycastTarget = true;
@@ -222,9 +241,35 @@ public class RTTFileListItem : MonoBehaviour
             _sizeText.text = "<b>" + FormatFileSize(file.Size) + "</b>";
         }
 
-        // Reset background
+        // Reset background and hover state
+        _isHovered = false;
         _background.color = NormalColor;
     }
+
+    #region Pointer Events
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        _isHovered = true;
+        if (_background != null)
+            _background.color = HoverColor;
+
+        _onHoverEnter?.Invoke(FilePath);
+    }
+
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        _isHovered = false;
+        if (_background != null)
+            _background.color = NormalColor;
+
+        _onHoverExit?.Invoke(FilePath);
+    }
+
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        _onClick?.Invoke(FilePath, IsFolder);
+    }
+    #endregion
 
     #region Public API for parent to control visuals
     public void SetBackgroundColor(Color color)
@@ -233,6 +278,16 @@ public class RTTFileListItem : MonoBehaviour
         {
             _background.color = color;
         }
+    }
+
+    /// <summary>
+    /// Force clear hover state (used when item is recycled)
+    /// </summary>
+    public void ClearHoverState()
+    {
+        _isHovered = false;
+        if (_background != null)
+            _background.color = NormalColor;
     }
     #endregion
 
@@ -296,15 +351,6 @@ public class RTTFileListItem : MonoBehaviour
     private string FormatFileSize(long bytes)
     {
         return FileSystemService.FormatFileSize(bytes);
-    }
-
-    private void SetLayerRecursively(GameObject obj, int layer)
-    {
-        obj.layer = layer;
-        foreach (Transform child in obj.transform)
-        {
-            SetLayerRecursively(child.gameObject, layer);
-        }
     }
     #endregion
 }
