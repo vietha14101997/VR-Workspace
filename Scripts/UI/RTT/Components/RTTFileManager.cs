@@ -1109,7 +1109,7 @@ public class RTTFileManager : MonoBehaviour
 
         popupRT.anchoredPosition = new Vector2(ellipsisX, -btnHeight / 2 - 8f);
 
-        // Background with strong glass effect (matching RTTPopupMenu style for better blur)
+        // Background matching VRDropdownFactory's dropdown panel style
         Image bgImage = _ellipsisPopup.AddComponent<Image>();
         float aspect = _ellipsisPopupWidth / popupHeight;
 
@@ -1118,23 +1118,29 @@ public class RTTFileManager : MonoBehaviour
         {
             Material mat = new Material(glassShader);
             mat.SetFloat("_Aspect", aspect);
-            mat.SetFloat("_CornerRadius", 0.06f); // Small rounded corners (matching sortTrigger button)
+            mat.SetFloat("_CornerRadius", 0.06f);
             mat.SetFloat("_EdgePadding", 0.01f);
 
-            // Single color with transparent tint but high glass alpha for blur
-            Color glassColor = new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.15f);
-            mat.SetColor("_ColorA", glassColor);
-            mat.SetColor("_ColorB", glassColor); // Same color = no gradient
-            mat.SetFloat("_GlassAlpha", 0.45f); // High glass alpha for blur effect
+            // Match VRDropdownFactory's CreateViewportBackground style (increased alpha for visibility)
+            float backgroundAlpha = 0.25f;
+            Color col = _primaryColor;
+            Color colorA = new Color(col.r * 0.8f, col.g * 0.9f, col.b, backgroundAlpha * 1.8f);
+            Color colorB = new Color(col.r, col.g * 0.7f, col.b * 0.9f, backgroundAlpha * 1.5f);
+            mat.SetColor("_ColorA", colorA);
+            mat.SetColor("_ColorB", colorB);
+            mat.SetFloat("_GradientOffset", 0f);
+            mat.SetFloat("_GradientAngle", -10f);
+            mat.SetFloat("_CyanRatio", 0.7f);
+            mat.SetFloat("_GlassAlpha", backgroundAlpha * 1.2f);
             mat.SetFloat("_FresnelPower", 2.2f);
-            mat.SetFloat("_FresnelStrength", 0.1f);
+            mat.SetFloat("_FresnelStrength", 0.12f);
 
             bgImage.material = mat;
             bgImage.color = Color.white;
         }
         else
         {
-            bgImage.color = new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.75f);
+            bgImage.color = new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.3f);
         }
 
         // Create folder items
