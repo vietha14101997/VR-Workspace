@@ -123,10 +123,72 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         textLE.preferredHeight = 90f;
         textLE.flexibleHeight = 0;
 
-        // 4. Background for interaction
+        // 4. Background for interaction (rounded rectangle with 9-slice)
         _bgImage = gameObject.AddComponent<Image>();
+        _bgImage.sprite = GetRoundedRectSprite();
+        _bgImage.type = Image.Type.Sliced;
         _bgImage.color = Color.clear;
         _bgImage.raycastTarget = true;
+    }
+
+    // Cached rounded rectangle sprite for background rendering
+    private static Sprite _cachedRoundedSprite;
+    private const int ROUNDED_RECT_SIZE = 64;
+    private const int CORNER_RADIUS = 16;
+
+    private static Sprite GetRoundedRectSprite()
+    {
+        if (_cachedRoundedSprite != null) return _cachedRoundedSprite;
+
+        int size = ROUNDED_RECT_SIZE;
+        int radius = CORNER_RADIUS;
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        tex.filterMode = FilterMode.Bilinear;
+
+        Color[] pixels = new Color[size * size];
+        float halfSize = size * 0.5f;
+        float innerRadius = radius;
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                // Distance from center
+                float dx = Mathf.Abs(x - halfSize + 0.5f);
+                float dy = Mathf.Abs(y - halfSize + 0.5f);
+
+                // Inner rect (without corners)
+                float innerHalfX = halfSize - innerRadius;
+                float innerHalfY = halfSize - innerRadius;
+
+                // Calculate signed distance to rounded rect
+                float qx = Mathf.Max(dx - innerHalfX, 0f);
+                float qy = Mathf.Max(dy - innerHalfY, 0f);
+                float dist = Mathf.Sqrt(qx * qx + qy * qy) - innerRadius;
+
+                // Anti-aliasing (smooth edge over 1.5 pixels)
+                float alpha = 1f - Mathf.Clamp01((dist + 0.5f) / 1.5f);
+
+                pixels[y * size + x] = new Color(1f, 1f, 1f, alpha);
+            }
+        }
+
+        tex.SetPixels(pixels);
+        tex.Apply();
+
+        // Create sliced sprite (9-slice) so corners don't stretch
+        int border = radius + 2;
+        _cachedRoundedSprite = Sprite.Create(
+            tex,
+            new Rect(0, 0, size, size),
+            Vector2.one * 0.5f,
+            100f,
+            0,
+            SpriteMeshType.FullRect,
+            new Vector4(border, border, border, border) // left, bottom, right, top borders
+        );
+
+        return _cachedRoundedSprite;
     }
 
     public void OnPointerClick(PointerEventData eventData)
