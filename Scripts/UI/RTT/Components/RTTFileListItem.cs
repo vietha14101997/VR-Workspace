@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using TMPro;
 using System;
+using VRWorkspace.UI.HoverEffects;
 
 /// <summary>
 /// Row item for File Manager List View.
@@ -11,6 +12,12 @@ using System;
 /// </summary>
 public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
 {
+    #region Hover Effect
+    private const float HOVER_SCALE = 1.02f;
+    private const float HOVER_ANIMATION_SPEED = 8f;
+    private HoverEffectController _hoverController;
+    #endregion
+
     #region Data
     public string FilePath { get; private set; }
     public bool IsFolder { get; private set; }
@@ -78,6 +85,13 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         _background = gameObject.AddComponent<Image>();
         _background.color = NormalColor;
         _background.raycastTarget = true;
+
+        // Add Hover Effect Controller with Scale Effect
+        _hoverController = gameObject.AddComponent<HoverEffectController>();
+        var scaleEffect = new ScaleHoverEffect()
+            .WithHoverScale(HOVER_SCALE)
+            .WithTransitionDuration(1f / HOVER_ANIMATION_SPEED);
+        _hoverController.AddEffect(scaleEffect);
 
         // Calculate column positions
         float usableWidth = totalWidth - RowPadding * 2;
@@ -281,6 +295,8 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         if (_background != null)
             _background.color = HoverColor;
 
+        // Note: HoverEffectController handles scale effect automatically via IPointerEnterHandler
+
         _onHoverEnter?.Invoke(FilePath);
     }
 
@@ -288,6 +304,8 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
     {
         if (_background != null)
             _background.color = NormalColor;
+
+        // Note: HoverEffectController handles scale effect automatically via IPointerExitHandler
 
         _onHoverExit?.Invoke(FilePath);
     }
@@ -314,6 +332,9 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
     {
         if (_background != null)
             _background.color = NormalColor;
+
+        // Reset scale hover effect immediately (snap to default state)
+        _hoverController?.ResetHoverState(immediate: true);
     }
 
     /// <summary>

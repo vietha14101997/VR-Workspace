@@ -348,6 +348,89 @@ public class RTTFileSidePanel : MonoBehaviour
         return _selectedItem?.Label;
     }
 
+    /// <summary>
+    /// Update selection based on current path.
+    /// Only selects if path exactly matches a side panel item's root path.
+    /// Deselects all if in a subfolder.
+    /// </summary>
+    public void UpdateSelectionForPath(string currentPath)
+    {
+        // Convert "root" to actual path
+        if (currentPath == "root")
+        {
+            currentPath = FileSystemService.RootPath;
+        }
+
+        // Normalize path for comparison
+        currentPath = currentPath?.TrimEnd('/', '\\');
+
+        string matchedId = null;
+
+        // Check if current path exactly matches any side panel item's path
+        string internalPath = FileSystemService.RootPath?.TrimEnd('/', '\\');
+        string downloadsPath = FileSystemService.GetDownloadsPath()?.TrimEnd('/', '\\');
+        string videosPath = FileSystemService.GetVideosPath()?.TrimEnd('/', '\\');
+        string musicPath = FileSystemService.GetMusicPath()?.TrimEnd('/', '\\');
+        string sdcardPath = FileSystemService.GetSDCardPath()?.TrimEnd('/', '\\');
+
+        if (currentPath == internalPath)
+        {
+            matchedId = "internal";
+        }
+        else if (currentPath == downloadsPath && downloadsPath != internalPath)
+        {
+            matchedId = "downloads";
+        }
+        else if (currentPath == videosPath && videosPath != internalPath)
+        {
+            matchedId = "videos";
+        }
+        else if (currentPath == musicPath && musicPath != internalPath)
+        {
+            matchedId = "music";
+        }
+        else if (currentPath == sdcardPath && sdcardPath != internalPath)
+        {
+            matchedId = "sdcard";
+        }
+
+        // Update visual selection
+        foreach (var item in _navItems)
+        {
+            bool isSelected = item.Id == matchedId;
+
+            // Toggle Marker visibility
+            if (item.SelectionMarker != null)
+                item.SelectionMarker.gameObject.SetActive(isSelected);
+
+            // Update text color
+            if (item.LabelText != null)
+                item.LabelText.color = isSelected ? Color.white : new Color(1f, 1f, 1f, 0.7f);
+
+            // Update icon color
+            if (item.Icon != null)
+                item.Icon.color = isSelected ? Color.white : new Color(1f, 1f, 1f, 0.7f);
+
+            if (isSelected) _selectedItem = item;
+        }
+
+        // If no match found (in subfolder), clear selection but keep _selectedItem for breadcrumb label
+        if (matchedId == null)
+        {
+            foreach (var item in _navItems)
+            {
+                if (item.SelectionMarker != null)
+                    item.SelectionMarker.gameObject.SetActive(false);
+
+                if (item.LabelText != null)
+                    item.LabelText.color = new Color(1f, 1f, 1f, 0.7f);
+
+                if (item.Icon != null)
+                    item.Icon.color = new Color(1f, 1f, 1f, 0.7f);
+            }
+        }
+    }
+
     #region Rounded Marker Sprite
     private static Sprite _cachedCapsuleSprite;
 

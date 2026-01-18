@@ -1087,6 +1087,16 @@ public class RTTFileManager : MonoBehaviour
 
         if (string.IsNullOrEmpty(path)) return;
 
+        // Convert "root" to actual absolute path
+        if (path == "root")
+        {
+            path = FileSystemService.RootPath;
+        }
+
+        // Update side panel selection based on current path
+        // Only shows selection when at exact root of a side panel item, not in subfolders
+        _sidePanel?.UpdateSelectionForPath(path);
+
         // Get root path and create relative path for display
         string rootPath = FileSystemService.RootPath;
         string displayPath = path;
@@ -1731,6 +1741,7 @@ public class RTTFileManager : MonoBehaviour
         Vector3 mainRight = _menuFrame.transform.right;
         Vector3 mainForward = _menuFrame.transform.forward;
 
+        // Calculate side panel position using arc placement (like WorldPanelClusterRig Flat Planar)
         float rotRad = rotationAngle * Mathf.Deg2Rad;
         float halfSide = sideWidth / 2f;
         float centerOffsetX = halfSide * Mathf.Cos(rotRad);
@@ -1741,20 +1752,46 @@ public class RTTFileManager : MonoBehaviour
 
         Vector3 offset = mainRight * (side * totalX) + mainForward * totalZ;
         Vector3 panelPos = mainPos + offset;
-        Quaternion panelRot = mainRot * Quaternion.Euler(0, side * rotationAngle, 0);
+
+        // Flat Planar orientation: content faces toward camera (like WorldPanelClusterRig.panelsFaceCamera = true)
+        // Panel's forward points AWAY from camera, so content (rendered on back) faces toward camera
+        Camera cam = Camera.main;
+        Quaternion panelRot;
+        if (cam != null)
+        {
+            // Calculate direction from camera to panel (away from camera)
+            Vector3 awayFromCamera = panelPos - cam.transform.position;
+            awayFromCamera.y = 0; // Keep panel upright (yaw only, like faceCameraYawOnly)
+
+            if (awayFromCamera.sqrMagnitude > 0.001f)
+            {
+                // Panel forward points away from camera, content faces toward camera
+                panelRot = Quaternion.LookRotation(awayFromCamera.normalized, Vector3.up);
+            }
+            else
+            {
+                // Fallback: use main panel's rotation with angle offset
+                panelRot = mainRot * Quaternion.Euler(0, side * rotationAngle, 0);
+            }
+        }
+        else
+        {
+            // No camera, fallback to original angle-based rotation
+            panelRot = mainRot * Quaternion.Euler(0, side * rotationAngle, 0);
+        }
 
         float logicalWidthPixels = (sideWidth / _menuFrame.PanelWidth) * _menuFrame.LogicalWidthValue;
 
         // Create RTTMenuFrame
         // Note: Creating as child of _menuFrame.transform can cause issues if parent scales/hides.
         // But RTTRemoteMenu does it this way initially, then RTTRemoteMenuController manages it.
-        // Here we create it as child of main frame for hierarchy organization, 
+        // Here we create it as child of main frame for hierarchy organization,
         // but physically positioned in world space.
         frameRef = RTTMenuFrame.Create(_menuFrame.transform, sideWidth, sideHeight, logicalWidthPixels, name);
         frameRef.transform.position = panelPos;
         frameRef.transform.rotation = panelRot;
         frameRef.transform.localScale = Vector3.one;
-        
+
         frameRef.SetContentMargins(20f, 20f, 20f, 20f);
         frameRef.SetFloatingDataEnabled(true, 5);
     }

@@ -16,6 +16,7 @@ public struct ThumbnailRequest
     public Action OnFailed;
     public int Priority;  // Lower = higher priority
     public long FileModifiedTicks;
+    public bool SkipOverlay;  // If true, skip video overlay icon (for detail panel)
 }
 
 /// <summary>
@@ -112,7 +113,8 @@ public class FileThumbnailService : MonoBehaviour
     /// <param name="onSuccess">Callback when thumbnail is ready</param>
     /// <param name="onFailed">Optional callback when loading fails</param>
     /// <param name="priority">Lower values = higher priority</param>
-    public void RequestThumbnail(MockFile file, int size, Action<Sprite> onSuccess, Action onFailed = null, int priority = 0)
+    /// <param name="skipOverlay">If true, skip video overlay icon (for detail panel high-quality preview)</param>
+    public void RequestThumbnail(MockFile file, int size, Action<Sprite> onSuccess, Action onFailed = null, int priority = 0, bool skipOverlay = false)
     {
         if (string.IsNullOrEmpty(file.Path) || file.IsFolder)
         {
@@ -128,7 +130,8 @@ public class FileThumbnailService : MonoBehaviour
         }
 
         long modifiedTicks = file.Modified.Ticks;
-        string cacheKey = _cache.GenerateCacheKey(file.Path, modifiedTicks, size);
+        string cacheKeySuffix = skipOverlay ? "_nooverlay" : "";
+        string cacheKey = _cache.GenerateCacheKey(file.Path, modifiedTicks, size) + cacheKeySuffix;
 
         // Check memory cache first
         if (_cache.TryGet(cacheKey, out Sprite cachedSprite))
@@ -166,7 +169,8 @@ public class FileThumbnailService : MonoBehaviour
             OnComplete = onSuccess,
             OnFailed = onFailed,
             Priority = priority,
-            FileModifiedTicks = modifiedTicks
+            FileModifiedTicks = modifiedTicks,
+            SkipOverlay = skipOverlay
         };
 
         _requestQueue.Add(request);
@@ -430,17 +434,31 @@ public class FileThumbnailService : MonoBehaviour
 
         if (extractedFrame != null)
         {
-            // Composite with video overlay
-            result = _videoExtractor.CompositeWithOverlay(extractedFrame, _videoOverlayIcon, request.TargetSize);
+            if (request.SkipOverlay)
+            {
+                // No overlay - create sprite directly from extracted frame
+                result = Sprite.Create(
+                    extractedFrame,
+                    new Rect(0, 0, extractedFrame.width, extractedFrame.height),
+                    new Vector2(0.5f, 0.5f),
+                    100f
+                );
+                // Don't destroy extractedFrame as it's used by the sprite
+            }
+            else
+            {
+                // Composite with video overlay
+                result = _videoExtractor.CompositeWithOverlay(extractedFrame, _videoOverlayIcon, request.TargetSize);
+                Destroy(extractedFrame);
+            }
 
             if (result != null)
             {
-                // Cache the result (include size in key for quality-specific caching)
-                string cacheKey = _cache.GenerateCacheKey(request.FilePath, request.FileModifiedTicks, request.TargetSize);
+                // Cache the result (include size and skipOverlay in key for quality-specific caching)
+                string cacheKeySuffix = request.SkipOverlay ? "_nooverlay" : "";
+                string cacheKey = _cache.GenerateCacheKey(request.FilePath, request.FileModifiedTicks, request.TargetSize) + cacheKeySuffix;
                 _cache.Set(cacheKey, result, request.FileModifiedTicks, request.FilePath);
             }
-
-            Destroy(extractedFrame);
         }
 
         CompleteRequest(request, result);

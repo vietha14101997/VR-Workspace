@@ -30,7 +30,7 @@ public class RTTFileDetail : MonoBehaviour
     private const float TOP_PADDING = 45f;       // 50% more than original 30
     private const float METADATA_ROW_HEIGHT = 44f;
     private const float HORIZONTAL_PADDING = 30f; // 50% more than original 20
-    private const float VERTICAL_SPACING = 22f;   // 50% more than original 15
+    private const float VERTICAL_SPACING = 28f;   // 50% more than original 15
 
     // Store preview Y position for metadata positioning
     private float _previewBottomY;
@@ -223,8 +223,8 @@ public class RTTFileDetail : MonoBehaviour
     {
         if (FileThumbnailService.Instance == null) return;
 
-        // Use larger size for detail panel preview
-        int thumbnailSize = 512;
+        // Use larger size for detail panel high-quality preview
+        int thumbnailSize = 720;
 
         FileThumbnailService.Instance.RequestThumbnail(
             file,
@@ -240,7 +240,8 @@ public class RTTFileDetail : MonoBehaviour
                 }
             },
             onFailed: null,
-            priority: 0
+            priority: 0,
+            skipOverlay: true  // Don't show icon_media overlay on detail panel preview
         );
     }
 
