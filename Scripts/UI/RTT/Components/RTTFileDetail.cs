@@ -318,9 +318,6 @@ public class RTTFileDetail : MonoBehaviour
             if (metadata.FrameRate > 0)
                 UpdateMetadataValue("Frame rate", $"{metadata.FrameRate:F2} fps");
 
-            if (metadata.DataRate > 0)
-                UpdateMetadataValue("Data rate", FormatBitrate(metadata.DataRate));
-
             if (metadata.TotalBitrate > 0)
                 UpdateMetadataValue("Total bitrate", FormatBitrate(metadata.TotalBitrate));
         });
@@ -388,7 +385,7 @@ public class RTTFileDetail : MonoBehaviour
 
     private void CreateMetadataForVideo(MockFile file)
     {
-        // Video: Type, Size, Date modified, Dimensions, Length, Frame rate, Data rate, Total bitrate
+        // Video: Type, Size, Date modified, Dimensions, Length, Frame rate, Total bitrate
         AddMetadataRow("Type", file.Type.ToUpper());
         AddMetadataRow("Size", FileSystemService.FormatFileSize(file.Size));
         AddMetadataRow("Date modified", FormatDate(file.Modified));
@@ -402,9 +399,6 @@ public class RTTFileDetail : MonoBehaviour
 
         string frameRate = file.FrameRate > 0 ? $"{file.FrameRate:F2} fps" : "-";
         AddMetadataRow("Frame rate", frameRate);
-
-        string dataRate = file.DataRate > 0 ? FormatBitrate(file.DataRate) : "-";
-        AddMetadataRow("Data rate", dataRate);
 
         string totalBitrate = file.TotalBitrate > 0 ? FormatBitrate(file.TotalBitrate) : "-";
         AddMetadataRow("Total bitrate", totalBitrate);

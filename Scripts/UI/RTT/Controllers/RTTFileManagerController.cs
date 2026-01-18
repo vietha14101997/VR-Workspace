@@ -304,7 +304,7 @@ public class RTTFileManagerController : MonoBehaviour
     private void UpdateDetailView()
     {
         if (_view == null) return;
-        
+
         if (_hoveredFile.HasValue)
         {
             _view.UpdateDetail(_hoveredFile.Value, false);
@@ -315,9 +315,55 @@ public class RTTFileManagerController : MonoBehaviour
         }
         else
         {
-            var folderInfo = new MockFile { Name = System.IO.Path.GetFileName(_currentPath), Path = _currentPath, IsFolder = true };
+            // Get folder's actual modified date from file system
+            DateTime folderModified = DateTime.MinValue;
+            try
+            {
+                if (Directory.Exists(_currentPath))
+                {
+                    folderModified = Directory.GetLastWriteTime(_currentPath);
+                }
+            }
+            catch { }
+
+            var folderInfo = new MockFile
+            {
+                Name = System.IO.Path.GetFileName(_currentPath),
+                Path = _currentPath,
+                IsFolder = true,
+                Modified = folderModified
+            };
             if (string.IsNullOrEmpty(folderInfo.Name)) folderInfo.Name = "Root";
             _view.UpdateDetail(folderInfo, true);
+        }
+    }
+
+    /// <summary>
+    /// Called when a side panel navigation item is selected
+    /// </summary>
+    public void OnSidePanelItemSelected(string id)
+    {
+        Debug.Log($"[Controller] Side panel item selected: {id}");
+
+        string targetPath = id switch
+        {
+            "internal" => FileSystemService.RootPath,
+            "sdcard" => FileSystemService.GetSDCardPath(),
+            "downloads" => FileSystemService.GetDownloadsPath(),
+            "videos" => FileSystemService.GetVideosPath(),
+            "music" => FileSystemService.GetMusicPath(),
+            "recent" => "recent", // Special handling for recent files
+            _ => FileSystemService.RootPath
+        };
+
+        if (id == "recent")
+        {
+            // TODO: Load recent files
+            Debug.Log("[Controller] Loading recent files (not implemented)");
+        }
+        else
+        {
+            NavigateTo(targetPath);
         }
     }
     #endregion
@@ -599,5 +645,107 @@ public static class FileSystemService
         }
 
         return $"{size:0.##} {sizes[order]}";
+    }
+
+    public static string GetSDCardPath()
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        // Try common SD card paths on Android
+        string[] sdcardPaths = new string[]
+        {
+            "/storage/sdcard1",
+            "/storage/extSdCard",
+            "/storage/external_SD"
+        };
+
+        foreach (string path in sdcardPaths)
+        {
+            if (Directory.Exists(path))
+            {
+                return path;
+            }
+        }
+#endif
+        // Fallback to root path (no SD card)
+        return RootPath;
+    }
+
+    public static string GetDownloadsPath()
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        string downloadsPath = Path.Combine(RootPath, "Download");
+        if (Directory.Exists(downloadsPath))
+        {
+            return downloadsPath;
+        }
+#elif UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+        string downloadsPath = Path.Combine(RootPath, "Downloads");
+        if (Directory.Exists(downloadsPath))
+        {
+            return downloadsPath;
+        }
+#elif UNITY_STANDALONE_OSX || UNITY_EDITOR_OSX
+        string downloadsPath = Path.Combine(RootPath, "Downloads");
+        if (Directory.Exists(downloadsPath))
+        {
+            return downloadsPath;
+        }
+#endif
+        return RootPath;
+    }
+
+    public static string GetVideosPath()
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        // Try DCIM and Movies folders
+        string dcimPath = Path.Combine(RootPath, "DCIM");
+        string moviesPath = Path.Combine(RootPath, "Movies");
+
+        if (Directory.Exists(moviesPath))
+        {
+            return moviesPath;
+        }
+        if (Directory.Exists(dcimPath))
+        {
+            return dcimPath;
+        }
+#elif UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+        string videosPath = Environment.GetFolderPath(Environment.SpecialFolder.MyVideos);
+        if (!string.IsNullOrEmpty(videosPath) && Directory.Exists(videosPath))
+        {
+            return videosPath;
+        }
+#elif UNITY_STANDALONE_OSX || UNITY_EDITOR_OSX
+        string moviesPath = Path.Combine(RootPath, "Movies");
+        if (Directory.Exists(moviesPath))
+        {
+            return moviesPath;
+        }
+#endif
+        return RootPath;
+    }
+
+    public static string GetMusicPath()
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        string musicPath = Path.Combine(RootPath, "Music");
+        if (Directory.Exists(musicPath))
+        {
+            return musicPath;
+        }
+#elif UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+        string musicPath = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic);
+        if (!string.IsNullOrEmpty(musicPath) && Directory.Exists(musicPath))
+        {
+            return musicPath;
+        }
+#elif UNITY_STANDALONE_OSX || UNITY_EDITOR_OSX
+        string musicPath = Path.Combine(RootPath, "Music");
+        if (Directory.Exists(musicPath))
+        {
+            return musicPath;
+        }
+#endif
+        return RootPath;
     }
 }
