@@ -1043,6 +1043,23 @@ public class RTTFileManager : MonoBehaviour
         rt.anchoredPosition = Vector2.zero;
     }
     
+    /// <summary>
+    /// Get base path for a side panel item ID
+    /// </summary>
+    private string GetBasePath(string id)
+    {
+        return id switch
+        {
+            "internal" => FileSystemService.RootPath,
+            "sdcard" => FileSystemService.GetSDCardPath(),
+            "downloads" => FileSystemService.GetDownloadsPath(),
+            "videos" => FileSystemService.GetVideosPath(),
+            "music" => FileSystemService.GetMusicPath(),
+            "recent" => FileSystemService.RootPath, // Recent uses root as base
+            _ => FileSystemService.RootPath
+        };
+    }
+
     // Breadcrumb Update Logic
     public void UpdateBreadcrumbs(string path)
     {
@@ -1077,14 +1094,29 @@ public class RTTFileManager : MonoBehaviour
         // Create list of breadcrumb items
         var breadcrumbs = new List<(string name, string fullPath, bool isEllipsis)>();
 
-        // Always add "Home" as first breadcrumb
-        breadcrumbs.Add(("Home", "root", false));
-
-        // If path is not root, add subfolders
-        if (path != "root" && !string.IsNullOrEmpty(path))
+        // Get the first breadcrumb label and path from side panel selection
+        string firstBreadcrumbLabel = _sidePanel != null ? _sidePanel.GetSelectedLabel() : null;
+        string selectedId = _sidePanel != null ? _sidePanel.GetSelectedId() : null;
+        if (string.IsNullOrEmpty(firstBreadcrumbLabel))
         {
-            // Make path relative to root for display
-            if (path.StartsWith(rootPath))
+            firstBreadcrumbLabel = "Home"; // Fallback
+        }
+
+        // Determine the base path for the first breadcrumb based on side panel selection
+        string basePath = GetBasePath(selectedId);
+
+        // Add first breadcrumb with selected side panel label
+        breadcrumbs.Add((firstBreadcrumbLabel, basePath, false));
+
+        // If path is not base path, add subfolders
+        if (path != basePath && !string.IsNullOrEmpty(path))
+        {
+            // Make path relative to base path for display
+            if (path.StartsWith(basePath))
+            {
+                displayPath = path.Substring(basePath.Length).TrimStart('/', '\\');
+            }
+            else if (path.StartsWith(rootPath))
             {
                 displayPath = path.Substring(rootPath.Length).TrimStart('/', '\\');
             }
@@ -1092,7 +1124,7 @@ public class RTTFileManager : MonoBehaviour
             if (!string.IsNullOrEmpty(displayPath))
             {
                 string[] parts = displayPath.Split(new char[] { '/', '\\' }, System.StringSplitOptions.RemoveEmptyEntries);
-                string currentPath = rootPath;
+                string currentPath = basePath;
 
                 var allFolders = new List<(string name, string fullPath)>();
                 foreach (string part in parts)

@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using TMPro;
 using System;
+using VRWorkspace.UI.HoverEffects;
 
 /// <summary>
 /// Represents a single file or folder item in the Grid View.
@@ -28,6 +29,11 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
     // Visual state
     private static readonly Color HoverColor = new Color(0f, 0f, 0f, 0.3f);
     private static readonly Color NormalColor = Color.clear;
+
+    // Hover effect
+    private HoverEffectController _hoverController;
+    private const float HOVER_SCALE = 1.05f;
+    private const float HOVER_ANIMATION_SPEED = 12f;
 
     // Font
     private TMP_FontAsset _font;
@@ -229,6 +235,13 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         _bgImage.color = NormalColor;
         _bgImage.raycastTarget = true;
 
+        // 5. Add Hover Effect Controller with Scale Effect
+        _hoverController = gameObject.AddComponent<HoverEffectController>();
+        var scaleEffect = new ScaleHoverEffect()
+            .WithHoverScale(HOVER_SCALE)
+            .WithTransitionDuration(1f / HOVER_ANIMATION_SPEED);
+        _hoverController.AddEffect(scaleEffect);
+
         // NOTE: No BoxCollider needed - RTT uses GraphicRaycaster via panel's DisplayQuad collider
         // Adding BoxColliders to individual items causes raycast issues when items are in buffer zone
         // (outside visible RectMask2D area but still active for smooth scrolling)
@@ -277,7 +290,7 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
 
     /// <summary>
     /// Called when item is recycled in the pool.
-    /// Cancels any pending thumbnail requests.
+    /// Cancels any pending thumbnail requests and resets visual state.
     /// </summary>
     public void OnRecycle()
     {
@@ -286,6 +299,12 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
             FileThumbnailService.Instance?.CancelRequest(_currentFilePath);
         }
         ClearHoverState();
+
+        // Reset hover state for recycled items
+        if (_hoverController != null)
+        {
+            _hoverController.ResetHoverState(immediate: true);
+        }
     }
     #endregion
 
