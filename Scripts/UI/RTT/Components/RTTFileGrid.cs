@@ -34,7 +34,7 @@ public class RTTFileGrid : MonoBehaviour
     private Action<string, bool> _onItemClick; // path, isFolder
 
     // Grid configuration
-    private float _cellWidth = 310f;
+    private float _cellWidth = 395f;
     private float _cellHeight = 320f;
     private float _spacingX = 30f;
     private float _spacingY = 30f;

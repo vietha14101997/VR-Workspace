@@ -11,8 +11,11 @@ using System;
 public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
 {
     private Image _iconImage;
+    private RectTransform _iconRect;
     private TextMeshProUGUI _nameText;
     private Image _bgImage;
+    private LayoutElement _iconContainerLE;
+    private RectTransform _iconContainerRect;
 
     public string FilePath { get; private set; }
     public bool IsFolder { get; private set; }
@@ -74,6 +77,8 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         // Update icon
         if (_iconImage != null)
         {
+            bool usesThumbnail = false;
+
             if (file.IsFolder)
             {
                 SetSprite(file.IsFolderEmpty ? "icon_folder_empty" : "icon_folder_not_empty", "icon_folder");
@@ -85,6 +90,7 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
                 // Request thumbnail for Image/Video categories
                 if (FileCategoryHelper.RequiresThumbnailGeneration(category))
                 {
+                    usesThumbnail = true;
                     // Use loading placeholder while thumbnail is being generated asynchronously
                     string loadingIcon = FileCategoryHelper.GetLoadingPlaceholderIcon(category);
                     SetSprite(loadingIcon, "icon_media_file");
@@ -114,6 +120,27 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
                     );
                 }
             }
+
+            // Adjust icon size within container: thumbnails fill, resource icons smaller and centered
+            if (_iconRect != null)
+            {
+                if (usesThumbnail)
+                {
+                    // Thumbnails: fill the container
+                    _iconRect.anchorMin = Vector2.zero;
+                    _iconRect.anchorMax = Vector2.one;
+                    _iconRect.offsetMin = Vector2.zero;
+                    _iconRect.offsetMax = Vector2.zero;
+                }
+                else
+                {
+                    // Resource icons: fixed smaller size, centered
+                    _iconRect.anchorMin = new Vector2(0.5f, 0.5f);
+                    _iconRect.anchorMax = new Vector2(0.5f, 0.5f);
+                    _iconRect.sizeDelta = new Vector2(180f, 180f);
+                    _iconRect.anchoredPosition = Vector2.zero;
+                }
+            }
         }
 
         // Reset background
@@ -140,46 +167,59 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
 
     private void BuildUI()
     {
-        // 1. Setup Layout
+        // 1. Setup Layout - icon container expands, text fixed at bottom
         var layout = gameObject.AddComponent<VerticalLayoutGroup>();
         layout.childAlignment = TextAnchor.MiddleCenter;
-        layout.spacing = 30f;
-        layout.padding = new RectOffset(10, 10, 10, 10);
+        layout.spacing = 10f;
+        layout.padding = new RectOffset(10, 10, 15, 10);
         layout.childControlWidth = true;
         layout.childControlHeight = true;
         layout.childForceExpandWidth = true;
         layout.childForceExpandHeight = false;
 
-        // 2. Icon
+        // 2. Icon Container - fixed size, expands to fill space
+        GameObject iconContainer = new GameObject("IconContainer");
+        iconContainer.transform.SetParent(transform, false);
+        _iconContainerRect = iconContainer.AddComponent<RectTransform>();
+
+        _iconContainerLE = iconContainer.AddComponent<LayoutElement>();
+        _iconContainerLE.preferredHeight = 220f;
+        _iconContainerLE.preferredWidth = 220f;
+        _iconContainerLE.flexibleHeight = 1;
+
+        // 3. Icon Image - inside container, centered
         GameObject iconObj = new GameObject("Icon");
-        iconObj.transform.SetParent(transform, false);
+        iconObj.transform.SetParent(iconContainer.transform, false);
+        _iconRect = iconObj.AddComponent<RectTransform>();
+        _iconRect.anchorMin = new Vector2(0.5f, 0.5f);
+        _iconRect.anchorMax = new Vector2(0.5f, 0.5f);
+        _iconRect.pivot = new Vector2(0.5f, 0.5f);
+        _iconRect.anchoredPosition = Vector2.zero;
+        _iconRect.sizeDelta = new Vector2(220f, 220f);
+
         _iconImage = iconObj.AddComponent<Image>();
         _iconImage.preserveAspect = true;
         _iconImage.raycastTarget = false;
 
         SetSprite("icon_folder_not_empty");
 
-        var iconLE = iconObj.AddComponent<LayoutElement>();
-        iconLE.preferredHeight = 150f;
-        iconLE.preferredWidth = 150f;
-        iconLE.flexibleHeight = 0;
-
-        // 3. Name Text
+        // 3. Name Text - single line at bottom
         GameObject textObj = new GameObject("Name");
         textObj.transform.SetParent(transform, false);
         _nameText = textObj.AddComponent<TextMeshProUGUI>();
         if (_font != null) _nameText.font = _font;
         _nameText.raycastTarget = false;
         _nameText.text = "";
-        _nameText.alignment = TextAlignmentOptions.Top;
+        _nameText.alignment = TextAlignmentOptions.Center;
         _nameText.fontSize = 32;
         _nameText.fontStyle = FontStyles.Bold;
         _nameText.color = Color.white;
         _nameText.overflowMode = TextOverflowModes.Ellipsis;
-        _nameText.enableWordWrapping = true;
+        _nameText.enableWordWrapping = false;
+        _nameText.maxVisibleLines = 1;
 
         var textLE = textObj.AddComponent<LayoutElement>();
-        textLE.preferredHeight = 90f;
+        textLE.preferredHeight = 45f;
         textLE.flexibleHeight = 0;
 
         // 4. Background (for highlighting)

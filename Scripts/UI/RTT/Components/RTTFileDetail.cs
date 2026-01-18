@@ -28,7 +28,7 @@ public class RTTFileDetail : MonoBehaviour
     // Layout constants - aligned with sortTrigger in RTTFileManager
     private const float NAME_HEIGHT = 68f;       // Match sortTrigger button height
     private const float TOP_PADDING = 45f;       // 50% more than original 30
-    private const float METADATA_ROW_HEIGHT = 36f;
+    private const float METADATA_ROW_HEIGHT = 44f;
     private const float HORIZONTAL_PADDING = 30f; // 50% more than original 20
     private const float VERTICAL_SPACING = 22f;   // 50% more than original 15
 
@@ -153,7 +153,7 @@ public class RTTFileDetail : MonoBehaviour
         // Vertical layout for metadata rows
         VerticalLayoutGroup layout = containerObj.AddComponent<VerticalLayoutGroup>();
         layout.childAlignment = TextAnchor.UpperLeft;
-        layout.spacing = 4f;
+        layout.spacing = 12f;
         layout.childControlHeight = false;
         layout.childControlWidth = true;
         layout.childForceExpandHeight = false;
@@ -186,30 +186,36 @@ public class RTTFileDetail : MonoBehaviour
         // Determine file category
         FileCategory category = file.IsFolder ? FileCategory.Folder : FileCategoryHelper.GetCategory(file.Type);
 
-        // Load placeholder icon - same logic as RTTFileGridItem
-        string iconName;
-        if (file.IsFolder)
+        // For images/videos that will have thumbnails, don't show placeholder icon
+        bool willHaveThumbnail = FileCategoryHelper.RequiresThumbnailGeneration(category) && !string.IsNullOrEmpty(file.Path);
+
+        if (willHaveThumbnail)
         {
-            // Use folder empty/not empty icons like grid items
-            iconName = file.IsFolderEmpty ? "icon_folder_empty" : "icon_folder_not_empty";
+            // Hide placeholder, load thumbnail directly
+            _previewPlaceholder.gameObject.SetActive(false);
+            _previewImage.gameObject.SetActive(false);
+            LoadThumbnail(file);
         }
         else
         {
-            iconName = FileCategoryHelper.GetDefaultIconName(category);
-        }
+            // Show placeholder icon for folders and other files
+            string iconName;
+            if (file.IsFolder)
+            {
+                iconName = file.IsFolderEmpty ? "icon_folder_empty" : "icon_folder_not_empty";
+            }
+            else
+            {
+                iconName = FileCategoryHelper.GetDefaultIconName(category);
+            }
 
-        Sprite icon = Resources.Load<Sprite>(iconName);
-        if (icon == null) icon = Resources.Load<Sprite>("icon_file_unknown");
+            Sprite icon = Resources.Load<Sprite>(iconName);
+            if (icon == null) icon = Resources.Load<Sprite>("icon_file_unknown");
 
-        _previewPlaceholder.sprite = icon;
-        _previewPlaceholder.color = Color.white; // Keep white, icons already have color
-        _previewPlaceholder.gameObject.SetActive(true);
-        _previewImage.gameObject.SetActive(false);
-
-        // Try to load actual thumbnail for images/videos
-        if (FileCategoryHelper.RequiresThumbnailGeneration(category) && !string.IsNullOrEmpty(file.Path))
-        {
-            LoadThumbnail(file);
+            _previewPlaceholder.sprite = icon;
+            _previewPlaceholder.color = Color.white;
+            _previewPlaceholder.gameObject.SetActive(true);
+            _previewImage.gameObject.SetActive(false);
         }
     }
 
@@ -303,14 +309,11 @@ public class RTTFileDetail : MonoBehaviour
             // Verify still showing same file
             if (_currentFile.Path != file.Path) return;
 
+            if (metadata.Width > 0 && metadata.Height > 0)
+                UpdateMetadataValue("Dimensions", $"{metadata.Width}x{metadata.Height}");
+
             if (metadata.Duration.TotalSeconds > 0)
                 UpdateMetadataValue("Length", FormatDuration(metadata.Duration));
-
-            if (metadata.Width > 0)
-                UpdateMetadataValue("Frame width", metadata.Width.ToString());
-
-            if (metadata.Height > 0)
-                UpdateMetadataValue("Frame height", metadata.Height.ToString());
 
             if (metadata.FrameRate > 0)
                 UpdateMetadataValue("Frame rate", $"{metadata.FrameRate:F2} fps");
@@ -365,39 +368,37 @@ public class RTTFileDetail : MonoBehaviour
 
     private void CreateMetadataForFolder(MockFile file, bool isCurrentFolder)
     {
-        // Folder: Type, File location, Date modified
+        // Folder: Type, Date modified
         AddMetadataRow("Type", "Folder");
-        AddMetadataRow("File location", FormatPath(file.Path));
         AddMetadataRow("Date modified", FormatDate(file.Modified));
     }
 
     private void CreateMetadataForImage(MockFile file)
     {
-        // Image: Type, Size, File location, Date modified, Dimensions
+        // Image: Type, Size, Date modified, Dimensions
         AddMetadataRow("Type", file.Type.ToUpper());
         AddMetadataRow("Size", FileSystemService.FormatFileSize(file.Size));
-        AddMetadataRow("File location", FormatPath(file.Path));
         AddMetadataRow("Date modified", FormatDate(file.Modified));
 
         string dimensions = (file.Width > 0 && file.Height > 0)
             ? $"{file.Width}x{file.Height}"
-            : "Unknown";
+            : "-";
         AddMetadataRow("Dimensions", dimensions);
     }
 
     private void CreateMetadataForVideo(MockFile file)
     {
-        // Video: Type, Size, File location, Date modified, Length, Frame width, Frame height, Frame rate, Data rate, Total bitrate
+        // Video: Type, Size, Date modified, Dimensions, Length, Frame rate, Data rate, Total bitrate
         AddMetadataRow("Type", file.Type.ToUpper());
         AddMetadataRow("Size", FileSystemService.FormatFileSize(file.Size));
-        AddMetadataRow("File location", FormatPath(file.Path));
         AddMetadataRow("Date modified", FormatDate(file.Modified));
-        AddMetadataRow("Length", FormatDuration(file.Duration));
 
-        string frameWidth = file.Width > 0 ? file.Width.ToString() : "-";
-        string frameHeight = file.Height > 0 ? file.Height.ToString() : "-";
-        AddMetadataRow("Frame width", frameWidth);
-        AddMetadataRow("Frame height", frameHeight);
+        string dimensions = (file.Width > 0 && file.Height > 0)
+            ? $"{file.Width}x{file.Height}"
+            : "-";
+        AddMetadataRow("Dimensions", dimensions);
+
+        AddMetadataRow("Length", FormatDuration(file.Duration));
 
         string frameRate = file.FrameRate > 0 ? $"{file.FrameRate:F2} fps" : "-";
         AddMetadataRow("Frame rate", frameRate);
@@ -411,10 +412,9 @@ public class RTTFileDetail : MonoBehaviour
 
     private void CreateMetadataForMusic(MockFile file)
     {
-        // Music: Type, Size, File location, Date modified, Contributing artists, Album, Genre, Length, Title, Bit rate
+        // Music: Type, Size, Date modified, Contributing artists, Album, Genre, Length, Title, Bit rate
         AddMetadataRow("Type", file.Type.ToUpper());
         AddMetadataRow("Size", FileSystemService.FormatFileSize(file.Size));
-        AddMetadataRow("File location", FormatPath(file.Path));
         AddMetadataRow("Date modified", FormatDate(file.Modified));
 
         string artist = !string.IsNullOrEmpty(file.Artist) ? file.Artist : "-";
@@ -437,10 +437,9 @@ public class RTTFileDetail : MonoBehaviour
 
     private void CreateMetadataForOther(MockFile file)
     {
-        // Other: Type, Size, File location, Date modified
+        // Other: Type, Size, Date modified
         AddMetadataRow("Type", file.Type.ToUpper());
         AddMetadataRow("Size", FileSystemService.FormatFileSize(file.Size));
-        AddMetadataRow("File location", FormatPath(file.Path));
         AddMetadataRow("Date modified", FormatDate(file.Modified));
     }
 
@@ -468,7 +467,7 @@ public class RTTFileDetail : MonoBehaviour
 
         TextMeshProUGUI labelText = labelObj.AddComponent<TextMeshProUGUI>();
         if (_font != null) labelText.font = _font;
-        labelText.fontSize = 24; // Increased from 22
+        labelText.fontSize = 28;
         labelText.alignment = TextAlignmentOptions.MidlineLeft;
         labelText.color = new Color(1f, 1f, 1f, 0.6f); // Semi-transparent white
         labelText.text = label;
@@ -487,7 +486,7 @@ public class RTTFileDetail : MonoBehaviour
 
         TextMeshProUGUI valueText = valueObj.AddComponent<TextMeshProUGUI>();
         if (_font != null) valueText.font = _font;
-        valueText.fontSize = 24; // Increased from 22
+        valueText.fontSize = 28;
         valueText.fontStyle = FontStyles.Bold;
         valueText.alignment = TextAlignmentOptions.MidlineLeft;
         valueText.color = Color.white; // Full white
