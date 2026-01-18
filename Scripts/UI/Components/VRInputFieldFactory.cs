@@ -478,6 +478,21 @@ public static class VRInputFieldFactory
         inputField.caretColor = config.themeColor;
         inputField.selectionColor = new Color(config.themeColor.r, config.themeColor.g, config.themeColor.b, 0.3f);
 
+        // Raycast Overlay - invisible image on top of content to ensure consistent hover detection
+        // TMP_InputField's internal Caret can intercept raycasts, so we add this overlay
+        // to guarantee the raycast always hits Content (child of HitArea) for proper hover effects
+        GameObject raycastOverlay = new GameObject("RaycastOverlay");
+        raycastOverlay.transform.SetParent(content.transform, false);
+        RectTransform overlayRT = raycastOverlay.AddComponent<RectTransform>();
+        overlayRT.anchorMin = Vector2.zero;
+        overlayRT.anchorMax = Vector2.one;
+        overlayRT.offsetMin = Vector2.zero;
+        overlayRT.offsetMax = Vector2.zero;
+
+        Image overlayImg = raycastOverlay.AddComponent<Image>();
+        overlayImg.color = new Color(0f, 0f, 0f, 0f); // Completely transparent
+        overlayImg.raycastTarget = true; // Captures all raycasts in the content area
+
         return inputField;
     }
 

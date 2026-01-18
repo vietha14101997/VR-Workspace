@@ -388,12 +388,16 @@ public class RTTFileList : MonoBehaviour
     {
         _allFiles = files ?? new List<MockFile>();
 
-        // Hide all visible items
+        // Hide all visible items and cancel their thumbnail requests
         foreach (var kvp in _visibleItems)
         {
+            kvp.Value.OnRecycle();
             kvp.Value.gameObject.SetActive(false);
         }
         _visibleItems.Clear();
+
+        // Clean up orphaned cache when loading a new folder
+        FileThumbnailService.Instance?.CleanupOrphanedCache();
 
         // Update content size
         UpdateContentSize();
@@ -433,6 +437,8 @@ public class RTTFileList : MonoBehaviour
         {
             if (kvp.Key < firstVisibleRow || kvp.Key > lastVisibleRow)
             {
+                // Cancel any pending thumbnail requests when recycling
+                kvp.Value.OnRecycle();
                 kvp.Value.gameObject.SetActive(false);
                 toRemove.Add(kvp.Key);
             }

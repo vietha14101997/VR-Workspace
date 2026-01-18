@@ -188,12 +188,16 @@ public class RTTFileGrid : MonoBehaviour
     {
         _allFiles = files ?? new List<MockFile>();
 
-        // Hide all visible items
+        // Hide all visible items and cancel their thumbnail requests
         foreach (var kvp in _visibleItems)
         {
+            kvp.Value.OnRecycle();
             kvp.Value.gameObject.SetActive(false);
         }
         _visibleItems.Clear();
+
+        // Clean up orphaned cache when loading a new folder
+        FileThumbnailService.Instance?.CleanupOrphanedCache();
 
         // Update content size
         UpdateContentSize();
@@ -235,6 +239,8 @@ public class RTTFileGrid : MonoBehaviour
         {
             if (kvp.Key < firstVisibleIndex || kvp.Key > lastVisibleIndex)
             {
+                // Cancel any pending thumbnail requests when recycling
+                kvp.Value.OnRecycle();
                 kvp.Value.gameObject.SetActive(false);
                 toRemove.Add(kvp.Key);
             }
@@ -296,8 +302,8 @@ public class RTTFileGrid : MonoBehaviour
         rect.pivot = new Vector2(0.5f, 0.5f);
         rect.anchoredPosition = new Vector2(x, y);
 
-        // Bind data
-        item.Bind(file.Name, file.IsFolder, file.Path, file.IsFolderEmpty);
+        // Bind data - pass full MockFile for thumbnail support
+        item.Bind(file);
         item.gameObject.SetActive(true);
     }
 

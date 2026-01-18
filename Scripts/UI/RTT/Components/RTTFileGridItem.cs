@@ -29,6 +29,11 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
     // Font
     private TMP_FontAsset _font;
 
+    // Thumbnail tracking
+    private string _currentFilePath;  // Track current file for thumbnail cancellation
+    private MockFile _currentFile;    // Current bound file
+    private const int THUMBNAIL_SIZE = 512;  // Grid thumbnail size (high quality)
+
     public void Initialize(TMP_FontAsset font = null)
     {
         _font = font;
@@ -47,28 +52,90 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
 
     /// <summary>
     /// Bind new data to this item (for virtualization/pooling).
+    /// Now accepts full MockFile for thumbnail support.
     /// </summary>
-    public void Bind(string name, bool isFolder, string path, bool isFolderEmpty = false)
+    public void Bind(MockFile file)
     {
-        FilePath = path;
-        IsFolder = isFolder;
+        // Cancel any pending thumbnail request for previous file
+        if (!string.IsNullOrEmpty(_currentFilePath) && _currentFilePath != file.Path)
+        {
+            FileThumbnailService.Instance?.CancelRequest(_currentFilePath);
+        }
+
+        FilePath = file.Path;
+        IsFolder = file.IsFolder;
+        _currentFilePath = file.Path;
+        _currentFile = file;
 
         // Update text
         if (_nameText != null)
-            _nameText.text = name;
+            _nameText.text = file.Name;
 
         // Update icon
         if (_iconImage != null)
         {
-            if (isFolder)
-                SetSprite(isFolderEmpty ? "icon_folder_empty" : "icon_folder_not_empty");
+            if (file.IsFolder)
+            {
+                SetSprite(file.IsFolderEmpty ? "icon_folder_empty" : "icon_folder_not_empty", "icon_folder");
+            }
             else
-                SetSprite(IsImageFile(name) ? "icon_image" : "icon_file");
+            {
+                var category = FileCategoryHelper.GetCategory(file.Type);
+
+                // Request thumbnail for Image/Video categories
+                if (FileCategoryHelper.RequiresThumbnailGeneration(category))
+                {
+                    // Use loading placeholder while thumbnail is being generated asynchronously
+                    string loadingIcon = FileCategoryHelper.GetLoadingPlaceholderIcon(category);
+                    SetSprite(loadingIcon, "icon_media_file");
+                }
+                else
+                {
+                    // Use default icon for non-thumbnail categories
+                    string defaultIcon = FileCategoryHelper.GetDefaultIconName(category);
+                    SetSprite(defaultIcon, "icon_file_unknown");
+                }
+
+                // Request async thumbnail generation for Image/Video
+                if (FileCategoryHelper.RequiresThumbnailGeneration(category))
+                {
+                    FileThumbnailService.Instance?.RequestThumbnail(
+                        file,
+                        THUMBNAIL_SIZE,
+                        onSuccess: (sprite) => {
+                            // Verify still same file before updating
+                            if (_currentFilePath == file.Path && sprite != null)
+                            {
+                                _iconImage.sprite = sprite;
+                            }
+                        },
+                        onFailed: null,  // Keep placeholder icon
+                        priority: 0
+                    );
+                }
+            }
         }
 
         // Reset background
         if (_bgImage != null)
             _bgImage.color = NormalColor;
+    }
+
+    /// <summary>
+    /// Legacy Bind method for backward compatibility.
+    /// </summary>
+    public void Bind(string name, bool isFolder, string path, bool isFolderEmpty = false)
+    {
+        // Create a minimal MockFile for backward compatibility
+        var file = new MockFile
+        {
+            Name = name,
+            Path = path,
+            IsFolder = isFolder,
+            IsFolderEmpty = isFolderEmpty,
+            Type = isFolder ? "Folder" : System.IO.Path.GetExtension(name).TrimStart('.').ToLower()
+        };
+        Bind(file);
     }
 
     private void BuildUI()
@@ -167,6 +234,19 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         if (_bgImage != null)
             _bgImage.color = NormalColor;
     }
+
+    /// <summary>
+    /// Called when item is recycled in the pool.
+    /// Cancels any pending thumbnail requests.
+    /// </summary>
+    public void OnRecycle()
+    {
+        if (!string.IsNullOrEmpty(_currentFilePath))
+        {
+            FileThumbnailService.Instance?.CancelRequest(_currentFilePath);
+        }
+        ClearHoverState();
+    }
     #endregion
 
     #region Helper Methods
@@ -225,24 +305,25 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         return _cachedRoundedSprite;
     }
 
-    private void SetSprite(string resourceName)
+    /// <summary>
+    /// Load and set an icon sprite from Resources.
+    /// </summary>
+    private void SetSprite(string resourceName, string fallbackIcon = "icon_file_unknown")
     {
         Sprite sprite = Resources.Load<Sprite>(resourceName);
         if (sprite != null)
         {
             _iconImage.sprite = sprite;
         }
-        else if (resourceName == "icon_image")
+        else
         {
-            sprite = Resources.Load<Sprite>("icon_file");
-            if (sprite != null) _iconImage.sprite = sprite;
+            // Try fallback
+            sprite = Resources.Load<Sprite>(fallbackIcon);
+            if (sprite != null)
+            {
+                _iconImage.sprite = sprite;
+            }
         }
-    }
-
-    private bool IsImageFile(string fileName)
-    {
-        string lower = fileName.ToLower();
-        return lower.EndsWith(".jpg") || lower.EndsWith(".png") || lower.EndsWith(".jpeg") || lower.EndsWith(".bmp");
     }
     #endregion
 }

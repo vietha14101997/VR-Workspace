@@ -47,10 +47,10 @@ public class RTTFileSidePanel : MonoBehaviour
 
     private void BuildUI()
     {
-        // 1. Main Vertical Layout
+        // 1. Main Vertical Layout - padding aligned with RTTFileDetail (50% increase)
         _mainLayout = gameObject.AddComponent<VerticalLayoutGroup>();
-        _mainLayout.padding = new RectOffset(20, 20, 30, 30);
-        _mainLayout.spacing = 20f;
+        _mainLayout.padding = new RectOffset(30, 30, 45, 45);
+        _mainLayout.spacing = 22f;
         _mainLayout.childAlignment = TextAnchor.UpperCenter;
         _mainLayout.childControlWidth = true;
         _mainLayout.childControlHeight = false;
@@ -94,10 +94,10 @@ public class RTTFileSidePanel : MonoBehaviour
         GameObject headerObj = new GameObject("Header");
         headerObj.transform.SetParent(transform, false);
 
-        // Layout Element for header height
+        // Layout Element for header height - match sortTrigger button height
         var headerLE = headerObj.AddComponent<LayoutElement>();
-        headerLE.minHeight = 50f;
-        headerLE.preferredHeight = 50f;
+        headerLE.minHeight = 68f;
+        headerLE.preferredHeight = 68f;
 
         // App Title (Centered)
         GameObject titleObj = new GameObject("AppTitle");
@@ -112,7 +112,7 @@ public class RTTFileSidePanel : MonoBehaviour
         var titleTxt = titleObj.AddComponent<TextMeshProUGUI>();
         titleTxt.text = "File Manager";
         titleTxt.font = _font;
-        titleTxt.fontSize = 32;
+        titleTxt.fontSize = 24; // Match sortTrigger fontSize
         titleTxt.color = Color.white;
         titleTxt.fontStyle = FontStyles.Bold;
         titleTxt.alignment = TextAlignmentOptions.Center;

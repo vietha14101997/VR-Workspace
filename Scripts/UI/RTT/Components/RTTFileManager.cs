@@ -506,17 +506,18 @@ public class RTTFileManager : MonoBehaviour
         SetupRowElement(editRT, new Vector2(1, 0.5f), new Vector2(-20, 0)); // Right align
 
         // New Folder Button (symmetric to sortTrigger on right side of search bar)
-        Sprite folderIcon = Resources.Load<Sprite>("icon_folder_add");
+        Sprite folderIcon = Resources.Load<Sprite>("icon_create_folder");
         var newFolderConfig = new VRButtonFactory.ButtonConfig
         {
-            label = "New Folder",
+            label = "Folder",
             icon = folderIcon,
             themeColor = _primaryColor,
             width = _sortTriggerWidth,
             height = 68f,
             fontSize = 24,
             font = _font,
-            iconSize = 28f,
+            iconSize = 35.2f,
+            horizontalLayout = true,  // Icon on left, text on right
             borderWidth = 0.04f,
             glowWidth = 0.08f,
             glowIntensity = 4f,
@@ -878,7 +879,11 @@ public class RTTFileManager : MonoBehaviour
         GameObject refreshBtn = VRButtonFactory.CreateButton(
             rowRT,
             refreshConfig,
-            () => _controller?.RefreshCurrentFolder()
+            () => {
+                // Clear thumbnail cache to regenerate with current quality settings
+                FileThumbnailService.Instance?.ClearAllCache();
+                _controller?.RefreshCurrentFolder();
+            }
         );
         RectTransform refreshRT = refreshBtn.GetComponent<RectTransform>();
         SetupRowElement(refreshRT, new Vector2(1, 0.5f), new Vector2(-20, 0));

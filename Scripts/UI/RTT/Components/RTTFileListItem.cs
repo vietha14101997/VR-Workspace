@@ -29,6 +29,8 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
 
     #region State
     private TMP_FontAsset _font;
+    private string _currentFilePath;  // Track current file for thumbnail cancellation
+    private MockFile _currentFile;    // Current bound file
     #endregion
 
     #region Callbacks
@@ -47,6 +49,7 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
     public static readonly float[] ColumnWidths = { 0.35f, 0.10f, 0.15f, 0.15f, 0.15f, 0.10f };
     public const float IconWidth = 90f;
     public const float RowPadding = 20f;
+    private const int THUMBNAIL_SIZE = 256;  // List thumbnail generation size (high quality)
     #endregion
 
     public void Initialize(TMP_FontAsset font = null)
@@ -182,33 +185,61 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
 
     public void Bind(MockFile file)
     {
+        // Cancel any pending thumbnail request for previous file
+        if (!string.IsNullOrEmpty(_currentFilePath) && _currentFilePath != file.Path)
+        {
+            FileThumbnailService.Instance?.CancelRequest(_currentFilePath);
+        }
+
         FilePath = file.Path;
         IsFolder = file.IsFolder;
+        _currentFilePath = file.Path;
+        _currentFile = file;
 
         // Name
         _nameText.text = file.Name;
 
         // Icon
-        string iconName;
         if (file.IsFolder)
         {
-            iconName = file.IsFolderEmpty ? "icon_folder_empty" : "icon_folder_not_empty";
+            string iconName = file.IsFolderEmpty ? "icon_folder_empty" : "icon_folder_not_empty";
+            LoadIcon(iconName, "icon_folder");
         }
         else
         {
-            iconName = GetFileIcon(file.Type);
-        }
+            var category = FileCategoryHelper.GetCategory(file.Type);
 
-        Sprite icon = Resources.Load<Sprite>(iconName);
-        if (icon != null)
-        {
-            _iconImage.sprite = icon;
-            _iconImage.color = Color.white;
-        }
-        else
-        {
-            _iconImage.sprite = Resources.Load<Sprite>(file.IsFolder ? "icon_folder" : "icon_file");
-            _iconImage.color = Color.white;
+            // Request thumbnail for Image/Video categories
+            if (FileCategoryHelper.RequiresThumbnailGeneration(category))
+            {
+                // Use loading placeholder while thumbnail is being generated asynchronously
+                string loadingIcon = FileCategoryHelper.GetLoadingPlaceholderIcon(category);
+                LoadIcon(loadingIcon, "icon_media_file");
+            }
+            else
+            {
+                // Use default icon for non-thumbnail categories
+                string defaultIcon = FileCategoryHelper.GetDefaultIconName(category);
+                LoadIcon(defaultIcon, "icon_file_unknown");
+            }
+
+            // Request async thumbnail generation for Image/Video
+            if (FileCategoryHelper.RequiresThumbnailGeneration(category))
+            {
+                FileThumbnailService.Instance?.RequestThumbnail(
+                    file,
+                    THUMBNAIL_SIZE,
+                    onSuccess: (sprite) => {
+                        // Verify still same file before updating
+                        if (_currentFilePath == file.Path && sprite != null)
+                        {
+                            _iconImage.sprite = sprite;
+                        }
+                    },
+                    onFailed: null,  // Keep placeholder icon
+                    priority: 0
+                );
+            }
         }
 
         // Type
@@ -284,49 +315,52 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         if (_background != null)
             _background.color = NormalColor;
     }
+
+    /// <summary>
+    /// Called when item is recycled in the pool.
+    /// Cancels any pending thumbnail requests.
+    /// </summary>
+    public void OnRecycle()
+    {
+        if (!string.IsNullOrEmpty(_currentFilePath))
+        {
+            FileThumbnailService.Instance?.CancelRequest(_currentFilePath);
+        }
+        ClearHoverState();
+    }
     #endregion
 
     #region Helper Methods
+    /// <summary>
+    /// Load and set an icon sprite from Resources.
+    /// </summary>
+    private void LoadIcon(string iconName, string fallbackIcon = "icon_file_unknown")
+    {
+        Sprite icon = Resources.Load<Sprite>(iconName);
+        if (icon != null)
+        {
+            _iconImage.sprite = icon;
+            _iconImage.color = Color.white;
+        }
+        else
+        {
+            // Try fallback
+            icon = Resources.Load<Sprite>(fallbackIcon);
+            if (icon != null)
+            {
+                _iconImage.sprite = icon;
+                _iconImage.color = Color.white;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Get icon name for a file type using FileCategoryHelper.
+    /// </summary>
     private string GetFileIcon(string type)
     {
-        switch (type.ToLower())
-        {
-            case "jpg":
-            case "jpeg":
-            case "png":
-            case "gif":
-            case "bmp":
-            case "webp":
-                return "icon_image";
-            case "mp4":
-            case "avi":
-            case "mkv":
-            case "mov":
-            case "wmv":
-                return "icon_video";
-            case "mp3":
-            case "wav":
-            case "flac":
-            case "aac":
-            case "ogg":
-                return "icon_audio";
-            case "pdf":
-                return "icon_pdf";
-            case "doc":
-            case "docx":
-                return "icon_doc";
-            case "txt":
-            case "log":
-                return "icon_text";
-            case "zip":
-            case "rar":
-            case "7z":
-            case "tar":
-            case "gz":
-                return "icon_archive";
-            default:
-                return "icon_file";
-        }
+        var category = FileCategoryHelper.GetCategory(type);
+        return FileCategoryHelper.GetDefaultIconName(category);
     }
 
     private string FormatDateTime(DateTime dt)

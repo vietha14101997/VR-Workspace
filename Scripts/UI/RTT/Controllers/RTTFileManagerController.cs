@@ -1,6 +1,7 @@
 using UnityEngine;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 
 /// <summary>
@@ -185,15 +186,19 @@ public class RTTFileManagerController : MonoBehaviour
         _filteredFiles.AddRange(files);
     }
 
+    // Vietnamese culture for proper diacritics sorting (Đ with D, etc.)
+    private static readonly CultureInfo VietnameseCulture = new CultureInfo("vi-VN");
+    private static readonly StringComparer VietnameseComparer = StringComparer.Create(VietnameseCulture, ignoreCase: true);
+
     private List<MockFile> SortList(List<MockFile> list)
     {
         switch (_sortBy)
         {
             case "Name":
-                list.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+                list.Sort((a, b) => VietnameseComparer.Compare(a.Name, b.Name));
                 break;
             case "Type":
-                list.Sort((a, b) => string.Compare(a.Type, b.Type, StringComparison.OrdinalIgnoreCase));
+                list.Sort((a, b) => VietnameseComparer.Compare(a.Type, b.Type));
                 break;
             case "Created":
                 list.Sort((a, b) => a.Created.CompareTo(b.Created));
@@ -208,7 +213,7 @@ public class RTTFileManagerController : MonoBehaviour
                 list.Sort((a, b) => a.Duration.CompareTo(b.Duration));
                 break;
             default:
-                list.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+                list.Sort((a, b) => VietnameseComparer.Compare(a.Name, b.Name));
                 break;
         }
 
@@ -329,6 +334,22 @@ public struct MockFile
     public DateTime Modified;
     public long Size;             // Bytes
     public TimeSpan Duration;     // For media files
+
+    // Image/Video dimensions
+    public int Width;
+    public int Height;
+
+    // Video metadata
+    public float FrameRate;
+    public long DataRate;         // bits per second
+    public long TotalBitrate;     // bits per second
+
+    // Music metadata
+    public string Artist;
+    public string Album;
+    public string Genre;
+    public string Title;
+    public int BitRate;           // kbps
 }
 
 public static class FileSystemService
