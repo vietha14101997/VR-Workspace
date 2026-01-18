@@ -256,7 +256,7 @@ public class RTTFileManagerController : MonoBehaviour
     {
         int totalPages = CalculateTotalPages();
         _currentPage = Mathf.Clamp(_currentPage, 1, totalPages);
-        
+
         if (_view != null)
         {
             if (fullReload)
@@ -264,8 +264,11 @@ public class RTTFileManagerController : MonoBehaviour
                 // Update Grid with selection state
                 string selectedPath = _selectedFile.HasValue ? _selectedFile.Value.Path : "";
                 _view.UpdateGrid(_filteredFiles, selectedPath);
+
+                // Update item count in header
+                _view.UpdateItemCount(_filteredFiles.Count);
             }
-            
+
             _view.UpdatePagination(_currentPage, totalPages);
             _view.ScrollToPage(_currentPage);
         }

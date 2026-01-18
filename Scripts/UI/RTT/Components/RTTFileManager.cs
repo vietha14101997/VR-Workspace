@@ -381,6 +381,7 @@ public class RTTFileManager : MonoBehaviour
     private bool _isGridView = true;
     private Image _sortArrowImg; // Reference to arrow icon
     private TextMeshProUGUI _sortTriggerText; // Reference to sort trigger text
+    private TextMeshProUGUI _itemCountText; // Reference to item count label
 
     // PlayerPrefs keys for saving view options
     private const string PREF_SORT_BY = "FileManager_SortBy";
@@ -504,8 +505,38 @@ public class RTTFileManager : MonoBehaviour
         RectTransform editRT = editBtn.GetComponent<RectTransform>();
         SetupRowElement(editRT, new Vector2(1, 0.5f), new Vector2(-20, 0)); // Right align
 
+        // New Folder Button (symmetric to sortTrigger on right side of search bar)
+        Sprite folderIcon = Resources.Load<Sprite>("icon_folder_add");
+        var newFolderConfig = new VRButtonFactory.ButtonConfig
+        {
+            label = "New Folder",
+            icon = folderIcon,
+            themeColor = _primaryColor,
+            width = _sortTriggerWidth,
+            height = 68f,
+            fontSize = 24,
+            font = _font,
+            iconSize = 28f,
+            borderWidth = 0.04f,
+            glowWidth = 0.08f,
+            glowIntensity = 4f,
+            popAmount = 0.05f
+        };
+        GameObject newFolderBtn = VRButtonFactory.CreateButton(
+            rowRT,
+            newFolderConfig,
+            () => Debug.Log("New Folder Clicked") // TODO: Implement create folder
+        );
+        RectTransform newFolderRT = newFolderBtn.GetComponent<RectTransform>();
+        // Position symmetric to sortTrigger (positive X instead of negative)
+        float newFolderCenterFromCenter = _containerWidth / 4f + 203.5f;
+        newFolderRT.anchorMin = new Vector2(0.5f, 0.5f);
+        newFolderRT.anchorMax = new Vector2(0.5f, 0.5f);
+        newFolderRT.pivot = new Vector2(0.5f, 0.5f);
+        newFolderRT.anchoredPosition = new Vector2(newFolderCenterFromCenter, 0);
+
         // Center: Search Bar
-        CreateSearchBar(rowRT); 
+        CreateSearchBar(rowRT);
     }
     
     private void ToggleViewOptionsPopup()
@@ -845,12 +876,34 @@ public class RTTFileManager : MonoBehaviour
             popAmount = 0.05f
         };
         GameObject refreshBtn = VRButtonFactory.CreateButton(
-            rowRT, 
-            refreshConfig, 
+            rowRT,
+            refreshConfig,
             () => _controller?.RefreshCurrentFolder()
         );
         RectTransform refreshRT = refreshBtn.GetComponent<RectTransform>();
         SetupRowElement(refreshRT, new Vector2(1, 0.5f), new Vector2(-20, 0));
+
+        // Item Count Label (centered, aligned with New Folder button in Row 1)
+        GameObject countObj = new GameObject("ItemCountLabel");
+        countObj.transform.SetParent(rowRT, false);
+
+        _itemCountText = countObj.AddComponent<TextMeshProUGUI>();
+        _itemCountText.text = "0 items";
+        _itemCountText.font = _font;
+        _itemCountText.fontSize = 28;
+        _itemCountText.fontStyle = FontStyles.Bold;
+        _itemCountText.color = Color.white;
+        _itemCountText.alignment = TextAlignmentOptions.Center;
+        _itemCountText.raycastTarget = false;
+
+        RectTransform countRT = countObj.GetComponent<RectTransform>();
+        countRT.sizeDelta = new Vector2(_sortTriggerWidth, 68f);
+        // Position symmetric to sortTrigger (same as New Folder button in Row 1)
+        float countCenterFromCenter = _containerWidth / 4f + 203.5f;
+        countRT.anchorMin = new Vector2(0.5f, 0.5f);
+        countRT.anchorMax = new Vector2(0.5f, 0.5f);
+        countRT.pivot = new Vector2(0.5f, 0.5f);
+        countRT.anchoredPosition = new Vector2(countCenterFromCenter, 0);
 
         // Left Container for Breadcrumbs
         GameObject crumbContainer = new GameObject("Breadcrumbs");
@@ -862,9 +915,9 @@ public class RTTFileManager : MonoBehaviour
         crumbRT.anchorMin = new Vector2(0, 0);
         crumbRT.anchorMax = new Vector2(1, 1);
         crumbRT.pivot = new Vector2(0, 0.5f);
-        // Left offset 20, Right offset to leave room for Refresh button (approx 80)
-        crumbRT.offsetMin = new Vector2(20, 0); 
-        crumbRT.offsetMax = new Vector2(-90, 0);
+        // Left offset 20, Right offset to leave room for item count + Refresh button
+        crumbRT.offsetMin = new Vector2(20, 0);
+        crumbRT.offsetMax = new Vector2(-320, 0);
 
         // NOTE: NOT using HorizontalLayoutGroup to allow independent control of:
         // - Visual position (left to right)
@@ -1590,6 +1643,17 @@ public class RTTFileManager : MonoBehaviour
             {
                 Debug.LogWarning("[RTTFileManager] FileList not ready yet!");
             }
+        }
+    }
+
+    /// <summary>
+    /// Update the item count label in header
+    /// </summary>
+    public void UpdateItemCount(int totalItems)
+    {
+        if (_itemCountText != null)
+        {
+            _itemCountText.text = totalItems == 1 ? "1 item" : $"{totalItems} items";
         }
     }
 

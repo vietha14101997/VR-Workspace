@@ -266,13 +266,14 @@ public class RTTFileList : MonoBehaviour
         text.alignment = TextAlignmentOptions.Center;
         text.raycastTarget = false;
 
-        // Sort arrow
+        // Sort arrow (positioned right after text)
         GameObject arrowObj = new GameObject("Arrow");
         arrowObj.transform.SetParent(colObj.transform, false);
 
         RectTransform arrowRT = arrowObj.AddComponent<RectTransform>();
         arrowRT.sizeDelta = new Vector2(14f, 14f);
 
+        // Estimate text width for positioning arrow right after text
         float estimatedTextWidth;
         switch (columnName)
         {
@@ -285,10 +286,17 @@ public class RTTFileList : MonoBehaviour
             default: estimatedTextWidth = columnName.Length * 16f; break;
         }
 
-        arrowRT.anchorMin = new Vector2(0, 0.5f);
-        arrowRT.anchorMax = new Vector2(0, 0.5f);
-        arrowRT.pivot = new Vector2(0, 0.5f);
-        float arrowX = textLeftPadding + estimatedTextWidth + 8f;
+        // Text area is shifted by textLeftPadding on left and -5 on right
+        // Text visual center offset from column center = (textLeftPadding - 5) / 2
+        float textCenterOffset = (textLeftPadding - 5f) / 2f;
+
+        // Arrow anchored to column center, positioned right after centered text
+        // Use center pivot (0.5, 0.5) so rotation doesn't shift visual position
+        arrowRT.anchorMin = new Vector2(0.5f, 0.5f);
+        arrowRT.anchorMax = new Vector2(0.5f, 0.5f);
+        arrowRT.pivot = new Vector2(0.5f, 0.5f);
+        // Position: text center offset + half text width + gap + half arrow width
+        float arrowX = textCenterOffset + (estimatedTextWidth / 2f) + 12f + 7f;
         arrowRT.anchoredPosition = new Vector2(arrowX, 0);
 
         Image arrowImg = arrowObj.AddComponent<Image>();
