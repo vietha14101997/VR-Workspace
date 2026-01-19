@@ -439,7 +439,7 @@ public static class VRInputFieldFactory
         TextMeshProUGUI placeholderTxt = placeholderObj.AddComponent<TextMeshProUGUI>();
         placeholderTxt.text = config.placeholder;
         placeholderTxt.fontSize = config.inputFontSize;
-        placeholderTxt.color = new Color(1f, 1f, 1f, 0.3f);
+        placeholderTxt.color = new Color(1f, 1f, 1f, 0.7f);
         placeholderTxt.alignment = TextAlignmentOptions.Left;
         placeholderTxt.verticalAlignment = VerticalAlignmentOptions.Middle;
         placeholderTxt.raycastTarget = false;

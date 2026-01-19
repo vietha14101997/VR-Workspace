@@ -31,7 +31,7 @@ public class RTTPopupInputable : MonoBehaviour
         public float width = 500f;
         public float padding = 20f;
         public float titleFontSize = 32;
-        public float labelFontSize = 32;
+        public float labelFontSize = 36;
         public float inputFontSize = 26;
         public float buttonFontSize = 24;
         public float buttonHeight = 60f;
@@ -538,7 +538,7 @@ public class RTTPopupInputable : MonoBehaviour
         // Calculate total height
         float totalHeight = _config.padding * 2 // Top and bottom padding
             + _config.titleHeight // Title bar
-            + _config.spacing // After title
+            + _config.spacing * 0.5f // After title
             + _config.labelFontSize * 1.5f // Label
             + _config.spacing * 0.5f // After label
             + _config.inputHeight // Input field
@@ -678,7 +678,7 @@ public class RTTPopupInputable : MonoBehaviour
         yOffset = CreateTitleBar(contentObj.transform, yOffset);
 
         // Spacing
-        yOffset += _config.spacing;
+        yOffset += _config.spacing * 0.5f;
 
         // Label
         yOffset = CreateLabel(contentObj.transform, yOffset);
