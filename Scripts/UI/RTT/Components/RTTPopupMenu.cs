@@ -682,14 +682,11 @@ public class RTTPopupMenu : MonoBehaviour
     {
         GameObject overlayObj = new GameObject("WorldSpacePopupOverlay");
 
-        float radius = 2.5f;
-        float verticalAngle = 120f;
-        float horizontalAngle = 180f;
-
         MeshFilter meshFilter = overlayObj.AddComponent<MeshFilter>();
         MeshRenderer meshRenderer = overlayObj.AddComponent<MeshRenderer>();
 
-        Mesh mesh = CreateCurvedMesh(radius, horizontalAngle, verticalAngle, 32, 16);
+        // Create flat quad mesh
+        Mesh mesh = CreateFlatQuadMesh(20f, 20f); // Large flat quad
         meshFilter.mesh = mesh;
 
         Shader shader = Shader.Find("Sprites/Default");
@@ -698,12 +695,16 @@ public class RTTPopupMenu : MonoBehaviour
 
         Material mat = new Material(shader);
         mat.color = _config.overlayColor;
-        mat.renderQueue = 2999;
+        // Render above most objects but below popup/inputable/keyboard canvases
+        // Canvas sortingOrder handles UI layering separately
+        mat.renderQueue = 3500;
         meshRenderer.material = mat;
         meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         meshRenderer.receiveShadows = false;
 
-        overlayObj.transform.position = camera.transform.position;
+        // Position flat quad in front of camera
+        float distance = 2.5f;
+        overlayObj.transform.position = camera.transform.position + camera.transform.forward * distance;
         overlayObj.transform.rotation = camera.transform.rotation;
         overlayObj.transform.SetParent(camera.transform);
 
@@ -714,66 +715,39 @@ public class RTTPopupMenu : MonoBehaviour
         Collider existingCol = overlayObj.GetComponent<Collider>();
         if (existingCol != null) Destroy(existingCol);
 
-        Debug.Log($"[RTTPopupMenu] Curved world overlay created with radius {radius}");
+        Debug.Log($"[RTTPopupMenu] Flat world overlay created at distance {distance}");
 
         return overlayObj;
     }
 
-    private Mesh CreateCurvedMesh(float radius, float horizontalAngleDeg, float verticalAngleDeg, int horizontalSegments, int verticalSegments)
+    private Mesh CreateFlatQuadMesh(float width, float height)
     {
         Mesh mesh = new Mesh();
 
-        float hAngle = horizontalAngleDeg * Mathf.Deg2Rad;
-        float vAngle = verticalAngleDeg * Mathf.Deg2Rad;
+        float halfW = width / 2f;
+        float halfH = height / 2f;
 
-        float hStart = -hAngle / 2f;
-        float vStart = -vAngle / 2f;
-
-        int vertCount = (horizontalSegments + 1) * (verticalSegments + 1);
-        Vector3[] vertices = new Vector3[vertCount];
-        Vector2[] uvs = new Vector2[vertCount];
-        int[] triangles = new int[horizontalSegments * verticalSegments * 6];
-
-        int vertIndex = 0;
-        for (int v = 0; v <= verticalSegments; v++)
+        Vector3[] vertices = new Vector3[4]
         {
-            float vRatio = (float)v / verticalSegments;
-            float pitch = vStart + vRatio * vAngle;
+            new Vector3(-halfW, -halfH, 0), // bottom-left
+            new Vector3(halfW, -halfH, 0),  // bottom-right
+            new Vector3(-halfW, halfH, 0),  // top-left
+            new Vector3(halfW, halfH, 0)    // top-right
+        };
 
-            for (int h = 0; h <= horizontalSegments; h++)
-            {
-                float hRatio = (float)h / horizontalSegments;
-                float yaw = hStart + hRatio * hAngle;
-
-                float x = radius * Mathf.Sin(yaw) * Mathf.Cos(pitch);
-                float y = radius * Mathf.Sin(pitch);
-                float z = radius * Mathf.Cos(yaw) * Mathf.Cos(pitch);
-
-                vertices[vertIndex] = new Vector3(x, y, z);
-                uvs[vertIndex] = new Vector2(hRatio, vRatio);
-                vertIndex++;
-            }
-        }
-
-        int triIndex = 0;
-        for (int v = 0; v < verticalSegments; v++)
+        Vector2[] uvs = new Vector2[4]
         {
-            for (int h = 0; h < horizontalSegments; h++)
-            {
-                int topLeft = v * (horizontalSegments + 1) + h;
-                int topRight = topLeft + 1;
-                int bottomLeft = topLeft + (horizontalSegments + 1);
-                int bottomRight = bottomLeft + 1;
+            new Vector2(0, 0),
+            new Vector2(1, 0),
+            new Vector2(0, 1),
+            new Vector2(1, 1)
+        };
 
-                triangles[triIndex++] = topLeft;
-                triangles[triIndex++] = topRight;
-                triangles[triIndex++] = bottomLeft;
-
-                triangles[triIndex++] = topRight;
-                triangles[triIndex++] = bottomRight;
-                triangles[triIndex++] = bottomLeft;
-            }
-        }
+        int[] triangles = new int[6]
+        {
+            0, 2, 1, // first triangle
+            2, 3, 1  // second triangle
+        };
 
         mesh.vertices = vertices;
         mesh.uv = uvs;

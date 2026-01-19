@@ -252,10 +252,13 @@ public class RTTRemoteMenu : MonoBehaviour
     {
         var header = CreateContainer(parent, "Header", x, y, w, h);
 
-        // Close button
-        float closeSize = 100f;
-        CreateButton(header.transform, 0, (h - closeSize) / 2f, closeSize, closeSize, "", LoadIcon("close"), themeColor,
-            () => OnBackClicked?.Invoke());
+        // Close button (BareIconButton - no background/border)
+        float closeSize = 75f;
+        var closeBtn = VRButtonFactory.CreateBareIconButton(header.transform, closeSize, LoadIcon("close"), themeColor, () => OnBackClicked?.Invoke());
+        var closeRT = closeBtn.GetComponent<RectTransform>();
+        closeRT.anchorMin = closeRT.anchorMax = Vector2.zero;
+        closeRT.pivot = Vector2.zero;
+        closeRT.anchoredPosition = new Vector2(0, (h - closeSize) / 2f);
 
         // Title - centered
         CreateLabel(header.transform, 0, 0, w, h, "Remote Desktop", 48, Color.white, true, TextAlignmentOptions.Center);

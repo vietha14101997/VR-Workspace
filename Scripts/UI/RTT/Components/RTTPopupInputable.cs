@@ -37,7 +37,7 @@ public class RTTPopupInputable : MonoBehaviour
         public float buttonHeight = 60f;
         public float inputHeight = 60f;
         public float titleHeight = 50f;
-        public float closeButtonSize = 40f;
+        public float closeButtonSize = 75f;
         public float spacing = 10f;
         public Color primaryColor = new Color(0f, 0.9f, 1f);
         public Color accentColor = new Color(0.76f, 0.36f, 1f);
@@ -168,6 +168,7 @@ public class RTTPopupInputable : MonoBehaviour
         Canvas canvas = rootObj.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.WorldSpace;
         canvas.worldCamera = mainCam;
+        canvas.sortingOrder = 100; // Higher sorting order to render above overlay
 
         // Set canvas size to match popup dimensions (with some margin)
         RectTransform canvasRT = rootObj.GetComponent<RectTransform>();
@@ -613,17 +614,11 @@ public class RTTPopupInputable : MonoBehaviour
     {
         GameObject overlayObj = new GameObject("WorldSpacePopupOverlay");
 
-        // Create curved mesh that wraps around behind the keyboard
-        // The mesh curves away from camera, so keyboard (closer to camera) appears in front
-        float radius = 2.5f; // Radius of the curved overlay
-        float verticalAngle = 120f; // Vertical coverage in degrees
-        float horizontalAngle = 180f; // Horizontal coverage in degrees
-
-        // Create curved mesh (partial sphere/dome)
         MeshFilter meshFilter = overlayObj.AddComponent<MeshFilter>();
         MeshRenderer meshRenderer = overlayObj.AddComponent<MeshRenderer>();
 
-        Mesh mesh = CreateCurvedMesh(radius, horizontalAngle, verticalAngle, 32, 16);
+        // Create flat quad mesh
+        Mesh mesh = CreateFlatQuadMesh(20f, 20f); // Large flat quad
         meshFilter.mesh = mesh;
 
         // Create semi-transparent dark material
@@ -633,91 +628,56 @@ public class RTTPopupInputable : MonoBehaviour
 
         Material mat = new Material(shader);
         mat.color = _config.overlayColor;
-        mat.renderQueue = 2999; // Render before UI (3000) but after geometry
+        // Render above most objects but below popup/inputable/keyboard canvases
+        mat.renderQueue = 3500;
         meshRenderer.material = mat;
         meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         meshRenderer.receiveShadows = false;
 
-        // Position at camera location (mesh curves outward from here)
-        overlayObj.transform.position = camera.transform.position;
+        // Position flat quad in front of camera
+        float distance = 2.5f;
+        overlayObj.transform.position = camera.transform.position + camera.transform.forward * distance;
         overlayObj.transform.rotation = camera.transform.rotation;
 
         // Parent to camera so it follows head movement
         overlayObj.transform.SetParent(camera.transform);
 
-        // NO BoxCollider - this overlay is visual only
-        // Interaction blocking is handled by invisible overlays on each RTT canvas
+        // Set to Ignore Raycast layer so it doesn't block reticle
+        overlayObj.layer = LayerMask.NameToLayer("Ignore Raycast");
 
-        Debug.Log($"[RTTPopupInputable] Curved world overlay created with radius {radius}");
+        Debug.Log($"[RTTPopupInputable] Flat world overlay created at distance {distance}");
 
         return overlayObj;
     }
 
-    /// <summary>
-    /// Creates a curved mesh (partial sphere) that faces inward toward the camera
-    /// </summary>
-    private Mesh CreateCurvedMesh(float radius, float horizontalAngleDeg, float verticalAngleDeg, int horizontalSegments, int verticalSegments)
+    private Mesh CreateFlatQuadMesh(float width, float height)
     {
         Mesh mesh = new Mesh();
 
-        // Convert to radians
-        float hAngle = horizontalAngleDeg * Mathf.Deg2Rad;
-        float vAngle = verticalAngleDeg * Mathf.Deg2Rad;
+        float halfW = width / 2f;
+        float halfH = height / 2f;
 
-        // Start angles (centered)
-        float hStart = -hAngle / 2f;
-        float vStart = -vAngle / 2f;
-
-        int vertCount = (horizontalSegments + 1) * (verticalSegments + 1);
-        Vector3[] vertices = new Vector3[vertCount];
-        Vector2[] uvs = new Vector2[vertCount];
-        int[] triangles = new int[horizontalSegments * verticalSegments * 6];
-
-        int vertIndex = 0;
-        for (int v = 0; v <= verticalSegments; v++)
+        Vector3[] vertices = new Vector3[4]
         {
-            float vRatio = (float)v / verticalSegments;
-            float pitch = vStart + vRatio * vAngle; // Vertical angle from center
+            new Vector3(-halfW, -halfH, 0), // bottom-left
+            new Vector3(halfW, -halfH, 0),  // bottom-right
+            new Vector3(-halfW, halfH, 0),  // top-left
+            new Vector3(halfW, halfH, 0)    // top-right
+        };
 
-            for (int h = 0; h <= horizontalSegments; h++)
-            {
-                float hRatio = (float)h / horizontalSegments;
-                float yaw = hStart + hRatio * hAngle; // Horizontal angle from center
-
-                // Calculate position on sphere (facing forward, +Z is forward)
-                // The mesh curves AWAY from origin (camera position)
-                float x = radius * Mathf.Sin(yaw) * Mathf.Cos(pitch);
-                float y = radius * Mathf.Sin(pitch);
-                float z = radius * Mathf.Cos(yaw) * Mathf.Cos(pitch);
-
-                vertices[vertIndex] = new Vector3(x, y, z);
-                uvs[vertIndex] = new Vector2(hRatio, vRatio);
-                vertIndex++;
-            }
-        }
-
-        // Create triangles (facing inward toward camera)
-        int triIndex = 0;
-        for (int v = 0; v < verticalSegments; v++)
+        Vector2[] uvs = new Vector2[4]
         {
-            for (int h = 0; h < horizontalSegments; h++)
-            {
-                int topLeft = v * (horizontalSegments + 1) + h;
-                int topRight = topLeft + 1;
-                int bottomLeft = topLeft + (horizontalSegments + 1);
-                int bottomRight = bottomLeft + 1;
+            new Vector2(0, 0),
+            new Vector2(1, 0),
+            new Vector2(0, 1),
+            new Vector2(1, 1)
+        };
 
-                // First triangle (reversed winding for inward facing)
-                triangles[triIndex++] = topLeft;
-                triangles[triIndex++] = topRight;
-                triangles[triIndex++] = bottomLeft;
-
-                // Second triangle
-                triangles[triIndex++] = topRight;
-                triangles[triIndex++] = bottomRight;
-                triangles[triIndex++] = bottomLeft;
-            }
-        }
+        int[] triangles = new int[6]
+        {
+            0, 2, 1, // first triangle
+            2, 3, 1  // second triangle
+        };
 
         mesh.vertices = vertices;
         mesh.uv = uvs;
@@ -934,7 +894,7 @@ public class RTTPopupInputable : MonoBehaviour
         titleRT.anchorMin = Vector2.zero;
         titleRT.anchorMax = Vector2.one;
         titleRT.offsetMin = Vector2.zero;
-        titleRT.offsetMax = new Vector2(-_config.closeButtonSize - 10f, 0);
+        titleRT.offsetMax = Vector2.zero; // Full width - title centered across popup, not affected by close button
 
         TextMeshProUGUI titleText = titleObj.AddComponent<TextMeshProUGUI>();
         titleText.text = _config.title;
@@ -942,7 +902,7 @@ public class RTTPopupInputable : MonoBehaviour
         titleText.fontSize = _config.titleFontSize;
         titleText.fontStyle = FontStyles.Bold;
         titleText.color = Color.white;
-        titleText.alignment = TextAlignmentOptions.MidlineLeft;
+        titleText.alignment = TextAlignmentOptions.Center;
         titleText.raycastTarget = false;
 
         // Close Button (X)
@@ -955,24 +915,11 @@ public class RTTPopupInputable : MonoBehaviour
     {
         Sprite closeIcon = Resources.Load<Sprite>("icon_close");
 
-        var closeConfig = new VRButtonFactory.ButtonConfig
-        {
-            label = "",
-            icon = closeIcon,
-            themeColor = _config.accentColor,
-            width = _config.closeButtonSize,
-            height = _config.closeButtonSize,
-            iconOnly = true,
-            iconSize = _config.closeButtonSize * 0.6f,
-            borderWidth = 0.04f,
-            glowWidth = 0.08f,
-            glowIntensity = 4f,
-            popAmount = 0.05f
-        };
-
-        GameObject closeBtn = VRButtonFactory.CreateButton(
-            parent as RectTransform,
-            closeConfig,
+        GameObject closeBtn = VRButtonFactory.CreateBareIconButton(
+            parent,
+            _config.closeButtonSize,
+            closeIcon,
+            _config.accentColor,
             OnCloseClicked
         );
 

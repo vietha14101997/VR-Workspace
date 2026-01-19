@@ -421,25 +421,13 @@ public class RTTFileManager : MonoBehaviour
     {
         RectTransform rowRT = CreateRowContainer(parent, "Row1", 0);
 
-        // Left: Close Button (Icon only, symmetric to Edit button)
+        // Left: Close Button (BareIconButton - no background/border)
         Sprite closeIcon = Resources.Load<Sprite>("icon_close");
-        var closeConfig = new VRButtonFactory.ButtonConfig
-        {
-            label = "Close",
-            icon = closeIcon,
-            themeColor = _primaryColor,
-            width = 75f,  // +10% (was 68f)
-            height = 75f, // +10% (was 68f)
-            iconOnly = true,
-            iconSize = 39f, // +10% (was 35.2f)
-            borderWidth = 0.04f,
-            glowWidth = 0.08f,
-            glowIntensity = 4f,
-            popAmount = 0.05f
-        };
-        GameObject closeBtn = VRButtonFactory.CreateButton(
+        GameObject closeBtn = VRButtonFactory.CreateBareIconButton(
             rowRT,
-            closeConfig,
+            75f,
+            closeIcon,
+            _primaryColor,
             () => _controller?.HandleBack()
         );
         RectTransform closeRT = closeBtn.GetComponent<RectTransform>();
@@ -2013,8 +2001,8 @@ public class RTTFileManager : MonoBehaviour
 
         var config = new RTTPopupInputable.PopupConfig
         {
-            title = "CREATE FOLDER",
-            inputLabel = "Name",
+            title = "New Folder",
+            inputLabel = "Folder Name",
             inputPlaceholder = "Enter folder name",
             buttonText = "Create",
             width = 575f,        // +15% (was 500f)
