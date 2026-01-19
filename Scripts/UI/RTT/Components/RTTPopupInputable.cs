@@ -64,6 +64,14 @@ public class RTTPopupInputable : MonoBehaviour
     // External overlays for other frames
     private List<GameObject> _externalOverlays = new List<GameObject>();
 
+    // World-space mode fields
+    private bool _isWorldSpaceMode = false;
+    private Canvas _worldCanvas;
+    private Camera _mainCamera;
+    private Transform _referenceTransform; // Reference frame for positioning
+    private const float WORLD_SPACE_OFFSET = 0.05f; // Distance in front of reference frame (meters)
+    private const float WORLD_SPACE_SCALE = 0.001f; // Scale for world-space canvas (1 pixel = 0.001m)
+
     private static Sprite _pixelSprite;
     private const float kBorderInset = 6f;
 
@@ -127,6 +135,111 @@ public class RTTPopupInputable : MonoBehaviour
         return Create(parent, config);
     }
 
+    /// <summary>
+    /// Create a world-space RTTPopupInputable that floats in front of a reference frame.
+    /// This mode positions the popup independently in 3D space like RTTMobileKeyboard,
+    /// allowing it to appear in front of overlay effects.
+    /// The popup is fixed in world space (does not follow camera).
+    /// </summary>
+    /// <param name="config">Popup configuration</param>
+    /// <param name="referenceFrame">Reference transform to position in front of (e.g., RTTMenuFrame)</param>
+    /// <returns>RTTPopupInputable instance in world-space mode</returns>
+    public static RTTPopupInputable CreateWorldSpace(PopupConfig config, Transform referenceFrame = null)
+    {
+        config = config ?? new PopupConfig();
+
+        // Create root object
+        GameObject rootObj = new GameObject("RTTPopupInputable_WorldSpace");
+
+        // Find main camera for canvas worldCamera
+        Camera mainCam = FindMainCamera();
+
+        // Calculate popup dimensions for canvas sizing
+        float totalHeight = config.padding * 2
+            + config.titleHeight
+            + config.spacing * 0.5f
+            + config.labelFontSize * 1.5f
+            + config.spacing * 0.5f
+            + config.inputHeight
+            + config.spacing
+            + config.buttonHeight;
+
+        // Create world-space Canvas
+        Canvas canvas = rootObj.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.WorldSpace;
+        canvas.worldCamera = mainCam;
+
+        // Set canvas size to match popup dimensions (with some margin)
+        RectTransform canvasRT = rootObj.GetComponent<RectTransform>();
+        canvasRT.sizeDelta = new Vector2(config.width + 40f, totalHeight + 40f);
+        canvasRT.localScale = Vector3.one * WORLD_SPACE_SCALE;
+
+        // Add GraphicRaycaster for UI interaction
+        rootObj.AddComponent<GraphicRaycaster>();
+
+        // Add CanvasScaler for consistent sizing
+        CanvasScaler scaler = rootObj.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
+
+        // Set layer for VR interaction
+        int layer = LayerMask.NameToLayer(config.layerName);
+        if (layer != -1)
+        {
+            rootObj.layer = layer;
+        }
+
+        // Create popup component
+        RTTPopupInputable popup = rootObj.AddComponent<RTTPopupInputable>();
+        popup._config = config;
+        popup._isWorldSpaceMode = true;
+        popup._worldCanvas = canvas;
+        popup._mainCamera = mainCam;
+        popup._referenceTransform = referenceFrame;
+
+        popup.BuildWorldSpacePopup();
+
+        // Position will be set when Show() is called (needs reference frame to be active)
+        // Hidden by default
+        rootObj.SetActive(false);
+
+        Debug.Log($"[RTTPopupInputable] Created world-space popup: {config.width}x{totalHeight}");
+
+        return popup;
+    }
+
+    /// <summary>
+    /// Find the main camera (VR center eye or main camera)
+    /// </summary>
+    private static Camera FindMainCamera()
+    {
+        // Try to find camera by specific names used in VR apps
+        string[] cameraNames = { "CenterEyeAnchor", "Main Camera", "PlayerCamera", "Camera" };
+        foreach (var name in cameraNames)
+        {
+            GameObject camObj = GameObject.Find(name);
+            if (camObj != null)
+            {
+                Camera cam = camObj.GetComponent<Camera>();
+                if (cam != null && cam.gameObject.activeInHierarchy) return cam;
+            }
+        }
+
+        // Fallback to Camera.main
+        if (Camera.main != null) return Camera.main;
+
+        // Last resort: find any camera that's not UICamera
+        Camera[] allCameras = GameObject.FindObjectsOfType<Camera>();
+        foreach (var cam in allCameras)
+        {
+            if (!cam.name.Contains("UI") && cam.gameObject.activeInHierarchy)
+            {
+                return cam;
+            }
+        }
+
+        return null;
+    }
+
     #endregion
 
     #region Public API
@@ -153,15 +266,31 @@ public class RTTPopupInputable : MonoBehaviour
             _inputField.text = "";
         }
 
-        // Move to last sibling to render on top (important for RTT system)
-        transform.SetAsLastSibling();
+        if (_isWorldSpaceMode)
+        {
+            // Position popup in front of reference frame (fixed in world space)
+            PositionInFrontOfReference();
 
-        // Create overlays on all other frames in VirtualObjects
-        CreateExternalOverlays();
+            // World-space mode: activate the entire GameObject
+            gameObject.SetActive(true);
 
-        // Show overlay and popup
-        if (_overlayObject != null) _overlayObject.SetActive(true);
-        if (_popupObject != null) _popupObject.SetActive(true);
+            // Create overlays (world-space visual + canvas blocking)
+            CreateExternalOverlays();
+
+            Debug.Log($"[RTTPopupInputable] Shown in world-space mode, fixed position in front of reference frame");
+        }
+        else
+        {
+            // RTT canvas mode: activate overlay and popup within canvas
+            transform.SetAsLastSibling();
+
+            // Create overlays on all other frames in VirtualObjects
+            CreateExternalOverlays();
+
+            // Show overlay and popup
+            if (_overlayObject != null) _overlayObject.SetActive(true);
+            if (_popupObject != null) _popupObject.SetActive(true);
+        }
 
         CurrentlyOpenPopup = this;
 
@@ -181,8 +310,17 @@ public class RTTPopupInputable : MonoBehaviour
         // Destroy external overlays on other frames
         DestroyExternalOverlays();
 
-        if (_overlayObject != null) _overlayObject.SetActive(false);
-        if (_popupObject != null) _popupObject.SetActive(false);
+        if (_isWorldSpaceMode)
+        {
+            // World-space mode: deactivate the entire GameObject
+            gameObject.SetActive(false);
+        }
+        else
+        {
+            // RTT canvas mode: hide overlay and popup
+            if (_overlayObject != null) _overlayObject.SetActive(false);
+            if (_popupObject != null) _popupObject.SetActive(false);
+        }
 
         if (CurrentlyOpenPopup == this)
         {
@@ -232,6 +370,83 @@ public class RTTPopupInputable : MonoBehaviour
         // Hidden by default
         _overlayObject.SetActive(false);
         _popupObject.SetActive(false);
+    }
+
+    /// <summary>
+    /// Build popup UI for world-space mode.
+    /// In this mode, no local overlay is needed - popup floats in world space.
+    /// </summary>
+    private void BuildWorldSpacePopup()
+    {
+        int layer = LayerMask.NameToLayer(_config.layerName);
+
+        // In world-space mode, we don't need a local overlay
+        // The popup panel is created directly on the canvas
+        _overlayObject = null;
+
+        // Create popup panel centered on canvas
+        CreatePopupPanelWorldSpace(layer);
+
+        // Add BoxCollider for VR raycast on the root canvas
+        BoxCollider canvasCollider = gameObject.AddComponent<BoxCollider>();
+        // Size based on popup dimensions
+        float totalHeight = CalculateTotalHeight();
+        canvasCollider.size = new Vector3(_config.width, totalHeight, 0.1f);
+        canvasCollider.center = Vector3.zero;
+
+        // Apply layer to entire hierarchy including root canvas
+        if (layer != -1) SetLayerRecursively(gameObject, layer);
+    }
+
+    /// <summary>
+    /// Create popup panel for world-space mode (no anchor filling, just centered)
+    /// </summary>
+    private void CreatePopupPanelWorldSpace(int layer)
+    {
+        float totalHeight = CalculateTotalHeight();
+
+        _popupObject = new GameObject("PopupPanel");
+        _popupObject.transform.SetParent(transform, false);
+
+        _popupRT = _popupObject.AddComponent<RectTransform>();
+        // Center in canvas
+        _popupRT.anchorMin = new Vector2(0.5f, 0.5f);
+        _popupRT.anchorMax = new Vector2(0.5f, 0.5f);
+        _popupRT.pivot = new Vector2(0.5f, 0.5f);
+        _popupRT.sizeDelta = new Vector2(_config.width, totalHeight);
+        _popupRT.anchoredPosition = Vector2.zero;
+
+        // Background
+        CreateBackground();
+
+        // Glow Border
+        CreateGlowBorder(totalHeight);
+
+        // Content
+        CreateContent(totalHeight);
+
+        // BoxCollider for VR raycast
+        BoxCollider popupCol = _popupObject.AddComponent<BoxCollider>();
+        popupCol.size = new Vector3(_config.width, totalHeight, 0.1f);
+        popupCol.center = Vector3.zero;
+
+        // Apply layer AFTER all content is created
+        if (layer != -1) SetLayerRecursively(_popupObject, layer);
+    }
+
+    /// <summary>
+    /// Calculate total popup height based on config
+    /// </summary>
+    private float CalculateTotalHeight()
+    {
+        return _config.padding * 2
+            + _config.titleHeight
+            + _config.spacing * 0.5f
+            + _config.labelFontSize * 1.5f
+            + _config.spacing * 0.5f
+            + _config.inputHeight
+            + _config.spacing
+            + _config.buttonHeight;
     }
 
     private void CreateOverlay(int layer)
@@ -349,6 +564,9 @@ public class RTTPopupInputable : MonoBehaviour
             Canvas frameCanvas = frame.GetCanvas();
             if (frameCanvas == null) continue;
             if (frameCanvas.transform == transform.parent) continue;
+
+            // Skip RTTMobileKeyboard - it should remain interactive when popup is shown
+            if (frame is RTTMobileKeyboard) continue;
 
             // Create invisible overlay with collider on this frame's canvas
             GameObject overlay = CreateInvisibleCanvasOverlay(frameCanvas, frame);
@@ -902,6 +1120,34 @@ public class RTTPopupInputable : MonoBehaviour
     #endregion
 
     #region Utility Methods
+
+    /// <summary>
+    /// Position the popup in front of the reference frame (fixed in world space).
+    /// The popup maintains the same orientation as the reference frame.
+    /// </summary>
+    private void PositionInFrontOfReference()
+    {
+        if (_referenceTransform == null)
+        {
+            Debug.LogWarning("[RTTPopupInputable] No reference transform set, popup will stay at origin");
+            return;
+        }
+
+        // Get reference frame's world position and forward direction
+        Vector3 refPosition = _referenceTransform.position;
+        Vector3 refForward = _referenceTransform.forward;
+        Quaternion refRotation = _referenceTransform.rotation;
+
+        // Position popup slightly in front of reference frame (toward camera/viewer)
+        // Reference frame's forward points away from viewer, so we subtract to move toward viewer
+        Vector3 popupPosition = refPosition - refForward * WORLD_SPACE_OFFSET;
+
+        // Apply position and rotation (same orientation as reference)
+        transform.position = popupPosition;
+        transform.rotation = refRotation;
+
+        Debug.Log($"[RTTPopupInputable] Positioned at {popupPosition}, offset {WORLD_SPACE_OFFSET}m in front of {_referenceTransform.name}");
+    }
 
     private void SetLayerRecursively(GameObject obj, int layer)
     {

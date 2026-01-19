@@ -113,6 +113,10 @@ public class RTTFileManager : MonoBehaviour
         if (_leftFrame != null) Destroy(_leftFrame.gameObject);
         if (_rightFrame != null) Destroy(_rightFrame.gameObject);
         if (_pagination != null) Destroy(_pagination.gameObject);
+
+        // Destroy world-space popup (parented to camera, not to this object)
+        if (_createFolderPopup != null) Destroy(_createFolderPopup.gameObject);
+        _createFolderPopup = null;
     }
     
     private void OnEnable()
@@ -1902,13 +1906,12 @@ public class RTTFileManager : MonoBehaviour
             accentColor = _accentColor,
             overlayColor = new Color(0f, 0f, 0f, 0.4f), // Lighter overlay
             font = _font,
-            layerName = "UI"
+            layerName = "VirtualObjects" // Use VirtualObjects layer for world-space interaction
         };
 
-        // Create popup as child of Canvas (not transform) to be rendered by UICamera
-        // Use GetCanvas().transform to ensure it's within the RTT rendering system
-        Transform popupParent = _menuFrame.GetCanvas()?.transform ?? _menuFrame.ContentContainer;
-        _createFolderPopup = RTTPopupInputable.Create(popupParent, config);
+        // Create popup in world-space mode - fixed position in front of RTTFileManager
+        // Pass _menuFrame.transform as reference so popup positions relative to it
+        _createFolderPopup = RTTPopupInputable.CreateWorldSpace(config, _menuFrame.transform);
     }
 
     private void ShowCreateFolderPopup()
