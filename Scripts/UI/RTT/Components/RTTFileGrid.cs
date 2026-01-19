@@ -184,6 +184,9 @@ public class RTTFileGrid : MonoBehaviour
             gridItem.SetCallbacks(_onItemHoverEnter, _onItemHoverExit, _onItemClick);
         }
 
+        // Set selection callback for edit mode
+        gridItem.SetSelectionCallback(OnItemSelectionChanged);
+
         return gridItem;
     }
 
@@ -307,6 +310,11 @@ public class RTTFileGrid : MonoBehaviour
 
         // Bind data - pass full MockFile for thumbnail support
         item.Bind(file);
+
+        // Restore edit mode and selection state
+        item.SetEditMode(_isEditMode);
+        item.SetSelected(_selectedPaths.Contains(file.Path));
+
         item.gameObject.SetActive(true);
     }
 
@@ -411,6 +419,97 @@ public class RTTFileGrid : MonoBehaviour
 
         _scrollRect.verticalNormalizedPosition = normalizedPosition;
         UpdateVisibleItems();
+    }
+    #endregion
+
+    #region Edit Mode
+    private bool _isEditMode = false;
+    private HashSet<string> _selectedPaths = new HashSet<string>();
+    private Action _onSelectionChanged;
+
+    public void SetSelectionChangedCallback(Action callback)
+    {
+        _onSelectionChanged = callback;
+    }
+
+    public void SetEditMode(bool editMode)
+    {
+        _isEditMode = editMode;
+
+        // Update all pooled items
+        foreach (var item in _itemPool)
+        {
+            item.SetEditMode(editMode);
+        }
+
+        // Clear selection when exiting edit mode
+        if (!editMode)
+        {
+            _selectedPaths.Clear();
+        }
+    }
+
+    public bool AreAllSelected()
+    {
+        if (_allFiles.Count == 0) return false;
+        return _selectedPaths.Count == _allFiles.Count;
+    }
+
+    public void SetAllSelected(bool selected)
+    {
+        _selectedPaths.Clear();
+
+        if (selected)
+        {
+            foreach (var file in _allFiles)
+            {
+                _selectedPaths.Add(file.Path);
+            }
+        }
+
+        // Update visible items
+        foreach (var kvp in _visibleItems)
+        {
+            kvp.Value.SetSelected(selected);
+        }
+
+        _onSelectionChanged?.Invoke();
+    }
+
+    public HashSet<string> GetSelectedPaths()
+    {
+        return new HashSet<string>(_selectedPaths);
+    }
+
+    public void ToggleItemSelection(string path)
+    {
+        bool isSelected = _selectedPaths.Contains(path);
+        if (isSelected)
+            _selectedPaths.Remove(path);
+        else
+            _selectedPaths.Add(path);
+
+        // Update visible item if it exists
+        foreach (var kvp in _visibleItems)
+        {
+            if (kvp.Value.FilePath == path)
+            {
+                kvp.Value.SetSelected(!isSelected);
+                break;
+            }
+        }
+
+        _onSelectionChanged?.Invoke();
+    }
+
+    private void OnItemSelectionChanged(string path, bool isSelected)
+    {
+        if (isSelected)
+            _selectedPaths.Add(path);
+        else
+            _selectedPaths.Remove(path);
+
+        _onSelectionChanged?.Invoke();
     }
     #endregion
 }

@@ -26,18 +26,30 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
     #region References
     private Image _background;
     private Image _iconImage;
+    private RectTransform _iconRT;
+    private RectTransform _nameRT;
     private TextMeshProUGUI _nameText;
     private TextMeshProUGUI _typeText;
     private TextMeshProUGUI _createdText;
     private TextMeshProUGUI _modifiedText;
     private TextMeshProUGUI _durationText;
     private TextMeshProUGUI _sizeText;
+
+    // Edit Mode Checkbox
+    private GameObject _checkbox;
+    private Image _checkmarkIcon;
+    private bool _isSelected = false;
+    private bool _isEditMode = false;
+    private Action<string, bool> _onSelectionChanged; // path, isSelected
+    private float _iconOriginalX;
+    private float _nameOriginalX;
     #endregion
 
     #region State
     private TMP_FontAsset _font;
     private string _currentFilePath;  // Track current file for thumbnail cancellation
     private MockFile _currentFile;    // Current bound file
+    public bool IsSelected => _isSelected;
     #endregion
 
     #region Callbacks
@@ -133,33 +145,40 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
 
     private void CreateIconAndName(float startX, float colWidth, float height)
     {
-        // Icon
+        float checkboxSize = 45f;
+
+        // Create checkbox first (left of icon, hidden by default)
+        CreateCheckbox(startX, height, checkboxSize);
+
+        // Icon - store original position for edit mode adjustment
+        _iconOriginalX = startX;
         GameObject iconObj = new GameObject("Icon");
         iconObj.transform.SetParent(transform, false);
 
-        RectTransform iconRT = iconObj.AddComponent<RectTransform>();
-        iconRT.anchorMin = new Vector2(0, 0.5f);
-        iconRT.anchorMax = new Vector2(0, 0.5f);
-        iconRT.pivot = new Vector2(0, 0.5f);
-        iconRT.sizeDelta = new Vector2(IconWidth, IconWidth);
-        iconRT.anchoredPosition = new Vector2(startX, 0);
+        _iconRT = iconObj.AddComponent<RectTransform>();
+        _iconRT.anchorMin = new Vector2(0, 0.5f);
+        _iconRT.anchorMax = new Vector2(0, 0.5f);
+        _iconRT.pivot = new Vector2(0, 0.5f);
+        _iconRT.sizeDelta = new Vector2(IconWidth, IconWidth);
+        _iconRT.anchoredPosition = new Vector2(startX, 0);
 
         _iconImage = iconObj.AddComponent<Image>();
         _iconImage.raycastTarget = false;
 
-        // Name text (after icon)
+        // Name text (after icon) - store original position
         float nameStartX = startX + IconWidth + 10f;
+        _nameOriginalX = nameStartX;
         float nameWidth = colWidth - IconWidth - 10f;
 
         GameObject nameObj = new GameObject("NameText");
         nameObj.transform.SetParent(transform, false);
 
-        RectTransform nameRT = nameObj.AddComponent<RectTransform>();
-        nameRT.anchorMin = new Vector2(0, 0);
-        nameRT.anchorMax = new Vector2(0, 1);
-        nameRT.pivot = new Vector2(0, 0.5f);
-        nameRT.sizeDelta = new Vector2(nameWidth, 0);
-        nameRT.anchoredPosition = new Vector2(nameStartX, 0);
+        _nameRT = nameObj.AddComponent<RectTransform>();
+        _nameRT.anchorMin = new Vector2(0, 0);
+        _nameRT.anchorMax = new Vector2(0, 1);
+        _nameRT.pivot = new Vector2(0, 0.5f);
+        _nameRT.sizeDelta = new Vector2(nameWidth, 0);
+        _nameRT.anchoredPosition = new Vector2(nameStartX, 0);
 
         _nameText = nameObj.AddComponent<TextMeshProUGUI>();
         _nameText.font = _font;
@@ -170,6 +189,86 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         _nameText.enableWordWrapping = false;
         _nameText.overflowMode = TextOverflowModes.Ellipsis;
         _nameText.raycastTarget = false;
+    }
+
+    private void CreateCheckbox(float startX, float height, float checkboxSize)
+    {
+        _checkbox = new GameObject("Checkbox");
+        _checkbox.transform.SetParent(transform, false);
+
+        // Position to left of icon
+        RectTransform checkboxRT = _checkbox.AddComponent<RectTransform>();
+        checkboxRT.anchorMin = new Vector2(0, 0.5f);
+        checkboxRT.anchorMax = new Vector2(0, 0.5f);
+        checkboxRT.pivot = new Vector2(0, 0.5f);
+        checkboxRT.sizeDelta = new Vector2(checkboxSize, checkboxSize);
+        checkboxRT.anchoredPosition = new Vector2(startX, 0);
+
+        // Background (glass style)
+        Image checkboxBg = _checkbox.AddComponent<Image>();
+        checkboxBg.raycastTarget = true;
+        Color primaryColor = new Color(0f, 0.9f, 1f); // Default cyan
+        Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
+        if (glassShader != null)
+        {
+            Material mat = new Material(glassShader);
+            mat.SetFloat("_Aspect", 1f);
+            mat.SetFloat("_CornerRadius", 0.25f);
+            mat.SetFloat("_EdgePadding", 0.02f);
+            mat.SetColor("_ColorA", new Color(primaryColor.r, primaryColor.g, primaryColor.b, 0.4f));
+            mat.SetColor("_ColorB", new Color(primaryColor.r, primaryColor.g, primaryColor.b, 0.15f));
+            mat.SetFloat("_GlassAlpha", 0.25f);
+            mat.SetFloat("_FresnelStrength", 0.15f);
+            checkboxBg.material = mat;
+            checkboxBg.color = Color.white;
+        }
+
+        // Checkmark icon (hidden by default)
+        GameObject checkmarkObj = new GameObject("Checkmark");
+        checkmarkObj.transform.SetParent(_checkbox.transform, false);
+        RectTransform checkmarkRT = checkmarkObj.AddComponent<RectTransform>();
+        checkmarkRT.anchorMin = new Vector2(0.15f, 0.15f);
+        checkmarkRT.anchorMax = new Vector2(0.85f, 0.85f);
+        checkmarkRT.offsetMin = checkmarkRT.offsetMax = Vector2.zero;
+        _checkmarkIcon = checkmarkObj.AddComponent<Image>();
+        _checkmarkIcon.sprite = Resources.Load<Sprite>("icon_check_mark");
+        _checkmarkIcon.color = Color.white;
+        _checkmarkIcon.preserveAspect = true;
+        _checkmarkIcon.raycastTarget = false;
+        checkmarkObj.SetActive(false);
+
+        // Button component for checkbox click
+        Button checkboxButton = _checkbox.AddComponent<Button>();
+        checkboxButton.transition = Selectable.Transition.None;
+        checkboxButton.onClick.AddListener(OnCheckboxClicked);
+
+        // Hover effect for checkbox
+        var hoverController = _checkbox.AddComponent<HoverEffectController>();
+        hoverController.TargetVisuals = _checkbox.transform;
+        var scaleEffect = new ScaleHoverEffect()
+            .WithHoverScale(1.15f)
+            .WithTransitionDuration(0.1f);
+        hoverController.AddEffect(scaleEffect);
+
+        // Background color change on hover (keep alpha, change RGB to accent)
+        Material checkboxMat = checkboxBg.material;
+        Color accentColor = new Color(1f, 0.4f, 0.7f); // Pink accent
+        Color normalColorA = new Color(primaryColor.r, primaryColor.g, primaryColor.b, 0.4f);
+        Color normalColorB = new Color(primaryColor.r, primaryColor.g, primaryColor.b, 0.15f);
+        Color hoverColorA = new Color(accentColor.r, accentColor.g, accentColor.b, 0.4f);
+        Color hoverColorB = new Color(accentColor.r, accentColor.g, accentColor.b, 0.15f);
+
+        hoverController.OnHoverStateChanged += (isHovered) =>
+        {
+            if (checkboxMat != null)
+            {
+                checkboxMat.SetColor("_ColorA", isHovered ? hoverColorA : normalColorA);
+                checkboxMat.SetColor("_ColorB", isHovered ? hoverColorB : normalColorB);
+            }
+        };
+
+        // Hidden by default (only shown in Edit Mode)
+        _checkbox.SetActive(false);
     }
 
     private TextMeshProUGUI CreateColumnText(string name, float startX, float colWidth, float height)
@@ -348,6 +447,56 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
             FileThumbnailService.Instance?.CancelRequest(_currentFilePath);
         }
         ClearHoverState();
+    }
+    #endregion
+
+    #region Edit Mode
+    private const float CHECKBOX_OFFSET = 55f; // Space for checkbox
+
+    public void SetSelectionCallback(Action<string, bool> onSelectionChanged)
+    {
+        _onSelectionChanged = onSelectionChanged;
+    }
+
+    public void SetEditMode(bool editMode)
+    {
+        _isEditMode = editMode;
+        if (_checkbox != null)
+            _checkbox.SetActive(editMode);
+
+        // Shift icon and name when checkbox is visible
+        if (_iconRT != null && _nameRT != null)
+        {
+            float offset = editMode ? CHECKBOX_OFFSET : 0f;
+            _iconRT.anchoredPosition = new Vector2(_iconOriginalX + offset, 0);
+            _nameRT.anchoredPosition = new Vector2(_nameOriginalX + offset, 0);
+        }
+
+        // Clear selection when exiting edit mode
+        if (!editMode)
+        {
+            _isSelected = false;
+            UpdateCheckmarkVisual();
+        }
+    }
+
+    public void SetSelected(bool selected)
+    {
+        _isSelected = selected;
+        UpdateCheckmarkVisual();
+    }
+
+    private void OnCheckboxClicked()
+    {
+        _isSelected = !_isSelected;
+        UpdateCheckmarkVisual();
+        _onSelectionChanged?.Invoke(FilePath, _isSelected);
+    }
+
+    private void UpdateCheckmarkVisual()
+    {
+        if (_checkmarkIcon != null)
+            _checkmarkIcon.gameObject.SetActive(_isSelected);
     }
     #endregion
 

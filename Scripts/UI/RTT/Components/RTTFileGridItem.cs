@@ -18,8 +18,16 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
     private LayoutElement _iconContainerLE;
     private RectTransform _iconContainerRect;
 
+    // Edit Mode Checkbox
+    private GameObject _checkbox;
+    private Image _checkmarkIcon;
+    private bool _isSelected = false;
+    private bool _isEditMode = false;
+    private Action<string, bool> _onSelectionChanged; // path, isSelected
+
     public string FilePath { get; private set; }
     public bool IsFolder { get; private set; }
+    public bool IsSelected => _isSelected;
 
     // Callbacks
     private Action<string> _onHoverEnter;
@@ -242,9 +250,99 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
             .WithTransitionDuration(1f / HOVER_ANIMATION_SPEED);
         _hoverController.AddEffect(scaleEffect);
 
+        // 6. Create Edit Mode Checkbox (top-left corner, hidden by default)
+        CreateCheckbox();
+
         // NOTE: No BoxCollider needed - RTT uses GraphicRaycaster via panel's DisplayQuad collider
         // Adding BoxColliders to individual items causes raycast issues when items are in buffer zone
         // (outside visible RectMask2D area but still active for smooth scrolling)
+    }
+
+    private void CreateCheckbox()
+    {
+        float checkboxSize = 45f;
+        float offset = 8f;
+
+        _checkbox = new GameObject("Checkbox");
+        _checkbox.transform.SetParent(transform, false);
+
+        // Position at top-left corner (outside VerticalLayoutGroup control)
+        RectTransform checkboxRT = _checkbox.AddComponent<RectTransform>();
+        checkboxRT.anchorMin = new Vector2(0, 1);
+        checkboxRT.anchorMax = new Vector2(0, 1);
+        checkboxRT.pivot = new Vector2(0, 1);
+        checkboxRT.sizeDelta = new Vector2(checkboxSize, checkboxSize);
+        checkboxRT.anchoredPosition = new Vector2(offset, -offset);
+
+        // Ignore layout so it stays in corner
+        var layoutIgnorer = _checkbox.AddComponent<LayoutElement>();
+        layoutIgnorer.ignoreLayout = true;
+
+        // Background (glass style)
+        Image checkboxBg = _checkbox.AddComponent<Image>();
+        checkboxBg.raycastTarget = true;
+        Color primaryColor = new Color(0f, 0.9f, 1f); // Default cyan
+        Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
+        if (glassShader != null)
+        {
+            Material mat = new Material(glassShader);
+            mat.SetFloat("_Aspect", 1f);
+            mat.SetFloat("_CornerRadius", 0.25f);
+            mat.SetFloat("_EdgePadding", 0.02f);
+            mat.SetColor("_ColorA", new Color(primaryColor.r, primaryColor.g, primaryColor.b, 0.4f));
+            mat.SetColor("_ColorB", new Color(primaryColor.r, primaryColor.g, primaryColor.b, 0.15f));
+            mat.SetFloat("_GlassAlpha", 0.25f);
+            mat.SetFloat("_FresnelStrength", 0.15f);
+            checkboxBg.material = mat;
+            checkboxBg.color = Color.white;
+        }
+
+        // Checkmark icon (hidden by default)
+        GameObject checkmarkObj = new GameObject("Checkmark");
+        checkmarkObj.transform.SetParent(_checkbox.transform, false);
+        RectTransform checkmarkRT = checkmarkObj.AddComponent<RectTransform>();
+        checkmarkRT.anchorMin = new Vector2(0.15f, 0.15f);
+        checkmarkRT.anchorMax = new Vector2(0.85f, 0.85f);
+        checkmarkRT.offsetMin = checkmarkRT.offsetMax = Vector2.zero;
+        _checkmarkIcon = checkmarkObj.AddComponent<Image>();
+        _checkmarkIcon.sprite = Resources.Load<Sprite>("icon_check_mark");
+        _checkmarkIcon.color = Color.white;
+        _checkmarkIcon.preserveAspect = true;
+        _checkmarkIcon.raycastTarget = false;
+        checkmarkObj.SetActive(false);
+
+        // Button component for checkbox click
+        Button checkboxButton = _checkbox.AddComponent<Button>();
+        checkboxButton.transition = Selectable.Transition.None;
+        checkboxButton.onClick.AddListener(OnCheckboxClicked);
+
+        // Hover effect for checkbox
+        var hoverController = _checkbox.AddComponent<HoverEffectController>();
+        hoverController.TargetVisuals = _checkbox.transform;
+        var scaleEffect = new ScaleHoverEffect()
+            .WithHoverScale(1.15f)
+            .WithTransitionDuration(0.1f);
+        hoverController.AddEffect(scaleEffect);
+
+        // Background color change on hover (keep alpha, change RGB to accent)
+        Material checkboxMat = checkboxBg.material;
+        Color accentColor = new Color(1f, 0.4f, 0.7f); // Pink accent
+        Color normalColorA = new Color(primaryColor.r, primaryColor.g, primaryColor.b, 0.4f);
+        Color normalColorB = new Color(primaryColor.r, primaryColor.g, primaryColor.b, 0.15f);
+        Color hoverColorA = new Color(accentColor.r, accentColor.g, accentColor.b, 0.4f);
+        Color hoverColorB = new Color(accentColor.r, accentColor.g, accentColor.b, 0.15f);
+
+        hoverController.OnHoverStateChanged += (isHovered) =>
+        {
+            if (checkboxMat != null)
+            {
+                checkboxMat.SetColor("_ColorA", isHovered ? hoverColorA : normalColorA);
+                checkboxMat.SetColor("_ColorB", isHovered ? hoverColorB : normalColorB);
+            }
+        };
+
+        // Hidden by default (only shown in Edit Mode)
+        _checkbox.SetActive(false);
     }
 
     #region Pointer Events
@@ -305,6 +403,46 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         {
             _hoverController.ResetHoverState(immediate: true);
         }
+    }
+    #endregion
+
+    #region Edit Mode
+    public void SetSelectionCallback(Action<string, bool> onSelectionChanged)
+    {
+        _onSelectionChanged = onSelectionChanged;
+    }
+
+    public void SetEditMode(bool editMode)
+    {
+        _isEditMode = editMode;
+        if (_checkbox != null)
+            _checkbox.SetActive(editMode);
+
+        // Clear selection when exiting edit mode
+        if (!editMode)
+        {
+            _isSelected = false;
+            UpdateCheckmarkVisual();
+        }
+    }
+
+    public void SetSelected(bool selected)
+    {
+        _isSelected = selected;
+        UpdateCheckmarkVisual();
+    }
+
+    private void OnCheckboxClicked()
+    {
+        _isSelected = !_isSelected;
+        UpdateCheckmarkVisual();
+        _onSelectionChanged?.Invoke(FilePath, _isSelected);
+    }
+
+    private void UpdateCheckmarkVisual()
+    {
+        if (_checkmarkIcon != null)
+            _checkmarkIcon.gameObject.SetActive(_isSelected);
     }
     #endregion
 

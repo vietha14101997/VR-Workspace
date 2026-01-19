@@ -5,6 +5,7 @@ using TMPro;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using VRWorkspace.UI.HoverEffects;
 
 /// <summary>
 /// Main View for File Manager App.
@@ -38,6 +39,22 @@ public class RTTFileManager : MonoBehaviour
 
     // Flag to track if initial setup is complete (used to prevent premature Show in OnEnable)
     private bool _viewReady = false;
+
+    // Edit Mode
+    private bool _isEditMode = false;
+    private GameObject _editButton;
+    private RectTransform _row3RT;
+    private HashSet<string> _selectedItems = new HashSet<string>();
+    private GameObject _selectAllCheckbox;
+    private Image _selectAllCheckmark;
+
+    // Edit Mode Action Buttons
+    private Button _copyButton;
+    private Button _moveButton;
+    private Button _deleteButton;
+    private CanvasGroup _copyButtonCG;
+    private CanvasGroup _moveButtonCG;
+    private CanvasGroup _deleteButtonCG;
     #endregion
 
     #region Initialization
@@ -227,6 +244,8 @@ public class RTTFileManager : MonoBehaviour
     private RectTransform _bodyRT;
     private float _singleRowHeight;
     private float _rowSpacing; // Spacing between header rows
+    private float _headerHeight2Rows; // Height with 2 rows (normal)
+    private float _headerHeight3Rows; // Height with 3 rows (edit mode)
 
     
     // Breadcrumb References
@@ -262,7 +281,9 @@ public class RTTFileManager : MonoBehaviour
         _rowSpacing = _singleRowHeight * 0.25f;
 
         // Header height = 2 rows + 1 gap between them
-        float headerOriginalHeight = (_singleRowHeight * 2f) + _rowSpacing;
+        _headerHeight2Rows = (_singleRowHeight * 2f) + _rowSpacing;
+        // Header height with Row3 = 3 rows + 2 gaps
+        _headerHeight3Rows = (_singleRowHeight * 3f) + (_rowSpacing * 2f);
 
         float bottomPadding = panelHeight * 0.02f;
 
@@ -272,7 +293,7 @@ public class RTTFileManager : MonoBehaviour
         _bodyRT = bodyObj.AddComponent<RectTransform>();
         _bodyRT.anchorMin = Vector2.zero;
         _bodyRT.anchorMax = Vector2.one;
-        _bodyRT.offsetMax = new Vector2(0, -headerOriginalHeight); // Top offset
+        _bodyRT.offsetMax = new Vector2(0, -_headerHeight2Rows); // Top offset
         _bodyRT.offsetMin = new Vector2(0, bottomPadding); // Bottom offset
         
         bodyObj.AddComponent<RectMask2D>(); 
@@ -285,7 +306,7 @@ public class RTTFileManager : MonoBehaviour
         _headerRT.anchorMax = new Vector2(1, 1);
         _headerRT.pivot = new Vector2(0.5f, 1);
         _headerRT.anchoredPosition = Vector2.zero;
-        _headerRT.sizeDelta = new Vector2(0, headerOriginalHeight);
+        _headerRT.sizeDelta = new Vector2(0, _headerHeight2Rows);
 
         // 3. Build Header Rows
         CreateHeaderRows(_headerRT);
@@ -301,7 +322,7 @@ public class RTTFileManager : MonoBehaviour
 
         _fileGrid = gridObj.AddComponent<RTTFileGrid>();
         // Calculate size based on BODY size
-        float bodyHeight = panelHeight - headerOriginalHeight - bottomPadding;
+        float bodyHeight = panelHeight - _headerHeight2Rows - bottomPadding;
         _fileGrid.Initialize(_controller, contentSize.x, bodyHeight, _font);
 
         // Set interaction callbacks
@@ -310,6 +331,7 @@ public class RTTFileManager : MonoBehaviour
             onHoverExit: (path) => _controller?.UnhoverFile(path),
             onClick: (path, isFolder) => OnItemClicked(path, isFolder)
         );
+        _fileGrid.SetSelectionChangedCallback(OnSelectionChanged);
 
         // Render Order
         headerObj.transform.SetAsLastSibling();
@@ -490,7 +512,7 @@ public class RTTFileManager : MonoBehaviour
         // Create popup (using RTTPopupMenu) with Sort Button as parent
         CreateViewOptionsPopup(sortRT);
 
-        // Right: Edit Button (Icon)
+        // Right: Edit Button (Icon) - toggles edit mode
         Sprite editIcon = Resources.Load<Sprite>("icon_edit");
         var editConfig = new VRButtonFactory.ButtonConfig
         {
@@ -506,12 +528,12 @@ public class RTTFileManager : MonoBehaviour
             glowIntensity = 4f,
             popAmount = 0.05f
         };
-        GameObject editBtn = VRButtonFactory.CreateButton(
+        _editButton = VRButtonFactory.CreateButton(
             rowRT,
             editConfig,
-            () => Debug.Log("Edit Clicked")
+            ToggleEditMode
         );
-        RectTransform editRT = editBtn.GetComponent<RectTransform>();
+        RectTransform editRT = _editButton.GetComponent<RectTransform>();
         SetupRowElement(editRT, new Vector2(1, 0.5f), new Vector2(-20, 0)); // Right align
 
         // New Folder Button (symmetric to sortTrigger on right side of search bar)
@@ -845,9 +867,9 @@ public class RTTFileManager : MonoBehaviour
 
         // Calculate size based on body
         Vector2 contentSize = _menuFrame.GetContentSize();
-        float headerOriginalHeight = (_singleRowHeight * 2f) + _rowSpacing; // 2 rows + spacing
+        float _headerHeight2Rows = (_singleRowHeight * 2f) + _rowSpacing; // 2 rows + spacing
         float bottomPadding = contentSize.y * 0.02f;
-        float bodyHeight = contentSize.y - headerOriginalHeight - bottomPadding;
+        float bodyHeight = contentSize.y - _headerHeight2Rows - bottomPadding;
 
         _fileList.Initialize(_controller, contentSize.x, bodyHeight, _font, _primaryColor, _accentColor, OnListHeaderColumnClicked);
         _fileList.UpdateSortState(_currentSortBy, _isAscending);
@@ -858,6 +880,7 @@ public class RTTFileManager : MonoBehaviour
             onHoverExit: (path) => _controller?.UnhoverFile(path),
             onClick: (path, isFolder) => OnItemClicked(path, isFolder)
         );
+        _fileList.SetSelectionChangedCallback(OnSelectionChanged);
 
         Debug.Log("[RTTFileManager] List view created");
     }
@@ -990,10 +1013,393 @@ public class RTTFileManager : MonoBehaviour
     private void CreateRow3(RectTransform parent)
     {
         // Position Row3 below Row2 with spacing
-        float row3Y = -((_singleRowHeight + _rowSpacing) * 2);
-        RectTransform rowRT = CreateRowContainer(parent, "Row3", row3Y);
-        rowRT.gameObject.SetActive(false); // Hidden by default
+        float row3Y = -((_singleRowHeight + _rowSpacing) * 2 - _rowSpacing * 0.75f);
+        _row3RT = CreateRowContainer(parent, "Row3", row3Y);
+        _row3RT.gameObject.SetActive(false); // Hidden by default, shown in Edit Mode
+
+        // Left: Select All Checkbox with label
+        CreateSelectAllCheckbox(_row3RT);
+
+        // Action buttons on the left side, after checkbox
+        // SelectAll container width = checkboxSize(50) + spacing(10) + labelWidth(120) + leftPadding(20) = 200
+        float btnSpacing = 25f;
+        float leftOffset = 250f; // After SelectAll container
+
+        // Copy button (first after checkbox)
+        var copyBtn = CreateEditModeActionButton(_row3RT, "Copy", "icon_copy", OnCopyClicked);
+        var copyRT = copyBtn.GetComponent<RectTransform>();
+        copyRT.anchorMin = copyRT.anchorMax = new Vector2(0, 0.5f);
+        copyRT.pivot = new Vector2(0, 0.5f);
+        copyRT.anchoredPosition = new Vector2(leftOffset, 0);
+        _copyButton = copyBtn.GetComponent<Button>();
+        _copyButtonCG = copyBtn.AddComponent<CanvasGroup>();
+
+        // Move button
+        var moveBtn = CreateEditModeActionButton(_row3RT, "Move", "icon_move_folder", OnMoveClicked);
+        var moveRT = moveBtn.GetComponent<RectTransform>();
+        moveRT.anchorMin = moveRT.anchorMax = new Vector2(0, 0.5f);
+        moveRT.pivot = new Vector2(0, 0.5f);
+        float moveX = leftOffset + copyRT.sizeDelta.x + btnSpacing;
+        moveRT.anchoredPosition = new Vector2(moveX, 0);
+        _moveButton = moveBtn.GetComponent<Button>();
+        _moveButtonCG = moveBtn.AddComponent<CanvasGroup>();
+
+        // Delete button
+        var deleteBtn = CreateEditModeActionButton(_row3RT, "Delete", "icon_trash", OnDeleteClicked);
+        var deleteRT = deleteBtn.GetComponent<RectTransform>();
+        deleteRT.anchorMin = deleteRT.anchorMax = new Vector2(0, 0.5f);
+        deleteRT.pivot = new Vector2(0, 0.5f);
+        float deleteX = moveX + moveRT.sizeDelta.x + btnSpacing;
+        deleteRT.anchoredPosition = new Vector2(deleteX, 0);
+        _deleteButton = deleteBtn.GetComponent<Button>();
+        _deleteButtonCG = deleteBtn.AddComponent<CanvasGroup>();
+
+        // Initially disable buttons (no selection)
+        UpdateActionButtonsState();
     }
+
+    private void CreateSelectAllCheckbox(RectTransform parent)
+    {
+        float checkboxSize = 50f;
+        float labelWidth = 120f;
+        float spacing = 10f;
+        float leftPadding = 20f;
+
+        // Container for checkbox + label
+        GameObject container = new GameObject("SelectAllContainer");
+        container.transform.SetParent(parent, false);
+        RectTransform containerRT = container.AddComponent<RectTransform>();
+        containerRT.anchorMin = containerRT.anchorMax = new Vector2(0, 0.5f);
+        containerRT.pivot = new Vector2(0, 0.5f);
+        containerRT.sizeDelta = new Vector2(checkboxSize + spacing + labelWidth, checkboxSize);
+        containerRT.anchoredPosition = new Vector2(leftPadding, 0);
+
+        // Checkbox button (glass pill style)
+        _selectAllCheckbox = new GameObject("Checkbox");
+        _selectAllCheckbox.transform.SetParent(container.transform, false);
+        RectTransform checkboxRT = _selectAllCheckbox.AddComponent<RectTransform>();
+        checkboxRT.anchorMin = checkboxRT.anchorMax = new Vector2(0, 0.5f);
+        checkboxRT.pivot = new Vector2(0, 0.5f);
+        checkboxRT.sizeDelta = new Vector2(checkboxSize, checkboxSize);
+        checkboxRT.anchoredPosition = Vector2.zero;
+
+        // Checkbox background (glass style)
+        Image checkboxBg = _selectAllCheckbox.AddComponent<Image>();
+        checkboxBg.raycastTarget = true;
+        Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
+        if (glassShader != null)
+        {
+            Material mat = new Material(glassShader);
+            mat.SetFloat("_Aspect", 1f);
+            mat.SetFloat("_CornerRadius", 0.25f);
+            mat.SetFloat("_EdgePadding", 0.02f);
+            mat.SetColor("_ColorA", new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.3f));
+            mat.SetColor("_ColorB", new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.1f));
+            mat.SetFloat("_GlassAlpha", 0.2f);
+            mat.SetFloat("_FresnelStrength", 0.15f);
+            checkboxBg.material = mat;
+            checkboxBg.color = Color.white;
+        }
+
+        // Checkmark icon (hidden by default)
+        GameObject checkmarkObj = new GameObject("Checkmark");
+        checkmarkObj.transform.SetParent(_selectAllCheckbox.transform, false);
+        RectTransform checkmarkRT = checkmarkObj.AddComponent<RectTransform>();
+        checkmarkRT.anchorMin = new Vector2(0.15f, 0.15f);
+        checkmarkRT.anchorMax = new Vector2(0.85f, 0.85f);
+        checkmarkRT.offsetMin = checkmarkRT.offsetMax = Vector2.zero;
+        _selectAllCheckmark = checkmarkObj.AddComponent<Image>();
+        _selectAllCheckmark.sprite = Resources.Load<Sprite>("icon_check_mark");
+        _selectAllCheckmark.color = Color.white;
+        _selectAllCheckmark.preserveAspect = true;
+        _selectAllCheckmark.raycastTarget = false;
+        checkmarkObj.SetActive(false);
+
+        // Button component
+        Button checkboxButton = _selectAllCheckbox.AddComponent<Button>();
+        checkboxButton.transition = Selectable.Transition.None;
+        checkboxButton.onClick.AddListener(OnSelectAllClicked);
+
+        // Add hover effects to checkbox
+        var checkboxHoverController = _selectAllCheckbox.AddComponent<HoverEffectController>();
+        checkboxHoverController.TargetVisuals = _selectAllCheckbox.transform; // Set before adding effects
+        var checkboxScaleEffect = new ScaleHoverEffect()
+            .WithHoverScale(1.1f)
+            .WithTransitionDuration(0.1f);
+        checkboxHoverController.AddEffect(checkboxScaleEffect);
+
+        // Background color change on hover (keep alpha, change RGB to accent)
+        Material checkboxMat = checkboxBg.material;
+        Color cbNormalColorA = new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.3f);
+        Color cbNormalColorB = new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.1f);
+        Color cbHoverColorA = new Color(_accentColor.r, _accentColor.g, _accentColor.b, 0.3f);
+        Color cbHoverColorB = new Color(_accentColor.r, _accentColor.g, _accentColor.b, 0.1f);
+
+        checkboxHoverController.OnHoverStateChanged += (isHovered) =>
+        {
+            if (checkboxMat != null)
+            {
+                checkboxMat.SetColor("_ColorA", isHovered ? cbHoverColorA : cbNormalColorA);
+                checkboxMat.SetColor("_ColorB", isHovered ? cbHoverColorB : cbNormalColorB);
+            }
+        };
+
+        // Label "Select all"
+        GameObject labelObj = new GameObject("Label");
+        labelObj.transform.SetParent(container.transform, false);
+        RectTransform labelRT = labelObj.AddComponent<RectTransform>();
+        labelRT.anchorMin = labelRT.anchorMax = new Vector2(0, 0.5f);
+        labelRT.pivot = new Vector2(0, 0.5f);
+        labelRT.sizeDelta = new Vector2(labelWidth, checkboxSize);
+        labelRT.anchoredPosition = new Vector2(checkboxSize + spacing, 0);
+
+        TextMeshProUGUI labelText = labelObj.AddComponent<TextMeshProUGUI>();
+        labelText.text = "Select all";
+        labelText.font = _font;
+        labelText.fontSize = 28;
+        labelText.color = Color.white;
+        labelText.fontStyle = FontStyles.Bold;
+        labelText.alignment = TextAlignmentOptions.MidlineLeft;
+        labelText.raycastTarget = false;
+    }
+
+    private GameObject CreateEditModeActionButton(RectTransform parent, string label, string iconName, UnityEngine.Events.UnityAction onClick)
+    {
+        float btnHeight = 60f;
+        float iconSize = 32f;
+        float textWidth = label.Length * 18f; // Approximate text width
+        float padding = 25f;
+        float spacing = 10f;
+        float btnWidth = padding + iconSize + spacing + textWidth + padding;
+
+        GameObject btnObj = new GameObject($"Btn_{label}");
+        btnObj.transform.SetParent(parent, false);
+        RectTransform btnRT = btnObj.AddComponent<RectTransform>();
+        btnRT.sizeDelta = new Vector2(btnWidth, btnHeight);
+
+        // Background (glass pill style - rounded on both sides, no border)
+        Image bgImage = btnObj.AddComponent<Image>();
+        bgImage.raycastTarget = true;
+        Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
+        if (glassShader != null)
+        {
+            Material mat = new Material(glassShader);
+            float aspect = btnWidth / btnHeight;
+            mat.SetFloat("_Aspect", aspect);
+            mat.SetFloat("_CornerRadius", 0.48f); // Fully rounded ends
+            mat.SetFloat("_EdgePadding", 0.02f);
+            mat.SetColor("_ColorA", new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.3f));
+            mat.SetColor("_ColorB", new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.1f));
+            mat.SetFloat("_GlassAlpha", 0.15f);
+            mat.SetFloat("_FresnelStrength", 0.15f);
+            bgImage.material = mat;
+            bgImage.color = Color.white;
+        }
+
+        // Icon (white color)
+        Sprite icon = Resources.Load<Sprite>(iconName);
+        Image iconImg = null;
+        if (icon != null)
+        {
+            GameObject iconObj = new GameObject("Icon");
+            iconObj.transform.SetParent(btnObj.transform, false);
+            RectTransform iconRT = iconObj.AddComponent<RectTransform>();
+            iconRT.anchorMin = iconRT.anchorMax = new Vector2(0, 0.5f);
+            iconRT.pivot = new Vector2(0, 0.5f);
+            iconRT.sizeDelta = new Vector2(iconSize, iconSize);
+            iconRT.anchoredPosition = new Vector2(padding, 0);
+
+            iconImg = iconObj.AddComponent<Image>();
+            iconImg.sprite = icon;
+            iconImg.color = Color.white; // White icon
+            iconImg.preserveAspect = true;
+            iconImg.raycastTarget = false;
+        }
+
+        // Text
+        GameObject textObj = new GameObject("Text");
+        textObj.transform.SetParent(btnObj.transform, false);
+        RectTransform textRT = textObj.AddComponent<RectTransform>();
+        textRT.anchorMin = textRT.anchorMax = new Vector2(0, 0.5f);
+        textRT.pivot = new Vector2(0, 0.5f);
+        textRT.sizeDelta = new Vector2(textWidth, btnHeight);
+        textRT.anchoredPosition = new Vector2(padding + iconSize + spacing, 0);
+
+        TextMeshProUGUI txt = textObj.AddComponent<TextMeshProUGUI>();
+        txt.text = label;
+        txt.font = _font;
+        txt.fontSize = 26;
+        txt.color = Color.white;
+        txt.alignment = TextAlignmentOptions.MidlineLeft;
+        txt.fontStyle = FontStyles.Bold;
+        txt.raycastTarget = false;
+
+        // Button component
+        Button btn = btnObj.AddComponent<Button>();
+        btn.transition = Selectable.Transition.None;
+        btn.onClick.AddListener(onClick);
+
+        // Add hover effects (Scale + Background Color)
+        var hoverController = btnObj.AddComponent<HoverEffectController>();
+        hoverController.TargetVisuals = btnObj.transform; // Set before adding effects
+
+        // Scale effect
+        var scaleEffect = new ScaleHoverEffect()
+            .WithHoverScale(1.05f)
+            .WithTransitionDuration(0.1f);
+        hoverController.AddEffect(scaleEffect);
+
+        // Background color change on hover (keep alpha, change RGB to accent)
+        Material btnMaterial = bgImage.material;
+        Color normalColorA = new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.3f);
+        Color normalColorB = new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.1f);
+        Color hoverColorA = new Color(_accentColor.r, _accentColor.g, _accentColor.b, 0.3f);
+        Color hoverColorB = new Color(_accentColor.r, _accentColor.g, _accentColor.b, 0.1f);
+
+        hoverController.OnHoverStateChanged += (isHovered) =>
+        {
+            if (btnMaterial != null)
+            {
+                btnMaterial.SetColor("_ColorA", isHovered ? hoverColorA : normalColorA);
+                btnMaterial.SetColor("_ColorB", isHovered ? hoverColorB : normalColorB);
+            }
+        };
+
+        return btnObj;
+    }
+
+    #region Edit Mode
+    private void ToggleEditMode()
+    {
+        _isEditMode = !_isEditMode;
+        UpdateEditButtonVisual();
+
+        // Show/hide Row3
+        if (_row3RT != null)
+            _row3RT.gameObject.SetActive(_isEditMode);
+
+        // Adjust header and body sizes for Row3
+        float targetHeaderHeight = _isEditMode ? _headerHeight3Rows : _headerHeight2Rows;
+        if (_headerRT != null)
+            _headerRT.sizeDelta = new Vector2(0, targetHeaderHeight);
+        if (_bodyRT != null)
+            _bodyRT.offsetMax = new Vector2(0, -targetHeaderHeight);
+
+        // Show/hide checkboxes on items
+        _fileGrid?.SetEditMode(_isEditMode);
+        _fileList?.SetEditMode(_isEditMode);
+
+        // Clear selection when exiting edit mode
+        if (!_isEditMode)
+        {
+            _selectedItems.Clear();
+            UpdateSelectAllCheckmark();
+        }
+
+        Debug.Log($"[RTTFileManager] Edit Mode: {_isEditMode}");
+    }
+
+    private void UpdateEditButtonVisual()
+    {
+        if (_editButton == null) return;
+
+        // Find icon and change sprite
+        var iconImg = _editButton.transform.Find("HitArea/Visuals/Content/Icon")?.GetComponent<Image>();
+        if (iconImg != null)
+        {
+            iconImg.sprite = Resources.Load<Sprite>(_isEditMode ? "icon_check_mark" : "icon_edit");
+        }
+
+        // Change border/glow color
+        var border = _editButton.transform.Find("HitArea/Visuals/Border")?.GetComponent<Image>();
+        if (border?.material != null)
+        {
+            Color targetColor = _isEditMode ? _accentColor : _primaryColor;
+            border.material.SetColor("_BorderColor", targetColor);
+            border.material.SetColor("_GlowColor", targetColor);
+        }
+    }
+
+    private void OnSelectAllClicked()
+    {
+        if (_fileGrid != null && _fileGrid.gameObject.activeInHierarchy)
+        {
+            bool allSelected = _fileGrid.AreAllSelected();
+            _fileGrid.SetAllSelected(!allSelected);
+        }
+        else if (_fileList != null && _fileList.gameObject.activeInHierarchy)
+        {
+            bool allSelected = _fileList.AreAllSelected();
+            _fileList.SetAllSelected(!allSelected);
+        }
+        UpdateSelectAllCheckmark();
+        UpdateActionButtonsState();
+    }
+
+    private void UpdateSelectAllCheckmark()
+    {
+        if (_selectAllCheckmark == null) return;
+
+        bool allSelected = false;
+        if (_fileGrid != null && _fileGrid.gameObject.activeInHierarchy)
+            allSelected = _fileGrid.AreAllSelected();
+        else if (_fileList != null && _fileList.gameObject.activeInHierarchy)
+            allSelected = _fileList.AreAllSelected();
+
+        _selectAllCheckmark.gameObject.SetActive(allSelected);
+    }
+
+    private void OnSelectionChanged()
+    {
+        UpdateSelectAllCheckmark();
+        UpdateActionButtonsState();
+    }
+
+    private void UpdateActionButtonsState()
+    {
+        int selectedCount = 0;
+        if (_fileGrid != null && _fileGrid.gameObject.activeInHierarchy)
+            selectedCount = _fileGrid.GetSelectedPaths().Count;
+        else if (_fileList != null && _fileList.gameObject.activeInHierarchy)
+            selectedCount = _fileList.GetSelectedPaths().Count;
+
+        bool hasSelection = selectedCount > 0;
+
+        // Update button interactability and visual state
+        SetButtonEnabled(_copyButton, _copyButtonCG, hasSelection);
+        SetButtonEnabled(_moveButton, _moveButtonCG, hasSelection);
+        SetButtonEnabled(_deleteButton, _deleteButtonCG, hasSelection);
+    }
+
+    private void SetButtonEnabled(Button button, CanvasGroup canvasGroup, bool enabled)
+    {
+        if (button != null)
+            button.interactable = enabled;
+        if (canvasGroup != null)
+        {
+            canvasGroup.alpha = enabled ? 1f : 0.4f;
+            canvasGroup.interactable = enabled;
+        }
+    }
+
+    private void OnCopyClicked()
+    {
+        Debug.Log("[RTTFileManager] Copy clicked - selected items: " + _selectedItems.Count);
+        // TODO: Implement copy functionality
+    }
+
+    private void OnMoveClicked()
+    {
+        Debug.Log("[RTTFileManager] Move clicked - selected items: " + _selectedItems.Count);
+        // TODO: Implement move functionality
+    }
+
+    private void OnDeleteClicked()
+    {
+        Debug.Log("[RTTFileManager] Delete clicked - selected items: " + _selectedItems.Count);
+        // TODO: Implement delete functionality
+    }
+    #endregion
 
     private RectTransform CreateRowContainer(Transform parent, string name, float yPos)
     {
@@ -1704,6 +2110,16 @@ public class RTTFileManager : MonoBehaviour
     /// </summary>
     private void OnItemClicked(string path, bool isFolder)
     {
+        // In edit mode, toggle checkbox instead of opening
+        if (_isEditMode)
+        {
+            if (_fileGrid != null && _fileGrid.gameObject.activeInHierarchy)
+                _fileGrid.ToggleItemSelection(path);
+            else if (_fileList != null && _fileList.gameObject.activeInHierarchy)
+                _fileList.ToggleItemSelection(path);
+            return;
+        }
+
         if (isFolder)
         {
             // Navigate into the folder (saves clicked folder's index for accurate back navigation)
