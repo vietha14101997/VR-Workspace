@@ -32,6 +32,10 @@ public class RTTFileManager : MonoBehaviour
     private RTTFilePagination _pagination;
     private RTTPopupInputable _createFolderPopup;
 
+    // New Folder button reference (for enabling/disabling based on permissions)
+    private Button _newFolderButton;
+    private CanvasGroup _newFolderCanvasGroup;
+
     // Flag to track if initial setup is complete (used to prevent premature Show in OnEnable)
     private bool _viewReady = false;
     #endregion
@@ -546,6 +550,16 @@ public class RTTFileManager : MonoBehaviour
         newFolderRT.anchorMax = new Vector2(0.5f, 0.5f);
         newFolderRT.pivot = new Vector2(0.5f, 0.5f);
         newFolderRT.anchoredPosition = new Vector2(newFolderCenterFromCenter, 0);
+
+        // Store button reference for enabling/disabling based on folder creation permission
+        // Note: VRButtonFactory creates Button on HitArea child, not on wrapper
+        _newFolderButton = newFolderBtn.GetComponentInChildren<Button>();
+        _newFolderCanvasGroup = newFolderBtn.AddComponent<CanvasGroup>();
+
+        Debug.Log($"[RTTFileManager] New Folder button created, _newFolderButton null: {_newFolderButton == null}");
+
+        // Update button state immediately based on current path permission
+        UpdateNewFolderButtonState();
 
         // Center: Search Bar
         CreateSearchBar(rowRT);
@@ -1100,6 +1114,9 @@ public class RTTFileManager : MonoBehaviour
     public void UpdateBreadcrumbs(string path)
     {
         Debug.Log($"[RTTFileManager] UpdateBreadcrumbs called with path: {path}, container null: {_breadcrumbContainer == null}, instance: {GetInstanceID()}");
+
+        // Update New Folder button state based on folder creation permission
+        UpdateNewFolderButtonState();
 
         // Fallback: find breadcrumb container from hierarchy if reference is lost
         if (_breadcrumbContainer == null)
@@ -1881,6 +1898,43 @@ public class RTTFileManager : MonoBehaviour
 
     #region Create Folder Popup
 
+    /// <summary>
+    /// Update the New Folder button's interactable state based on folder creation permission.
+    /// Called when navigating to a new directory.
+    /// </summary>
+    private void UpdateNewFolderButtonState()
+    {
+        if (_newFolderButton == null || _newFolderCanvasGroup == null)
+        {
+            Debug.Log("[RTTFileManager] UpdateNewFolderButtonState skipped - button not yet created");
+            return;
+        }
+
+        bool canCreate = _controller != null && _controller.CanCreateFolderHere();
+
+        Debug.Log($"[RTTFileManager] UpdateNewFolderButtonState: canCreate={canCreate}");
+
+        _newFolderButton.interactable = canCreate;
+        _newFolderCanvasGroup.alpha = canCreate ? 1f : 0.4f;
+        _newFolderCanvasGroup.interactable = canCreate; // Block Unity UI raycast
+        _newFolderCanvasGroup.blocksRaycasts = canCreate; // Block graphic raycasts
+
+        // VRButtonFactory creates Button and BoxCollider on the same HitArea object
+        // Since _newFolderButton is on HitArea, get BoxCollider from same GameObject
+        var collider = _newFolderButton.GetComponent<BoxCollider>();
+        if (collider != null)
+        {
+            collider.enabled = canCreate;
+            Debug.Log($"[RTTFileManager] BoxCollider.enabled set to {canCreate}");
+        }
+        else
+        {
+            Debug.LogWarning("[RTTFileManager] BoxCollider not found on Button's GameObject!");
+        }
+
+        Debug.Log($"[RTTFileManager] New Folder button {(canCreate ? "ENABLED" : "DISABLED")} - alpha={_newFolderCanvasGroup.alpha}");
+    }
+
     private void CreateFolderPopup()
     {
         if (_createFolderPopup != null) return;
@@ -1916,6 +1970,13 @@ public class RTTFileManager : MonoBehaviour
 
     private void ShowCreateFolderPopup()
     {
+        // Double-check permission (button should already be disabled, but safeguard)
+        if (_controller == null || !_controller.CanCreateFolderHere())
+        {
+            Debug.LogWarning("[RTTFileManager] Cannot create folder in current path");
+            return;
+        }
+
         // Create popup if not exists
         if (_createFolderPopup == null)
         {

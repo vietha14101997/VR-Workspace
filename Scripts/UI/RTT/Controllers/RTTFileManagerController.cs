@@ -118,7 +118,18 @@ public class RTTFileManagerController : MonoBehaviour
         _currentDirectoryFiles = FileSystemService.GetFiles(_currentPath);
         SearchFiles(_currentSearchQuery); // Re-apply search/filter
     }
-    
+
+    /// <summary>
+    /// Check if folder creation is allowed in the current path.
+    /// </summary>
+    public bool CanCreateFolderHere()
+    {
+        Debug.Log($"[Controller] CanCreateFolderHere called, _currentPath: '{_currentPath}'");
+        bool result = FileSystemService.CanCreateFolderInPath(_currentPath);
+        Debug.Log($"[Controller] CanCreateFolderHere result: {result}");
+        return result;
+    }
+
     public void SearchFiles(string query)
     {
         _currentSearchQuery = query;
@@ -804,5 +815,71 @@ public static class FileSystemService
         }
 #endif
         return RootPath;
+    }
+
+    /// <summary>
+    /// Check if folder creation is allowed in the given path.
+    /// Returns false for:
+    /// - Virtual paths like "root" (can't create in device root listing)
+    /// - Device root path (Internal Storage root - for cleanliness)
+    /// - Paths that don't exist
+    /// - Paths without write permission
+    /// </summary>
+    public static bool CanCreateFolderInPath(string path)
+    {
+        Debug.Log($"[FileSystemService] CanCreateFolderInPath called with path: '{path}'");
+
+        // Can't create folders in virtual "root" path (device listing)
+        if (path == "root" || string.IsNullOrEmpty(path))
+        {
+            Debug.Log($"[FileSystemService] Path is 'root' or empty, returning false");
+            return false;
+        }
+
+        string absolutePath = GetAbsolutePath(path);
+        Debug.Log($"[FileSystemService] absolutePath: '{absolutePath}'");
+
+        // Can't create folders directly in device root (Internal Storage)
+        // Normalize paths for comparison (remove trailing slashes)
+        string normalizedAbsolute = absolutePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        string normalizedRoot = RootPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+        Debug.Log($"[FileSystemService] Comparing normalizedAbsolute: '{normalizedAbsolute}' with normalizedRoot: '{normalizedRoot}'");
+
+        bool isDeviceRoot = string.Equals(normalizedAbsolute, normalizedRoot, StringComparison.OrdinalIgnoreCase);
+        Debug.Log($"[FileSystemService] isDeviceRoot: {isDeviceRoot}");
+
+        if (isDeviceRoot)
+        {
+            Debug.Log($"[FileSystemService] Folder creation not allowed in device root: {absolutePath}");
+            return false;
+        }
+
+        // Path must exist
+        if (!Directory.Exists(absolutePath))
+        {
+            Debug.Log($"[FileSystemService] Path does not exist: {absolutePath}");
+            return false;
+        }
+
+        // Check write permission by attempting to create a temp directory
+        try
+        {
+            string testPath = Path.Combine(absolutePath, ".vrworkspace_write_test_" + Guid.NewGuid().ToString("N").Substring(0, 8));
+            Directory.CreateDirectory(testPath);
+            Directory.Delete(testPath);
+            Debug.Log($"[FileSystemService] Write permission OK for: {absolutePath}");
+            return true;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Debug.Log($"[FileSystemService] No write permission for: {absolutePath}");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Debug.Log($"[FileSystemService] Cannot write to {absolutePath}: {ex.Message}");
+            return false;
+        }
     }
 }

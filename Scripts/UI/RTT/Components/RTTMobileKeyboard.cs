@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using TMPro;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using VRWorkspace.UI.HoverEffects;
 
@@ -47,6 +48,10 @@ public class RTTMobileKeyboard : RTTCanvasBase
 
     #region Constants
     private const float PixelToMeter = 1.6f / 1920f;
+
+    // Key press animation constants
+    private const float KEY_PRESS_SCALE = 0.9f;        // Scale down to 90% when pressed
+    private const float KEY_PRESS_DURATION = 0.08f;    // Total animation duration (down + up)
 
     private static readonly string[] LETTERS_ROW_0 = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0" };
     private static readonly string[] LETTERS_ROW_1 = { "q", "w", "e", "r", "t", "y", "u", "i", "o", "p" };
@@ -1205,8 +1210,10 @@ public class RTTMobileKeyboard : RTTCanvasBase
         colors.pressedColor = new Color(0.8f, 0.8f, 0.8f, 1f);
         btn.colors = colors;
 
+        Transform capturedTransform = keyObj.transform;
         btn.onClick.AddListener(() =>
         {
+            PlayKeyPressAnimation(capturedTransform);
             onClick?.Invoke();
             MarkDirty();
         });
@@ -1312,8 +1319,10 @@ public class RTTMobileKeyboard : RTTCanvasBase
         colors.pressedColor = new Color(0.8f, 0.8f, 0.8f, 1f);
         btn.colors = colors;
 
+        Transform capturedTransform = keyObj.transform;
         btn.onClick.AddListener(() =>
         {
+            PlayKeyPressAnimation(capturedTransform);
             onClick?.Invoke();
             MarkDirty();
         });
@@ -1433,8 +1442,10 @@ public class RTTMobileKeyboard : RTTCanvasBase
         btn.colors = colors;
 
         string capturedLabel = label;
+        Transform capturedTransform = keyObj.transform;
         btn.onClick.AddListener(() =>
         {
+            PlayKeyPressAnimation(capturedTransform);
             if (onClick != null)
                 onClick.Invoke();
             else
@@ -1556,8 +1567,10 @@ public class RTTMobileKeyboard : RTTCanvasBase
         btn.colors = colors;
 
         string capturedLabel = label;
+        Transform capturedTransform = keyObj.transform;
         btn.onClick.AddListener(() =>
         {
+            PlayKeyPressAnimation(capturedTransform);
             if (onClick != null)
                 onClick.Invoke();
             else
@@ -2105,6 +2118,50 @@ public class RTTMobileKeyboard : RTTCanvasBase
 
         // Subscribe to hover state changes for RTT re-render
         hoverController.OnHoverStateChanged += (isHovered) => MarkDirty();
+    }
+
+    /// <summary>
+    /// Play a key press animation - scales the key down and back up to simulate pressing.
+    /// </summary>
+    private void PlayKeyPressAnimation(Transform keyTransform)
+    {
+        if (keyTransform == null) return;
+        StartCoroutine(KeyPressAnimationCoroutine(keyTransform));
+    }
+
+    private IEnumerator KeyPressAnimationCoroutine(Transform keyTransform)
+    {
+        Vector3 originalScale = keyTransform.localScale;
+        Vector3 pressedScale = originalScale * KEY_PRESS_SCALE;
+        float halfDuration = KEY_PRESS_DURATION * 0.5f;
+
+        // Scale down (press)
+        float elapsed = 0f;
+        while (elapsed < halfDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / halfDuration;
+            // Use smooth easing for natural feel
+            t = t * t * (3f - 2f * t); // Smoothstep
+            keyTransform.localScale = Vector3.Lerp(originalScale, pressedScale, t);
+            MarkDirty();
+            yield return null;
+        }
+        keyTransform.localScale = pressedScale;
+
+        // Scale back up (release)
+        elapsed = 0f;
+        while (elapsed < halfDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / halfDuration;
+            t = t * t * (3f - 2f * t); // Smoothstep
+            keyTransform.localScale = Vector3.Lerp(pressedScale, originalScale, t);
+            MarkDirty();
+            yield return null;
+        }
+        keyTransform.localScale = originalScale;
+        MarkDirty();
     }
     #endregion
 }
