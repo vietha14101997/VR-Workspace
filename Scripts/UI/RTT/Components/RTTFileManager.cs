@@ -30,6 +30,7 @@ public class RTTFileManager : MonoBehaviour
     private RTTFileGrid _fileGrid;
     private RTTFileList _fileList;
     private RTTFilePagination _pagination;
+    private RTTPopupInputable _createFolderPopup;
 
     // Flag to track if initial setup is complete (used to prevent premature Show in OnEnable)
     private bool _viewReady = false;
@@ -211,6 +212,7 @@ public class RTTFileManager : MonoBehaviour
     private RectTransform _headerRT;
     private RectTransform _bodyRT;
     private float _singleRowHeight;
+    private float _rowSpacing; // Spacing between header rows
 
     
     // Breadcrumb References
@@ -231,17 +233,22 @@ public class RTTFileManager : MonoBehaviour
         Vector2 contentSize = _menuFrame.GetContentSize();
         float panelHeight = contentSize.y;
         
-        // Logic kích thước mới: Header gốc (2 rows) = 18% panel.
-        // Mỗi row = 9%. Row 3 sẽ thêm 9% khi hiện.
-        float headerOriginalHeight = panelHeight * 0.18f; 
-        _singleRowHeight = headerOriginalHeight / 2f;
-        
-        // Ensure minimum row height to fit 68f buttons
-        if (_singleRowHeight < 80f) 
+        // Logic kích thước mới: Header gốc (2 rows) = 19.8% panel (+10% from 18%).
+        // Mỗi row = 9.9%. Row 3 sẽ thêm 9.9% khi hiện.
+        float headerBaseHeight = panelHeight * 0.198f; // +10% (was 0.18f)
+        _singleRowHeight = headerBaseHeight / 2f;
+
+        // Ensure minimum row height to fit 75f buttons (+10% from 68f)
+        if (_singleRowHeight < 88f) // +10% (was 80f)
         {
-            _singleRowHeight = 80f;
-            headerOriginalHeight = _singleRowHeight * 2f;
+            _singleRowHeight = 88f;
         }
+
+        // Row spacing = 50% of row height
+        _rowSpacing = _singleRowHeight * 0.25f;
+
+        // Header height = 2 rows + 1 gap between them
+        float headerOriginalHeight = (_singleRowHeight * 2f) + _rowSpacing;
 
         float bottomPadding = panelHeight * 0.02f;
 
@@ -394,7 +401,7 @@ public class RTTFileManager : MonoBehaviour
     private List<(string name, string fullPath)> _hiddenFolders = new List<(string name, string fullPath)>();
     private float _ellipsisPopupWidth; // Calculated width for popup
 
-    private float _sortTriggerWidth = 200f; // Increased width (was 160f) to maintain aspect ratio with height
+    private float _sortTriggerWidth = 220f; // Increased 10% (was 200f)
     
     private void CreateRow1(RectTransform parent)
     {
@@ -407,10 +414,10 @@ public class RTTFileManager : MonoBehaviour
             label = "Close",
             icon = closeIcon,
             themeColor = _primaryColor,
-            width = 68f,
-            height = 68f,
+            width = 75f,  // +10% (was 68f)
+            height = 75f, // +10% (was 68f)
             iconOnly = true,
-            iconSize = 35.2f,
+            iconSize = 39f, // +10% (was 35.2f)
             borderWidth = 0.04f,
             glowWidth = 0.08f,
             glowIntensity = 4f,
@@ -432,8 +439,8 @@ public class RTTFileManager : MonoBehaviour
             label = _currentSortBy,
             themeColor = _primaryColor,
             width = _sortTriggerWidth,
-            height = 68f,
-            fontSize = 24,
+            height = 75f,  // +10% (was 68f)
+            fontSize = 26, // +10% (was 24)
             font = _font,
             textOnly = true,
             borderWidth = 0.04f,
@@ -463,8 +470,8 @@ public class RTTFileManager : MonoBehaviour
         iconRT.anchorMin = new Vector2(1, 0.5f);
         iconRT.anchorMax = new Vector2(1, 0.5f);
         iconRT.pivot = new Vector2(0.5f, 0.5f);
-        iconRT.sizeDelta = new Vector2(16f, 16f);
-        iconRT.anchoredPosition = new Vector2(-33f, 0);
+        iconRT.sizeDelta = new Vector2(18f, 18f); // +10% (was 16f)
+        iconRT.anchoredPosition = new Vector2(-36f, 0); // +10% (was -33f)
 
         RectTransform sortRT = sortTrigger.GetComponent<RectTransform>();
         // Position centered between Close button and SearchBar
@@ -488,11 +495,11 @@ public class RTTFileManager : MonoBehaviour
             label = "Edit",
             icon = editIcon,
             themeColor = _primaryColor,
-            width = 68f,
-            height = 68f,
+            width = 75f,  // +10% (was 68f)
+            height = 75f, // +10% (was 68f)
             iconOnly = true, // Hide text
-            iconSize = 35.2f, // Reduced 20% (Default ~44)
-            borderWidth = 0.04f, // Custom thicker border (Increased to match Sort/Search)
+            iconSize = 39f, // +10% (was 35.2f)
+            borderWidth = 0.04f,
             glowWidth = 0.08f,
             glowIntensity = 4f,
             popAmount = 0.05f
@@ -513,10 +520,10 @@ public class RTTFileManager : MonoBehaviour
             icon = folderIcon,
             themeColor = _primaryColor,
             width = _sortTriggerWidth,
-            height = 68f,
-            fontSize = 24,
+            height = 75f,  // +10% (was 68f)
+            fontSize = 26, // +10% (was 24)
             font = _font,
-            iconSize = 35.2f,
+            iconSize = 39f, // +10% (was 35.2f)
             horizontalLayout = true,  // Icon on left, text on right
             borderWidth = 0.04f,
             glowWidth = 0.08f,
@@ -526,7 +533,7 @@ public class RTTFileManager : MonoBehaviour
         GameObject newFolderBtn = VRButtonFactory.CreateButton(
             rowRT,
             newFolderConfig,
-            () => Debug.Log("New Folder Clicked") // TODO: Implement create folder
+            ShowCreateFolderPopup
         );
         RectTransform newFolderRT = newFolderBtn.GetComponent<RectTransform>();
         // Position symmetric to sortTrigger (positive X instead of negative)
@@ -581,11 +588,11 @@ public class RTTFileManager : MonoBehaviour
         var config = new RTTPopupMenu.PopupConfig
         {
             width = _sortTriggerWidth * 2.5f, // Width = 2.5x Trigger (increased 25%)
-            buttonHeight = 68f, // Increased height for popup buttons too
-            sideSpacing = 10f,  // Increased spacing
-            rowSpacing = 10f,
-            fontSize = 18,      // Larger text
-            iconSize = 24f,     // Larger icon (approx matches Edit button)
+            buttonHeight = 75f, // +10% (was 68f)
+            sideSpacing = 11f,  // +10% (was 10f)
+            rowSpacing = 11f,   // +10% (was 10f)
+            fontSize = 20,      // +10% (was 18)
+            iconSize = 26f,     // +10% (was 24f)
             primaryColor = _primaryColor,
             accentColor = _accentColor,
             font = _font
@@ -606,8 +613,8 @@ public class RTTFileManager : MonoBehaviour
         
         // Position the popup
         // sortTrigger uses center pivot (0.5, 0.5), so offset X by -width/2 to align popup left edge with button left edge
-        // Y = below the button
-        _viewOptionsPopup.SetPosition(new Vector2(-_sortTriggerWidth / 2f, -34f - config.rowSpacing));
+        // Y = below the button (37.5f = half of 75f button height)
+        _viewOptionsPopup.SetPosition(new Vector2(-_sortTriggerWidth / 2f, -37.5f - config.rowSpacing));
     }
     
     private void BuildViewOptionsPopupContent()
@@ -800,7 +807,7 @@ public class RTTFileManager : MonoBehaviour
 
         // Calculate size based on body
         Vector2 contentSize = _menuFrame.GetContentSize();
-        float headerOriginalHeight = _singleRowHeight * 2;
+        float headerOriginalHeight = (_singleRowHeight * 2f) + _rowSpacing; // 2 rows + spacing
         float bottomPadding = contentSize.y * 0.02f;
         float bodyHeight = contentSize.y - headerOriginalHeight - bottomPadding;
 
@@ -855,10 +862,23 @@ public class RTTFileManager : MonoBehaviour
         }
     }
 
+    private Transform FindChildRecursive(Transform parent, string name)
+    {
+        foreach (Transform child in parent)
+        {
+            if (child.name == name) return child;
+            Transform found = FindChildRecursive(child, name);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
     private void CreateRow2(RectTransform parent)
     {
         Debug.Log("[RTTFileManager] CreateRow2 called");
-        RectTransform rowRT = CreateRowContainer(parent, "Row2", -_singleRowHeight);
+        // Position Row2 below Row1 with spacing
+        float row2Y = -(_singleRowHeight + _rowSpacing);
+        RectTransform rowRT = CreateRowContainer(parent, "Row2", row2Y);
 
         // Right: Refresh Button (Icon)
         Sprite refreshIcon = Resources.Load<Sprite>("icon_refresh");
@@ -867,11 +887,11 @@ public class RTTFileManager : MonoBehaviour
             label = "Refresh",
             icon = refreshIcon,
             themeColor = _accentColor,
-            width = 68f,
-            height = 68f,
+            width = 75f,  // +10% (was 68f)
+            height = 75f, // +10% (was 68f)
             iconOnly = true, // Hide text
-            iconSize = 35.2f, // Reduced 20% (Default ~44)
-            borderWidth = 0.04f, // Custom thicker border (Increased to match Sort/Search)
+            iconSize = 39f, // +10% (was 35.2f)
+            borderWidth = 0.04f,
             glowWidth = 0.08f,
             glowIntensity = 4f,
             popAmount = 0.05f
@@ -895,14 +915,14 @@ public class RTTFileManager : MonoBehaviour
         _itemCountText = countObj.AddComponent<TextMeshProUGUI>();
         _itemCountText.text = "0 items";
         _itemCountText.font = _font;
-        _itemCountText.fontSize = 28;
+        _itemCountText.fontSize = 31; // +10% (was 28)
         _itemCountText.fontStyle = FontStyles.Bold;
         _itemCountText.color = Color.white;
         _itemCountText.alignment = TextAlignmentOptions.Center;
         _itemCountText.raycastTarget = false;
 
         RectTransform countRT = countObj.GetComponent<RectTransform>();
-        countRT.sizeDelta = new Vector2(_sortTriggerWidth, 68f);
+        countRT.sizeDelta = new Vector2(_sortTriggerWidth, 75f); // +10% (was 68f)
         // Position symmetric to sortTrigger (same as New Folder button in Row 1)
         float countCenterFromCenter = _containerWidth / 4f + 203.5f;
         countRT.anchorMin = new Vector2(0.5f, 0.5f);
@@ -931,7 +951,9 @@ public class RTTFileManager : MonoBehaviour
 
     private void CreateRow3(RectTransform parent)
     {
-        RectTransform rowRT = CreateRowContainer(parent, "Row3", -_singleRowHeight * 2);
+        // Position Row3 below Row2 with spacing
+        float row3Y = -((_singleRowHeight + _rowSpacing) * 2);
+        RectTransform rowRT = CreateRowContainer(parent, "Row3", row3Y);
         rowRT.gameObject.SetActive(false); // Hidden by default
     }
 
@@ -963,12 +985,11 @@ public class RTTFileManager : MonoBehaviour
         
         var config = new VRInputFieldFactory.InputFieldConfig();
         config.label = "";
-        config.placeholder = "Search current folder..."; 
-        // Width = 3 * CellWidth (310) + 2 * SpacingX (30) = 990f. Excluding outer spacings.
-        config.width = 990f; 
+        config.placeholder = "Search current folder...";
+        config.width = 990f;
         config.themeColor = _primaryColor;
-        // Increase font size to 31 to achieve ~68f height (31 * 2.2 = 68.2)
-        config.inputFontSize = 31; 
+        // fontSize * 2.2 = height, so 34 * 2.2 = 74.8 ≈ 75
+        config.inputFontSize = 34;
         config.font = _font;
         
         // Match Button Visuals (Sharper, Brighter Border)
@@ -1009,8 +1030,8 @@ public class RTTFileManager : MonoBehaviour
             RectTransform iconRT = iconObj.AddComponent<RectTransform>();
             
             // Layout: Left aligned, vertically centered
-            float iconSize = 24f;
-            float leftPadding = 20f;
+            float iconSize = 30f;
+            float leftPadding = 26f; 
             
             iconRT.anchorMin = new Vector2(0, 0.5f);
             iconRT.anchorMax = new Vector2(0, 0.5f);
@@ -1023,14 +1044,25 @@ public class RTTFileManager : MonoBehaviour
             iconImg.color = new Color(1f, 1f, 1f, 0.8f); // Slightly transparent white
             
             // 3. Adjust Text Area Padding
-            // Find "Text Area" child (standard TMP InputField structure)
-            Transform textArea = searchBar.transform.Find("Text Area");
+            // Find "Text Area" recursively in the InputField hierarchy
+            float textOffset = iconSize;
+            Transform textArea = FindChildRecursive(searchBar.transform, "Text Area");
+
             if (textArea != null)
             {
                 RectTransform textAreaRT = textArea.GetComponent<RectTransform>();
-                // Push text to right: Icon Width + Padding + Spacing
-                float textOffset = leftPadding + iconSize + 10f; 
                 textAreaRT.offsetMin = new Vector2(textOffset, textAreaRT.offsetMin.y);
+                Debug.Log($"[RTTFileManager] Text Area found and offsetMin set to: {textAreaRT.offsetMin}");
+            }
+            else
+            {
+                // Fallback: adjust Placeholder and Text directly
+                var placeholder = searchBar.GetComponentInChildren<TMP_Text>();
+                if (placeholder != null)
+                {
+                    placeholder.margin = new Vector4(textOffset, 0, 0, 0);
+                    Debug.Log($"[RTTFileManager] Set placeholder margin to: {placeholder.margin}");
+                }
             }
         }
         // -------------------------------------
@@ -1039,7 +1071,7 @@ public class RTTFileManager : MonoBehaviour
         rt.anchorMin = new Vector2(0.5f, 0.5f);
         rt.anchorMax = new Vector2(0.5f, 0.5f);
         rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.sizeDelta = new Vector2(config.width, 68f); // Force height 68f to match buttons
+        rt.sizeDelta = new Vector2(config.width, 75f);
         rt.anchoredPosition = Vector2.zero;
     }
     
@@ -1184,7 +1216,7 @@ public class RTTFileManager : MonoBehaviour
 
         // Create breadcrumb chevron buttons (connected style like reference image)
         // Strategy: All buttons are pill-shaped, left buttons overlap right buttons
-        float btnHeight = 68f; // Same height as sortTrigger button
+        float btnHeight = 75f; // +10% (was 68f)
         float btnWidth = _sortTriggerWidth * 1.25f;
         int totalCount = breadcrumbs.Count;
 
@@ -1345,7 +1377,7 @@ public class RTTFileManager : MonoBehaviour
 
         TextMeshProUGUI txt = textObj.AddComponent<TextMeshProUGUI>();
         txt.text = label;
-        txt.fontSize = 22;
+        txt.fontSize = 24; // +10% (was 22)
         txt.font = _font;
         txt.color = Color.white;
         txt.alignment = TextAlignmentOptions.Center;
@@ -1388,7 +1420,7 @@ public class RTTFileManager : MonoBehaviour
         BoxCollider col = btnObj.AddComponent<BoxCollider>();
 
         // Calculate overlap amount
-        float overlapAmount = 68f * 0.45f; // ~30.6f
+        float overlapAmount = height * 0.45f; // Uses button height
         float safetyBuffer = 5f; // Extra buffer to ensure no overlap
 
         if (isFirstButton)
@@ -1448,8 +1480,8 @@ public class RTTFileManager : MonoBehaviour
     {
         if (_hiddenFolders.Count == 0) return;
 
-        float itemHeight = 50f;
-        float verticalPadding = 12f;
+        float itemHeight = 55f;       // +10% (was 50f)
+        float verticalPadding = 13f;   // +10% (was 12f)
         float popupHeight = (_hiddenFolders.Count * itemHeight) + (verticalPadding * 2);
 
         // Create popup container
@@ -1465,13 +1497,13 @@ public class RTTFileManager : MonoBehaviour
         popupRT.pivot = new Vector2(0, 1); // Top-left pivot
 
         // Get ellipsis button position (it's at index 1, so xPos = 1 * effectiveWidth)
-        float btnHeight = 68f;
-        float overlapAmount = btnHeight * 0.45f;
+        float btnHeightLocal = 75f; // +10% (was 68f)
+        float overlapAmount = btnHeightLocal * 0.45f;
         float btnWidth = _sortTriggerWidth * 1.25f;
         float effectiveWidth = btnWidth - overlapAmount;
         float ellipsisX = effectiveWidth; // Index 1 position
 
-        popupRT.anchoredPosition = new Vector2(ellipsisX, -btnHeight / 2 - 8f);
+        popupRT.anchoredPosition = new Vector2(ellipsisX, -btnHeightLocal / 2 - 8f);
 
         // Background matching VRDropdownFactory's dropdown panel style
         Image bgImage = _ellipsisPopup.AddComponent<Image>();
@@ -1530,7 +1562,7 @@ public class RTTFileManager : MonoBehaviour
     /// </summary>
     private void CreateEllipsisPopupItem(string folderName, string folderPath, int index, float itemHeight, float verticalPadding)
     {
-        float horizontalPadding = 20f;
+        float horizontalPadding = 22f; // +10% (was 20f)
 
         GameObject itemObj = new GameObject($"Item_{folderName}");
         itemObj.transform.SetParent(_ellipsisPopup.transform, false);
@@ -1582,7 +1614,7 @@ public class RTTFileManager : MonoBehaviour
         TextMeshProUGUI txt = textObj.AddComponent<TextMeshProUGUI>();
         txt.text = folderName;
         txt.font = _font;
-        txt.fontSize = 26;
+        txt.fontSize = 29; // +10% (was 26)
         txt.color = Color.white;
         txt.alignment = TextAlignmentOptions.MidlineLeft; // Left aligned
         txt.raycastTarget = false;
@@ -1841,5 +1873,74 @@ public class RTTFileManager : MonoBehaviour
         _fileDetail = contentObj.AddComponent<RTTFileDetail>();
         _fileDetail.Initialize(_primaryColor, _accentColor, _font);
     }
+    #endregion
+
+    #region Create Folder Popup
+
+    private void CreateFolderPopup()
+    {
+        if (_createFolderPopup != null) return;
+
+        var config = new RTTPopupInputable.PopupConfig
+        {
+            title = "CREATE FOLDER",
+            inputLabel = "Name",
+            inputPlaceholder = "Enter folder name",
+            buttonText = "Create",
+            width = 575f,        // +15% (was 500f)
+            padding = 33f,       // +10% (was 30f)
+            titleFontSize = 31,  // +10% (was 28)
+            labelFontSize = 24,  // +10% (was 22)
+            inputFontSize = 29,  // +10% (was 26)
+            buttonFontSize = 26, // +10% (was 24)
+            buttonHeight = 72f,  // +10% (was 65f)
+            inputHeight = 72f,   // +10% (was 65f)
+            titleHeight = 55f,   // +10% (was 50f)
+            closeButtonSize = 50f, // +10% (was 45f)
+            spacing = 22f,       // +10% (was 20f)
+            primaryColor = _primaryColor,
+            accentColor = _accentColor,
+            overlayColor = new Color(0f, 0f, 0f, 0.4f), // Lighter overlay
+            font = _font,
+            layerName = "UI"
+        };
+
+        // Create popup as child of Canvas (not transform) to be rendered by UICamera
+        // Use GetCanvas().transform to ensure it's within the RTT rendering system
+        Transform popupParent = _menuFrame.GetCanvas()?.transform ?? _menuFrame.ContentContainer;
+        _createFolderPopup = RTTPopupInputable.Create(popupParent, config);
+    }
+
+    private void ShowCreateFolderPopup()
+    {
+        // Create popup if not exists
+        if (_createFolderPopup == null)
+        {
+            CreateFolderPopup();
+        }
+
+        // Show with callbacks
+        _createFolderPopup.Show(
+            onConfirm: OnCreateFolderConfirmed,
+            onCancel: OnCreateFolderCancelled
+        );
+    }
+
+    private void OnCreateFolderConfirmed(string folderName)
+    {
+        Debug.Log($"[RTTFileManager] Create folder: {folderName}");
+
+        // Request controller to create the folder
+        if (_controller != null)
+        {
+            _controller.CreateFolder(folderName);
+        }
+    }
+
+    private void OnCreateFolderCancelled()
+    {
+        Debug.Log("[RTTFileManager] Create folder cancelled");
+    }
+
     #endregion
 }

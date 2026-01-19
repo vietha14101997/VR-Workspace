@@ -141,14 +141,17 @@ public class RTTFileGrid : MonoBehaviour
     }
 
     /// <summary>
-    /// Returns the number of complete rows that fit in the viewport for pagination purposes.
-    /// This excludes buffer rows and uses floor calculation for accurate page counting.
+    /// Returns the number of rows that fit in the viewport for pagination purposes.
+    /// Uses round instead of floor to handle borderline cases where rows almost fit.
     /// </summary>
     public int GetVisibleRowsForPagination()
     {
-        float availableHeight = _height - _paddingTop - _paddingBottom;
-        int visibleRows = Mathf.Max(1, Mathf.FloorToInt(availableHeight / _rowHeight));
-        Debug.Log($"[RTTFileGrid] GetVisibleRowsForPagination: height={_height}, availableHeight={availableHeight}, rowHeight={_rowHeight}, visibleRows={visibleRows}");
+        // Don't subtract bottom padding - it's for scroll aesthetics, not viewport capacity
+        float availableHeight = _height - _paddingTop;
+        float rowsFloat = availableHeight / _rowHeight;
+        // Use Round to count partially visible rows (>=50% visible counts as full row)
+        int visibleRows = Mathf.Max(1, Mathf.RoundToInt(rowsFloat));
+        Debug.Log($"[RTTFileGrid] GetVisibleRowsForPagination: height={_height}, availableHeight={availableHeight}, rowHeight={_rowHeight}, rowsFloat={rowsFloat}, visibleRows={visibleRows}");
         return visibleRows;
     }
 

@@ -73,7 +73,7 @@ public class RTTFileDetail : MonoBehaviour
 
         _nameText = nameObj.AddComponent<TextMeshProUGUI>();
         if (_font != null) _nameText.font = _font;
-        _nameText.fontSize = 32; // Match sortTrigger fontSize
+        _nameText.fontSize = 36;
         _nameText.fontStyle = FontStyles.Bold;
         _nameText.alignment = TextAlignmentOptions.Center;
         _nameText.color = Color.white;

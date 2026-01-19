@@ -30,9 +30,10 @@ public class RTTFileSidePanel : MonoBehaviour
     // Selection marker color
     private Color SELECTION_COLOR;
 
-    // Layout constants - synced with RTTFileDetail
-    private const float HEADER_HEIGHT = 68f;
+    // Layout constants - synced with RTTFileDetail and RTTFileManager header
+    private const float HEADER_HEIGHT = 75f;
     private const float TOP_PADDING = 45f;
+    private const float CONTENT_TOP_OFFSET = 142f;
     private const float MARKER_LEFT_OFFSET = 30f;
     private const float CONTENT_INDENT = 52f;
     private const float ITEM_HEIGHT = 60f;
@@ -81,16 +82,17 @@ public class RTTFileSidePanel : MonoBehaviour
         CreateHeader();
 
         // 2. Content Container for Nav Items
+        // Positioned to align first item with main panel's Row2 (breadcrumbs)
         GameObject contentObj = new GameObject("NavItemsContainer");
         contentObj.transform.SetParent(transform, false);
         var contentRT = contentObj.AddComponent<RectTransform>();
         contentRT.anchorMin = new Vector2(0, 0);
         contentRT.anchorMax = new Vector2(1, 1);
         contentRT.offsetMin = new Vector2(0, 0);
-        contentRT.offsetMax = new Vector2(0, -HEADER_HEIGHT - TOP_PADDING);
+        contentRT.offsetMax = new Vector2(0, -CONTENT_TOP_OFFSET);
 
         var contentLayout = contentObj.AddComponent<VerticalLayoutGroup>();
-        contentLayout.padding = new RectOffset(0, 0, 10, 10);
+        contentLayout.padding = new RectOffset(0, 0, 0, 10); // No top padding to align with breadcrumbs
         contentLayout.spacing = ITEM_SPACING;
         contentLayout.childAlignment = TextAnchor.UpperLeft;
         contentLayout.childControlWidth = true;
@@ -269,7 +271,7 @@ public class RTTFileSidePanel : MonoBehaviour
         var iconImg = iconObj.AddComponent<Image>();
         iconImg.sprite = iconSprite;
         iconImg.preserveAspect = true;
-        iconImg.color = new Color(1f, 1f, 1f, 0.7f);
+        iconImg.color = new Color(1f, 1f, 1f, 0.85f);
 
         // Text Label
         GameObject textObj = new GameObject("Label");
@@ -283,8 +285,9 @@ public class RTTFileSidePanel : MonoBehaviour
         var txt = textObj.AddComponent<TextMeshProUGUI>();
         txt.text = label;
         txt.font = _font;
-        txt.fontSize = 32;  // 50% larger
-        txt.color = new Color(1f, 1f, 1f, 0.7f);
+        txt.fontSize = 32;
+        txt.fontStyle = FontStyles.Bold;
+        txt.color = new Color(1f, 1f, 1f, 0.85f);
         txt.alignment = TextAlignmentOptions.MidlineLeft;
         txt.enableWordWrapping = false;
         txt.overflowMode = TextOverflowModes.Ellipsis;

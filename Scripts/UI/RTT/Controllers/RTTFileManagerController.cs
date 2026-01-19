@@ -366,6 +366,63 @@ public class RTTFileManagerController : MonoBehaviour
             NavigateTo(targetPath);
         }
     }
+
+    /// <summary>
+    /// Create a new folder in the current directory
+    /// </summary>
+    public void CreateFolder(string folderName)
+    {
+        if (string.IsNullOrWhiteSpace(folderName))
+        {
+            Debug.LogWarning("[Controller] Cannot create folder: name is empty");
+            return;
+        }
+
+        // Sanitize folder name
+        string sanitizedName = SanitizeFolderName(folderName);
+        if (string.IsNullOrEmpty(sanitizedName))
+        {
+            Debug.LogWarning("[Controller] Cannot create folder: invalid name after sanitization");
+            return;
+        }
+
+        string newFolderPath = System.IO.Path.Combine(_currentPath, sanitizedName);
+
+        try
+        {
+            if (Directory.Exists(newFolderPath))
+            {
+                Debug.LogWarning($"[Controller] Folder already exists: {newFolderPath}");
+                // TODO: Show error notification to user
+                return;
+            }
+
+            Directory.CreateDirectory(newFolderPath);
+            Debug.Log($"[Controller] Created folder: {newFolderPath}");
+
+            // Refresh current directory to show new folder
+            NavigateTo(_currentPath);
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[Controller] Failed to create folder: {e.Message}");
+            // TODO: Show error notification to user
+        }
+    }
+
+    private string SanitizeFolderName(string name)
+    {
+        // Remove invalid characters for file/folder names
+        char[] invalidChars = System.IO.Path.GetInvalidFileNameChars();
+        string result = name;
+
+        foreach (char c in invalidChars)
+        {
+            result = result.Replace(c.ToString(), "");
+        }
+
+        return result.Trim();
+    }
     #endregion
 }
 
