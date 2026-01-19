@@ -385,5 +385,32 @@ public class RTTFileGrid : MonoBehaviour
         }
         return null;
     }
+
+    /// <summary>
+    /// Get current scroll position (normalized 0-1, where 1 = top)
+    /// </summary>
+    public float GetScrollPosition()
+    {
+        if (_scrollRect == null) return 1f;
+        return _scrollRect.verticalNormalizedPosition;
+    }
+
+    /// <summary>
+    /// Set scroll position (normalized 0-1, where 1 = top)
+    /// </summary>
+    public void SetScrollPosition(float normalizedPosition)
+    {
+        if (_scrollRect == null) return;
+
+        // Stop any ongoing scroll animation
+        if (_scrollCoroutine != null)
+        {
+            StopCoroutine(_scrollCoroutine);
+            _scrollCoroutine = null;
+        }
+
+        _scrollRect.verticalNormalizedPosition = normalizedPosition;
+        UpdateVisibleItems();
+    }
     #endregion
 }

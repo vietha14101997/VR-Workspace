@@ -37,6 +37,11 @@ public class RTTFileManagerController : MonoBehaviour
     // Sort State
     private string _sortBy = "Name";
     private bool _sortAscending = true;
+
+    // Navigation history - stores first visible item index for each visited path
+    // Key: path, Value: first visible item index (0-based)
+    // Using item index instead of page number because Grid and List have different items per page
+    private Dictionary<string, int> _itemIndexHistory = new Dictionary<string, int>();
     #endregion
 
     #region Public API
@@ -86,7 +91,70 @@ public class RTTFileManagerController : MonoBehaviour
 
     public void NavigateTo(string path)
     {
-        Debug.Log($"[Controller] Navigating to: {path}");
+        NavigateToInternal(path, restorePage: false, clickedFolderPath: null);
+    }
+
+    /// <summary>
+    /// Navigate into a folder that was clicked. Saves the folder's index for accurate page restoration.
+    /// </summary>
+    public void NavigateToFolder(string folderPath)
+    {
+        NavigateToInternal(folderPath, restorePage: false, clickedFolderPath: folderPath);
+    }
+
+    /// <summary>
+    /// Navigate to a path via breadcrumb - restores saved page number if available
+    /// </summary>
+    public void NavigateBack(string path)
+    {
+        NavigateToInternal(path, restorePage: true, clickedFolderPath: null);
+    }
+
+    // Normalize path for history storage - treat "root" and RootPath as the same
+    private string NormalizePathForHistory(string path)
+    {
+        if (path == "root")
+            return FileSystemService.RootPath;
+        return path;
+    }
+
+    private void NavigateToInternal(string path, bool restorePage, string clickedFolderPath)
+    {
+        Debug.Log($"[Controller] NavigateToInternal: path='{path}', restorePage={restorePage}, clickedFolder='{clickedFolderPath}'");
+        Debug.Log($"[Controller] Current state: _currentPath='{_currentPath}', _currentPage={_currentPage}, _pageSize={_pageSize}");
+
+        // Normalize paths for comparison and history
+        string normalizedCurrentPath = NormalizePathForHistory(_currentPath);
+        string normalizedDestPath = NormalizePathForHistory(path);
+
+        // Save current item index before leaving (if we have a valid path and it's different from destination)
+        if (!string.IsNullOrEmpty(_currentPath) && normalizedCurrentPath != normalizedDestPath)
+        {
+            int itemIndexToSave;
+
+            // If we clicked on a folder, use that folder's index in the list
+            // This gives more accurate position when navigating back
+            if (!string.IsNullOrEmpty(clickedFolderPath))
+            {
+                int folderIndex = _filteredFiles.FindIndex(f => f.Path == clickedFolderPath);
+                itemIndexToSave = folderIndex >= 0 ? folderIndex : (_currentPage - 1) * _pageSize;
+                Debug.Log($"[Controller] Clicked folder index in list: {folderIndex}");
+            }
+            else
+            {
+                // Default: use first item of current page
+                itemIndexToSave = (_currentPage - 1) * _pageSize;
+            }
+
+            // Use normalized path as key for consistent save/restore
+            _itemIndexHistory[normalizedCurrentPath] = itemIndexToSave;
+            Debug.Log($"[Controller] SAVED: _itemIndexHistory['{normalizedCurrentPath}'] = {itemIndexToSave}");
+        }
+        else if (normalizedCurrentPath == normalizedDestPath)
+        {
+            Debug.Log($"[Controller] Same path (normalized), skipping save");
+        }
+
         _currentPath = path;
         _currentSearchQuery = ""; // Reset search state
 
@@ -99,8 +167,29 @@ public class RTTFileManagerController : MonoBehaviour
         // Apply current sort
         ApplySort();
 
-        // Reset to page 1
-        _currentPage = 1;
+        // Restore page from item index or reset to page 1
+        // Use normalized path as key for consistent save/restore
+        if (restorePage && _itemIndexHistory.TryGetValue(normalizedDestPath, out int savedItemIndex))
+        {
+            // Calculate page from saved item index using current pageSize
+            // page = (itemIndex / pageSize) + 1
+            int calculatedPage = (savedItemIndex / Mathf.Max(1, _pageSize)) + 1;
+            int totalPages = CalculateTotalPages();
+            _currentPage = Mathf.Clamp(calculatedPage, 1, totalPages);
+            Debug.Log($"[Controller] RESTORED: page={_currentPage} from _itemIndexHistory['{normalizedDestPath}']={savedItemIndex}, pageSize={_pageSize}, total={totalPages}");
+        }
+        else
+        {
+            _currentPage = 1;
+            if (restorePage)
+            {
+                Debug.Log($"[Controller] NO HISTORY for '{normalizedDestPath}' (path='{path}'), reset to page 1. History keys: [{string.Join(", ", _itemIndexHistory.Keys)}]");
+            }
+            else
+            {
+                Debug.Log($"[Controller] restorePage=false, reset to page 1");
+            }
+        }
 
         // Reset selection/hover on nav
         _selectedFile = null;
@@ -117,6 +206,35 @@ public class RTTFileManagerController : MonoBehaviour
         // Reload files (Mock logic: just re-fetch)
         _currentDirectoryFiles = FileSystemService.GetFiles(_currentPath);
         SearchFiles(_currentSearchQuery); // Re-apply search/filter
+    }
+
+    /// <summary>
+    /// Refresh current folder while keeping the current page position.
+    /// Used when switching between Grid/List view.
+    /// </summary>
+    public void RefreshCurrentFolderKeepPage()
+    {
+        Debug.Log("[Controller] Refreshing current folder (keep page)...");
+        // Reload files
+        _currentDirectoryFiles = FileSystemService.GetFiles(_currentPath);
+
+        // Re-apply filter without resetting page
+        if (string.IsNullOrEmpty(_currentSearchQuery))
+        {
+            _filteredFiles = new List<MockFile>(_currentDirectoryFiles);
+        }
+        else
+        {
+            _filteredFiles = _currentDirectoryFiles.FindAll(f => f.Name.IndexOf(_currentSearchQuery, StringComparison.OrdinalIgnoreCase) >= 0);
+        }
+
+        ApplySort();
+
+        // Clamp page to valid range (in case folder content changed)
+        int totalPages = CalculateTotalPages();
+        _currentPage = Mathf.Clamp(_currentPage, 1, totalPages);
+
+        UpdateView(true); // Full reload to update Grid/List
     }
 
     /// <summary>
@@ -177,9 +295,18 @@ public class RTTFileManagerController : MonoBehaviour
             return;
         }
 
-        Debug.Log($"[Controller] Page size changed: {_pageSize} -> {itemsPerPage}");
+        // Calculate current item index before changing page size
+        int currentItemIndex = (_currentPage - 1) * _pageSize;
+
+        Debug.Log($"[Controller] Page size changed: {_pageSize} -> {itemsPerPage}, currentItemIndex: {currentItemIndex}");
         _pageSize = Mathf.Max(1, itemsPerPage);
-        _currentPage = 1;
+
+        // Calculate new page from item index with new page size
+        int newPage = (currentItemIndex / _pageSize) + 1;
+        int totalPages = CalculateTotalPages();
+        _currentPage = Mathf.Clamp(newPage, 1, totalPages);
+
+        Debug.Log($"[Controller] New page: {_currentPage} (total: {totalPages})");
         UpdateView(false); // Recalculate pagination
     }
 

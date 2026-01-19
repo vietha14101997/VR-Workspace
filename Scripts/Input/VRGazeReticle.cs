@@ -655,6 +655,13 @@ public class VRGazeReticle : MonoBehaviour
             return;
         }
 
+        // If popup is open and target is popup background (not a button), skip dwell
+        if (hasOpenPopup && isPopupOption && !isDwellableTarget)
+        {
+            ResetDwellState();
+            return;
+        }
+
         // Calculate angle moved
         float angleMoved = Vector3.Angle(_lastGazeDirection, currentGazeDir);
 
@@ -1006,6 +1013,13 @@ public class VRGazeReticle : MonoBehaviour
 
         // If keyboard is open and target is keyboard background (not a button), skip dwell
         if (hasOpenKeyboard && isKeyboardPart && !isDwellableTarget)
+        {
+            ResetDwellState();
+            return;
+        }
+
+        // If popup is open and target is popup background (not a button), skip dwell
+        if (hasOpenPopup && isPopupOption && !isDwellableTarget)
         {
             ResetDwellState();
             return;

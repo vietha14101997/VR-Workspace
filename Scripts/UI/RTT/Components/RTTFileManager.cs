@@ -118,9 +118,12 @@ public class RTTFileManager : MonoBehaviour
         if (_rightFrame != null) Destroy(_rightFrame.gameObject);
         if (_pagination != null) Destroy(_pagination.gameObject);
 
-        // Destroy world-space popup (parented to camera, not to this object)
+        // Destroy world-space popups (not parented to this object)
         if (_createFolderPopup != null) Destroy(_createFolderPopup.gameObject);
         _createFolderPopup = null;
+
+        if (_viewOptionsPopup != null) Destroy(_viewOptionsPopup.gameObject);
+        _viewOptionsPopup = null;
     }
     
     private void OnEnable()
@@ -140,6 +143,9 @@ public class RTTFileManager : MonoBehaviour
         if (_leftFrame != null) _leftFrame.gameObject.SetActive(false);
         if (_rightFrame != null) _rightFrame.gameObject.SetActive(false);
         if (_pagination != null) _pagination.Hide();
+
+        // Hide world-space popup
+        if (_viewOptionsPopup != null) _viewOptionsPopup.Hide();
     }
 
     private void OnDestroy()
@@ -567,7 +573,10 @@ public class RTTFileManager : MonoBehaviour
     
     private void ToggleViewOptionsPopup()
     {
+        Debug.Log($"[RTTFileManager] ToggleViewOptionsPopup called, popup null: {_viewOptionsPopup == null}");
         if (_viewOptionsPopup == null) return;
+
+        Debug.Log($"[RTTFileManager] Popup IsVisible: {_viewOptionsPopup.IsVisible}");
 
         if (_viewOptionsPopup.IsVisible)
         {
@@ -599,9 +608,8 @@ public class RTTFileManager : MonoBehaviour
     
     private void CreateViewOptionsPopup(Transform parent)
     {
-        // Parent to Row1 so coordinates are relative to the Sort Button
-        // Sort Button is at (20, 0)
-        
+        Debug.Log($"[RTTFileManager] CreateViewOptionsPopup, _menuFrame null: {_menuFrame == null}");
+
         // Create popup config
         var config = new RTTPopupMenu.PopupConfig
         {
@@ -613,26 +621,50 @@ public class RTTFileManager : MonoBehaviour
             iconSize = 26f,     // +10% (was 24f)
             primaryColor = _primaryColor,
             accentColor = _accentColor,
-            font = _font
+            overlayColor = new Color(0f, 0f, 0f, 0.4f), // Dark overlay
+            font = _font,
+            layerName = "VirtualObjects"
         };
-        
-        // Create popup using RTTPopupMenu
-        _viewOptionsPopup = RTTPopupMenu.Create(parent, config);
+
+        // Create world-space popup (like RTTPopupInputable)
+        // Pass _menuFrame.transform as reference for positioning
+        _viewOptionsPopup = RTTPopupMenu.CreateWorldSpace(config, _menuFrame.transform);
+
+        Debug.Log($"[RTTFileManager] ViewOptionsPopup created, null: {_viewOptionsPopup == null}");
 
         // Subscribe to OnHide to reset arrow when popup closes from click-outside
         _viewOptionsPopup.OnHide += OnViewOptionsPopupHide;
 
-        // Override Anchor to Bottom-Left of parent (Sort Button)
-        // Sort Button Pivot is (0,0), so (0,0) relative to it is its Bottom-Left corner.
-        _viewOptionsPopup.SetAnchor(Vector2.zero, Vector2.zero, new Vector2(0, 1));
-
         // Build popup content
         BuildViewOptionsPopupContent();
-        
-        // Position the popup
-        // sortTrigger uses center pivot (0.5, 0.5), so offset X by -width/2 to align popup left edge with button left edge
-        // Y = below the button (37.5f = half of 75f button height)
-        _viewOptionsPopup.SetPosition(new Vector2(-_sortTriggerWidth / 2f, -37.5f - config.rowSpacing));
+
+        // Set position offset (relative to menu frame center, in logical pixels)
+        // Position below the header row, left-aligned with sortTrigger button
+        float popupWidth = config.width;
+
+        // X: popup left edge aligned with sortTrigger button's left edge
+        // sortTrigger center X = -containerWidth/4 - 203.5 (from CreateRow1)
+        // sortTrigger width = _sortTriggerWidth = 220
+        // sortTrigger left edge = center - width/2 = -containerWidth/4 - 203.5 - 110 = -containerWidth/4 - 313.5
+        // Popup center X = sortTrigger left + popupWidth/2
+        // Additional adjustment to align better visually
+        float sortTriggerCenterX = -_containerWidth / 4f - 203.5f;
+        float sortTriggerLeftX = sortTriggerCenterX - (_sortTriggerWidth / 2f);
+        float additionalOffset = 130f;
+        float offsetX = sortTriggerLeftX + (popupWidth / 2f) + additionalOffset;
+
+        // Y: popup top below header area
+        // Header takes approximately 200 logical pixels (Row1 + Row2 + spacing)
+        // Frame center is at 0, top is at +containerHeight/2
+        // Popup top should be at containerHeight/2 - headerHeight
+        float headerHeight = 200f; // Row1 + Row2 + margins
+        float estimatedPopupHeight = 450f; // DISPLAY AS + SORT BY + Ascending button
+        // Popup center Y = popup top - popupHeight/2
+        float offsetY = (_containerHeight / 2f) - headerHeight - (estimatedPopupHeight / 2f);
+
+        _viewOptionsPopup.SetPositionOffset(new Vector2(offsetX, offsetY));
+
+        Debug.Log($"[RTTFileManager] ViewOptionsPopup position offset: ({offsetX}, {offsetY})");
     }
     
     private void BuildViewOptionsPopupContent()
@@ -739,8 +771,8 @@ public class RTTFileManager : MonoBehaviour
         }
         _controller?.SetPageSize(itemsPerPage);
 
-        // Refresh content with current data
-        _controller?.RefreshCurrentFolder();
+        // Refresh content with current data (keep page position)
+        _controller?.RefreshCurrentFolderKeepPage();
 
         // Save preference
         SaveViewPreferences();
@@ -1238,7 +1270,7 @@ public class RTTFileManager : MonoBehaviour
         // Create breadcrumb chevron buttons (connected style like reference image)
         // Strategy: All buttons are pill-shaped, left buttons overlap right buttons
         float btnHeight = 75f; // +10% (was 68f)
-        float btnWidth = _sortTriggerWidth * 1.25f;
+        float btnWidth = _sortTriggerWidth * 1.2f;
         int totalCount = breadcrumbs.Count;
 
         // Create buttons in REVERSE order (right-to-left) for GraphicRaycaster priority
@@ -1428,8 +1460,8 @@ public class RTTFileManager : MonoBehaviour
 
         if (!isEllipsis)
         {
-            // Normal breadcrumb: navigate to folder
-            btn.onClick.AddListener(() => _controller?.NavigateTo(pathToNavigate));
+            // Normal breadcrumb: navigate back to folder (restores scroll position)
+            btn.onClick.AddListener(() => _controller?.NavigateBack(pathToNavigate));
         }
         else
         {
@@ -1504,6 +1536,8 @@ public class RTTFileManager : MonoBehaviour
         float itemHeight = 55f;       // +10% (was 50f)
         float verticalPadding = 13f;   // +10% (was 12f)
         float popupHeight = (_hiddenFolders.Count * itemHeight) + (verticalPadding * 2);
+
+        Debug.Log($"[EllipsisPopup] Creating popup: hiddenFolders={_hiddenFolders.Count}, itemHeight={itemHeight}, verticalPadding={verticalPadding}, popupHeight={popupHeight}, width={_ellipsisPopupWidth}");
 
         // Create popup container
         _ellipsisPopup = new GameObject("EllipsisPopup");
@@ -1585,7 +1619,7 @@ public class RTTFileManager : MonoBehaviour
     {
         float horizontalPadding = 22f; // +10% (was 20f)
 
-        GameObject itemObj = new GameObject($"Item_{folderName}");
+        GameObject itemObj = new GameObject($"Item_{index}_{folderName}");
         itemObj.transform.SetParent(_ellipsisPopup.transform, false);
 
         RectTransform itemRT = itemObj.AddComponent<RectTransform>();
@@ -1593,7 +1627,11 @@ public class RTTFileManager : MonoBehaviour
         itemRT.anchorMax = new Vector2(1, 1);
         itemRT.pivot = new Vector2(0.5f, 1);
         itemRT.sizeDelta = new Vector2(0, itemHeight);
-        itemRT.anchoredPosition = new Vector2(0, -verticalPadding - (index * itemHeight));
+
+        float yPos = -verticalPadding - (index * itemHeight);
+        itemRT.anchoredPosition = new Vector2(0, yPos);
+
+        Debug.Log($"[EllipsisPopup] Item {index} '{folderName}': yPos={yPos}, itemHeight={itemHeight}");
 
         // Background for hover effect (starts transparent)
         Image btnBg = itemObj.AddComponent<Image>();
@@ -1635,10 +1673,13 @@ public class RTTFileManager : MonoBehaviour
         TextMeshProUGUI txt = textObj.AddComponent<TextMeshProUGUI>();
         txt.text = folderName;
         txt.font = _font;
-        txt.fontSize = 29; // +10% (was 26)
+        txt.fontSize = 30;
         txt.color = Color.white;
-        txt.alignment = TextAlignmentOptions.MidlineLeft; // Left aligned
+        txt.alignment = TextAlignmentOptions.MidlineLeft;
         txt.raycastTarget = false;
+        txt.enableWordWrapping = false; // Single line - prevent wrap causing vertical expansion
+        txt.overflowMode = TextOverflowModes.Ellipsis; // Truncate with ... if too long
+        txt.maxVisibleLines = 1;
 
         // BoxCollider for VR raycast
         BoxCollider col = itemObj.AddComponent<BoxCollider>();
@@ -1666,8 +1707,8 @@ public class RTTFileManager : MonoBehaviour
             _ellipsisPopup.SetActive(false);
         }
 
-        // Navigate to selected folder
-        _controller?.NavigateTo(path);
+        // Navigate back to selected folder (restores scroll position)
+        _controller?.NavigateBack(path);
     }
 
     /// <summary>
@@ -1677,8 +1718,8 @@ public class RTTFileManager : MonoBehaviour
     {
         if (isFolder)
         {
-            // Navigate into the folder
-            _controller?.NavigateTo(path);
+            // Navigate into the folder (saves clicked folder's index for accurate back navigation)
+            _controller?.NavigateToFolder(path);
         }
         else
         {
@@ -1716,6 +1757,37 @@ public class RTTFileManager : MonoBehaviour
         {
             int visibleRows = _fileList.GetVisibleRowsForPagination();
             _fileList.ScrollToPage(page, visibleRows);
+        }
+    }
+
+    /// <summary>
+    /// Get current scroll position (normalized 0-1, where 1 = top)
+    /// </summary>
+    public float GetScrollPosition()
+    {
+        if (_isGridView && _fileGrid != null)
+        {
+            return _fileGrid.GetScrollPosition();
+        }
+        else if (!_isGridView && _fileList != null)
+        {
+            return _fileList.GetScrollPosition();
+        }
+        return 1f; // Default to top
+    }
+
+    /// <summary>
+    /// Set scroll position (normalized 0-1, where 1 = top)
+    /// </summary>
+    public void SetScrollPosition(float normalizedPosition)
+    {
+        if (_isGridView && _fileGrid != null)
+        {
+            _fileGrid.SetScrollPosition(normalizedPosition);
+        }
+        else if (!_isGridView && _fileList != null)
+        {
+            _fileList.SetScrollPosition(normalizedPosition);
         }
     }
 
