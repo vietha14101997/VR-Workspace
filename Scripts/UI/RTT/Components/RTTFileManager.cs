@@ -55,6 +55,9 @@ public class RTTFileManager : MonoBehaviour
     private CanvasGroup _copyButtonCG;
     private CanvasGroup _moveButtonCG;
     private CanvasGroup _deleteButtonCG;
+
+    // Delete Confirmation Popup
+    private RTTPopupMenu _deleteConfirmPopup;
     #endregion
 
     #region Initialization
@@ -141,6 +144,9 @@ public class RTTFileManager : MonoBehaviour
 
         if (_viewOptionsPopup != null) Destroy(_viewOptionsPopup.gameObject);
         _viewOptionsPopup = null;
+
+        if (_deleteConfirmPopup != null) Destroy(_deleteConfirmPopup.gameObject);
+        _deleteConfirmPopup = null;
     }
     
     private void OnEnable()
@@ -1120,29 +1126,13 @@ public class RTTFileManager : MonoBehaviour
         checkboxButton.transition = Selectable.Transition.None;
         checkboxButton.onClick.AddListener(OnSelectAllClicked);
 
-        // Add hover effects to checkbox
+        // Add scale hover effect to checkbox (no color change)
         var checkboxHoverController = _selectAllCheckbox.AddComponent<HoverEffectController>();
-        checkboxHoverController.TargetVisuals = _selectAllCheckbox.transform; // Set before adding effects
+        checkboxHoverController.TargetVisuals = _selectAllCheckbox.transform;
         var checkboxScaleEffect = new ScaleHoverEffect()
             .WithHoverScale(1.1f)
             .WithTransitionDuration(0.1f);
         checkboxHoverController.AddEffect(checkboxScaleEffect);
-
-        // Background color change on hover (keep alpha, change RGB to accent)
-        Material checkboxMat = checkboxBg.material;
-        Color cbNormalColorA = new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.3f);
-        Color cbNormalColorB = new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.1f);
-        Color cbHoverColorA = new Color(_accentColor.r, _accentColor.g, _accentColor.b, 0.3f);
-        Color cbHoverColorB = new Color(_accentColor.r, _accentColor.g, _accentColor.b, 0.1f);
-
-        checkboxHoverController.OnHoverStateChanged += (isHovered) =>
-        {
-            if (checkboxMat != null)
-            {
-                checkboxMat.SetColor("_ColorA", isHovered ? cbHoverColorA : cbNormalColorA);
-                checkboxMat.SetColor("_ColorB", isHovered ? cbHoverColorB : cbNormalColorB);
-            }
-        };
 
         // Label "Select all"
         GameObject labelObj = new GameObject("Label");
@@ -1310,13 +1300,16 @@ public class RTTFileManager : MonoBehaviour
             iconImg.sprite = Resources.Load<Sprite>(_isEditMode ? "icon_check_mark" : "icon_edit");
         }
 
-        // Change border/glow color
-        var border = _editButton.transform.Find("HitArea/Visuals/Border")?.GetComponent<Image>();
-        if (border?.material != null)
+        // Calculate target color (lerp with white like VRButtonFactory does)
+        Color themeColor = _isEditMode ? _accentColor : _primaryColor;
+        Color glowColor = Color.Lerp(themeColor, Color.white, 0.75f);
+
+        // Update GlowBorderHoverEffect's saved color so it persists through hover state changes
+        var hoverController = _editButton.transform.Find("HitArea")?.GetComponent<HoverEffectController>();
+        if (hoverController != null)
         {
-            Color targetColor = _isEditMode ? _accentColor : _primaryColor;
-            border.material.SetColor("_BorderColor", targetColor);
-            border.material.SetColor("_GlowColor", targetColor);
+            var glowEffect = hoverController.GetEffect("glow_border") as GlowBorderHoverEffect;
+            glowEffect?.UpdateSavedGlowColor(glowColor);
         }
     }
 
@@ -1396,8 +1389,126 @@ public class RTTFileManager : MonoBehaviour
 
     private void OnDeleteClicked()
     {
-        Debug.Log("[RTTFileManager] Delete clicked - selected items: " + _selectedItems.Count);
-        // TODO: Implement delete functionality
+        var selectedPaths = GetCurrentSelectedPaths();
+        Debug.Log("[RTTFileManager] Delete clicked - selected items: " + selectedPaths.Count);
+
+        if (selectedPaths.Count == 0)
+        {
+            Debug.LogWarning("[RTTFileManager] No items selected for deletion");
+            return;
+        }
+
+        ShowDeleteConfirmPopup();
+    }
+
+    private HashSet<string> GetCurrentSelectedPaths()
+    {
+        if (_fileGrid != null && _fileGrid.gameObject.activeInHierarchy)
+            return _fileGrid.GetSelectedPaths();
+        else if (_fileList != null && _fileList.gameObject.activeInHierarchy)
+            return _fileList.GetSelectedPaths();
+        return new HashSet<string>();
+    }
+
+    private void CreateDeleteConfirmPopup()
+    {
+        if (_deleteConfirmPopup != null) return;
+
+        // Match RTTPopupInputable styling
+        var config = new RTTPopupMenu.PopupConfig
+        {
+            width = 500f,
+            buttonHeight = 60f,
+            sideSpacing = 20f,
+            rowSpacing = 10f,
+            labelHeight = 50f,
+            labelFontSize = 32,  // Match RTTPopupInputable.titleFontSize
+            fontSize = 24,       // Match RTTPopupInputable.buttonFontSize
+            borderWidth = 0.028f,
+            primaryColor = _primaryColor,
+            accentColor = _accentColor,
+            overlayColor = new Color(0f, 0f, 0f, 0.4f), // Match New Folder popup
+            font = _font,
+            layerName = "VirtualObjects",
+            // Button styling (match RTTPopupInputable.CreateActionButton)
+            buttonBorderWidth = 0.04f,
+            buttonGlowWidth = 0.08f,
+            buttonGlowIntensity = 4f,
+            buttonCornerRadius = 0.12f
+        };
+
+        _deleteConfirmPopup = RTTPopupMenu.CreateWorldSpace(config, _menuFrame.transform);
+    }
+
+    private void ShowDeleteConfirmPopup()
+    {
+        if (_deleteConfirmPopup == null)
+        {
+            CreateDeleteConfirmPopup();
+        }
+
+        // Clear previous content and rebuild
+        _deleteConfirmPopup.Clear();
+
+        // Build confirmation message
+        var selectedPaths = GetCurrentSelectedPaths();
+        int count = selectedPaths.Count;
+        string itemText = count == 1 ? "item" : "items";
+        string title = $"Delete {count} {itemText}?";
+
+        // Add title section
+        _deleteConfirmPopup.AddSectionBlock(title, new List<RTTPopupMenu.ButtonData>());
+
+        // Add Yes/No buttons (accent for Yes, primary for No)
+        var yesButton = new RTTPopupMenu.ButtonData(
+            "Yes",
+            OnDeleteConfirmed,
+            null,
+            false,
+            _accentColor // Accent color (magenta/pink)
+        );
+
+        var noButton = new RTTPopupMenu.ButtonData(
+            "No",
+            OnDeleteCancelled,
+            null,
+            false,
+            _primaryColor // Primary color (cyan)
+        );
+
+        _deleteConfirmPopup.AddSectionBlock("", new List<RTTPopupMenu.ButtonData> { yesButton, noButton }, 2);
+
+        _deleteConfirmPopup.Build();
+        _deleteConfirmPopup.Show();
+    }
+
+    private void OnDeleteConfirmed()
+    {
+        var selectedPaths = GetCurrentSelectedPaths();
+        Debug.Log("[RTTFileManager] Delete confirmed - deleting " + selectedPaths.Count + " items");
+
+        // Hide popup
+        if (_deleteConfirmPopup != null)
+        {
+            _deleteConfirmPopup.Hide();
+        }
+
+        // Call controller to delete items
+        var itemsToDelete = new List<string>(selectedPaths);
+        _controller?.DeleteItems(itemsToDelete);
+
+        // Exit edit mode (which also clears selections in grid/list)
+        ToggleEditMode();
+    }
+
+    private void OnDeleteCancelled()
+    {
+        Debug.Log("[RTTFileManager] Delete cancelled");
+
+        if (_deleteConfirmPopup != null)
+        {
+            _deleteConfirmPopup.Hide();
+        }
     }
     #endregion
 

@@ -310,5 +310,22 @@ namespace VRWorkspace.UI.HoverEffects
         }
 
         #endregion
+
+        #region Runtime Updates
+
+        /// <summary>
+        /// Update the saved glow color so it persists through hover state changes.
+        /// Call this when changing the button's theme color at runtime.
+        /// </summary>
+        public void UpdateSavedGlowColor(Color newColor)
+        {
+            _savedGlowColor = newColor;
+            if (_borderMaterial != null && _borderMaterial.HasProperty("_GlowColor"))
+            {
+                _borderMaterial.SetColor("_GlowColor", newColor);
+            }
+        }
+
+        #endregion
     }
 }

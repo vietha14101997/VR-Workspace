@@ -35,14 +35,23 @@ public class RTTPopupMenu : MonoBehaviour
         public float sideSpacing = 10f;   // Spacing between sections and padding
         public float rowSpacing = 8f;     // Spacing between button rows in grid
         public float labelHeight = 18f;
-        public int fontSize = 15;
+        public int labelFontSize = 18;  // Font size for section labels/titles
+        public int fontSize = 15;       // Font size for buttons
         public float iconSize = 20f;
+        public float borderWidth = 0.028f; // Popup border thickness (shader normalized value)
+        public float glassAlpha = 0.55f;  // Popup background transparency (match RTTPopupInputable)
         public Color backgroundColor = new Color(0.12f, 0.12f, 0.16f, 0.96f);
         public Color primaryColor = new Color(0f, 0.9f, 1f);
         public Color accentColor = new Color(0.76f, 0.36f, 1f);
         public Color overlayColor = new Color(0f, 0f, 0f, 0.4f); // Overlay darkness
         public TMP_FontAsset font;
         public string layerName = "VirtualObjects";
+
+        // Button styling (like sortTrigger style)
+        public float buttonBorderWidth = 0.04f;
+        public float buttonGlowWidth = 0.08f;
+        public float buttonGlowIntensity = 4f;
+        public float buttonCornerRadius = 0.12f;
     }
 
     /// <summary>
@@ -884,11 +893,11 @@ public class RTTPopupMenu : MonoBehaviour
             mat.SetFloat("_EdgePadding", 0.01f);
             mat.SetFloat("_Aspect", _config.width / 100f);
 
-            Color glassColorA = new Color(0.0f, 0.55f, 0.65f, 0.35f);
-            Color glassColorB = new Color(0.30f, 0.12f, 0.50f, 0.32f);
+            Color glassColorA = new Color(0.0f, 0.55f, 0.65f, 0.25f);
+            Color glassColorB = new Color(0.30f, 0.12f, 0.50f, 0.22f);
             mat.SetColor("_ColorA", glassColorA);
             mat.SetColor("_ColorB", glassColorB);
-            mat.SetFloat("_GlassAlpha", 0.75f);
+            mat.SetFloat("_GlassAlpha", _config.glassAlpha);
             mat.SetFloat("_GradientOffset", 0f);
             mat.SetFloat("_GradientAngle", -10f);
             mat.SetFloat("_CyanRatio", 0.7f);
@@ -924,18 +933,20 @@ public class RTTPopupMenu : MonoBehaviour
         {
             Material mat = new Material(glowShader);
             mat.SetFloat("_StrokeEnabled", 0);
-            mat.SetFloat("_BorderWidth", 0.028f);
+            mat.SetFloat("_BorderWidth", _config.borderWidth);
             mat.SetFloat("_CornerRadius", 0.04f);
             mat.SetFloat("_EdgePadding", 0.01f);
             mat.SetFloat("_Aspect", _config.width / 100f);
 
-            mat.SetFloat("_Layer1Width", 0.006f);
+            // Scale layer widths based on border width ratio
+            float borderScale = _config.borderWidth / 0.028f;
+            mat.SetFloat("_Layer1Width", 0.006f * borderScale);
             mat.SetFloat("_Layer1Alpha", 1.2f);
-            mat.SetFloat("_Layer2Width", 0.01f);
+            mat.SetFloat("_Layer2Width", 0.01f * borderScale);
             mat.SetFloat("_Layer2Alpha", 0.8f);
-            mat.SetFloat("_Layer3Width", 0.015f);
+            mat.SetFloat("_Layer3Width", 0.015f * borderScale);
             mat.SetFloat("_Layer3Alpha", 0.4f);
-            mat.SetFloat("_Layer4Width", 0.02f);
+            mat.SetFloat("_Layer4Width", 0.02f * borderScale);
             mat.SetFloat("_Layer4Alpha", 0.2f);
 
             Color glowColorA = new Color(0.3f, 1f, 1f, 1f);
@@ -948,8 +959,8 @@ public class RTTPopupMenu : MonoBehaviour
             mat.SetColor("_GlassTint", new Color(0.9f, 0.95f, 1f, 1f));
             mat.SetFloat("_ShimmerSpeed", 0.4f);
             mat.SetFloat("_ShimmerIntensity", 0.2f);
-            mat.SetFloat("_LightSize", 0.008f);
-            mat.SetFloat("_LightGlow", 0.008f);
+            mat.SetFloat("_LightSize", 0.008f * borderScale);
+            mat.SetFloat("_LightGlow", 0.008f * borderScale);
 
             borderImg.material = mat;
             _borderMaterial = mat;
@@ -1071,12 +1082,12 @@ public class RTTPopupMenu : MonoBehaviour
 
         TextMeshProUGUI label = labelObj.AddComponent<TextMeshProUGUI>();
         label.text = text;
-        label.fontSize = 18;
+        label.fontSize = _config.labelFontSize;
         label.font = _config.font;
         label.color = Color.white;
         label.fontStyle = FontStyles.Bold;
-        label.alignment = TextAlignmentOptions.Left;
-        label.margin = new Vector4(4f, 0, 0, 0);
+        label.alignment = TextAlignmentOptions.Center;
+        label.margin = Vector4.zero;
         label.raycastTarget = false;
 
         LayoutElement le = labelObj.AddComponent<LayoutElement>();
@@ -1087,36 +1098,34 @@ public class RTTPopupMenu : MonoBehaviour
     {
         Color btnColor = data.color ?? (data.isSelected ? _config.accentColor : _config.primaryColor);
 
-        GameObject btn = VRButtonFactory.CreateTextButton(
-            parent as RectTransform, width, _config.buttonHeight,
-            data.text, btnColor,
-            data.onClick, _config.fontSize, _config.font
-        );
+        // Use full ButtonConfig for better styling
+        var btnConfig = new VRButtonFactory.ButtonConfig
+        {
+            label = data.text,
+            icon = data.icon,
+            themeColor = btnColor,
+            width = width,
+            height = _config.buttonHeight,
+            fontSize = _config.fontSize,
+            font = _config.font,
+            textOnly = data.icon == null,
+            horizontalLayout = data.icon != null,
+            iconSize = _config.iconSize,
+            // Better button styling
+            borderWidth = _config.buttonBorderWidth,
+            glowWidth = _config.buttonGlowWidth,
+            glowIntensity = _config.buttonGlowIntensity,
+            cornerRadius = _config.buttonCornerRadius,
+            popAmount = 0.05f,
+            layerName = _config.layerName
+        };
+
+        GameObject btn = VRButtonFactory.CreateButton(parent, btnConfig, data.onClick);
 
         if (data.isSelected)
         {
             var clickLock = btn.AddComponent<VRButtonClickLock>();
             clickLock.Lock();
-        }
-
-        if (data.icon != null)
-        {
-            GameObject iconObj = new GameObject("Icon");
-            iconObj.transform.SetParent(btn.transform, false);
-
-            Image iconImg = iconObj.AddComponent<Image>();
-            iconImg.sprite = data.icon;
-            iconImg.color = Color.white;
-            iconImg.raycastTarget = false;
-
-            RectTransform iconRT = iconObj.GetComponent<RectTransform>();
-            iconRT.anchorMin = new Vector2(0, 0.5f);
-            iconRT.anchorMax = new Vector2(0, 0.5f);
-            iconRT.pivot = new Vector2(0, 0.5f);
-
-            float size = _config.iconSize;
-            iconRT.sizeDelta = new Vector2(size, size);
-            iconRT.anchoredPosition = new Vector2(16f, 0);
         }
 
         LayoutElement le = btn.GetComponent<LayoutElement>();

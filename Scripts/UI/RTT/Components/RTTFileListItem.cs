@@ -38,6 +38,7 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
     // Edit Mode Checkbox
     private GameObject _checkbox;
     private Image _checkmarkIcon;
+    private HoverEffectController _checkboxHoverController;
     private bool _isSelected = false;
     private bool _isEditMode = false;
     private Action<string, bool> _onSelectionChanged; // path, isSelected
@@ -243,29 +244,12 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         checkboxButton.onClick.AddListener(OnCheckboxClicked);
 
         // Hover effect for checkbox
-        var hoverController = _checkbox.AddComponent<HoverEffectController>();
-        hoverController.TargetVisuals = _checkbox.transform;
+        _checkboxHoverController = _checkbox.AddComponent<HoverEffectController>();
+        _checkboxHoverController.TargetVisuals = _checkbox.transform;
         var scaleEffect = new ScaleHoverEffect()
             .WithHoverScale(1.15f)
             .WithTransitionDuration(0.1f);
-        hoverController.AddEffect(scaleEffect);
-
-        // Background color change on hover (keep alpha, change RGB to accent)
-        Material checkboxMat = checkboxBg.material;
-        Color accentColor = new Color(1f, 0.4f, 0.7f); // Pink accent
-        Color normalColorA = new Color(primaryColor.r, primaryColor.g, primaryColor.b, 0.4f);
-        Color normalColorB = new Color(primaryColor.r, primaryColor.g, primaryColor.b, 0.15f);
-        Color hoverColorA = new Color(accentColor.r, accentColor.g, accentColor.b, 0.4f);
-        Color hoverColorB = new Color(accentColor.r, accentColor.g, accentColor.b, 0.15f);
-
-        hoverController.OnHoverStateChanged += (isHovered) =>
-        {
-            if (checkboxMat != null)
-            {
-                checkboxMat.SetColor("_ColorA", isHovered ? hoverColorA : normalColorA);
-                checkboxMat.SetColor("_ColorB", isHovered ? hoverColorB : normalColorB);
-            }
-        };
+        _checkboxHoverController.AddEffect(scaleEffect);
 
         // Hidden by default (only shown in Edit Mode)
         _checkbox.SetActive(false);
@@ -394,7 +378,9 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         if (_background != null)
             _background.color = HoverColor;
 
-        // Note: HoverEffectController handles scale effect automatically via IPointerEnterHandler
+        // Forward hover to checkbox in edit mode
+        if (_isEditMode && _checkboxHoverController != null)
+            _checkboxHoverController.SetForceHover(true);
 
         _onHoverEnter?.Invoke(FilePath);
     }
@@ -404,7 +390,9 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         if (_background != null)
             _background.color = NormalColor;
 
-        // Note: HoverEffectController handles scale effect automatically via IPointerExitHandler
+        // Forward hover exit to checkbox in edit mode
+        if (_isEditMode && _checkboxHoverController != null)
+            _checkboxHoverController.SetForceHover(false);
 
         _onHoverExit?.Invoke(FilePath);
     }

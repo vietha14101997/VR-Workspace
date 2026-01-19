@@ -561,6 +561,60 @@ public class RTTFileManagerController : MonoBehaviour
 
         return result.Trim();
     }
+
+    /// <summary>
+    /// Delete multiple files/folders.
+    /// </summary>
+    public void DeleteItems(List<string> paths)
+    {
+        if (paths == null || paths.Count == 0)
+        {
+            Debug.LogWarning("[Controller] No items to delete");
+            return;
+        }
+
+        int successCount = 0;
+        int failCount = 0;
+
+        foreach (string path in paths)
+        {
+            try
+            {
+                if (Directory.Exists(path))
+                {
+                    // Delete folder recursively
+                    Directory.Delete(path, recursive: true);
+                    Debug.Log($"[Controller] Deleted folder: {path}");
+                    successCount++;
+                }
+                else if (File.Exists(path))
+                {
+                    // Delete file
+                    File.Delete(path);
+                    Debug.Log($"[Controller] Deleted file: {path}");
+                    successCount++;
+                }
+                else
+                {
+                    Debug.LogWarning($"[Controller] Item not found: {path}");
+                    failCount++;
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[Controller] Failed to delete {path}: {e.Message}");
+                failCount++;
+            }
+        }
+
+        Debug.Log($"[Controller] Delete completed: {successCount} succeeded, {failCount} failed");
+
+        // Refresh current directory to reflect changes
+        if (successCount > 0)
+        {
+            NavigateTo(_currentPath);
+        }
+    }
     #endregion
 }
 
