@@ -95,9 +95,15 @@ namespace VRWorkspace.ViewModels
 
         /// <summary>
         /// Cursor position update from server.
-        /// Parameters: monitorIndex, u (0-1), v (0-1), visible
+        /// Parameters: monitorIndex, u (0-1), v (0-1), visible, cursorType, cursorId
         /// </summary>
-        public event Action<int, float, float, bool> OnCursorPositionChanged;
+        public event Action<int, float, float, bool, CursorType, long> OnCursorPositionChanged;
+
+        /// <summary>
+        /// Cursor image received from server.
+        /// Parameters: cursorId, cursorType, texture, hotspotX, hotspotY
+        /// </summary>
+        public event Action<long, CursorType, Texture2D, int, int> OnCursorImageReceived;
 
         /// <summary>
         /// Fired when START button is clicked with new flow.
@@ -697,11 +703,18 @@ namespace VRWorkspace.ViewModels
                 IsStreaming.Value = false;
             };
 
-            _client.OnCursorPosition += (monitorIndex, u, v, visible) =>
+            _client.OnCursorPosition += (monitorIndex, u, v, visible, cursorType, cursorId) =>
             {
                 if (_clientGeneration != subscribedGeneration) return;
                 // Forward cursor position to UI (already on main thread from PhaseProtocolClient)
-                OnCursorPositionChanged?.Invoke(monitorIndex, u, v, visible);
+                OnCursorPositionChanged?.Invoke(monitorIndex, u, v, visible, cursorType, cursorId);
+            };
+
+            _client.OnCursorImageReceived += (cursorId, cursorType, texture, hotspotX, hotspotY) =>
+            {
+                if (_clientGeneration != subscribedGeneration) return;
+                // Forward cursor image to UI
+                OnCursorImageReceived?.Invoke(cursorId, cursorType, texture, hotspotX, hotspotY);
             };
 
             _client.OnSpeedTestProgress += (direction, mbps, progress) =>

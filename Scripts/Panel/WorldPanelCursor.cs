@@ -1,5 +1,8 @@
 using UnityEngine;
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using VRWorkspace.Streaming;
 
 [ExecuteAlways]
 public class WorldPanelCursor : MonoBehaviour
@@ -18,6 +21,10 @@ public class WorldPanelCursor : MonoBehaviour
     [Range(0, 1)] public float v = 0.5f;      // UV.y trong [0..1]
     public bool visible = false;
 
+    [Header("Cursor State")]
+    public CursorType currentCursorType = CursorType.Arrow;
+    public long currentCursorId = 0;
+
     MeshRenderer _mr;
     MeshFilter _mf;
     Material _mat;
@@ -28,6 +35,121 @@ public class WorldPanelCursor : MonoBehaviour
     public Action<float, float> onMovedUV;    // (u,v)
     public Action onClickDown;
     public Action onClickUp;
+
+    // ==================== Static Cursor Cache ====================
+
+    /// <summary>
+    /// Cache entry for cursor textures received from server.
+    /// </summary>
+    public struct CursorCacheEntry
+    {
+        public Texture2D texture;
+        public int hotspotX;
+        public int hotspotY;
+        public long lastUsedTicks;
+    }
+
+    /// <summary>
+    /// Static cache for all cursor textures received from server.
+    /// Key is cursorId (server's hCursor handle as Int64).
+    /// </summary>
+    private static Dictionary<long, CursorCacheEntry> _cursorCache = new Dictionary<long, CursorCacheEntry>();
+
+    private const int MAX_CACHE_SIZE = 100;
+
+    /// <summary>
+    /// Cache a cursor texture received from server.
+    /// </summary>
+    public static void CacheCursor(long cursorId, Texture2D texture, int hotspotX, int hotspotY)
+    {
+        // LRU eviction if cache exceeds limit
+        if (_cursorCache.Count >= MAX_CACHE_SIZE && !_cursorCache.ContainsKey(cursorId))
+        {
+            // Find and remove oldest entry
+            var oldest = _cursorCache.OrderBy(kv => kv.Value.lastUsedTicks).First();
+            if (oldest.Value.texture != null)
+                Destroy(oldest.Value.texture);
+            _cursorCache.Remove(oldest.Key);
+        }
+
+        _cursorCache[cursorId] = new CursorCacheEntry
+        {
+            texture = texture,
+            hotspotX = hotspotX,
+            hotspotY = hotspotY,
+            lastUsedTicks = DateTime.Now.Ticks
+        };
+    }
+
+    /// <summary>
+    /// Check if a cursor is in the cache.
+    /// </summary>
+    public static bool HasCursor(long cursorId)
+    {
+        return _cursorCache.ContainsKey(cursorId);
+    }
+
+    /// <summary>
+    /// Try to get a cursor from cache.
+    /// </summary>
+    public static bool TryGetCursor(long cursorId, out CursorCacheEntry entry)
+    {
+        if (_cursorCache.TryGetValue(cursorId, out entry))
+        {
+            // Update last used time
+            entry.lastUsedTicks = DateTime.Now.Ticks;
+            _cursorCache[cursorId] = entry;
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Clear all cached cursors.
+    /// </summary>
+    public static void ClearCache()
+    {
+        foreach (var entry in _cursorCache.Values)
+        {
+            if (entry.texture != null)
+                Destroy(entry.texture);
+        }
+        _cursorCache.Clear();
+        Debug.Log("[WorldPanelCursor] Cursor cache cleared");
+    }
+
+    /// <summary>
+    /// Set cursor by ID from cache.
+    /// Returns true if cursor was found and applied.
+    /// </summary>
+    public bool SetCursorById(long cursorId)
+    {
+        currentCursorId = cursorId;
+
+        if (TryGetCursor(cursorId, out var entry))
+        {
+            if (entry.texture != null && entry.texture != cursorTexture)
+            {
+                cursorTexture = entry.texture;
+                ApplyCursorTexture();
+            }
+            return true;
+        }
+        // Cursor not in cache yet - wait for cursor_image message
+        return false;
+    }
+
+    /// <summary>
+    /// Apply current cursor texture to material.
+    /// </summary>
+    private void ApplyCursorTexture()
+    {
+        EnsureBuilt();
+        if (_mr?.sharedMaterial != null && cursorTexture != null)
+        {
+            _mr.sharedMaterial.SetTexture("_MainTex", cursorTexture);
+        }
+    }
 
     void EnsureBuilt()
     {

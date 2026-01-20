@@ -12,6 +12,30 @@ using VRWorkspace.Native;
 namespace VRWorkspace.Streaming
 {
     /// <summary>
+    /// Cursor type enum matching Windows system cursors.
+    /// Values must match server-side CursorType enum.
+    /// </summary>
+    public enum CursorType
+    {
+        Unknown = 0,
+        Arrow = 1,
+        IBeam = 2,
+        Wait = 3,
+        Cross = 4,
+        SizeNWSE = 5,
+        SizeNESW = 6,
+        SizeWE = 7,
+        SizeNS = 8,
+        SizeAll = 9,
+        No = 10,
+        Hand = 11,
+        AppStarting = 12,
+        Help = 13,
+        UpArrow = 14,
+        Custom = 99
+    }
+
+    /// <summary>
     /// Client-side handler for 3-phase connection protocol.
     /// Manages WebSocket connection, phase transitions, and WebRTC setup.
     /// </summary>
@@ -70,7 +94,8 @@ namespace VRWorkspace.Streaming
         public event Action OnStreamingStarted;
         public event Action<string> OnError;
         public event Action OnDisconnected;
-        public event Action<int, float, float, bool> OnCursorPosition; // monitorIndex, u, v, visible
+        public event Action<int, float, float, bool, CursorType, long> OnCursorPosition; // monitorIndex, u, v, visible, cursorType, cursorId
+        public event Action<long, CursorType, Texture2D, int, int> OnCursorImageReceived; // cursorId, cursorType, texture, hotspotX, hotspotY
         public event Action<int, float> OnFpsAdjusted; // monitorIndex, targetFps - server adjusted encoding FPS
         public event Action<long, long> OnFrameTimingReceived; // serverTime, clockOffset - for latency calculation
 
@@ -1282,6 +1307,10 @@ namespace VRWorkspace.Streaming
 
                         case "cursor_position":
                             HandleCursorPosition(json);
+                            break;
+
+                        case "cursor_image":
+                            HandleCursorImage(json);
                             break;
 
                         case "error":
@@ -3416,9 +3445,87 @@ namespace VRWorkspace.Streaming
             float u = json.GetFloat("u");
             float v = json.GetFloat("v");
             bool visible = json.GetBool("visible");
+            int cursorTypeInt = json.GetInt("cursorType", 1); // Default: Arrow
+            long cursorId = json.GetLong("cursorId", 0);
+            CursorType cursorType = (CursorType)cursorTypeInt;
 
             // Invoke event for ConnectionViewModel to handle
-            OnCursorPosition?.Invoke(monitorIndex, u, v, visible);
+            OnCursorPosition?.Invoke(monitorIndex, u, v, visible, cursorType, cursorId);
+        }
+
+        /// <summary>
+        /// Handle cursor image from server.
+        /// Decodes PNG data and creates texture for cursor rendering.
+        /// </summary>
+        private void HandleCursorImage(SimpleJson json)
+        {
+            try
+            {
+                long cursorId = json.GetLong("cursorId");
+                int cursorTypeInt = json.GetInt("cursorType");
+                int width = json.GetInt("width");
+                int height = json.GetInt("height");
+                int hotspotX = json.GetInt("hotspotX");
+                int hotspotY = json.GetInt("hotspotY");
+                string imageBase64 = json.GetString("imageBase64");
+                CursorType cursorType = (CursorType)cursorTypeInt;
+
+                Debug.Log($"[PhaseProtocol] Received cursor_image: id={cursorId}, type={cursorType}, size={width}x{height}, base64Len={imageBase64?.Length ?? 0}");
+
+                if (string.IsNullOrEmpty(imageBase64))
+                {
+                    Debug.LogError("[PhaseProtocol] cursor_image has empty imageBase64!");
+                    return;
+                }
+
+                // Decode raw RGBA on main thread
+                VRWorkspace.Core.MainThreadDispatcher.Enqueue(() =>
+                {
+                    try
+                    {
+                        byte[] rgbaData = Convert.FromBase64String(imageBase64);
+                        int expectedSize = width * height * 4;
+
+                        Debug.Log($"[PhaseProtocol] Cursor {cursorId} decoded: {rgbaData.Length} bytes, expected {expectedSize}");
+
+                        // Handle size mismatch - truncate if larger, error if smaller
+                        if (rgbaData.Length < expectedSize)
+                        {
+                            Debug.LogError($"[PhaseProtocol] RGBA too small: got {rgbaData.Length}, need {expectedSize} for {width}x{height}");
+                            return;
+                        }
+
+                        // If larger, truncate to expected size
+                        if (rgbaData.Length > expectedSize)
+                        {
+                            Debug.LogWarning($"[PhaseProtocol] RGBA larger than expected ({rgbaData.Length} > {expectedSize}), truncating");
+                            var truncated = new byte[expectedSize];
+                            Array.Copy(rgbaData, truncated, expectedSize);
+                            rgbaData = truncated;
+                        }
+
+                        // Create texture with exact dimensions
+                        var texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+                        texture.filterMode = FilterMode.Point; // Crisp cursor edges
+
+                        // Load raw RGBA data directly
+                        texture.LoadRawTextureData(rgbaData);
+                        texture.Apply();
+
+                        Debug.Log($"[PhaseProtocol] Cursor texture loaded: {texture.width}x{texture.height}, format={texture.format}");
+
+                        OnCursorImageReceived?.Invoke(cursorId, cursorType, texture, hotspotX, hotspotY);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogError($"[PhaseProtocol] Failed to decode cursor image: {ex.Message}\n{ex.StackTrace}");
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[PhaseProtocol] Failed to parse cursor_image: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -4090,7 +4197,9 @@ namespace VRWorkspace.Streaming
 
         public string GetString(string key) => _data.TryGetValue(key, out var v) ? v?.ToString() : null;
         public int GetInt(string key) => _data.TryGetValue(key, out var v) && v != null ? Convert.ToInt32(v) : 0;
+        public int GetInt(string key, int defaultValue) => _data.TryGetValue(key, out var v) && v != null ? Convert.ToInt32(v) : defaultValue;
         public long GetLong(string key) => _data.TryGetValue(key, out var v) && v != null ? Convert.ToInt64(v) : 0;
+        public long GetLong(string key, long defaultValue) => _data.TryGetValue(key, out var v) && v != null ? Convert.ToInt64(v) : defaultValue;
         public double GetDouble(string key) => _data.TryGetValue(key, out var v) && v != null ? Convert.ToDouble(v) : 0;
         public float GetFloat(string key) => _data.TryGetValue(key, out var v) && v != null ? Convert.ToSingle(v) : 0f;
         public bool GetBool(string key) => _data.TryGetValue(key, out var v) && v != null && Convert.ToBoolean(v);

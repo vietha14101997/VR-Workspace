@@ -108,6 +108,7 @@ public class RTTRemoteMenuController : MonoBehaviour
             _viewModel.MonitorIceProgress.OnChanged += HandleMonitorIceProgress;
             _viewModel.IsStreaming.OnChanged += HandleStreamingStateChanged;
             _viewModel.OnCursorPositionChanged += HandleCursorPosition;
+            _viewModel.OnCursorImageReceived += HandleCursorImageReceived;
         }
         else
         {
@@ -170,11 +171,13 @@ public class RTTRemoteMenuController : MonoBehaviour
             _viewModel.MonitorIceProgress.OnChanged -= HandleMonitorIceProgress;
             _viewModel.IsStreaming.OnChanged -= HandleStreamingStateChanged;
             _viewModel.OnCursorPositionChanged -= HandleCursorPosition;
+            _viewModel.OnCursorImageReceived -= HandleCursorImageReceived;
         }
 
-        // Hide cursors before cleanup
+        // Hide cursors before cleanup and clear cache
         HideAllCursors();
         _activeCursorPanelIndex = -1;
+        WorldPanelCursor.ClearCache();
 
         // Cleanup progress overlays and pending config
         CleanupProgressOverlays();
@@ -774,7 +777,7 @@ public class RTTRemoteMenuController : MonoBehaviour
     /// <summary>
     /// Handle cursor position updates from server.
     /// </summary>
-    private void HandleCursorPosition(int monitorIndex, float u, float v, bool visible)
+    private void HandleCursorPosition(int monitorIndex, float u, float v, bool visible, VRWorkspace.Streaming.CursorType cursorType, long cursorId)
     {
         if (_clusterRig == null || _clusterRig.panels == null) return;
 
@@ -799,12 +802,35 @@ public class RTTRemoteMenuController : MonoBehaviour
         panel.EnsureCursor();
         if (panel.cursor == null) return;
 
+        // Set cursor from cache (if available)
+        panel.cursor.SetCursorById(cursorId);
+
         // Unity V is inverted (0 at bottom, 1 at top)
         float unityV = 1f - v;
         panel.cursor.SetUV(u, unityV, silent: true);
         panel.cursor.SetVisible(true);
 
         _activeCursorPanelIndex = monitorIndex;
+    }
+
+    /// <summary>
+    /// Handle cursor image received from server.
+    /// Caches the texture for use by cursor rendering.
+    /// </summary>
+    private void HandleCursorImageReceived(long cursorId, VRWorkspace.Streaming.CursorType cursorType, Texture2D texture, int hotspotX, int hotspotY)
+    {
+        // Cache the cursor texture
+        WorldPanelCursor.CacheCursor(cursorId, texture, hotspotX, hotspotY);
+
+        // If this is the cursor currently being displayed, update it immediately
+        if (_activeCursorPanelIndex >= 0 && _activeCursorPanelIndex < _clusterRig?.panels?.Count)
+        {
+            var panel = _clusterRig.panels[_activeCursorPanelIndex];
+            if (panel?.cursor != null && panel.cursor.currentCursorId == cursorId)
+            {
+                panel.cursor.SetCursorById(cursorId);
+            }
+        }
     }
 
     /// <summary>
