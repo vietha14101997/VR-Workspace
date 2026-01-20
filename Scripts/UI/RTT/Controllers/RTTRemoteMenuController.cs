@@ -460,6 +460,9 @@ public class RTTRemoteMenuController : MonoBehaviour
     {
         Debug.Log($"[RTTRemoteMenuController] HandleStartWithProgress: {config.monitors} monitors - waiting for streaming ready");
 
+        // Clear cursor cache to ensure fresh cursors for new session
+        WorldPanelCursor.ClearCache();
+
         // Store config for later ClusterRig creation
         _pendingConfig = config;
 

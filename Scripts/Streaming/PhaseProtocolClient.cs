@@ -3483,30 +3483,51 @@ namespace VRWorkspace.Streaming
                 {
                     try
                     {
+                        // Log sample of base64 for debugging transmission
+                        int b64Len = imageBase64.Length;
+                        string b64Start = imageBase64.Substring(0, Math.Min(40, b64Len));
+                        string b64End = imageBase64.Substring(Math.Max(0, b64Len - 20));
+                        Debug.Log($"[PhaseProtocol] Cursor {cursorId} base64: len={b64Len}, start={b64Start}...end={b64End}");
+
                         byte[] rgbaData = Convert.FromBase64String(imageBase64);
                         int expectedSize = width * height * 4;
 
                         Debug.Log($"[PhaseProtocol] Cursor {cursorId} decoded: {rgbaData.Length} bytes, expected {expectedSize}");
 
-                        // Handle size mismatch - truncate if larger, error if smaller
-                        if (rgbaData.Length < expectedSize)
+                        // Handle size mismatch intelligently
+                        if (rgbaData.Length != expectedSize)
                         {
-                            Debug.LogError($"[PhaseProtocol] RGBA too small: got {rgbaData.Length}, need {expectedSize} for {width}x{height}");
-                            return;
+                            // Try to detect actual cursor size from data length
+                            int actualPixels = rgbaData.Length / 4;
+                            int actualSide = (int)Mathf.Sqrt(actualPixels);
+                            
+                            // Check if data represents a square cursor of different size
+                            if (actualSide * actualSide * 4 == rgbaData.Length && actualSide > 0 && actualSide <= 256)
+                            {
+                                Debug.Log($"[PhaseProtocol] Cursor size adjusted: declared {width}x{height} -> actual {actualSide}x{actualSide}");
+                                width = actualSide;
+                                height = actualSide;
+                                expectedSize = rgbaData.Length;
+                            }
+                            else if (rgbaData.Length < expectedSize)
+                            {
+                                Debug.LogError($"[PhaseProtocol] RGBA too small: got {rgbaData.Length}, need {expectedSize} for {width}x{height}");
+                                return;
+                            }
+                            else
+                            {
+                                // Truncate extra bytes
+                                Debug.LogWarning($"[PhaseProtocol] RGBA larger than expected ({rgbaData.Length} > {expectedSize}), truncating");
+                                var truncated = new byte[expectedSize];
+                                Array.Copy(rgbaData, truncated, expectedSize);
+                                rgbaData = truncated;
+                            }
                         }
 
-                        // If larger, truncate to expected size
-                        if (rgbaData.Length > expectedSize)
-                        {
-                            Debug.LogWarning($"[PhaseProtocol] RGBA larger than expected ({rgbaData.Length} > {expectedSize}), truncating");
-                            var truncated = new byte[expectedSize];
-                            Array.Copy(rgbaData, truncated, expectedSize);
-                            rgbaData = truncated;
-                        }
-
-                        // Create texture with exact dimensions
+                        // Create texture with correct dimensions
                         var texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
-                        texture.filterMode = FilterMode.Point; // Crisp cursor edges
+                        texture.filterMode = FilterMode.Bilinear; // Smooth cursor edges
+                        texture.wrapMode = TextureWrapMode.Clamp; // Prevent edge artifacts
 
                         // Load raw RGBA data directly
                         texture.LoadRawTextureData(rgbaData);
