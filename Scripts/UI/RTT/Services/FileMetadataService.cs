@@ -40,14 +40,9 @@ public class FileMetadataService : MonoBehaviour
     }
 
     /// <summary>
-    /// Read image dimensions without keeping texture in memory.
+    /// Read image dimensions from file header (fast, doesn't load entire image).
     /// </summary>
     public void GetImageMetadata(string filePath, Action<int, int> onComplete)
-    {
-        StartCoroutine(LoadImageMetadataCoroutine(filePath, onComplete));
-    }
-
-    private IEnumerator LoadImageMetadataCoroutine(string filePath, Action<int, int> onComplete)
     {
         int width = 0;
         int height = 0;
@@ -56,14 +51,8 @@ public class FileMetadataService : MonoBehaviour
         {
             if (File.Exists(filePath))
             {
-                byte[] fileData = File.ReadAllBytes(filePath);
-                Texture2D tex = new Texture2D(2, 2);
-                if (tex.LoadImage(fileData))
-                {
-                    width = tex.width;
-                    height = tex.height;
-                }
-                Destroy(tex);
+                // Read dimensions from file header - much faster than loading entire image
+                (width, height) = ReadImageDimensionsFromHeader(filePath);
             }
         }
         catch (Exception ex)
@@ -71,8 +60,141 @@ public class FileMetadataService : MonoBehaviour
             Debug.LogWarning($"[FileMetadataService] Failed to read image metadata: {ex.Message}");
         }
 
-        yield return null;
         onComplete?.Invoke(width, height);
+    }
+
+    /// <summary>
+    /// Read image dimensions directly from file header without loading entire image.
+    /// Supports PNG, JPEG, GIF, BMP, WebP.
+    /// </summary>
+    private (int width, int height) ReadImageDimensionsFromHeader(string filePath)
+    {
+        using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+        using (var reader = new BinaryReader(stream))
+        {
+            // Read first 32 bytes to identify format
+            byte[] header = reader.ReadBytes(32);
+            if (header.Length < 8) return (0, 0);
+
+            // PNG: 89 50 4E 47 0D 0A 1A 0A
+            if (header[0] == 0x89 && header[1] == 0x50 && header[2] == 0x4E && header[3] == 0x47)
+            {
+                // Width at offset 16, Height at offset 20 (big-endian)
+                int width = (header[16] << 24) | (header[17] << 16) | (header[18] << 8) | header[19];
+                int height = (header[20] << 24) | (header[21] << 16) | (header[22] << 8) | header[23];
+                return (width, height);
+            }
+
+            // JPEG: FF D8 FF
+            if (header[0] == 0xFF && header[1] == 0xD8 && header[2] == 0xFF)
+            {
+                return ReadJpegDimensions(stream, reader);
+            }
+
+            // GIF: 47 49 46 38
+            if (header[0] == 0x47 && header[1] == 0x49 && header[2] == 0x46 && header[3] == 0x38)
+            {
+                // Width at offset 6, Height at offset 8 (little-endian)
+                int width = header[6] | (header[7] << 8);
+                int height = header[8] | (header[9] << 8);
+                return (width, height);
+            }
+
+            // BMP: 42 4D
+            if (header[0] == 0x42 && header[1] == 0x4D)
+            {
+                // Width at offset 18, Height at offset 22 (little-endian)
+                int width = header[18] | (header[19] << 8) | (header[20] << 16) | (header[21] << 24);
+                int height = Math.Abs(header[22] | (header[23] << 8) | (header[24] << 16) | (header[25] << 24));
+                return (width, height);
+            }
+
+            // WebP: 52 49 46 46 ... 57 45 42 50
+            if (header[0] == 0x52 && header[1] == 0x49 && header[2] == 0x46 && header[3] == 0x46 &&
+                header[8] == 0x57 && header[9] == 0x45 && header[10] == 0x42 && header[11] == 0x50)
+            {
+                return ReadWebPDimensions(stream, reader, header);
+            }
+        }
+
+        return (0, 0);
+    }
+
+    private (int width, int height) ReadJpegDimensions(FileStream stream, BinaryReader reader)
+    {
+        stream.Seek(2, SeekOrigin.Begin);
+
+        while (stream.Position < stream.Length - 1)
+        {
+            byte marker1 = reader.ReadByte();
+            if (marker1 != 0xFF) continue;
+
+            byte marker2 = reader.ReadByte();
+
+            // SOF markers (Start Of Frame) contain dimensions
+            if ((marker2 >= 0xC0 && marker2 <= 0xC3) ||
+                (marker2 >= 0xC5 && marker2 <= 0xC7) ||
+                (marker2 >= 0xC9 && marker2 <= 0xCB) ||
+                (marker2 >= 0xCD && marker2 <= 0xCF))
+            {
+                stream.Seek(3, SeekOrigin.Current); // Skip length and precision
+                byte[] dims = reader.ReadBytes(4);
+                int height = (dims[0] << 8) | dims[1];
+                int width = (dims[2] << 8) | dims[3];
+                return (width, height);
+            }
+
+            // Skip other markers
+            if (marker2 == 0xD8 || marker2 == 0xD9 || marker2 == 0x01 || (marker2 >= 0xD0 && marker2 <= 0xD7))
+                continue;
+
+            // Read segment length and skip
+            byte[] lenBytes = reader.ReadBytes(2);
+            if (lenBytes.Length < 2) break;
+            int segmentLen = (lenBytes[0] << 8) | lenBytes[1];
+            stream.Seek(segmentLen - 2, SeekOrigin.Current);
+        }
+
+        return (0, 0);
+    }
+
+    private (int width, int height) ReadWebPDimensions(FileStream stream, BinaryReader reader, byte[] header)
+    {
+        // Check VP8 chunk type at offset 12
+        if (header.Length < 16) return (0, 0);
+
+        // VP8 (lossy): 56 50 38 20
+        if (header[12] == 0x56 && header[13] == 0x50 && header[14] == 0x38 && header[15] == 0x20)
+        {
+            stream.Seek(26, SeekOrigin.Begin);
+            byte[] dims = reader.ReadBytes(4);
+            int width = (dims[0] | (dims[1] << 8)) & 0x3FFF;
+            int height = (dims[2] | (dims[3] << 8)) & 0x3FFF;
+            return (width, height);
+        }
+
+        // VP8L (lossless): 56 50 38 4C
+        if (header[12] == 0x56 && header[13] == 0x50 && header[14] == 0x38 && header[15] == 0x4C)
+        {
+            stream.Seek(21, SeekOrigin.Begin);
+            byte[] dims = reader.ReadBytes(4);
+            int bits = dims[0] | (dims[1] << 8) | (dims[2] << 16) | (dims[3] << 24);
+            int width = (bits & 0x3FFF) + 1;
+            int height = ((bits >> 14) & 0x3FFF) + 1;
+            return (width, height);
+        }
+
+        // VP8X (extended): 56 50 38 58
+        if (header[12] == 0x56 && header[13] == 0x50 && header[14] == 0x38 && header[15] == 0x58)
+        {
+            stream.Seek(24, SeekOrigin.Begin);
+            byte[] dims = reader.ReadBytes(6);
+            int width = (dims[0] | (dims[1] << 8) | (dims[2] << 16)) + 1;
+            int height = (dims[3] | (dims[4] << 8) | (dims[5] << 16)) + 1;
+            return (width, height);
+        }
+
+        return (0, 0);
     }
 
     /// <summary>

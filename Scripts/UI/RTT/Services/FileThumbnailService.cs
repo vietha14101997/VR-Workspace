@@ -52,11 +52,20 @@ public class FileThumbnailService : MonoBehaviour
     #region Private Fields
     private ThumbnailCache _cache;
     private List<ThumbnailRequest> _requestQueue;
-    private Dictionary<string, List<Action<Sprite>>> _pendingCallbacks;
+    private Dictionary<string, List<PendingCallbackInfo>> _pendingCallbacks;
     private HashSet<string> _processingPaths;
     private int _currentLoadingCount = 0;
     private VideoFrameExtractor _videoExtractor;
     private Sprite _videoOverlayIcon;
+
+    // Info for pending callbacks to retrieve correct sprite from cache
+    private class PendingCallbackInfo
+    {
+        public int Size;
+        public bool SkipOverlay;
+        public Action<Sprite> Callback;
+        public long FileModifiedTicks;
+    }
 
     // UI callback throttling to prevent stutters
     private Queue<Action> _uiCallbackQueue = new Queue<Action>();
@@ -81,7 +90,7 @@ public class FileThumbnailService : MonoBehaviour
     {
         _cache = new ThumbnailCache(_maxCacheEntries, enableDiskCache: true);
         _requestQueue = new List<ThumbnailRequest>();
-        _pendingCallbacks = new Dictionary<string, List<Action<Sprite>>>();
+        _pendingCallbacks = new Dictionary<string, List<PendingCallbackInfo>>();
         _processingPaths = new HashSet<string>();
         _uiCallbackQueue = new Queue<Action>();
         _highPriorityUIQueue = new Queue<Action>();
@@ -148,11 +157,12 @@ public class FileThumbnailService : MonoBehaviour
 
         // Use high priority for detail panel (priority 0)
         bool isHighPriority = priority == 0;
+        string fileName = System.IO.Path.GetFileName(file.Path);
 
         // Check memory cache first
         if (_cache.TryGet(cacheKey, out Sprite cachedSprite))
         {
-            // Queue callback to prevent stutters when many cache hits happen at once
+            Debug.Log($"[Thumb] MEMORY HIT: {fileName} size={size} skip={skipOverlay}");
             QueueUICallback(() => onSuccess?.Invoke(cachedSprite), isHighPriority);
             return;
         }
@@ -160,9 +170,8 @@ public class FileThumbnailService : MonoBehaviour
         // Check disk cache
         if (_cache.TryLoadFromDisk(cacheKey, out Sprite diskSprite))
         {
-            // Add to memory cache
+            Debug.Log($"[Thumb] DISK HIT: {fileName} size={size} skip={skipOverlay}");
             _cache.Set(cacheKey, diskSprite, modifiedTicks, file.Path);
-            // Queue callback to prevent stutters
             QueueUICallback(() => onSuccess?.Invoke(diskSprite), isHighPriority);
             return;
         }
@@ -170,13 +179,22 @@ public class FileThumbnailService : MonoBehaviour
         // Add to pending callbacks if already processing this file
         if (_processingPaths.Contains(file.Path))
         {
+            Debug.Log($"[Thumb] PENDING: {fileName} size={size} skip={skipOverlay}");
             if (!_pendingCallbacks.ContainsKey(file.Path))
             {
-                _pendingCallbacks[file.Path] = new List<Action<Sprite>>();
+                _pendingCallbacks[file.Path] = new List<PendingCallbackInfo>();
             }
-            _pendingCallbacks[file.Path].Add(onSuccess);
+            _pendingCallbacks[file.Path].Add(new PendingCallbackInfo
+            {
+                Size = size,
+                SkipOverlay = skipOverlay,
+                Callback = onSuccess,
+                FileModifiedTicks = modifiedTicks
+            });
             return;
         }
+
+        Debug.Log($"[Thumb] MISS - LOAD: {fileName} size={size} skip={skipOverlay}");
 
         // Queue new request
         var request = new ThumbnailRequest
@@ -294,10 +312,17 @@ public class FileThumbnailService : MonoBehaviour
         }
     }
 
+    // Standard sizes for pre-caching
+    private const int DETAIL_THUMBNAIL_SIZE = 512;
+    private const int LIST_THUMBNAIL_SIZE = 256;
+
     private IEnumerator LoadImageThumbnail(ThumbnailRequest request)
     {
         Sprite result = null;
         Texture2D texture = null;
+        string fileName = System.IO.Path.GetFileName(request.FilePath);
+        var totalStart = System.Diagnostics.Stopwatch.StartNew();
+        var stepWatch = System.Diagnostics.Stopwatch.StartNew();
 
         // Use UnityWebRequestTexture for non-blocking texture loading
         string fileUrl = "file:///" + request.FilePath.Replace("\\", "/");
@@ -326,61 +351,125 @@ public class FileThumbnailService : MonoBehaviour
             texture.wrapMode = TextureWrapMode.Clamp;
         }
 
+        Debug.Log($"[Thumb] {fileName} LOAD: {stepWatch.ElapsedMilliseconds}ms ({texture.width}x{texture.height})");
+        stepWatch.Restart();
+
         // Yield to spread work
         yield return null;
 
-        // Step 2: Resize texture asynchronously
-        Texture2D resized = null;
-        bool resizeComplete = false;
+        // Step 2: Always resize to 512px first (for Detail panel cache)
+        // This ensures Detail panel never needs to reload 4K images
+        Texture2D resized512 = null;
+        bool resize512Complete = false;
 
-        StartCoroutine(ResizeTextureAsync(texture, request.TargetSize, (resizedTexture) =>
+        StartCoroutine(ResizeTextureAsync(texture, DETAIL_THUMBNAIL_SIZE, (resizedTexture) =>
         {
-            resized = resizedTexture;
-            resizeComplete = true;
+            resized512 = resizedTexture;
+            resize512Complete = true;
         }));
 
-        // Wait for async resize to complete
-        while (!resizeComplete)
+        while (!resize512Complete)
         {
             yield return null;
         }
 
-        if (resized == null)
+        Debug.Log($"[Thumb] {fileName} RESIZE512: {stepWatch.ElapsedMilliseconds}ms");
+        stepWatch.Restart();
+
+        if (resized512 == null)
         {
-            Debug.LogWarning($"[FileThumbnailService] Failed to resize image");
+            Debug.LogWarning($"[FileThumbnailService] Failed to resize image to 512");
             if (texture != null) Destroy(texture);
             CompleteRequest(request, null);
             yield break;
         }
 
-        // Clean up original texture if a new one was created
-        if (resized != texture)
+        // Clean up original texture
+        if (resized512 != texture)
         {
             Destroy(texture);
-            texture = resized;
         }
 
-        // Yield after resize
         yield return null;
 
-        // Step 3: Create sprite and cache
+        // Step 3: Cache 512px version (for Grid and Detail panel)
+        Sprite sprite512 = null;
         try
         {
-            result = Sprite.Create(
-                texture,
-                new Rect(0, 0, texture.width, texture.height),
+            sprite512 = Sprite.Create(
+                resized512,
+                new Rect(0, 0, resized512.width, resized512.height),
                 new Vector2(0.5f, 0.5f),
                 100f
             );
 
-            // Cache the result (include size in key for quality-specific caching)
-            string cacheKey = _cache.GenerateCacheKey(request.FilePath, request.FileModifiedTicks, request.TargetSize);
-            _cache.Set(cacheKey, result, request.FileModifiedTicks, request.FilePath);
+            string cacheKey512 = _cache.GenerateCacheKey(request.FilePath, request.FileModifiedTicks, DETAIL_THUMBNAIL_SIZE);
+            _cache.Set(cacheKey512, sprite512, request.FileModifiedTicks, request.FilePath);
+            // Alias for nooverlay (images don't have overlay, same sprite for both)
+            _cache.SetAlias(cacheKey512 + "_nooverlay", cacheKey512);
+
+            Debug.Log($"[Thumb] {fileName} CACHE512: {stepWatch.ElapsedMilliseconds}ms");
+            stepWatch.Restart();
         }
         catch (Exception ex)
         {
-            Debug.LogWarning($"[FileThumbnailService] Failed to create sprite: {ex.Message}");
-            if (texture != null) Destroy(texture);
+            Debug.LogWarning($"[FileThumbnailService] Failed to create 512 sprite: {ex.Message}");
+            if (resized512 != null) Destroy(resized512);
+            CompleteRequest(request, null);
+            yield break;
+        }
+
+        // Step 4: If request needs 256px (List view), also create that version
+        if (request.TargetSize <= LIST_THUMBNAIL_SIZE)
+        {
+            Texture2D resized256 = null;
+            bool resize256Complete = false;
+
+            StartCoroutine(ResizeTextureAsync(resized512, LIST_THUMBNAIL_SIZE, (resizedTexture) =>
+            {
+                resized256 = resizedTexture;
+                resize256Complete = true;
+            }));
+
+            while (!resize256Complete)
+            {
+                yield return null;
+            }
+
+            if (resized256 != null && resized256 != resized512)
+            {
+                try
+                {
+                    Sprite sprite256 = Sprite.Create(
+                        resized256,
+                        new Rect(0, 0, resized256.width, resized256.height),
+                        new Vector2(0.5f, 0.5f),
+                        100f
+                    );
+
+                    string cacheKey256 = _cache.GenerateCacheKey(request.FilePath, request.FileModifiedTicks, LIST_THUMBNAIL_SIZE);
+                    _cache.Set(cacheKey256, sprite256, request.FileModifiedTicks, request.FilePath);
+                    _cache.SetAlias(cacheKey256 + "_nooverlay", cacheKey256);
+
+                    result = sprite256;
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[FileThumbnailService] Failed to create 256 sprite: {ex.Message}");
+                    // Fall back to 512 sprite
+                    if (resized256 != null) Destroy(resized256);
+                    result = sprite512;
+                }
+            }
+            else
+            {
+                result = sprite512;
+            }
+        }
+        else
+        {
+            // Request was for 512 or larger, use the 512 sprite
+            result = sprite512;
         }
 
         // Complete request
@@ -401,10 +490,11 @@ public class FileThumbnailService : MonoBehaviour
         bool extractionComplete = false;
         Texture2D extractedFrame = null;
 
+        // Always extract at 512px to pre-cache for Detail panel
         _videoExtractor.ExtractFrame(
             request.FilePath,
-            request.TargetSize,
-            request.TargetSize,
+            DETAIL_THUMBNAIL_SIZE,
+            DETAIL_THUMBNAIL_SIZE,
             (texture) => {
                 extractedFrame = texture;
                 extractionComplete = true;
@@ -422,30 +512,75 @@ public class FileThumbnailService : MonoBehaviour
 
         if (extractedFrame != null)
         {
-            if (request.SkipOverlay)
+            // Step 1: Cache 512px versions (for Grid and Detail panel)
+            string cacheKey512 = _cache.GenerateCacheKey(request.FilePath, request.FileModifiedTicks, DETAIL_THUMBNAIL_SIZE);
+
+            // Create no-overlay version (used by detail panel)
+            Sprite noOverlaySprite512 = Sprite.Create(
+                extractedFrame,
+                new Rect(0, 0, extractedFrame.width, extractedFrame.height),
+                new Vector2(0.5f, 0.5f),
+                100f
+            );
+            _cache.Set(cacheKey512 + "_nooverlay", noOverlaySprite512, request.FileModifiedTicks, request.FilePath);
+
+            // Create overlay version (used by grid)
+            Sprite overlaySprite512 = _videoExtractor.CompositeWithOverlay(extractedFrame, _videoOverlayIcon, DETAIL_THUMBNAIL_SIZE);
+            if (overlaySprite512 != null)
             {
-                // No overlay - create sprite directly from extracted frame
-                result = Sprite.Create(
-                    extractedFrame,
-                    new Rect(0, 0, extractedFrame.width, extractedFrame.height),
-                    new Vector2(0.5f, 0.5f),
-                    100f
-                );
-                // Don't destroy extractedFrame as it's used by the sprite
+                _cache.Set(cacheKey512, overlaySprite512, request.FileModifiedTicks, request.FilePath);
+            }
+
+            // Step 2: If request needs 256px (List view), also create those versions
+            if (request.TargetSize <= LIST_THUMBNAIL_SIZE)
+            {
+                Texture2D resized256 = null;
+                bool resize256Complete = false;
+
+                StartCoroutine(ResizeTextureAsync(extractedFrame, LIST_THUMBNAIL_SIZE, (resizedTexture) =>
+                {
+                    resized256 = resizedTexture;
+                    resize256Complete = true;
+                }));
+
+                while (!resize256Complete)
+                {
+                    yield return null;
+                }
+
+                if (resized256 != null)
+                {
+                    string cacheKey256 = _cache.GenerateCacheKey(request.FilePath, request.FileModifiedTicks, LIST_THUMBNAIL_SIZE);
+
+                    // Create no-overlay version for 256
+                    Sprite noOverlaySprite256 = Sprite.Create(
+                        resized256,
+                        new Rect(0, 0, resized256.width, resized256.height),
+                        new Vector2(0.5f, 0.5f),
+                        100f
+                    );
+                    _cache.Set(cacheKey256 + "_nooverlay", noOverlaySprite256, request.FileModifiedTicks, request.FilePath);
+
+                    // Create overlay version for 256
+                    Sprite overlaySprite256 = _videoExtractor.CompositeWithOverlay(resized256, _videoOverlayIcon, LIST_THUMBNAIL_SIZE);
+                    if (overlaySprite256 != null)
+                    {
+                        _cache.Set(cacheKey256, overlaySprite256, request.FileModifiedTicks, request.FilePath);
+                    }
+
+                    // Return 256px version
+                    result = request.SkipOverlay ? noOverlaySprite256 : overlaySprite256;
+                }
+                else
+                {
+                    // Fall back to 512 version
+                    result = request.SkipOverlay ? noOverlaySprite512 : overlaySprite512;
+                }
             }
             else
             {
-                // Composite with video overlay
-                result = _videoExtractor.CompositeWithOverlay(extractedFrame, _videoOverlayIcon, request.TargetSize);
-                Destroy(extractedFrame);
-            }
-
-            if (result != null)
-            {
-                // Cache the result (include size and skipOverlay in key for quality-specific caching)
-                string cacheKeySuffix = request.SkipOverlay ? "_nooverlay" : "";
-                string cacheKey = _cache.GenerateCacheKey(request.FilePath, request.FileModifiedTicks, request.TargetSize) + cacheKeySuffix;
-                _cache.Set(cacheKey, result, request.FileModifiedTicks, request.FilePath);
+                // Request was for 512 or larger
+                result = request.SkipOverlay ? noOverlaySprite512 : overlaySprite512;
             }
         }
 
@@ -466,13 +601,26 @@ public class FileThumbnailService : MonoBehaviour
             var onComplete = request.OnComplete;
             QueueUICallback(() => onComplete?.Invoke(result), isHighPriority);
 
-            // Notify pending callbacks (also throttled)
-            if (_pendingCallbacks.TryGetValue(request.FilePath, out var callbacks))
+            // Notify pending callbacks - each gets the correct sprite from cache based on their settings
+            if (_pendingCallbacks.TryGetValue(request.FilePath, out var pendingList))
             {
-                foreach (var callback in callbacks)
+                foreach (var pending in pendingList)
                 {
-                    var cb = callback; // Capture for closure
-                    QueueUICallback(() => cb?.Invoke(result), isHighPriority);
+                    // Get the correct sprite from cache for this pending request
+                    string cacheKey = _cache.GenerateCacheKey(request.FilePath, pending.FileModifiedTicks, pending.Size);
+                    if (pending.SkipOverlay) cacheKey += "_nooverlay";
+
+                    if (_cache.TryGet(cacheKey, out Sprite cachedSprite))
+                    {
+                        var cb = pending.Callback;
+                        QueueUICallback(() => cb?.Invoke(cachedSprite), isHighPriority);
+                    }
+                    else
+                    {
+                        // Fallback to result if cache miss (shouldn't happen normally)
+                        var cb = pending.Callback;
+                        QueueUICallback(() => cb?.Invoke(result), isHighPriority);
+                    }
                 }
                 _pendingCallbacks.Remove(request.FilePath);
             }
@@ -492,20 +640,34 @@ public class FileThumbnailService : MonoBehaviour
     #region UI Callback Throttling
     /// <summary>
     /// Queue a UI callback to be executed with throttling to prevent frame stutters.
+    /// High priority callbacks (detail panel) are executed immediately for responsiveness.
     /// </summary>
     private void QueueUICallback(Action callback, bool highPriority = false)
     {
         if (callback == null) return;
 
         if (highPriority)
-            _highPriorityUIQueue.Enqueue(callback);
+        {
+            // Execute high priority callbacks immediately for responsive detail panel
+            try
+            {
+                callback.Invoke();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[FileThumbnailService] High priority callback error: {ex.Message}");
+            }
+        }
         else
+        {
             _uiCallbackQueue.Enqueue(callback);
+        }
     }
 
     /// <summary>
     /// Process queued UI callbacks with a frame budget to prevent stutters.
-    /// High-priority callbacks (detail panel) are processed first.
+    /// Only processes normal priority callbacks (grid/list thumbnails).
+    /// High-priority callbacks are executed immediately in QueueUICallback.
     /// </summary>
     private IEnumerator ProcessUICallbacksCoroutine()
     {
@@ -514,22 +676,6 @@ public class FileThumbnailService : MonoBehaviour
             // Process up to MAX_UI_CALLBACKS_PER_FRAME callbacks per frame
             int processed = 0;
 
-            // Process high-priority queue first (detail panel thumbnails)
-            while (_highPriorityUIQueue.Count > 0 && processed < MAX_UI_CALLBACKS_PER_FRAME)
-            {
-                var callback = _highPriorityUIQueue.Dequeue();
-                try
-                {
-                    callback?.Invoke();
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogWarning($"[FileThumbnailService] UI callback error: {ex.Message}");
-                }
-                processed++;
-            }
-
-            // Then process normal queue with remaining budget
             while (_uiCallbackQueue.Count > 0 && processed < MAX_UI_CALLBACKS_PER_FRAME)
             {
                 var callback = _uiCallbackQueue.Dequeue();
@@ -574,6 +720,10 @@ public class FileThumbnailService : MonoBehaviour
                 height = maxSize;
                 width = Mathf.RoundToInt(maxSize * ratio);
             }
+
+            // Ensure dimensions are multiples of 4 for GPU alignment
+            width = (width + 3) & ~3;
+            height = (height + 3) & ~3;
         }
         else
         {
@@ -590,12 +740,12 @@ public class FileThumbnailService : MonoBehaviour
         // Yield to let the GPU process
         yield return null;
 
-        // Use AsyncGPUReadback to avoid blocking main thread
+        // Use AsyncGPUReadback WITHOUT specifying format - let Unity handle conversion
         bool readbackComplete = false;
         Texture2D result = null;
         Exception readbackError = null;
 
-        AsyncGPUReadback.Request(rt, 0, TextureFormat.RGBA32, (request) =>
+        AsyncGPUReadback.Request(rt, 0, (request) =>
         {
             if (request.hasError)
             {
@@ -605,12 +755,13 @@ public class FileThumbnailService : MonoBehaviour
             {
                 try
                 {
-                    // Create texture with mipmaps
-                    result = new Texture2D(width, height, TextureFormat.RGBA32, true);
+                    // Create texture with the same format as returned by readback
+                    var data = request.GetData<byte>();
+                    result = new Texture2D(width, height, TextureFormat.ARGB32, true);
                     result.filterMode = FilterMode.Trilinear;
                     result.anisoLevel = 16;
                     result.wrapMode = TextureWrapMode.Clamp;
-                    result.LoadRawTextureData(request.GetData<byte>());
+                    result.LoadRawTextureData(data);
                     result.Apply(true); // updateMipmaps = true
                 }
                 catch (Exception ex)
@@ -660,20 +811,24 @@ public class FileThumbnailService : MonoBehaviour
                 height = maxSize;
                 width = Mathf.RoundToInt(maxSize * ratio);
             }
+
+            // Ensure dimensions are multiples of 4 for GPU alignment
+            width = (width + 3) & ~3;
+            height = (height + 3) & ~3;
         }
         else
         {
             return source;
         }
 
-        RenderTexture rt = RenderTexture.GetTemporary(width, height);
+        RenderTexture rt = RenderTexture.GetTemporary(width, height, 0, RenderTextureFormat.ARGB32);
         rt.filterMode = FilterMode.Trilinear;
         Graphics.Blit(source, rt);
 
         RenderTexture previous = RenderTexture.active;
         RenderTexture.active = rt;
 
-        Texture2D result = new Texture2D(width, height, TextureFormat.RGBA32, true);
+        Texture2D result = new Texture2D(width, height, TextureFormat.ARGB32, true);
         result.filterMode = FilterMode.Trilinear;
         result.anisoLevel = 16;
         result.wrapMode = TextureWrapMode.Clamp;

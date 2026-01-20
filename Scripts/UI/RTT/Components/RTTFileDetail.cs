@@ -164,6 +164,14 @@ public class RTTFileDetail : MonoBehaviour
 
     public void UpdateInfo(MockFile file, bool isCurrentFolder = false)
     {
+        // Skip update if same file (prevents lag when hovering between same items)
+        if (_currentFile.Path == file.Path && !isCurrentFolder)
+        {
+            return;
+        }
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
         _currentFile = file;
 
         // Update file name
@@ -172,11 +180,19 @@ public class RTTFileDetail : MonoBehaviour
             _nameText.text = file.Name;
         }
 
+        var nameTime = sw.ElapsedMilliseconds;
+
         // Update preview
         UpdatePreview(file);
 
+        var previewTime = sw.ElapsedMilliseconds;
+
         // Update metadata based on file type
         UpdateMetadata(file, isCurrentFolder);
+
+        var metadataTime = sw.ElapsedMilliseconds;
+
+        Debug.Log($"[Detail] UpdateInfo: {file.Name} name={nameTime}ms preview={previewTime - nameTime}ms metadata={metadataTime - previewTime}ms total={metadataTime}ms");
     }
 
     private void UpdatePreview(MockFile file)
@@ -226,11 +242,15 @@ public class RTTFileDetail : MonoBehaviour
         // Use larger size for detail panel high-quality preview
         int thumbnailSize = 512; // Reduced from 720 for better performance
 
+        var requestTime = System.Diagnostics.Stopwatch.StartNew();
+        Debug.Log($"[Detail] REQUEST: {file.Name}");
+
         FileThumbnailService.Instance.RequestThumbnail(
             file,
             thumbnailSize,
             onSuccess: (sprite) =>
             {
+                var assignStart = System.Diagnostics.Stopwatch.StartNew();
                 // Verify this is still the current file being displayed
                 if (sprite != null && _previewImage != null && _currentFile.Path == file.Path)
                 {
@@ -238,9 +258,11 @@ public class RTTFileDetail : MonoBehaviour
                     _previewImage.gameObject.SetActive(true);
                     _previewPlaceholder.gameObject.SetActive(false);
                 }
+                Debug.Log($"[Detail] RECEIVED: {file.Name} wait={requestTime.ElapsedMilliseconds}ms assign={assignStart.ElapsedMilliseconds}ms");
             },
             onFailed: () =>
             {
+                Debug.Log($"[Detail] FAILED: {file.Name}");
                 // On failure, leave preview area blank (no placeholder shown)
             },
             priority: 0,

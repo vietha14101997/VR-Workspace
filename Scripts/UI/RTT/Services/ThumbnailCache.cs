@@ -31,6 +31,7 @@ public class ThumbnailCache
     #region Memory Cache
     private readonly Dictionary<string, ThumbnailCacheEntry> _memoryCache;
     private readonly LinkedList<string> _lruList;  // Most recently used at front
+    private readonly Dictionary<string, string> _aliasMap;  // Maps alias key -> real key
     #endregion
 
     #region Constructor
@@ -45,6 +46,7 @@ public class ThumbnailCache
         _enableDiskCache = enableDiskCache;
         _memoryCache = new Dictionary<string, ThumbnailCacheEntry>();
         _lruList = new LinkedList<string>();
+        _aliasMap = new Dictionary<string, string>();
 
         if (_enableDiskCache)
         {
@@ -60,22 +62,43 @@ public class ThumbnailCache
     #region Public API - Memory Cache
     /// <summary>
     /// Try to get a cached thumbnail from memory.
+    /// Supports alias keys that point to the real cache entry.
     /// </summary>
     public bool TryGet(string key, out Sprite sprite)
     {
         sprite = null;
 
-        if (_memoryCache.TryGetValue(key, out var entry))
+        // Check if this is an alias key
+        string realKey = key;
+        if (_aliasMap.TryGetValue(key, out string aliasTarget))
         {
-            // Update LRU order
-            _lruList.Remove(key);
-            _lruList.AddFirst(key);
+            realKey = aliasTarget;
+        }
+
+        if (_memoryCache.TryGetValue(realKey, out var entry))
+        {
+            // Update LRU order using the real key
+            _lruList.Remove(realKey);
+            _lruList.AddFirst(realKey);
             entry.LastAccessed = DateTime.Now;
             sprite = entry.Thumbnail;
             return sprite != null;
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Set an alias key that points to another key's cache entry.
+    /// This allows the same sprite to be accessed via multiple keys without duplication.
+    /// The alias does NOT count toward cache size limit.
+    /// </summary>
+    public void SetAlias(string aliasKey, string targetKey)
+    {
+        if (string.IsNullOrEmpty(aliasKey) || string.IsNullOrEmpty(targetKey)) return;
+        if (aliasKey == targetKey) return;  // No self-alias
+
+        _aliasMap[aliasKey] = targetKey;
     }
 
     /// <summary>
@@ -121,7 +144,15 @@ public class ThumbnailCache
     /// </summary>
     public void Remove(string key)
     {
-        if (_memoryCache.TryGetValue(key, out var entry))
+        // Resolve alias if this is an alias key
+        string realKey = key;
+        if (_aliasMap.TryGetValue(key, out string aliasTarget))
+        {
+            realKey = aliasTarget;
+            _aliasMap.Remove(key);
+        }
+
+        if (_memoryCache.TryGetValue(realKey, out var entry))
         {
             // Destroy the sprite and texture to free memory
             if (entry.Thumbnail != null)
@@ -132,14 +163,28 @@ public class ThumbnailCache
                 }
                 UnityEngine.Object.Destroy(entry.Thumbnail);
             }
-            _memoryCache.Remove(key);
-            _lruList.Remove(key);
+            _memoryCache.Remove(realKey);
+            _lruList.Remove(realKey);
+
+            // Remove any aliases pointing to this key
+            var aliasesToRemove = new List<string>();
+            foreach (var kvp in _aliasMap)
+            {
+                if (kvp.Value == realKey)
+                {
+                    aliasesToRemove.Add(kvp.Key);
+                }
+            }
+            foreach (var alias in aliasesToRemove)
+            {
+                _aliasMap.Remove(alias);
+            }
         }
 
         // Also remove from disk
         if (_enableDiskCache)
         {
-            DeleteFromDisk(key);
+            DeleteFromDisk(realKey);
         }
     }
 
@@ -161,6 +206,7 @@ public class ThumbnailCache
         }
         _memoryCache.Clear();
         _lruList.Clear();
+        _aliasMap.Clear();
     }
 
     /// <summary>
@@ -195,6 +241,7 @@ public class ThumbnailCache
     #region Public API - Disk Cache
     /// <summary>
     /// Try to load a thumbnail from disk cache.
+    /// Supports alias keys - will try both alias and real key paths.
     /// </summary>
     public bool TryLoadFromDisk(string key, out Sprite sprite)
     {
@@ -202,17 +249,30 @@ public class ThumbnailCache
 
         if (!_enableDiskCache) return false;
 
+        // First try with the given key
         string filePath = GetDiskCachePath(key);
+
+        // If key is an alias, also try the real key path
+        if (!File.Exists(filePath) && _aliasMap.TryGetValue(key, out string realKey))
+        {
+            filePath = GetDiskCachePath(realKey);
+        }
+
         if (!File.Exists(filePath)) return false;
 
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         try
         {
             byte[] data = File.ReadAllBytes(filePath);
+            Debug.Log($"[Cache] DISK READ: {sw.ElapsedMilliseconds}ms ({data.Length/1024}KB)");
+            sw.Restart();
+
             Texture2D texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
             texture.filterMode = FilterMode.Bilinear;
 
             if (texture.LoadImage(data))
             {
+                Debug.Log($"[Cache] DISK DECODE: {sw.ElapsedMilliseconds}ms ({texture.width}x{texture.height})");
                 sprite = Sprite.Create(
                     texture,
                     new Rect(0, 0, texture.width, texture.height),
@@ -452,6 +512,20 @@ public class ThumbnailCache
                 UnityEngine.Object.Destroy(entry.Thumbnail);
             }
             _memoryCache.Remove(oldestKey);
+
+            // Remove any aliases pointing to this key
+            var aliasesToRemove = new List<string>();
+            foreach (var kvp in _aliasMap)
+            {
+                if (kvp.Value == oldestKey)
+                {
+                    aliasesToRemove.Add(kvp.Key);
+                }
+            }
+            foreach (var alias in aliasesToRemove)
+            {
+                _aliasMap.Remove(alias);
+            }
         }
     }
 
