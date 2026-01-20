@@ -385,6 +385,33 @@ public class RTTFileManagerController : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Scroll to the very beginning (top) of the content.
+    /// </summary>
+    public void ScrollToStart()
+    {
+        _currentPage = 1;
+        if (_view != null)
+        {
+            _view.UpdatePagination(_currentPage, CalculateTotalPages());
+            _view.SetScrollPosition(1f); // 1 = top
+        }
+    }
+
+    /// <summary>
+    /// Scroll to the very end (bottom) of the content.
+    /// </summary>
+    public void ScrollToEnd()
+    {
+        int totalPages = CalculateTotalPages();
+        _currentPage = totalPages;
+        if (_view != null)
+        {
+            _view.UpdatePagination(_currentPage, totalPages);
+            _view.SetScrollPosition(0f); // 0 = bottom
+        }
+    }
+
     private int CalculateTotalPages()
     {
         int totalFiles = _filteredFiles.Count;

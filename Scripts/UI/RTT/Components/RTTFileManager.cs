@@ -43,10 +43,13 @@ public class RTTFileManager : MonoBehaviour
     // Edit Mode
     private bool _isEditMode = false;
     private GameObject _editButton;
-    private RectTransform _row3RT;
     private HashSet<string> _selectedItems = new HashSet<string>();
     private GameObject _selectAllCheckbox;
     private Image _selectAllCheckmark;
+
+    // Edit Mode UI in Row2
+    private GameObject _editControlsContainer; // Container for edit mode controls (replaces breadcrumbs)
+    private TextMeshProUGUI _selectedCountText; // "X selected" text to the left of item count (shown in Edit Mode)
 
     // Edit Mode Action Buttons
     private Button _copyButton;
@@ -250,8 +253,7 @@ public class RTTFileManager : MonoBehaviour
     private RectTransform _bodyRT;
     private float _singleRowHeight;
     private float _rowSpacing; // Spacing between header rows
-    private float _headerHeight2Rows; // Height with 2 rows (normal)
-    private float _headerHeight3Rows; // Height with 3 rows (edit mode)
+    private float _headerHeight2Rows; // Height with 2 rows
 
     
     // Breadcrumb References
@@ -288,8 +290,6 @@ public class RTTFileManager : MonoBehaviour
 
         // Header height = 2 rows + 1 gap between them
         _headerHeight2Rows = (_singleRowHeight * 2f) + _rowSpacing;
-        // Header height with Row3 = 3 rows + 2 gaps
-        _headerHeight3Rows = (_singleRowHeight * 3f) + (_rowSpacing * 2f);
 
         float bottomPadding = panelHeight * 0.02f;
 
@@ -414,11 +414,8 @@ public class RTTFileManager : MonoBehaviour
         // Row 1: Sort | Search | Edit
         CreateRow1(parent);
 
-        // Row 2: Breadcrumbs | Refresh
+        // Row 2: Breadcrumbs (or Edit Controls in Edit Mode) | Item Count | Refresh
         CreateRow2(parent);
-
-        // Row 3: Hidden Placeholder
-        CreateRow3(parent);
 
         Debug.Log($"[RTTFileManager] CreateHeaderRows completed, breadcrumb null: {_breadcrumbContainer == null}");
     }
@@ -975,7 +972,8 @@ public class RTTFileManager : MonoBehaviour
         RectTransform refreshRT = refreshBtn.GetComponent<RectTransform>();
         SetupRowElement(refreshRT, new Vector2(1, 0.5f), new Vector2(-20, 0));
 
-        // Item Count Label (centered, aligned with New Folder button in Row 1)
+        // Item Count Label (aligned with New Folder button in Row 1)
+        // Create this first so we know its position for the selected count label
         GameObject countObj = new GameObject("ItemCountLabel");
         countObj.transform.SetParent(rowRT, false);
 
@@ -997,6 +995,31 @@ public class RTTFileManager : MonoBehaviour
         countRT.pivot = new Vector2(0.5f, 0.5f);
         countRT.anchoredPosition = new Vector2(countCenterFromCenter, 0);
 
+        // Selected Count Label (right edge aligned with SearchBar right edge, shown in Edit Mode)
+        // SearchBar is centered with width 990, so right edge is at +495 from center
+        float searchBarRightEdge = 990f / 2f; // +495
+
+        GameObject selectedObj = new GameObject("SelectedCountLabel");
+        selectedObj.transform.SetParent(rowRT, false);
+
+        _selectedCountText = selectedObj.AddComponent<TextMeshProUGUI>();
+        _selectedCountText.text = "";
+        _selectedCountText.font = _font;
+        _selectedCountText.fontSize = 28;
+        _selectedCountText.fontStyle = FontStyles.Bold;
+        _selectedCountText.color = Color.white; // White color as requested
+        _selectedCountText.alignment = TextAlignmentOptions.MidlineRight;
+        _selectedCountText.raycastTarget = false;
+
+        RectTransform selectedRT = selectedObj.GetComponent<RectTransform>();
+        selectedRT.sizeDelta = new Vector2(280f, 75f); // Wide enough for "9999 items selected" on 1 line
+        // Right edge aligned with SearchBar right edge
+        selectedRT.anchorMin = new Vector2(0.5f, 0.5f);
+        selectedRT.anchorMax = new Vector2(0.5f, 0.5f);
+        selectedRT.pivot = new Vector2(1, 0.5f); // Right-aligned pivot
+        selectedRT.anchoredPosition = new Vector2(searchBarRightEdge, 0);
+        selectedObj.SetActive(false); // Hidden by default
+
         // Left Container for Breadcrumbs
         GameObject crumbContainer = new GameObject("Breadcrumbs");
         crumbContainer.transform.SetParent(rowRT, false);
@@ -1011,49 +1034,77 @@ public class RTTFileManager : MonoBehaviour
         crumbRT.offsetMin = new Vector2(20, 0);
         crumbRT.offsetMax = new Vector2(-320, 0);
 
+        // Edit Controls Container (hidden by default, shown in Edit Mode)
+        GameObject editControlsObj = new GameObject("EditControls");
+        editControlsObj.transform.SetParent(rowRT, false);
+        _editControlsContainer = editControlsObj;
+
+        RectTransform editRT = editControlsObj.AddComponent<RectTransform>();
+        editRT.anchorMin = new Vector2(0, 0);
+        editRT.anchorMax = new Vector2(1, 1);
+        editRT.pivot = new Vector2(0, 0.5f);
+        editRT.offsetMin = new Vector2(20, 0);
+        editRT.offsetMax = new Vector2(-320, 0);
+
+        Debug.Log($"[RTTFileManager] EditControls container created - parent: {rowRT.name}, sizeDelta: {editRT.sizeDelta}, rect: {editRT.rect}, instanceID: {editControlsObj.GetInstanceID()}");
+
+        // Create Edit Controls inside the container BEFORE setting inactive
+        // This ensures components initialize correctly
+        CreateEditControlsInRow2(editRT);
+
+        Debug.Log($"[RTTFileManager] EditControls child count after creation: {editControlsObj.transform.childCount}");
+        Debug.Log($"[RTTFileManager] _editControlsContainer reference instanceID: {_editControlsContainer.GetInstanceID()}, same object: {_editControlsContainer == editControlsObj}");
+
+        // Hide after creating children
+        editControlsObj.SetActive(false);
+        Debug.Log($"[RTTFileManager] EditControls set to inactive, activeSelf: {editControlsObj.activeSelf}");
+
         // NOTE: NOT using HorizontalLayoutGroup to allow independent control of:
         // - Visual position (left to right)
         // - Sibling order (reversed, so left buttons have higher index = hit first by GraphicRaycaster)
     }
 
-    private void CreateRow3(RectTransform parent)
+    private void CreateEditControlsInRow2(RectTransform parent)
     {
-        // Position Row3 below Row2 with spacing
-        float row3Y = -((_singleRowHeight + _rowSpacing) * 2 - _rowSpacing * 0.75f);
-        _row3RT = CreateRowContainer(parent, "Row3", row3Y);
-        _row3RT.gameObject.SetActive(false); // Hidden by default, shown in Edit Mode
+        Debug.Log($"[RTTFileManager] CreateEditControlsInRow2 called, parent: {parent?.name}, parent active: {parent?.gameObject.activeInHierarchy}");
 
-        // Left: Select All Checkbox with label
-        CreateSelectAllCheckbox(_row3RT);
+        // Select All Checkbox (at left edge)
+        CreateSelectAllCheckbox(parent);
 
-        // Action buttons on the left side, after checkbox
-        // SelectAll container width = checkboxSize(50) + spacing(10) + labelWidth(120) + leftPadding(20) = 200
-        float btnSpacing = 25f;
-        float leftOffset = 250f; // After SelectAll container
+        // SearchBar dimensions for alignment (SearchBar is centered on row, width = 990)
+        // EditControls container has offsetMin=(20,0), offsetMax=(-320,0)
+        // Container center offset from row center = (20 + (-320)) / 2 = -150
+        // So we need to compensate: searchBarLeft_in_container = searchBarLeft_from_row_center - container_offset
+        float searchBarWidth = 990f;
+        float searchBarLeftFromRowCenter = -searchBarWidth / 2f; // -495
+        float containerCenterOffset = (20f + (-320f)) / 2f; // -150 (container center is 150px left of row center)
+        float searchBarLeftInContainer = searchBarLeftFromRowCenter - containerCenterOffset; // -495 - (-150) = -345
+        float btnSpacing = 15f;
 
-        // Copy button (first after checkbox)
-        var copyBtn = CreateEditModeActionButton(_row3RT, "Copy", "icon_copy", OnCopyClicked);
+        // Copy button - align with SearchBar left edge (use center anchor)
+        var copyBtn = CreateEditModeActionButton(parent, "Copy", "icon_copy", OnCopyClicked);
+        Debug.Log($"[RTTFileManager] Copy button created: {copyBtn?.name}");
         var copyRT = copyBtn.GetComponent<RectTransform>();
-        copyRT.anchorMin = copyRT.anchorMax = new Vector2(0, 0.5f);
+        copyRT.anchorMin = copyRT.anchorMax = new Vector2(0.5f, 0.5f);
         copyRT.pivot = new Vector2(0, 0.5f);
-        copyRT.anchoredPosition = new Vector2(leftOffset, 0);
+        copyRT.anchoredPosition = new Vector2(searchBarLeftInContainer, 0);
         _copyButton = copyBtn.GetComponent<Button>();
         _copyButtonCG = copyBtn.AddComponent<CanvasGroup>();
 
         // Move button
-        var moveBtn = CreateEditModeActionButton(_row3RT, "Move", "icon_move_folder", OnMoveClicked);
+        var moveBtn = CreateEditModeActionButton(parent, "Move", "icon_move_folder", OnMoveClicked);
         var moveRT = moveBtn.GetComponent<RectTransform>();
-        moveRT.anchorMin = moveRT.anchorMax = new Vector2(0, 0.5f);
+        moveRT.anchorMin = moveRT.anchorMax = new Vector2(0.5f, 0.5f);
         moveRT.pivot = new Vector2(0, 0.5f);
-        float moveX = leftOffset + copyRT.sizeDelta.x + btnSpacing;
+        float moveX = searchBarLeftInContainer + copyRT.sizeDelta.x + btnSpacing;
         moveRT.anchoredPosition = new Vector2(moveX, 0);
         _moveButton = moveBtn.GetComponent<Button>();
         _moveButtonCG = moveBtn.AddComponent<CanvasGroup>();
 
         // Delete button
-        var deleteBtn = CreateEditModeActionButton(_row3RT, "Delete", "icon_trash", OnDeleteClicked);
+        var deleteBtn = CreateEditModeActionButton(parent, "Delete", "icon_trash", OnDeleteClicked);
         var deleteRT = deleteBtn.GetComponent<RectTransform>();
-        deleteRT.anchorMin = deleteRT.anchorMax = new Vector2(0, 0.5f);
+        deleteRT.anchorMin = deleteRT.anchorMax = new Vector2(0.5f, 0.5f);
         deleteRT.pivot = new Vector2(0, 0.5f);
         float deleteX = moveX + moveRT.sizeDelta.x + btnSpacing;
         deleteRT.anchoredPosition = new Vector2(deleteX, 0);
@@ -1062,12 +1113,14 @@ public class RTTFileManager : MonoBehaviour
 
         // Initially disable buttons (no selection)
         UpdateActionButtonsState();
+
+        Debug.Log($"[RTTFileManager] CreateEditControlsInRow2 completed - Copy: {_copyButton != null} (size: {copyRT.sizeDelta}), Move: {_moveButton != null} (size: {moveRT.sizeDelta}), Delete: {_deleteButton != null} (size: {deleteRT.sizeDelta})");
     }
 
     private void CreateSelectAllCheckbox(RectTransform parent)
     {
         float checkboxSize = 50f;
-        float labelWidth = 120f;
+        float labelWidth = 150f; // Increased to fit "Select all" on one line
         float spacing = 10f;
         float leftPadding = 20f;
 
@@ -1185,9 +1238,16 @@ public class RTTFileManager : MonoBehaviour
             bgImage.material = mat;
             bgImage.color = Color.white;
         }
+        else
+        {
+            Debug.LogWarning($"[RTTFileManager] CreateEditModeActionButton: Shader 'Custom/GlassGradientBackgroundWide' not found for {label}");
+            // Fallback: use white background
+            bgImage.color = new Color(1f, 1f, 1f, 0.2f);
+        }
 
         // Icon (white color)
         Sprite icon = Resources.Load<Sprite>(iconName);
+        Debug.Log($"[RTTFileManager] CreateEditModeActionButton: {label}, icon '{iconName}' loaded: {icon != null}");
         Image iconImg = null;
         if (icon != null)
         {
@@ -1261,19 +1321,62 @@ public class RTTFileManager : MonoBehaviour
     #region Edit Mode
     private void ToggleEditMode()
     {
+        Debug.Log($"[RTTFileManager] ToggleEditMode CALLED - _isEditMode before: {_isEditMode}");
+
         _isEditMode = !_isEditMode;
+
+        Debug.Log($"[RTTFileManager] ToggleEditMode - _isEditMode after toggle: {_isEditMode}");
+        Debug.Log($"[RTTFileManager] ToggleEditMode - _editControlsContainer: {(_editControlsContainer != null ? $"{_editControlsContainer.name} (ID:{_editControlsContainer.GetInstanceID()})" : "NULL")}, _breadcrumbContainer: {(_breadcrumbContainer != null ? _breadcrumbContainer.name : "NULL")}");
+
         UpdateEditButtonVisual();
 
-        // Show/hide Row3
-        if (_row3RT != null)
-            _row3RT.gameObject.SetActive(_isEditMode);
+        // Toggle between Breadcrumbs and Edit Controls in Row2
+        if (_breadcrumbContainer != null)
+            _breadcrumbContainer.gameObject.SetActive(!_isEditMode);
+        if (_editControlsContainer != null)
+        {
+            // Explicitly set active state
+            bool beforeState = _editControlsContainer.activeSelf;
+            _editControlsContainer.SetActive(_isEditMode);
+            bool afterState = _editControlsContainer.activeSelf;
+            Debug.Log($"[RTTFileManager] EditControls activeSelf before: {beforeState}, after: {afterState}, expected: {_isEditMode}");
 
-        // Adjust header and body sizes for Row3
-        float targetHeaderHeight = _isEditMode ? _headerHeight3Rows : _headerHeight2Rows;
-        if (_headerRT != null)
-            _headerRT.sizeDelta = new Vector2(0, targetHeaderHeight);
-        if (_bodyRT != null)
-            _bodyRT.offsetMax = new Vector2(0, -targetHeaderHeight);
+            // Force layout rebuild if entering edit mode
+            if (_isEditMode)
+            {
+                Canvas.ForceUpdateCanvases();
+                var rt = _editControlsContainer.GetComponent<RectTransform>();
+                if (rt != null)
+                {
+                    LayoutRebuilder.ForceRebuildLayoutImmediate(rt);
+                }
+            }
+
+            Debug.Log($"[RTTFileManager] EditControls SetActive({_isEditMode}) called, now activeSelf: {_editControlsContainer.activeSelf}, activeInHierarchy: {_editControlsContainer.activeInHierarchy}");
+            // Check parent hierarchy
+            Transform parent = _editControlsContainer.transform.parent;
+            while (parent != null)
+            {
+                Debug.Log($"[RTTFileManager] Parent: {parent.name}, activeSelf: {parent.gameObject.activeSelf}");
+                parent = parent.parent;
+            }
+            Debug.Log($"[RTTFileManager] EditControls child count: {_editControlsContainer.transform.childCount}");
+            // Log all children for debugging
+            for (int i = 0; i < _editControlsContainer.transform.childCount; i++)
+            {
+                var child = _editControlsContainer.transform.GetChild(i);
+                var childRT = child as RectTransform;
+                Debug.Log($"[RTTFileManager] EditControls child[{i}]: {child.name}, active: {child.gameObject.activeSelf}, pos: {(childRT != null ? childRT.anchoredPosition.ToString() : "N/A")}");
+            }
+        }
+        else
+        {
+            Debug.LogError("[RTTFileManager] _editControlsContainer is NULL in ToggleEditMode!");
+        }
+
+        // Show/hide selected count text
+        if (_selectedCountText != null)
+            _selectedCountText.gameObject.SetActive(_isEditMode);
 
         // Show/hide checkboxes on items
         _fileGrid?.SetEditMode(_isEditMode);
@@ -1284,9 +1387,29 @@ public class RTTFileManager : MonoBehaviour
         {
             _selectedItems.Clear();
             UpdateSelectAllCheckmark();
+            UpdateSelectedCountText();
+        }
+        else
+        {
+            // Update selected count when entering edit mode
+            UpdateSelectedCountText();
         }
 
         Debug.Log($"[RTTFileManager] Edit Mode: {_isEditMode}");
+    }
+
+    private void UpdateSelectedCountText()
+    {
+        // Get actual selected count from grid/list
+        int count = 0;
+        if (_fileGrid != null && _fileGrid.gameObject.activeInHierarchy)
+            count = _fileGrid.GetSelectedPaths().Count;
+        else if (_fileList != null && _fileList.gameObject.activeInHierarchy)
+            count = _fileList.GetSelectedPaths().Count;
+
+        // Update the text (to the left of item count)
+        if (_selectedCountText != null)
+            _selectedCountText.text = count > 0 ? $"{count} item selected" : "0 item selected";
     }
 
     private void UpdateEditButtonVisual()
@@ -1327,6 +1450,7 @@ public class RTTFileManager : MonoBehaviour
         }
         UpdateSelectAllCheckmark();
         UpdateActionButtonsState();
+        UpdateSelectedCountText();
     }
 
     private void UpdateSelectAllCheckmark()
@@ -1346,6 +1470,7 @@ public class RTTFileManager : MonoBehaviour
     {
         UpdateSelectAllCheckmark();
         UpdateActionButtonsState();
+        UpdateSelectedCountText();
     }
 
     private void UpdateActionButtonsState()

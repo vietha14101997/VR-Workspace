@@ -496,7 +496,12 @@ public class RTTFilePagination : RTTCanvasBase
         hoverEffect.Initialize(circleMat, isActive);
     }
     
-    private GameObject CreatePageButton(Transform parent, int pageNumber, bool isActive)
+    /// <summary>
+    /// Position type for special scroll behavior on first/last buttons.
+    /// </summary>
+    private enum PageButtonPosition { Normal, First, Last }
+
+    private GameObject CreatePageButton(Transform parent, int pageNumber, bool isActive, PageButtonPosition position = PageButtonPosition.Normal)
     {
         GameObject btnObj = new GameObject($"Page_{pageNumber}", typeof(RectTransform), typeof(Image), typeof(Button));
         btnObj.layer = LayerMask.NameToLayer("UI");
@@ -526,10 +531,20 @@ public class RTTFilePagination : RTTCanvasBase
         Button btn = btnObj.GetComponent<Button>();
         btn.transition = Selectable.Transition.None; // Disable default transition to avoid interference
         btn.interactable = !isActive;
-        btn.onClick.AddListener(() =>
+
+        // Special click behavior for first/last visible buttons
+        if (position == PageButtonPosition.First)
         {
-            _controller.GoToPage(pageNumber);
-        });
+            btn.onClick.AddListener(() => _controller.ScrollToStart());
+        }
+        else if (position == PageButtonPosition.Last)
+        {
+            btn.onClick.AddListener(() => _controller.ScrollToEnd());
+        }
+        else
+        {
+            btn.onClick.AddListener(() => _controller.GoToPage(pageNumber));
+        }
 
         // Hover Effect - apply to ALL buttons (even active)
         AddPageButtonHoverEffect(btnObj, circleMat, isActive);
@@ -663,14 +678,20 @@ public class RTTFilePagination : RTTCanvasBase
             // 1. Render Left Group Elements (into Stack)
             if (showStart)
             {
-                CreatePageButton(_stackPagingTransform, 1, 1 == _currentPage);
+                // First visible button -> scroll to start
+                CreatePageButton(_stackPagingTransform, 1, 1 == _currentPage, PageButtonPosition.First);
                 if (startPage > 2) CreateEllipsisButton(_stackPagingTransform);
             }
 
             // 2. Render Central Stack Elements (into Stack)
             for (int i = startPage; i <= endPage; i++)
             {
-                GameObject btn = CreatePageButton(_stackPagingTransform, i, i == _currentPage);
+                // Determine position for first/last button in central range
+                PageButtonPosition pos = PageButtonPosition.Normal;
+                if (!showStart && i == startPage) pos = PageButtonPosition.First;
+                if (!showEnd && i == endPage) pos = PageButtonPosition.Last;
+
+                GameObject btn = CreatePageButton(_stackPagingTransform, i, i == _currentPage, pos);
                 if (btn != null) _pageButtons.Add(btn);
             }
 
@@ -678,7 +699,8 @@ public class RTTFilePagination : RTTCanvasBase
             if (showEnd)
             {
                 if (endPage < _totalPages - 1) CreateEllipsisButton(_stackPagingTransform);
-                CreatePageButton(_stackPagingTransform, _totalPages, _totalPages == _currentPage);
+                // Last visible button -> scroll to end
+                CreatePageButton(_stackPagingTransform, _totalPages, _totalPages == _currentPage, PageButtonPosition.Last);
             }
             
             // 4. Force Layout Logic

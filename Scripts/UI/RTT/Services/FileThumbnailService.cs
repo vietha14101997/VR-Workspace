@@ -62,7 +62,6 @@ public class FileThumbnailService : MonoBehaviour
     private Queue<Action> _uiCallbackQueue = new Queue<Action>();
     private Queue<Action> _highPriorityUIQueue = new Queue<Action>(); // For detail panel
     private const int MAX_UI_CALLBACKS_PER_FRAME = 4; // Limit UI updates per frame
-    private bool _isProcessingUICallbacks = false;
     #endregion
 
     #region Unity Lifecycle
@@ -510,8 +509,6 @@ public class FileThumbnailService : MonoBehaviour
     /// </summary>
     private IEnumerator ProcessUICallbacksCoroutine()
     {
-        _isProcessingUICallbacks = true;
-
         while (true)
         {
             // Process up to MAX_UI_CALLBACKS_PER_FRAME callbacks per frame
