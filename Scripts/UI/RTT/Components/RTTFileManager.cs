@@ -61,6 +61,23 @@ public class RTTFileManager : MonoBehaviour
 
     // Delete Confirmation Popup
     private RTTPopupMenu _deleteConfirmPopup;
+
+    // Clipboard Mode (for Copy/Move operations)
+    private bool _isClipboardMode = false;
+    private ClipboardOperation _clipboardOperation;
+    private List<string> _clipboardItems = new List<string>();
+    private string _clipboardSourcePath;
+
+    private enum ClipboardOperation { None, Copy, Move }
+
+    // Close button reference (for clipboard mode icon/function swap)
+    private GameObject _closeButton;
+    private Image _closeButtonIcon;
+    private Sprite _originalCloseIcon;
+    private Sprite _originalEditIcon;
+
+    // Conflict Dialog
+    private RTTPopupMenu _conflictPopup;
     #endregion
 
     #region Initialization
@@ -447,15 +464,17 @@ public class RTTFileManager : MonoBehaviour
         RectTransform rowRT = CreateRowContainer(parent, "Row1", 0);
 
         // Left: Close Button (BareIconButton - no background/border)
-        Sprite closeIcon = Resources.Load<Sprite>("icon_close");
-        GameObject closeBtn = VRButtonFactory.CreateBareIconButton(
+        _originalCloseIcon = Resources.Load<Sprite>("icon_close");
+        _closeButton = VRButtonFactory.CreateBareIconButton(
             rowRT,
             75f,
-            closeIcon,
+            _originalCloseIcon,
             _primaryColor,
-            () => _controller?.HandleBack()
+            OnCloseButtonClicked
         );
-        RectTransform closeRT = closeBtn.GetComponent<RectTransform>();
+        // Store icon reference for clipboard mode swap (path: HitArea/Visuals/Content/Icon)
+        _closeButtonIcon = _closeButton.transform.Find("HitArea/Visuals/Content/Icon")?.GetComponent<Image>();
+        RectTransform closeRT = _closeButton.GetComponent<RectTransform>();
         SetupRowElement(closeRT, new Vector2(0, 0.5f), new Vector2(20, 0)); // Left align
 
         // View Options Trigger Button (Custom Layout: Text Left, Icon Right)
@@ -516,11 +535,11 @@ public class RTTFileManager : MonoBehaviour
         CreateViewOptionsPopup(sortRT);
 
         // Right: Edit Button (Icon) - toggles edit mode
-        Sprite editIcon = Resources.Load<Sprite>("icon_edit");
+        _originalEditIcon = Resources.Load<Sprite>("icon_edit");
         var editConfig = new VRButtonFactory.ButtonConfig
         {
             label = "Edit",
-            icon = editIcon,
+            icon = _originalEditIcon,
             themeColor = _primaryColor,
             width = 75f,  // +10% (was 68f)
             height = 75f, // +10% (was 68f)
@@ -534,7 +553,7 @@ public class RTTFileManager : MonoBehaviour
         _editButton = VRButtonFactory.CreateButton(
             rowRT,
             editConfig,
-            ToggleEditMode
+            OnEditButtonClicked
         );
         RectTransform editRT = _editButton.GetComponent<RectTransform>();
         SetupRowElement(editRT, new Vector2(1, 0.5f), new Vector2(-20, 0)); // Right align
@@ -1502,14 +1521,22 @@ public class RTTFileManager : MonoBehaviour
 
     private void OnCopyClicked()
     {
-        Debug.Log("[RTTFileManager] Copy clicked - selected items: " + _selectedItems.Count);
-        // TODO: Implement copy functionality
+        var selectedPaths = GetCurrentSelectedPaths();
+        Debug.Log("[RTTFileManager] Copy clicked - selected items: " + selectedPaths.Count);
+
+        if (selectedPaths.Count == 0) return;
+
+        EnterClipboardMode(ClipboardOperation.Copy, selectedPaths);
     }
 
     private void OnMoveClicked()
     {
-        Debug.Log("[RTTFileManager] Move clicked - selected items: " + _selectedItems.Count);
-        // TODO: Implement move functionality
+        var selectedPaths = GetCurrentSelectedPaths();
+        Debug.Log("[RTTFileManager] Move clicked - selected items: " + selectedPaths.Count);
+
+        if (selectedPaths.Count == 0) return;
+
+        EnterClipboardMode(ClipboardOperation.Move, selectedPaths);
     }
 
     private void OnDeleteClicked()
@@ -1534,6 +1561,339 @@ public class RTTFileManager : MonoBehaviour
             return _fileList.GetSelectedPaths();
         return new HashSet<string>();
     }
+
+    #region Clipboard Mode (Copy/Move)
+
+    /// <summary>
+    /// Handler for Close button - either closes file manager or cancels clipboard mode
+    /// </summary>
+    private void OnCloseButtonClicked()
+    {
+        if (_isClipboardMode)
+        {
+            ExitClipboardMode();
+        }
+        else
+        {
+            _controller?.HandleBack();
+        }
+    }
+
+    /// <summary>
+    /// Handler for Edit button - either toggles edit mode or performs paste
+    /// </summary>
+    private void OnEditButtonClicked()
+    {
+        if (_isClipboardMode)
+        {
+            OnClipboardPaste();
+        }
+        else
+        {
+            ToggleEditMode();
+        }
+    }
+
+    private void EnterClipboardMode(ClipboardOperation operation, HashSet<string> items)
+    {
+        // 1. Store clipboard data
+        _clipboardOperation = operation;
+        _clipboardItems = new List<string>(items);
+        _clipboardSourcePath = _controller.GetCurrentPath();
+        _isClipboardMode = true;
+
+        // 2. Exit Edit Mode (hide edit controls, checkboxes)
+        if (_isEditMode)
+        {
+            ToggleEditMode();
+        }
+
+        // 3. Change Close button to Back icon
+        Sprite backIcon = Resources.Load<Sprite>("icon_back");
+        if (_closeButtonIcon != null && backIcon != null)
+        {
+            _closeButtonIcon.sprite = backIcon;
+        }
+
+        // 4. Change Edit button to Copy/Move icon
+        string iconName = operation == ClipboardOperation.Copy ? "icon_copy" : "icon_move_folder";
+        Sprite operationIcon = Resources.Load<Sprite>(iconName);
+        UpdateEditButtonIcon(operationIcon);
+        UpdateEditButtonColor(_accentColor); // Use accent color to indicate active state
+
+        // 5. Update paste button state (edit button enabled/disabled)
+        UpdatePasteButtonState();
+
+        Debug.Log($"[RTTFileManager] Entered Clipboard Mode: {operation}, {items.Count} items from {_clipboardSourcePath}");
+    }
+
+    private void ExitClipboardMode()
+    {
+        _isClipboardMode = false;
+        _clipboardOperation = ClipboardOperation.None;
+        _clipboardItems.Clear();
+        _clipboardSourcePath = null;
+
+        // Restore Close button icon
+        if (_closeButtonIcon != null && _originalCloseIcon != null)
+        {
+            _closeButtonIcon.sprite = _originalCloseIcon;
+        }
+
+        // Restore Edit button icon and color
+        UpdateEditButtonIcon(_originalEditIcon);
+        UpdateEditButtonColor(_primaryColor);
+
+        // Restore Edit button interactability
+        var editButtonCG = _editButton?.GetComponent<CanvasGroup>();
+        if (editButtonCG != null)
+        {
+            editButtonCG.alpha = 1f;
+            editButtonCG.interactable = true;
+            editButtonCG.blocksRaycasts = true;
+        }
+
+        var editBtn = _editButton?.GetComponentInChildren<Button>();
+        if (editBtn != null)
+        {
+            editBtn.interactable = true;
+        }
+
+        Debug.Log("[RTTFileManager] Exited Clipboard Mode");
+    }
+
+    private void UpdateEditButtonIcon(Sprite icon)
+    {
+        if (_editButton == null || icon == null) return;
+
+        // Find icon in the button hierarchy: HitArea/Visuals/Content/Icon
+        var iconImg = _editButton.transform.Find("HitArea/Visuals/Content/Icon")?.GetComponent<Image>();
+        if (iconImg != null)
+        {
+            iconImg.sprite = icon;
+        }
+    }
+
+    private void UpdateEditButtonColor(Color color)
+    {
+        if (_editButton == null) return;
+
+        // Update glow border color
+        var glowEffect = _editButton.GetComponentInChildren<GlowBorderHoverEffect>();
+        if (glowEffect != null)
+        {
+            glowEffect.UpdateSavedGlowColor(color);
+        }
+    }
+
+    private void UpdatePasteButtonState()
+    {
+        if (!_isClipboardMode) return;
+
+        string currentPath = _controller.GetCurrentPath();
+        bool canPaste = !string.Equals(currentPath, _clipboardSourcePath,
+                                        StringComparison.OrdinalIgnoreCase);
+
+        // Also check write permission
+        canPaste = canPaste && FileSystemService.CanCreateFolderInPath(currentPath);
+
+        // Prevent moving folder into itself or its subfolder
+        if (canPaste && _clipboardOperation == ClipboardOperation.Move)
+        {
+            foreach (string sourcePath in _clipboardItems)
+            {
+                if (currentPath.StartsWith(sourcePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    canPaste = false;
+                    break;
+                }
+            }
+        }
+
+        // Update Edit button (now acting as Paste) visual state
+        var editButtonCG = _editButton?.GetComponent<CanvasGroup>();
+        if (editButtonCG == null && _editButton != null)
+        {
+            editButtonCG = _editButton.AddComponent<CanvasGroup>();
+        }
+
+        if (editButtonCG != null)
+        {
+            editButtonCG.alpha = canPaste ? 1f : 0.4f;
+            editButtonCG.interactable = canPaste;
+            editButtonCG.blocksRaycasts = canPaste;
+        }
+
+        var editBtn = _editButton?.GetComponentInChildren<Button>();
+        if (editBtn != null)
+        {
+            editBtn.interactable = canPaste;
+        }
+    }
+
+    private void OnClipboardCancel()
+    {
+        Debug.Log("[RTTFileManager] Clipboard operation cancelled");
+        ExitClipboardMode();
+    }
+
+    private void OnClipboardPaste()
+    {
+        if (_clipboardItems.Count == 0) return;
+
+        string destination = _controller.GetCurrentPath();
+
+        // Check for conflicts first
+        var conflicts = CheckForConflicts(destination);
+
+        if (conflicts.Count > 0)
+        {
+            ShowConflictDialog(conflicts, destination);
+        }
+        else
+        {
+            ExecutePasteOperation(destination);
+        }
+    }
+
+    private List<string> CheckForConflicts(string destination)
+    {
+        var conflicts = new List<string>();
+
+        foreach (string sourcePath in _clipboardItems)
+        {
+            string fileName = System.IO.Path.GetFileName(sourcePath);
+            string destPath = System.IO.Path.Combine(destination, fileName);
+
+            if (System.IO.File.Exists(destPath) || System.IO.Directory.Exists(destPath))
+            {
+                conflicts.Add(fileName);
+            }
+        }
+
+        return conflicts;
+    }
+
+    private void ExecutePasteOperation(string destination, bool overwrite = false)
+    {
+        Debug.Log($"[RTTFileManager] Executing paste: {_clipboardOperation} to {destination}, overwrite={overwrite}");
+
+        if (_clipboardOperation == ClipboardOperation.Copy)
+        {
+            _controller.CopyItems(_clipboardItems, destination, overwrite);
+        }
+        else if (_clipboardOperation == ClipboardOperation.Move)
+        {
+            _controller.MoveItems(_clipboardItems, destination, overwrite);
+        }
+
+        ExitClipboardMode();
+    }
+
+    private void ExecutePasteOperationSkipConflicts(string destination)
+    {
+        // Filter out items that would conflict
+        var nonConflictingItems = new List<string>();
+
+        foreach (string sourcePath in _clipboardItems)
+        {
+            string fileName = System.IO.Path.GetFileName(sourcePath);
+            string destPath = System.IO.Path.Combine(destination, fileName);
+
+            if (!System.IO.File.Exists(destPath) && !System.IO.Directory.Exists(destPath))
+            {
+                nonConflictingItems.Add(sourcePath);
+            }
+        }
+
+        if (nonConflictingItems.Count > 0)
+        {
+            if (_clipboardOperation == ClipboardOperation.Copy)
+            {
+                _controller.CopyItems(nonConflictingItems, destination, false);
+            }
+            else if (_clipboardOperation == ClipboardOperation.Move)
+            {
+                _controller.MoveItems(nonConflictingItems, destination, false);
+            }
+        }
+
+        ExitClipboardMode();
+    }
+
+    private void CreateConflictPopup()
+    {
+        if (_conflictPopup != null) return;
+
+        var config = new RTTPopupMenu.PopupConfig
+        {
+            width = 550f,
+            buttonHeight = 60f,
+            sideSpacing = 20f,
+            rowSpacing = 10f,
+            labelHeight = 60f,
+            labelFontSize = 28,
+            fontSize = 24,
+            borderWidth = 0.028f,
+            primaryColor = _primaryColor,
+            accentColor = _accentColor,
+            overlayColor = new Color(0f, 0f, 0f, 0.4f),
+            font = _font,
+            layerName = "VirtualObjects",
+            buttonBorderWidth = 0.04f,
+            buttonGlowWidth = 0.08f,
+            buttonGlowIntensity = 4f,
+            buttonCornerRadius = 0.12f
+        };
+
+        _conflictPopup = RTTPopupMenu.CreateWorldSpace(config, _menuFrame.transform);
+    }
+
+    private void ShowConflictDialog(List<string> conflicts, string destination)
+    {
+        if (_conflictPopup == null)
+        {
+            CreateConflictPopup();
+        }
+
+        _conflictPopup.Clear();
+
+        string title = conflicts.Count == 1
+            ? $"'{conflicts[0]}' already exists"
+            : $"{conflicts.Count} items already exist";
+
+        _conflictPopup.AddSectionBlock(title, new List<RTTPopupMenu.ButtonData>());
+
+        var replaceBtn = new RTTPopupMenu.ButtonData(
+            "Replace",
+            () => { _conflictPopup.Hide(); ExecutePasteOperation(destination, true); },
+            null,
+            false,
+            _accentColor
+        );
+
+        var skipBtn = new RTTPopupMenu.ButtonData(
+            "Skip",
+            () => { _conflictPopup.Hide(); ExecutePasteOperationSkipConflicts(destination); },
+            null,
+            false,
+            _primaryColor
+        );
+
+        var cancelBtn = new RTTPopupMenu.ButtonData(
+            "Cancel",
+            () => { _conflictPopup.Hide(); },
+            null,
+            false,
+            _primaryColor
+        );
+
+        _conflictPopup.AddSectionBlock("", new List<RTTPopupMenu.ButtonData> { replaceBtn, skipBtn, cancelBtn }, 3);
+        _conflictPopup.Build();
+        _conflictPopup.Show();
+    }
+
+    #endregion
 
     private void CreateDeleteConfirmPopup()
     {
@@ -1953,8 +2313,14 @@ public class RTTFileManager : MonoBehaviour
         }
 
         Debug.Log($"[RTTFileManager] Created {breadcrumbs.Count} breadcrumbs for path: {path}");
+
+        // Update paste button state if in clipboard mode
+        if (_isClipboardMode)
+        {
+            UpdatePasteButtonState();
+        }
     }
-    
+
     /// <summary>
     /// Creates a chevron-shaped breadcrumb button.
     /// Right side: convex rounded (pill end)

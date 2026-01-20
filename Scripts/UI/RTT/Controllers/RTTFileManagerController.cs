@@ -642,6 +642,188 @@ public class RTTFileManagerController : MonoBehaviour
             NavigateTo(_currentPath);
         }
     }
+
+    /// <summary>
+    /// Copy multiple files/folders to destination.
+    /// </summary>
+    public void CopyItems(List<string> sourcePaths, string destination, bool overwrite = false)
+    {
+        if (sourcePaths == null || sourcePaths.Count == 0)
+        {
+            Debug.LogWarning("[Controller] No items to copy");
+            return;
+        }
+
+        int successCount = 0;
+        int failCount = 0;
+
+        foreach (string sourcePath in sourcePaths)
+        {
+            try
+            {
+                string fileName = Path.GetFileName(sourcePath);
+                string destPath = Path.Combine(destination, fileName);
+
+                if (Directory.Exists(sourcePath))
+                {
+                    // Copy folder recursively
+                    CopyDirectoryRecursive(sourcePath, destPath, overwrite);
+                    Debug.Log($"[Controller] Copied folder: {sourcePath} -> {destPath}");
+                    successCount++;
+                }
+                else if (File.Exists(sourcePath))
+                {
+                    // Copy file
+                    if (overwrite || !File.Exists(destPath))
+                    {
+                        File.Copy(sourcePath, destPath, overwrite);
+                        Debug.Log($"[Controller] Copied file: {sourcePath} -> {destPath}");
+                        successCount++;
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[Controller] File already exists: {destPath}");
+                        failCount++;
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning($"[Controller] Source not found: {sourcePath}");
+                    failCount++;
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[Controller] Failed to copy {sourcePath}: {e.Message}");
+                failCount++;
+            }
+        }
+
+        Debug.Log($"[Controller] Copy completed: {successCount} succeeded, {failCount} failed");
+
+        // Refresh current directory to show new items
+        if (successCount > 0)
+        {
+            NavigateTo(_currentPath);
+        }
+    }
+
+    /// <summary>
+    /// Move multiple files/folders to destination.
+    /// </summary>
+    public void MoveItems(List<string> sourcePaths, string destination, bool overwrite = false)
+    {
+        if (sourcePaths == null || sourcePaths.Count == 0)
+        {
+            Debug.LogWarning("[Controller] No items to move");
+            return;
+        }
+
+        int successCount = 0;
+        int failCount = 0;
+
+        foreach (string sourcePath in sourcePaths)
+        {
+            try
+            {
+                string fileName = Path.GetFileName(sourcePath);
+                string destPath = Path.Combine(destination, fileName);
+
+                // Handle overwrite
+                if (overwrite)
+                {
+                    if (Directory.Exists(destPath))
+                    {
+                        Directory.Delete(destPath, true);
+                    }
+                    else if (File.Exists(destPath))
+                    {
+                        File.Delete(destPath);
+                    }
+                }
+
+                if (Directory.Exists(sourcePath))
+                {
+                    // Move folder
+                    if (!Directory.Exists(destPath))
+                    {
+                        Directory.Move(sourcePath, destPath);
+                        Debug.Log($"[Controller] Moved folder: {sourcePath} -> {destPath}");
+                        successCount++;
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[Controller] Destination folder already exists: {destPath}");
+                        failCount++;
+                    }
+                }
+                else if (File.Exists(sourcePath))
+                {
+                    // Move file
+                    if (!File.Exists(destPath))
+                    {
+                        File.Move(sourcePath, destPath);
+                        Debug.Log($"[Controller] Moved file: {sourcePath} -> {destPath}");
+                        successCount++;
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[Controller] Destination file already exists: {destPath}");
+                        failCount++;
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning($"[Controller] Source not found: {sourcePath}");
+                    failCount++;
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[Controller] Failed to move {sourcePath}: {e.Message}");
+                failCount++;
+            }
+        }
+
+        Debug.Log($"[Controller] Move completed: {successCount} succeeded, {failCount} failed");
+
+        // Refresh current directory to reflect changes
+        if (successCount > 0)
+        {
+            NavigateTo(_currentPath);
+        }
+    }
+
+    /// <summary>
+    /// Recursively copy a directory.
+    /// </summary>
+    private void CopyDirectoryRecursive(string sourceDir, string destDir, bool overwrite)
+    {
+        // Create destination directory
+        Directory.CreateDirectory(destDir);
+
+        // Copy files
+        foreach (string file in Directory.GetFiles(sourceDir))
+        {
+            string destFile = Path.Combine(destDir, Path.GetFileName(file));
+            File.Copy(file, destFile, overwrite);
+        }
+
+        // Copy subdirectories
+        foreach (string subDir in Directory.GetDirectories(sourceDir))
+        {
+            string destSubDir = Path.Combine(destDir, Path.GetFileName(subDir));
+            CopyDirectoryRecursive(subDir, destSubDir, overwrite);
+        }
+    }
+
+    /// <summary>
+    /// Get current path for clipboard operations.
+    /// </summary>
+    public string GetCurrentPath()
+    {
+        return _currentPath;
+    }
     #endregion
 }
 
