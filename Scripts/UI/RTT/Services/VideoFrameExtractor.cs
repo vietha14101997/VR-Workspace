@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.Video;
+using UnityEngine.Rendering;
 using System;
 using System.Collections;
 
@@ -92,7 +93,7 @@ public class VideoFrameExtractor : MonoBehaviour
     }
 
     /// <summary>
-    /// Composite a video frame with an overlay icon in the center.
+    /// Composite a video frame with an overlay icon in the center using GPU blending.
     /// </summary>
     /// <param name="frameTexture">The video frame texture</param>
     /// <param name="overlayIcon">The overlay sprite (e.g., play button)</param>
@@ -105,23 +106,31 @@ public class VideoFrameExtractor : MonoBehaviour
         int width = frameTexture.width;
         int height = frameTexture.height;
 
-        // Create a copy to composite on - enable mipmaps for stable rendering
-        Texture2D result = new Texture2D(width, height, TextureFormat.RGBA32, true);
-        result.filterMode = FilterMode.Trilinear;
-        result.anisoLevel = 16; // Max anisotropic filtering
-        result.wrapMode = TextureWrapMode.Clamp;
+        // Use GPU-based compositing with RenderTexture
+        RenderTexture rt = RenderTexture.GetTemporary(width, height, 0, RenderTextureFormat.ARGB32);
 
-        // Copy the frame pixels
-        Color[] framePixels = frameTexture.GetPixels();
-        result.SetPixels(framePixels);
+        // First, blit the video frame
+        Graphics.Blit(frameTexture, rt);
 
-        // Draw overlay if available
+        // Draw overlay using GPU if available
         if (overlayIcon != null && overlayIcon.texture != null)
         {
-            DrawOverlay(result, overlayIcon);
+            DrawOverlayGPU(rt, overlayIcon);
         }
 
-        result.Apply(true); // updateMipmaps = true
+        // Read back the result (this is still synchronous, but the compositing was GPU-accelerated)
+        RenderTexture previous = RenderTexture.active;
+        RenderTexture.active = rt;
+
+        Texture2D result = new Texture2D(width, height, TextureFormat.RGBA32, true);
+        result.filterMode = FilterMode.Trilinear;
+        result.anisoLevel = 16;
+        result.wrapMode = TextureWrapMode.Clamp;
+        result.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+        result.Apply(true);
+
+        RenderTexture.active = previous;
+        RenderTexture.ReleaseTemporary(rt);
 
         // Create sprite from composited texture
         Sprite sprite = Sprite.Create(
@@ -132,6 +141,46 @@ public class VideoFrameExtractor : MonoBehaviour
         );
 
         return sprite;
+    }
+
+    /// <summary>
+    /// Draw overlay using GPU (Graphics.DrawTexture).
+    /// </summary>
+    private void DrawOverlayGPU(RenderTexture target, Sprite overlaySprite)
+    {
+        Texture2D overlayTexture = overlaySprite.texture;
+        if (overlayTexture == null) return;
+
+        // Calculate overlay size (about 50% of the smaller dimension)
+        int overlaySize = Mathf.Min(target.width, target.height) * 50 / 100;
+
+        // Center position
+        float startX = (target.width - overlaySize) / 2f;
+        float startY = (target.height - overlaySize) / 2f;
+
+        // Use GL to draw overlay with alpha blending
+        RenderTexture previous = RenderTexture.active;
+        RenderTexture.active = target;
+
+        GL.PushMatrix();
+        GL.LoadPixelMatrix(0, target.width, target.height, 0);
+
+        // Draw overlay texture with alpha blending
+        Graphics.DrawTexture(
+            new Rect(startX, startY, overlaySize, overlaySize),
+            overlayTexture,
+            new Rect(
+                overlaySprite.rect.x / overlayTexture.width,
+                overlaySprite.rect.y / overlayTexture.height,
+                overlaySprite.rect.width / overlayTexture.width,
+                overlaySprite.rect.height / overlayTexture.height
+            ),
+            0, 0, 0, 0,
+            new Color(1, 1, 1, 0.9f) // Slight transparency
+        );
+
+        GL.PopMatrix();
+        RenderTexture.active = previous;
     }
     #endregion
 
@@ -223,8 +272,21 @@ public class VideoFrameExtractor : MonoBehaviour
             waitFrames--;
         }
 
-        // Capture the frame
-        Texture2D capturedFrame = CaptureFrame();
+        // Capture the frame asynchronously
+        Texture2D capturedFrame = null;
+        bool captureComplete = false;
+
+        StartCoroutine(CaptureFrameAsync((frame) =>
+        {
+            capturedFrame = frame;
+            captureComplete = true;
+        }));
+
+        // Wait for async capture to complete
+        while (!captureComplete)
+        {
+            yield return null;
+        }
 
         // Stop and cleanup
         _videoPlayer.Stop();
@@ -233,7 +295,65 @@ public class VideoFrameExtractor : MonoBehaviour
         CompleteExtraction(capturedFrame);
     }
 
-    private Texture2D CaptureFrame()
+    private IEnumerator CaptureFrameAsync(Action<Texture2D> onComplete)
+    {
+        if (_renderTexture == null)
+        {
+            onComplete?.Invoke(null);
+            yield break;
+        }
+
+        bool readbackComplete = false;
+        Texture2D frame = null;
+        Exception readbackError = null;
+
+        // Use AsyncGPUReadback to avoid blocking main thread
+        AsyncGPUReadback.Request(_renderTexture, 0, TextureFormat.RGBA32, (request) =>
+        {
+            if (request.hasError)
+            {
+                readbackError = new Exception("AsyncGPUReadback failed");
+            }
+            else
+            {
+                try
+                {
+                    frame = new Texture2D(_renderTexture.width, _renderTexture.height, TextureFormat.RGBA32, true);
+                    frame.filterMode = FilterMode.Trilinear;
+                    frame.anisoLevel = 16;
+                    frame.wrapMode = TextureWrapMode.Clamp;
+                    frame.LoadRawTextureData(request.GetData<byte>());
+                    frame.Apply(true);
+                }
+                catch (Exception ex)
+                {
+                    readbackError = ex;
+                    if (frame != null)
+                    {
+                        Destroy(frame);
+                        frame = null;
+                    }
+                }
+            }
+            readbackComplete = true;
+        });
+
+        // Wait for async readback
+        while (!readbackComplete)
+        {
+            yield return null;
+        }
+
+        if (readbackError != null)
+        {
+            Debug.LogWarning($"[VideoFrameExtractor] Async capture failed: {readbackError.Message}, using fallback");
+            frame = CaptureFrameSync();
+        }
+
+        onComplete?.Invoke(frame);
+    }
+
+    private Texture2D CaptureFrameSync()
     {
         if (_renderTexture == null) return null;
 
@@ -242,13 +362,12 @@ public class VideoFrameExtractor : MonoBehaviour
             RenderTexture previous = RenderTexture.active;
             RenderTexture.active = _renderTexture;
 
-            // Enable mipmaps for stable rendering at different scales
             Texture2D frame = new Texture2D(_renderTexture.width, _renderTexture.height, TextureFormat.RGBA32, true);
             frame.filterMode = FilterMode.Trilinear;
-            frame.anisoLevel = 16; // Max anisotropic filtering
+            frame.anisoLevel = 16;
             frame.wrapMode = TextureWrapMode.Clamp;
             frame.ReadPixels(new Rect(0, 0, _renderTexture.width, _renderTexture.height), 0, 0);
-            frame.Apply(true); // updateMipmaps = true
+            frame.Apply(true);
 
             RenderTexture.active = previous;
             return frame;

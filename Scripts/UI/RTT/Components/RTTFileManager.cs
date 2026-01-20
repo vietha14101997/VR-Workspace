@@ -283,8 +283,8 @@ public class RTTFileManager : MonoBehaviour
             _singleRowHeight = 88f;
         }
 
-        // Row spacing = 50% of row height
-        _rowSpacing = _singleRowHeight * 0.25f;
+        // Row spacing = ~19% of row height (reduced by 25%)
+        _rowSpacing = _singleRowHeight * 0.1875f;
 
         // Header height = 2 rows + 1 gap between them
         _headerHeight2Rows = (_singleRowHeight * 2f) + _rowSpacing;

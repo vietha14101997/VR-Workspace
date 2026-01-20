@@ -191,7 +191,7 @@ public class RTTFileDetail : MonoBehaviour
 
         if (willHaveThumbnail)
         {
-            // Hide placeholder, load thumbnail directly
+            // Hide placeholder while thumbnail loads (leave preview area blank)
             _previewPlaceholder.gameObject.SetActive(false);
             _previewImage.gameObject.SetActive(false);
             LoadThumbnail(file);
@@ -224,7 +224,7 @@ public class RTTFileDetail : MonoBehaviour
         if (FileThumbnailService.Instance == null) return;
 
         // Use larger size for detail panel high-quality preview
-        int thumbnailSize = 720;
+        int thumbnailSize = 512; // Reduced from 720 for better performance
 
         FileThumbnailService.Instance.RequestThumbnail(
             file,
@@ -239,7 +239,10 @@ public class RTTFileDetail : MonoBehaviour
                     _previewPlaceholder.gameObject.SetActive(false);
                 }
             },
-            onFailed: null,
+            onFailed: () =>
+            {
+                // On failure, leave preview area blank (no placeholder shown)
+            },
             priority: 0,
             skipOverlay: true  // Don't show icon_media overlay on detail panel preview
         );
