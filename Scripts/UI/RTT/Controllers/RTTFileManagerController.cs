@@ -91,7 +91,32 @@ public class RTTFileManagerController : MonoBehaviour
 
     public void OnViewReady()
     {
-        Debug.Log("[Controller] View is ready. Loading initial path.");
+        Debug.Log("[Controller] View is ready. Checking storage permissions...");
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+        // Check and request storage permissions on Android
+        if (!StoragePermissionHelper.HasStoragePermission())
+        {
+            Debug.Log("[Controller] Storage permission not granted. Requesting...");
+            StoragePermissionHelper.RequestStoragePermission((granted) =>
+            {
+                if (granted)
+                {
+                    Debug.Log("[Controller] Storage permission granted. Loading files...");
+                    NavigateTo("root");
+                }
+                else
+                {
+                    Debug.LogWarning("[Controller] Storage permission denied. Files may not be accessible.");
+                    // Still try to navigate - user might grant permission later
+                    NavigateTo("root");
+                }
+            });
+            return;
+        }
+        Debug.Log("[Controller] Storage permission already granted.");
+#endif
+
         NavigateTo("root");
     }
 
@@ -1144,16 +1169,20 @@ public static class FileSystemService
 
             // Get files
             string[] files = Directory.GetFiles(absolutePath);
+            Debug.Log($"[FileSystemService] Raw file count from Directory.GetFiles: {files.Length}");
+
             foreach (string filePath in files)
             {
                 try
                 {
                     FileInfo fileInfo = new FileInfo(filePath);
+                    Debug.Log($"[FileSystemService] Checking file: {fileInfo.Name}, Attributes: {fileInfo.Attributes}");
 
                     // Skip hidden and system files
                     if ((fileInfo.Attributes & FileAttributes.Hidden) != 0 ||
                         (fileInfo.Attributes & FileAttributes.System) != 0)
                     {
+                        Debug.Log($"[FileSystemService] SKIPPED (Hidden/System): {fileInfo.Name}");
                         continue;
                     }
 
@@ -1171,10 +1200,16 @@ public static class FileSystemService
                         Size = fileInfo.Length,
                         Duration = GetMediaDuration(filePath, extension)
                     });
+                    Debug.Log($"[FileSystemService] ADDED file: {fileInfo.Name}");
                 }
-                catch (UnauthorizedAccessException)
+                catch (UnauthorizedAccessException ex)
                 {
-                    // Skip files we can't access
+                    Debug.LogWarning($"[FileSystemService] UnauthorizedAccess for file: {filePath} - {ex.Message}");
+                    continue;
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[FileSystemService] Error reading file {filePath}: {ex.Message}");
                     continue;
                 }
             }
