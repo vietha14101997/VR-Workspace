@@ -3627,9 +3627,22 @@ namespace VRWorkspace.Streaming
                             int dstRow = (height - 1 - y) * rowSize;
                             Array.Copy(rgbaData, srcRow, flippedData, dstRow, rowSize);
                         }
+
+                        // Zero out RGB for fully transparent pixels to prevent edge artifacts
+                        for (int i = 0; i < flippedData.Length; i += 4)
+                        {
+                            if (flippedData[i + 3] == 0) // Alpha = 0
+                            {
+                                flippedData[i] = 0;     // R
+                                flippedData[i + 1] = 0; // G
+                                flippedData[i + 2] = 0; // B
+                            }
+                        }
+
                         texture.LoadRawTextureData(flippedData);
                         texture.Apply();
                         texture.filterMode = FilterMode.Point;
+                        texture.wrapMode = TextureWrapMode.Clamp; // Prevent edge bleeding
 
                         Debug.Log($"[PhaseProtocol] Cursor {cursorId} texture created (RAW parser): {width}x{height}, hotspot=({hotspotX},{hotspotY})");
 
