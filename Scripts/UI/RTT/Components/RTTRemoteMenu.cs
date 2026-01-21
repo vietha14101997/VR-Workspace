@@ -110,16 +110,15 @@ public class RTTRemoteMenu : MonoBehaviour
     #region Public Accessors (Easy Form Data Access)
     /// <summary>
     /// Get connection host based on mode:
-    /// - USB Mode: Prioritize manual host input, fallback to USB Tethering IP from QR
+    /// - USB Mode: Use USB Tethering IP from QR scan
     /// - WiFi Mode: Use manual host input
     /// </summary>
     public string Host {
         get {
-            string hostInput = VRInputFieldFactory.GetValue(_hostInput);
-            // Prioritize manual host input, fallback to USB Tethering IP if empty and USB mode
-            if (!string.IsNullOrEmpty(hostInput)) return hostInput;
+            // USB Mode uses USB Tethering IP from QR scan
             if (_isUsbMode && HasUsbTetheringIP) return _usbTetheringIP;
-            return hostInput;
+            // WiFi Mode uses manual host input
+            return VRInputFieldFactory.GetValue(_hostInput);
         }
     }
     public string Port => DEFAULT_PORT.ToString();
@@ -409,8 +408,8 @@ public class RTTRemoteMenu : MonoBehaviour
         _isUsbMode = !_isUsbMode;
         UpdateUsbModeToggleVisual();
 
-        // Keep host input enabled - user can enter IP manually or use QR scan
-        // VRInputFieldFactory.SetInteractable(_hostInput, !_isUsbMode);
+        // USB mode requires QR scan - disable manual host input
+        VRInputFieldFactory.SetInteractable(_hostInput, !_isUsbMode);
 
         Debug.Log($"[RTTRemoteMenu] USB Mode: {_isUsbMode}");
     }
@@ -766,21 +765,18 @@ public class RTTRemoteMenu : MonoBehaviour
         {
             case ConnectionPhase.Disconnected:
             case ConnectionPhase.Error:
-                // USB Mode: Prioritize Host input, fallback to USB Tethering IP from QR scan
+                // USB Mode: Require QR scan to get USB Tethering IP
                 if (_isUsbMode)
                 {
-                    // Get host from input field first
-                    string hostInputValue = VRInputFieldFactory.GetValue(_hostInput);
-                    string usbHost = !string.IsNullOrEmpty(hostInputValue) ? hostInputValue : _usbTetheringIP;
-
-                    if (string.IsNullOrEmpty(usbHost))
+                    // USB mode requires QR scan to get the USB Tethering IP
+                    if (!HasUsbTetheringIP)
                     {
-                        Debug.LogWarning("[RTTRemoteMenu] USB mode: No host IP specified. Enter IP or scan QR code.");
-                        ShowTemporaryButtonText("ENTER IP OR SCAN QR!", 2f);
+                        Debug.LogWarning("[RTTRemoteMenu] USB mode: Please scan QR code to get USB Tethering IP.");
+                        ShowTemporaryButtonText("SCAN QR CODE!", 2f);
                         return;
                     }
 
-                    Debug.Log($"[RTTRemoteMenu] Connecting via USB ({usbHost})...");
+                    Debug.Log($"[RTTRemoteMenu] Connecting via USB ({_usbTetheringIP})...");
                     UpdateButtonText("CONNECTING...");
 
                     // Lock inputs during connection
@@ -788,7 +784,7 @@ public class RTTRemoteMenu : MonoBehaviour
                     SetUsbToggleInteractable(false);
                     VRButtonFactory.SetInteractable(_qrButton, false);
 
-                    await _viewModel.ConnectUSBAsync(DEFAULT_PORT, usbHost);
+                    await _viewModel.ConnectUSBAsync(DEFAULT_PORT, _usbTetheringIP);
                     break;
                 }
 
@@ -997,7 +993,7 @@ public class RTTRemoteMenu : MonoBehaviour
                 ShowConnectButton();
                 UpdateButtonText("CONNECT");
                 InitializeDropdownsDisabled();
-                VRInputFieldFactory.SetInteractable(_hostInput, true);  // Always enabled - user can enter IP manually
+                VRInputFieldFactory.SetInteractable(_hostInput, !_isUsbMode);  // Disabled in USB mode (requires QR scan)
                 SetUsbToggleInteractable(true);
                 VRButtonFactory.SetInteractable(_qrButton, true);
                 HideSidePanels();
@@ -1057,7 +1053,7 @@ public class RTTRemoteMenu : MonoBehaviour
                 ShowConnectButton();
                 UpdateButtonText("CONNECT");
                 InitializeDropdownsDisabled();
-                VRInputFieldFactory.SetInteractable(_hostInput, true);  // Always enabled - user can enter IP manually
+                VRInputFieldFactory.SetInteractable(_hostInput, !_isUsbMode);  // Disabled in USB mode (requires QR scan)
                 SetUsbToggleInteractable(true);
                 VRButtonFactory.SetInteractable(_qrButton, true);
                 HideSidePanels();
@@ -1634,8 +1630,8 @@ public class RTTRemoteMenu : MonoBehaviour
         _isUsbMode = prefs.usbMode;
         UpdateUsbModeToggleVisual();
 
-        // Keep host input enabled - user can enter IP manually in USB mode
-        // VRInputFieldFactory.SetInteractable(_hostInput, !_isUsbMode);
+        // USB mode requires QR scan - disable manual host input
+        VRInputFieldFactory.SetInteractable(_hostInput, !_isUsbMode);
     }
 
     /// <summary>
