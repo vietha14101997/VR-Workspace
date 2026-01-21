@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using UnityEngine;
+using Debug = UnityEngine.Debug;
 
 namespace VRWorkspace.Core
 {
@@ -128,6 +130,129 @@ namespace VRWorkspace.Core
         {
             Debug.unityLogger.logEnabled = true;
             Debug.unityLogger.filterLogType = LogType.Warning;
+        }
+    }
+
+    /// <summary>
+    /// Editor-only logging utility. All methods are completely stripped from builds.
+    /// Use this instead of Debug.Log to ensure zero overhead in production.
+    ///
+    /// Usage: Replace Debug.Log("message") with AppLog.Log("message")
+    /// </summary>
+    public static class AppLog
+    {
+        /// <summary>
+        /// Log a message (Editor only - stripped from builds).
+        /// </summary>
+        [Conditional("UNITY_EDITOR")]
+        public static void Log(object message)
+        {
+            Debug.Log(message);
+        }
+
+        /// <summary>
+        /// Log a message with context (Editor only - stripped from builds).
+        /// </summary>
+        [Conditional("UNITY_EDITOR")]
+        public static void Log(object message, Object context)
+        {
+            Debug.Log(message, context);
+        }
+
+        /// <summary>
+        /// Log a formatted message (Editor only - stripped from builds).
+        /// </summary>
+        [Conditional("UNITY_EDITOR")]
+        public static void LogFormat(string format, params object[] args)
+        {
+            Debug.LogFormat(format, args);
+        }
+
+        /// <summary>
+        /// Log a warning (Editor only - stripped from builds).
+        /// </summary>
+        [Conditional("UNITY_EDITOR")]
+        public static void LogWarning(object message)
+        {
+            Debug.LogWarning(message);
+        }
+
+        /// <summary>
+        /// Log a warning with context (Editor only - stripped from builds).
+        /// </summary>
+        [Conditional("UNITY_EDITOR")]
+        public static void LogWarning(object message, Object context)
+        {
+            Debug.LogWarning(message, context);
+        }
+
+        /// <summary>
+        /// Log a formatted warning (Editor only - stripped from builds).
+        /// </summary>
+        [Conditional("UNITY_EDITOR")]
+        public static void LogWarningFormat(string format, params object[] args)
+        {
+            Debug.LogWarningFormat(format, args);
+        }
+
+        /// <summary>
+        /// Log an error (ALWAYS included - errors should be visible in builds).
+        /// </summary>
+        public static void LogError(object message)
+        {
+            Debug.LogError(message);
+        }
+
+        /// <summary>
+        /// Log an error with context (ALWAYS included).
+        /// </summary>
+        public static void LogError(object message, Object context)
+        {
+            Debug.LogError(message, context);
+        }
+
+        /// <summary>
+        /// Log a formatted error (ALWAYS included).
+        /// </summary>
+        public static void LogErrorFormat(string format, params object[] args)
+        {
+            Debug.LogErrorFormat(format, args);
+        }
+
+        /// <summary>
+        /// Log an exception (ALWAYS included).
+        /// </summary>
+        public static void LogException(System.Exception exception)
+        {
+            Debug.LogException(exception);
+        }
+
+        /// <summary>
+        /// Log an exception with context (ALWAYS included).
+        /// </summary>
+        public static void LogException(System.Exception exception, Object context)
+        {
+            Debug.LogException(exception, context);
+        }
+
+        // === Verbose logging (completely stripped from builds) ===
+
+        /// <summary>
+        /// Verbose log for detailed debugging (Editor only).
+        /// </summary>
+        [Conditional("UNITY_EDITOR")]
+        public static void Verbose(object message)
+        {
+            Debug.Log($"[VERBOSE] {message}");
+        }
+
+        /// <summary>
+        /// Log with custom tag (Editor only).
+        /// </summary>
+        [Conditional("UNITY_EDITOR")]
+        public static void Tag(string tag, object message)
+        {
+            Debug.Log($"[{tag}] {message}");
         }
     }
 }
