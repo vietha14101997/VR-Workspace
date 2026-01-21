@@ -13,6 +13,7 @@ public class RTTFileDetail : MonoBehaviour
 {
     // UI References
     private TextMeshProUGUI _nameText;
+    private MarqueeText _nameMarquee;
     private Image _previewImage;
     private Image _previewPlaceholder;
     private Transform _metadataContainer;
@@ -75,11 +76,13 @@ public class RTTFileDetail : MonoBehaviour
         if (_font != null) _nameText.font = _font;
         _nameText.fontSize = 36;
         _nameText.fontStyle = FontStyles.Bold;
-        _nameText.alignment = TextAlignmentOptions.Center;
+        _nameText.alignment = TextAlignmentOptions.MidlineLeft;
         _nameText.color = Color.white;
-        _nameText.enableWordWrapping = true;
-        _nameText.overflowMode = TextOverflowModes.Ellipsis;
-        _nameText.maxVisibleLines = 1;
+        _nameText.enableWordWrapping = false;
+        _nameText.overflowMode = TextOverflowModes.Overflow;
+
+        // Setup marquee for auto-scrolling long file names (centered when fits)
+        _nameMarquee = MarqueeText.Setup(_nameText, 40f, centerWhenFits: true);
     }
 
     private void CreatePreviewSection(float containerWidth, float containerHeight)
@@ -174,8 +177,12 @@ public class RTTFileDetail : MonoBehaviour
 
         _currentFile = file;
 
-        // Update file name
-        if (_nameText != null)
+        // Update file name with marquee scroll
+        if (_nameMarquee != null)
+        {
+            _nameMarquee.SetText(file.Name);
+        }
+        else if (_nameText != null)
         {
             _nameText.text = file.Name;
         }
@@ -270,9 +277,9 @@ public class RTTFileDetail : MonoBehaviour
         );
     }
 
-    // Dictionary to store metadata row value text references for async updates
-    private System.Collections.Generic.Dictionary<string, TextMeshProUGUI> _metadataValueTexts =
-        new System.Collections.Generic.Dictionary<string, TextMeshProUGUI>();
+    // Dictionary to store metadata row value marquee references for async updates
+    private System.Collections.Generic.Dictionary<string, MarqueeText> _metadataValueMarquees =
+        new System.Collections.Generic.Dictionary<string, MarqueeText>();
 
     private void UpdateMetadata(MockFile file, bool isCurrentFolder)
     {
@@ -283,7 +290,7 @@ public class RTTFileDetail : MonoBehaviour
         {
             Destroy(child.gameObject);
         }
-        _metadataValueTexts.Clear();
+        _metadataValueMarquees.Clear();
 
         FileCategory category = file.IsFolder ? FileCategory.Folder : FileCategoryHelper.GetCategory(file.Type);
 
@@ -380,11 +387,11 @@ public class RTTFileDetail : MonoBehaviour
 
     private void UpdateMetadataValue(string label, string value)
     {
-        if (_metadataValueTexts.TryGetValue(label, out TextMeshProUGUI valueText))
+        if (_metadataValueMarquees.TryGetValue(label, out MarqueeText marquee))
         {
-            if (valueText != null)
+            if (marquee != null)
             {
-                valueText.text = value;
+                marquee.SetText(value);
             }
         }
     }
@@ -510,12 +517,15 @@ public class RTTFileDetail : MonoBehaviour
         valueText.fontStyle = FontStyles.Bold;
         valueText.alignment = TextAlignmentOptions.MidlineLeft;
         valueText.color = Color.white; // Full white
-        valueText.text = value;
         valueText.enableWordWrapping = false;
-        valueText.overflowMode = TextOverflowModes.Ellipsis;
+        valueText.overflowMode = TextOverflowModes.Overflow;
+
+        // Setup marquee for auto-scrolling long values
+        MarqueeText marquee = MarqueeText.Setup(valueText, 40f);
+        marquee.SetText(value);
 
         // Store reference for async updates
-        _metadataValueTexts[label] = valueText;
+        _metadataValueMarquees[label] = marquee;
     }
 
     #region Formatting Helpers

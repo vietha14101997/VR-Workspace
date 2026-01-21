@@ -434,6 +434,25 @@ public class RTTFileSidePanel : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Clear all selections (used in filter mode).
+    /// </summary>
+    public void ClearSelection()
+    {
+        foreach (var item in _navItems)
+        {
+            if (item.SelectionMarker != null)
+                item.SelectionMarker.gameObject.SetActive(false);
+
+            if (item.LabelText != null)
+                item.LabelText.color = new Color(1f, 1f, 1f, 0.7f);
+
+            if (item.Icon != null)
+                item.Icon.color = new Color(1f, 1f, 1f, 0.7f);
+        }
+        _selectedItem = null;
+    }
+
     #region Rounded Marker Sprite
     private static Sprite _cachedCapsuleSprite;
 

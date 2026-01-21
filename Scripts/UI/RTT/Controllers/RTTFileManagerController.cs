@@ -42,6 +42,12 @@ public class RTTFileManagerController : MonoBehaviour
     // Key: path, Value: first visible item index (0-based)
     // Using item index instead of page number because Grid and List have different items per page
     private Dictionary<string, int> _itemIndexHistory = new Dictionary<string, int>();
+
+    // Category Filter Mode (for scanning all videos/music from storage)
+    private bool _isFilterMode = false;
+    private FileCategory _filterCategory = FileCategory.Unknown;
+    private Coroutine _scanCoroutine = null;
+    private bool _isScanning = false;
     #endregion
 
     #region Public API
@@ -122,6 +128,22 @@ public class RTTFileManagerController : MonoBehaviour
     {
         Debug.Log($"[Controller] NavigateToInternal: path='{path}', restorePage={restorePage}, clickedFolder='{clickedFolderPath}'");
         Debug.Log($"[Controller] Current state: _currentPath='{_currentPath}', _currentPage={_currentPage}, _pageSize={_pageSize}");
+
+        // Exit filter mode when navigating to a real folder
+        if (_isFilterMode)
+        {
+            _isFilterMode = false;
+            _filterCategory = FileCategory.Unknown;
+            _view?.ShowScanningIndicator(false, "", 0);
+        }
+
+        // Cancel any ongoing scan
+        if (_scanCoroutine != null)
+        {
+            StopCoroutine(_scanCoroutine);
+            _scanCoroutine = null;
+            _isScanning = false;
+        }
 
         // Normalize paths for comparison and history
         string normalizedCurrentPath = NormalizePathForHistory(_currentPath);
@@ -510,6 +532,32 @@ public class RTTFileManagerController : MonoBehaviour
     {
         Debug.Log($"[Controller] Side panel item selected: {id}");
 
+        // Cancel any ongoing scan
+        if (_scanCoroutine != null)
+        {
+            StopCoroutine(_scanCoroutine);
+            _scanCoroutine = null;
+            _isScanning = false;
+        }
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+        // On Android: Videos and Music trigger full storage scan
+        if (id == "videos")
+        {
+            StartCategoryScan(FileCategory.Video, "All Videos");
+            return;
+        }
+        else if (id == "music")
+        {
+            StartCategoryScan(FileCategory.Music, "All Music");
+            return;
+        }
+#endif
+
+        // Exit filter mode when navigating to a folder
+        _isFilterMode = false;
+        _filterCategory = FileCategory.Unknown;
+
         string targetPath = id switch
         {
             "internal" => FileSystemService.RootPath,
@@ -531,6 +579,76 @@ public class RTTFileManagerController : MonoBehaviour
             NavigateTo(targetPath);
         }
     }
+
+    /// <summary>
+    /// Start scanning all files of a category from storage.
+    /// </summary>
+    private void StartCategoryScan(FileCategory category, string displayName)
+    {
+        Debug.Log($"[Controller] Starting category scan for {category}");
+
+        _isFilterMode = true;
+        _filterCategory = category;
+        _isScanning = true;
+
+        // Clear current files and show scanning state
+        _currentDirectoryFiles.Clear();
+        _filteredFiles.Clear();
+        _currentPath = $"filter:{category}";
+        _currentPage = 1;
+
+        // Update breadcrumb to show filter mode
+        _view?.UpdateBreadcrumb(displayName, false);
+
+        // Show loading indicator
+        _view?.ShowScanningIndicator(true, $"Scanning {displayName}...", 0);
+
+        // Start async scan
+        _scanCoroutine = StartCoroutine(FileSystemService.ScanAllFilesByCategory(
+            category,
+            onProgress: (progress, count) =>
+            {
+                // Update progress UI
+                _view?.ShowScanningIndicator(true, $"Found {count} files...", progress);
+            },
+            onComplete: (results) =>
+            {
+                _isScanning = false;
+                _scanCoroutine = null;
+
+                // Store results
+                _currentDirectoryFiles = results;
+                _filteredFiles = new List<MockFile>(results);
+
+                // Apply default sort (by modified date, newest first for media)
+                _sortBy = "Modified";
+                _sortAscending = false;
+                ApplySort();
+
+                // Hide loading and update view
+                _view?.ShowScanningIndicator(false, "", 1f);
+                _currentPage = 1;
+                UpdateView(true);
+
+                Debug.Log($"[Controller] Category scan complete: {results.Count} {category} files");
+            }
+        ));
+    }
+
+    /// <summary>
+    /// Check if currently in filter mode (showing all files of a category).
+    /// </summary>
+    public bool IsFilterMode => _isFilterMode;
+
+    /// <summary>
+    /// Check if currently scanning for files.
+    /// </summary>
+    public bool IsScanning => _isScanning;
+
+    /// <summary>
+    /// Get current filter category.
+    /// </summary>
+    public FileCategory FilterCategory => _filterCategory;
 
     /// <summary>
     /// Create a new folder in the current directory
@@ -1206,6 +1324,165 @@ public static class FileSystemService
 #endif
         return RootPath;
     }
+
+    #region Recursive Category Scan
+
+    /// <summary>
+    /// Scan all files of a specific category recursively from root storage.
+    /// This is an async operation that yields periodically to prevent freezing.
+    /// </summary>
+    /// <param name="category">File category to filter (Video, Music, Image)</param>
+    /// <param name="onProgress">Progress callback (0-1)</param>
+    /// <param name="onComplete">Completion callback with results</param>
+    public static System.Collections.IEnumerator ScanAllFilesByCategory(
+        FileCategory category,
+        Action<float, int> onProgress,
+        Action<List<MockFile>> onComplete)
+    {
+        var results = new List<MockFile>();
+        var extensions = FileCategoryHelper.GetExtensionsForCategory(category);
+
+        if (extensions.Count == 0)
+        {
+            onComplete?.Invoke(results);
+            yield break;
+        }
+
+        // Folders to scan (start from root and common media locations)
+        var foldersToScan = new Queue<string>();
+        var scannedFolders = new HashSet<string>();
+
+        // Add root path
+        foldersToScan.Enqueue(RootPath);
+
+        // Add SD card if available
+        string sdCardPath = GetSDCardPath();
+        if (sdCardPath != RootPath && Directory.Exists(sdCardPath))
+        {
+            foldersToScan.Enqueue(sdCardPath);
+        }
+
+        int totalFoldersScanned = 0;
+        int filesFound = 0;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        // Folders to skip (system folders, hidden folders, etc.)
+        var skipFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Android", ".android", ".thumbnails", ".cache",
+            "lost+found", "System Volume Information", "$RECYCLE.BIN"
+        };
+
+        while (foldersToScan.Count > 0)
+        {
+            string currentFolder = foldersToScan.Dequeue();
+
+            // Skip if already scanned (avoid loops from symlinks)
+            if (scannedFolders.Contains(currentFolder))
+                continue;
+
+            scannedFolders.Add(currentFolder);
+            totalFoldersScanned++;
+
+            // Yield every 50 folders or 100ms to prevent freezing
+            if (totalFoldersScanned % 50 == 0 || sw.ElapsedMilliseconds > 100)
+            {
+                sw.Restart();
+                onProgress?.Invoke(-1f, filesFound); // -1 means indeterminate progress
+                yield return null;
+            }
+
+            try
+            {
+                // Get files in current folder
+                string[] files;
+                try
+                {
+                    files = Directory.GetFiles(currentFolder);
+                }
+                catch { files = new string[0]; }
+
+                foreach (string filePath in files)
+                {
+                    try
+                    {
+                        FileInfo fileInfo = new FileInfo(filePath);
+
+                        // Skip hidden/system files
+                        if ((fileInfo.Attributes & FileAttributes.Hidden) != 0 ||
+                            (fileInfo.Attributes & FileAttributes.System) != 0)
+                            continue;
+
+                        string ext = fileInfo.Extension.TrimStart('.').ToLower();
+
+                        // Check if extension matches category
+                        if (extensions.Contains(ext))
+                        {
+                            results.Add(new MockFile
+                            {
+                                Name = fileInfo.Name,
+                                Path = filePath,
+                                IsFolder = false,
+                                Type = ext,
+                                Created = fileInfo.CreationTime,
+                                Modified = fileInfo.LastWriteTime,
+                                Size = fileInfo.Length,
+                                Duration = TimeSpan.Zero
+                            });
+                            filesFound++;
+                        }
+                    }
+                    catch { /* Skip inaccessible files */ }
+                }
+
+                // Add subdirectories to scan queue
+                string[] subdirs;
+                try
+                {
+                    subdirs = Directory.GetDirectories(currentFolder);
+                }
+                catch { subdirs = new string[0]; }
+
+                foreach (string subdir in subdirs)
+                {
+                    try
+                    {
+                        DirectoryInfo dirInfo = new DirectoryInfo(subdir);
+
+                        // Skip hidden/system directories
+                        if ((dirInfo.Attributes & FileAttributes.Hidden) != 0 ||
+                            (dirInfo.Attributes & FileAttributes.System) != 0)
+                            continue;
+
+                        // Skip known system folders
+                        if (skipFolders.Contains(dirInfo.Name))
+                            continue;
+
+                        // Skip folders starting with '.'
+                        if (dirInfo.Name.StartsWith("."))
+                            continue;
+
+                        foldersToScan.Enqueue(subdir);
+                    }
+                    catch { /* Skip inaccessible directories */ }
+                }
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Skip folders we can't access
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[FileSystemService] Error scanning {currentFolder}: {ex.Message}");
+            }
+        }
+
+        Debug.Log($"[FileSystemService] Category scan complete: {filesFound} {category} files found in {totalFoldersScanned} folders");
+        onProgress?.Invoke(1f, filesFound);
+        onComplete?.Invoke(results);
+    }
+
+    #endregion
 
     /// <summary>
     /// Check if folder creation is allowed in the given path.

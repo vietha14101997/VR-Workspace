@@ -78,6 +78,10 @@ public class RTTFileManager : MonoBehaviour
 
     // Conflict Dialog
     private RTTPopupMenu _conflictPopup;
+
+    // Scanning Indicator (for category filter mode)
+    private GameObject _scanningOverlay;
+    private TextMeshProUGUI _scanningText;
     #endregion
 
     #region Initialization
@@ -355,6 +359,9 @@ public class RTTFileManager : MonoBehaviour
             onClick: (path, isFolder) => OnItemClicked(path, isFolder)
         );
         _fileGrid.SetSelectionChangedCallback(OnSelectionChanged);
+
+        // 5. Create Scanning Overlay (hidden by default)
+        CreateScanningOverlay(_bodyRT);
 
         // Render Order
         headerObj.transform.SetAsLastSibling();
@@ -3082,6 +3089,135 @@ public class RTTFileManager : MonoBehaviour
     private void OnCreateFolderCancelled()
     {
         Debug.Log("[RTTFileManager] Create folder cancelled");
+    }
+
+    #endregion
+
+    #region Scanning Indicator (Category Filter Mode)
+
+    /// <summary>
+    /// Create the scanning overlay UI (shown during category scan).
+    /// </summary>
+    private void CreateScanningOverlay(RectTransform parent)
+    {
+        // Overlay container
+        _scanningOverlay = new GameObject("ScanningOverlay");
+        _scanningOverlay.transform.SetParent(parent, false);
+
+        RectTransform overlayRT = _scanningOverlay.AddComponent<RectTransform>();
+        overlayRT.anchorMin = Vector2.zero;
+        overlayRT.anchorMax = Vector2.one;
+        overlayRT.offsetMin = Vector2.zero;
+        overlayRT.offsetMax = Vector2.zero;
+
+        // Semi-transparent background
+        Image bgImage = _scanningOverlay.AddComponent<Image>();
+        bgImage.color = new Color(0, 0, 0, 0.7f);
+
+        // Text container (centered)
+        GameObject textObj = new GameObject("ScanningText");
+        textObj.transform.SetParent(_scanningOverlay.transform, false);
+
+        RectTransform textRT = textObj.AddComponent<RectTransform>();
+        textRT.anchorMin = new Vector2(0.5f, 0.5f);
+        textRT.anchorMax = new Vector2(0.5f, 0.5f);
+        textRT.pivot = new Vector2(0.5f, 0.5f);
+        textRT.sizeDelta = new Vector2(400f, 100f);
+
+        _scanningText = textObj.AddComponent<TextMeshProUGUI>();
+        if (_font != null) _scanningText.font = _font;
+        _scanningText.fontSize = 32;
+        _scanningText.alignment = TextAlignmentOptions.Center;
+        _scanningText.color = Color.white;
+        _scanningText.text = "Scanning...";
+
+        // Hide by default
+        _scanningOverlay.SetActive(false);
+    }
+
+    /// <summary>
+    /// Show or hide the scanning indicator overlay.
+    /// </summary>
+    /// <param name="show">True to show, false to hide</param>
+    /// <param name="message">Message to display</param>
+    /// <param name="progress">Progress value (0-1, or -1 for indeterminate)</param>
+    public void ShowScanningIndicator(bool show, string message, float progress)
+    {
+        if (_scanningOverlay == null) return;
+
+        _scanningOverlay.SetActive(show);
+
+        if (show && _scanningText != null)
+        {
+            _scanningText.text = message;
+        }
+    }
+
+    /// <summary>
+    /// Update breadcrumb for filter mode (e.g., "All Videos", "All Music").
+    /// </summary>
+    /// <param name="displayName">Name to show in breadcrumb</param>
+    /// <param name="canCreateFolder">Whether folder creation is allowed (false for filter mode)</param>
+    public void UpdateBreadcrumb(string displayName, bool canCreateFolder)
+    {
+        if (_breadcrumbContainer == null) return;
+
+        // Clear existing breadcrumbs
+        foreach (Transform child in _breadcrumbContainer)
+        {
+            Destroy(child.gameObject);
+        }
+
+        // Create single breadcrumb item for filter mode
+        float x = 0f;
+        float chipHeight = 48f;
+
+        GameObject crumbObj = new GameObject("Crumb_Filter");
+        crumbObj.transform.SetParent(_breadcrumbContainer, false);
+
+        RectTransform crumbRT = crumbObj.AddComponent<RectTransform>();
+        crumbRT.anchorMin = new Vector2(0, 0.5f);
+        crumbRT.anchorMax = new Vector2(0, 0.5f);
+        crumbRT.pivot = new Vector2(0, 0.5f);
+
+        // Background
+        Image crumbBg = crumbObj.AddComponent<Image>();
+        crumbBg.color = _accentColor;
+        crumbBg.sprite = Resources.Load<Sprite>("rounded_rect");
+        crumbBg.type = Image.Type.Sliced;
+
+        // Text
+        TextMeshProUGUI crumbText = crumbObj.AddComponent<TextMeshProUGUI>();
+        if (_font != null) crumbText.font = _font;
+        crumbText.fontSize = 28;
+        crumbText.alignment = TextAlignmentOptions.Center;
+        crumbText.color = Color.white;
+        crumbText.text = displayName;
+        crumbText.enableWordWrapping = false;
+        crumbText.overflowMode = TextOverflowModes.Ellipsis;
+
+        // Size to fit text
+        float textWidth = crumbText.preferredWidth + 30f;
+        crumbRT.sizeDelta = new Vector2(textWidth, chipHeight);
+        crumbRT.anchoredPosition = new Vector2(x, 0);
+
+        // Disable new folder button in filter mode
+        if (_newFolderButton != null && _newFolderCanvasGroup != null)
+        {
+            _newFolderButton.interactable = canCreateFolder;
+            _newFolderCanvasGroup.alpha = canCreateFolder ? 1f : 0.4f;
+            _newFolderCanvasGroup.interactable = canCreateFolder;
+            _newFolderCanvasGroup.blocksRaycasts = canCreateFolder;
+
+            var collider = _newFolderButton.GetComponent<BoxCollider>();
+            if (collider != null)
+            {
+                collider.enabled = canCreateFolder;
+            }
+        }
+
+        // Update side panel selection
+        _sidePanel?.ClearSelection();
     }
 
     #endregion
