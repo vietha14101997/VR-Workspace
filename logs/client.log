@@ -10,6 +10,11 @@ Camera 0: Twitch Virtual Cam (front facing: True)
 
 Starting webcam texture: Twitch Virtual Cam at 1280x720
 
+Could not connect pins - RenderStream()
+UnityEngine.StackTraceUtility:ExtractStackTrace ()
+CameraPassthrough:StartCam () (at Assets/VR-Workspace/Scripts/Camera/CameraPassthrough.cs:115)
+CameraPassthrough:OnEnable () (at Assets/VR-Workspace/Scripts/Camera/CameraPassthrough.cs:17)
+
 [AndroidHelper] App resumed
 
 [RTTMenu] Created main frame
@@ -32,6 +37,11 @@ Starting webcam texture: Twitch Virtual Cam at 1280x720
 
 [RTTMiniFrame] UI built: 1095.5x128 pixels
 
+Please initialize Cardboard XR loader before calling this function.
+UnityEngine.Debug:LogError (object)
+Google.XR.Cardboard.Api:UpdateScreenParams () (at ./Library/PackageCache/com.google.xr.cardboard@e91752ce4c/Runtime/Api.cs:317)
+CardboardStartup:Update () (at Assets/Samples/Google Cardboard XR Plugin for Unity/1.30.0/Hello Cardboard/Scripts/CardboardStartup.cs:70)
+
 [RTTMainMenuController] Icons loaded - Remote:True, Browser:True, Media:True, Files:False
 
 [HoverEffectController] AddEffect 'glow_border' to HitArea, TargetVisuals=Visuals
@@ -51,6 +61,11 @@ Starting webcam texture: Twitch Virtual Cam at 1280x720
 [RTTManager] Main Menu initialized (persistent, cannot be closed)
 
 Restarting webcam texture as it was not playing
+
+Could not connect pins - RenderStream()
+UnityEngine.StackTraceUtility:ExtractStackTrace ()
+CameraPassthrough/<EnsureTextureStarted>d__11:MoveNext () (at Assets/VR-Workspace/Scripts/Camera/CameraPassthrough.cs:158)
+UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 Stopping camera passthrough
 
@@ -253,13 +268,13 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [PhaseProtocol] Received: pong...
 
-[SpeedTest] Ping: 15.6ms, Jitter: 1.5ms
+[SpeedTest] Ping: 16.0ms, Jitter: 1.8ms
 
 [RTTRemoteMenu] HandleNetworkInfoReceived called, info null: False, panel null: False
 
-[RTTInfoSidePanel] SetNetworkInfo: 15.6ms
+[RTTInfoSidePanel] SetNetworkInfo: 16.0ms
 
-[RTTRemoteMenu] Updated network info panel: 15.6ms, 0Mbps
+[RTTRemoteMenu] Updated network info panel: 16.0ms, 0Mbps
 
 [SpeedTest] Running bandwidth test (2000ms with 0ms warmup)...
 
@@ -267,7 +282,7 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [SpeedTest] Warmup complete - starting measurement
 
-[PhaseProtocol] Received: {"type":"speedtest_end","direction":"download","totalBytes":41943040,"durationMs":2143}...
+[PhaseProtocol] Received: {"type":"speedtest_end","direction":"download","totalBytes":41943040,"durationMs":2144}...
 
 [PhaseProtocol] Speed test end: direction=download, current phase: SpeedTesting
 
@@ -275,23 +290,25 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [SpeedTest] Bandwidth: 138.8 Mbps
 
-[PhaseProtocol] Received: pong:1768965160845...
+[PhaseProtocol] Received: pong:1768971926844...
 
 [SpeedTest] Sent speedtest_result to server
 
-[RTTRemoteMenu] Updated network info panel: 15.6ms, 139Mbps
+[RTTRemoteMenu] Updated network info panel: 16.0ms, 139Mbps
 
-[PhaseProtocol] Speed test complete: 138.8Mbps, 15.6ms ping, type=Wi-Fi
+[PhaseProtocol] Speed test complete: 138.8Mbps, 16.0ms ping, type=Wi-Fi
 
 [StateMachine] Invalid transition: SpeedTesting -> AwaitingSuggestedConfig
 UnityEngine.Debug:LogWarning (object)
 VRWorkspace.Streaming.ConnectionStateMachine:TryTransition (VRWorkspace.Streaming.ConnectionPhase,string) (at Assets/VR-Workspace/Scripts/Streaming/ConnectionStateMachine.cs:86)
-VRWorkspace.Streaming.PhaseProtocolClient/<RunSpeedTestInBackgroundAsync>d__211:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:1675)
+VRWorkspace.Streaming.PhaseProtocolClient/<RunSpeedTestInBackgroundAsync>d__211:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:1685)
 System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1<VRWorkspace.Streaming.SpeedTestResult>:SetResult (VRWorkspace.Streaming.SpeedTestResult)
 VRWorkspace.Streaming.SpeedTestClient/<RunSpeedTestAsync>d__39:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/SpeedTestClient.cs:121)
 System.Runtime.CompilerServices.AsyncTaskMethodBuilder:SetResult ()
 VRWorkspace.Streaming.SpeedTestClient/<SendTextAsync>d__54:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/SpeedTestClient.cs:520)
 UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] Received: pong:1768971928878...
 
 [PhaseProtocol] Received: {"type":"suggested_config","monitors":3,"resolution":{"w":1440,"h":810},"bitrateKbps":15000,"fps":60...
 
@@ -299,8 +316,8 @@ UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
 [PhaseProtocol] Skipping networkInfo update: _networkInfo=True, connectionType=Unknown
 UnityEngine.Debug:LogWarning (object)
-VRWorkspace.Streaming.PhaseProtocolClient:HandleSuggestedConfig (VRWorkspace.Streaming.SimpleJson) (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:1963)
-VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__202:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:1277)
+VRWorkspace.Streaming.PhaseProtocolClient:HandleSuggestedConfig (VRWorkspace.Streaming.SimpleJson) (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:1973)
+VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__202:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:1286)
 System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__202> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__202&)
 VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
 VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__201:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:1224)
@@ -332,7 +349,7 @@ UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
 [RTTRemoteMenu] HandlePhaseChanged: SpeedTesting -> ConfiguringSettings
 
-[PhaseProtocol] Received: pong:1768965162881...
+[PhaseProtocol] Received: pong:1768971930910...
 
 [HoverEffectController] OnPointerEnter on Option_0 but NO EFFECTS! TargetVisuals=Option_0
 UnityEngine.Debug:LogWarning (object)
@@ -350,13 +367,13 @@ VRGazeReticle:HandlePointerEnter (UnityEngine.GameObject) (at Assets/VR-Workspac
 VRGazeReticle:CheckGaze () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:380)
 VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:314)
 
-[PhaseProtocol] Received: pong:1768965164917...
+[PhaseProtocol] Received: pong:1768971932943...
 
 [RTTRemoteMenu] Monitor selection changed: index=1, value=2 Monitors
 
 [RTTRemoteMenu] Auto-selected for 2 monitors: Bitrate=15 Mbps, FPS=60 FPS
 
-[PhaseProtocol] Received: pong:1768965166932...
+[PhaseProtocol] Received: pong:1768971934962...
 
 [RTTRemoteMenu] Button clicked! viewModel=True, currentPhase=ConfiguringSettings
 
@@ -404,28 +421,28 @@ VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:3
 
 [PhaseProtocol] Config progress: vdd_setup 30% - Configuring virtual displays...
 
-[PhaseProtocol] Pong timeout! 6041ms since last pong, missed: 1
+[PhaseProtocol] Pong timeout! 6073ms since last pong, missed: 1
 UnityEngine.Debug:LogWarning (object)
-VRWorkspace.Streaming.PhaseProtocolClient/<KeepaliveLoopAsync>d__259:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3941)
+VRWorkspace.Streaming.PhaseProtocolClient/<KeepaliveLoopAsync>d__263:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:4147)
 UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
-[PhaseProtocol] Pong timeout! 8062ms since last pong, missed: 2
+[PhaseProtocol] Pong timeout! 8105ms since last pong, missed: 2
 UnityEngine.Debug:LogWarning (object)
-VRWorkspace.Streaming.PhaseProtocolClient/<KeepaliveLoopAsync>d__259:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3941)
+VRWorkspace.Streaming.PhaseProtocolClient/<KeepaliveLoopAsync>d__263:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:4147)
 UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
 [PhaseProtocol] Received: {"type":"config_progress","step":"topology","progress":60,"message":"Setting up display topology..."...
 
 [PhaseProtocol] Config progress: topology 60% - Setting up display topology...
 
-[PhaseProtocol] Pong timeout! 10098ms since last pong, missed: 3
+[PhaseProtocol] Pong timeout! 10140ms since last pong, missed: 3
 UnityEngine.Debug:LogWarning (object)
-VRWorkspace.Streaming.PhaseProtocolClient/<KeepaliveLoopAsync>d__259:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3941)
+VRWorkspace.Streaming.PhaseProtocolClient/<KeepaliveLoopAsync>d__263:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:4147)
 UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
-[PhaseProtocol] Pong timeout! 12323ms since last pong, missed: 4
-UnityEngine.Debug:LogWarning (object)
-VRWorkspace.Streaming.PhaseProtocolClient/<KeepaliveLoopAsync>d__259:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3941)
+[PhaseProtocol] Server not responding - triggering reconnect
+UnityEngine.Debug:LogError (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<KeepaliveLoopAsync>d__263:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:4151)
 UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
 [PhaseProtocol] Received: {"type":"config_progress","step":"capture_init","progress":90,"message":"Initializing capture..."}...
@@ -462,41 +479,39 @@ UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
 [PhaseProtocol] Setting up Single-PC event handlers for 2 tracks
 
-[PhaseProtocol] Received: pong:1768965168949...
+[PhaseProtocol] Single-PC local ICE candidate: candidate:2306035327 1 udp 2122063615 192.168.1.41 52350 typ...
 
-[PhaseProtocol] Received: pong:1768965170967...
+[PhaseProtocol] Single-PC local ICE candidate: candidate:4076166466 1 udp 2122262783 2402:800:6d62:a46e:41d...
 
-[PhaseProtocol] Received: pong:1768965172989...
+[PhaseProtocol] Single-PC local ICE candidate: candidate:31684007 1 udp 2122197247 2402:800:6d62:a46e:5169:...
 
-[PhaseProtocol] Received: pong:1768965175010...
+[PhaseProtocol] Single-PC local ICE candidate: candidate:1405561240 1 udp 2122131711 2402:800:6d62:a46e:534...
 
-[PhaseProtocol] Received: pong:1768965177047...
+[PhaseProtocol] Single-PC local ICE candidate: candidate:2306035327 1 udp 2122063615 192.168.1.41 52354 typ...
 
-[PhaseProtocol] Received: pong:1768965179272...
+[PhaseProtocol] Single-PC offer sent with 2 m= sections (70ms)
 
-[PhaseProtocol] Single-PC local ICE candidate: candidate:959042253 1 udp 2122063615 192.168.1.41 57621 typ ...
-
-[PhaseProtocol] Single-PC local ICE candidate: candidate:1118814704 1 udp 2122262783 2402:800:6d62:a46e:41d...
-
-[PhaseProtocol] Single-PC local ICE candidate: candidate:2981751061 1 udp 2122197247 2402:800:6d62:a46e:516...
-
-[PhaseProtocol] Single-PC local ICE candidate: candidate:3818763562 1 udp 2122131711 2402:800:6d62:a46e:534...
-
-[PhaseProtocol] Single-PC local ICE candidate: candidate:959042253 1 udp 2122063615 192.168.1.41 57625 typ ...
-
-[PhaseProtocol] Single-PC offer sent with 2 m= sections (62ms)
-
-[PhaseProtocol] Single-PC local ICE candidate: candidate:3347252825 1 tcp 1518083839 192.168.1.41 64675 typ...
+[PhaseProtocol] Single-PC local ICE candidate: candidate:2010749675 1 tcp 1518083839 192.168.1.41 53902 typ...
 
 [PhaseProtocol] Skipping TCP candidate
 
-[PhaseProtocol] Single-PC local ICE candidate: candidate:3154449764 1 tcp 1518283007 2402:800:6d62:a46e:41d...
+[PhaseProtocol] Single-PC local ICE candidate: candidate:207587798 1 tcp 1518283007 2402:800:6d62:a46e:41d7...
 
-[PhaseProtocol] Single-PC local ICE candidate: candidate:1326660993 1 tcp 1518217471 2402:800:6d62:a46e:516...
+[PhaseProtocol] Single-PC local ICE candidate: candidate:4283015475 1 tcp 1518217471 2402:800:6d62:a46e:516...
 
-[PhaseProtocol] Single-PC local ICE candidate: candidate:490168766 1 tcp 1518151935 2402:800:6d62:a46e:5340...
+[PhaseProtocol] Single-PC local ICE candidate: candidate:2909666572 1 tcp 1518151935 2402:800:6d62:a46e:534...
 
-[PhaseProtocol] Single-PC local ICE candidate: candidate:3347252825 1 tcp 1518083839 192.168.1.41 64679 typ...
+[PhaseProtocol] Single-PC local ICE candidate: candidate:2010749675 1 tcp 1518083839 192.168.1.41 53906 typ...
+
+[PhaseProtocol] Received: pong:1768971936995...
+
+[PhaseProtocol] Received: pong:1768971939028...
+
+[PhaseProtocol] Received: pong:1768971941050...
+
+[PhaseProtocol] Received: pong:1768971943082...
+
+[PhaseProtocol] Received: pong:1768971945117...
 
 [PhaseProtocol] Received: {"type":"candidate","monitorIndex":0,"candidate":"3562064952 1 udp 2113940223 2402:800:6d62:a46e:534...
 
@@ -512,27 +527,27 @@ UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
 [PhaseProtocol] PC0 queuing remote ICE candidate (AnswerSet=false, pending=3)
 
-[PhaseProtocol] Received: {"type":"candidate","monitorIndex":0,"candidate":"894532200 1 udp 2113937663 192.168.1.41 57630 typ ...
+[PhaseProtocol] Received: {"type":"candidate","monitorIndex":0,"candidate":"894532200 1 udp 2113937663 192.168.1.41 63658 typ ...
 
 [PhaseProtocol] PC0 queuing remote ICE candidate (AnswerSet=false, pending=4)
 
-[PhaseProtocol] Received: {"type":"answer","monitorIndex":0,"sdp":"v=0\r\no=- 64317 0 IN IP4 127.0.0.1\r\ns=sipsorcery\r\nt=0 ...
+[PhaseProtocol] Single-PC State: Connecting
 
-[PhaseProtocol] PC0 raw SDP preview: v=0\r\no=- 64317 0 IN IP4 127.0.0.1\r\ns=sipsorcery\r\nt=0 0\r\na=group:BUNDLE 0 1\r\nm=video 9 UDP/TLS/RTP/SAVPF 123\r\nc=IN IP4 0.0.0.0\r\na=ice-ufrag:LEJD\r\na=ice-pwd:KVRFQFCOFLKHSLOBHQIPZYJW\r\na=fingerprint:sha-2
+[PhaseProtocol] Received: {"type":"answer","monitorIndex":0,"sdp":"v=0\r\no=- 90363 0 IN IP4 127.0.0.1\r\ns=sipsorcery\r\nt=0 ...
 
-[PhaseProtocol] FixSdp result preview: v=0 | o=- 64317 0 IN IP4 127.0.0.1 | s=sipsorcery | t=0 0 | a=group:BUNDLE 0 1
+[PhaseProtocol] PC0 raw SDP preview: v=0\r\no=- 90363 0 IN IP4 127.0.0.1\r\ns=sipsorcery\r\nt=0 0\r\na=group:BUNDLE 0 1\r\nm=video 9 UDP/TLS/RTP/SAVPF 123\r\nc=IN IP4 0.0.0.0\r\na=ice-ufrag:ECZI\r\na=ice-pwd:OUGSYZKZQFDLNTHXINNTOTQC\r\na=fingerprint:sha-2
 
-[PhaseProtocol] FixSdp total lines: 35, result length: 1178
+[PhaseProtocol] FixSdp result preview: v=0 | o=- 90363 0 IN IP4 127.0.0.1 | s=sipsorcery | t=0 0 | a=group:BUNDLE 0 1
 
-[PhaseProtocol] PC0 received answer (SDP: 1176 -> 1178 bytes)
+[PhaseProtocol] FixSdp total lines: 35, result length: 1179
+
+[PhaseProtocol] PC0 received answer (SDP: 1177 -> 1179 bytes)
 
 [PhaseProtocol] PC0 SignalingState=HaveLocalOffer, IceState=New
 
-[PhaseProtocol] PC0 calling SetRemoteDescription (SDP len=1178)...
+[PhaseProtocol] PC0 calling SetRemoteDescription (SDP len=1179)...
 
 [PhaseProtocol] PC0 SetRemoteDescription called, waiting for completion...
-
-[PhaseProtocol] Single-PC State: Connecting
 
 [PhaseProtocol] Single-PC ICE: Checking
 
@@ -546,11 +561,11 @@ UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
 [PhaseProtocol] PC0 queuing remote ICE candidate (AnswerSet=false, pending=5)
 
-[PhaseProtocol] Received: pong:1768965181523...
+[PhaseProtocol] Received: pong:1768971947636...
 
-[PhaseProtocol] PC0 SetRemoteDescription wait done: IsDone=True, IsError=False, elapsed=21ms
+[PhaseProtocol] PC0 SetRemoteDescription wait done: IsDone=True, IsError=False, elapsed=25ms
 
-[PhaseProtocol] PC0 answer set OK (21ms)
+[PhaseProtocol] PC0 answer set OK (25ms)
 
 [PhaseProtocol] Single-PC mode: marking all wrappers as AnswerSet
 
@@ -568,11 +583,11 @@ UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
 [RTTRemoteMenu] HandlePhaseChanged: ICENegotiating -> ReadyToStream
 
-[PhaseProtocol] Received: {"type":"candidate","monitorIndex":0,"candidate":"1359935623 1 udp 1677730047 27.72.102.134 57630 ty...
+[PhaseProtocol] Received: {"type":"candidate","monitorIndex":0,"candidate":"1359935623 1 udp 1677730047 27.72.102.134 63658 ty...
 
 [PhaseProtocol] PC0 adding remote ICE candidate (AnswerSet=true)
 
-[PhaseProtocol] Single-PC answer received in 1177ms
+[PhaseProtocol] Single-PC answer received in 1948ms
 
 [PhaseProtocol] CreatePeerConnectionsAsync completed successfully
 
@@ -604,7 +619,7 @@ UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
 [PhaseProtocol] ice_ready received but phase is StartingStream, ignoring
 
-[PhaseProtocol] Received: {"type":"streaming_started","timestamp":1768965182439}...
+[PhaseProtocol] Received: {"type":"streaming_started","timestamp":1768971949020}...
 
 [PhaseProtocol] Streaming started (server message)!
 
@@ -670,24 +685,17 @@ UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
 [PhaseProtocol] Received: {"type":"cursor_image","cursorId":1,"cursorType":2,"width":32,"height":32,"hotspotX":0,"hotspotY":0,...
 
-[PhaseProtocol] Received cursor_image: id=1, type=IBeam, size=32x32, base64Len=5468
+[PhaseProtocol] cursor_image RAW message length: 5581 chars
 
-[PhaseProtocol] Cursor 1 base64: len=5468, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+[PhaseProtocol] HandleCursorImageRaw: rawJson.Length=5581
 
-[PhaseProtocol] Cursor 1 decoded: 4099 bytes, expected 4096
+[PhaseProtocol] RAW Parsed cursor_image: id=1, type=IBeam, size=32x32, base64Len=5464
 
-[PhaseProtocol] RGBA larger than expected (4099 > 4096), truncating
-UnityEngine.Debug:LogWarning (object)
-VRWorkspace.Streaming.PhaseProtocolClient/<>c__DisplayClass248_0:<HandleCursorImage>b__0 () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3520)
-VRWorkspace.Core.MainThreadDispatcher:Enqueue (System.Action) (at Assets/VR-Workspace/Scripts/Core/MainThreadDispatcher.cs:122)
-VRWorkspace.Streaming.PhaseProtocolClient:HandleCursorImage (VRWorkspace.Streaming.SimpleJson) (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3482)
-VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__202:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:1313)
-System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__202> (VRWorkspace.Streaming.PhaseProtocolClient/<HandleTextMessageAsync>d__202&)
-VRWorkspace.Streaming.PhaseProtocolClient:HandleTextMessageAsync (string)
-VRWorkspace.Streaming.PhaseProtocolClient/<ReceiveLoopAsync>d__201:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:1224)
-UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+[PhaseProtocol] Cursor 1 base64 (RAW): len=5464, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
 
-[PhaseProtocol] Cursor texture loaded: 32x32, format=RGBA32
+[PhaseProtocol] Cursor 1 decoded: 4096 bytes, expected 4096
+
+[PhaseProtocol] Cursor 1 texture created (RAW parser): 32x32, hotspot=(0,0)
 
 [RTTTaskbarExpansion] Icons loaded - Bitrate: 5/5, FPS: 3/3
 
@@ -697,25 +705,49 @@ UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
 [RTTRemote-MIPMAP] Created mipmap RT for panel 1: 1440x810, sourceType=Texture2D
 
-[RTTRemote-MIPMAP] Created mipmap RT for panel 0: 1440x810, sourceType=Texture2D
-
 [PhaseProtocol] Single-PC ICE: Completed
 
 [ConnectionViewModel] Monitor 0 ICE complete. Ready: 3/2
 
 [ConnectionViewModel] Monitor 1 ICE complete. Ready: 4/2
 
-[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768965183446,"currentFrame":59,"recentFrames":[{"frameNum":49,"c...
+[RTTRemote-MIPMAP] Created mipmap RT for panel 0: 1440x810, sourceType=Texture2D
 
-[PhaseProtocol] Received: pong:1768965183543...
+[PhaseProtocol] Received: pong:1768971949660...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971950025,"currentFrame":59,"recentFrames":[{"frameNum":49,"c...
 
 [PhaseProtocol] Received: ping...
 
-[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768965184460,"currentFrame":122,"recentFrames":[{"frameNum":113,...
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971951047,"currentFrame":122,"recentFrames":[{"frameNum":113,...
 
-[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768965185461,"currentFrame":184,"recentFrames":[{"frameNum":175,...
+[PhaseProtocol] Received: pong:1768971951694...
 
-[PhaseProtocol] Received: pong:1768965185576...
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971952047,"currentFrame":184,"recentFrames":[{"frameNum":175,...
+
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":2,"cursorType":2,"width":32,"height":32,"hotspotX":11,"hotspotY":4...
+
+[PhaseProtocol] cursor_image RAW message length: 5582 chars
+
+[PhaseProtocol] HandleCursorImageRaw: rawJson.Length=5582
+
+[PhaseProtocol] RAW Parsed cursor_image: id=2, type=IBeam, size=32x32, base64Len=5464
+
+[PhaseProtocol] Cursor 2 base64 (RAW): len=5464, start=AAAAAAAAAAAAAAAAAAEENwABC70AAQu9AAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+
+[PhaseProtocol] Cursor 2 decoded: 4096 bytes, expected 4096
+
+[PhaseProtocol] Cursor 2 texture created (RAW parser): 32x32, hotspot=(11,4)
+
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":3,"cursorType":2,"width":32,"height":32,"hotspotX":0,"hotspotY":0,...
+
+[PhaseProtocol] RAW Parsed cursor_image: id=3, type=IBeam, size=32x32, base64Len=5464
+
+[PhaseProtocol] Cursor 3 base64 (RAW): len=5464, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+
+[PhaseProtocol] Cursor 3 decoded: 4096 bytes, expected 4096
+
+[PhaseProtocol] Cursor 3 texture created (RAW parser): 32x32, hotspot=(0,0)
 
 [ConnectionViewModel] Timeout waiting for ReadyToStream, current phase: Streaming, using force start
 UnityEngine.Debug:LogWarning (object)
@@ -738,37 +770,15 @@ VRWorkspace.ViewModels.ConnectionViewModel:StartStreamingAsync (bool)
 VRWorkspace.ViewModels.ConnectionViewModel/<>c__DisplayClass113_0/<<SubscribeToEvents>b__16>d:MoveNext () (at Assets/VR-Workspace/Scripts/ViewModels/ConnectionViewModel.cs:779)
 UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
-[PhaseProtocol] Received: {"type":"cursor_image","cursorId":2,"cursorType":2,"width":32,"height":32,"hotspotX":11,"hotspotY":4...
-
-[PhaseProtocol] Received cursor_image: id=2, type=IBeam, size=32x32, base64Len=5468
-
-[PhaseProtocol] Cursor 2 base64: len=5468, start=AAAAAAAAAAAAAAAAAAEENwABC70AAQu9AAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
-
-[PhaseProtocol] Cursor 2 decoded: 4099 bytes, expected 4096
-
-[PhaseProtocol] Received: {"type":"cursor_image","cursorId":3,"cursorType":2,"width":32,"height":32,"hotspotX":0,"hotspotY":0,...
-
-[PhaseProtocol] Received cursor_image: id=3, type=IBeam, size=32x32, base64Len=5468
-
-[PhaseProtocol] Cursor 3 base64: len=5468, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
-
-[PhaseProtocol] Cursor 3 decoded: 4099 bytes, expected 4096
-
-[PhaseProtocol] Received: {"type":"cursor_image","cursorId":4,"cursorType":2,"width":32,"height":32,"hotspotX":0,"hotspotY":0,...
-
-[PhaseProtocol] Received cursor_image: id=4, type=IBeam, size=32x32, base64Len=5468
-
-[PhaseProtocol] Cursor 4 base64: len=5468, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
-
-[PhaseProtocol] Cursor 4 decoded: 4099 bytes, expected 4096
-
-[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768965186463,"currentFrame":247,"recentFrames":[{"frameNum":238,...
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971953048,"currentFrame":246,"recentFrames":[{"frameNum":237,...
 
 [PhaseProtocol] Sending request_keyframe: {"type":"request_keyframe"}
 
 [PhaseProtocol] request_keyframe SENT successfully
 
-[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768965187463,"currentFrame":309,"recentFrames":[{"frameNum":300,...
+[PhaseProtocol] Received: pong:1768971953711...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971954050,"currentFrame":310,"recentFrames":[{"frameNum":301,...
 
 [PhaseProtocol] Received: {"type":"fps_adjusted","monitorIndex":0,"targetFps":60}...
 
@@ -778,155 +788,539 @@ UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
 [PhaseProtocol] Server adjusted FPS: monitor 1 → 60.0 fps
 
-[PhaseProtocol] Received: pong:1768965187594...
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971955051,"currentFrame":372,"recentFrames":[{"frameNum":363,...
 
-[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768965188465,"currentFrame":370,"recentFrames":[{"frameNum":361,...
+[PhaseProtocol] Received: pong:1768971955729...
 
-[PhaseProtocol] Received: {"type":"cursor_image","cursorId":5,"cursorType":2,"width":32,"height":32,"hotspotX":11,"hotspotY":4...
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":4,"cursorType":2,"width":32,"height":32,"hotspotX":16,"hotspotY":1...
 
-[PhaseProtocol] Received cursor_image: id=5, type=IBeam, size=32x32, base64Len=5468
+[PhaseProtocol] cursor_image RAW message length: 5583 chars
 
-[PhaseProtocol] Cursor 5 base64: len=5468, start=AAAAAAAAAAAAAAAAAAEENwABC70AAQu9AAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+[PhaseProtocol] HandleCursorImageRaw: rawJson.Length=5583
 
-[PhaseProtocol] Cursor 5 decoded: 4099 bytes, expected 4096
+[PhaseProtocol] RAW Parsed cursor_image: id=4, type=IBeam, size=32x32, base64Len=5464
 
-[PhaseProtocol] Received: {"type":"cursor_image","cursorId":6,"cursorType":2,"width":32,"height":32,"hotspotX":0,"hotspotY":0,...
+[PhaseProtocol] Cursor 4 base64 (RAW): len=5464, start=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
 
-[PhaseProtocol] Received cursor_image: id=6, type=IBeam, size=32x32, base64Len=5468
+[PhaseProtocol] Cursor 4 decoded: 4096 bytes, expected 4096
 
-[PhaseProtocol] Cursor 6 base64: len=5468, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+[PhaseProtocol] Cursor 4 texture created (RAW parser): 32x32, hotspot=(16,16)
 
-[PhaseProtocol] Cursor 6 decoded: 4099 bytes, expected 4096
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971956051,"currentFrame":435,"recentFrames":[{"frameNum":426,...
 
-[PhaseProtocol] Received: {"type":"cursor_image","cursorId":7,"cursorType":2,"width":32,"height":32,"hotspotX":11,"hotspotY":4...
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971957052,"currentFrame":497,"recentFrames":[{"frameNum":488,...
 
-[PhaseProtocol] Received cursor_image: id=7, type=IBeam, size=32x32, base64Len=5468
+[PhaseProtocol] Received: pong:1768971957749...
 
-[PhaseProtocol] Cursor 7 base64: len=5468, start=AAAAAAAAAAAAAAAAAAEENwABC70AAQu9AAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":5,"cursorType":2,"width":32,"height":32,"hotspotX":0,"hotspotY":0,...
 
-[PhaseProtocol] Cursor 7 decoded: 4099 bytes, expected 4096
+[PhaseProtocol] RAW Parsed cursor_image: id=5, type=IBeam, size=32x32, base64Len=5464
 
-[PhaseProtocol] Received: {"type":"cursor_image","cursorId":8,"cursorType":2,"width":32,"height":32,"hotspotX":0,"hotspotY":0,...
+[PhaseProtocol] Cursor 5 base64 (RAW): len=5464, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
 
-[PhaseProtocol] Received cursor_image: id=8, type=IBeam, size=32x32, base64Len=5468
+[PhaseProtocol] Cursor 5 decoded: 4096 bytes, expected 4096
 
-[PhaseProtocol] Cursor 8 base64: len=5468, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+[PhaseProtocol] Cursor 5 texture created (RAW parser): 32x32, hotspot=(0,0)
 
-[PhaseProtocol] Cursor 8 decoded: 4099 bytes, expected 4096
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971958552,"currentFrame":591,"recentFrames":[{"frameNum":582,...
 
-[PhaseProtocol] Received: pong:1768965189626...
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971959554,"currentFrame":653,"recentFrames":[{"frameNum":644,...
 
-[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768965189965,"currentFrame":463,"recentFrames":[{"frameNum":454,...
+[PhaseProtocol] Received: pong:1768971959782...
 
-[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768965191465,"currentFrame":557,"recentFrames":[{"frameNum":548,...
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971960555,"currentFrame":716,"recentFrames":[{"frameNum":707,...
 
-[PhaseProtocol] Received: pong:1768965191660...
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971961556,"currentFrame":779,"recentFrames":[{"frameNum":770,...
 
-[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768965192465,"currentFrame":620,"recentFrames":[{"frameNum":611,...
+[PhaseProtocol] Received: pong:1768971961799...
 
-[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768965193465,"currentFrame":682,"recentFrames":[{"frameNum":673,...
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971962557,"currentFrame":841,"recentFrames":[{"frameNum":832,...
 
-[PhaseProtocol] Received: pong:1768965193693...
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971963558,"currentFrame":903,"recentFrames":[{"frameNum":894,...
 
-[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768965194465,"currentFrame":745,"recentFrames":[{"frameNum":736,...
+[PhaseProtocol] Received: pong:1768971963815...
 
-[PhaseProtocol] Received: {"type":"cursor_image","cursorId":9,"cursorType":2,"width":32,"height":32,"hotspotX":11,"hotspotY":4...
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971964559,"currentFrame":966,"recentFrames":[{"frameNum":957,...
 
-[PhaseProtocol] Received cursor_image: id=9, type=IBeam, size=32x32, base64Len=5468
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971965560,"currentFrame":1028,"recentFrames":[{"frameNum":101...
 
-[PhaseProtocol] Cursor 9 base64: len=5468, start=AAAAAAAAAAAAAAAAAAEENwABC70AAQu9AAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+[PhaseProtocol] Received: pong:1768971965833...
 
-[PhaseProtocol] Cursor 9 decoded: 4099 bytes, expected 4096
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":6,"cursorType":2,"width":32,"height":32,"hotspotX":16,"hotspotY":1...
 
-[PhaseProtocol] Received: {"type":"cursor_image","cursorId":10,"cursorType":2,"width":32,"height":32,"hotspotX":0,"hotspotY":0...
+[PhaseProtocol] RAW Parsed cursor_image: id=6, type=IBeam, size=32x32, base64Len=5464
 
-[PhaseProtocol] Received cursor_image: id=10, type=IBeam, size=32x32, base64Len=5468
+[PhaseProtocol] Cursor 6 base64 (RAW): len=5464, start=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
 
-[PhaseProtocol] Cursor 10 base64: len=5468, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+[PhaseProtocol] Cursor 6 decoded: 4096 bytes, expected 4096
 
-[PhaseProtocol] Cursor 10 decoded: 4099 bytes, expected 4096
+[PhaseProtocol] Cursor 6 texture created (RAW parser): 32x32, hotspot=(16,16)
 
-[PhaseProtocol] Received: {"type":"cursor_image","cursorId":11,"cursorType":2,"width":32,"height":32,"hotspotX":11,"hotspotY":...
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971966560,"currentFrame":1091,"recentFrames":[{"frameNum":108...
 
-[PhaseProtocol] Received cursor_image: id=11, type=IBeam, size=32x32, base64Len=5468
+[PhaseProtocol] Quality feedback: RTT=16ms, jitter=542.5ms, loss=0.0 %, fps=10/60, health=100, buffer=healthy
 
-[PhaseProtocol] Cursor 11 base64: len=5468, start=AAAAAAAAAAAAAAAAAAEENwABC70AAQu9AAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+[PhaseProtocol] Received: pong:1768971967866...
 
-[PhaseProtocol] Cursor 11 decoded: 4099 bytes, expected 4096
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971968061,"currentFrame":1185,"recentFrames":[{"frameNum":117...
 
-[PhaseProtocol] Received: {"type":"cursor_image","cursorId":12,"cursorType":2,"width":32,"height":32,"hotspotX":0,"hotspotY":0...
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":7,"cursorType":2,"width":32,"height":32,"hotspotX":0,"hotspotY":0,...
 
-[PhaseProtocol] Received cursor_image: id=12, type=IBeam, size=32x32, base64Len=5468
+[PhaseProtocol] RAW Parsed cursor_image: id=7, type=IBeam, size=32x32, base64Len=5464
 
-[PhaseProtocol] Cursor 12 base64: len=5468, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+[PhaseProtocol] Cursor 7 base64 (RAW): len=5464, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
 
-[PhaseProtocol] Cursor 12 decoded: 4099 bytes, expected 4096
+[PhaseProtocol] Cursor 7 decoded: 4096 bytes, expected 4096
 
-[PhaseProtocol] Received: pong:1768965195727...
+[PhaseProtocol] Cursor 7 texture created (RAW parser): 32x32, hotspot=(0,0)
 
-[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768965195965,"currentFrame":838,"recentFrames":[{"frameNum":829,...
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971969062,"currentFrame":1248,"recentFrames":[{"frameNum":123...
+
+[PhaseProtocol] Received: pong:1768971969900...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971970064,"currentFrame":1310,"recentFrames":[{"frameNum":130...
+
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":8,"cursorType":2,"width":32,"height":32,"hotspotX":16,"hotspotY":1...
+
+[PhaseProtocol] RAW Parsed cursor_image: id=8, type=IBeam, size=32x32, base64Len=5464
+
+[PhaseProtocol] Cursor 8 base64 (RAW): len=5464, start=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+
+[PhaseProtocol] Cursor 8 decoded: 4096 bytes, expected 4096
+
+[PhaseProtocol] Cursor 8 texture created (RAW parser): 32x32, hotspot=(16,16)
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971971065,"currentFrame":1373,"recentFrames":[{"frameNum":136...
+
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":9,"cursorType":2,"width":32,"height":32,"hotspotX":0,"hotspotY":0,...
+
+[PhaseProtocol] RAW Parsed cursor_image: id=9, type=IBeam, size=32x32, base64Len=5464
+
+[PhaseProtocol] Cursor 9 base64 (RAW): len=5464, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+
+[PhaseProtocol] Cursor 9 decoded: 4096 bytes, expected 4096
+
+[PhaseProtocol] Cursor 9 texture created (RAW parser): 32x32, hotspot=(0,0)
+
+[PhaseProtocol] Received: pong:1768971971917...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971972066,"currentFrame":1436,"recentFrames":[{"frameNum":142...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971973068,"currentFrame":1498,"recentFrames":[{"frameNum":148...
+
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":10,"cursorType":2,"width":32,"height":32,"hotspotX":16,"hotspotY":...
+
+[PhaseProtocol] cursor_image RAW message length: 5584 chars
+
+[PhaseProtocol] HandleCursorImageRaw: rawJson.Length=5584
+
+[PhaseProtocol] RAW Parsed cursor_image: id=10, type=IBeam, size=32x32, base64Len=5464
+
+[PhaseProtocol] Cursor 10 base64 (RAW): len=5464, start=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+
+[PhaseProtocol] Cursor 10 decoded: 4096 bytes, expected 4096
+
+[PhaseProtocol] Cursor 10 texture created (RAW parser): 32x32, hotspot=(16,16)
+
+[PhaseProtocol] Received: pong:1768971973950...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971974068,"currentFrame":1561,"recentFrames":[{"frameNum":155...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971975069,"currentFrame":1623,"recentFrames":[{"frameNum":161...
+
+[PhaseProtocol] Received: pong:1768971975966...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971976071,"currentFrame":1686,"recentFrames":[{"frameNum":167...
+
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":11,"cursorType":2,"width":32,"height":32,"hotspotX":0,"hotspotY":0...
+
+[PhaseProtocol] RAW Parsed cursor_image: id=11, type=IBeam, size=32x32, base64Len=5464
+
+[PhaseProtocol] Cursor 11 base64 (RAW): len=5464, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+
+[PhaseProtocol] Cursor 11 decoded: 4096 bytes, expected 4096
+
+[PhaseProtocol] Cursor 11 texture created (RAW parser): 32x32, hotspot=(0,0)
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971977072,"currentFrame":1748,"recentFrames":[{"frameNum":173...
+
+[PhaseProtocol] Received: pong:1768971977983...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971978073,"currentFrame":1811,"recentFrames":[{"frameNum":180...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971979073,"currentFrame":1873,"recentFrames":[{"frameNum":186...
+
+[PhaseProtocol] Received: pong:1768971980016...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971980075,"currentFrame":1936,"recentFrames":[{"frameNum":192...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971981075,"currentFrame":1998,"recentFrames":[{"frameNum":198...
+
+[PhaseProtocol] Received: pong:1768971982049...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971982076,"currentFrame":2061,"recentFrames":[{"frameNum":205...
+
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":12,"cursorType":2,"width":32,"height":32,"hotspotX":4,"hotspotY":1...
+
+[PhaseProtocol] RAW Parsed cursor_image: id=12, type=IBeam, size=32x32, base64Len=5464
+
+[PhaseProtocol] Cursor 12 base64 (RAW): len=5464, start=AAAAAAAAAAAAAAAAAAEENwABC70AAQQ3AAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+
+[PhaseProtocol] Cursor 12 decoded: 4096 bytes, expected 4096
+
+[PhaseProtocol] Cursor 12 texture created (RAW parser): 32x32, hotspot=(4,11)
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971983077,"currentFrame":2124,"recentFrames":[{"frameNum":211...
 
 [PhaseProtocol] Received: {"type":"cursor_image","cursorId":13,"cursorType":2,"width":32,"height":32,"hotspotX":0,"hotspotY":0...
 
-[PhaseProtocol] Received cursor_image: id=13, type=IBeam, size=32x32, base64Len=5468
+[PhaseProtocol] RAW Parsed cursor_image: id=13, type=IBeam, size=32x32, base64Len=5464
 
-[PhaseProtocol] Cursor 13 base64: len=5468, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+[PhaseProtocol] Cursor 13 base64 (RAW): len=5464, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
 
-[PhaseProtocol] Cursor 13 decoded: 4099 bytes, expected 4096
+[PhaseProtocol] Cursor 13 decoded: 4096 bytes, expected 4096
 
-[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768965196966,"currentFrame":900,"recentFrames":[{"frameNum":891,...
+[PhaseProtocol] Cursor 13 texture created (RAW parser): 32x32, hotspot=(0,0)
 
-[PhaseProtocol] Received: pong:1768965197743...
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":14,"cursorType":2,"width":32,"height":32,"hotspotX":11,"hotspotY":...
 
-[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768965198466,"currentFrame":994,"recentFrames":[{"frameNum":985,...
+[PhaseProtocol] RAW Parsed cursor_image: id=14, type=IBeam, size=32x32, base64Len=5464
 
-[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768965199466,"currentFrame":1056,"recentFrames":[{"frameNum":104...
+[PhaseProtocol] Cursor 14 base64 (RAW): len=5464, start=AAAAAAAAAAAAAAAAAAEENwABC70AAQu9AAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
 
-[PhaseProtocol] Received: pong:1768965199760...
+[PhaseProtocol] Cursor 14 decoded: 4096 bytes, expected 4096
 
-[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768965200469,"currentFrame":1119,"recentFrames":[{"frameNum":111...
-
-[PhaseProtocol] Received: {"type":"cursor_image","cursorId":14,"cursorType":2,"width":32,"height":32,"hotspotX":0,"hotspotY":0...
-
-[PhaseProtocol] Received cursor_image: id=14, type=IBeam, size=32x32, base64Len=5468
-
-[PhaseProtocol] Cursor 14 base64: len=5468, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
-
-[PhaseProtocol] Cursor 14 decoded: 4099 bytes, expected 4096
-
-[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768965201469,"currentFrame":1182,"recentFrames":[{"frameNum":117...
-
-[PhaseProtocol] Received: pong:1768965201793...
+[PhaseProtocol] Cursor 14 texture created (RAW parser): 32x32, hotspot=(11,4)
 
 [PhaseProtocol] Received: {"type":"cursor_image","cursorId":15,"cursorType":2,"width":32,"height":32,"hotspotX":0,"hotspotY":0...
 
-[PhaseProtocol] Received cursor_image: id=15, type=IBeam, size=32x32, base64Len=5468
+[PhaseProtocol] RAW Parsed cursor_image: id=15, type=IBeam, size=32x32, base64Len=5464
 
-[PhaseProtocol] Cursor 15 base64: len=5468, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+[PhaseProtocol] Cursor 15 base64 (RAW): len=5464, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
 
-[PhaseProtocol] Cursor 15 decoded: 4099 bytes, expected 4096
+[PhaseProtocol] Cursor 15 decoded: 4096 bytes, expected 4096
 
-[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768965202471,"currentFrame":1244,"recentFrames":[{"frameNum":123...
+[PhaseProtocol] Cursor 15 texture created (RAW parser): 32x32, hotspot=(0,0)
 
-[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768965203472,"currentFrame":1307,"recentFrames":[{"frameNum":129...
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971984077,"currentFrame":2186,"recentFrames":[{"frameNum":217...
 
-[PhaseProtocol] Received: pong:1768965203827...
+[PhaseProtocol] Received: pong:1768971984082...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971985078,"currentFrame":2249,"recentFrames":[{"frameNum":224...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971986078,"currentFrame":2311,"recentFrames":[{"frameNum":230...
+
+[PhaseProtocol] Received: pong:1768971986100...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971987078,"currentFrame":2374,"recentFrames":[{"frameNum":236...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971988079,"currentFrame":2436,"recentFrames":[{"frameNum":242...
+
+[PhaseProtocol] Received: pong:1768971988133...
 
 [PhaseProtocol] Received: {"type":"cursor_image","cursorId":16,"cursorType":2,"width":32,"height":32,"hotspotX":0,"hotspotY":0...
 
-[PhaseProtocol] Received cursor_image: id=16, type=IBeam, size=32x32, base64Len=5468
+[PhaseProtocol] RAW Parsed cursor_image: id=16, type=IBeam, size=32x32, base64Len=5464
 
-[PhaseProtocol] Cursor 16 base64: len=5468, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+[PhaseProtocol] Cursor 16 base64 (RAW): len=5464, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
 
-[PhaseProtocol] Cursor 16 decoded: 4099 bytes, expected 4096
+[PhaseProtocol] Cursor 16 decoded: 4096 bytes, expected 4096
 
-[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768965204473,"currentFrame":1370,"recentFrames":[{"frameNum":136...
+[PhaseProtocol] Cursor 16 texture created (RAW parser): 32x32, hotspot=(0,0)
 
-[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768965205475,"currentFrame":1432,"recentFrames":[{"frameNum":142...
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":17,"cursorType":2,"width":32,"height":32,"hotspotX":11,"hotspotY":...
 
-[PhaseProtocol] Received: pong:1768965205861...
+[PhaseProtocol] RAW Parsed cursor_image: id=17, type=IBeam, size=32x32, base64Len=5464
 
-[RTTRemoteMenu] OnDestroy called - this will stop all coroutines including CreateSidePanelContent!
+[PhaseProtocol] Cursor 17 base64 (RAW): len=5464, start=AAAAAAAAAAAAAAAAAAEENwABC70AAQu9AAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+
+[PhaseProtocol] Cursor 17 decoded: 4096 bytes, expected 4096
+
+[PhaseProtocol] Cursor 17 texture created (RAW parser): 32x32, hotspot=(11,4)
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971989081,"currentFrame":2499,"recentFrames":[{"frameNum":249...
+
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":18,"cursorType":2,"width":32,"height":32,"hotspotX":0,"hotspotY":0...
+
+[PhaseProtocol] RAW Parsed cursor_image: id=18, type=IBeam, size=32x32, base64Len=5464
+
+[PhaseProtocol] Cursor 18 base64 (RAW): len=5464, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+
+[PhaseProtocol] Cursor 18 decoded: 4096 bytes, expected 4096
+
+[PhaseProtocol] Cursor 18 texture created (RAW parser): 32x32, hotspot=(0,0)
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971990081,"currentFrame":2562,"recentFrames":[{"frameNum":255...
+
+[PhaseProtocol] Received: pong:1768971990165...
+
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":19,"cursorType":2,"width":32,"height":32,"hotspotX":11,"hotspotY":...
+
+[PhaseProtocol] RAW Parsed cursor_image: id=19, type=IBeam, size=32x32, base64Len=5464
+
+[PhaseProtocol] Cursor 19 base64 (RAW): len=5464, start=AAAAAAAAAAAAAAAAAAEENwABC70AAQu9AAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+
+[PhaseProtocol] Cursor 19 decoded: 4096 bytes, expected 4096
+
+[PhaseProtocol] Cursor 19 texture created (RAW parser): 32x32, hotspot=(11,4)
+
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":20,"cursorType":2,"width":32,"height":32,"hotspotX":0,"hotspotY":0...
+
+[PhaseProtocol] RAW Parsed cursor_image: id=20, type=IBeam, size=32x32, base64Len=5464
+
+[PhaseProtocol] Cursor 20 base64 (RAW): len=5464, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+
+[PhaseProtocol] Cursor 20 decoded: 4096 bytes, expected 4096
+
+[PhaseProtocol] Cursor 20 texture created (RAW parser): 32x32, hotspot=(0,0)
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971991082,"currentFrame":2624,"recentFrames":[{"frameNum":261...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971992084,"currentFrame":2687,"recentFrames":[{"frameNum":267...
+
+[PhaseProtocol] Received: pong:1768971992199...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971993084,"currentFrame":2749,"recentFrames":[{"frameNum":274...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971994085,"currentFrame":2812,"recentFrames":[{"frameNum":280...
+
+[PhaseProtocol] Received: pong:1768971994232...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971995087,"currentFrame":2874,"recentFrames":[{"frameNum":286...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971996087,"currentFrame":2937,"recentFrames":[{"frameNum":292...
+
+[PhaseProtocol] Received: pong:1768971996249...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971997088,"currentFrame":2999,"recentFrames":[{"frameNum":299...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971998090,"currentFrame":3062,"recentFrames":[{"frameNum":305...
+
+[PhaseProtocol] Received: pong:1768971998282...
+
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":21,"cursorType":2,"width":32,"height":32,"hotspotX":0,"hotspotY":0...
+
+[PhaseProtocol] RAW Parsed cursor_image: id=21, type=IBeam, size=32x32, base64Len=5464
+
+[PhaseProtocol] Cursor 21 base64 (RAW): len=5464, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+
+[PhaseProtocol] Cursor 21 decoded: 4096 bytes, expected 4096
+
+[PhaseProtocol] Cursor 21 texture created (RAW parser): 32x32, hotspot=(0,0)
+
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":22,"cursorType":1,"width":32,"height":32,"hotspotX":16,"hotspotY":...
+
+[PhaseProtocol] RAW Parsed cursor_image: id=22, type=Arrow, size=32x32, base64Len=5464
+
+[PhaseProtocol] Cursor 22 base64 (RAW): len=5464, start=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+
+[PhaseProtocol] Cursor 22 decoded: 4096 bytes, expected 4096
+
+[PhaseProtocol] Cursor 22 texture created (RAW parser): 32x32, hotspot=(16,16)
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768971999092,"currentFrame":3125,"recentFrames":[{"frameNum":311...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972000092,"currentFrame":3187,"recentFrames":[{"frameNum":317...
+
+[PhaseProtocol] Received: pong:1768972000299...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972001095,"currentFrame":3250,"recentFrames":[{"frameNum":324...
+
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":23,"cursorType":2,"width":32,"height":32,"hotspotX":0,"hotspotY":0...
+
+[PhaseProtocol] RAW Parsed cursor_image: id=23, type=IBeam, size=32x32, base64Len=5464
+
+[PhaseProtocol] Cursor 23 base64 (RAW): len=5464, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+
+[PhaseProtocol] Cursor 23 decoded: 4096 bytes, expected 4096
+
+[PhaseProtocol] Cursor 23 texture created (RAW parser): 32x32, hotspot=(0,0)
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972002096,"currentFrame":3312,"recentFrames":[{"frameNum":330...
+
+[PhaseProtocol] Received: pong:1768972002316...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972003096,"currentFrame":3375,"recentFrames":[{"frameNum":336...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972004097,"currentFrame":3437,"recentFrames":[{"frameNum":342...
+
+[PhaseProtocol] Received: pong:1768972004334...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972005098,"currentFrame":3500,"recentFrames":[{"frameNum":349...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972006098,"currentFrame":3563,"recentFrames":[{"frameNum":355...
+
+[PhaseProtocol] Received: pong:1768972006349...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972007099,"currentFrame":3625,"recentFrames":[{"frameNum":361...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972008102,"currentFrame":3688,"recentFrames":[{"frameNum":367...
+
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":24,"cursorType":2,"width":32,"height":32,"hotspotX":16,"hotspotY":...
+
+[PhaseProtocol] RAW Parsed cursor_image: id=24, type=IBeam, size=32x32, base64Len=5464
+
+[PhaseProtocol] Cursor 24 base64 (RAW): len=5464, start=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+
+[PhaseProtocol] Cursor 24 decoded: 4096 bytes, expected 4096
+
+[PhaseProtocol] Cursor 24 texture created (RAW parser): 32x32, hotspot=(16,16)
+
+[PhaseProtocol] Received: pong:1768972008367...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972009103,"currentFrame":3750,"recentFrames":[{"frameNum":374...
+
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":25,"cursorType":2,"width":32,"height":32,"hotspotX":0,"hotspotY":0...
+
+[PhaseProtocol] RAW Parsed cursor_image: id=25, type=IBeam, size=32x32, base64Len=5464
+
+[PhaseProtocol] Cursor 25 base64 (RAW): len=5464, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+
+[PhaseProtocol] Cursor 25 decoded: 4096 bytes, expected 4096
+
+[PhaseProtocol] Cursor 25 texture created (RAW parser): 32x32, hotspot=(0,0)
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972010104,"currentFrame":3813,"recentFrames":[{"frameNum":380...
+
+[PhaseProtocol] Received: pong:1768972010383...
+
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":26,"cursorType":2,"width":32,"height":32,"hotspotX":16,"hotspotY":...
+
+[PhaseProtocol] RAW Parsed cursor_image: id=26, type=IBeam, size=32x32, base64Len=5464
+
+[PhaseProtocol] Cursor 26 base64 (RAW): len=5464, start=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+
+[PhaseProtocol] Cursor 26 decoded: 4096 bytes, expected 4096
+
+[PhaseProtocol] Cursor 26 texture created (RAW parser): 32x32, hotspot=(16,16)
+
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":27,"cursorType":2,"width":32,"height":32,"hotspotX":0,"hotspotY":0...
+
+[PhaseProtocol] RAW Parsed cursor_image: id=27, type=IBeam, size=32x32, base64Len=5464
+
+[PhaseProtocol] Cursor 27 base64 (RAW): len=5464, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+
+[PhaseProtocol] Cursor 27 decoded: 4096 bytes, expected 4096
+
+[PhaseProtocol] Cursor 27 texture created (RAW parser): 32x32, hotspot=(0,0)
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972011106,"currentFrame":3875,"recentFrames":[{"frameNum":386...
+
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":28,"cursorType":2,"width":32,"height":32,"hotspotX":16,"hotspotY":...
+
+[PhaseProtocol] RAW Parsed cursor_image: id=28, type=IBeam, size=32x32, base64Len=5464
+
+[PhaseProtocol] Cursor 28 base64 (RAW): len=5464, start=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+
+[PhaseProtocol] Cursor 28 decoded: 4096 bytes, expected 4096
+
+[PhaseProtocol] Cursor 28 texture created (RAW parser): 32x32, hotspot=(16,16)
+
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":29,"cursorType":2,"width":32,"height":32,"hotspotX":0,"hotspotY":0...
+
+[PhaseProtocol] RAW Parsed cursor_image: id=29, type=IBeam, size=32x32, base64Len=5464
+
+[PhaseProtocol] Cursor 29 base64 (RAW): len=5464, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+
+[PhaseProtocol] Cursor 29 decoded: 4096 bytes, expected 4096
+
+[PhaseProtocol] Cursor 29 texture created (RAW parser): 32x32, hotspot=(0,0)
+
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":30,"cursorType":2,"width":32,"height":32,"hotspotX":16,"hotspotY":...
+
+[PhaseProtocol] RAW Parsed cursor_image: id=30, type=IBeam, size=32x32, base64Len=5464
+
+[PhaseProtocol] Cursor 30 base64 (RAW): len=5464, start=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+
+[PhaseProtocol] Cursor 30 decoded: 4096 bytes, expected 4096
+
+[PhaseProtocol] Cursor 30 texture created (RAW parser): 32x32, hotspot=(16,16)
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972012106,"currentFrame":3938,"recentFrames":[{"frameNum":392...
+
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":31,"cursorType":2,"width":32,"height":32,"hotspotX":0,"hotspotY":0...
+
+[PhaseProtocol] RAW Parsed cursor_image: id=31, type=IBeam, size=32x32, base64Len=5464
+
+[PhaseProtocol] Cursor 31 base64 (RAW): len=5464, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+
+[PhaseProtocol] Cursor 31 decoded: 4096 bytes, expected 4096
+
+[PhaseProtocol] Cursor 31 texture created (RAW parser): 32x32, hotspot=(0,0)
+
+[PhaseProtocol] Received: pong:1768972012417...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972013107,"currentFrame":4000,"recentFrames":[{"frameNum":399...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972014109,"currentFrame":4063,"recentFrames":[{"frameNum":405...
+
+[PhaseProtocol] Received: pong:1768972014451...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972015109,"currentFrame":4126,"recentFrames":[{"frameNum":411...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972016112,"currentFrame":4188,"recentFrames":[{"frameNum":417...
+
+[PhaseProtocol] Received: pong:1768972016466...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972017113,"currentFrame":4251,"recentFrames":[{"frameNum":424...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972018114,"currentFrame":4314,"recentFrames":[{"frameNum":430...
+
+[PhaseProtocol] Received: pong:1768972018501...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972019115,"currentFrame":4376,"recentFrames":[{"frameNum":436...
+
+[PhaseProtocol] Received: pong:1768972020534...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972020616,"currentFrame":4470,"recentFrames":[{"frameNum":446...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972021617,"currentFrame":4533,"recentFrames":[{"frameNum":452...
+
+[PhaseProtocol] Received: pong:1768972022551...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972022617,"currentFrame":4595,"recentFrames":[{"frameNum":458...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972023617,"currentFrame":4657,"recentFrames":[{"frameNum":464...
+
+[PhaseProtocol] Received: pong:1768972024581...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972024617,"currentFrame":4720,"recentFrames":[{"frameNum":471...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972025620,"currentFrame":4781,"recentFrames":[{"frameNum":477...
+
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":32,"cursorType":2,"width":32,"height":32,"hotspotX":11,"hotspotY":...
+
+[PhaseProtocol] RAW Parsed cursor_image: id=32, type=IBeam, size=32x32, base64Len=5464
+
+[PhaseProtocol] Cursor 32 base64 (RAW): len=5464, start=AAAAAAAAAAAAAAAAAAEENwABC70AAQu9AAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+
+[PhaseProtocol] Cursor 32 decoded: 4096 bytes, expected 4096
+
+[PhaseProtocol] Cursor 32 texture created (RAW parser): 32x32, hotspot=(11,4)
+
+[PhaseProtocol] Received: {"type":"cursor_image","cursorId":33,"cursorType":2,"width":32,"height":32,"hotspotX":0,"hotspotY":0...
+
+[PhaseProtocol] RAW Parsed cursor_image: id=33, type=IBeam, size=32x32, base64Len=5464
+
+[PhaseProtocol] Cursor 33 base64 (RAW): len=5464, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+
+[PhaseProtocol] Cursor 33 decoded: 4096 bytes, expected 4096
+
+[PhaseProtocol] Cursor 33 texture created (RAW parser): 32x32, hotspot=(0,0)
+
+[PhaseProtocol] Received: pong:1768972026616...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972026620,"currentFrame":4844,"recentFrames":[{"frameNum":483...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972027622,"currentFrame":4906,"recentFrames":[{"frameNum":489...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972028622,"currentFrame":4969,"recentFrames":[{"frameNum":496...
+
+[PhaseProtocol] Received: pong:1768972028633...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972029622,"currentFrame":5031,"recentFrames":[{"frameNum":502...
+
+[PhaseProtocol] Received: {"type":"frameTiming","serverTime":1768972030622,"currentFrame":5094,"recentFrames":[{"frameNum":508...
 
 [ConnectionViewModel] All state reset to initial values
 
@@ -934,64 +1328,74 @@ UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
 [AndroidHelper] Screen sleep: system default
 
+[RTTRemoteMenuController] Shown RTTMenuFrame
+
+[RTTRemoteMenuController] Shown RTTTaskbar
+
+[RTTTaskbar] App button 0 selected
+
+[RTTTaskbar] Unregistered app from slot 1
+
 [RTTManager] Closed app: remote
 
-[PhaseProtocol] PC0 FRAME STALL detected! No frames for 4.0s (frames received: 213)
+[RTTRemoteMenu] OnDestroy called - this will stop all coroutines including CreateSidePanelContent!
+
+[PhaseProtocol] PC0 FRAME STALL detected! No frames for 4.0s (frames received: 793)
 UnityEngine.Debug:LogWarning (object)
-VRWorkspace.Streaming.PhaseProtocolClient/<FrameStallMonitorAsync>d__246:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3411)
+VRWorkspace.Streaming.PhaseProtocolClient/<FrameStallMonitorAsync>d__246:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3421)
 UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
 [PhaseProtocol] PC0 triggering reconnect due to frame stall
 UnityEngine.Debug:Log (object)
-VRWorkspace.Streaming.PhaseProtocolClient/<FrameStallMonitorAsync>d__246:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3417)
+VRWorkspace.Streaming.PhaseProtocolClient/<FrameStallMonitorAsync>d__246:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3427)
 UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
 [PhaseProtocol] PC0 auto-heal: attempt 1/5, waiting 500ms...
 UnityEngine.Debug:Log (object)
-VRWorkspace.Streaming.PhaseProtocolClient/<AutoHealMonitorAsync>d__242:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3215)
+VRWorkspace.Streaming.PhaseProtocolClient/<AutoHealMonitorAsync>d__242:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3225)
 System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<AutoHealMonitorAsync>d__242> (VRWorkspace.Streaming.PhaseProtocolClient/<AutoHealMonitorAsync>d__242&)
 VRWorkspace.Streaming.PhaseProtocolClient:AutoHealMonitorAsync (int)
-VRWorkspace.Streaming.PhaseProtocolClient/<FrameStallMonitorAsync>d__246:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3418)
+VRWorkspace.Streaming.PhaseProtocolClient/<FrameStallMonitorAsync>d__246:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3428)
 UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
-[PhaseProtocol] PC1 FRAME STALL detected! No frames for 4.0s (frames received: 213)
+[PhaseProtocol] PC1 FRAME STALL detected! No frames for 4.0s (frames received: 793)
 UnityEngine.Debug:LogWarning (object)
-VRWorkspace.Streaming.PhaseProtocolClient/<FrameStallMonitorAsync>d__246:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3411)
+VRWorkspace.Streaming.PhaseProtocolClient/<FrameStallMonitorAsync>d__246:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3421)
 UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
 [PhaseProtocol] PC1 triggering reconnect due to frame stall
 UnityEngine.Debug:Log (object)
-VRWorkspace.Streaming.PhaseProtocolClient/<FrameStallMonitorAsync>d__246:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3417)
+VRWorkspace.Streaming.PhaseProtocolClient/<FrameStallMonitorAsync>d__246:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3427)
 UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
 [PhaseProtocol] PC1 auto-heal: attempt 1/5, waiting 500ms...
 UnityEngine.Debug:Log (object)
-VRWorkspace.Streaming.PhaseProtocolClient/<AutoHealMonitorAsync>d__242:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3215)
+VRWorkspace.Streaming.PhaseProtocolClient/<AutoHealMonitorAsync>d__242:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3225)
 System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<AutoHealMonitorAsync>d__242> (VRWorkspace.Streaming.PhaseProtocolClient/<AutoHealMonitorAsync>d__242&)
 VRWorkspace.Streaming.PhaseProtocolClient:AutoHealMonitorAsync (int)
-VRWorkspace.Streaming.PhaseProtocolClient/<FrameStallMonitorAsync>d__246:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3418)
+VRWorkspace.Streaming.PhaseProtocolClient/<FrameStallMonitorAsync>d__246:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3428)
 UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
-[PhaseProtocol] PC0 auto-heal: PC Connected but frames stalled for 4593ms - forcing reconnect
+[PhaseProtocol] PC0 auto-heal: PC Connected but frames stalled for 4582ms - forcing reconnect
 UnityEngine.Debug:LogWarning (object)
-VRWorkspace.Streaming.PhaseProtocolClient/<AutoHealMonitorAsync>d__242:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3244)
+VRWorkspace.Streaming.PhaseProtocolClient/<AutoHealMonitorAsync>d__242:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3254)
 UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
 [PhaseProtocol] Reconnecting PC0...
 UnityEngine.Debug:Log (object)
-VRWorkspace.Streaming.PhaseProtocolClient/<ReconnectMonitorAsync>d__239:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:2940)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReconnectMonitorAsync>d__239:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:2950)
 System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<ReconnectMonitorAsync>d__239> (VRWorkspace.Streaming.PhaseProtocolClient/<ReconnectMonitorAsync>d__239&)
 VRWorkspace.Streaming.PhaseProtocolClient:ReconnectMonitorAsync (int)
-VRWorkspace.Streaming.PhaseProtocolClient/<AutoHealMonitorAsync>d__242:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3253)
+VRWorkspace.Streaming.PhaseProtocolClient/<AutoHealMonitorAsync>d__242:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3263)
 UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
 [PhaseProtocol] PC0 codec preferences: H264 first, total 15 codecs
 UnityEngine.Debug:Log (object)
-VRWorkspace.Streaming.PhaseProtocolClient:SetCodecPreferences (Unity.WebRTC.RTCRtpTransceiver,int) (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:2527)
-VRWorkspace.Streaming.PhaseProtocolClient/<ReconnectMonitorAsync>d__239:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:2961)
+VRWorkspace.Streaming.PhaseProtocolClient:SetCodecPreferences (Unity.WebRTC.RTCRtpTransceiver,int) (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:2537)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReconnectMonitorAsync>d__239:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:2971)
 System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start<VRWorkspace.Streaming.PhaseProtocolClient/<ReconnectMonitorAsync>d__239> (VRWorkspace.Streaming.PhaseProtocolClient/<ReconnectMonitorAsync>d__239&)
 VRWorkspace.Streaming.PhaseProtocolClient:ReconnectMonitorAsync (int)
-VRWorkspace.Streaming.PhaseProtocolClient/<AutoHealMonitorAsync>d__242:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3253)
+VRWorkspace.Streaming.PhaseProtocolClient/<AutoHealMonitorAsync>d__242:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3263)
 UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
 [PhaseProtocol] WebSocket closed by server
@@ -1007,9 +1411,9 @@ UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
 [PhaseProtocol] Frame stall monitor stopped
 UnityEngine.Debug:Log (object)
-VRWorkspace.Streaming.PhaseProtocolClient/<FrameStallMonitorAsync>d__246:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3436)
+VRWorkspace.Streaming.PhaseProtocolClient/<FrameStallMonitorAsync>d__246:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3446)
 System.Threading.CancellationTokenSource:Cancel ()
-VRWorkspace.Streaming.PhaseProtocolClient:Cleanup () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:4182)
+VRWorkspace.Streaming.PhaseProtocolClient:Cleanup () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:4388)
 VRWorkspace.Streaming.PhaseProtocolClient/<StopAsync>d__120:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:408)
 UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
@@ -1018,5 +1422,10 @@ UnityEngine.Debug:Log (object)
 VRWorkspace.Streaming.ConnectionStateMachine:ForceTransition (VRWorkspace.Streaming.ConnectionPhase,string) (at Assets/VR-Workspace/Scripts/Streaming/ConnectionStateMachine.cs:137)
 VRWorkspace.Streaming.ConnectionStateMachine:Reset () (at Assets/VR-Workspace/Scripts/Streaming/ConnectionStateMachine.cs:149)
 VRWorkspace.Streaming.PhaseProtocolClient/<StopAsync>d__120:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:409)
+UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+
+[PhaseProtocol] PC0 CreateOffer failed on reconnect
+UnityEngine.Debug:LogError (object)
+VRWorkspace.Streaming.PhaseProtocolClient/<ReconnectMonitorAsync>d__239:MoveNext () (at Assets/VR-Workspace/Scripts/Streaming/PhaseProtocolClient.cs:3095)
 UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
 
