@@ -464,7 +464,7 @@ public class RTTFileDetail : MonoBehaviour
     }
 
     // Fixed label width to align all values consistently
-    private const float LABEL_WIDTH = 180f; // Fits "Contributing artists" + spacing
+    private const float LABEL_WIDTH = 210f;
 
     private void AddMetadataRow(string label, string value)
     {
@@ -487,9 +487,9 @@ public class RTTFileDetail : MonoBehaviour
 
         TextMeshProUGUI labelText = labelObj.AddComponent<TextMeshProUGUI>();
         if (_font != null) labelText.font = _font;
-        labelText.fontSize = 28;
+        labelText.fontSize = 30;
         labelText.alignment = TextAlignmentOptions.MidlineLeft;
-        labelText.color = new Color(1f, 1f, 1f, 0.6f); // Semi-transparent white
+        labelText.color = new Color(1f, 1f, 1f, 0.85f); // Semi-transparent white
         labelText.text = label;
         labelText.enableWordWrapping = false;
         labelText.overflowMode = TextOverflowModes.Ellipsis;
@@ -501,12 +501,12 @@ public class RTTFileDetail : MonoBehaviour
         RectTransform valueRT = valueObj.AddComponent<RectTransform>();
         valueRT.anchorMin = new Vector2(0, 0);
         valueRT.anchorMax = new Vector2(1, 1);
-        valueRT.offsetMin = new Vector2(LABEL_WIDTH + 15f, 0); // 15px gap after label
+        valueRT.offsetMin = new Vector2(LABEL_WIDTH + 10f, 0);
         valueRT.offsetMax = Vector2.zero;
 
         TextMeshProUGUI valueText = valueObj.AddComponent<TextMeshProUGUI>();
         if (_font != null) valueText.font = _font;
-        valueText.fontSize = 28;
+        valueText.fontSize = 30;
         valueText.fontStyle = FontStyles.Bold;
         valueText.alignment = TextAlignmentOptions.MidlineLeft;
         valueText.color = Color.white; // Full white

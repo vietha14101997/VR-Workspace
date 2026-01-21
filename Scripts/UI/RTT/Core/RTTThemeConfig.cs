@@ -10,7 +10,11 @@ public class RTTThemeConfig : ScriptableObject
 {
     #region Font
     [Header("Typography")]
-    [Tooltip("Default font for all UI text (supports Vietnamese, Japanese, Korean, etc.)")]
+    [Tooltip("Default font for all UI text.\n\n" +
+             "IMPORTANT: To display Chinese/Japanese/Korean characters correctly, " +
+             "the font must have CJK fallback fonts configured.\n\n" +
+             "Use 'Tools > TMP Font Fallback Setup' to add fallback fonts, " +
+             "or 'Tools > TMP Font Auto Builder' to create font assets with automatic fallback.")]
     public TMP_FontAsset font;
     #endregion
 

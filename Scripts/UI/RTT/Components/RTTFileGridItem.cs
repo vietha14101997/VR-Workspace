@@ -198,8 +198,8 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         _iconContainerRect = iconContainer.AddComponent<RectTransform>();
 
         _iconContainerLE = iconContainer.AddComponent<LayoutElement>();
-        _iconContainerLE.preferredHeight = 220f;
-        _iconContainerLE.preferredWidth = 220f;
+        _iconContainerLE.preferredHeight = 200f;  // Reduced to make room for 2-line text
+        _iconContainerLE.preferredWidth = 200f;
         _iconContainerLE.flexibleHeight = 1;
 
         // 3. Icon Image - inside container, centered
@@ -210,7 +210,7 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         _iconRect.anchorMax = new Vector2(0.5f, 0.5f);
         _iconRect.pivot = new Vector2(0.5f, 0.5f);
         _iconRect.anchoredPosition = Vector2.zero;
-        _iconRect.sizeDelta = new Vector2(220f, 220f);
+        _iconRect.sizeDelta = new Vector2(200f, 200f);
 
         _iconImage = iconObj.AddComponent<Image>();
         _iconImage.preserveAspect = true;
@@ -218,24 +218,29 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
 
         SetSprite("icon_folder_not_empty");
 
-        // 3. Name Text - single line at bottom
+        // 3. Name Text - two lines at bottom for longer filenames
         GameObject textObj = new GameObject("Name");
         textObj.transform.SetParent(transform, false);
+
+        // Add RectTransform first to ensure proper sizing
+        RectTransform textRect = textObj.AddComponent<RectTransform>();
+
         _nameText = textObj.AddComponent<TextMeshProUGUI>();
         if (_font != null) _nameText.font = _font;
         _nameText.raycastTarget = false;
         _nameText.text = "";
         _nameText.alignment = TextAlignmentOptions.Center;
-        _nameText.fontSize = 32;
+        _nameText.fontSize = 32;  // Match List view font size
         _nameText.fontStyle = FontStyles.Bold;
         _nameText.color = Color.white;
         _nameText.overflowMode = TextOverflowModes.Ellipsis;
-        _nameText.enableWordWrapping = false;
-        _nameText.maxVisibleLines = 1;
+        _nameText.enableWordWrapping = true;  // Enable word wrap
+        _nameText.maxVisibleLines = 2;  // Allow 2 lines
 
         var textLE = textObj.AddComponent<LayoutElement>();
-        textLE.preferredHeight = 45f;
+        textLE.preferredHeight = 80f;  // Increased for 2 lines (32px * 2.5)
         textLE.flexibleHeight = 0;
+        textLE.minHeight = 80f;  // Ensure minimum height
 
         // 4. Background (for highlighting)
         _bgImage = gameObject.AddComponent<Image>();
