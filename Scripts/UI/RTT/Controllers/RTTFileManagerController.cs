@@ -544,12 +544,12 @@ public class RTTFileManagerController : MonoBehaviour
         // On Android: Videos and Music trigger full storage scan
         if (id == "videos")
         {
-            StartCategoryScan(FileCategory.Video, "All Videos");
+            StartCategoryScan(FileCategory.Video, "Videos", "videos");
             return;
         }
         else if (id == "music")
         {
-            StartCategoryScan(FileCategory.Music, "All Music");
+            StartCategoryScan(FileCategory.Music, "Music", "music");
             return;
         }
 #endif
@@ -583,7 +583,7 @@ public class RTTFileManagerController : MonoBehaviour
     /// <summary>
     /// Start scanning all files of a category from storage.
     /// </summary>
-    private void StartCategoryScan(FileCategory category, string displayName)
+    private void StartCategoryScan(FileCategory category, string displayName, string sidePanelId)
     {
         Debug.Log($"[Controller] Starting category scan for {category}");
 
@@ -597,36 +597,43 @@ public class RTTFileManagerController : MonoBehaviour
         _currentPath = $"filter:{category}";
         _currentPage = 1;
 
-        // Update breadcrumb to show filter mode
-        _view?.UpdateBreadcrumb(displayName, false);
+        // Update breadcrumb to show filter mode (pass sidePanelId for highlighting)
+        _view?.UpdateBreadcrumb(displayName, false, sidePanelId);
 
-        // Show loading indicator
-        _view?.ShowScanningIndicator(true, $"Scanning {displayName}...", 0);
+        // Clear the file view immediately
+        _view?.ClearFileView();
 
-        // Start async scan
+        // Show animated dots indicator
+        _view?.ShowScanningIndicator(true, "", 0);
+
+        // Start async scan with incremental updates
         _scanCoroutine = StartCoroutine(FileSystemService.ScanAllFilesByCategory(
             category,
-            onProgress: (progress, count) =>
+            onProgress: (count) =>
             {
-                // Update progress UI
-                _view?.ShowScanningIndicator(true, $"Found {count} files...", progress);
+                // Progress is now shown via item count in header, no need to update indicator text
+            },
+            onFilesFound: (newFiles) =>
+            {
+                // Add new files incrementally
+                _currentDirectoryFiles.AddRange(newFiles);
+                _filteredFiles.AddRange(newFiles);
+
+                // Update view with current files and item count
+                UpdateView(true);
             },
             onComplete: (results) =>
             {
                 _isScanning = false;
                 _scanCoroutine = null;
 
-                // Store results
-                _currentDirectoryFiles = results;
-                _filteredFiles = new List<MockFile>(results);
-
-                // Apply default sort (by modified date, newest first for media)
+                // Apply sort after scan completes
                 _sortBy = "Modified";
                 _sortAscending = false;
                 ApplySort();
 
-                // Hide loading and update view
-                _view?.ShowScanningIndicator(false, "", 1f);
+                // Hide animated dots and final update
+                _view?.ShowScanningIndicator(false, "", 0);
                 _currentPage = 1;
                 UpdateView(true);
 
@@ -1332,11 +1339,13 @@ public static class FileSystemService
     /// This is an async operation that yields periodically to prevent freezing.
     /// </summary>
     /// <param name="category">File category to filter (Video, Music, Image)</param>
-    /// <param name="onProgress">Progress callback (0-1)</param>
-    /// <param name="onComplete">Completion callback with results</param>
+    /// <param name="onProgress">Progress callback (filesFound count)</param>
+    /// <param name="onFilesFound">Incremental callback when new files are found (for real-time UI update)</param>
+    /// <param name="onComplete">Completion callback with all results</param>
     public static System.Collections.IEnumerator ScanAllFilesByCategory(
         FileCategory category,
-        Action<float, int> onProgress,
+        Action<int> onProgress,
+        Action<List<MockFile>> onFilesFound,
         Action<List<MockFile>> onComplete)
     {
         var results = new List<MockFile>();
@@ -1365,6 +1374,8 @@ public static class FileSystemService
         int totalFoldersScanned = 0;
         int filesFound = 0;
         var sw = System.Diagnostics.Stopwatch.StartNew();
+        var batchFiles = new List<MockFile>(); // Batch for incremental updates
+        int lastReportedCount = 0;
 
         // Folders to skip (system folders, hidden folders, etc.)
         var skipFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -1384,11 +1395,19 @@ public static class FileSystemService
             scannedFolders.Add(currentFolder);
             totalFoldersScanned++;
 
-            // Yield every 50 folders or 100ms to prevent freezing
+            // Yield and report progress every 50 folders or 100ms
             if (totalFoldersScanned % 50 == 0 || sw.ElapsedMilliseconds > 100)
             {
                 sw.Restart();
-                onProgress?.Invoke(-1f, filesFound); // -1 means indeterminate progress
+                onProgress?.Invoke(filesFound);
+
+                // Send batch of found files for incremental UI update
+                if (batchFiles.Count > 0)
+                {
+                    onFilesFound?.Invoke(new List<MockFile>(batchFiles));
+                    batchFiles.Clear();
+                }
+
                 yield return null;
             }
 
@@ -1418,7 +1437,7 @@ public static class FileSystemService
                         // Check if extension matches category
                         if (extensions.Contains(ext))
                         {
-                            results.Add(new MockFile
+                            var file = new MockFile
                             {
                                 Name = fileInfo.Name,
                                 Path = filePath,
@@ -1428,7 +1447,9 @@ public static class FileSystemService
                                 Modified = fileInfo.LastWriteTime,
                                 Size = fileInfo.Length,
                                 Duration = TimeSpan.Zero
-                            });
+                            };
+                            results.Add(file);
+                            batchFiles.Add(file);
                             filesFound++;
                         }
                     }
@@ -1477,8 +1498,15 @@ public static class FileSystemService
             }
         }
 
+        // Send any remaining batched files
+        if (batchFiles.Count > 0)
+        {
+            onFilesFound?.Invoke(new List<MockFile>(batchFiles));
+            batchFiles.Clear();
+        }
+
         Debug.Log($"[FileSystemService] Category scan complete: {filesFound} {category} files found in {totalFoldersScanned} folders");
-        onProgress?.Invoke(1f, filesFound);
+        onProgress?.Invoke(filesFound);
         onComplete?.Invoke(results);
     }
 

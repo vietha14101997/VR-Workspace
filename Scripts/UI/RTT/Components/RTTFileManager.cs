@@ -79,9 +79,9 @@ public class RTTFileManager : MonoBehaviour
     // Conflict Dialog
     private RTTPopupMenu _conflictPopup;
 
-    // Scanning Indicator (for category filter mode)
-    private GameObject _scanningOverlay;
-    private TextMeshProUGUI _scanningText;
+    // Scan Status Text (for category filter mode - shown in Row2 next to breadcrumbs)
+    private TextMeshProUGUI _scanStatusText;
+    private Coroutine _dotsAnimationCoroutine;
     #endregion
 
     #region Initialization
@@ -359,9 +359,6 @@ public class RTTFileManager : MonoBehaviour
             onClick: (path, isFolder) => OnItemClicked(path, isFolder)
         );
         _fileGrid.SetSelectionChangedCallback(OnSelectionChanged);
-
-        // 5. Create Scanning Overlay (hidden by default)
-        CreateScanningOverlay(_bodyRT);
 
         // Render Order
         headerObj.transform.SetAsLastSibling();
@@ -1056,9 +1053,31 @@ public class RTTFileManager : MonoBehaviour
         crumbRT.anchorMin = new Vector2(0, 0);
         crumbRT.anchorMax = new Vector2(1, 1);
         crumbRT.pivot = new Vector2(0, 0.5f);
-        // Left offset 20, Right offset to leave room for item count + Refresh button
+        // Left offset 20, Right offset to leave room for scan status + item count + Refresh button
         crumbRT.offsetMin = new Vector2(20, 0);
-        crumbRT.offsetMax = new Vector2(-320, 0);
+        crumbRT.offsetMax = new Vector2(-520, 0); // More room for scan status
+
+        // Scan Status Text (shown during category scan, positioned between breadcrumbs and item count)
+        GameObject scanStatusObj = new GameObject("ScanStatusText");
+        scanStatusObj.transform.SetParent(rowRT, false);
+
+        _scanStatusText = scanStatusObj.AddComponent<TextMeshProUGUI>();
+        _scanStatusText.text = "";
+        _scanStatusText.font = _font;
+        _scanStatusText.fontSize = 26;
+        _scanStatusText.fontStyle = FontStyles.Italic;
+        _scanStatusText.color = new Color(1f, 1f, 1f, 0.7f); // Semi-transparent
+        _scanStatusText.alignment = TextAlignmentOptions.MidlineRight;
+        _scanStatusText.raycastTarget = false;
+
+        RectTransform scanStatusRT = scanStatusObj.GetComponent<RectTransform>();
+        scanStatusRT.sizeDelta = new Vector2(200f, 75f);
+        // Position to the left of item count
+        float scanStatusX = countCenterFromCenter - _sortTriggerWidth / 2f - 110f;
+        scanStatusRT.anchorMin = new Vector2(0.5f, 0.5f);
+        scanStatusRT.anchorMax = new Vector2(0.5f, 0.5f);
+        scanStatusRT.pivot = new Vector2(1, 0.5f); // Right-aligned
+        scanStatusRT.anchoredPosition = new Vector2(scanStatusX, 0);
 
         // Edit Controls Container (hidden by default, shown in Edit Mode)
         GameObject editControlsObj = new GameObject("EditControls");
@@ -3093,72 +3112,61 @@ public class RTTFileManager : MonoBehaviour
 
     #endregion
 
-    #region Scanning Indicator (Category Filter Mode)
+    #region Scan Status (Category Filter Mode)
 
     /// <summary>
-    /// Create the scanning overlay UI (shown during category scan).
+    /// Show or hide the scan status animated dots (displayed in Row2 next to breadcrumbs).
+    /// While scanning, displays animated ".", "..", "..." dots.
     /// </summary>
-    private void CreateScanningOverlay(RectTransform parent)
+    /// <param name="show">True to show animated dots, false to hide</param>
+    /// <param name="message">Unused - kept for API compatibility</param>
+    /// <param name="progress">Unused - kept for API compatibility</param>
+    public void ShowScanningIndicator(bool show, string message, float progress)
     {
-        // Overlay container
-        _scanningOverlay = new GameObject("ScanningOverlay");
-        _scanningOverlay.transform.SetParent(parent, false);
+        if (_scanStatusText == null) return;
 
-        RectTransform overlayRT = _scanningOverlay.AddComponent<RectTransform>();
-        overlayRT.anchorMin = Vector2.zero;
-        overlayRT.anchorMax = Vector2.one;
-        overlayRT.offsetMin = Vector2.zero;
-        overlayRT.offsetMax = Vector2.zero;
-
-        // Semi-transparent background
-        Image bgImage = _scanningOverlay.AddComponent<Image>();
-        bgImage.color = new Color(0, 0, 0, 0.7f);
-
-        // Text container (centered)
-        GameObject textObj = new GameObject("ScanningText");
-        textObj.transform.SetParent(_scanningOverlay.transform, false);
-
-        RectTransform textRT = textObj.AddComponent<RectTransform>();
-        textRT.anchorMin = new Vector2(0.5f, 0.5f);
-        textRT.anchorMax = new Vector2(0.5f, 0.5f);
-        textRT.pivot = new Vector2(0.5f, 0.5f);
-        textRT.sizeDelta = new Vector2(400f, 100f);
-
-        _scanningText = textObj.AddComponent<TextMeshProUGUI>();
-        if (_font != null) _scanningText.font = _font;
-        _scanningText.fontSize = 32;
-        _scanningText.alignment = TextAlignmentOptions.Center;
-        _scanningText.color = Color.white;
-        _scanningText.text = "Scanning...";
-
-        // Hide by default
-        _scanningOverlay.SetActive(false);
+        if (show)
+        {
+            // Start dots animation if not already running
+            if (_dotsAnimationCoroutine == null)
+            {
+                _dotsAnimationCoroutine = StartCoroutine(AnimateDotsCoroutine());
+            }
+        }
+        else
+        {
+            // Stop animation and hide text
+            if (_dotsAnimationCoroutine != null)
+            {
+                StopCoroutine(_dotsAnimationCoroutine);
+                _dotsAnimationCoroutine = null;
+            }
+            _scanStatusText.text = "";
+        }
     }
 
     /// <summary>
-    /// Show or hide the scanning indicator overlay.
+    /// Coroutine that animates the scan status text with cycling dots: ".", "..", "..."
     /// </summary>
-    /// <param name="show">True to show, false to hide</param>
-    /// <param name="message">Message to display</param>
-    /// <param name="progress">Progress value (0-1, or -1 for indeterminate)</param>
-    public void ShowScanningIndicator(bool show, string message, float progress)
+    private System.Collections.IEnumerator AnimateDotsCoroutine()
     {
-        if (_scanningOverlay == null) return;
-
-        _scanningOverlay.SetActive(show);
-
-        if (show && _scanningText != null)
+        int dotCount = 1;
+        while (true)
         {
-            _scanningText.text = message;
+            _scanStatusText.text = new string('.', dotCount);
+            dotCount = (dotCount % 3) + 1; // Cycle 1 -> 2 -> 3 -> 1
+            yield return new WaitForSeconds(0.4f);
         }
     }
 
     /// <summary>
     /// Update breadcrumb for filter mode (e.g., "All Videos", "All Music").
+    /// Uses existing pill button style for consistency.
     /// </summary>
     /// <param name="displayName">Name to show in breadcrumb</param>
     /// <param name="canCreateFolder">Whether folder creation is allowed (false for filter mode)</param>
-    public void UpdateBreadcrumb(string displayName, bool canCreateFolder)
+    /// <param name="sidePanelId">Optional side panel item ID to select (e.g., "videos", "music")</param>
+    public void UpdateBreadcrumb(string displayName, bool canCreateFolder, string sidePanelId = null)
     {
         if (_breadcrumbContainer == null) return;
 
@@ -3168,38 +3176,18 @@ public class RTTFileManager : MonoBehaviour
             Destroy(child.gameObject);
         }
 
-        // Create single breadcrumb item for filter mode
-        float x = 0f;
-        float chipHeight = 48f;
+        // Use existing pill button style
+        float btnHeight = 75f;
+        float btnWidth = _sortTriggerWidth * 1.2f;
 
-        GameObject crumbObj = new GameObject("Crumb_Filter");
-        crumbObj.transform.SetParent(_breadcrumbContainer, false);
+        // Create single pill button for filter mode (uses accent color as "active")
+        GameObject btn = CreateBreadcrumbPillButton(displayName, "", true, btnWidth, btnHeight, 0, 1, false);
 
-        RectTransform crumbRT = crumbObj.AddComponent<RectTransform>();
-        crumbRT.anchorMin = new Vector2(0, 0.5f);
-        crumbRT.anchorMax = new Vector2(0, 0.5f);
-        crumbRT.pivot = new Vector2(0, 0.5f);
-
-        // Background
-        Image crumbBg = crumbObj.AddComponent<Image>();
-        crumbBg.color = _accentColor;
-        crumbBg.sprite = Resources.Load<Sprite>("rounded_rect");
-        crumbBg.type = Image.Type.Sliced;
-
-        // Text
-        TextMeshProUGUI crumbText = crumbObj.AddComponent<TextMeshProUGUI>();
-        if (_font != null) crumbText.font = _font;
-        crumbText.fontSize = 28;
-        crumbText.alignment = TextAlignmentOptions.Center;
-        crumbText.color = Color.white;
-        crumbText.text = displayName;
-        crumbText.enableWordWrapping = false;
-        crumbText.overflowMode = TextOverflowModes.Ellipsis;
-
-        // Size to fit text
-        float textWidth = crumbText.preferredWidth + 30f;
-        crumbRT.sizeDelta = new Vector2(textWidth, chipHeight);
-        crumbRT.anchoredPosition = new Vector2(x, 0);
+        RectTransform btnRT = btn.GetComponent<RectTransform>();
+        btnRT.anchorMin = new Vector2(0, 0.5f);
+        btnRT.anchorMax = new Vector2(0, 0.5f);
+        btnRT.pivot = new Vector2(0, 0.5f);
+        btnRT.anchoredPosition = Vector2.zero;
 
         // Disable new folder button in filter mode
         if (_newFolderButton != null && _newFolderCanvasGroup != null)
@@ -3217,7 +3205,29 @@ public class RTTFileManager : MonoBehaviour
         }
 
         // Update side panel selection
-        _sidePanel?.ClearSelection();
+        if (!string.IsNullOrEmpty(sidePanelId))
+        {
+            _sidePanel?.SelectById(sidePanelId);
+        }
+        else
+        {
+            _sidePanel?.ClearSelection();
+        }
+    }
+
+    /// <summary>
+    /// Clear all items in the file grid/list (for scan mode).
+    /// </summary>
+    public void ClearFileView()
+    {
+        if (_isGridView && _fileGrid != null)
+        {
+            _fileGrid.Populate(new List<MockFile>(), "");
+        }
+        else if (_fileList != null)
+        {
+            _fileList.Populate(new List<MockFile>(), "");
+        }
     }
 
     #endregion

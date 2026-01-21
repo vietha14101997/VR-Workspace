@@ -222,7 +222,10 @@ public class WorldPanelCursor : MonoBehaviour
     public void SetVisible(bool on)
     {
         visible = on;
+        // Ensure cursor is always hidden by disabling GameObject
+        // This handles cases where _mr might not be initialized yet
         if (_mr) _mr.enabled = on;
+        gameObject.SetActive(on);
     }
 
     public void SetUV(float uu, float vv, bool silent = false)

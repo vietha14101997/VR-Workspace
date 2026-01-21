@@ -453,6 +453,29 @@ public class RTTFileSidePanel : MonoBehaviour
         _selectedItem = null;
     }
 
+    /// <summary>
+    /// Select an item by its ID (e.g., "videos", "music").
+    /// </summary>
+    public void SelectById(string id)
+    {
+        foreach (var item in _navItems)
+        {
+            bool isSelected = item.Id == id;
+
+            if (item.SelectionMarker != null)
+                item.SelectionMarker.gameObject.SetActive(isSelected);
+
+            if (item.LabelText != null)
+                item.LabelText.color = isSelected ? Color.white : new Color(1f, 1f, 1f, 0.7f);
+
+            if (item.Icon != null)
+                item.Icon.color = isSelected ? Color.white : new Color(1f, 1f, 1f, 0.7f);
+
+            if (isSelected)
+                _selectedItem = item;
+        }
+    }
+
     #region Rounded Marker Sprite
     private static Sprite _cachedCapsuleSprite;
 
