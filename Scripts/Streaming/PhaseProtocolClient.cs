@@ -3529,8 +3529,18 @@ namespace VRWorkspace.Streaming
                         texture.filterMode = FilterMode.Bilinear; // Smooth cursor edges
                         texture.wrapMode = TextureWrapMode.Clamp; // Prevent edge artifacts
 
-                        // Load raw RGBA data directly
-                        texture.LoadRawTextureData(rgbaData);
+                        // Flip rows vertically: Server sends top-to-bottom (Windows order),
+                        // but Unity Texture2D expects bottom-to-top
+                        int rowSize = width * 4; // 4 bytes per pixel (RGBA)
+                        byte[] flippedData = new byte[rgbaData.Length];
+                        for (int y = 0; y < height; y++)
+                        {
+                            int srcRow = y * rowSize;
+                            int dstRow = (height - 1 - y) * rowSize;
+                            Array.Copy(rgbaData, srcRow, flippedData, dstRow, rowSize);
+                        }
+
+                        texture.LoadRawTextureData(flippedData);
                         texture.Apply();
 
                         Debug.Log($"[PhaseProtocol] Cursor texture loaded: {texture.width}x{texture.height}, format={texture.format}");
