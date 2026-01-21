@@ -2,11 +2,13 @@ using UnityEngine;
 using UnityEditor;
 using System.IO;
 using System.Collections.Generic;
+using System.Text;
+using System.Text.RegularExpressions;
 using TMPro;
 
 /// <summary>
 /// Editor tool to generate TextMeshPro Font Assets with full Vietnamese character support.
-/// Ensures all diacritics and special characters are included to avoid missing glyphs.
+/// Uses Unicode Range (Hex) format for comprehensive character coverage.
 /// </summary>
 public class TMPFontAssetGenerator : EditorWindow
 {
@@ -16,41 +18,148 @@ public class TMPFontAssetGenerator : EditorWindow
     private int samplingPointSize = 90;
     private int atlasPadding = 5;
 
-    private bool includeBasicLatin = true;
-    private bool includeVietnamese = true;
-    private bool includeNumbers = true;
-    private bool includeSymbols = true;
-    private bool includeExtendedLatin = false;
-    private bool includeCJKCommon = false;
-
     private Vector2 scrollPosition;
+    private Vector2 previewScrollPosition;
+    private string customUnicodeRanges = "";
     private string previewCharacters = "";
+    private int totalCharCount = 0;
 
-    // Vietnamese character sets
-    private const string VIETNAMESE_LOWERCASE = "àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ";
-    private const string VIETNAMESE_UPPERCASE = "ÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴĐ";
+    // Unicode Range Presets (Hex format)
+    private static class UnicodeRanges
+    {
+        // Basic Latin: Space to Tilde (printable ASCII)
+        public const string BASIC_LATIN = "0020-007E";
 
-    private const string BASIC_LATIN_LOWERCASE = "abcdefghijklmnopqrstuvwxyz";
-    private const string BASIC_LATIN_UPPERCASE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        // Latin-1 Supplement: Extended Latin characters
+        public const string LATIN_1_SUPPLEMENT = "00A0-00FF";
 
-    private const string NUMBERS = "0123456789";
+        // Latin Extended-A: European Latin
+        public const string LATIN_EXTENDED_A = "0100-017F";
 
-    private const string SYMBOLS = "!@#$%^&*()_+-=[]{}|;':\",./<>?`~\\© ";
+        // Latin Extended-B: African, Croatian, Romanian, etc.
+        public const string LATIN_EXTENDED_B = "0180-024F";
 
-    private const string EXTENDED_LATIN = "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿŒœŠšŸŽž";
+        // Vietnamese: All Vietnamese diacritics
+        public const string VIETNAMESE = "1EA0-1EFF";
 
-    // Common CJK punctuation and symbols
-    private const string CJK_COMMON = "。、！？「」『』（）【】〈〉《》〔〕｛｝［］・：；，．";
+        // Latin Extended Additional: Vietnamese + Welsh
+        public const string LATIN_EXTENDED_ADDITIONAL = "1E00-1EFF";
+
+        // General Punctuation
+        public const string GENERAL_PUNCTUATION = "2000-206F";
+
+        // Currency Symbols
+        public const string CURRENCY_SYMBOLS = "20A0-20CF";
+
+        // Letterlike Symbols
+        public const string LETTERLIKE_SYMBOLS = "2100-214F";
+
+        // Number Forms
+        public const string NUMBER_FORMS = "2150-218F";
+
+        // Arrows
+        public const string ARROWS = "2190-21FF";
+
+        // Mathematical Operators
+        public const string MATH_OPERATORS = "2200-22FF";
+
+        // Box Drawing
+        public const string BOX_DRAWING = "2500-257F";
+
+        // Geometric Shapes
+        public const string GEOMETRIC_SHAPES = "25A0-25FF";
+
+        // CJK Symbols and Punctuation
+        public const string CJK_SYMBOLS = "3000-303F";
+
+        // Halfwidth and Fullwidth Forms
+        public const string HALFWIDTH_FULLWIDTH = "FF00-FFEF";
+
+        // Private Use Area (custom icons)
+        public const string PRIVATE_USE = "E000-F8FF";
+
+        // Combining Diacritical Marks (for proper accent rendering)
+        public const string COMBINING_DIACRITICS = "0300-036F";
+    }
+
+    // Preset configurations
+    private enum PresetType
+    {
+        Custom,
+        VietnameseFull,
+        VietnameseMinimal,
+        LatinComplete,
+        AllLanguages
+    }
+
+    private PresetType selectedPreset = PresetType.VietnameseFull;
+
+    private static readonly Dictionary<PresetType, string> PresetRanges = new Dictionary<PresetType, string>
+    {
+        {
+            PresetType.VietnameseFull,
+            $"{UnicodeRanges.BASIC_LATIN}\n" +
+            $"{UnicodeRanges.LATIN_1_SUPPLEMENT}\n" +
+            $"{UnicodeRanges.LATIN_EXTENDED_A}\n" +
+            $"{UnicodeRanges.LATIN_EXTENDED_B}\n" +
+            $"{UnicodeRanges.VIETNAMESE}\n" +
+            $"{UnicodeRanges.COMBINING_DIACRITICS}\n" +
+            $"{UnicodeRanges.GENERAL_PUNCTUATION}\n" +
+            $"{UnicodeRanges.CURRENCY_SYMBOLS}"
+        },
+        {
+            PresetType.VietnameseMinimal,
+            $"{UnicodeRanges.BASIC_LATIN}\n" +
+            $"{UnicodeRanges.VIETNAMESE}\n" +
+            $"{UnicodeRanges.COMBINING_DIACRITICS}"
+        },
+        {
+            PresetType.LatinComplete,
+            $"{UnicodeRanges.BASIC_LATIN}\n" +
+            $"{UnicodeRanges.LATIN_1_SUPPLEMENT}\n" +
+            $"{UnicodeRanges.LATIN_EXTENDED_A}\n" +
+            $"{UnicodeRanges.LATIN_EXTENDED_B}\n" +
+            $"{UnicodeRanges.LATIN_EXTENDED_ADDITIONAL}\n" +
+            $"{UnicodeRanges.COMBINING_DIACRITICS}\n" +
+            $"{UnicodeRanges.GENERAL_PUNCTUATION}\n" +
+            $"{UnicodeRanges.CURRENCY_SYMBOLS}\n" +
+            $"{UnicodeRanges.LETTERLIKE_SYMBOLS}\n" +
+            $"{UnicodeRanges.NUMBER_FORMS}"
+        },
+        {
+            PresetType.AllLanguages,
+            $"{UnicodeRanges.BASIC_LATIN}\n" +
+            $"{UnicodeRanges.LATIN_1_SUPPLEMENT}\n" +
+            $"{UnicodeRanges.LATIN_EXTENDED_A}\n" +
+            $"{UnicodeRanges.LATIN_EXTENDED_B}\n" +
+            $"{UnicodeRanges.LATIN_EXTENDED_ADDITIONAL}\n" +
+            $"{UnicodeRanges.COMBINING_DIACRITICS}\n" +
+            $"{UnicodeRanges.GENERAL_PUNCTUATION}\n" +
+            $"{UnicodeRanges.CURRENCY_SYMBOLS}\n" +
+            $"{UnicodeRanges.LETTERLIKE_SYMBOLS}\n" +
+            $"{UnicodeRanges.NUMBER_FORMS}\n" +
+            $"{UnicodeRanges.ARROWS}\n" +
+            $"{UnicodeRanges.MATH_OPERATORS}\n" +
+            $"{UnicodeRanges.BOX_DRAWING}\n" +
+            $"{UnicodeRanges.GEOMETRIC_SHAPES}\n" +
+            $"{UnicodeRanges.CJK_SYMBOLS}\n" +
+            $"{UnicodeRanges.HALFWIDTH_FULLWIDTH}"
+        }
+    };
 
     [MenuItem("Tools/TMP Font Generator (Vietnamese)")]
     public static void ShowWindow()
     {
         var window = GetWindow<TMPFontAssetGenerator>("TMP Font Generator");
-        window.minSize = new Vector2(400, 500);
+        window.minSize = new Vector2(450, 600);
     }
 
     private void OnEnable()
     {
+        if (string.IsNullOrEmpty(customUnicodeRanges))
+        {
+            customUnicodeRanges = PresetRanges[PresetType.VietnameseFull];
+        }
         UpdatePreview();
     }
 
@@ -59,8 +168,8 @@ public class TMPFontAssetGenerator : EditorWindow
         EditorGUILayout.Space(10);
         EditorGUILayout.LabelField("TMP Font Asset Generator", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "Tạo Font Asset cho TextMeshPro với đầy đủ ký tự tiếng Việt.\n" +
-            "Đảm bảo không bị lỗi dấu khi hiển thị văn bản.",
+            "Tạo Font Asset cho TextMeshPro sử dụng Unicode Range (Hex).\n" +
+            "Đảm bảo đầy đủ ký tự tiếng Việt và các ngôn ngữ khác.",
             MessageType.Info);
 
         EditorGUILayout.Space(10);
@@ -98,30 +207,69 @@ public class TMPFontAssetGenerator : EditorWindow
 
         EditorGUILayout.Space(10);
 
-        // Character sets
-        EditorGUILayout.LabelField("Character Sets", EditorStyles.boldLabel);
+        // Preset selection
+        EditorGUILayout.LabelField("Unicode Range Preset", EditorStyles.boldLabel);
 
         EditorGUI.BeginChangeCheck();
+        selectedPreset = (PresetType)EditorGUILayout.EnumPopup("Preset", selectedPreset);
 
-        includeBasicLatin = EditorGUILayout.Toggle("Basic Latin (A-Z, a-z)", includeBasicLatin);
-        includeVietnamese = EditorGUILayout.Toggle("Vietnamese (Full diacritics)", includeVietnamese);
-        includeNumbers = EditorGUILayout.Toggle("Numbers (0-9)", includeNumbers);
-        includeSymbols = EditorGUILayout.Toggle("Symbols (!@#$%...)", includeSymbols);
-        includeExtendedLatin = EditorGUILayout.Toggle("Extended Latin (Accents)", includeExtendedLatin);
-        includeCJKCommon = EditorGUILayout.Toggle("CJK Punctuation", includeCJKCommon);
+        if (EditorGUI.EndChangeCheck() && selectedPreset != PresetType.Custom)
+        {
+            customUnicodeRanges = PresetRanges[selectedPreset];
+            UpdatePreview();
+        }
+
+        EditorGUILayout.Space(5);
+
+        // Unicode ranges input
+        EditorGUILayout.LabelField($"Unicode Ranges (Hex) - {totalCharCount} characters", EditorStyles.boldLabel);
+
+        EditorGUI.BeginChangeCheck();
+        scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition, GUILayout.Height(120));
+        customUnicodeRanges = EditorGUILayout.TextArea(customUnicodeRanges, GUILayout.ExpandHeight(true));
+        EditorGUILayout.EndScrollView();
 
         if (EditorGUI.EndChangeCheck())
         {
+            selectedPreset = PresetType.Custom;
             UpdatePreview();
+        }
+
+        // Quick add buttons
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("+Vietnamese", EditorStyles.miniButton))
+        {
+            AddRange(UnicodeRanges.VIETNAMESE);
+        }
+        if (GUILayout.Button("+Latin Ext", EditorStyles.miniButton))
+        {
+            AddRange(UnicodeRanges.LATIN_EXTENDED_A + "\n" + UnicodeRanges.LATIN_EXTENDED_B);
+        }
+        if (GUILayout.Button("+Symbols", EditorStyles.miniButton))
+        {
+            AddRange(UnicodeRanges.GENERAL_PUNCTUATION + "\n" + UnicodeRanges.CURRENCY_SYMBOLS);
+        }
+        if (GUILayout.Button("+CJK", EditorStyles.miniButton))
+        {
+            AddRange(UnicodeRanges.CJK_SYMBOLS + "\n" + UnicodeRanges.HALFWIDTH_FULLWIDTH);
+        }
+        EditorGUILayout.EndHorizontal();
+
+        EditorGUILayout.Space(5);
+
+        // Unicode ranges reference
+        if (GUILayout.Button("Show Unicode Ranges Reference", EditorStyles.linkLabel))
+        {
+            ShowUnicodeRangesReference();
         }
 
         EditorGUILayout.Space(10);
 
         // Preview
-        EditorGUILayout.LabelField($"Character Preview ({previewCharacters.Length} characters)", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Character Preview (Sample)", EditorStyles.boldLabel);
 
-        scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition, GUILayout.Height(100));
-        EditorGUILayout.TextArea(previewCharacters, GUILayout.ExpandHeight(true));
+        previewScrollPosition = EditorGUILayout.BeginScrollView(previewScrollPosition, GUILayout.Height(60));
+        EditorGUILayout.SelectableLabel(previewCharacters, EditorStyles.textArea, GUILayout.ExpandHeight(true));
         EditorGUILayout.EndScrollView();
 
         EditorGUILayout.Space(10);
@@ -140,91 +288,91 @@ public class TMPFontAssetGenerator : EditorWindow
         {
             EditorGUILayout.HelpBox("Please select a source font file (.ttf or .otf)", MessageType.Warning);
         }
+    }
 
-        EditorGUILayout.Space(10);
-
-        // Quick actions
-        EditorGUILayout.LabelField("Quick Actions", EditorStyles.boldLabel);
-
-        EditorGUILayout.BeginHorizontal();
-
-        if (GUILayout.Button("Select All"))
+    private void AddRange(string range)
+    {
+        if (!customUnicodeRanges.Contains(range))
         {
-            includeBasicLatin = includeVietnamese = includeNumbers = includeSymbols = includeExtendedLatin = includeCJKCommon = true;
+            customUnicodeRanges = customUnicodeRanges.TrimEnd() + "\n" + range;
+            selectedPreset = PresetType.Custom;
             UpdatePreview();
         }
-
-        if (GUILayout.Button("Vietnamese Only"))
-        {
-            includeBasicLatin = includeVietnamese = includeNumbers = includeSymbols = true;
-            includeExtendedLatin = includeCJKCommon = false;
-            UpdatePreview();
-        }
-
-        if (GUILayout.Button("Minimal"))
-        {
-            includeBasicLatin = includeVietnamese = includeNumbers = true;
-            includeSymbols = includeExtendedLatin = includeCJKCommon = false;
-            UpdatePreview();
-        }
-
-        EditorGUILayout.EndHorizontal();
     }
 
     private void UpdatePreview()
     {
-        previewCharacters = BuildCharacterSet();
+        var chars = ParseUnicodeRanges(customUnicodeRanges);
+        totalCharCount = chars.Count;
+
+        // Build preview string (sample of characters)
+        var preview = new StringBuilder();
+        int count = 0;
+        foreach (uint unicode in chars)
+        {
+            if (count >= 200) // Limit preview
+            {
+                preview.Append("...");
+                break;
+            }
+
+            char c = (char)unicode;
+            if (!char.IsControl(c))
+            {
+                preview.Append(c);
+                count++;
+            }
+        }
+        previewCharacters = preview.ToString();
     }
 
-    private string BuildCharacterSet()
+    private HashSet<uint> ParseUnicodeRanges(string rangesText)
     {
-        var chars = new HashSet<char>();
+        var result = new HashSet<uint>();
 
-        if (includeBasicLatin)
+        if (string.IsNullOrEmpty(rangesText))
+            return result;
+
+        // Split by newlines, commas, spaces
+        string[] lines = rangesText.Split(new[] { '\n', '\r', ',', ' ' }, System.StringSplitOptions.RemoveEmptyEntries);
+
+        foreach (string line in lines)
         {
-            AddChars(chars, BASIC_LATIN_LOWERCASE);
-            AddChars(chars, BASIC_LATIN_UPPERCASE);
+            string trimmed = line.Trim();
+            if (string.IsNullOrEmpty(trimmed))
+                continue;
+
+            // Check if it's a range (XXXX-YYYY) or single value (XXXX)
+            if (trimmed.Contains("-"))
+            {
+                string[] parts = trimmed.Split('-');
+                if (parts.Length == 2)
+                {
+                    if (TryParseHex(parts[0], out uint start) && TryParseHex(parts[1], out uint end))
+                    {
+                        for (uint i = start; i <= end && i <= 0xFFFF; i++)
+                        {
+                            result.Add(i);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                if (TryParseHex(trimmed, out uint value))
+                {
+                    result.Add(value);
+                }
+            }
         }
 
-        if (includeVietnamese)
-        {
-            AddChars(chars, VIETNAMESE_LOWERCASE);
-            AddChars(chars, VIETNAMESE_UPPERCASE);
-        }
-
-        if (includeNumbers)
-        {
-            AddChars(chars, NUMBERS);
-        }
-
-        if (includeSymbols)
-        {
-            AddChars(chars, SYMBOLS);
-        }
-
-        if (includeExtendedLatin)
-        {
-            AddChars(chars, EXTENDED_LATIN);
-        }
-
-        if (includeCJKCommon)
-        {
-            AddChars(chars, CJK_COMMON);
-        }
-
-        // Sort and build string
-        var sortedChars = new List<char>(chars);
-        sortedChars.Sort();
-
-        return new string(sortedChars.ToArray());
+        return result;
     }
 
-    private void AddChars(HashSet<char> set, string chars)
+    private bool TryParseHex(string hex, out uint value)
     {
-        foreach (char c in chars)
-        {
-            set.Add(c);
-        }
+        hex = hex.Trim().TrimStart('0', 'x', 'X', 'U', '+');
+        return uint.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out value);
     }
 
     private void GenerateFontAsset()
@@ -242,7 +390,13 @@ public class TMPFontAssetGenerator : EditorWindow
             AssetDatabase.Refresh();
         }
 
-        string characterSet = BuildCharacterSet();
+        var unicodes = ParseUnicodeRanges(customUnicodeRanges);
+        if (unicodes.Count == 0)
+        {
+            EditorUtility.DisplayDialog("Error", "No valid Unicode ranges specified.", "OK");
+            return;
+        }
+
         string fontName = sourceFont.name;
         string outputFilePath = $"{outputPath}/{fontName}_TMP.asset";
 
@@ -255,13 +409,16 @@ public class TMPFontAssetGenerator : EditorWindow
             {
                 return;
             }
+
+            // Delete existing asset
+            AssetDatabase.DeleteAsset(outputFilePath);
         }
 
         try
         {
-            EditorUtility.DisplayProgressBar("Generating Font Asset", "Creating TMP Font Asset...", 0.5f);
+            EditorUtility.DisplayProgressBar("Generating Font Asset", "Creating TMP Font Asset...", 0.3f);
 
-            // Create the font asset using TMP's built-in method
+            // Create the font asset
             var fontAsset = TMP_FontAsset.CreateFontAsset(
                 sourceFont,
                 samplingPointSize,
@@ -279,16 +436,13 @@ public class TMPFontAssetGenerator : EditorWindow
                 return;
             }
 
-            // Try to add all characters
-            EditorUtility.DisplayProgressBar("Generating Font Asset", "Adding characters...", 0.7f);
+            // Add characters
+            EditorUtility.DisplayProgressBar("Generating Font Asset", $"Adding {unicodes.Count} characters...", 0.6f);
 
-            uint[] unicodes = new uint[characterSet.Length];
-            for (int i = 0; i < characterSet.Length; i++)
-            {
-                unicodes[i] = characterSet[i];
-            }
+            uint[] unicodeArray = new uint[unicodes.Count];
+            unicodes.CopyTo(unicodeArray);
 
-            fontAsset.TryAddCharacters(unicodes, out uint[] missingUnicodes);
+            fontAsset.TryAddCharacters(unicodeArray, out uint[] missingUnicodes);
 
             // Save the asset
             EditorUtility.DisplayProgressBar("Generating Font Asset", "Saving asset...", 0.9f);
@@ -315,24 +469,28 @@ public class TMPFontAssetGenerator : EditorWindow
             EditorUtility.ClearProgressBar();
 
             // Report results
-            int addedCount = characterSet.Length - (missingUnicodes?.Length ?? 0);
+            int addedCount = unicodes.Count - (missingUnicodes?.Length ?? 0);
             int missingCount = missingUnicodes?.Length ?? 0;
 
             string message = $"Font Asset created successfully!\n\n" +
+                           $"Total Unicode ranges: {unicodes.Count}\n" +
                            $"Characters added: {addedCount}\n" +
-                           $"Missing characters: {missingCount}";
+                           $"Missing in font: {missingCount}";
 
-            if (missingCount > 0 && missingUnicodes != null)
+            if (missingCount > 0 && missingUnicodes != null && missingCount <= 50)
             {
                 message += "\n\nMissing characters:\n";
-                for (int i = 0; i < Mathf.Min(missingCount, 20); i++)
+                foreach (uint unicode in missingUnicodes)
                 {
-                    message += $"'{(char)missingUnicodes[i]}' (U+{missingUnicodes[i]:X4}) ";
+                    char c = (char)unicode;
+                    message += $"U+{unicode:X4} ";
+                    if (!char.IsControl(c))
+                        message += $"'{c}' ";
                 }
-                if (missingCount > 20)
-                {
-                    message += $"\n... and {missingCount - 20} more";
-                }
+            }
+            else if (missingCount > 50)
+            {
+                message += $"\n\n(Too many missing characters to display)";
             }
 
             EditorUtility.DisplayDialog("Success", message, "OK");
@@ -349,23 +507,44 @@ public class TMPFontAssetGenerator : EditorWindow
         }
     }
 
-    /// <summary>
-    /// Get the full Vietnamese character set for use in other scripts.
-    /// </summary>
-    public static string GetVietnameseCharacterSet()
+    private void ShowUnicodeRangesReference()
     {
-        return BASIC_LATIN_LOWERCASE + BASIC_LATIN_UPPERCASE +
-               VIETNAMESE_LOWERCASE + VIETNAMESE_UPPERCASE +
-               NUMBERS + SYMBOLS;
+        string reference =
+            "=== Unicode Ranges Reference ===\n\n" +
+            "BASIC CHARACTERS:\n" +
+            "  0020-007E  Basic Latin (ASCII printable)\n" +
+            "  00A0-00FF  Latin-1 Supplement\n\n" +
+            "LATIN EXTENDED:\n" +
+            "  0100-017F  Latin Extended-A\n" +
+            "  0180-024F  Latin Extended-B\n" +
+            "  1E00-1EFF  Latin Extended Additional\n\n" +
+            "VIETNAMESE:\n" +
+            "  1EA0-1EFF  Vietnamese characters\n" +
+            "  0300-036F  Combining Diacritical Marks\n\n" +
+            "SYMBOLS:\n" +
+            "  2000-206F  General Punctuation\n" +
+            "  20A0-20CF  Currency Symbols (₫, €, £, ¥)\n" +
+            "  2100-214F  Letterlike Symbols\n" +
+            "  2150-218F  Number Forms (fractions)\n\n" +
+            "TECHNICAL:\n" +
+            "  2190-21FF  Arrows\n" +
+            "  2200-22FF  Mathematical Operators\n" +
+            "  2500-257F  Box Drawing\n" +
+            "  25A0-25FF  Geometric Shapes\n\n" +
+            "CJK:\n" +
+            "  3000-303F  CJK Symbols and Punctuation\n" +
+            "  FF00-FFEF  Halfwidth and Fullwidth Forms\n\n" +
+            "ICONS:\n" +
+            "  E000-F8FF  Private Use Area (custom icons)";
+
+        EditorUtility.DisplayDialog("Unicode Ranges Reference", reference, "OK");
     }
 
     /// <summary>
-    /// Get Unicode ranges for Vietnamese characters.
-    /// Useful for TMP Font Asset settings.
+    /// Get Vietnamese Unicode ranges string.
     /// </summary>
     public static string GetVietnameseUnicodeRanges()
     {
-        // Basic Latin + Vietnamese Unicode ranges
-        return "0020-007E,00C0-00FF,0100-017F,1EA0-1EFF";
+        return PresetRanges[PresetType.VietnameseFull];
     }
 }
