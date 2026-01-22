@@ -447,7 +447,19 @@ public class VirtualObjectsZoomController : MonoBehaviour
     }
 
     /// <summary>
-    /// Recalculate side panel position so inner edge stays on main panel's plane.
+    /// Recalculate side panel position so:
+    /// 1. Inner edge lies exactly on main panel's plane
+    /// 2. Panel surface is perpendicular to vector (center -> camera)
+    ///
+    /// Mathematical solution:
+    /// Given inner edge E and camera C, find panel center P such that:
+    /// - P is at distance w (half-width) from E along panel's right direction
+    /// - Panel faces camera from P
+    ///
+    /// Solution uses trigonometry:
+    /// - r = sqrt(|E-C|² - w²) = distance from camera to panel center
+    /// - θ = atan2(Ez-Cz, Ex-Cx) - arcsin(w*side / |E-C|)
+    /// - P = C + (cos(θ), 0, sin(θ)) * r
     /// </summary>
     private void RecalculateSidePanelPosition(SidePanelInfo info, Vector3 cameraPos)
     {
@@ -458,22 +470,61 @@ public class VirtualObjectsZoomController : MonoBehaviour
         float innerEdgeOffset = (info.mainWidth / 2f) + info.gap;
         Vector3 innerEdgePos = info.mainPanel.position + mainRight * innerEdgeOffset * info.side;
 
-        // Step 2: Calculate rotation (face camera from inner edge)
-        Vector3 toCameraHorizontal = cameraPos - innerEdgePos;
-        toCameraHorizontal.y = 0;
-        if (toCameraHorizontal.sqrMagnitude < 0.001f)
+        // Step 2: Calculate in horizontal plane (XZ)
+        float w = info.sideWidth / 2f; // half width
+        int s = info.side; // ±1
+
+        // Vector from camera to inner edge (horizontal only)
+        float a = innerEdgePos.x - cameraPos.x;
+        float b = innerEdgePos.z - cameraPos.z;
+        float distSq = a * a + b * b;
+        float dist = Mathf.Sqrt(distSq);
+
+        // Edge case: camera too close to inner edge
+        if (dist < 0.001f)
         {
-            toCameraHorizontal = -Camera.main.transform.forward;
-            toCameraHorizontal.y = 0;
+            // Fallback: use main panel's right direction
+            Vector3 fallbackPos = innerEdgePos + mainRight * w * s;
+            fallbackPos.y = info.mainPanel.position.y;
+            info.frame.transform.position = fallbackPos;
+            info.frame.transform.rotation = Quaternion.LookRotation(-mainRight * s, Vector3.up);
+            return;
         }
-        Quaternion panelRotation = Quaternion.LookRotation(-toCameraHorizontal.normalized, Vector3.up);
 
-        // Step 3: Calculate center position from inner edge
-        Vector3 panelRight = panelRotation * Vector3.right;
-        Vector3 panelPos = innerEdgePos + panelRight * (info.sideWidth / 2f) * info.side;
+        // Step 3: Calculate distance from camera to panel center
+        // r² = |E-C|² - w²
+        float rSq = distSq - w * w;
+        if (rSq < 0.0001f) rSq = 0.0001f; // Clamp to avoid negative sqrt
+        float r = Mathf.Sqrt(rSq);
 
-        // Keep same Y as main panel
-        panelPos.y = info.mainPanel.position.y;
+        // Step 4: Calculate direction angle θ
+        // θ = atan2(b, a) - arcsin(w * side / dist)
+        // Note: SUBTRACT because inner edge is on the INNER side of panel
+        float alpha = Mathf.Atan2(b, a);
+        float sinArg = (w * s) / dist;
+        sinArg = Mathf.Clamp(sinArg, -1f, 1f); // Ensure valid range for arcsin
+        float theta = alpha - Mathf.Asin(sinArg);
+
+        // Step 5: Calculate panel center position
+        float dx = Mathf.Cos(theta);
+        float dz = Mathf.Sin(theta);
+        Vector3 panelPos = new Vector3(
+            cameraPos.x + dx * r,
+            info.mainPanel.position.y, // Keep same Y as main panel
+            cameraPos.z + dz * r
+        );
+
+        // Step 6: Calculate rotation to face camera from center
+        Vector3 toCamera = new Vector3(cameraPos.x - panelPos.x, 0, cameraPos.z - panelPos.z);
+        Quaternion panelRotation;
+        if (toCamera.sqrMagnitude > 0.001f)
+        {
+            panelRotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
+        }
+        else
+        {
+            panelRotation = Quaternion.LookRotation(-mainRight * s, Vector3.up);
+        }
 
         // Apply position and rotation
         info.frame.transform.position = panelPos;

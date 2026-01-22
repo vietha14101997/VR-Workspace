@@ -1783,31 +1783,70 @@ public class RTTRemoteMenu : MonoBehaviour
             return;
         }
 
-        // Step 1: Calculate where the INNER edge of side panel should be
-        // Inner edge lies on the same plane as main panel (Z=0 in main panel's local space)
-        // Inner edge = main panel edge + gap
+        // Mathematical solution to satisfy BOTH conditions:
+        // 1. Inner edge lies exactly on main panel's plane
+        // 2. Panel surface is perpendicular to vector (center -> camera)
+        //
+        // Solution: r = sqrt(|E-C|² - w²), θ = atan2(b,a) + arcsin(w*side/|E-C|)
+
+        // Step 1: Calculate inner edge position on main panel's plane
         Vector3 mainRight = _menuFrame.transform.right;
         float innerEdgeOffset = (mainWidth / 2f) + gap;
         Vector3 innerEdgePos = _menuFrame.transform.position + mainRight * innerEdgeOffset * side;
 
-        // Step 2: Calculate rotation FIRST (face camera from inner edge position)
-        Vector3 toCameraHorizontal = cam.transform.position - innerEdgePos;
-        toCameraHorizontal.y = 0; // Project to horizontal plane for upright panel
-        if (toCameraHorizontal.sqrMagnitude < 0.001f)
+        // Step 2: Calculate in horizontal plane (XZ)
+        float w = sideWidth / 2f; // half width
+        Vector3 cameraPos = cam.transform.position;
+
+        // Vector from camera to inner edge (horizontal only)
+        float a = innerEdgePos.x - cameraPos.x;
+        float b = innerEdgePos.z - cameraPos.z;
+        float distSq = a * a + b * b;
+        float dist = Mathf.Sqrt(distSq);
+
+        Vector3 panelPos;
+        Quaternion panelRotation;
+
+        // Edge case: camera too close to inner edge
+        if (dist < 0.001f)
         {
-            toCameraHorizontal = -cam.transform.forward;
-            toCameraHorizontal.y = 0;
+            panelPos = innerEdgePos + mainRight * w * side;
+            panelPos.y = _menuFrame.transform.position.y;
+            panelRotation = Quaternion.LookRotation(-mainRight * side, Vector3.up);
         }
-        Quaternion panelRotation = Quaternion.LookRotation(-toCameraHorizontal.normalized, Vector3.up);
+        else
+        {
+            // Step 3: Calculate distance from camera to panel center
+            float rSq = distSq - w * w;
+            if (rSq < 0.0001f) rSq = 0.0001f;
+            float r = Mathf.Sqrt(rSq);
 
-        // Step 3: Calculate center position from inner edge
-        // Center = inner edge + panel's right * (sideWidth/2) * side
-        // Panel's right points AWAY from main panel (toward outer edge)
-        Vector3 panelRight = panelRotation * Vector3.right;
-        Vector3 panelPos = innerEdgePos + panelRight * (sideWidth / 2f) * side;
+            // Step 4: Calculate direction angle θ
+            // θ = atan2(b, a) - arcsin(w * side / dist)
+            float alpha = Mathf.Atan2(b, a);
+            float sinArg = Mathf.Clamp((w * side) / dist, -1f, 1f);
+            float theta = alpha - Mathf.Asin(sinArg);
 
-        // Keep same Y as main panel
-        panelPos.y = _menuFrame.transform.position.y;
+            // Step 5: Calculate panel center position
+            float dx = Mathf.Cos(theta);
+            float dz = Mathf.Sin(theta);
+            panelPos = new Vector3(
+                cameraPos.x + dx * r,
+                _menuFrame.transform.position.y,
+                cameraPos.z + dz * r
+            );
+
+            // Step 6: Calculate rotation to face camera from center
+            Vector3 toCamera = new Vector3(cameraPos.x - panelPos.x, 0, cameraPos.z - panelPos.z);
+            if (toCamera.sqrMagnitude > 0.001f)
+            {
+                panelRotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
+            }
+            else
+            {
+                panelRotation = Quaternion.LookRotation(-mainRight * side, Vector3.up);
+            }
+        }
 
         // Calculate logical width based on aspect ratio (same resolution density as main panel)
         float logicalWidthPixels = (sideWidth / _menuFrame.PanelWidth) * _menuFrame.LogicalWidthValue;
