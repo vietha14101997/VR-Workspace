@@ -1829,7 +1829,7 @@ public class RTTRemoteMenu : MonoBehaviour
         var zoomController = VirtualObjectsZoomController.Instance;
         if (zoomController != null)
         {
-            zoomController.RegisterSidePanel(frameRef);
+            zoomController.RegisterSidePanel(frameRef, _menuFrame.transform, side, mainWidth, sideWidth, gap);
             Debug.Log($"[RTTRemoteMenu] Registered {name} with VirtualObjectsZoomController");
         }
 

@@ -3030,7 +3030,7 @@ public class RTTFileManager : MonoBehaviour
         var zoomController = VirtualObjectsZoomController.Instance;
         if (zoomController != null)
         {
-            zoomController.RegisterSidePanel(frameRef);
+            zoomController.RegisterSidePanel(frameRef, _menuFrame.transform, side, mainWidth, sideWidth, gap);
             Debug.Log($"[RTTFileManager] Registered {name} with VirtualObjectsZoomController");
         }
 

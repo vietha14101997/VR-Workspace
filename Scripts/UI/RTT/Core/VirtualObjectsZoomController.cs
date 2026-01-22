@@ -39,9 +39,22 @@ public class VirtualObjectsZoomController : MonoBehaviour
     #region Private Fields
     private float _currentDistance;
     private RTTMenuFrame _primaryFrame;
-    private List<RTTMenuFrame> _sidePanels = new List<RTTMenuFrame>();
+    private List<SidePanelInfo> _sidePanelInfos = new List<SidePanelInfo>();
     private RTTMiniFrame _taskbarFrame;
     private bool _initialized = false;
+
+    /// <summary>
+    /// Stores information needed to recalculate side panel position on zoom
+    /// </summary>
+    private class SidePanelInfo
+    {
+        public RTTMenuFrame frame;
+        public Transform mainPanel;
+        public int side; // -1 for left, +1 for right
+        public float mainWidth;
+        public float sideWidth;
+        public float gap;
+    }
     #endregion
 
     #region Properties
@@ -310,15 +323,65 @@ public class VirtualObjectsZoomController : MonoBehaviour
 
     #region Side Panel Registration
     /// <summary>
-    /// Register a side panel for sphere positioning updates on zoom
+    /// Register a side panel for sphere positioning updates on zoom.
+    /// Stores information needed to recalculate position when zoom changes.
+    /// </summary>
+    /// <param name="panel">The side panel frame</param>
+    /// <param name="mainPanel">The main panel this side panel is attached to</param>
+    /// <param name="side">-1 for left, +1 for right</param>
+    /// <param name="mainWidth">Width of the main panel in meters</param>
+    /// <param name="sideWidth">Width of the side panel in meters</param>
+    /// <param name="gap">Gap between main panel and side panel in meters</param>
+    public void RegisterSidePanel(RTTMenuFrame panel, Transform mainPanel, int side, float mainWidth, float sideWidth, float gap)
+    {
+        if (panel == null) return;
+
+        // Check if already registered
+        foreach (var info in _sidePanelInfos)
+        {
+            if (info.frame == panel) return;
+        }
+
+        var newInfo = new SidePanelInfo
+        {
+            frame = panel,
+            mainPanel = mainPanel,
+            side = side,
+            mainWidth = mainWidth,
+            sideWidth = sideWidth,
+            gap = gap
+        };
+
+        _sidePanelInfos.Add(newInfo);
+        Debug.Log($"[VirtualObjectsZoomController] Registered side panel: {panel.name} (side={side}, mainW={mainWidth}, sideW={sideWidth}, gap={gap})");
+    }
+
+    /// <summary>
+    /// Legacy register method - only updates rotation, not position
     /// </summary>
     public void RegisterSidePanel(RTTMenuFrame panel)
     {
-        if (panel != null && !_sidePanels.Contains(panel))
+        if (panel == null) return;
+
+        // Check if already registered
+        foreach (var info in _sidePanelInfos)
         {
-            _sidePanels.Add(panel);
-            Debug.Log($"[VirtualObjectsZoomController] Registered side panel: {panel.name}");
+            if (info.frame == panel) return;
         }
+
+        // Register with minimal info (rotation-only updates)
+        var newInfo = new SidePanelInfo
+        {
+            frame = panel,
+            mainPanel = null,
+            side = 0,
+            mainWidth = 0,
+            sideWidth = 0,
+            gap = 0
+        };
+
+        _sidePanelInfos.Add(newInfo);
+        Debug.Log($"[VirtualObjectsZoomController] Registered side panel (rotation-only): {panel.name}");
     }
 
     /// <summary>
@@ -326,7 +389,8 @@ public class VirtualObjectsZoomController : MonoBehaviour
     /// </summary>
     public void UnregisterSidePanel(RTTMenuFrame panel)
     {
-        if (_sidePanels.Remove(panel))
+        int removed = _sidePanelInfos.RemoveAll(info => info.frame == panel);
+        if (removed > 0)
         {
             Debug.Log($"[VirtualObjectsZoomController] Unregistered side panel: {panel?.name}");
         }
@@ -337,14 +401,14 @@ public class VirtualObjectsZoomController : MonoBehaviour
     /// </summary>
     public void ClearSidePanels()
     {
-        _sidePanels.Clear();
+        _sidePanelInfos.Clear();
     }
     #endregion
 
     #region Sphere Positioning
     /// <summary>
     /// Update all registered side panels to maintain sphere positioning after zoom.
-    /// Side panels stay on sphere surface with radius = currentDistance, facing camera.
+    /// Recalculates position so inner edge stays on main panel's plane.
     /// </summary>
     private void UpdateSidePanelsOnSphere()
     {
@@ -354,25 +418,66 @@ public class VirtualObjectsZoomController : MonoBehaviour
         Vector3 cameraPos = cam.transform.position;
 
         // Remove null entries
-        _sidePanels.RemoveAll(p => p == null);
+        _sidePanelInfos.RemoveAll(info => info.frame == null);
 
-        foreach (var panel in _sidePanels)
+        foreach (var info in _sidePanelInfos)
         {
-            if (panel == null || !panel.gameObject.activeInHierarchy)
+            if (info.frame == null || !info.frame.gameObject.activeInHierarchy)
             {
                 continue;
             }
 
-            // Update face-to-camera orientation
-            UpdatePanelFaceToCamera(panel, cameraPos);
+            // If we have full positioning info, recalculate position
+            if (info.mainPanel != null && info.side != 0)
+            {
+                RecalculateSidePanelPosition(info, cameraPos);
+            }
+            else
+            {
+                // Legacy: only update rotation
+                UpdatePanelFaceToCamera(info.frame, cameraPos);
+            }
         }
 
         // Update taskbar face-to-camera (it handles its own positioning via follow target)
         if (_taskbarFrame != null)
         {
             // RTTMiniFrame already updates face-to-camera in LateUpdate
-            // But we can trigger immediate update if needed for smoother zoom
         }
+    }
+
+    /// <summary>
+    /// Recalculate side panel position so inner edge stays on main panel's plane.
+    /// </summary>
+    private void RecalculateSidePanelPosition(SidePanelInfo info, Vector3 cameraPos)
+    {
+        if (info.mainPanel == null || info.frame == null) return;
+
+        // Step 1: Calculate inner edge position on main panel's plane
+        Vector3 mainRight = info.mainPanel.right;
+        float innerEdgeOffset = (info.mainWidth / 2f) + info.gap;
+        Vector3 innerEdgePos = info.mainPanel.position + mainRight * innerEdgeOffset * info.side;
+
+        // Step 2: Calculate rotation (face camera from inner edge)
+        Vector3 toCameraHorizontal = cameraPos - innerEdgePos;
+        toCameraHorizontal.y = 0;
+        if (toCameraHorizontal.sqrMagnitude < 0.001f)
+        {
+            toCameraHorizontal = -Camera.main.transform.forward;
+            toCameraHorizontal.y = 0;
+        }
+        Quaternion panelRotation = Quaternion.LookRotation(-toCameraHorizontal.normalized, Vector3.up);
+
+        // Step 3: Calculate center position from inner edge
+        Vector3 panelRight = panelRotation * Vector3.right;
+        Vector3 panelPos = innerEdgePos + panelRight * (info.sideWidth / 2f) * info.side;
+
+        // Keep same Y as main panel
+        panelPos.y = info.mainPanel.position.y;
+
+        // Apply position and rotation
+        info.frame.transform.position = panelPos;
+        info.frame.transform.rotation = panelRotation;
     }
 
     /// <summary>
@@ -382,16 +487,17 @@ public class VirtualObjectsZoomController : MonoBehaviour
     private void UpdatePanelFaceToCamera(RTTMenuFrame panel, Vector3 cameraPos)
     {
         Vector3 panelPos = panel.transform.position;
-        Vector3 toCamera = cameraPos - panelPos;
+        Vector3 toCameraHorizontal = cameraPos - panelPos;
+        toCameraHorizontal.y = 0; // Project to horizontal for upright panel
 
-        if (toCamera.sqrMagnitude < 0.001f)
+        if (toCameraHorizontal.sqrMagnitude < 0.001f)
         {
-            // Panel at camera position, use camera forward as fallback
-            toCamera = -Camera.main.transform.forward;
+            toCameraHorizontal = -Camera.main.transform.forward;
+            toCameraHorizontal.y = 0;
         }
 
         // Face camera: panel's forward points away from camera
-        panel.transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
+        panel.transform.rotation = Quaternion.LookRotation(-toCameraHorizontal.normalized, Vector3.up);
     }
 
     /// <summary>
