@@ -157,6 +157,14 @@ public class RTTFileManager : MonoBehaviour
         // Reset state for potential recreation
         _viewReady = false;
 
+        // Unregister side panels from ZoomController before destroying
+        var zoomController = VirtualObjectsZoomController.Instance;
+        if (zoomController != null)
+        {
+            if (_leftFrame != null) zoomController.UnregisterSidePanel(_leftFrame);
+            if (_rightFrame != null) zoomController.UnregisterSidePanel(_rightFrame);
+        }
+
         // Destroy side panels when main app is closed
         if (_leftFrame != null) Destroy(_leftFrame.gameObject);
         if (_rightFrame != null) Destroy(_rightFrame.gameObject);
@@ -2870,10 +2878,9 @@ public class RTTFileManager : MonoBehaviour
         float sideWidth = mainPanelWidth / 3f;
         float sideHeight = mainPanelHeight;
         float gapMeters = 0.05f;
-        float rotationAngle = 30f;
 
-        // Left Panel (Navigation)
-        PlaceSidePanelFlat("FileNavigationPanel", -1, mainPanelWidth, sideWidth, sideHeight, gapMeters, rotationAngle, ref _leftFrame);
+        // Left Panel (Navigation) - sphere positioning
+        PlaceSidePanelOnSphere("FileNavigationPanel", -1, mainPanelWidth, sideWidth, sideHeight, gapMeters, ref _leftFrame);
         if (_leftFrame != null)
         {
             _leftFrame.SetVisible(true); // Make visible immediately for now
@@ -2881,8 +2888,8 @@ public class RTTFileManager : MonoBehaviour
             StartCoroutine(CreateLeftPanelContent());
         }
 
-        // Right Panel (Detail)
-        PlaceSidePanelFlat("FileDetailPanel", 1, mainPanelWidth, sideWidth, sideHeight, gapMeters, rotationAngle, ref _rightFrame);
+        // Right Panel (Detail) - sphere positioning
+        PlaceSidePanelOnSphere("FileDetailPanel", 1, mainPanelWidth, sideWidth, sideHeight, gapMeters, ref _rightFrame);
         if (_rightFrame != null)
         {
             _rightFrame.SetVisible(true); // Make visible immediately for now
@@ -2953,6 +2960,81 @@ public class RTTFileManager : MonoBehaviour
 
         frameRef.SetContentMargins(20f, 20f, 20f, 20f);
         frameRef.SetFloatingDataEnabled(true, 5);
+    }
+
+    /// <summary>
+    /// Place a side panel on sphere surface with camera as center.
+    /// Uses PRIMARY menu frame (not app frame) for positioning reference.
+    /// Sphere radius = zoom distance from VirtualObjectsZoomController or distance to primary frame.
+    /// Panel faces camera (vector from panel to camera is perpendicular to panel surface).
+    /// </summary>
+    /// <param name="side">-1 for left, +1 for right</param>
+    private void PlaceSidePanelOnSphere(string name, int side, float mainWidth, float sideWidth, float sideHeight,
+        float gap, ref RTTMenuFrame frameRef)
+    {
+        Camera cam = Camera.main;
+        if (cam == null)
+        {
+            Debug.LogError("[RTTFileManager] PlaceSidePanelOnSphere: No main camera found!");
+            return;
+        }
+
+        if (_menuFrame == null)
+        {
+            Debug.LogError("[RTTFileManager] PlaceSidePanelOnSphere: No app frame (_menuFrame) found!");
+            return;
+        }
+
+        // Step 1: Calculate where the INNER edge of side panel should be
+        // Inner edge lies on the same plane as main panel (Z=0 in main panel's local space)
+        // Inner edge = main panel edge + gap
+        Vector3 mainRight = _menuFrame.transform.right;
+        float innerEdgeOffset = (mainWidth / 2f) + gap;
+        Vector3 innerEdgePos = _menuFrame.transform.position + mainRight * innerEdgeOffset * side;
+
+        // Step 2: Calculate rotation FIRST (face camera from inner edge position)
+        Vector3 toCameraHorizontal = cam.transform.position - innerEdgePos;
+        toCameraHorizontal.y = 0; // Project to horizontal plane for upright panel
+        if (toCameraHorizontal.sqrMagnitude < 0.001f)
+        {
+            toCameraHorizontal = -cam.transform.forward;
+            toCameraHorizontal.y = 0;
+        }
+        Quaternion panelRotation = Quaternion.LookRotation(-toCameraHorizontal.normalized, Vector3.up);
+
+        // Step 3: Calculate center position from inner edge
+        // Center = inner edge + panel's right * (sideWidth/2) * side
+        // Panel's right points AWAY from main panel (toward outer edge)
+        Vector3 panelRight = panelRotation * Vector3.right;
+        Vector3 panelPos = innerEdgePos + panelRight * (sideWidth / 2f) * side;
+
+        // Keep same Y as main panel
+        panelPos.y = _menuFrame.transform.position.y;
+
+        // Calculate logical width based on aspect ratio (same resolution density as main panel)
+        float logicalWidthPixels = (sideWidth / _menuFrame.PanelWidth) * _menuFrame.LogicalWidthValue;
+
+        // Create RTTMenuFrame for the side panel with unique name
+        frameRef = RTTMenuFrame.Create(_menuFrame.transform, sideWidth, sideHeight, logicalWidthPixels, name);
+        frameRef.transform.position = panelPos;
+        frameRef.transform.rotation = panelRotation;
+        frameRef.transform.localScale = Vector3.one;
+
+        Debug.Log($"[RTTFileManager] PlaceSidePanel: innerEdge={innerEdgePos}, panelPos={panelPos}");
+
+        // Configure frame appearance
+        frameRef.SetContentMargins(20f, 20f, 20f, 20f);
+        frameRef.SetFloatingDataEnabled(true, 5);
+
+        // Register with ZoomController for updates on zoom change
+        var zoomController = VirtualObjectsZoomController.Instance;
+        if (zoomController != null)
+        {
+            zoomController.RegisterSidePanel(frameRef);
+            Debug.Log($"[RTTFileManager] Registered {name} with VirtualObjectsZoomController");
+        }
+
+        Debug.Log($"[RTTFileManager] Placed {name}: pos={panelPos}");
     }
 
     private IEnumerator CreateLeftPanelContent()

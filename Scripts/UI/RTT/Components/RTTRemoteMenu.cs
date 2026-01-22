@@ -1659,7 +1659,8 @@ public class RTTRemoteMenu : MonoBehaviour
     /// <summary>
     /// Create side panels for hardware and network info.
     /// Panels are hidden by default and shown when connected.
-    /// Uses arc positioning like WorldPanelClusterRig for proper placement.
+    /// Uses sphere positioning: panels placed on sphere surface with camera as center,
+    /// radius = distance from camera to main panel, facing camera.
     /// </summary>
     private void CreateSidePanels()
     {
@@ -1679,22 +1680,19 @@ public class RTTRemoteMenu : MonoBehaviour
         // Gap between main panel and side panels (in meters)
         float gapMeters = 0.05f;
 
-        // Angle to rotate side panels (facing slightly toward viewer)
-        float rotationAngle = 30f;
-
-        Debug.Log($"[RTTRemoteMenu] Creating Hardware Info Panel (left)...");
-        // Hardware Info Panel (Left)
-        PlaceSidePanelFlat("HardwareInfoPanel", -1, mainPanelWidth, sideWidth, sideHeight,
-            gapMeters, rotationAngle, RTTInfoSidePanel.PanelType.HardwareInfo, ref _hardwareFrame);
+        Debug.Log($"[RTTRemoteMenu] Creating Hardware Info Panel (left) with sphere positioning...");
+        // Hardware Info Panel (Left) - sphere positioning
+        PlaceSidePanelOnSphere("HardwareInfoPanel", -1, mainPanelWidth, sideWidth, sideHeight,
+            gapMeters, RTTInfoSidePanel.PanelType.HardwareInfo, ref _hardwareFrame);
         Debug.Log($"[RTTRemoteMenu] Hardware frame created: {_hardwareFrame != null}");
 
-        Debug.Log($"[RTTRemoteMenu] Creating Network Info Panel (right)...");
-        // Network Info Panel (Right)
-        PlaceSidePanelFlat("NetworkInfoPanel", 1, mainPanelWidth, sideWidth, sideHeight,
-            gapMeters, rotationAngle, RTTInfoSidePanel.PanelType.NetworkInfo, ref _networkFrame);
+        Debug.Log($"[RTTRemoteMenu] Creating Network Info Panel (right) with sphere positioning...");
+        // Network Info Panel (Right) - sphere positioning
+        PlaceSidePanelOnSphere("NetworkInfoPanel", 1, mainPanelWidth, sideWidth, sideHeight,
+            gapMeters, RTTInfoSidePanel.PanelType.NetworkInfo, ref _networkFrame);
         Debug.Log($"[RTTRemoteMenu] Network frame created: {_networkFrame != null}");
 
-        Debug.Log($"[RTTRemoteMenu] Side panels created ({sideWidth:F2}m x {sideHeight:F2}m) gap={gapMeters}m angle={rotationAngle}° (hidden)");
+        Debug.Log($"[RTTRemoteMenu] Side panels created ({sideWidth:F2}m x {sideHeight:F2}m) gap={gapMeters}m with sphere positioning (hidden)");
     }
 
     /// <summary>
@@ -1757,6 +1755,85 @@ public class RTTRemoteMenu : MonoBehaviour
         frameRef.SetFloatingDataEnabled(true, 10); // Fewer particles for smaller panel
 
         // Frame will stay hidden until ShowSidePanels() is called on successful connect
+
+        // Wait for frame to initialize, then create content
+        _sidePanelCoroutinesStarted = true;
+        StartCoroutine(CreateSidePanelContent(frameRef, type));
+    }
+
+    /// <summary>
+    /// Place a side panel on sphere surface with camera as center.
+    /// Sphere radius = distance from camera to main panel center.
+    /// Panel faces camera (vector from panel to camera is perpendicular to panel surface).
+    /// </summary>
+    /// <param name="side">-1 for left, +1 for right</param>
+    private void PlaceSidePanelOnSphere(string name, int side, float mainWidth, float sideWidth, float sideHeight,
+        float gap, RTTInfoSidePanel.PanelType type, ref RTTMenuFrame frameRef)
+    {
+        Camera cam = Camera.main;
+        if (cam == null)
+        {
+            Debug.LogError("[RTTRemoteMenu] PlaceSidePanelOnSphere: No main camera found!");
+            return;
+        }
+
+        if (_menuFrame == null)
+        {
+            Debug.LogError("[RTTRemoteMenu] PlaceSidePanelOnSphere: No app frame (_menuFrame) found!");
+            return;
+        }
+
+        // Step 1: Calculate where the INNER edge of side panel should be
+        // Inner edge lies on the same plane as main panel (Z=0 in main panel's local space)
+        // Inner edge = main panel edge + gap
+        Vector3 mainRight = _menuFrame.transform.right;
+        float innerEdgeOffset = (mainWidth / 2f) + gap;
+        Vector3 innerEdgePos = _menuFrame.transform.position + mainRight * innerEdgeOffset * side;
+
+        // Step 2: Calculate rotation FIRST (face camera from inner edge position)
+        Vector3 toCameraHorizontal = cam.transform.position - innerEdgePos;
+        toCameraHorizontal.y = 0; // Project to horizontal plane for upright panel
+        if (toCameraHorizontal.sqrMagnitude < 0.001f)
+        {
+            toCameraHorizontal = -cam.transform.forward;
+            toCameraHorizontal.y = 0;
+        }
+        Quaternion panelRotation = Quaternion.LookRotation(-toCameraHorizontal.normalized, Vector3.up);
+
+        // Step 3: Calculate center position from inner edge
+        // Center = inner edge + panel's right * (sideWidth/2) * side
+        // Panel's right points AWAY from main panel (toward outer edge)
+        Vector3 panelRight = panelRotation * Vector3.right;
+        Vector3 panelPos = innerEdgePos + panelRight * (sideWidth / 2f) * side;
+
+        // Keep same Y as main panel
+        panelPos.y = _menuFrame.transform.position.y;
+
+        // Calculate logical width based on aspect ratio (same resolution density as main panel)
+        float logicalWidthPixels = (sideWidth / _menuFrame.PanelWidth) * _menuFrame.LogicalWidthValue;
+
+        // Create RTTMenuFrame for the side panel with unique name
+        frameRef = RTTMenuFrame.Create(_menuFrame.transform, sideWidth, sideHeight, logicalWidthPixels, name);
+        frameRef.transform.position = panelPos;
+        frameRef.transform.rotation = panelRotation;
+        frameRef.transform.localScale = Vector3.one;
+
+        // IMMEDIATELY set invisible BEFORE Start() runs
+        frameRef.SetVisible(false);
+
+        // Configure frame appearance (smaller margins for side panels)
+        frameRef.SetContentMargins(40f, 40f, 30f, 30f);
+        frameRef.SetFloatingDataEnabled(true, 10); // Fewer particles for smaller panel
+
+        // Register with ZoomController for updates on zoom change
+        var zoomController = VirtualObjectsZoomController.Instance;
+        if (zoomController != null)
+        {
+            zoomController.RegisterSidePanel(frameRef);
+            Debug.Log($"[RTTRemoteMenu] Registered {name} with VirtualObjectsZoomController");
+        }
+
+        Debug.Log($"[RTTRemoteMenu] PlaceSidePanel: mainPos={_menuFrame.transform.position}, panelPos={panelPos}");
 
         // Wait for frame to initialize, then create content
         _sidePanelCoroutinesStarted = true;
@@ -2417,6 +2494,16 @@ public class RTTRemoteMenu : MonoBehaviour
             _viewModel.ServerSetupProgress.OnChanged -= HandleServerSetupProgressForButton;
             _viewModel.MonitorIceProgress.OnChanged -= HandleMonitorIceProgressForButton;
             _viewModel.OnAllMonitorsReady -= HandleAllMonitorsReadyForButton;
+        }
+
+        // Unregister side panels from ZoomController
+        var zoomController = VirtualObjectsZoomController.Instance;
+        if (zoomController != null)
+        {
+            if (_hardwareFrame != null)
+                zoomController.UnregisterSidePanel(_hardwareFrame);
+            if (_networkFrame != null)
+                zoomController.UnregisterSidePanel(_networkFrame);
         }
 
         // Destroy side panels
