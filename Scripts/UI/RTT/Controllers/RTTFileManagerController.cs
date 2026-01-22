@@ -1467,7 +1467,6 @@ public static class FileSystemService
         int filesFound = 0;
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var batchFiles = new List<MockFile>(); // Batch for incremental updates
-        int lastReportedCount = 0;
 
         // Folders to skip (system folders, hidden folders, etc.)
         var skipFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
