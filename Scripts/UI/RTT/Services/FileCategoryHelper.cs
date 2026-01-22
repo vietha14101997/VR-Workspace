@@ -42,7 +42,7 @@ public static class FileCategoryHelper
     // Text-based file extensions that can be read with System.IO
     private static readonly HashSet<string> TextExtensions = new HashSet<string>
     {
-        "txt", "log", "json", "xml", "csv"
+        "txt", "log", "json", "xml", "md"
     };
 
     // Archive extensions (only zip is widely supported)
