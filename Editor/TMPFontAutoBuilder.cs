@@ -26,6 +26,8 @@ public class TMPFontAutoBuilder : EditorWindow
     private bool setupFontWeights = true;
     private bool lightweightMode = true;  // Default to lightweight
     private bool deleteUnusedFonts = false;  // Option to delete unused source fonts after build
+    private bool prebakeVietnamese = true;  // Pre-bake Vietnamese characters into atlas
+    private bool prebakeCommon = true;  // Pre-bake common Latin characters
 
     // Font weight detection
     private enum FontWeight
@@ -80,6 +82,25 @@ public class TMPFontAutoBuilder : EditorWindow
         { "Hebrew", "אבגדהוזחטיכלמנסעפצקרשת" },
         { "Currency", "₠₡₢₣₤₥₦₧₨₩₪₫€₭₮₯₰₱₲₳₴₵₸₹₺₻₼₽₾₿$¥£" },
     };
+
+    // Complete Vietnamese character set for pre-baking
+    private static readonly string VietnameseCharacters =
+        @" !""#$%&'()*+,-./0123456789:;<=>?@" +
+        @"ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`" +
+        @"abcdefghijklmnopqrstuvwxyz{|}~" +
+        // Vietnamese uppercase with diacritics
+        "ÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚÝĂĐĨŨƠƯẠẢẤẦẨẪẬẮẰẲẴẶẸẺẼẾỀỂỄỆỈỊỌỎỐỒỔỖỘỚỜỞỠỢỤỦỨỪỬỮỰỲỴỶỸ" +
+        // Vietnamese lowercase with diacritics
+        "àáâãèéêìíòóôõùúýăđĩũơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ" +
+        // Common punctuation and symbols
+        "…–—«»•·×÷±≠≤≥°©®™¶§†‡";
+
+    // Common characters for all languages
+    private static readonly string CommonCharacters =
+        @" !""#$%&'()*+,-./0123456789:;<=>?@" +
+        @"ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`" +
+        @"abcdefghijklmnopqrstuvwxyz{|}~" +
+        "…–—«»•·×÷±≠≤≥°©®™¶§†‡€$¥£₫";
 
     // Weight detection patterns
     private static readonly Dictionary<string, FontWeight> WeightPatterns = new Dictionary<string, FontWeight>
@@ -172,6 +193,20 @@ public class TMPFontAutoBuilder : EditorWindow
             EditorGUILayout.HelpBox(
                 "Tự động chọn bộ font tối thiểu để hỗ trợ tất cả ngôn ngữ.\n" +
                 "Fallback sử dụng atlas nhỏ hơn để giảm dung lượng.",
+                MessageType.Info);
+        }
+        EditorGUILayout.EndVertical();
+
+        // Pre-bake characters option
+        EditorGUILayout.BeginVertical("box");
+        EditorGUILayout.LabelField("Pre-bake Characters", EditorStyles.boldLabel);
+        prebakeVietnamese = EditorGUILayout.Toggle("Vietnamese Characters", prebakeVietnamese);
+        prebakeCommon = EditorGUILayout.Toggle("Common Latin/Symbols", prebakeCommon);
+        if (prebakeVietnamese || prebakeCommon)
+        {
+            EditorGUILayout.HelpBox(
+                "Pre-bake ký tự vào atlas để đảm bảo hiển thị đúng ngay từ đầu.\n" +
+                "Khắc phục lỗi ký tự tiếng Việt không hiển thị trong Dynamic mode.",
                 MessageType.Info);
         }
         EditorGUILayout.EndVertical();
@@ -716,8 +751,8 @@ public class TMPFontAutoBuilder : EditorWindow
 
             if (fontAsset == null) return null;
 
-            // Dynamic mode: Characters will be added on-demand at runtime
-            // No need to pre-populate atlas - this avoids long build times for large character sets (Arabic, CJK)
+            // Pre-bake characters into atlas if enabled
+            PrebakeCharacters(fontAsset, sourceFont.name);
 
             // Create subfolder using source folder name
             string sourceFolderName = Path.GetFileName(sourceFontFolder);
@@ -755,6 +790,63 @@ public class TMPFontAutoBuilder : EditorWindow
             return null;
         }
     }
+
+    #region Pre-bake Characters
+
+    /// <summary>
+    /// Pre-bake characters into the font atlas to ensure proper display.
+    /// This fixes Vietnamese characters not rendering in Dynamic mode.
+    /// </summary>
+    private void PrebakeCharacters(TMP_FontAsset fontAsset, string fontName)
+    {
+        if (!prebakeVietnamese && !prebakeCommon) return;
+
+        var charactersToPrebake = new HashSet<uint>();
+
+        // Add common characters
+        if (prebakeCommon)
+        {
+            foreach (char c in CommonCharacters)
+            {
+                charactersToPrebake.Add(c);
+            }
+        }
+
+        // Add Vietnamese characters
+        if (prebakeVietnamese)
+        {
+            foreach (char c in VietnameseCharacters)
+            {
+                charactersToPrebake.Add(c);
+            }
+        }
+
+        if (charactersToPrebake.Count == 0) return;
+
+        // Convert to string for TryAddCharacters
+        string charsToAdd = new string(charactersToPrebake.Select(c => (char)c).ToArray());
+
+        // Try to add characters to the font asset
+        if (fontAsset.TryAddCharacters(charsToAdd, out string missingChars))
+        {
+            int addedCount = charsToAdd.Length - (missingChars?.Length ?? 0);
+            Debug.Log($"[Pre-bake] {fontName}: Added {addedCount}/{charsToAdd.Length} characters to atlas.");
+        }
+        else
+        {
+            int addedCount = charsToAdd.Length - (missingChars?.Length ?? 0);
+            if (addedCount > 0)
+            {
+                Debug.Log($"[Pre-bake] {fontName}: Added {addedCount}/{charsToAdd.Length} characters. Missing: {missingChars?.Length ?? 0} chars (font may not support them).");
+            }
+            else
+            {
+                Debug.LogWarning($"[Pre-bake] {fontName}: Could not add characters. Font may not support Vietnamese.");
+            }
+        }
+    }
+
+    #endregion
 
     #region Delete Unused Fonts
 
