@@ -2241,7 +2241,9 @@ public class RTTFileManager : MonoBehaviour
                 foreach (string part in parts)
                 {
                     currentPath = System.IO.Path.Combine(currentPath, part);
-                    allFolders.Add((part, currentPath));
+                    // Fix encoding for folder names that may have mojibake
+                    string fixedName = TextEncodingHelper.FixString(part);
+                    allFolders.Add((fixedName, currentPath));
                 }
 
                 // Limit: Max 6 buttons total (Home + 5 folders OR Home + ... + 4 folders)

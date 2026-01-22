@@ -269,8 +269,9 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
 
         TextMeshProUGUI text = textObj.AddComponent<TextMeshProUGUI>();
         text.font = _font;
-        text.fontSize = 26;
+        text.fontSize = 28;
         text.color = Color.white;
+        text.fontStyle = FontStyles.Bold;
         text.alignment = TextAlignmentOptions.Center;
         text.enableWordWrapping = false;
         text.overflowMode = TextOverflowModes.Ellipsis;

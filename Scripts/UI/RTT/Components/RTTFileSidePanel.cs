@@ -57,6 +57,7 @@ public class RTTFileSidePanel : MonoBehaviour
         public TextMeshProUGUI LabelText;
         public Image Icon;
         public HoverEffectController HoverController;
+        public Button Button;
     }
 
     public void Initialize(RTTFileManagerController controller, float w, float h, TMP_FontAsset font, Color primary, Color accent)
@@ -116,10 +117,10 @@ public class RTTFileSidePanel : MonoBehaviour
     /// </summary>
     private void CreateDynamicNavigationItems()
     {
-        // Internal Storage - always available
-        CreateNavItem("internal", "Internal Storage", "icon_internal");
+        // Internal - always available
+        CreateNavItem("internal", "Internal", "icon_internal");
 
-        // SD Card - only show if SD card is available (different from internal storage)
+        // SD Card - only show if SD card is available (different from internal)
         string sdCardPath = FileSystemService.GetSDCardPath();
         string rootPath = FileSystemService.RootPath;
         if (!string.IsNullOrEmpty(sdCardPath) && sdCardPath != rootPath && Directory.Exists(sdCardPath))
@@ -302,7 +303,8 @@ public class RTTFileSidePanel : MonoBehaviour
             SelectionMarker = markerImg,
             LabelText = txt,
             Icon = iconImg,
-            HoverController = hoverController
+            HoverController = hoverController,
+            Button = btn
         });
     }
 
@@ -331,6 +333,13 @@ public class RTTFileSidePanel : MonoBehaviour
             if (item.Icon != null)
                 item.Icon.color = isSelected ? Color.white : new Color(1f, 1f, 1f, 0.7f);
 
+            // Disable button and hover for selected item (no interaction needed)
+            if (item.Button != null)
+                item.Button.interactable = !isSelected;
+
+            if (item.HoverController != null)
+                item.HoverController.enabled = !isSelected;
+
             if (isSelected) _selectedItem = item;
         }
     }
@@ -352,9 +361,11 @@ public class RTTFileSidePanel : MonoBehaviour
     }
 
     /// <summary>
-    /// Update selection based on current path.
-    /// Only selects if path exactly matches a side panel item's root path.
-    /// Deselects all if in a subfolder.
+    /// Update visual selection based on current path.
+    /// Only updates visual when at EXACT root of Internal or SD Card.
+    /// Does NOT change visual for special folders (Downloads, Videos, Music) - those are only
+    /// highlighted when user explicitly clicks them on side panel.
+    /// When in any subfolder, keeps current visual selection unchanged.
     /// </summary>
     public void UpdateSelectionForPath(string currentPath)
     {
@@ -367,71 +378,46 @@ public class RTTFileSidePanel : MonoBehaviour
         // Normalize path for comparison
         currentPath = currentPath?.TrimEnd('/', '\\');
 
-        string matchedId = null;
-
-        // Check if current path exactly matches any side panel item's path
+        // Only check for root storage paths (Internal and SD Card)
+        // Do NOT match special folders like Downloads, Videos, Music
+        // Those should only be highlighted when explicitly clicked on side panel
         string internalPath = FileSystemService.RootPath?.TrimEnd('/', '\\');
-        string downloadsPath = FileSystemService.GetDownloadsPath()?.TrimEnd('/', '\\');
-        string videosPath = FileSystemService.GetVideosPath()?.TrimEnd('/', '\\');
-        string musicPath = FileSystemService.GetMusicPath()?.TrimEnd('/', '\\');
         string sdcardPath = FileSystemService.GetSDCardPath()?.TrimEnd('/', '\\');
+
+        string matchedId = null;
 
         if (currentPath == internalPath)
         {
             matchedId = "internal";
-        }
-        else if (currentPath == downloadsPath && downloadsPath != internalPath)
-        {
-            matchedId = "downloads";
-        }
-        else if (currentPath == videosPath && videosPath != internalPath)
-        {
-            matchedId = "videos";
-        }
-        else if (currentPath == musicPath && musicPath != internalPath)
-        {
-            matchedId = "music";
         }
         else if (currentPath == sdcardPath && sdcardPath != internalPath)
         {
             matchedId = "sdcard";
         }
 
-        // Update visual selection
-        foreach (var item in _navItems)
-        {
-            bool isSelected = item.Id == matchedId;
-
-            // Toggle Marker visibility
-            if (item.SelectionMarker != null)
-                item.SelectionMarker.gameObject.SetActive(isSelected);
-
-            // Update text color
-            if (item.LabelText != null)
-                item.LabelText.color = isSelected ? Color.white : new Color(1f, 1f, 1f, 0.7f);
-
-            // Update icon color
-            if (item.Icon != null)
-                item.Icon.color = isSelected ? Color.white : new Color(1f, 1f, 1f, 0.7f);
-
-            if (isSelected) _selectedItem = item;
-        }
-
-        // If no match found (in subfolder), clear selection but keep _selectedItem for breadcrumb label
-        if (matchedId == null)
+        // Only update visual if we matched a root storage path
+        // If in subfolder (matchedId == null), keep current visual selection unchanged
+        if (matchedId != null)
         {
             foreach (var item in _navItems)
             {
+                bool isSelected = item.Id == matchedId;
+
+                // Toggle Marker visibility
                 if (item.SelectionMarker != null)
-                    item.SelectionMarker.gameObject.SetActive(false);
+                    item.SelectionMarker.gameObject.SetActive(isSelected);
 
+                // Update text color
                 if (item.LabelText != null)
-                    item.LabelText.color = new Color(1f, 1f, 1f, 0.7f);
+                    item.LabelText.color = isSelected ? Color.white : new Color(1f, 1f, 1f, 0.7f);
 
+                // Update icon color
                 if (item.Icon != null)
-                    item.Icon.color = new Color(1f, 1f, 1f, 0.7f);
+                    item.Icon.color = isSelected ? Color.white : new Color(1f, 1f, 1f, 0.7f);
             }
         }
+        // When in subfolder (including special folders like Downloads, Videos, Music),
+        // do nothing - keep current visual selection from side panel click
     }
 
     /// <summary>
@@ -449,6 +435,13 @@ public class RTTFileSidePanel : MonoBehaviour
 
             if (item.Icon != null)
                 item.Icon.color = new Color(1f, 1f, 1f, 0.7f);
+
+            // Re-enable button and hover for all items
+            if (item.Button != null)
+                item.Button.interactable = true;
+
+            if (item.HoverController != null)
+                item.HoverController.enabled = true;
         }
         _selectedItem = null;
     }
@@ -470,6 +463,13 @@ public class RTTFileSidePanel : MonoBehaviour
 
             if (item.Icon != null)
                 item.Icon.color = isSelected ? Color.white : new Color(1f, 1f, 1f, 0.7f);
+
+            // Disable button and hover for selected item
+            if (item.Button != null)
+                item.Button.interactable = !isSelected;
+
+            if (item.HoverController != null)
+                item.HoverController.enabled = !isSelected;
 
             if (isSelected)
                 _selectedItem = item;

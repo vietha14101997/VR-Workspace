@@ -584,7 +584,7 @@ public class RTTFileManagerController : MonoBehaviour
 
             var folderInfo = new MockFile
             {
-                Name = System.IO.Path.GetFileName(_currentPath),
+                Name = TextEncodingHelper.FixString(System.IO.Path.GetFileName(_currentPath)),
                 Path = _currentPath,
                 IsFolder = true,
                 Modified = folderModified
@@ -1193,7 +1193,7 @@ public static class FileSystemService
 
                     list.Add(new MockFile
                     {
-                        Name = dirInfo.Name,
+                        Name = TextEncodingHelper.FixString(dirInfo.Name),
                         Path = dirPath,
                         IsFolder = true,
                         IsFolderEmpty = isFolderEmpty,
@@ -1233,9 +1233,22 @@ public static class FileSystemService
                     string extension = fileInfo.Extension.TrimStart('.').ToLower();
                     if (string.IsNullOrEmpty(extension)) extension = "file";
 
+                    string displayName = TextEncodingHelper.FixString(fileInfo.Name);
+
+                    // Debug: Log character codes for non-ASCII file names
+                    bool hasNonAscii = false;
+                    foreach (char c in displayName)
+                    {
+                        if (c > 127) { hasNonAscii = true; break; }
+                    }
+                    if (hasNonAscii)
+                    {
+                        Debug.Log($"[FileSystemService] Unicode file: '{displayName}' codes: {TextEncodingHelper.GetCharCodeDump(displayName, 30)}");
+                    }
+
                     list.Add(new MockFile
                     {
-                        Name = fileInfo.Name,
+                        Name = displayName,
                         Path = filePath,
                         IsFolder = false,
                         Type = extension,
@@ -1518,7 +1531,7 @@ public static class FileSystemService
                         {
                             var file = new MockFile
                             {
-                                Name = fileInfo.Name,
+                                Name = TextEncodingHelper.FixString(fileInfo.Name),
                                 Path = filePath,
                                 IsFolder = false,
                                 Type = ext,
@@ -1656,4 +1669,60 @@ public static class FileSystemService
             return false;
         }
     }
+
+    #region Text File Reading with Encoding Detection
+
+    /// <summary>
+    /// Read text file content with automatic encoding detection and mojibake fixing.
+    /// </summary>
+    /// <param name="path">File path (can be relative or absolute)</param>
+    /// <returns>Properly decoded text content</returns>
+    public static string ReadTextFileContent(string path)
+    {
+        string absolutePath = GetAbsolutePath(path);
+        return TextEncodingHelper.ReadTextFile(absolutePath);
+    }
+
+    /// <summary>
+    /// Read text file content with size limit and automatic encoding detection.
+    /// Useful for previewing large files.
+    /// </summary>
+    /// <param name="path">File path (can be relative or absolute)</param>
+    /// <param name="maxBytes">Maximum bytes to read (0 = no limit)</param>
+    /// <returns>Properly decoded text content</returns>
+    public static string ReadTextFileContentWithLimit(string path, int maxBytes = 10240)
+    {
+        string absolutePath = GetAbsolutePath(path);
+        return TextEncodingHelper.ReadTextFileWithLimit(absolutePath, maxBytes);
+    }
+
+    /// <summary>
+    /// Get the detected encoding of a text file.
+    /// </summary>
+    public static string GetFileEncoding(string path)
+    {
+        string absolutePath = GetAbsolutePath(path);
+        return TextEncodingHelper.GetEncodingName(absolutePath);
+    }
+
+    /// <summary>
+    /// Check if a file is likely a text file based on extension.
+    /// </summary>
+    public static bool IsTextFile(string extension)
+    {
+        if (string.IsNullOrEmpty(extension)) return false;
+
+        string ext = extension.TrimStart('.').ToLower();
+        string[] textExtensions = {
+            "txt", "md", "markdown", "json", "xml", "html", "htm", "css", "js",
+            "ts", "cs", "java", "py", "rb", "php", "c", "cpp", "h", "hpp",
+            "yaml", "yml", "ini", "cfg", "conf", "log", "sh", "bat", "ps1",
+            "sql", "csv", "tsv", "rtf", "tex", "rst", "org", "wiki",
+            "gradle", "properties", "gitignore", "dockerignore", "editorconfig"
+        };
+
+        return Array.Exists(textExtensions, e => e == ext);
+    }
+
+    #endregion
 }
