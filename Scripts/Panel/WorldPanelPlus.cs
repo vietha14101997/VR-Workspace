@@ -27,7 +27,9 @@ public class WorldPanelPlus : MonoBehaviour
     [Tooltip("FilterMode for video textures. Trilinear recommended for VR.")]
     public FilterMode textureFilterMode = FilterMode.Trilinear;
     [Tooltip("Anisotropic filtering level (1-16). Higher = sharper at angles.")]
-    [Range(1, 16)] public int anisoLevel = 8;
+    [Range(1, 16)] public int anisoLevel = 16; // Maximum for VR sharpness
+    [Tooltip("Mipmap bias for VR sharpness. Negative = sharper textures at distance.")]
+    [Range(-2f, 0f)] public float mipMapBias = -0.5f;
 
     [Header("Video Sharpening (disable if image has artifacts)")]
     [Tooltip("Enable shader-based sharpening. Disable if you see color artifacts or noise.")]
@@ -421,6 +423,10 @@ public class WorldPanelPlus : MonoBehaviour
                 _panelMat.SetFloat("_Sharpness", sharpnessStrength);
             if (_panelMat.HasProperty("_ChromaSharpness"))
                 _panelMat.SetFloat("_ChromaSharpness", chromaSharpness);
+
+            // VR quality - mipmap bias for sharper textures at distance
+            if (_panelMat.HasProperty("_MipMapBias"))
+                _panelMat.SetFloat("_MipMapBias", mipMapBias);
         }
 
         if (_panelMat.HasProperty("_Surface")) _panelMat.SetFloat("_Surface", 1f);

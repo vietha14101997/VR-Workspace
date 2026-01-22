@@ -31,6 +31,10 @@ Shader "Unlit/WorldPanelBoard"
         _SharpnessRadius ("Sharpness Radius", Range(0.5, 3)) = 1.0
         _ChromaSharpness ("Chroma Sharpness", Range(0, 1)) = 0.3
         _EnableSharpening ("Enable Sharpening", Float) = 0
+
+        // VR quality - negative bias for sharper textures at distance
+        [Header(VR Quality)]
+        _MipMapBias ("Mipmap Bias", Range(-2, 0)) = -0.5
     }
 
     SubShader
@@ -58,6 +62,9 @@ Shader "Unlit/WorldPanelBoard"
             float _SharpnessRadius;
             float _ChromaSharpness;
             float _EnableSharpening;
+
+            // VR quality - mipmap bias for sharper textures at distance
+            float _MipMapBias;
 
             float4 _PanelSize;   // (W,H,0,0)
             float   _EdgeFadeX;
@@ -163,16 +170,17 @@ Shader "Unlit/WorldPanelBoard"
             }
 
             // Unsharp Mask sharpening - enhances edges after H.264 decode blur
-            float4 UnsharpMask(sampler2D tex, float2 uv, float2 texelSize, float sharpness, float radius)
+            // Uses tex2Dbias for VR sharpness at distance
+            float4 UnsharpMask(sampler2D tex, float2 uv, float2 texelSize, float sharpness, float radius, float mipBias)
             {
-                float4 center = tex2D(tex, uv);
+                float4 center = tex2Dbias(tex, float4(uv, 0, mipBias));
 
                 // 4-tap box blur for performance (sufficient for streaming artifacts)
                 float4 blur = (
-                    tex2D(tex, uv + float2(-texelSize.x, 0) * radius) +
-                    tex2D(tex, uv + float2(texelSize.x, 0) * radius) +
-                    tex2D(tex, uv + float2(0, -texelSize.y) * radius) +
-                    tex2D(tex, uv + float2(0, texelSize.y) * radius)
+                    tex2Dbias(tex, float4(uv + float2(-texelSize.x, 0) * radius, 0, mipBias)) +
+                    tex2Dbias(tex, float4(uv + float2(texelSize.x, 0) * radius, 0, mipBias)) +
+                    tex2Dbias(tex, float4(uv + float2(0, -texelSize.y) * radius, 0, mipBias)) +
+                    tex2Dbias(tex, float4(uv + float2(0, texelSize.y) * radius, 0, mipBias))
                 ) * 0.25;
 
                 // Unsharp mask: center + (center - blur) * strength
@@ -238,18 +246,19 @@ Shader "Unlit/WorldPanelBoard"
                 clip(aRound - 0.001);
 
                 // ---- Lấy màu texture với sharpening (nếu enabled) ----
+                // Uses tex2Dbias with _MipMapBias for sharper VR viewing at distance
                 fixed4 col;
                 if (_EnableSharpening > 0.5)
                 {
                     // Apply Unsharp Mask to combat H.264 decode blur
-                    col = UnsharpMask(_MainTex, i.uv, _MainTex_TexelSize.xy, _Sharpness, _SharpnessRadius);
+                    col = UnsharpMask(_MainTex, i.uv, _MainTex_TexelSize.xy, _Sharpness, _SharpnessRadius, _MipMapBias);
 
                     // Apply chroma correction to reduce YUV 4:2:0 color bleeding
                     col = ChromaCorrect(col, _ChromaSharpness);
                 }
                 else
                 {
-                    col = tex2D(_MainTex, i.uv);
+                    col = tex2Dbias(_MainTex, float4(i.uv, 0, _MipMapBias));
                 }
                 col *= _Color;
 
