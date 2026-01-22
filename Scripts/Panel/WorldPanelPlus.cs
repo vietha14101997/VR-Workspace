@@ -28,8 +28,8 @@ public class WorldPanelPlus : MonoBehaviour
     public FilterMode textureFilterMode = FilterMode.Trilinear;
     [Tooltip("Anisotropic filtering level (1-16). Higher = sharper at angles.")]
     [Range(1, 16)] public int anisoLevel = 16; // Maximum for VR sharpness
-    [Tooltip("Mipmap bias for VR sharpness. Negative = sharper textures at distance.")]
-    [Range(-2f, 0f)] public float mipMapBias = -0.5f;
+    [Tooltip("Mipmap bias for VR sharpness. Negative = sharper but may cause color aliasing. Keep at 0 for best quality.")]
+    [Range(-2f, 0f)] public float mipMapBias = 0f;
 
     [Header("Video Sharpening (disable if image has artifacts)")]
     [Tooltip("Enable shader-based sharpening. Disable if you see color artifacts or noise.")]

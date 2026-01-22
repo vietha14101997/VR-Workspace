@@ -306,7 +306,7 @@ public class RTTRemoteMenuController : MonoBehaviour
             rt.filterMode = FilterMode.Trilinear;
             rt.anisoLevel = 16; // Maximum anisotropic filtering for VR
             rt.Create();
-            rt.mipMapBias = -0.5f; // Negative bias for sharper textures at distance
+            rt.mipMapBias = 0f; // No bias - rely on aniso filtering only to avoid color aliasing
 
             _mipmapTextures[index] = rt;
             Debug.Log($"[RTTRemote-MIPMAP] Created mipmap RT for panel {index}: {source.width}x{source.height}, sourceType={source.GetType().Name}");

@@ -31,7 +31,7 @@ Shader "Custom/ClusterContentFlatPlanar"
 
         // VR quality - negative bias for sharper textures at distance
         [Header(VR Quality)]
-        _MipMapBias ("Mipmap Bias", Range(-2, 0)) = -0.5
+        _MipMapBias ("Mipmap Bias", Range(-2, 0)) = 0
     }
 
     SubShader
