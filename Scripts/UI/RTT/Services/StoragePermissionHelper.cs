@@ -22,6 +22,8 @@ public static class StoragePermissionHelper
 
     /// <summary>
     /// Check if app has storage read permission.
+    /// For media-only access on Android 13+, use HasMediaPermission().
+    /// For full file access (all file types), use HasFullFileAccess().
     /// </summary>
     public static bool HasStoragePermission()
     {
@@ -29,22 +31,24 @@ public static class StoragePermissionHelper
         int sdkVersion = GetAndroidSDKVersion();
         Debug.Log($"[StoragePermission] Android SDK version: {sdkVersion}");
 
-        // Android 13+ (API 33): Check granular media permissions
-        if (sdkVersion >= 33)
-        {
-            bool hasImages = Permission.HasUserAuthorizedPermission(READ_MEDIA_IMAGES);
-            bool hasVideo = Permission.HasUserAuthorizedPermission(READ_MEDIA_VIDEO);
-            bool hasAudio = Permission.HasUserAuthorizedPermission(READ_MEDIA_AUDIO);
-            Debug.Log($"[StoragePermission] API 33+: Images={hasImages}, Video={hasVideo}, Audio={hasAudio}");
-            return hasImages || hasVideo || hasAudio;
-        }
-
-        // Android 11-12 (API 30-32): Check MANAGE_EXTERNAL_STORAGE
+        // Android 11+ (API 30+): Prefer MANAGE_EXTERNAL_STORAGE for full file access
         if (sdkVersion >= 30)
         {
             bool hasManageStorage = HasManageExternalStoragePermission();
-            Debug.Log($"[StoragePermission] API 30-32: MANAGE_EXTERNAL_STORAGE={hasManageStorage}");
-            return hasManageStorage;
+            Debug.Log($"[StoragePermission] API 30+: MANAGE_EXTERNAL_STORAGE={hasManageStorage}");
+
+            // If has full access, return true
+            if (hasManageStorage) return true;
+
+            // Android 13+: Fall back to media permissions (limited access)
+            if (sdkVersion >= 33)
+            {
+                bool hasMedia = HasMediaPermission();
+                Debug.Log($"[StoragePermission] API 33+ fallback to media: {hasMedia}");
+                return hasMedia;
+            }
+
+            return false;
         }
 
         // Android 10 and below: Check READ_EXTERNAL_STORAGE
@@ -57,36 +61,64 @@ public static class StoragePermissionHelper
     }
 
     /// <summary>
-    /// Request storage permissions based on Android version.
+    /// Check if app has FULL file access (all file types including documents, text, etc.)
+    /// On Android 11+, this requires MANAGE_EXTERNAL_STORAGE.
+    /// On Android 10 and below, READ_EXTERNAL_STORAGE is sufficient.
     /// </summary>
-    public static void RequestStoragePermission(Action<bool> onComplete = null)
+    public static bool HasFullFileAccess()
     {
 #if UNITY_ANDROID && !UNITY_EDITOR
         int sdkVersion = GetAndroidSDKVersion();
-        Debug.Log($"[StoragePermission] Requesting permissions for SDK {sdkVersion}");
 
-        // Android 13+ (API 33): Request granular media permissions
-        if (sdkVersion >= 33)
+        // Android 11+ requires MANAGE_EXTERNAL_STORAGE for full access
+        if (sdkVersion >= 30)
         {
-            var permissions = new string[] { READ_MEDIA_IMAGES, READ_MEDIA_VIDEO, READ_MEDIA_AUDIO };
-            var callbacks = new PermissionCallbacks();
-            callbacks.PermissionGranted += (perm) => {
-                Debug.Log($"[StoragePermission] Granted: {perm}");
-                onComplete?.Invoke(true);
-            };
-            callbacks.PermissionDenied += (perm) => {
-                Debug.Log($"[StoragePermission] Denied: {perm}");
-                onComplete?.Invoke(false);
-            };
-            callbacks.PermissionDeniedAndDontAskAgain += (perm) => {
-                Debug.Log($"[StoragePermission] Denied (Don't ask again): {perm}");
-                onComplete?.Invoke(false);
-            };
-            Permission.RequestUserPermissions(permissions, callbacks);
-            return;
+            return HasManageExternalStoragePermission();
         }
 
-        // Android 11-12 (API 30-32): Need to open Settings for MANAGE_EXTERNAL_STORAGE
+        // Android 10 and below: READ_EXTERNAL_STORAGE gives full access
+        return Permission.HasUserAuthorizedPermission(READ_EXTERNAL_STORAGE);
+#else
+        return true;
+#endif
+    }
+
+    /// <summary>
+    /// Check if app has media permissions (images, video, audio) on Android 13+.
+    /// </summary>
+    public static bool HasMediaPermission()
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        bool hasImages = Permission.HasUserAuthorizedPermission(READ_MEDIA_IMAGES);
+        bool hasVideo = Permission.HasUserAuthorizedPermission(READ_MEDIA_VIDEO);
+        bool hasAudio = Permission.HasUserAuthorizedPermission(READ_MEDIA_AUDIO);
+        return hasImages || hasVideo || hasAudio;
+#else
+        return true;
+#endif
+    }
+
+    /// <summary>
+    /// Request storage permissions based on Android version.
+    /// On Android 11+, this will request MANAGE_EXTERNAL_STORAGE for full file access.
+    /// </summary>
+    public static void RequestStoragePermission(Action<bool> onComplete = null)
+    {
+        RequestFullFileAccess(onComplete);
+    }
+
+    /// <summary>
+    /// Request FULL file access (all file types).
+    /// On Android 11+, opens Settings for MANAGE_EXTERNAL_STORAGE.
+    /// On Android 10 and below, requests READ/WRITE_EXTERNAL_STORAGE.
+    /// </summary>
+    public static void RequestFullFileAccess(Action<bool> onComplete = null)
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        int sdkVersion = GetAndroidSDKVersion();
+        Debug.Log($"[StoragePermission] Requesting FULL file access for SDK {sdkVersion}");
+
+        // Android 11+ (API 30+): Need MANAGE_EXTERNAL_STORAGE for full access
         if (sdkVersion >= 30)
         {
             if (!HasManageExternalStoragePermission())
@@ -101,28 +133,65 @@ public static class StoragePermissionHelper
         }
 
         // Android 10 and below: Request READ/WRITE_EXTERNAL_STORAGE
-        var callbacks2 = new PermissionCallbacks();
-        callbacks2.PermissionGranted += (perm) => {
+        var callbacks = new PermissionCallbacks();
+        callbacks.PermissionGranted += (perm) => {
             Debug.Log($"[StoragePermission] Granted: {perm}");
             onComplete?.Invoke(true);
         };
-        callbacks2.PermissionDenied += (perm) => {
+        callbacks.PermissionDenied += (perm) => {
             Debug.Log($"[StoragePermission] Denied: {perm}");
             onComplete?.Invoke(false);
         };
-        callbacks2.PermissionDeniedAndDontAskAgain += (perm) => {
+        callbacks.PermissionDeniedAndDontAskAgain += (perm) => {
             Debug.Log($"[StoragePermission] Denied (Don't ask again): {perm}");
             onComplete?.Invoke(false);
         };
 
         if (sdkVersion <= 29)
         {
-            Permission.RequestUserPermissions(new string[] { READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE }, callbacks2);
+            Permission.RequestUserPermissions(new string[] { READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE }, callbacks);
         }
         else
         {
-            Permission.RequestUserPermission(READ_EXTERNAL_STORAGE, callbacks2);
+            Permission.RequestUserPermission(READ_EXTERNAL_STORAGE, callbacks);
         }
+#else
+        onComplete?.Invoke(true);
+#endif
+    }
+
+    /// <summary>
+    /// Request media-only permissions (images, video, audio) on Android 13+.
+    /// This is a fallback when user doesn't want to grant full file access.
+    /// </summary>
+    public static void RequestMediaPermission(Action<bool> onComplete = null)
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        int sdkVersion = GetAndroidSDKVersion();
+
+        // Android 13+: Request granular media permissions
+        if (sdkVersion >= 33)
+        {
+            var permissions = new string[] { READ_MEDIA_IMAGES, READ_MEDIA_VIDEO, READ_MEDIA_AUDIO };
+            var callbacks = new PermissionCallbacks();
+            callbacks.PermissionGranted += (perm) => {
+                Debug.Log($"[StoragePermission] Media granted: {perm}");
+                onComplete?.Invoke(true);
+            };
+            callbacks.PermissionDenied += (perm) => {
+                Debug.Log($"[StoragePermission] Media denied: {perm}");
+                onComplete?.Invoke(false);
+            };
+            callbacks.PermissionDeniedAndDontAskAgain += (perm) => {
+                Debug.Log($"[StoragePermission] Media denied (Don't ask again): {perm}");
+                onComplete?.Invoke(false);
+            };
+            Permission.RequestUserPermissions(permissions, callbacks);
+            return;
+        }
+
+        // For older versions, full access = media access
+        RequestFullFileAccess(onComplete);
 #else
         onComplete?.Invoke(true);
 #endif

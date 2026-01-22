@@ -14,6 +14,9 @@ public class APBootstrap : MonoBehaviour
 
         // Initialize Android streaming helper for Wi-Fi Lock, Wake Lock, etc.
         InitializeAndroidStreamingHelper();
+
+        // Initialize Permission Manager
+        InitializePermissionManager();
     }
 
     void Start()
@@ -23,10 +26,27 @@ public class APBootstrap : MonoBehaviour
 #endif
 
 #if UNITY_ANDROID && !UNITY_EDITOR
-        // Request battery optimization exemption for stable streaming
-        // This will prompt user once to allow the app to run without restrictions
-        AndroidStreamingHelper.Instance?.RequestDisableBatteryOptimization();
+        // Request all permissions at startup (storage, camera, etc.)
+        // This runs before battery optimization to avoid overwhelming user with dialogs
+        AppPermissionManager.Instance?.RequestAllPermissions((allGranted) =>
+        {
+            Debug.Log($"[APBootstrap] Permissions complete. All granted: {allGranted}");
+
+            // Request battery optimization exemption after permissions
+            AndroidStreamingHelper.Instance?.RequestDisableBatteryOptimization();
+        });
 #endif
+    }
+
+    private void InitializePermissionManager()
+    {
+        if (AppPermissionManager.Instance == null)
+        {
+            var go = new GameObject("AppPermissionManager");
+            go.AddComponent<AppPermissionManager>();
+            DontDestroyOnLoad(go);
+            Debug.Log("[APBootstrap] AppPermissionManager initialized");
+        }
     }
 
     private void InitializeAndroidStreamingHelper()

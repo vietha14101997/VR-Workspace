@@ -94,30 +94,74 @@ public class RTTFileManagerController : MonoBehaviour
         Debug.Log("[Controller] View is ready. Checking storage permissions...");
 
 #if UNITY_ANDROID && !UNITY_EDITOR
-        // Check and request storage permissions on Android
-        if (!StoragePermissionHelper.HasStoragePermission())
+        // Check if AppPermissionManager already handled permissions at startup
+        if (AppPermissionManager.Instance != null && AppPermissionManager.Instance.HasAllPermissions)
         {
-            Debug.Log("[Controller] Storage permission not granted. Requesting...");
-            StoragePermissionHelper.RequestStoragePermission((granted) =>
+            Debug.Log("[Controller] Permissions already granted via AppPermissionManager.");
+            NavigateTo("root");
+            return;
+        }
+
+        // Fallback: Check for FULL file access (all file types including documents, text, etc.)
+        if (!StoragePermissionHelper.HasFullFileAccess())
+        {
+            // Check if we have at least some storage permission
+            if (StoragePermissionHelper.HasStoragePermission())
+            {
+                Debug.Log("[Controller] Has media-only access. Proceeding with limited view.");
+                NavigateTo("root");
+                return;
+            }
+
+            Debug.Log("[Controller] No storage access. Requesting...");
+            StoragePermissionHelper.RequestFullFileAccess((granted) =>
             {
                 if (granted)
                 {
-                    Debug.Log("[Controller] Storage permission granted. Loading files...");
-                    NavigateTo("root");
+                    Debug.Log("[Controller] Full file access granted. Loading files...");
                 }
                 else
                 {
-                    Debug.LogWarning("[Controller] Storage permission denied. Files may not be accessible.");
-                    // Still try to navigate - user might grant permission later
-                    NavigateTo("root");
+                    Debug.LogWarning("[Controller] Full file access denied. Only media files may be visible.");
                 }
+                // Navigate regardless - user can still browse with whatever access they have
+                NavigateTo("root");
             });
             return;
         }
-        Debug.Log("[Controller] Storage permission already granted.");
+        Debug.Log("[Controller] Full file access already granted.");
 #endif
 
         NavigateTo("root");
+    }
+
+    /// <summary>
+    /// Request full file access permission. Called from UI when user wants to see all files.
+    /// </summary>
+    public void RequestFullFileAccessPermission()
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        // Use AppPermissionManager if available
+        if (AppPermissionManager.Instance != null)
+        {
+            AppPermissionManager.Instance.RequestFullFileAccess();
+            return;
+        }
+
+        // Fallback to StoragePermissionHelper
+        StoragePermissionHelper.RequestFullFileAccess((granted) =>
+        {
+            if (granted)
+            {
+                Debug.Log("[Controller] Full file access granted. Refreshing...");
+                RefreshCurrentFolder();
+            }
+            else
+            {
+                Debug.LogWarning("[Controller] Full file access denied.");
+            }
+        });
+#endif
     }
 
     public void NavigateTo(string path)
