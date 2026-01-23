@@ -26,6 +26,9 @@ public class RTTTaskbarExpansion : RTTCanvasBase
     [SerializeField] private float frameHeight = 128f;
     [SerializeField] private float contentPadding = 16f;
 
+    [Header("App Expansion")]
+    [SerializeField] private int appExpansionCapacity = 4; // Fixed 4 slots for app expansion
+
     [Header("Glowing Border")]
     [ColorUsage(true, true)]
     [SerializeField] private Color glowColorA = new Color(0f, 1.5f, 2f, 1f);
@@ -40,14 +43,19 @@ public class RTTTaskbarExpansion : RTTCanvasBase
     {
         None,
         Bitrate,
-        Fps
+        Fps,
+        Eye,
+        Apps
     }
     #endregion
 
     #region Events
     public event Action<int> OnBitrateSelected;
     public event Action<int> OnFpsSelected;
+    public event Action<bool> OnPassthroughToggled;
+    public event Action<bool> OnLightToggled;
     public event Action OnDismissed;
+    public event Action<int> OnAppSlotClicked;
     #endregion
 
     #region Private Fields
@@ -74,6 +82,25 @@ public class RTTTaskbarExpansion : RTTCanvasBase
     // Icons
     private Dictionary<int, Sprite> _bitrateIcons = new Dictionary<int, Sprite>();
     private Dictionary<int, Sprite> _fpsIcons = new Dictionary<int, Sprite>();
+    private Sprite _iconPassthrough;
+    private Sprite _iconLightOn;
+    private Sprite _iconLightOff;
+
+    // Eye expansion state
+    private bool _isPassthroughOn = false;
+    private bool _isLightOn = true; // Default ON
+
+    // App expansion state
+    private List<AppSlotData> _appSlots = new List<AppSlotData>();
+    private int _activeAppSlotIndex = -1;
+
+    private class AppSlotData
+    {
+        public int SlotIndex;
+        public Sprite Icon;
+        public Action OnClick;
+        public GameObject Button;
+    }
 
     // Colors
     private readonly Color _cyanColor = new Color(0f, 0.9f, 1f);
@@ -89,6 +116,7 @@ public class RTTTaskbarExpansion : RTTCanvasBase
     #region Properties
     public new bool IsVisible => _isVisible;
     public ExpansionType CurrentType => _currentType;
+    public int AppSlotCount => _appSlots.Count;
     #endregion
 
     #region Lifecycle
@@ -106,18 +134,16 @@ public class RTTTaskbarExpansion : RTTCanvasBase
     protected override void Start()
     {
         base.Start();
-        // Start hidden
-        Hide();
+        // Start hidden - but only if not already shown by creator
+        // (ShowExpansion may have been called between Awake and Start)
+        if (!_isVisible)
+        {
+            Hide();
+        }
     }
 
     protected override void OnDestroy()
     {
-        // Clear static reference if this is the open one
-        if (CurrentlyOpenExpansion == this)
-        {
-            CurrentlyOpenExpansion = null;
-        }
-
         if (_glassMaterial != null) Destroy(_glassMaterial);
         if (_borderMaterial != null) Destroy(_borderMaterial);
         base.OnDestroy();
@@ -186,6 +212,20 @@ public class RTTTaskbarExpansion : RTTCanvasBase
     }
 
     /// <summary>
+    /// Show expansion panel with Eye options (Passthrough and Light).
+    /// </summary>
+    /// <param name="isPassthroughOn">Current passthrough state</param>
+    /// <param name="isLightOn">Current light state</param>
+    /// <param name="triggerButtonWorldPos">World position of the trigger button (for X-axis alignment)</param>
+    public void ShowEyeOptions(bool isPassthroughOn, bool isLightOn, Vector3? triggerButtonWorldPos = null)
+    {
+        _isPassthroughOn = isPassthroughOn;
+        _isLightOn = isLightOn;
+        CalculateLocalXOffset(triggerButtonWorldPos);
+        ShowExpansion(ExpansionType.Eye);
+    }
+
+    /// <summary>
     /// Calculate local X offset to align expansion center with trigger button.
     /// </summary>
     private void CalculateLocalXOffset(Vector3? triggerButtonWorldPos)
@@ -210,14 +250,23 @@ public class RTTTaskbarExpansion : RTTCanvasBase
     /// </summary>
     public new void Hide()
     {
+        // Don't hide Apps expansion if there are still apps - only UnregisterAppSlot can hide it
+        if (_currentType == ExpansionType.Apps && _appSlots.Count > 0)
+        {
+            Debug.Log("[RTTTaskbarExpansion] Cannot hide Apps expansion while apps are registered");
+            return;
+        }
+
+        ForceHide();
+    }
+
+    /// <summary>
+    /// Force hide the expansion panel (used internally when all apps are unregistered).
+    /// </summary>
+    private void ForceHide()
+    {
         _isVisible = false;
         _currentType = ExpansionType.None;
-
-        // Clear static reference
-        if (CurrentlyOpenExpansion == this)
-        {
-            CurrentlyOpenExpansion = null;
-        }
 
         if (gameObject.activeInHierarchy)
         {
@@ -252,6 +301,53 @@ public class RTTTaskbarExpansion : RTTCanvasBase
     }
 
     /// <summary>
+    /// Set passthrough state from external (used when light toggles).
+    /// </summary>
+    public void SetPassthroughState(bool isOn)
+    {
+        if (_isPassthroughOn == isOn) return;
+
+        _isPassthroughOn = isOn;
+        if (_currentType == ExpansionType.Eye)
+        {
+            UpdateEyeButtonStates();
+            MarkDirty();
+        }
+    }
+
+    /// <summary>
+    /// Set whether passthrough button is interactable (disabled when light is OFF).
+    /// </summary>
+    public void SetPassthroughInteractable(bool interactable)
+    {
+        if (_currentType != ExpansionType.Eye || _optionButtons.Count < 1) return;
+
+        var passthroughBtn = _optionButtons[0];
+        var button = passthroughBtn.GetComponentInChildren<UnityEngine.UI.Button>();
+        if (button != null)
+        {
+            button.interactable = interactable;
+        }
+
+        // Disable hover effect when locked
+        var hoverController = passthroughBtn.GetComponentInChildren<VRWorkspace.UI.HoverEffects.HoverEffectController>();
+        if (hoverController != null)
+        {
+            hoverController.enabled = interactable;
+        }
+
+        // Dim the icon when disabled
+        var canvasGroup = passthroughBtn.GetComponent<CanvasGroup>();
+        if (canvasGroup == null)
+        {
+            canvasGroup = passthroughBtn.AddComponent<CanvasGroup>();
+        }
+        canvasGroup.alpha = interactable ? 1f : 0.5f;
+
+        MarkDirty();
+    }
+
+    /// <summary>
     /// Check if a GameObject is part of this expansion panel.
     /// Used by VRGazeReticle to determine click-outside behavior.
     /// </summary>
@@ -281,17 +377,144 @@ public class RTTTaskbarExpansion : RTTCanvasBase
 
         return false;
     }
+
+    /// <summary>
+    /// Register an app in the expansion panel.
+    /// </summary>
+    public void RegisterAppSlot(int slotIndex, Sprite icon, Action onClick)
+    {
+        // Check if slot already exists
+        var existing = _appSlots.Find(s => s.SlotIndex == slotIndex);
+        if (existing != null)
+        {
+            existing.Icon = icon;
+            existing.OnClick = onClick;
+            RebuildAppButtons();
+            return;
+        }
+
+        _appSlots.Add(new AppSlotData
+        {
+            SlotIndex = slotIndex,
+            Icon = icon,
+            OnClick = onClick,
+            Button = null
+        });
+
+        // Show expansion if not already visible
+        if (!_isVisible || _currentType != ExpansionType.Apps)
+        {
+            ShowAppExpansion();
+        }
+        else
+        {
+            RebuildAppButtons();
+        }
+
+        Debug.Log($"[RTTTaskbarExpansion] Registered app slot {slotIndex}, total slots: {_appSlots.Count}");
+    }
+
+    /// <summary>
+    /// Unregister an app from the expansion panel.
+    /// </summary>
+    public void UnregisterAppSlot(int slotIndex)
+    {
+        var slot = _appSlots.Find(s => s.SlotIndex == slotIndex);
+        if (slot == null) return;
+
+        if (slot.Button != null)
+        {
+            Destroy(slot.Button);
+        }
+        _appSlots.Remove(slot);
+
+        // If active slot was removed, reset to -1
+        if (_activeAppSlotIndex == slotIndex)
+        {
+            _activeAppSlotIndex = -1;
+        }
+
+        // Force hide expansion if no more apps
+        if (_appSlots.Count == 0)
+        {
+            ForceHide();
+        }
+        else
+        {
+            RebuildAppButtons();
+        }
+
+        Debug.Log($"[RTTTaskbarExpansion] Unregistered app slot {slotIndex}, remaining slots: {_appSlots.Count}");
+    }
+
+    /// <summary>
+    /// Clear all app slots from the expansion panel.
+    /// </summary>
+    public void ClearAllAppSlots()
+    {
+        foreach (var slot in _appSlots)
+        {
+            if (slot.Button != null)
+            {
+                Destroy(slot.Button);
+            }
+        }
+        _appSlots.Clear();
+        _activeAppSlotIndex = -1;
+
+        if (_currentType == ExpansionType.Apps)
+        {
+            ForceHide();
+        }
+
+        Debug.Log("[RTTTaskbarExpansion] Cleared all app slots");
+    }
+
+    /// <summary>
+    /// Select an app slot in the expansion (set it as active).
+    /// </summary>
+    public void SelectAppSlot(int slotIndex)
+    {
+        if (_activeAppSlotIndex == slotIndex) return;
+
+        _activeAppSlotIndex = slotIndex;
+        UpdateAppButtonStates();
+        MarkDirty();
+    }
+
+    /// <summary>
+    /// Clear active selection in expansion (when main taskbar slot is selected).
+    /// </summary>
+    public void ClearAppSlotSelection()
+    {
+        if (_activeAppSlotIndex == -1) return;
+
+        _activeAppSlotIndex = -1;
+        UpdateAppButtonStates();
+        MarkDirty();
+    }
+
+    /// <summary>
+    /// Set the position offset for app expansion (call before registering slots).
+    /// </summary>
+    /// <param name="section2CenterWorldPos">World position of Section 2 center for alignment</param>
+    public void SetAppExpansionPosition(Vector3? section2CenterWorldPos)
+    {
+        CalculateLocalXOffset(section2CenterWorldPos);
+    }
+
+    /// <summary>
+    /// Show expansion panel for app overflow.
+    /// </summary>
+    public void ShowAppExpansion()
+    {
+        ShowExpansion(ExpansionType.Apps);
+    }
     #endregion
 
     #region Private Methods
     private void ShowExpansion(ExpansionType type)
     {
-        // Close any other open expansion first
-        if (CurrentlyOpenExpansion != null && CurrentlyOpenExpansion != this)
-        {
-            CurrentlyOpenExpansion.Hide();
-        }
-
         _currentType = type;
 
         // Recalculate size based on type
@@ -311,8 +534,7 @@ public class RTTTaskbarExpansion : RTTCanvasBase
         gameObject.SetActive(true);
         _isVisible = true;
 
-        // Set static reference
-        CurrentlyOpenExpansion = this;
+        // NOTE: Not setting CurrentlyOpenExpansion - click-outside-to-close is disabled for all expansion types
 
         // Rebuild UI completely (glass panel aspect ratio needs updating)
         RebuildUI();
@@ -362,36 +584,59 @@ public class RTTTaskbarExpansion : RTTCanvasBase
 
     private void RecalculateSize(ExpansionType type)
     {
-        int buttonCount = type == ExpansionType.Bitrate ? _bitrateOptions.Length : _fpsOptions.Length;
+        int buttonCount = type switch
+        {
+            ExpansionType.Bitrate => _bitrateOptions.Length,
+            ExpansionType.Fps => _fpsOptions.Length,
+            ExpansionType.Eye => 2, // Passthrough + Light
+            ExpansionType.Apps => appExpansionCapacity, // Fixed 4 slots
+            _ => 3
+        };
         _totalWidth = contentPadding * 2 + (buttonCount * buttonSize) + ((buttonCount - 1) * buttonSpacing);
     }
 
     private void RebuildUI()
     {
-        // Destroy old visuals
+        // Destroy old visuals - use DestroyImmediate to avoid timing issues
         if (_canvas != null)
         {
-            foreach (Transform child in _canvas.transform)
+            for (int i = _canvas.transform.childCount - 1; i >= 0; i--)
             {
-                Destroy(child.gameObject);
+                var child = _canvas.transform.GetChild(i).gameObject;
+                if (Application.isPlaying)
+                    Destroy(child);
+                else
+                    DestroyImmediate(child);
             }
         }
 
         // Cleanup old materials to avoid memory leak
         if (_glassMaterial != null)
         {
-            Destroy(_glassMaterial);
+            if (Application.isPlaying)
+                Destroy(_glassMaterial);
+            else
+                DestroyImmediate(_glassMaterial);
             _glassMaterial = null;
         }
         if (_borderMaterial != null)
         {
-            Destroy(_borderMaterial);
+            if (Application.isPlaying)
+                Destroy(_borderMaterial);
+            else
+                DestroyImmediate(_borderMaterial);
             _borderMaterial = null;
         }
 
         // Clear references
         _optionButtons.Clear();
         _contentContainer = null;
+
+        // Clear app slot button references
+        foreach (var slot in _appSlots)
+        {
+            slot.Button = null;
+        }
 
         // Rebuild
         BuildUI();
@@ -403,10 +648,17 @@ public class RTTTaskbarExpansion : RTTCanvasBase
     {
         if (_contentContainer == null) return;
 
-        // Clear existing buttons
-        foreach (var btn in _optionButtons)
+        // Clear existing buttons - destroy immediately to avoid overlap issues
+        for (int i = _optionButtons.Count - 1; i >= 0; i--)
         {
-            if (btn != null) Destroy(btn);
+            var btn = _optionButtons[i];
+            if (btn != null)
+            {
+                if (Application.isPlaying)
+                    Destroy(btn);
+                else
+                    DestroyImmediate(btn);
+            }
         }
         _optionButtons.Clear();
 
@@ -418,6 +670,14 @@ public class RTTTaskbarExpansion : RTTCanvasBase
         else if (_currentType == ExpansionType.Fps)
         {
             CreateFpsButtons();
+        }
+        else if (_currentType == ExpansionType.Eye)
+        {
+            CreateEyeButtons();
+        }
+        else if (_currentType == ExpansionType.Apps)
+        {
+            CreateAppButtons();
         }
     }
 
@@ -461,6 +721,185 @@ public class RTTTaskbarExpansion : RTTCanvasBase
             SetLayerRecursively(btn, LayerMask.NameToLayer("UI"));
             _optionButtons.Add(btn);
         }
+    }
+
+    private void CreateEyeButtons()
+    {
+        // Passthrough button
+        Color passthroughColor = _isPassthroughOn ? _purpleColor : _cyanColor;
+        var passthroughBtn = VRButtonFactory.CreateBareIconButton(
+            _contentContainer, buttonSize, _iconPassthrough, passthroughColor,
+            OnPassthroughButtonClicked,
+            0.05f, 0.6f
+        );
+        passthroughBtn.name = "Btn_Passthrough";
+        SetLayerRecursively(passthroughBtn, LayerMask.NameToLayer("UI"));
+        _optionButtons.Add(passthroughBtn);
+
+        // Light button
+        Color lightColor = _isLightOn ? _purpleColor : _cyanColor;
+        Sprite lightIcon = _isLightOn ? _iconLightOn : _iconLightOff;
+        var lightBtn = VRButtonFactory.CreateBareIconButton(
+            _contentContainer, buttonSize, lightIcon, lightColor,
+            OnLightButtonClicked,
+            0.05f, 0.6f
+        );
+        lightBtn.name = "Btn_Light";
+        SetLayerRecursively(lightBtn, LayerMask.NameToLayer("UI"));
+        _optionButtons.Add(lightBtn);
+    }
+
+    private void CreateAppButtons()
+    {
+        // Create fixed number of slots (4 buttons)
+        for (int visualIndex = 0; visualIndex < appExpansionCapacity; visualIndex++)
+        {
+            // Find app for this visual index (apps are ordered left to right)
+            AppSlotData slotData = (visualIndex < _appSlots.Count) ? _appSlots[visualIndex] : null;
+
+            if (slotData != null)
+            {
+                // Create actual app button
+                bool isActive = (slotData.SlotIndex == _activeAppSlotIndex);
+                Color color = isActive ? _purpleColor : _cyanColor;
+
+                int capturedIndex = slotData.SlotIndex;
+                var btn = VRButtonFactory.CreateBareIconButton(
+                    _contentContainer, buttonSize, slotData.Icon, color,
+                    () => OnAppButtonClicked(capturedIndex),
+                    0.05f, 0.6f
+                );
+
+                btn.name = $"Btn_App_{slotData.SlotIndex}";
+                SetLayerRecursively(btn, LayerMask.NameToLayer("UI"));
+                _optionButtons.Add(btn);
+                slotData.Button = btn;
+
+                // Set interactable and force hover for active button
+                var button = btn.GetComponentInChildren<UnityEngine.UI.Button>();
+                if (button != null)
+                {
+                    button.interactable = !isActive;
+                }
+
+                var hoverController = btn.GetComponentInChildren<VRWorkspace.UI.HoverEffects.HoverEffectController>();
+                if (hoverController != null)
+                {
+                    hoverController.SetForceHover(isActive);
+                }
+            }
+            else
+            {
+                // Create empty placeholder slot
+                var placeholder = CreateEmptySlotPlaceholder();
+                _optionButtons.Add(placeholder);
+            }
+        }
+    }
+
+    private GameObject CreateEmptySlotPlaceholder()
+    {
+        GameObject placeholder = new GameObject("EmptySlot");
+        placeholder.transform.SetParent(_contentContainer, false);
+
+        RectTransform rt = placeholder.AddComponent<RectTransform>();
+        rt.sizeDelta = new Vector2(buttonSize, buttonSize);
+
+        // Make it invisible but take up space
+        CanvasGroup cg = placeholder.AddComponent<CanvasGroup>();
+        cg.alpha = 0f;
+
+        SetLayerRecursively(placeholder, LayerMask.NameToLayer("UI"));
+        return placeholder;
+    }
+
+    private void RebuildAppButtons()
+    {
+        if (_currentType != ExpansionType.Apps) return;
+
+        // Just rebuild content, size is fixed
+        RebuildContent();
+        MarkDirty();
+    }
+
+    private void OnAppButtonClicked(int slotIndex)
+    {
+        // Don't do anything if already active
+        if (slotIndex == _activeAppSlotIndex) return;
+
+        _activeAppSlotIndex = slotIndex;
+        UpdateAppButtonStates();
+
+        // Find the slot and invoke its callback
+        var slot = _appSlots.Find(s => s.SlotIndex == slotIndex);
+        slot?.OnClick?.Invoke();
+
+        OnAppSlotClicked?.Invoke(slotIndex);
+        MarkDirty();
+    }
+
+    private void UpdateAppButtonStates()
+    {
+        foreach (var slot in _appSlots)
+        {
+            if (slot.Button == null) continue;
+
+            bool isActive = (slot.SlotIndex == _activeAppSlotIndex);
+            Color color = isActive ? _purpleColor : _cyanColor;
+            VRButtonFactory.SetBareIconButtonGlowColor(slot.Button, color);
+
+            // Update interactable and force hover
+            var button = slot.Button.GetComponentInChildren<UnityEngine.UI.Button>();
+            if (button != null)
+            {
+                button.interactable = !isActive;
+            }
+
+            var hoverController = slot.Button.GetComponentInChildren<VRWorkspace.UI.HoverEffects.HoverEffectController>();
+            if (hoverController != null)
+            {
+                hoverController.SetForceHover(isActive);
+            }
+        }
+    }
+
+    private void OnPassthroughButtonClicked()
+    {
+        _isPassthroughOn = !_isPassthroughOn;
+        UpdateEyeButtonStates();
+        OnPassthroughToggled?.Invoke(_isPassthroughOn);
+        MarkDirty();
+
+        // Hide after selection (except Apps expansion)
+        Hide();
+    }
+
+    private void OnLightButtonClicked()
+    {
+        _isLightOn = !_isLightOn;
+        UpdateEyeButtonStates();
+        OnLightToggled?.Invoke(_isLightOn);
+        MarkDirty();
+
+        // Hide after selection (except Apps expansion)
+        Hide();
+    }
+
+    private void UpdateEyeButtonStates()
+    {
+        if (_optionButtons.Count < 2) return;
+
+        // Passthrough button (index 0)
+        Color passthroughColor = _isPassthroughOn ? _purpleColor : _cyanColor;
+        VRButtonFactory.SetBareIconButtonGlowColor(_optionButtons[0], passthroughColor);
+
+        // Light button (index 1) - also update icon
+        Color lightColor = _isLightOn ? _purpleColor : _cyanColor;
+        VRButtonFactory.SetBareIconButtonGlowColor(_optionButtons[1], lightColor);
+
+        // Update light icon
+        Sprite lightIcon = _isLightOn ? _iconLightOn : _iconLightOff;
+        VRButtonFactory.SetBareIconButtonSprite(_optionButtons[1], lightIcon);
     }
 
     private void OnBitrateButtonClicked(int mbps)
@@ -704,7 +1143,14 @@ public class RTTTaskbarExpansion : RTTCanvasBase
             }
         }
 
-        Debug.Log($"[RTTTaskbarExpansion] Icons loaded - Bitrate: {_bitrateIcons.Count}/{_bitrateOptions.Length}, FPS: {_fpsIcons.Count}/{_fpsOptions.Length}");
+        // Eye expansion icons
+        _iconPassthrough = Resources.Load<Sprite>("icon_passthrough");
+        _iconLightOn = Resources.Load<Sprite>("icon_light_on");
+        _iconLightOff = Resources.Load<Sprite>("icon_light_off");
+
+        Debug.Log($"[RTTTaskbarExpansion] Icons loaded - Bitrate: {_bitrateIcons.Count}/{_bitrateOptions.Length}, " +
+            $"FPS: {_fpsIcons.Count}/{_fpsOptions.Length}, " +
+            $"Passthrough: {_iconPassthrough != null}, LightOn: {_iconLightOn != null}, LightOff: {_iconLightOff != null}");
     }
     #endregion
 

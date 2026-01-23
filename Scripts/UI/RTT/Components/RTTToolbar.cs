@@ -3,10 +3,15 @@ using UnityEngine;
 /// <summary>
 /// RTTToolbar - Invisible container that manages sphere positioning for all taskbar-related components.
 ///
+/// Layout (3 rows, each separated by 0.05 × taskbar height):
+/// - Row 1 (top):    RTTFilePagination, RTTTaskbarExpansion (when RTTRemoteTaskbar is active)
+/// - Row 2 (center): RTTTaskbar / RTTRemoteTaskbar
+/// - Row 3 (bottom): RTTTaskbarExpansion (when RTTTaskbar is active - Eye expansion)
+///
 /// Architecture:
-/// - RTTToolbar contains RTTTaskbar/RTTRemoteTaskbar (center) and RTTFilePagination/RTTTaskbarExpansion (top)
+/// - RTTToolbar contains all taskbar-related components
 /// - Only RTTToolbar handles sphere positioning, child components use local positions
-/// - Height = 3.1 × taskbar height to accommodate pagination/expansion above
+/// - Height = 3.1 × taskbar height to accommodate all 3 rows
 ///
 /// Sphere Positioning Rules:
 /// 1. Top edge of toolbar touches plane at gap distance below target bottom
@@ -116,39 +121,79 @@ public class RTTToolbar : MonoBehaviour
     }
 
     /// <summary>
-    /// Get local Y position for child components.
+    /// Get local Y position for Row 1 (above taskbar).
+    /// Used for RTTFilePagination and RTTTaskbarExpansion when RTTRemoteTaskbar is active.
     /// </summary>
-    /// <param name="aboveTaskbar">True for pagination/expansion (above), false for taskbar (center)</param>
-    public float GetChildLocalY(bool aboveTaskbar)
+    public float GetRow1LocalY()
     {
-        if (!aboveTaskbar) return 0f;
-
-        // Position above taskbar with small gap
+        // Row 1: Above taskbar with small gap (0.05 × taskbar height)
         return _taskbarHeight * 1.05f;
     }
 
     /// <summary>
-    /// Get local position for pagination component.
+    /// Get local Y position for Row 3 (below taskbar).
+    /// Used for RTTTaskbarExpansion when RTTTaskbar is active.
+    /// </summary>
+    public float GetRow3LocalY()
+    {
+        // Row 3: Below taskbar with small gap (0.05 × taskbar height)
+        return -_taskbarHeight * 1.05f;
+    }
+
+    /// <summary>
+    /// Get local position for pagination component (always Row 1).
     /// </summary>
     public Vector3 GetPaginationLocalPosition()
     {
-        return new Vector3(0, GetChildLocalY(true), 0);
+        return new Vector3(0, GetRow1LocalY(), 0);
     }
 
     /// <summary>
     /// Get local position for expansion component.
+    /// Row 1 (above) when RTTRemoteTaskbar, Row 3 (below) when RTTTaskbar.
     /// </summary>
     public Vector3 GetExpansionLocalPosition()
     {
-        return new Vector3(0, GetChildLocalY(true), 0);
+        // Check if active taskbar is RTTTaskbar (not RTTRemoteTaskbar)
+        bool isRTTTaskbar = _activeTaskbarFrame != null &&
+            _activeTaskbarFrame.GetComponent<RTTTaskbar>() != null;
+
+        // RTTTaskbar uses Row 3 (below), RTTRemoteTaskbar uses Row 1 (above)
+        float localY = isRTTTaskbar ? GetRow3LocalY() : GetRow1LocalY();
+        return new Vector3(0, localY, 0);
     }
 
     /// <summary>
-    /// Get local position for taskbar component (center).
+    /// Get local position for expansion component - explicitly above (Row 1).
+    /// </summary>
+    public Vector3 GetExpansionLocalPositionAbove()
+    {
+        return new Vector3(0, GetRow1LocalY(), 0);
+    }
+
+    /// <summary>
+    /// Get local position for expansion component - explicitly below (Row 3).
+    /// </summary>
+    public Vector3 GetExpansionLocalPositionBelow()
+    {
+        return new Vector3(0, GetRow3LocalY(), 0);
+    }
+
+    /// <summary>
+    /// Get local position for taskbar component (Row 2 - center).
     /// </summary>
     public Vector3 GetTaskbarLocalPosition()
     {
         return Vector3.zero;
+    }
+
+    /// <summary>
+    /// Check if the active taskbar is RTTTaskbar (not RTTRemoteTaskbar).
+    /// </summary>
+    public bool IsRTTTaskbarActive()
+    {
+        return _activeTaskbarFrame != null &&
+            _activeTaskbarFrame.GetComponent<RTTTaskbar>() != null;
     }
     #endregion
 

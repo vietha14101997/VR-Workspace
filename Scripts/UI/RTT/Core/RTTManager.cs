@@ -1183,8 +1183,11 @@ public class RTTManager : MonoBehaviour
 
     private int GetNextAvailableSlot()
     {
-        int maxSlots = appRegistry?.maxOpenApps ?? 3;
-        for (int i = 1; i <= maxSlots; i++)
+        int mainSlots = appRegistry?.maxOpenApps ?? 3;
+        int maxOverflowSlots = 5; // Allow up to 5 additional overflow apps
+        int totalMaxSlots = mainSlots + maxOverflowSlots;
+
+        for (int i = 1; i <= totalMaxSlots; i++)
         {
             bool slotUsed = false;
             foreach (var app in _activeApps.Values)

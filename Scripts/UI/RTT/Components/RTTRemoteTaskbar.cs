@@ -27,7 +27,8 @@ public class RTTRemoteTaskbar : MonoBehaviour
     #region Configuration
     [Header("Icons")]
     [SerializeField] private Sprite iconBack;
-    [SerializeField] private Sprite iconPassthrough;
+    [SerializeField] private Sprite iconEye;
+    [SerializeField] private Sprite iconEyeClose;
     [SerializeField] private Sprite iconRecenter;
     [SerializeField] private Sprite iconZoom;
     [SerializeField] private Sprite iconMonitor;
@@ -57,7 +58,7 @@ public class RTTRemoteTaskbar : MonoBehaviour
     private GameObject _backButton;
     private GameObject _bitrateButton;
     private GameObject _fpsButton;
-    private GameObject _passthroughButton;
+    private GameObject _eyeButton;
     private int _currentBitrateMbps = 20;
     private int _currentFps = 60;
 
@@ -76,6 +77,8 @@ public class RTTRemoteTaskbar : MonoBehaviour
 
     // State
     private bool _isPassthroughOn = false;
+    private bool _isLightOn = true; // Default ON
+    private bool _savedPassthroughState = false; // Lưu trạng thái passthrough khi tắt đèn
 
     // Colors
     private readonly Color _cyanColor = new Color(0f, 0.9f, 1f);
@@ -228,8 +231,8 @@ public class RTTRemoteTaskbar : MonoBehaviour
         // 4. Zoom display button (icon only)
         _zoomButton = CreateDisplayIconButton(section1, iconZoom, "Zoom", _cyanColor, buttonSize);
 
-        // 5. Passthrough toggle
-        _passthroughButton = CreateIconButton(section1, iconPassthrough, "Passthrough", _cyanColor, buttonSize, TogglePassthrough);
+        // 5. Eye button (opens expansion with Passthrough + Light)
+        _eyeButton = CreateIconButton(section1, iconEye, "Eye", _cyanColor, buttonSize, OnEyeClicked);
 
         // 6. Recenter
         CreateIconButton(section1, iconRecenter, "Recenter", _cyanColor, buttonSize, RecenterObject);
@@ -355,6 +358,8 @@ public class RTTRemoteTaskbar : MonoBehaviour
         // Subscribe to events
         _expansionPanel.OnBitrateSelected += OnExpansionBitrateSelected;
         _expansionPanel.OnFpsSelected += OnExpansionFpsSelected;
+        _expansionPanel.OnPassthroughToggled += OnPassthroughToggled;
+        _expansionPanel.OnLightToggled += OnLightToggled;
 
         Debug.Log("[RTTRemoteTaskbar] Expansion panel created in RTTToolbar");
     }
@@ -365,6 +370,8 @@ public class RTTRemoteTaskbar : MonoBehaviour
         {
             _expansionPanel.OnBitrateSelected -= OnExpansionBitrateSelected;
             _expansionPanel.OnFpsSelected -= OnExpansionFpsSelected;
+            _expansionPanel.OnPassthroughToggled -= OnPassthroughToggled;
+            _expansionPanel.OnLightToggled -= OnLightToggled;
 
             if (Application.isPlaying)
                 Destroy(_expansionPanel.gameObject);
@@ -729,13 +736,60 @@ public class RTTRemoteTaskbar : MonoBehaviour
     }
     #endregion
 
-    #region Passthrough
-    private void TogglePassthrough()
+    #region Eye Button (Passthrough + Light)
+    private void OnEyeClicked()
     {
-        _isPassthroughOn = !_isPassthroughOn;
-        Debug.Log($"[RTTRemoteTaskbar] Passthrough: {(_isPassthroughOn ? "ON" : "OFF")}");
+        if (_expansionPanel == null) return;
 
-        UpdatePassthroughButtonColor();
+        // Toggle behavior: if already showing Eye options, hide it
+        if (_expansionPanel.IsVisible && _expansionPanel.CurrentType == RTTTaskbarExpansion.ExpansionType.Eye)
+        {
+            Debug.Log("[RTTRemoteTaskbar] Eye clicked - hiding expansion panel (toggle)");
+            _expansionPanel.Hide();
+        }
+        else
+        {
+            // Show Eye options
+            Debug.Log("[RTTRemoteTaskbar] Eye clicked - showing expansion panel");
+            Vector3? buttonWorldPos = GetButtonWorldPosition(_eyeButton);
+            _expansionPanel.ShowEyeOptions(_isPassthroughOn, _isLightOn, buttonWorldPos);
+
+            // Disable passthrough button if light is OFF
+            _expansionPanel.SetPassthroughInteractable(_isLightOn);
+        }
+        _miniFrame.MarkDirty();
+    }
+
+    private void SyncPassthroughWithModeController()
+    {
+        var modeController = FindObjectOfType<ModeController>();
+        if (modeController != null)
+        {
+            _isPassthroughOn = modeController.mode == ViewMode.RealWorld;
+            UpdateEyeButtonColor();
+        }
+
+        // Sync light state with RTTTaskbar
+        if (RTTTaskbar.Instance != null)
+        {
+            _isLightOn = RTTTaskbar.Instance.IsLightOn;
+            UpdateEyeButtonColor();
+        }
+    }
+
+    private void OnPassthroughToggled(bool isOn)
+    {
+        // Chặn toggle passthrough khi đèn đang tắt
+        if (!_isLightOn)
+        {
+            Debug.Log("[RTTRemoteTaskbar] Cannot toggle passthrough while light is OFF");
+            return;
+        }
+
+        _isPassthroughOn = isOn;
+        Debug.Log($"[RTTRemoteTaskbar] Passthrough toggled: {(_isPassthroughOn ? "ON" : "OFF")}");
+
+        UpdateEyeButtonColor();
 
         var modeController = FindObjectOfType<ModeController>();
         if (modeController != null)
@@ -746,22 +800,128 @@ public class RTTRemoteTaskbar : MonoBehaviour
         _miniFrame.MarkDirty();
     }
 
-    private void SyncPassthroughWithModeController()
+    private void OnLightToggled(bool isOn)
     {
+        _isLightOn = isOn;
+        Debug.Log($"[RTTRemoteTaskbar] Light toggled: {(_isLightOn ? "ON" : "OFF")}");
+
         var modeController = FindObjectOfType<ModeController>();
-        if (modeController != null)
+
+        if (!_isLightOn)
         {
-            _isPassthroughOn = modeController.mode == ViewMode.RealWorld;
-            UpdatePassthroughButtonColor();
+            // Tắt đèn: lưu trạng thái passthrough, ẩn environment, tắt passthrough
+            _savedPassthroughState = _isPassthroughOn;
+
+            if (modeController != null)
+            {
+                // Tắt passthrough trực tiếp
+                if (modeController.cameraPassthrough != null)
+                {
+                    modeController.cameraPassthrough.enabled = false;
+                }
+
+                // Tắt backgroundReal (tránh màn hình trắng khi passthrough đang ON)
+                if (modeController.backgroundReal != null)
+                {
+                    modeController.backgroundReal.enabled = false;
+                }
+
+                // Bật backgroundVirtual để hiển thị màu đen (clear color)
+                if (modeController.backgroundVirtual != null)
+                {
+                    modeController.backgroundVirtual.enabled = true;
+                }
+
+                // Ẩn virtual environment
+                if (modeController.virtualEnvironment != null)
+                {
+                    modeController.virtualEnvironment.SetActive(false);
+                }
+            }
+
+            // Cập nhật trạng thái passthrough trong expansion panel
+            _isPassthroughOn = false;
+            if (_expansionPanel != null)
+            {
+                _expansionPanel.SetPassthroughState(false);
+                _expansionPanel.SetPassthroughInteractable(false);
+            }
         }
+        else
+        {
+            // Bật đèn: khôi phục virtual environment và passthrough state
+            if (modeController != null)
+            {
+                // Khôi phục passthrough state
+                if (_savedPassthroughState)
+                {
+                    _isPassthroughOn = true;
+                    modeController.SetMode(ViewMode.RealWorld);
+                }
+                else
+                {
+                    // Không có passthrough: hiện virtual environment bình thường
+                    if (modeController.virtualEnvironment != null)
+                    {
+                        modeController.virtualEnvironment.SetActive(true);
+                    }
+                }
+            }
+
+            // Enable lại nút passthrough trong expansion
+            if (_expansionPanel != null)
+            {
+                _expansionPanel.SetPassthroughState(_isPassthroughOn);
+                _expansionPanel.SetPassthroughInteractable(true);
+            }
+        }
+
+        UpdateEyeButtonColor();
+        _miniFrame.MarkDirty();
     }
 
-    private void UpdatePassthroughButtonColor()
+    private void UpdateEyeButtonColor()
     {
-        if (_passthroughButton == null) return;
+        if (_eyeButton == null) return;
 
-        Color targetColor = _isPassthroughOn ? _purpleColor : _cyanColor;
-        SetBareIconButtonColor(_passthroughButton, targetColor);
+        // Eye button is purple if passthrough is ON or light is OFF (non-default states)
+        bool hasActiveState = _isPassthroughOn || !_isLightOn;
+        Color targetColor = hasActiveState ? _purpleColor : _cyanColor;
+
+        // Determine icon: eye_close when light is OFF, eye when light is ON
+        Sprite targetIcon = _isLightOn ? iconEye : iconEyeClose;
+
+        Transform iconTransform = _eyeButton.transform.Find("HitArea/Visuals/Content/Icon");
+        if (iconTransform != null)
+        {
+            Image iconImg = iconTransform.GetComponent<Image>();
+            if (iconImg != null)
+            {
+                // Update icon sprite based on light state
+                if (targetIcon != null)
+                {
+                    iconImg.sprite = targetIcon;
+                }
+
+                iconImg.color = Color.Lerp(targetColor, Color.white, 0.9f);
+
+                Shadow[] shadows = iconTransform.GetComponents<Shadow>();
+                if (shadows.Length >= 2)
+                {
+                    Color glowCol = Color.Lerp(targetColor, Color.white, 0.7f);
+                    glowCol.a = 0.4f;
+                    shadows[0].effectColor = glowCol;
+                    shadows[1].effectColor = glowCol;
+                }
+            }
+        }
+
+        // Force hover (scale effect) when in active state (purple)
+        var hoverController = _eyeButton.GetComponentInChildren<VRWorkspace.UI.HoverEffects.HoverEffectController>();
+        if (hoverController != null)
+        {
+            hoverController.SetForceHover(hasActiveState);
+        }
     }
 
     public void SetPassthrough(bool isOn)
@@ -769,7 +929,7 @@ public class RTTRemoteTaskbar : MonoBehaviour
         if (_isPassthroughOn != isOn)
         {
             _isPassthroughOn = isOn;
-            UpdatePassthroughButtonColor();
+            UpdateEyeButtonColor();
 
             var modeController = FindObjectOfType<ModeController>();
             if (modeController != null)
@@ -778,6 +938,14 @@ public class RTTRemoteTaskbar : MonoBehaviour
             }
 
             _miniFrame.MarkDirty();
+        }
+    }
+
+    public void SetLight(bool isOn)
+    {
+        if (_isLightOn != isOn)
+        {
+            OnLightToggled(isOn);
         }
     }
     #endregion
@@ -1131,7 +1299,8 @@ public class RTTRemoteTaskbar : MonoBehaviour
     {
         // Static icons
         if (iconBack == null) iconBack = LoadIcon("back");
-        if (iconPassthrough == null) iconPassthrough = LoadIcon("passthrough");
+        if (iconEye == null) iconEye = LoadIcon("eye");
+        if (iconEyeClose == null) iconEyeClose = LoadIcon("eye_close");
         if (iconRecenter == null) iconRecenter = LoadIcon("recenter");
         if (iconZoom == null) iconZoom = LoadIcon("zoom");
         if (iconMonitor == null) iconMonitor = LoadIcon("monitor");
@@ -1171,7 +1340,7 @@ public class RTTRemoteTaskbar : MonoBehaviour
             }
         }
 
-        Debug.Log($"[RTTRemoteTaskbar] Icons loaded - Back:{iconBack != null}, Passthrough:{iconPassthrough != null}, Recenter:{iconRecenter != null}, Zoom:{iconZoom != null}, Monitor:{iconMonitor != null}");
+        Debug.Log($"[RTTRemoteTaskbar] Icons loaded - Back:{iconBack != null}, Eye:{iconEye != null}, EyeClose:{iconEyeClose != null}, Recenter:{iconRecenter != null}, Zoom:{iconZoom != null}, Monitor:{iconMonitor != null}");
         Debug.Log($"[RTTRemoteTaskbar] Bitrate icons: {_bitrateIcons.Count}/5, FPS icons: {_fpsIcons.Count}/3, Screen icons: {_screenIcons.Count}/3");
     }
 

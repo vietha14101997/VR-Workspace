@@ -224,6 +224,28 @@ public class RTTMiniFrame : RTTCanvasBase
     public RectTransform GetSection3Container() => _section3Container;
 
     /// <summary>
+    /// Get Section 2's center X offset from frame center (in world units).
+    /// Used for aligning expansion panels with Section 2.
+    /// </summary>
+    public float GetSection2CenterXOffset()
+    {
+        // Calculate Section 2's center position from canvas left edge (in pixels)
+        // Section 2 starts at: contentMarginLeft + _section1Width + sectionSpacing
+        // Section 2's center: + _section2Width / 2
+        float section2CenterFromLeft = contentMarginLeft + _section1Width + sectionSpacing + (_section2Width / 2f);
+
+        // Canvas center from left edge
+        float canvasCenterFromLeft = _totalWidth / 2f;
+
+        // Offset of Section 2 center from canvas center (in pixels)
+        float offsetPixels = section2CenterFromLeft - canvasCenterFromLeft;
+
+        // Convert to world units
+        const float PixelToMeter = 1.6f / 1920f;
+        return offsetPixels * PixelToMeter;
+    }
+
+    /// <summary>
     /// Recalculate frame size based on section capacities.
     /// </summary>
     public void RecalculateSize()

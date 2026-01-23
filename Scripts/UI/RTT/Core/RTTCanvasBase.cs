@@ -149,6 +149,16 @@ public abstract class RTTCanvasBase : MonoBehaviour
 
     #region Initialization
     /// <summary>
+    /// Force initialization immediately (useful when component is added at runtime
+    /// and you need to use it before Start() is called).
+    /// Safe to call multiple times - subsequent calls are no-ops.
+    /// </summary>
+    public void ForceInitialize()
+    {
+        Initialize();
+    }
+
+    /// <summary>
     /// Initialize the RTT system: create RenderTexture, Camera, Canvas, and Display Quad
     /// </summary>
     protected virtual void Initialize()
