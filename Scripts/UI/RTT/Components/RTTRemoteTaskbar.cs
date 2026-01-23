@@ -878,6 +878,44 @@ public class RTTRemoteTaskbar : MonoBehaviour
 
         UpdateEyeButtonColor();
         _miniFrame.MarkDirty();
+
+        // Sync with RTTTaskbar
+        if (RTTTaskbar.Instance != null)
+        {
+            RTTTaskbar.Instance.SyncLightState(_isLightOn, _savedPassthroughState);
+        }
+    }
+
+    /// <summary>
+    /// Sync light state from another taskbar (UI only, no ModeController changes).
+    /// </summary>
+    public void SyncLightState(bool isLightOn, bool savedPassthroughState)
+    {
+        if (_isLightOn == isLightOn) return;
+
+        _isLightOn = isLightOn;
+        _savedPassthroughState = savedPassthroughState;
+
+        if (!_isLightOn)
+        {
+            _isPassthroughOn = false;
+        }
+        else if (_savedPassthroughState)
+        {
+            _isPassthroughOn = true;
+        }
+
+        // Update expansion panel if visible
+        if (_expansionPanel != null)
+        {
+            _expansionPanel.SetPassthroughState(_isPassthroughOn);
+            _expansionPanel.SetPassthroughInteractable(_isLightOn);
+        }
+
+        UpdateEyeButtonColor();
+        _miniFrame.MarkDirty();
+
+        Debug.Log($"[RTTRemoteTaskbar] Light state synced: {(_isLightOn ? "ON" : "OFF")}");
     }
 
     private void UpdateEyeButtonColor()
