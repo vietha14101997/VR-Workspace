@@ -128,6 +128,17 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
         {
             UpdateContentTextures();
         }
+
+        // Check if arc radius changed (zoom) and regenerate mesh if needed
+        if (Application.isPlaying && _cachedArcRadius > 0)
+        {
+            float currentRadius = GetArcRadius();
+            if (Mathf.Abs(currentRadius - _cachedArcRadius) > 0.001f)
+            {
+                Debug.Log($"[ClusterVisualFlatPlanar] Arc radius changed: {_cachedArcRadius:F3} -> {currentRadius:F3}, regenerating mesh");
+                Rebuild();
+            }
+        }
     }
 
     #endregion
@@ -318,6 +329,19 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
 
     #region Mesh Generation
 
+    /// <summary>
+    /// Get arc radius from VirtualObjectsZoomController.
+    /// </summary>
+    private float GetArcRadius()
+    {
+        var zoomController = VirtualObjectsZoomController.Instance;
+        if (zoomController != null && zoomController.IsInitialized)
+        {
+            return zoomController.CurrentDistance;
+        }
+        return 1.8f; // Default fallback
+    }
+
     private void GenerateMeshes()
     {
         if (_clusterRig == null || _clusterRig.panels.Count == 0) return;
@@ -340,7 +364,7 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
         int panelCount = enabledCount;
         float panelWidth = refPanel.width;
         float panelHeight = refPanel.height;
-        float arcRadius = _clusterRig.distanceFromCamera;
+        float arcRadius = GetArcRadius();
 
         Debug.Log($"[ClusterVisualFlatPlanar] GenerateMeshes: totalPanels={panels.Count}, enabledCount={enabledCount}, " +
             $"enabledIndices=[{string.Join(",", enabledIndices)}], panelWidth={panelWidth:F3}m");

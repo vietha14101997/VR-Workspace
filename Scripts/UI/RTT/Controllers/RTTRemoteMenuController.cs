@@ -197,6 +197,13 @@ public class RTTRemoteMenuController : MonoBehaviour
             _webrtcUpdateCoroutine = null;
         }
 
+        // Clear ClusterRig from RTTMenu before destroying
+        RTTMenu menu = RTTMenu.Instance;
+        if (menu != null)
+        {
+            menu.ClearClusterRig();
+        }
+
         // Destroy ClusterRig
         if (_clusterRig != null)
         {
@@ -389,6 +396,13 @@ public class RTTRemoteMenuController : MonoBehaviour
         // Hide cursors before cleanup
         HideAllCursors();
         _activeCursorPanelIndex = -1;
+
+        // Clear ClusterRig from RTTMenu before destroying
+        RTTMenu menu = RTTMenu.Instance;
+        if (menu != null)
+        {
+            menu.ClearClusterRig();
+        }
 
         // Cleanup ClusterRig
         if (_clusterRig != null)
@@ -710,6 +724,7 @@ public class RTTRemoteMenuController : MonoBehaviour
     /// <summary>
     /// Create ClusterRig when streaming is ready.
     /// No progress overlays or sample textures - video will be applied directly.
+    /// ClusterRig is parented inside RTTMenu for synchronized positioning.
     /// </summary>
     private void CreateClusterRigForStreaming(StreamingConfig config)
     {
@@ -721,6 +736,18 @@ public class RTTRemoteMenuController : MonoBehaviour
         {
             Debug.LogError("[RTTRemoteMenuController] Failed to create ClusterRig!");
             return;
+        }
+
+        // Parent ClusterRig into RTTMenu BEFORE building
+        // This enables parent-origin positioning for synchronized distance with menus
+        RTTMenu menu = RTTMenu.Instance;
+        if (menu != null)
+        {
+            menu.SetClusterRig(_clusterRig);
+        }
+        else
+        {
+            Debug.LogWarning("[RTTRemoteMenuController] RTTMenu.Instance is null, ClusterRig not parented");
         }
 
         // Build cluster with the specified monitor count (skip sample textures)
@@ -741,7 +768,7 @@ public class RTTRemoteMenuController : MonoBehaviour
         // Hide main menu and taskbar when ClusterRig appears
         HideMainMenuAndTaskbar();
 
-        Debug.Log("[RTTRemoteMenuController] ClusterRig created and visible - streaming active");
+        Debug.Log("[RTTRemoteMenuController] ClusterRig created inside RTTMenu - streaming active");
     }
 
     /// <summary>

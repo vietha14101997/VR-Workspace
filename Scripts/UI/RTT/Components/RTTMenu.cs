@@ -21,6 +21,7 @@ public class RTTMenu : MonoBehaviour
     #region Private Fields
     private RTTMenuFrame _mainFrame;
     private List<RTTMenuFrame> _frames = new List<RTTMenuFrame>();
+    private WorldPanelClusterRig _clusterRig;
     #endregion
 
     #region Properties
@@ -28,6 +29,11 @@ public class RTTMenu : MonoBehaviour
     /// The main (primary) RTTMenuFrame showing the main menu.
     /// </summary>
     public RTTMenuFrame MainFrame => _mainFrame;
+
+    /// <summary>
+    /// The WorldPanelClusterRig for remote streaming (if active).
+    /// </summary>
+    public WorldPanelClusterRig ClusterRig => _clusterRig;
 
     /// <summary>
     /// The currently active (enabled) RTTMenuFrame.
@@ -160,11 +166,18 @@ public class RTTMenu : MonoBehaviour
     }
 
     /// <summary>
-    /// Get the world size based on the currently active frame dimensions.
+    /// Get the world size based on active content (ClusterRig or frame dimensions).
     /// Used by RTTMiniFrame for position tracking.
+    /// Priority: ClusterRig > ActiveFrame
     /// </summary>
     public Vector2 GetWorldSize()
     {
+        // Check ClusterRig first (streaming mode)
+        if (_clusterRig != null && _clusterRig.gameObject.activeInHierarchy)
+        {
+            return _clusterRig.GetWorldSize();
+        }
+
         var activeFrame = GetActiveFrame();
         if (activeFrame != null)
         {
@@ -201,6 +214,37 @@ public class RTTMenu : MonoBehaviour
                 return frame;
         }
         return null;
+    }
+
+    /// <summary>
+    /// Set the WorldPanelClusterRig for remote streaming.
+    /// Parents the rig inside RTTMenu and enables parent-origin positioning.
+    /// </summary>
+    public void SetClusterRig(WorldPanelClusterRig rig)
+    {
+        _clusterRig = rig;
+        if (rig != null)
+        {
+            // Parent into RTTMenu
+            rig.transform.SetParent(transform, false);
+            rig.transform.localPosition = Vector3.zero;
+            rig.transform.localRotation = Quaternion.identity;
+
+            // Enable parent-origin positioning
+            rig.useParentOrigin = true;
+
+            Debug.Log("[RTTMenu] SetClusterRig: ClusterRig parented with useParentOrigin=true");
+        }
+    }
+
+    /// <summary>
+    /// Clear the ClusterRig reference.
+    /// Does not destroy the rig - caller is responsible for cleanup.
+    /// </summary>
+    public void ClearClusterRig()
+    {
+        _clusterRig = null;
+        Debug.Log("[RTTMenu] ClearClusterRig: ClusterRig reference cleared");
     }
     #endregion
 
