@@ -32,9 +32,7 @@ public class RTTTaskbarExpansion : RTTCanvasBase
     [ColorUsage(true, true)]
     [SerializeField] private Color glowColorB = new Color(1.2f, 0.3f, 2f, 1f);
 
-    [Header("Position")]
-    [SerializeField] private Transform followTarget;
-    [SerializeField] private float gapAboveTaskbar = 0.002f;
+    // Note: Positioning is handled by RTTToolbar parent
     #endregion
 
     #region Types
@@ -84,9 +82,6 @@ public class RTTTaskbarExpansion : RTTCanvasBase
     // State
     private new bool _isVisible = false;
 
-    // Trigger button world position (for X-axis alignment)
-    private Vector3 _triggerButtonWorldPos;
-    private bool _hasTriggerPosition = false;
     #endregion
 
     #region Properties
@@ -129,7 +124,7 @@ public class RTTTaskbarExpansion : RTTCanvasBase
     protected override void LateUpdate()
     {
         base.LateUpdate();
-        UpdatePositionTracking();
+        // Note: Positioning is handled by RTTToolbar parent
     }
     #endregion
 
@@ -168,15 +163,10 @@ public class RTTTaskbarExpansion : RTTCanvasBase
     /// Show expansion panel with bitrate options.
     /// </summary>
     /// <param name="currentBitrateMbps">Current selected bitrate</param>
-    /// <param name="triggerButtonWorldPos">World position of the trigger button (optional, for X-axis alignment)</param>
+    /// <param name="triggerButtonWorldPos">World position of the trigger button (unused, kept for API compatibility)</param>
     public void ShowBitrateOptions(int currentBitrateMbps, Vector3? triggerButtonWorldPos = null)
     {
         _selectedBitrateMbps = currentBitrateMbps;
-        if (triggerButtonWorldPos.HasValue)
-        {
-            _triggerButtonWorldPos = triggerButtonWorldPos.Value;
-            _hasTriggerPosition = true;
-        }
         ShowExpansion(ExpansionType.Bitrate);
     }
 
@@ -184,15 +174,10 @@ public class RTTTaskbarExpansion : RTTCanvasBase
     /// Show expansion panel with FPS options.
     /// </summary>
     /// <param name="currentFps">Current selected FPS</param>
-    /// <param name="triggerButtonWorldPos">World position of the trigger button (optional, for X-axis alignment)</param>
+    /// <param name="triggerButtonWorldPos">World position of the trigger button (unused, kept for API compatibility)</param>
     public void ShowFpsOptions(int currentFps, Vector3? triggerButtonWorldPos = null)
     {
         _selectedFps = currentFps;
-        if (triggerButtonWorldPos.HasValue)
-        {
-            _triggerButtonWorldPos = triggerButtonWorldPos.Value;
-            _hasTriggerPosition = true;
-        }
         ShowExpansion(ExpansionType.Fps);
     }
 
@@ -203,7 +188,6 @@ public class RTTTaskbarExpansion : RTTCanvasBase
     {
         _isVisible = false;
         _currentType = ExpansionType.None;
-        _hasTriggerPosition = false;
 
         // Clear static reference
         if (CurrentlyOpenExpansion == this)
@@ -217,14 +201,6 @@ public class RTTTaskbarExpansion : RTTCanvasBase
         }
 
         OnDismissed?.Invoke();
-    }
-
-    /// <summary>
-    /// Set the follow target (typically the taskbar).
-    /// </summary>
-    public void SetFollowTarget(Transform target)
-    {
-        followTarget = target;
     }
 
     /// <summary>
@@ -613,97 +589,6 @@ public class RTTTaskbarExpansion : RTTCanvasBase
         layout.childControlHeight = false;
         layout.childForceExpandWidth = false;
         layout.childForceExpandHeight = false;
-    }
-    #endregion
-
-    #region Position Tracking
-    private void UpdatePositionTracking()
-    {
-        if (followTarget == null || !_isVisible) return;
-
-        // Get taskbar bounds
-        var taskbarRTT = followTarget.GetComponent<RTTCanvasBase>();
-        float taskbarHalfHeight = 0f;
-
-        if (taskbarRTT != null)
-        {
-            taskbarHalfHeight = taskbarRTT.GetWorldSize().y / 2f;
-        }
-        else
-        {
-            var taskbarMiniFrame = followTarget.GetComponent<RTTMiniFrame>();
-            if (taskbarMiniFrame != null)
-            {
-                taskbarHalfHeight = taskbarMiniFrame.GetWorldSize().y / 2f;
-            }
-        }
-
-        float myHalfHeight = (frameHeight * PixelToMeter) / 2f;
-
-        // Position above taskbar
-        float totalOffset = taskbarHalfHeight + myHalfHeight + gapAboveTaskbar;
-
-        Vector3 localUp = followTarget.TransformDirection(Vector3.up);
-
-        // Calculate base position (centered above taskbar)
-        Vector3 basePosition = followTarget.position + localUp * totalOffset;
-
-        // If we have a trigger button position, align X-axis to it
-        if (_hasTriggerPosition)
-        {
-            // Get the local right direction of the taskbar
-            Vector3 localRight = followTarget.TransformDirection(Vector3.right);
-
-            // Calculate the offset from taskbar center to trigger button (along local right)
-            Vector3 taskbarToTrigger = _triggerButtonWorldPos - followTarget.position;
-            float xOffset = Vector3.Dot(taskbarToTrigger, localRight);
-
-            // Apply the offset to center expansion panel on trigger button
-            transform.position = basePosition + localRight * xOffset;
-        }
-        else
-        {
-            transform.position = basePosition;
-        }
-
-        // Face camera
-        FaceCamera();
-    }
-
-    private void FaceCamera()
-    {
-        if (followTarget == null) return;
-
-        var cam = Camera.main;
-        if (cam == null) return;
-
-        // Copy Y rotation from taskbar (followTarget)
-        // Only adjust X rotation (tilt) based on camera position
-
-        // Get taskbar's forward direction (Y rotation)
-        Vector3 taskbarForward = followTarget.forward;
-        Vector3 taskbarUp = followTarget.up;
-
-        // Calculate the direction to camera in taskbar's local space
-        Vector3 toCamera = cam.transform.position - transform.position;
-        if (toCamera.sqrMagnitude < 0.001f) return;
-
-        // Project toCamera onto the plane defined by taskbar's right axis
-        // This gives us the tilt angle (X rotation) while keeping Y rotation from taskbar
-        Vector3 taskbarRight = followTarget.right;
-
-        // Calculate the angle between taskbar forward and direction to camera (projected onto forward-up plane)
-        Vector3 toCameraProjected = toCamera - Vector3.Project(toCamera, taskbarRight);
-        if (toCameraProjected.sqrMagnitude < 0.001f)
-        {
-            toCameraProjected = -taskbarForward;
-        }
-
-        // Create rotation that faces the projected direction to camera
-        Quaternion lookRotation = Quaternion.LookRotation(-toCameraProjected.normalized, taskbarUp);
-
-        // Apply rotation
-        transform.rotation = lookRotation;
     }
     #endregion
 

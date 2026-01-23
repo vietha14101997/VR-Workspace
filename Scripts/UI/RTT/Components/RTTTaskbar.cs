@@ -499,8 +499,22 @@ public class RTTTaskbar : MonoBehaviour
     public void Show()
     {
         if (_miniFrame != null)
+        {
             _miniFrame.Show();
+
+            // Re-register with RTTToolbar as the active taskbar
+            if (RTTToolbar.Instance != null)
+            {
+                RTTToolbar.Instance.SetActiveTaskbar(_miniFrame);
+            }
+        }
     }
+
+    /// <summary>
+    /// Get the follow target that this taskbar is tracking.
+    /// Used by RTTFilePagination and RTTTaskbarExpansion to share the same target.
+    /// </summary>
+    public Transform GetFollowTarget() => _miniFrame?.GetFollowTarget();
 
     public void SelectHome()
     {

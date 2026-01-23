@@ -535,19 +535,16 @@ public class RTTRemoteMenuController : MonoBehaviour
         // Cleanup existing taskbar
         CleanupRemoteTaskbar();
 
-        // Create taskbar object
-        GameObject taskbarObj = new GameObject("RTTRemoteTaskbar");
+        // Get or create RTTToolbar
+        RTTToolbar toolbar = RTTToolbar.Instance;
+        if (toolbar == null)
+        {
+            toolbar = RTTToolbar.Create();
+        }
 
-        // Parent to VirtualObjects if exists, otherwise to ClusterRig parent
-        GameObject virtualObjects = GameObject.Find("VirtualObjects");
-        if (virtualObjects != null)
-        {
-            taskbarObj.transform.SetParent(virtualObjects.transform, false);
-        }
-        else
-        {
-            taskbarObj.transform.SetParent(_clusterRig.transform.parent, false);
-        }
+        // Create taskbar object in RTTToolbar
+        GameObject taskbarObj = new GameObject("RTTRemoteTaskbar");
+        taskbarObj.transform.SetParent(toolbar.transform, false);
 
         // Add RTTMiniFrame first (required component)
         RTTMiniFrame frame = taskbarObj.AddComponent<RTTMiniFrame>();
@@ -563,11 +560,13 @@ public class RTTRemoteMenuController : MonoBehaviour
         _remoteTaskbar = taskbarObj.AddComponent<RTTRemoteTaskbar>();
         _remoteTaskbar.SetFollowTarget(_clusterRig);
 
+        // Register with RTTToolbar for sphere positioning
+        toolbar.SetActiveTaskbar(frame);
+
         // Subscribe to taskbar events
         _remoteTaskbar.OnMenuRequested += HandleTaskbarMenuRequest;
 
-
-        Debug.Log("[RTTRemoteMenuController] Created RTTRemoteTaskbar following ClusterRig");
+        Debug.Log("[RTTRemoteMenuController] Created RTTRemoteTaskbar in RTTToolbar, following ClusterRig");
     }
 
     /// <summary>

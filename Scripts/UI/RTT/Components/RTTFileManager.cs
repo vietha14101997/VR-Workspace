@@ -248,33 +248,26 @@ public class RTTFileManager : MonoBehaviour
     
     private void CreatePagination()
     {
-        // User Request: Attach to RTTTaskbar (outside menu)
-        Transform targetTransform = null;
-        if (RTTTaskbar.Instance != null)
+        // Get RTTToolbar to parent pagination into
+        RTTToolbar toolbar = RTTToolbar.Instance;
+        if (toolbar == null)
         {
-            targetTransform = RTTTaskbar.Instance.transform;
+            Debug.LogWarning("[RTTFileManager] RTTToolbar not found, pagination positioning may be incorrect");
+            // Fallback: create toolbar
+            toolbar = RTTToolbar.Create();
         }
-        else
-        {
-            // Fallback to MenuFrame if Taskbar not found (e.g. testing)
-            targetTransform = _menuFrame != null ? _menuFrame.transform : transform;
-        }
-        
+
         GameObject pagObj = new GameObject("FilePagination");
-        
-        // User Request: "Must be in VirtualObjects"
-        GameObject virtualObjects = GameObject.Find("VirtualObjects");
-        if (virtualObjects != null)
-        {
-            pagObj.transform.SetParent(virtualObjects.transform, true);
-        }
-        
-        // Initial pos near target
-        pagObj.transform.position = targetTransform.position;
-        pagObj.transform.rotation = targetTransform.rotation;
-        
+
+        // Parent into RTTToolbar
+        pagObj.transform.SetParent(toolbar.transform, false);
+
+        // Set local position (above taskbar area)
+        pagObj.transform.localPosition = toolbar.GetPaginationLocalPosition();
+        pagObj.transform.localRotation = Quaternion.identity;
+
         _pagination = pagObj.AddComponent<RTTFilePagination>();
-        _pagination.Initialize(_controller, targetTransform);
+        _pagination.Initialize(_controller);
     }
     
     // Header References

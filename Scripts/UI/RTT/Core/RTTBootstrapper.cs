@@ -163,9 +163,16 @@ public class RTTBootstrapper : MonoBehaviour
 
     private void CreateTaskbar()
     {
+        // Create RTTToolbar container first (handles sphere positioning)
+        RTTToolbar toolbar = RTTToolbar.Instance;
+        if (toolbar == null)
+        {
+            toolbar = RTTToolbar.Create();
+        }
+
         // Create GameObject for RTTMiniFrame + RTTTaskbar
         GameObject taskbarObj = new GameObject("RTTTaskbar");
-        taskbarObj.transform.SetParent(transform, false);
+        taskbarObj.transform.SetParent(toolbar.transform, false);
 
         // Add RTTMiniFrame first (required by RTTTaskbar)
         _miniFrame = taskbarObj.AddComponent<RTTMiniFrame>();
@@ -175,12 +182,14 @@ public class RTTBootstrapper : MonoBehaviour
 
         // Set follow target to RTTMenu container (not individual frame)
         _miniFrame.SetFollowTarget(_menu.transform);
-        _miniFrame.SetSpacingMultiplier(taskbarSpacingMultiplier);
 
         // Add RTTTaskbar (logic controller)
         _taskbar = taskbarObj.AddComponent<RTTTaskbar>();
 
-        Debug.Log($"[RTTBootstrapper] Created RTTTaskbar following RTTMenu");
+        // Register taskbar with RTTToolbar for sphere positioning
+        toolbar.SetActiveTaskbar(_miniFrame);
+
+        Debug.Log($"[RTTBootstrapper] Created RTTTaskbar in RTTToolbar, following RTTMenu");
     }
 
     private void FaceCameraImmediate()

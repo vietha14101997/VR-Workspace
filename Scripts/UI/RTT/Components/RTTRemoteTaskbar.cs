@@ -333,18 +333,30 @@ public class RTTRemoteTaskbar : MonoBehaviour
     #region Expansion Panel
     private void CreateExpansionPanel()
     {
-        // Create expansion panel as sibling to taskbar
+        // Get RTTToolbar to parent expansion into
+        RTTToolbar toolbar = RTTToolbar.Instance;
+        if (toolbar == null)
+        {
+            Debug.LogWarning("[RTTRemoteTaskbar] RTTToolbar not found, expansion positioning may be incorrect");
+            // Fallback: create toolbar
+            toolbar = RTTToolbar.Create();
+        }
+
+        // Create expansion panel inside RTTToolbar
         GameObject expansionObj = new GameObject("RTTTaskbarExpansion");
-        expansionObj.transform.SetParent(transform.parent, false);
+        expansionObj.transform.SetParent(toolbar.transform, false);
+
+        // Set local position (above taskbar area)
+        expansionObj.transform.localPosition = toolbar.GetExpansionLocalPosition();
+        expansionObj.transform.localRotation = Quaternion.identity;
 
         _expansionPanel = expansionObj.AddComponent<RTTTaskbarExpansion>();
-        _expansionPanel.SetFollowTarget(transform);
 
         // Subscribe to events
         _expansionPanel.OnBitrateSelected += OnExpansionBitrateSelected;
         _expansionPanel.OnFpsSelected += OnExpansionFpsSelected;
 
-        Debug.Log("[RTTRemoteTaskbar] Expansion panel created");
+        Debug.Log("[RTTRemoteTaskbar] Expansion panel created in RTTToolbar");
     }
 
     private void CleanupExpansionPanel()
@@ -1102,7 +1114,15 @@ public class RTTRemoteTaskbar : MonoBehaviour
     public void Show()
     {
         if (_miniFrame != null)
+        {
             _miniFrame.Show();
+
+            // Re-register with RTTToolbar as the active taskbar
+            if (RTTToolbar.Instance != null)
+            {
+                RTTToolbar.Instance.SetActiveTaskbar(_miniFrame);
+            }
+        }
     }
     #endregion
 

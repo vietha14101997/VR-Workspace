@@ -17,9 +17,7 @@ public class RTTFilePagination : RTTCanvasBase
     [SerializeField] private float buttonSize = 90f;
     [SerializeField] private float buttonSpacing = 10f;
     
-    [Header("Position")]
-    [SerializeField] private Transform followTarget; // The Main Menu Frame
-    [SerializeField] private float gapBelowFrame = 0.0065f;
+    // Note: Positioning is handled by RTTToolbar parent
     #endregion
 
     #region Private Fields
@@ -64,24 +62,27 @@ public class RTTFilePagination : RTTCanvasBase
         }
     }
 
-    public void Initialize(RTTFileManagerController controller, Transform targetFrame)
+    public void Initialize(RTTFileManagerController controller)
     {
         // CRITICAL: Disable object BEFORE creating any visuals to prevent flicker
         gameObject.SetActive(false);
 
         _controller = controller;
-        followTarget = targetFrame;
+        // Note: Positioning is handled by RTTToolbar parent
 
-        // Width Calculation: 4/3 of target RTTMiniFrame width
-        if (targetFrame != null)
+        // Width Calculation: Get size from RTTTaskbar's RTTMiniFrame (not from followTarget)
+        // followTarget is now the main menu, but we still want pagination sized relative to taskbar
+        RTTMiniFrame taskbarMiniFrame = null;
+        if (RTTTaskbar.Instance != null)
         {
-            var targetMiniFrame = targetFrame.GetComponent<RTTMiniFrame>();
-            if (targetMiniFrame != null)
-            {
-                frameWidth = targetMiniFrame.TotalWidth * (4f / 3f);
-                frameHeight = targetMiniFrame.TotalHeight * 0.9f; // Reduced height by 10%
-                buttonSize = targetMiniFrame.ButtonSize; // Sync button size
-            }
+            taskbarMiniFrame = RTTTaskbar.Instance.GetComponent<RTTMiniFrame>();
+        }
+
+        if (taskbarMiniFrame != null)
+        {
+            frameWidth = taskbarMiniFrame.TotalWidth * (4f / 3f);
+            frameHeight = taskbarMiniFrame.TotalHeight * 0.9f; // Reduced height by 10%
+            buttonSize = taskbarMiniFrame.ButtonSize; // Sync button size
         }
 
         // Initial setup
@@ -185,7 +186,7 @@ public class RTTFilePagination : RTTCanvasBase
     protected override void LateUpdate()
     {
         base.LateUpdate();
-        UpdatePositionTracking();
+        // Note: Positioning is handled by RTTToolbar parent
     }
     #endregion
 
@@ -750,62 +751,6 @@ public class RTTFilePagination : RTTCanvasBase
         
         SetButtonState(_btnPrev, prevActive);
         SetButtonState(_btnNext, nextActive);
-    }
-    
-    private void UpdatePositionTracking()
-    {
-        if (followTarget == null) return;
-        
-        // Calculate target height
-        float targetHalfHeight = 0f;
-        
-        // Try to get RTTMiniFrame (Taskbar usually has this)
-        var targetMiniFrame = followTarget.GetComponent<RTTMiniFrame>();
-        if (targetMiniFrame != null)
-        {
-            targetHalfHeight = targetMiniFrame.GetWorldSize().y / 2f;
-        }
-        else
-        {
-             // Try RTTCanvasBase/MenuFrame
-             var targetCanvas = followTarget.GetComponent<RTTCanvasBase>();
-             if (targetCanvas != null)
-             {
-                 targetHalfHeight = targetCanvas.GetWorldSize().y / 2f;
-             }
-        }
-        
-        float myHalfHeight = worldHeight / 2f;
-        
-        // Position ABOVE the target (like TaskbarExpansion)
-        float totalOffset = targetHalfHeight + myHalfHeight + gapBelowFrame; 
-        
-        // Position: Target Pos + Up * Offset
-        transform.position = followTarget.position + (followTarget.up * totalOffset);
-        
-        // Rotation: Same as target
-        transform.rotation = followTarget.rotation;
-        
-        FaceCamera();
-    }
-    
-    private void FaceCamera()
-    {
-        if (followTarget == null) return;
-        var cam = Camera.main;
-        if (cam == null) return;
-        
-        Vector3 taskbarForward = followTarget.forward;
-        Vector3 taskbarUp = followTarget.up;
-        Vector3 toCamera = cam.transform.position - transform.position;
-        if (toCamera.sqrMagnitude < 0.001f) return;
-        
-        Vector3 taskbarRight = followTarget.right;
-        Vector3 toCameraProjected = toCamera - Vector3.Project(toCamera, taskbarRight);
-        if (toCameraProjected.sqrMagnitude < 0.001f) toCameraProjected = -taskbarForward;
-        
-        Quaternion lookRotation = Quaternion.LookRotation(-toCameraProjected.normalized, taskbarUp);
-        transform.rotation = lookRotation;
     }
     
     private Sprite GetPixelSprite()

@@ -55,6 +55,21 @@ public class VirtualObjectsZoomController : MonoBehaviour
         public float sideWidth;
         public float gap;
     }
+
+    /// <summary>
+    /// Stores information needed to recalculate bottom panel (taskbar) position on zoom.
+    /// Bottom panels are positioned below their target with face-to-camera orientation.
+    /// </summary>
+    private class BottomPanelInfo
+    {
+        public RTTCanvasBase panel;       // The bottom panel (taskbar, pagination, expansion)
+        public Transform target;          // The target panel to follow
+        public float targetHeight;        // Height of target in meters
+        public float panelHeight;         // Height of bottom panel in meters
+        public float gap;                 // Gap between target bottom and panel top in meters
+    }
+
+    private List<BottomPanelInfo> _bottomPanelInfos = new List<BottomPanelInfo>();
     #endregion
 
     #region Properties
@@ -405,6 +420,184 @@ public class VirtualObjectsZoomController : MonoBehaviour
     }
     #endregion
 
+    #region Bottom Panel Registration
+    /// <summary>
+    /// Register a bottom panel (taskbar, pagination, expansion) for sphere positioning updates on zoom.
+    /// Bottom panels are positioned below their target with top edge at gap distance from target bottom.
+    /// </summary>
+    /// <param name="panel">The bottom panel</param>
+    /// <param name="target">The target transform to follow</param>
+    /// <param name="targetHeight">Height of the target in meters</param>
+    /// <param name="panelHeight">Height of the bottom panel in meters</param>
+    /// <param name="gap">Gap between target bottom and panel top in meters</param>
+    public void RegisterBottomPanel(RTTCanvasBase panel, Transform target, float targetHeight, float panelHeight, float gap)
+    {
+        if (panel == null) return;
+
+        // Check if already registered - update if so
+        foreach (var info in _bottomPanelInfos)
+        {
+            if (info.panel == panel)
+            {
+                // Update existing registration
+                info.target = target;
+                info.targetHeight = targetHeight;
+                info.panelHeight = panelHeight;
+                info.gap = gap;
+                return;
+            }
+        }
+
+        var newInfo = new BottomPanelInfo
+        {
+            panel = panel,
+            target = target,
+            targetHeight = targetHeight,
+            panelHeight = panelHeight,
+            gap = gap
+        };
+
+        _bottomPanelInfos.Add(newInfo);
+        Debug.Log($"[VirtualObjectsZoomController] Registered bottom panel: {panel.name} (targetH={targetHeight:F3}, panelH={panelHeight:F3}, gap={gap:F3})");
+    }
+
+    /// <summary>
+    /// Unregister a bottom panel
+    /// </summary>
+    public void UnregisterBottomPanel(RTTCanvasBase panel)
+    {
+        int removed = _bottomPanelInfos.RemoveAll(info => info.panel == panel);
+        if (removed > 0)
+        {
+            Debug.Log($"[VirtualObjectsZoomController] Unregistered bottom panel: {panel?.name}");
+        }
+    }
+
+    /// <summary>
+    /// Clear all registered bottom panels
+    /// </summary>
+    public void ClearBottomPanels()
+    {
+        _bottomPanelInfos.Clear();
+    }
+
+    /// <summary>
+    /// Calculate sphere position for a bottom panel.
+    /// Ensures:
+    /// 1. Top edge of panel is at gap distance below target bottom
+    /// 2. Panel face is perpendicular to vector(panel center → camera)
+    ///
+    /// Mathematical approach:
+    /// - Calculate top edge position E (target bottom - gap in world down direction)
+    /// - Find panel center P such that P is on sphere surface and panel faces camera
+    /// - Uses vertical plane geometry similar to horizontal side panel positioning
+    /// </summary>
+    /// <param name="target">Target transform to position below</param>
+    /// <param name="targetHalfHeight">Half height of target in meters</param>
+    /// <param name="panelHalfHeight">Half height of panel in meters</param>
+    /// <param name="gap">Gap between target bottom and panel top in meters</param>
+    /// <param name="position">Output: calculated world position for panel center</param>
+    /// <param name="rotation">Output: calculated rotation to face camera</param>
+    public void CalculateBottomPanelSpherePosition(
+        Transform target,
+        float targetHalfHeight,
+        float panelHalfHeight,
+        float gap,
+        out Vector3 position,
+        out Quaternion rotation)
+    {
+        position = Vector3.zero;
+        rotation = Quaternion.identity;
+
+        Camera cam = Camera.main;
+        if (cam == null || target == null) return;
+
+        Vector3 cameraPos = cam.transform.position;
+        Vector3 targetCenter = target.position;
+        Vector3 targetUp = target.up;
+
+        // Step 1: Calculate top edge position E
+        // Top edge should be at: target bottom - gap (in world down direction toward camera)
+        Vector3 targetBottom = targetCenter - targetUp * targetHalfHeight;
+        Vector3 E = targetBottom - Vector3.up * gap;
+
+        // Step 2: Calculate vector from camera to E
+        Vector3 toE = E - cameraPos;
+        float distToE = toE.magnitude;
+
+        float h = panelHalfHeight;
+
+        // Edge case: camera too close to top edge
+        if (distToE < 0.001f || distToE < h)
+        {
+            // Fallback: simple linear positioning below target
+            position = targetBottom - Vector3.up * (gap + h);
+            Vector3 toCam = cameraPos - position;
+            if (toCam.sqrMagnitude > 0.001f)
+            {
+                rotation = Quaternion.LookRotation(-toCam.normalized, Vector3.up);
+            }
+            else
+            {
+                rotation = target.rotation;
+            }
+            return;
+        }
+
+        // Step 3: Calculate distance from camera to panel center
+        // r² = |E-C|² - h²
+        float rSq = distToE * distToE - h * h;
+        if (rSq < 0.0001f) rSq = 0.0001f;
+        float r = Mathf.Sqrt(rSq);
+
+        // Step 4: Calculate direction and angle adjustment
+        Vector3 dirToE = toE.normalized;
+
+        // Calculate adjustment angle β = arcsin(h / distToE)
+        float sinBeta = h / distToE;
+        sinBeta = Mathf.Clamp(sinBeta, -1f, 1f);
+        float beta = Mathf.Asin(sinBeta);
+
+        // Step 5: Calculate panel center position
+        // Work in vertical plane containing camera and E
+        // Horizontal direction from camera to E
+        Vector3 horizontalDir = new Vector3(toE.x, 0, toE.z);
+        float horizontalDist = horizontalDir.magnitude;
+
+        if (horizontalDist < 0.001f)
+        {
+            // Camera directly above/below E - use target's forward as reference
+            horizontalDir = target.forward;
+            horizontalDir.y = 0;
+            if (horizontalDir.sqrMagnitude < 0.001f) horizontalDir = Vector3.forward;
+        }
+        horizontalDir.Normalize();
+
+        // Current elevation angle from camera to E
+        float currentAngle = Mathf.Atan2(toE.y, horizontalDist);
+
+        // New angle: rotate downward by beta (panel center is below top edge)
+        float newAngle = currentAngle - beta;
+
+        // Calculate new horizontal and vertical distances
+        float newHorizontalDist = r * Mathf.Cos(newAngle);
+        float newVerticalDist = r * Mathf.Sin(newAngle);
+
+        position = cameraPos + horizontalDir * newHorizontalDist + Vector3.up * newVerticalDist;
+
+        // Step 6: Calculate rotation to face camera
+        Vector3 toCamera = cameraPos - position;
+        if (toCamera.sqrMagnitude > 0.001f)
+        {
+            rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
+        }
+        else
+        {
+            rotation = target.rotation;
+        }
+    }
+    #endregion
+
     #region Sphere Positioning
     /// <summary>
     /// Update all registered side panels to maintain sphere positioning after zoom.
@@ -443,6 +636,47 @@ public class VirtualObjectsZoomController : MonoBehaviour
         if (_taskbarFrame != null)
         {
             // RTTMiniFrame already updates face-to-camera in LateUpdate
+        }
+
+        // Update bottom panels (taskbars, pagination, expansion)
+        UpdateBottomPanelsOnSphere();
+    }
+
+    /// <summary>
+    /// Update all registered bottom panels to maintain sphere positioning after zoom.
+    /// Recalculates position so top edge stays at correct distance below target.
+    /// </summary>
+    private void UpdateBottomPanelsOnSphere()
+    {
+        Camera cam = Camera.main;
+        if (cam == null) return;
+
+        // Remove null entries
+        _bottomPanelInfos.RemoveAll(info => info.panel == null);
+
+        foreach (var info in _bottomPanelInfos)
+        {
+            if (info.panel == null || !info.panel.gameObject.activeInHierarchy)
+            {
+                continue;
+            }
+
+            if (info.target == null)
+            {
+                continue;
+            }
+
+            CalculateBottomPanelSpherePosition(
+                info.target,
+                info.targetHeight / 2f,
+                info.panelHeight / 2f,
+                info.gap,
+                out Vector3 newPos,
+                out Quaternion newRot
+            );
+
+            info.panel.transform.position = newPos;
+            info.panel.transform.rotation = newRot;
         }
     }
 
