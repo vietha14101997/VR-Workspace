@@ -82,6 +82,8 @@ public class RTTTaskbarExpansion : RTTCanvasBase
     // State
     private new bool _isVisible = false;
 
+    // Local X offset to align with trigger button
+    private float _localXOffset = 0f;
     #endregion
 
     #region Properties
@@ -163,10 +165,11 @@ public class RTTTaskbarExpansion : RTTCanvasBase
     /// Show expansion panel with bitrate options.
     /// </summary>
     /// <param name="currentBitrateMbps">Current selected bitrate</param>
-    /// <param name="triggerButtonWorldPos">World position of the trigger button (unused, kept for API compatibility)</param>
+    /// <param name="triggerButtonWorldPos">World position of the trigger button (for X-axis alignment)</param>
     public void ShowBitrateOptions(int currentBitrateMbps, Vector3? triggerButtonWorldPos = null)
     {
         _selectedBitrateMbps = currentBitrateMbps;
+        CalculateLocalXOffset(triggerButtonWorldPos);
         ShowExpansion(ExpansionType.Bitrate);
     }
 
@@ -174,11 +177,32 @@ public class RTTTaskbarExpansion : RTTCanvasBase
     /// Show expansion panel with FPS options.
     /// </summary>
     /// <param name="currentFps">Current selected FPS</param>
-    /// <param name="triggerButtonWorldPos">World position of the trigger button (unused, kept for API compatibility)</param>
+    /// <param name="triggerButtonWorldPos">World position of the trigger button (for X-axis alignment)</param>
     public void ShowFpsOptions(int currentFps, Vector3? triggerButtonWorldPos = null)
     {
         _selectedFps = currentFps;
+        CalculateLocalXOffset(triggerButtonWorldPos);
         ShowExpansion(ExpansionType.Fps);
+    }
+
+    /// <summary>
+    /// Calculate local X offset to align expansion center with trigger button.
+    /// </summary>
+    private void CalculateLocalXOffset(Vector3? triggerButtonWorldPos)
+    {
+        _localXOffset = 0f;
+
+        if (!triggerButtonWorldPos.HasValue) return;
+
+        // Get RTTToolbar to convert world position to local
+        RTTToolbar toolbar = RTTToolbar.Instance;
+        if (toolbar == null) return;
+
+        // Convert button world position to toolbar local position
+        Vector3 localPos = toolbar.transform.InverseTransformPoint(triggerButtonWorldPos.Value);
+
+        // Use the local X as offset (expansion panel center aligns with button center)
+        _localXOffset = localPos.x;
     }
 
     /// <summary>
@@ -280,6 +304,9 @@ public class RTTTaskbarExpansion : RTTCanvasBase
         // Resize quad and canvas to match new size
         ResizeQuadAndCanvas();
 
+        // Update local position with X offset to align with trigger button
+        UpdateLocalPosition();
+
         // Show
         gameObject.SetActive(true);
         _isVisible = true;
@@ -292,7 +319,22 @@ public class RTTTaskbarExpansion : RTTCanvasBase
 
         MarkDirty();
 
-        Debug.Log($"[RTTTaskbarExpansion] Showing {type} options, width={_totalWidth}px, worldWidth={worldWidth}m");
+        Debug.Log($"[RTTTaskbarExpansion] Showing {type} options, width={_totalWidth}px, worldWidth={worldWidth}m, xOffset={_localXOffset:F3}");
+    }
+
+    /// <summary>
+    /// Update local position within RTTToolbar, applying X offset to align with trigger button.
+    /// </summary>
+    private void UpdateLocalPosition()
+    {
+        RTTToolbar toolbar = RTTToolbar.Instance;
+        if (toolbar == null) return;
+
+        // Get base Y position from toolbar
+        Vector3 basePos = toolbar.GetExpansionLocalPosition();
+
+        // Apply X offset to align with trigger button
+        transform.localPosition = new Vector3(_localXOffset, basePos.y, basePos.z);
     }
 
     /// <summary>
