@@ -1852,13 +1852,14 @@ public class RTTFileManager : MonoBehaviour
     {
         if (_conflictPopup != null) return;
 
+        // 2-row layout: sideSpacing = rowSpacing for tight button spacing
         var config = new RTTPopupMenu.PopupConfig
         {
             width = 550f,
             buttonHeight = 60f,
-            sideSpacing = 20f,
-            rowSpacing = 10f,
-            labelHeight = 60f,
+            sideSpacing = 12f,
+            rowSpacing = 6f,
+            labelHeight = 50f,
             labelFontSize = 28,
             fontSize = 24,
             borderWidth = 0.028f,
@@ -1915,7 +1916,11 @@ public class RTTFileManager : MonoBehaviour
             _primaryColor
         );
 
-        _conflictPopup.AddSectionBlock("", new List<RTTPopupMenu.ButtonData> { replaceBtn, skipBtn, cancelBtn }, 3);
+        // Row 1: Replace + Skip (2 buttons)
+        _conflictPopup.AddSectionBlock("", new List<RTTPopupMenu.ButtonData> { replaceBtn, skipBtn }, 2);
+        // Row 2: Cancel (full width)
+        _conflictPopup.AddSectionBlock("", new List<RTTPopupMenu.ButtonData> { cancelBtn }, 1);
+
         _conflictPopup.Build();
         _conflictPopup.Show();
     }
@@ -1926,23 +1931,22 @@ public class RTTFileManager : MonoBehaviour
     {
         if (_deleteConfirmPopup != null) return;
 
-        // Match RTTPopupInputable styling
+        // Standardized Yes/No popup config
         var config = new RTTPopupMenu.PopupConfig
         {
             width = 500f,
-            buttonHeight = 60f,
-            sideSpacing = 20f,
-            rowSpacing = 10f,
-            labelHeight = 50f,
-            labelFontSize = 32,  // Match RTTPopupInputable.titleFontSize
-            fontSize = 24,       // Match RTTPopupInputable.buttonFontSize
+            buttonHeight = 66f,
+            sideSpacing = 26f,
+            rowSpacing = 16f,
+            labelHeight = 52f,
+            labelFontSize = 32,
+            fontSize = 25,
             borderWidth = 0.028f,
             primaryColor = _primaryColor,
             accentColor = _accentColor,
-            overlayColor = new Color(0f, 0f, 0f, 0.4f), // Match New Folder popup
+            overlayColor = new Color(0f, 0f, 0f, 0.4f),
             font = _font,
             layerName = "VirtualObjects",
-            // Button styling (match RTTPopupInputable.CreateActionButton)
             buttonBorderWidth = 0.04f,
             buttonGlowWidth = 0.08f,
             buttonGlowIntensity = 4f,

@@ -54,6 +54,9 @@ public class RTTTaskbar : MonoBehaviour
 
     // App overflow expansion panel
     private RTTTaskbarExpansion _appExpansion;
+
+    // Quit Confirmation Popup
+    private RTTPopupMenu _quitConfirmPopup;
     #endregion
 
     #region Lifecycle
@@ -381,6 +384,13 @@ public class RTTTaskbar : MonoBehaviour
             _appExpansion.OnAppSlotClicked -= OnAppExpansionSlotClicked;
             _appExpansion.OnDismissed -= OnAppExpansionDismissed;
         }
+
+        // Cleanup quit confirm popup
+        if (_quitConfirmPopup != null)
+        {
+            Destroy(_quitConfirmPopup.gameObject);
+            _quitConfirmPopup = null;
+        }
     }
     #endregion
 
@@ -397,11 +407,7 @@ public class RTTTaskbar : MonoBehaviour
         CreateIconButton(section1, iconQuit, "Quit", cyanColor, buttonSize, () =>
         {
             Debug.Log("[RTTTaskbar] Quit clicked");
-#if UNITY_EDITOR
-            UnityEditor.EditorApplication.isPlaying = false;
-#else
-            Application.Quit();
-#endif
+            ShowQuitConfirmPopup();
         });
 
         // Settings
@@ -1289,6 +1295,105 @@ public class RTTTaskbar : MonoBehaviour
             {
                 HandleHomeClick();
             });
+        }
+    }
+    #endregion
+
+    #region Quit Confirmation
+    private void CreateQuitConfirmPopup()
+    {
+        if (_quitConfirmPopup != null) return;
+
+        // Get the primary menu frame to center popup on it
+        RTTMenuFrame primaryFrame = RTTMenuFrame.PrimaryInstance;
+        Transform parentTransform = primaryFrame != null ? primaryFrame.transform : _miniFrame.transform;
+
+        Color primaryColor = new Color(0f, 0.9f, 1f);
+        Color accentColor = new Color(0.9f, 0.3f, 1f);
+
+        var config = new RTTPopupMenu.PopupConfig
+        {
+            width = 500f,
+            buttonHeight = 66f,
+            sideSpacing = 26f,
+            rowSpacing = 16f,
+            labelHeight = 52f,
+            labelFontSize = 32,
+            fontSize = 25,
+            borderWidth = 0.028f,
+            primaryColor = primaryColor,
+            accentColor = accentColor,
+            overlayColor = new Color(0f, 0f, 0f, 0.4f),
+            layerName = "VirtualObjects",
+            buttonBorderWidth = 0.04f,
+            buttonGlowWidth = 0.08f,
+            buttonGlowIntensity = 4f,
+            buttonCornerRadius = 0.12f
+        };
+
+        _quitConfirmPopup = RTTPopupMenu.CreateWorldSpace(config, parentTransform);
+    }
+
+    private void ShowQuitConfirmPopup()
+    {
+        if (_quitConfirmPopup == null)
+        {
+            CreateQuitConfirmPopup();
+        }
+
+        _quitConfirmPopup.Clear();
+
+        // Add title
+        _quitConfirmPopup.AddSectionBlock("Quit application?", new List<RTTPopupMenu.ButtonData>());
+
+        Color accentColor = new Color(0.9f, 0.3f, 1f);
+        Color primaryColor = new Color(0f, 0.9f, 1f);
+
+        var yesButton = new RTTPopupMenu.ButtonData(
+            "Yes",
+            OnQuitConfirmed,
+            null,
+            false,
+            accentColor
+        );
+
+        var noButton = new RTTPopupMenu.ButtonData(
+            "No",
+            OnQuitCancelled,
+            null,
+            false,
+            primaryColor
+        );
+
+        _quitConfirmPopup.AddSectionBlock("", new List<RTTPopupMenu.ButtonData> { yesButton, noButton }, 2);
+
+        _quitConfirmPopup.Build();
+        _quitConfirmPopup.Show();
+    }
+
+    private void OnQuitConfirmed()
+    {
+        Debug.Log("[RTTTaskbar] Quit confirmed");
+
+        if (_quitConfirmPopup != null)
+        {
+            _quitConfirmPopup.Hide();
+        }
+
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
+    }
+
+    private void OnQuitCancelled()
+    {
+        Debug.Log("[RTTTaskbar] Quit cancelled");
+
+        if (_quitConfirmPopup != null)
+        {
+            _quitConfirmPopup.Hide();
         }
     }
     #endregion

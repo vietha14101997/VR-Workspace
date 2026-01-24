@@ -25,7 +25,7 @@ public static class VRInputFieldFactory
     // Hằng số layout
     private const float FONT_TO_BOX_RATIO = 2.2f;      // Tỷ lệ font size -> box height
     private const float LABEL_HEIGHT = 32f;            // Chiều cao label cố định
-    private const float HORIZONTAL_PADDING = 60f;      // Padding trái/phải cho text
+    private const float HORIZONTAL_PADDING = 30f;      // Padding trái/phải cho text
     private const float VERTICAL_PADDING = 8f;         // Padding trên/dưới cho text
 
     /// <summary>
