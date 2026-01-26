@@ -28,6 +28,19 @@ public abstract class RTTCanvasBase : MonoBehaviour
 
     [Tooltip("Layer name for the display quad (visible in world)")]
     [SerializeField] protected string quadLayerName = "VirtualObjects";
+
+    [Header("Texture Quality (VR)")]
+    [Tooltip("Enable mipmaps for better quality at distance in VR. Reduces aliasing and shimmer.")]
+    [SerializeField] protected bool useMipMaps = true;
+
+    [Tooltip("FilterMode for the RenderTexture. Trilinear recommended for VR with mipmaps.")]
+    [SerializeField] protected FilterMode textureFilterMode = FilterMode.Trilinear;
+
+    [Tooltip("Anisotropic filtering level (0-16). Higher = sharper at angles. 16 recommended for VR.")]
+    [Range(0, 16)] [SerializeField] protected int anisoLevel = 16;
+
+    [Tooltip("Mipmap bias for sharpness. Negative = sharper text (use higher mip level). -0.5 to -1.0 recommended for VR text clarity.")]
+    [Range(-2f, 0f)] [SerializeField] protected float mipMapBias = -0.25f;
     #endregion
 
     #region Protected Fields
@@ -234,10 +247,20 @@ public abstract class RTTCanvasBase : MonoBehaviour
 
         _renderTexture = new RenderTexture(resolution.x, resolution.y, depthBits, format);
         _renderTexture.antiAliasing = antiAliasing;
-        _renderTexture.filterMode = config.filterMode;
-        _renderTexture.useMipMap = false;
-        _renderTexture.autoGenerateMips = false;
-        _renderTexture.anisoLevel = 0;
+        _renderTexture.filterMode = textureFilterMode;
+
+        // Mipmap settings for VR quality - reduces aliasing and shimmer at distance
+        _renderTexture.useMipMap = useMipMaps;
+        _renderTexture.autoGenerateMips = useMipMaps;
+        _renderTexture.anisoLevel = anisoLevel;
+
+        // Negative bias = sharper (uses higher resolution mip level)
+        // This keeps mipmaps for anti-shimmer while improving text clarity
+        if (useMipMaps)
+        {
+            _renderTexture.mipMapBias = mipMapBias;
+        }
+
         _renderTexture.name = $"RTT_{GetType().Name}_{GetInstanceID()}";
 
         if (!_renderTexture.Create())
@@ -317,8 +340,19 @@ public abstract class RTTCanvasBase : MonoBehaviour
         // Create new
         _renderTexture = new RenderTexture(newWidth, newHeight, depthBits, format);
         _renderTexture.antiAliasing = antiAliasing;
-        _renderTexture.filterMode = config.filterMode;
-        _renderTexture.useMipMap = false;
+        _renderTexture.filterMode = textureFilterMode;
+
+        // Mipmap settings for VR quality
+        _renderTexture.useMipMap = useMipMaps;
+        _renderTexture.autoGenerateMips = useMipMaps;
+        _renderTexture.anisoLevel = anisoLevel;
+
+        // Negative bias = sharper text
+        if (useMipMaps)
+        {
+            _renderTexture.mipMapBias = mipMapBias;
+        }
+
         _renderTexture.name = $"RTT_{GetType().Name}_{GetInstanceID()}";
         _renderTexture.Create();
 
@@ -524,6 +558,29 @@ public abstract class RTTCanvasBase : MonoBehaviour
         mat.name = $"RTTQuadMaterial_{GetType().Name}";
         mat.renderQueue = 3000; // Render after opaque objects
         return mat;
+    }
+
+    /// <summary>
+    /// Configure texture quality settings at runtime.
+    /// </summary>
+    /// <param name="enableMipMaps">Enable mipmaps for VR quality</param>
+    /// <param name="filterMode">Texture filter mode (Trilinear recommended for VR)</param>
+    /// <param name="anisotropicLevel">Anisotropic filtering level (0-16, 16 recommended for VR)</param>
+    /// <param name="mipBias">Mipmap bias (-2 to 0). Negative = sharper text. -0.5 recommended.</param>
+    public virtual void SetTextureQuality(bool enableMipMaps, FilterMode filterMode = FilterMode.Trilinear, int anisotropicLevel = 16, float mipBias = -0.5f)
+    {
+        useMipMaps = enableMipMaps;
+        textureFilterMode = filterMode;
+        anisoLevel = Mathf.Clamp(anisotropicLevel, 0, 16);
+        mipMapBias = Mathf.Clamp(mipBias, -2f, 0f);
+
+        // Apply to existing RenderTexture if initialized
+        if (_renderTexture != null)
+        {
+            // Need to recreate RenderTexture to change mipmap settings
+            var resolution = GetResolution();
+            ResizeRenderTexture(resolution.x, resolution.y);
+        }
     }
     #endregion
 

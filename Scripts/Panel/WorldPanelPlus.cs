@@ -29,7 +29,7 @@ public class WorldPanelPlus : MonoBehaviour
     [Tooltip("Anisotropic filtering level (1-16). Higher = sharper at angles.")]
     [Range(1, 16)] public int anisoLevel = 16; // Maximum for VR sharpness
     [Tooltip("Mipmap bias for VR sharpness. Negative = sharper but may cause color aliasing. Keep at 0 for best quality.")]
-    [Range(-2f, 0f)] public float mipMapBias = 0f;
+    [Range(-2f, 0f)] public float mipMapBias = -0.25f;
 
     [Header("Video Sharpening (disable if image has artifacts)")]
     [Tooltip("Enable shader-based sharpening. Disable if you see color artifacts or noise.")]

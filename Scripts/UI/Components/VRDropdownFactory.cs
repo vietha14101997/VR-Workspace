@@ -23,6 +23,7 @@ public static class VRDropdownFactory
     private static Sprite _pixelSprite;
     private static Sprite _arrowSprite;
     private static Sprite _checkmarkSprite;
+    private static Sprite _horizontalFadeSprite;
 
     // Hằng số layout
     private const float FONT_TO_BOX_RATIO = 4.2f;      // Tỷ lệ font size -> box height (tăng từ 3.5)
@@ -981,109 +982,52 @@ public static class VRDropdownFactory
         Button optBtn = option.AddComponent<Button>();
         optBtn.targetGraphic = optBg;
 
-        // More subtle color transitions since we have glowing border
+        // Strong color transitions for visible hover feedback
         ColorBlock colors = optBtn.colors;
-        colors.normalColor = isSelected ? new Color(config.themeColor.r, config.themeColor.g, config.themeColor.b, 0.15f) : Color.clear;
-        colors.highlightedColor = new Color(config.themeColor.r, config.themeColor.g, config.themeColor.b, 0.25f);
-        colors.pressedColor = new Color(config.themeColor.r, config.themeColor.g, config.themeColor.b, 0.4f);
+        colors.normalColor = isSelected ? new Color(config.themeColor.r, config.themeColor.g, config.themeColor.b, 0.3f) : Color.clear;
+        colors.highlightedColor = new Color(config.themeColor.r, config.themeColor.g, config.themeColor.b, 0.5f);
+        colors.pressedColor = new Color(config.themeColor.r, config.themeColor.g, config.themeColor.b, 0.65f);
         colors.selectedColor = colors.highlightedColor;
         optBtn.colors = colors;
 
-        // === GLOWING BORDER for hover effect ===
-        // Create border container that matches panel border edges exactly
-        //
-        // Layout hierarchy: Panel > Viewport > Visuals (expanded) > Content (10px padding) > Options > Option
-        // Border needs to span the full Visuals width regardless of Option size
-        //
-        // Visuals width = config.width * (1 + 2*adjustedExpansion)
-        // We use center anchor and set fixed size to match Visuals exactly
-
-        // Border dimensions should exactly match Visuals dimensions horizontally
-        // Visuals width = config.width * (1 + 2*adjustedExpansion)
-        float visualsWidth = config.width * (1f + 2f * adjustedExpansion);
-        float borderWidth = visualsWidth;
-
-        // Calculate border height based on option's aspect ratio
-        // Option width is approximately config.width (fills Content container)
-        // Border height should maintain the same width:height ratio expansion
-        // borderHeight / optionHeight = borderWidth / optionWidth
-        float optionWidth = config.width;
-        float borderHeight = borderWidth * optionHeight / optionWidth;
-
-        float firstOptionExtraTop = 0f;
-        float lastOptionExtraBottom = 0f;
-        if (index == 0)
+        // === SEPARATOR LINE between options ===
+        // Add separator at bottom of each option (except last)
+        // Separator fades at both ends for a clean look
+        bool isLastOption = (index == config.options.Count - 1);
+        if (!isLastOption)
         {
-            firstOptionExtraTop = 5f;
-        }
-        else if (index == config.options.Count - 1)
-        {
-            lastOptionExtraBottom = 10f;
-        }
+            GameObject separatorObj = new GameObject("Separator");
+            separatorObj.transform.SetParent(option.transform, false);
+            separatorObj.layer = renderLayer;
+            RectTransform separatorRT = separatorObj.AddComponent<RectTransform>();
 
-        float adjustedBorderHeight = borderHeight + firstOptionExtraTop + lastOptionExtraBottom;
+            // Position at bottom of option, stretch horizontally with padding
+            separatorRT.anchorMin = new Vector2(0f, 0f);
+            separatorRT.anchorMax = new Vector2(1f, 0f);
+            separatorRT.pivot = new Vector2(0.5f, 0.5f);
+            separatorRT.anchoredPosition = new Vector2(0f, 0f);
+            separatorRT.sizeDelta = new Vector2(-20f, 3f); // 3px height, 10px padding each side
 
-        GameObject borderObj = new GameObject("HoverBorder");
-        borderObj.transform.SetParent(option.transform, false);
-        RectTransform borderRT = borderObj.AddComponent<RectTransform>();
-
-        // Use center anchor with fixed size matching Visuals
-        // Position at center of Option (which should align with center of panel)
-        borderRT.anchorMin = new Vector2(0.5f, 0.5f);
-        borderRT.anchorMax = new Vector2(0.5f, 0.5f);
-        borderRT.pivot = new Vector2(0.5f, 0.5f);
-        borderRT.sizeDelta = new Vector2(borderWidth, adjustedBorderHeight + 10f);
-
-        // Shift border up by half of extra height so the extra is on top
-        float yOffset = (firstOptionExtraTop + 10f) / 2f;
-        if (index == config.options.Count - 1)
-        {
-            yOffset = 0f;
-        }
-        borderRT.anchoredPosition = new Vector2(0f, yOffset);
-
-        // Border image with GlowingElementBorder shader
-        Image borderImg = borderObj.AddComponent<Image>();
-        borderImg.sprite = GetPixelSprite();
-        borderImg.raycastTarget = false;
-        borderImg.color = Color.clear; // Start invisible, HoverEffectController will control alpha
-
-        // Calculate shader parameters to match panel border visually
-        float heightRatio = config.BoxHeight / panelHeight;
-        float optionHeightRatio = optionHeight / panelHeight;
-        float scaledEdgePadding = config.edgePadding * 3.5f / 3f;
-        float scaledCornerRadius = Mathf.Min(config.cornerRadius * heightRatio / optionHeightRatio, 0.4f);
-        float scaledBorderWidth = config.borderWidth * heightRatio / optionHeightRatio;
-        float scaledGlowWidth = config.glowWidth * heightRatio / optionHeightRatio;
-
-        // Setup border material
-        Shader glowShader = Shader.Find("Custom/GlowingElementBorder");
-        if (glowShader != null)
-        {
-            Material borderMat = new Material(glowShader);
-            float aspect = borderWidth / (adjustedBorderHeight + 10f);
-            borderMat.SetFloat("_Aspect", aspect);
-            borderMat.SetFloat("_EdgePadding", scaledEdgePadding);
-            borderMat.SetFloat("_CornerRadius", scaledCornerRadius);
-            borderMat.SetFloat("_BorderWidth", scaledBorderWidth);
-            borderMat.SetFloat("_GlowWidth", scaledGlowWidth);
-            borderMat.SetFloat("_GlowIntensity", config.glowIntensity);
-            Color glowCol = Color.Lerp(config.themeColor, Color.white, 0.75f);
-            borderMat.SetColor("_GlowColor", glowCol);
-            borderImg.material = borderMat;
+            Image separatorImg = separatorObj.AddComponent<Image>();
+            separatorImg.sprite = GetHorizontalFadeSprite();
+            separatorImg.raycastTarget = false;
+            // Same color as panel border
+            Color separatorColor = Color.Lerp(config.themeColor, Color.white, 0.75f);
+            separatorColor.a = 0.7f; // Semi-transparent
+            separatorImg.color = separatorColor;
         }
 
         // Add HoverEffectController for hover animation
         HoverEffectController hoverController = option.AddComponent<HoverEffectController>();
         hoverController.TargetVisuals = option.transform;
 
-        // Add color effect to control border alpha
+        // Add background color effect for hover feedback (stronger intensity)
+        Color bgHoverColor = new Color(config.themeColor.r, config.themeColor.g, config.themeColor.b, 0.55f);
         hoverController.AddEffect(new ColorHoverEffect()
-            .WithTargetChild("HoverBorder")
-            .WithHoverColor(Color.white)
-            .WithAlphaOnly(true));
+            .WithTargetChild("")  // Empty = target TargetVisuals directly (option has Image)
+            .WithHoverColor(bgHoverColor));
 
-        // If selected, show border
+        // If selected, highlight background
         if (isSelected)
         {
             hoverController.SetForceHover(true);
@@ -1323,6 +1267,54 @@ public static class VRDropdownFactory
         float t = Mathf.Clamp01(Vector2.Dot(ap, ab) / Vector2.Dot(ab, ab));
         Vector2 closest = a + t * ab;
         return Vector2.Distance(p, closest);
+    }
+
+    /// <summary>
+    /// Tạo sprite ngang với gradient fade ở 2 đầu (cho separator lines)
+    /// </summary>
+    public static Sprite GetHorizontalFadeSprite()
+    {
+        if (_horizontalFadeSprite != null) return _horizontalFadeSprite;
+
+        int width = 128;
+        int height = 4;
+        Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        Color[] colors = new Color[width * height];
+
+        // Fade region at both ends (25% each side)
+        float fadeRatio = 0.25f;
+        int fadePixels = Mathf.RoundToInt(width * fadeRatio);
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                float alpha = 1f;
+
+                // Left fade
+                if (x < fadePixels)
+                {
+                    alpha = (float)x / fadePixels;
+                }
+                // Right fade
+                else if (x > width - fadePixels)
+                {
+                    alpha = (float)(width - x) / fadePixels;
+                }
+
+                // Smooth easing
+                alpha = alpha * alpha * (3f - 2f * alpha); // Smoothstep
+
+                colors[y * width + x] = new Color(1f, 1f, 1f, alpha);
+            }
+        }
+
+        tex.SetPixels(colors);
+        tex.Apply();
+        tex.filterMode = FilterMode.Bilinear;
+        tex.wrapMode = TextureWrapMode.Clamp;
+        _horizontalFadeSprite = Sprite.Create(tex, new Rect(0, 0, width, height), new Vector2(0.5f, 0.5f));
+        return _horizontalFadeSprite;
     }
 
     /// <summary>
@@ -1818,11 +1810,21 @@ public class VRDropdown : MonoBehaviour
                     _onValueChanged?.Invoke(capturedIndex, displayValue);
                 });
 
-                // Restore selected state on cloned HoverEffectController
-                // When panel is cloned, HoverEffectController instances lose their force hover state
+                // Re-add hover effects to cloned HoverEffectController
+                // When panel is cloned, _activeEffects (runtime list) is lost
                 HoverEffectController hoverController = btn.GetComponent<HoverEffectController>();
                 if (hoverController != null)
                 {
+                    // Get theme color from button's highlightedColor (was set during CreateOptionItem)
+                    Color themeColor = btn.colors.highlightedColor;
+                    // Reconstruct the full color with stronger hover intensity
+                    Color bgHoverColor = new Color(themeColor.r, themeColor.g, themeColor.b, 0.55f);
+
+                    // Re-add background color effect
+                    hoverController.AddEffect(new ColorHoverEffect()
+                        .WithTargetChild("")
+                        .WithHoverColor(bgHoverColor));
+
                     // Set selected state for the currently selected option
                     bool isSelected = (capturedIndex == _selectedIndex);
                     hoverController.SetForceHover(isSelected);
