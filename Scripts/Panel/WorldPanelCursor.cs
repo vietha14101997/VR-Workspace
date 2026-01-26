@@ -246,42 +246,177 @@ public class WorldPanelCursor : MonoBehaviour
         if (forceRebuild) EnsureBuilt();
         if (_board == null) return;
 
-        // 1) Tọa độ local trên mặt quad: x,y ∈ [-0.5..0.5]
-        float lx = u - 0.5f;
-        float ly = v - 0.5f;
-        Vector3 local = new(lx, ly, 0f);
+        Vector3 worldPoint = Vector3.zero;
+        Vector3 n = Vector3.forward;
 
-        // 2) Chuyển sang world
-        Vector3 worldPoint = _board.TransformPoint(local);
+        // Try to get cluster rig for curved mapping
+        WorldPanelClusterRig clusterRig = null;
+        WorldPanelPlus panel = null;
+        int panelIndex = -1;
 
-        // 3) Lấy pháp tuyến bề mặt (hướng "mặt trước" của Board)
-        Vector3 n = _board.forward;
-        if (invertNormal) n = -n;
+        // Traverse hierarchy: Cursor -> Board -> WorldPanelPlus -> WorldPanelClusterRig
+        Transform panelTransform = _board.parent;
+        if (panelTransform != null)
+        {
+            panel = panelTransform.GetComponent<WorldPanelPlus>();
+            Transform clusterTransform = panelTransform.parent;
+            if (clusterTransform != null)
+            {
+                clusterRig = clusterTransform.GetComponent<WorldPanelClusterRig>();
+                if (clusterRig != null && panel != null)
+                {
+                    // Find panel index in panels list
+                    for (int i = 0; i < clusterRig.panels.Count; i++)
+                    {
+                        if (clusterRig.panels[i] == panel)
+                        {
+                            panelIndex = i;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
 
-        // 4) Bảo đảm đẩy TỚI camera (nếu enabled)
+        // Determine mapping mode:
+        // 1. CurvedSurround (useCurvedVisual=true): continuous curved arc, use arc-based mapping
+        // 2. FlatPlanar (!useCurvedVisual but _flatPlanarVisual exists): flat panels on arc with yaw rotation
+        // 3. Board-only: use original board.TransformPoint
+        bool useCurvedMapping = clusterRig != null && panelIndex >= 0 && clusterRig.IsUsingUnifiedVisual;
+        bool useFlatPlanarMapping = clusterRig != null && panelIndex >= 0 && clusterRig.IsUsingFlatPlanarVisual;
+        bool specialMappingApplied = false;
+
+        if (useCurvedMapping)
+        {
+            // === CURVED SURROUND MAPPING ===
+            // Calculate position on curved surface using EXACT same formula as CurvedClusterMeshGenerator
+
+            var enabledIndices = clusterRig.GetEnabledPanelIndices();
+            int enabledCount = enabledIndices.Count;
+            int enabledPanelIndex = enabledIndices.IndexOf(panelIndex);
+
+            if (enabledPanelIndex >= 0 && enabledCount > 0)
+            {
+                float arcRadius = clusterRig.ArcRadius;
+                float panelWidth = panel.width;
+                float panelHeight = panel.height;
+
+                // Use EXACT same parameters as CurvedClusterMeshGenerator
+                float boardWidth = panelWidth;
+                float gapMeters = clusterRig.edgeGapMeters;
+                float overlapMeters = clusterRig.panelOverlap;
+
+                float boardAngleRad = 2f * Mathf.Atan(boardWidth / 2f / arcRadius);
+                float gapAngleRad = 2f * Mathf.Atan(gapMeters / 2f / arcRadius);
+                float overlapAngleRad = 2f * Mathf.Atan(overlapMeters / 2f / arcRadius);
+                float anglePerPanelRad = boardAngleRad + gapAngleRad - overlapAngleRad;
+                float totalArcAngleRad = enabledCount * anglePerPanelRad;
+
+                float globalU = (enabledPanelIndex + u) / enabledCount;
+                float angle = (globalU - 0.5f) * totalArcAngleRad;
+
+                float xPos = Mathf.Sin(angle) * arcRadius;
+                float zPos = Mathf.Cos(angle) * arcRadius - arcRadius;
+                float yPos = (v - 0.5f) * panelHeight;
+
+                Vector3 contentLocalPos = clusterRig.GetUnifiedContentLocalPosition();
+                Vector3 localPos = new Vector3(xPos + contentLocalPos.x, yPos, zPos + contentLocalPos.z);
+                worldPoint = clusterRig.transform.TransformPoint(localPos);
+
+                Vector3 localNormal = new Vector3(-Mathf.Sin(angle), 0f, -Mathf.Cos(angle));
+                n = clusterRig.transform.TransformDirection(localNormal);
+
+                specialMappingApplied = true;
+            }
+        }
+        else if (useFlatPlanarMapping)
+        {
+            // === FLAT PLANAR MAPPING ===
+            // Each panel is a FLAT quad positioned on arc with yaw rotation.
+            // Boards are positioned linearly (z=0, no rotation), but mesh panels are on arc.
+            // Use FlatPlanarMeshGenerator formulas for cursor positioning.
+
+            var enabledIndices = clusterRig.GetEnabledPanelIndices();
+            int enabledCount = enabledIndices.Count;
+            int enabledPanelIndex = enabledIndices.IndexOf(panelIndex);
+
+            if (enabledPanelIndex >= 0 && enabledCount > 0)
+            {
+                // Get panel transform matching FlatPlanarMeshGenerator
+                clusterRig.GetFlatPlanarPanelTransform(enabledPanelIndex, enabledCount,
+                    out Vector3 panelCenter, out Vector3 panelRight, out Vector3 panelNormal);
+
+                // Get board dimensions
+                clusterRig.GetFlatPlanarBoardDimensions(out float boardWidth, out float boardHeight);
+
+                // Calculate local position on panel surface
+                // u,v are 0-1 within this panel
+                float localX = (u - 0.5f) * boardWidth;  // -halfWidth to +halfWidth
+                float localY = (v - 0.5f) * boardHeight; // -halfHeight to +halfHeight
+
+                // Position in ClusterRig local space
+                // panelCenter + right * localX + up * localY
+                Vector3 localPos = panelCenter + panelRight * localX + Vector3.up * localY;
+
+                // Add content mesh offset (to match where mesh is rendered)
+                Vector3 contentLocalPos = clusterRig.GetUnifiedContentLocalPosition();
+                localPos += contentLocalPos;
+
+                worldPoint = clusterRig.transform.TransformPoint(localPos);
+                n = clusterRig.transform.TransformDirection(panelNormal);
+
+                specialMappingApplied = true;
+            }
+        }
+
+        if (!specialMappingApplied)
+        {
+            // === BOARD MAPPING (original behavior) ===
+            float lx = u - 0.5f;
+            float ly = v - 0.5f;
+            worldPoint = _board.TransformPoint(new Vector3(lx, ly, 0f));
+            n = _board.forward;
+            if (invertNormal) n = -n;
+        }
+
+        // Ensure normal points toward camera (if enabled)
         if (faceCamera)
         {
             Camera cam = Camera.main;
-            if (cam)
+            if (cam != null)
             {
                 Vector3 toCam = cam.transform.position - worldPoint;
                 if (Vector3.Dot(n, toCam) < 0f) n = -n;
             }
         }
 
-        // 5) Đặt vị trí thế giới và xoay "ốp" theo mặt Board
-        float zWorldOffset = Mathf.Max(1e-4f, zOffset); // mét
-        transform.position = worldPoint + n * zWorldOffset;
-        transform.rotation = _board.rotation;  // cùng hướng với mặt Board
+        // Reparent cursor for special mapping modes
+        if (specialMappingApplied && clusterRig != null && transform.parent != clusterRig.transform)
+        {
+            transform.SetParent(clusterRig.transform, true);
+            UpdateScaleMeters();
+        }
+        else if (!specialMappingApplied && _board != null && transform.parent != _board)
+        {
+            transform.SetParent(_board, true);
+            UpdateScaleMeters();
+        }
+
+        // Set position and rotation
+        transform.position = worldPoint + n * Mathf.Max(1e-4f, zOffset);
+        transform.rotation = (specialMappingApplied && clusterRig != null)
+            ? Quaternion.LookRotation(-n, clusterRig.transform.up)
+            : _board.rotation;
     }
 
     void UpdateScaleMeters()
     {
-        if (_board == null) return;
-        var s = _board.lossyScale;
-        // Chia ngược scale của Board để sizeMeters là kích thước thật tính theo thế giới
-        float sx = sizeMeters / Mathf.Max(1e-6f, s.x);
-        float sy = sizeMeters / Mathf.Max(1e-6f, s.y);
+        // Get parent's lossy scale to calculate local scale for target world size
+        Vector3 parentScale = transform.parent != null ? transform.parent.lossyScale : Vector3.one;
+
+        // Calculate local scale to achieve sizeMeters world size
+        float sx = sizeMeters / Mathf.Max(1e-6f, parentScale.x);
+        float sy = sizeMeters / Mathf.Max(1e-6f, parentScale.y);
         transform.localScale = new Vector3(sx, sy, 1f);
     }
 }

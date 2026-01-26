@@ -56,8 +56,7 @@ public class RTTMiniFrame : RTTCanvasBase
 
     [Header("Position Tracking")]
     [SerializeField] private Transform followTarget;
-    [SerializeField] private float spacingMultiplier = 1.1f;
-    [SerializeField] private bool faceOnInit = true;
+    // Note: Actual positioning is handled by RTTToolbar parent
     #endregion
 
     #region Private Fields
@@ -140,8 +139,7 @@ public class RTTMiniFrame : RTTCanvasBase
         UpdateBattery();
         UpdateNetwork();
 
-        // Position tracking (follows target position and rotation)
-        UpdatePositionTracking();
+        // Note: Position tracking is now handled by RTTToolbar parent
     }
     #endregion
 
@@ -224,6 +222,28 @@ public class RTTMiniFrame : RTTCanvasBase
     /// Get Section 3 container for adding content.
     /// </summary>
     public RectTransform GetSection3Container() => _section3Container;
+
+    /// <summary>
+    /// Get Section 2's center X offset from frame center (in world units).
+    /// Used for aligning expansion panels with Section 2.
+    /// </summary>
+    public float GetSection2CenterXOffset()
+    {
+        // Calculate Section 2's center position from canvas left edge (in pixels)
+        // Section 2 starts at: contentMarginLeft + _section1Width + sectionSpacing
+        // Section 2's center: + _section2Width / 2
+        float section2CenterFromLeft = contentMarginLeft + _section1Width + sectionSpacing + (_section2Width / 2f);
+
+        // Canvas center from left edge
+        float canvasCenterFromLeft = _totalWidth / 2f;
+
+        // Offset of Section 2 center from canvas center (in pixels)
+        float offsetPixels = section2CenterFromLeft - canvasCenterFromLeft;
+
+        // Convert to world units
+        const float PixelToMeter = 1.6f / 1920f;
+        return offsetPixels * PixelToMeter;
+    }
 
     /// <summary>
     /// Recalculate frame size based on section capacities.
@@ -785,133 +805,25 @@ public class RTTMiniFrame : RTTCanvasBase
     #endregion
 
     #region Position Tracking
-    private void UpdatePositionTracking()
-    {
-        if (followTarget == null) return;
-
-        // Get target bounds (try RTTCanvasBase first, then RTTMenu, then WorldPanelClusterRig, then renderer)
-        float targetHalfHeight = 0f;
-        Vector3 targetCenter = followTarget.position;
-
-        var targetRTT = followTarget.GetComponent<RTTCanvasBase>();
-        if (targetRTT != null)
-        {
-            targetHalfHeight = targetRTT.GetWorldSize().y / 2f;
-        }
-        else
-        {
-            // Try RTTMenu container
-            var targetMenu = followTarget.GetComponent<RTTMenu>();
-            if (targetMenu != null)
-            {
-                targetHalfHeight = targetMenu.GetWorldSize().y / 2f;
-            }
-            else
-            {
-                // Try WorldPanelClusterRig (for Remote Desktop streaming)
-                var clusterRig = followTarget.GetComponent<WorldPanelClusterRig>();
-                if (clusterRig != null)
-                {
-                    // GetFollowBounds returns:
-                    // - FixedThreeSlot: center panel bounds (taskbar under center monitor)
-                    // - Dynamic: combined bounds (taskbar under entire cluster)
-                    Bounds bounds = clusterRig.GetFollowBounds();
-                    targetHalfHeight = bounds.extents.y;
-                    targetCenter = bounds.center;
-                }
-                else
-                {
-                    // Fallback: try to get from renderer bounds
-                    var renderer = followTarget.GetComponent<Renderer>();
-                    if (renderer != null)
-                    {
-                        targetHalfHeight = renderer.bounds.extents.y;
-                        targetCenter = renderer.bounds.center;
-                    }
-                }
-            }
-        }
-
-        float physicalHeight = frameHeight * PixelToMeter;
-        float myHalfHeight = physicalHeight / 2f;
-
-        // Calculate gap: spacingMultiplier = 1.0 means gap equals one taskbar height
-        float gap = physicalHeight * spacingMultiplier;
-        float totalOffset = targetHalfHeight + myHalfHeight + gap;
-
-        // Calculate position below follow target center
-        // Use world down direction for consistency with curved panels
-        Vector3 localDown = followTarget.TransformDirection(Vector3.down);
-        transform.position = targetCenter + localDown * totalOffset;
-
-        // Face towards camera independently
-        FaceCamera();
-    }
-
-    private void FaceCamera()
-    {
-        if (!faceOnInit) return;
-
-        var cam = Camera.main;
-        if (cam == null) return;
-
-        Vector3 toCamera = cam.transform.position - transform.position;
-
-        if (toCamera.sqrMagnitude < 0.001f)
-        {
-            // Too close to camera, use camera's forward direction
-            toCamera = -cam.transform.forward;
-        }
-
-        if (toCamera.sqrMagnitude < 0.001f) return;
-
-        // Face camera fully (including pitch/tilt on X axis)
-        transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
-    }
-
-    /// <summary>
-    /// Set whether the frame should continuously face the camera.
-    /// </summary>
-    public void SetFaceOnInit(bool value)
-    {
-        faceOnInit = value;
-    }
-
     /// <summary>
     /// Set the target transform to follow.
+    /// RTTToolbar will use this to determine positioning.
     /// </summary>
     public void SetFollowTarget(Transform target)
     {
         followTarget = target;
-        // Delay initialization to ensure camera is ready
-        if (followTarget != null)
+
+        // Notify RTTToolbar if it exists
+        if (RTTToolbar.Instance != null)
         {
-            StartCoroutine(DelayedInitialPositioning());
+            RTTToolbar.Instance.UpdateFollowTarget();
         }
-    }
-
-    private System.Collections.IEnumerator DelayedInitialPositioning()
-    {
-        // Wait for end of frame to ensure camera is initialized
-        yield return new WaitForEndOfFrame();
-        // Additional frame for safety
-        yield return null;
-
-        UpdatePositionTracking();
     }
 
     /// <summary>
     /// Get the current follow target.
     /// </summary>
     public Transform GetFollowTarget() => followTarget;
-
-    /// <summary>
-    /// Set the spacing multiplier for position tracking.
-    /// </summary>
-    public void SetSpacingMultiplier(float multiplier)
-    {
-        spacingMultiplier = multiplier;
-    }
     #endregion
 
     #region Theme Support

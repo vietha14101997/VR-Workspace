@@ -190,6 +190,71 @@ public class RTTManager : MonoBehaviour
             : null;
     #endregion
 
+    #region Properties - Zoom
+    /// <summary>Get current zoom distance from camera</summary>
+    public float ZoomDistance => VirtualObjectsZoomController.Instance?.CurrentDistance ?? 1.8f;
+
+    /// <summary>Get minimum zoom distance</summary>
+    public float ZoomMinDistance => VirtualObjectsZoomController.Instance?.MinDistance ?? 1.0f;
+
+    /// <summary>Get maximum zoom distance</summary>
+    public float ZoomMaxDistance => VirtualObjectsZoomController.Instance?.MaxDistance ?? 2.0f;
+
+    /// <summary>Whether zoom controller is available</summary>
+    public bool IsZoomAvailable => VirtualObjectsZoomController.Instance != null;
+    #endregion
+
+    #region Zoom API
+    /// <summary>
+    /// Set zoom distance (move VirtualObjects closer/farther from camera).
+    /// </summary>
+    /// <param name="distance">Distance in meters (clamped to min/max)</param>
+    public void SetZoom(float distance)
+    {
+        VirtualObjectsZoomController.Instance?.SetZoomDistance(distance);
+    }
+
+    /// <summary>
+    /// Set zoom using normalized value (0 = closest, 1 = farthest).
+    /// </summary>
+    public void SetNormalizedZoom(float normalized01)
+    {
+        VirtualObjectsZoomController.Instance?.SetNormalizedZoom(normalized01);
+    }
+
+    /// <summary>
+    /// Get normalized zoom value (0 = closest, 1 = farthest).
+    /// </summary>
+    public float GetNormalizedZoom()
+    {
+        return VirtualObjectsZoomController.Instance?.GetNormalizedZoom() ?? 0.5f;
+    }
+
+    /// <summary>
+    /// Zoom in by one step (move closer to camera).
+    /// </summary>
+    public void ZoomIn()
+    {
+        VirtualObjectsZoomController.Instance?.ZoomIn();
+    }
+
+    /// <summary>
+    /// Zoom out by one step (move farther from camera).
+    /// </summary>
+    public void ZoomOut()
+    {
+        VirtualObjectsZoomController.Instance?.ZoomOut();
+    }
+
+    /// <summary>
+    /// Reset zoom to default distance.
+    /// </summary>
+    public void ResetZoom()
+    {
+        VirtualObjectsZoomController.Instance?.ResetZoom();
+    }
+    #endregion
+
     #region Lifecycle
     private void Awake()
     {
@@ -453,6 +518,9 @@ public class RTTManager : MonoBehaviour
         }
 
         Debug.Log($"[RTTManager] Instant recenter: moved {children.Count} objects to face camera");
+
+        // Notify ZoomController to recalculate distance after recenter
+        VirtualObjectsZoomController.Instance?.OnRecenter();
     }
 
     /// <summary>
@@ -1115,8 +1183,11 @@ public class RTTManager : MonoBehaviour
 
     private int GetNextAvailableSlot()
     {
-        int maxSlots = appRegistry?.maxOpenApps ?? 3;
-        for (int i = 1; i <= maxSlots; i++)
+        int mainSlots = appRegistry?.maxOpenApps ?? 3;
+        int maxOverflowSlots = 5; // Allow up to 5 additional overflow apps
+        int totalMaxSlots = mainSlots + maxOverflowSlots;
+
+        for (int i = 1; i <= totalMaxSlots; i++)
         {
             bool slotUsed = false;
             foreach (var app in _activeApps.Values)

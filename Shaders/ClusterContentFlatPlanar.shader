@@ -28,6 +28,10 @@ Shader "Custom/ClusterContentFlatPlanar"
         _SharpnessRadius ("Sharpness Radius", Range(0.5, 3)) = 1.0
         _ChromaSharpness ("Chroma Sharpness", Range(0, 1)) = 0.3
         _EnableSharpening ("Enable Sharpening", Float) = 1
+
+        // VR quality - negative bias for sharper textures at distance
+        [Header(VR Quality)]
+        _MipMapBias ("Mipmap Bias", Range(-2, 0)) = 0
     }
 
     SubShader
@@ -99,6 +103,9 @@ Shader "Custom/ClusterContentFlatPlanar"
             float _ChromaSharpness;
             float _EnableSharpening;
 
+            // VR quality - mipmap bias for sharper textures at distance
+            float _MipMapBias;
+
             // SDF for rounded box
             float sdRoundedBox(float2 pos, float2 halfSize, float radius)
             {
@@ -106,16 +113,16 @@ Shader "Custom/ClusterContentFlatPlanar"
                 return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
             }
 
-            // Unsharp Mask sharpening
-            float4 UnsharpMask(sampler2D tex, float2 uv, float2 texelSize, float sharpness, float radius)
+            // Unsharp Mask sharpening with tex2Dbias for VR sharpness at distance
+            float4 UnsharpMask(sampler2D tex, float2 uv, float2 texelSize, float sharpness, float radius, float mipBias)
             {
-                float4 center = tex2D(tex, uv);
+                float4 center = tex2Dbias(tex, float4(uv, 0, mipBias));
 
                 float4 blur = (
-                    tex2D(tex, uv + float2(-texelSize.x, 0) * radius) +
-                    tex2D(tex, uv + float2(texelSize.x, 0) * radius) +
-                    tex2D(tex, uv + float2(0, -texelSize.y) * radius) +
-                    tex2D(tex, uv + float2(0, texelSize.y) * radius)
+                    tex2Dbias(tex, float4(uv + float2(-texelSize.x, 0) * radius, 0, mipBias)) +
+                    tex2Dbias(tex, float4(uv + float2(texelSize.x, 0) * radius, 0, mipBias)) +
+                    tex2Dbias(tex, float4(uv + float2(0, -texelSize.y) * radius, 0, mipBias)) +
+                    tex2Dbias(tex, float4(uv + float2(0, texelSize.y) * radius, 0, mipBias))
                 ) * 0.25;
 
                 float4 sharpened = center + (center - blur) * sharpness;
@@ -132,6 +139,7 @@ Shader "Custom/ClusterContentFlatPlanar"
             }
 
             // Sample from specific panel texture with optional sharpening
+            // Uses tex2Dbias with _MipMapBias for sharper VR viewing at distance
             float4 SamplePanel(int panelIndex, float2 panelUV)
             {
                 float4 color = float4(0, 0, 0, 1);
@@ -142,49 +150,49 @@ Shader "Custom/ClusterContentFlatPlanar"
                 {
                     texelSize = _Content0_TexelSize.xy;
                     if (_EnableSharpening > 0.5)
-                        color = UnsharpMask(_Content0, panelUV, texelSize, _Sharpness, _SharpnessRadius);
+                        color = UnsharpMask(_Content0, panelUV, texelSize, _Sharpness, _SharpnessRadius, _MipMapBias);
                     else
-                        color = tex2D(_Content0, panelUV);
+                        color = tex2Dbias(_Content0, float4(panelUV, 0, _MipMapBias));
                 }
                 else if (panelIndex == 1)
                 {
                     texelSize = _Content1_TexelSize.xy;
                     if (_EnableSharpening > 0.5)
-                        color = UnsharpMask(_Content1, panelUV, texelSize, _Sharpness, _SharpnessRadius);
+                        color = UnsharpMask(_Content1, panelUV, texelSize, _Sharpness, _SharpnessRadius, _MipMapBias);
                     else
-                        color = tex2D(_Content1, panelUV);
+                        color = tex2Dbias(_Content1, float4(panelUV, 0, _MipMapBias));
                 }
                 else if (panelIndex == 2)
                 {
                     texelSize = _Content2_TexelSize.xy;
                     if (_EnableSharpening > 0.5)
-                        color = UnsharpMask(_Content2, panelUV, texelSize, _Sharpness, _SharpnessRadius);
+                        color = UnsharpMask(_Content2, panelUV, texelSize, _Sharpness, _SharpnessRadius, _MipMapBias);
                     else
-                        color = tex2D(_Content2, panelUV);
+                        color = tex2Dbias(_Content2, float4(panelUV, 0, _MipMapBias));
                 }
                 else if (panelIndex == 3)
                 {
                     texelSize = _Content3_TexelSize.xy;
                     if (_EnableSharpening > 0.5)
-                        color = UnsharpMask(_Content3, panelUV, texelSize, _Sharpness, _SharpnessRadius);
+                        color = UnsharpMask(_Content3, panelUV, texelSize, _Sharpness, _SharpnessRadius, _MipMapBias);
                     else
-                        color = tex2D(_Content3, panelUV);
+                        color = tex2Dbias(_Content3, float4(panelUV, 0, _MipMapBias));
                 }
                 else if (panelIndex == 4)
                 {
                     texelSize = _Content4_TexelSize.xy;
                     if (_EnableSharpening > 0.5)
-                        color = UnsharpMask(_Content4, panelUV, texelSize, _Sharpness, _SharpnessRadius);
+                        color = UnsharpMask(_Content4, panelUV, texelSize, _Sharpness, _SharpnessRadius, _MipMapBias);
                     else
-                        color = tex2D(_Content4, panelUV);
+                        color = tex2Dbias(_Content4, float4(panelUV, 0, _MipMapBias));
                 }
                 else if (panelIndex == 5)
                 {
                     texelSize = _Content5_TexelSize.xy;
                     if (_EnableSharpening > 0.5)
-                        color = UnsharpMask(_Content5, panelUV, texelSize, _Sharpness, _SharpnessRadius);
+                        color = UnsharpMask(_Content5, panelUV, texelSize, _Sharpness, _SharpnessRadius, _MipMapBias);
                     else
-                        color = tex2D(_Content5, panelUV);
+                        color = tex2Dbias(_Content5, float4(panelUV, 0, _MipMapBias));
                 }
 
                 // Apply chroma correction

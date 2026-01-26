@@ -38,7 +38,7 @@ public class RTTPopupMenu : MonoBehaviour
         public int labelFontSize = 18;  // Font size for section labels/titles
         public int fontSize = 15;       // Font size for buttons
         public float iconSize = 20f;
-        public float borderWidth = 0.028f; // Popup border thickness (shader normalized value)
+        public float borderWidth = 0.05f; // Popup border thickness (shader normalized value)
         public float glassAlpha = 0.55f;  // Popup background transparency (match RTTPopupInputable)
         public Color backgroundColor = new Color(0.12f, 0.12f, 0.16f, 0.96f);
         public Color primaryColor = new Color(0f, 0.9f, 1f);
@@ -352,6 +352,15 @@ public class RTTPopupMenu : MonoBehaviour
         {
             BuildSection(section);
             _lastSectionType = section.type;
+
+            // Add spacer after title-only sections (has title but no buttons)
+            bool isTitleOnly = section.type == PopupSectionType.SectionBlock
+                && !string.IsNullOrEmpty(section.title)
+                && (section.buttons == null || section.buttons.Count == 0);
+            if (isTitleOnly)
+            {
+                BuildTitleSpacer();
+            }
         }
 
         _isBuilt = true;
@@ -1026,12 +1035,19 @@ public class RTTPopupMenu : MonoBehaviour
 
         int rowCount = Mathf.CeilToInt((float)section.buttons.Count / section.columns);
         float gridHeight = (rowCount * _config.buttonHeight) + ((rowCount - 1) * _config.rowSpacing);
-        float sectionHeight = _config.labelHeight + _config.rowSpacing + gridHeight;
+
+        // Skip label height when title is empty
+        bool hasTitle = !string.IsNullOrEmpty(section.title);
+        float sectionHeight = hasTitle ? (_config.labelHeight + _config.rowSpacing + gridHeight) : gridHeight;
 
         LayoutElement sectionLE = sectionObj.AddComponent<LayoutElement>();
         sectionLE.preferredHeight = sectionHeight;
 
-        CreateSectionLabel(sectionObj.transform, section.title);
+        // Only create label if title is not empty
+        if (hasTitle)
+        {
+            CreateSectionLabel(sectionObj.transform, section.title);
+        }
 
         GameObject gridObj = new GameObject("Grid_" + section.title);
         gridObj.transform.SetParent(sectionObj.transform, false);
@@ -1074,6 +1090,23 @@ public class RTTPopupMenu : MonoBehaviour
         sepLE.preferredHeight = 1f;
     }
 
+    private void BuildTitleSpacer()
+    {
+        // Add spacer after title-only section so total gap = labelHeight
+        // VLG adds sideSpacing before and after spacer, so:
+        // total gap = sideSpacing + spacerHeight + sideSpacing = labelHeight
+        // spacerHeight = labelHeight - 2*sideSpacing
+        float spacerHeight = _config.labelHeight - (2 * _config.sideSpacing);
+        if (spacerHeight <= 0) return;
+
+        GameObject spacer = new GameObject("TitleSpacer");
+        spacer.transform.SetParent(_contentContainer.transform, false);
+        SetLayerRecursively(spacer, _popupObject.layer);
+
+        LayoutElement spacerLE = spacer.AddComponent<LayoutElement>();
+        spacerLE.preferredHeight = spacerHeight;
+    }
+
     private void CreateSectionLabel(Transform parent, string text)
     {
         GameObject labelObj = new GameObject("Label_" + text);
@@ -1087,7 +1120,12 @@ public class RTTPopupMenu : MonoBehaviour
         label.color = Color.white;
         label.fontStyle = FontStyles.Bold;
         label.alignment = TextAlignmentOptions.Center;
-        label.margin = Vector4.zero;
+        // Side margin = 2x button horizontal padding, top margin = verticalPadding (same as bottom)
+        float horizontalPadding = ((_config.rowSpacing * 0.75f) + kBorderInset) * 1.75f;
+        float sideMargin = horizontalPadding * 2f;
+        float topMargin = (_config.rowSpacing + kBorderInset) * 1.5f;
+        label.margin = new Vector4(sideMargin, topMargin, sideMargin, 0);
+        label.enableWordWrapping = true;
         label.raycastTarget = false;
 
         LayoutElement le = labelObj.AddComponent<LayoutElement>();
@@ -1162,12 +1200,30 @@ public class RTTPopupMenu : MonoBehaviour
 
             if (section.type == PopupSectionType.SectionBlock)
             {
-                height += _config.labelHeight;
-                height += _config.rowSpacing;
+                // Only add label height if title is not empty
+                if (!string.IsNullOrEmpty(section.title))
+                {
+                    height += _config.labelHeight;
+                    height += _config.rowSpacing;
+                }
 
                 int rowCount = Mathf.CeilToInt((float)section.buttons.Count / section.columns);
                 float gridHeight = (rowCount * _config.buttonHeight) + ((rowCount - 1) * _config.rowSpacing);
                 height += gridHeight;
+
+                // Add title spacer height for title-only sections
+                bool isTitleOnly = !string.IsNullOrEmpty(section.title)
+                    && (section.buttons == null || section.buttons.Count == 0);
+                if (isTitleOnly)
+                {
+                    // spacerHeight = labelHeight - 2*sideSpacing
+                    // total extra = spacerHeight + sideSpacing (VLG adds spacing after spacer)
+                    float spacerHeight = _config.labelHeight - (2 * _config.sideSpacing);
+                    if (spacerHeight > 0)
+                    {
+                        height += spacerHeight + _config.sideSpacing;
+                    }
+                }
             }
             else if (section.type == PopupSectionType.FullWidthButton)
             {

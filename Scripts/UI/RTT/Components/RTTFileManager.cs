@@ -157,6 +157,14 @@ public class RTTFileManager : MonoBehaviour
         // Reset state for potential recreation
         _viewReady = false;
 
+        // Unregister side panels from ZoomController before destroying
+        var zoomController = VirtualObjectsZoomController.Instance;
+        if (zoomController != null)
+        {
+            if (_leftFrame != null) zoomController.UnregisterSidePanel(_leftFrame);
+            if (_rightFrame != null) zoomController.UnregisterSidePanel(_rightFrame);
+        }
+
         // Destroy side panels when main app is closed
         if (_leftFrame != null) Destroy(_leftFrame.gameObject);
         if (_rightFrame != null) Destroy(_rightFrame.gameObject);
@@ -240,33 +248,26 @@ public class RTTFileManager : MonoBehaviour
     
     private void CreatePagination()
     {
-        // User Request: Attach to RTTTaskbar (outside menu)
-        Transform targetTransform = null;
-        if (RTTTaskbar.Instance != null)
+        // Get RTTToolbar to parent pagination into
+        RTTToolbar toolbar = RTTToolbar.Instance;
+        if (toolbar == null)
         {
-            targetTransform = RTTTaskbar.Instance.transform;
+            Debug.LogWarning("[RTTFileManager] RTTToolbar not found, pagination positioning may be incorrect");
+            // Fallback: create toolbar
+            toolbar = RTTToolbar.Create();
         }
-        else
-        {
-            // Fallback to MenuFrame if Taskbar not found (e.g. testing)
-            targetTransform = _menuFrame != null ? _menuFrame.transform : transform;
-        }
-        
+
         GameObject pagObj = new GameObject("FilePagination");
-        
-        // User Request: "Must be in VirtualObjects"
-        GameObject virtualObjects = GameObject.Find("VirtualObjects");
-        if (virtualObjects != null)
-        {
-            pagObj.transform.SetParent(virtualObjects.transform, true);
-        }
-        
-        // Initial pos near target
-        pagObj.transform.position = targetTransform.position;
-        pagObj.transform.rotation = targetTransform.rotation;
-        
+
+        // Parent into RTTToolbar
+        pagObj.transform.SetParent(toolbar.transform, false);
+
+        // Set local position (above taskbar area)
+        pagObj.transform.localPosition = toolbar.GetPaginationLocalPosition();
+        pagObj.transform.localRotation = Quaternion.identity;
+
         _pagination = pagObj.AddComponent<RTTFilePagination>();
-        _pagination.Initialize(_controller, targetTransform);
+        _pagination.Initialize(_controller);
     }
     
     // Header References
@@ -1851,16 +1852,17 @@ public class RTTFileManager : MonoBehaviour
     {
         if (_conflictPopup != null) return;
 
+        // 2-row layout: sideSpacing = rowSpacing for tight button spacing
         var config = new RTTPopupMenu.PopupConfig
         {
             width = 550f,
             buttonHeight = 60f,
-            sideSpacing = 20f,
-            rowSpacing = 10f,
-            labelHeight = 60f,
+            sideSpacing = 12f,
+            rowSpacing = 6f,
+            labelHeight = 50f,
             labelFontSize = 28,
             fontSize = 24,
-            borderWidth = 0.028f,
+            borderWidth = 0.05f,
             primaryColor = _primaryColor,
             accentColor = _accentColor,
             overlayColor = new Color(0f, 0f, 0f, 0.4f),
@@ -1914,7 +1916,11 @@ public class RTTFileManager : MonoBehaviour
             _primaryColor
         );
 
-        _conflictPopup.AddSectionBlock("", new List<RTTPopupMenu.ButtonData> { replaceBtn, skipBtn, cancelBtn }, 3);
+        // Row 1: Replace + Skip (2 buttons)
+        _conflictPopup.AddSectionBlock("", new List<RTTPopupMenu.ButtonData> { replaceBtn, skipBtn }, 2);
+        // Row 2: Cancel (full width)
+        _conflictPopup.AddSectionBlock("", new List<RTTPopupMenu.ButtonData> { cancelBtn }, 1);
+
         _conflictPopup.Build();
         _conflictPopup.Show();
     }
@@ -1925,23 +1931,22 @@ public class RTTFileManager : MonoBehaviour
     {
         if (_deleteConfirmPopup != null) return;
 
-        // Match RTTPopupInputable styling
+        // Standardized Yes/No popup config
         var config = new RTTPopupMenu.PopupConfig
         {
             width = 500f,
-            buttonHeight = 60f,
-            sideSpacing = 20f,
-            rowSpacing = 10f,
-            labelHeight = 50f,
-            labelFontSize = 32,  // Match RTTPopupInputable.titleFontSize
-            fontSize = 24,       // Match RTTPopupInputable.buttonFontSize
-            borderWidth = 0.028f,
+            buttonHeight = 66f,
+            sideSpacing = 26f,
+            rowSpacing = 16f,
+            labelHeight = 52f,
+            labelFontSize = 32,
+            fontSize = 25,
+            borderWidth = 0.05f,
             primaryColor = _primaryColor,
             accentColor = _accentColor,
-            overlayColor = new Color(0f, 0f, 0f, 0.4f), // Match New Folder popup
+            overlayColor = new Color(0f, 0f, 0f, 0.4f),
             font = _font,
             layerName = "VirtualObjects",
-            // Button styling (match RTTPopupInputable.CreateActionButton)
             buttonBorderWidth = 0.04f,
             buttonGlowWidth = 0.08f,
             buttonGlowIntensity = 4f,
@@ -2870,10 +2875,9 @@ public class RTTFileManager : MonoBehaviour
         float sideWidth = mainPanelWidth / 3f;
         float sideHeight = mainPanelHeight;
         float gapMeters = 0.05f;
-        float rotationAngle = 30f;
 
-        // Left Panel (Navigation)
-        PlaceSidePanelFlat("FileNavigationPanel", -1, mainPanelWidth, sideWidth, sideHeight, gapMeters, rotationAngle, ref _leftFrame);
+        // Left Panel (Navigation) - sphere positioning
+        PlaceSidePanelOnSphere("FileNavigationPanel", -1, mainPanelWidth, sideWidth, sideHeight, gapMeters, ref _leftFrame);
         if (_leftFrame != null)
         {
             _leftFrame.SetVisible(true); // Make visible immediately for now
@@ -2881,8 +2885,8 @@ public class RTTFileManager : MonoBehaviour
             StartCoroutine(CreateLeftPanelContent());
         }
 
-        // Right Panel (Detail)
-        PlaceSidePanelFlat("FileDetailPanel", 1, mainPanelWidth, sideWidth, sideHeight, gapMeters, rotationAngle, ref _rightFrame);
+        // Right Panel (Detail) - sphere positioning
+        PlaceSidePanelOnSphere("FileDetailPanel", 1, mainPanelWidth, sideWidth, sideHeight, gapMeters, ref _rightFrame);
         if (_rightFrame != null)
         {
             _rightFrame.SetVisible(true); // Make visible immediately for now
@@ -2953,6 +2957,120 @@ public class RTTFileManager : MonoBehaviour
 
         frameRef.SetContentMargins(20f, 20f, 20f, 20f);
         frameRef.SetFloatingDataEnabled(true, 5);
+    }
+
+    /// <summary>
+    /// Place a side panel on sphere surface with camera as center.
+    /// Uses PRIMARY menu frame (not app frame) for positioning reference.
+    /// Sphere radius = zoom distance from VirtualObjectsZoomController or distance to primary frame.
+    /// Panel faces camera (vector from panel to camera is perpendicular to panel surface).
+    /// </summary>
+    /// <param name="side">-1 for left, +1 for right</param>
+    private void PlaceSidePanelOnSphere(string name, int side, float mainWidth, float sideWidth, float sideHeight,
+        float gap, ref RTTMenuFrame frameRef)
+    {
+        Camera cam = Camera.main;
+        if (cam == null)
+        {
+            Debug.LogError("[RTTFileManager] PlaceSidePanelOnSphere: No main camera found!");
+            return;
+        }
+
+        if (_menuFrame == null)
+        {
+            Debug.LogError("[RTTFileManager] PlaceSidePanelOnSphere: No app frame (_menuFrame) found!");
+            return;
+        }
+
+        // Mathematical solution to satisfy BOTH conditions:
+        // 1. Inner edge lies exactly on main panel's plane
+        // 2. Panel surface is perpendicular to vector (center -> camera)
+        //
+        // Solution: r = sqrt(|E-C|² - w²), θ = atan2(b,a) + arcsin(w*side/|E-C|)
+
+        // Step 1: Calculate inner edge position on main panel's plane
+        Vector3 mainRight = _menuFrame.transform.right;
+        float innerEdgeOffset = (mainWidth / 2f) + gap;
+        Vector3 innerEdgePos = _menuFrame.transform.position + mainRight * innerEdgeOffset * side;
+
+        // Step 2: Calculate in horizontal plane (XZ)
+        float w = sideWidth / 2f; // half width
+        Vector3 cameraPos = cam.transform.position;
+
+        // Vector from camera to inner edge (horizontal only)
+        float a = innerEdgePos.x - cameraPos.x;
+        float b = innerEdgePos.z - cameraPos.z;
+        float distSq = a * a + b * b;
+        float dist = Mathf.Sqrt(distSq);
+
+        Vector3 panelPos;
+        Quaternion panelRotation;
+
+        // Edge case: camera too close to inner edge
+        if (dist < 0.001f)
+        {
+            panelPos = innerEdgePos + mainRight * w * side;
+            panelPos.y = _menuFrame.transform.position.y;
+            panelRotation = Quaternion.LookRotation(-mainRight * side, Vector3.up);
+        }
+        else
+        {
+            // Step 3: Calculate distance from camera to panel center
+            float rSq = distSq - w * w;
+            if (rSq < 0.0001f) rSq = 0.0001f;
+            float r = Mathf.Sqrt(rSq);
+
+            // Step 4: Calculate direction angle θ
+            // θ = atan2(b, a) - arcsin(w * side / dist)
+            float alpha = Mathf.Atan2(b, a);
+            float sinArg = Mathf.Clamp((w * side) / dist, -1f, 1f);
+            float theta = alpha - Mathf.Asin(sinArg);
+
+            // Step 5: Calculate panel center position
+            float dx = Mathf.Cos(theta);
+            float dz = Mathf.Sin(theta);
+            panelPos = new Vector3(
+                cameraPos.x + dx * r,
+                _menuFrame.transform.position.y,
+                cameraPos.z + dz * r
+            );
+
+            // Step 6: Calculate rotation to face camera from center
+            Vector3 toCamera = new Vector3(cameraPos.x - panelPos.x, 0, cameraPos.z - panelPos.z);
+            if (toCamera.sqrMagnitude > 0.001f)
+            {
+                panelRotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
+            }
+            else
+            {
+                panelRotation = Quaternion.LookRotation(-mainRight * side, Vector3.up);
+            }
+        }
+
+        // Calculate logical width based on aspect ratio (same resolution density as main panel)
+        float logicalWidthPixels = (sideWidth / _menuFrame.PanelWidth) * _menuFrame.LogicalWidthValue;
+
+        // Create RTTMenuFrame for the side panel with unique name
+        frameRef = RTTMenuFrame.Create(_menuFrame.transform, sideWidth, sideHeight, logicalWidthPixels, name);
+        frameRef.transform.position = panelPos;
+        frameRef.transform.rotation = panelRotation;
+        frameRef.transform.localScale = Vector3.one;
+
+        Debug.Log($"[RTTFileManager] PlaceSidePanel: innerEdge={innerEdgePos}, panelPos={panelPos}");
+
+        // Configure frame appearance
+        frameRef.SetContentMargins(20f, 20f, 20f, 20f);
+        frameRef.SetFloatingDataEnabled(true, 5);
+
+        // Register with ZoomController for updates on zoom change
+        var zoomController = VirtualObjectsZoomController.Instance;
+        if (zoomController != null)
+        {
+            zoomController.RegisterSidePanel(frameRef, _menuFrame.transform, side, mainWidth, sideWidth, gap);
+            Debug.Log($"[RTTFileManager] Registered {name} with VirtualObjectsZoomController");
+        }
+
+        Debug.Log($"[RTTFileManager] Placed {name}: pos={panelPos}");
     }
 
     private IEnumerator CreateLeftPanelContent()

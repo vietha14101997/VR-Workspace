@@ -3,11 +3,12 @@ using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
 
 /// <summary>
-/// Editor-only camera controller that allows mouse look rotation.
+/// Editor-only camera controller that allows mouse look rotation and VirtualObjects zoom.
 /// Uses New Input System.
 /// - Move mouse to rotate camera
 /// - Mouse cursor is hidden while active
 /// - Press Alt or Escape to toggle mouse look mode
+/// - Hold Shift + Scroll to zoom VirtualObjects in/out
 /// </summary>
 public class EditorCameraController : MonoBehaviour
 {
@@ -75,6 +76,34 @@ public class EditorCameraController : MonoBehaviour
         if (isMouseLookActive)
         {
             HandleMouseLook();
+        }
+
+        // Handle VirtualObjects zoom: Shift + Mouse Scroll
+        HandleZoom();
+    }
+
+    private void HandleZoom()
+    {
+        // Check if Shift is held
+        bool shiftHeld = keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed;
+        if (!shiftHeld) return;
+
+        // Get mouse scroll delta using New Input System
+        float scrollDelta = mouse.scroll.ReadValue().y;
+        if (Mathf.Approximately(scrollDelta, 0f)) return;
+
+        // Get ZoomController
+        var zoomController = VirtualObjectsZoomController.Instance;
+        if (zoomController == null) return;
+
+        // Scroll up = zoom in (closer), Scroll down = zoom out (farther)
+        if (scrollDelta > 0)
+        {
+            zoomController.ZoomIn();
+        }
+        else
+        {
+            zoomController.ZoomOut();
         }
     }
     

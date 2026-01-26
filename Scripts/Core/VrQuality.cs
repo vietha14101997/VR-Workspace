@@ -8,6 +8,9 @@ public class VrQuality : MonoBehaviour
     {
         QualitySettings.antiAliasing = 8;
 
+        // Force maximum anisotropic filtering for VR sharpness
+        QualitySettings.anisotropicFiltering = AnisotropicFiltering.ForceEnable;
+
         var display = XRGeneralSettings.Instance?.Manager?.activeLoader
             ?.GetLoadedSubsystem<XRDisplaySubsystem>();
 

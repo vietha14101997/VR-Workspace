@@ -35,7 +35,8 @@ public class WorldPanelClusterRig : MonoBehaviour
     [Header("Layout")]
     [Tooltip("Dynamic: panels spread evenly. FixedThreeSlot: panels use fixed 3-slot positions (max 3 panels)")]
     public ClusterLayoutMode layoutMode = ClusterLayoutMode.FixedThreeSlot;
-    public float distanceFromCamera = 2.0f;
+    [Tooltip("When true, panels are positioned relative to parent origin instead of camera. Used when parented inside RTTMenu.")]
+    public bool useParentOrigin = false;
     [Tooltip("Extra gap in meters between panel edges (0 = edges touch)")]
     [Range(0f, 0.1f)] public float edgeGapMeters = 0f;
     [Tooltip("Whether panels should face directly toward camera (true) or have limited tilt (false)")]
@@ -88,6 +89,141 @@ public class WorldPanelClusterRig : MonoBehaviour
     Camera Cam => Application.isPlaying ? Camera.main : FindObjectOfType<Camera>();
 
     /// <summary>
+    /// Get arc radius for panel positioning.
+    /// Uses VirtualObjectsZoomController.CurrentDistance when available, otherwise default 1.8m.
+    /// </summary>
+    public float ArcRadius
+    {
+        get
+        {
+            var zoomController = VirtualObjectsZoomController.Instance;
+            if (zoomController != null && zoomController.IsInitialized)
+            {
+                return zoomController.CurrentDistance;
+            }
+            return 1.8f; // Default fallback
+        }
+    }
+
+    /// <summary>
+    /// Returns true if using curved visual that requires arc-based cursor mapping.
+    /// FlatPlanar mode does NOT require this - each panel is flat, only joints are folded.
+    /// </summary>
+    public bool IsUsingUnifiedVisual
+    {
+        get
+        {
+            // Only CurvedSurround mode requires arc-based cursor mapping
+            // FlatPlanar mode has flat panels, cursor should use board.TransformPoint
+            return useCurvedVisual && _curvedVisual != null;
+        }
+    }
+
+    /// <summary>
+    /// Returns true if using FlatPlanar visual mode.
+    /// In this mode, panels are flat quads positioned on arc with yaw rotation,
+    /// but the board transforms are positioned linearly (z=0, no rotation).
+    /// Cursor needs special handling to match mesh positions.
+    /// </summary>
+    public bool IsUsingFlatPlanarVisual
+    {
+        get
+        {
+            return !useCurvedVisual && _flatPlanarVisual != null;
+        }
+    }
+
+    /// <summary>
+    /// Get the content mesh local position from active visual (curved or flat planar).
+    /// This ensures cursor is drawn on the same plane as the rendered content.
+    /// </summary>
+    public Vector3 GetUnifiedContentLocalPosition()
+    {
+        if (useCurvedVisual && _curvedVisual != null)
+            return _curvedVisual.ContentLocalPosition;
+        if (!useCurvedVisual && _flatPlanarVisual != null)
+            return _flatPlanarVisual.ContentLocalPosition;
+        return Vector3.zero;
+    }
+
+    /// <summary>
+    /// Get the content mesh local position from curved visual (for cursor synchronization).
+    /// This ensures cursor is drawn on the same plane as the rendered content.
+    /// </summary>
+    [System.Obsolete("Use GetUnifiedContentLocalPosition instead")]
+    public Vector3 GetCurvedContentLocalPosition()
+    {
+        return GetUnifiedContentLocalPosition();
+    }
+
+    /// <summary>
+    /// Get FlatPlanar panel position and orientation for cursor mapping.
+    /// Returns the panel center position and right vector in ClusterRig local space,
+    /// matching FlatPlanarMeshGenerator exactly.
+    /// </summary>
+    /// <param name="enabledPanelIndex">Index within enabled panels (0, 1, 2...)</param>
+    /// <param name="enabledCount">Total number of enabled panels</param>
+    /// <param name="panelCenter">Output: Panel center in ClusterRig local space</param>
+    /// <param name="panelRight">Output: Panel right vector in ClusterRig local space</param>
+    /// <param name="panelNormal">Output: Panel normal in ClusterRig local space</param>
+    public void GetFlatPlanarPanelTransform(int enabledPanelIndex, int enabledCount,
+        out Vector3 panelCenter, out Vector3 panelRight, out Vector3 panelNormal)
+    {
+        // Get reference panel dimensions
+        var refPanel = _panels.Count > 0 ? _panels[_panels.Count / 2] : null;
+        float panelWidth = refPanel ? refPanel.width : 1f;
+        float panelHeight = refPanel ? refPanel.height : 0.5625f;
+
+        // FlatPlanar mode uses FULL panel width (margin = 0) for mesh generation
+        // This matches ClusterVisualFlatPlanar.GenerateMeshes() which sets meshMarginH = 0
+        float boardWidth = panelWidth;  // No margin reduction
+        float arcRadius = ArcRadius;
+
+        // Calculate angle per panel (same formula as FlatPlanarMeshGenerator with margin=0)
+        float boardAngleRad = 2f * Mathf.Atan(boardWidth / 2f / arcRadius);
+        float gapAngleRad = 2f * Mathf.Atan(edgeGapMeters / 2f / arcRadius);
+        float overlapAngleRad = 2f * Mathf.Atan(panelOverlap / 2f / arcRadius);
+        float angleDeg = (boardAngleRad + gapAngleRad - overlapAngleRad) * Mathf.Rad2Deg;
+
+        // Get yaw angle for this panel (same logic as FlatPlanarMeshGenerator.GetPanelYaws)
+        float panelYawDeg = enabledCount switch
+        {
+            1 => 0f,
+            2 => enabledPanelIndex == 0 ? 0f : angleDeg,
+            3 => (enabledPanelIndex - 1) * angleDeg,
+            _ => (enabledPanelIndex - (enabledCount - 1) / 2f) * angleDeg
+        };
+
+        float panelYawRad = panelYawDeg * Mathf.Deg2Rad;
+
+        // Panel center position in ClusterRig local space (same as FlatPlanarMeshGenerator)
+        float panelCenterX = Mathf.Sin(panelYawRad) * arcRadius;
+        float panelCenterZ = Mathf.Cos(panelYawRad) * arcRadius - arcRadius;
+        panelCenter = new Vector3(panelCenterX, 0f, panelCenterZ);
+
+        // Panel orientation vectors (same as FlatPlanarMeshGenerator)
+        panelRight = new Vector3(Mathf.Cos(panelYawRad), 0f, -Mathf.Sin(panelYawRad));
+        panelNormal = new Vector3(-Mathf.Sin(panelYawRad), 0f, -Mathf.Cos(panelYawRad));
+    }
+
+    /// <summary>
+    /// Get the board dimensions used for FlatPlanar cursor mapping.
+    /// IMPORTANT: FlatPlanar mode uses FULL panel dimensions (margin = 0) for mesh generation,
+    /// so cursor must use the same dimensions to match.
+    /// </summary>
+    public void GetFlatPlanarBoardDimensions(out float boardWidth, out float boardHeight)
+    {
+        var refPanel = _panels.Count > 0 ? _panels[_panels.Count / 2] : null;
+        float panelWidth = refPanel ? refPanel.width : 1f;
+        float panelHeight = refPanel ? refPanel.height : 0.5625f;
+
+        // FlatPlanar mode uses full panel dimensions (meshMarginH = 0, meshMarginV = 0)
+        // This matches ClusterVisualFlatPlanar.GenerateMeshes() which sets margins to 0
+        boardWidth = panelWidth;
+        boardHeight = panelHeight;
+    }
+
+    /// <summary>
     /// Build cluster with specified number of panels
     /// </summary>
     /// <param name="count">Number of panels to create</param>
@@ -101,7 +237,11 @@ public class WorldPanelClusterRig : MonoBehaviour
         if (count > maxPanels) count = maxPanels;
 
         // Ensure cluster is inside VirtualObjects parent and has correct layer
-        EnsureVirtualObjectsParent();
+        // Skip when using parent-origin mode (parent is managed by caller)
+        if (!useParentOrigin)
+        {
+            EnsureVirtualObjectsParent();
+        }
 
         KillChildren();
         CreatePanels(count, skipSampleTextures);
@@ -480,6 +620,13 @@ public class WorldPanelClusterRig : MonoBehaviour
 
     void LayoutFromCamera()
     {
+        // Use parent-origin positioning when parented inside RTTMenu
+        if (useParentOrigin)
+        {
+            LayoutFromParentOrigin();
+            return;
+        }
+
         var cam = Cam;
         if (!cam || _panels.Count == 0) return;
 
@@ -492,7 +639,7 @@ public class WorldPanelClusterRig : MonoBehaviour
             camFwd.Normalize();
         }
 
-        Vector3 clusterCenter = cam.transform.position + camFwd * distanceFromCamera + camUp * verticalOffset;
+        Vector3 clusterCenter = cam.transform.position + camFwd * ArcRadius + camUp * verticalOffset;
         transform.SetPositionAndRotation(clusterCenter, Quaternion.LookRotation(camFwd, camUp));
 
         var refPanel = _panels[_panels.Count / 2];
@@ -513,10 +660,10 @@ public class WorldPanelClusterRig : MonoBehaviour
             spacingWidth = panelWidth * (1f - 2f * contentMarginHorizontal);
         }
 
-        float boardAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(spacingWidth / 2f / distanceFromCamera);
-        float gapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(edgeGapMeters / 2f / distanceFromCamera);
+        float boardAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(spacingWidth / 2f / ArcRadius);
+        float gapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(edgeGapMeters / 2f / ArcRadius);
         // Apply overlap to eliminate seams between adjacent panels
-        float overlapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(panelOverlap / 2f / distanceFromCamera);
+        float overlapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(panelOverlap / 2f / ArcRadius);
         float angleDeg = boardAngleDeg + gapAngleDeg - overlapAngleDeg;
 
         // Create list of ONLY enabled panels to allow reflow into primary slots
@@ -560,12 +707,123 @@ public class WorldPanelClusterRig : MonoBehaviour
     }
 
     /// <summary>
+    /// Layout panels relative to parent origin (0,0,0) instead of camera.
+    /// Used when ClusterRig is parented inside RTTMenu for synchronized positioning.
+    /// - Flat Planar: center panel at local (0,0,0)
+    /// - Curved Surround: arc center at local (0,0,0)
+    /// </summary>
+    void LayoutFromParentOrigin()
+    {
+        if (_panels.Count == 0) return;
+
+        // Keep cluster at local origin
+        transform.localPosition = Vector3.zero;
+        transform.localRotation = Quaternion.identity;
+
+        var refPanel = _panels[_panels.Count / 2];
+        float panelWidth = refPanel ? refPanel.width : 1f;
+        float panelHeight = refPanel ? refPanel.height : 0.5625f;
+
+        // Calculate spacing width based on mode
+        float spacingWidth;
+        if (layoutMode == ClusterLayoutMode.FixedThreeSlot && !useCurvedVisual)
+        {
+            spacingWidth = panelWidth;
+        }
+        else
+        {
+            spacingWidth = panelWidth * (1f - 2f * contentMarginHorizontal);
+        }
+
+        // Get enabled panels
+        var enabledPanels = new List<WorldPanelPlus>();
+        for (int i = 0; i < _panels.Count; i++)
+        {
+            if (IsPanelEnabled(i)) enabledPanels.Add(_panels[i]);
+        }
+
+        int enabledCount = enabledPanels.Count;
+        if (enabledCount == 0) return;
+
+        if (layoutMode == ClusterLayoutMode.FixedThreeSlot && !useCurvedVisual)
+        {
+            // Flat Planar mode: panels positioned linearly
+            // Center panel at local (0, 0, 0)
+            int[] slotOffsets = enabledCount switch
+            {
+                1 => new[] { 0 },
+                2 => new[] { 0, 1 },
+                _ => new[] { -1, 0, 1 }
+            };
+
+            for (int i = 0; i < enabledCount; i++)
+            {
+                var panel = enabledPanels[i];
+                if (panel == null) continue;
+
+                // Calculate horizontal offset from center
+                float xOffset = slotOffsets[i] * (spacingWidth + edgeGapMeters - panelOverlap);
+                Vector3 localPos = new Vector3(xOffset, verticalOffset, 0);
+                Quaternion localRot = Quaternion.identity; // Face forward (Z+)
+
+                panel.transform.localPosition = localPos;
+                panel.transform.localRotation = localRot;
+            }
+        }
+        else
+        {
+            // Curved Surround mode: panels on arc around origin
+            // Arc center at local (0, 0, 0)
+            float boardAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(spacingWidth / 2f / ArcRadius);
+            float gapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(edgeGapMeters / 2f / ArcRadius);
+            float overlapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(panelOverlap / 2f / ArcRadius);
+            float angleDeg = boardAngleDeg + gapAngleDeg - overlapAngleDeg;
+
+            for (int i = 0; i < enabledCount; i++)
+            {
+                var panel = enabledPanels[i];
+                if (panel == null) continue;
+
+                // Calculate angle offset from center
+                float offset = i - (enabledCount - 1) / 2f;
+                float yawDeg = offset * angleDeg;
+                float yawRad = yawDeg * Mathf.Deg2Rad;
+
+                // Position on arc: sin for X, cos for Z offset from radius
+                // Panel at angle θ: x = sin(θ) * r, z = cos(θ) * r - r
+                // This puts center panel at (0, 0, 0) and others on arc
+                float x = Mathf.Sin(yawRad) * ArcRadius;
+                float z = Mathf.Cos(yawRad) * ArcRadius - ArcRadius;
+
+                Vector3 localPos = new Vector3(x, verticalOffset, z);
+
+                // Rotation: face outward from arc center (toward camera position)
+                // Panel forward points toward camera (which is at -Z direction from arc)
+                Quaternion localRot = Quaternion.Euler(0, yawDeg, 0);
+
+                panel.transform.localPosition = localPos;
+                panel.transform.localRotation = localRot;
+            }
+        }
+
+        Debug.Log($"[WorldPanelClusterRig] LayoutFromParentOrigin: {enabledCount} panels, " +
+            $"mode={(layoutMode == ClusterLayoutMode.FixedThreeSlot ? "FlatPlanar" : "CurvedSurround")}");
+    }
+
+    /// <summary>
     /// Reposition enabled panels within the cluster WITHOUT moving the cluster itself.
     /// Used when enabling/disabling panels to keep cluster and taskbar in place.
     /// </summary>
     void LayoutPanelsInPlace()
     {
         if (_panels.Count == 0) return;
+
+        // Use parent-origin positioning when enabled
+        if (useParentOrigin)
+        {
+            LayoutFromParentOrigin();
+            return;
+        }
 
         // Use cluster's current position and rotation (don't move it)
         Vector3 clusterCenter = transform.position;
@@ -589,10 +847,10 @@ public class WorldPanelClusterRig : MonoBehaviour
             // Curved mode: use board width (panel minus margins) for spacing so Board edges touch
             spacingWidth = panelWidth * (1f - 2f * contentMarginHorizontal);
         }
-        float boardAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(spacingWidth / 2f / distanceFromCamera);
-        float gapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(edgeGapMeters / 2f / distanceFromCamera);
+        float boardAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(spacingWidth / 2f / ArcRadius);
+        float gapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(edgeGapMeters / 2f / ArcRadius);
         // Apply overlap to eliminate seams between adjacent panels
-        float overlapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(panelOverlap / 2f / distanceFromCamera);
+        float overlapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(panelOverlap / 2f / ArcRadius);
         float angleDeg = boardAngleDeg + gapAngleDeg - overlapAngleDeg;
 
         // Create list of ONLY enabled panels to allow reflow into primary slots
@@ -640,7 +898,7 @@ public class WorldPanelClusterRig : MonoBehaviour
 
         Quaternion yaw = Quaternion.AngleAxis(yawDeg, clusterUp);
         Vector3 dir = yaw * clusterFwd;
-        Vector3 pos = clusterCenter + dir * distanceFromCamera - clusterFwd * distanceFromCamera;
+        Vector3 pos = clusterCenter + dir * ArcRadius - clusterFwd * ArcRadius;
 
         Quaternion rot;
         if (panelsFaceCamera)
@@ -661,7 +919,7 @@ public class WorldPanelClusterRig : MonoBehaviour
 
         Quaternion yaw = Quaternion.AngleAxis(yawDeg, camUp);
         Vector3 dir = yaw * camFwd;
-        Vector3 pos = cam.transform.position + dir * distanceFromCamera + camUp * verticalOffset;
+        Vector3 pos = cam.transform.position + dir * ArcRadius + camUp * verticalOffset;
 
         Quaternion rot;
         if (panelsFaceCamera)

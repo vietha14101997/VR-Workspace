@@ -808,7 +808,7 @@ public class RTTPopupInputable : MonoBehaviour
         {
             _borderMaterial = new Material(glowShader);
             _borderMaterial.SetFloat("_StrokeEnabled", 0);
-            _borderMaterial.SetFloat("_BorderWidth", 0.025f);
+            _borderMaterial.SetFloat("_BorderWidth", 0.05f);
             _borderMaterial.SetFloat("_CornerRadius", 0.03f);
             _borderMaterial.SetFloat("_EdgePadding", 0.01f);
             _borderMaterial.SetFloat("_Aspect", _config.width / height);

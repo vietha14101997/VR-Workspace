@@ -877,4 +877,29 @@ public static class VRButtonFactory
             shadow.effectColor = glowCol;
         }
     }
+
+    /// <summary>
+    /// Change the icon sprite of a BareIconButton.
+    /// </summary>
+    public static void SetBareIconButtonSprite(GameObject wrapper, Sprite newSprite)
+    {
+        if (wrapper == null || newSprite == null) return;
+
+        // Find Icon in hierarchy: wrapper > HitArea > Visuals > Content > Icon
+        Transform visuals = wrapper.transform.Find("HitArea/Visuals");
+        if (visuals == null) return;
+
+        Transform content = visuals.Find("Content");
+        if (content == null) return;
+
+        Transform iconTransform = content.Find("Icon");
+        if (iconTransform == null) return;
+
+        // Update icon sprite
+        Image iconImg = iconTransform.GetComponent<Image>();
+        if (iconImg != null)
+        {
+            iconImg.sprite = newSprite;
+        }
+    }
 }

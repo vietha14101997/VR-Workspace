@@ -27,6 +27,16 @@ public class RTTBootstrapper : MonoBehaviour
     [Header("Auto Init")]
     [SerializeField] private bool autoInitialize = true;
     [SerializeField] private bool faceCamera = true;
+
+    [Header("Zoom Settings")]
+    [Tooltip("Enable zoom controller for VirtualObjects")]
+    [SerializeField] private bool enableZoomController = true;
+    [Tooltip("Minimum zoom distance from camera")]
+    [SerializeField] private float zoomMinDistance = 1.0f;
+    [Tooltip("Maximum zoom distance from camera")]
+    [SerializeField] private float zoomMaxDistance = 2.0f;
+    [Tooltip("Default/initial zoom distance")]
+    [SerializeField] private float zoomDefaultDistance = 1.8f;
     #endregion
 
     #region Private Fields
@@ -34,6 +44,7 @@ public class RTTBootstrapper : MonoBehaviour
     private RTTMenuFrame _menuFrame;
     private RTTMiniFrame _miniFrame;
     private RTTTaskbar _taskbar;
+    private VirtualObjectsZoomController _zoomController;
     #endregion
 
     #region Properties
@@ -41,6 +52,7 @@ public class RTTBootstrapper : MonoBehaviour
     public RTTMenuFrame MenuFrame => _menuFrame;
     public RTTMiniFrame MiniFrame => _miniFrame;
     public RTTTaskbar Taskbar => _taskbar;
+    public VirtualObjectsZoomController ZoomController => _zoomController;
     #endregion
 
     #region Lifecycle
@@ -82,6 +94,12 @@ public class RTTBootstrapper : MonoBehaviour
         // Register with RTTManager if available
         RegisterWithManager();
 
+        // Create ZoomController if enabled
+        if (enableZoomController)
+        {
+            CreateZoomController();
+        }
+
         Debug.Log("[RTTBootstrapper] Initialization complete");
     }
 
@@ -99,6 +117,13 @@ public class RTTBootstrapper : MonoBehaviour
     /// </summary>
     public void Cleanup()
     {
+        // Cleanup ZoomController first
+        if (_zoomController != null)
+        {
+            Destroy(_zoomController);
+            _zoomController = null;
+        }
+
         if (_miniFrame != null)
         {
             Destroy(_miniFrame.gameObject);
@@ -138,9 +163,16 @@ public class RTTBootstrapper : MonoBehaviour
 
     private void CreateTaskbar()
     {
+        // Create RTTToolbar container first (handles sphere positioning)
+        RTTToolbar toolbar = RTTToolbar.Instance;
+        if (toolbar == null)
+        {
+            toolbar = RTTToolbar.Create();
+        }
+
         // Create GameObject for RTTMiniFrame + RTTTaskbar
         GameObject taskbarObj = new GameObject("RTTTaskbar");
-        taskbarObj.transform.SetParent(transform, false);
+        taskbarObj.transform.SetParent(toolbar.transform, false);
 
         // Add RTTMiniFrame first (required by RTTTaskbar)
         _miniFrame = taskbarObj.AddComponent<RTTMiniFrame>();
@@ -150,12 +182,14 @@ public class RTTBootstrapper : MonoBehaviour
 
         // Set follow target to RTTMenu container (not individual frame)
         _miniFrame.SetFollowTarget(_menu.transform);
-        _miniFrame.SetSpacingMultiplier(taskbarSpacingMultiplier);
 
         // Add RTTTaskbar (logic controller)
         _taskbar = taskbarObj.AddComponent<RTTTaskbar>();
 
-        Debug.Log($"[RTTBootstrapper] Created RTTTaskbar following RTTMenu");
+        // Register taskbar with RTTToolbar for sphere positioning
+        toolbar.SetActiveTaskbar(_miniFrame);
+
+        Debug.Log($"[RTTBootstrapper] Created RTTTaskbar in RTTToolbar, following RTTMenu");
     }
 
     private void FaceCameraImmediate()
@@ -202,6 +236,25 @@ public class RTTBootstrapper : MonoBehaviour
             Debug.LogWarning("[RTTBootstrapper] RTTManager not found. Main Menu initialization may need manual setup.");
         }
     }
+
+    private void CreateZoomController()
+    {
+        // Add ZoomController component to VirtualObjects (this GameObject)
+        _zoomController = gameObject.AddComponent<VirtualObjectsZoomController>();
+
+        // Configure zoom settings from RTTBootstrapper inspector values
+        _zoomController.Configure(zoomMinDistance, zoomMaxDistance, zoomDefaultDistance);
+
+        // Set references explicitly for reliability
+        _zoomController.SetPrimaryFrame(_menuFrame);
+        _zoomController.SetTaskbarFrame(_miniFrame);
+
+        // Explicitly call Initialize() now that references are set
+        // This ensures initialization happens immediately rather than waiting for Start()
+        _zoomController.Initialize();
+
+        Debug.Log($"[RTTBootstrapper] Created VirtualObjectsZoomController (range: {zoomMinDistance}m - {zoomMaxDistance}m, default: {zoomDefaultDistance}m)");
+    }
     #endregion
 
     #region Editor
@@ -215,6 +268,11 @@ public class RTTBootstrapper : MonoBehaviour
         section1Capacity = Mathf.Clamp(section1Capacity, 1, 10);
         section2Capacity = Mathf.Clamp(section2Capacity, 1, 10);
         taskbarSpacingMultiplier = Mathf.Max(0.1f, taskbarSpacingMultiplier);
+
+        // Zoom settings validation
+        zoomMinDistance = Mathf.Max(0.1f, zoomMinDistance);
+        zoomMaxDistance = Mathf.Max(zoomMinDistance + 0.1f, zoomMaxDistance);
+        zoomDefaultDistance = Mathf.Clamp(zoomDefaultDistance, zoomMinDistance, zoomMaxDistance);
     }
 #endif
     #endregion

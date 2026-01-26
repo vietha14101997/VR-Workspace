@@ -197,6 +197,13 @@ public class RTTRemoteMenuController : MonoBehaviour
             _webrtcUpdateCoroutine = null;
         }
 
+        // Clear ClusterRig from RTTMenu before destroying
+        RTTMenu menu = RTTMenu.Instance;
+        if (menu != null)
+        {
+            menu.ClearClusterRig();
+        }
+
         // Destroy ClusterRig
         if (_clusterRig != null)
         {
@@ -304,8 +311,9 @@ public class RTTRemoteMenuController : MonoBehaviour
             rt.useMipMap = true;
             rt.autoGenerateMips = false; // Manual generation for reliability
             rt.filterMode = FilterMode.Trilinear;
-            rt.anisoLevel = 8;
+            rt.anisoLevel = 16; // Maximum anisotropic filtering for VR
             rt.Create();
+            rt.mipMapBias = 0f; // No bias - rely on aniso filtering only to avoid color aliasing
 
             _mipmapTextures[index] = rt;
             Debug.Log($"[RTTRemote-MIPMAP] Created mipmap RT for panel {index}: {source.width}x{source.height}, sourceType={source.GetType().Name}");
@@ -388,6 +396,13 @@ public class RTTRemoteMenuController : MonoBehaviour
         // Hide cursors before cleanup
         HideAllCursors();
         _activeCursorPanelIndex = -1;
+
+        // Clear ClusterRig from RTTMenu before destroying
+        RTTMenu menu = RTTMenu.Instance;
+        if (menu != null)
+        {
+            menu.ClearClusterRig();
+        }
 
         // Cleanup ClusterRig
         if (_clusterRig != null)
@@ -534,19 +549,16 @@ public class RTTRemoteMenuController : MonoBehaviour
         // Cleanup existing taskbar
         CleanupRemoteTaskbar();
 
-        // Create taskbar object
-        GameObject taskbarObj = new GameObject("RTTRemoteTaskbar");
+        // Get or create RTTToolbar
+        RTTToolbar toolbar = RTTToolbar.Instance;
+        if (toolbar == null)
+        {
+            toolbar = RTTToolbar.Create();
+        }
 
-        // Parent to VirtualObjects if exists, otherwise to ClusterRig parent
-        GameObject virtualObjects = GameObject.Find("VirtualObjects");
-        if (virtualObjects != null)
-        {
-            taskbarObj.transform.SetParent(virtualObjects.transform, false);
-        }
-        else
-        {
-            taskbarObj.transform.SetParent(_clusterRig.transform.parent, false);
-        }
+        // Create taskbar object in RTTToolbar
+        GameObject taskbarObj = new GameObject("RTTRemoteTaskbar");
+        taskbarObj.transform.SetParent(toolbar.transform, false);
 
         // Add RTTMiniFrame first (required component)
         RTTMiniFrame frame = taskbarObj.AddComponent<RTTMiniFrame>();
@@ -562,11 +574,13 @@ public class RTTRemoteMenuController : MonoBehaviour
         _remoteTaskbar = taskbarObj.AddComponent<RTTRemoteTaskbar>();
         _remoteTaskbar.SetFollowTarget(_clusterRig);
 
+        // Register with RTTToolbar for sphere positioning
+        toolbar.SetActiveTaskbar(frame);
+
         // Subscribe to taskbar events
         _remoteTaskbar.OnMenuRequested += HandleTaskbarMenuRequest;
 
-
-        Debug.Log("[RTTRemoteMenuController] Created RTTRemoteTaskbar following ClusterRig");
+        Debug.Log("[RTTRemoteMenuController] Created RTTRemoteTaskbar in RTTToolbar, following ClusterRig");
     }
 
     /// <summary>
@@ -710,6 +724,7 @@ public class RTTRemoteMenuController : MonoBehaviour
     /// <summary>
     /// Create ClusterRig when streaming is ready.
     /// No progress overlays or sample textures - video will be applied directly.
+    /// ClusterRig is parented inside RTTMenu for synchronized positioning.
     /// </summary>
     private void CreateClusterRigForStreaming(StreamingConfig config)
     {
@@ -721,6 +736,18 @@ public class RTTRemoteMenuController : MonoBehaviour
         {
             Debug.LogError("[RTTRemoteMenuController] Failed to create ClusterRig!");
             return;
+        }
+
+        // Parent ClusterRig into RTTMenu BEFORE building
+        // This enables parent-origin positioning for synchronized distance with menus
+        RTTMenu menu = RTTMenu.Instance;
+        if (menu != null)
+        {
+            menu.SetClusterRig(_clusterRig);
+        }
+        else
+        {
+            Debug.LogWarning("[RTTRemoteMenuController] RTTMenu.Instance is null, ClusterRig not parented");
         }
 
         // Build cluster with the specified monitor count (skip sample textures)
@@ -741,7 +768,7 @@ public class RTTRemoteMenuController : MonoBehaviour
         // Hide main menu and taskbar when ClusterRig appears
         HideMainMenuAndTaskbar();
 
-        Debug.Log("[RTTRemoteMenuController] ClusterRig created and visible - streaming active");
+        Debug.Log("[RTTRemoteMenuController] ClusterRig created inside RTTMenu - streaming active");
     }
 
     /// <summary>
