@@ -38,7 +38,7 @@ public class RTTPopupMenu : MonoBehaviour
         public int labelFontSize = 18;  // Font size for section labels/titles
         public int fontSize = 15;       // Font size for buttons
         public float iconSize = 20f;
-        public float borderWidth = 0.028f; // Popup border thickness (shader normalized value)
+        public float borderWidth = 0.05f; // Popup border thickness (shader normalized value)
         public float glassAlpha = 0.55f;  // Popup background transparency (match RTTPopupInputable)
         public Color backgroundColor = new Color(0.12f, 0.12f, 0.16f, 0.96f);
         public Color primaryColor = new Color(0f, 0.9f, 1f);

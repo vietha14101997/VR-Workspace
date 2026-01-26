@@ -1320,7 +1320,7 @@ public class RTTTaskbar : MonoBehaviour
             labelHeight = 52f,
             labelFontSize = 32,
             fontSize = 25,
-            borderWidth = 0.028f,
+            borderWidth = 0.05f,
             primaryColor = primaryColor,
             accentColor = accentColor,
             overlayColor = new Color(0f, 0f, 0f, 0.4f),
