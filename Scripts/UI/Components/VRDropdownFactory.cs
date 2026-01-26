@@ -829,6 +829,8 @@ public static class VRDropdownFactory
         rt.anchorMax = Vector2.one;
         rt.offsetMin = Vector2.zero;
         rt.offsetMax = Vector2.zero;
+        // Ensure same Z position as border to avoid parallax issues at different viewing angles
+        rt.localPosition = new Vector3(rt.localPosition.x, rt.localPosition.y, 0f);
 
         Image img = bgObj.AddComponent<Image>();
         img.sprite = GetPixelSprite();
@@ -861,8 +863,10 @@ public static class VRDropdownFactory
             mat.SetFloat("_GradientAngle", -10f);
             mat.SetFloat("_CyanRatio", 0.7f);
             mat.SetFloat("_GlassAlpha", config.backgroundAlpha * 1.2f);
-            mat.SetFloat("_FresnelPower", 2.2f);
-            mat.SetFloat("_FresnelStrength", 0.12f);
+            // Disable Fresnel effect to prevent view-angle-dependent appearance
+            // Fresnel causes background to look different from different viewing angles
+            mat.SetFloat("_FresnelPower", 1f);
+            mat.SetFloat("_FresnelStrength", 0f);
 
             // Glassmorphism settings
             mat.SetFloat("_BlurEnabled", config.enableGlassmorphism ? 1f : 0f);
@@ -914,6 +918,8 @@ public static class VRDropdownFactory
         rt.anchorMax = Vector2.one;
         rt.offsetMin = Vector2.zero;
         rt.offsetMax = Vector2.zero;
+        // Ensure same Z position as background to avoid parallax issues at different viewing angles
+        rt.localPosition = new Vector3(rt.localPosition.x, rt.localPosition.y, 0f);
 
         Image img = borderObj.AddComponent<Image>();
         img.sprite = GetPixelSprite();
@@ -1706,6 +1712,13 @@ public class VRDropdown : MonoBehaviour
         }
 
         _worldSpaceDropdownRoot = new GameObject("WorldSpaceDropdown_" + gameObject.name);
+
+        // Parent to VirtualObjects for better hierarchy organization
+        GameObject virtualObjects = GameObject.Find("VirtualObjects");
+        if (virtualObjects != null)
+        {
+            _worldSpaceDropdownRoot.transform.SetParent(virtualObjects.transform, true);
+        }
 
         // Fix Issue 2: Calculate proper gap from original panel's anchoredPosition (-25f pixels)
         // Original panel has anchoredPosition = (0, -25f), need to convert this to world space
