@@ -145,6 +145,14 @@ public class ClusterVisualCurved : MonoBehaviour
     #region Public API
 
     /// <summary>
+    /// Get the local position of the content object (for cursor synchronization).
+    /// This ensures cursor uses the same position as the rendered content mesh.
+    /// </summary>
+    public Vector3 ContentLocalPosition => _contentObject != null
+        ? _contentObject.transform.localPosition
+        : Vector3.zero;
+
+    /// <summary>
     /// Initialize the curved visual system
     /// </summary>
     public void Initialize()

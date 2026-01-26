@@ -92,7 +92,7 @@ public class WorldPanelClusterRig : MonoBehaviour
     /// Get arc radius for panel positioning.
     /// Uses VirtualObjectsZoomController.CurrentDistance when available, otherwise default 1.8m.
     /// </summary>
-    float ArcRadius
+    public float ArcRadius
     {
         get
         {
@@ -103,6 +103,124 @@ public class WorldPanelClusterRig : MonoBehaviour
             }
             return 1.8f; // Default fallback
         }
+    }
+
+    /// <summary>
+    /// Returns true if using curved visual that requires arc-based cursor mapping.
+    /// FlatPlanar mode does NOT require this - each panel is flat, only joints are folded.
+    /// </summary>
+    public bool IsUsingUnifiedVisual
+    {
+        get
+        {
+            // Only CurvedSurround mode requires arc-based cursor mapping
+            // FlatPlanar mode has flat panels, cursor should use board.TransformPoint
+            return useCurvedVisual && _curvedVisual != null;
+        }
+    }
+
+    /// <summary>
+    /// Returns true if using FlatPlanar visual mode.
+    /// In this mode, panels are flat quads positioned on arc with yaw rotation,
+    /// but the board transforms are positioned linearly (z=0, no rotation).
+    /// Cursor needs special handling to match mesh positions.
+    /// </summary>
+    public bool IsUsingFlatPlanarVisual
+    {
+        get
+        {
+            return !useCurvedVisual && _flatPlanarVisual != null;
+        }
+    }
+
+    /// <summary>
+    /// Get the content mesh local position from active visual (curved or flat planar).
+    /// This ensures cursor is drawn on the same plane as the rendered content.
+    /// </summary>
+    public Vector3 GetUnifiedContentLocalPosition()
+    {
+        if (useCurvedVisual && _curvedVisual != null)
+            return _curvedVisual.ContentLocalPosition;
+        if (!useCurvedVisual && _flatPlanarVisual != null)
+            return _flatPlanarVisual.ContentLocalPosition;
+        return Vector3.zero;
+    }
+
+    /// <summary>
+    /// Get the content mesh local position from curved visual (for cursor synchronization).
+    /// This ensures cursor is drawn on the same plane as the rendered content.
+    /// </summary>
+    [System.Obsolete("Use GetUnifiedContentLocalPosition instead")]
+    public Vector3 GetCurvedContentLocalPosition()
+    {
+        return GetUnifiedContentLocalPosition();
+    }
+
+    /// <summary>
+    /// Get FlatPlanar panel position and orientation for cursor mapping.
+    /// Returns the panel center position and right vector in ClusterRig local space,
+    /// matching FlatPlanarMeshGenerator exactly.
+    /// </summary>
+    /// <param name="enabledPanelIndex">Index within enabled panels (0, 1, 2...)</param>
+    /// <param name="enabledCount">Total number of enabled panels</param>
+    /// <param name="panelCenter">Output: Panel center in ClusterRig local space</param>
+    /// <param name="panelRight">Output: Panel right vector in ClusterRig local space</param>
+    /// <param name="panelNormal">Output: Panel normal in ClusterRig local space</param>
+    public void GetFlatPlanarPanelTransform(int enabledPanelIndex, int enabledCount,
+        out Vector3 panelCenter, out Vector3 panelRight, out Vector3 panelNormal)
+    {
+        // Get reference panel dimensions
+        var refPanel = _panels.Count > 0 ? _panels[_panels.Count / 2] : null;
+        float panelWidth = refPanel ? refPanel.width : 1f;
+        float panelHeight = refPanel ? refPanel.height : 0.5625f;
+
+        // FlatPlanar mode uses FULL panel width (margin = 0) for mesh generation
+        // This matches ClusterVisualFlatPlanar.GenerateMeshes() which sets meshMarginH = 0
+        float boardWidth = panelWidth;  // No margin reduction
+        float arcRadius = ArcRadius;
+
+        // Calculate angle per panel (same formula as FlatPlanarMeshGenerator with margin=0)
+        float boardAngleRad = 2f * Mathf.Atan(boardWidth / 2f / arcRadius);
+        float gapAngleRad = 2f * Mathf.Atan(edgeGapMeters / 2f / arcRadius);
+        float overlapAngleRad = 2f * Mathf.Atan(panelOverlap / 2f / arcRadius);
+        float angleDeg = (boardAngleRad + gapAngleRad - overlapAngleRad) * Mathf.Rad2Deg;
+
+        // Get yaw angle for this panel (same logic as FlatPlanarMeshGenerator.GetPanelYaws)
+        float panelYawDeg = enabledCount switch
+        {
+            1 => 0f,
+            2 => enabledPanelIndex == 0 ? 0f : angleDeg,
+            3 => (enabledPanelIndex - 1) * angleDeg,
+            _ => (enabledPanelIndex - (enabledCount - 1) / 2f) * angleDeg
+        };
+
+        float panelYawRad = panelYawDeg * Mathf.Deg2Rad;
+
+        // Panel center position in ClusterRig local space (same as FlatPlanarMeshGenerator)
+        float panelCenterX = Mathf.Sin(panelYawRad) * arcRadius;
+        float panelCenterZ = Mathf.Cos(panelYawRad) * arcRadius - arcRadius;
+        panelCenter = new Vector3(panelCenterX, 0f, panelCenterZ);
+
+        // Panel orientation vectors (same as FlatPlanarMeshGenerator)
+        panelRight = new Vector3(Mathf.Cos(panelYawRad), 0f, -Mathf.Sin(panelYawRad));
+        panelNormal = new Vector3(-Mathf.Sin(panelYawRad), 0f, -Mathf.Cos(panelYawRad));
+    }
+
+    /// <summary>
+    /// Get the board dimensions used for FlatPlanar cursor mapping.
+    /// IMPORTANT: FlatPlanar mode uses FULL panel dimensions (margin = 0) for mesh generation,
+    /// so cursor must use the same dimensions to match.
+    /// </summary>
+    public void GetFlatPlanarBoardDimensions(out float boardWidth, out float boardHeight)
+    {
+        var refPanel = _panels.Count > 0 ? _panels[_panels.Count / 2] : null;
+        float panelWidth = refPanel ? refPanel.width : 1f;
+        float panelHeight = refPanel ? refPanel.height : 0.5625f;
+
+        // FlatPlanar mode uses full panel dimensions (meshMarginH = 0, meshMarginV = 0)
+        // This matches ClusterVisualFlatPlanar.GenerateMeshes() which sets margins to 0
+        boardWidth = panelWidth;
+        boardHeight = panelHeight;
     }
 
     /// <summary>
