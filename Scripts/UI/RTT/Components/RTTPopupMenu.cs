@@ -348,10 +348,21 @@ public class RTTPopupMenu : MonoBehaviour
 
         UpdateBackgroundAspect(totalHeight);
 
-        foreach (var section in _sections)
+        PopupSectionType? prevSectionType = null;
+        for (int i = 0; i < _sections.Count; i++)
         {
+            var section = _sections[i];
+
+            // Add spacer between sections (not before first section)
+            if (prevSectionType.HasValue)
+            {
+                float spacing = GetSpacingBetweenSections(prevSectionType.Value, section.type);
+                BuildSpacer(spacing);
+            }
+
             BuildSection(section);
             _lastSectionType = section.type;
+            prevSectionType = section.type;
 
             // Add spacer after title-only sections (has title but no buttons)
             bool isTitleOnly = section.type == PopupSectionType.SectionBlock
@@ -365,6 +376,36 @@ public class RTTPopupMenu : MonoBehaviour
 
         _isBuilt = true;
         return this;
+    }
+
+    /// <summary>
+    /// Get spacing between two section types.
+    /// FullWidthButton after SectionBlock uses rowSpacing (closer).
+    /// All other transitions use sideSpacing.
+    /// </summary>
+    private float GetSpacingBetweenSections(PopupSectionType prev, PopupSectionType current)
+    {
+        // FullWidthButton (like Ascending) should be closer to the section above
+        if (prev == PopupSectionType.SectionBlock && current == PopupSectionType.FullWidthButton)
+        {
+            return _config.rowSpacing;
+        }
+        return _config.sideSpacing;
+    }
+
+    /// <summary>
+    /// Build a spacer with specified height
+    /// </summary>
+    private void BuildSpacer(float height)
+    {
+        if (height <= 0) return;
+
+        GameObject spacer = new GameObject("Spacer");
+        spacer.transform.SetParent(_contentContainer.transform, false);
+        SetLayerRecursively(spacer, _popupObject.layer);
+
+        LayoutElement le = spacer.AddComponent<LayoutElement>();
+        le.preferredHeight = height;
     }
 
     /// <summary>
@@ -539,9 +580,10 @@ public class RTTPopupMenu : MonoBehaviour
         // Content Layout
         VerticalLayoutGroup vlg = _contentContainer.AddComponent<VerticalLayoutGroup>();
         float horizontalPadding = ((_config.rowSpacing * 0.75f) + kBorderInset) * 1.75f;
-        float verticalPadding = (_config.rowSpacing + kBorderInset) * 1.5f;
-        vlg.padding = new RectOffset((int)horizontalPadding, (int)horizontalPadding, (int)verticalPadding, (int)verticalPadding);
-        vlg.spacing = _config.sideSpacing;
+        float topPadding = (_config.rowSpacing + kBorderInset) * 2.5f;
+        float bottomPadding = (_config.rowSpacing + kBorderInset) * 1.5f;  // Smaller bottom for visual balance
+        vlg.padding = new RectOffset((int)horizontalPadding, (int)horizontalPadding, (int)topPadding, (int)bottomPadding);
+        vlg.spacing = 0;  // Spacing handled manually via BuildSpacer for fine-grained control
         vlg.childControlWidth = true;
         vlg.childControlHeight = true;
         vlg.childForceExpandWidth = true;
@@ -838,9 +880,10 @@ public class RTTPopupMenu : MonoBehaviour
 
         VerticalLayoutGroup vlg = _contentContainer.AddComponent<VerticalLayoutGroup>();
         float horizontalPadding = ((_config.rowSpacing * 0.75f) + kBorderInset) * 1.75f;
-        float verticalPadding = (_config.rowSpacing + kBorderInset) * 1.5f;
-        vlg.padding = new RectOffset((int)horizontalPadding, (int)horizontalPadding, (int)verticalPadding, (int)verticalPadding);
-        vlg.spacing = _config.sideSpacing;
+        float topPadding = (_config.rowSpacing + kBorderInset) * 2.5f;
+        float bottomPadding = (_config.rowSpacing + kBorderInset) * 1.5f;  // Smaller bottom for visual balance
+        vlg.padding = new RectOffset((int)horizontalPadding, (int)horizontalPadding, (int)topPadding, (int)bottomPadding);
+        vlg.spacing = 0;  // Spacing handled manually via BuildSpacer for fine-grained control
         vlg.childControlWidth = true;
         vlg.childControlHeight = true;
         vlg.childForceExpandWidth = true;
@@ -942,20 +985,19 @@ public class RTTPopupMenu : MonoBehaviour
         {
             Material mat = new Material(glowShader);
             mat.SetFloat("_StrokeEnabled", 0);
-            mat.SetFloat("_BorderWidth", _config.borderWidth);
-            mat.SetFloat("_CornerRadius", 0.04f);
+            mat.SetFloat("_BorderWidth", 0.05f);  // Match RTTPopupInputable
+            mat.SetFloat("_CornerRadius", 0.03f); // Match RTTPopupInputable
             mat.SetFloat("_EdgePadding", 0.01f);
             mat.SetFloat("_Aspect", _config.width / 100f);
 
-            // Scale layer widths based on border width ratio
-            float borderScale = _config.borderWidth / 0.028f;
-            mat.SetFloat("_Layer1Width", 0.006f * borderScale);
+            // Fixed layer widths (same as RTTPopupInputable - no scaling)
+            mat.SetFloat("_Layer1Width", 0.006f);
             mat.SetFloat("_Layer1Alpha", 1.2f);
-            mat.SetFloat("_Layer2Width", 0.01f * borderScale);
+            mat.SetFloat("_Layer2Width", 0.01f);
             mat.SetFloat("_Layer2Alpha", 0.8f);
-            mat.SetFloat("_Layer3Width", 0.015f * borderScale);
+            mat.SetFloat("_Layer3Width", 0.015f);
             mat.SetFloat("_Layer3Alpha", 0.4f);
-            mat.SetFloat("_Layer4Width", 0.02f * borderScale);
+            mat.SetFloat("_Layer4Width", 0.02f);
             mat.SetFloat("_Layer4Alpha", 0.2f);
 
             Color glowColorA = new Color(0.3f, 1f, 1f, 1f);
@@ -968,8 +1010,8 @@ public class RTTPopupMenu : MonoBehaviour
             mat.SetColor("_GlassTint", new Color(0.9f, 0.95f, 1f, 1f));
             mat.SetFloat("_ShimmerSpeed", 0.4f);
             mat.SetFloat("_ShimmerIntensity", 0.2f);
-            mat.SetFloat("_LightSize", 0.008f * borderScale);
-            mat.SetFloat("_LightGlow", 0.008f * borderScale);
+            mat.SetFloat("_LightSize", 0.008f);
+            mat.SetFloat("_LightGlow", 0.008f);
 
             borderImg.material = mat;
             _borderMaterial = mat;
@@ -1096,11 +1138,9 @@ public class RTTPopupMenu : MonoBehaviour
 
     private void BuildTitleSpacer()
     {
-        // Add spacer after title-only section so total gap = labelHeight
-        // VLG adds sideSpacing before and after spacer, so:
-        // total gap = sideSpacing + spacerHeight + sideSpacing = labelHeight
-        // spacerHeight = labelHeight - 2*sideSpacing
-        float spacerHeight = _config.labelHeight - (2 * _config.sideSpacing);
+        // Add spacer after title-only section
+        // VLG spacing is 0, so spacer height = desired gap
+        float spacerHeight = _config.labelHeight;
         if (spacerHeight <= 0) return;
 
         GameObject spacer = new GameObject("TitleSpacer");
@@ -1119,17 +1159,19 @@ public class RTTPopupMenu : MonoBehaviour
 
         TextMeshProUGUI label = labelObj.AddComponent<TextMeshProUGUI>();
         label.text = text;
-        label.fontSize = _config.labelFontSize;
+        // Use button fontSize for labels (matches visual hierarchy better)
+        label.fontSize = _config.fontSize;
         label.font = _config.font;
         label.color = Color.white;
         label.fontStyle = FontStyles.Bold;
-        label.alignment = TextAlignmentOptions.Center;
-        // Side margin = 2x button horizontal padding, top margin = verticalPadding (same as bottom)
-        float horizontalPadding = ((_config.rowSpacing * 0.75f) + kBorderInset) * 1.75f;
-        float sideMargin = horizontalPadding * 2f;
-        float topMargin = (_config.rowSpacing + kBorderInset) * 1.5f;
-        float bottomMargin = _config.rowSpacing * 2.5f;
-        label.margin = new Vector4(sideMargin, topMargin, sideMargin, bottomMargin);
+        // Left align labels to match button alignment
+        label.alignment = TextAlignmentOptions.MidlineLeft;
+        // No extra left margin since VLG already has padding - align with buttons
+        float leftMargin = 0f;
+        float rightMargin = 0f;
+        float topMargin = 0f;  // Controlled by VLG padding
+        float bottomMargin = _config.rowSpacing * 2.0f;  // Space between label and buttons below
+        label.margin = new Vector4(leftMargin, topMargin, rightMargin, bottomMargin);
         label.enableWordWrapping = true;
         label.raycastTarget = false;
 
@@ -1196,8 +1238,10 @@ public class RTTPopupMenu : MonoBehaviour
 
     private float CalculateTotalHeight()
     {
-        float verticalPadding = (_config.rowSpacing + kBorderInset) * 1.5f;
-        float height = verticalPadding * 2;
+        // Must match VLG padding (asymmetric for visual balance)
+        float topPadding = (_config.rowSpacing + kBorderInset) * 2.5f;
+        float bottomPadding = (_config.rowSpacing + kBorderInset) * 1.5f;
+        float height = topPadding + bottomPadding;
 
         for (int i = 0; i < _sections.Count; i++)
         {
@@ -1221,13 +1265,8 @@ public class RTTPopupMenu : MonoBehaviour
                 bool isTitleOnly = !string.IsNullOrEmpty(section.title) && buttonCount == 0;
                 if (isTitleOnly)
                 {
-                    // spacerHeight = labelHeight - 2*sideSpacing
-                    // total extra = spacerHeight + sideSpacing (VLG adds spacing after spacer)
-                    float spacerHeight = _config.labelHeight - (2 * _config.sideSpacing);
-                    if (spacerHeight > 0)
-                    {
-                        height += spacerHeight + _config.sideSpacing;
-                    }
+                    // VLG spacing is 0, so just add the spacer height
+                    height += _config.labelHeight;
                 }
             }
             else if (section.type == PopupSectionType.FullWidthButton)
@@ -1242,9 +1281,13 @@ public class RTTPopupMenu : MonoBehaviour
                 }
             }
 
+            // Add spacing before next section (if any)
             if (i < _sections.Count - 1)
             {
-                height += _config.sideSpacing;
+                var nextSection = _sections[i + 1];
+                // Use rowSpacing for FullWidthButton after SectionBlock (like Ascending button)
+                float spacing = GetSpacingBetweenSections(section.type, nextSection.type);
+                height += spacing;
             }
         }
 

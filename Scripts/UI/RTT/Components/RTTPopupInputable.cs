@@ -83,6 +83,15 @@ public class RTTPopupInputable : MonoBehaviour
     public string InputValue => _inputField != null ? _inputField.text : "";
 
     /// <summary>
+    /// Set the default value for the input field (will be shown when popup opens)
+    /// </summary>
+    public void SetDefaultValue(string value)
+    {
+        _defaultInputValue = value;
+    }
+    private string _defaultInputValue = "";
+
+    /// <summary>
     /// Static reference to currently open popup
     /// </summary>
     public static RTTPopupInputable CurrentlyOpenPopup { get; private set; }
@@ -261,10 +270,12 @@ public class RTTPopupInputable : MonoBehaviour
             CurrentlyOpenPopup.Hide();
         }
 
-        // Clear input
+        // Set input value (use default value if set, otherwise clear)
         if (_inputField != null)
         {
-            _inputField.text = "";
+            _inputField.text = _defaultInputValue;
+            // Clear default value after use
+            _defaultInputValue = "";
         }
 
         if (_isWorldSpaceMode)

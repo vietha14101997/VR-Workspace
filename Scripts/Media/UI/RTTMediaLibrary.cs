@@ -1,0 +1,1433 @@
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.EventSystems;
+using TMPro;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using VRWorkspace.UI.HoverEffects;
+
+/// <summary>
+/// Main View for Media Library App.
+/// Orchestrates the 3-panel layout: Side Panel (Left), Grid (Center), Detail (Right).
+/// Based on RTTFileManager pattern with modifications:
+/// - No New Folder button
+/// - Grid only (no List view)
+/// - Edit mode: Rename and Delete only (no Copy/Move)
+/// </summary>
+public class RTTMediaLibrary : MonoBehaviour
+{
+    #region Configuration
+    private RTTMediaLibraryController _controller;
+    private float _containerWidth;
+    private float _containerHeight;
+    private TMP_FontAsset _font;
+    private Color _primaryColor;
+    private Color _accentColor;
+    #endregion
+
+    #region UI References
+    private RTTMenuFrame _menuFrame;
+    private RTTMenuFrame _leftFrame;
+    private RTTMenuFrame _rightFrame;
+
+    private RTTMediaSidePanel _sidePanel;
+    private RTTMediaGrid _grid;
+    private RTTMediaDetail _detailPanel;
+    private RTTFilePagination _pagination;
+
+    // Flag to track if initial setup is complete
+    private bool _viewReady = false;
+
+    // Edit Mode
+    private bool _isEditMode = false;
+    private GameObject _editButton;
+    private HashSet<string> _selectedItems = new HashSet<string>();
+    private GameObject _selectAllCheckbox;
+    private Image _selectAllCheckmark;
+
+    // Edit Mode UI in Row2
+    private GameObject _editControlsContainer;
+    private TextMeshProUGUI _selectedCountText;
+
+    // Edit Mode Action Buttons
+    private Button _renameButton;
+    private Button _deleteButton;
+    private CanvasGroup _renameButtonCG;
+    private CanvasGroup _deleteButtonCG;
+    private HoverEffectController _renameButtonHover;
+    private HoverEffectController _deleteButtonHover;
+
+    // Close button reference
+    private GameObject _closeButton;
+    private Image _closeButtonIcon;
+    private Sprite _originalCloseIcon;
+    private Sprite _originalEditIcon;
+    #endregion
+
+    #region Properties
+    public RTTMediaSidePanel SidePanel => _sidePanel;
+    public RTTMediaGrid Grid => _grid;
+    public RTTMediaDetail DetailPanel => _detailPanel;
+    #endregion
+
+    #region Events
+    public event Action<MediaVideoInfo> OnVideoPlayRequested;
+    public event Action OnCloseRequested;
+    #endregion
+
+    #region Header References
+    private RectTransform _headerRT;
+    private RectTransform _bodyRT;
+    private float _singleRowHeight;
+    private float _rowSpacing;
+    private float _headerHeight2Rows;
+
+    // Breadcrumb References
+    private Transform _breadcrumbContainer;
+
+    // View Options
+    private RTTPopupMenu _viewOptionsPopup;
+    private string _currentSortBy = "Name";
+    private bool _isAscending = true;
+    private Image _sortArrowImg;
+    private TextMeshProUGUI _sortTriggerText;
+    private TextMeshProUGUI _itemCountText;
+
+    private float _sortTriggerWidth = 220f;
+
+    // Side Panel Gap
+    private const float SIDE_PANEL_GAP = 0.05f;
+    #endregion
+
+    #region Initialization
+    public void Initialize(RTTMediaLibraryController controller, RTTMenuFrame menuFrame,
+        float w, float h, TMP_FontAsset font, Color primary, Color accent)
+    {
+        _controller = controller;
+        _menuFrame = menuFrame;
+        _containerWidth = w;
+        _containerHeight = h;
+        _font = font;
+        _primaryColor = primary;
+        _accentColor = accent;
+
+        BuildUI();
+    }
+
+    public void BuildUI()
+    {
+        Debug.Log("[RTTMediaLibrary] Building UI...");
+
+        RectTransform rt = GetComponent<RectTransform>();
+        if (rt == null) rt = gameObject.AddComponent<RectTransform>();
+
+        if (_menuFrame != null)
+        {
+            CreatePanels();
+        }
+        else
+        {
+            Debug.LogWarning("[RTTMediaLibrary] Parent RTTMenuFrame not found, cannot create side panels correctly.");
+        }
+    }
+
+    public void Cleanup()
+    {
+        _viewReady = false;
+
+        var zoomController = VirtualObjectsZoomController.Instance;
+        if (zoomController != null)
+        {
+            if (_leftFrame != null) zoomController.UnregisterSidePanel(_leftFrame);
+            if (_rightFrame != null) zoomController.UnregisterSidePanel(_rightFrame);
+        }
+
+        if (_leftFrame != null) Destroy(_leftFrame.gameObject);
+        if (_rightFrame != null) Destroy(_rightFrame.gameObject);
+        if (_pagination != null) Destroy(_pagination.gameObject);
+
+        if (_viewOptionsPopup != null) Destroy(_viewOptionsPopup.gameObject);
+        _viewOptionsPopup = null;
+    }
+
+    private void OnEnable()
+    {
+        if (!_viewReady) return;
+
+        if (_leftFrame != null) _leftFrame.gameObject.SetActive(true);
+        if (_rightFrame != null) _rightFrame.gameObject.SetActive(true);
+        if (_pagination != null) _pagination.Show();
+    }
+
+    private void OnDisable()
+    {
+        if (_leftFrame != null) _leftFrame.gameObject.SetActive(false);
+        if (_rightFrame != null) _rightFrame.gameObject.SetActive(false);
+        if (_pagination != null) _pagination.Hide();
+
+        if (_viewOptionsPopup != null) _viewOptionsPopup.Hide();
+    }
+
+    private void OnDestroy()
+    {
+        Cleanup();
+
+        if (_grid != null)
+        {
+            _grid.OnVideoSelected -= OnGridVideoSelected;
+            _grid.OnVideoDoubleClicked -= OnGridVideoDoubleClicked;
+            _grid.OnPageChanged -= OnGridPageChanged;
+        }
+
+        if (_detailPanel != null)
+        {
+            _detailPanel.OnPlayRequested -= OnDetailPlayRequested;
+            _detailPanel.OnToggleFavorite -= OnDetailToggleFavorite;
+        }
+
+        if (_sidePanel != null)
+        {
+            _sidePanel.OnCategorySelected -= OnCategorySelected;
+        }
+    }
+    #endregion
+
+    #region Panel Creation
+    private void CreatePanels()
+    {
+        if (_menuFrame == null) return;
+
+        // 1. Create Pagination
+        CreatePagination();
+
+        // 2. Create Side Panels
+        CreateSidePanels();
+
+        // 3. Setup Center Grid
+        StartCoroutine(CreateCenterGrid());
+    }
+
+    private void CreatePagination()
+    {
+        RTTToolbar toolbar = RTTToolbar.Instance;
+        if (toolbar == null)
+        {
+            Debug.LogWarning("[RTTMediaLibrary] RTTToolbar not found, pagination positioning may be incorrect");
+            toolbar = RTTToolbar.Create();
+        }
+
+        GameObject pagObj = new GameObject("MediaPagination");
+        pagObj.transform.SetParent(toolbar.transform, false);
+        pagObj.transform.localPosition = toolbar.GetPaginationLocalPosition();
+        pagObj.transform.localRotation = Quaternion.identity;
+
+        _pagination = pagObj.AddComponent<RTTFilePagination>();
+        _pagination.Initialize(_controller);
+    }
+
+    private void CreateSidePanels()
+    {
+        float mainPanelWidth = _menuFrame.PanelWidth;
+        float mainPanelHeight = _menuFrame.PanelHeight;
+        float sideWidth = mainPanelWidth / 3f;
+        float sideHeight = mainPanelHeight;
+
+        // Left Panel (Navigation)
+        PlaceSidePanelOnSphere("MediaNavigationPanel", -1, mainPanelWidth, sideWidth, sideHeight, SIDE_PANEL_GAP, ref _leftFrame);
+        if (_leftFrame != null)
+        {
+            _leftFrame.SetVisible(true);
+            StartCoroutine(CreateLeftPanelContent());
+        }
+
+        // Right Panel (Detail)
+        PlaceSidePanelOnSphere("MediaDetailPanel", 1, mainPanelWidth, sideWidth, sideHeight, SIDE_PANEL_GAP, ref _rightFrame);
+        if (_rightFrame != null)
+        {
+            _rightFrame.SetVisible(true);
+            StartCoroutine(CreateRightPanelContent());
+        }
+    }
+
+    private void PlaceSidePanelOnSphere(string name, int side, float mainWidth, float sideWidth, float sideHeight,
+        float gap, ref RTTMenuFrame frameRef)
+    {
+        Camera cam = Camera.main;
+        if (cam == null)
+        {
+            Debug.LogError("[RTTMediaLibrary] PlaceSidePanelOnSphere: No main camera found!");
+            return;
+        }
+
+        if (_menuFrame == null)
+        {
+            Debug.LogError("[RTTMediaLibrary] PlaceSidePanelOnSphere: No app frame (_menuFrame) found!");
+            return;
+        }
+
+        Vector3 mainRight = _menuFrame.transform.right;
+        float innerEdgeOffset = (mainWidth / 2f) + gap;
+        Vector3 innerEdgePos = _menuFrame.transform.position + mainRight * innerEdgeOffset * side;
+
+        float w = sideWidth / 2f;
+        Vector3 cameraPos = cam.transform.position;
+
+        float a = innerEdgePos.x - cameraPos.x;
+        float b = innerEdgePos.z - cameraPos.z;
+        float distSq = a * a + b * b;
+        float dist = Mathf.Sqrt(distSq);
+
+        Vector3 panelPos;
+        Quaternion panelRotation;
+
+        if (dist < 0.001f)
+        {
+            panelPos = innerEdgePos + mainRight * w * side;
+            panelPos.y = _menuFrame.transform.position.y;
+            panelRotation = Quaternion.LookRotation(-mainRight * side, Vector3.up);
+        }
+        else
+        {
+            float rSq = distSq - w * w;
+            if (rSq < 0.0001f) rSq = 0.0001f;
+            float r = Mathf.Sqrt(rSq);
+
+            float alpha = Mathf.Atan2(b, a);
+            float sinArg = Mathf.Clamp((w * side) / dist, -1f, 1f);
+            float theta = alpha - Mathf.Asin(sinArg);
+
+            float dx = Mathf.Cos(theta);
+            float dz = Mathf.Sin(theta);
+            panelPos = new Vector3(
+                cameraPos.x + dx * r,
+                _menuFrame.transform.position.y,
+                cameraPos.z + dz * r
+            );
+
+            Vector3 toCamera = new Vector3(cameraPos.x - panelPos.x, 0, cameraPos.z - panelPos.z);
+            if (toCamera.sqrMagnitude > 0.001f)
+            {
+                panelRotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
+            }
+            else
+            {
+                panelRotation = Quaternion.LookRotation(-mainRight * side, Vector3.up);
+            }
+        }
+
+        float logicalWidthPixels = (sideWidth / _menuFrame.PanelWidth) * _menuFrame.LogicalWidthValue;
+
+        frameRef = RTTMenuFrame.Create(_menuFrame.transform, sideWidth, sideHeight, logicalWidthPixels, name);
+        frameRef.transform.position = panelPos;
+        frameRef.transform.rotation = panelRotation;
+        frameRef.transform.localScale = Vector3.one;
+
+        frameRef.SetContentMargins(20f, 20f, 20f, 20f);
+        frameRef.SetFloatingDataEnabled(true, 5);
+
+        var zoomController = VirtualObjectsZoomController.Instance;
+        if (zoomController != null)
+        {
+            zoomController.RegisterSidePanel(frameRef, _menuFrame.transform, side, mainWidth, sideWidth, gap);
+        }
+
+        Debug.Log($"[RTTMediaLibrary] Placed {name}: pos={panelPos}");
+    }
+
+    private IEnumerator CreateLeftPanelContent()
+    {
+        while (_leftFrame.ContentContainer == null) yield return null;
+
+        var containerSize = _leftFrame.GetContentSize();
+
+        GameObject contentObj = new GameObject("SidePanelContent");
+        contentObj.transform.SetParent(_leftFrame.ContentContainer, false);
+
+        RectTransform rt = contentObj.AddComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+
+        _sidePanel = contentObj.AddComponent<RTTMediaSidePanel>();
+        _sidePanel.Initialize(_controller, containerSize.x, containerSize.y, _font, _primaryColor, _accentColor);
+
+        _sidePanel.OnCategorySelected += OnCategorySelected;
+
+        _leftFrame.MarkDirty();
+        Debug.Log("[RTTMediaLibrary] Left panel content created");
+    }
+
+    private IEnumerator CreateRightPanelContent()
+    {
+        while (_rightFrame.ContentContainer == null) yield return null;
+
+        var containerSize = _rightFrame.GetContentSize();
+
+        GameObject contentObj = new GameObject("DetailContent");
+        contentObj.transform.SetParent(_rightFrame.ContentContainer, false);
+
+        RectTransform rt = contentObj.AddComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+
+        _detailPanel = contentObj.AddComponent<RTTMediaDetail>();
+        _detailPanel.Initialize(_controller, containerSize.x, containerSize.y, _font, _primaryColor, _accentColor);
+
+        _detailPanel.OnPlayRequested += OnDetailPlayRequested;
+        _detailPanel.OnToggleFavorite += OnDetailToggleFavorite;
+
+        _rightFrame.MarkDirty();
+        Debug.Log("[RTTMediaLibrary] Right panel content created");
+    }
+    #endregion
+
+    #region Center Grid Creation
+    private IEnumerator CreateCenterGrid()
+    {
+        while (_menuFrame.ContentContainer == null) yield return null;
+
+        foreach (Transform child in _menuFrame.ContentContainer)
+        {
+            if (child.name == "PlaceholderText") Destroy(child.gameObject);
+        }
+
+        Vector2 contentSize = _menuFrame.GetContentSize();
+        float panelHeight = contentSize.y;
+
+        float headerBaseHeight = panelHeight * 0.198f;
+        _singleRowHeight = headerBaseHeight / 2f;
+
+        if (_singleRowHeight < 88f)
+        {
+            _singleRowHeight = 88f;
+        }
+
+        _rowSpacing = _singleRowHeight * 0.1875f;
+        _headerHeight2Rows = (_singleRowHeight * 2f) + _rowSpacing;
+
+        float bottomPadding = panelHeight * 0.02f;
+
+        // 1. Create Body Object (Grid Container)
+        GameObject bodyObj = new GameObject("Body");
+        bodyObj.transform.SetParent(_menuFrame.ContentContainer, false);
+        _bodyRT = bodyObj.AddComponent<RectTransform>();
+        _bodyRT.anchorMin = Vector2.zero;
+        _bodyRT.anchorMax = Vector2.one;
+        _bodyRT.offsetMax = new Vector2(0, -_headerHeight2Rows);
+        _bodyRT.offsetMin = new Vector2(0, bottomPadding);
+
+        bodyObj.AddComponent<RectMask2D>();
+
+        // 2. Create Header Container
+        GameObject headerObj = new GameObject("Header");
+        headerObj.transform.SetParent(_menuFrame.ContentContainer, false);
+        _headerRT = headerObj.AddComponent<RectTransform>();
+        _headerRT.anchorMin = new Vector2(0, 1);
+        _headerRT.anchorMax = new Vector2(1, 1);
+        _headerRT.pivot = new Vector2(0.5f, 1);
+        _headerRT.anchoredPosition = Vector2.zero;
+        _headerRT.sizeDelta = new Vector2(0, _headerHeight2Rows);
+
+        // 3. Build Header Rows
+        CreateHeaderRows(_headerRT);
+
+        // 4. Create Grid Inside Body
+        GameObject gridObj = new GameObject("MediaGrid");
+        gridObj.transform.SetParent(_bodyRT, false);
+        RectTransform gridRT = gridObj.AddComponent<RectTransform>();
+        gridRT.anchorMin = Vector2.zero;
+        gridRT.anchorMax = Vector2.one;
+        gridRT.offsetMin = Vector2.zero;
+        gridRT.offsetMax = Vector2.zero;
+
+        _grid = gridObj.AddComponent<RTTMediaGrid>();
+        float bodyHeight = panelHeight - _headerHeight2Rows - bottomPadding;
+        _grid.Initialize(_controller, contentSize.x, bodyHeight, _font, _primaryColor, _accentColor);
+
+        // Wire grid events
+        _grid.OnVideoSelected += OnGridVideoSelected;
+        _grid.OnVideoDoubleClicked += OnGridVideoDoubleClicked;
+        _grid.OnPageChanged += OnGridPageChanged;
+
+        // Render Order
+        headerObj.transform.SetAsLastSibling();
+        bodyObj.transform.SetAsFirstSibling();
+
+        _viewReady = true;
+
+        _controller?.OnViewReady();
+
+        StartCoroutine(InitializePageSizeDeferred());
+
+        Debug.Log("[RTTMediaLibrary] Center grid created");
+    }
+
+    private IEnumerator InitializePageSizeDeferred()
+    {
+        yield return null;
+
+        int itemsPerPage = _grid?.ItemsPerPage ?? 6;
+        _controller?.SetPageSize(itemsPerPage);
+        Debug.Log($"[RTTMediaLibrary] InitializePageSizeDeferred: itemsPerPage={itemsPerPage}");
+    }
+
+    private void CreateHeaderRows(RectTransform parent)
+    {
+        // Row 1: Close | Sort | Search | Edit (No New Folder)
+        CreateRow1(parent);
+
+        // Row 2: Breadcrumbs (or Edit Controls) | Item Count | Refresh
+        CreateRow2(parent);
+    }
+
+    private void CreateRow1(RectTransform parent)
+    {
+        RectTransform rowRT = CreateRowContainer(parent, "Row1", 0);
+
+        // Left: Close Button
+        _originalCloseIcon = Resources.Load<Sprite>("icon_close");
+        _closeButton = VRButtonFactory.CreateBareIconButton(
+            rowRT,
+            75f,
+            _originalCloseIcon,
+            _primaryColor,
+            OnCloseButtonClicked
+        );
+        _closeButtonIcon = _closeButton.transform.Find("HitArea/Visuals/Content/Icon")?.GetComponent<Image>();
+        RectTransform closeRT = _closeButton.GetComponent<RectTransform>();
+        SetupRowElement(closeRT, new Vector2(0, 0.5f), new Vector2(20, 0));
+
+        // Sort Button
+        Sprite arrowIcon = VRDropdownFactory.GetArrowSprite();
+
+        var sortConfig = new VRButtonFactory.ButtonConfig
+        {
+            label = _currentSortBy,
+            themeColor = _primaryColor,
+            width = _sortTriggerWidth,
+            height = 75f,
+            fontSize = 26,
+            font = _font,
+            textOnly = true,
+            borderWidth = 0.04f,
+            glowWidth = 0.08f,
+            glowIntensity = 4f,
+            popAmount = 0.05f
+        };
+        GameObject sortTrigger = VRButtonFactory.CreateButton(rowRT, sortConfig, ToggleViewOptionsPopup);
+
+        _sortTriggerText = sortTrigger.GetComponentInChildren<TextMeshProUGUI>();
+        if (_sortTriggerText != null)
+        {
+            _sortTriggerText.alignment = TextAlignmentOptions.Center;
+            _sortTriggerText.margin = Vector4.zero;
+        }
+
+        // Arrow Icon
+        GameObject iconObj = new GameObject("ArrowIcon");
+        iconObj.transform.SetParent(sortTrigger.transform, false);
+        _sortArrowImg = iconObj.AddComponent<Image>();
+        _sortArrowImg.sprite = arrowIcon;
+        _sortArrowImg.color = Color.white;
+        _sortArrowImg.raycastTarget = false;
+
+        RectTransform iconRT = iconObj.GetComponent<RectTransform>();
+        iconRT.anchorMin = new Vector2(1, 0.5f);
+        iconRT.anchorMax = new Vector2(1, 0.5f);
+        iconRT.pivot = new Vector2(0.5f, 0.5f);
+        iconRT.sizeDelta = new Vector2(18f, 18f);
+        iconRT.anchoredPosition = new Vector2(-36f, 0);
+
+        RectTransform sortRT = sortTrigger.GetComponent<RectTransform>();
+        float gapCenterFromCenter = -_containerWidth / 4f - 203.5f;
+        sortRT.anchorMin = new Vector2(0.5f, 0.5f);
+        sortRT.anchorMax = new Vector2(0.5f, 0.5f);
+        sortRT.pivot = new Vector2(0.5f, 0.5f);
+        sortRT.anchoredPosition = new Vector2(gapCenterFromCenter, 0);
+
+        CreateViewOptionsPopup(sortRT);
+
+        // Right: Edit Button
+        _originalEditIcon = Resources.Load<Sprite>("icon_edit");
+        var editConfig = new VRButtonFactory.ButtonConfig
+        {
+            label = "Edit",
+            icon = _originalEditIcon,
+            themeColor = _primaryColor,
+            width = 75f,
+            height = 75f,
+            iconOnly = true,
+            iconSize = 39f,
+            borderWidth = 0.04f,
+            glowWidth = 0.08f,
+            glowIntensity = 4f,
+            popAmount = 0.05f
+        };
+        _editButton = VRButtonFactory.CreateButton(
+            rowRT,
+            editConfig,
+            OnEditButtonClicked
+        );
+        RectTransform editRT = _editButton.GetComponent<RectTransform>();
+        SetupRowElement(editRT, new Vector2(1, 0.5f), new Vector2(-20, 0));
+
+        // NO New Folder button for Media Library
+
+        // Center: Search Bar
+        CreateSearchBar(rowRT);
+    }
+
+    private void CreateRow2(RectTransform parent)
+    {
+        float row2Y = -(_singleRowHeight + _rowSpacing);
+        RectTransform rowRT = CreateRowContainer(parent, "Row2", row2Y);
+
+        // Right: Refresh Button
+        Sprite refreshIcon = Resources.Load<Sprite>("icon_refresh");
+        var refreshConfig = new VRButtonFactory.ButtonConfig
+        {
+            label = "Refresh",
+            icon = refreshIcon,
+            themeColor = _accentColor,
+            width = 75f,
+            height = 75f,
+            iconOnly = true,
+            iconSize = 39f,
+            borderWidth = 0.04f,
+            glowWidth = 0.08f,
+            glowIntensity = 4f,
+            popAmount = 0.05f
+        };
+        GameObject refreshBtn = VRButtonFactory.CreateButton(
+            rowRT,
+            refreshConfig,
+            () => _controller?.RefreshLibrary()
+        );
+        RectTransform refreshRT = refreshBtn.GetComponent<RectTransform>();
+        SetupRowElement(refreshRT, new Vector2(1, 0.5f), new Vector2(-20, 0));
+
+        // Item Count Label
+        GameObject countObj = new GameObject("ItemCountLabel");
+        countObj.transform.SetParent(rowRT, false);
+
+        _itemCountText = countObj.AddComponent<TextMeshProUGUI>();
+        _itemCountText.text = "0 items";
+        _itemCountText.font = _font;
+        _itemCountText.fontSize = 31;
+        _itemCountText.fontStyle = FontStyles.Bold;
+        _itemCountText.color = Color.white;
+        _itemCountText.alignment = TextAlignmentOptions.Center;
+        _itemCountText.raycastTarget = false;
+
+        RectTransform countRT = countObj.GetComponent<RectTransform>();
+        countRT.sizeDelta = new Vector2(_sortTriggerWidth, 75f);
+        float countCenterFromCenter = _containerWidth / 4f + 203.5f;
+        countRT.anchorMin = new Vector2(0.5f, 0.5f);
+        countRT.anchorMax = new Vector2(0.5f, 0.5f);
+        countRT.pivot = new Vector2(0.5f, 0.5f);
+        countRT.anchoredPosition = new Vector2(countCenterFromCenter, 0);
+
+        // Selected Count Label (Edit Mode)
+        float searchBarRightEdge = 990f / 2f;
+
+        GameObject selectedObj = new GameObject("SelectedCountLabel");
+        selectedObj.transform.SetParent(rowRT, false);
+
+        _selectedCountText = selectedObj.AddComponent<TextMeshProUGUI>();
+        _selectedCountText.text = "";
+        _selectedCountText.font = _font;
+        _selectedCountText.fontSize = 28;
+        _selectedCountText.fontStyle = FontStyles.Bold;
+        _selectedCountText.color = Color.white;
+        _selectedCountText.alignment = TextAlignmentOptions.MidlineRight;
+        _selectedCountText.raycastTarget = false;
+
+        RectTransform selectedRT = selectedObj.GetComponent<RectTransform>();
+        selectedRT.sizeDelta = new Vector2(280f, 75f);
+        selectedRT.anchorMin = new Vector2(0.5f, 0.5f);
+        selectedRT.anchorMax = new Vector2(0.5f, 0.5f);
+        selectedRT.pivot = new Vector2(1, 0.5f);
+        selectedRT.anchoredPosition = new Vector2(searchBarRightEdge, 0);
+        selectedObj.SetActive(false);
+
+        // Breadcrumb Container
+        GameObject crumbContainer = new GameObject("Breadcrumbs");
+        crumbContainer.transform.SetParent(rowRT, false);
+        _breadcrumbContainer = crumbContainer.transform;
+
+        RectTransform crumbRT = crumbContainer.AddComponent<RectTransform>();
+        crumbRT.anchorMin = new Vector2(0, 0);
+        crumbRT.anchorMax = new Vector2(1, 1);
+        crumbRT.pivot = new Vector2(0, 0.5f);
+        crumbRT.offsetMin = new Vector2(20, 0);
+        crumbRT.offsetMax = new Vector2(-520, 0);
+
+        // Edit Controls Container (hidden by default)
+        CreateEditControlsInRow2(rowRT);
+    }
+
+    private void CreateEditControlsInRow2(RectTransform parent)
+    {
+        _editControlsContainer = new GameObject("EditControls");
+        _editControlsContainer.transform.SetParent(parent, false);
+
+        RectTransform editRT = _editControlsContainer.AddComponent<RectTransform>();
+        editRT.anchorMin = new Vector2(0, 0);
+        editRT.anchorMax = new Vector2(1, 1);
+        editRT.pivot = new Vector2(0, 0.5f);
+        editRT.offsetMin = new Vector2(20, 0);
+        editRT.offsetMax = new Vector2(-320, 0);
+
+        // Select All Checkbox
+        CreateSelectAllCheckbox(_editControlsContainer.transform);
+
+        // Positioning for buttons
+        float searchBarWidth = 990f;
+        float searchBarLeftFromRowCenter = -searchBarWidth / 2f;
+        float containerCenterOffset = (20f + (-320f)) / 2f;
+        float searchBarLeftInContainer = searchBarLeftFromRowCenter - containerCenterOffset;
+        float buttonsStartX = searchBarLeftInContainer - 90f;
+        float btnSpacing = 15f;
+
+        // Rename Button
+        var renameBtn = CreateEditModeActionButton(_editControlsContainer.transform, "Rename", "icon_rename", OnRenameClicked, 130f);
+        var renameRT = renameBtn.GetComponent<RectTransform>();
+        renameRT.anchorMin = renameRT.anchorMax = new Vector2(0.5f, 0.5f);
+        renameRT.pivot = new Vector2(0, 0.5f);
+        renameRT.anchoredPosition = new Vector2(buttonsStartX, 0);
+        _renameButton = renameBtn.GetComponent<Button>();
+        _renameButtonCG = renameBtn.AddComponent<CanvasGroup>();
+        _renameButtonHover = renameBtn.GetComponent<HoverEffectController>();
+
+        // Delete Button (NO Copy/Move for Media Library)
+        var deleteBtn = CreateEditModeActionButton(_editControlsContainer.transform, "Delete", "icon_trash", OnDeleteClicked, 100f);
+        var deleteRT = deleteBtn.GetComponent<RectTransform>();
+        deleteRT.anchorMin = deleteRT.anchorMax = new Vector2(0.5f, 0.5f);
+        deleteRT.pivot = new Vector2(0, 0.5f);
+        float deleteX = buttonsStartX + renameRT.sizeDelta.x + btnSpacing;
+        deleteRT.anchoredPosition = new Vector2(deleteX, 0);
+        _deleteButton = deleteBtn.GetComponent<Button>();
+        _deleteButtonCG = deleteBtn.AddComponent<CanvasGroup>();
+        _deleteButtonHover = deleteBtn.GetComponent<HoverEffectController>();
+
+        UpdateActionButtonsState();
+
+        _editControlsContainer.SetActive(false);
+    }
+
+    private void CreateSelectAllCheckbox(Transform parent)
+    {
+        float checkboxSize = 50f;
+        float labelWidth = 150f;
+        float spacing = 10f;
+        float leftPadding = 20f;
+
+        GameObject container = new GameObject("SelectAllContainer");
+        container.transform.SetParent(parent, false);
+        RectTransform containerRT = container.AddComponent<RectTransform>();
+        containerRT.anchorMin = containerRT.anchorMax = new Vector2(0, 0.5f);
+        containerRT.pivot = new Vector2(0, 0.5f);
+        containerRT.sizeDelta = new Vector2(checkboxSize + spacing + labelWidth, checkboxSize);
+        containerRT.anchoredPosition = new Vector2(leftPadding, 0);
+
+        // Checkbox button
+        _selectAllCheckbox = new GameObject("Checkbox");
+        _selectAllCheckbox.transform.SetParent(container.transform, false);
+        RectTransform checkboxRT = _selectAllCheckbox.AddComponent<RectTransform>();
+        checkboxRT.anchorMin = checkboxRT.anchorMax = new Vector2(0, 0.5f);
+        checkboxRT.pivot = new Vector2(0, 0.5f);
+        checkboxRT.sizeDelta = new Vector2(checkboxSize, checkboxSize);
+        checkboxRT.anchoredPosition = Vector2.zero;
+
+        Image checkboxBg = _selectAllCheckbox.AddComponent<Image>();
+        checkboxBg.raycastTarget = true;
+        Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
+        if (glassShader != null)
+        {
+            Material mat = new Material(glassShader);
+            mat.SetFloat("_Aspect", 1f);
+            mat.SetFloat("_CornerRadius", 0.25f);
+            mat.SetFloat("_EdgePadding", 0.02f);
+            mat.SetColor("_ColorA", new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.3f));
+            mat.SetColor("_ColorB", new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.1f));
+            mat.SetFloat("_GlassAlpha", 0.2f);
+            mat.SetFloat("_FresnelStrength", 0.15f);
+            checkboxBg.material = mat;
+            checkboxBg.color = Color.white;
+        }
+
+        // Checkmark icon
+        GameObject checkmarkObj = new GameObject("Checkmark");
+        checkmarkObj.transform.SetParent(_selectAllCheckbox.transform, false);
+        RectTransform checkmarkRT = checkmarkObj.AddComponent<RectTransform>();
+        checkmarkRT.anchorMin = new Vector2(0.15f, 0.15f);
+        checkmarkRT.anchorMax = new Vector2(0.85f, 0.85f);
+        checkmarkRT.offsetMin = Vector2.zero;
+        checkmarkRT.offsetMax = Vector2.zero;
+
+        _selectAllCheckmark = checkmarkObj.AddComponent<Image>();
+        _selectAllCheckmark.sprite = Resources.Load<Sprite>("icon_check_mark");
+        _selectAllCheckmark.color = Color.white;
+        _selectAllCheckmark.preserveAspect = true;
+        checkmarkObj.SetActive(false);
+
+        // Button
+        Button checkboxBtn = _selectAllCheckbox.AddComponent<Button>();
+        checkboxBtn.transition = Selectable.Transition.None;
+        checkboxBtn.onClick.AddListener(OnSelectAllClicked);
+
+        // VR Collider
+        var collider = _selectAllCheckbox.AddComponent<BoxCollider>();
+        collider.size = new Vector3(checkboxSize, checkboxSize, 10);
+        collider.center = new Vector3(checkboxSize / 2f, 0, -5);
+
+        // Label
+        GameObject labelObj = new GameObject("Label");
+        labelObj.transform.SetParent(container.transform, false);
+        RectTransform labelRT = labelObj.AddComponent<RectTransform>();
+        labelRT.anchorMin = labelRT.anchorMax = new Vector2(0, 0.5f);
+        labelRT.pivot = new Vector2(0, 0.5f);
+        labelRT.sizeDelta = new Vector2(labelWidth, checkboxSize);
+        labelRT.anchoredPosition = new Vector2(checkboxSize + spacing, 0);
+
+        TextMeshProUGUI labelTMP = labelObj.AddComponent<TextMeshProUGUI>();
+        labelTMP.text = "Select all";
+        labelTMP.font = _font;
+        labelTMP.fontSize = 28;
+        labelTMP.fontStyle = FontStyles.Bold;
+        labelTMP.color = Color.white;
+        labelTMP.alignment = TextAlignmentOptions.MidlineLeft;
+    }
+
+    private GameObject CreateEditModeActionButton(Transform parent, string label, string iconName, UnityEngine.Events.UnityAction onClick, float minTextWidth = 80f)
+    {
+        float btnHeight = 75f;
+        float iconSize = 35f;
+        float padding = 22f;
+        float spacing = 11f;
+        float textWidth = Mathf.Max(minTextWidth, label.Length * 18f);
+        float btnWidth = padding + iconSize + spacing + textWidth + padding;
+
+        GameObject btnObj = new GameObject($"Btn_{label}");
+        btnObj.transform.SetParent(parent, false);
+
+        RectTransform rt = btnObj.AddComponent<RectTransform>();
+        rt.sizeDelta = new Vector2(btnWidth, btnHeight);
+
+        // Glass background
+        Image bg = btnObj.AddComponent<Image>();
+        Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
+        if (glassShader != null)
+        {
+            Material mat = new Material(glassShader);
+            mat.SetFloat("_Aspect", btnWidth / btnHeight);
+            mat.SetFloat("_CornerRadius", 0.48f);
+            mat.SetFloat("_EdgePadding", 0.02f);
+            mat.SetColor("_ColorA", new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.25f));
+            mat.SetColor("_ColorB", new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.1f));
+            mat.SetFloat("_GlassAlpha", 0.2f);
+            mat.SetFloat("_FresnelStrength", 0.15f);
+            bg.material = mat;
+            bg.color = Color.white;
+        }
+        else
+        {
+            bg.color = new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.2f);
+        }
+
+        // Button
+        Button btn = btnObj.AddComponent<Button>();
+        btn.transition = Selectable.Transition.None;
+        btn.onClick.AddListener(onClick);
+
+        // Hover effect
+        var hoverController = btnObj.AddComponent<HoverEffectController>();
+        hoverController.AddEffect(new ScaleHoverEffect().WithHoverScale(1.03f));
+
+        // Icon
+        Sprite iconSprite = Resources.Load<Sprite>(iconName);
+        if (iconSprite != null)
+        {
+            GameObject iconObj = new GameObject("Icon");
+            iconObj.transform.SetParent(btnObj.transform, false);
+            RectTransform iconRT = iconObj.AddComponent<RectTransform>();
+            iconRT.anchorMin = new Vector2(0, 0.5f);
+            iconRT.anchorMax = new Vector2(0, 0.5f);
+            iconRT.pivot = new Vector2(0, 0.5f);
+            iconRT.sizeDelta = new Vector2(iconSize, iconSize);
+            iconRT.anchoredPosition = new Vector2(padding, 0);
+
+            Image iconImg = iconObj.AddComponent<Image>();
+            iconImg.sprite = iconSprite;
+            iconImg.color = Color.white;
+            iconImg.preserveAspect = true;
+        }
+
+        // Text
+        GameObject textObj = new GameObject("Text");
+        textObj.transform.SetParent(btnObj.transform, false);
+        RectTransform textRT = textObj.AddComponent<RectTransform>();
+        textRT.anchorMin = new Vector2(0, 0);
+        textRT.anchorMax = new Vector2(1, 1);
+        textRT.offsetMin = new Vector2(padding + iconSize + spacing, 0);
+        textRT.offsetMax = new Vector2(-padding, 0);
+
+        TextMeshProUGUI tmp = textObj.AddComponent<TextMeshProUGUI>();
+        tmp.text = label;
+        tmp.font = _font;
+        tmp.fontSize = 28;
+        tmp.fontStyle = FontStyles.Bold;
+        tmp.color = Color.white;
+        tmp.alignment = TextAlignmentOptions.MidlineLeft;
+
+        // VR Collider
+        var collider = btnObj.AddComponent<BoxCollider>();
+        collider.size = new Vector3(btnWidth, btnHeight, 10);
+        collider.center = new Vector3(btnWidth / 2f, 0, -5);
+
+        return btnObj;
+    }
+
+    private RectTransform CreateRowContainer(Transform parent, string name, float yPos)
+    {
+        GameObject rowObj = new GameObject(name);
+        rowObj.transform.SetParent(parent, false);
+        RectTransform rt = rowObj.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0, 1);
+        rt.anchorMax = new Vector2(1, 1);
+        rt.pivot = new Vector2(0.5f, 1);
+        rt.sizeDelta = new Vector2(0, _singleRowHeight);
+        rt.anchoredPosition = new Vector2(0, yPos);
+        return rt;
+    }
+
+    private void SetupRowElement(RectTransform rt, Vector2 anchor, Vector2 anchoredPos)
+    {
+        rt.anchorMin = anchor;
+        rt.anchorMax = anchor;
+        rt.pivot = anchor;
+        if (anchor.x == 0.5f) rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = anchoredPos;
+    }
+
+    private void CreateSearchBar(Transform parent)
+    {
+        if (parent == null) return;
+
+        var config = new VRInputFieldFactory.InputFieldConfig();
+        config.label = "";
+        config.placeholder = "Search media...";
+        config.width = 990f;
+        config.themeColor = _primaryColor;
+        config.inputFontSize = 34;
+        config.font = _font;
+        config.borderWidth = 0.04f;
+        config.glowWidth = 0.08f;
+        config.glowIntensity = 4f;
+        config.layerName = "UI";
+
+        GameObject searchBar = VRInputFieldFactory.CreateInputField(
+            parent as RectTransform,
+            config,
+            OnSearchValueChanged,
+            OnSearchEndEdit
+        );
+
+        // Search Icon
+        Sprite searchIcon = Resources.Load<Sprite>("icon_search");
+        if (searchIcon != null)
+        {
+            GameObject iconObj = new GameObject("SearchIcon");
+            Transform visuals = searchBar.transform.Find("InputBox/HitArea/Visuals");
+            if (visuals != null)
+            {
+                iconObj.transform.SetParent(visuals, false);
+            }
+            else
+            {
+                iconObj.transform.SetParent(searchBar.transform, false);
+            }
+
+            RectTransform iconRT = iconObj.AddComponent<RectTransform>();
+            float iconSize = 30f;
+            float leftPadding = 26f;
+
+            iconRT.anchorMin = new Vector2(0, 0.5f);
+            iconRT.anchorMax = new Vector2(0, 0.5f);
+            iconRT.pivot = new Vector2(0, 0.5f);
+            iconRT.sizeDelta = new Vector2(iconSize, iconSize);
+            iconRT.anchoredPosition = new Vector2(leftPadding, 0);
+
+            Image iconImg = iconObj.AddComponent<Image>();
+            iconImg.sprite = searchIcon;
+            iconImg.color = new Color(1f, 1f, 1f, 0.8f);
+
+            // Adjust text area padding
+            float textOffset = iconSize;
+            Transform textArea = FindChildRecursive(searchBar.transform, "Text Area");
+            if (textArea != null)
+            {
+                RectTransform textAreaRT = textArea.GetComponent<RectTransform>();
+                textAreaRT.offsetMin = new Vector2(textOffset, textAreaRT.offsetMin.y);
+            }
+        }
+
+        // Position centered with explicit height to match buttons
+        RectTransform searchRT = searchBar.GetComponent<RectTransform>();
+        searchRT.anchorMin = new Vector2(0.5f, 0.5f);
+        searchRT.anchorMax = new Vector2(0.5f, 0.5f);
+        searchRT.pivot = new Vector2(0.5f, 0.5f);
+        searchRT.sizeDelta = new Vector2(config.width, 75f);
+        searchRT.anchoredPosition = Vector2.zero;
+    }
+
+    private Transform FindChildRecursive(Transform parent, string name)
+    {
+        foreach (Transform child in parent)
+        {
+            if (child.name == name) return child;
+            Transform found = FindChildRecursive(child, name);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    private void CreateViewOptionsPopup(Transform parent)
+    {
+        var config = new RTTPopupMenu.PopupConfig
+        {
+            width = _sortTriggerWidth * 2.5f,
+            buttonHeight = 75f,
+            sideSpacing = 35f,  // Half of bottom padding for balanced section spacing
+            rowSpacing = 11f,
+            fontSize = 24,  // Increased from 20 to match other popups
+            iconSize = 26f,
+            primaryColor = _primaryColor,
+            accentColor = _accentColor,
+            overlayColor = new Color(0f, 0f, 0f, 0.4f),
+            font = _font,
+            layerName = "VirtualObjects"
+        };
+
+        _viewOptionsPopup = RTTPopupMenu.CreateWorldSpace(config, _menuFrame.transform);
+        _viewOptionsPopup.OnHide += OnViewOptionsPopupHide;
+
+        BuildViewOptionsPopupContent();
+
+        // Position offset calculation (same approach as RTTFileManager)
+        float popupWidth = config.width;
+
+        // X: popup left edge aligned with sortTrigger button's left edge
+        float sortTriggerCenterX = -_containerWidth / 4f - 203.5f;
+        float sortTriggerLeftX = sortTriggerCenterX - (_sortTriggerWidth / 2f);
+        float additionalOffset = 130f;
+        float offsetX = sortTriggerLeftX + (popupWidth / 2f) + additionalOffset;
+
+        // Y: popup top below header area with gap from sortTrigger button
+        // Header takes approximately 200 logical pixels (Row1 + Row2 + spacing)
+        // Frame center is at 0, top is at +containerHeight/2
+        // Popup top should be at containerHeight/2 - headerHeight - gap
+        float headerHeight = 200f;
+        float gapFromButton = 15f; // Gap between sortTrigger button and popup top
+        float estimatedPopupHeight = 360f; // SORT BY + Ascending (adjusted to match RTTFileManager gap)
+        float offsetY = (_containerHeight / 2f) - headerHeight - gapFromButton - (estimatedPopupHeight / 2f);
+
+        _viewOptionsPopup.SetPositionOffset(new Vector2(offsetX, offsetY));
+    }
+
+    private void BuildViewOptionsPopupContent()
+    {
+        if (_viewOptionsPopup == null) return;
+
+        _viewOptionsPopup.Clear();
+
+        // NO "DISPLAY AS" section - MediaLibrary is Grid-only
+
+        // Section: Sort Options (2 columns like FileManager)
+        // Name, Type, Created, Modified, Duration, Size (same as FileManager)
+        string[] sortOptions = { "Name", "Type", "Created", "Modified", "Duration", "Size" };
+        var sortButtons = new System.Collections.Generic.List<RTTPopupMenu.ButtonData>();
+        foreach (string option in sortOptions)
+        {
+            bool isSelected = (_currentSortBy == option);
+            sortButtons.Add(new RTTPopupMenu.ButtonData(option, () => SetSortBy(option), null, isSelected));
+        }
+        _viewOptionsPopup.AddSectionBlock("SORT BY", sortButtons, 2);
+
+        // Full-width Order button
+        Sprite orderIcon = Resources.Load<Sprite>(_isAscending ? "icon_ascending" : "icon_descending");
+        string orderText = _isAscending ? "Ascending" : "Descending";
+        _viewOptionsPopup.AddFullWidthButton(new RTTPopupMenu.ButtonData(orderText, ToggleSortOrder, orderIcon));
+
+        // Build the popup
+        _viewOptionsPopup.Build();
+    }
+
+    private void ToggleSortOrder()
+    {
+        SetAscending(!_isAscending);
+    }
+
+    private void ToggleViewOptionsPopup()
+    {
+        if (_viewOptionsPopup == null) return;
+
+        if (_viewOptionsPopup.IsVisible)
+        {
+            _viewOptionsPopup.Hide();
+        }
+        else
+        {
+            BuildViewOptionsPopupContent();
+            _viewOptionsPopup.Show();
+        }
+        UpdateSortArrow();
+    }
+
+    private void OnViewOptionsPopupHide()
+    {
+        UpdateSortArrow();
+    }
+
+    private void UpdateSortArrow()
+    {
+        if (_sortArrowImg != null)
+        {
+            float targetZ = (_viewOptionsPopup != null && _viewOptionsPopup.IsVisible) ? 180f : 0f;
+            _sortArrowImg.rectTransform.localEulerAngles = new Vector3(0, 0, targetZ);
+        }
+    }
+
+    private void SetSortBy(string sortBy)
+    {
+        _currentSortBy = sortBy;
+        if (_sortTriggerText != null) _sortTriggerText.text = sortBy;
+        _controller?.SetSortBy(sortBy);
+        _viewOptionsPopup?.Hide();
+    }
+
+    private void SetAscending(bool ascending)
+    {
+        _isAscending = ascending;
+        _controller?.SetAscending(ascending);
+        _viewOptionsPopup?.Hide();
+    }
+    #endregion
+
+    #region Public Methods
+    public void SetVideos(List<MediaVideoInfo> videos)
+    {
+        if (_grid != null)
+        {
+            _grid.SetData(videos);
+        }
+        int count = videos?.Count ?? 0;
+        UpdateItemCount(count);
+        UpdatePagination();
+    }
+
+    public void UpdateItemCount(int count)
+    {
+        if (_itemCountText != null)
+        {
+            _itemCountText.text = $"{count} item{(count != 1 ? "s" : "")}";
+        }
+    }
+
+    public void UpdatePagination()
+    {
+        if (_grid == null || _pagination == null) return;
+        _pagination.SetPage(_grid.CurrentPage, _grid.TotalPages);
+    }
+
+    public void SelectCategory(string categoryId)
+    {
+        if (_sidePanel != null)
+        {
+            _sidePanel.SelectItem(categoryId);
+        }
+    }
+
+    public void UpdateBreadcrumb(string path)
+    {
+        if (_breadcrumbContainer == null) return;
+
+        // Clear existing breadcrumbs
+        foreach (Transform child in _breadcrumbContainer)
+        {
+            Destroy(child.gameObject);
+        }
+
+        // Create simple text breadcrumb for now
+        GameObject textObj = new GameObject("BreadcrumbText");
+        textObj.transform.SetParent(_breadcrumbContainer, false);
+
+        RectTransform textRT = textObj.AddComponent<RectTransform>();
+        textRT.anchorMin = Vector2.zero;
+        textRT.anchorMax = Vector2.one;
+        textRT.offsetMin = Vector2.zero;
+        textRT.offsetMax = Vector2.zero;
+
+        TextMeshProUGUI tmp = textObj.AddComponent<TextMeshProUGUI>();
+        tmp.text = path;
+        tmp.font = _font;
+        tmp.fontSize = 28;
+        tmp.fontStyle = FontStyles.Bold;
+        tmp.color = Color.white;
+        tmp.alignment = TextAlignmentOptions.MidlineLeft;
+    }
+    #endregion
+
+    #region Edit Mode
+    private void ToggleEditMode()
+    {
+        _isEditMode = !_isEditMode;
+
+        // Toggle visibility
+        if (_breadcrumbContainer != null)
+            _breadcrumbContainer.gameObject.SetActive(!_isEditMode);
+        if (_editControlsContainer != null)
+            _editControlsContainer.SetActive(_isEditMode);
+        if (_itemCountText != null)
+            _itemCountText.gameObject.SetActive(!_isEditMode);
+        if (_selectedCountText != null)
+            _selectedCountText.gameObject.SetActive(_isEditMode);
+
+        // Update edit button icon
+        UpdateEditButtonVisual();
+
+        if (!_isEditMode)
+        {
+            ClearSelection();
+        }
+
+        Debug.Log($"[RTTMediaLibrary] Edit mode: {_isEditMode}");
+    }
+
+    private void UpdateEditButtonVisual()
+    {
+        if (_editButton == null) return;
+
+        var iconImg = _editButton.transform.Find("HitArea/Visuals/Content/Icon")?.GetComponent<Image>();
+        if (iconImg != null)
+        {
+            iconImg.sprite = Resources.Load<Sprite>(_isEditMode ? "icon_check_mark" : "icon_edit");
+        }
+    }
+
+    private void UpdateSelectedCountText()
+    {
+        if (_selectedCountText != null)
+        {
+            int count = _selectedItems.Count;
+            _selectedCountText.text = count > 0 ? $"{count} selected" : "";
+        }
+    }
+
+    private void UpdateActionButtonsState()
+    {
+        bool hasSelection = _selectedItems.Count > 0;
+        bool singleSelection = _selectedItems.Count == 1;
+
+        // Rename requires single selection
+        SetButtonEnabled(_renameButton, _renameButtonCG, _renameButtonHover, singleSelection);
+
+        // Delete requires any selection
+        SetButtonEnabled(_deleteButton, _deleteButtonCG, _deleteButtonHover, hasSelection);
+    }
+
+    private void SetButtonEnabled(Button btn, CanvasGroup cg, HoverEffectController hover, bool enabled)
+    {
+        if (btn != null) btn.interactable = enabled;
+        if (cg != null)
+        {
+            cg.alpha = enabled ? 1f : 0.4f;
+            cg.interactable = enabled;
+            cg.blocksRaycasts = enabled;
+        }
+        if (hover != null) hover.enabled = enabled;
+
+        var collider = btn?.GetComponent<BoxCollider>();
+        if (collider != null) collider.enabled = enabled;
+    }
+
+    private void UpdateSelectAllCheckmark()
+    {
+        if (_selectAllCheckmark == null) return;
+        _selectAllCheckmark.gameObject.SetActive(_selectedItems.Count > 0);
+    }
+
+    public void ClearSelection()
+    {
+        _selectedItems.Clear();
+        UpdateSelectAllCheckmark();
+        UpdateSelectedCountText();
+        UpdateActionButtonsState();
+    }
+
+    public void AddToSelection(string videoPath)
+    {
+        _selectedItems.Add(videoPath);
+        UpdateSelectAllCheckmark();
+        UpdateSelectedCountText();
+        UpdateActionButtonsState();
+    }
+
+    public void RemoveFromSelection(string videoPath)
+    {
+        _selectedItems.Remove(videoPath);
+        UpdateSelectAllCheckmark();
+        UpdateSelectedCountText();
+        UpdateActionButtonsState();
+    }
+
+    public bool IsSelected(string videoPath)
+    {
+        return _selectedItems.Contains(videoPath);
+    }
+
+    public HashSet<string> GetSelectedItems()
+    {
+        return new HashSet<string>(_selectedItems);
+    }
+    #endregion
+
+    #region Event Handlers
+    private void OnCategorySelected(string categoryId)
+    {
+        _controller?.SelectCategory(categoryId);
+        UpdateBreadcrumbForCategory(categoryId);
+    }
+
+    private void UpdateBreadcrumbForCategory(string categoryId)
+    {
+        string breadcrumbText;
+
+        switch (categoryId)
+        {
+            case "all":
+                breadcrumbText = "All Media";
+                break;
+            case "videos":
+                breadcrumbText = "All Media > Videos";
+                break;
+            case "images":
+                breadcrumbText = "All Media > Images";
+                break;
+            case "audio":
+                breadcrumbText = "All Media > Audio";
+                break;
+            case "recent":
+                breadcrumbText = "Recent";
+                break;
+            case "favorites":
+                breadcrumbText = "Favorites";
+                break;
+            case "playlists":
+                breadcrumbText = "Playlists";
+                break;
+            default:
+                breadcrumbText = categoryId;
+                break;
+        }
+
+        UpdateBreadcrumb(breadcrumbText);
+    }
+
+    private void OnGridVideoSelected(MediaVideoInfo video)
+    {
+        if (_detailPanel != null)
+        {
+            _detailPanel.SetVideo(video);
+        }
+    }
+
+    private void OnGridVideoDoubleClicked(MediaVideoInfo video)
+    {
+        OnVideoPlayRequested?.Invoke(video);
+    }
+
+    private void OnGridPageChanged(int currentPage, int totalPages)
+    {
+        UpdatePagination();
+    }
+
+    private void OnDetailPlayRequested(MediaVideoInfo video)
+    {
+        OnVideoPlayRequested?.Invoke(video);
+    }
+
+    private void OnDetailToggleFavorite(MediaVideoInfo video)
+    {
+        _controller?.ToggleFavorite(video);
+    }
+
+    private void OnSearchValueChanged(string value)
+    {
+        _controller?.Search(value);
+    }
+
+    private void OnSearchEndEdit(string value)
+    {
+        // Optional: Additional handling when search is submitted
+    }
+
+    private void OnCloseButtonClicked()
+    {
+        OnCloseRequested?.Invoke();
+    }
+
+    private void OnEditButtonClicked()
+    {
+        ToggleEditMode();
+    }
+
+    private void OnSelectAllClicked()
+    {
+        if (_selectedItems.Count > 0)
+        {
+            ClearSelection();
+        }
+        else
+        {
+            // Select all visible items - would need grid access
+            Debug.Log("[RTTMediaLibrary] Select all clicked");
+        }
+        UpdateSelectAllCheckmark();
+    }
+
+    private void OnRenameClicked()
+    {
+        if (_selectedItems.Count != 1)
+        {
+            Debug.LogWarning("[RTTMediaLibrary] Rename requires exactly one selected item");
+            return;
+        }
+
+        string selectedPath = null;
+        foreach (var path in _selectedItems)
+        {
+            selectedPath = path;
+            break;
+        }
+        Debug.Log($"[RTTMediaLibrary] Rename requested for: {selectedPath}");
+        // TODO: Show rename dialog
+    }
+
+    private void OnDeleteClicked()
+    {
+        if (_selectedItems.Count == 0)
+        {
+            Debug.LogWarning("[RTTMediaLibrary] No items selected for delete");
+            return;
+        }
+
+        Debug.Log($"[RTTMediaLibrary] Delete requested for {_selectedItems.Count} items");
+        // TODO: Show confirmation dialog
+    }
+    #endregion
+}

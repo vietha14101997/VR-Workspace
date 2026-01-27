@@ -29,7 +29,7 @@ public class RTTFilePagination : RTTCanvasBase
     private static readonly Color TransparentColor = new Color(0f, 0f, 0f, 0f);
     private const float HighlightGlassAlpha = 0.45f;
 
-    private RTTFileManagerController _controller;
+    private IPaginationController _controller;
     private int _currentPage = 1;
     private int _totalPages = 1;
 
@@ -63,6 +63,11 @@ public class RTTFilePagination : RTTCanvasBase
     }
 
     public void Initialize(RTTFileManagerController controller)
+    {
+        Initialize((IPaginationController)controller);
+    }
+
+    public void Initialize(IPaginationController controller)
     {
         // CRITICAL: Disable object BEFORE creating any visuals to prevent flicker
         gameObject.SetActive(false);

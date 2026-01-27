@@ -1679,8 +1679,10 @@ public class RTTManager : MonoBehaviour
             case RTTAppRegistry.AppType.Files:
                 CreateFilesMenuContent(instance);
                 break;
-            case RTTAppRegistry.AppType.Browser:
             case RTTAppRegistry.AppType.Media:
+                CreateMediaContent(instance);
+                break;
+            case RTTAppRegistry.AppType.Browser:
             case RTTAppRegistry.AppType.Settings:
                 Debug.Log($"[RTTManager] {appType} app not yet implemented");
                 break;
@@ -1739,6 +1741,33 @@ public class RTTManager : MonoBehaviour
         GameObject controllerObj = new GameObject($"FileManagerController_{instance.AppId}");
         controllerObj.transform.SetParent(this.transform);
         var controller = controllerObj.AddComponent<RTTFileManagerController>();
+
+        var containerSize = instance.Frame.GetContentSize();
+
+        // Create View via Controller
+        instance.MenuContent = controller.CreateMenu(
+            instance.Frame.ContentContainer,
+            containerSize.x,
+            containerSize.y,
+            Font,  // Uses theme font with fallback
+            PrimaryColor,
+            AccentColor
+        );
+
+        instance.Controller = controller;
+        controller.OnBackClicked += () => CloseApp(instance.AppId);
+
+        instance.Frame.MarkDirty();
+    }
+
+    private void CreateMediaContent(RTTAppInstance instance)
+    {
+        Debug.Log($"[RTTManager] Creating Media content...");
+
+        // Create controller
+        GameObject controllerObj = new GameObject($"MediaController_{instance.AppId}");
+        controllerObj.transform.SetParent(this.transform);
+        var controller = controllerObj.AddComponent<VRMediaAppController>();
 
         var containerSize = instance.Frame.GetContentSize();
 

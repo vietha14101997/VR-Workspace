@@ -53,12 +53,22 @@ public class RTTFileManager : MonoBehaviour
     private TextMeshProUGUI _selectedCountText; // "X selected" text to the left of item count (shown in Edit Mode)
 
     // Edit Mode Action Buttons
+    private Button _renameButton;
     private Button _copyButton;
     private Button _moveButton;
     private Button _deleteButton;
+    private CanvasGroup _renameButtonCG;
     private CanvasGroup _copyButtonCG;
     private CanvasGroup _moveButtonCG;
     private CanvasGroup _deleteButtonCG;
+    private HoverEffectController _renameButtonHover;
+    private HoverEffectController _copyButtonHover;
+    private HoverEffectController _moveButtonHover;
+    private HoverEffectController _deleteButtonHover;
+
+    // Rename Popup
+    private RTTPopupInputable _renamePopup;
+    private string _renameTargetPath; // Path of item being renamed
 
     // Delete Confirmation Popup
     private RTTPopupMenu _deleteConfirmPopup;
@@ -179,6 +189,9 @@ public class RTTFileManager : MonoBehaviour
         // Destroy world-space popups (not parented to this object)
         if (_createFolderPopup != null) Destroy(_createFolderPopup.gameObject);
         _createFolderPopup = null;
+
+        if (_renamePopup != null) Destroy(_renamePopup.gameObject);
+        _renamePopup = null;
 
         if (_viewOptionsPopup != null) Destroy(_viewOptionsPopup.gameObject);
         _viewOptionsPopup = null;
@@ -669,9 +682,9 @@ public class RTTFileManager : MonoBehaviour
         {
             width = _sortTriggerWidth * 2.5f, // Width = 2.5x Trigger (increased 25%)
             buttonHeight = 75f, // +10% (was 68f)
-            sideSpacing = 11f,  // +10% (was 10f)
+            sideSpacing = 35f,  // Half of bottom padding for balanced section spacing
             rowSpacing = 11f,   // +10% (was 10f)
-            fontSize = 20,      // +10% (was 18)
+            fontSize = 24,      // Increased from 20 to match other popups
             iconSize = 26f,     // +10% (was 24f)
             primaryColor = _primaryColor,
             accentColor = _accentColor,
@@ -707,14 +720,15 @@ public class RTTFileManager : MonoBehaviour
         float additionalOffset = 130f;
         float offsetX = sortTriggerLeftX + (popupWidth / 2f) + additionalOffset;
 
-        // Y: popup top below header area
+        // Y: popup top below header area with gap from sortTrigger button
         // Header takes approximately 200 logical pixels (Row1 + Row2 + spacing)
         // Frame center is at 0, top is at +containerHeight/2
-        // Popup top should be at containerHeight/2 - headerHeight
+        // Popup top should be at containerHeight/2 - headerHeight - gap
         float headerHeight = 200f; // Row1 + Row2 + margins
-        float estimatedPopupHeight = 450f; // DISPLAY AS + SORT BY + Ascending button
+        float gapFromButton = 15f; // Gap between sortTrigger button and popup top
+        float estimatedPopupHeight = 500f; // DISPLAY AS + SORT BY + Ascending
         // Popup center Y = popup top - popupHeight/2
-        float offsetY = (_containerHeight / 2f) - headerHeight - (estimatedPopupHeight / 2f);
+        float offsetY = (_containerHeight / 2f) - headerHeight - gapFromButton - (estimatedPopupHeight / 2f);
 
         _viewOptionsPopup.SetPositionOffset(new Vector2(offsetX, offsetY));
 
@@ -1142,42 +1156,61 @@ public class RTTFileManager : MonoBehaviour
         float searchBarLeftFromRowCenter = -searchBarWidth / 2f; // -495
         float containerCenterOffset = (20f + (-320f)) / 2f; // -150 (container center is 150px left of row center)
         float searchBarLeftInContainer = searchBarLeftFromRowCenter - containerCenterOffset; // -495 - (-150) = -345
+
+        // Move buttons closer to "Select all" (shift left to reduce gap)
+        float buttonsStartX = searchBarLeftInContainer - 90f;
         float btnSpacing = 15f;
 
-        // Copy button - align with SearchBar left edge (use center anchor)
+        // Rename button - with wider width to prevent text wrapping
+        var renameBtn = CreateEditModeActionButton(parent, "Rename", "icon_rename", OnRenameClicked, minTextWidth: 130f);
+        Debug.Log($"[RTTFileManager] Rename button created: {renameBtn?.name}");
+        var renameRT = renameBtn.GetComponent<RectTransform>();
+        renameRT.anchorMin = renameRT.anchorMax = new Vector2(0.5f, 0.5f);
+        renameRT.pivot = new Vector2(0, 0.5f);
+        renameRT.anchoredPosition = new Vector2(buttonsStartX, 0);
+        _renameButton = renameBtn.GetComponent<Button>();
+        _renameButtonCG = renameBtn.AddComponent<CanvasGroup>();
+        _renameButtonHover = renameBtn.GetComponent<HoverEffectController>();
+
+        // Copy button
         var copyBtn = CreateEditModeActionButton(parent, "Copy", "icon_copy", OnCopyClicked);
         Debug.Log($"[RTTFileManager] Copy button created: {copyBtn?.name}");
         var copyRT = copyBtn.GetComponent<RectTransform>();
         copyRT.anchorMin = copyRT.anchorMax = new Vector2(0.5f, 0.5f);
         copyRT.pivot = new Vector2(0, 0.5f);
-        copyRT.anchoredPosition = new Vector2(searchBarLeftInContainer, 0);
+        float copyX = buttonsStartX + renameRT.sizeDelta.x + btnSpacing;
+        copyRT.anchoredPosition = new Vector2(copyX, 0);
         _copyButton = copyBtn.GetComponent<Button>();
         _copyButtonCG = copyBtn.AddComponent<CanvasGroup>();
+        _copyButtonHover = copyBtn.GetComponent<HoverEffectController>();
 
         // Move button
         var moveBtn = CreateEditModeActionButton(parent, "Move", "icon_move_folder", OnMoveClicked);
         var moveRT = moveBtn.GetComponent<RectTransform>();
         moveRT.anchorMin = moveRT.anchorMax = new Vector2(0.5f, 0.5f);
         moveRT.pivot = new Vector2(0, 0.5f);
-        float moveX = searchBarLeftInContainer + copyRT.sizeDelta.x + btnSpacing;
+        float moveX = copyX + copyRT.sizeDelta.x + btnSpacing;
         moveRT.anchoredPosition = new Vector2(moveX, 0);
         _moveButton = moveBtn.GetComponent<Button>();
         _moveButtonCG = moveBtn.AddComponent<CanvasGroup>();
+        _moveButtonHover = moveBtn.GetComponent<HoverEffectController>();
 
-        // Delete button
+        // Delete button (reduced width by 5%)
         var deleteBtn = CreateEditModeActionButton(parent, "Delete", "icon_trash", OnDeleteClicked);
         var deleteRT = deleteBtn.GetComponent<RectTransform>();
+        deleteRT.sizeDelta = new Vector2(deleteRT.sizeDelta.x * 0.95f, deleteRT.sizeDelta.y);
         deleteRT.anchorMin = deleteRT.anchorMax = new Vector2(0.5f, 0.5f);
         deleteRT.pivot = new Vector2(0, 0.5f);
         float deleteX = moveX + moveRT.sizeDelta.x + btnSpacing;
         deleteRT.anchoredPosition = new Vector2(deleteX, 0);
         _deleteButton = deleteBtn.GetComponent<Button>();
         _deleteButtonCG = deleteBtn.AddComponent<CanvasGroup>();
+        _deleteButtonHover = deleteBtn.GetComponent<HoverEffectController>();
 
         // Initially disable buttons (no selection)
         UpdateActionButtonsState();
 
-        Debug.Log($"[RTTFileManager] CreateEditControlsInRow2 completed - Copy: {_copyButton != null} (size: {copyRT.sizeDelta}), Move: {_moveButton != null} (size: {moveRT.sizeDelta}), Delete: {_deleteButton != null} (size: {deleteRT.sizeDelta})");
+        Debug.Log($"[RTTFileManager] CreateEditControlsInRow2 completed - Rename: {_renameButton != null}, Copy: {_copyButton != null} (size: {copyRT.sizeDelta}), Move: {_moveButton != null} (size: {moveRT.sizeDelta}), Delete: {_deleteButton != null} (size: {deleteRT.sizeDelta})");
     }
 
     private void CreateSelectAllCheckbox(RectTransform parent)
@@ -1269,11 +1302,11 @@ public class RTTFileManager : MonoBehaviour
         labelText.raycastTarget = false;
     }
 
-    private GameObject CreateEditModeActionButton(RectTransform parent, string label, string iconName, UnityEngine.Events.UnityAction onClick)
+    private GameObject CreateEditModeActionButton(RectTransform parent, string label, string iconName, UnityEngine.Events.UnityAction onClick, float minTextWidth = 0f)
     {
         float btnHeight = 60f;
         float iconSize = 32f;
-        float textWidth = label.Length * 18f; // Approximate text width
+        float textWidth = Mathf.Max(label.Length * 18f, minTextWidth); // Approximate text width, with minimum
         float padding = 25f;
         float spacing = 10f;
         float btnWidth = padding + iconSize + spacing + textWidth + padding;
@@ -1545,14 +1578,17 @@ public class RTTFileManager : MonoBehaviour
             selectedCount = _fileList.GetSelectedPaths().Count;
 
         bool hasSelection = selectedCount > 0;
+        bool hasSingleSelection = selectedCount == 1;
 
         // Update button interactability and visual state
-        SetButtonEnabled(_copyButton, _copyButtonCG, hasSelection);
-        SetButtonEnabled(_moveButton, _moveButtonCG, hasSelection);
-        SetButtonEnabled(_deleteButton, _deleteButtonCG, hasSelection);
+        // Rename only enabled when exactly 1 item is selected
+        SetButtonEnabled(_renameButton, _renameButtonCG, _renameButtonHover, hasSingleSelection);
+        SetButtonEnabled(_copyButton, _copyButtonCG, _copyButtonHover, hasSelection);
+        SetButtonEnabled(_moveButton, _moveButtonCG, _moveButtonHover, hasSelection);
+        SetButtonEnabled(_deleteButton, _deleteButtonCG, _deleteButtonHover, hasSelection);
     }
 
-    private void SetButtonEnabled(Button button, CanvasGroup canvasGroup, bool enabled)
+    private void SetButtonEnabled(Button button, CanvasGroup canvasGroup, HoverEffectController hoverController, bool enabled)
     {
         if (button != null)
             button.interactable = enabled;
@@ -1560,7 +1596,39 @@ public class RTTFileManager : MonoBehaviour
         {
             canvasGroup.alpha = enabled ? 1f : 0.4f;
             canvasGroup.interactable = enabled;
+            canvasGroup.blocksRaycasts = enabled;
         }
+        if (hoverController != null)
+        {
+            hoverController.enabled = enabled;
+            // Reset hover state when disabling
+            if (!enabled)
+            {
+                hoverController.ResetHoverState(immediate: true);
+            }
+        }
+    }
+
+    private void OnRenameClicked()
+    {
+        var selectedPaths = GetCurrentSelectedPaths();
+        Debug.Log("[RTTFileManager] Rename clicked - selected items: " + selectedPaths.Count);
+
+        // Rename only works with exactly 1 item selected
+        if (selectedPaths.Count != 1)
+        {
+            Debug.LogWarning("[RTTFileManager] Rename requires exactly 1 item selected");
+            return;
+        }
+
+        // Get the single selected path
+        foreach (var path in selectedPaths)
+        {
+            _renameTargetPath = path;
+            break;
+        }
+
+        ShowRenamePopup();
     }
 
     private void OnCopyClicked()
@@ -3409,6 +3477,99 @@ public class RTTFileManager : MonoBehaviour
     private void OnCreateFolderCancelled()
     {
         Debug.Log("[RTTFileManager] Create folder cancelled");
+    }
+
+    #endregion
+
+    #region Rename Item
+
+    private void CreateRenamePopup()
+    {
+        if (_renamePopup != null) return;
+
+        var config = new RTTPopupInputable.PopupConfig
+        {
+            title = "Rename",
+            inputLabel = "New Name",
+            inputPlaceholder = "Enter new name",
+            buttonText = "Rename",
+            width = 575f,
+            padding = 33f,
+            titleFontSize = 31,
+            labelFontSize = 24,
+            inputFontSize = 29,
+            buttonFontSize = 26,
+            buttonHeight = 72f,
+            inputHeight = 72f,
+            titleHeight = 55f,
+            closeButtonSize = 50f,
+            spacing = 22f,
+            primaryColor = _primaryColor,
+            accentColor = _accentColor,
+            overlayColor = new Color(0f, 0f, 0f, 0.4f),
+            font = _font,
+            layerName = "VirtualObjects"
+        };
+
+        _renamePopup = RTTPopupInputable.CreateWorldSpace(config, _menuFrame.transform);
+    }
+
+    private void ShowRenamePopup()
+    {
+        if (string.IsNullOrEmpty(_renameTargetPath))
+        {
+            Debug.LogWarning("[RTTFileManager] No target path for rename");
+            return;
+        }
+
+        // Create popup if not exists
+        if (_renamePopup == null)
+        {
+            CreateRenamePopup();
+        }
+
+        // Get current name from path
+        string currentName = System.IO.Path.GetFileName(_renameTargetPath);
+
+        // Set default value to current name
+        _renamePopup.SetDefaultValue(currentName);
+
+        // Show with callbacks
+        _renamePopup.Show(
+            onConfirm: OnRenameConfirmed,
+            onCancel: OnRenameCancelled
+        );
+    }
+
+    private void OnRenameConfirmed(string newName)
+    {
+        Debug.Log($"[RTTFileManager] Rename '{_renameTargetPath}' to '{newName}'");
+
+        if (string.IsNullOrEmpty(newName) || string.IsNullOrEmpty(_renameTargetPath))
+        {
+            Debug.LogWarning("[RTTFileManager] Invalid rename parameters");
+            return;
+        }
+
+        // Request controller to rename the item
+        if (_controller != null)
+        {
+            _controller.RenameItem(_renameTargetPath, newName);
+        }
+
+        // Exit edit mode after rename (this will also clear selection)
+        if (_isEditMode)
+        {
+            ToggleEditMode();
+        }
+
+        _renameTargetPath = null;
+    }
+
+    private void OnRenameCancelled()
+    {
+        Debug.Log("[RTTFileManager] Rename cancelled");
+        _renameTargetPath = null;
     }
 
     #endregion

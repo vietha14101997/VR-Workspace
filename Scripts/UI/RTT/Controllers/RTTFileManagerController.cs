@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 /// Handles business logic, data fetching, and state management.
 /// Follows MVVM pattern where this controls the RTTFileManager View.
 /// </summary>
-public class RTTFileManagerController : MonoBehaviour
+public class RTTFileManagerController : MonoBehaviour, IPaginationController
 {
     #region Private Fields
     private RTTFileManager _view;
@@ -783,6 +783,83 @@ public class RTTFileManagerController : MonoBehaviour
         }
 
         return result.Trim();
+    }
+
+    /// <summary>
+    /// Rename a file or folder
+    /// </summary>
+    public void RenameItem(string sourcePath, string newName)
+    {
+        if (string.IsNullOrWhiteSpace(sourcePath) || string.IsNullOrWhiteSpace(newName))
+        {
+            Debug.LogWarning("[Controller] Cannot rename: invalid parameters");
+            return;
+        }
+
+        // Sanitize new name
+        string sanitizedName = SanitizeFolderName(newName);
+        if (string.IsNullOrEmpty(sanitizedName))
+        {
+            Debug.LogWarning("[Controller] Cannot rename: invalid name after sanitization");
+            return;
+        }
+
+        try
+        {
+            string directory = System.IO.Path.GetDirectoryName(sourcePath);
+            string newPath = System.IO.Path.Combine(directory, sanitizedName);
+
+            // Check if source and destination are the same
+            if (sourcePath.Equals(newPath, StringComparison.OrdinalIgnoreCase))
+            {
+                Debug.Log("[Controller] Rename skipped: same name");
+                return;
+            }
+
+            // Check if destination already exists
+            bool isDirectory = Directory.Exists(sourcePath);
+            bool isFile = File.Exists(sourcePath);
+
+            if (!isDirectory && !isFile)
+            {
+                Debug.LogWarning($"[Controller] Source does not exist: {sourcePath}");
+                return;
+            }
+
+            if (Directory.Exists(newPath) || File.Exists(newPath))
+            {
+                Debug.LogWarning($"[Controller] Cannot rename: destination already exists: {newPath}");
+                // TODO: Show error notification to user
+                return;
+            }
+
+            if (isDirectory)
+            {
+                Directory.Move(sourcePath, newPath);
+                Debug.Log($"[Controller] Renamed folder: {sourcePath} -> {newPath}");
+            }
+            else
+            {
+                // For files, preserve the extension if user didn't provide one
+                string sourceExt = System.IO.Path.GetExtension(sourcePath);
+                string newExt = System.IO.Path.GetExtension(sanitizedName);
+                if (string.IsNullOrEmpty(newExt) && !string.IsNullOrEmpty(sourceExt))
+                {
+                    newPath = System.IO.Path.Combine(directory, sanitizedName + sourceExt);
+                }
+
+                File.Move(sourcePath, newPath);
+                Debug.Log($"[Controller] Renamed file: {sourcePath} -> {newPath}");
+            }
+
+            // Refresh current directory to show renamed item
+            NavigateTo(_currentPath);
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[Controller] Failed to rename: {e.Message}");
+            // TODO: Show error notification to user
+        }
     }
 
     /// <summary>
