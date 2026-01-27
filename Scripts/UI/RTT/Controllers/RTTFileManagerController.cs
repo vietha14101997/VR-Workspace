@@ -3,6 +3,8 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 
 /// <summary>
 /// Controller for the File Manager app.
@@ -1010,6 +1012,113 @@ public class RTTFileManagerController : MonoBehaviour
             CopyDirectoryRecursive(subDir, destSubDir, overwrite);
         }
     }
+
+    #region Async File Operations
+
+    /// <summary>
+    /// Async copy operation with progress reporting.
+    /// Runs on background thread to avoid blocking UI.
+    /// </summary>
+    public async Task<FileOperationService.FileOperationResult> CopyItemsAsync(
+        List<string> sourcePaths,
+        string destination,
+        bool overwrite,
+        IProgress<FileOperationService.FileOperationProgress> progress,
+        CancellationToken ct,
+        FileOperationService.PauseToken pauseToken = null)
+    {
+        if (sourcePaths == null || sourcePaths.Count == 0)
+        {
+            Debug.LogWarning("[Controller] No items to copy");
+            return new FileOperationService.FileOperationResult();
+        }
+
+        Debug.Log($"[Controller] Starting async copy: {sourcePaths.Count} items to {destination}");
+
+        var result = await FileOperationService.CopyAsync(
+            sourcePaths, destination, overwrite, progress, ct, pauseToken);
+
+        Debug.Log($"[Controller] Async copy completed: {result.SuccessCount} succeeded, {result.FailCount} failed, cancelled: {result.WasCancelled}");
+
+        // Refresh UI on main thread after completion
+        if (result.SuccessCount > 0 && !result.WasCancelled)
+        {
+            // Use Unity's main thread
+            await Task.Yield(); // Ensure we're back on main thread
+            NavigateTo(_currentPath);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Async move operation with progress reporting.
+    /// Runs on background thread to avoid blocking UI.
+    /// </summary>
+    public async Task<FileOperationService.FileOperationResult> MoveItemsAsync(
+        List<string> sourcePaths,
+        string destination,
+        bool overwrite,
+        IProgress<FileOperationService.FileOperationProgress> progress,
+        CancellationToken ct,
+        FileOperationService.PauseToken pauseToken = null)
+    {
+        if (sourcePaths == null || sourcePaths.Count == 0)
+        {
+            Debug.LogWarning("[Controller] No items to move");
+            return new FileOperationService.FileOperationResult();
+        }
+
+        Debug.Log($"[Controller] Starting async move: {sourcePaths.Count} items to {destination}");
+
+        var result = await FileOperationService.MoveAsync(
+            sourcePaths, destination, overwrite, progress, ct, pauseToken);
+
+        Debug.Log($"[Controller] Async move completed: {result.SuccessCount} succeeded, {result.FailCount} failed, cancelled: {result.WasCancelled}");
+
+        // Refresh UI on main thread after completion
+        if (result.SuccessCount > 0 && !result.WasCancelled)
+        {
+            await Task.Yield(); // Ensure we're back on main thread
+            NavigateTo(_currentPath);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Async delete operation with progress reporting.
+    /// Runs on background thread to avoid blocking UI.
+    /// </summary>
+    public async Task<FileOperationService.FileOperationResult> DeleteItemsAsync(
+        List<string> paths,
+        IProgress<FileOperationService.FileOperationProgress> progress,
+        CancellationToken ct,
+        FileOperationService.PauseToken pauseToken = null)
+    {
+        if (paths == null || paths.Count == 0)
+        {
+            Debug.LogWarning("[Controller] No items to delete");
+            return new FileOperationService.FileOperationResult();
+        }
+
+        Debug.Log($"[Controller] Starting async delete: {paths.Count} items");
+
+        var result = await FileOperationService.DeleteAsync(paths, progress, ct, pauseToken);
+
+        Debug.Log($"[Controller] Async delete completed: {result.SuccessCount} succeeded, {result.FailCount} failed, cancelled: {result.WasCancelled}");
+
+        // Refresh UI on main thread after completion
+        if (result.SuccessCount > 0 && !result.WasCancelled)
+        {
+            await Task.Yield(); // Ensure we're back on main thread
+            NavigateTo(_currentPath);
+        }
+
+        return result;
+    }
+
+    #endregion
 
     /// <summary>
     /// Get current path for clipboard operations.

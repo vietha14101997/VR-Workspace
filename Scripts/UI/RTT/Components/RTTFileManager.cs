@@ -5,6 +5,7 @@ using TMPro;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading;
 using VRWorkspace.UI.HoverEffects;
 
 /// <summary>
@@ -78,6 +79,11 @@ public class RTTFileManager : MonoBehaviour
 
     // Conflict Dialog
     private RTTPopupMenu _conflictPopup;
+
+    // Progress Popup (for async copy/move operations)
+    private RTTProgressPopup _progressPopup;
+    private CancellationTokenSource _operationCts;
+    private FileOperationService.PauseToken _pauseToken;
 
     // Scan Status Text (for category filter mode - shown in Row2 next to breadcrumbs)
     private TextMeshProUGUI _scanStatusText;
@@ -179,6 +185,17 @@ public class RTTFileManager : MonoBehaviour
 
         if (_deleteConfirmPopup != null) Destroy(_deleteConfirmPopup.gameObject);
         _deleteConfirmPopup = null;
+
+        if (_conflictPopup != null) Destroy(_conflictPopup.gameObject);
+        _conflictPopup = null;
+
+        if (_progressPopup != null) Destroy(_progressPopup.gameObject);
+        _progressPopup = null;
+
+        // Cancel any ongoing operation
+        _operationCts?.Cancel();
+        _operationCts?.Dispose();
+        _operationCts = null;
     }
     
     private void OnEnable()
@@ -1801,23 +1818,78 @@ public class RTTFileManager : MonoBehaviour
         return conflicts;
     }
 
-    private void ExecutePasteOperation(string destination, bool overwrite = false)
+    private async void ExecutePasteOperation(string destination, bool overwrite = false)
     {
         Debug.Log($"[RTTFileManager] Executing paste: {_clipboardOperation} to {destination}, overwrite={overwrite}");
 
-        if (_clipboardOperation == ClipboardOperation.Copy)
+        // Create cancellation source and pause token
+        _operationCts = new CancellationTokenSource();
+        _pauseToken = new FileOperationService.PauseToken();
+
+        // Create and show progress popup
+        if (_progressPopup == null)
         {
-            _controller.CopyItems(_clipboardItems, destination, overwrite);
-        }
-        else if (_clipboardOperation == ClipboardOperation.Move)
-        {
-            _controller.MoveItems(_clipboardItems, destination, overwrite);
+            CreateProgressPopup();
         }
 
-        ExitClipboardMode();
+        string title = _clipboardOperation == ClipboardOperation.Copy
+            ? "Copying Files..." : "Moving Files...";
+        _progressPopup.Show(title, OnOperationCancel, OnOperationPauseToggle);
+
+        // Create progress reporter
+        var progress = new Progress<FileOperationService.FileOperationProgress>(p =>
+        {
+            _progressPopup.UpdateProgress(p);
+        });
+
+        try
+        {
+            if (_clipboardOperation == ClipboardOperation.Copy)
+            {
+                await _controller.CopyItemsAsync(
+                    new List<string>(_clipboardItems), destination, overwrite,
+                    progress, _operationCts.Token, _pauseToken);
+            }
+            else if (_clipboardOperation == ClipboardOperation.Move)
+            {
+                await _controller.MoveItemsAsync(
+                    new List<string>(_clipboardItems), destination, overwrite,
+                    progress, _operationCts.Token, _pauseToken);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            Debug.Log("[RTTFileManager] Operation cancelled by user");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[RTTFileManager] Operation failed: {e.Message}");
+        }
+        finally
+        {
+            _progressPopup?.Hide();
+            ExitClipboardMode();
+            _operationCts?.Dispose();
+            _operationCts = null;
+        }
     }
 
-    private void ExecutePasteOperationSkipConflicts(string destination)
+    private void OnOperationCancel()
+    {
+        Debug.Log("[RTTFileManager] Cancel requested");
+        _operationCts?.Cancel();
+    }
+
+    private void OnOperationPauseToggle(bool isPaused)
+    {
+        Debug.Log($"[RTTFileManager] Pause toggled: {isPaused}");
+        if (isPaused)
+            _pauseToken?.Pause();
+        else
+            _pauseToken?.Resume();
+    }
+
+    private async void ExecutePasteOperationSkipConflicts(string destination)
     {
         // Filter out items that would conflict
         var nonConflictingItems = new List<string>();
@@ -1835,33 +1907,108 @@ public class RTTFileManager : MonoBehaviour
 
         if (nonConflictingItems.Count > 0)
         {
-            if (_clipboardOperation == ClipboardOperation.Copy)
+            // Create cancellation source and pause token
+            _operationCts = new CancellationTokenSource();
+            _pauseToken = new FileOperationService.PauseToken();
+
+            // Create and show progress popup
+            if (_progressPopup == null)
             {
-                _controller.CopyItems(nonConflictingItems, destination, false);
+                CreateProgressPopup();
             }
-            else if (_clipboardOperation == ClipboardOperation.Move)
+
+            string title = _clipboardOperation == ClipboardOperation.Copy
+                ? "Copying Files..." : "Moving Files...";
+            _progressPopup.Show(title, OnOperationCancel, OnOperationPauseToggle);
+
+            // Create progress reporter
+            var progress = new Progress<FileOperationService.FileOperationProgress>(p =>
             {
-                _controller.MoveItems(nonConflictingItems, destination, false);
+                _progressPopup.UpdateProgress(p);
+            });
+
+            try
+            {
+                if (_clipboardOperation == ClipboardOperation.Copy)
+                {
+                    await _controller.CopyItemsAsync(
+                        nonConflictingItems, destination, false,
+                        progress, _operationCts.Token, _pauseToken);
+                }
+                else if (_clipboardOperation == ClipboardOperation.Move)
+                {
+                    await _controller.MoveItemsAsync(
+                        nonConflictingItems, destination, false,
+                        progress, _operationCts.Token, _pauseToken);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                Debug.Log("[RTTFileManager] Operation cancelled by user");
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[RTTFileManager] Operation failed: {e.Message}");
+            }
+            finally
+            {
+                _progressPopup?.Hide();
+                _operationCts?.Dispose();
+                _operationCts = null;
             }
         }
 
         ExitClipboardMode();
     }
 
+    private void CreateProgressPopup()
+    {
+        if (_progressPopup != null) return;
+
+        // Standardized popup config (same as DeleteConfirm/QuitConfirm/Conflict)
+        var config = new RTTProgressPopup.PopupConfig
+        {
+            width = 550f,
+            padding = 26f,
+            titleFontSize = 32f,
+            statusFontSize = 24f,
+            percentFontSize = 24f,
+            buttonFontSize = 25f,
+            titleHeight = 52f,
+            statusHeight = 32f,
+            progressBarHeight = 24f,
+            buttonHeight = 66f,
+            spacing = 16f,
+            primaryColor = _primaryColor,
+            accentColor = _accentColor,
+            overlayColor = new Color(0f, 0f, 0f, 0.4f),
+            font = _font,
+            layerName = "VirtualObjects",
+            borderWidth = 0.05f,
+            buttonWidth = 450f,
+            buttonBorderWidth = 0.04f,
+            buttonGlowWidth = 0.08f,
+            buttonGlowIntensity = 4f,
+            buttonCornerRadius = 0.12f
+        };
+
+        _progressPopup = RTTProgressPopup.CreateWorldSpace(config, _menuFrame.transform);
+    }
+
     private void CreateConflictPopup()
     {
         if (_conflictPopup != null) return;
 
-        // 2-row layout: sideSpacing = rowSpacing for tight button spacing
+        // Standardized popup config (same as DeleteConfirm/QuitConfirm)
         var config = new RTTPopupMenu.PopupConfig
         {
             width = 550f,
-            buttonHeight = 60f,
-            sideSpacing = 12f,
-            rowSpacing = 6f,
-            labelHeight = 50f,
-            labelFontSize = 28,
-            fontSize = 24,
+            buttonHeight = 66f,
+            sideSpacing = 26f,
+            rowSpacing = 16f,
+            labelHeight = 52f,
+            labelFontSize = 32,
+            fontSize = 25,
             borderWidth = 0.05f,
             primaryColor = _primaryColor,
             accentColor = _accentColor,
@@ -1934,7 +2081,7 @@ public class RTTFileManager : MonoBehaviour
         // Standardized Yes/No popup config
         var config = new RTTPopupMenu.PopupConfig
         {
-            width = 500f,
+            width = 550f,
             buttonHeight = 66f,
             sideSpacing = 26f,
             rowSpacing = 16f,
@@ -1998,23 +2145,57 @@ public class RTTFileManager : MonoBehaviour
         _deleteConfirmPopup.Show();
     }
 
-    private void OnDeleteConfirmed()
+    private async void OnDeleteConfirmed()
     {
         var selectedPaths = GetCurrentSelectedPaths();
         Debug.Log("[RTTFileManager] Delete confirmed - deleting " + selectedPaths.Count + " items");
 
-        // Hide popup
+        // Hide confirmation popup
         if (_deleteConfirmPopup != null)
         {
             _deleteConfirmPopup.Hide();
         }
 
-        // Call controller to delete items
-        var itemsToDelete = new List<string>(selectedPaths);
-        _controller?.DeleteItems(itemsToDelete);
-
-        // Exit edit mode (which also clears selections in grid/list)
+        // Exit edit mode first (which also clears selections in grid/list)
         ToggleEditMode();
+
+        // Create cancellation source and pause token
+        _operationCts = new CancellationTokenSource();
+        _pauseToken = new FileOperationService.PauseToken();
+
+        // Create and show progress popup
+        if (_progressPopup == null)
+        {
+            CreateProgressPopup();
+        }
+
+        _progressPopup.Show("Deleting Files...", OnOperationCancel, OnOperationPauseToggle);
+
+        // Create progress reporter
+        var progress = new Progress<FileOperationService.FileOperationProgress>(p =>
+        {
+            _progressPopup.UpdateProgress(p);
+        });
+
+        try
+        {
+            var itemsToDelete = new List<string>(selectedPaths);
+            await _controller.DeleteItemsAsync(itemsToDelete, progress, _operationCts.Token, _pauseToken);
+        }
+        catch (OperationCanceledException)
+        {
+            Debug.Log("[RTTFileManager] Delete operation cancelled by user");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[RTTFileManager] Delete operation failed: {e.Message}");
+        }
+        finally
+        {
+            _progressPopup?.Hide();
+            _operationCts?.Dispose();
+            _operationCts = null;
+        }
     }
 
     private void OnDeleteCancelled()

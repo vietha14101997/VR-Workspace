@@ -1033,8 +1033,9 @@ public class RTTPopupMenu : MonoBehaviour
         sectionVLG.childForceExpandWidth = true;
         sectionVLG.childForceExpandHeight = false;
 
-        int rowCount = Mathf.CeilToInt((float)section.buttons.Count / section.columns);
-        float gridHeight = (rowCount * _config.buttonHeight) + ((rowCount - 1) * _config.rowSpacing);
+        int buttonCount = section.buttons != null ? section.buttons.Count : 0;
+        int rowCount = buttonCount > 0 ? Mathf.CeilToInt((float)buttonCount / section.columns) : 0;
+        float gridHeight = rowCount > 0 ? (rowCount * _config.buttonHeight) + ((rowCount - 1) * _config.rowSpacing) : 0f;
 
         // Skip label height when title is empty
         bool hasTitle = !string.IsNullOrEmpty(section.title);
@@ -1064,9 +1065,12 @@ public class RTTPopupMenu : MonoBehaviour
         LayoutElement gridLE = gridObj.AddComponent<LayoutElement>();
         gridLE.preferredHeight = gridHeight;
 
-        foreach (var btnData in section.buttons)
+        if (section.buttons != null)
         {
-            CreateButton(gridObj.transform, btnData, cellWidth);
+            foreach (var btnData in section.buttons)
+            {
+                CreateButton(gridObj.transform, btnData, cellWidth);
+            }
         }
     }
 
@@ -1124,7 +1128,8 @@ public class RTTPopupMenu : MonoBehaviour
         float horizontalPadding = ((_config.rowSpacing * 0.75f) + kBorderInset) * 1.75f;
         float sideMargin = horizontalPadding * 2f;
         float topMargin = (_config.rowSpacing + kBorderInset) * 1.5f;
-        label.margin = new Vector4(sideMargin, topMargin, sideMargin, 0);
+        float bottomMargin = _config.rowSpacing * 2.5f;
+        label.margin = new Vector4(sideMargin, topMargin, sideMargin, bottomMargin);
         label.enableWordWrapping = true;
         label.raycastTarget = false;
 
@@ -1207,13 +1212,13 @@ public class RTTPopupMenu : MonoBehaviour
                     height += _config.rowSpacing;
                 }
 
-                int rowCount = Mathf.CeilToInt((float)section.buttons.Count / section.columns);
-                float gridHeight = (rowCount * _config.buttonHeight) + ((rowCount - 1) * _config.rowSpacing);
+                int buttonCount = section.buttons != null ? section.buttons.Count : 0;
+                int rowCount = buttonCount > 0 ? Mathf.CeilToInt((float)buttonCount / section.columns) : 0;
+                float gridHeight = rowCount > 0 ? (rowCount * _config.buttonHeight) + ((rowCount - 1) * _config.rowSpacing) : 0f;
                 height += gridHeight;
 
                 // Add title spacer height for title-only sections
-                bool isTitleOnly = !string.IsNullOrEmpty(section.title)
-                    && (section.buttons == null || section.buttons.Count == 0);
+                bool isTitleOnly = !string.IsNullOrEmpty(section.title) && buttonCount == 0;
                 if (isTitleOnly)
                 {
                     // spacerHeight = labelHeight - 2*sideSpacing

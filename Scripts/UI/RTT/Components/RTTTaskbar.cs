@@ -1313,7 +1313,7 @@ public class RTTTaskbar : MonoBehaviour
 
         var config = new RTTPopupMenu.PopupConfig
         {
-            width = 500f,
+            width = 550f,
             buttonHeight = 66f,
             sideSpacing = 26f,
             rowSpacing = 16f,
