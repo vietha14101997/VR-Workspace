@@ -105,7 +105,9 @@ public class RTTMediaSidePanel : MonoBehaviour
         CreateNavigationItems();
 
         // Select "videos" by default (not "all")
-        SelectItem("videos");
+        // Don't fire event here - wait for view to be fully ready
+        // RTTMediaLibrary.OnViewReady() will trigger the initial data load
+        SelectItem("videos", fireEvent: false);
     }
 
     private void CreateHeader()
@@ -308,11 +310,10 @@ public class RTTMediaSidePanel : MonoBehaviour
     #region Selection
     private void OnItemClicked(string id)
     {
-        SelectItem(id);
-        OnCategorySelected?.Invoke(id);
+        SelectItem(id, fireEvent: true);
     }
 
-    public void SelectItem(string id)
+    public void SelectItem(string id, bool fireEvent = false)
     {
         foreach (var item in _navItems)
         {
@@ -342,6 +343,12 @@ public class RTTMediaSidePanel : MonoBehaviour
             }
 
             if (isSelected) _selectedItem = item;
+        }
+
+        // Fire event if requested (used during initialization)
+        if (fireEvent)
+        {
+            OnCategorySelected?.Invoke(id);
         }
     }
 

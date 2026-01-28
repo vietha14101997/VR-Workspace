@@ -56,6 +56,13 @@ public class RTTMediaGrid2 : MonoBehaviour
     private int _bufferRows = 2;
     #endregion
 
+    #region Progressive Loading
+    private Coroutine _progressiveBindCoroutine;
+    private Queue<int> _pendingBindIndices = new Queue<int>();
+    private const int BINDS_PER_FRAME = 2; // Load 2 items per frame to spread I/O
+    private const int BINDS_PER_FRAME_SMALL = 50; // For small datasets, bind all at once to avoid race conditions
+    #endregion
+
     #region Callbacks
     private Action<string> _onItemHoverEnter;
     private Action<string> _onItemHoverExit;
@@ -67,6 +74,10 @@ public class RTTMediaGrid2 : MonoBehaviour
     public event Action<MediaVideoInfo> OnVideoSelected;
     public event Action<MediaVideoInfo> OnVideoDoubleClicked;
     public event Action<int, int> OnPageChanged;
+    /// <summary>
+    /// Fired when all items have been bound to the grid (initial load complete).
+    /// </summary>
+    public event Action OnBindingComplete;
     #endregion
 
     #region Properties
@@ -87,13 +98,13 @@ public class RTTMediaGrid2 : MonoBehaviour
         _primaryColor = primaryColor;
         _accentColor = accentColor;
 
+        // Setup internal callbacks BEFORE CreateItemPool so pool items get valid callbacks
+        _onItemClick = OnItemClicked;
+        _onItemDoubleClick = OnItemDoubleClicked;
+
         BuildUI();
         CalculateGridMetrics();
         CreateItemPool();
-
-        // Setup internal callbacks
-        _onItemClick = OnItemClicked;
-        _onItemDoubleClick = OnItemDoubleClicked;
     }
 
     private void BuildUI()
@@ -138,7 +149,7 @@ public class RTTMediaGrid2 : MonoBehaviour
         _rowHeight = _cellHeight + _spacingY;
         _visibleRowCount = Mathf.CeilToInt(_height / _rowHeight) + 1;
 
-        Debug.Log($"[RTTMediaGrid2] CalculateGridMetrics: width={_width}, columnsPerRow={_columnsPerRow}");
+        Debug.Log($"[RTTMediaGrid2] CalculateGridMetrics: width={_width}, height={_height}, columnsPerRow={_columnsPerRow}, rowHeight={_rowHeight}, visibleRowCount={_visibleRowCount}, cellSize={_cellWidth}x{_cellHeight}");
     }
 
     private void CreateItemPool()
@@ -173,6 +184,14 @@ public class RTTMediaGrid2 : MonoBehaviour
     #region Public Methods
     public void SetData(List<MediaVideoInfo> videos)
     {
+        // Stop any pending progressive binding (prevents binding stale data)
+        if (_progressiveBindCoroutine != null)
+        {
+            StopCoroutine(_progressiveBindCoroutine);
+            _progressiveBindCoroutine = null;
+        }
+        _pendingBindIndices.Clear();
+
         _allVideos = videos ?? new List<MediaVideoInfo>();
 
         // Hide all visible items
@@ -183,8 +202,8 @@ public class RTTMediaGrid2 : MonoBehaviour
         }
         _visibleItems.Clear();
 
-        // Clean up orphaned cache
-        FileThumbnailService.Instance?.CleanupOrphanedCache();
+        // NOTE: Don't call CleanupOrphanedCache here - it's expensive and causes lag
+        // Cache cleanup should be done periodically or when app closes, not on every category switch
 
         // Calculate pagination
         int itemsPerPage = ItemsPerPage;
@@ -197,7 +216,9 @@ public class RTTMediaGrid2 : MonoBehaviour
         // Reset scroll
         _scrollRect.verticalNormalizedPosition = 1f;
 
-        // Render visible items
+        Debug.Log($"[RTTMediaGrid2] SetData: {_allVideos.Count} items, columnsPerRow={_columnsPerRow}, visibleRowCount={_visibleRowCount}, itemsPerPage={itemsPerPage}, totalPages={TotalPages}, gridHeight={_height}, rowHeight={_rowHeight}");
+
+        // Render visible items (uses progressive loading to prevent frame drops)
         UpdateVisibleItems();
     }
 
@@ -285,12 +306,28 @@ public class RTTMediaGrid2 : MonoBehaviour
     {
         if (_allVideos.Count == 0) return;
 
-        float scrollY = _contentRect.anchoredPosition.y;
-        int firstVisibleRow = Mathf.Max(0, Mathf.FloorToInt((scrollY - _paddingTop) / _rowHeight) - _bufferRows);
-        int lastVisibleRow = firstVisibleRow + _visibleRowCount + _bufferRows * 2;
+        int firstVisibleIndex;
+        int lastVisibleIndex;
 
-        int firstVisibleIndex = firstVisibleRow * _columnsPerRow;
-        int lastVisibleIndex = Mathf.Min((lastVisibleRow + 1) * _columnsPerRow - 1, _allVideos.Count - 1);
+        // For small datasets, render ALL items to avoid virtualization edge cases
+        const int SMALL_DATASET_THRESHOLD = 50;
+        if (_allVideos.Count <= SMALL_DATASET_THRESHOLD)
+        {
+            firstVisibleIndex = 0;
+            lastVisibleIndex = _allVideos.Count - 1;
+            Debug.Log($"[RTTMediaGrid2] UpdateVisibleItems (ALL): indices=0-{lastVisibleIndex}, total={_allVideos.Count}");
+        }
+        else
+        {
+            // For large datasets, use virtualization based on scroll position
+            float scrollY = _contentRect.anchoredPosition.y;
+            int firstVisibleRow = Mathf.Max(0, Mathf.FloorToInt((scrollY - _paddingTop) / _rowHeight) - _bufferRows);
+            int lastVisibleRow = firstVisibleRow + _visibleRowCount + _bufferRows * 2;
+
+            firstVisibleIndex = firstVisibleRow * _columnsPerRow;
+            lastVisibleIndex = Mathf.Min((lastVisibleRow + 1) * _columnsPerRow - 1, _allVideos.Count - 1);
+            Debug.Log($"[RTTMediaGrid2] UpdateVisibleItems (VIRTUAL): scrollY={scrollY}, rows={firstVisibleRow}-{lastVisibleRow}, indices={firstVisibleIndex}-{lastVisibleIndex}, total={_allVideos.Count}");
+        }
 
         // Find items no longer visible
         List<int> toRemove = new List<int>();
@@ -308,19 +345,135 @@ public class RTTMediaGrid2 : MonoBehaviour
             _visibleItems.Remove(idx);
         }
 
-        // Show items that should be visible
+        // Collect items that need to be bound (progressive loading)
+        List<int> toBind = new List<int>();
         for (int i = firstVisibleIndex; i <= lastVisibleIndex && i < _allVideos.Count; i++)
         {
             if (!_visibleItems.ContainsKey(i))
             {
+                toBind.Add(i);
+            }
+        }
+
+        // If we have items to bind, use progressive loading
+        if (toBind.Count > 0)
+        {
+            // DON'T clear the queue - just add items that aren't already queued
+            // This prevents race conditions where scroll events clear items before they're bound
+            HashSet<int> alreadyQueued = new HashSet<int>(_pendingBindIndices);
+            int addedCount = 0;
+
+            foreach (var idx in toBind)
+            {
+                if (!alreadyQueued.Contains(idx))
+                {
+                    _pendingBindIndices.Enqueue(idx);
+                    addedCount++;
+                }
+            }
+
+            if (addedCount > 0)
+            {
+                Debug.Log($"[RTTMediaGrid2] Queuing {addedCount} NEW items for binding (total pending={_pendingBindIndices.Count})");
+            }
+
+            // Start progressive binding if not already running
+            if (_progressiveBindCoroutine == null)
+            {
+                _progressiveBindCoroutine = StartCoroutine(ProgressiveBindCoroutine());
+            }
+        }
+        else if (_progressiveBindCoroutine == null)
+        {
+            Debug.Log($"[RTTMediaGrid2] No items to bind (all {_visibleItems.Count} already visible)");
+        }
+    }
+
+    /// <summary>
+    /// Progressively bind items to spread disk I/O across multiple frames.
+    /// Prevents frame drops when loading many thumbnails at once.
+    /// For small datasets, binds all at once to avoid race conditions with page changes.
+    /// </summary>
+    private IEnumerator ProgressiveBindCoroutine()
+    {
+        int totalBound = 0;
+        int totalSkipped = 0;
+
+        // For small datasets, bind all at once to avoid race conditions where
+        // page changes can interrupt binding before all items are rendered
+        const int SMALL_DATASET_THRESHOLD = 50;
+        int maxBindsPerFrame = (_allVideos.Count <= SMALL_DATASET_THRESHOLD)
+            ? BINDS_PER_FRAME_SMALL
+            : BINDS_PER_FRAME;
+
+        Debug.Log($"[RTTMediaGrid2] ProgressiveBindCoroutine started, pending={_pendingBindIndices.Count}, bindsPerFrame={maxBindsPerFrame}");
+
+        while (_pendingBindIndices.Count > 0)
+        {
+            int bindCount = 0;
+
+            while (_pendingBindIndices.Count > 0 && bindCount < maxBindsPerFrame)
+            {
+                int idx = _pendingBindIndices.Dequeue();
+
+                // Skip if already bound or index out of range
+                if (_visibleItems.ContainsKey(idx))
+                {
+                    Debug.Log($"[RTTMediaGrid2] Skip index {idx}: already bound");
+                    totalSkipped++;
+                    continue;
+                }
+                if (idx >= _allVideos.Count)
+                {
+                    Debug.LogWarning($"[RTTMediaGrid2] Skip index {idx}: out of range (count={_allVideos.Count})");
+                    totalSkipped++;
+                    continue;
+                }
+
                 var item = GetPooledItem();
                 if (item != null)
                 {
-                    BindItemAtIndex(item, i);
-                    _visibleItems[i] = item;
+                    try
+                    {
+                        BindItemAtIndex(item, idx);
+                        _visibleItems[idx] = item;
+                        bindCount++;
+                        totalBound++;
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Debug.LogError($"[RTTMediaGrid2] Error binding index {idx}: {ex.Message}\n{ex.StackTrace}");
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning($"[RTTMediaGrid2] GetPooledItem returned null for index {idx}");
+                }
+            }
+
+            // Wait for next frame before binding more
+            yield return null;
+        }
+
+        Debug.Log($"[RTTMediaGrid2] ProgressiveBindCoroutine complete: bound={totalBound}, skipped={totalSkipped}, visibleItems={_visibleItems.Count}, totalItems={_allVideos.Count}");
+
+        // Validate: check if any items in the expected range are missing
+        if (_visibleItems.Count < _allVideos.Count)
+        {
+            // Find missing indices
+            for (int i = 0; i < _allVideos.Count; i++)
+            {
+                if (!_visibleItems.ContainsKey(i))
+                {
+                    Debug.LogWarning($"[RTTMediaGrid2] Missing item at index {i}: {_allVideos[i].Title}");
                 }
             }
         }
+
+        _progressiveBindCoroutine = null;
+
+        // Notify listeners that binding is complete (e.g., to start background scan)
+        OnBindingComplete?.Invoke();
     }
 
     private RTTMediaGridItem2 GetPooledItem()
@@ -359,6 +512,8 @@ public class RTTMediaGrid2 : MonoBehaviour
         rect.anchorMax = new Vector2(0, 1);
         rect.pivot = new Vector2(0.5f, 0.5f);
         rect.anchoredPosition = new Vector2(x, y);
+
+        Debug.Log($"[RTTMediaGrid2] BindItemAtIndex: index={index}, title={video.Title}, row={row}, col={col}, pos=({x:F0},{y:F0})");
 
         // Bind data
         item.Bind(video);
@@ -556,6 +711,18 @@ public class RTTMediaGrid2 : MonoBehaviour
 
         _scrollRect.verticalNormalizedPosition = normalizedPosition;
         UpdateVisibleItems();
+    }
+    #endregion
+
+    #region Cleanup
+    private void OnDestroy()
+    {
+        if (_progressiveBindCoroutine != null)
+        {
+            StopCoroutine(_progressiveBindCoroutine);
+            _progressiveBindCoroutine = null;
+        }
+        _pendingBindIndices.Clear();
     }
     #endregion
 }

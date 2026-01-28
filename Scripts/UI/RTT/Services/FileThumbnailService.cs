@@ -71,6 +71,11 @@ public class FileThumbnailService : MonoBehaviour
     private Queue<Action> _uiCallbackQueue = new Queue<Action>();
     private Queue<Action> _highPriorityUIQueue = new Queue<Action>(); // For detail panel
     private const int MAX_UI_CALLBACKS_PER_FRAME = 8; // Limit UI updates per frame (increased for faster grid updates)
+
+    // Disk cache load throttling to prevent frame drops on first category switch
+    private int _diskLoadsThisFrame = 0;
+    private const int MAX_DISK_LOADS_PER_FRAME = 4; // Limit disk I/O per frame to prevent stutters
+    private Queue<ThumbnailRequest> _deferredDiskLoads = new Queue<ThumbnailRequest>();
     #endregion
 
     #region Unity Lifecycle
@@ -94,12 +99,16 @@ public class FileThumbnailService : MonoBehaviour
         _processingPaths = new HashSet<string>();
         _uiCallbackQueue = new Queue<Action>();
         _highPriorityUIQueue = new Queue<Action>();
+        _deferredDiskLoads = new Queue<ThumbnailRequest>();
 
         // Load video overlay icon
         _videoOverlayIcon = Resources.Load<Sprite>("icon_media");
 
         // Start UI callback processor
         StartCoroutine(ProcessUICallbacksCoroutine());
+
+        // Start deferred disk load processor
+        StartCoroutine(ProcessDeferredDiskLoadsCoroutine());
     }
 
     private void OnDestroy()
@@ -128,6 +137,11 @@ public class FileThumbnailService : MonoBehaviour
     #region Public API
     /// <summary>
     /// Request a thumbnail for a file.
+    /// Priority order:
+    /// 1. Memory cache (instant)
+    /// 2. Metadata thumbnail (fast extraction, NOT cached)
+    /// 3. Disk cache (generated thumbnails)
+    /// 4. Generate new thumbnail (load/resize, cached to disk)
     /// </summary>
     /// <param name="file">The MockFile to generate thumbnail for</param>
     /// <param name="size">Target thumbnail size in pixels</param>
@@ -159,7 +173,7 @@ public class FileThumbnailService : MonoBehaviour
         bool isHighPriority = priority == 0;
         string fileName = System.IO.Path.GetFileName(file.Path);
 
-        // Check memory cache first
+        // PRIORITY 1: Check memory cache first (instant, no I/O)
         if (_cache.TryGet(cacheKey, out Sprite cachedSprite))
         {
             Debug.Log($"[Thumb] MEMORY HIT: {fileName} size={size} skip={skipOverlay}");
@@ -167,15 +181,76 @@ public class FileThumbnailService : MonoBehaviour
             return;
         }
 
-        // Check disk cache
+        // PRIORITY 2: Try metadata thumbnail extraction (fast, NOT cached)
+        // This is faster than loading from disk cache for files with embedded thumbnails
+        if (FileMetadataThumbnailExtractor.MayHaveMetadataThumbnail(category))
+        {
+            if (FileMetadataThumbnailExtractor.TryExtractMetadataThumbnail(file.Path, category, out Texture2D metaThumb))
+            {
+                // Resize if needed
+                metaThumb = FileMetadataThumbnailExtractor.ResizeIfNeeded(metaThumb, size);
+
+                // Create sprite (NOT cached - metadata extraction is fast enough)
+                Sprite metaSprite = Sprite.Create(
+                    metaThumb,
+                    new Rect(0, 0, metaThumb.width, metaThumb.height),
+                    new Vector2(0.5f, 0.5f),
+                    100f
+                );
+
+                // For videos, optionally add overlay
+                if (category == FileCategory.Video && !skipOverlay && _videoOverlayIcon != null)
+                {
+                    // Composite with overlay for grid view
+                    if (_videoExtractor == null)
+                    {
+                        GameObject go = new GameObject("VideoFrameExtractor");
+                        go.transform.SetParent(transform);
+                        _videoExtractor = go.AddComponent<VideoFrameExtractor>();
+                    }
+                    Sprite overlaySprite = _videoExtractor.CompositeWithOverlay(metaThumb, _videoOverlayIcon, size);
+                    if (overlaySprite != null)
+                    {
+                        metaSprite = overlaySprite;
+                    }
+                }
+
+                Debug.Log($"[Thumb] METADATA: {fileName} size={size} ({metaThumb.width}x{metaThumb.height})");
+                QueueUICallback(() => onSuccess?.Invoke(metaSprite), isHighPriority);
+                return;
+            }
+        }
+
+        // PRIORITY 3: Check disk cache - throttled to prevent frame drops on category switch
+        // High priority requests (detail panel) bypass throttling for responsiveness
+        if (!isHighPriority && _diskLoadsThisFrame >= MAX_DISK_LOADS_PER_FRAME)
+        {
+            // Defer this request to next frame
+            var deferredRequest = new ThumbnailRequest
+            {
+                FilePath = file.Path,
+                Category = category,
+                TargetSize = size,
+                OnComplete = onSuccess,
+                OnFailed = onFailed,
+                Priority = priority,
+                FileModifiedTicks = modifiedTicks,
+                SkipOverlay = skipOverlay
+            };
+            _deferredDiskLoads.Enqueue(deferredRequest);
+            return;
+        }
+
         if (_cache.TryLoadFromDisk(cacheKey, out Sprite diskSprite))
         {
+            _diskLoadsThisFrame++;
             Debug.Log($"[Thumb] DISK HIT: {fileName} size={size} skip={skipOverlay}");
             _cache.Set(cacheKey, diskSprite, modifiedTicks, file.Path);
             QueueUICallback(() => onSuccess?.Invoke(diskSprite), isHighPriority);
             return;
         }
 
+        // PRIORITY 4: Generate new thumbnail (will be cached to disk)
         // Add to pending callbacks if already processing this file
         if (_processingPaths.Contains(file.Path))
         {
@@ -194,7 +269,7 @@ public class FileThumbnailService : MonoBehaviour
             return;
         }
 
-        Debug.Log($"[Thumb] MISS - LOAD: {fileName} size={size} skip={skipOverlay}");
+        Debug.Log($"[Thumb] GENERATE: {fileName} size={size} skip={skipOverlay}");
 
         // Queue new request
         var request = new ThumbnailRequest
@@ -842,6 +917,40 @@ public class FileThumbnailService : MonoBehaviour
                     Debug.LogWarning($"[FileThumbnailService] UI callback error: {ex.Message}");
                 }
                 processed++;
+            }
+
+            // Wait for next frame
+            yield return null;
+        }
+    }
+
+    /// <summary>
+    /// Process deferred disk cache loads with throttling to prevent frame drops.
+    /// Resets disk load counter each frame and processes queued requests.
+    /// </summary>
+    private IEnumerator ProcessDeferredDiskLoadsCoroutine()
+    {
+        while (true)
+        {
+            // Reset disk load counter at start of each frame
+            _diskLoadsThisFrame = 0;
+
+            // Process deferred disk loads up to the limit
+            while (_deferredDiskLoads.Count > 0 && _diskLoadsThisFrame < MAX_DISK_LOADS_PER_FRAME)
+            {
+                var request = _deferredDiskLoads.Dequeue();
+
+                // Re-request the thumbnail (will now check disk cache within this frame's budget)
+                var mockFile = new MockFile
+                {
+                    Path = request.FilePath,
+                    Name = System.IO.Path.GetFileName(request.FilePath),
+                    Type = System.IO.Path.GetExtension(request.FilePath).TrimStart('.').ToLower(),
+                    IsFolder = false,
+                    Modified = new System.DateTime(request.FileModifiedTicks)
+                };
+
+                RequestThumbnail(mockFile, request.TargetSize, request.OnComplete, request.OnFailed, request.Priority, request.SkipOverlay);
             }
 
             // Wait for next frame

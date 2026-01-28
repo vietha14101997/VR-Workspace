@@ -304,16 +304,17 @@ public class VRMediaAppController : MonoBehaviour
         libraryRT.offsetMin = Vector2.zero;
         libraryRT.offsetMax = Vector2.zero;
 
-        // Create Controller
-        _libraryController = libraryObj.AddComponent<RTTMediaLibraryController>();
-
-        // Create View - pass RTTMenuFrame reference for proper panel creation
+        // Create View component first (but don't initialize yet)
         _libraryView = libraryObj.AddComponent<RTTMediaLibrary>();
+
+        // Create and initialize Controller BEFORE view initialization
+        // (so controller is ready when view's coroutines call OnViewReady)
+        _libraryController = libraryObj.AddComponent<RTTMediaLibraryController>();
+        _libraryController.Initialize(_libraryView);
+
+        // Now initialize View - this starts coroutines that may call back to controller
         _libraryView.Initialize(_libraryController, menuFrame, _containerWidth, _containerHeight,
             _font, _primaryColor, _accentColor);
-
-        // Initialize controller with view
-        _libraryController.Initialize(_libraryView);
 
         // Wire events
         _libraryController.OnVideoPlayRequested += HandleLibraryPlayRequested;

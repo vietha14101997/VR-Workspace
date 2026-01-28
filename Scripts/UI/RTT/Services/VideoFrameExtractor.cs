@@ -249,6 +249,40 @@ public class VideoFrameExtractor : MonoBehaviour
     {
         _isExtracting = true;
 
+        // PRIORITY 1: Try to extract embedded thumbnail from video metadata first
+        // This matches Windows Explorer behavior and is much faster than decoding video
+        Texture2D embeddedThumb = null;
+        bool hasEmbedded = false;
+
+        // Run metadata extraction (this is synchronous but fast for reading metadata)
+        try
+        {
+            hasEmbedded = VideoMetadataThumbnailExtractor.TryExtractEmbeddedThumbnail(videoPath, out embeddedThumb);
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogWarning($"[VideoFrameExtractor] Metadata extraction failed: {ex.Message}");
+            hasEmbedded = false;
+        }
+
+        if (hasEmbedded && embeddedThumb != null)
+        {
+            // Resize if needed to match target size
+            if (embeddedThumb.width > maxSize || embeddedThumb.height > maxSize)
+            {
+                Texture2D resized = ResizeTexture(embeddedThumb, maxSize);
+                Destroy(embeddedThumb);
+                embeddedThumb = resized;
+            }
+
+            Debug.Log($"[VideoFrameExtractor] Using embedded metadata thumbnail for: {System.IO.Path.GetFileName(videoPath)}");
+            CompleteExtraction(embeddedThumb);
+            yield break;
+        }
+
+        // PRIORITY 2: Fall back to extracting frame from video at 10% position
+        Debug.Log($"[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: {System.IO.Path.GetFileName(videoPath)}");
+
         // Clean up previous render texture
         if (_renderTexture != null)
         {
@@ -314,9 +348,29 @@ public class VideoFrameExtractor : MonoBehaviour
         _renderTexture.Create();
         _videoPlayer.targetTexture = _renderTexture;
 
-        // Seek to 10% into the video (to skip black frames at start)
-        double seekTime = _videoPlayer.length * 0.1;
+        // Seek to a position that typically shows interesting content
+        // Windows-style: Use fixed time for longer videos, percentage for shorter ones
+        // - For videos > 30 seconds: Seek to ~10 seconds (skip intros/loading)
+        // - For videos 10-30 seconds: Seek to 30%
+        // - For videos < 10 seconds: Seek to 20%
+        double seekTime;
+        if (_videoPlayer.length > 30)
+        {
+            // Longer videos: fixed 10 second mark (similar to Windows behavior)
+            seekTime = 10.0;
+        }
+        else if (_videoPlayer.length > 10)
+        {
+            // Medium videos: 30% in
+            seekTime = _videoPlayer.length * 0.3;
+        }
+        else
+        {
+            // Short videos: 20% in
+            seekTime = _videoPlayer.length * 0.2;
+        }
         _videoPlayer.time = seekTime;
+        Debug.Log($"[VideoFrameExtractor] Seeking to {seekTime:F1}s (video length: {_videoPlayer.length:F1}s)");
 
         // Start playback briefly to render a frame
         _videoPlayer.Play();
@@ -581,6 +635,49 @@ public class VideoFrameExtractor : MonoBehaviour
                 }
             }
         }
+    }
+    #endregion
+
+    #region Utility Methods
+    /// <summary>
+    /// Resize a texture to fit within maxSize while maintaining aspect ratio.
+    /// Used for resizing embedded metadata thumbnails.
+    /// </summary>
+    private Texture2D ResizeTexture(Texture2D source, int maxSize)
+    {
+        int targetWidth, targetHeight;
+
+        if (source.width > source.height)
+        {
+            targetWidth = maxSize;
+            targetHeight = Mathf.RoundToInt((float)source.height / source.width * maxSize);
+        }
+        else
+        {
+            targetHeight = maxSize;
+            targetWidth = Mathf.RoundToInt((float)source.width / source.height * maxSize);
+        }
+
+        // Use RenderTexture for GPU-accelerated resize
+        RenderTexture rt = RenderTexture.GetTemporary(targetWidth, targetHeight, 0, RenderTextureFormat.ARGB32);
+        rt.filterMode = FilterMode.Bilinear;
+
+        RenderTexture previous = RenderTexture.active;
+        RenderTexture.active = rt;
+
+        Graphics.Blit(source, rt);
+
+        Texture2D result = new Texture2D(targetWidth, targetHeight, TextureFormat.RGBA32, true);
+        result.filterMode = FilterMode.Trilinear;
+        result.anisoLevel = 16;
+        result.wrapMode = TextureWrapMode.Clamp;
+        result.ReadPixels(new Rect(0, 0, targetWidth, targetHeight), 0, 0);
+        result.Apply(true);
+
+        RenderTexture.active = previous;
+        RenderTexture.ReleaseTemporary(rt);
+
+        return result;
     }
     #endregion
 

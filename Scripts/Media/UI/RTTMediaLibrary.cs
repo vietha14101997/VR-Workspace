@@ -352,9 +352,11 @@ public class RTTMediaLibrary : MonoBehaviour
         rt.offsetMax = Vector2.zero;
 
         _sidePanel = contentObj.AddComponent<RTTMediaSidePanel>();
-        _sidePanel.Initialize(_controller, containerSize.x, containerSize.y, _font, _primaryColor, _accentColor);
 
+        // Subscribe to event BEFORE Initialize so we catch the initial selection
         _sidePanel.OnCategorySelected += OnCategorySelected;
+
+        _sidePanel.Initialize(_controller, containerSize.x, containerSize.y, _font, _primaryColor, _accentColor);
 
         _leftFrame.MarkDirty();
         Debug.Log("[RTTMediaLibrary] Left panel content created");
@@ -435,6 +437,7 @@ public class RTTMediaLibrary : MonoBehaviour
 
         // 3. Build Header Rows
         CreateHeaderRows(_headerRT);
+        Debug.Log($"[RTTMediaLibrary] After CreateHeaderRows: _headerRT={_headerRT != null}, _breadcrumbContainer={_breadcrumbContainer != null}");
 
         // 4. Create Grid Inside Body
         GameObject gridObj = new GameObject("MediaGrid");
@@ -609,7 +612,12 @@ public class RTTMediaLibrary : MonoBehaviour
         GameObject refreshBtn = VRButtonFactory.CreateButton(
             rowRT,
             refreshConfig,
-            () => _controller?.RefreshLibrary()
+            () => {
+                // Clear thumbnail cache to regenerate with current settings
+                FileThumbnailService.Instance?.ClearAllCache();
+                // Force rescan to detect new/removed files (not just reload from cache)
+                _controller?.ForceRescan();
+            }
         );
         RectTransform refreshRT = refreshBtn.GetComponent<RectTransform>();
         SetupRowElement(refreshRT, new Vector2(1, 0.5f), new Vector2(-20, 0));
@@ -662,16 +670,19 @@ public class RTTMediaLibrary : MonoBehaviour
         GameObject crumbContainer = new GameObject("Breadcrumbs");
         crumbContainer.layer = LayerMask.NameToLayer("UI");
         crumbContainer.transform.SetParent(rowRT, false);
-        _breadcrumbContainer = crumbContainer.transform;
 
+        // IMPORTANT: Add RectTransform FIRST, then store the reference
+        // Storing transform before AddComponent<RectTransform> can cause stale reference issues
         RectTransform crumbRT = crumbContainer.AddComponent<RectTransform>();
+        _breadcrumbContainer = crumbRT; // Store RectTransform as the container reference
+
         crumbRT.anchorMin = new Vector2(0, 0);
-        crumbRT.anchorMax = new Vector2(0.6f, 1);
+        crumbRT.anchorMax = new Vector2(1, 1);  // Stretch full width like RTTFileManager
         crumbRT.pivot = new Vector2(0, 0.5f);
         crumbRT.offsetMin = new Vector2(20f, 0);
-        crumbRT.offsetMax = Vector2.zero;
+        crumbRT.offsetMax = new Vector2(-520f, 0);  // Leave room for item count and refresh button
 
-        Debug.Log($"[RTTMediaLibrary] Breadcrumb container created");
+        Debug.Log($"[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to {_breadcrumbContainer.name}, instanceID={GetInstanceID()}");
 
         // Edit Controls Container (hidden by default)
         CreateEditControlsInRow2(rowRT);
@@ -1161,16 +1172,28 @@ public class RTTMediaLibrary : MonoBehaviour
 
     public void UpdateBreadcrumb(string path)
     {
+        // Fallback: find breadcrumb container from hierarchy if reference is lost
         if (_breadcrumbContainer == null)
         {
-            Debug.LogWarning("[RTTMediaLibrary] UpdateBreadcrumb: _breadcrumbContainer is null!");
+            Debug.LogWarning($"[RTTMediaLibrary] Breadcrumb container reference lost (instanceID={GetInstanceID()}), searching in hierarchy...");
+            var row2 = _headerRT?.Find("Row2");
+            if (row2 != null)
+            {
+                _breadcrumbContainer = row2.Find("Breadcrumbs");
+                Debug.Log($"[RTTMediaLibrary] Found breadcrumb container from hierarchy: {_breadcrumbContainer != null}");
+            }
+        }
+
+        if (_breadcrumbContainer == null)
+        {
+            Debug.LogWarning("[RTTMediaLibrary] UpdateBreadcrumb: _breadcrumbContainer is null and could not be found!");
             return;
         }
 
-        // Clear existing breadcrumbs
-        foreach (Transform child in _breadcrumbContainer)
+        // Clear existing breadcrumbs (use reverse for loop to avoid collection modification issues)
+        for (int i = _breadcrumbContainer.childCount - 1; i >= 0; i--)
         {
-            Destroy(child.gameObject);
+            DestroyImmediate(_breadcrumbContainer.GetChild(i).gameObject);
         }
 
         // Parse path into segments (split by " > ")
@@ -1180,25 +1203,23 @@ public class RTTMediaLibrary : MonoBehaviour
             segments = new[] { path };
         }
 
-        // Breadcrumb button dimensions
-        float btnHeight = 60f;
-        float minWidth = 80f;
-        float maxWidth = 200f;
-        float charWidth = 12f;
-        float padding = 40f;
+        Debug.Log($"[RTTMediaLibrary] Creating {segments.Length} breadcrumb segments for: {path}");
+
+        // Breadcrumb button dimensions (match RTTFileManager)
+        float btnHeight = 75f;  // Match RTTFileManager
+        float btnWidth = _sortTriggerWidth * 1.2f;  // Use consistent width like RTTFileManager
         float overlap = btnHeight * 0.45f;
 
-        float currentX = 0f;
+        // Create buttons in REVERSE order like RTTFileManager for proper GraphicRaycaster priority
+        // Left buttons created LAST = higher sibling index = hit first
+        float effectiveWidth = btnWidth - overlap;
+        int totalCount = segments.Length;
 
-        for (int i = 0; i < segments.Length; i++)
+        for (int i = totalCount - 1; i >= 0; i--)
         {
             string label = segments[i].Trim();
             bool isFirst = (i == 0);
-            bool isLast = (i == segments.Length - 1);
-
-            // Calculate button width based on text
-            float textWidth = label.Length * charWidth;
-            float btnWidth = Mathf.Clamp(textWidth + padding, minWidth, maxWidth);
+            bool isLast = (i == totalCount - 1);
 
             // Create pill button
             GameObject btn = CreateBreadcrumbPill(label, btnWidth, btnHeight, isFirst, isLast, i);
@@ -1207,15 +1228,18 @@ public class RTTMediaLibrary : MonoBehaviour
             btnRT.anchorMin = new Vector2(0, 0.5f);
             btnRT.anchorMax = new Vector2(0, 0.5f);
             btnRT.pivot = new Vector2(0, 0.5f);
-            btnRT.anchoredPosition = new Vector2(currentX, 0);
 
-            // Set z-index for proper layering (first buttons in front)
-            btnRT.localPosition = new Vector3(btnRT.localPosition.x, btnRT.localPosition.y, -i * 0.1f);
+            // X position: each button offset by effectiveWidth
+            float xPos = i * effectiveWidth;
+            btnRT.anchoredPosition = new Vector2(xPos, 0);
 
-            currentX += btnWidth - overlap;
+            // Z-position for visual layering (left buttons closer to camera)
+            Vector3 pos = btnRT.localPosition;
+            pos.z = i * -0.5f;
+            btnRT.localPosition = pos;
         }
 
-        Debug.Log($"[RTTMediaLibrary] UpdateBreadcrumb: '{path}' ({segments.Length} segments)");
+        Debug.Log($"[RTTMediaLibrary] Created {totalCount} breadcrumb pills for path: {path}");
     }
 
     /// <summary>

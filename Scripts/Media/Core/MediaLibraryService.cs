@@ -107,15 +107,229 @@ public class MediaLibraryService : MonoBehaviour
         IsScanning = false;
     }
 
+    #region Incremental Background Scan
+    /// <summary>
+    /// Event fired when new items are detected during background scan.
+    /// </summary>
+    public event Action<List<MediaVideoInfo>> OnNewItemsDetected;
+
+    private Coroutine _backgroundScanCoroutine;
+    private bool _isBackgroundScanning = false;
+
+    /// <summary>
+    /// Perform a background incremental scan to detect new files.
+    /// Does NOT interrupt current display - only adds new items if found.
+    /// </summary>
+    public void StartBackgroundScan()
+    {
+        if (_isBackgroundScanning || IsScanning)
+        {
+            Debug.Log("[MediaLibraryService] Background scan skipped - already scanning");
+            return;
+        }
+
+        if (_backgroundScanCoroutine != null)
+        {
+            StopCoroutine(_backgroundScanCoroutine);
+        }
+
+        _backgroundScanCoroutine = StartCoroutine(BackgroundScanCoroutine());
+    }
+
+    private IEnumerator BackgroundScanCoroutine()
+    {
+        _isBackgroundScanning = true;
+        var newItems = new List<MediaVideoInfo>();
+        var existingPaths = new HashSet<string>(AllVideos.Select(v => v.Path));
+
+        Debug.Log($"[MediaLibraryService] Starting background scan (existing: {existingPaths.Count} items)");
+        var startTime = System.Diagnostics.Stopwatch.StartNew();
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+        // Use MediaStore for fast query
+        var mediaItems = AndroidMediaStoreHelper.QueryAllMedia();
+
+        foreach (var item in mediaItems)
+        {
+            if (!existingPaths.Contains(item.Path))
+            {
+                try
+                {
+                    var videoInfo = CreateVideoInfoFromMediaStore(item);
+                    newItems.Add(videoInfo);
+                }
+                catch { }
+            }
+        }
+
+        yield return null;
+#else
+        // Use directory scan for Editor/Desktop
+        var scanRoots = GetScanRoots();
+        var allExtensions = VIDEO_EXTENSIONS.Concat(IMAGE_EXTENSIONS).Concat(AUDIO_EXTENSIONS).ToHashSet();
+
+        foreach (var root in scanRoots)
+        {
+            if (!Directory.Exists(root)) continue;
+
+            string[] files = null;
+            try
+            {
+                files = Directory.GetFiles(root, "*.*", SearchOption.AllDirectories);
+            }
+            catch { continue; }
+
+            foreach (var filePath in files)
+            {
+                string ext = Path.GetExtension(filePath).ToLowerInvariant();
+                if (!allExtensions.Contains(ext)) continue;
+
+                if (!existingPaths.Contains(filePath))
+                {
+                    try
+                    {
+                        var videoInfo = CreateVideoInfo(filePath);
+                        newItems.Add(videoInfo);
+                    }
+                    catch { }
+                }
+            }
+
+            yield return null; // Yield between roots to keep UI responsive
+        }
+#endif
+
+        _isBackgroundScanning = false;
+
+        if (newItems.Count > 0)
+        {
+            Debug.Log($"[MediaLibraryService] Background scan found {newItems.Count} new items in {startTime.ElapsedMilliseconds}ms");
+
+            // Add new items to AllVideos
+            AllVideos.AddRange(newItems);
+            AllVideos = AllVideos.OrderBy(v => v.Title).ToList();
+
+            // Update cache
+            SaveLibraryCache();
+
+            // Notify listeners
+            OnNewItemsDetected?.Invoke(newItems);
+        }
+        else
+        {
+            Debug.Log($"[MediaLibraryService] Background scan complete - no new items ({startTime.ElapsedMilliseconds}ms)");
+        }
+    }
+    #endregion
+
     private IEnumerator ScanCoroutine(Action<List<MediaVideoInfo>> onComplete)
     {
         IsScanning = true;
         AllVideos.Clear();
 
+#if UNITY_ANDROID && !UNITY_EDITOR
+        // Use Android MediaStore for fast queries (instant vs seconds/minutes of scanning)
+        yield return ScanUsingMediaStore();
+#else
+        // Fallback to directory scanning for Editor/Desktop
+        yield return ScanUsingDirectories();
+#endif
+
+        // Sort by name
+        AllVideos = AllVideos.OrderBy(v => v.Title).ToList();
+
+        // Save to cache for faster loading next time
+        SaveLibraryCache();
+
+        IsScanning = false;
+        OnScanProgress?.Invoke(AllVideos.Count, AllVideos.Count);
+        OnScanComplete?.Invoke(AllVideos);
+        onComplete?.Invoke(AllVideos);
+
+        Debug.Log($"[MediaLibraryService] Scan complete: {AllVideos.Count} media files (cached)");
+    }
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+    /// <summary>
+    /// Scan using Android MediaStore API - much faster than directory scanning.
+    /// MediaStore is a system-maintained database that indexes all media files.
+    /// </summary>
+    private IEnumerator ScanUsingMediaStore()
+    {
+        Debug.Log("[MediaLibraryService] Using Android MediaStore for fast media discovery...");
+        var startTime = System.Diagnostics.Stopwatch.StartNew();
+
+        // Query all media from MediaStore (this is very fast - typically < 100ms)
+        var mediaItems = AndroidMediaStoreHelper.QueryAllMedia();
+
+        Debug.Log($"[MediaLibraryService] MediaStore query returned {mediaItems.Count} items in {startTime.ElapsedMilliseconds}ms");
+
+        int processed = 0;
+        int total = mediaItems.Count;
+
+        foreach (var item in mediaItems)
+        {
+            try
+            {
+                // Convert MediaStoreItem to MediaVideoInfo
+                var videoInfo = CreateVideoInfoFromMediaStore(item);
+                AllVideos.Add(videoInfo);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[MediaLibraryService] Error processing MediaStore item {item.Path}: {ex.Message}");
+            }
+
+            processed++;
+
+            // Report progress and yield every 50 items (MediaStore is fast, so we can batch more)
+            if (processed % 50 == 0)
+            {
+                OnScanProgress?.Invoke(processed, total);
+                yield return null;
+            }
+        }
+
+        Debug.Log($"[MediaLibraryService] MediaStore scan complete in {startTime.ElapsedMilliseconds}ms");
+    }
+
+    /// <summary>
+    /// Create MediaVideoInfo from AndroidMediaStoreHelper.MediaStoreItem.
+    /// </summary>
+    private MediaVideoInfo CreateVideoInfoFromMediaStore(AndroidMediaStoreHelper.MediaStoreItem item)
+    {
+        var info = new MediaVideoInfo
+        {
+            Path = item.Path,
+            Title = !string.IsNullOrEmpty(item.Title) ? item.Title :
+                    (!string.IsNullOrEmpty(item.DisplayName) ? Path.GetFileNameWithoutExtension(item.DisplayName) : "Unknown"),
+            FileSizeBytes = item.SizeBytes,
+            DateAdded = item.DateAdded,
+            DateModified = item.DateModified,
+            Duration = TimeSpan.FromMilliseconds(item.DurationMs),
+            Width = item.Width,
+            Height = item.Height,
+            IsFavorite = _favorites.Contains(item.Path),
+            Format = MediaVideoInfo.DetectFormat(item.Path),
+            PlaylistIds = new List<string>()
+        };
+
+        // Detect projection from filename and dimensions
+        info.Projection = ProjectionDetector.DetectProjection(item.Path, item.Width, item.Height);
+
+        return info;
+    }
+#endif
+
+    /// <summary>
+    /// Scan using traditional directory traversal (for Editor/Desktop).
+    /// </summary>
+    private IEnumerator ScanUsingDirectories()
+    {
         var foundFiles = new List<string>();
         var scanRoots = GetScanRoots();
 
-        Debug.Log($"[MediaLibraryService] Starting scan in {scanRoots.Count} locations: {string.Join(", ", scanRoots)}");
+        Debug.Log($"[MediaLibraryService] Starting directory scan in {scanRoots.Count} locations: {string.Join(", ", scanRoots)}");
 
         // Combine all supported extensions
         var allExtensions = VIDEO_EXTENSIONS.Concat(IMAGE_EXTENSIONS).Concat(AUDIO_EXTENSIONS).ToHashSet();
@@ -173,19 +387,6 @@ public class MediaLibraryService : MonoBehaviour
                 yield return null;
             }
         }
-
-        // Sort by name
-        AllVideos = AllVideos.OrderBy(v => v.Title).ToList();
-
-        // Save to cache for faster loading next time
-        SaveLibraryCache();
-
-        IsScanning = false;
-        OnScanProgress?.Invoke(total, total);
-        OnScanComplete?.Invoke(AllVideos);
-        onComplete?.Invoke(AllVideos);
-
-        Debug.Log($"[MediaLibraryService] Scan complete: {AllVideos.Count} media files (cached)");
     }
 
     private List<string> GetScanRoots()

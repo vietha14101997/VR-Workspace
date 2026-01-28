@@ -1,6 +1,8 @@
 using UnityEngine;
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 
 /// <summary>
@@ -33,6 +35,14 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
     private List<MediaVideoInfo> _allVideos = new List<MediaVideoInfo>();
     private List<MediaVideoInfo> _filteredVideos = new List<MediaVideoInfo>();
     private bool _isInitialized = false;
+    private bool _isFirstLoad = true; // Use sync filtering for first load to ensure immediate display
+    private bool _waitingForInitialBinding = false; // Track if we're waiting for grid binding before starting scan
+    private Coroutine _filterCoroutine;
+    private const int FILTER_BATCH_SIZE = 200; // Items to process per frame
+
+    // Vietnamese culture for proper diacritics sorting (Đ with D, etc.) - synced with RTTFileManagerController
+    private static readonly CultureInfo VietnameseCulture = new CultureInfo("vi-VN");
+    private static readonly StringComparer VietnameseComparer = StringComparer.Create(VietnameseCulture, ignoreCase: true);
     #endregion
 
     #region Initialization
@@ -56,6 +66,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
         {
             _libraryService.OnScanProgress += HandleScanProgress;
             _libraryService.OnScanComplete += HandleScanComplete;
+            _libraryService.OnNewItemsDetected += HandleNewItemsDetected;
         }
 
         // Note: Side panel events are now wired in OnViewReady() because panels are created asynchronously
@@ -80,14 +91,81 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
     }
 
     /// <summary>
+    /// Handle new items detected during background scan.
+    /// Updates local data and refreshes display without interrupting user.
+    /// </summary>
+    private void HandleNewItemsDetected(List<MediaVideoInfo> newItems)
+    {
+        if (newItems == null || newItems.Count == 0) return;
+
+        Debug.Log($"[RTTMediaLibraryController] New items detected: {newItems.Count}");
+
+        // Add new items to local list
+        _allVideos.AddRange(newItems);
+
+        // Re-apply filters to include new items (will update display)
+        ApplyFilters();
+    }
+
+    /// <summary>
     /// Called by RTTMediaLibrary when all panels (including async side panels) are ready.
     /// </summary>
     public void OnViewReady()
     {
         Debug.Log("[RTTMediaLibraryController] View ready, loading data...");
 
-        // Load initial data
+        // IMPORTANT: Reset _isFirstLoad to ensure sync filtering for immediate display
+        // This is needed because side panel may have already triggered category selection
+        // before OnViewReady, consuming the flag and causing async filtering to clear the view
+        _isFirstLoad = true;
+
+        // Check if we have cached data before subscribing to binding event
+        int cachedCount = _libraryService?.GetAllVideos()?.Count ?? 0;
+
+        if (cachedCount > 0 && _view?.Grid != null)
+        {
+            // Subscribe to grid binding complete event - start scan AFTER all cached items are displayed
+            _waitingForInitialBinding = true;
+            _view.Grid.OnBindingComplete += OnInitialBindingComplete;
+            Debug.Log($"[RTTMediaLibraryController] Waiting for {cachedCount} cached items to bind before scanning...");
+        }
+        else
+        {
+            // No cached items - start scan immediately after loading
+            _waitingForInitialBinding = false;
+            Debug.Log("[RTTMediaLibraryController] No cached items, will scan immediately after load...");
+        }
+
+        // Load initial data from cache (will trigger binding if has data, then scan)
         RefreshLibrary();
+
+        // If no cached items, start background scan now (no binding to wait for)
+        if (!_waitingForInitialBinding)
+        {
+            Debug.Log("[RTTMediaLibraryController] Starting background scan (no binding to wait for)...");
+            _libraryService?.StartBackgroundScan();
+        }
+    }
+
+    /// <summary>
+    /// Called when grid finishes binding all items from cache.
+    /// Now safe to start background scan without interfering with initial display.
+    /// </summary>
+    private void OnInitialBindingComplete()
+    {
+        if (!_waitingForInitialBinding) return;
+        _waitingForInitialBinding = false;
+
+        // Unsubscribe to avoid multiple triggers
+        if (_view?.Grid != null)
+        {
+            _view.Grid.OnBindingComplete -= OnInitialBindingComplete;
+        }
+
+        Debug.Log("[RTTMediaLibraryController] Initial binding complete, starting background scan...");
+
+        // Now safe to start background scan
+        _libraryService?.StartBackgroundScan();
     }
 
     /// <summary>
@@ -97,6 +175,9 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
     public void SelectCategory(string categoryId)
     {
         HandleCategorySelected(categoryId);
+
+        // Trigger background scan when switching categories to detect new files
+        _libraryService?.StartBackgroundScan();
     }
     #endregion
 
@@ -134,6 +215,40 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
             Debug.Log($"[RTTMediaLibraryController] Using cached data: {_allVideos.Count} items");
             ApplyFilters();
         }
+    }
+
+    /// <summary>
+    /// Force a full rescan of the media library to detect new/removed files.
+    /// Clears the library cache first then triggers a fresh scan.
+    /// </summary>
+    public void ForceRescan()
+    {
+        Debug.Log("[RTTMediaLibraryController] ForceRescan called - clearing cache and rescanning...");
+
+        if (_libraryService == null)
+        {
+            Debug.LogError("[RTTMediaLibraryController] LibraryService not available!");
+            return;
+        }
+
+        if (_libraryService.IsScanning)
+        {
+            Debug.Log("[RTTMediaLibraryController] Scan already in progress, please wait...");
+            return;
+        }
+
+        // Clear the library cache to force fresh scan
+        _libraryService.ClearLibraryCache();
+
+        // Clear local data
+        _allVideos.Clear();
+        _filteredVideos.Clear();
+
+        // Update UI to show scanning state
+        _view?.UpdateItemCount(0);
+
+        // Start fresh scan
+        _libraryService.ScanMediaLibrary(OnScanComplete);
     }
 
     /// <summary>
@@ -322,38 +437,32 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
 
     private void ApplySort()
     {
+        // Use in-place sort to avoid creating new lists (better GC performance)
+        int direction = IsAscending ? 1 : -1;
+
         switch (SortBy.ToLower())
         {
             case "name":
-                _filteredVideos = IsAscending
-                    ? _filteredVideos.OrderBy(v => v.Title).ToList()
-                    : _filteredVideos.OrderByDescending(v => v.Title).ToList();
+                // Use Vietnamese comparer for proper diacritics sorting (synced with RTTFileManagerController)
+                _filteredVideos.Sort((a, b) => direction * VietnameseComparer.Compare(a.Title, b.Title));
                 break;
             case "type":
-                // Sort by file extension/format
-                _filteredVideos = IsAscending
-                    ? _filteredVideos.OrderBy(v => System.IO.Path.GetExtension(v.Path)).ToList()
-                    : _filteredVideos.OrderByDescending(v => System.IO.Path.GetExtension(v.Path)).ToList();
+                // Use Vietnamese comparer for type names as well
+                _filteredVideos.Sort((a, b) => direction * VietnameseComparer.Compare(
+                    System.IO.Path.GetExtension(a.Path),
+                    System.IO.Path.GetExtension(b.Path)));
                 break;
             case "created":
-                _filteredVideos = IsAscending
-                    ? _filteredVideos.OrderBy(v => v.DateAdded).ToList()
-                    : _filteredVideos.OrderByDescending(v => v.DateAdded).ToList();
+                _filteredVideos.Sort((a, b) => direction * a.DateAdded.CompareTo(b.DateAdded));
                 break;
             case "modified":
-                _filteredVideos = IsAscending
-                    ? _filteredVideos.OrderBy(v => v.DateModified).ToList()
-                    : _filteredVideos.OrderByDescending(v => v.DateModified).ToList();
+                _filteredVideos.Sort((a, b) => direction * a.DateModified.CompareTo(b.DateModified));
                 break;
             case "duration":
-                _filteredVideos = IsAscending
-                    ? _filteredVideos.OrderBy(v => v.Duration).ToList()
-                    : _filteredVideos.OrderByDescending(v => v.Duration).ToList();
+                _filteredVideos.Sort((a, b) => direction * a.Duration.CompareTo(b.Duration));
                 break;
             case "size":
-                _filteredVideos = IsAscending
-                    ? _filteredVideos.OrderBy(v => v.FileSizeBytes).ToList()
-                    : _filteredVideos.OrderByDescending(v => v.FileSizeBytes).ToList();
+                _filteredVideos.Sort((a, b) => direction * a.FileSizeBytes.CompareTo(b.FileSizeBytes));
                 break;
         }
     }
@@ -368,88 +477,199 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
     #region Private Methods
     private void ApplyFilters()
     {
-        List<MediaVideoInfo> result;
-
-        // Start with category-based data
-        switch (CurrentCategory)
+        // Cancel any existing filter operation
+        if (_filterCoroutine != null)
         {
-            case "all":
-                result = new List<MediaVideoInfo>(_allVideos);
-                break;
-
-            case "videos":
-                // Filter to video files only
-                result = _allVideos.FindAll(v => IsVideoFile(v.Path));
-                break;
-
-            case "images":
-                // Filter to image files only (if supported)
-                result = _allVideos.FindAll(v => IsImageFile(v.Path));
-                break;
-
-            case "audio":
-                // Filter to audio files only (if supported)
-                result = _allVideos.FindAll(v => IsAudioFile(v.Path));
-                break;
-
-            case "recent":
-                result = _libraryService?.GetRecentVideos(50) ?? new List<MediaVideoInfo>();
-                break;
-
-            case "favorites":
-                result = _libraryService?.GetFavorites() ?? new List<MediaVideoInfo>();
-                break;
-
-            case "playlists":
-                // Show all videos for now (playlist sub-items not implemented yet)
-                result = new List<MediaVideoInfo>(_allVideos);
-                break;
-
-            default:
-                // Check if it's a playlist ID
-                if (CurrentCategory.StartsWith("playlist_"))
-                {
-                    // TODO: Get videos from specific playlist
-                    result = new List<MediaVideoInfo>(_allVideos);
-                }
-                else
-                {
-                    result = new List<MediaVideoInfo>(_allVideos);
-                }
-                break;
+            StopCoroutine(_filterCoroutine);
+            _filterCoroutine = null;
         }
 
-        // Apply search filter locally
-        if (!string.IsNullOrEmpty(CurrentSearchQuery))
+        // IMPORTANT: Use sync filtering for first load to ensure data displays immediately
+        // Async filtering clears the view first, which causes "0 items" on startup
+        if (_isFirstLoad)
         {
-            var query = CurrentSearchQuery.ToLowerInvariant();
-            result = result.Where(v =>
-                v.Title.ToLowerInvariant().Contains(query) ||
-                v.Path.ToLowerInvariant().Contains(query)
-            ).ToList();
+            _isFirstLoad = false;
+            ApplyFiltersSync();
+            return;
         }
 
-        // Apply additional filters locally
-        if (CurrentProjectionFilter.HasValue)
-        {
-            result = result.Where(v => v.Projection == CurrentProjectionFilter.Value).ToList();
-        }
+        // For small datasets or special categories, filter synchronously for instant response
+        bool useAsync = _allVideos.Count > FILTER_BATCH_SIZE &&
+                       (CurrentCategory == "all" || CurrentCategory == "videos" ||
+                        CurrentCategory == "images" || CurrentCategory == "audio");
 
-        if (CurrentFormatFilter.HasValue)
+        if (useAsync)
         {
-            result = result.Where(v => v.Format == CurrentFormatFilter.Value).ToList();
+            _filterCoroutine = StartCoroutine(ApplyFiltersAsync());
         }
+        else
+        {
+            ApplyFiltersSync();
+        }
+    }
 
-        if (CurrentDurationFilter.HasValue && CurrentDurationFilter.Value != DurationRange.All)
-        {
-            result = result.Where(v => v.DurationCategory == CurrentDurationFilter.Value).ToList();
-        }
+    /// <summary>
+    /// Synchronous filter for small datasets or special categories (recent, favorites, etc.)
+    /// </summary>
+    private void ApplyFiltersSync()
+    {
+        List<MediaVideoInfo> result = GetFilteredByCategory();
+
+        // Apply additional filters
+        result = ApplyAdditionalFilters(result);
 
         _filteredVideos = result;
 
         // Apply sort
         ApplySort();
 
+        // Recalculate pagination and update view
+        FinalizeAndUpdateView();
+    }
+
+    /// <summary>
+    /// Async filter for large datasets - spreads work across multiple frames
+    /// </summary>
+    private IEnumerator ApplyFiltersAsync()
+    {
+        // NOTE: Do NOT clear the view here - keep showing old data until new data is ready
+        // Clearing causes "0 items" flash which is a poor user experience
+        // The view will be updated atomically in FinalizeAndUpdateView()
+
+        List<MediaVideoInfo> result = new List<MediaVideoInfo>();
+        Func<MediaVideoInfo, bool> categoryFilter = GetCategoryFilter();
+        int processed = 0;
+
+        // Process in batches to avoid frame drops
+        for (int i = 0; i < _allVideos.Count; i++)
+        {
+            if (categoryFilter(_allVideos[i]))
+            {
+                result.Add(_allVideos[i]);
+            }
+
+            processed++;
+
+            // Yield every FILTER_BATCH_SIZE items to keep UI responsive
+            if (processed >= FILTER_BATCH_SIZE)
+            {
+                processed = 0;
+                yield return null; // Wait one frame
+            }
+        }
+
+        // Apply additional filters (these are usually fast since result is already filtered)
+        result = ApplyAdditionalFilters(result);
+
+        _filteredVideos = result;
+
+        // Apply sort
+        ApplySort();
+
+        // Recalculate pagination and update view
+        FinalizeAndUpdateView();
+
+        _filterCoroutine = null;
+    }
+
+    /// <summary>
+    /// Get filter function based on current category
+    /// </summary>
+    private Func<MediaVideoInfo, bool> GetCategoryFilter()
+    {
+        switch (CurrentCategory)
+        {
+            case "all":
+                return v => true;
+            case "videos":
+                return v => IsVideoFile(v.Path);
+            case "images":
+                return v => IsImageFile(v.Path);
+            case "audio":
+                return v => IsAudioFile(v.Path);
+            default:
+                return v => true;
+        }
+    }
+
+    /// <summary>
+    /// Get filtered list by category (for sync path or special categories)
+    /// </summary>
+    private List<MediaVideoInfo> GetFilteredByCategory()
+    {
+        switch (CurrentCategory)
+        {
+            case "all":
+                return new List<MediaVideoInfo>(_allVideos);
+
+            case "videos":
+                return _allVideos.FindAll(v => IsVideoFile(v.Path));
+
+            case "images":
+                return _allVideos.FindAll(v => IsImageFile(v.Path));
+
+            case "audio":
+                return _allVideos.FindAll(v => IsAudioFile(v.Path));
+
+            case "recent":
+                return _libraryService?.GetRecentVideos(50) ?? new List<MediaVideoInfo>();
+
+            case "favorites":
+                return _libraryService?.GetFavorites() ?? new List<MediaVideoInfo>();
+
+            case "playlists":
+                return new List<MediaVideoInfo>(_allVideos);
+
+            default:
+                if (CurrentCategory.StartsWith("playlist_"))
+                {
+                    // TODO: Get videos from specific playlist
+                    return new List<MediaVideoInfo>(_allVideos);
+                }
+                return new List<MediaVideoInfo>(_allVideos);
+        }
+    }
+
+    /// <summary>
+    /// Apply search and additional filters
+    /// </summary>
+    private List<MediaVideoInfo> ApplyAdditionalFilters(List<MediaVideoInfo> result)
+    {
+        // Apply search filter
+        if (!string.IsNullOrEmpty(CurrentSearchQuery))
+        {
+            var query = CurrentSearchQuery.ToLowerInvariant();
+            result = result.FindAll(v =>
+                v.Title.ToLowerInvariant().Contains(query) ||
+                v.Path.ToLowerInvariant().Contains(query));
+        }
+
+        // Apply projection filter
+        if (CurrentProjectionFilter.HasValue)
+        {
+            result = result.FindAll(v => v.Projection == CurrentProjectionFilter.Value);
+        }
+
+        // Apply format filter
+        if (CurrentFormatFilter.HasValue)
+        {
+            result = result.FindAll(v => v.Format == CurrentFormatFilter.Value);
+        }
+
+        // Apply duration filter
+        if (CurrentDurationFilter.HasValue && CurrentDurationFilter.Value != DurationRange.All)
+        {
+            result = result.FindAll(v => v.DurationCategory == CurrentDurationFilter.Value);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Finalize filtering and update the view
+    /// </summary>
+    private void FinalizeAndUpdateView()
+    {
         // Recalculate pagination
         RecalculatePagination();
 
@@ -555,16 +775,30 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
     #region Cleanup
     private void OnDestroy()
     {
+        // Cancel any pending filter operation
+        if (_filterCoroutine != null)
+        {
+            StopCoroutine(_filterCoroutine);
+            _filterCoroutine = null;
+        }
+
         if (_view != null)
         {
             _view.OnVideoPlayRequested -= HandleVideoPlayRequested;
             _view.OnCloseRequested -= HandleCloseRequested;
+
+            // Unsubscribe from grid binding event
+            if (_view.Grid != null)
+            {
+                _view.Grid.OnBindingComplete -= OnInitialBindingComplete;
+            }
         }
 
         if (_libraryService != null)
         {
             _libraryService.OnScanProgress -= HandleScanProgress;
             _libraryService.OnScanComplete -= HandleScanComplete;
+            _libraryService.OnNewItemsDetected -= HandleNewItemsDetected;
         }
 
         // Note: Side panel events are now managed by RTTMediaLibrary
