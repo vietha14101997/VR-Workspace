@@ -34,9 +34,10 @@ public static class FileCategoryHelper
     };
 
     // Unity-natively supported audio extensions (AudioSource)
+    // Also includes FLAC and M4A which can have embedded album art
     private static readonly HashSet<string> MusicExtensions = new HashSet<string>
     {
-        "mp3", "wav", "ogg", "aif"
+        "mp3", "wav", "ogg", "aif", "flac", "m4a", "aac"
     };
 
     // Text-based file extensions that can be read with System.IO
@@ -121,13 +122,14 @@ public static class FileCategoryHelper
 
     /// <summary>
     /// Check if a category requires thumbnail generation (async loading).
-    /// Image and Video categories generate actual preview thumbnails.
+    /// Image, Video, and Music categories can generate preview thumbnails.
+    /// Music files may have embedded album art.
     /// </summary>
     /// <param name="category">File category</param>
     /// <returns>True if thumbnail should be generated for this category</returns>
     public static bool RequiresThumbnailGeneration(FileCategory category)
     {
-        return category == FileCategory.Image || category == FileCategory.Video;
+        return category == FileCategory.Image || category == FileCategory.Video || category == FileCategory.Music;
     }
 
     /// <summary>

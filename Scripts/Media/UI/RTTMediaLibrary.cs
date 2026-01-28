@@ -32,7 +32,7 @@ public class RTTMediaLibrary : MonoBehaviour
     private RTTMenuFrame _rightFrame;
 
     private RTTMediaSidePanel _sidePanel;
-    private RTTMediaGrid _grid;
+    private RTTMediaGrid2 _grid;
     private RTTMediaDetail _detailPanel;
     private RTTFilePagination _pagination;
 
@@ -67,7 +67,7 @@ public class RTTMediaLibrary : MonoBehaviour
 
     #region Properties
     public RTTMediaSidePanel SidePanel => _sidePanel;
-    public RTTMediaGrid Grid => _grid;
+    public RTTMediaGrid2 Grid => _grid;
     public RTTMediaDetail DetailPanel => _detailPanel;
     #endregion
 
@@ -85,6 +85,7 @@ public class RTTMediaLibrary : MonoBehaviour
 
     // Breadcrumb References
     private Transform _breadcrumbContainer;
+    private TextMeshProUGUI _breadcrumbText;
 
     // View Options
     private RTTPopupMenu _viewOptionsPopup;
@@ -444,7 +445,7 @@ public class RTTMediaLibrary : MonoBehaviour
         gridRT.offsetMin = Vector2.zero;
         gridRT.offsetMax = Vector2.zero;
 
-        _grid = gridObj.AddComponent<RTTMediaGrid>();
+        _grid = gridObj.AddComponent<RTTMediaGrid2>();
         float bodyHeight = panelHeight - _headerHeight2Rows - bottomPadding;
         _grid.Initialize(_controller, contentSize.x, bodyHeight, _font, _primaryColor, _accentColor);
 
@@ -458,6 +459,9 @@ public class RTTMediaLibrary : MonoBehaviour
         bodyObj.transform.SetAsFirstSibling();
 
         _viewReady = true;
+
+        // Set initial breadcrumb and category (default to Videos)
+        UpdateBreadcrumbForCategory("videos");
 
         _controller?.OnViewReady();
 
@@ -654,17 +658,20 @@ public class RTTMediaLibrary : MonoBehaviour
         selectedRT.anchoredPosition = new Vector2(searchBarRightEdge, 0);
         selectedObj.SetActive(false);
 
-        // Breadcrumb Container
+        // Breadcrumb Container (holds pill-shaped segments like RTTFileManager)
         GameObject crumbContainer = new GameObject("Breadcrumbs");
+        crumbContainer.layer = LayerMask.NameToLayer("UI");
         crumbContainer.transform.SetParent(rowRT, false);
         _breadcrumbContainer = crumbContainer.transform;
 
         RectTransform crumbRT = crumbContainer.AddComponent<RectTransform>();
         crumbRT.anchorMin = new Vector2(0, 0);
-        crumbRT.anchorMax = new Vector2(1, 1);
+        crumbRT.anchorMax = new Vector2(0.6f, 1);
         crumbRT.pivot = new Vector2(0, 0.5f);
-        crumbRT.offsetMin = new Vector2(20, 0);
-        crumbRT.offsetMax = new Vector2(-520, 0);
+        crumbRT.offsetMin = new Vector2(20f, 0);
+        crumbRT.offsetMax = Vector2.zero;
+
+        Debug.Log($"[RTTMediaLibrary] Breadcrumb container created");
 
         // Edit Controls Container (hidden by default)
         CreateEditControlsInRow2(rowRT);
@@ -1154,7 +1161,11 @@ public class RTTMediaLibrary : MonoBehaviour
 
     public void UpdateBreadcrumb(string path)
     {
-        if (_breadcrumbContainer == null) return;
+        if (_breadcrumbContainer == null)
+        {
+            Debug.LogWarning("[RTTMediaLibrary] UpdateBreadcrumb: _breadcrumbContainer is null!");
+            return;
+        }
 
         // Clear existing breadcrumbs
         foreach (Transform child in _breadcrumbContainer)
@@ -1162,23 +1173,152 @@ public class RTTMediaLibrary : MonoBehaviour
             Destroy(child.gameObject);
         }
 
-        // Create simple text breadcrumb for now
-        GameObject textObj = new GameObject("BreadcrumbText");
-        textObj.transform.SetParent(_breadcrumbContainer, false);
+        // Parse path into segments (split by " > ")
+        string[] segments = path.Split(new[] { " > " }, StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length == 0)
+        {
+            segments = new[] { path };
+        }
+
+        // Breadcrumb button dimensions
+        float btnHeight = 60f;
+        float minWidth = 80f;
+        float maxWidth = 200f;
+        float charWidth = 12f;
+        float padding = 40f;
+        float overlap = btnHeight * 0.45f;
+
+        float currentX = 0f;
+
+        for (int i = 0; i < segments.Length; i++)
+        {
+            string label = segments[i].Trim();
+            bool isFirst = (i == 0);
+            bool isLast = (i == segments.Length - 1);
+
+            // Calculate button width based on text
+            float textWidth = label.Length * charWidth;
+            float btnWidth = Mathf.Clamp(textWidth + padding, minWidth, maxWidth);
+
+            // Create pill button
+            GameObject btn = CreateBreadcrumbPill(label, btnWidth, btnHeight, isFirst, isLast, i);
+
+            RectTransform btnRT = btn.GetComponent<RectTransform>();
+            btnRT.anchorMin = new Vector2(0, 0.5f);
+            btnRT.anchorMax = new Vector2(0, 0.5f);
+            btnRT.pivot = new Vector2(0, 0.5f);
+            btnRT.anchoredPosition = new Vector2(currentX, 0);
+
+            // Set z-index for proper layering (first buttons in front)
+            btnRT.localPosition = new Vector3(btnRT.localPosition.x, btnRT.localPosition.y, -i * 0.1f);
+
+            currentX += btnWidth - overlap;
+        }
+
+        Debug.Log($"[RTTMediaLibrary] UpdateBreadcrumb: '{path}' ({segments.Length} segments)");
+    }
+
+    /// <summary>
+    /// Create a pill-shaped breadcrumb button (styled like RTTFileManager but not clickable).
+    /// </summary>
+    private GameObject CreateBreadcrumbPill(string label, float width, float height, bool isFirst, bool isLast, int index)
+    {
+        Color btnColor = isLast ? _accentColor : _primaryColor;
+
+        GameObject btnObj = new GameObject($"Crumb_{label}");
+        btnObj.layer = LayerMask.NameToLayer("UI");
+        btnObj.transform.SetParent(_breadcrumbContainer, false);
+
+        RectTransform btnRT = btnObj.AddComponent<RectTransform>();
+        btnRT.sizeDelta = new Vector2(width, height);
+
+        // Background image with shader
+        Image bgImage = btnObj.AddComponent<Image>();
+        bgImage.raycastTarget = false; // Not clickable
+
+        float aspect = width / height;
+        float glassAlpha = 0.2f;
+
+        if (isFirst)
+        {
+            // First button: rounded rect
+            Shader pillShader = Shader.Find("Custom/GlassGradientBackgroundWide");
+            if (pillShader != null)
+            {
+                Material mat = new Material(pillShader);
+                mat.SetFloat("_Aspect", aspect);
+                mat.SetFloat("_CornerRadius", 0.48f);
+                mat.SetFloat("_EdgePadding", 0.02f);
+                Color colorA = new Color(btnColor.r, btnColor.g, btnColor.b, glassAlpha * 1.5f);
+                Color colorB = new Color(btnColor.r, btnColor.g, btnColor.b, glassAlpha * 0.5f);
+                mat.SetColor("_ColorA", colorA);
+                mat.SetColor("_ColorB", colorB);
+                mat.SetFloat("_GlassAlpha", glassAlpha);
+                mat.SetFloat("_FresnelStrength", 0.15f);
+                bgImage.material = mat;
+                bgImage.color = Color.white;
+            }
+            else
+            {
+                bgImage.color = new Color(btnColor.r, btnColor.g, btnColor.b, glassAlpha);
+            }
+        }
+        else
+        {
+            // Subsequent buttons: chevron shape
+            Shader chevronShader = Shader.Find("Custom/ChevronBackground");
+            if (chevronShader != null)
+            {
+                Material mat = new Material(chevronShader);
+                mat.SetFloat("_Aspect", aspect);
+                mat.SetFloat("_EdgePadding", 0.02f);
+                mat.SetColor("_BackgroundColor", btnColor);
+                mat.SetFloat("_BackgroundAlpha", glassAlpha);
+                mat.SetFloat("_EdgeGlow", 0.15f);
+                mat.SetFloat("_CenterGlow", 0.1f);
+                bgImage.material = mat;
+                bgImage.color = Color.white;
+            }
+            else
+            {
+                bgImage.color = new Color(btnColor.r, btnColor.g, btnColor.b, glassAlpha);
+            }
+        }
+
+        // Text label
+        GameObject textObj = new GameObject("Text");
+        textObj.layer = LayerMask.NameToLayer("UI");
+        textObj.transform.SetParent(btnObj.transform, false);
 
         RectTransform textRT = textObj.AddComponent<RectTransform>();
         textRT.anchorMin = Vector2.zero;
         textRT.anchorMax = Vector2.one;
-        textRT.offsetMin = Vector2.zero;
-        textRT.offsetMax = Vector2.zero;
 
-        TextMeshProUGUI tmp = textObj.AddComponent<TextMeshProUGUI>();
-        tmp.text = path;
-        tmp.font = _font;
-        tmp.fontSize = 28;
-        tmp.fontStyle = FontStyles.Bold;
-        tmp.color = Color.white;
-        tmp.alignment = TextAlignmentOptions.MidlineLeft;
+        float curveR = height * 0.5f;
+        if (isFirst)
+        {
+            textRT.offsetMin = new Vector2(curveR * 0.85f, 0);
+            textRT.offsetMax = new Vector2(-curveR * 0.75f, 0);
+        }
+        else
+        {
+            textRT.offsetMin = new Vector2(curveR * 1.1f, 0);
+            textRT.offsetMax = new Vector2(-curveR * 0.6f, 0);
+        }
+
+        TextMeshProUGUI txt = textObj.AddComponent<TextMeshProUGUI>();
+        txt.text = label;
+        txt.fontSize = 24;
+        txt.font = _font;
+        txt.color = Color.white;
+        txt.alignment = TextAlignmentOptions.Center;
+        txt.verticalAlignment = VerticalAlignmentOptions.Middle;
+        txt.fontStyle = FontStyles.Bold;
+        txt.raycastTarget = false;
+        txt.enableWordWrapping = false;
+        txt.overflowMode = TextOverflowModes.Ellipsis;
+
+        return btnObj;
     }
     #endregion
 
@@ -1319,7 +1459,7 @@ public class RTTMediaLibrary : MonoBehaviour
                 breadcrumbText = "All Media > Images";
                 break;
             case "audio":
-                breadcrumbText = "All Media > Audio";
+                breadcrumbText = "All Media > Music";
                 break;
             case "recent":
                 breadcrumbText = "Recent";

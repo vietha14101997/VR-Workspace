@@ -104,11 +104,8 @@ public class RTTMediaSidePanel : MonoBehaviour
         // 3. Create Navigation Items with hierarchy
         CreateNavigationItems();
 
-        // Select first item by default
-        if (_navItems.Count > 0)
-        {
-            SelectItem(_navItems[0].Id);
-        }
+        // Select "videos" by default (not "all")
+        SelectItem("videos");
     }
 
     private void CreateHeader()
@@ -173,7 +170,7 @@ public class RTTMediaSidePanel : MonoBehaviour
         // Sub-items under All Media (indent: 1)
         CreateNavItem("videos", "Videos", "icon_video_folder", 1);
         CreateNavItem("images", "Images", "icon_image_folder", 1);
-        CreateNavItem("audio", "Audio", "icon_music_folder", 1);
+        CreateNavItem("audio", "Music", "icon_music_folder", 1);
 
         // Other categories (indent: 0)
         CreateNavItem("recent", "Recent", "icon_recent_folder", 0);

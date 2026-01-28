@@ -128,6 +128,29 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
                             if (_currentFilePath == file.Path && sprite != null)
                             {
                                 _iconImage.sprite = sprite;
+
+                                // Update AspectRatioFitter based on actual sprite aspect ratio
+                                var aspectFitter = _iconImage.GetComponent<AspectRatioFitter>();
+                                if (aspectFitter != null && sprite.texture != null)
+                                {
+                                    float spriteAspect = (float)sprite.texture.width / sprite.texture.height;
+                                    const float targetAspect = 16f / 9f;
+
+                                    // If image is wider than 16:9 → crop horizontally (EnvelopeParent)
+                                    // If image is narrower (like 1:1 square) → show full image (FitInParent)
+                                    if (spriteAspect >= targetAspect)
+                                    {
+                                        aspectFitter.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
+                                    }
+                                    else
+                                    {
+                                        aspectFitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+                                    }
+                                    aspectFitter.aspectRatio = spriteAspect;
+
+                                    // Force layout rebuild to apply AspectRatioFitter changes immediately
+                                    LayoutRebuilder.ForceRebuildLayoutImmediate(_iconRect);
+                                }
                             }
                         },
                         onFailed: null,  // Keep placeholder icon
@@ -136,16 +159,24 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
                 }
             }
 
-            // Adjust icon size within container: thumbnails fill, resource icons smaller and centered
+            // Adjust icon size and AspectRatioFitter mode
             if (_iconRect != null)
             {
+                var aspectFitter = _iconImage?.GetComponent<AspectRatioFitter>();
+
                 if (usesThumbnail)
                 {
-                    // Thumbnails: fill the container
-                    _iconRect.anchorMin = Vector2.zero;
-                    _iconRect.anchorMax = Vector2.one;
-                    _iconRect.offsetMin = Vector2.zero;
-                    _iconRect.offsetMax = Vector2.zero;
+                    // Thumbnails: center-crop to fill container (same as RTTMediaGridItem2)
+                    _iconRect.anchorMin = new Vector2(0.5f, 0.5f);
+                    _iconRect.anchorMax = new Vector2(0.5f, 0.5f);
+                    _iconRect.anchoredPosition = Vector2.zero;
+
+                    // Enable AspectRatioFitter with EnvelopeParent for center-crop behavior
+                    if (aspectFitter != null)
+                    {
+                        aspectFitter.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
+                        aspectFitter.aspectRatio = 16f / 9f;  // Default, will update when thumbnail loads
+                    }
                 }
                 else
                 {
@@ -154,6 +185,12 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
                     _iconRect.anchorMax = new Vector2(0.5f, 0.5f);
                     _iconRect.sizeDelta = new Vector2(180f, 180f);
                     _iconRect.anchoredPosition = Vector2.zero;
+
+                    // Disable AspectRatioFitter for regular icons
+                    if (aspectFitter != null)
+                    {
+                        aspectFitter.aspectMode = AspectRatioFitter.AspectMode.None;
+                    }
                 }
             }
         }
@@ -202,6 +239,9 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         _iconContainerLE.preferredWidth = 200f;
         _iconContainerLE.flexibleHeight = 1;
 
+        // Add RectMask2D for thumbnail cropping (center-crop overflow)
+        iconContainer.AddComponent<RectMask2D>();
+
         // 3. Icon Image - inside container, centered
         GameObject iconObj = new GameObject("Icon");
         iconObj.transform.SetParent(iconContainer.transform, false);
@@ -215,6 +255,11 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         _iconImage = iconObj.AddComponent<Image>();
         _iconImage.preserveAspect = true;
         _iconImage.raycastTarget = false;
+
+        // Add AspectRatioFitter for thumbnail center-crop (same as RTTMediaGridItem2)
+        var aspectFitter = iconObj.AddComponent<AspectRatioFitter>();
+        aspectFitter.aspectMode = AspectRatioFitter.AspectMode.None;  // Disabled by default, enabled for thumbnails
+        aspectFitter.aspectRatio = 1f;
 
         SetSprite("icon_folder_not_empty");
 

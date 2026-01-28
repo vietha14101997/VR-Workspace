@@ -46,7 +46,7 @@ public class FileThumbnailService : MonoBehaviour
 
     #region Configuration
     [SerializeField] private int _maxCacheEntries = 200;  // Increased for larger thumbnails
-    [SerializeField] private int _concurrentLoadLimit = 3;
+    [SerializeField] private int _concurrentLoadLimit = 6;  // Increased for faster loading
     #endregion
 
     #region Private Fields
@@ -70,7 +70,7 @@ public class FileThumbnailService : MonoBehaviour
     // UI callback throttling to prevent stutters
     private Queue<Action> _uiCallbackQueue = new Queue<Action>();
     private Queue<Action> _highPriorityUIQueue = new Queue<Action>(); // For detail panel
-    private const int MAX_UI_CALLBACKS_PER_FRAME = 4; // Limit UI updates per frame
+    private const int MAX_UI_CALLBACKS_PER_FRAME = 8; // Limit UI updates per frame (increased for faster grid updates)
     #endregion
 
     #region Unity Lifecycle
@@ -302,6 +302,10 @@ public class FileThumbnailService : MonoBehaviour
         else if (request.Category == FileCategory.Video)
         {
             StartCoroutine(LoadVideoThumbnail(request));
+        }
+        else if (request.Category == FileCategory.Music)
+        {
+            StartCoroutine(LoadAudioThumbnail(request));
         }
         else
         {
@@ -582,6 +586,156 @@ public class FileThumbnailService : MonoBehaviour
                 // Request was for 512 or larger
                 result = request.SkipOverlay ? noOverlaySprite512 : overlaySprite512;
             }
+        }
+
+        CompleteRequest(request, result);
+    }
+
+    private IEnumerator LoadAudioThumbnail(ThumbnailRequest request)
+    {
+        Sprite result = null;
+        string fileName = System.IO.Path.GetFileName(request.FilePath);
+
+        // Try to extract album art from audio metadata
+        byte[] albumArtData = null;
+        bool extractionComplete = false;
+
+        // Run extraction on a background thread (only file I/O, no Unity API)
+        System.Threading.Tasks.Task.Run(() =>
+        {
+            try
+            {
+                albumArtData = AudioMetadataExtractor.TryExtractAlbumArtData(request.FilePath);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[FileThumbnailService] Audio metadata extraction failed: {ex.Message}");
+            }
+            extractionComplete = true;
+        });
+
+        // Wait for extraction to complete
+        float timeout = 5f;
+        float elapsed = 0f;
+        while (!extractionComplete && elapsed < timeout)
+        {
+            yield return null;
+            elapsed += Time.deltaTime;
+        }
+
+        // Create texture on main thread
+        Texture2D albumArt = null;
+        if (albumArtData != null && albumArtData.Length > 0)
+        {
+            try
+            {
+                albumArt = new Texture2D(2, 2, TextureFormat.RGBA32, true);
+                albumArt.filterMode = FilterMode.Trilinear;
+                albumArt.anisoLevel = 16;
+                albumArt.wrapMode = TextureWrapMode.Clamp;
+
+                if (!albumArt.LoadImage(albumArtData))
+                {
+                    Destroy(albumArt);
+                    albumArt = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[FileThumbnailService] Failed to create album art texture: {ex.Message}");
+                if (albumArt != null)
+                {
+                    Destroy(albumArt);
+                    albumArt = null;
+                }
+            }
+        }
+
+        if (albumArt != null)
+        {
+            Debug.Log($"[Thumb] {fileName} AUDIO: Album art found ({albumArt.width}x{albumArt.height})");
+
+            // Resize to standard thumbnail sizes
+            Texture2D resized512 = null;
+            bool resize512Complete = false;
+
+            StartCoroutine(ResizeTextureAsync(albumArt, DETAIL_THUMBNAIL_SIZE, (resizedTexture) =>
+            {
+                resized512 = resizedTexture;
+                resize512Complete = true;
+            }));
+
+            while (!resize512Complete)
+            {
+                yield return null;
+            }
+
+            if (resized512 != null)
+            {
+                // Clean up original if resized
+                if (resized512 != albumArt)
+                {
+                    Destroy(albumArt);
+                }
+
+                // Cache 512px version
+                Sprite sprite512 = Sprite.Create(
+                    resized512,
+                    new Rect(0, 0, resized512.width, resized512.height),
+                    new Vector2(0.5f, 0.5f),
+                    100f
+                );
+
+                string cacheKey512 = _cache.GenerateCacheKey(request.FilePath, request.FileModifiedTicks, DETAIL_THUMBNAIL_SIZE);
+                _cache.Set(cacheKey512, sprite512, request.FileModifiedTicks, request.FilePath);
+                _cache.SetAlias(cacheKey512 + "_nooverlay", cacheKey512);
+
+                // Create 256px version if needed
+                if (request.TargetSize <= LIST_THUMBNAIL_SIZE)
+                {
+                    Texture2D resized256 = null;
+                    bool resize256Complete = false;
+
+                    StartCoroutine(ResizeTextureAsync(resized512, LIST_THUMBNAIL_SIZE, (resizedTexture) =>
+                    {
+                        resized256 = resizedTexture;
+                        resize256Complete = true;
+                    }));
+
+                    while (!resize256Complete)
+                    {
+                        yield return null;
+                    }
+
+                    if (resized256 != null && resized256 != resized512)
+                    {
+                        Sprite sprite256 = Sprite.Create(
+                            resized256,
+                            new Rect(0, 0, resized256.width, resized256.height),
+                            new Vector2(0.5f, 0.5f),
+                            100f
+                        );
+
+                        string cacheKey256 = _cache.GenerateCacheKey(request.FilePath, request.FileModifiedTicks, LIST_THUMBNAIL_SIZE);
+                        _cache.Set(cacheKey256, sprite256, request.FileModifiedTicks, request.FilePath);
+                        _cache.SetAlias(cacheKey256 + "_nooverlay", cacheKey256);
+
+                        result = sprite256;
+                    }
+                    else
+                    {
+                        result = sprite512;
+                    }
+                }
+                else
+                {
+                    result = sprite512;
+                }
+            }
+        }
+        else
+        {
+            Debug.Log($"[Thumb] {fileName} AUDIO: No album art found");
         }
 
         CompleteRequest(request, result);

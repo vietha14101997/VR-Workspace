@@ -214,7 +214,7 @@ public class RTTMediaGrid : MonoBehaviour
         int startIndex = (CurrentPage - 1) * ItemsPerPage;
         int endIndex = Mathf.Min(startIndex + ItemsPerPage, _currentData.Count);
 
-        // Create items for current page
+        // Create items for current page - GridLayoutGroup handles positioning
         for (int i = startIndex; i < endIndex; i++)
         {
             RTTMediaGridItem item;
@@ -232,7 +232,7 @@ public class RTTMediaGrid : MonoBehaviour
             item.SetData(video);
             item.SetSelected(SelectedVideo?.Path == video.Path);
             item.gameObject.SetActive(true);
-            item.transform.SetAsLastSibling();
+            item.transform.SetAsLastSibling(); // Ensure correct order in GridLayoutGroup
 
             _items.Add(item);
 

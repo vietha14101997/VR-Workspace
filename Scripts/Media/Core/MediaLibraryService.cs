@@ -28,9 +28,12 @@ public class MediaLibraryService : MonoBehaviour
     #endregion
 
     #region Constants
-    private static readonly string[] VIDEO_EXTENSIONS = { ".mp4", ".mkv", ".avi", ".webm", ".mov", ".wmv" };
+    private static readonly string[] VIDEO_EXTENSIONS = { ".mp4", ".mkv", ".avi", ".webm", ".mov", ".wmv", ".m4v", ".flv" };
+    private static readonly string[] IMAGE_EXTENSIONS = { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff", ".tif" };
+    private static readonly string[] AUDIO_EXTENSIONS = { ".mp3", ".wav", ".flac", ".aac", ".ogg", ".m4a", ".wma" };
     private const string FAVORITES_KEY = "MediaLibrary_Favorites";
     private const string HISTORY_KEY = "MediaLibrary_History";
+    private const string LIBRARY_CACHE_KEY = "MediaLibrary_Cache";
     private const int MAX_HISTORY = 50;
     #endregion
 
@@ -67,6 +70,7 @@ public class MediaLibraryService : MonoBehaviour
 
         LoadFavorites();
         LoadHistory();
+        LoadLibraryCache();
     }
     #endregion
 
@@ -111,17 +115,25 @@ public class MediaLibraryService : MonoBehaviour
         var foundFiles = new List<string>();
         var scanRoots = GetScanRoots();
 
-        Debug.Log($"[MediaLibraryService] Starting scan in {scanRoots.Count} locations");
+        Debug.Log($"[MediaLibraryService] Starting scan in {scanRoots.Count} locations: {string.Join(", ", scanRoots)}");
 
-        // Collect all video files
+        // Combine all supported extensions
+        var allExtensions = VIDEO_EXTENSIONS.Concat(IMAGE_EXTENSIONS).Concat(AUDIO_EXTENSIONS).ToHashSet();
+
+        // Collect all media files
         foreach (var root in scanRoots)
         {
-            if (!Directory.Exists(root)) continue;
+            if (!Directory.Exists(root))
+            {
+                Debug.Log($"[MediaLibraryService] Skipping non-existent root: {root}");
+                continue;
+            }
+            Debug.Log($"[MediaLibraryService] Scanning: {root}");
 
             try
             {
                 var files = Directory.GetFiles(root, "*.*", SearchOption.AllDirectories)
-                    .Where(f => VIDEO_EXTENSIONS.Contains(Path.GetExtension(f).ToLowerInvariant()))
+                    .Where(f => allExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
                     .ToList();
 
                 foundFiles.AddRange(files);
@@ -134,7 +146,7 @@ public class MediaLibraryService : MonoBehaviour
             yield return null; // Yield between roots
         }
 
-        Debug.Log($"[MediaLibraryService] Found {foundFiles.Count} video files");
+        Debug.Log($"[MediaLibraryService] Found {foundFiles.Count} media files");
 
         // Process files and create MediaVideoInfo
         int processed = 0;
@@ -165,12 +177,15 @@ public class MediaLibraryService : MonoBehaviour
         // Sort by name
         AllVideos = AllVideos.OrderBy(v => v.Title).ToList();
 
+        // Save to cache for faster loading next time
+        SaveLibraryCache();
+
         IsScanning = false;
         OnScanProgress?.Invoke(total, total);
         OnScanComplete?.Invoke(AllVideos);
         onComplete?.Invoke(AllVideos);
 
-        Debug.Log($"[MediaLibraryService] Scan complete: {AllVideos.Count} videos");
+        Debug.Log($"[MediaLibraryService] Scan complete: {AllVideos.Count} media files (cached)");
     }
 
     private List<string> GetScanRoots()
@@ -196,9 +211,11 @@ public class MediaLibraryService : MonoBehaviour
             roots.Add(sdCard);
         }
 #else
-        // Editor/Desktop - scan common video folders
+        // Editor/Desktop - scan common media folders
         string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         roots.Add(Path.Combine(userProfile, "Videos"));
+        roots.Add(Path.Combine(userProfile, "Pictures"));
+        roots.Add(Path.Combine(userProfile, "Music"));
         roots.Add(Path.Combine(userProfile, "Downloads"));
 
         // Also scan project's StreamingAssets for testing
@@ -496,6 +513,86 @@ public class MediaLibraryService : MonoBehaviour
     }
     #endregion
 
+    #region Library Cache
+    /// <summary>
+    /// Load cached library data for faster startup.
+    /// </summary>
+    private void LoadLibraryCache()
+    {
+        string json = PlayerPrefs.GetString(LIBRARY_CACHE_KEY, "");
+        if (string.IsNullOrEmpty(json))
+        {
+            Debug.Log("[MediaLibraryService] No library cache found");
+            return;
+        }
+
+        try
+        {
+            var cache = JsonUtility.FromJson<LibraryCacheWrapper>(json);
+            if (cache?.paths == null || cache.paths.Count == 0)
+            {
+                Debug.Log("[MediaLibraryService] Library cache is empty");
+                return;
+            }
+
+            Debug.Log($"[MediaLibraryService] Loading {cache.paths.Count} items from cache...");
+
+            // Rebuild MediaVideoInfo from cached paths
+            AllVideos.Clear();
+            int validCount = 0;
+            foreach (var path in cache.paths)
+            {
+                // Only add if file still exists
+                if (File.Exists(path))
+                {
+                    var info = CreateVideoInfo(path);
+                    AllVideos.Add(info);
+                    validCount++;
+                }
+            }
+
+            AllVideos = AllVideos.OrderBy(v => v.Title).ToList();
+            Debug.Log($"[MediaLibraryService] Loaded {validCount} items from cache ({cache.paths.Count - validCount} missing files)");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[MediaLibraryService] Failed to load library cache: {ex.Message}");
+            AllVideos.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Save library data to cache for faster startup.
+    /// </summary>
+    private void SaveLibraryCache()
+    {
+        try
+        {
+            var paths = AllVideos.Select(v => v.Path).ToList();
+            var cache = new LibraryCacheWrapper { paths = paths };
+            string json = JsonUtility.ToJson(cache);
+            PlayerPrefs.SetString(LIBRARY_CACHE_KEY, json);
+            PlayerPrefs.Save();
+            Debug.Log($"[MediaLibraryService] Saved {paths.Count} items to cache");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[MediaLibraryService] Failed to save library cache: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Clear the library cache (forces rescan on next load).
+    /// </summary>
+    public void ClearLibraryCache()
+    {
+        PlayerPrefs.DeleteKey(LIBRARY_CACHE_KEY);
+        PlayerPrefs.Save();
+        AllVideos.Clear();
+        Debug.Log("[MediaLibraryService] Library cache cleared");
+    }
+    #endregion
+
     #region Sorting
     /// <summary>
     /// Sort videos by property.
@@ -553,6 +650,12 @@ public class MediaLibraryService : MonoBehaviour
     private class StringListWrapper
     {
         public List<string> items = new List<string>();
+    }
+
+    [Serializable]
+    private class LibraryCacheWrapper
+    {
+        public List<string> paths = new List<string>();
     }
     #endregion
 }

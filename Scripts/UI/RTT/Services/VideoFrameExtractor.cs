@@ -3,10 +3,12 @@ using UnityEngine.Video;
 using UnityEngine.Rendering;
 using System;
 using System.Collections;
+using System.Collections.Generic;
 
 /// <summary>
 /// Extracts preview frames from video files using Unity's VideoPlayer.
 /// Can composite frames with overlay icons for video indicators.
+/// Now supports queuing multiple requests - processes one at a time but accepts all.
 /// </summary>
 public class VideoFrameExtractor : MonoBehaviour
 {
@@ -17,6 +19,18 @@ public class VideoFrameExtractor : MonoBehaviour
     private Action<Texture2D> _onComplete;
     private Action _onFailed;
     private float _extractionTimeout = 10f;  // Timeout in seconds
+
+    // Request queue for handling multiple concurrent requests
+    private Queue<ExtractionRequest> _requestQueue = new Queue<ExtractionRequest>();
+
+    private class ExtractionRequest
+    {
+        public string VideoPath;
+        public int FrameWidth;
+        public int FrameHeight;
+        public Action<Texture2D> OnComplete;
+        public Action OnFailed;
+    }
     #endregion
 
     #region Unity Lifecycle
@@ -51,6 +65,11 @@ public class VideoFrameExtractor : MonoBehaviour
 
     private void Cleanup()
     {
+        // Clear pending requests
+        _requestQueue.Clear();
+        _onComplete = null;
+        _onFailed = null;
+
         if (_videoPlayer != null)
         {
             _videoPlayer.prepareCompleted -= OnVideoPrepared;
@@ -65,11 +84,30 @@ public class VideoFrameExtractor : MonoBehaviour
             _renderTexture = null;
         }
     }
+
+    /// <summary>
+    /// Get the number of pending requests in the queue.
+    /// </summary>
+    public int PendingRequestCount => _requestQueue.Count;
+
+    /// <summary>
+    /// Clear all pending requests in the queue.
+    /// </summary>
+    public void ClearPendingRequests()
+    {
+        // Invoke failed callbacks for all pending requests
+        while (_requestQueue.Count > 0)
+        {
+            var request = _requestQueue.Dequeue();
+            request.OnFailed?.Invoke();
+        }
+    }
     #endregion
 
     #region Public API
     /// <summary>
     /// Extract a frame from a video file.
+    /// Requests are queued if extraction is in progress.
     /// </summary>
     /// <param name="videoPath">Path to the video file</param>
     /// <param name="frameWidth">Target frame width</param>
@@ -79,17 +117,39 @@ public class VideoFrameExtractor : MonoBehaviour
     public void ExtractFrame(string videoPath, int frameWidth, int frameHeight,
         Action<Texture2D> onComplete, Action onFailed)
     {
-        if (_isExtracting)
+        var request = new ExtractionRequest
         {
-            Debug.LogWarning("[VideoFrameExtractor] Already extracting a frame, please wait.");
-            onFailed?.Invoke();
+            VideoPath = videoPath,
+            FrameWidth = frameWidth,
+            FrameHeight = frameHeight,
+            OnComplete = onComplete,
+            OnFailed = onFailed
+        };
+
+        _requestQueue.Enqueue(request);
+
+        // If not already extracting, start processing
+        if (!_isExtracting)
+        {
+            TryProcessNextRequest();
+        }
+    }
+
+    /// <summary>
+    /// Process the next request in the queue.
+    /// </summary>
+    private void TryProcessNextRequest()
+    {
+        if (_isExtracting || _requestQueue.Count == 0)
+        {
             return;
         }
 
-        _onComplete = onComplete;
-        _onFailed = onFailed;
+        var request = _requestQueue.Dequeue();
+        _onComplete = request.OnComplete;
+        _onFailed = request.OnFailed;
 
-        StartCoroutine(ExtractFrameCoroutine(videoPath, frameWidth, frameHeight));
+        StartCoroutine(ExtractFrameCoroutine(request.VideoPath, request.FrameWidth, request.FrameHeight));
     }
 
     /// <summary>
@@ -394,6 +454,9 @@ public class VideoFrameExtractor : MonoBehaviour
 
         _onComplete = null;
         _onFailed = null;
+
+        // Process next queued request
+        TryProcessNextRequest();
     }
     #endregion
 
