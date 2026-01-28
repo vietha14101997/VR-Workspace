@@ -27,6 +27,8 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
     public int PageSize { get; private set; } = 6;
     public string SortBy { get; private set; } = "Name";
     public bool IsAscending { get; private set; } = true;
+    public string GroupBy { get; private set; } = "Date Added";
+    public List<MediaGroupInfo> Groups => _groups;
     #endregion
 
     #region Private Fields
@@ -34,6 +36,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
     private MediaLibraryService _libraryService;
     private List<MediaVideoInfo> _allVideos = new List<MediaVideoInfo>();
     private List<MediaVideoInfo> _filteredVideos = new List<MediaVideoInfo>();
+    private List<MediaGroupInfo> _groups = new List<MediaGroupInfo>();  // Grouped items for display
     private bool _isInitialized = false;
     private bool _isFirstLoad = true; // Use sync filtering for first load to ensure immediate display
     private bool _waitingForInitialBinding = false; // Track if we're waiting for grid binding before starting scan
@@ -408,7 +411,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
         {
             SortBy = sortBy;
             ApplySort();
-            CurrentPage = 1; // Reset to first page
+            CurrentPage = 1;
             RefreshView();
             Debug.Log($"[RTTMediaLibraryController] Sort by: {SortBy}");
         }
@@ -429,9 +432,33 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
         }
     }
 
+    /// <summary>
+    /// Set group by field.
+    /// </summary>
+    public void SetGroupBy(string groupBy)
+    {
+        if (GroupBy != groupBy)
+        {
+            GroupBy = groupBy;
+            ApplyGrouping();
+            CurrentPage = 1;
+            RefreshView();
+            Debug.Log($"[RTTMediaLibraryController] Group by: {GroupBy}");
+        }
+    }
+
     private void RecalculatePagination()
     {
-        TotalPages = Mathf.Max(1, Mathf.CeilToInt((float)_filteredVideos.Count / PageSize));
+        // Get TotalPages from grid which now uses group-aware pagination
+        if (_view?.Grid != null)
+        {
+            TotalPages = _view.Grid.TotalPages;
+        }
+        else
+        {
+            // Fallback to simple calculation if grid not available
+            TotalPages = Mathf.Max(1, Mathf.CeilToInt((float)_filteredVideos.Count / PageSize));
+        }
         CurrentPage = Mathf.Clamp(CurrentPage, 1, TotalPages);
     }
 
@@ -467,9 +494,95 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
         }
     }
 
+    /// <summary>
+    /// Apply grouping to cluster items by selected field.
+    /// This re-sorts items to group them visually.
+    /// </summary>
+    private void ApplyGrouping()
+    {
+        if (string.IsNullOrEmpty(GroupBy))
+        {
+            GroupBy = "Date Added";  // Default
+        }
+
+        // Group by sorting to cluster items visually
+        switch (GroupBy.ToLower().Replace(" ", ""))
+        {
+            case "dateadded":
+                // Group by date, most recent first
+                _filteredVideos.Sort((a, b) =>
+                {
+                    int dateCompare = b.DateAdded.Date.CompareTo(a.DateAdded.Date);
+                    if (dateCompare != 0) return dateCompare;
+                    return VietnameseComparer.Compare(a.Title, b.Title);
+                });
+                break;
+
+            case "duration":
+                // Group by duration category (Short <5m, Medium 5-20m, Long 20-60m, Extended >60m)
+                _filteredVideos.Sort((a, b) =>
+                {
+                    int catA = GetDurationCategory(a.Duration);
+                    int catB = GetDurationCategory(b.Duration);
+                    int catCompare = catA.CompareTo(catB);
+                    if (catCompare != 0) return catCompare;
+                    return a.Duration.CompareTo(b.Duration);
+                });
+                break;
+
+            case "resolution":
+                // Group by resolution (4K, 1440p, 1080p, 720p, SD)
+                _filteredVideos.Sort((a, b) =>
+                {
+                    int resA = GetResolutionCategory(a.Height);
+                    int resB = GetResolutionCategory(b.Height);
+                    int resCompare = resB.CompareTo(resA);  // Higher resolution first
+                    if (resCompare != 0) return resCompare;
+                    return VietnameseComparer.Compare(a.Title, b.Title);
+                });
+                break;
+
+            case "format":
+                // Group by video format/extension
+                _filteredVideos.Sort((a, b) =>
+                {
+                    string extA = System.IO.Path.GetExtension(a.Path)?.ToLower() ?? "";
+                    string extB = System.IO.Path.GetExtension(b.Path)?.ToLower() ?? "";
+                    int extCompare = extA.CompareTo(extB);
+                    if (extCompare != 0) return extCompare;
+                    return VietnameseComparer.Compare(a.Title, b.Title);
+                });
+                break;
+        }
+
+        // Generate group info for display
+        _groups = MediaGroupHelper.CreateGroups(_filteredVideos, GroupBy);
+        Debug.Log($"[RTTMediaLibraryController] Created {_groups.Count} groups for {_filteredVideos.Count} items");
+    }
+
+    private int GetDurationCategory(TimeSpan duration)
+    {
+        double minutes = duration.TotalMinutes;
+        if (minutes < 5) return 0;       // Short
+        if (minutes < 20) return 1;      // Medium
+        if (minutes < 60) return 2;      // Long
+        return 3;                         // Extended
+    }
+
+    private int GetResolutionCategory(int height)
+    {
+        if (height >= 2160) return 4;    // 4K
+        if (height >= 1440) return 3;    // 1440p
+        if (height >= 1080) return 2;    // 1080p
+        if (height >= 720) return 1;     // 720p
+        return 0;                         // SD
+    }
+
     private void RefreshView()
     {
-        _view?.SetVideos(_filteredVideos);
+        _view?.SetVideos(_filteredVideos, _groups);
+        // Update pagination after SetVideos (grid computes TotalPages)
+        RecalculatePagination();
         _view?.UpdatePagination();
     }
     #endregion
@@ -523,7 +636,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
         // Apply sort
         ApplySort();
 
-        // Recalculate pagination and update view
+        // Finalize and update view
         FinalizeAndUpdateView();
     }
 
@@ -566,7 +679,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
         // Apply sort
         ApplySort();
 
-        // Recalculate pagination and update view
+        // Finalize and update view
         FinalizeAndUpdateView();
 
         _filterCoroutine = null;
@@ -670,13 +783,16 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
     /// </summary>
     private void FinalizeAndUpdateView()
     {
-        // Recalculate pagination
+        // Apply grouping to generate group headers
+        ApplyGrouping();
+
+        // Update view with groups (grid calculates page layout internally)
+        _view?.SetVideos(_filteredVideos, _groups);
+
+        // Recalculate pagination AFTER SetVideos (grid now has computed TotalPages)
         RecalculatePagination();
 
-        // Update view
-        _view?.SetVideos(_filteredVideos);
-
-        Debug.Log($"[RTTMediaLibraryController] Showing {_filteredVideos.Count} videos (Category: {CurrentCategory}, Search: '{CurrentSearchQuery}', Page: {CurrentPage}/{TotalPages})");
+        Debug.Log($"[RTTMediaLibraryController] Showing {_filteredVideos.Count} videos in {_groups.Count} groups (Category: {CurrentCategory}, Search: '{CurrentSearchQuery}', Page: {CurrentPage}/{TotalPages})");
     }
 
     /// <summary>

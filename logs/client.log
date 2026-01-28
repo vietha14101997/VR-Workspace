@@ -1,0 +1,329 @@
+[MainThreadDispatcher] Initialized on thread 1
+
+[APBootstrap] AndroidStreamingHelper initialized
+
+[APBootstrap] AppPermissionManager initialized
+
+Starting camera passthrough
+
+Found 1 camera devices
+
+Camera 0: Twitch Virtual Cam (front facing: True)
+
+Starting webcam texture: Twitch Virtual Cam at 1280x720
+
+[AndroidHelper] App resumed
+
+[RTTMenu] Created main frame
+
+[RTTBootstrapper] Created RTTMenu with RTTMenuFrame_main
+
+[RTTBootstrapper] RTTMenu oriented towards camera
+
+[RTTToolbar] Created
+
+[RTTTaskbar] Icons loaded - Quit:True, Settings:True, Eye:True, EyeClose:True, Recenter:True, Home:True
+
+[RTTToolbar] Initialized with taskbar. Size: 0.913x0.331m, followTarget: RTTMenu
+
+[RTTBootstrapper] Created RTTTaskbar in RTTToolbar, following RTTMenu
+
+[RTTBootstrapper] RTTManager found, UI will be auto-detected
+
+[VirtualObjectsZoomController] Configured: min=1m, max=2m, default=1.8m, step=0.1m
+
+[VirtualObjectsZoomController] Initialized. Already at default distance: 1.80m
+
+[RTTBootstrapper] Created VirtualObjectsZoomController (range: 1m - 2m, default: 1.8m)
+
+[RTTBootstrapper] Initialization complete
+
+[RTTRaycastManager] Auto-initialized layer mask to VirtualObjects (layer 3)
+
+[RTTMenuFrame] UI built: 1920x1080 logical pixels
+
+[RTTMiniFrame] UI built: 1095.5x128 pixels
+
+[RTTMainMenuController] Icons loaded - Remote:True, Browser:True, Media:True, Files:False
+
+[HoverEffectController] AddEffect 'glow_border' to HitArea, TargetVisuals=Visuals
+
+[GlowBorderHoverEffect] Initialized successfully on HitArea, material=Custom/GlowingElementBorder
+
+[HoverEffectController] AddEffect 'background' to HitArea, TargetVisuals=Visuals
+
+[HoverEffectController] AddEffect 'scale' to HitArea, TargetVisuals=Visuals
+
+[HoverEffectController] AddEffect 'z_pop' to HitArea, TargetVisuals=Visuals
+
+[RTTMainMenu] Built 6 items in 3x2 grid
+
+[RTTMainMenuController] Main Menu created (useRegistry=True, itemCount=6)
+
+[RTTManager] Main Menu initialized (persistent, cannot be closed)
+
+Restarting webcam texture as it was not playing
+
+Stopping camera passthrough
+
+Destroying webcam texture
+
+Webcam texture was destroyed during initialization
+UnityEngine.Debug:LogWarning (object)
+CameraPassthrough/<EnsureTextureStarted>d__11:MoveNext () (at Assets/VR-Workspace/Scripts/Camera/CameraPassthrough.cs:171)
+UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
+
+[RTTManager] Instant recenter: moved 2 objects to face camera
+
+[VirtualObjectsZoomController] Recenter: distance recalculated to 1.80m
+
+[RTTManager] Auto-recenter completed
+
+[RTTMenu] Created app frame: media
+
+[RTTManager] Preparing app: media in slot 1
+
+[RTTManager] Creating Media content...
+
+[VRVideoProjectionSystem] Created FlatProjectionRenderer
+
+[VRVideoProjectionSystem] Initialized
+
+[MediaLibraryService] Loading 1295 items from cache...
+
+[MediaLibraryService] Loaded 1295 items from cache (0 missing files)
+
+[RTTMediaLibraryController] Initialized, libraryService=OK
+
+[RTTMediaLibrary] Building UI...
+
+[VirtualObjectsZoomController] Registered side panel: MediaNavigationPanel (side=-1, mainW=1.6, sideW=0.5333334, gap=0.05)
+
+[RTTMediaLibrary] Placed MediaNavigationPanel: pos=(-0.81, 1000.00, 1.80)
+
+[RTTMenuFrame] UI built: 640x1080 logical pixels
+
+[HoverEffectController] AddEffect 'scale' to Item_all, TargetVisuals=Item_all
+
+[HoverEffectController] AddEffect 'color' to Item_all, TargetVisuals=Item_all
+
+[HoverEffectController] AddEffect 'scale' to Item_videos, TargetVisuals=Item_videos
+
+[HoverEffectController] AddEffect 'color' to Item_videos, TargetVisuals=Item_videos
+
+[HoverEffectController] AddEffect 'scale' to Item_images, TargetVisuals=Item_images
+
+[HoverEffectController] AddEffect 'color' to Item_images, TargetVisuals=Item_images
+
+[HoverEffectController] AddEffect 'scale' to Item_audio, TargetVisuals=Item_audio
+
+[HoverEffectController] AddEffect 'color' to Item_audio, TargetVisuals=Item_audio
+
+[HoverEffectController] AddEffect 'scale' to Item_recent, TargetVisuals=Item_recent
+
+[HoverEffectController] AddEffect 'color' to Item_recent, TargetVisuals=Item_recent
+
+[HoverEffectController] AddEffect 'scale' to Item_favorites, TargetVisuals=Item_favorites
+
+[HoverEffectController] AddEffect 'color' to Item_favorites, TargetVisuals=Item_favorites
+
+[HoverEffectController] AddEffect 'scale' to Item_playlists, TargetVisuals=Item_playlists
+
+[HoverEffectController] AddEffect 'color' to Item_playlists, TargetVisuals=Item_playlists
+
+[RTTMediaLibrary] Left panel content created
+
+[VirtualObjectsZoomController] Registered side panel: MediaDetailPanel (side=1, mainW=1.6, sideW=0.5333334, gap=0.05)
+
+[RTTMediaLibrary] Placed MediaDetailPanel: pos=(1.31, 1000.00, 1.47)
+
+[HoverEffectController] AddEffect 'scale' to PlayButton, TargetVisuals=PlayButton
+
+[HoverEffectController] AddEffect 'scale' to Btn_Favorite, TargetVisuals=Btn_Favorite
+
+[HoverEffectController] AddEffect 'scale' to Btn_+ Playlist, TargetVisuals=Btn_+ Playlist
+
+[RTTMediaLibrary] Right panel content created
+
+[RTTPopupMenu] CreateWorldSpace: layer 'VirtualObjects' = 3, mainCam: VRCamera
+
+[RTTPopupMenu] Created world-space popup
+
+[HoverEffectController] AddEffect 'cursor_change' to HitArea, TargetVisuals=Visuals
+
+[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-590450
+
+[HoverEffectController] AddEffect 'scale' to Btn_Rename, TargetVisuals=Btn_Rename
+
+[HoverEffectController] AddEffect 'scale' to Btn_Delete, TargetVisuals=Btn_Delete
+
+[RTTMediaLibrary] After CreateHeaderRows: _headerRT=True, _breadcrumbContainer=True
+
+[RTTMediaGrid] CalculateGridMetrics: width=1770, height=748.1688, columnsPerRow=4, rowHeight=350, visibleRowCount=4, cellSize=395x320
+
+[HoverEffectController] AddEffect 'scale' to PooledItem, TargetVisuals=PooledItem
+
+[HoverEffectController] AddEffect 'scale' to Checkbox, TargetVisuals=Checkbox
+
+[RTTMediaLibrary] Creating 2 breadcrumb segments for: All Media > Videos
+
+[RTTMediaLibrary] Created 2 breadcrumb pills for path: All Media > Videos
+
+[RTTMediaLibraryController] View ready, loading data...
+
+[RTTMediaLibraryController] Waiting for 1295 cached items to bind before scanning...
+
+[RTTMediaLibraryController] RefreshLibrary called, _libraryService=OK
+
+[RTTMediaLibraryController] GetAllVideos returned 1295 items, IsScanning=False
+
+[RTTMediaLibraryController] Using cached data: 1295 items
+
+[RTTMediaLibraryController] Created 13 groups for 13 items
+
+[RTTMediaGrid] SetData: 13 items, 13 groups, columnsPerRow=4, visibleRowCount=4, gridHeight=748.1688, rowHeight=350
+
+[RTTMediaGrid] UpdateVisibleItems (ALL): indices=0-12, total=13
+
+[RTTMediaGrid] Queuing 13 NEW items for binding (total pending=13)
+
+[RTTMediaGrid] ProgressiveBindCoroutine started, pending=13, bindsPerFrame=50
+
+[RTTMediaGrid] BindItemAtIndex: index=0, title=videoplayback, col=0, pos=(248,-270)
+
+[Cache] DISK READ: 0ms (206KB)
+
+[Cache] DISK DECODE: 3ms (512x288)
+
+[Thumb] DISK HIT: videoplayback.mp4 size=512 skip=False
+
+[RTTMediaGrid] BindItemAtIndex: index=1, title=Genshin-Impact 2026-1-26 12-24-11, col=0, pos=(248,-710)
+
+[Cache] DISK READ: 0ms (279KB)
+
+[Cache] DISK DECODE: 5ms (512x288)
+
+[Thumb] DISK HIT: Genshin-Impact 2026-1-26 12-24-11.mp4 size=512 skip=False
+
+[RTTMediaGrid] BindItemAtIndex: index=2, title=video_client, col=0, pos=(248,-1150)
+
+[Cache] DISK READ: 0ms (115KB)
+
+[Cache] DISK DECODE: 2ms (512x230)
+
+[Thumb] DISK HIT: video_client.mp4 size=512 skip=False
+
+[RTTMediaGrid] BindItemAtIndex: index=3, title=Phàm Nhân Tu Tiên Tập 173 Vietsub, col=0, pos=(248,-1590)
+
+[Cache] DISK READ: 0ms (18KB)
+
+[Cache] DISK DECODE: 0ms (512x288)
+
+[Thumb] DISK HIT: Phàm Nhân Tu Tiên Tập 173 Vietsub.mp4 size=512 skip=False
+
+[RTTMediaGrid] BindItemAtIndex: index=4, title=7295785205012, col=0, pos=(248,-2030)
+
+[Cache] DISK READ: 0ms (119KB)
+
+[Thumb] DISK HIT: 7295785205012.mp4 size=512 skip=False
+
+[RTTMediaGrid] BindItemAtIndex: index=5, title=7077543476647, col=0, pos=(248,-2470)
+
+[Cache] DISK READ: 0ms (242KB)
+
+[Cache] DISK DECODE: 4ms (512x230)
+
+[Thumb] DISK HIT: 7077543476647.mp4 size=512 skip=False
+
+[RTTMediaGrid] BindItemAtIndex: index=6, title=7065774217733, col=0, pos=(248,-2910)
+
+[Cache] DISK READ: 0ms (80KB)
+
+[Cache] DISK DECODE: 2ms (512x238)
+
+[Thumb] DISK HIT: 7065774217733.mp4 size=512 skip=False
+
+[RTTMediaGrid] BindItemAtIndex: index=7, title=Genshin_Impact_2025-09-10_11-32-27, col=0, pos=(248,-3350)
+
+[Cache] DISK READ: 0ms (227KB)
+
+[Cache] DISK DECODE: 4ms (512x288)
+
+[Thumb] DISK HIT: Genshin_Impact_2025-09-10_11-32-27.mp4 size=512 skip=False
+
+[RTTMediaGrid] BindItemAtIndex: index=8, title=FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD), col=0, pos=(248,-3790)
+
+[Cache] DISK READ: 0ms (148KB)
+
+[Thumb] DISK HIT: FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD).mp4 size=512 skip=False
+
+[RTTMediaGrid] BindItemAtIndex: index=9, title=Honkai  Star Rail 2025.05.21 - 15.03.08.01, col=0, pos=(248,-4230)
+
+[Cache] DISK READ: 0ms (172KB)
+
+[Thumb] DISK HIT: Honkai  Star Rail 2025.05.21 - 15.03.08.01.mp4 size=512 skip=False
+
+[RTTMediaGrid] BindItemAtIndex: index=10, title=khác màu, col=0, pos=(248,-4670)
+
+[Cache] DISK READ: 0ms (38KB)
+
+[Cache] DISK DECODE: 1ms (512x288)
+
+[Thumb] DISK HIT: khác màu.mp4 size=512 skip=False
+
+[RTTMediaGrid] BindItemAtIndex: index=11, title=vết xước 2, col=0, pos=(248,-5110)
+
+[Cache] DISK READ: 0ms (48KB)
+
+[Thumb] DISK HIT: vết xước 2.mp4 size=512 skip=False
+
+[RTTMediaGrid] BindItemAtIndex: index=12, title=vết xước 1, col=0, pos=(248,-5550)
+
+[Cache] DISK READ: 0ms (97KB)
+
+[Cache] DISK DECODE: 2ms (512x284)
+
+[Thumb] DISK HIT: vết xước 1.mp4 size=512 skip=False
+
+[RTTMediaLibraryController] Showing 13 videos in 13 groups (Category: videos, Search: '')
+
+[RTTMediaLibrary] Center grid created
+
+[VRMediaAppController] Library UI built
+
+[VRMediaAppController] Media app created
+
+[RTTMediaGrid] ProgressiveBindCoroutine complete: bound=13, skipped=0, visibleItems=13, totalItems=13
+
+[RTTMediaLibraryController] Initial binding complete, starting background scan...
+
+[MediaLibraryService] Starting background scan (existing: 1295 items)
+
+[MediaLibraryService] Background scan complete - no new items (136ms)
+
+[RTTManager] App media prepared
+
+[RTTTaskbar] RegisterApp called - slotIndex=1, icon=icon_media
+
+[RTTTaskbar] SetSlotIcon - slot=AppBtn_AppSlot_1, icon=icon_media, slotIndex=1
+
+[RTTTaskbar] SetSlotIcon - removed 0 old children
+
+[RTTTaskbar] SetSlotIcon - created iconBtn=Btn_icon_media, slot.childCount now=1
+
+[RTTTaskbar] Registered app slot 1, total apps: 1
+
+[RTTTaskbar] SelectSlot(1) called, current active: 0
+
+[RTTTaskbar] Selected app with slot index 1
+
+[RTTTaskbar] SelectSlot(1) called, current active: 1
+
+[VirtualObjectsZoomController] Zoom set to 1.90m (delta: 0.100m)
+
+[VirtualObjectsZoomController] Zoom set to 2.00m (delta: 0.100m)
+
+[VirtualObjectsZoomController] Zoom set to 1.90m (delta: -0.100m)
+
+[VirtualObjectsZoomController] Zoom set to 1.80m (delta: -0.100m)
+

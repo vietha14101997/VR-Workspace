@@ -97,6 +97,12 @@ public class RTTMediaLibrary : MonoBehaviour
 
     private float _sortTriggerWidth = 220f;
 
+    // Group By Options
+    private RTTPopupMenu _groupOptionsPopup;
+    private string _currentGroupBy = "Date Added";
+    private Image _groupArrowImg;
+    private TextMeshProUGUI _groupTriggerText;
+
     // Side Panel Gap
     private const float SIDE_PANEL_GAP = 0.05f;
     #endregion
@@ -150,6 +156,9 @@ public class RTTMediaLibrary : MonoBehaviour
 
         if (_viewOptionsPopup != null) Destroy(_viewOptionsPopup.gameObject);
         _viewOptionsPopup = null;
+
+        if (_groupOptionsPopup != null) Destroy(_groupOptionsPopup.gameObject);
+        _groupOptionsPopup = null;
     }
 
     private void OnEnable()
@@ -168,6 +177,7 @@ public class RTTMediaLibrary : MonoBehaviour
         if (_pagination != null) _pagination.Hide();
 
         if (_viewOptionsPopup != null) _viewOptionsPopup.Hide();
+        if (_groupOptionsPopup != null) _groupOptionsPopup.Hide();
     }
 
     private void OnDestroy()
@@ -557,6 +567,54 @@ public class RTTMediaLibrary : MonoBehaviour
         sortRT.anchoredPosition = new Vector2(gapCenterFromCenter, 0);
 
         CreateViewOptionsPopup(sortRT);
+
+        // Group By Trigger Button (symmetric to sortTrigger on right side of search bar)
+        var groupConfig = new VRButtonFactory.ButtonConfig
+        {
+            label = _currentGroupBy,
+            themeColor = _primaryColor,
+            width = _sortTriggerWidth,
+            height = 75f,
+            fontSize = 26,
+            font = _font,
+            textOnly = true,
+            borderWidth = 0.04f,
+            glowWidth = 0.08f,
+            glowIntensity = 4f,
+            popAmount = 0.05f
+        };
+        GameObject groupTrigger = VRButtonFactory.CreateButton(rowRT, groupConfig, ToggleGroupOptionsPopup);
+
+        _groupTriggerText = groupTrigger.GetComponentInChildren<TextMeshProUGUI>();
+        if (_groupTriggerText != null)
+        {
+            _groupTriggerText.alignment = TextAlignmentOptions.Center;
+            _groupTriggerText.margin = Vector4.zero;
+        }
+
+        // Arrow Icon for Group Trigger
+        GameObject groupIconObj = new GameObject("ArrowIcon");
+        groupIconObj.transform.SetParent(groupTrigger.transform, false);
+        _groupArrowImg = groupIconObj.AddComponent<Image>();
+        _groupArrowImg.sprite = arrowIcon;
+        _groupArrowImg.color = Color.white;
+        _groupArrowImg.raycastTarget = false;
+
+        RectTransform groupIconRT = groupIconObj.GetComponent<RectTransform>();
+        groupIconRT.anchorMin = new Vector2(1, 0.5f);
+        groupIconRT.anchorMax = new Vector2(1, 0.5f);
+        groupIconRT.pivot = new Vector2(0.5f, 0.5f);
+        groupIconRT.sizeDelta = new Vector2(18f, 18f);
+        groupIconRT.anchoredPosition = new Vector2(-36f, 0);
+
+        RectTransform groupRT = groupTrigger.GetComponent<RectTransform>();
+        float groupCenterFromCenter = _containerWidth / 4f + 203.5f;  // Symmetric to sortTrigger (positive X)
+        groupRT.anchorMin = new Vector2(0.5f, 0.5f);
+        groupRT.anchorMax = new Vector2(0.5f, 0.5f);
+        groupRT.pivot = new Vector2(0.5f, 0.5f);
+        groupRT.anchoredPosition = new Vector2(groupCenterFromCenter, 0);
+
+        CreateGroupOptionsPopup(groupRT);
 
         // Right: Edit Button
         _originalEditIcon = Resources.Load<Sprite>("icon_edit");
@@ -1134,14 +1192,111 @@ public class RTTMediaLibrary : MonoBehaviour
         _controller?.SetAscending(ascending);
         _viewOptionsPopup?.Hide();
     }
+
+    // ===== GROUP BY POPUP =====
+
+    private void ToggleGroupOptionsPopup()
+    {
+        if (_groupOptionsPopup == null) return;
+
+        if (_groupOptionsPopup.IsVisible)
+        {
+            _groupOptionsPopup.Hide();
+        }
+        else
+        {
+            BuildGroupOptionsPopupContent();
+            _groupOptionsPopup.Show();
+        }
+        UpdateGroupArrow();
+    }
+
+    private void OnGroupOptionsPopupHide()
+    {
+        UpdateGroupArrow();
+    }
+
+    private void UpdateGroupArrow()
+    {
+        if (_groupArrowImg != null)
+        {
+            float targetZ = (_groupOptionsPopup != null && _groupOptionsPopup.IsVisible) ? 180f : 0f;
+            _groupArrowImg.rectTransform.localEulerAngles = new Vector3(0, 0, targetZ);
+        }
+    }
+
+    private void CreateGroupOptionsPopup(Transform parent)
+    {
+        var config = new RTTPopupMenu.PopupConfig
+        {
+            width = _sortTriggerWidth * 2.5f,
+            buttonHeight = 75f,
+            sideSpacing = 35f,
+            rowSpacing = 11f,
+            fontSize = 24,
+            iconSize = 26f,
+            primaryColor = _primaryColor,
+            accentColor = _accentColor,
+            overlayColor = new Color(0f, 0f, 0f, 0.4f),
+            font = _font,
+            layerName = "VirtualObjects"
+        };
+
+        _groupOptionsPopup = RTTPopupMenu.CreateWorldSpace(config, _menuFrame.transform);
+        _groupOptionsPopup.OnHide += OnGroupOptionsPopupHide;
+
+        BuildGroupOptionsPopupContent();
+
+        // Position offset calculation (mirror of ViewOptionsPopup - align to right side)
+        float popupWidth = config.width;
+        float groupTriggerCenterX = _containerWidth / 4f + 203.5f;
+        float groupTriggerRightX = groupTriggerCenterX + (_sortTriggerWidth / 2f);
+        float offsetX = groupTriggerRightX - (popupWidth / 2f) - 130f;
+
+        float headerHeight = 200f;
+        float gapFromButton = 15f;
+        float estimatedPopupHeight = 300f;
+        float offsetY = (_containerHeight / 2f) - headerHeight - gapFromButton - (estimatedPopupHeight / 2f);
+
+        _groupOptionsPopup.SetPositionOffset(new Vector2(offsetX, offsetY));
+    }
+
+    private void BuildGroupOptionsPopupContent()
+    {
+        if (_groupOptionsPopup == null) return;
+
+        _groupOptionsPopup.Clear();
+
+        // GROUP BY options (2 columns, 4 options) - removed None and Folder
+        string[] groupOptions = { "Date Added", "Duration", "Resolution", "Format" };
+        var groupButtons = new System.Collections.Generic.List<RTTPopupMenu.ButtonData>();
+
+        foreach (string option in groupOptions)
+        {
+            bool isSelected = (_currentGroupBy == option);
+            string capturedOption = option;
+            groupButtons.Add(new RTTPopupMenu.ButtonData(option, () => SetGroupBy(capturedOption), null, isSelected));
+        }
+        _groupOptionsPopup.AddSectionBlock("GROUP BY", groupButtons, 2);
+
+        _groupOptionsPopup.Build();
+    }
+
+    private void SetGroupBy(string groupBy)
+    {
+        _currentGroupBy = groupBy;
+        if (_groupTriggerText != null) _groupTriggerText.text = groupBy;
+        _controller?.SetGroupBy(groupBy);
+        _groupOptionsPopup?.Hide();
+    }
     #endregion
 
     #region Public Methods
-    public void SetVideos(List<MediaVideoInfo> videos)
+    public void SetVideos(List<MediaVideoInfo> videos, List<MediaGroupInfo> groups = null)
     {
         if (_grid != null)
         {
-            _grid.SetData(videos);
+            _grid.SetData(videos, groups);
         }
         int count = videos?.Count ?? 0;
         UpdateItemCount(count);

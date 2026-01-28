@@ -148,18 +148,22 @@ public struct MediaVideoInfo
             Path = path,
             Title = System.IO.Path.GetFileNameWithoutExtension(path),
             Format = DetectFormat(path),
-            DateAdded = DateTime.Now,
             PlaylistIds = new List<string>()
         };
 
-        // Get file info
+        // Get file info from metadata
         try
         {
             var fileInfo = new FileInfo(path);
             info.FileSizeBytes = fileInfo.Length;
             info.DateModified = fileInfo.LastWriteTime;
+            // Use file creation time as DateAdded (when file was added to system)
+            info.DateAdded = fileInfo.CreationTime;
         }
-        catch { }
+        catch
+        {
+            info.DateAdded = DateTime.Now;
+        }
 
         return info;
     }
