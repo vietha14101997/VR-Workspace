@@ -333,12 +333,16 @@ public class RTTMediaSidePanel : MonoBehaviour
             if (item.Icon != null)
                 item.Icon.color = isSelected ? Color.white : new Color(1f, 1f, 1f, 0.7f);
 
-            // Disable button and hover for selected item (no interaction needed)
+            // Disable button for selected item (no interaction needed)
             if (item.Button != null)
                 item.Button.interactable = !isSelected;
 
+            // Keep hover effect active for selected item
             if (item.HoverController != null)
-                item.HoverController.enabled = !isSelected;
+            {
+                item.HoverController.enabled = true;
+                item.HoverController.SetForceHover(isSelected);
+            }
 
             if (isSelected) _selectedItem = item;
         }
@@ -376,12 +380,15 @@ public class RTTMediaSidePanel : MonoBehaviour
             if (item.Icon != null)
                 item.Icon.color = new Color(1f, 1f, 1f, 0.7f);
 
-            // Re-enable button and hover for all items
+            // Re-enable button and reset hover for all items
             if (item.Button != null)
                 item.Button.interactable = true;
 
             if (item.HoverController != null)
+            {
                 item.HoverController.enabled = true;
+                item.HoverController.SetForceHover(false);
+            }
         }
         _selectedItem = null;
     }
