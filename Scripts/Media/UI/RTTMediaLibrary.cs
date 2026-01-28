@@ -32,7 +32,7 @@ public class RTTMediaLibrary : MonoBehaviour
     private RTTMenuFrame _rightFrame;
 
     private RTTMediaSidePanel _sidePanel;
-    private RTTMediaGrid2 _grid;
+    private RTTMediaGrid _grid;
     private RTTMediaDetail _detailPanel;
     private RTTFilePagination _pagination;
 
@@ -67,7 +67,7 @@ public class RTTMediaLibrary : MonoBehaviour
 
     #region Properties
     public RTTMediaSidePanel SidePanel => _sidePanel;
-    public RTTMediaGrid2 Grid => _grid;
+    public RTTMediaGrid Grid => _grid;
     public RTTMediaDetail DetailPanel => _detailPanel;
     #endregion
 
@@ -448,7 +448,7 @@ public class RTTMediaLibrary : MonoBehaviour
         gridRT.offsetMin = Vector2.zero;
         gridRT.offsetMax = Vector2.zero;
 
-        _grid = gridObj.AddComponent<RTTMediaGrid2>();
+        _grid = gridObj.AddComponent<RTTMediaGrid>();
         float bodyHeight = panelHeight - _headerHeight2Rows - bottomPadding;
         _grid.Initialize(_controller, contentSize.x, bodyHeight, _font, _primaryColor, _accentColor);
 

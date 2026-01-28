@@ -1,492 +1,650 @@
 using UnityEngine;
 using UnityEngine.UI;
-using System;
+using UnityEngine.EventSystems;
 using TMPro;
+using System;
 using VRWorkspace.UI.HoverEffects;
 
 /// <summary>
-/// Grid item component for displaying a video in the media library.
-/// Shows thumbnail, duration badge, resolution badge, title, and subtitle.
-/// Design based on RTTFileGridItem with glass background styling.
+/// Represents a single video item in the Media Library Grid View.
+/// Cloned from RTTFileGridItem with modifications for video display:
+/// - Thumbnail with duration badge (top-left)
+/// - Resolution badge (bottom-right)
+/// - Title and subtitle text
 /// </summary>
-public class RTTMediaGridItem : MonoBehaviour
+public class RTTMediaGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
 {
     #region Constants
-    public const float ITEM_WIDTH = 395f;
-    public const float ITEM_HEIGHT = 320f;
-    public const float THUMBNAIL_HEIGHT = 222f;  // 16:9 aspect
-    public const float TITLE_HEIGHT = 98f;
-    public const float CORNER_RADIUS = 20f;
-    public const float CARD_PADDING = 12f;
-    #endregion
+    // Card dimensions - synced with RTTFileGrid (395x320)
+    public const float CELL_WIDTH = 395f;
+    public const float CELL_HEIGHT = 320f;
+    public const float THUMBNAIL_HEIGHT = 222f;  // 395 / 1.777 = 222 (16:9 aspect ratio)
+    private const float TEXT_HEIGHT = 94f;       // Title area (320 - 222 - 4 gap)
 
-    #region Events
-    public event Action<MediaVideoInfo> OnClicked;
-    public event Action<MediaVideoInfo> OnDoubleClicked;
-    public event Action<MediaVideoInfo> OnSelected;
-    #endregion
-
-    #region Properties
-    public MediaVideoInfo VideoInfo { get; private set; }
-    public bool IsSelected { get; private set; }
+    private const int THUMBNAIL_SIZE = 512;
+    private const float HOVER_SCALE = 1.03f;
+    private const float HOVER_ANIMATION_SPEED = 12f;
+    private const float DOUBLE_CLICK_TIME = 0.3f;
     #endregion
 
     #region Private Fields
-    private Image _cardBackground;
+    // UI Elements
     private Image _thumbnailImage;
-    private Image _thumbnailBackground;
-    private TextMeshProUGUI _durationText;
-    private GameObject _durationBadge;
-    private TextMeshProUGUI _resolutionText;
-    private GameObject _resolutionBadge;
+    private RectTransform _thumbnailRect;
+    private RectTransform _thumbnailContainerRect;
     private TextMeshProUGUI _titleText;
-    private TextMeshProUGUI _subtitleText;
-    private Image _selectionBorder;
-    private GameObject _checkbox;
-    private Image _checkmark;
-    private Image _favoriteIcon;
+    private Image _bgImage;
 
+    // Duration Badge (bottom-right of thumbnail)
+    private GameObject _durationBadge;
+    private TextMeshProUGUI _durationText;
+
+    // Resolution Badge (bottom-right of thumbnail, left of duration)
+    private GameObject _resolutionBadge;
+    private TextMeshProUGUI _resolutionText;
+
+    // Favorite Icon (top-right of thumbnail)
+    private GameObject _favoriteIcon;
+
+    // Edit Mode Checkbox
+    private GameObject _checkbox;
+    private Image _checkmarkIcon;
+    private HoverEffectController _checkboxHoverController;
+    private bool _isSelected = false;
+    private bool _isEditMode = false;
+    private Action<string, bool> _onSelectionChanged;
+
+    // Hover effect
+    private HoverEffectController _hoverController;
+
+    // Font and colors
     private TMP_FontAsset _font;
     private Color _primaryColor;
     private Color _accentColor;
 
+    // Current data
+    private MediaVideoInfo _currentVideo;
+    private string _currentFilePath;
+
+    // Double click detection
     private float _lastClickTime;
-    private const float DOUBLE_CLICK_TIME = 0.3f;
+    #endregion
 
-    private HoverEffectController _hoverController;
+    #region Properties
+    public string FilePath => _currentVideo.Path;
+    public MediaVideoInfo VideoInfo => _currentVideo;
+    public bool IsSelected => _isSelected;
+    #endregion
 
-    // Cached rounded rect sprite
-    private static Sprite _cachedRoundedSprite;
-    private static Sprite _cachedBadgeSprite;
+    #region Callbacks
+    private Action<string> _onHoverEnter;
+    private Action<string> _onHoverExit;
+    private Action<MediaVideoInfo> _onClick;
+    private Action<MediaVideoInfo> _onDoubleClick;
+    #endregion
+
+    #region Visual State
+    private static readonly Color HoverColor = new Color(0f, 0f, 0f, 0.3f);
+    private static readonly Color NormalColor = Color.clear;
     #endregion
 
     #region Initialization
-    public void Initialize(TMP_FontAsset font, Color primary, Color accent)
+    public void Initialize(TMP_FontAsset font, Color primaryColor, Color accentColor)
     {
         _font = font;
-        _primaryColor = primary;
-        _accentColor = accent;
-
+        _primaryColor = primaryColor;
+        _accentColor = accentColor;
         BuildUI();
     }
 
+    public void SetCallbacks(Action<string> onHoverEnter, Action<string> onHoverExit,
+        Action<MediaVideoInfo> onClick, Action<MediaVideoInfo> onDoubleClick)
+    {
+        _onHoverEnter = onHoverEnter;
+        _onHoverExit = onHoverExit;
+        _onClick = onClick;
+        _onDoubleClick = onDoubleClick;
+    }
+
+    public void SetSelectionCallback(Action<string, bool> onSelectionChanged)
+    {
+        _onSelectionChanged = onSelectionChanged;
+    }
+    #endregion
+
+    #region Build UI
     private void BuildUI()
     {
-        var rt = GetComponent<RectTransform>();
-        if (rt == null) rt = gameObject.AddComponent<RectTransform>();
-        rt.sizeDelta = new Vector2(ITEM_WIDTH, ITEM_HEIGHT);
+        // 1. Background (for highlighting)
+        _bgImage = gameObject.AddComponent<Image>();
+        _bgImage.sprite = GetRoundedRectSprite();
+        _bgImage.type = Image.Type.Sliced;
+        _bgImage.color = NormalColor;
+        _bgImage.raycastTarget = true;
 
-        // 1. Glass Background for entire card
-        CreateCardBackground();
+        // 2. Thumbnail Container - positioned at top, full width
+        CreateThumbnailContainer();
 
-        // 2. Use VerticalLayoutGroup for content
-        var layout = gameObject.AddComponent<VerticalLayoutGroup>();
-        layout.childAlignment = TextAnchor.UpperCenter;
-        layout.spacing = 0;
-        layout.padding = new RectOffset((int)CARD_PADDING, (int)CARD_PADDING, (int)CARD_PADDING, (int)CARD_PADDING);
-        layout.childControlWidth = true;
-        layout.childControlHeight = false;
-        layout.childForceExpandWidth = true;
-        layout.childForceExpandHeight = false;
+        // 3. Text Container - positioned below thumbnail
+        CreateTextContainer();
 
-        // 3. Thumbnail Container (top section)
-        CreateThumbnailSection();
+        // 4. Add Hover Effect Controller
+        _hoverController = gameObject.AddComponent<HoverEffectController>();
+        var scaleEffect = new ScaleHoverEffect()
+            .WithHoverScale(HOVER_SCALE)
+            .WithTransitionDuration(1f / HOVER_ANIMATION_SPEED);
+        _hoverController.AddEffect(scaleEffect);
 
-        // 4. Title Section (bottom section)
-        CreateTitleSection();
-
-        // 5. Selection border (covers entire card)
-        CreateSelectionBorder();
-
-        // 6. Add interaction components
-        CreateInteraction();
+        // 5. Create Edit Mode Checkbox
+        CreateCheckbox();
     }
 
-    private void CreateCardBackground()
+    private void CreateThumbnailContainer()
     {
-        _cardBackground = gameObject.AddComponent<Image>();
-        _cardBackground.sprite = GetRoundedRectSprite(CORNER_RADIUS);
-        _cardBackground.type = Image.Type.Sliced;
-        _cardBackground.raycastTarget = true;
+        GameObject container = new GameObject("ThumbnailContainer");
+        container.transform.SetParent(transform, false);
+        _thumbnailContainerRect = container.AddComponent<RectTransform>();
 
-        // Apply glass shader
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
-        if (glassShader != null)
-        {
-            Material mat = new Material(glassShader);
-            mat.SetFloat("_Aspect", ITEM_WIDTH / ITEM_HEIGHT);
-            mat.SetFloat("_CornerRadius", CORNER_RADIUS / ITEM_HEIGHT);
-            mat.SetFloat("_EdgePadding", 0.01f);
-            mat.SetColor("_ColorA", new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.35f));
-            mat.SetColor("_ColorB", new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.15f));
-            mat.SetFloat("_GlassAlpha", 0.25f);
-            mat.SetFloat("_FresnelStrength", 0.12f);
-            _cardBackground.material = mat;
-            _cardBackground.color = Color.white;
-        }
-        else
-        {
-            _cardBackground.color = new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.25f);
-        }
-    }
+        // Position at top, stretch full width, fixed height
+        _thumbnailContainerRect.anchorMin = new Vector2(0, 1);
+        _thumbnailContainerRect.anchorMax = new Vector2(1, 1);
+        _thumbnailContainerRect.pivot = new Vector2(0.5f, 1);
+        _thumbnailContainerRect.anchoredPosition = Vector2.zero;
+        _thumbnailContainerRect.sizeDelta = new Vector2(0, THUMBNAIL_HEIGHT); // Width from anchors, fixed height
 
-    private void CreateThumbnailSection()
-    {
-        float innerCornerRadius = CORNER_RADIUS - CARD_PADDING;
-        float thumbnailHeight = THUMBNAIL_HEIGHT - CARD_PADDING;
+        // Background for thumbnail area
+        Image containerBg = container.AddComponent<Image>();
+        containerBg.sprite = GetRoundedRectSprite();
+        containerBg.type = Image.Type.Sliced;
+        containerBg.color = new Color(0.1f, 0.1f, 0.12f, 1f);
+        containerBg.raycastTarget = false;
 
-        GameObject thumbContainer = new GameObject("ThumbnailContainer");
-        thumbContainer.transform.SetParent(transform, false);
+        // Mask for rounded corners clipping and crop overflow
+        var mask = container.AddComponent<RectMask2D>();
 
-        var thumbRT = thumbContainer.AddComponent<RectTransform>();
-
-        var thumbLE = thumbContainer.AddComponent<LayoutElement>();
-        thumbLE.preferredHeight = thumbnailHeight;
-        thumbLE.flexibleWidth = 1;
-
-        // Rounded background for thumbnail area
-        _thumbnailBackground = thumbContainer.AddComponent<Image>();
-        _thumbnailBackground.sprite = GetRoundedRectSprite(innerCornerRadius);
-        _thumbnailBackground.type = Image.Type.Sliced;
-        _thumbnailBackground.color = new Color(0.08f, 0.08f, 0.1f, 1f);
-
-        // Add RectMask2D for rounded clipping
-        var mask = thumbContainer.AddComponent<RectMask2D>();
-        mask.softness = new Vector2Int(2, 2);
-
-        // Thumbnail Image
+        // Thumbnail Image - center crop to fill container (maintains aspect ratio)
         GameObject thumbObj = new GameObject("Thumbnail");
-        thumbObj.transform.SetParent(thumbContainer.transform, false);
-
-        var thumbImgRT = thumbObj.AddComponent<RectTransform>();
-        thumbImgRT.anchorMin = Vector2.zero;
-        thumbImgRT.anchorMax = Vector2.one;
-        thumbImgRT.offsetMin = Vector2.zero;
-        thumbImgRT.offsetMax = Vector2.zero;
+        thumbObj.transform.SetParent(container.transform, false);
+        _thumbnailRect = thumbObj.AddComponent<RectTransform>();
+        // Center anchored, will be sized by AspectRatioFitter
+        _thumbnailRect.anchorMin = new Vector2(0.5f, 0.5f);
+        _thumbnailRect.anchorMax = new Vector2(0.5f, 0.5f);
+        _thumbnailRect.pivot = new Vector2(0.5f, 0.5f);
+        _thumbnailRect.anchoredPosition = Vector2.zero;
 
         _thumbnailImage = thumbObj.AddComponent<Image>();
-        _thumbnailImage.color = new Color(0.15f, 0.15f, 0.18f, 1f);
-        _thumbnailImage.preserveAspect = false; // Fill the area
+        _thumbnailImage.preserveAspect = true;  // Maintain aspect ratio
+        _thumbnailImage.raycastTarget = false;
+        _thumbnailImage.color = new Color(0.12f, 0.12f, 0.14f, 1f);
 
-        // Duration Badge (top-left) - like target design
-        CreateDurationBadge(thumbContainer.transform);
+        // AspectRatioFitter with EnvelopeParent = cover/crop mode
+        var aspectFitter = thumbObj.AddComponent<AspectRatioFitter>();
+        aspectFitter.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
+        aspectFitter.aspectRatio = 16f / 9f;  // Default 16:9, will update when thumbnail loads
 
-        // Resolution Badge (bottom-right) - like "1080p" in target
-        CreateResolutionBadge(thumbContainer.transform);
+        // Duration Badge (top-left)
+        CreateDurationBadge(container.transform);
 
-        // Favorite icon (top-right)
-        CreateFavoriteIcon(thumbContainer.transform);
+        // Resolution Badge (bottom-right)
+        CreateResolutionBadge(container.transform);
+
+        // Favorite Icon (top-right)
+        CreateFavoriteIcon(container.transform);
     }
 
     private void CreateDurationBadge(Transform parent)
     {
-        // Duration badge in top-left corner (like "1m 25s" in target)
         _durationBadge = new GameObject("DurationBadge");
         _durationBadge.transform.SetParent(parent, false);
 
-        var badgeRT = _durationBadge.AddComponent<RectTransform>();
-        badgeRT.anchorMin = new Vector2(0, 1);
-        badgeRT.anchorMax = new Vector2(0, 1);
-        badgeRT.pivot = new Vector2(0, 1);
-        badgeRT.anchoredPosition = new Vector2(10, -10);
-        badgeRT.sizeDelta = new Vector2(75, 28);
+        // Position at bottom-right of thumbnail
+        RectTransform rt = _durationBadge.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(1, 0);
+        rt.anchorMax = new Vector2(1, 0);
+        rt.pivot = new Vector2(1, 0);
+        rt.anchoredPosition = new Vector2(-6, 6);
+        rt.sizeDelta = new Vector2(58, 22);
 
-        // Rounded background
-        var badgeBg = _durationBadge.AddComponent<Image>();
-        badgeBg.sprite = GetBadgeSprite();
-        badgeBg.type = Image.Type.Sliced;
-        badgeBg.color = new Color(0f, 0f, 0f, 0.7f);
+        // Background - semi-transparent dark
+        Image bg = _durationBadge.AddComponent<Image>();
+        bg.sprite = GetBadgeSprite();
+        bg.type = Image.Type.Sliced;
+        bg.color = new Color(0f, 0f, 0f, 0.7f);
+        bg.raycastTarget = false;
 
-        // Duration text
+        // Text
         GameObject textObj = new GameObject("Text");
         textObj.transform.SetParent(_durationBadge.transform, false);
-
-        var textRT = textObj.AddComponent<RectTransform>();
+        RectTransform textRT = textObj.AddComponent<RectTransform>();
         textRT.anchorMin = Vector2.zero;
         textRT.anchorMax = Vector2.one;
-        textRT.offsetMin = new Vector2(8, 0);
-        textRT.offsetMax = new Vector2(-8, 0);
+        textRT.offsetMin = new Vector2(4, 0);
+        textRT.offsetMax = new Vector2(-4, 0);
 
         _durationText = textObj.AddComponent<TextMeshProUGUI>();
         _durationText.text = "0:00";
-        _durationText.font = _font;
-        _durationText.fontSize = 18;
+        if (_font != null) _durationText.font = _font;
+        _durationText.fontSize = 14;
         _durationText.fontStyle = FontStyles.Bold;
         _durationText.color = Color.white;
         _durationText.alignment = TextAlignmentOptions.Center;
+        _durationText.raycastTarget = false;
     }
 
     private void CreateResolutionBadge(Transform parent)
     {
-        // Resolution badge in bottom-right corner (like "1080p" in target)
         _resolutionBadge = new GameObject("ResolutionBadge");
         _resolutionBadge.transform.SetParent(parent, false);
 
-        var badgeRT = _resolutionBadge.AddComponent<RectTransform>();
-        badgeRT.anchorMin = new Vector2(1, 0);
-        badgeRT.anchorMax = new Vector2(1, 0);
-        badgeRT.pivot = new Vector2(1, 0);
-        badgeRT.anchoredPosition = new Vector2(-10, 10);
-        badgeRT.sizeDelta = new Vector2(65, 26);
+        RectTransform rt = _resolutionBadge.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(1, 0);
+        rt.anchorMax = new Vector2(1, 0);
+        rt.pivot = new Vector2(1, 0);
+        rt.anchoredPosition = new Vector2(-68, 6); // Left of duration badge (6 + 58 + 4 gap)
+        rt.sizeDelta = new Vector2(50, 22);
 
-        // Semi-transparent background with accent color
-        var badgeBg = _resolutionBadge.AddComponent<Image>();
-        badgeBg.sprite = GetBadgeSprite();
-        badgeBg.type = Image.Type.Sliced;
-        badgeBg.color = new Color(_accentColor.r, _accentColor.g, _accentColor.b, 0.85f);
+        // Background with accent color (cyan/teal like target)
+        Image bg = _resolutionBadge.AddComponent<Image>();
+        bg.sprite = GetBadgeSprite();
+        bg.type = Image.Type.Sliced;
+        bg.color = new Color(0.2f, 0.8f, 0.9f, 0.95f); // Cyan color like target
+        bg.raycastTarget = false;
 
-        // Resolution text
+        // Text
         GameObject textObj = new GameObject("Text");
         textObj.transform.SetParent(_resolutionBadge.transform, false);
-
-        var textRT = textObj.AddComponent<RectTransform>();
+        RectTransform textRT = textObj.AddComponent<RectTransform>();
         textRT.anchorMin = Vector2.zero;
         textRT.anchorMax = Vector2.one;
-        textRT.offsetMin = new Vector2(6, 0);
-        textRT.offsetMax = new Vector2(-6, 0);
+        textRT.offsetMin = new Vector2(3, 0);
+        textRT.offsetMax = new Vector2(-3, 0);
 
         _resolutionText = textObj.AddComponent<TextMeshProUGUI>();
         _resolutionText.text = "1080p";
-        _resolutionText.font = _font;
-        _resolutionText.fontSize = 16;
+        if (_font != null) _resolutionText.font = _font;
+        _resolutionText.fontSize = 12;
         _resolutionText.fontStyle = FontStyles.Bold;
         _resolutionText.color = Color.white;
         _resolutionText.alignment = TextAlignmentOptions.Center;
+        _resolutionText.raycastTarget = false;
 
-        // Hide by default (only show if resolution info available)
         _resolutionBadge.SetActive(false);
     }
 
     private void CreateFavoriteIcon(Transform parent)
     {
-        GameObject favObj = new GameObject("Favorite");
-        favObj.transform.SetParent(parent, false);
+        _favoriteIcon = new GameObject("FavoriteIcon");
+        _favoriteIcon.transform.SetParent(parent, false);
 
-        var favRT = favObj.AddComponent<RectTransform>();
-        favRT.anchorMin = new Vector2(1, 1);
-        favRT.anchorMax = new Vector2(1, 1);
-        favRT.pivot = new Vector2(1, 1);
-        favRT.anchoredPosition = new Vector2(-10, -10);
-        favRT.sizeDelta = new Vector2(28, 28);
+        RectTransform rt = _favoriteIcon.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(1, 1);
+        rt.anchorMax = new Vector2(1, 1);
+        rt.pivot = new Vector2(1, 1);
+        rt.anchoredPosition = new Vector2(-6, -6);
+        rt.sizeDelta = new Vector2(20, 20);
 
-        _favoriteIcon = favObj.AddComponent<Image>();
-        _favoriteIcon.color = new Color(1f, 0.85f, 0.2f);  // Gold/Yellow
+        Image icon = _favoriteIcon.AddComponent<Image>();
+        icon.sprite = Resources.Load<Sprite>("icon_star");
+        icon.color = new Color(1f, 0.85f, 0.2f);
+        icon.preserveAspect = true;
+        icon.raycastTarget = false;
 
-        // Load star icon
-        var starSprite = Resources.Load<Sprite>("icon_star");
-        if (starSprite != null)
-        {
-            _favoriteIcon.sprite = starSprite;
-            _favoriteIcon.preserveAspect = true;
-        }
-
-        favObj.SetActive(false);  // Hidden by default
+        _favoriteIcon.SetActive(false);
     }
 
-    private void CreateSelectionBorder()
+    private void CreateTextContainer()
     {
-        // Selection border covers the entire card
-        GameObject borderObj = new GameObject("SelectionBorder");
-        borderObj.transform.SetParent(transform, false);
+        GameObject container = new GameObject("TextContainer");
+        container.transform.SetParent(transform, false);
+        RectTransform containerRT = container.AddComponent<RectTransform>();
 
-        var borderRT = borderObj.AddComponent<RectTransform>();
-        borderRT.anchorMin = Vector2.zero;
-        borderRT.anchorMax = Vector2.one;
-        borderRT.offsetMin = new Vector2(-3, -3);
-        borderRT.offsetMax = new Vector2(3, 3);
+        // Position below thumbnail, stretch full width
+        containerRT.anchorMin = new Vector2(0, 0);
+        containerRT.anchorMax = new Vector2(1, 0);
+        containerRT.pivot = new Vector2(0.5f, 0);
+        containerRT.anchoredPosition = new Vector2(0, 0);
+        containerRT.sizeDelta = new Vector2(0, TEXT_HEIGHT); // Width from anchors, fixed height
 
-        // Ignore layout so it stays as overlay
-        var layoutIgnorer = borderObj.AddComponent<LayoutElement>();
-        layoutIgnorer.ignoreLayout = true;
-
-        _selectionBorder = borderObj.AddComponent<Image>();
-        _selectionBorder.sprite = GetRoundedRectSprite(CORNER_RADIUS + 3);
-        _selectionBorder.type = Image.Type.Sliced;
-        _selectionBorder.color = new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.8f);
-        _selectionBorder.fillCenter = false; // Only show border, not fill
-        _selectionBorder.raycastTarget = false;
-
-        borderObj.SetActive(false);
-    }
-
-    private void CreateTitleSection()
-    {
-        float titleHeight = TITLE_HEIGHT - CARD_PADDING;
-
-        GameObject titleContainer = new GameObject("TitleContainer");
-        titleContainer.transform.SetParent(transform, false);
-
-        var titleRT = titleContainer.AddComponent<RectTransform>();
-
-        var titleLE = titleContainer.AddComponent<LayoutElement>();
-        titleLE.preferredHeight = titleHeight;
-        titleLE.flexibleWidth = 1;
-
-        // No background - the card background shows through
-
-        // Use vertical layout for title + subtitle
-        var layout = titleContainer.AddComponent<VerticalLayoutGroup>();
-        layout.childAlignment = TextAnchor.UpperLeft;
-        layout.spacing = 4f;
-        layout.padding = new RectOffset(8, 8, 8, 8);
-        layout.childControlWidth = true;
-        layout.childControlHeight = false;
-        layout.childForceExpandWidth = true;
-        layout.childForceExpandHeight = false;
-
-        // Title Text (video name)
+        // Title Text - fills the entire text container (no subtitle)
         GameObject titleObj = new GameObject("Title");
-        titleObj.transform.SetParent(titleContainer.transform, false);
+        titleObj.transform.SetParent(container.transform, false);
+        RectTransform titleRT = titleObj.AddComponent<RectTransform>();
+        titleRT.anchorMin = Vector2.zero;
+        titleRT.anchorMax = Vector2.one;
+        titleRT.pivot = new Vector2(0.5f, 0.5f);
+        titleRT.offsetMin = new Vector2(8, 4);   // Left and bottom padding
+        titleRT.offsetMax = new Vector2(-8, -4); // Right and top padding
 
         _titleText = titleObj.AddComponent<TextMeshProUGUI>();
+        if (_font != null) _titleText.font = _font;
         _titleText.text = "Video Title";
-        _titleText.font = _font;
         _titleText.fontSize = 24;
         _titleText.fontStyle = FontStyles.Bold;
         _titleText.color = Color.white;
-        _titleText.alignment = TextAlignmentOptions.TopLeft;
+        _titleText.alignment = TextAlignmentOptions.MidlineLeft;
         _titleText.overflowMode = TextOverflowModes.Ellipsis;
-        _titleText.enableWordWrapping = true;
-        _titleText.maxVisibleLines = 2;
-
-        var titleTextLE = titleObj.AddComponent<LayoutElement>();
-        titleTextLE.preferredHeight = 52f;
-        titleTextLE.flexibleWidth = 1;
-
-        // Subtitle Text (duration info)
-        GameObject subtitleObj = new GameObject("Subtitle");
-        subtitleObj.transform.SetParent(titleContainer.transform, false);
-
-        _subtitleText = subtitleObj.AddComponent<TextMeshProUGUI>();
-        _subtitleText.text = "0 m 0s";
-        _subtitleText.font = _font;
-        _subtitleText.fontSize = 18;
-        _subtitleText.color = new Color(0.7f, 0.7f, 0.7f, 1f);
-        _subtitleText.alignment = TextAlignmentOptions.TopLeft;
-
-        var subtitleLE = subtitleObj.AddComponent<LayoutElement>();
-        subtitleLE.preferredHeight = 22f;
-        subtitleLE.flexibleWidth = 1;
+        _titleText.enableWordWrapping = false;
+        _titleText.maxVisibleLines = 1;
+        _titleText.raycastTarget = false;
     }
 
-    private void CreateInteraction()
+    private void CreateCheckbox()
     {
-        // Button
-        var button = gameObject.AddComponent<Button>();
-        button.transition = Selectable.Transition.None;
-        button.onClick.AddListener(HandleClick);
+        float checkboxSize = 32f;
+        float offset = 6f;
 
-        // BoxCollider for VR
-        var collider = gameObject.AddComponent<BoxCollider>();
-        collider.size = new Vector3(ITEM_WIDTH, ITEM_HEIGHT, 10);
-        collider.center = new Vector3(ITEM_WIDTH / 2, -ITEM_HEIGHT / 2, -5);
+        _checkbox = new GameObject("Checkbox");
+        _checkbox.transform.SetParent(transform, false);
 
-        // Hover Effects
-        _hoverController = gameObject.AddComponent<HoverEffectController>();
-        _hoverController.AddEffect(new ScaleHoverEffect().WithHoverScale(1.05f));
-        _hoverController.AddEffect(new ZPopHoverEffect().WithPopAmount(0.02f));
+        RectTransform checkboxRT = _checkbox.AddComponent<RectTransform>();
+        checkboxRT.anchorMin = new Vector2(0, 1);
+        checkboxRT.anchorMax = new Vector2(0, 1);
+        checkboxRT.pivot = new Vector2(0, 1);
+        checkboxRT.sizeDelta = new Vector2(checkboxSize, checkboxSize);
+        checkboxRT.anchoredPosition = new Vector2(offset, -offset);
+
+        var layoutIgnorer = _checkbox.AddComponent<LayoutElement>();
+        layoutIgnorer.ignoreLayout = true;
+
+        // Background (glass style)
+        Image checkboxBg = _checkbox.AddComponent<Image>();
+        checkboxBg.raycastTarget = true;
+        Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
+        if (glassShader != null)
+        {
+            Material mat = new Material(glassShader);
+            mat.SetFloat("_Aspect", 1f);
+            mat.SetFloat("_CornerRadius", 0.25f);
+            mat.SetFloat("_EdgePadding", 0.02f);
+            mat.SetColor("_ColorA", new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.4f));
+            mat.SetColor("_ColorB", new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.15f));
+            mat.SetFloat("_GlassAlpha", 0.25f);
+            mat.SetFloat("_FresnelStrength", 0.15f);
+            checkboxBg.material = mat;
+            checkboxBg.color = Color.white;
+        }
+
+        // Checkmark icon
+        GameObject checkmarkObj = new GameObject("Checkmark");
+        checkmarkObj.transform.SetParent(_checkbox.transform, false);
+        RectTransform checkmarkRT = checkmarkObj.AddComponent<RectTransform>();
+        checkmarkRT.anchorMin = new Vector2(0.15f, 0.15f);
+        checkmarkRT.anchorMax = new Vector2(0.85f, 0.85f);
+        checkmarkRT.offsetMin = checkmarkRT.offsetMax = Vector2.zero;
+
+        _checkmarkIcon = checkmarkObj.AddComponent<Image>();
+        _checkmarkIcon.sprite = Resources.Load<Sprite>("icon_check_mark");
+        _checkmarkIcon.color = Color.white;
+        _checkmarkIcon.preserveAspect = true;
+        _checkmarkIcon.raycastTarget = false;
+        checkmarkObj.SetActive(false);
+
+        // Button for checkbox click
+        Button checkboxButton = _checkbox.AddComponent<Button>();
+        checkboxButton.transition = Selectable.Transition.None;
+        checkboxButton.onClick.AddListener(OnCheckboxClicked);
+
+        // Hover effect
+        _checkboxHoverController = _checkbox.AddComponent<HoverEffectController>();
+        _checkboxHoverController.TargetVisuals = _checkbox.transform;
+        var scaleEffect = new ScaleHoverEffect()
+            .WithHoverScale(1.15f)
+            .WithTransitionDuration(0.1f);
+        _checkboxHoverController.AddEffect(scaleEffect);
+
+        _checkbox.SetActive(false);
     }
     #endregion
 
-    #region Public Methods
-    public void SetData(MediaVideoInfo video)
+    #region Data Binding
+    public void Bind(MediaVideoInfo video)
     {
-        VideoInfo = video;
-
-        // Title
-        _titleText.text = video.Title;
-
-        // Duration badge (top-left of thumbnail)
-        _durationText.text = video.FormattedDuration;
-
-        // Subtitle (below title) - shows formatted duration
-        _subtitleText.text = video.FormattedDuration;
-
-        // Resolution badge - show if we have resolution info
-        UpdateResolutionBadge(video);
-
-        // Favorite icon
-        if (_favoriteIcon != null)
+        // Cancel previous thumbnail request
+        if (!string.IsNullOrEmpty(_currentFilePath) && _currentFilePath != video.Path)
         {
-            _favoriteIcon.gameObject.SetActive(video.IsFavorite);
+            FileThumbnailService.Instance?.CancelRequest(_currentFilePath);
         }
 
-        // Thumbnail - will be loaded async by FileThumbnailService
-        _thumbnailImage.sprite = null;
-        _thumbnailImage.color = new Color(0.15f, 0.15f, 0.18f, 1f);
+        _currentVideo = video;
+        _currentFilePath = video.Path;
+
+        // Update title - show filename with extension
+        if (_titleText != null)
+        {
+            string fileName = System.IO.Path.GetFileName(video.Path);
+            if (string.IsNullOrEmpty(fileName))
+                fileName = video.Title ?? "Untitled";
+            _titleText.text = fileName;
+        }
+
+        // Determine media type from extension
+        string ext = System.IO.Path.GetExtension(video.Path)?.ToLowerInvariant() ?? "";
+        bool isVideo = ext == ".mp4" || ext == ".mkv" || ext == ".avi" || ext == ".webm" || ext == ".mov" || ext == ".wmv" || ext == ".m4v" || ext == ".flv";
+        bool isAudio = ext == ".mp3" || ext == ".wav" || ext == ".flac" || ext == ".aac" || ext == ".ogg" || ext == ".m4a" || ext == ".wma";
+        bool isImage = !isVideo && !isAudio;
+
+        // Update duration badge - only show for video/audio with duration > 0
+        if (_durationBadge != null)
+        {
+            bool showDuration = (isVideo || isAudio) && video.Duration.TotalSeconds > 0;
+            _durationBadge.SetActive(showDuration);
+            if (showDuration && _durationText != null)
+                _durationText.text = video.FormattedDuration;
+        }
+
+        // Update resolution badge - only show for video with resolution
+        UpdateResolutionBadge(video, isVideo);
+
+        // Update favorite icon
+        if (_favoriteIcon != null)
+            _favoriteIcon.SetActive(video.IsFavorite);
+
+        // Reset thumbnail to placeholder
+        if (_thumbnailImage != null)
+        {
+            _thumbnailImage.sprite = null;
+            _thumbnailImage.color = new Color(0.15f, 0.15f, 0.18f, 1f);
+        }
+
+        // Request thumbnail
+        RequestThumbnail(video);
+
+        // Reset background
+        if (_bgImage != null)
+            _bgImage.color = NormalColor;
     }
 
-    private void UpdateResolutionBadge(MediaVideoInfo video)
+    private void UpdateResolutionBadge(MediaVideoInfo video, bool isVideo = true)
     {
         if (_resolutionBadge == null || _resolutionText == null) return;
 
-        // Try to determine resolution from video info
-        string resText = "";
-
-        if (video.Width > 0 && video.Height > 0)
+        // Only show resolution badge for videos with valid resolution
+        if (!isVideo || video.Height <= 0)
         {
-            // Determine resolution label based on height
-            if (video.Height >= 2160)
-                resText = "4K";
-            else if (video.Height >= 1440)
-                resText = "1440p";
-            else if (video.Height >= 1080)
-                resText = "1080p";
-            else if (video.Height >= 720)
-                resText = "720p";
-            else if (video.Height >= 480)
-                resText = "480p";
-            else
-                resText = $"{video.Height}p";
+            _resolutionBadge.SetActive(false);
+            return;
         }
 
-        if (!string.IsNullOrEmpty(resText))
+        string resText = "";
+        if (video.Height >= 2160)
+            resText = "4K";
+        else if (video.Height >= 1440)
+            resText = "1440p";
+        else if (video.Height >= 1080)
+            resText = "1080p";
+        else if (video.Height >= 720)
+            resText = "720p";
+        else if (video.Height >= 480)
+            resText = "480p";
+        else
+            resText = $"{video.Height}p";
+
+        _resolutionText.text = resText;
+        _resolutionBadge.SetActive(true);
+    }
+
+    private void RequestThumbnail(MediaVideoInfo video)
+    {
+        var thumbnailService = FileThumbnailService.Instance;
+        if (thumbnailService == null) return;
+
+        // Create MockFile for thumbnail service
+        var mockFile = new MockFile
         {
-            _resolutionText.text = resText;
-            _resolutionBadge.SetActive(true);
+            Path = video.Path,
+            Name = video.Title,
+            Type = System.IO.Path.GetExtension(video.Path).TrimStart('.').ToLower(),
+            IsFolder = false,
+            Modified = video.DateModified
+        };
+
+        thumbnailService.RequestThumbnail(
+            mockFile,
+            THUMBNAIL_SIZE,
+            onSuccess: (sprite) =>
+            {
+                if (_currentFilePath == video.Path && sprite != null && _thumbnailImage != null)
+                {
+                    _thumbnailImage.sprite = sprite;
+                    _thumbnailImage.color = Color.white;
+
+                    // Update AspectRatioFitter based on actual sprite aspect ratio
+                    var aspectFitter = _thumbnailImage.GetComponent<AspectRatioFitter>();
+                    if (aspectFitter != null && sprite.texture != null)
+                    {
+                        float spriteAspect = (float)sprite.texture.width / sprite.texture.height;
+                        const float targetAspect = 16f / 9f;
+
+                        // If image is wider than 16:9 → crop horizontally (EnvelopeParent)
+                        // If image is narrower (like 1:1 square album art) → show full image (FitInParent)
+                        if (spriteAspect >= targetAspect)
+                        {
+                            aspectFitter.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
+                        }
+                        else
+                        {
+                            aspectFitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+                        }
+                        aspectFitter.aspectRatio = spriteAspect;
+
+                        // Force layout rebuild to apply AspectRatioFitter changes immediately
+                        LayoutRebuilder.ForceRebuildLayoutImmediate(_thumbnailRect);
+                    }
+                }
+            },
+            onFailed: null,
+            priority: 0,
+            skipOverlay: false  // Show media icon overlay on thumbnails
+        );
+    }
+    #endregion
+
+    #region Pointer Events
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        if (_bgImage != null)
+            _bgImage.color = HoverColor;
+
+        if (_isEditMode && _checkboxHoverController != null)
+            _checkboxHoverController.SetForceHover(true);
+
+        _onHoverEnter?.Invoke(_currentFilePath);
+    }
+
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        if (_bgImage != null)
+            _bgImage.color = NormalColor;
+
+        if (_isEditMode && _checkboxHoverController != null)
+            _checkboxHoverController.SetForceHover(false);
+
+        _onHoverExit?.Invoke(_currentFilePath);
+    }
+
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        float currentTime = Time.time;
+
+        if (currentTime - _lastClickTime < DOUBLE_CLICK_TIME)
+        {
+            _onDoubleClick?.Invoke(_currentVideo);
         }
         else
         {
-            _resolutionBadge.SetActive(false);
+            _onClick?.Invoke(_currentVideo);
         }
-    }
 
-    public void SetThumbnail(Sprite thumbnail)
+        _lastClickTime = currentTime;
+    }
+    #endregion
+
+    #region Edit Mode
+    public void SetEditMode(bool editMode)
     {
-        if (thumbnail != null)
+        _isEditMode = editMode;
+        if (_checkbox != null)
+            _checkbox.SetActive(editMode);
+
+        if (!editMode)
         {
-            _thumbnailImage.sprite = thumbnail;
-            _thumbnailImage.color = Color.white;
+            _isSelected = false;
+            UpdateCheckmarkVisual();
         }
     }
 
     public void SetSelected(bool selected)
     {
-        IsSelected = selected;
-        if (_selectionBorder != null)
-        {
-            _selectionBorder.gameObject.SetActive(selected);
-        }
+        _isSelected = selected;
+        UpdateCheckmarkVisual();
     }
 
-    public void SetEditMode(bool editMode, bool isChecked = false)
+    private void OnCheckboxClicked()
     {
-        // TODO: Show/hide checkbox for multi-select in edit mode
+        _isSelected = !_isSelected;
+        UpdateCheckmarkVisual();
+        _onSelectionChanged?.Invoke(_currentFilePath, _isSelected);
+    }
+
+    private void UpdateCheckmarkVisual()
+    {
+        if (_checkmarkIcon != null)
+            _checkmarkIcon.gameObject.SetActive(_isSelected);
+    }
+    #endregion
+
+    #region Public API
+    public void ClearHoverState()
+    {
+        if (_bgImage != null)
+            _bgImage.color = NormalColor;
+    }
+
+    public void OnRecycle()
+    {
+        if (!string.IsNullOrEmpty(_currentFilePath))
+        {
+            FileThumbnailService.Instance?.CancelRequest(_currentFilePath);
+        }
+        ClearHoverState();
+
+        if (_hoverController != null)
+        {
+            _hoverController.ResetHoverState(immediate: true);
+        }
     }
     #endregion
 
     #region Helper Methods
-    /// <summary>
-    /// Generate a rounded rectangle sprite for backgrounds
-    /// </summary>
-    private static Sprite GetRoundedRectSprite(float radius)
+    private static Sprite _cachedRoundedSprite;
+    private static Sprite _cachedBadgeSprite;
+
+    private static Sprite GetRoundedRectSprite()
     {
         if (_cachedRoundedSprite != null) return _cachedRoundedSprite;
 
         int size = 64;
-        int cornerRadius = Mathf.RoundToInt(radius * 64f / ITEM_WIDTH);
-        cornerRadius = Mathf.Clamp(cornerRadius, 4, 24);
-
+        int radius = 16;
         Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
         tex.filterMode = FilterMode.Bilinear;
 
@@ -500,12 +658,12 @@ public class RTTMediaGridItem : MonoBehaviour
                 float dx = Mathf.Abs(x - halfSize + 0.5f);
                 float dy = Mathf.Abs(y - halfSize + 0.5f);
 
-                float innerHalfX = halfSize - cornerRadius;
-                float innerHalfY = halfSize - cornerRadius;
+                float innerHalfX = halfSize - radius;
+                float innerHalfY = halfSize - radius;
 
                 float qx = Mathf.Max(dx - innerHalfX, 0f);
                 float qy = Mathf.Max(dy - innerHalfY, 0f);
-                float dist = Mathf.Sqrt(qx * qx + qy * qy) - cornerRadius;
+                float dist = Mathf.Sqrt(qx * qx + qy * qy) - radius;
 
                 float alpha = 1f - Mathf.Clamp01((dist + 0.5f) / 1.5f);
                 pixels[y * size + x] = new Color(1f, 1f, 1f, alpha);
@@ -515,7 +673,7 @@ public class RTTMediaGridItem : MonoBehaviour
         tex.SetPixels(pixels);
         tex.Apply();
 
-        int border = cornerRadius + 2;
+        int border = radius + 2;
         _cachedRoundedSprite = Sprite.Create(
             tex,
             new Rect(0, 0, size, size),
@@ -529,16 +687,12 @@ public class RTTMediaGridItem : MonoBehaviour
         return _cachedRoundedSprite;
     }
 
-    /// <summary>
-    /// Generate a small rounded sprite for badges
-    /// </summary>
     private static Sprite GetBadgeSprite()
     {
         if (_cachedBadgeSprite != null) return _cachedBadgeSprite;
 
         int size = 32;
-        int cornerRadius = 8;
-
+        int radius = 8;
         Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
         tex.filterMode = FilterMode.Bilinear;
 
@@ -552,12 +706,12 @@ public class RTTMediaGridItem : MonoBehaviour
                 float dx = Mathf.Abs(x - halfSize + 0.5f);
                 float dy = Mathf.Abs(y - halfSize + 0.5f);
 
-                float innerHalfX = halfSize - cornerRadius;
-                float innerHalfY = halfSize - cornerRadius;
+                float innerHalfX = halfSize - radius;
+                float innerHalfY = halfSize - radius;
 
                 float qx = Mathf.Max(dx - innerHalfX, 0f);
                 float qy = Mathf.Max(dy - innerHalfY, 0f);
-                float dist = Mathf.Sqrt(qx * qx + qy * qy) - cornerRadius;
+                float dist = Mathf.Sqrt(qx * qx + qy * qy) - radius;
 
                 float alpha = 1f - Mathf.Clamp01((dist + 0.5f) / 1.5f);
                 pixels[y * size + x] = new Color(1f, 1f, 1f, alpha);
@@ -567,7 +721,7 @@ public class RTTMediaGridItem : MonoBehaviour
         tex.SetPixels(pixels);
         tex.Apply();
 
-        int border = cornerRadius + 2;
+        int border = radius + 2;
         _cachedBadgeSprite = Sprite.Create(
             tex,
             new Rect(0, 0, size, size),
@@ -579,27 +733,6 @@ public class RTTMediaGridItem : MonoBehaviour
         );
 
         return _cachedBadgeSprite;
-    }
-    #endregion
-
-    #region Event Handlers
-    private void HandleClick()
-    {
-        float currentTime = Time.time;
-
-        if (currentTime - _lastClickTime < DOUBLE_CLICK_TIME)
-        {
-            // Double click
-            OnDoubleClicked?.Invoke(VideoInfo);
-        }
-        else
-        {
-            // Single click
-            OnClicked?.Invoke(VideoInfo);
-            OnSelected?.Invoke(VideoInfo);
-        }
-
-        _lastClickTime = currentTime;
     }
     #endregion
 }
