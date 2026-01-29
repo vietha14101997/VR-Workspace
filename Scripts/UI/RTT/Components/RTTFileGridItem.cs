@@ -148,8 +148,8 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
                                     }
                                     aspectFitter.aspectRatio = spriteAspect;
 
-                                    // Force layout rebuild to apply AspectRatioFitter changes immediately
-                                    LayoutRebuilder.ForceRebuildLayoutImmediate(_iconRect);
+                                    // Mark for deferred layout rebuild - avoids blocking main thread
+                                    LayoutRebuilder.MarkLayoutForRebuild(_iconRect);
                                 }
                             }
                         },

@@ -598,7 +598,7 @@ public class RTTFilePagination : RTTCanvasBase
 
     public void SetPage(int current, int total)
     {
-        Debug.Log($"[RTTFilePagination] SetPage Called: Current={current}, TotalInput={total}");
+        // Debug.Log($"[RTTFilePagination] SetPage Called: Current={current}, TotalInput={total}");
         
         // Immediate Update - Remove Coroutine
         // Note: The Coroutine approach (previous fix) was causing issues with visibility state or frame timing conflicts.
@@ -644,7 +644,7 @@ public class RTTFilePagination : RTTCanvasBase
 
     private void UpdateDisplay()
     {
-        Debug.Log($"[RTTFilePagination] UpdateDisplay: TotalPages={_totalPages}");
+        // Debug.Log($"[RTTFilePagination] UpdateDisplay: TotalPages={_totalPages}");
         UpdateNavigationButtonsState(); // Sync nav buttons first
 
         if (_stackPagingTransform == null) return;

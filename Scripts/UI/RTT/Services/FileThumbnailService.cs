@@ -46,7 +46,8 @@ public class FileThumbnailService : MonoBehaviour
 
     #region Configuration
     [SerializeField] private int _maxCacheEntries = 200;  // Increased for larger thumbnails
-    [SerializeField] private int _concurrentLoadLimit = 6;  // Increased for faster loading
+    // Mobile-first: reduce concurrent loads to prevent CPU spikes
+    [SerializeField] private int _concurrentLoadLimit = 2;  // Mobile: 2, was 6
     #endregion
 
     #region Private Fields
@@ -67,14 +68,14 @@ public class FileThumbnailService : MonoBehaviour
         public long FileModifiedTicks;
     }
 
-    // UI callback throttling to prevent stutters
+    // UI callback throttling to prevent stutters - Mobile-optimized
     private Queue<Action> _uiCallbackQueue = new Queue<Action>();
     private Queue<Action> _highPriorityUIQueue = new Queue<Action>(); // For detail panel
-    private const int MAX_UI_CALLBACKS_PER_FRAME = 8; // Limit UI updates per frame (increased for faster grid updates)
+    private const int MAX_UI_CALLBACKS_PER_FRAME = 3; // Mobile: 3, was 8
 
     // Disk cache load throttling to prevent frame drops on first category switch
     private int _diskLoadsThisFrame = 0;
-    private const int MAX_DISK_LOADS_PER_FRAME = 4; // Limit disk I/O per frame to prevent stutters
+    private const int MAX_DISK_LOADS_PER_FRAME = 2; // Mobile: 2, was 4
     private Queue<ThumbnailRequest> _deferredDiskLoads = new Queue<ThumbnailRequest>();
     #endregion
 
@@ -176,7 +177,7 @@ public class FileThumbnailService : MonoBehaviour
         // PRIORITY 1: Check memory cache first (instant, no I/O)
         if (_cache.TryGet(cacheKey, out Sprite cachedSprite))
         {
-            Debug.Log($"[Thumb] MEMORY HIT: {fileName} size={size} skip={skipOverlay}");
+            // Debug.Log($"[Thumb] MEMORY HIT: {fileName} size={size} skip={skipOverlay}");
             QueueUICallback(() => onSuccess?.Invoke(cachedSprite), isHighPriority);
             return;
         }
@@ -215,7 +216,7 @@ public class FileThumbnailService : MonoBehaviour
                     }
                 }
 
-                Debug.Log($"[Thumb] METADATA: {fileName} size={size} ({metaThumb.width}x{metaThumb.height})");
+                // Debug.Log($"[Thumb] METADATA: {fileName} size={size} ({metaThumb.width}x{metaThumb.height})");
                 QueueUICallback(() => onSuccess?.Invoke(metaSprite), isHighPriority);
                 return;
             }
@@ -244,7 +245,7 @@ public class FileThumbnailService : MonoBehaviour
         if (_cache.TryLoadFromDisk(cacheKey, out Sprite diskSprite))
         {
             _diskLoadsThisFrame++;
-            Debug.Log($"[Thumb] DISK HIT: {fileName} size={size} skip={skipOverlay}");
+            // Debug.Log($"[Thumb] DISK HIT: {fileName} size={size} skip={skipOverlay}");
             _cache.Set(cacheKey, diskSprite, modifiedTicks, file.Path);
             QueueUICallback(() => onSuccess?.Invoke(diskSprite), isHighPriority);
             return;
@@ -254,7 +255,7 @@ public class FileThumbnailService : MonoBehaviour
         // Add to pending callbacks if already processing this file
         if (_processingPaths.Contains(file.Path))
         {
-            Debug.Log($"[Thumb] PENDING: {fileName} size={size} skip={skipOverlay}");
+            // Debug.Log($"[Thumb] PENDING: {fileName} size={size} skip={skipOverlay}");
             if (!_pendingCallbacks.ContainsKey(file.Path))
             {
                 _pendingCallbacks[file.Path] = new List<PendingCallbackInfo>();
@@ -269,7 +270,7 @@ public class FileThumbnailService : MonoBehaviour
             return;
         }
 
-        Debug.Log($"[Thumb] GENERATE: {fileName} size={size} skip={skipOverlay}");
+        // Debug.Log($"[Thumb] GENERATE: {fileName} size={size} skip={skipOverlay}");
 
         // Queue new request
         var request = new ThumbnailRequest
@@ -329,7 +330,7 @@ public class FileThumbnailService : MonoBehaviour
     public void ClearAllCache()
     {
         _cache.ClearAll();
-        Debug.Log("[FileThumbnailService] All cache cleared (memory + disk)");
+        // Debug.Log("[FileThumbnailService] All cache cleared (memory + disk)");
     }
 
     /// <summary>
@@ -430,7 +431,7 @@ public class FileThumbnailService : MonoBehaviour
             texture.wrapMode = TextureWrapMode.Clamp;
         }
 
-        Debug.Log($"[Thumb] {fileName} LOAD: {stepWatch.ElapsedMilliseconds}ms ({texture.width}x{texture.height})");
+        // Debug.Log($"[Thumb] {fileName} LOAD: {stepWatch.ElapsedMilliseconds}ms ({texture.width}x{texture.height})");
         stepWatch.Restart();
 
         // Yield to spread work
@@ -452,7 +453,7 @@ public class FileThumbnailService : MonoBehaviour
             yield return null;
         }
 
-        Debug.Log($"[Thumb] {fileName} RESIZE512: {stepWatch.ElapsedMilliseconds}ms");
+        // Debug.Log($"[Thumb] {fileName} RESIZE512: {stepWatch.ElapsedMilliseconds}ms");
         stepWatch.Restart();
 
         if (resized512 == null)
@@ -487,7 +488,7 @@ public class FileThumbnailService : MonoBehaviour
             // Alias for nooverlay (images don't have overlay, same sprite for both)
             _cache.SetAlias(cacheKey512 + "_nooverlay", cacheKey512);
 
-            Debug.Log($"[Thumb] {fileName} CACHE512: {stepWatch.ElapsedMilliseconds}ms");
+            // Debug.Log($"[Thumb] {fileName} CACHE512: {stepWatch.ElapsedMilliseconds}ms");
             stepWatch.Restart();
         }
         catch (Exception ex)
@@ -728,7 +729,7 @@ public class FileThumbnailService : MonoBehaviour
 
         if (albumArt != null)
         {
-            Debug.Log($"[Thumb] {fileName} AUDIO: Album art found ({albumArt.width}x{albumArt.height})");
+            // Debug.Log($"[Thumb] {fileName} AUDIO: Album art found ({albumArt.width}x{albumArt.height})");
 
             // Resize to standard thumbnail sizes
             Texture2D resized512 = null;
@@ -810,7 +811,7 @@ public class FileThumbnailService : MonoBehaviour
         }
         else
         {
-            Debug.Log($"[Thumb] {fileName} AUDIO: No album art found");
+            // Debug.Log($"[Thumb] {fileName} AUDIO: No album art found");
         }
 
         CompleteRequest(request, result);

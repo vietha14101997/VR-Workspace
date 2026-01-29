@@ -81,7 +81,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
         // Note: Side panel events are now wired in OnViewReady() because panels are created asynchronously
 
         _isInitialized = true;
-        Debug.Log($"[RTTMediaLibraryController] Initialized, libraryService={((_libraryService != null) ? "OK" : "NULL")}");
+        // Debug.Log($"[RTTMediaLibraryController] Initialized, libraryService={((_libraryService != null) ? "OK" : "NULL")}");
 
         // Note: Don't load data yet - wait for OnViewReady() when all panels are created
     }
@@ -94,7 +94,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
 
     private void HandleScanComplete(List<MediaVideoInfo> videos)
     {
-        Debug.Log($"[RTTMediaLibraryController] HandleScanComplete: {videos.Count} files");
+        // Debug.Log($"[RTTMediaLibraryController] HandleScanComplete: {videos.Count} files");
         _allVideos = videos;
         ApplyFilters();
     }
@@ -107,7 +107,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
     {
         if (newItems == null || newItems.Count == 0) return;
 
-        Debug.Log($"[RTTMediaLibraryController] New items detected: {newItems.Count}");
+        // Debug.Log($"[RTTMediaLibraryController] New items detected: {newItems.Count}");
 
         // Add new items to local list
         _allVideos.AddRange(newItems);
@@ -121,7 +121,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
     /// </summary>
     public void OnViewReady()
     {
-        Debug.Log("[RTTMediaLibraryController] View ready, loading data...");
+        // Debug.Log("[RTTMediaLibraryController] View ready, loading data...");
 
         // IMPORTANT: Reset _isFirstLoad to ensure sync filtering for immediate display
         // This is needed because side panel may have already triggered category selection
@@ -136,13 +136,13 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
             // Subscribe to grid binding complete event - start scan AFTER all cached items are displayed
             _waitingForInitialBinding = true;
             _view.Grid.OnBindingComplete += OnInitialBindingComplete;
-            Debug.Log($"[RTTMediaLibraryController] Waiting for {cachedCount} cached items to bind before scanning...");
+            // Debug.Log($"[RTTMediaLibraryController] Waiting for {cachedCount} cached items to bind before scanning...");
         }
         else
         {
             // No cached items - start scan immediately after loading
             _waitingForInitialBinding = false;
-            Debug.Log("[RTTMediaLibraryController] No cached items, will scan immediately after load...");
+            // Debug.Log("[RTTMediaLibraryController] No cached items, will scan immediately after load...");
         }
 
         // Load initial data from cache (will trigger binding if has data, then scan)
@@ -151,7 +151,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
         // If no cached items, start background scan now (no binding to wait for)
         if (!_waitingForInitialBinding)
         {
-            Debug.Log("[RTTMediaLibraryController] Starting background scan (no binding to wait for)...");
+            // Debug.Log("[RTTMediaLibraryController] Starting background scan (no binding to wait for)...");
             _libraryService?.StartBackgroundScan();
         }
     }
@@ -171,7 +171,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
             _view.Grid.OnBindingComplete -= OnInitialBindingComplete;
         }
 
-        Debug.Log("[RTTMediaLibraryController] Initial binding complete, starting background scan...");
+        // Debug.Log("[RTTMediaLibraryController] Initial binding complete, starting background scan...");
 
         // Now safe to start background scan
         _libraryService?.StartBackgroundScan();
@@ -196,7 +196,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
     /// </summary>
     public void RefreshLibrary()
     {
-        Debug.Log($"[RTTMediaLibraryController] RefreshLibrary called, _libraryService={((_libraryService != null) ? "OK" : "NULL")}");
+        // Debug.Log($"[RTTMediaLibraryController] RefreshLibrary called, _libraryService={((_libraryService != null) ? "OK" : "NULL")}");
 
         if (_libraryService == null)
         {
@@ -206,22 +206,22 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
 
         // Check if media has been scanned
         _allVideos = _libraryService.GetAllVideos();
-        Debug.Log($"[RTTMediaLibraryController] GetAllVideos returned {_allVideos.Count} items, IsScanning={_libraryService.IsScanning}");
+        // Debug.Log($"[RTTMediaLibraryController] GetAllVideos returned {_allVideos.Count} items, IsScanning={_libraryService.IsScanning}");
 
         if (_allVideos.Count == 0 && !_libraryService.IsScanning)
         {
             // No videos and not scanning - trigger scan
-            Debug.Log("[RTTMediaLibraryController] Starting media scan...");
+            // Debug.Log("[RTTMediaLibraryController] Starting media scan...");
             _libraryService.ScanMediaLibrary(OnScanComplete);
         }
         else if (_libraryService.IsScanning)
         {
-            Debug.Log("[RTTMediaLibraryController] Scan already in progress, waiting...");
+            // Debug.Log("[RTTMediaLibraryController] Scan already in progress, waiting...");
             // UI will be updated via OnScanComplete event
         }
         else
         {
-            Debug.Log($"[RTTMediaLibraryController] Using cached data: {_allVideos.Count} items");
+            // Debug.Log($"[RTTMediaLibraryController] Using cached data: {_allVideos.Count} items");
             ApplyFilters();
         }
     }
@@ -232,7 +232,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
     /// </summary>
     public void ForceRescan()
     {
-        Debug.Log("[RTTMediaLibraryController] ForceRescan called - clearing cache and rescanning...");
+        // Debug.Log("[RTTMediaLibraryController] ForceRescan called - clearing cache and rescanning...");
 
         if (_libraryService == null)
         {
@@ -242,7 +242,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
 
         if (_libraryService.IsScanning)
         {
-            Debug.Log("[RTTMediaLibraryController] Scan already in progress, please wait...");
+            // Debug.Log("[RTTMediaLibraryController] Scan already in progress, please wait...");
             return;
         }
 
@@ -266,7 +266,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
     private void OnScanComplete(List<MediaVideoInfo> videos)
     {
         _allVideos = videos;
-        Debug.Log($"[RTTMediaLibraryController] Scan complete: {_allVideos.Count} videos");
+        // Debug.Log($"[RTTMediaLibraryController] Scan complete: {_allVideos.Count} videos");
         ApplyFilters();
     }
 
@@ -366,7 +366,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
     {
         PageSize = Mathf.Max(1, size);
         RecalculatePagination();
-        Debug.Log($"[RTTMediaLibraryController] PageSize set to {PageSize}");
+        // Debug.Log($"[RTTMediaLibraryController] PageSize set to {PageSize}");
     }
 
     /// <summary>
@@ -388,7 +388,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
             CurrentPage = newPage;
             // Forward to grid to actually scroll
             _view?.Grid?.GoToPage(newPage);
-            Debug.Log($"[RTTMediaLibraryController] Page changed to {CurrentPage}/{TotalPages}");
+            // Debug.Log($"[RTTMediaLibraryController] Page changed to {CurrentPage}/{TotalPages}");
         }
     }
 
@@ -419,7 +419,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
             ApplySort();
             CurrentPage = 1;
             RefreshView();
-            Debug.Log($"[RTTMediaLibraryController] Sort by: {SortBy}");
+            // Debug.Log($"[RTTMediaLibraryController] Sort by: {SortBy}");
         }
     }
 
@@ -434,7 +434,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
             ApplySort();
             CurrentPage = 1;
             RefreshView();
-            Debug.Log($"[RTTMediaLibraryController] Ascending: {IsAscending}");
+            // Debug.Log($"[RTTMediaLibraryController] Ascending: {IsAscending}");
         }
     }
 
@@ -449,7 +449,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
             ApplyGrouping();
             CurrentPage = 1;
             RefreshView();
-            Debug.Log($"[RTTMediaLibraryController] Group by: {GroupBy}");
+            // Debug.Log($"[RTTMediaLibraryController] Group by: {GroupBy}");
         }
     }
 
@@ -563,7 +563,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
 
         // Generate group info for display
         _groups = MediaGroupHelper.CreateGroups(_filteredVideos, GroupBy);
-        Debug.Log($"[RTTMediaLibraryController] Created {_groups.Count} groups for {_filteredVideos.Count} items");
+        // Debug.Log($"[RTTMediaLibraryController] Created {_groups.Count} groups for {_filteredVideos.Count} items");
     }
 
     private int GetDurationCategory(TimeSpan duration)
@@ -806,10 +806,10 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
             
             // Navigate instantly after data is ready
             _view?.Grid?.GoToPageInstant(targetPage);
-            Debug.Log($"[RTTMediaLibraryController] Navigated to pending page {targetPage}");
+            // Debug.Log($"[RTTMediaLibraryController] Navigated to pending page {targetPage}");
         }
 
-        Debug.Log($"[RTTMediaLibraryController] Showing {_filteredVideos.Count} videos in {_groups.Count} groups (Category: {CurrentCategory}, Search: '{CurrentSearchQuery}', Page: {CurrentPage}/{TotalPages})");
+        // Debug.Log($"[RTTMediaLibraryController] Showing {_filteredVideos.Count} videos in {_groups.Count} groups (Category: {CurrentCategory}, Search: '{CurrentSearchQuery}', Page: {CurrentPage}/{TotalPages})");
     }
 
     /// <summary>
@@ -863,7 +863,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
     #region Event Handlers
     private void HandleVideoPlayRequested(MediaVideoInfo video)
     {
-        Debug.Log($"[RTTMediaLibraryController] Play requested: {video.Title}");
+        // Debug.Log($"[RTTMediaLibraryController] Play requested: {video.Title}");
         RecordPlayback(video.Path);
         OnVideoPlayRequested?.Invoke(video);
     }
@@ -875,7 +875,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
 
     private void HandleCategorySelected(string categoryId)
     {
-        Debug.Log($"[RTTMediaLibraryController] Category selected: {categoryId}");
+        // Debug.Log($"[RTTMediaLibraryController] Category selected: {categoryId}");
         
         // Save current page for the OLD category before switching
         if (!string.IsNullOrEmpty(CurrentCategory))
@@ -888,7 +888,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
         // Trigger scan if no videos loaded yet
         if (_allVideos.Count == 0 && _libraryService != null && !_libraryService.IsScanning)
         {
-            Debug.Log("[RTTMediaLibraryController] No videos loaded, triggering scan from category selection...");
+            // Debug.Log("[RTTMediaLibraryController] No videos loaded, triggering scan from category selection...");
             _libraryService.ScanMediaLibrary(OnScanComplete);
             return;
         }
@@ -898,7 +898,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
         {
             CurrentPage = cachedPage;
             _pendingPageNavigation = cachedPage; // Will navigate after data loads
-            Debug.Log($"[RTTMediaLibraryController] Will restore page {cachedPage} for category {categoryId} after data loads");
+            // Debug.Log($"[RTTMediaLibraryController] Will restore page {cachedPage} for category {categoryId} after data loads");
         }
         else
         {

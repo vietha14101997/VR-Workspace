@@ -124,7 +124,7 @@ public class RTTMediaLibrary : MonoBehaviour
 
     public void BuildUI()
     {
-        Debug.Log("[RTTMediaLibrary] Building UI...");
+        // Debug.Log("[RTTMediaLibrary] Building UI...");
 
         RectTransform rt = GetComponent<RectTransform>();
         if (rt == null) rt = gameObject.AddComponent<RectTransform>();
@@ -343,7 +343,7 @@ public class RTTMediaLibrary : MonoBehaviour
             zoomController.RegisterSidePanel(frameRef, _menuFrame.transform, side, mainWidth, sideWidth, gap);
         }
 
-        Debug.Log($"[RTTMediaLibrary] Placed {name}: pos={panelPos}");
+        // Debug.Log($"[RTTMediaLibrary] Placed {name}: pos={panelPos}");
     }
 
     private IEnumerator CreateLeftPanelContent()

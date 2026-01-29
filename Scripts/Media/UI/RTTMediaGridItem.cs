@@ -527,8 +527,9 @@ public class RTTMediaGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExi
                         }
                         aspectFitter.aspectRatio = spriteAspect;
 
-                        // Force layout rebuild to apply AspectRatioFitter changes immediately
-                        LayoutRebuilder.ForceRebuildLayoutImmediate(_thumbnailRect);
+                        // Mark for deferred layout rebuild - avoids blocking main thread
+                        // Canvas will batch these updates naturally
+                        LayoutRebuilder.MarkLayoutForRebuild(_thumbnailRect);
                     }
                 }
             },
