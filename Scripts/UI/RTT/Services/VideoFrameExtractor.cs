@@ -369,42 +369,90 @@ public class VideoFrameExtractor : MonoBehaviour
             // Short videos: 20% in
             seekTime = _videoPlayer.length * 0.2;
         }
-        _videoPlayer.time = seekTime;
-        Debug.Log($"[VideoFrameExtractor] Seeking to {seekTime:F1}s (video length: {_videoPlayer.length:F1}s)");
-
-        // Start playback briefly to render a frame
-        _videoPlayer.Play();
-
-        // Wait for frame to render
-        yield return new WaitForSeconds(0.1f);
-
-        // Wait a bit more for the render texture to update
-        int waitFrames = 5;
-        while (waitFrames > 0)
-        {
-            yield return null;
-            waitFrames--;
-        }
-
-        // Capture the frame asynchronously
+        
+        // Try to extract frame with retry logic for problematic videos
         Texture2D capturedFrame = null;
-        bool captureComplete = false;
-
-        StartCoroutine(CaptureFrameAsync((frame) =>
+        int maxRetries = 3;
+        double[] seekPositions = new double[] { seekTime, 0.5, _videoPlayer.length * 0.5 }; // Try original, start, middle
+        
+        for (int attempt = 0; attempt < maxRetries && capturedFrame == null; attempt++)
         {
-            capturedFrame = frame;
-            captureComplete = true;
-        }));
+            double currentSeekTime = (attempt < seekPositions.Length) ? seekPositions[attempt] : seekTime;
+            _videoPlayer.time = currentSeekTime;
+            
+            if (attempt == 0)
+            {
+                Debug.Log($"[VideoFrameExtractor] Seeking to {currentSeekTime:F1}s (video length: {_videoPlayer.length:F1}s)");
+            }
+            else
+            {
+                Debug.Log($"[VideoFrameExtractor] Retry {attempt}: Seeking to {currentSeekTime:F1}s");
+            }
 
-        // Wait for async capture to complete
-        while (!captureComplete)
-        {
-            yield return null;
+            // Start playback briefly to render a frame
+            _videoPlayer.Play();
+
+            // Wait longer for videos with timestamp issues (0.3s instead of 0.1s)
+            yield return new WaitForSeconds(0.3f);
+
+            // Wait more frames for the render texture to update (10 instead of 5)
+            int waitFrames = 10;
+            while (waitFrames > 0)
+            {
+                yield return null;
+                waitFrames--;
+            }
+
+            // Check if video is actually playing and rendering
+            if (!_videoPlayer.isPlaying)
+            {
+                Debug.LogWarning($"[VideoFrameExtractor] Video stopped unexpectedly at attempt {attempt}");
+                _videoPlayer.Play();
+                yield return new WaitForSeconds(0.2f);
+            }
+
+            // Capture the frame asynchronously
+            bool captureComplete = false;
+
+            StartCoroutine(CaptureFrameAsync((frame) =>
+            {
+                capturedFrame = frame;
+                captureComplete = true;
+            }));
+
+            // Wait for async capture to complete
+            float captureTimeout = 5f;
+            float captureStartTime = Time.time;
+            while (!captureComplete)
+            {
+                if (Time.time - captureStartTime > captureTimeout)
+                {
+                    Debug.LogWarning($"[VideoFrameExtractor] Capture timeout at attempt {attempt}");
+                    captureComplete = true; // Break out of wait
+                }
+                yield return null;
+            }
+
+            // If capture failed, pause and try next position
+            if (capturedFrame == null && attempt < maxRetries - 1)
+            {
+                _videoPlayer.Pause();
+                yield return new WaitForSeconds(0.1f);
+            }
         }
 
         // Stop and cleanup
         _videoPlayer.Stop();
         _videoPlayer.targetTexture = null;
+
+        if (capturedFrame != null)
+        {
+            Debug.Log($"[VideoFrameExtractor] Successfully extracted frame for: {System.IO.Path.GetFileName(_videoPlayer.url)}");
+        }
+        else
+        {
+            Debug.LogWarning($"[VideoFrameExtractor] Failed to extract frame after {maxRetries} attempts for: {System.IO.Path.GetFileName(_videoPlayer.url)}");
+        }
 
         CompleteExtraction(capturedFrame);
     }

@@ -132,7 +132,7 @@ public class MarqueeText : MonoBehaviour
 
     private void Update()
     {
-        if (!_isOverflowing || _text == null) return;
+        if (!_isOverflowing || _text == null || !_isActive) return;
 
         if (_pauseTimer > 0)
         {
@@ -199,6 +199,64 @@ public class MarqueeText : MonoBehaviour
         _pauseTimer = _pauseDuration;
         IsScrolling = false;
         _pausingAtEnd = false;
+        _isActive = true; // Keep active by default for existing usage
         UpdateTextPosition();
     }
+
+    #region Hover-Triggered Scrolling
+    private bool _isActive = true;  // Controls whether scrolling is active
+    private bool _hoverMode = false; // If true, only scroll when active (on hover)
+
+    /// <summary>
+    /// Enable hover mode - scrolling only happens when StartScroll() is called.
+    /// </summary>
+    public void SetHoverMode(bool enabled)
+    {
+        _hoverMode = enabled;
+        if (enabled)
+        {
+            _isActive = false;
+            ResetScrollPosition();
+        }
+    }
+
+    /// <summary>
+    /// Set scroll speed.
+    /// </summary>
+    public void SetScrollSpeed(float speed)
+    {
+        _scrollSpeed = speed;
+    }
+
+    /// <summary>
+    /// Start scrolling (for hover mode).
+    /// </summary>
+    public void StartScroll()
+    {
+        if (!_hoverMode) return;
+        _isActive = true;
+        _scrollOffset = 0f;
+        _pauseTimer = 0.5f;  // Short pause before starting
+        _pausingAtEnd = false;
+        CheckOverflow();
+    }
+
+    /// <summary>
+    /// Stop scrolling and reset (for hover mode).
+    /// </summary>
+    public void StopScroll()
+    {
+        if (!_hoverMode) return;
+        _isActive = false;
+        ResetScrollPosition();
+    }
+
+    private void ResetScrollPosition()
+    {
+        _scrollOffset = 0f;
+        IsScrolling = false;
+        _pausingAtEnd = false;
+        UpdateTextPosition();
+    }
+    #endregion
 }

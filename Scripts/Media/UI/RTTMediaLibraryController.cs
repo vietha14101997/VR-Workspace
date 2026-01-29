@@ -246,6 +246,9 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
             return;
         }
 
+        // Save current page to restore after rescan
+        _pendingPageNavigation = CurrentPage;
+
         // Clear the library cache to force fresh scan
         _libraryService.ClearLibraryCache();
 

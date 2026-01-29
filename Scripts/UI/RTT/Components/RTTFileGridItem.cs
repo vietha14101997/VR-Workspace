@@ -14,6 +14,7 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
     private Image _iconImage;
     private RectTransform _iconRect;
     private TextMeshProUGUI _nameText;
+    private MarqueeText _nameMarquee;  // For hover scrolling
     private Image _bgImage;
     private LayoutElement _iconContainerLE;
     private RectTransform _iconContainerRect;
@@ -43,6 +44,7 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
     private HoverEffectController _hoverController;
     private const float HOVER_SCALE = 1.05f;
     private const float HOVER_ANIMATION_SPEED = 12f;
+    private const float MARQUEE_SCROLL_SPEED = 80f;  // Faster than default 50
 
     // Font
     private TMP_FontAsset _font;
@@ -283,9 +285,17 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         _nameText.maxVisibleLines = 2;  // Allow 2 lines
 
         var textLE = textObj.AddComponent<LayoutElement>();
-        textLE.preferredHeight = 80f;  // Increased for 2 lines (32px * 2.5)
+        textLE.preferredHeight = 80f;  // For 2 lines (32px * 2.5)
         textLE.flexibleHeight = 0;
         textLE.minHeight = 80f;  // Ensure minimum height
+        
+        // TODO: Re-enable marquee after fixing layout issues
+        // Marquee is temporarily disabled as it causes text to disappear
+        // _nameMarquee = MarqueeText.Setup(_nameText, MARQUEE_SCROLL_SPEED, centerWhenFits: true);
+        // if (_nameMarquee != null)
+        // {
+        //     _nameMarquee.SetHoverMode(true);
+        // }
 
         // 4. Background (for highlighting)
         _bgImage = gameObject.AddComponent<Image>();
@@ -389,6 +399,9 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         if (_isEditMode && _checkboxHoverController != null)
             _checkboxHoverController.SetForceHover(true);
 
+        // Start marquee scroll on hover (disabled)
+        // _nameMarquee?.StartScroll();
+
         _onHoverEnter?.Invoke(FilePath);
     }
 
@@ -400,6 +413,9 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         // Forward hover exit to checkbox in edit mode
         if (_isEditMode && _checkboxHoverController != null)
             _checkboxHoverController.SetForceHover(false);
+
+        // Stop marquee scroll on exit (disabled)
+        // _nameMarquee?.StopScroll();
 
         _onHoverExit?.Invoke(FilePath);
     }
