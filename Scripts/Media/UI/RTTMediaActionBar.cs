@@ -20,17 +20,15 @@ public class RTTMediaActionBar : MonoBehaviour
     public event Action OnPlaylistClicked;
     #endregion
 
-    #region Configuration
-    [Header("Positioning")]
-    [SerializeField] private float gapMultiplier = 0.05f;  // Gap between panel and action bar
-    [SerializeField] private float barHeight = 0.08f;      // Height of action bar in world units
-    #endregion
-
     #region Private Fields
     private Transform _followTarget;
     private float _targetHeight;
-    private float _panelWidth;  // Width of the side panel
+    private float _panelWidth;
     private bool _initialized = false;
+
+    // Dimensions synced with RTTToolbar/RTTTaskbar
+    private float _frameHeight = 0.12f;      // Height of the invisible frame (matches Taskbar)
+    private float _spacingMult = 0.095f;      // Spacing multiplier (matches RTTToolbar)
 
     // Buttons
     private GameObject _container;
@@ -81,10 +79,19 @@ public class RTTMediaActionBar : MonoBehaviour
         _accentColor = accentColor;
         _font = font;
 
+        // Try to sync dimensions with RTTTaskbar if available
+        RTTToolbar toolbar = RTTToolbar.Instance;
+        if (toolbar != null && toolbar.TaskbarHeight > 0)
+        {
+            _frameHeight = toolbar.TaskbarHeight;
+            // Use standard gap multiplier from Toolbar logic
+            _spacingMult = 0.095f; 
+        }
+
         CreateButtons(font);
 
         _initialized = true;
-        Debug.Log($"[RTTMediaActionBar] Initialized, following: {_followTarget?.name}, panelWidth: {_panelWidth}");
+        Debug.Log($"[RTTMediaActionBar] Initialized, following: {_followTarget?.name}, frameHeight: {_frameHeight}, gapMult: {_spacingMult}");
     }
 
     /// <summary>
@@ -124,31 +131,38 @@ public class RTTMediaActionBar : MonoBehaviour
         canvas.renderMode = RenderMode.WorldSpace;
 
         // Button configuration
-        float buttonHeight = 67.5f;
+        float buttonHeight = 67.5f;  // Visual height of buttons
         float iconSize = 28f;
         float fontSize = 20;
-        float spacing = 8f;          // Tighter spacing between icon and text
+        float spacing = 8f;          
         float charWidth = 12f;
-        float sidePadding = 25f;     // Padding on left/right edges of button content
-        float buttonSpacing = 15f;   // Space between buttons on the bar
+        float sidePadding = 25f;     
+        float buttonSpacing = 15f;   
 
         // Button labels
         string playLabel = "Play";
         string favLabel = "Favorite";
         string playlistLabel = "Playlist";
 
-        // Calculate width for each button: Icon + Gap + Text + Side Padding
+        // Calculate width for each button
         float playWidth = iconSize + spacing + (playLabel.Length * charWidth) + (sidePadding * 2);
         float favWidth = iconSize + spacing + (favLabel.Length * charWidth) + (sidePadding * 2);
         float playlistWidth = iconSize + spacing + (playlistLabel.Length * charWidth) + (sidePadding * 2);
 
-        // Total width of all buttons + spacing between them
+        // Total width of buttons
         float totalButtonsWidth = playWidth + favWidth + playlistWidth + (buttonSpacing * 2);
 
-        // Canvas size based on panel width
+        // Canvas Setup:
+        // Width = Panel Width
+        // Height = Frame Height (in canvas pixels) -> derived from World Frame Height
         float logicalPanelWidth = _panelWidth * 1000f;
         float canvasWidth = logicalPanelWidth;
-        float canvasHeight = buttonHeight + 20f;
+        
+        // Convert world frame height to canvas pixels approx (assuming 1 unit ~= 1000px scale logic typically used or 1 pixel = X meters)
+        // RTTFilePagination uses PixelToMeter = 1.6f / 1920f ~= 0.000833
+        // So Canvas Pixels = World Meters / 0.000833 ~= World * 1200
+        // But here we use scale 0.001. So Canvas Pixels = World / 0.001 = World * 1000
+        float canvasHeight = _frameHeight * 1000f; 
 
         RectTransform canvasRT = _container.GetComponent<RectTransform>();
         canvasRT.sizeDelta = new Vector2(canvasWidth, canvasHeight);
@@ -159,9 +173,12 @@ public class RTTMediaActionBar : MonoBehaviour
         _container.AddComponent<GraphicRaycaster>();
 
         // Center the button group within the canvas
+        // Canvas origin is center.
+        // Group Center X = 0 relative to canvas center.
+        // Group Start X (leftmost edge) = -totalButtonsWidth / 2f
         float groupStartX = -totalButtonsWidth / 2f;
 
-        // Play Button (icon left, text right)
+        // Play Button
         float playX = groupStartX + playWidth / 2f;
         Sprite playIcon = Resources.Load<Sprite>("icon_play");
         var playConfig = new VRButtonFactory.ButtonConfig
@@ -176,8 +193,8 @@ public class RTTMediaActionBar : MonoBehaviour
             fontSize = (int)fontSize,
             font = font,
             spacing = spacing,
-            cornerRadius = 0.15f,    // Reduced corner radius (was 0.25f)
-            borderWidth = 0.055f,    // Thicker border
+            cornerRadius = 0.15f,    
+            borderWidth = 0.055f,    
             glowWidth = 0.06f,
             glowIntensity = 3f,
             popAmount = 0.03f
@@ -186,7 +203,7 @@ public class RTTMediaActionBar : MonoBehaviour
         PositionButton(playBtn, playX);
         _playButton = playBtn.GetComponent<Button>();
 
-        // Favourite Button (icon left, text right)
+        // Favourite Button
         float favX = groupStartX + playWidth + buttonSpacing + favWidth / 2f;
         Sprite favIcon = Resources.Load<Sprite>("icon_add_favorite");
         var favConfig = new VRButtonFactory.ButtonConfig
@@ -201,7 +218,7 @@ public class RTTMediaActionBar : MonoBehaviour
             fontSize = (int)fontSize,
             font = font,
             spacing = spacing,
-            cornerRadius = 0.15f,    // Reduced corner radius
+            cornerRadius = 0.15f,
             borderWidth = 0.055f,
             glowWidth = 0.06f,
             glowIntensity = 3f,
@@ -212,7 +229,7 @@ public class RTTMediaActionBar : MonoBehaviour
         _favouriteButton = favBtn.GetComponent<Button>();
         _favouriteIcon = favBtn.transform.Find("HitArea/Visuals/Content/Icon")?.GetComponent<Image>();
 
-        // Playlist Button (icon left, text right)
+        // Playlist Button
         float playlistX = groupStartX + playWidth + buttonSpacing + favWidth + buttonSpacing + playlistWidth / 2f;
         Sprite playlistIcon = Resources.Load<Sprite>("icon_add_playlist");
         var playlistConfig = new VRButtonFactory.ButtonConfig
@@ -227,7 +244,7 @@ public class RTTMediaActionBar : MonoBehaviour
             fontSize = (int)fontSize,
             font = font,
             spacing = spacing,
-            cornerRadius = 0.15f,    // Reduced corner radius
+            cornerRadius = 0.15f,
             borderWidth = 0.055f,
             glowWidth = 0.06f,
             glowIntensity = 3f,
@@ -237,7 +254,7 @@ public class RTTMediaActionBar : MonoBehaviour
         PositionButton(playlistBtn, playlistX);
         _playlistButton = playlistBtn.GetComponent<Button>();
 
-        Debug.Log($"[RTTMediaActionBar] Buttons created - Play: {playWidth}px, Favorite: {favWidth}px, Playlist: {playlistWidth}px");
+        Debug.Log($"[RTTMediaActionBar] Buttons created - CanvasHeight: {canvasHeight}px (World: {_frameHeight}m)");
     }
 
     private void PositionButton(GameObject btn, float xOffset)
@@ -246,6 +263,7 @@ public class RTTMediaActionBar : MonoBehaviour
         rt.anchorMin = new Vector2(0.5f, 0.5f);
         rt.anchorMax = new Vector2(0.5f, 0.5f);
         rt.pivot = new Vector2(0.5f, 0.5f);
+        // Anchor y=0 puts it in vertical center of the canvas (frame)
         rt.anchoredPosition = new Vector2(xOffset, 0);
     }
 
@@ -259,11 +277,10 @@ public class RTTMediaActionBar : MonoBehaviour
         Vector3 targetUp = _followTarget.up;
 
         float targetHalfHeight = _targetHeight / 2f;
-        float barHalfHeight = barHeight / 2f;
+        float frameHalfHeight = _frameHeight / 2f;
         
-        // Gap is 10% of button height (closely matches Toolbar spacing)
-        float buttonHeightWorld = 0.0675f;
-        float gap = buttonHeightWorld * 0.1f;
+        // Gap calculation matching RTTToolbar
+        float gap = _frameHeight * _spacingMult;
 
         // Step 1: Calculate top edge position E (below panel bottom)
         Vector3 targetBottom = targetCenter - targetUp * targetHalfHeight;
@@ -273,13 +290,14 @@ public class RTTMediaActionBar : MonoBehaviour
         Vector3 toE = E - cameraPos;
         float distToE = toE.magnitude;
 
-        float h = barHalfHeight;
+        float h = frameHalfHeight;
 
         // Edge case: camera too close
         if (distToE < 0.001f || distToE < h)
         {
             // Fallback: simple linear positioning
-            transform.position = targetBottom - Vector3.up * (gap + h);
+            // Position is E moved down by half height
+            transform.position = E - Vector3.up * h;
             Vector3 toCam = cameraPos - transform.position;
             if (toCam.sqrMagnitude > 0.001f)
             {
