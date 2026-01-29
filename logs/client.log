@@ -97,9 +97,11 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [RTTMediaLibrary] Building UI...
 
+[RTTFilePagination] UpdateDisplay: TotalPages=1
+
 [VirtualObjectsZoomController] Registered side panel: MediaNavigationPanel (side=-1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
-[RTTMediaLibrary] Placed MediaNavigationPanel: pos=(-0.81, 1000.00, 1.80)
+[RTTMediaLibrary] Placed MediaNavigationPanel: pos=(-0.94, 1000.00, 1.73)
 
 [RTTMenuFrame] UI built: 640x1080 logical pixels
 
@@ -135,7 +137,7 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [VirtualObjectsZoomController] Registered side panel: MediaDetailPanel (side=1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
-[RTTMediaLibrary] Placed MediaDetailPanel: pos=(1.31, 1000.00, 1.47)
+[RTTMediaLibrary] Placed MediaDetailPanel: pos=(1.20, 1000.00, 1.57)
 
 [HoverEffectController] AddEffect 'scale' to PlayButton, TargetVisuals=PlayButton
 
@@ -151,7 +153,7 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [HoverEffectController] AddEffect 'cursor_change' to HitArea, TargetVisuals=Visuals
 
-[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-590450
+[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-178158
 
 [HoverEffectController] AddEffect 'scale' to Btn_Rename, TargetVisuals=Btn_Rename
 
@@ -181,6 +183,8 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [RTTMediaLibraryController] Created 13 groups for 13 items
 
+[RTTMediaGrid] CalculatePageLayout: fullScrollHeight=5800, viewportHeight=748.1688, pages=8, groups=13, items=13
+
 [RTTMediaGrid] SetData: 13 items, 13 groups, columnsPerRow=4, visibleRowCount=4, gridHeight=748.1688, rowHeight=350
 
 [RTTMediaGrid] UpdateVisibleItems (ALL): indices=0-12, total=13
@@ -188,6 +192,34 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 [RTTMediaGrid] Queuing 13 NEW items for binding (total pending=13)
 
 [RTTMediaGrid] ProgressiveBindCoroutine started, pending=13, bindsPerFrame=50
+
+[RTTMediaGrid] UpdateVisibleGroupHeaders: groupCount=13, scrollY=0, viewportTop=0, viewportBottom=748.1688
+
+  Group[0]: YOffset=20, ContentHeight=350, items=1
+
+  Group[1]: YOffset=460, ContentHeight=350, items=1
+
+  Group[2]: YOffset=900, ContentHeight=350, items=1
+
+  Group[3]: YOffset=1340, ContentHeight=350, items=1
+
+  Group[4]: YOffset=1780, ContentHeight=350, items=1
+
+  Group[5]: YOffset=2220, ContentHeight=350, items=1
+
+  Group[6]: YOffset=2660, ContentHeight=350, items=1
+
+  Group[7]: YOffset=3100, ContentHeight=350, items=1
+
+  Group[8]: YOffset=3540, ContentHeight=350, items=1
+
+  Group[9]: YOffset=3980, ContentHeight=350, items=1
+
+  Group[10]: YOffset=4420, ContentHeight=350, items=1
+
+  Group[11]: YOffset=4860, ContentHeight=350, items=1
+
+  Group[12]: YOffset=5300, ContentHeight=350, items=1
 
 [RTTMediaGrid] BindItemAtIndex: index=0, title=videoplayback, col=0, pos=(248,-270)
 
@@ -285,7 +317,11 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [Thumb] DISK HIT: vết xước 1.mp4 size=512 skip=False
 
-[RTTMediaLibraryController] Showing 13 videos in 13 groups (Category: videos, Search: '')
+[RTTFilePagination] SetPage Called: Current=1, TotalInput=8
+
+[RTTFilePagination] UpdateDisplay: TotalPages=8
+
+[RTTMediaLibraryController] Showing 13 videos in 13 groups (Category: videos, Search: '', Page: 1/8)
 
 [RTTMediaLibrary] Center grid created
 
@@ -299,7 +335,11 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [MediaLibraryService] Starting background scan (existing: 1295 items)
 
-[MediaLibraryService] Background scan complete - no new items (136ms)
+[RTTMediaLibraryController] PageSize set to 8
+
+[RTTMediaLibrary] InitializePageSizeDeferred: itemsPerPage=8
+
+[MediaLibraryService] Background scan complete - no new items (443ms)
 
 [RTTManager] App media prepared
 
@@ -319,11 +359,17 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [RTTTaskbar] SelectSlot(1) called, current active: 1
 
-[VirtualObjectsZoomController] Zoom set to 1.90m (delta: 0.100m)
+[RTTFilePagination] SetPage Called: Current=2, TotalInput=8
 
-[VirtualObjectsZoomController] Zoom set to 2.00m (delta: 0.100m)
+[RTTMediaLibraryController] Page changed to 2/8
 
-[VirtualObjectsZoomController] Zoom set to 1.90m (delta: -0.100m)
+[RTTMediaGrid] No items to bind (all 13 already visible)
 
-[VirtualObjectsZoomController] Zoom set to 1.80m (delta: -0.100m)
+[RTTFilePagination] SetPage Called: Current=3, TotalInput=8
+
+[RTTMediaLibraryController] Page changed to 3/8
+
+[RTTFilePagination] SetPage Called: Current=4, TotalInput=8
+
+[RTTMediaLibraryController] Page changed to 4/8
 

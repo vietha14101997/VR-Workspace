@@ -167,8 +167,8 @@ public class RTTMediaGrid : MonoBehaviour
 
         _scrollRect.content = _contentRect;
 
-        // 4. Sticky Header Container (rendered on top of viewport)
-        CreateStickyHeader();
+        // 4. Sticky Header DISABLED - headers now scroll with content
+        // CreateStickyHeader();
     }
 
     private void CreateStickyHeader()
@@ -208,7 +208,8 @@ public class RTTMediaGrid : MonoBehaviour
     private void CalculateGridMetrics()
     {
         float availableWidth = _width - _paddingLeft - _paddingRight;
-        _columnsPerRow = Mathf.Max(1, Mathf.FloorToInt((availableWidth + _spacingX) / (_cellWidth + _spacingX)));
+        // HARDCODE: Always use 4 columns per row as per user requirement
+        _columnsPerRow = 4;
         _rowHeight = _cellHeight + _spacingY;
         _visibleRowCount = Mathf.CeilToInt(_height / _rowHeight) + 1;
 
@@ -444,8 +445,9 @@ public class RTTMediaGrid : MonoBehaviour
     }
 
     /// <summary>
-    /// Calculate page layouts based on groups and available viewport height.
-    /// Groups are kept together when possible, split with sticky headers when too large.
+    /// Calculate page layouts based on new rules:
+    /// Step 1: Calculate full scroll height from groups (Header + Grid per group)
+    /// Step 2: Divide by viewport height to get page count (round up if remainder)
     /// </summary>
     private void CalculatePageLayout()
     {
@@ -457,217 +459,79 @@ public class RTTMediaGrid : MonoBehaviour
             return;
         }
 
-        // Available height per page (excluding sticky header space at top)
-        float availableHeight = _height - _paddingTop - _paddingBottom;
-        float stickyHeaderHeight = GROUP_HEADER_HEIGHT + _spacingY;
-
-        // If no groups, fall back to simple row-based pagination
-        if (_groupData.Count == 0)
+        // Step 1: Calculate full scroll height
+        float fullScrollHeight = CalculateFullScrollHeight();
+        
+        // Step 2: Calculate page count
+        // Divide by viewport height (_height = body area), round up if remainder
+        TotalPages = Mathf.Max(1, Mathf.CeilToInt(fullScrollHeight / _height));
+        
+        // Generate simple page layouts for scroll positions
+        float contentHeight = fullScrollHeight;
+        float viewportHeight = _height;
+        float scrollRange = Mathf.Max(0, contentHeight - viewportHeight);
+        
+        for (int i = 0; i < TotalPages; i++)
         {
-            CalculateSimplePageLayout(availableHeight);
-            return;
-        }
-
-        int pageNumber = 1;
-        float usedHeight = 0f;
-        int globalItemIndex = 0;
-        PageLayoutInfo currentPage = new PageLayoutInfo
-        {
-            PageNumber = pageNumber,
-            StartY = 0f,
-            FirstItemIndex = 0
-        };
-
-        for (int groupIdx = 0; groupIdx < _groupData.Count; groupIdx++)
-        {
-            var gd = _groupData[groupIdx];
-            var group = gd.Info;
-
-            // Calculate full group height (header + all items)
-            float headerHeight = GROUP_HEADER_HEIGHT + _spacingY;
-            float groupHeight = headerHeight + gd.ContentHeight;
-
-            // Case 1: Group fits entirely on current page
-            if (usedHeight + groupHeight <= availableHeight)
+            float startY;
+            if (TotalPages == 1)
             {
-                var slice = new PageGroupSlice
-                {
-                    Group = group,
-                    GroupIndex = groupIdx,
-                    StartIndexInGroup = 0,
-                    EndIndexInGroup = group.Count - 1,
-                    ShowHeader = true,
-                    IsContinued = false,
-                    YOffsetInPage = usedHeight,
-                    Height = groupHeight
-                };
-                currentPage.GroupSlices.Add(slice);
-                usedHeight += groupHeight;
-                globalItemIndex += group.Count;
+                startY = 0;
             }
-            // Case 2: Group fits on a new page (but not current)
-            else if (groupHeight <= availableHeight && usedHeight > 0)
-            {
-                // Finish current page
-                currentPage.LastItemIndex = globalItemIndex - 1;
-                currentPage.TotalHeight = usedHeight;
-                _pageLayouts.Add(currentPage);
-
-                // Start new page
-                pageNumber++;
-                currentPage = new PageLayoutInfo
-                {
-                    PageNumber = pageNumber,
-                    StartY = gd.YOffset,
-                    FirstItemIndex = globalItemIndex
-                };
-                usedHeight = 0f;
-
-                var slice = new PageGroupSlice
-                {
-                    Group = group,
-                    GroupIndex = groupIdx,
-                    StartIndexInGroup = 0,
-                    EndIndexInGroup = group.Count - 1,
-                    ShowHeader = true,
-                    IsContinued = false,
-                    YOffsetInPage = 0f,
-                    Height = groupHeight
-                };
-                currentPage.GroupSlices.Add(slice);
-                usedHeight = groupHeight;
-                globalItemIndex += group.Count;
-            }
-            // Case 3: Group needs to be split across multiple pages
             else
             {
-                int remainingItems = group.Count;
-                int startIndexInGroup = 0;
-                bool isFirstSlice = true;
-
-                while (remainingItems > 0)
-                {
-                    // If current page has content, finish it first (unless it's the first slice)
-                    if (!isFirstSlice && usedHeight > 0)
-                    {
-                        currentPage.LastItemIndex = globalItemIndex - 1;
-                        currentPage.TotalHeight = usedHeight;
-                        _pageLayouts.Add(currentPage);
-
-                        pageNumber++;
-                        currentPage = new PageLayoutInfo
-                        {
-                            PageNumber = pageNumber,
-                            StartY = gd.YOffset + headerHeight + (startIndexInGroup / _columnsPerRow) * _rowHeight,
-                            FirstItemIndex = globalItemIndex
-                        };
-                        usedHeight = 0f;
-                    }
-
-                    // Calculate how many items fit on this page
-                    // Account for sticky header on continued pages
-                    float effectiveAvailable = availableHeight - usedHeight;
-                    if (!isFirstSlice || usedHeight > 0)
-                    {
-                        // Reserve space for sticky header on continued slices
-                        effectiveAvailable -= stickyHeaderHeight;
-                    }
-                    else
-                    {
-                        // First slice needs full header
-                        effectiveAvailable -= headerHeight;
-                    }
-
-                    int rowsThatFit = Mathf.Max(1, Mathf.FloorToInt(effectiveAvailable / _rowHeight));
-                    int itemsThatFit = Mathf.Min(rowsThatFit * _columnsPerRow, remainingItems);
-
-                    float sliceHeight = isFirstSlice ? headerHeight : stickyHeaderHeight;
-                    sliceHeight += Mathf.CeilToInt((float)itemsThatFit / _columnsPerRow) * _rowHeight;
-
-                    var slice = new PageGroupSlice
-                    {
-                        Group = group,
-                        GroupIndex = groupIdx,
-                        StartIndexInGroup = startIndexInGroup,
-                        EndIndexInGroup = startIndexInGroup + itemsThatFit - 1,
-                        ShowHeader = true, // Always show header (original or sticky)
-                        IsContinued = !isFirstSlice,
-                        YOffsetInPage = usedHeight,
-                        Height = sliceHeight
-                    };
-                    currentPage.GroupSlices.Add(slice);
-
-                    usedHeight += sliceHeight;
-                    startIndexInGroup += itemsThatFit;
-                    globalItemIndex += itemsThatFit;
-                    remainingItems -= itemsThatFit;
-                    isFirstSlice = false;
-
-                    // If page is full and there's more, start new page
-                    if (remainingItems > 0)
-                    {
-                        currentPage.LastItemIndex = globalItemIndex - 1;
-                        currentPage.TotalHeight = usedHeight;
-                        _pageLayouts.Add(currentPage);
-
-                        pageNumber++;
-                        currentPage = new PageLayoutInfo
-                        {
-                            PageNumber = pageNumber,
-                            StartY = gd.YOffset + headerHeight + (startIndexInGroup / _columnsPerRow) * _rowHeight,
-                            FirstItemIndex = globalItemIndex
-                        };
-                        usedHeight = 0f;
-                    }
-                }
+                // Proportional scroll position for each page
+                startY = scrollRange * ((float)i / (TotalPages - 1));
             }
+            
+            var page = new PageLayoutInfo
+            {
+                PageNumber = i + 1,
+                StartY = startY,
+                FirstItemIndex = 0,
+                LastItemIndex = _allVideos.Count - 1,
+                TotalHeight = viewportHeight
+            };
+            _pageLayouts.Add(page);
         }
-
-        // Add the last page
-        if (currentPage.GroupSlices.Count > 0)
-        {
-            currentPage.LastItemIndex = _allVideos.Count - 1;
-            currentPage.TotalHeight = usedHeight;
-            _pageLayouts.Add(currentPage);
-        }
-
-        TotalPages = _pageLayouts.Count;
-        Debug.Log($"[RTTMediaGrid] CalculatePageLayout: {TotalPages} pages, {_groupData.Count} groups, {_allVideos.Count} items");
+        
+        Debug.Log($"[RTTMediaGrid] CalculatePageLayout: fullScrollHeight={fullScrollHeight}, viewportHeight={_height}, pages={TotalPages}, groups={_groupData.Count}, items={_allVideos.Count}");
     }
 
     /// <summary>
-    /// Simple page layout when no groups are present.
+    /// Calculate full scroll content height based on groups.
+    /// Each group = Header height (GROUP_HEADER_HEIGHT) + Grid height (rows based on items)
+    /// Uses _columnsPerRow (hardcoded to 4)
     /// </summary>
-    private void CalculateSimplePageLayout(float availableHeight)
+    private float CalculateFullScrollHeight()
     {
-        int rowsPerPage = Mathf.Max(1, Mathf.FloorToInt(availableHeight / _rowHeight));
-        int itemsPerPage = rowsPerPage * _columnsPerRow;
-        int totalItems = _allVideos.Count;
-
-        int pageNumber = 1;
-        int itemIndex = 0;
-
-        while (itemIndex < totalItems)
+        // Use the class field _columnsPerRow which is set to 4 in CalculateGridMetrics
+        
+        float totalHeight = _paddingTop;
+        
+        if (_groupData.Count > 0)
         {
-            int itemsOnPage = Mathf.Min(itemsPerPage, totalItems - itemIndex);
-            int rowsOnPage = Mathf.CeilToInt((float)itemsOnPage / _columnsPerRow);
-
-            var page = new PageLayoutInfo
+            foreach (var gd in _groupData)
             {
-                PageNumber = pageNumber,
-                StartY = _paddingTop + (pageNumber - 1) * rowsPerPage * _rowHeight,
-                FirstItemIndex = itemIndex,
-                LastItemIndex = itemIndex + itemsOnPage - 1,
-                TotalHeight = rowsOnPage * _rowHeight
-            };
-            _pageLayouts.Add(page);
-
-            itemIndex += itemsOnPage;
-            pageNumber++;
+                // Add header height
+                totalHeight += GROUP_HEADER_HEIGHT + _spacingY;
+                
+                // Calculate grid height: items / _columnsPerRow, round up for remainder
+                int rowCount = Mathf.CeilToInt((float)gd.Info.Count / _columnsPerRow);
+                totalHeight += rowCount * _rowHeight;
+            }
         }
-
-        TotalPages = _pageLayouts.Count;
+        else
+        {
+            // No groups - simple calculation
+            int totalRows = Mathf.CeilToInt((float)_allVideos.Count / _columnsPerRow);
+            totalHeight += totalRows * _rowHeight;
+        }
+        
+        totalHeight += _paddingBottom;
+        return totalHeight;
     }
+
 
     /// <summary>
     /// Get the page layout for a specific page number.
@@ -743,16 +607,25 @@ public class RTTMediaGrid : MonoBehaviour
     private void OnScrollChanged(Vector2 normalizedPos)
     {
         UpdateVisibleItems();
+        UpdateVisibleGroupHeaders();  // FIX: Update group headers when scrolling
         UpdateStickyHeader();
     }
 
     /// <summary>
     /// Update the sticky header based on current scroll position.
-    /// Shows the group header for the topmost visible group.
+    /// DISABLED: Headers now just scroll with content, no sticky behavior.
     /// </summary>
     private void UpdateStickyHeader()
     {
-        if (_stickyHeader == null || _stickyHeaderContainer == null) return;
+        // DISABLED - sticky header is no longer used
+        if (_stickyHeaderContainer != null)
+        {
+            _stickyHeaderContainer.gameObject.SetActive(false);
+        }
+        return;
+
+        // Original logic commented out:
+        // if (_stickyHeader == null || _stickyHeaderContainer == null) return;
 
         // Don't show sticky header if no groups
         if (_groupData.Count == 0)
@@ -1095,6 +968,14 @@ public class RTTMediaGrid : MonoBehaviour
         float viewportTop = scrollY;
         float viewportBottom = scrollY + _height;
         float headerBuffer = GROUP_HEADER_HEIGHT * 2;  // Buffer zone
+        
+        // DEBUG: Log group data
+        Debug.Log($"[RTTMediaGrid] UpdateVisibleGroupHeaders: groupCount={_groupData.Count}, scrollY={scrollY}, viewportTop={viewportTop}, viewportBottom={viewportBottom}");
+        for (int dbgIdx = 0; dbgIdx < _groupData.Count; dbgIdx++)
+        {
+            var dbgGd = _groupData[dbgIdx];
+            Debug.Log($"  Group[{dbgIdx}]: YOffset={dbgGd.YOffset}, ContentHeight={dbgGd.ContentHeight}, items={dbgGd.Info.Count}");
+        }
 
         // Hide headers outside viewport
         List<int> toRemove = new List<int>();
@@ -1195,36 +1076,51 @@ public class RTTMediaGrid : MonoBehaviour
 
         Canvas.ForceUpdateCanvases();
 
-        float targetY;
-
-        // Use pre-calculated page layout if available
-        if (_pageLayouts.Count > 0 && pageIndex >= 1 && pageIndex <= _pageLayouts.Count)
-        {
-            var pageLayout = _pageLayouts[pageIndex - 1];
-            targetY = pageLayout.StartY;
-
-            // Update sticky header when page changes
-            UpdateStickyHeader();
-        }
-        else
-        {
-            // Fallback to simple row-based calculation
-            int rowsPerPage = GetVisibleRowsForPagination();
-            int targetRow = (pageIndex - 1) * rowsPerPage;
-            targetY = _paddingTop + targetRow * _rowHeight;
-        }
-
-        if (pageIndex == 1) targetY = 0;
-
         float contentHeight = _contentRect.rect.height;
         float viewportHeight = _scrollRect.viewport.rect.height;
         float maxScrollY = Mathf.Max(0, contentHeight - viewportHeight);
 
+        float targetY;
+
+        // Step 3: Special scroll rules
+        if (TotalPages <= 1)
+        {
+            // Only one page - scroll to top
+            targetY = 0;
+        }
+        else if (pageIndex == 1)
+        {
+            // First page: scroll to top
+            targetY = 0;
+        }
+        else if (pageIndex >= TotalPages)
+        {
+            // Last page: scroll to bottom
+            targetY = maxScrollY;
+        }
+        else
+        {
+            // Middle pages: use pre-calculated layout positions
+            if (_pageLayouts.Count > 0 && pageIndex >= 1 && pageIndex <= _pageLayouts.Count)
+            {
+                targetY = _pageLayouts[pageIndex - 1].StartY;
+            }
+            else
+            {
+                // Fallback: proportional scroll
+                targetY = maxScrollY * ((float)(pageIndex - 1) / (TotalPages - 1));
+            }
+        }
+
         targetY = Mathf.Clamp(targetY, 0, maxScrollY);
+
+        // Update sticky header
+        UpdateStickyHeader();
 
         if (_scrollCoroutine != null) StopCoroutine(_scrollCoroutine);
         _scrollCoroutine = StartCoroutine(SmoothScroll(targetY, 0.3f));
     }
+
 
     private IEnumerator SmoothScroll(float targetY, float duration)
     {
