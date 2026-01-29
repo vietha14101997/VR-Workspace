@@ -407,14 +407,16 @@ public class RTTMediaLibrary : MonoBehaviour
     {
         if (_rightFrame == null) return;
 
-        // Get panel world height for positioning calculations
+        // Get panel world size for positioning calculations
         Vector2 panelSize = _rightFrame.GetWorldSize();
         float targetHeight = panelSize.y;
+        float panelWidth = panelSize.x;
 
         // Create action bar that follows the right panel
         _mediaActionBar = RTTMediaActionBar.Create(
             _rightFrame.transform,
             targetHeight,
+            panelWidth,
             _primaryColor,
             _accentColor,
             _font

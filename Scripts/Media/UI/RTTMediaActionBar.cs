@@ -29,6 +29,7 @@ public class RTTMediaActionBar : MonoBehaviour
     #region Private Fields
     private Transform _followTarget;
     private float _targetHeight;
+    private float _panelWidth;  // Width of the side panel
     private bool _initialized = false;
 
     // Buttons
@@ -37,6 +38,8 @@ public class RTTMediaActionBar : MonoBehaviour
     private Button _favouriteButton;
     private Button _playlistButton;
     private Image _favouriteIcon;
+    private TMP_FontAsset _font;
+    private bool _isFavourite = false;
 
     // Theme
     private Color _primaryColor;
@@ -69,17 +72,19 @@ public class RTTMediaActionBar : MonoBehaviour
     /// <summary>
     /// Initialize with follow target and theme colors.
     /// </summary>
-    public void Initialize(Transform followTarget, float targetHeight, Color primaryColor, Color accentColor, TMP_FontAsset font)
+    public void Initialize(Transform followTarget, float targetHeight, float panelWidth, Color primaryColor, Color accentColor, TMP_FontAsset font)
     {
         _followTarget = followTarget;
         _targetHeight = targetHeight;
+        _panelWidth = panelWidth;
         _primaryColor = primaryColor;
         _accentColor = accentColor;
+        _font = font;
 
         CreateButtons(font);
 
         _initialized = true;
-        Debug.Log($"[RTTMediaActionBar] Initialized, following: {_followTarget?.name}");
+        Debug.Log($"[RTTMediaActionBar] Initialized, following: {_followTarget?.name}, panelWidth: {_panelWidth}");
     }
 
     /// <summary>
@@ -87,9 +92,10 @@ public class RTTMediaActionBar : MonoBehaviour
     /// </summary>
     public void UpdateFavouriteState(bool isFavourite)
     {
+        _isFavourite = isFavourite;
         if (_favouriteIcon == null) return;
 
-        Sprite icon = Resources.Load<Sprite>(isFavourite ? "icon_heart_filled" : "icon_heart_outline");
+        Sprite icon = Resources.Load<Sprite>(isFavourite ? "icon_remove_favorite" : "icon_add_favorite");
         if (icon != null) _favouriteIcon.sprite = icon;
         _favouriteIcon.color = isFavourite ? _accentColor : Color.white;
     }
@@ -117,82 +123,115 @@ public class RTTMediaActionBar : MonoBehaviour
         Canvas canvas = _container.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.WorldSpace;
 
+        // Button configuration
+        float buttonHeight = 90f;  // Match RTTFilePagination
+        float iconSize = 36f;      // Consistent icon size for all buttons
+        float fontSize = 24;
+        float spacing = 15f;       // Space between buttons
+        float charWidth = 14f;     // Approximate width per character at fontSize 24
+        float iconPadding = 20f;   // Padding around icon
+        float textPadding = 30f;   // Padding around text (left + right)
+
+        // Button labels
+        string playLabel = "Play";
+        string favLabel = "Favorite";
+        string playlistLabel = "Playlist";
+
+        // Calculate width for each button based on text length
+        float playWidth = iconSize + iconPadding + (playLabel.Length * charWidth) + textPadding;
+        float favWidth = iconSize + iconPadding + (favLabel.Length * charWidth) + textPadding;
+        float playlistWidth = iconSize + iconPadding + (playlistLabel.Length * charWidth) + textPadding;
+
+        // Total width of all buttons + spacing
+        float totalButtonsWidth = playWidth + favWidth + playlistWidth + (spacing * 2);
+
+        // Canvas size based on panel width
+        float logicalPanelWidth = _panelWidth * 1000f;
+        float canvasWidth = logicalPanelWidth;
+        float canvasHeight = buttonHeight + 20f;
+
         RectTransform canvasRT = _container.GetComponent<RectTransform>();
-        canvasRT.sizeDelta = new Vector2(300, 100);
-        canvasRT.localScale = Vector3.one * 0.001f;  // Scale down to world units
+        canvasRT.sizeDelta = new Vector2(canvasWidth, canvasHeight);
+        canvasRT.localScale = Vector3.one * 0.001f;
 
         // Add CanvasScaler and GraphicRaycaster
         _container.AddComponent<CanvasScaler>();
         _container.AddComponent<GraphicRaycaster>();
 
-        // Button configuration
-        float buttonSize = 75f;
-        float spacing = 20f;
-        float totalWidth = (buttonSize * 3) + (spacing * 2);
-        float startX = -totalWidth / 2f + buttonSize / 2f;
+        // Center the button group within the canvas
+        float groupStartX = -totalButtonsWidth / 2f;
 
-        // Play Button
+        // Play Button (icon left, text right)
+        float playX = groupStartX + playWidth / 2f;
         Sprite playIcon = Resources.Load<Sprite>("icon_play");
         var playConfig = new VRButtonFactory.ButtonConfig
         {
-            label = "",
+            label = playLabel,
             icon = playIcon,
             themeColor = _accentColor,
-            width = buttonSize,
-            height = buttonSize,
-            iconOnly = true,
-            iconSize = 39f,
+            width = playWidth,
+            height = buttonHeight,
+            horizontalLayout = true,
+            iconSize = iconSize,
+            fontSize = (int)fontSize,
+            font = font,
             borderWidth = 0.04f,
-            glowWidth = 0.08f,
-            glowIntensity = 4f,
-            popAmount = 0.05f
+            glowWidth = 0.06f,
+            glowIntensity = 3f,
+            popAmount = 0.03f
         };
         GameObject playBtn = VRButtonFactory.CreateButton(canvasRT, playConfig, () => OnPlayClicked?.Invoke());
-        PositionButton(playBtn, startX);
+        PositionButton(playBtn, playX);
         _playButton = playBtn.GetComponent<Button>();
 
-        // Favourite Button
-        Sprite heartIcon = Resources.Load<Sprite>("icon_heart_outline");
+        // Favourite Button (icon left, text right)
+        float favX = groupStartX + playWidth + spacing + favWidth / 2f;
+        Sprite favIcon = Resources.Load<Sprite>("icon_add_favorite");
         var favConfig = new VRButtonFactory.ButtonConfig
         {
-            label = "",
-            icon = heartIcon,
+            label = favLabel,
+            icon = favIcon,
             themeColor = _primaryColor,
-            width = buttonSize,
-            height = buttonSize,
-            iconOnly = true,
-            iconSize = 39f,
+            width = favWidth,
+            height = buttonHeight,
+            horizontalLayout = true,
+            iconSize = iconSize,
+            fontSize = (int)fontSize,
+            font = font,
             borderWidth = 0.04f,
-            glowWidth = 0.08f,
-            glowIntensity = 4f,
-            popAmount = 0.05f
+            glowWidth = 0.06f,
+            glowIntensity = 3f,
+            popAmount = 0.03f
         };
         GameObject favBtn = VRButtonFactory.CreateButton(canvasRT, favConfig, () => OnFavouriteClicked?.Invoke());
-        PositionButton(favBtn, startX + buttonSize + spacing);
+        PositionButton(favBtn, favX);
         _favouriteButton = favBtn.GetComponent<Button>();
         _favouriteIcon = favBtn.transform.Find("HitArea/Visuals/Content/Icon")?.GetComponent<Image>();
 
-        // Playlist Button
-        Sprite playlistIcon = Resources.Load<Sprite>("icon_playlist_add");
+        // Playlist Button (icon left, text right)
+        float playlistX = groupStartX + playWidth + spacing + favWidth + spacing + playlistWidth / 2f;
+        Sprite playlistIcon = Resources.Load<Sprite>("icon_add_playlist");
         var playlistConfig = new VRButtonFactory.ButtonConfig
         {
-            label = "",
+            label = playlistLabel,
             icon = playlistIcon,
             themeColor = _primaryColor,
-            width = buttonSize,
-            height = buttonSize,
-            iconOnly = true,
-            iconSize = 39f,
+            width = playlistWidth,
+            height = buttonHeight,
+            horizontalLayout = true,
+            iconSize = iconSize,
+            fontSize = (int)fontSize,
+            font = font,
             borderWidth = 0.04f,
-            glowWidth = 0.08f,
-            glowIntensity = 4f,
-            popAmount = 0.05f
+            glowWidth = 0.06f,
+            glowIntensity = 3f,
+            popAmount = 0.03f
         };
         GameObject playlistBtn = VRButtonFactory.CreateButton(canvasRT, playlistConfig, () => OnPlaylistClicked?.Invoke());
-        PositionButton(playlistBtn, startX + (buttonSize + spacing) * 2);
+        PositionButton(playlistBtn, playlistX);
         _playlistButton = playlistBtn.GetComponent<Button>();
 
-        Debug.Log("[RTTMediaActionBar] Buttons created");
+        Debug.Log($"[RTTMediaActionBar] Buttons created - Play: {playWidth}px, Favorite: {favWidth}px, Playlist: {playlistWidth}px");
     }
 
     private void PositionButton(GameObject btn, float xOffset)
@@ -215,7 +254,10 @@ public class RTTMediaActionBar : MonoBehaviour
 
         float targetHalfHeight = _targetHeight / 2f;
         float barHalfHeight = barHeight / 2f;
-        float gap = _targetHeight * gapMultiplier;
+        
+        // Gap is 5% of button height (90px = 0.09 world units at 0.001 scale)
+        float buttonHeightWorld = 0.09f;  // 90px * 0.001 scale
+        float gap = buttonHeightWorld * 0.05f;  // 5% of button height
 
         // Step 1: Calculate top edge position E (below panel bottom)
         Vector3 targetBottom = targetCenter - targetUp * targetHalfHeight;
@@ -283,7 +325,7 @@ public class RTTMediaActionBar : MonoBehaviour
     /// <summary>
     /// Create RTTMediaActionBar in VirtualObjects.
     /// </summary>
-    public static RTTMediaActionBar Create(Transform followTarget, float targetHeight, Color primaryColor, Color accentColor, TMP_FontAsset font)
+    public static RTTMediaActionBar Create(Transform followTarget, float targetHeight, float panelWidth, Color primaryColor, Color accentColor, TMP_FontAsset font)
     {
         GameObject barObj = new GameObject("RTTMediaActionBar");
 
@@ -295,7 +337,7 @@ public class RTTMediaActionBar : MonoBehaviour
         }
 
         RTTMediaActionBar actionBar = barObj.AddComponent<RTTMediaActionBar>();
-        actionBar.Initialize(followTarget, targetHeight, primaryColor, accentColor, font);
+        actionBar.Initialize(followTarget, targetHeight, panelWidth, primaryColor, accentColor, font);
 
         return actionBar;
     }
