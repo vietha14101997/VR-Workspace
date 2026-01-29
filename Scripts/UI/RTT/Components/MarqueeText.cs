@@ -37,11 +37,24 @@ public class MarqueeText : MonoBehaviour
     /// <param name="centerWhenFits">If true, center text when it fits; if false, align left</param>
     public static MarqueeText Setup(TextMeshProUGUI textComponent, float scrollSpeed = 50f, bool centerWhenFits = false)
     {
+        return Setup(textComponent, scrollSpeed, centerWhenFits, -1f);
+    }
+
+    /// <summary>
+    /// Setup with explicit height for LayoutGroup compatibility.
+    /// </summary>
+    /// <param name="textComponent">The TextMeshProUGUI to wrap</param>
+    /// <param name="scrollSpeed">Scroll speed in pixels per second</param>
+    /// <param name="centerWhenFits">If true, center text when it fits; if false, align left</param>
+    /// <param name="explicitHeight">Explicit height for the mask container. Use -1 to auto-detect.</param>
+    public static MarqueeText Setup(TextMeshProUGUI textComponent, float scrollSpeed, bool centerWhenFits, float explicitHeight)
+    {
         if (textComponent == null) return null;
 
         // Create mask container as parent
         GameObject maskObj = new GameObject("MarqueeMask");
         RectTransform originalParent = textComponent.transform.parent as RectTransform;
+        GameObject textGameObject = textComponent.gameObject;
         maskObj.transform.SetParent(originalParent, false);
 
         // Copy text's RectTransform settings to mask
@@ -55,17 +68,44 @@ public class MarqueeText : MonoBehaviour
         maskRT.offsetMin = textRT.offsetMin;
         maskRT.offsetMax = textRT.offsetMax;
 
+        // Copy LayoutElement from text to mask if it exists (for LayoutGroup compatibility)
+        var textLayoutElement = textGameObject.GetComponent<UnityEngine.UI.LayoutElement>();
+        if (textLayoutElement != null)
+        {
+            var maskLayoutElement = maskObj.AddComponent<UnityEngine.UI.LayoutElement>();
+            maskLayoutElement.minWidth = textLayoutElement.minWidth;
+            maskLayoutElement.minHeight = textLayoutElement.minHeight;
+            maskLayoutElement.preferredWidth = textLayoutElement.preferredWidth;
+            maskLayoutElement.preferredHeight = textLayoutElement.preferredHeight;
+            maskLayoutElement.flexibleWidth = textLayoutElement.flexibleWidth;
+            maskLayoutElement.flexibleHeight = textLayoutElement.flexibleHeight;
+            maskLayoutElement.ignoreLayout = textLayoutElement.ignoreLayout;
+            
+            // Remove LayoutElement from text since mask now handles layout
+            UnityEngine.Object.Destroy(textLayoutElement);
+        }
+        else if (explicitHeight > 0)
+        {
+            // Add LayoutElement with explicit height if specified
+            var maskLayoutElement = maskObj.AddComponent<UnityEngine.UI.LayoutElement>();
+            maskLayoutElement.preferredHeight = explicitHeight;
+            maskLayoutElement.minHeight = explicitHeight;
+            maskLayoutElement.flexibleHeight = 0;
+        }
+
         // Add mask component
         RectMask2D mask = maskObj.AddComponent<RectMask2D>();
 
         // Reparent text under mask
         textComponent.transform.SetParent(maskObj.transform, false);
 
-        // Reset text position within mask - anchor left
+        // Reset text position within mask - stretch vertically, expand horizontally
         textRT.anchorMin = new Vector2(0, 0);
         textRT.anchorMax = new Vector2(0, 1);
         textRT.pivot = new Vector2(0, 0.5f);
         textRT.anchoredPosition = Vector2.zero;
+        textRT.offsetMin = Vector2.zero;
+        textRT.offsetMax = Vector2.zero;
         // Width needs to be large enough to show full text
         textRT.sizeDelta = new Vector2(2000f, 0); // Large width, height from anchors
 
@@ -85,6 +125,15 @@ public class MarqueeText : MonoBehaviour
         return marquee;
     }
 
+    private void OnEnable()
+    {
+        // Re-check overflow when enabled, as layout might have changed or was invalid
+        if (_text != null)
+        {
+            SetText(_text.text);
+        }
+    }
+
     /// <summary>
     /// Set text and check if scrolling is needed.
     /// </summary>
@@ -97,8 +146,32 @@ public class MarqueeText : MonoBehaviour
         // Force layout update to get accurate text width
         _text.ForceMeshUpdate();
 
-        // Check overflow after layout
+        // Check overflow after layout - may need to retry if layout not ready
         Canvas.ForceUpdateCanvases();
+        
+        // If container has no width yet, delay the check
+        if (_maskRT != null && _maskRT.rect.width <= 0)
+        {
+            // Start coroutine to check after layout is ready
+            StartCoroutine(DelayedCheckOverflow());
+        }
+        else
+        {
+            CheckOverflow();
+        }
+    }
+
+    private System.Collections.IEnumerator DelayedCheckOverflow()
+    {
+        // Wait up to 5 frames for valid width
+        int visualFrames = 0;
+        while (_maskRT != null && _maskRT.rect.width <= 0 && visualFrames < 5)
+        {
+            yield return null; // Wait for Update
+            Canvas.ForceUpdateCanvases(); // Try to force update
+            visualFrames++;
+        }
+        
         CheckOverflow();
     }
 
@@ -170,6 +243,15 @@ public class MarqueeText : MonoBehaviour
     {
         if (_textRT == null || _maskRT == null) return;
 
+        float containerWidth = _maskRT.rect.width;
+        
+        // Safety: If container has no width yet, position at 0 (will be recalculated later)
+        if (containerWidth <= 0)
+        {
+            _textRT.anchoredPosition = Vector2.zero;
+            return;
+        }
+
         if (_isOverflowing)
         {
             // Scrolling mode - always from left
@@ -179,8 +261,7 @@ public class MarqueeText : MonoBehaviour
         {
             // Center text when it fits
             float textWidth = _text.preferredWidth;
-            float containerWidth = _maskRT.rect.width;
-            float centerOffset = (containerWidth - textWidth) / 2f;
+            float centerOffset = Mathf.Max(0, (containerWidth - textWidth) / 2f);
             _textRT.anchoredPosition = new Vector2(centerOffset, 0);
         }
         else
@@ -236,9 +317,15 @@ public class MarqueeText : MonoBehaviour
         if (!_hoverMode) return;
         _isActive = true;
         _scrollOffset = 0f;
-        _pauseTimer = 0.5f;  // Short pause before starting
         _pausingAtEnd = false;
+        
         CheckOverflow();
+        
+        // Override pause timer set by CheckOverflow to start immediately
+        if (_isOverflowing)
+        {
+            _pauseTimer = 0f;
+        }
     }
 
     /// <summary>

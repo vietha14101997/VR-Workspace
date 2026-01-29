@@ -87,8 +87,10 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         _currentFilePath = file.Path;
         _currentFile = file;
 
-        // Update text
-        if (_nameText != null)
+        // Update text - use marquee if available for proper positioning
+        if (_nameMarquee != null)
+            _nameMarquee.SetText(file.Name);
+        else if (_nameText != null)
             _nameText.text = file.Name;
 
         // Update icon
@@ -200,6 +202,11 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         // Reset background
         if (_bgImage != null)
             _bgImage.color = NormalColor;
+
+        // Force layout rebuild to ensure MarqueeText gets correct dimensions immediately
+        // This is critical when reusing items from pool
+        Canvas.ForceUpdateCanvases();
+        LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)transform);
     }
 
     /// <summary>
@@ -224,7 +231,7 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         // 1. Setup Layout - icon container expands, text fixed at bottom
         var layout = gameObject.AddComponent<VerticalLayoutGroup>();
         layout.childAlignment = TextAnchor.MiddleCenter;
-        layout.spacing = 10f;
+        layout.spacing = 5f; // Reduced from 10f to ensure text fits
         layout.padding = new RectOffset(10, 10, 15, 10);
         layout.childControlWidth = true;
         layout.childControlHeight = true;
@@ -237,9 +244,9 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         _iconContainerRect = iconContainer.AddComponent<RectTransform>();
 
         _iconContainerLE = iconContainer.AddComponent<LayoutElement>();
-        _iconContainerLE.preferredHeight = 200f;  // Reduced to make room for 2-line text
+        _iconContainerLE.preferredHeight = 220f;  // Fixed height for icon area
         _iconContainerLE.preferredWidth = 200f;
-        _iconContainerLE.flexibleHeight = 1;
+        _iconContainerLE.flexibleHeight = 0;  // Don't expand - let text have its space
 
         // Add RectMask2D for thumbnail cropping (center-crop overflow)
         iconContainer.AddComponent<RectMask2D>();
@@ -276,26 +283,29 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         if (_font != null) _nameText.font = _font;
         _nameText.raycastTarget = false;
         _nameText.text = "";
-        _nameText.alignment = TextAlignmentOptions.Center;
-        _nameText.fontSize = 32;  // Match List view font size
+        _nameText.alignment = TextAlignmentOptions.MidlineLeft; // Changed from Center to MidlineLeft for correct Marquee positioning
+        _nameText.fontSize = 32;  // Synced with RTTMediaGridItem
         _nameText.fontStyle = FontStyles.Bold;
         _nameText.color = Color.white;
         _nameText.overflowMode = TextOverflowModes.Ellipsis;
-        _nameText.enableWordWrapping = true;  // Enable word wrap
-        _nameText.maxVisibleLines = 2;  // Allow 2 lines
+        _nameText.enableWordWrapping = false;  // Single line for marquee
+        _nameText.maxVisibleLines = 1;
 
+        // Add LayoutElement BEFORE MarqueeText.Setup - it will be copied to mask container
         var textLE = textObj.AddComponent<LayoutElement>();
-        textLE.preferredHeight = 80f;  // For 2 lines (32px * 2.5)
+        textLE.preferredHeight = 60f;  // Single line (fontSize 32 ≈ 40px line height + padding)
         textLE.flexibleHeight = 0;
-        textLE.minHeight = 80f;  // Ensure minimum height
-        
-        // TODO: Re-enable marquee after fixing layout issues
-        // Marquee is temporarily disabled as it causes text to disappear
-        // _nameMarquee = MarqueeText.Setup(_nameText, MARQUEE_SCROLL_SPEED, centerWhenFits: true);
-        // if (_nameMarquee != null)
-        // {
-        //     _nameMarquee.SetHoverMode(true);
-        // }
+        textLE.minHeight = 60f;
+        textLE.minWidth = 100f; // Ensure minimum width so text doesn't collapse
+        textLE.flexibleWidth = 1f; // Allow expansion
+
+        // Setup marquee for hover scrolling (center when fits)
+        // MarqueeText.Setup will copy LayoutElement to its mask container
+        _nameMarquee = MarqueeText.Setup(_nameText, MARQUEE_SCROLL_SPEED, centerWhenFits: true);
+        if (_nameMarquee != null)
+        {
+            _nameMarquee.SetHoverMode(true);  // Only scroll on hover
+        }
 
         // 4. Background (for highlighting)
         _bgImage = gameObject.AddComponent<Image>();
@@ -399,8 +409,8 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         if (_isEditMode && _checkboxHoverController != null)
             _checkboxHoverController.SetForceHover(true);
 
-        // Start marquee scroll on hover (disabled)
-        // _nameMarquee?.StartScroll();
+        // Start marquee scroll on hover
+        _nameMarquee?.StartScroll();
 
         _onHoverEnter?.Invoke(FilePath);
     }
@@ -414,8 +424,8 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         if (_isEditMode && _checkboxHoverController != null)
             _checkboxHoverController.SetForceHover(false);
 
-        // Stop marquee scroll on exit (disabled)
-        // _nameMarquee?.StopScroll();
+        // Stop marquee scroll on exit
+        _nameMarquee?.StopScroll();
 
         _onHoverExit?.Invoke(FilePath);
     }

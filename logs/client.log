@@ -79,125 +79,373 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [RTTManager] Auto-recenter completed
 
-[RTTMenu] Created app frame: media
+[RTTMenu] Created app frame: folder
 
-[RTTManager] Preparing app: media in slot 1
+[RTTManager] Preparing app: folder in slot 1
 
-[RTTManager] Creating Media content...
+[RTTManager] Creating FileManager content...
 
-[VRVideoProjectionSystem] Created FlatProjectionRenderer
+[RTTFileManager] Building UI...
 
-[VRVideoProjectionSystem] Initialized
+[RTTFileManager] Loaded preferences: sortBy=Name, ascending=True, gridView=True
 
-[MediaLibraryService] Loading 1295 items from cache...
+[RTTFileManager] PlaceSidePanel: innerEdge=(-0.74, 1000.00, 1.85), panelPos=(-0.97, 1000.00, 1.72)
 
-[MediaLibraryService] Loaded 1295 items from cache (0 missing files)
+[VirtualObjectsZoomController] Registered side panel: FileNavigationPanel (side=-1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
-[VirtualObjectsZoomController] Registered side panel: MediaNavigationPanel (side=-1, mainW=1.6, sideW=0.5333334, gap=0.05)
+[RTTFileManager] Registered FileNavigationPanel with VirtualObjectsZoomController
+
+[RTTFileManager] Placed FileNavigationPanel: pos=(-0.97, 1000.00, 1.72)
 
 [RTTMenuFrame] UI built: 640x1080 logical pixels
 
-[HoverEffectController] AddEffect 'scale' to Item_all, TargetVisuals=Item_all
+[HoverEffectController] AddEffect 'scale' to Item_internal, TargetVisuals=Item_internal
 
-[HoverEffectController] AddEffect 'color' to Item_all, TargetVisuals=Item_all
+[HoverEffectController] AddEffect 'color' to Item_internal, TargetVisuals=Item_internal
+
+[FileSystemService] Root path set to: C:\Users\Admin
+
+[HoverEffectController] AddEffect 'scale' to Item_downloads, TargetVisuals=Item_downloads
+
+[HoverEffectController] AddEffect 'color' to Item_downloads, TargetVisuals=Item_downloads
 
 [HoverEffectController] AddEffect 'scale' to Item_videos, TargetVisuals=Item_videos
 
 [HoverEffectController] AddEffect 'color' to Item_videos, TargetVisuals=Item_videos
 
-[HoverEffectController] AddEffect 'scale' to Item_images, TargetVisuals=Item_images
+[HoverEffectController] AddEffect 'scale' to Item_music, TargetVisuals=Item_music
 
-[HoverEffectController] AddEffect 'color' to Item_images, TargetVisuals=Item_images
-
-[HoverEffectController] AddEffect 'scale' to Item_audio, TargetVisuals=Item_audio
-
-[HoverEffectController] AddEffect 'color' to Item_audio, TargetVisuals=Item_audio
+[HoverEffectController] AddEffect 'color' to Item_music, TargetVisuals=Item_music
 
 [HoverEffectController] AddEffect 'scale' to Item_recent, TargetVisuals=Item_recent
 
 [HoverEffectController] AddEffect 'color' to Item_recent, TargetVisuals=Item_recent
 
-[HoverEffectController] AddEffect 'scale' to Item_favorites, TargetVisuals=Item_favorites
+[RTTFileManager] PlaceSidePanel: innerEdge=(0.96, 1000.00, 1.75), panelPos=(1.17, 1000.00, 1.59)
 
-[HoverEffectController] AddEffect 'color' to Item_favorites, TargetVisuals=Item_favorites
+[VirtualObjectsZoomController] Registered side panel: FileDetailPanel (side=1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
-[HoverEffectController] AddEffect 'scale' to Item_playlists, TargetVisuals=Item_playlists
+[RTTFileManager] Registered FileDetailPanel with VirtualObjectsZoomController
 
-[HoverEffectController] AddEffect 'color' to Item_playlists, TargetVisuals=Item_playlists
+[RTTFileManager] Placed FileDetailPanel: pos=(1.17, 1000.00, 1.59)
 
-[RTTMediaLibrary] Left panel content created
+[RTTFileManager] CreateHeaderRows started, instance: -128458
 
-[VirtualObjectsZoomController] Registered side panel: MediaDetailPanel (side=1, mainW=1.6, sideW=0.5333334, gap=0.05)
-
-[HoverEffectController] AddEffect 'scale' to PlayButton, TargetVisuals=PlayButton
-
-[HoverEffectController] AddEffect 'scale' to Btn_Favorite, TargetVisuals=Btn_Favorite
-
-[HoverEffectController] AddEffect 'scale' to Btn_+ Playlist, TargetVisuals=Btn_+ Playlist
-
-[RTTMediaLibrary] Right panel content created
+[RTTFileManager] CreateViewOptionsPopup, _menuFrame null: False
 
 [RTTPopupMenu] CreateWorldSpace: layer 'VirtualObjects' = 3, mainCam: VRCamera
 
 [RTTPopupMenu] Created world-space popup
 
+[RTTFileManager] ViewOptionsPopup created, null: False
+
+[RTTFileManager] ViewOptionsPopup position offset: (-351, 25)
+
+[RTTFileManager] New Folder button created, _newFolderButton null: False
+
+[Controller] CanCreateFolderHere called, _currentPath: 'root'
+
+[FileSystemService] CanCreateFolderInPath called with path: 'root'
+
+[FileSystemService] Path is 'root' or empty, returning false
+
+[Controller] CanCreateFolderHere result: False
+
+[RTTFileManager] UpdateNewFolderButtonState: canCreate=False
+
+[RTTFileManager] BoxCollider.enabled set to False
+
+[RTTFileManager] New Folder button DISABLED - alpha=0.4
+
 [HoverEffectController] AddEffect 'cursor_change' to HitArea, TargetVisuals=Visuals
 
-[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-570504
+[RTTFileManager] Text Area found and offsetMin set to: (30.00, 0.00)
 
-[HoverEffectController] AddEffect 'scale' to Btn_Rename, TargetVisuals=Btn_Rename
+[RTTFileManager] CreateRow2 called
 
-[HoverEffectController] AddEffect 'scale' to Btn_Delete, TargetVisuals=Btn_Delete
+[RTTFileManager] Breadcrumb container set: True, instance: -128458
 
-[RTTMediaLibrary] After CreateHeaderRows: _headerRT=True, _breadcrumbContainer=True
+[RTTFileManager] EditControls container created - parent: Row2, sizeDelta: (-340.00, 0.00), rect: (x:0.00, y:-48.51, width:1430.00, height:97.02), instanceID: -130694
 
-[HoverEffectController] AddEffect 'scale' to PooledItem, TargetVisuals=PooledItem
+[RTTFileManager] CreateEditControlsInRow2 called, parent: EditControls, parent active: True
 
 [HoverEffectController] AddEffect 'scale' to Checkbox, TargetVisuals=Checkbox
 
-[RTTMediaLibrary] Creating 2 breadcrumb segments for: All Media > Videos
+[RTTFileManager] CreateEditModeActionButton: Rename, icon 'icon_rename' loaded: True
 
-[RTTMediaLibrary] Created 2 breadcrumb pills for path: All Media > Videos
+[HoverEffectController] AddEffect 'scale' to Btn_Rename, TargetVisuals=Btn_Rename
 
-[Cache] DISK READ: 0ms (206KB)
+[RTTFileManager] Rename button created: Btn_Rename
 
-[Cache] DISK DECODE: 3ms (512x288)
+[RTTFileManager] CreateEditModeActionButton: Copy, icon 'icon_copy' loaded: True
 
-[RTTMediaLibrary] Center grid created
+[HoverEffectController] AddEffect 'scale' to Btn_Copy, TargetVisuals=Btn_Copy
 
-[VRMediaAppController] Library UI built
+[RTTFileManager] Copy button created: Btn_Copy
 
-[VRMediaAppController] Media app created
+[RTTFileManager] CreateEditModeActionButton: Move, icon 'icon_move_folder' loaded: True
 
-[Cache] DISK READ: 0ms (279KB)
+[HoverEffectController] AddEffect 'scale' to Btn_Move, TargetVisuals=Btn_Move
 
-[Cache] DISK DECODE: 5ms (512x288)
+[RTTFileManager] CreateEditModeActionButton: Delete, icon 'icon_trash' loaded: True
 
-[RTTMediaLibrary] InitializePageSizeDeferred: itemsPerPage=8
+[HoverEffectController] AddEffect 'scale' to Btn_Delete, TargetVisuals=Btn_Delete
 
-[Cache] DISK READ: 0ms (115KB)
+[RTTFileManager] CreateEditControlsInRow2 completed - Rename: True, Copy: True (size: (164.00, 60.00)), Move: True (size: (164.00, 60.00)), Delete: True (size: (190.00, 60.00))
 
-[Cache] DISK DECODE: 2ms (512x230)
+[RTTFileManager] EditControls child count after creation: 5
 
-[Cache] DISK READ: 0ms (18KB)
+[RTTFileManager] _editControlsContainer reference instanceID: -130694, same object: True
 
-[Cache] DISK DECODE: 0ms (512x288)
+[RTTFileManager] EditControls set to inactive, activeSelf: False
 
-[Cache] DISK READ: 0ms (119KB)
+[RTTFileManager] CreateHeaderRows completed, breadcrumb null: True
 
-[Cache] DISK READ: 0ms (242KB)
+[RTTFileGrid] CalculateGridMetrics: width=1770, availableWidth=1730, columnsPerRow=4, cellWidth=395, spacingX=30
 
-[Cache] DISK DECODE: 4ms (512x230)
+[HoverEffectController] AddEffect 'scale' to PooledItem, TargetVisuals=PooledItem
 
-[RTTManager] App media prepared
+[RTTFileManager] Before OnViewReady - breadcrumb container null: True, instance: -128458
 
-[RTTTaskbar] RegisterApp called - slotIndex=1, icon=icon_media
+[Controller] SetSortOptionsNoRefresh: sortBy=Name, ascending=True
 
-[RTTTaskbar] SetSlotIcon - slot=AppBtn_AppSlot_1, icon=icon_media, slotIndex=1
+[Controller] View is ready. Checking storage permissions...
+
+[Controller] NavigateToInternal: path='root', restorePage=False, clickedFolder=''
+
+[Controller] Current state: _currentPath='root', _currentPage=1, _pageSize=10
+
+[Controller] Same path (normalized), skipping save
+
+[FileSystemService] Reading directory: C:\Users\Admin
+
+[FileSystemService] Raw file count from Directory.GetFiles: 43
+
+[FileSystemService] Checking file: .bash_history, Attributes: Archive
+
+[FileSystemService] ADDED file: .bash_history
+
+[FileSystemService] Checking file: .claude.json, Attributes: Archive
+
+[FileSystemService] ADDED file: .claude.json
+
+[FileSystemService] Checking file: .claude.json.backup, Attributes: Archive
+
+[FileSystemService] ADDED file: .claude.json.backup
+
+[FileSystemService] Checking file: .claude.json.backup.1769652232961, Attributes: Archive
+
+[FileSystemService] ADDED file: .claude.json.backup.1769652232961
+
+[FileSystemService] Checking file: .claude.json.backup.1769652882760, Attributes: Archive
+
+[FileSystemService] ADDED file: .claude.json.backup.1769652882760
+
+[FileSystemService] Checking file: .claude.json.backup.1769653777600, Attributes: Archive
+
+[FileSystemService] ADDED file: .claude.json.backup.1769653777600
+
+[FileSystemService] Checking file: .claude.json.backup.1769655944492, Attributes: Archive
+
+[FileSystemService] ADDED file: .claude.json.backup.1769655944492
+
+[FileSystemService] Checking file: .claude.json.backup.1769655944555, Attributes: Archive
+
+[FileSystemService] ADDED file: .claude.json.backup.1769655944555
+
+[FileSystemService] Checking file: .emulator_console_auth_token, Attributes: Archive
+
+[FileSystemService] ADDED file: .emulator_console_auth_token
+
+[FileSystemService] Checking file: .gitconfig, Attributes: Archive
+
+[FileSystemService] ADDED file: .gitconfig
+
+[FileSystemService] Checking file: .lesshst, Attributes: Archive
+
+[FileSystemService] ADDED file: .lesshst
+
+[FileSystemService] Checking file: .viminfo, Attributes: Archive
+
+[FileSystemService] ADDED file: .viminfo
+
+[FileSystemService] Checking file: .yarnrc, Attributes: Archive
+
+[FileSystemService] ADDED file: .yarnrc
+
+[FileSystemService] Checking file: d4ac4633ebd6440fa397b84f1bc94a3c.7z, Attributes: Archive
+
+[FileSystemService] ADDED file: d4ac4633ebd6440fa397b84f1bc94a3c.7z
+
+[FileSystemService] Checking file: ezpcopensdkconfig_9ffc4da769078eeb963f0897d728be4e.xml, Attributes: Archive
+
+[FileSystemService] ADDED file: ezpcopensdkconfig_9ffc4da769078eeb963f0897d728be4e.xml
+
+[FileSystemService] Checking file: inittk.ini, Attributes: Archive
+
+[FileSystemService] ADDED file: inittk.ini
+
+[FileSystemService] Checking file: inst.ini, Attributes: Archive
+
+[FileSystemService] ADDED file: inst.ini
+
+[FileSystemService] Checking file: mercurial.ini, Attributes: Archive
+
+[FileSystemService] ADDED file: mercurial.ini
+
+[FileSystemService] Checking file: mumu_boot.txt, Attributes: Archive
+
+[FileSystemService] ADDED file: mumu_boot.txt
+
+[FileSystemService] Checking file: NTUSER.DAT, Attributes: Hidden, Archive, NotContentIndexed
+
+[FileSystemService] SKIPPED (Hidden/System): NTUSER.DAT
+
+[FileSystemService] Checking file: ntuser.dat.LOG1, Attributes: Hidden, System, Archive
+
+[FileSystemService] SKIPPED (Hidden/System): ntuser.dat.LOG1
+
+[FileSystemService] Checking file: ntuser.dat.LOG2, Attributes: Hidden, System, Archive
+
+[FileSystemService] SKIPPED (Hidden/System): ntuser.dat.LOG2
+
+[FileSystemService] Checking file: NTUSER.DAT{baca888b-b635-11ec-abff-144f8a959420}.TxR.0.regtrans-ms, Attributes: Hidden, System, Archive
+
+[FileSystemService] SKIPPED (Hidden/System): NTUSER.DAT{baca888b-b635-11ec-abff-144f8a959420}.TxR.0.regtrans-ms
+
+[FileSystemService] Checking file: NTUSER.DAT{baca888b-b635-11ec-abff-144f8a959420}.TxR.1.regtrans-ms, Attributes: Hidden, System, Archive
+
+[FileSystemService] SKIPPED (Hidden/System): NTUSER.DAT{baca888b-b635-11ec-abff-144f8a959420}.TxR.1.regtrans-ms
+
+[FileSystemService] Checking file: NTUSER.DAT{baca888b-b635-11ec-abff-144f8a959420}.TxR.2.regtrans-ms, Attributes: Hidden, System, Archive
+
+[FileSystemService] SKIPPED (Hidden/System): NTUSER.DAT{baca888b-b635-11ec-abff-144f8a959420}.TxR.2.regtrans-ms
+
+[FileSystemService] Checking file: NTUSER.DAT{baca888b-b635-11ec-abff-144f8a959420}.TxR.blf, Attributes: Hidden, System, Archive
+
+[FileSystemService] SKIPPED (Hidden/System): NTUSER.DAT{baca888b-b635-11ec-abff-144f8a959420}.TxR.blf
+
+[FileSystemService] Checking file: NTUSER.DAT{baca888c-b635-11ec-abff-144f8a959420}.TM.blf, Attributes: Hidden, System, Archive
+
+[FileSystemService] SKIPPED (Hidden/System): NTUSER.DAT{baca888c-b635-11ec-abff-144f8a959420}.TM.blf
+
+[FileSystemService] Checking file: NTUSER.DAT{baca888c-b635-11ec-abff-144f8a959420}.TMContainer00000000000000000001.regtrans-ms, Attributes: Hidden, System, Archive
+
+[FileSystemService] SKIPPED (Hidden/System): NTUSER.DAT{baca888c-b635-11ec-abff-144f8a959420}.TMContainer00000000000000000001.regtrans-ms
+
+[FileSystemService] Checking file: NTUSER.DAT{baca888c-b635-11ec-abff-144f8a959420}.TMContainer00000000000000000002.regtrans-ms, Attributes: Hidden, System, Archive
+
+[FileSystemService] SKIPPED (Hidden/System): NTUSER.DAT{baca888c-b635-11ec-abff-144f8a959420}.TMContainer00000000000000000002.regtrans-ms
+
+[FileSystemService] Checking file: NTUSER.DAT{bd35c6bd-ce5e-11f0-ad4e-309c23d935e1}.TM.blf, Attributes: Hidden, System, Archive
+
+[FileSystemService] SKIPPED (Hidden/System): NTUSER.DAT{bd35c6bd-ce5e-11f0-ad4e-309c23d935e1}.TM.blf
+
+[FileSystemService] Checking file: NTUSER.DAT{bd35c6bd-ce5e-11f0-ad4e-309c23d935e1}.TMContainer00000000000000000001.regtrans-ms, Attributes: Hidden, System, Archive
+
+[FileSystemService] SKIPPED (Hidden/System): NTUSER.DAT{bd35c6bd-ce5e-11f0-ad4e-309c23d935e1}.TMContainer00000000000000000001.regtrans-ms
+
+[FileSystemService] Checking file: NTUSER.DAT{bd35c6bd-ce5e-11f0-ad4e-309c23d935e1}.TMContainer00000000000000000002.regtrans-ms, Attributes: Hidden, System, Archive
+
+[FileSystemService] SKIPPED (Hidden/System): NTUSER.DAT{bd35c6bd-ce5e-11f0-ad4e-309c23d935e1}.TMContainer00000000000000000002.regtrans-ms
+
+[FileSystemService] Checking file: NTUSER.DAT{be04592b-84ef-11ee-ac81-309c23d935e1}.TxR.0.regtrans-ms, Attributes: Hidden, System, Archive
+
+[FileSystemService] SKIPPED (Hidden/System): NTUSER.DAT{be04592b-84ef-11ee-ac81-309c23d935e1}.TxR.0.regtrans-ms
+
+[FileSystemService] Checking file: NTUSER.DAT{be04592b-84ef-11ee-ac81-309c23d935e1}.TxR.1.regtrans-ms, Attributes: Hidden, System, Archive
+
+[FileSystemService] SKIPPED (Hidden/System): NTUSER.DAT{be04592b-84ef-11ee-ac81-309c23d935e1}.TxR.1.regtrans-ms
+
+[FileSystemService] Checking file: NTUSER.DAT{be04592b-84ef-11ee-ac81-309c23d935e1}.TxR.2.regtrans-ms, Attributes: Hidden, System, Archive
+
+[FileSystemService] SKIPPED (Hidden/System): NTUSER.DAT{be04592b-84ef-11ee-ac81-309c23d935e1}.TxR.2.regtrans-ms
+
+[FileSystemService] Checking file: NTUSER.DAT{be04592b-84ef-11ee-ac81-309c23d935e1}.TxR.blf, Attributes: Hidden, System, Archive
+
+[FileSystemService] SKIPPED (Hidden/System): NTUSER.DAT{be04592b-84ef-11ee-ac81-309c23d935e1}.TxR.blf
+
+[FileSystemService] Checking file: NTUSER.DAT{be04592c-84ef-11ee-ac81-309c23d935e1}.TM.blf, Attributes: Hidden, System, Archive
+
+[FileSystemService] SKIPPED (Hidden/System): NTUSER.DAT{be04592c-84ef-11ee-ac81-309c23d935e1}.TM.blf
+
+[FileSystemService] Checking file: NTUSER.DAT{be04592c-84ef-11ee-ac81-309c23d935e1}.TMContainer00000000000000000001.regtrans-ms, Attributes: Hidden, System, Archive
+
+[FileSystemService] SKIPPED (Hidden/System): NTUSER.DAT{be04592c-84ef-11ee-ac81-309c23d935e1}.TMContainer00000000000000000001.regtrans-ms
+
+[FileSystemService] Checking file: NTUSER.DAT{be04592c-84ef-11ee-ac81-309c23d935e1}.TMContainer00000000000000000002.regtrans-ms, Attributes: Hidden, System, Archive
+
+[FileSystemService] SKIPPED (Hidden/System): NTUSER.DAT{be04592c-84ef-11ee-ac81-309c23d935e1}.TMContainer00000000000000000002.regtrans-ms
+
+[FileSystemService] Checking file: ntuser.ini, Attributes: Hidden, System
+
+[FileSystemService] SKIPPED (Hidden/System): ntuser.ini
+
+[FileSystemService] Checking file: nuuid.ini, Attributes: Archive
+
+[FileSystemService] ADDED file: nuuid.ini
+
+[FileSystemService] Checking file: useruid.ini, Attributes: Archive
+
+[FileSystemService] ADDED file: useruid.ini
+
+[FileSystemService] Checking file: VirtualKey.db, Attributes: Archive
+
+[FileSystemService] ADDED file: VirtualKey.db
+
+[FileSystemService] Found 91 items (69 folders, 22 files)
+
+[Controller] restorePage=false, reset to page 1
+
+[Controller] CalculateTotalPages: totalFiles=91, pageSize=10, totalPages=10
+
+[RTTFileGrid] GetVisibleRowsForPagination: height=748.1688, availableHeight=728.1688, rowHeight=350, rowsFloat=2.080482, visibleRows=2
+
+[Detail] UpdateInfo: root name=0ms preview=1ms metadata=4ms total=5ms
+
+[RTTFileManager] UpdateBreadcrumbs called with path: root, container null: True, instance: -128458
+
+[RTTFileManager] Breadcrumb container reference lost, searching in hierarchy...
+UnityEngine.Debug:LogWarning (object)
+RTTFileManager:UpdateBreadcrumbs (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:2426)
+RTTFileManagerController:NavigateToInternal (string,bool,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:293)
+RTTFileManagerController:NavigateTo (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:171)
+RTTFileManagerController:OnViewReady () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:137)
+RTTFileManager/<CreateCenterGrid>d__71:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:416)
+UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
+RTTFileManager:CreatePanels () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:276)
+RTTFileManager:BuildUI () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:147)
+RTTFileManagerController:CreateMenu (UnityEngine.RectTransform,single,single,TMPro.TMP_FontAsset,UnityEngine.Color,UnityEngine.Color) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:75)
+RTTManager:CreateFilesMenuContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:1748)
+RTTManager:CreateAppContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:1680)
+RTTManager/<PrepareAppFrameAsync>d__172:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:1392)
+UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
+
+[RTTFileManager] Found breadcrumb container from hierarchy: True
+
+[RTTFileManager] Created 1 breadcrumbs for path: C:\Users\Admin
+
+[RTTFileManagerController] Menu created
+
+[RTTFileGrid] GetItemsPerPage: rowsPerPage=2, columnsPerRow=4, result=8
+
+[RTTFileManager] InitializePageSizeDeferred(Grid): columnsPerRow=4, visibleRows=2, itemsPerPage=8
+
+[Controller] Page size changed: 10 -> 8, currentItemIndex: 0
+
+[Controller] CalculateTotalPages: totalFiles=91, pageSize=8, totalPages=12
+
+[Controller] New page: 1 (total: 12)
+
+[RTTManager] App folder prepared
+
+[RTTTaskbar] RegisterApp called - slotIndex=1, icon=icon_folder
+
+[RTTTaskbar] SetSlotIcon - slot=AppBtn_AppSlot_1, icon=icon_folder, slotIndex=1
 
 [RTTTaskbar] SetSlotIcon - removed 0 old children
 
-[RTTTaskbar] SetSlotIcon - created iconBtn=Btn_icon_media, slot.childCount now=1
+[RTTTaskbar] SetSlotIcon - created iconBtn=Btn_icon_folder, slot.childCount now=1
 
 [RTTTaskbar] Registered app slot 1, total apps: 1
 
@@ -207,250 +455,677 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [RTTTaskbar] SelectSlot(1) called, current active: 1
 
-[MediaLibraryService] Starting background scan (existing: 1295 items)
+[Detail] UpdateInfo: .android name=0ms preview=0ms metadata=5ms total=5ms
 
-[RTTMediaLibrary] Creating 2 breadcrumb segments for: All Media > Images
+[Detail] UpdateInfo: root name=0ms preview=0ms metadata=4ms total=4ms
 
-[RTTMediaLibrary] Created 2 breadcrumb pills for path: All Media > Images
+[Detail] UpdateInfo: .antigravity name=0ms preview=0ms metadata=4ms total=4ms
 
-[MediaLibraryService] Background scan complete - no new items (129ms)
+[Detail] UpdateInfo: root name=0ms preview=0ms metadata=3ms total=3ms
 
-[Cache] DISK READ: 0ms (194KB)
+[Detail] UpdateInfo: .antigravity_tools name=0ms preview=1ms metadata=3ms total=4ms
 
-[Cache] DISK DECODE: 6ms (512x492)
+[Detail] UpdateInfo: .cargo name=0ms preview=0ms metadata=3ms total=3ms
 
-[Cache] DISK READ: 0ms (241KB)
+[Detail] UpdateInfo: root name=1ms preview=0ms metadata=3ms total=4ms
 
-[Cache] DISK DECODE: 5ms (512x344)
+[Detail] UpdateInfo: .codeverse name=0ms preview=0ms metadata=4ms total=4ms
 
-[Cache] DISK READ: 0ms (2KB)
+[Detail] UpdateInfo: .local name=0ms preview=0ms metadata=4ms total=4ms
 
-[Cache] DISK DECODE: 0ms (128x128)
+[Detail] UpdateInfo: root name=0ms preview=0ms metadata=7ms total=7ms
 
-[Cache] DISK READ: 0ms (111KB)
+[Detail] UpdateInfo: .jdks name=0ms preview=0ms metadata=4ms total=4ms
 
-[Cache] DISK DECODE: 2ms (512x288)
+[Detail] UpdateInfo: .ipython name=0ms preview=0ms metadata=4ms total=4ms
 
-[Cache] DISK READ: 0ms (3KB)
+[Detail] UpdateInfo: .factory name=0ms preview=0ms metadata=3ms total=3ms
 
-[MediaLibraryService] Background scan complete - no new items (135ms)
+[Controller] Side panel item selected: downloads
 
-[Cache] DISK READ: 0ms (53KB)
+[Controller] NavigateToInternal: path='C:\Users\Admin\Downloads', restorePage=False, clickedFolder=''
 
-[Cache] DISK DECODE: 1ms (512x232)
+[Controller] Current state: _currentPath='root', _currentPage=3, _pageSize=8
 
-[Cache] DISK READ: 0ms (146KB)
+[Controller] SAVED: _itemIndexHistory['C:\Users\Admin'] = 16
 
-[Cache] DISK DECODE: 3ms (512x232)
+[FileSystemService] Reading directory: C:\Users\Admin\Downloads
 
-[Cache] DISK READ: 0ms (92KB)
+[FileSystemService] Raw file count from Directory.GetFiles: 96
 
-[Cache] DISK DECODE: 1ms (512x144)
+[FileSystemService] Checking file: 01. Moon Halo (feat. Chalili, TetraCalyx & Hanser) [Honkai Impact 3rd ''Everlasting Flames'' Animated Short Theme].mp3, Attributes: Archive
 
-[Cache] DISK READ: 0ms (87KB)
+[FileSystemService] ADDED file: 01. Moon Halo (feat. Chalili, TetraCalyx & Hanser) [Honkai Impact 3rd ''Everlasting Flames'' Animated Short Theme].mp3
 
-[Cache] DISK READ: 0ms (1KB)
+[FileSystemService] Checking file: 1.png, Attributes: Archive
 
-[Cache] DISK DECODE: 0ms (256x256)
+[FileSystemService] ADDED file: 1.png
 
-[Cache] DISK READ: 0ms (4KB)
+[FileSystemService] Checking file: 2.png, Attributes: Archive
 
-[Cache] DISK READ: 0ms (33KB)
+[FileSystemService] ADDED file: 2.png
 
-[Cache] DISK DECODE: 1ms (256x256)
+[FileSystemService] Checking file: 2_monitors.png, Attributes: Archive
 
-[Cache] DISK READ: 0ms (37KB)
+[FileSystemService] ADDED file: 2_monitors.png
 
-[Cache] DISK READ: 0ms (35KB)
+[FileSystemService] Checking file: 3. Đề án buynow66.pdf, Attributes: Archive
 
-[Cache] DISK READ: 0ms (36KB)
+[FileSystemService] Unicode file: '3. Đề án buynow66.pdf' codes: U+0033 U+002E U+0020 U+0110 U+1EC1 U+0020 U+00E1 U+006E U+0020 U+0062 U+0075 U+0079 U+006E U+006F U+0077 U+0036 U+0036 U+002E U+0070 U+0064 U+0066
 
-[Cache] DISK READ: 0ms (30KB)
+[FileSystemService] ADDED file: 3. Đề án buynow66.pdf
 
-[Cache] DISK READ: 0ms (47KB)
+[FileSystemService] Checking file: 3_monitors.png, Attributes: Archive
 
-[Cache] DISK READ: 0ms (42KB)
+[FileSystemService] ADDED file: 3_monitors.png
 
-[Cache] DISK READ: 0ms (39KB)
+[FileSystemService] Checking file: 7065774217733.mp4, Attributes: Archive
 
-[Cache] DISK READ: 0ms (38KB)
+[FileSystemService] ADDED file: 7065774217733.mp4
 
-[Cache] DISK READ: 0ms (5KB)
+[FileSystemService] Checking file: 7077543476647.mp4, Attributes: Archive
 
-[Cache] DISK DECODE: 2ms (512x512)
+[FileSystemService] ADDED file: 7077543476647.mp4
 
-[Cache] DISK READ: 0ms (44KB)
+[FileSystemService] Checking file: 7295785205012.mp4, Attributes: Archive
 
-[Cache] DISK READ: 0ms (59KB)
+[FileSystemService] ADDED file: 7295785205012.mp4
 
-[Cache] DISK DECODE: 2ms (512x328)
+[FileSystemService] Checking file: App đại lý.rar, Attributes: Archive
 
-[Cache] DISK READ: 1ms (5KB)
+[FileSystemService] Unicode file: 'App đại lý.rar' codes: U+0041 U+0070 U+0070 U+0020 U+0111 U+1EA1 U+0069 U+0020 U+006C U+00FD U+F028 U+002E U+0072 U+0061 U+0072
 
-[Cache] DISK READ: 7ms (5KB)
+[FileSystemService] ADDED file: App đại lý.rar
 
-[Cache] DISK READ: 8ms (272KB)
+[FileSystemService] Checking file: bodyjson.txt, Attributes: Archive
 
-[Cache] DISK READ: 7ms (272KB)
+[FileSystemService] ADDED file: bodyjson.txt
 
-[Cache] DISK READ: 8ms (264KB)
+[FileSystemService] Checking file: cancel_flow.png, Attributes: Archive
 
-[Cache] DISK DECODE: 4ms (512x288)
+[FileSystemService] ADDED file: cancel_flow.png
 
-[Cache] DISK READ: 6ms (30KB)
+[FileSystemService] Checking file: cancel_flow.txt, Attributes: Archive
 
-[Cache] DISK DECODE: 0ms (274x240)
+[FileSystemService] ADDED file: cancel_flow.txt
+
+[FileSystemService] Checking file: code screen.png, Attributes: Archive
+
+[FileSystemService] ADDED file: code screen.png
+
+[FileSystemService] Checking file: complaints.jpg, Attributes: Archive
+
+[FileSystemService] ADDED file: complaints.jpg
+
+[FileSystemService] Checking file: complaints_2.jpg, Attributes: Archive
+
+[FileSystemService] ADDED file: complaints_2.jpg
+
+[FileSystemService] Checking file: coupon_program.jpg, Attributes: Archive
+
+[FileSystemService] ADDED file: coupon_program.jpg
+
+[FileSystemService] Checking file: Các phần chỉnh sửa và cần cung cấp của website.pdf, Attributes: Archive
+
+[FileSystemService] Unicode file: 'Các phần chỉnh sửa và cần cung cấp của website.pdf' codes: U+0043 U+00E1 U+0063 U+0020 U+0070 U+0068 U+1EA7 U+006E U+0020 U+0063 U+0068 U+1EC9 U+006E U+0068 U+0020 U+0073 U+1EED U+0061 U+0020 U+0076 U+00E0 U+0020 U+0063 U+1EA7 U+006E U+0020 U+0063 U+0075 U+006E U+0067
+
+[FileSystemService] ADDED file: Các phần chỉnh sửa và cần cung cấp của website.pdf
+
+[FileSystemService] Checking file: dashboard ecommerce.png, Attributes: Archive
+
+[FileSystemService] ADDED file: dashboard ecommerce.png
+
+[FileSystemService] Checking file: desktop.ini, Attributes: Hidden, System, Archive
+
+[FileSystemService] SKIPPED (Hidden/System): desktop.ini
+
+[FileSystemService] Checking file: DS.png, Attributes: Archive
+
+[FileSystemService] ADDED file: DS.png
+
+[FileSystemService] Checking file: errors.txt, Attributes: Archive
+
+[FileSystemService] ADDED file: errors.txt
+
+[FileSystemService] Checking file: Genshin_Impact_2025-09-10_11-32-27.mp4, Attributes: Archive
+
+[FileSystemService] ADDED file: Genshin_Impact_2025-09-10_11-32-27.mp4
+
+[FileSystemService] Checking file: Giao diện xếp hạng và chiết khấu-Webshop.drawio.png, Attributes: Archive
+
+[FileSystemService] Unicode file: 'Giao diện xếp hạng và chiết khấu-Webshop.drawio.png' codes: U+0047 U+0069 U+0061 U+006F U+0020 U+0064 U+0069 U+1EC7 U+006E U+0020 U+0078 U+1EBF U+0070 U+0020 U+0068 U+1EA1 U+006E U+0067 U+0020 U+0076 U+00E0 U+0020 U+0063 U+0068 U+0069 U+1EBF U+0074 U+0020 U+006B U+0068
+
+[FileSystemService] ADDED file: Giao diện xếp hạng và chiết khấu-Webshop.drawio.png
+
+[FileSystemService] Checking file: giao_dien_QC.png, Attributes: Archive
+
+[FileSystemService] ADDED file: giao_dien_QC.png
+
+[FileSystemService] Checking file: giao_dien_QC_2.png, Attributes: Archive
+
+[FileSystemService] ADDED file: giao_dien_QC_2.png
+
+[FileSystemService] Checking file: icon_10_mbps.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_10_mbps.png
+
+[FileSystemService] Checking file: icon_15_mbps.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_15_mbps.png
+
+[FileSystemService] Checking file: icon_20_mbps.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_20_mbps.png
+
+[FileSystemService] Checking file: icon_25_mbps.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_25_mbps.png
+
+[FileSystemService] Checking file: icon_2_monitors.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_2_monitors.png
+
+[FileSystemService] Checking file: icon_30_fps.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_30_fps.png
+
+[FileSystemService] Checking file: icon_30_mbps.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_30_mbps.png
+
+[FileSystemService] Checking file: icon_45_fps.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_45_fps.png
+
+[FileSystemService] Checking file: icon_60_fps.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_60_fps.png
+
+[FileSystemService] Checking file: icon_arrow_down.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_arrow_down.png
+
+[FileSystemService] Checking file: icon_arrow_up.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_arrow_up.png
+
+[FileSystemService] Checking file: icon_ascending.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_ascending.png
+
+[FileSystemService] Checking file: icon_auto_bitrate.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_auto_bitrate.png
+
+[FileSystemService] Checking file: icon_back.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_back.png
+
+[FileSystemService] Checking file: icon_copy.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_copy.png
+
+[FileSystemService] Checking file: icon_descending.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_descending.png
+
+[FileSystemService] Checking file: icon_file_text.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_file_text.png
+
+[FileSystemService] Checking file: icon_folder.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_folder.png
+
+[FileSystemService] Checking file: icon_grid.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_grid.png
+
+[FileSystemService] Checking file: icon_left_arrow.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_left_arrow.png
+
+[FileSystemService] Checking file: icon_line.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_line.png
+
+[FileSystemService] Checking file: icon_list.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_list.png
+
+[FileSystemService] Checking file: icon_move_folder.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_move_folder.png
+
+[FileSystemService] Checking file: icon_pause.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_pause.png
+
+[FileSystemService] Checking file: icon_right_arrow.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_right_arrow.png
+
+[FileSystemService] Checking file: icon_screen.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_screen.png
+
+[FileSystemService] Checking file: icon_screen_1.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_screen_1.png
+
+[FileSystemService] Checking file: icon_screen_2.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_screen_2.png
+
+[FileSystemService] Checking file: icon_screen_3.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_screen_3.png
+
+[FileSystemService] Checking file: icon_trash.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_trash.png
+
+[FileSystemService] Checking file: icon_zoom.png, Attributes: Archive
+
+[FileSystemService] ADDED file: icon_zoom.png
+
+[FileSystemService] Checking file: implementation_plan.md, Attributes: Archive
+
+[FileSystemService] ADDED file: implementation_plan.md
+
+[FileSystemService] Checking file: list account.txt, Attributes: Archive
+
+[FileSystemService] ADDED file: list account.txt
+
+[FileSystemService] Checking file: main_menu.jpg, Attributes: Archive
+
+[FileSystemService] ADDED file: main_menu.jpg
+
+[FileSystemService] Checking file: minhduclive-payment-service-hoaf13.postman_collection.json, Attributes: Archive
+
+[FileSystemService] ADDED file: minhduclive-payment-service-hoaf13.postman_collection.json
+
+[FileSystemService] Checking file: minhduclive.pfx, Attributes: Archive
+
+[FileSystemService] ADDED file: minhduclive.pfx
+
+[FileSystemService] Checking file: minhduclive_key_crt.zip, Attributes: Archive
+
+[FileSystemService] ADDED file: minhduclive_key_crt.zip
+
+[FileSystemService] Checking file: mockup_TKHQCD.png, Attributes: Archive
+
+[FileSystemService] ADDED file: mockup_TKHQCD.png
+
+[FileSystemService] Checking file: note vr.txt, Attributes: Archive
+
+[FileSystemService] ADDED file: note vr.txt
+
+[FileSystemService] Checking file: Noto_Sans.zip, Attributes: Archive
+
+[FileSystemService] ADDED file: Noto_Sans.zip
+
+[FileSystemService] Checking file: PlayaVR.jpg, Attributes: Archive
+
+[FileSystemService] ADDED file: PlayaVR.jpg
+
+[FileSystemService] Checking file: qr.png, Attributes: Archive
+
+[FileSystemService] ADDED file: qr.png
+
+[FileSystemService] Checking file: Refine VR Menu Style.md, Attributes: Archive
+
+[FileSystemService] ADDED file: Refine VR Menu Style.md
+
+[FileSystemService] Checking file: refund.jpg, Attributes: Archive
+
+[FileSystemService] ADDED file: refund.jpg
+
+[FileSystemService] Checking file: refund_flow.png, Attributes: Archive
+
+[FileSystemService] ADDED file: refund_flow.png
+
+[FileSystemService] Checking file: results.json, Attributes: Archive
+
+[FileSystemService] ADDED file: results.json
+
+[FileSystemService] Checking file: screen.png, Attributes: Archive
+
+[FileSystemService] ADDED file: screen.png
+
+[FileSystemService] Checking file: screen_cluster.png, Attributes: Archive
+
+[FileSystemService] ADDED file: screen_cluster.png
+
+[FileSystemService] Checking file: serviceAccountKey (1).json, Attributes: Archive
+
+[FileSystemService] ADDED file: serviceAccountKey (1).json
+
+[FileSystemService] Checking file: serviceAccountKey.json, Attributes: Archive
+
+[FileSystemService] ADDED file: serviceAccountKey.json
+
+[FileSystemService] Checking file: Setup_W311MIV6.0_V1.0.0.14.zip, Attributes: Archive
+
+[FileSystemService] ADDED file: Setup_W311MIV6.0_V1.0.0.14.zip
+
+[FileSystemService] Checking file: state_history.png, Attributes: Archive
+
+[FileSystemService] ADDED file: state_history.png
+
+[FileSystemService] Checking file: test.py, Attributes: Archive
+
+[FileSystemService] ADDED file: test.py
+
+[FileSystemService] Checking file: Thiết Kế CSDL.drawio.png, Attributes: Archive
+
+[FileSystemService] Unicode file: 'Thiết Kế CSDL.drawio.png' codes: U+0054 U+0068 U+0069 U+1EBF U+0074 U+0020 U+004B U+1EBF U+0020 U+0043 U+0053 U+0044 U+004C U+002E U+0064 U+0072 U+0061 U+0077 U+0069 U+006F U+002E U+0070 U+006E U+0067
+
+[FileSystemService] ADDED file: Thiết Kế CSDL.drawio.png
+
+[FileSystemService] Checking file: thông tin số điện thoại MD live.xlsx, Attributes: Archive
+
+[FileSystemService] Unicode file: 'thông tin số điện thoại MD live.xlsx' codes: U+0074 U+0068 U+00F4 U+006E U+0067 U+0020 U+0074 U+0069 U+006E U+0020 U+0073 U+1ED1 U+0020 U+0111 U+0069 U+1EC7 U+006E U+0020 U+0074 U+0068 U+006F U+1EA1 U+0069 U+0020 U+004D U+0044 U+0020 U+006C U+0069 U+0076
+
+[FileSystemService] ADDED file: thông tin số điện thoại MD live.xlsx
+
+[FileSystemService] Checking file: UI_menu.png, Attributes: Archive
+
+[FileSystemService] ADDED file: UI_menu.png
+
+[FileSystemService] Checking file: Untitled.png, Attributes: Archive
+
+[FileSystemService] ADDED file: Untitled.png
+
+[FileSystemService] Checking file: Varesa-684b940d827b14510f0ae4e8.png, Attributes: Archive
+
+[FileSystemService] ADDED file: Varesa-684b940d827b14510f0ae4e8.png
+
+[FileSystemService] Checking file: videoplayback.mp4, Attributes: Archive
+
+[FileSystemService] ADDED file: videoplayback.mp4
+
+[FileSystemService] Checking file: video_client.mp4, Attributes: Archive
+
+[FileSystemService] ADDED file: video_client.mp4
+
+[FileSystemService] Checking file: Video_Codec_Interface_13.0.19.zip, Attributes: Archive
+
+[FileSystemService] ADDED file: Video_Codec_Interface_13.0.19.zip
+
+[FileSystemService] Checking file: VRWorkspace.jpg, Attributes: Archive
+
+[FileSystemService] ADDED file: VRWorkspace.jpg
+
+[FileSystemService] Checking file: z6877398910107_04686f38c74ba78614cd80fd52cea575.jpg, Attributes: Archive
+
+[FileSystemService] ADDED file: z6877398910107_04686f38c74ba78614cd80fd52cea575.jpg
+
+[FileSystemService] Checking file: z6901805818710_c8996e64343b905577f19cd327b16bef.jpg, Attributes: Archive
+
+[FileSystemService] ADDED file: z6901805818710_c8996e64343b905577f19cd327b16bef.jpg
+
+[FileSystemService] Checking file: z6901806000954_5526beb0f09797aecdca97f7b9cf05e5.jpg, Attributes: Archive
+
+[FileSystemService] ADDED file: z6901806000954_5526beb0f09797aecdca97f7b9cf05e5.jpg
+
+[FileSystemService] Checking file: z6923428909401_f81b0a42d86244aa0f6377e12961267c.jpg, Attributes: Archive
+
+[FileSystemService] ADDED file: z6923428909401_f81b0a42d86244aa0f6377e12961267c.jpg
+
+[FileSystemService] Checking file: z7049022909707_03ce10cda87cb68fe7a73ce24115dfca.jpg, Attributes: Archive
+
+[FileSystemService] ADDED file: z7049022909707_03ce10cda87cb68fe7a73ce24115dfca.jpg
+
+[FileSystemService] Checking file: ZXing.Net.0.16.11.0.zip, Attributes: Archive
+
+[FileSystemService] ADDED file: ZXing.Net.0.16.11.0.zip
+
+[FileSystemService] Checking file: ZXing.Net.DemoClients.0.16.11.0.zip, Attributes: Archive
+
+[FileSystemService] ADDED file: ZXing.Net.DemoClients.0.16.11.0.zip
+
+[FileSystemService] Checking file: 星星10000007.48e72913..png, Attributes: Archive
+
+[FileSystemService] Unicode file: '星星10000007.48e72913..png' codes: U+661F U+661F U+0031 U+0030 U+0030 U+0030 U+0030 U+0030 U+0030 U+0037 U+002E U+0034 U+0038 U+0065 U+0037 U+0032 U+0039 U+0031 U+0033 U+002E U+002E U+0070 U+006E U+0067
+
+[FileSystemService] ADDED file: 星星10000007.48e72913..png
+
+[FileSystemService] Found 113 items (18 folders, 95 files)
+
+[Controller] CalculateTotalPages: totalFiles=113, pageSize=8, totalPages=15
+
+[Cache] DISK READ: 0ms (83KB)
+
+[Cache] DISK DECODE: 2ms (512x304)
+
+[Cache] DISK READ: 0ms (12KB)
+
+[Cache] DISK DECODE: 0ms (512x184)
 
 [Cache] DISK READ: 0ms (176KB)
 
 [Cache] DISK DECODE: 3ms (512x164)
 
-[Cache] DISK READ: 6ms (42KB)
-
-[Cache] DISK DECODE: 1ms (330x240)
-
 [Cache] DISK READ: 0ms (124KB)
 
 [Cache] DISK DECODE: 2ms (512x128)
 
-[Cache] DISK READ: 6ms (58KB)
-
-[Cache] DISK DECODE: 1ms (512x236)
-
-[Cache] DISK READ: 6ms (53KB)
-
-[Cache] DISK DECODE: 2ms (512x344)
-
-[Cache] DISK DECODE: 1ms (512x344)
-
-[Cache] DISK READ: 0ms (9KB)
-
-[Cache] DISK DECODE: 0ms (320x240)
-
-[Cache] DISK READ: 0ms (14KB)
-
-[Cache] DISK DECODE: 0ms (96x96)
-
-[MediaLibraryService] Background scan complete - no new items (158ms)
-
-[Cache] DISK READ: 0ms (80KB)
+[Cache] DISK READ: 0ms (77KB)
 
 [Cache] DISK DECODE: 2ms (512x238)
 
-[Cache] DISK READ: 0ms (227KB)
+[Cache] DISK READ: 0ms (267KB)
 
-[Cache] DISK READ: 0ms (148KB)
+[Cache] DISK DECODE: 4ms (512x230)
 
-[Cache] DISK DECODE: 6ms (512x288)
+[Cache] DISK READ: 0ms (120KB)
 
-[Cache] DISK READ: 0ms (172KB)
+[Cache] DISK DECODE: 2ms (512x230)
 
-[Cache] DISK DECODE: 1ms (512x288)
+The character with Unicode value \uF028 was not found in the [NotoSansKR-Regular_TMP_Primary] font asset or any potential fallbacks. It was replaced by Unicode character \u25A1 in text object [Name].
+UnityEngine.Debug:LogWarning (object,UnityEngine.Object)
+TMPro.TextMeshProUGUI:SetArraySizes (TMPro.TMP_Text/UnicodeChar[]) (at ./Library/PackageCache/com.unity.textmeshpro@3.0.9/Scripts/Runtime/TMPro_UGUI_Private.cs:1274)
+TMPro.TMP_Text:ParseInputText () (at ./Library/PackageCache/com.unity.textmeshpro@3.0.9/Scripts/Runtime/TMP_Text.cs:1902)
+TMPro.TextMeshProUGUI:OnPreRenderCanvas () (at ./Library/PackageCache/com.unity.textmeshpro@3.0.9/Scripts/Runtime/TMPro_UGUI_Private.cs:1644)
+TMPro.TextMeshProUGUI:ForceMeshUpdate (bool,bool) (at ./Library/PackageCache/com.unity.textmeshpro@3.0.9/Scripts/Runtime/TextMeshProUGUI.cs:547)
+MarqueeText:SetText (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/MarqueeText.cs:147)
+RTTFileGridItem:Bind (MockFile) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileGridItem.cs:92)
+RTTFileGrid:BindItemAtIndex (RTTFileGridItem,int) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileGrid.cs:315)
+RTTFileGrid:UpdateVisibleItems () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileGrid.cs:267)
+RTTFileGrid:Populate (System.Collections.Generic.List`1<MockFile>,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileGrid.cs:215)
+RTTFileManager:UpdateGrid (System.Collections.Generic.List`1<MockFile>,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:3088)
+RTTFileManagerController:UpdateView (bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:529)
+RTTFileManagerController:NavigateToInternal (string,bool,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:291)
+RTTFileManagerController:NavigateTo (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:171)
+RTTFileManagerController:OnSidePanelItemSelected (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:650)
+RTTFileSidePanel:OnItemClicked (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileSidePanel.cs:315)
+RTTFileSidePanel/<>c__DisplayClass28_0:<CreateNavItem>b__0 () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileSidePanel.cs:224)
+UnityEngine.EventSystems.ExecuteEvents:Execute<UnityEngine.EventSystems.IPointerClickHandler> (UnityEngine.GameObject,UnityEngine.EventSystems.BaseEventData,UnityEngine.EventSystems.ExecuteEvents/EventFunction`1<UnityEngine.EventSystems.IPointerClickHandler>)
+RTTRaycastManager:SendClick () (at Assets/VR-Workspace/Scripts/UI/RTT/Input/RTTRaycastManager.cs:339)
+VRGazeReticle:SendRTTClickAndLock (UnityEngine.GameObject) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:582)
+VRGazeReticle:ProcessDwellClickRTT (UnityEngine.Vector3) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:836)
+VRGazeReticle:CheckGaze () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:474)
+VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:314)
 
-[Cache] DISK READ: 0ms (48KB)
+The character with Unicode value \uF028 was not found in the [NotoSansKR-Regular_TMP_Primary] font asset or any potential fallbacks. It was replaced by Unicode character \u25A1 in text object [Name].
+UnityEngine.Debug:LogWarning (object,UnityEngine.Object)
+TMPro.TextMeshProUGUI:SetArraySizes (TMPro.TMP_Text/UnicodeChar[]) (at ./Library/PackageCache/com.unity.textmeshpro@3.0.9/Scripts/Runtime/TMPro_UGUI_Private.cs:1274)
+TMPro.TMP_Text:ParseInputText () (at ./Library/PackageCache/com.unity.textmeshpro@3.0.9/Scripts/Runtime/TMP_Text.cs:1902)
+TMPro.TMP_Text:GetPreferredWidth () (at ./Library/PackageCache/com.unity.textmeshpro@3.0.9/Scripts/Runtime/TMP_Text.cs:3755)
+TMPro.TMP_Text:get_preferredWidth () (at ./Library/PackageCache/com.unity.textmeshpro@3.0.9/Scripts/Runtime/TMP_Text.cs:1384)
+MarqueeText:CheckOverflow () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/MarqueeText.cs:187)
+MarqueeText:SetText (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/MarqueeText.cs:160)
+RTTFileGridItem:Bind (MockFile) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileGridItem.cs:92)
+RTTFileGrid:BindItemAtIndex (RTTFileGridItem,int) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileGrid.cs:315)
+RTTFileGrid:UpdateVisibleItems () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileGrid.cs:267)
+RTTFileGrid:Populate (System.Collections.Generic.List`1<MockFile>,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileGrid.cs:215)
+RTTFileManager:UpdateGrid (System.Collections.Generic.List`1<MockFile>,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:3088)
+RTTFileManagerController:UpdateView (bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:529)
+RTTFileManagerController:NavigateToInternal (string,bool,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:291)
+RTTFileManagerController:NavigateTo (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:171)
+RTTFileManagerController:OnSidePanelItemSelected (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:650)
+RTTFileSidePanel:OnItemClicked (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileSidePanel.cs:315)
+RTTFileSidePanel/<>c__DisplayClass28_0:<CreateNavItem>b__0 () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileSidePanel.cs:224)
+UnityEngine.EventSystems.ExecuteEvents:Execute<UnityEngine.EventSystems.IPointerClickHandler> (UnityEngine.GameObject,UnityEngine.EventSystems.BaseEventData,UnityEngine.EventSystems.ExecuteEvents/EventFunction`1<UnityEngine.EventSystems.IPointerClickHandler>)
+RTTRaycastManager:SendClick () (at Assets/VR-Workspace/Scripts/UI/RTT/Input/RTTRaycastManager.cs:339)
+VRGazeReticle:SendRTTClickAndLock (UnityEngine.GameObject) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:582)
+VRGazeReticle:ProcessDwellClickRTT (UnityEngine.Vector3) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:836)
+VRGazeReticle:CheckGaze () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:474)
+VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:314)
 
-[Cache] DISK READ: 7ms (97KB)
+[Cache] DISK READ: 0ms (62KB)
+
+[Cache] DISK DECODE: 1ms (512x228)
+
+[Cache] DISK READ: 0ms (111KB)
+
+[Cache] DISK DECODE: 2ms (512x288)
+
+[Cache] DISK READ: 0ms (30KB)
+
+[Cache] DISK DECODE: 1ms (512x296)
+
+[Cache] DISK READ: 0ms (90KB)
+
+[Cache] DISK DECODE: 3ms (512x472)
+
+[Cache] DISK READ: 0ms (125KB)
+
+[Cache] DISK DECODE: 3ms (512x392)
+
+[Detail] UpdateInfo: Downloads name=0ms preview=0ms metadata=4ms total=4ms
+
+[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\Downloads, container null: False, instance: -128458
+
+[Controller] CanCreateFolderHere called, _currentPath: 'C:\Users\Admin\Downloads'
+
+[FileSystemService] CanCreateFolderInPath called with path: 'C:\Users\Admin\Downloads'
+
+[FileSystemService] absolutePath: 'C:\Users\Admin\Downloads'
+
+[FileSystemService] Comparing normalizedAbsolute: 'C:\Users\Admin\Downloads' with normalizedRoot: 'C:\Users\Admin'
+
+[FileSystemService] isDeviceRoot: False
+
+[FileSystemService] Write permission OK for: C:\Users\Admin\Downloads
+
+[Controller] CanCreateFolderHere result: True
+
+[RTTFileManager] UpdateNewFolderButtonState: canCreate=True
+
+[RTTFileManager] BoxCollider.enabled set to True
+
+[RTTFileManager] New Folder button ENABLED - alpha=1
+
+[RTTFileManager] Created 1 breadcrumbs for path: C:\Users\Admin\Downloads
+
+[Detail] UpdateInfo: 2110 name=0ms preview=0ms metadata=4ms total=4ms
+
+[Detail] UpdateInfo: icons name=0ms preview=0ms metadata=4ms total=4ms
+
+[Detail] UpdateInfo: Downloads name=0ms preview=0ms metadata=3ms total=3ms
+
+[Detail] UpdateInfo: Inventory Kamera name=0ms preview=0ms metadata=4ms total=4ms
+
+[Detail] UpdateInfo: New folder (2) name=0ms preview=0ms metadata=4ms total=4ms
+
+[Cache] DISK READ: 0ms (100KB)
 
 [Cache] DISK DECODE: 2ms (512x284)
 
-[ThumbnailCache] Cleared 820 files from disk cache
+[Cache] DISK READ: 0ms (34KB)
 
-[MediaLibraryService] Library cache cleared
+[Cache] DISK DECODE: 1ms (492x512)
 
-[MediaLibraryService] Starting directory scan in 4 locations: C:\Users\Admin\Videos, C:\Users\Admin\Pictures, C:\Users\Admin\Music, C:\Users\Admin\Downloads
+[Cache] DISK READ: 0ms (283KB)
 
-[MediaLibraryService] Scanning: C:\Users\Admin\Videos
+[Cache] DISK DECODE: 5ms (512x288)
 
-[MediaLibraryService] Scanning: C:\Users\Admin\Pictures
+[Cache] DISK READ: 0ms (92KB)
 
-[MediaLibraryService] Scanning: C:\Users\Admin\Music
+[Cache] DISK DECODE: 3ms (512x492)
 
-[MediaLibraryService] Scanning: C:\Users\Admin\Downloads
+[Cache] DISK READ: 0ms (48KB)
 
-[MediaLibraryService] Found 1295 media files
+[Cache] DISK DECODE: 1ms (268x512)
 
-[MediaLibraryService] Saved 1295 items to cache
+[Cache] DISK DECODE: 2ms (304x512)
 
-[MediaLibraryService] Scan complete: 1295 media files (cached)
+[Cache] DISK READ: 0ms (33KB)
 
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: videoplayback.mp4
+[Cache] DISK DECODE: 0ms (256x256)
 
-First video frame not zero: 2 (0.066667s). Result may be out of sync. Please make sure tracks all start at 0 in C:\Users\Admin\Downloads\videoplayback.mp4
+[Detail] REQUEST: 7295785205012.mp4
 
-[VideoFrameExtractor] Seeking to 10.0s (video length: 144.0s)
+[Cache] DISK READ: 0ms (112KB)
 
-[VideoFrameExtractor] Async capture failed: LoadRawTextureData: not enough data provided (will result in overread)., using fallback
+[Detail] RECEIVED: 7295785205012.mp4 wait=14ms assign=0ms
+
+[Detail] UpdateInfo: 7295785205012.mp4 name=0ms preview=16ms metadata=14ms total=30ms
+
+[Detail] UpdateInfo: Downloads name=1ms preview=0ms metadata=4ms total=5ms
+
+[Detail] UpdateInfo: 3. Đề án buynow66.pdf name=0ms preview=0ms metadata=6ms total=6ms
+
+[Detail] UpdateInfo: Downloads name=0ms preview=1ms metadata=3ms total=4ms
+
+[Detail] REQUEST: 01. Moon Halo (feat. Chalili, TetraCalyx & Hanser) [Honkai Impact 3rd ''Everlasting Flames'' Animated Short Theme].mp3
+
+[Detail] RECEIVED: 01. Moon Halo (feat. Chalili, TetraCalyx & Hanser) [Honkai Impact 3rd ''Everlasting Flames'' Animated Short Theme].mp3 wait=18ms assign=0ms
+
+[Detail] UpdateInfo: 01. Moon Halo (feat. Chalili, TetraCalyx & Hanser) [Honkai Impact 3rd ''Everlasting Flames'' Animated Short Theme].mp3 name=1ms preview=18ms metadata=28ms total=47ms
+
+[Detail] UpdateInfo: Downloads name=1ms preview=0ms metadata=3ms total=4ms
+
+[Detail] UpdateInfo: 3. Đề án buynow66.pdf name=1ms preview=0ms metadata=4ms total=5ms
+
+[Detail] REQUEST: 2_monitors.png
+
+[Detail] UpdateInfo: 2_monitors.png name=0ms preview=6ms metadata=8ms total=14ms
+
+[FileThumbnailService] Async resize failed: LoadRawTextureData: not enough data provided (will result in overread)., falling back to sync
 UnityEngine.Debug:LogWarning (object)
-VideoFrameExtractor/<CaptureFrameAsync>d__20:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Services/VideoFrameExtractor.cs:463)
+FileThumbnailService/<ResizeTextureAsync>d__40:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Services/FileThumbnailService.cs:1049)
 UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
 
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: Genshin-Impact 2026-1-26 12-24-11.mp4
+[Detail] RECEIVED: 2_monitors.png wait=129ms assign=0ms
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\Genshin-Impact 2026-1-26 12-24-11.mp4
+[Detail] UpdateInfo: 3. Đề án buynow66.pdf name=0ms preview=0ms metadata=5ms total=5ms
 
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\Genshin-Impact 2026-1-26 12-24-11.mp4
+[Detail] RECEIVED: 01. Moon Halo (feat. Chalili, TetraCalyx & Hanser) [Honkai Impact 3rd ''Everlasting Flames'' Animated Short Theme].mp3 wait=20ms assign=0ms
 
-[VideoFrameExtractor] Seeking to 10.0s (video length: 85.7s)
+[Detail] UpdateInfo: 01. Moon Halo (feat. Chalili, TetraCalyx & Hanser) [Honkai Impact 3rd ''Everlasting Flames'' Animated Short Theme].mp3 name=1ms preview=20ms metadata=24ms total=45ms
 
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: video_client.mp4
+[Detail] REQUEST: 1.png
 
-[VideoFrameExtractor] Seeking to 3.4s (video length: 11.4s)
+[Detail] UpdateInfo: 1.png name=0ms preview=1ms metadata=7ms total=8ms
 
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: Phàm Nhân Tu Tiên Tập 173 Vietsub.mp4
+[Detail] RECEIVED: 1.png wait=125ms assign=0ms
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Video\Phàm Nhân Tu Tiên Tập 173 Vietsub.mp4
+[Detail] REQUEST: 3_monitors.png
 
-[VideoFrameExtractor] Seeking to 10.0s (video length: 1118.9s)
+[Detail] UpdateInfo: 3_monitors.png name=0ms preview=1ms metadata=7ms total=8ms
 
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: 7295785205012.mp4
+[Detail] RECEIVED: 3_monitors.png wait=141ms assign=0ms
 
-[VideoFrameExtractor] Seeking to 3.4s (video length: 11.2s)
+[Detail] RECEIVED: 2_monitors.png wait=0ms assign=0ms
 
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: 7077543476647.mp4
+[Detail] UpdateInfo: 2_monitors.png name=0ms preview=1ms metadata=7ms total=8ms
 
-[VideoFrameExtractor] Seeking to 1.8s (video length: 9.1s)
+[Detail] UpdateInfo: zlapi-extension name=1ms preview=0ms metadata=3ms total=4ms
 
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: 7065774217733.mp4
+[Detail] UpdateInfo: 01. Moon Halo (feat. Chalili, TetraCalyx & Hanser) [Honkai Impact 3rd ''Everlasting Flames'' Animated Short Theme].mp3 name=1ms preview=19ms metadata=25ms total=45ms
 
-[VideoFrameExtractor] Seeking to 10.0s (video length: 77.6s)
+[Controller] Selected: C:\Users\Admin\Downloads\01. Moon Halo (feat. Chalili, TetraCalyx & Hanser) [Honkai Impact 3rd ''Everlasting Flames'' Animated Short Theme].mp3
 
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: Genshin_Impact_2025-09-10_11-32-27.mp4
+[Detail] REQUEST: 2.png
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Genshin_Impact_2025-09-10_11-32-27.mp4
+[Detail] UpdateInfo: 2.png name=1ms preview=0ms metadata=7ms total=8ms
 
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Downloads\Genshin_Impact_2025-09-10_11-32-27.mp4
+[Detail] RECEIVED: 01. Moon Halo (feat. Chalili, TetraCalyx & Hanser) [Honkai Impact 3rd ''Everlasting Flames'' Animated Short Theme].mp3 wait=23ms assign=0ms
 
-[VideoFrameExtractor] Seeking to 4.6s (video length: 15.2s)
+[Detail] UpdateInfo: 01. Moon Halo (feat. Chalili, TetraCalyx & Hanser) [Honkai Impact 3rd ''Everlasting Flames'' Animated Short Theme].mp3 name=1ms preview=24ms metadata=28ms total=53ms
 
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD).mp4
-
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Compressed\FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD).mp4
-
-[VideoFrameExtractor] Seeking to 6.0s (video length: 19.9s)
-
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: Honkai  Star Rail 2025.05.21 - 15.03.08.01.mp4
-
-[VideoFrameExtractor] Seeking to 10.0s (video length: 86.4s)
-
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: khác màu.mp4
-
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\New folder\khác màu.mp4
-
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\New folder\khác màu.mp4
-
-[VideoFrameExtractor] Seeking to 8.3s (video length: 27.8s)
-
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: vết xước 2.mp4
-
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\New folder\vết xước 2.mp4
-
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\New folder\vết xước 2.mp4
-
-[VideoFrameExtractor] Seeking to 4.2s (video length: 14.1s)
-
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: vết xước 1.mp4
-
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\New folder\vết xước 1.mp4
-
-[VideoFrameExtractor] Seeking to 4.0s (video length: 13.2s)
+[Detail] RECEIVED: 2.png wait=166ms assign=0ms
 

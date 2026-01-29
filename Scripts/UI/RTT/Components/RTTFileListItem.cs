@@ -29,6 +29,7 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
     private RectTransform _iconRT;
     private RectTransform _nameRT;
     private TextMeshProUGUI _nameText;
+    private MarqueeText _nameMarquee; // Added MarqueeText
     private TextMeshProUGUI _typeText;
     private TextMeshProUGUI _createdText;
     private TextMeshProUGUI _modifiedText;
@@ -51,6 +52,7 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
     private string _currentFilePath;  // Track current file for thumbnail cancellation
     private MockFile _currentFile;    // Current bound file
     public bool IsSelected => _isSelected;
+    private const float MARQUEE_SCROLL_SPEED = 80f; // Scroll speed
     #endregion
 
     #region Callbacks
@@ -167,9 +169,10 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         _iconImage.raycastTarget = false;
 
         // Name text (after icon) - store original position
-        float nameStartX = startX + IconWidth + 10f;
+        // Increased gap from 10f to 20f
+        float nameStartX = startX + IconWidth + 20f;
         _nameOriginalX = nameStartX;
-        float nameWidth = colWidth - IconWidth - 10f;
+        float nameWidth = colWidth - IconWidth - 20f;
 
         GameObject nameObj = new GameObject("NameText");
         nameObj.transform.SetParent(transform, false);
@@ -190,6 +193,13 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         _nameText.enableWordWrapping = false;
         _nameText.overflowMode = TextOverflowModes.Ellipsis;
         _nameText.raycastTarget = false;
+
+        // Setup marquee for hover scrolling (left aligned)
+        _nameMarquee = MarqueeText.Setup(_nameText, MARQUEE_SCROLL_SPEED, centerWhenFits: false, explicitHeight: height);
+        if (_nameMarquee != null)
+        {
+            _nameMarquee.SetHoverMode(true);  // Only scroll on hover
+        }
     }
 
     private void CreateCheckbox(float startX, float height, float checkboxSize)
@@ -294,8 +304,11 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         _currentFilePath = file.Path;
         _currentFile = file;
 
-        // Name
-        _nameText.text = file.Name;
+        // Name - use marquee set text
+        if (_nameMarquee != null)
+            _nameMarquee.SetText(file.Name);
+        else
+            _nameText.text = file.Name;
 
         // Icon
         if (file.IsFolder)
@@ -382,6 +395,9 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         // Forward hover to checkbox in edit mode
         if (_isEditMode && _checkboxHoverController != null)
             _checkboxHoverController.SetForceHover(true);
+            
+        // Start marquee scroll
+        _nameMarquee?.StartScroll();
 
         _onHoverEnter?.Invoke(FilePath);
     }
@@ -394,6 +410,9 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         // Forward hover exit to checkbox in edit mode
         if (_isEditMode && _checkboxHoverController != null)
             _checkboxHoverController.SetForceHover(false);
+
+        // Stop marquee scroll
+        _nameMarquee?.StopScroll();
 
         _onHoverExit?.Invoke(FilePath);
     }

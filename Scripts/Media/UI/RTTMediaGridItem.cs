@@ -22,15 +22,15 @@ public class RTTMediaGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExi
     
     // Layout calculation:
     // Bottom area (below thumbnail) = 320 - 222 = 98px
-    // Text height (single line, fontSize 32) = 50px
-    // Remaining spacing = 98 - 50 = 48px
-    // Divide spacing into 3 parts: 48 / 3 = 16px
-    // TOP_PADDING = 1 part = 16px, Bottom spacing = 2 parts = 32px
-    private const float ACTUAL_TEXT_HEIGHT = 50f;  // Single line text height (fontSize 32)
+    // Text height (single line, fontSize 32) = 60px (line height ≈ 40px + padding)
+    // Remaining spacing = 98 - 60 = 38px
+    // Divide spacing into 3 parts: 38 / 3 ≈ 13px
+    // TOP_PADDING = 1 part = 13px, Bottom spacing = 2 parts = 25px
+    private const float ACTUAL_TEXT_HEIGHT = 60f;  // Single line text height (fontSize 32)
     private const float BOTTOM_AREA = 98f;         // CELL_HEIGHT - THUMBNAIL_HEIGHT
-    private const float SPACING = 48f;             // BOTTOM_AREA - ACTUAL_TEXT_HEIGHT
-    private const float TOP_PADDING = 16f;         // SPACING / 3 (1 part for top)
-    private const float TEXT_HEIGHT = 82f;         // ACTUAL_TEXT_HEIGHT + 2 parts (50 + 32)
+    private const float SPACING = 38f;             // BOTTOM_AREA - ACTUAL_TEXT_HEIGHT
+    private const float TOP_PADDING = 13f;         // SPACING / 3 (1 part for top)
+    private const float TEXT_HEIGHT = 85f;         // ACTUAL_TEXT_HEIGHT + 2 parts (60 + 25)
 
     private const int THUMBNAIL_SIZE = 512;
     private const float HOVER_SCALE = 1.03f;
@@ -334,19 +334,19 @@ public class RTTMediaGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExi
         _titleText.fontSize = 32;  // Synced with RTTFileGridItem
         _titleText.fontStyle = FontStyles.Bold;
         _titleText.color = Color.white;
-        _titleText.alignment = TextAlignmentOptions.Center;  // Center aligned
+        _titleText.alignment = TextAlignmentOptions.MidlineLeft;  // Changed from Center to MidlineLeft for correct Marquee positioning
         _titleText.overflowMode = TextOverflowModes.Ellipsis;
         _titleText.enableWordWrapping = false;
         _titleText.maxVisibleLines = 1;
         _titleText.raycastTarget = false;
 
-        // TODO: Re-enable marquee after fixing layout issues
-        // Marquee is temporarily disabled as it causes text to disappear
-        // _titleMarquee = MarqueeText.Setup(_titleText, MARQUEE_SCROLL_SPEED, centerWhenFits: true);
-        // if (_titleMarquee != null)
-        // {
-        //     _titleMarquee.SetHoverMode(true);
-        // }
+        // Setup marquee for hover scrolling
+        // Use explicit height since this uses anchor-based layout (not LayoutGroup)
+        _titleMarquee = MarqueeText.Setup(_titleText, MARQUEE_SCROLL_SPEED, centerWhenFits: true, explicitHeight: ACTUAL_TEXT_HEIGHT);
+        if (_titleMarquee != null)
+        {
+            _titleMarquee.SetHoverMode(true);  // Only scroll on hover
+        }
     }
 
     private void CreateCheckbox()
@@ -430,13 +430,20 @@ public class RTTMediaGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExi
         _currentFilePath = video.Path;
 
         // Update title - show filename with extension
-        if (_titleText != null)
-        {
-            string fileName = System.IO.Path.GetFileName(video.Path);
-            if (string.IsNullOrEmpty(fileName))
-                fileName = video.Title ?? "Untitled";
+        // Use marquee if available for proper positioning
+        string fileName = System.IO.Path.GetFileName(video.Path);
+        if (string.IsNullOrEmpty(fileName))
+            fileName = video.Title ?? "Untitled";
+            
+        if (_titleMarquee != null)
+            _titleMarquee.SetText(fileName);
+        else if (_titleText != null)
             _titleText.text = fileName;
-        }
+
+        // Force layout rebuild to ensure MarqueeText gets correct dimensions
+        Canvas.ForceUpdateCanvases();
+        if (_thumbnailRect != null) LayoutRebuilder.ForceRebuildLayoutImmediate(_thumbnailRect);
+        LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)transform);
 
         // Determine media type from extension
         string ext = System.IO.Path.GetExtension(video.Path)?.ToLowerInvariant() ?? "";
@@ -584,8 +591,8 @@ public class RTTMediaGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExi
         if (_isEditMode && _checkboxHoverController != null)
             _checkboxHoverController.SetForceHover(true);
 
-        // Start marquee scroll on hover (disabled)
-        // _titleMarquee?.StartScroll();
+        // Start marquee scroll on hover
+        _titleMarquee?.StartScroll();
 
         _onHoverEnter?.Invoke(_currentFilePath);
     }
@@ -598,8 +605,8 @@ public class RTTMediaGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExi
         if (_isEditMode && _checkboxHoverController != null)
             _checkboxHoverController.SetForceHover(false);
 
-        // Stop marquee scroll on exit (disabled)
-        // _titleMarquee?.StopScroll();
+        // Stop marquee scroll on exit
+        _titleMarquee?.StopScroll();
 
         _onHoverExit?.Invoke(_currentFilePath);
     }

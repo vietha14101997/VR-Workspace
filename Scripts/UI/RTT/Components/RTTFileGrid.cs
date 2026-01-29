@@ -308,14 +308,15 @@ public class RTTFileGrid : MonoBehaviour
         rect.pivot = new Vector2(0.5f, 0.5f);
         rect.anchoredPosition = new Vector2(x, y);
 
+        // Activate first so coroutines (like in MarqueeText) can run correctly
+        item.gameObject.SetActive(true);
+
         // Bind data - pass full MockFile for thumbnail support
         item.Bind(file);
 
         // Restore edit mode and selection state
         item.SetEditMode(_isEditMode);
         item.SetSelected(_selectedPaths.Contains(file.Path));
-
-        item.gameObject.SetActive(true);
     }
 
     public void ScrollToPage(int pageIndex, int rowsPerPage)
