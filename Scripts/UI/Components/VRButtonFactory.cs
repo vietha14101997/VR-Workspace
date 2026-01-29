@@ -748,22 +748,37 @@ public static class VRButtonFactory
     /// </summary>
     /// <summary>
     /// Tạo layout ngang: Icon bên trái, Text bên phải
-    /// Uses HorizontalLayoutGroup to center the specific combination of Icon + Text
+    /// Uses a centered container with HorizontalLayoutGroup to ensure Icon + Text are centered as a unit
     /// </summary>
     private static void CreateHorizontalIconText(Transform parent, ButtonConfig config)
     {
-        // Use HorizontalLayoutGroup to center the content (Icon + Spacing + Text)
-        HorizontalLayoutGroup layout = parent.gameObject.AddComponent<HorizontalLayoutGroup>();
+        // 1. Create a centered container acting as the group wrapper
+        GameObject container = new GameObject("CenteredContent");
+        container.transform.SetParent(parent, false);
+        RectTransform containerRT = container.AddComponent<RectTransform>();
+        // Center in parent
+        containerRT.anchorMin = new Vector2(0.5f, 0.5f);
+        containerRT.anchorMax = new Vector2(0.5f, 0.5f);
+        containerRT.pivot = new Vector2(0.5f, 0.5f);
+        containerRT.anchoredPosition = Vector2.zero;
+        
+        // 2. Add Layout Group to the container
+        HorizontalLayoutGroup layout = container.AddComponent<HorizontalLayoutGroup>();
         layout.childAlignment = TextAnchor.MiddleCenter;
         layout.spacing = config.spacing;
-        layout.childControlWidth = false; // We set sizes manually
+        layout.childControlWidth = false; 
         layout.childControlHeight = false;
         layout.childForceExpandWidth = false;
         layout.childForceExpandHeight = false;
 
-        // Icon Object
+        // 3. Add ContentSizeFitter so container hugs the children
+        ContentSizeFitter containerCsf = container.AddComponent<ContentSizeFitter>();
+        containerCsf.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+        containerCsf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        // 4. Icon Object
         GameObject iconObj = new GameObject("Icon");
-        iconObj.transform.SetParent(parent, false);
+        iconObj.transform.SetParent(container.transform, false);
         RectTransform iconRT = iconObj.AddComponent<RectTransform>();
         iconRT.sizeDelta = new Vector2(config.iconSize, config.iconSize);
 
@@ -786,9 +801,9 @@ public static class VRButtonFactory
         shadow2.effectColor = glowCol;
         shadow2.effectDistance = new Vector2(-s1, s1);
 
-        // Text Object
+        // 5. Text Object
         GameObject txtObj = new GameObject("TextTMP");
-        txtObj.transform.SetParent(parent, false);
+        txtObj.transform.SetParent(container.transform, false);
         
         TextMeshProUGUI txt = txtObj.AddComponent<TextMeshProUGUI>();
         txt.text = config.label;

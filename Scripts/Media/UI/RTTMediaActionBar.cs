@@ -124,26 +124,26 @@ public class RTTMediaActionBar : MonoBehaviour
         canvas.renderMode = RenderMode.WorldSpace;
 
         // Button configuration
-        float buttonHeight = 90f;  // Match RTTFilePagination
-        float iconSize = 36f;      // Consistent icon size for all buttons
-        float fontSize = 24;
-        float spacing = 15f;       // Space between buttons
-        float charWidth = 14f;     // Approximate width per character at fontSize 24
-        float iconPadding = 20f;   // Padding around icon
-        float textPadding = 30f;   // Padding around text (left + right)
+        float buttonHeight = 67.5f;
+        float iconSize = 28f;
+        float fontSize = 20;
+        float spacing = 8f;          // Tighter spacing between icon and text
+        float charWidth = 12f;
+        float sidePadding = 25f;     // Padding on left/right edges of button content
+        float buttonSpacing = 15f;   // Space between buttons on the bar
 
         // Button labels
         string playLabel = "Play";
         string favLabel = "Favorite";
         string playlistLabel = "Playlist";
 
-        // Calculate width for each button based on text length
-        float playWidth = iconSize + iconPadding + (playLabel.Length * charWidth) + textPadding;
-        float favWidth = iconSize + iconPadding + (favLabel.Length * charWidth) + textPadding;
-        float playlistWidth = iconSize + iconPadding + (playlistLabel.Length * charWidth) + textPadding;
+        // Calculate width for each button: Icon + Gap + Text + Side Padding
+        float playWidth = iconSize + spacing + (playLabel.Length * charWidth) + (sidePadding * 2);
+        float favWidth = iconSize + spacing + (favLabel.Length * charWidth) + (sidePadding * 2);
+        float playlistWidth = iconSize + spacing + (playlistLabel.Length * charWidth) + (sidePadding * 2);
 
-        // Total width of all buttons + spacing
-        float totalButtonsWidth = playWidth + favWidth + playlistWidth + (spacing * 2);
+        // Total width of all buttons + spacing between them
+        float totalButtonsWidth = playWidth + favWidth + playlistWidth + (buttonSpacing * 2);
 
         // Canvas size based on panel width
         float logicalPanelWidth = _panelWidth * 1000f;
@@ -175,7 +175,9 @@ public class RTTMediaActionBar : MonoBehaviour
             iconSize = iconSize,
             fontSize = (int)fontSize,
             font = font,
-            borderWidth = 0.04f,
+            spacing = spacing,
+            cornerRadius = 0.15f,    // Reduced corner radius (was 0.25f)
+            borderWidth = 0.055f,    // Thicker border
             glowWidth = 0.06f,
             glowIntensity = 3f,
             popAmount = 0.03f
@@ -185,7 +187,7 @@ public class RTTMediaActionBar : MonoBehaviour
         _playButton = playBtn.GetComponent<Button>();
 
         // Favourite Button (icon left, text right)
-        float favX = groupStartX + playWidth + spacing + favWidth / 2f;
+        float favX = groupStartX + playWidth + buttonSpacing + favWidth / 2f;
         Sprite favIcon = Resources.Load<Sprite>("icon_add_favorite");
         var favConfig = new VRButtonFactory.ButtonConfig
         {
@@ -198,7 +200,9 @@ public class RTTMediaActionBar : MonoBehaviour
             iconSize = iconSize,
             fontSize = (int)fontSize,
             font = font,
-            borderWidth = 0.04f,
+            spacing = spacing,
+            cornerRadius = 0.15f,    // Reduced corner radius
+            borderWidth = 0.055f,
             glowWidth = 0.06f,
             glowIntensity = 3f,
             popAmount = 0.03f
@@ -209,7 +213,7 @@ public class RTTMediaActionBar : MonoBehaviour
         _favouriteIcon = favBtn.transform.Find("HitArea/Visuals/Content/Icon")?.GetComponent<Image>();
 
         // Playlist Button (icon left, text right)
-        float playlistX = groupStartX + playWidth + spacing + favWidth + spacing + playlistWidth / 2f;
+        float playlistX = groupStartX + playWidth + buttonSpacing + favWidth + buttonSpacing + playlistWidth / 2f;
         Sprite playlistIcon = Resources.Load<Sprite>("icon_add_playlist");
         var playlistConfig = new VRButtonFactory.ButtonConfig
         {
@@ -222,7 +226,9 @@ public class RTTMediaActionBar : MonoBehaviour
             iconSize = iconSize,
             fontSize = (int)fontSize,
             font = font,
-            borderWidth = 0.04f,
+            spacing = spacing,
+            cornerRadius = 0.15f,    // Reduced corner radius
+            borderWidth = 0.055f,
             glowWidth = 0.06f,
             glowIntensity = 3f,
             popAmount = 0.03f
@@ -255,9 +261,9 @@ public class RTTMediaActionBar : MonoBehaviour
         float targetHalfHeight = _targetHeight / 2f;
         float barHalfHeight = barHeight / 2f;
         
-        // Gap is 5% of button height (90px = 0.09 world units at 0.001 scale)
-        float buttonHeightWorld = 0.09f;  // 90px * 0.001 scale
-        float gap = buttonHeightWorld * 0.05f;  // 5% of button height
+        // Gap is 10% of button height (closely matches Toolbar spacing)
+        float buttonHeightWorld = 0.0675f;
+        float gap = buttonHeightWorld * 0.1f;
 
         // Step 1: Calculate top edge position E (below panel bottom)
         Vector3 targetBottom = targetCenter - targetUp * targetHalfHeight;
