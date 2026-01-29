@@ -42,6 +42,12 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
     private bool _waitingForInitialBinding = false; // Track if we're waiting for grid binding before starting scan
     private Coroutine _filterCoroutine;
     private const int FILTER_BATCH_SIZE = 200; // Items to process per frame
+    
+    // Category page position cache - remembers page for each category
+    private Dictionary<string, int> _categoryPageCache = new Dictionary<string, int>();
+    
+    // Pending page to navigate after data loads (for category switching)
+    private int? _pendingPageNavigation = null;
 
     // Vietnamese culture for proper diacritics sorting (Đ with D, etc.) - synced with RTTFileManagerController
     private static readonly CultureInfo VietnameseCulture = new CultureInfo("vi-VN");
@@ -791,6 +797,17 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
 
         // Recalculate pagination AFTER SetVideos (grid now has computed TotalPages)
         RecalculatePagination();
+        
+        // Navigate to pending page if set (from category switch)
+        if (_pendingPageNavigation.HasValue)
+        {
+            int targetPage = Mathf.Clamp(_pendingPageNavigation.Value, 1, TotalPages);
+            _pendingPageNavigation = null;
+            
+            // Navigate instantly after data is ready
+            _view?.Grid?.GoToPageInstant(targetPage);
+            Debug.Log($"[RTTMediaLibraryController] Navigated to pending page {targetPage}");
+        }
 
         Debug.Log($"[RTTMediaLibraryController] Showing {_filteredVideos.Count} videos in {_groups.Count} groups (Category: {CurrentCategory}, Search: '{CurrentSearchQuery}', Page: {CurrentPage}/{TotalPages})");
     }
@@ -859,6 +876,13 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
     private void HandleCategorySelected(string categoryId)
     {
         Debug.Log($"[RTTMediaLibraryController] Category selected: {categoryId}");
+        
+        // Save current page for the OLD category before switching
+        if (!string.IsNullOrEmpty(CurrentCategory))
+        {
+            _categoryPageCache[CurrentCategory] = CurrentPage;
+        }
+        
         CurrentCategory = categoryId;
 
         // Trigger scan if no videos loaded yet
@@ -869,7 +893,21 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
             return;
         }
 
+        // Restore cached page for the NEW category, or default to page 1
+        if (_categoryPageCache.TryGetValue(categoryId, out int cachedPage))
+        {
+            CurrentPage = cachedPage;
+            _pendingPageNavigation = cachedPage; // Will navigate after data loads
+            Debug.Log($"[RTTMediaLibraryController] Will restore page {cachedPage} for category {categoryId} after data loads");
+        }
+        else
+        {
+            CurrentPage = 1;
+            _pendingPageNavigation = 1;
+        }
+
         ApplyFilters();
+        // Note: Navigation happens in FinalizeAndUpdateView() after data is loaded
     }
 
     private void HandleProjectionFilterChanged(VideoProjectionType? projection)

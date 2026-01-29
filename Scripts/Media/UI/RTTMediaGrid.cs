@@ -85,7 +85,7 @@ public class RTTMediaGrid : MonoBehaviour
     #region Progressive Loading
     private Coroutine _progressiveBindCoroutine;
     private Queue<int> _pendingBindIndices = new Queue<int>();
-    private const int BINDS_PER_FRAME = 2; // Load 2 items per frame to spread I/O
+    private const int BINDS_PER_FRAME = 15; // Load 15 items per frame for fast loading
     private const int BINDS_PER_FRAME_SMALL = 50; // For small datasets, bind all at once to avoid race conditions
     #endregion
 
@@ -339,11 +339,24 @@ public class RTTMediaGrid : MonoBehaviour
 
     public void GoToPage(int page)
     {
+        GoToPage(page, animate: true);
+    }
+    
+    /// <summary>
+    /// Go to page instantly without animation. Used when switching categories.
+    /// </summary>
+    public void GoToPageInstant(int page)
+    {
+        GoToPage(page, animate: false);
+    }
+    
+    private void GoToPage(int page, bool animate)
+    {
         page = Mathf.Clamp(page, 1, TotalPages);
-        if (page != CurrentPage)
+        if (page != CurrentPage || !animate) // Always execute for instant mode
         {
             CurrentPage = page;
-            ScrollToPage(page);
+            ScrollToPage(page, animate);
             OnPageChanged?.Invoke(CurrentPage, TotalPages);
         }
     }
@@ -699,14 +712,48 @@ public class RTTMediaGrid : MonoBehaviour
         }
         else
         {
-            // For large datasets, use virtualization based on scroll position
+            // For large datasets with groups, use Y-position based virtualization
+            // This properly accounts for group headers which affect item positions
             float scrollY = _contentRect.anchoredPosition.y;
-            int firstVisibleRow = Mathf.Max(0, Mathf.FloorToInt((scrollY - _paddingTop) / _rowHeight) - _bufferRows);
-            int lastVisibleRow = firstVisibleRow + _visibleRowCount + _bufferRows * 2;
-
-            firstVisibleIndex = firstVisibleRow * _columnsPerRow;
-            lastVisibleIndex = Mathf.Min((lastVisibleRow + 1) * _columnsPerRow - 1, _allVideos.Count - 1);
-            Debug.Log($"[RTTMediaGrid] UpdateVisibleItems (VIRTUAL): scrollY={scrollY}, rows={firstVisibleRow}-{lastVisibleRow}, indices={firstVisibleIndex}-{lastVisibleIndex}, total={_allVideos.Count}");
+            float viewportTop = scrollY;
+            float viewportBottom = scrollY + _height;
+            float buffer = _rowHeight * _bufferRows;
+            
+            // Find first visible item by scanning from start
+            // Use binary search optimization if needed for very large datasets
+            firstVisibleIndex = 0;
+            for (int i = 0; i < _allVideos.Count; i++)
+            {
+                float itemY = Mathf.Abs(GetYPositionForIndex(i)); // Y is negative in Unity UI
+                float itemBottom = itemY + _cellHeight;
+                
+                // Item is visible if its bottom is below viewport top (with buffer)
+                if (itemBottom >= viewportTop - buffer)
+                {
+                    firstVisibleIndex = i;
+                    break;
+                }
+            }
+            
+            // Find last visible item
+            lastVisibleIndex = _allVideos.Count - 1;
+            for (int i = firstVisibleIndex; i < _allVideos.Count; i++)
+            {
+                float itemY = Mathf.Abs(GetYPositionForIndex(i));
+                
+                // Item is not visible if its top is below viewport bottom (with buffer)
+                if (itemY > viewportBottom + buffer)
+                {
+                    lastVisibleIndex = i - 1;
+                    break;
+                }
+            }
+            
+            // Clamp to valid range
+            firstVisibleIndex = Mathf.Max(0, firstVisibleIndex);
+            lastVisibleIndex = Mathf.Min(lastVisibleIndex, _allVideos.Count - 1);
+            
+            Debug.Log($"[RTTMediaGrid] UpdateVisibleItems (VIRTUAL): scrollY={scrollY}, viewport={viewportTop}-{viewportBottom}, indices={firstVisibleIndex}-{lastVisibleIndex}, total={_allVideos.Count}");
         }
 
         // Find items no longer visible
@@ -1070,7 +1117,7 @@ public class RTTMediaGrid : MonoBehaviour
 
     private Coroutine _scrollCoroutine;
 
-    private void ScrollToPage(int pageIndex)
+    private void ScrollToPage(int pageIndex, bool animate = true)
     {
         if (_scrollRect == null || _contentRect == null) return;
 
@@ -1118,7 +1165,21 @@ public class RTTMediaGrid : MonoBehaviour
         UpdateStickyHeader();
 
         if (_scrollCoroutine != null) StopCoroutine(_scrollCoroutine);
-        _scrollCoroutine = StartCoroutine(SmoothScroll(targetY, 0.3f));
+        
+        if (animate)
+        {
+            _scrollCoroutine = StartCoroutine(SmoothScroll(targetY, 0.3f));
+        }
+        else
+        {
+            // Instant scroll - no animation
+            _contentRect.anchoredPosition = new Vector2(_contentRect.anchoredPosition.x, targetY);
+            _scrollCoroutine = null;
+            
+            // Force update visible items immediately
+            UpdateVisibleItems();
+            UpdateVisibleGroupHeaders();
+        }
     }
 
 
