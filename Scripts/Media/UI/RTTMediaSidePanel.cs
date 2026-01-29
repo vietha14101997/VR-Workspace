@@ -176,7 +176,7 @@ public class RTTMediaSidePanel : MonoBehaviour
 
         // Other categories (indent: 0)
         CreateNavItem("recent", "Recent", "icon_recent_folder", 0);
-        CreateNavItem("favorites", "Favorites", "icon_star", 0);
+        CreateNavItem("favorites", "Favorites", "icon_favorite", 0);
         CreateNavItem("playlists", "Playlists", "icon_playlist", 0);
     }
 

@@ -306,11 +306,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
         // Refresh display
         ApplyFilters();
 
-        // Update detail panel if same video
-        if (_view.DetailPanel != null)
-        {
-            _view.DetailPanel.UpdateFavoriteState(newState);
-        }
+        // Favourite button state is handled by RTTMediaLibrary's action buttons
     }
 
     /// <summary>

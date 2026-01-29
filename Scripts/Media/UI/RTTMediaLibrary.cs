@@ -33,8 +33,12 @@ public class RTTMediaLibrary : MonoBehaviour
 
     private RTTMediaSidePanel _sidePanel;
     private RTTMediaGrid _grid;
-    private RTTMediaDetail _detailPanel;
+    private RTTFileDetail _detailPanel;
     private RTTFilePagination _pagination;
+
+    // Media Action Bar (below detail panel)
+    private RTTMediaActionBar _mediaActionBar;
+    private MediaVideoInfo? _currentVideo;
 
     // Flag to track if initial setup is complete
     private bool _viewReady = false;
@@ -68,7 +72,7 @@ public class RTTMediaLibrary : MonoBehaviour
     #region Properties
     public RTTMediaSidePanel SidePanel => _sidePanel;
     public RTTMediaGrid Grid => _grid;
-    public RTTMediaDetail DetailPanel => _detailPanel;
+    public RTTFileDetail DetailPanel => _detailPanel;
     #endregion
 
     #region Events
@@ -153,6 +157,7 @@ public class RTTMediaLibrary : MonoBehaviour
         if (_leftFrame != null) Destroy(_leftFrame.gameObject);
         if (_rightFrame != null) Destroy(_rightFrame.gameObject);
         if (_pagination != null) Destroy(_pagination.gameObject);
+        if (_mediaActionBar != null) Destroy(_mediaActionBar.gameObject);
 
         if (_viewOptionsPopup != null) Destroy(_viewOptionsPopup.gameObject);
         _viewOptionsPopup = null;
@@ -191,11 +196,7 @@ public class RTTMediaLibrary : MonoBehaviour
             _grid.OnPageChanged -= OnGridPageChanged;
         }
 
-        if (_detailPanel != null)
-        {
-            _detailPanel.OnPlayRequested -= OnDetailPlayRequested;
-            _detailPanel.OnToggleFavorite -= OnDetailToggleFavorite;
-        }
+        // RTTFileDetail doesn't have events - action buttons are handled directly
 
         if (_sidePanel != null)
         {
@@ -387,14 +388,44 @@ public class RTTMediaLibrary : MonoBehaviour
         rt.offsetMin = Vector2.zero;
         rt.offsetMax = Vector2.zero;
 
-        _detailPanel = contentObj.AddComponent<RTTMediaDetail>();
-        _detailPanel.Initialize(_controller, containerSize.x, containerSize.y, _font, _primaryColor, _accentColor);
-
-        _detailPanel.OnPlayRequested += OnDetailPlayRequested;
-        _detailPanel.OnToggleFavorite += OnDetailToggleFavorite;
+        // Use RTTFileDetail instead of RTTMediaDetail
+        _detailPanel = contentObj.AddComponent<RTTFileDetail>();
+        _detailPanel.Initialize(_primaryColor, _accentColor, _font);
 
         _rightFrame.MarkDirty();
-        Debug.Log("[RTTMediaLibrary] Right panel content created");
+
+        // Create action bar below the panel (follows panel position)
+        CreateMediaActionBar();
+
+        Debug.Log("[RTTMediaLibrary] Right panel content created with RTTFileDetail");
+    }
+
+    /// <summary>
+    /// Create RTTMediaActionBar that follows the detail panel.
+    /// </summary>
+    private void CreateMediaActionBar()
+    {
+        if (_rightFrame == null) return;
+
+        // Get panel world height for positioning calculations
+        Vector2 panelSize = _rightFrame.GetWorldSize();
+        float targetHeight = panelSize.y;
+
+        // Create action bar that follows the right panel
+        _mediaActionBar = RTTMediaActionBar.Create(
+            _rightFrame.transform,
+            targetHeight,
+            _primaryColor,
+            _accentColor,
+            _font
+        );
+
+        // Wire up events
+        _mediaActionBar.OnPlayClicked += OnPlayButtonClicked;
+        _mediaActionBar.OnFavouriteClicked += OnFavouriteButtonClicked;
+        _mediaActionBar.OnPlaylistClicked += OnPlaylistButtonClicked;
+
+        Debug.Log("[RTTMediaLibrary] Media action bar created");
     }
     #endregion
 
@@ -1402,7 +1433,9 @@ public class RTTMediaLibrary : MonoBehaviour
     /// </summary>
     private GameObject CreateBreadcrumbPill(string label, float width, float height, bool isFirst, bool isLast, int index)
     {
-        Color btnColor = isLast ? _accentColor : _primaryColor;
+        // Only use accent color for the last item if there are multiple breadcrumbs
+        // When there's only one breadcrumb (isFirst && isLast), use primary color
+        Color btnColor = (isLast && !isFirst) ? _accentColor : _primaryColor;
 
         GameObject btnObj = new GameObject($"Crumb_{label}");
         btnObj.layer = LayerMask.NameToLayer("UI");
@@ -1659,9 +1692,44 @@ public class RTTMediaLibrary : MonoBehaviour
 
     private void OnGridVideoSelected(MediaVideoInfo video)
     {
+        // Store current video for action buttons
+        _currentVideo = video;
+
         if (_detailPanel != null)
         {
-            _detailPanel.SetVideo(video);
+            // Convert MediaVideoInfo to MockFile for RTTFileDetail
+            var mockFile = ConvertToMockFile(video);
+            _detailPanel.UpdateInfo(mockFile, isCurrentFolder: false);
+        }
+
+        // Update favourite icon state
+        UpdateFavouriteButtonState(video.IsFavorite);
+    }
+
+    /// <summary>
+    /// Convert MediaVideoInfo to MockFile for RTTFileDetail compatibility.
+    /// </summary>
+    private MockFile ConvertToMockFile(MediaVideoInfo video)
+    {
+        return new MockFile
+        {
+            Path = video.Path,
+            Name = video.Title,
+            Type = System.IO.Path.GetExtension(video.Path).TrimStart('.').ToUpperInvariant(),
+            Size = video.FileSizeBytes,
+            Modified = video.DateAdded,
+            IsFolder = false,
+            Width = video.Width,
+            Height = video.Height,
+            Duration = video.Duration
+        };
+    }
+
+    private void UpdateFavouriteButtonState(bool isFavourite)
+    {
+        if (_mediaActionBar != null)
+        {
+            _mediaActionBar.UpdateFavouriteState(isFavourite);
         }
     }
 
@@ -1675,14 +1743,36 @@ public class RTTMediaLibrary : MonoBehaviour
         UpdatePagination();
     }
 
-    private void OnDetailPlayRequested(MediaVideoInfo video)
+    // Action Button Handlers
+    private void OnPlayButtonClicked()
     {
-        OnVideoPlayRequested?.Invoke(video);
+        if (_currentVideo.HasValue)
+        {
+            OnVideoPlayRequested?.Invoke(_currentVideo.Value);
+        }
     }
 
-    private void OnDetailToggleFavorite(MediaVideoInfo video)
+    private void OnFavouriteButtonClicked()
     {
-        _controller?.ToggleFavorite(video);
+        if (_currentVideo.HasValue)
+        {
+            _controller?.ToggleFavorite(_currentVideo.Value);
+
+            // Toggle the state locally for immediate UI feedback
+            var video = _currentVideo.Value;
+            video.IsFavorite = !video.IsFavorite;
+            _currentVideo = video;
+            UpdateFavouriteButtonState(video.IsFavorite);
+        }
+    }
+
+    private void OnPlaylistButtonClicked()
+    {
+        if (_currentVideo.HasValue)
+        {
+            Debug.Log($"[RTTMediaLibrary] Add to playlist requested for: {_currentVideo.Value.Title}");
+            // TODO: Show playlist selection dialog
+        }
     }
 
     private void OnSearchValueChanged(string value)
