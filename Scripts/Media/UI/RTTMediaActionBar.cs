@@ -28,7 +28,7 @@ public class RTTMediaActionBar : MonoBehaviour
 
     // Dimensions synced with RTTToolbar/RTTTaskbar
     private float _frameHeight = 0.12f;      // Height of the invisible frame (matches Taskbar)
-    private float _spacingMult = 0.095f;      // Spacing multiplier (matches RTTToolbar)
+    private float _spacingMult = 0.145f;      // Spacing multiplier (matches Row 1 of Toolbar)
 
     // Buttons
     private GameObject _container;
@@ -84,8 +84,8 @@ public class RTTMediaActionBar : MonoBehaviour
         if (toolbar != null && toolbar.TaskbarHeight > 0)
         {
             _frameHeight = toolbar.TaskbarHeight;
-            // Use standard gap multiplier from Toolbar logic
-            _spacingMult = 0.095f; 
+            // Align with Pagination (Row 1) gap = 0.145f (0.095f toolbar gap + 0.05f row offset)
+            _spacingMult = 0.2f; 
         }
 
         CreateButtons(font);
