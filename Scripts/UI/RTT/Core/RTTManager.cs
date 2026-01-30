@@ -115,7 +115,7 @@ public class RTTManager : MonoBehaviour
     // Extracted Managers
     private RTTPanelManager _panelManager;
     private RTTQualityManager _qualityManager;
-    private RTTAppLifecycleHelper _appLifecycleHelper;
+    private RTTAppManager _appManager;
     #endregion
 
     #region Menu State Fields
@@ -127,17 +127,6 @@ public class RTTManager : MonoBehaviour
     private GameObject _mainMenuContent;
     private bool _mainMenuInitialized = false;
     private bool _hasAutoRecentered = false;
-    #endregion
-
-    #region App Lifecycle Fields
-    // Note: These fields are kept for now as the coroutine-based logic
-    // requires tight integration with MonoBehaviour. Full migration to
-    // _appLifecycleHelper would require significant refactoring.
-    private Dictionary<string, RTTAppInstance> _activeApps = new Dictionary<string, RTTAppInstance>();
-    private Dictionary<string, RTTAppInstance> _preparingApps = new Dictionary<string, RTTAppInstance>();
-    private string _currentVisibleAppId = null;
-    private string _pendingOpenAppId = null;
-    private bool _isTransitioning = false;
     #endregion
 
     #region Events
@@ -184,16 +173,12 @@ public class RTTManager : MonoBehaviour
 
     #region Properties - App Lifecycle
     public RTTMenuFrame MainMenuFrame => mainMenuFrame;
-    public bool IsMainMenuVisible => _currentVisibleAppId == null;
-    public string CurrentVisibleAppId => _currentVisibleAppId;
+    public bool IsMainMenuVisible => _appManager?.IsMainMenuVisible ?? true;
+    public string CurrentVisibleAppId => _appManager?.CurrentVisibleAppId;
     public int MaxOpenApps => appRegistry?.maxOpenApps ?? 3;
-    public bool IsTransitioning => _isTransitioning;
-    public int OpenAppCount => _activeApps.Count;
-
-    public RTTAppInstance CurrentApp =>
-        _currentVisibleAppId != null && _activeApps.ContainsKey(_currentVisibleAppId)
-            ? _activeApps[_currentVisibleAppId]
-            : null;
+    public bool IsTransitioning => _appManager?.IsTransitioning ?? false;
+    public int OpenAppCount => _appManager?.OpenAppCount ?? 0;
+    public RTTAppInstance CurrentApp => _appManager?.CurrentApp;
     #endregion
 
     #region Properties - Zoom
@@ -293,6 +278,9 @@ public class RTTManager : MonoBehaviour
         // Auto-find references
         AutoFindReferences();
 
+        // Initialize app manager with references
+        InitializeAppManager();
+
         // Subscribe to controller events
         SubscribeToControllerEvents();
 
@@ -316,11 +304,7 @@ public class RTTManager : MonoBehaviour
 
         UnsubscribeFromControllerEvents();
 
-        // Cleanup active apps
-        foreach (var appId in new List<string>(_activeApps.Keys))
-        {
-            CloseAppInternal(appId, skipSwitchToHome: true);
-        }
+        // Cleanup active apps (handled by RTTAppManager.OnDestroy)
 
         if (_instance == this) _instance = null;
     }
@@ -354,8 +338,44 @@ public class RTTManager : MonoBehaviour
         // Quality Manager - handles quality levels and memory monitoring
         _qualityManager = new RTTQualityManager(rttConfig, _panelManager, enablePerformanceLogging);
 
-        // App Lifecycle Helper - handles app state tracking
-        _appLifecycleHelper = new RTTAppLifecycleHelper(appRegistry?.maxOpenApps ?? 3);
+        // App Manager - handles app lifecycle (MonoBehaviour)
+        _appManager = gameObject.AddComponent<RTTAppManager>();
+    }
+
+    /// <summary>
+    /// Initialize RTTAppManager with references after AutoFindReferences.
+    /// </summary>
+    private void InitializeAppManager()
+    {
+        if (_appManager == null) return;
+
+        _appManager.Initialize(
+            menu,
+            mainMenuFrame,
+            taskbar,
+            appRegistry,
+            frameParent,
+            transitionOutDuration,
+            transitionInDuration,
+            useFadeTransition,
+            useScaleTransition
+        );
+
+        _appManager.SetCreateContentCallback(CreateAppContent);
+        _appManager.SetMenuStateCallback(state => {
+            _currentMenuState = state;
+            OnMenuStateChanged?.Invoke(state);
+        });
+
+        // Subscribe to app manager events
+        _appManager.OnAppOpened += (appId, instance) => {
+            if (enablePerformanceLogging)
+                Debug.Log($"[RTTManager] App opened: {appId}");
+        };
+        _appManager.OnAppClosed += appId => {
+            if (enablePerformanceLogging)
+                Debug.Log($"[RTTManager] App closed: {appId}");
+        };
     }
 
     private void AutoFindReferences()
@@ -827,736 +847,20 @@ public class RTTManager : MonoBehaviour
     }
     #endregion
 
-    #region App Lifecycle - Public API
-    public RTTAppInstance OpenApp(string appId)
-    {
-        if (_activeApps.ContainsKey(appId))
-        {
-            SwitchToApp(appId);
-            return _activeApps[appId];
-        }
-
-        if (_preparingApps.ContainsKey(appId))
-        {
-            StartCoroutine(WaitAndSwitchToPreparedApp(appId));
-            return _preparingApps[appId];
-        }
-
-        int slotIndex = GetNextAvailableSlot();
-        if (slotIndex == -1)
-        {
-            Debug.LogWarning("[RTTManager] No available app slots");
-            return null;
-        }
-
-        Sprite icon = GetAppIcon(appId);
-        var instance = new RTTAppInstance(appId)
-        {
-            TaskbarSlotIndex = slotIndex,
-            Icon = icon
-        };
-
-        _activeApps[appId] = instance;
-        StartCoroutine(CreateAppFrameAndContent(instance));
-
-        Debug.Log($"[RTTManager] Opening app: {appId} in slot {slotIndex}");
-        return instance;
-    }
-
-    public void PrepareApp(string appId)
-    {
-        _pendingOpenAppId = appId;
-
-        if (_activeApps.ContainsKey(appId) || _preparingApps.ContainsKey(appId))
-            return;
-
-        CancelAllPreparations();
-
-        int slotIndex = GetNextAvailableSlot();
-        if (slotIndex == -1)
-        {
-            Debug.LogWarning("[RTTManager] No available app slots for prepare");
-            return;
-        }
-
-        Sprite icon = GetAppIcon(appId);
-        var instance = new RTTAppInstance(appId)
-        {
-            TaskbarSlotIndex = slotIndex,
-            Icon = icon
-        };
-
-        _preparingApps[appId] = instance;
-        StartCoroutine(PrepareAppFrameAsync(instance));
-
-        Debug.Log($"[RTTManager] Preparing app: {appId} in slot {slotIndex}");
-    }
-
-    public bool IsAppPrepared(string appId)
-    {
-        if (_activeApps.ContainsKey(appId)) return true;
-        if (!_preparingApps.ContainsKey(appId)) return false;
-        var instance = _preparingApps[appId];
-        // Use IsPrepared flag to ensure preparation is fully complete (including SetActive(false))
-        return instance.IsPrepared;
-    }
-
-    public void OpenPreparedApp(string appId)
-    {
-        if (_pendingOpenAppId != appId)
-        {
-            Debug.Log($"[RTTManager] Skipping open for {appId} - user clicked {_pendingOpenAppId} instead");
-            return;
-        }
-
-        _pendingOpenAppId = null;
-
-        if (_activeApps.ContainsKey(appId))
-        {
-            SwitchToApp(appId);
-            return;
-        }
-
-        if (_preparingApps.ContainsKey(appId))
-        {
-            StartCoroutine(WaitAndSwitchToPreparedApp(appId));
-            return;
-        }
-
-        OpenApp(appId);
-    }
-
-    public void SwitchToApp(string appId)
-    {
-        if (!_activeApps.ContainsKey(appId))
-        {
-            Debug.LogWarning($"[RTTManager] App not open: {appId}");
-            return;
-        }
-
-        if (_isTransitioning)
-        {
-            SwitchToAppImmediate(appId);
-            return;
-        }
-
-        StartCoroutine(SwitchToAppWithTransition(appId));
-    }
-
-    public void SwitchToHome()
-    {
-        if (_currentVisibleAppId == null)
-        {
-            taskbar?.SelectSlot(0);
-            return;
-        }
-
-        if (_isTransitioning)
-        {
-            SwitchToHomeImmediate();
-            return;
-        }
-
-        StartCoroutine(SwitchToHomeWithTransition());
-    }
-
-    public void CloseApp(string appId)
-    {
-        if (!_activeApps.ContainsKey(appId)) return;
-
-        if (_currentVisibleAppId == appId && !_isTransitioning)
-            StartCoroutine(CloseAppWithTransition(appId));
-        else
-            CloseAppInternal(appId, skipSwitchToHome: false);
-    }
-
-    public bool IsAppOpen(string appId) => _activeApps.ContainsKey(appId);
-
-    public RTTAppInstance GetApp(string appId) =>
-        _activeApps.ContainsKey(appId) ? _activeApps[appId] : null;
-
-    public IReadOnlyCollection<string> GetOpenAppIds() => _activeApps.Keys;
+    #region App Lifecycle - Public API (Delegated to RTTAppManager)
+    public RTTAppInstance OpenApp(string appId) => _appManager?.OpenApp(appId);
+    public void PrepareApp(string appId) => _appManager?.PrepareApp(appId);
+    public bool IsAppPrepared(string appId) => _appManager?.IsAppPrepared(appId) ?? false;
+    public void OpenPreparedApp(string appId) => _appManager?.OpenPreparedApp(appId);
+    public void SwitchToApp(string appId) => _appManager?.SwitchToApp(appId);
+    public void SwitchToHome() => _appManager?.SwitchToHome();
+    public void CloseApp(string appId) => _appManager?.CloseApp(appId);
+    public bool IsAppOpen(string appId) => _appManager?.IsAppOpen(appId) ?? false;
+    public RTTAppInstance GetApp(string appId) => _appManager?.GetApp(appId);
+    public IReadOnlyCollection<string> GetOpenAppIds() => _appManager?.GetOpenAppIds() ?? new List<string>();
     #endregion
 
-    #region App Lifecycle - Internal
-    private void CancelAllPreparations()
-    {
-        foreach (var kvp in new Dictionary<string, RTTAppInstance>(_preparingApps))
-        {
-            // Destroy controller first (it's not a child of frame anymore)
-            if (kvp.Value.Controller != null && kvp.Value.Controller.gameObject != null)
-                Destroy(kvp.Value.Controller.gameObject);
-            if (kvp.Value.Frame != null)
-            {
-                if (menu != null)
-                    menu.DestroyFrame(kvp.Value.Frame);
-                else
-                    Destroy(kvp.Value.Frame.gameObject);
-            }
-            Debug.Log($"[RTTManager] Cancelled preparation for: {kvp.Key}");
-        }
-        _preparingApps.Clear();
-    }
-
-    private void HideCurrentView()
-    {
-        if (_currentVisibleAppId == null)
-        {
-            if (mainMenuFrame != null)
-                mainMenuFrame.gameObject.SetActive(false);
-        }
-        else if (_activeApps.ContainsKey(_currentVisibleAppId))
-        {
-            var currentApp = _activeApps[_currentVisibleAppId];
-            if (currentApp.Frame != null)
-                currentApp.Frame.gameObject.SetActive(false);
-            currentApp.IsVisible = false;
-        }
-    }
-
-    private void CloseAppInternal(string appId, bool skipSwitchToHome)
-    {
-        if (!_activeApps.ContainsKey(appId)) return;
-
-        var app = _activeApps[appId];
-
-        if (!skipSwitchToHome && _currentVisibleAppId == appId)
-        {
-            if (app.Frame != null)
-                app.Frame.gameObject.SetActive(false);
-            app.IsVisible = false;
-
-            if (mainMenuFrame != null)
-            {
-                mainMenuFrame.gameObject.SetActive(true);
-                mainMenuFrame.SetAsPrimaryFrame();
-            }
-
-            // Show the persistent Main Menu content
-            if (_mainMenuContent != null)
-            {
-                _mainMenuContent.SetActive(true);
-            }
-
-            _currentVisibleAppId = null;
-            _currentMenuState = MenuState.MainMenu;
-            taskbar?.SelectSlot(0);
-        }
-
-        // Cleanup controller
-        if (app.Controller != null)
-        {
-            var cleanupMethod = app.Controller.GetType().GetMethod("Cleanup");
-            if (cleanupMethod != null)
-            {
-                try { cleanupMethod.Invoke(app.Controller, null); }
-                catch (Exception e) { Debug.LogWarning($"[RTTManager] Cleanup failed: {e.Message}"); }
-            }
-            // Destroy controller GameObject (it's not a child of frame anymore)
-            if (app.Controller.gameObject != null)
-                Destroy(app.Controller.gameObject);
-        }
-
-        if (app.Frame != null)
-        {
-            // Use RTTMenu.DestroyFrame if available to properly track frame removal
-            if (menu != null)
-                menu.DestroyFrame(app.Frame);
-            else
-                Destroy(app.Frame.gameObject);
-        }
-
-        if (taskbar != null && app.TaskbarSlotIndex > 0)
-            taskbar.UnregisterApp(app.TaskbarSlotIndex);
-
-        _activeApps.Remove(appId);
-        Debug.Log($"[RTTManager] Closed app: {appId}");
-    }
-
-    private int GetNextAvailableSlot()
-    {
-        int mainSlots = appRegistry?.maxOpenApps ?? 3;
-        int maxOverflowSlots = 5; // Allow up to 5 additional overflow apps
-        int totalMaxSlots = mainSlots + maxOverflowSlots;
-
-        for (int i = 1; i <= totalMaxSlots; i++)
-        {
-            bool slotUsed = false;
-            foreach (var app in _activeApps.Values)
-            {
-                if (app.TaskbarSlotIndex == i) { slotUsed = true; break; }
-            }
-            if (!slotUsed)
-            {
-                foreach (var app in _preparingApps.Values)
-                {
-                    if (app.TaskbarSlotIndex == i) { slotUsed = true; break; }
-                }
-            }
-            if (!slotUsed) return i;
-        }
-        return -1;
-    }
-
-    private Sprite GetAppIcon(string appId)
-    {
-        // Try app registry first
-        if (appRegistry != null)
-        {
-            var icon = appRegistry.GetIcon(appId);
-            if (icon != null) return icon;
-        }
-
-        // Fallback to Resources
-        return Resources.Load<Sprite>($"icon_{appId}");
-    }
-    #endregion
-
-    #region App Lifecycle - Coroutines
-    private IEnumerator WaitAndSwitchToPreparedApp(string appId)
-    {
-        while (_preparingApps.ContainsKey(appId) && !IsAppPrepared(appId))
-            yield return null;
-
-        if (_preparingApps.ContainsKey(appId))
-        {
-            var instance = _preparingApps[appId];
-            _preparingApps.Remove(appId);
-            _activeApps[appId] = instance;
-            StartCoroutine(SwitchToPreparedAppWithTransition(instance));
-        }
-    }
-
-    private IEnumerator CreateAppFrameAndContent(RTTAppInstance instance)
-    {
-        if (mainMenuFrame == null)
-        {
-            Debug.LogError("[RTTManager] MainMenuFrame is null");
-            yield break;
-        }
-
-        _isTransitioning = true;
-
-        // Animate out
-        if (useFadeTransition && transitionOutDuration > 0)
-            yield return StartCoroutine(AnimateFrameFade(mainMenuFrame, 1f, 0f, transitionOutDuration, true));
-        else if (useScaleTransition && transitionOutDuration > 0)
-            yield return StartCoroutine(AnimateFrameScale(mainMenuFrame.transform, 1f, 0.9f, transitionOutDuration, true));
-
-        // Create frame with unique name based on app ID
-        if (menu != null)
-        {
-            instance.Frame = menu.CreateAppFrame(
-                instance.AppId,
-                mainMenuFrame.PanelWidth,
-                mainMenuFrame.PanelHeight,
-                mainMenuFrame.LogicalWidthValue
-            );
-        }
-        else
-        {
-            // Fallback for when RTTMenu is not available
-            instance.Frame = RTTMenuFrame.Create(
-                frameParent,
-                mainMenuFrame.PanelWidth,
-                mainMenuFrame.PanelHeight,
-                mainMenuFrame.LogicalWidthValue,
-                name: $"RTTMenuFrame_{instance.AppId}"
-            );
-        }
-
-        instance.Frame.transform.position = mainMenuFrame.transform.position;
-        instance.Frame.transform.rotation = mainMenuFrame.transform.rotation;
-        instance.Frame.transform.localScale = Vector3.one;
-
-        // Wait for ContentContainer
-        int waitFrames = 0;
-        while (instance.Frame.ContentContainer == null && waitFrames < 60)
-        {
-            waitFrames++;
-            yield return null;
-        }
-
-        if (instance.Frame.ContentContainer == null)
-        {
-            Debug.LogError($"[RTTManager] ContentContainer not ready for {instance.AppId}");
-            ResetFrameAlpha(mainMenuFrame);
-            _isTransitioning = false;
-            yield break;
-        }
-
-        yield return null;
-
-        // Create content
-        CreateAppContent(instance);
-
-        // Hide MainMenu, show new frame
-        mainMenuFrame.gameObject.SetActive(false);
-        ResetFrameAlpha(mainMenuFrame);
-
-        instance.Frame.SetVisible(true); // Ensure DisplayQuad is visible
-        ResetFrameAlpha(instance.Frame); // Reset material alpha in case of previous fade
-        instance.Frame.SetAsPrimaryFrame();
-        instance.IsVisible = true;
-        _currentVisibleAppId = instance.AppId;
-
-        // Animate in
-        if (useFadeTransition && transitionInDuration > 0)
-        {
-            var newQuad = instance.Frame.GetDisplayQuad();
-            if (newQuad?.material != null)
-                newQuad.material.color = new Color(1f, 1f, 1f, 0f);
-            yield return StartCoroutine(AnimateFrameFade(instance.Frame, 0f, 1f, transitionInDuration, false));
-        }
-        else if (useScaleTransition && transitionInDuration > 0)
-        {
-            instance.Frame.transform.localScale = Vector3.one * 0.9f;
-            yield return StartCoroutine(AnimateFrameScale(instance.Frame.transform, 0.9f, 1f, transitionInDuration, false));
-        }
-
-        // Register with taskbar
-        if (taskbar != null)
-        {
-            taskbar.RegisterApp(instance.TaskbarSlotIndex, instance.Icon, () => SwitchToApp(instance.AppId));
-            taskbar.SelectSlot(instance.TaskbarSlotIndex);
-        }
-
-        _isTransitioning = false;
-        Debug.Log($"[RTTManager] App {instance.AppId} opened");
-    }
-
-    private IEnumerator PrepareAppFrameAsync(RTTAppInstance instance)
-    {
-        if (mainMenuFrame == null)
-        {
-            _preparingApps.Remove(instance.AppId);
-            yield break;
-        }
-
-        // Create frame with unique name based on app ID
-        if (menu != null)
-        {
-            instance.Frame = menu.CreateAppFrame(
-                instance.AppId,
-                mainMenuFrame.PanelWidth,
-                mainMenuFrame.PanelHeight,
-                mainMenuFrame.LogicalWidthValue
-            );
-        }
-        else
-        {
-            // Fallback for when RTTMenu is not available
-            instance.Frame = RTTMenuFrame.Create(
-                frameParent,
-                mainMenuFrame.PanelWidth,
-                mainMenuFrame.PanelHeight,
-                mainMenuFrame.LogicalWidthValue,
-                name: $"RTTMenuFrame_{instance.AppId}"
-            );
-        }
-
-        instance.Frame.transform.position = mainMenuFrame.transform.position + Vector3.up * 1000f;
-        instance.Frame.transform.rotation = mainMenuFrame.transform.rotation;
-        instance.Frame.transform.localScale = Vector3.one;
-
-        int waitFrames = 0;
-        while (instance.Frame.ContentContainer == null && waitFrames < 60)
-        {
-            waitFrames++;
-            yield return null;
-        }
-
-        if (instance.Frame.ContentContainer == null)
-        {
-            if (instance.Frame != null)
-            {
-                if (menu != null)
-                    menu.DestroyFrame(instance.Frame);
-                else
-                    Destroy(instance.Frame.gameObject);
-            }
-            _preparingApps.Remove(instance.AppId);
-            yield break;
-        }
-
-        yield return null;
-
-        CreateAppContent(instance);
-
-        // Wait for child components (including side panel RTTMenuFrames) to initialize
-        // Side panels are created in CreateAppContent → RTTRemoteMenu.BuildUI → CreateSidePanels
-        // They need their Start() to be called before we can disable the frame
-        // Start() is called on the next frame after Awake(), so we need to wait
-        for (int i = 0; i < 5; i++)
-        {
-            yield return null;
-        }
-
-        // Ensure frame is fully initialized before disabling
-        if (!instance.Frame.IsInitialized)
-        {
-            Debug.LogWarning($"[RTTManager] Frame not initialized after 5 frames, calling EnsureInitialized()");
-            instance.Frame.EnsureInitialized();
-        }
-
-        instance.Frame.transform.position = mainMenuFrame.transform.position;
-
-        // Reset alpha to 1 before disabling (in case any fade was applied)
-        ResetFrameAlpha(instance.Frame);
-
-        instance.Frame.gameObject.SetActive(false);
-        instance.Frame.MarkDirty();
-
-        // Mark as fully prepared AFTER SetActive(false) to prevent race condition
-        instance.IsPrepared = true;
-
-        Debug.Log($"[RTTManager] App {instance.AppId} prepared");
-    }
-
-    private void SwitchToAppImmediate(string appId)
-    {
-        HideCurrentView();
-        var targetApp = _activeApps[appId];
-        if (targetApp.Frame != null)
-        {
-            targetApp.Frame.gameObject.SetActive(true);
-            targetApp.Frame.SetVisible(true); // Ensure DisplayQuad is visible
-            ResetFrameAlpha(targetApp.Frame); // Reset material alpha in case of previous fade
-            targetApp.Frame.SetAsPrimaryFrame();
-            targetApp.IsVisible = true;
-        }
-        _currentVisibleAppId = appId;
-        taskbar?.SelectSlot(targetApp.TaskbarSlotIndex);
-    }
-
-    private IEnumerator SwitchToAppWithTransition(string appId)
-    {
-        _isTransitioning = true;
-        var targetApp = _activeApps[appId];
-
-        RTTMenuFrame currentFrame = _currentVisibleAppId == null
-            ? mainMenuFrame
-            : (_activeApps.ContainsKey(_currentVisibleAppId) ? _activeApps[_currentVisibleAppId].Frame : null);
-
-        if (useFadeTransition && currentFrame != null && transitionOutDuration > 0)
-            yield return StartCoroutine(AnimateFrameFade(currentFrame, 1f, 0f, transitionOutDuration * 0.5f, true));
-        else if (useScaleTransition && currentFrame != null && transitionOutDuration > 0)
-            yield return StartCoroutine(AnimateFrameScale(currentFrame.transform, 1f, 0.95f, transitionOutDuration * 0.5f, true));
-
-        HideCurrentView();
-        ResetFrameAlpha(currentFrame);
-        if (currentFrame != null) currentFrame.transform.localScale = Vector3.one;
-
-        if (targetApp.Frame != null)
-        {
-            targetApp.Frame.gameObject.SetActive(true);
-            targetApp.Frame.SetVisible(true); // Ensure DisplayQuad is visible
-            ResetFrameAlpha(targetApp.Frame); // Reset material alpha in case of previous fade
-            targetApp.Frame.SetAsPrimaryFrame();
-            targetApp.IsVisible = true;
-
-            if (useFadeTransition)
-            {
-                var quad = targetApp.Frame.GetDisplayQuad();
-                if (quad?.material != null)
-                    quad.material.color = new Color(1f, 1f, 1f, 0f);
-            }
-            else if (useScaleTransition)
-            {
-                targetApp.Frame.transform.localScale = Vector3.one * 0.95f;
-            }
-        }
-
-        _currentVisibleAppId = appId;
-
-        if (useFadeTransition && targetApp.Frame != null && transitionInDuration > 0)
-            yield return StartCoroutine(AnimateFrameFade(targetApp.Frame, 0f, 1f, transitionInDuration * 0.5f, false));
-        else if (useScaleTransition && targetApp.Frame != null && transitionInDuration > 0)
-            yield return StartCoroutine(AnimateFrameScale(targetApp.Frame.transform, 0.95f, 1f, transitionInDuration * 0.5f, false));
-
-        taskbar?.SelectSlot(targetApp.TaskbarSlotIndex);
-
-        _isTransitioning = false;
-    }
-
-    private void SwitchToHomeImmediate()
-    {
-        HideCurrentView();
-        if (mainMenuFrame != null)
-        {
-            mainMenuFrame.gameObject.SetActive(true);
-            mainMenuFrame.SetVisible(true); // Ensure DisplayQuad is visible
-            mainMenuFrame.SetAsPrimaryFrame();
-        }
-        // Show the persistent Main Menu content
-        if (_mainMenuContent != null)
-        {
-            _mainMenuContent.SetActive(true);
-        }
-        _currentVisibleAppId = null;
-        _currentMenuState = MenuState.MainMenu;
-        taskbar?.SelectSlot(0);
-    }
-
-    private IEnumerator SwitchToHomeWithTransition()
-    {
-        _isTransitioning = true;
-
-        RTTMenuFrame currentFrame = _activeApps.ContainsKey(_currentVisibleAppId)
-            ? _activeApps[_currentVisibleAppId].Frame : null;
-
-        if (useFadeTransition && currentFrame != null && transitionOutDuration > 0)
-            yield return StartCoroutine(AnimateFrameFade(currentFrame, 1f, 0f, transitionOutDuration * 0.5f, true));
-        else if (useScaleTransition && currentFrame != null && transitionOutDuration > 0)
-            yield return StartCoroutine(AnimateFrameScale(currentFrame.transform, 1f, 0.95f, transitionOutDuration * 0.5f, true));
-
-        HideCurrentView();
-        ResetFrameAlpha(currentFrame);
-        if (currentFrame != null) currentFrame.transform.localScale = Vector3.one;
-
-        if (mainMenuFrame != null)
-        {
-            mainMenuFrame.gameObject.SetActive(true);
-            mainMenuFrame.SetVisible(true); // Ensure DisplayQuad is visible
-            mainMenuFrame.SetAsPrimaryFrame();
-
-            if (useFadeTransition)
-            {
-                var quad = mainMenuFrame.GetDisplayQuad();
-                if (quad?.material != null)
-                    quad.material.color = new Color(1f, 1f, 1f, 0f);
-            }
-            else if (useScaleTransition)
-            {
-                mainMenuFrame.transform.localScale = Vector3.one * 0.95f;
-            }
-        }
-
-        // Show the persistent Main Menu content
-        if (_mainMenuContent != null)
-        {
-            _mainMenuContent.SetActive(true);
-        }
-
-        _currentVisibleAppId = null;
-        _currentMenuState = MenuState.MainMenu;
-
-        if (useFadeTransition && mainMenuFrame != null && transitionInDuration > 0)
-            yield return StartCoroutine(AnimateFrameFade(mainMenuFrame, 0f, 1f, transitionInDuration * 0.5f, false));
-        else if (useScaleTransition && mainMenuFrame != null && transitionInDuration > 0)
-            yield return StartCoroutine(AnimateFrameScale(mainMenuFrame.transform, 0.95f, 1f, transitionInDuration * 0.5f, false));
-
-        taskbar?.SelectSlot(0);
-        _isTransitioning = false;
-    }
-
-    private IEnumerator SwitchToPreparedAppWithTransition(RTTAppInstance instance)
-    {
-        _isTransitioning = true;
-
-        if (useFadeTransition && transitionOutDuration > 0)
-            yield return StartCoroutine(AnimateFrameFade(mainMenuFrame, 1f, 0f, transitionOutDuration, true));
-        else if (useScaleTransition && transitionOutDuration > 0)
-            yield return StartCoroutine(AnimateFrameScale(mainMenuFrame.transform, 1f, 0.9f, transitionOutDuration, true));
-
-        mainMenuFrame.gameObject.SetActive(false);
-        ResetFrameAlpha(mainMenuFrame);
-
-        instance.Frame.gameObject.SetActive(true);
-
-        // Force rebuild Canvas layout after re-enabling
-        var canvas = instance.Frame.GetCanvas();
-        if (canvas != null)
-        {
-            UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(canvas.GetComponent<RectTransform>());
-        }
-
-        instance.Frame.SetVisible(true); // Ensure DisplayQuad is visible
-        ResetFrameAlpha(instance.Frame); // Reset material alpha in case of previous fade
-        instance.Frame.MarkDirty(); // Force re-render
-        instance.Frame.SetAsPrimaryFrame();
-        instance.IsVisible = true;
-        _currentVisibleAppId = instance.AppId;
-
-        if (useFadeTransition && transitionInDuration > 0)
-        {
-            var newQuad = instance.Frame.GetDisplayQuad();
-            if (newQuad?.material != null)
-                newQuad.material.color = new Color(1f, 1f, 1f, 0f);
-            yield return StartCoroutine(AnimateFrameFade(instance.Frame, 0f, 1f, transitionInDuration, false));
-        }
-        else if (useScaleTransition && transitionInDuration > 0)
-        {
-            instance.Frame.transform.localScale = Vector3.one * 0.9f;
-            yield return StartCoroutine(AnimateFrameScale(instance.Frame.transform, 0.9f, 1f, transitionInDuration, false));
-        }
-
-        if (taskbar != null)
-        {
-            taskbar.RegisterApp(instance.TaskbarSlotIndex, instance.Icon, () => SwitchToApp(instance.AppId));
-            taskbar.SelectSlot(instance.TaskbarSlotIndex);
-        }
-
-        _isTransitioning = false;
-    }
-
-    private IEnumerator CloseAppWithTransition(string appId)
-    {
-        if (!_activeApps.ContainsKey(appId)) yield break;
-
-        _isTransitioning = true;
-        var app = _activeApps[appId];
-
-        if (useFadeTransition && app.Frame != null && transitionOutDuration > 0)
-            yield return StartCoroutine(AnimateFrameFade(app.Frame, 1f, 0f, transitionOutDuration, true));
-        else if (useScaleTransition && app.Frame != null && transitionOutDuration > 0)
-            yield return StartCoroutine(AnimateFrameScale(app.Frame.transform, 1f, 0.9f, transitionOutDuration, true));
-
-        if (app.Frame != null)
-        {
-            app.Frame.gameObject.SetActive(false);
-            ResetFrameAlpha(app.Frame);
-        }
-        app.IsVisible = false;
-
-        if (mainMenuFrame != null)
-        {
-            mainMenuFrame.gameObject.SetActive(true);
-            mainMenuFrame.SetVisible(true); // Ensure DisplayQuad is visible
-            mainMenuFrame.SetAsPrimaryFrame();
-
-            if (useFadeTransition)
-            {
-                var quad = mainMenuFrame.GetDisplayQuad();
-                if (quad?.material != null)
-                    quad.material.color = new Color(1f, 1f, 1f, 0f);
-            }
-            else if (useScaleTransition)
-            {
-                mainMenuFrame.transform.localScale = Vector3.one * 0.9f;
-            }
-        }
-
-        // Show the persistent Main Menu content
-        if (_mainMenuContent != null)
-        {
-            _mainMenuContent.SetActive(true);
-        }
-
-        _currentVisibleAppId = null;
-        _currentMenuState = MenuState.MainMenu;
-
-        if (useFadeTransition && mainMenuFrame != null && transitionInDuration > 0)
-            yield return StartCoroutine(AnimateFrameFade(mainMenuFrame, 0f, 1f, transitionInDuration, false));
-        else if (useScaleTransition && mainMenuFrame != null && transitionInDuration > 0)
-            yield return StartCoroutine(AnimateFrameScale(mainMenuFrame.transform, 0.9f, 1f, transitionInDuration, false));
-
-        taskbar?.SelectSlot(0);
-        _isTransitioning = false;
-
-        CloseAppInternal(appId, skipSwitchToHome: true);
-    }
-    #endregion
+    // App Lifecycle code (Internal + Coroutines) moved to RTTAppManager
 
     #region App Content Creation
     private void CreateAppContent(RTTAppInstance instance)
@@ -1680,54 +984,5 @@ public class RTTManager : MonoBehaviour
     }
     #endregion
 
-    #region Animation Helpers
-    private IEnumerator AnimateFrameScale(Transform target, float fromScale, float toScale, float duration, bool fadeOut)
-    {
-        float elapsed = 0f;
-        Vector3 from = Vector3.one * fromScale;
-        Vector3 to = Vector3.one * toScale;
-
-        while (elapsed < duration)
-        {
-            elapsed += Time.deltaTime;
-            float t = Mathf.Clamp01(elapsed / duration);
-            float easedT = fadeOut ? t * t : 1f - (1f - t) * (1f - t);
-            target.localScale = Vector3.Lerp(from, to, easedT);
-            yield return null;
-        }
-
-        target.localScale = to;
-    }
-
-    private IEnumerator AnimateFrameFade(RTTMenuFrame frame, float fromAlpha, float toAlpha, float duration, bool isFadeOut)
-    {
-        if (frame == null) yield break;
-
-        var displayQuad = frame.GetDisplayQuad();
-        if (displayQuad == null || displayQuad.material == null) yield break;
-
-        Material mat = displayQuad.material;
-        float elapsed = 0f;
-
-        while (elapsed < duration)
-        {
-            elapsed += Time.deltaTime;
-            float t = Mathf.Clamp01(elapsed / duration);
-            float easedT = isFadeOut ? t * t : 1f - (1f - t) * (1f - t);
-            float alpha = Mathf.Lerp(fromAlpha, toAlpha, easedT);
-            mat.color = new Color(1f, 1f, 1f, alpha);
-            yield return null;
-        }
-
-        mat.color = new Color(1f, 1f, 1f, toAlpha);
-    }
-
-    private void ResetFrameAlpha(RTTMenuFrame frame)
-    {
-        if (frame == null) return;
-        var displayQuad = frame.GetDisplayQuad();
-        if (displayQuad?.material != null)
-            displayQuad.material.color = new Color(1f, 1f, 1f, 1f);
-    }
-    #endregion
+    // Animation Helpers moved to RTTAppManager
 }

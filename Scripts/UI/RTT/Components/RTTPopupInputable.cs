@@ -4,6 +4,7 @@ using UnityEngine.Events;
 using TMPro;
 using System;
 using System.Collections.Generic;
+using VRWorkspace.UI.Config;
 
 /// <summary>
 /// RTTPopupInputable - A modal popup with input field for user input.
@@ -774,16 +775,14 @@ public class RTTPopupInputable : MonoBehaviour
         if (glassShader != null)
         {
             _bgMaterial = new Material(glassShader);
-            _bgMaterial.SetFloat("_CornerRadius", 0.03f);
-            _bgMaterial.SetFloat("_EdgePadding", 0.01f);
+            _bgMaterial.SetFloat("_CornerRadius", UIConstants.PopupCornerRadius);
+            _bgMaterial.SetFloat("_EdgePadding", UIConstants.PopupEdgePadding);
             _bgMaterial.SetFloat("_Aspect", _config.width / 300f);
 
-            // Glass colors matching RTTMenuFrame - lighter/more transparent
-            Color glassColorA = new Color(0.0f, 0.55f, 0.65f, 0.25f); // Reduced alpha
-            Color glassColorB = new Color(0.30f, 0.12f, 0.50f, 0.22f); // Reduced alpha
-            _bgMaterial.SetColor("_ColorA", glassColorA);
-            _bgMaterial.SetColor("_ColorB", glassColorB);
-            _bgMaterial.SetFloat("_GlassAlpha", 0.55f); // Reduced from 0.85 to match MenuFrame
+            // Glass colors from UIConstants
+            _bgMaterial.SetColor("_ColorA", UIConstants.PopupGlassColorA);
+            _bgMaterial.SetColor("_ColorB", UIConstants.PopupGlassColorB);
+            _bgMaterial.SetFloat("_GlassAlpha", UIConstants.PopupGlassAlpha);
             _bgMaterial.SetFloat("_GradientOffset", 0f);
             _bgMaterial.SetFloat("_GradientAngle", -10f);
             _bgMaterial.SetFloat("_CyanRatio", 0.7f);
@@ -819,26 +818,24 @@ public class RTTPopupInputable : MonoBehaviour
         {
             _borderMaterial = new Material(glowShader);
             _borderMaterial.SetFloat("_StrokeEnabled", 0);
-            _borderMaterial.SetFloat("_BorderWidth", 0.05f);
-            _borderMaterial.SetFloat("_CornerRadius", 0.03f);
-            _borderMaterial.SetFloat("_EdgePadding", 0.01f);
+            _borderMaterial.SetFloat("_BorderWidth", UIConstants.PopupBorderWidth);
+            _borderMaterial.SetFloat("_CornerRadius", UIConstants.PopupCornerRadius);
+            _borderMaterial.SetFloat("_EdgePadding", UIConstants.PopupEdgePadding);
             _borderMaterial.SetFloat("_Aspect", _config.width / height);
 
-            // Glow layers
-            _borderMaterial.SetFloat("_Layer1Width", 0.006f);
-            _borderMaterial.SetFloat("_Layer1Alpha", 1.2f);
-            _borderMaterial.SetFloat("_Layer2Width", 0.01f);
-            _borderMaterial.SetFloat("_Layer2Alpha", 0.8f);
-            _borderMaterial.SetFloat("_Layer3Width", 0.015f);
-            _borderMaterial.SetFloat("_Layer3Alpha", 0.4f);
-            _borderMaterial.SetFloat("_Layer4Width", 0.02f);
-            _borderMaterial.SetFloat("_Layer4Alpha", 0.2f);
+            // Glow layers from UIConstants
+            _borderMaterial.SetFloat("_Layer1Width", UIConstants.PopupGlowLayer1Width);
+            _borderMaterial.SetFloat("_Layer1Alpha", UIConstants.PopupGlowLayer1Alpha);
+            _borderMaterial.SetFloat("_Layer2Width", UIConstants.PopupGlowLayer2Width);
+            _borderMaterial.SetFloat("_Layer2Alpha", UIConstants.PopupGlowLayer2Alpha);
+            _borderMaterial.SetFloat("_Layer3Width", UIConstants.PopupGlowLayer3Width);
+            _borderMaterial.SetFloat("_Layer3Alpha", UIConstants.PopupGlowLayer3Alpha);
+            _borderMaterial.SetFloat("_Layer4Width", UIConstants.PopupGlowLayer4Width);
+            _borderMaterial.SetFloat("_Layer4Alpha", UIConstants.PopupGlowLayer4Alpha);
 
-            // Glow colors
-            Color glowColorA = new Color(0.3f, 1f, 1f, 1f);
-            Color glowColorB = new Color(1f, 0.4f, 1f, 1f);
-            _borderMaterial.SetColor("_ColorA", glowColorA);
-            _borderMaterial.SetColor("_ColorB", glowColorB);
+            // Glow colors from UIConstants
+            _borderMaterial.SetColor("_ColorA", UIConstants.PopupGlowColorA);
+            _borderMaterial.SetColor("_ColorB", UIConstants.PopupGlowColorB);
             _borderMaterial.SetFloat("_GradientMode", 2f);
             _borderMaterial.SetFloat("_GradientAngle", -10f);
             _borderMaterial.SetFloat("_GlassAlpha", 0.02f);

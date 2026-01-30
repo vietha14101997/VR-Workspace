@@ -7,6 +7,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
 using VRWorkspace.UI.HoverEffects;
+using VRWorkspace.UI.Config;
 
 /// <summary>
 /// Main View for File Manager App.
@@ -665,7 +666,7 @@ public class RTTFileManager : MonoBehaviour
     {
         Debug.Log($"[RTTFileManager] CreateViewOptionsPopup, _menuFrame null: {_menuFrame == null}");
 
-        // Create popup config
+        // Create popup config with consistent button styling from UIConstants
         var config = new RTTPopupMenu.PopupConfig
         {
             width = _sortTriggerWidth * 2.5f, // Width = 2.5x Trigger (increased 25%)
@@ -676,9 +677,16 @@ public class RTTFileManager : MonoBehaviour
             iconSize = 26f,     // +10% (was 24f)
             primaryColor = _primaryColor,
             accentColor = _accentColor,
-            overlayColor = new Color(0f, 0f, 0f, 0.4f), // Dark overlay
+            overlayColor = new Color(0f, 0f, 0f, UIConstants.PopupOverlayAlpha),
             font = _font,
-            layerName = "VirtualObjects"
+            layerName = UIConstants.VirtualObjectsLayer,
+            // Consistent button styling across all popups
+            borderWidth = UIConstants.PopupBorderWidth,
+            glassAlpha = UIConstants.PopupGlassAlpha,
+            buttonBorderWidth = UIConstants.PopupButtonBorderWidth,
+            buttonGlowWidth = UIConstants.PopupButtonGlowWidth,
+            buttonGlowIntensity = UIConstants.PopupButtonGlowIntensity,
+            buttonCornerRadius = UIConstants.PopupButtonCornerRadius
         };
 
         // Create world-space popup (like RTTPopupInputable)
@@ -2128,7 +2136,7 @@ public class RTTFileManager : MonoBehaviour
     {
         if (_progressPopup != null) return;
 
-        // Standardized popup config (same as DeleteConfirm/QuitConfirm/Conflict)
+        // Standardized popup config using UIConstants for consistent styling
         var config = new RTTProgressPopup.PopupConfig
         {
             width = 550f,
@@ -2144,15 +2152,15 @@ public class RTTFileManager : MonoBehaviour
             spacing = 16f,
             primaryColor = _primaryColor,
             accentColor = _accentColor,
-            overlayColor = new Color(0f, 0f, 0f, 0.4f),
+            overlayColor = new Color(0f, 0f, 0f, UIConstants.PopupOverlayAlpha),
             font = _font,
-            layerName = "VirtualObjects",
-            borderWidth = 0.05f,
+            layerName = UIConstants.VirtualObjectsLayer,
+            borderWidth = UIConstants.PopupBorderWidth,
             buttonWidth = 450f,
-            buttonBorderWidth = 0.04f,
-            buttonGlowWidth = 0.08f,
-            buttonGlowIntensity = 4f,
-            buttonCornerRadius = 0.12f
+            buttonBorderWidth = UIConstants.PopupButtonBorderWidth,
+            buttonGlowWidth = UIConstants.PopupButtonGlowWidth,
+            buttonGlowIntensity = UIConstants.PopupButtonGlowIntensity,
+            buttonCornerRadius = UIConstants.PopupButtonCornerRadius
         };
 
         _progressPopup = RTTProgressPopup.CreateWorldSpace(config, _menuFrame.transform);
@@ -2162,7 +2170,7 @@ public class RTTFileManager : MonoBehaviour
     {
         if (_conflictPopup != null) return;
 
-        // Standardized popup config (same as DeleteConfirm/QuitConfirm)
+        // Standardized popup config using UIConstants for consistent styling
         var config = new RTTPopupMenu.PopupConfig
         {
             width = 550f,
@@ -2172,16 +2180,17 @@ public class RTTFileManager : MonoBehaviour
             labelHeight = 52f,
             labelFontSize = 32,
             fontSize = 25,
-            borderWidth = 0.05f,
+            borderWidth = UIConstants.PopupBorderWidth,
+            glassAlpha = UIConstants.PopupGlassAlpha,
             primaryColor = _primaryColor,
             accentColor = _accentColor,
-            overlayColor = new Color(0f, 0f, 0f, 0.4f),
+            overlayColor = new Color(0f, 0f, 0f, UIConstants.PopupOverlayAlpha),
             font = _font,
-            layerName = "VirtualObjects",
-            buttonBorderWidth = 0.04f,
-            buttonGlowWidth = 0.08f,
-            buttonGlowIntensity = 4f,
-            buttonCornerRadius = 0.12f
+            layerName = UIConstants.VirtualObjectsLayer,
+            buttonBorderWidth = UIConstants.PopupButtonBorderWidth,
+            buttonGlowWidth = UIConstants.PopupButtonGlowWidth,
+            buttonGlowIntensity = UIConstants.PopupButtonGlowIntensity,
+            buttonCornerRadius = UIConstants.PopupButtonCornerRadius
         };
 
         _conflictPopup = RTTPopupMenu.CreateWorldSpace(config, _menuFrame.transform);
@@ -2241,7 +2250,7 @@ public class RTTFileManager : MonoBehaviour
     {
         if (_deleteConfirmPopup != null) return;
 
-        // Standardized Yes/No popup config
+        // Standardized Yes/No popup config using UIConstants for consistent styling
         var config = new RTTPopupMenu.PopupConfig
         {
             width = 550f,
@@ -2251,16 +2260,17 @@ public class RTTFileManager : MonoBehaviour
             labelHeight = 52f,
             labelFontSize = 32,
             fontSize = 25,
-            borderWidth = 0.05f,
+            borderWidth = UIConstants.PopupBorderWidth,
+            glassAlpha = UIConstants.PopupGlassAlpha,
             primaryColor = _primaryColor,
             accentColor = _accentColor,
-            overlayColor = new Color(0f, 0f, 0f, 0.4f),
+            overlayColor = new Color(0f, 0f, 0f, UIConstants.PopupOverlayAlpha),
             font = _font,
-            layerName = "VirtualObjects",
-            buttonBorderWidth = 0.04f,
-            buttonGlowWidth = 0.08f,
-            buttonGlowIntensity = 4f,
-            buttonCornerRadius = 0.12f
+            layerName = UIConstants.VirtualObjectsLayer,
+            buttonBorderWidth = UIConstants.PopupButtonBorderWidth,
+            buttonGlowWidth = UIConstants.PopupButtonGlowWidth,
+            buttonGlowIntensity = UIConstants.PopupButtonGlowIntensity,
+            buttonCornerRadius = UIConstants.PopupButtonCornerRadius
         };
 
         _deleteConfirmPopup = RTTPopupMenu.CreateWorldSpace(config, _menuFrame.transform);

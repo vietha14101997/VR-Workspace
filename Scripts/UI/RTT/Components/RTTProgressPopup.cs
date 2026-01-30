@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using TMPro;
 using System;
 using System.Collections.Generic;
+using VRWorkspace.UI.Config;
 
 /// <summary>
 /// RTTProgressPopup - A modal popup showing file operation progress.
@@ -324,15 +325,13 @@ public class RTTProgressPopup : MonoBehaviour
         if (glassShader != null)
         {
             _bgMaterial = new Material(glassShader);
-            _bgMaterial.SetFloat("_CornerRadius", 0.03f);
-            _bgMaterial.SetFloat("_EdgePadding", 0.01f);
+            _bgMaterial.SetFloat("_CornerRadius", UIConstants.PopupCornerRadius);
+            _bgMaterial.SetFloat("_EdgePadding", UIConstants.PopupEdgePadding);
             _bgMaterial.SetFloat("_Aspect", _config.width / 300f);
 
-            Color glassColorA = new Color(0.0f, 0.55f, 0.65f, 0.25f);
-            Color glassColorB = new Color(0.30f, 0.12f, 0.50f, 0.22f);
-            _bgMaterial.SetColor("_ColorA", glassColorA);
-            _bgMaterial.SetColor("_ColorB", glassColorB);
-            _bgMaterial.SetFloat("_GlassAlpha", 0.55f);
+            _bgMaterial.SetColor("_ColorA", UIConstants.PopupGlassColorA);
+            _bgMaterial.SetColor("_ColorB", UIConstants.PopupGlassColorB);
+            _bgMaterial.SetFloat("_GlassAlpha", UIConstants.PopupGlassAlpha);
             _bgMaterial.SetFloat("_GradientOffset", 0f);
             _bgMaterial.SetFloat("_GradientAngle", -10f);
             _bgMaterial.SetFloat("_CyanRatio", 0.7f);
@@ -368,34 +367,32 @@ public class RTTProgressPopup : MonoBehaviour
         {
             _borderMaterial = new Material(glowShader);
             _borderMaterial.SetFloat("_StrokeEnabled", 0);
-            _borderMaterial.SetFloat("_BorderWidth", _config.borderWidth);
-            _borderMaterial.SetFloat("_CornerRadius", 0.04f);
-            _borderMaterial.SetFloat("_EdgePadding", 0.01f);
+            _borderMaterial.SetFloat("_BorderWidth", UIConstants.PopupBorderWidth);
+            _borderMaterial.SetFloat("_CornerRadius", UIConstants.PopupCornerRadius);
+            _borderMaterial.SetFloat("_EdgePadding", UIConstants.PopupEdgePadding);
             _borderMaterial.SetFloat("_Aspect", _config.width / height);
 
-            // Scale layer widths based on border width ratio (same as RTTPopupMenu)
-            float borderScale = _config.borderWidth / 0.028f;
-            _borderMaterial.SetFloat("_Layer1Width", 0.006f * borderScale);
-            _borderMaterial.SetFloat("_Layer1Alpha", 1.2f);
-            _borderMaterial.SetFloat("_Layer2Width", 0.01f * borderScale);
-            _borderMaterial.SetFloat("_Layer2Alpha", 0.8f);
-            _borderMaterial.SetFloat("_Layer3Width", 0.015f * borderScale);
-            _borderMaterial.SetFloat("_Layer3Alpha", 0.4f);
-            _borderMaterial.SetFloat("_Layer4Width", 0.02f * borderScale);
-            _borderMaterial.SetFloat("_Layer4Alpha", 0.2f);
+            // Glow layers from UIConstants
+            _borderMaterial.SetFloat("_Layer1Width", UIConstants.PopupGlowLayer1Width);
+            _borderMaterial.SetFloat("_Layer1Alpha", UIConstants.PopupGlowLayer1Alpha);
+            _borderMaterial.SetFloat("_Layer2Width", UIConstants.PopupGlowLayer2Width);
+            _borderMaterial.SetFloat("_Layer2Alpha", UIConstants.PopupGlowLayer2Alpha);
+            _borderMaterial.SetFloat("_Layer3Width", UIConstants.PopupGlowLayer3Width);
+            _borderMaterial.SetFloat("_Layer3Alpha", UIConstants.PopupGlowLayer3Alpha);
+            _borderMaterial.SetFloat("_Layer4Width", UIConstants.PopupGlowLayer4Width);
+            _borderMaterial.SetFloat("_Layer4Alpha", UIConstants.PopupGlowLayer4Alpha);
 
-            Color glowColorA = new Color(0.3f, 1f, 1f, 1f);
-            Color glowColorB = new Color(1f, 0.4f, 1f, 1f);
-            _borderMaterial.SetColor("_ColorA", glowColorA);
-            _borderMaterial.SetColor("_ColorB", glowColorB);
+            // Glow colors from UIConstants
+            _borderMaterial.SetColor("_ColorA", UIConstants.PopupGlowColorA);
+            _borderMaterial.SetColor("_ColorB", UIConstants.PopupGlowColorB);
             _borderMaterial.SetFloat("_GradientMode", 2f);
             _borderMaterial.SetFloat("_GradientAngle", -10f);
             _borderMaterial.SetFloat("_GlassAlpha", 0.02f);
             _borderMaterial.SetColor("_GlassTint", new Color(0.9f, 0.95f, 1f, 1f));
             _borderMaterial.SetFloat("_ShimmerSpeed", 0.4f);
             _borderMaterial.SetFloat("_ShimmerIntensity", 0.2f);
-            _borderMaterial.SetFloat("_LightSize", 0.008f * borderScale);
-            _borderMaterial.SetFloat("_LightGlow", 0.008f * borderScale);
+            _borderMaterial.SetFloat("_LightSize", 0.008f);
+            _borderMaterial.SetFloat("_LightGlow", 0.008f);
 
             borderImg.material = _borderMaterial;
         }

@@ -88,6 +88,7 @@ public class RTTMediaGrid : MonoBehaviour
     // Mobile-first frame budget system: bind items until time budget exhausted
     private const float MOBILE_FRAME_BUDGET_MS = 1.5f;  // Mobile: 1.5ms for smooth 60fps
     private const float DESKTOP_FRAME_BUDGET_MS = 4f;   // Desktop: 4ms with more headroom
+    private const int INITIAL_SYNC_BIND_COUNT = 6;      // Bind first row immediately for instant visibility
     #endregion
 
     #region Callbacks
@@ -771,27 +772,40 @@ public class RTTMediaGrid : MonoBehaviour
         // If we have items to bind, use progressive loading
         if (toBind.Count > 0)
         {
-            // DON'T clear the queue - just add items that aren't already queued
-            // This prevents race conditions where scroll events clear items before they're bound
+            // Bind first row SYNCHRONOUSLY for immediate visibility
+            // This prevents the "only first item shows" issue caused by frame budget
+            int syncBindCount = Mathf.Min(INITIAL_SYNC_BIND_COUNT, toBind.Count);
+            for (int i = 0; i < syncBindCount; i++)
+            {
+                int idx = toBind[i];
+                if (!_visibleItems.ContainsKey(idx) && idx < _allVideos.Count)
+                {
+                    var item = GetPooledItem();
+                    if (item != null)
+                    {
+                        BindItemAtIndex(item, idx);
+                        _visibleItems[idx] = item;
+                    }
+                }
+            }
+
+            // Queue remaining items for progressive binding
             HashSet<int> alreadyQueued = new HashSet<int>(_pendingBindIndices);
             int addedCount = 0;
 
-            foreach (var idx in toBind)
+            // Skip items we already bound synchronously
+            for (int i = syncBindCount; i < toBind.Count; i++)
             {
-                if (!alreadyQueued.Contains(idx))
+                int idx = toBind[i];
+                if (!alreadyQueued.Contains(idx) && !_visibleItems.ContainsKey(idx))
                 {
                     _pendingBindIndices.Enqueue(idx);
                     addedCount++;
                 }
             }
 
-            if (addedCount > 0)
-            {
-                // Debug.Log($"[RTTMediaGrid] Queuing {addedCount} NEW items for binding (total pending={_pendingBindIndices.Count})");
-            }
-
-            // Start progressive binding if not already running
-            if (_progressiveBindCoroutine == null)
+            // Start progressive binding for remaining items if not already running
+            if (_pendingBindIndices.Count > 0 && _progressiveBindCoroutine == null)
             {
                 _progressiveBindCoroutine = StartCoroutine(ProgressiveBindCoroutine());
             }

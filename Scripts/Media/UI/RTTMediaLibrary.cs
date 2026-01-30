@@ -6,6 +6,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using VRWorkspace.UI.HoverEffects;
+using VRWorkspace.UI.Config;
 
 /// <summary>
 /// Main View for Media Library App.
@@ -1133,19 +1134,27 @@ public class RTTMediaLibrary : MonoBehaviour
 
     private void CreateViewOptionsPopup(Transform parent)
     {
+        // Consistent popup config using UIConstants
         var config = new RTTPopupMenu.PopupConfig
         {
             width = _sortTriggerWidth * 2.5f,
             buttonHeight = 75f,
-            sideSpacing = 35f,  // Half of bottom padding for balanced section spacing
+            sideSpacing = 35f,
             rowSpacing = 11f,
-            fontSize = 24,  // Increased from 20 to match other popups
+            fontSize = 24,
             iconSize = 26f,
             primaryColor = _primaryColor,
             accentColor = _accentColor,
-            overlayColor = new Color(0f, 0f, 0f, 0.4f),
+            overlayColor = new Color(0f, 0f, 0f, UIConstants.PopupOverlayAlpha),
             font = _font,
-            layerName = "VirtualObjects"
+            layerName = UIConstants.VirtualObjectsLayer,
+            // Consistent button styling across all popups
+            borderWidth = UIConstants.PopupBorderWidth,
+            glassAlpha = UIConstants.PopupGlassAlpha,
+            buttonBorderWidth = UIConstants.PopupButtonBorderWidth,
+            buttonGlowWidth = UIConstants.PopupButtonGlowWidth,
+            buttonGlowIntensity = UIConstants.PopupButtonGlowIntensity,
+            buttonCornerRadius = UIConstants.PopupButtonCornerRadius
         };
 
         _viewOptionsPopup = RTTPopupMenu.CreateWorldSpace(config, _menuFrame.transform);
@@ -1255,6 +1264,7 @@ public class RTTMediaLibrary : MonoBehaviour
 
     private void CreateGroupOptionsPopup(Transform parent)
     {
+        // Consistent popup config using UIConstants
         var config = new RTTPopupMenu.PopupConfig
         {
             width = _sortTriggerWidth * 2.5f,
@@ -1265,9 +1275,16 @@ public class RTTMediaLibrary : MonoBehaviour
             iconSize = 26f,
             primaryColor = _primaryColor,
             accentColor = _accentColor,
-            overlayColor = new Color(0f, 0f, 0f, 0.4f),
+            overlayColor = new Color(0f, 0f, 0f, UIConstants.PopupOverlayAlpha),
             font = _font,
-            layerName = "VirtualObjects"
+            layerName = UIConstants.VirtualObjectsLayer,
+            // Consistent button styling across all popups
+            borderWidth = UIConstants.PopupBorderWidth,
+            glassAlpha = UIConstants.PopupGlassAlpha,
+            buttonBorderWidth = UIConstants.PopupButtonBorderWidth,
+            buttonGlowWidth = UIConstants.PopupButtonGlowWidth,
+            buttonGlowIntensity = UIConstants.PopupButtonGlowIntensity,
+            buttonCornerRadius = UIConstants.PopupButtonCornerRadius
         };
 
         _groupOptionsPopup = RTTPopupMenu.CreateWorldSpace(config, _menuFrame.transform);

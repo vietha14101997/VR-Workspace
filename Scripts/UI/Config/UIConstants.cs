@@ -325,5 +325,117 @@ namespace VRWorkspace.UI.Config
         public const float ColliderZOffset = -0.1f;
 
         #endregion
+
+        #region Popup Defaults
+
+        /// <summary>
+        /// Popup frame border width (GlowingGlassBorder shader)
+        /// </summary>
+        public const float PopupBorderWidth = 0.05f;
+
+        /// <summary>
+        /// Popup frame corner radius (GlowingGlassBorder shader)
+        /// </summary>
+        public const float PopupCornerRadius = 0.03f;
+
+        /// <summary>
+        /// Popup frame edge padding
+        /// </summary>
+        public const float PopupEdgePadding = 0.01f;
+
+        /// <summary>
+        /// Popup background glass alpha
+        /// </summary>
+        public const float PopupGlassAlpha = 0.55f;
+
+        /// <summary>
+        /// Popup overlay darkness (0-1)
+        /// </summary>
+        public const float PopupOverlayAlpha = 0.4f;
+
+        /// <summary>
+        /// Popup button border width
+        /// </summary>
+        public const float PopupButtonBorderWidth = 0.04f;
+
+        /// <summary>
+        /// Popup button glow width
+        /// </summary>
+        public const float PopupButtonGlowWidth = 0.08f;
+
+        /// <summary>
+        /// Popup button glow intensity
+        /// </summary>
+        public const float PopupButtonGlowIntensity = 4f;
+
+        /// <summary>
+        /// Popup button corner radius
+        /// </summary>
+        public const float PopupButtonCornerRadius = 0.12f;
+
+        // Glow border layer widths (for GlowingGlassBorder shader)
+        /// <summary>
+        /// Glow border layer 1 width
+        /// </summary>
+        public const float PopupGlowLayer1Width = 0.006f;
+
+        /// <summary>
+        /// Glow border layer 1 alpha
+        /// </summary>
+        public const float PopupGlowLayer1Alpha = 1.2f;
+
+        /// <summary>
+        /// Glow border layer 2 width
+        /// </summary>
+        public const float PopupGlowLayer2Width = 0.01f;
+
+        /// <summary>
+        /// Glow border layer 2 alpha
+        /// </summary>
+        public const float PopupGlowLayer2Alpha = 0.8f;
+
+        /// <summary>
+        /// Glow border layer 3 width
+        /// </summary>
+        public const float PopupGlowLayer3Width = 0.015f;
+
+        /// <summary>
+        /// Glow border layer 3 alpha
+        /// </summary>
+        public const float PopupGlowLayer3Alpha = 0.4f;
+
+        /// <summary>
+        /// Glow border layer 4 width
+        /// </summary>
+        public const float PopupGlowLayer4Width = 0.02f;
+
+        /// <summary>
+        /// Glow border layer 4 alpha
+        /// </summary>
+        public const float PopupGlowLayer4Alpha = 0.2f;
+
+        // Glow border colors
+        /// <summary>
+        /// Popup glow color A (cyan)
+        /// </summary>
+        public static readonly Color PopupGlowColorA = new Color(0.3f, 1f, 1f, 1f);
+
+        /// <summary>
+        /// Popup glow color B (magenta)
+        /// </summary>
+        public static readonly Color PopupGlowColorB = new Color(1f, 0.4f, 1f, 1f);
+
+        // Background glass colors
+        /// <summary>
+        /// Popup glass color A
+        /// </summary>
+        public static readonly Color PopupGlassColorA = new Color(0.0f, 0.55f, 0.65f, 0.25f);
+
+        /// <summary>
+        /// Popup glass color B
+        /// </summary>
+        public static readonly Color PopupGlassColorB = new Color(0.30f, 0.12f, 0.50f, 0.22f);
+
+        #endregion
     }
 }
