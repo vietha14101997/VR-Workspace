@@ -435,6 +435,9 @@ public class RTTPopupInputable : MonoBehaviour
         // Glow Border
         CreateGlowBorder(totalHeight);
 
+        // Update aspect ratio with actual height (like RTTPopupMenu)
+        UpdateBackgroundAspect(totalHeight);
+
         // Content
         CreateContent(totalHeight);
 
@@ -757,6 +760,9 @@ public class RTTPopupInputable : MonoBehaviour
         // Glow Border
         CreateGlowBorder(totalHeight);
 
+        // Update aspect ratio with actual height (like RTTPopupMenu)
+        UpdateBackgroundAspect(totalHeight);
+
         // Content
         CreateContent(totalHeight);
 
@@ -775,9 +781,9 @@ public class RTTPopupInputable : MonoBehaviour
         if (glassShader != null)
         {
             _bgMaterial = new Material(glassShader);
-            _bgMaterial.SetFloat("_CornerRadius", UIConstants.PopupCornerRadius);
+            _bgMaterial.SetFloat("_CornerRadius", UIConstants.PopupCornerRadius + 0.01f); // Slightly larger than border
             _bgMaterial.SetFloat("_EdgePadding", UIConstants.PopupEdgePadding);
-            _bgMaterial.SetFloat("_Aspect", _config.width / 300f);
+            _bgMaterial.SetFloat("_Aspect", _config.width / 100f);
 
             // Glass colors from UIConstants
             _bgMaterial.SetColor("_ColorA", UIConstants.PopupGlassColorA);
@@ -821,7 +827,7 @@ public class RTTPopupInputable : MonoBehaviour
             _borderMaterial.SetFloat("_BorderWidth", UIConstants.PopupBorderWidth);
             _borderMaterial.SetFloat("_CornerRadius", UIConstants.PopupCornerRadius);
             _borderMaterial.SetFloat("_EdgePadding", UIConstants.PopupEdgePadding);
-            _borderMaterial.SetFloat("_Aspect", _config.width / height);
+            _borderMaterial.SetFloat("_Aspect", _config.width / 100f);
 
             // Glow layers from UIConstants
             _borderMaterial.SetFloat("_Layer1Width", UIConstants.PopupGlowLayer1Width);
@@ -842,8 +848,26 @@ public class RTTPopupInputable : MonoBehaviour
             _borderMaterial.SetColor("_GlassTint", new Color(0.9f, 0.95f, 1f, 1f));
             _borderMaterial.SetFloat("_ShimmerSpeed", 0.4f);
             _borderMaterial.SetFloat("_ShimmerIntensity", 0.2f);
+            _borderMaterial.SetFloat("_LightSize", 0.008f);
+            _borderMaterial.SetFloat("_LightGlow", 0.008f);
 
             borderImg.material = _borderMaterial;
+        }
+    }
+
+    /// <summary>
+    /// Update aspect ratio for background and border materials with actual popup height.
+    /// Matches RTTPopupMenu behavior for consistent border rendering.
+    /// </summary>
+    private void UpdateBackgroundAspect(float height)
+    {
+        if (_bgMaterial != null)
+        {
+            _bgMaterial.SetFloat("_Aspect", _config.width / height);
+        }
+        if (_borderMaterial != null)
+        {
+            _borderMaterial.SetFloat("_Aspect", _config.width / height);
         }
     }
 
