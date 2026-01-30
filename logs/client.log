@@ -133,6 +133,8 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [RTTMediaActionBar] Initialized, following: MediaDetailPanel, frameHeight: 0.1066667, gapMult: 0.2
 
+[RTTMediaActionBar] ShowWithFade: position not valid, queued for later
+
 [RTTMediaLibrary] Right panel content created with RTTFileDetail
 
 [RTTPopupMenu] CreateWorldSpace: layer 'VirtualObjects' = 3, mainCam: VRCamera
@@ -141,7 +143,7 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [HoverEffectController] AddEffect 'cursor_change' to HitArea, TargetVisuals=Visuals
 
-[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-1100246
+[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-1135284
 
 [HoverEffectController] AddEffect 'scale' to Btn_Rename, TargetVisuals=Btn_Rename
 
@@ -167,13 +169,13 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [RTTMediaLibrary] OnGridVideoSelected: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51, _isEditMode=False, _mediaActionBar=exists
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4
-
 [Detail] REQUEST: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4
 
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4
 
 [Cache] DISK READ: 0ms (100KB)
+
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4
 
 [Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4 wait=18ms assign=0ms
 
@@ -185,18 +187,18 @@ Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling b
 
 [VRMediaAppController] Media app created
 
-[RTTMediaActionBar] FollowTarget too far! cam=(0.00, 0.00, 0.00), target=(1.15, 1000.00, 1.60), dist=1000.002m. Waiting for valid position...
+[RTTMediaActionBar] FollowTarget too far! cam=(0.00, 0.00, 0.00), target=(1.21, 1000.00, 1.56), dist=1000.002m. Waiting for valid position...
 UnityEngine.Debug:LogWarning (object)
 RTTMediaActionBar:UpdateSpherePosition () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaActionBar.cs:605)
 RTTMediaActionBar:LateUpdate () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaActionBar.cs:90)
 
-[RTTMediaActionBar] Initial state - Pos: (0.00, 0.00, 1.80), FollowTarget: (1.15, 1000.00, 1.60), Alpha: 0, Layer: 3
+[RTTMediaActionBar] Initial state - Pos: (0.00, 0.00, 1.80), FollowTarget: (1.21, 1000.00, 1.56), Alpha: 0, Layer: 3
 
 [RTTMediaGridItem] Duration badge for 'videoplayback': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
 [Cache] DISK READ: 0ms (206KB)
 
-[Cache] DISK DECODE: 3ms (512x288)
+[Cache] DISK DECODE: 4ms (512x288)
 
 First video frame not zero: 2 (0.066667s). Result may be out of sync. Please make sure tracks all start at 0 in C:\Users\Admin\Downloads\videoplayback.mp4
 
@@ -206,25 +208,21 @@ First video frame not zero: 2 (0.066667s). Result may be out of sync. Please mak
 
 [Cache] DISK READ: 0ms (199KB)
 
-[Cache] DISK DECODE: 5ms (512x288)
-
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\Genshin-Impact 2026-1-26 12-24-11.mp4
 
 Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\Genshin-Impact 2026-1-26 12-24-11.mp4
-
-[RTTMediaActionBar] ShowImmediate: position not valid, queued for later
-
-[RTTMediaLibrary] Media action bar shown after delay
 
 [RTTMediaGridItem] Duration badge for 'video_client': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
 [Cache] DISK READ: 0ms (117KB)
 
-[Cache] DISK DECODE: 3ms (512x230)
+[Cache] DISK DECODE: 2ms (512x230)
 
 [RTTMediaGridItem] Duration badge for 'Phàm Nhân Tu Tiên Tập 173 Vietsub': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
 [Cache] DISK READ: 0ms (122KB)
+
+[Cache] DISK DECODE: 3ms (512x288)
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Video\Phàm Nhân Tu Tiên Tập 173 Vietsub.mp4
 
@@ -232,13 +230,15 @@ Unexpected timestamp values detected. This can occur in H.264 videos not encoded
 
 [Cache] DISK READ: 0ms (120KB)
 
-[Cache] DISK DECODE: 2ms (512x230)
+[Cache] DISK DECODE: 3ms (512x230)
 
 [RTTManager] App media prepared
 
-[RTTMediaActionBar] FollowTarget now valid: (1.15, 0.00, 1.60), dist=1.97266m
+[RTTMediaActionBar] FollowTarget now valid: (1.21, 0.00, 1.56), dist=1.97266m
 
-[RTTMediaActionBar] DoShowImmediate: alpha=1, active=true
+[RTTMediaActionBar] FadeCoroutine started: from=0, to=1, canvasGroup=-1136124
+
+[RTTMediaActionBar] DoShowWithFade: starting fade animation
 
 [RTTTaskbar] RegisterApp called - slotIndex=1, icon=icon_media
 
@@ -255,4 +255,100 @@ Unexpected timestamp values detected. This can occur in H.264 videos not encoded
 [RTTTaskbar] Selected app with slot index 1
 
 [RTTTaskbar] SelectSlot(1) called, current active: 1
+
+[RTTMediaActionBar] FadeCoroutine completed: set=1, verify=1, frames=12, container.active=True
+
+[RTTTaskbar] SelectSlot(0) called, current active: 1
+
+[RTTTaskbar] Selected app with slot index 0
+
+[VRVideoProjectionSystem] Disposed
+
+[VirtualObjectsZoomController] Unregistered side panel: MediaNavigationPanel
+
+[VirtualObjectsZoomController] Unregistered side panel: MediaDetailPanel
+
+[RTTMediaLibrary] Cleanup: Destroying _mediaActionBar
+
+[VRMediaAppController] Cleanup completed
+
+[RTTTaskbar] Unregistered app slot 1, remaining apps: 0
+
+[RTTManager] Closed app: media
+
+[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-1145030
+
+[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4 wait=0ms assign=0ms
+
+[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4 name=0ms preview=0ms metadata=10ms total=10ms
+
+[RTTMediaGridItem] Duration badge for '7077543476647': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (268KB)
+
+[Cache] DISK DECODE: 4ms (512x230)
+
+[RTTMediaGridItem] Duration badge for '7065774217733': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (75KB)
+
+[Cache] DISK DECODE: 2ms (512x238)
+
+[RTTMediaGridItem] Duration badge for 'Genshin_Impact_2025-09-10_11-32-27': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (215KB)
+
+[RTTMediaGridItem] Duration badge for 'FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD)': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (175KB)
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Genshin_Impact_2025-09-10_11-32-27.mp4
+
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Downloads\Genshin_Impact_2025-09-10_11-32-27.mp4
+
+[RTTMediaActionBar] FadeCoroutine started: from=0, to=1, canvasGroup=-1145856
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Compressed\FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD).mp4
+
+[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-1154454
+
+[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4 name=0ms preview=0ms metadata=7ms total=7ms
+
+[RTTMediaGridItem] Duration badge for 'Honkai  Star Rail 2025.05.21 - 15.03.08.01': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (207KB)
+
+[RTTMediaGridItem] Duration badge for 'khác màu': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (38KB)
+
+[Cache] DISK DECODE: 2ms (512x288)
+
+[RTTMediaActionBar] FadeCoroutine started: from=0, to=1, canvasGroup=-1155280
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\New folder\khác màu.mp4
+
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\New folder\khác màu.mp4
+
+[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-1163812
+
+[RTTMediaGridItem] Duration badge for 'vết xước 2': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (48KB)
+
+[RTTMediaGridItem] Duration badge for 'vết xước 1': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (101KB)
+
+[Cache] DISK DECODE: 2ms (512x284)
+
+[RTTMediaActionBar] FadeCoroutine started: from=0, to=1, canvasGroup=-1164638
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\New folder\vết xước 2.mp4
+
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\New folder\vết xước 2.mp4
+
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\New folder\vết xước 1.mp4
+
+[RTTMediaActionBar] FadeCoroutine completed: set=1, verify=1, frames=11, container.active=True
 

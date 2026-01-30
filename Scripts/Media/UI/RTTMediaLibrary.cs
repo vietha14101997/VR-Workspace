@@ -200,17 +200,15 @@ public class RTTMediaLibrary : MonoBehaviour
         if (_pagination != null) _pagination.Show();
 
         // Show action bar when app is re-opened (if not in edit mode)
+        // ShowWithFade() will queue pending and fade when position becomes valid
         if (_mediaActionBar != null && !_isEditMode)
         {
-            Invoke(nameof(ShowActionBarAfterDelay), 0.15f);
+            _mediaActionBar.ShowWithFade();
         }
     }
 
     private void OnDisable()
     {
-        // Cancel any pending show
-        CancelInvoke(nameof(ShowActionBarAfterDelay));
-
         if (_leftFrame != null) _leftFrame.gameObject.SetActive(false);
         if (_rightFrame != null) _rightFrame.gameObject.SetActive(false);
         if (_pagination != null) _pagination.Hide();
@@ -475,10 +473,11 @@ public class RTTMediaLibrary : MonoBehaviour
 
         // Container starts active but invisible (alpha=0) - positioning runs via LateUpdate
         // For Media Library, always show action bar when app opens (if not in edit mode)
-        // Delay fade-in to wait for sphere positioning to complete
+        // Call ShowWithFade() immediately - it will queue pending and fade when position becomes valid
+        // This syncs the fade animation with Menu's appearance
         if (!_isEditMode)
         {
-            Invoke(nameof(ShowActionBarAfterDelay), 0.15f);  // ~9 frames at 60fps
+            _mediaActionBar.ShowWithFade();
         }
     }
 
@@ -486,7 +485,7 @@ public class RTTMediaLibrary : MonoBehaviour
     {
         if (_mediaActionBar != null && !_isEditMode)
         {
-            _mediaActionBar.ShowImmediate();
+            _mediaActionBar.ShowWithFade();
             Debug.Log("[RTTMediaLibrary] Media action bar shown after delay");
         }
     }
