@@ -48,17 +48,25 @@ public class RTTFilePagination : RTTCanvasBase
     #region Lifecycle
     private bool _initialized = false;
     private Coroutine _fadeCoroutine = null;
+    private bool _pendingDisplayUpdate = false; // Track if UpdateDisplay() was deferred during fade
+    private bool _isShown = false; // Track if pagination has been shown (to prevent OnEnable resetting alpha)
+    private float _lastShowTime = 0f; // Track when Show() was called to prevent rapid hide/show flicker
     private const float FADE_DURATION = 0.15f; // Match RTTManager's transitionInDuration
+    private const float HIDE_GRACE_PERIOD = 0.5f; // Don't hide within this time after Show()
 
     protected override void OnEnable()
     {
         base.OnEnable();
 
-        // CRITICAL: If Show() was NOT called and fade is not in progress, this OnEnable is from app switching
-        // Force alpha to 0 immediately to prevent flash before fade animation starts
-        // But don't reset if fade is already running (would cause flash)
-        if (_initialized && _fadeCoroutine == null)
+        float currentAlpha = GetQuadAlpha();
+        Debug.Log($"[RTTFilePagination] OnEnable: _initialized={_initialized}, _fadeCoroutine={(_fadeCoroutine != null ? "running" : "null")}, _isShown={_isShown}, alpha={currentAlpha:F2}");
+
+        // CRITICAL: Only reset alpha if NOT already shown and no fade is in progress
+        // This prevents OnEnable from resetting alpha after fade has completed
+        // _isShown is true when Show() has been called and fade has completed
+        if (_initialized && _fadeCoroutine == null && !_isShown)
         {
+            Debug.Log($"[RTTFilePagination] OnEnable: RESETTING alpha to 0 (was {currentAlpha:F2})");
             SetQuadAlpha(0f);
         }
     }
@@ -109,27 +117,35 @@ public class RTTFilePagination : RTTCanvasBase
 
     public new void Show()
     {
-        // Skip if already fully visible or fade is in progress
-        if (gameObject.activeSelf && (GetQuadAlpha() >= 0.95f || _fadeCoroutine != null))
+        float currentAlpha = GetQuadAlpha();
+        Debug.Log($"[RTTFilePagination] Show() called: _isShown={_isShown}, activeSelf={gameObject.activeSelf}, alpha={currentAlpha:F2}, _fadeCoroutine={(_fadeCoroutine != null ? "running" : "null")}");
+
+        // Skip if already shown and visible
+        if (_isShown && gameObject.activeSelf && GetQuadAlpha() >= 0.95f)
         {
+            Debug.Log("[RTTFilePagination] Show() SKIPPED: already shown and visible");
             return;
         }
 
-        // Cancel any pending fade
+        // Skip if fade is already in progress
         if (_fadeCoroutine != null)
         {
-            StopCoroutine(_fadeCoroutine);
-            _fadeCoroutine = null;
+            Debug.Log("[RTTFilePagination] Show() SKIPPED: fade in progress");
+            return;
         }
 
+        Debug.Log("[RTTFilePagination] Show() STARTING fade-in animation");
+
+        // Track when Show() was called to prevent rapid hide/show flicker
+        _lastShowTime = Time.time;
+
         // CRITICAL: Set alpha to 0 BEFORE activating to prevent flash
-        // This handles the case where object is already active (OnEnable won't fire)
         SetQuadAlpha(0f);
 
-        // Activate the object
+        // Activate the object (OnEnable will NOT reset alpha because _isShown check comes after)
         gameObject.SetActive(true);
 
-        // Double-check alpha is 0 after activation (in case OnEnable changed something)
+        // Double-check alpha is 0 after activation
         SetQuadAlpha(0f);
 
         // Start fade in animation
@@ -138,7 +154,9 @@ public class RTTFilePagination : RTTCanvasBase
 
     private System.Collections.IEnumerator FadeIn()
     {
+        Debug.Log("[RTTFilePagination] FadeIn STARTED");
         float elapsed = 0f;
+        int frameCount = 0;
         while (elapsed < FADE_DURATION)
         {
             elapsed += Time.deltaTime;
@@ -146,11 +164,23 @@ public class RTTFilePagination : RTTCanvasBase
             // Ease out for smooth appearance
             float alpha = 1f - Mathf.Pow(1f - t, 2f);
             SetQuadAlpha(alpha);
+            frameCount++;
             yield return null;
         }
 
         SetQuadAlpha(1f);
         _fadeCoroutine = null;
+        _isShown = true; // Mark as shown to prevent OnEnable from resetting alpha
+
+        Debug.Log($"[RTTFilePagination] FadeIn COMPLETED: frames={frameCount}, _isShown={_isShown}, alpha={GetQuadAlpha():F2}");
+
+        // Process pending display update if SetPage() was called during fade
+        if (_pendingDisplayUpdate)
+        {
+            Debug.Log("[RTTFilePagination] FadeIn: Processing pending UpdateDisplay()");
+            _pendingDisplayUpdate = false;
+            UpdateDisplay();
+        }
     }
 
     private void SetQuadAlpha(float alpha)
@@ -176,17 +206,36 @@ public class RTTFilePagination : RTTCanvasBase
 
     public new void Hide()
     {
+        float timeSinceShow = Time.time - _lastShowTime;
+        Debug.Log($"[RTTFilePagination] Hide() called: _isShown={_isShown}, _fadeCoroutine={(_fadeCoroutine != null ? "running" : "null")}, alpha={GetQuadAlpha():F2}, timeSinceShow={timeSinceShow:F2}s");
+
+        // CRITICAL: Prevent rapid hide/show flicker by ignoring Hide() calls too soon after Show()
+        // This fixes the issue where SelectSlot() triggers OnDisable/OnEnable after fade completes
+        if (_isShown && timeSinceShow < HIDE_GRACE_PERIOD)
+        {
+            Debug.Log($"[RTTFilePagination] Hide() SKIPPED: within grace period ({timeSinceShow:F2}s < {HIDE_GRACE_PERIOD}s)");
+            return;
+        }
+
         // Cancel any pending fade
         if (_fadeCoroutine != null)
         {
+            Debug.Log("[RTTFilePagination] Hide(): Stopping fade coroutine");
             StopCoroutine(_fadeCoroutine);
             _fadeCoroutine = null;
         }
+
+        // Clear pending display update when hiding
+        _pendingDisplayUpdate = false;
+
+        // Reset shown state so next Show() will work correctly
+        _isShown = false;
 
         // Immediately hide - no fade out to prevent race conditions during app switching
         // The frame transition already handles visual continuity
         SetQuadAlpha(0f);
         gameObject.SetActive(false);
+        Debug.Log("[RTTFilePagination] Hide() completed: _isShown=false, alpha=0, active=false");
     }
     
     protected override void OnDestroy()
@@ -605,21 +654,33 @@ public class RTTFilePagination : RTTCanvasBase
 
     public void SetPage(int current, int total)
     {
-        // Debug.Log($"[RTTFilePagination] SetPage Called: Current={current}, TotalInput={total}");
-        
-        // Immediate Update - Remove Coroutine
-        // Note: The Coroutine approach (previous fix) was causing issues with visibility state or frame timing conflicts.
-        
         bool dataChanged = (_totalPages != total) || (_currentPage != current);
+        Debug.Log($"[RTTFilePagination] SetPage({current}, {total}): dataChanged={dataChanged}, _fadeCoroutine={(_fadeCoroutine != null ? "running" : "null")}, _isShown={_isShown}");
+
         _currentPage = current;
         _totalPages = Mathf.Max(1, total);
-        
-        // Always update to ensure visual sync, especially if data changed or first load
+
+        // Defer UpdateDisplay() if fade is in progress to prevent flicker
+        // The UI will be rebuilt when fade completes
+        if (_fadeCoroutine != null)
+        {
+            if (dataChanged || _stackPagingTransform.childCount == 0)
+            {
+                Debug.Log("[RTTFilePagination] SetPage: DEFERRING UpdateDisplay (fade in progress)");
+                _pendingDisplayUpdate = true;
+            }
+            // Still update nav buttons state even during fade
+            UpdateNavigationButtonsState();
+            return;
+        }
+
+        // Not fading - update display immediately if needed
         if (dataChanged || _stackPagingTransform.childCount == 0)
         {
-             UpdateDisplay();
+            Debug.Log("[RTTFilePagination] SetPage: Calling UpdateDisplay immediately");
+            UpdateDisplay();
         }
-        
+
         // Ensure nav buttons state is updated
         UpdateNavigationButtonsState();
     }

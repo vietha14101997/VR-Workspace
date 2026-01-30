@@ -54,6 +54,10 @@ public class RTTMediaActionBar : MonoBehaviour
     // Pending show state - waits for valid position before showing
     private bool _pendingShow = false;
     private bool _pendingShowWithFade = false;
+
+    // Time-based guard to prevent rapid hide/show flicker
+    private float _lastShowTime = 0f;
+    private const float HIDE_GRACE_PERIOD = 0.5f;
     #endregion
 
     #region Properties
@@ -277,12 +281,25 @@ public class RTTMediaActionBar : MonoBehaviour
     /// </summary>
     public void HideImmediate()
     {
+        float alpha = _canvasGroup != null ? _canvasGroup.alpha : -1f;
+        float timeSinceShow = Time.time - _lastShowTime;
+        Debug.Log($"[RTTMediaActionBar] HideImmediate() called: _isVisible={_isVisible}, alpha={alpha:F2}, timeSinceShow={timeSinceShow:F2}s");
+
+        // CRITICAL: Prevent rapid hide/show flicker by ignoring Hide() calls too soon after Show()
+        // This fixes the issue where SelectSlot() triggers OnDisable/OnEnable after fade completes
+        if (_isVisible && timeSinceShow < HIDE_GRACE_PERIOD)
+        {
+            Debug.Log($"[RTTMediaActionBar] HideImmediate() SKIPPED: within grace period ({timeSinceShow:F2}s < {HIDE_GRACE_PERIOD}s)");
+            return;
+        }
+
         // Clear pending show to prevent showing after hide
         _pendingShow = false;
         _pendingShowWithFade = false;
 
         if (_fadeCoroutine != null)
         {
+            Debug.Log("[RTTMediaActionBar] HideImmediate(): Stopping fade coroutine");
             StopCoroutine(_fadeCoroutine);
             _fadeCoroutine = null;
         }
@@ -298,6 +315,7 @@ public class RTTMediaActionBar : MonoBehaviour
         }
 
         _isVisible = false;
+        Debug.Log("[RTTMediaActionBar] HideImmediate() completed: _isVisible=false, alpha=0");
     }
 
     /// <summary>
@@ -352,6 +370,10 @@ public class RTTMediaActionBar : MonoBehaviour
         }
 
         _isVisible = true;
+
+        // Track when show started to prevent rapid hide/show flicker
+        _lastShowTime = Time.time;
+
         Debug.Log("[RTTMediaActionBar] DoShowImmediate: alpha=1, active=true");
     }
 
@@ -387,9 +409,20 @@ public class RTTMediaActionBar : MonoBehaviour
     /// </summary>
     public void ShowWithFade()
     {
+        float alpha = _canvasGroup != null ? _canvasGroup.alpha : -1f;
+        Debug.Log($"[RTTMediaActionBar] ShowWithFade() called: _isVisible={_isVisible}, _fadeCoroutine={(_fadeCoroutine != null ? "running" : "null")}, alpha={alpha:F2}");
+
         if (_container == null) return;
-        if (_isVisible) return;  // Already visible
-        if (_fadeCoroutine != null) return;  // Fade already in progress
+        if (_isVisible)
+        {
+            Debug.Log("[RTTMediaActionBar] ShowWithFade() SKIPPED: already visible");
+            return;
+        }
+        if (_fadeCoroutine != null)
+        {
+            Debug.Log("[RTTMediaActionBar] ShowWithFade() SKIPPED: fade in progress");
+            return;
+        }
 
         // Clear any pending show states
         _pendingShow = false;
@@ -421,6 +454,9 @@ public class RTTMediaActionBar : MonoBehaviour
         }
 
         _isVisible = true;
+
+        // Track when show started to prevent rapid hide/show flicker
+        _lastShowTime = Time.time;
 
         // Stop any ongoing fade
         if (_fadeCoroutine != null)

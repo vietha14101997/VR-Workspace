@@ -193,8 +193,10 @@ public class RTTMediaLibrary : MonoBehaviour
 
     private void OnEnable()
     {
+        Debug.Log($"[RTTMediaLibrary] OnEnable: _viewReady={_viewReady}");
         if (!_viewReady) return;
 
+        Debug.Log("[RTTMediaLibrary] OnEnable: Activating side frames and showing Pagination/ActionBar");
         if (_leftFrame != null) _leftFrame.gameObject.SetActive(true);
         if (_rightFrame != null) _rightFrame.gameObject.SetActive(true);
         if (_pagination != null) _pagination.Show();
@@ -209,6 +211,7 @@ public class RTTMediaLibrary : MonoBehaviour
 
     private void OnDisable()
     {
+        Debug.Log("[RTTMediaLibrary] OnDisable: Hiding Pagination/ActionBar");
         if (_leftFrame != null) _leftFrame.gameObject.SetActive(false);
         if (_rightFrame != null) _rightFrame.gameObject.SetActive(false);
         if (_pagination != null) _pagination.Hide();
