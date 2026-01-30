@@ -8,6 +8,7 @@ using VRWorkspace.Utils;
 using VRWorkspace.Streaming;
 using VRWorkspace.Core;
 using VRWorkspace.ViewModels;
+using VRWorkspace.UI.RTT;
 #if UNITY_ANDROID && !UNITY_EDITOR
 using Google.XR.Cardboard;
 #endif
@@ -106,15 +107,15 @@ public class RTTManager : MonoBehaviour
     #endregion
 
     #region Panel Management Fields
-    private List<RTTCanvasBase> _registeredPanels = new List<RTTCanvasBase>();
+    // Legacy fields removed - now managed by extracted managers
     private Queue<RTTCanvasBase> _renderQueue = new Queue<RTTCanvasBase>();
-    private int _currentCameraDepth;
-    private RTTQualityLevel _currentQualityLevel = RTTQualityLevel.High;
     private float _lastFrameRenderTime;
     private int _rendersThisFrame;
-    private float _totalMemoryMB;
-    private float _lastMemoryCheck;
-    private const float MEMORY_CHECK_INTERVAL = 1.0f;
+
+    // Extracted Managers
+    private RTTPanelManager _panelManager;
+    private RTTQualityManager _qualityManager;
+    private RTTAppLifecycleHelper _appLifecycleHelper;
     #endregion
 
     #region Menu State Fields
@@ -129,6 +130,9 @@ public class RTTManager : MonoBehaviour
     #endregion
 
     #region App Lifecycle Fields
+    // Note: These fields are kept for now as the coroutine-based logic
+    // requires tight integration with MonoBehaviour. Full migration to
+    // _appLifecycleHelper would require significant refactoring.
     private Dictionary<string, RTTAppInstance> _activeApps = new Dictionary<string, RTTAppInstance>();
     private Dictionary<string, RTTAppInstance> _preparingApps = new Dictionary<string, RTTAppInstance>();
     private string _currentVisibleAppId = null;
@@ -163,9 +167,9 @@ public class RTTManager : MonoBehaviour
     #endregion
 
     #region Properties - Panel Management
-    public RTTQualityLevel CurrentQualityLevel => _currentQualityLevel;
-    public int RegisteredPanelCount => _registeredPanels.Count;
-    public int VisiblePanelCount => _registeredPanels.FindAll(p => p != null && p.IsVisible).Count;
+    public RTTQualityLevel CurrentQualityLevel => _qualityManager?.CurrentQualityLevel ?? RTTQualityLevel.High;
+    public int RegisteredPanelCount => _panelManager?.RegisteredPanelCount ?? 0;
+    public int VisiblePanelCount => _panelManager?.VisiblePanelCount ?? 0;
     #endregion
 
     #region Properties - Menu State
@@ -183,6 +187,8 @@ public class RTTManager : MonoBehaviour
     public bool IsMainMenuVisible => _currentVisibleAppId == null;
     public string CurrentVisibleAppId => _currentVisibleAppId;
     public int MaxOpenApps => appRegistry?.maxOpenApps ?? 3;
+    public bool IsTransitioning => _isTransitioning;
+    public int OpenAppCount => _activeApps.Count;
 
     public RTTAppInstance CurrentApp =>
         _currentVisibleAppId != null && _activeApps.ContainsKey(_currentVisibleAppId)
@@ -272,10 +278,11 @@ public class RTTManager : MonoBehaviour
 
         DontDestroyOnLoad(gameObject);
 
-        _currentCameraDepth = startingCameraDepth;
-
         // Load configs from Resources if not assigned
         LoadConfigsFromResources();
+
+        // Initialize extracted managers
+        InitializeManagers();
 
         // Subscribe to theme property changes for runtime updates
         RTTThemeConfig.OnAnyThemePropertyChanged += HandleThemePropertyChanged;
@@ -298,13 +305,8 @@ public class RTTManager : MonoBehaviour
 
     private void Update()
     {
-        // Periodic memory check
-        if (Time.unscaledTime - _lastMemoryCheck >= MEMORY_CHECK_INTERVAL)
-        {
-            _lastMemoryCheck = Time.unscaledTime;
-            UpdateMemoryStats();
-            CheckMemoryThresholds();
-        }
+        // Delegate periodic memory check to quality manager
+        _qualityManager?.PeriodicUpdate();
     }
 
     private void OnDestroy()
@@ -338,6 +340,22 @@ public class RTTManager : MonoBehaviour
             themeConfig = Resources.Load<RTTThemeConfig>("RTTTheme");
         if (appRegistry == null)
             appRegistry = Resources.Load<RTTAppRegistry>("RTTAppRegistry");
+    }
+
+    /// <summary>
+    /// Initialize extracted manager classes for cleaner architecture.
+    /// These managers handle specific responsibilities while RTTManager coordinates them.
+    /// </summary>
+    private void InitializeManagers()
+    {
+        // Panel Manager - handles panel registration and camera depth
+        _panelManager = new RTTPanelManager(startingCameraDepth, enablePerformanceLogging);
+
+        // Quality Manager - handles quality levels and memory monitoring
+        _qualityManager = new RTTQualityManager(rttConfig, _panelManager, enablePerformanceLogging);
+
+        // App Lifecycle Helper - handles app state tracking
+        _appLifecycleHelper = new RTTAppLifecycleHelper(appRegistry?.maxOpenApps ?? 3);
     }
 
     private void AutoFindReferences()
@@ -562,170 +580,44 @@ public class RTTManager : MonoBehaviour
     public void RegisterPanel(RTTCanvasBase panel)
     {
         if (panel == null) return;
-
-        if (!_registeredPanels.Contains(panel))
-        {
-            _registeredPanels.Add(panel);
-            panel.OnRTTDestroyed += () => UnregisterPanel(panel);
-
-            if (enablePerformanceLogging)
-                Debug.Log($"[RTTManager] Registered: {panel.GetType().Name} (Total: {_registeredPanels.Count})");
-        }
+        _panelManager?.RegisterPanel(panel);
     }
 
     public void UnregisterPanel(RTTCanvasBase panel)
     {
         if (panel == null) return;
-
-        if (_registeredPanels.Remove(panel))
-        {
-            if (enablePerformanceLogging)
-                Debug.Log($"[RTTManager] Unregistered: {panel.GetType().Name} (Total: {_registeredPanels.Count})");
-        }
+        _panelManager?.UnregisterPanel(panel);
     }
 
-    public int AssignCameraDepth() => _currentCameraDepth--;
+    public int AssignCameraDepth() => _panelManager?.AssignCameraDepth() ?? -100;
 
-    public IReadOnlyList<RTTCanvasBase> GetRegisteredPanels() => _registeredPanels.AsReadOnly();
+    public IReadOnlyList<RTTCanvasBase> GetRegisteredPanels() => _panelManager?.RegisteredPanels ?? new List<RTTCanvasBase>().AsReadOnly();
 
-    public T FindPanel<T>() where T : RTTCanvasBase
-    {
-        foreach (var panel in _registeredPanels)
-        {
-            if (panel is T typedPanel) return typedPanel;
-        }
-        return null;
-    }
+    public T FindPanel<T>() where T : RTTCanvasBase => _panelManager?.FindPanel<T>();
     #endregion
 
     #region Quality Management
-    public void SetQualityLevel(RTTQualityLevel level)
-    {
-        if (_currentQualityLevel == level) return;
-
-        _currentQualityLevel = level;
-        var preset = GetQualityPreset(level);
-
-        if (enablePerformanceLogging)
-            Debug.Log($"[RTTManager] Quality changed to {level}: {preset.width}x{preset.height} AA={preset.antiAliasing}");
-
-        foreach (var panel in _registeredPanels)
-        {
-            if (panel == null) continue;
-            var resolution = panel.CurrentResolution;
-            int newWidth = Mathf.RoundToInt(resolution.x * preset.renderScale);
-            int newHeight = Mathf.RoundToInt(resolution.y * preset.renderScale);
-            panel.ResizeRenderTexture(newWidth, newHeight);
-        }
-    }
-
-    public RTTQualityPreset GetQualityPreset(RTTQualityLevel level)
-    {
-        if (rttConfig != null) return rttConfig.GetPreset(level);
-
-        switch (level)
-        {
-            case RTTQualityLevel.Low:
-                return new RTTQualityPreset { name = "Low", width = 1280, height = 720, antiAliasing = 2, renderScale = 0.75f };
-            case RTTQualityLevel.Medium:
-                return new RTTQualityPreset { name = "Medium", width = 1600, height = 900, antiAliasing = 4, renderScale = 0.875f };
-            default:
-                return new RTTQualityPreset { name = "High", width = 1920, height = 1080, antiAliasing = 4, renderScale = 1.0f };
-        }
-    }
-
-    public void TryScaleUp()
-    {
-        if (_currentQualityLevel == RTTQualityLevel.High) return;
-        float threshold = rttConfig != null ? rttConfig.maxTextureMemoryMB * 0.6f : 80f;
-        if (_totalMemoryMB < threshold)
-        {
-            var newLevel = _currentQualityLevel == RTTQualityLevel.Low ? RTTQualityLevel.Medium : RTTQualityLevel.High;
-            SetQualityLevel(newLevel);
-        }
-    }
-
-    public void TryScaleDown()
-    {
-        if (_currentQualityLevel == RTTQualityLevel.Low) return;
-        var newLevel = _currentQualityLevel == RTTQualityLevel.High ? RTTQualityLevel.Medium : RTTQualityLevel.Low;
-        SetQualityLevel(newLevel);
-    }
+    public void SetQualityLevel(RTTQualityLevel level) => _qualityManager?.SetQualityLevel(level);
+    public RTTQualityPreset GetQualityPreset(RTTQualityLevel level) => _qualityManager?.GetQualityPreset(level) ?? rttConfig?.GetPreset(level);
+    public void TryScaleUp() => _qualityManager?.TryScaleUp();
+    public void TryScaleDown() => _qualityManager?.TryScaleDown();
     #endregion
 
     #region Memory Management
-    private void UpdateMemoryStats()
-    {
-        _totalMemoryMB = CalculateTotalTextureMemory() / (1024f * 1024f);
-    }
-
-    private void CheckMemoryThresholds()
-    {
-        if (rttConfig == null || !rttConfig.enableAutoScaling) return;
-
-        if (_totalMemoryMB > rttConfig.maxTextureMemoryMB)
-            TryScaleDown();
-        else if (_totalMemoryMB < rttConfig.maxTextureMemoryMB * 0.5f)
-            TryScaleUp();
-    }
-
-    private long CalculateTotalTextureMemory()
-    {
-        long total = 0;
-        foreach (var panel in _registeredPanels)
-        {
-            if (panel == null) continue;
-            var rt = panel.GetRenderTexture();
-            if (rt != null)
-                total += (long)rt.width * rt.height * 4 * rt.antiAliasing;
-        }
-        return total;
-    }
+    public float TotalMemoryMB => _qualityManager?.TotalMemoryMB ?? 0f;
+    public float MaxTextureMemoryMB => _qualityManager?.MaxTextureMemoryMB ?? 150f;
     #endregion
 
     #region Performance Statistics
-    public RTTPerformanceStats GetPerformanceStats()
-    {
-        return new RTTPerformanceStats
-        {
-            totalPanels = _registeredPanels.Count,
-            visiblePanels = VisiblePanelCount,
-            totalTextureMemoryMB = _totalMemoryMB,
-            averageRenderTimeMs = _lastFrameRenderTime,
-            currentQuality = _currentQualityLevel
-        };
-    }
-
-    public void LogPerformanceStats()
-    {
-        var stats = GetPerformanceStats();
-        Debug.Log($"[RTTManager] {stats}");
-    }
+    public RTTPerformanceStats GetPerformanceStats() => _qualityManager?.GetPerformanceStats() ?? new RTTPerformanceStats();
+    public void LogPerformanceStats() => _qualityManager?.LogPerformanceStats();
     #endregion
 
     #region Panel Utility
-    public void MarkAllDirty()
-    {
-        foreach (var panel in _registeredPanels)
-            panel?.MarkDirty();
-    }
-
-    public void HideAll()
-    {
-        foreach (var panel in _registeredPanels)
-            panel?.Hide();
-    }
-
-    public void ShowAll()
-    {
-        foreach (var panel in _registeredPanels)
-            panel?.Show();
-    }
-
-    public void CleanupDestroyedPanels()
-    {
-        _registeredPanels.RemoveAll(p => p == null);
-    }
+    public void MarkAllDirty() => _panelManager?.MarkAllDirty();
+    public void HideAll() => _panelManager?.HideAll();
+    public void ShowAll() => _panelManager?.ShowAll();
+    public void CleanupDestroyedPanels() => _panelManager?.CleanupDestroyedPanels();
     #endregion
 
     #region Theme Management

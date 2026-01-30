@@ -4,6 +4,7 @@ using UnityEngine.EventSystems;
 using System.Collections.Generic;
 using TMPro;
 using System;
+using VRWorkspace.UI.Utilities;
 
 /// <summary>
 /// Virtualized List View for File Manager.
@@ -303,7 +304,7 @@ public class RTTFileList : MonoBehaviour
         arrowRT.anchoredPosition = new Vector2(arrowX, 0);
 
         Image arrowImg = arrowObj.AddComponent<Image>();
-        arrowImg.sprite = VRDropdownFactory.GetArrowSprite();
+        arrowImg.sprite = SpriteUtility.GetArrowSprite();
         arrowImg.color = Color.white;
         arrowImg.raycastTarget = false;
 
