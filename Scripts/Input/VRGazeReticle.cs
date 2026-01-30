@@ -1280,6 +1280,16 @@ public class VRGazeReticle : MonoBehaviour
         VRButtonClickLock clickLock = VRButtonClickLock.FindOnButton(obj);
         if (clickLock != null && clickLock.IsLocked) return false;
 
+        // Check if this is a selected grid/list item (block dwell on selected items)
+        RTTMediaGridItem mediaGridItem = obj.GetComponentInParent<RTTMediaGridItem>();
+        if (mediaGridItem != null && mediaGridItem.IsItemSelected) return false;
+
+        RTTFileGridItem fileGridItem = obj.GetComponentInParent<RTTFileGridItem>();
+        if (fileGridItem != null && fileGridItem.IsItemSelected) return false;
+
+        RTTFileListItem fileListItem = obj.GetComponentInParent<RTTFileListItem>();
+        if (fileListItem != null && fileListItem.IsItemSelected) return false;
+
         // Kiểm tra có Button hoặc IPointerClickHandler không
         Button btn = obj.GetComponentInParent<Button>();
         if (btn != null && btn.interactable) return true;

@@ -102,6 +102,14 @@ public class RTTMediaGrid : MonoBehaviour
     public event Action<MediaVideoInfo> OnVideoDoubleClicked;
     public event Action<int, int> OnPageChanged;
     /// <summary>
+    /// Fired when a video item is hovered.
+    /// </summary>
+    public event Action<MediaVideoInfo> OnVideoHoverEnter;
+    /// <summary>
+    /// Fired when hover exits a video item.
+    /// </summary>
+    public event Action<MediaVideoInfo> OnVideoHoverExit;
+    /// <summary>
     /// Fired when all items have been bound to the grid (initial load complete).
     /// </summary>
     public event Action OnBindingComplete;
@@ -126,6 +134,8 @@ public class RTTMediaGrid : MonoBehaviour
         _accentColor = accentColor;
 
         // Setup internal callbacks BEFORE CreateItemPool so pool items get valid callbacks
+        _onItemHoverEnter = OnItemHoverEnter;
+        _onItemHoverExit = OnItemHoverExit;
         _onItemClick = OnItemClicked;
         _onItemDoubleClick = OnItemDoubleClicked;
 
@@ -309,10 +319,14 @@ public class RTTMediaGrid : MonoBehaviour
     {
         SelectedVideo = video;
 
-        foreach (var kvp in _visibleItems)
+        // In edit mode, don't apply visual selection effect
+        if (!_isEditMode)
         {
-            bool selected = kvp.Value.VideoInfo.Path == video.Path;
-            kvp.Value.SetSelected(selected);
+            foreach (var kvp in _visibleItems)
+            {
+                bool selected = kvp.Value.VideoInfo.Path == video.Path;
+                kvp.Value.SetItemSelected(selected);
+            }
         }
 
         OnVideoSelected?.Invoke(video);
@@ -324,7 +338,7 @@ public class RTTMediaGrid : MonoBehaviour
 
         foreach (var kvp in _visibleItems)
         {
-            kvp.Value.SetSelected(false);
+            kvp.Value.SetItemSelected(false);
         }
     }
 
@@ -1068,9 +1082,13 @@ public class RTTMediaGrid : MonoBehaviour
         // Bind data
         item.Bind(video);
 
-        // Restore edit mode and selection state
+        // Restore edit mode and checkbox selection state
         item.SetEditMode(_isEditMode);
         item.SetSelected(_selectedPaths.Contains(video.Path));
+
+        // Restore item selection state (non-edit mode visual selection)
+        bool isItemSelected = SelectedVideo.HasValue && SelectedVideo.Value.Path == video.Path;
+        item.SetItemSelected(isItemSelected);
 
         item.gameObject.SetActive(true);
     }
@@ -1165,6 +1183,24 @@ public class RTTMediaGrid : MonoBehaviour
     #endregion
 
     #region Event Handlers
+    private void OnItemHoverEnter(string path)
+    {
+        var video = _allVideos.Find(v => v.Path == path);
+        if (!string.IsNullOrEmpty(video.Path))
+        {
+            OnVideoHoverEnter?.Invoke(video);
+        }
+    }
+
+    private void OnItemHoverExit(string path)
+    {
+        var video = _allVideos.Find(v => v.Path == path);
+        if (!string.IsNullOrEmpty(video.Path))
+        {
+            OnVideoHoverExit?.Invoke(video);
+        }
+    }
+
     private void OnItemClicked(MediaVideoInfo video)
     {
         SelectVideo(video);
@@ -1190,6 +1226,19 @@ public class RTTMediaGrid : MonoBehaviour
     {
         _isEditMode = editMode;
 
+        // When entering edit mode, clear visual selection (but keep SelectedVideo for later)
+        if (editMode && SelectedVideo.HasValue)
+        {
+            foreach (var kvp in _visibleItems)
+            {
+                if (kvp.Value.VideoInfo.Path == SelectedVideo.Value.Path)
+                {
+                    kvp.Value.SetItemSelected(false);
+                    break;
+                }
+            }
+        }
+
         foreach (var item in _itemPool)
         {
             item.SetEditMode(editMode);
@@ -1207,9 +1256,23 @@ public class RTTMediaGrid : MonoBehaviour
             _stickyHeader.SetEditMode(editMode);
         }
 
+        // Clear checkbox selection when exiting edit mode
         if (!editMode)
         {
             _selectedPaths.Clear();
+
+            // Restore visual selection if there was one
+            if (SelectedVideo.HasValue)
+            {
+                foreach (var kvp in _visibleItems)
+                {
+                    if (kvp.Value.VideoInfo.Path == SelectedVideo.Value.Path)
+                    {
+                        kvp.Value.SetItemSelected(true);
+                        break;
+                    }
+                }
+            }
         }
     }
 
@@ -1297,6 +1360,40 @@ public class RTTMediaGrid : MonoBehaviour
             return _allVideos[index];
         }
         return null;
+    }
+
+    /// <summary>
+    /// Get the first video in the current data set.
+    /// </summary>
+    public MediaVideoInfo? GetFirstVideo()
+    {
+        if (_allVideos.Count > 0)
+        {
+            return _allVideos[0];
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Find the index of a video by its path.
+    /// </summary>
+    public int GetVideoIndex(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return -1;
+        return _allVideos.FindIndex(v => v.Path == path);
+    }
+
+    /// <summary>
+    /// Select a video by its path.
+    /// </summary>
+    public void SelectVideoByPath(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return;
+        var video = _allVideos.Find(v => v.Path == path);
+        if (!string.IsNullOrEmpty(video.Path))
+        {
+            SelectVideo(video);
+        }
     }
 
     public float GetScrollPosition()

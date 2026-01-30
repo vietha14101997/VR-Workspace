@@ -40,6 +40,9 @@ public class RTTMediaLibrary : MonoBehaviour
     private RTTMediaActionBar _mediaActionBar;
     private MediaVideoInfo? _currentVideo;
 
+    // Track if there's an actual selected video (not just hovered)
+    private bool _hasSelectedVideo = false;
+
     // Flag to track if initial setup is complete
     private bool _viewReady = false;
 
@@ -95,7 +98,6 @@ public class RTTMediaLibrary : MonoBehaviour
     private RTTPopupMenu _viewOptionsPopup;
     private string _currentSortBy = "Name";
     private bool _isAscending = true;
-    private Image _sortArrowImg;
     private TextMeshProUGUI _sortTriggerText;
     private TextMeshProUGUI _itemCountText;
 
@@ -104,7 +106,6 @@ public class RTTMediaLibrary : MonoBehaviour
     // Group By Options
     private RTTPopupMenu _groupOptionsPopup;
     private string _currentGroupBy = "Date Added";
-    private Image _groupArrowImg;
     private TextMeshProUGUI _groupTriggerText;
 
     // Side Panel Gap
@@ -193,6 +194,8 @@ public class RTTMediaLibrary : MonoBehaviour
         {
             _grid.OnVideoSelected -= OnGridVideoSelected;
             _grid.OnVideoDoubleClicked -= OnGridVideoDoubleClicked;
+            _grid.OnVideoHoverEnter -= OnGridVideoHoverEnter;
+            _grid.OnVideoHoverExit -= OnGridVideoHoverExit;
             _grid.OnPageChanged -= OnGridPageChanged;
         }
 
@@ -427,7 +430,10 @@ public class RTTMediaLibrary : MonoBehaviour
         _mediaActionBar.OnFavouriteClicked += OnFavouriteButtonClicked;
         _mediaActionBar.OnPlaylistClicked += OnPlaylistButtonClicked;
 
-        Debug.Log("[RTTMediaLibrary] Media action bar created");
+        // Hide initially until a video is selected
+        _mediaActionBar.SetVisible(false);
+
+        Debug.Log("[RTTMediaLibrary] Media action bar created (hidden initially)");
     }
     #endregion
 
@@ -498,6 +504,8 @@ public class RTTMediaLibrary : MonoBehaviour
         // Wire grid events
         _grid.OnVideoSelected += OnGridVideoSelected;
         _grid.OnVideoDoubleClicked += OnGridVideoDoubleClicked;
+        _grid.OnVideoHoverEnter += OnGridVideoHoverEnter;
+        _grid.OnVideoHoverExit += OnGridVideoHoverExit;
         _grid.OnPageChanged += OnGridPageChanged;
 
         // Render Order
@@ -552,8 +560,6 @@ public class RTTMediaLibrary : MonoBehaviour
         SetupRowElement(closeRT, new Vector2(0, 0.5f), new Vector2(20, 0));
 
         // Sort Button
-        Sprite arrowIcon = VRDropdownFactory.GetArrowSprite();
-
         var sortConfig = new VRButtonFactory.ButtonConfig
         {
             label = _currentSortBy,
@@ -576,21 +582,6 @@ public class RTTMediaLibrary : MonoBehaviour
             _sortTriggerText.alignment = TextAlignmentOptions.Center;
             _sortTriggerText.margin = Vector4.zero;
         }
-
-        // Arrow Icon
-        GameObject iconObj = new GameObject("ArrowIcon");
-        iconObj.transform.SetParent(sortTrigger.transform, false);
-        _sortArrowImg = iconObj.AddComponent<Image>();
-        _sortArrowImg.sprite = arrowIcon;
-        _sortArrowImg.color = Color.white;
-        _sortArrowImg.raycastTarget = false;
-
-        RectTransform iconRT = iconObj.GetComponent<RectTransform>();
-        iconRT.anchorMin = new Vector2(1, 0.5f);
-        iconRT.anchorMax = new Vector2(1, 0.5f);
-        iconRT.pivot = new Vector2(0.5f, 0.5f);
-        iconRT.sizeDelta = new Vector2(18f, 18f);
-        iconRT.anchoredPosition = new Vector2(-36f, 0);
 
         RectTransform sortRT = sortTrigger.GetComponent<RectTransform>();
         float gapCenterFromCenter = -_containerWidth / 4f - 203.5f;
@@ -624,21 +615,6 @@ public class RTTMediaLibrary : MonoBehaviour
             _groupTriggerText.alignment = TextAlignmentOptions.Center;
             _groupTriggerText.margin = Vector4.zero;
         }
-
-        // Arrow Icon for Group Trigger
-        GameObject groupIconObj = new GameObject("ArrowIcon");
-        groupIconObj.transform.SetParent(groupTrigger.transform, false);
-        _groupArrowImg = groupIconObj.AddComponent<Image>();
-        _groupArrowImg.sprite = arrowIcon;
-        _groupArrowImg.color = Color.white;
-        _groupArrowImg.raycastTarget = false;
-
-        RectTransform groupIconRT = groupIconObj.GetComponent<RectTransform>();
-        groupIconRT.anchorMin = new Vector2(1, 0.5f);
-        groupIconRT.anchorMax = new Vector2(1, 0.5f);
-        groupIconRT.pivot = new Vector2(0.5f, 0.5f);
-        groupIconRT.sizeDelta = new Vector2(18f, 18f);
-        groupIconRT.anchoredPosition = new Vector2(-36f, 0);
 
         RectTransform groupRT = groupTrigger.GetComponent<RectTransform>();
         float groupCenterFromCenter = _containerWidth / 4f + 203.5f;  // Symmetric to sortTrigger (positive X)
@@ -1123,7 +1099,6 @@ public class RTTMediaLibrary : MonoBehaviour
         };
 
         _viewOptionsPopup = RTTPopupMenu.CreateWorldSpace(config, _menuFrame.transform);
-        _viewOptionsPopup.OnHide += OnViewOptionsPopupHide;
 
         BuildViewOptionsPopupContent();
 
@@ -1194,21 +1169,6 @@ public class RTTMediaLibrary : MonoBehaviour
             BuildViewOptionsPopupContent();
             _viewOptionsPopup.Show();
         }
-        UpdateSortArrow();
-    }
-
-    private void OnViewOptionsPopupHide()
-    {
-        UpdateSortArrow();
-    }
-
-    private void UpdateSortArrow()
-    {
-        if (_sortArrowImg != null)
-        {
-            float targetZ = (_viewOptionsPopup != null && _viewOptionsPopup.IsVisible) ? 180f : 0f;
-            _sortArrowImg.rectTransform.localEulerAngles = new Vector3(0, 0, targetZ);
-        }
     }
 
     private void SetSortBy(string sortBy)
@@ -1241,21 +1201,6 @@ public class RTTMediaLibrary : MonoBehaviour
             BuildGroupOptionsPopupContent();
             _groupOptionsPopup.Show();
         }
-        UpdateGroupArrow();
-    }
-
-    private void OnGroupOptionsPopupHide()
-    {
-        UpdateGroupArrow();
-    }
-
-    private void UpdateGroupArrow()
-    {
-        if (_groupArrowImg != null)
-        {
-            float targetZ = (_groupOptionsPopup != null && _groupOptionsPopup.IsVisible) ? 180f : 0f;
-            _groupArrowImg.rectTransform.localEulerAngles = new Vector3(0, 0, targetZ);
-        }
     }
 
     private void CreateGroupOptionsPopup(Transform parent)
@@ -1276,7 +1221,6 @@ public class RTTMediaLibrary : MonoBehaviour
         };
 
         _groupOptionsPopup = RTTPopupMenu.CreateWorldSpace(config, _menuFrame.transform);
-        _groupOptionsPopup.OnHide += OnGroupOptionsPopupHide;
 
         BuildGroupOptionsPopupContent();
 
@@ -1288,7 +1232,7 @@ public class RTTMediaLibrary : MonoBehaviour
 
         float headerHeight = 200f;
         float gapFromButton = 15f;
-        float estimatedPopupHeight = 300f;
+        float estimatedPopupHeight = 180f;  // Smaller popup, use smaller height to align top edge with SortBy
         float offsetY = (_containerHeight / 2f) - headerHeight - gapFromButton - (estimatedPopupHeight / 2f);
 
         _groupOptionsPopup.SetPositionOffset(new Vector2(offsetX, offsetY));
@@ -1356,6 +1300,48 @@ public class RTTMediaLibrary : MonoBehaviour
         {
             _sidePanel.SelectItem(categoryId);
         }
+    }
+
+    /// <summary>
+    /// Update the detail panel with video info.
+    /// Called by controller based on hover/select state.
+    /// </summary>
+    public void UpdateDetailPanel(MediaVideoInfo video)
+    {
+        if (_detailPanel != null)
+        {
+            var mockFile = ConvertToMockFile(video);
+            _detailPanel.UpdateInfo(mockFile, isCurrentFolder: false);
+        }
+
+        // Update current video for action buttons if this is the selected item (not just hovered)
+        // The _currentVideo is set in OnGridVideoSelected, so we don't overwrite it here
+        // This ensures the action buttons (Play, Favorite) work on the selected item
+
+        // Update favourite icon state based on displayed video
+        UpdateFavouriteButtonState(video.IsFavorite);
+
+        // Only show action bar when there's an actual selected video (not just hover)
+        // AND not in edit mode
+        if (_mediaActionBar != null)
+        {
+            bool showActionBar = _hasSelectedVideo && !_isEditMode;
+            _mediaActionBar.SetVisible(showActionBar);
+        }
+    }
+
+    /// <summary>
+    /// Clear the detail panel when no item is selected or hovered.
+    /// Shows empty state in edit mode, otherwise keeps last item.
+    /// </summary>
+    public void ClearDetailPanel()
+    {
+        // In edit mode, show empty state
+        if (_isEditMode)
+        {
+            _detailPanel?.ShowEmpty();
+        }
+        // Outside edit mode, keep showing last item (auto-select behavior)
     }
 
     public void UpdateBreadcrumb(string path)
@@ -1554,9 +1540,32 @@ public class RTTMediaLibrary : MonoBehaviour
         // Update edit button icon
         UpdateEditButtonVisual();
 
-        if (!_isEditMode)
+        // Show/hide checkboxes on items
+        _grid?.SetEditMode(_isEditMode);
+
+        // Handle detail panel and action bar visibility based on edit mode
+        if (_isEditMode)
         {
+            // Entering edit mode: clear controller's selected video state
+            // This ensures hover/unhover shows empty state when not hovering
+            _controller?.ClearSelectedVideo();
+
+            // Clear detail panel and hide action bar
+            _detailPanel?.ShowEmpty();
+            _mediaActionBar?.SetVisible(false);
+        }
+        else
+        {
+            // Exiting edit mode: clear checkbox selection
             ClearSelection();
+
+            // Restore detail panel if there was a selected video
+            if (_hasSelectedVideo && _currentVideo.HasValue)
+            {
+                var mockFile = ConvertToMockFile(_currentVideo.Value);
+                _detailPanel?.UpdateInfo(mockFile, isCurrentFolder: false);
+                _mediaActionBar?.SetVisible(true);
+            }
         }
 
         Debug.Log($"[RTTMediaLibrary] Edit mode: {_isEditMode}");
@@ -1653,6 +1662,16 @@ public class RTTMediaLibrary : MonoBehaviour
     #region Event Handlers
     private void OnCategorySelected(string categoryId)
     {
+        // Exit edit mode when changing category
+        if (_isEditMode)
+        {
+            ToggleEditMode();
+        }
+
+        // Clear video selection when changing category
+        _hasSelectedVideo = false;
+        if (_mediaActionBar != null) _mediaActionBar.SetVisible(false);
+
         _controller?.SelectCategory(categoryId);
         UpdateBreadcrumbForCategory(categoryId);
     }
@@ -1694,18 +1713,27 @@ public class RTTMediaLibrary : MonoBehaviour
 
     private void OnGridVideoSelected(MediaVideoInfo video)
     {
+        // Mark that we have a selected video
+        _hasSelectedVideo = true;
+
         // Store current video for action buttons
         _currentVideo = video;
 
-        if (_detailPanel != null)
-        {
-            // Convert MediaVideoInfo to MockFile for RTTFileDetail
-            var mockFile = ConvertToMockFile(video);
-            _detailPanel.UpdateInfo(mockFile, isCurrentFolder: false);
-        }
+        // Notify controller of selection (controller manages detail panel via hover/select logic)
+        _controller?.SelectVideo(video);
 
         // Update favourite icon state
         UpdateFavouriteButtonState(video.IsFavorite);
+    }
+
+    private void OnGridVideoHoverEnter(MediaVideoInfo video)
+    {
+        _controller?.HoverVideo(video);
+    }
+
+    private void OnGridVideoHoverExit(MediaVideoInfo video)
+    {
+        _controller?.UnhoverVideo(video);
     }
 
     /// <summary>
@@ -1716,7 +1744,7 @@ public class RTTMediaLibrary : MonoBehaviour
         return new MockFile
         {
             Path = video.Path,
-            Name = video.Title,
+            Name = System.IO.Path.GetFileName(video.Path),  // Full filename with extension
             Type = System.IO.Path.GetExtension(video.Path).TrimStart('.').ToUpperInvariant(),
             Size = video.FileSizeBytes,
             Modified = video.DateAdded,

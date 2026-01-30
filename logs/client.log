@@ -1,10 +1,180 @@
-Assets\VR-Workspace\Scripts\Media\UI\RTTMediaLibraryController.cs(312,31): error CS1061: 'RTTFileDetail' does not contain a definition for 'UpdateFavoriteState' and no accessible extension method 'UpdateFavoriteState' accepting a first argument of type 'RTTFileDetail' could be found (are you missing a using directive or an assembly reference?)
+Please initialize Cardboard XR loader before calling this function.
+UnityEngine.Debug:LogError (object)
+Google.XR.Cardboard.Api:UpdateScreenParams () (at ./Library/PackageCache/com.google.xr.cardboard@e91752ce4c/Runtime/Api.cs:317)
+CardboardStartup:Update () (at Assets/Samples/Google Cardboard XR Plugin for Unity/1.30.0/Hello Cardboard/Scripts/CardboardStartup.cs:70)
 
-Assets\VR-Workspace\Scripts\Media\UI\RTTMediaLibrary.cs(1802,47): error CS1739: The best overload for 'UpdateInfo' does not have a parameter named 'isFolder'
+[Detail] UpdateInfo: zlapi-extension name=1ms preview=0ms metadata=3ms total=4ms
 
-Assets\VR-Workspace\Scripts\Media\UI\RTTMediaLibrary.cs(1819,26): error CS1061: 'MediaVideoInfo' does not contain a definition for 'FileSize' and no accessible extension method 'FileSize' accepting a first argument of type 'MediaVideoInfo' could be found (are you missing a using directive or an assembly reference?)
+[Controller] NavigateToInternal: path='C:\Users\Admin\Downloads\zlapi-extension', restorePage=False, clickedFolder='C:\Users\Admin\Downloads\zlapi-extension'
 
-Assets\VR-Workspace\Scripts\Media\UI\RTTMediaLibrary.cs(1825,13): error CS0117: 'MockFile' does not contain a definition for 'Projection'
+[Controller] Current state: _currentPath='C:\Users\Admin\Downloads', _currentPage=3, _pageSize=8
 
-Assets\VR-Workspace\Scripts\Media\UI\RTTMediaLibrary.cs(1826,13): error CS0117: 'MockFile' does not contain a definition for 'IsFavorite'
+[Controller] Clicked folder index in list: 17
+
+[Controller] SAVED: _itemIndexHistory['C:\Users\Admin\Downloads'] = 17
+
+[FileSystemService] Reading directory: C:\Users\Admin\Downloads\zlapi-extension
+
+[FileSystemService] Raw file count from Directory.GetFiles: 3
+
+[FileSystemService] Checking file: background.js, Attributes: Archive
+
+[FileSystemService] ADDED file: background.js
+
+[FileSystemService] Checking file: manifest.json, Attributes: Archive
+
+[FileSystemService] ADDED file: manifest.json
+
+[FileSystemService] Checking file: popup.html, Attributes: Archive
+
+[FileSystemService] ADDED file: popup.html
+
+[FileSystemService] Found 7 items (4 folders, 3 files)
+
+[Controller] restorePage=false, reset to page 1
+
+[Controller] CalculateTotalPages: totalFiles=7, pageSize=8, totalPages=1
+
+[RTTFileGrid] GetVisibleRowsForPagination: height=748.1688, availableHeight=728.1688, rowHeight=350, rowsFloat=2.080482, visibleRows=2
+
+[Detail] UpdateInfo: zlapi-extension name=0ms preview=0ms metadata=2ms total=2ms
+
+[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\Downloads\zlapi-extension, container null: False, instance: -467462
+
+[Controller] CanCreateFolderHere called, _currentPath: 'C:\Users\Admin\Downloads\zlapi-extension'
+
+[FileSystemService] CanCreateFolderInPath called with path: 'C:\Users\Admin\Downloads\zlapi-extension'
+
+[FileSystemService] absolutePath: 'C:\Users\Admin\Downloads\zlapi-extension'
+
+[FileSystemService] Comparing normalizedAbsolute: 'C:\Users\Admin\Downloads\zlapi-extension' with normalizedRoot: 'C:\Users\Admin'
+
+[FileSystemService] isDeviceRoot: False
+
+[FileSystemService] Write permission OK for: C:\Users\Admin\Downloads\zlapi-extension
+
+[Controller] CanCreateFolderHere result: True
+
+[RTTFileManager] UpdateNewFolderButtonState: canCreate=True
+
+[RTTFileManager] BoxCollider.enabled set to True
+
+[RTTFileManager] New Folder button ENABLED - alpha=1
+
+[RTTFileManager] Created 2 breadcrumbs for path: C:\Users\Admin\Downloads\zlapi-extension
+
+[Detail] UpdateInfo: fonts name=0ms preview=0ms metadata=2ms total=2ms
+
+[Detail] UpdateInfo: manifest.json name=0ms preview=0ms metadata=3ms total=3ms
+
+[Controller] Selected: C:\Users\Admin\Downloads\zlapi-extension\manifest.json
+
+[Detail] UpdateInfo: images name=0ms preview=0ms metadata=2ms total=2ms
+
+[RTTFileManager] ToggleEditMode CALLED - _isEditMode before: False
+
+[RTTFileManager] ToggleEditMode - _isEditMode after toggle: True
+
+[RTTFileManager] ToggleEditMode - _editControlsContainer: EditControls (ID:-470036), _breadcrumbContainer: Breadcrumbs
+
+[RTTFileManager] EditControls activeSelf before: False, after: True, expected: True
+
+[RTTFileManager] EditControls SetActive(True) called, now activeSelf: True, activeInHierarchy: True
+
+[RTTFileManager] Parent: Row2, activeSelf: True
+
+[RTTFileManager] Parent: Header, activeSelf: True
+
+[RTTFileManager] Parent: ContentContainer, activeSelf: True
+
+[RTTFileManager] Parent: Canvas_RTTMenuFrame, activeSelf: True
+
+[RTTFileManager] Parent: UICamera_RTTMenuFrame, activeSelf: True
+
+[RTTFileManager] Parent: RTTMenuFrame_folder, activeSelf: True
+
+[RTTFileManager] Parent: RTTMenu, activeSelf: True
+
+[RTTFileManager] Parent: VirtualObjects, activeSelf: True
+
+[RTTFileManager] Parent: AppRoot, activeSelf: True
+
+[RTTFileManager] EditControls child count: 5
+
+[RTTFileManager] EditControls child[0]: SelectAllContainer, active: True, pos: (20.00, 0.00)
+
+[RTTFileManager] EditControls child[1]: Btn_Rename, active: True, pos: (-435.00, 0.00)
+
+[RTTFileManager] EditControls child[2]: Btn_Copy, active: True, pos: (-198.00, 0.00)
+
+[RTTFileManager] EditControls child[3]: Btn_Move, active: True, pos: (-19.00, 0.00)
+
+[RTTFileManager] EditControls child[4]: Btn_Delete, active: True, pos: (160.00, 0.00)
+
+[Detail] UpdateInfo: zlapi-extension name=1ms preview=0ms metadata=2ms total=3ms
+
+[RTTFileManager] Edit Mode: True
+
+[Detail] UpdateInfo: popup.html name=0ms preview=0ms metadata=3ms total=3ms
+
+[RTTFileManager] Copy clicked - selected items: 1
+
+[RTTFileManager] ToggleEditMode CALLED - _isEditMode before: True
+
+[RTTFileManager] ToggleEditMode - _isEditMode after toggle: False
+
+[RTTFileManager] EditControls activeSelf before: True, after: False, expected: False
+
+[RTTFileManager] EditControls SetActive(False) called, now activeSelf: False, activeInHierarchy: False
+
+[Controller] Selected: C:\Users\Admin\Downloads\zlapi-extension
+
+NullReferenceException: Object reference not set to an instance of an object
+RTTFileDetail.CreateMetadataForOther (MockFile file) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:508)
+RTTFileDetail.UpdateMetadata (MockFile file, System.Boolean isCurrentFolder) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:355)
+RTTFileDetail.UpdateInfo (MockFile file, System.Boolean isCurrentFolder) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:198)
+RTTFileManager.UpdateDetail (MockFile file, System.Boolean isCurrentFolder) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:3474)
+RTTFileManagerController.UpdateDetailView () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:581)
+RTTFileManagerController.SelectFile (System.String path) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:544)
+RTTFileManager.ToggleEditMode () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:1490)
+RTTFileManager.EnterClipboardMode (RTTFileManager+ClipboardOperation operation, System.Collections.Generic.HashSet`1[T] items) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:1754)
+RTTFileManager.OnCopyClicked () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:1671)
+UnityEngine.Events.InvokableCall.Invoke () (at <37cc348edc804f4cb176b63962c716e7>:0)
+UnityEngine.Events.UnityEvent.Invoke () (at <37cc348edc804f4cb176b63962c716e7>:0)
+UnityEngine.UI.Button.Press () (at ./Library/PackageCache/com.unity.ugui@1.0.0/Runtime/UI/Core/Button.cs:70)
+UnityEngine.UI.Button.OnPointerClick (UnityEngine.EventSystems.PointerEventData eventData) (at ./Library/PackageCache/com.unity.ugui@1.0.0/Runtime/UI/Core/Button.cs:114)
+UnityEngine.EventSystems.ExecuteEvents.Execute (UnityEngine.EventSystems.IPointerClickHandler handler, UnityEngine.EventSystems.BaseEventData eventData) (at ./Library/PackageCache/com.unity.ugui@1.0.0/Runtime/EventSystem/ExecuteEvents.cs:57)
+UnityEngine.EventSystems.ExecuteEvents.Execute[T] (UnityEngine.GameObject target, UnityEngine.EventSystems.BaseEventData eventData, UnityEngine.EventSystems.ExecuteEvents+EventFunction`1[T1] functor) (at ./Library/PackageCache/com.unity.ugui@1.0.0/Runtime/EventSystem/ExecuteEvents.cs:272)
+UnityEngine.EventSystems.ExecuteEvents:Execute(GameObject, BaseEventData, EventFunction`1)
+RTTRaycastManager:SendClick() (at Assets/VR-Workspace/Scripts/UI/RTT/Input/RTTRaycastManager.cs:339)
+VRGazeReticle:SendRTTClickAndLock(GameObject) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:582)
+VRGazeReticle:ProcessDwellClickRTT(Vector3) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:836)
+VRGazeReticle:CheckGaze() (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:474)
+VRGazeReticle:Update() (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:314)
+
+[Detail] UpdateInfo: css name=0ms preview=0ms metadata=5ms total=5ms
+
+NullReferenceException: Object reference not set to an instance of an object
+RTTFileDetail.CreateMetadataForOther (MockFile file) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:508)
+RTTFileDetail.UpdateMetadata (MockFile file, System.Boolean isCurrentFolder) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:355)
+RTTFileDetail.UpdateInfo (MockFile file, System.Boolean isCurrentFolder) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:198)
+RTTFileManager.UpdateDetail (MockFile file, System.Boolean isCurrentFolder) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:3474)
+RTTFileManagerController.UpdateDetailView () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:581)
+RTTFileManagerController.UnhoverFile (System.String path) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:567)
+RTTFileManager.<CreateCenterGrid>b__77_1 (System.String path) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:404)
+RTTFileGridItem.OnPointerExit (UnityEngine.EventSystems.PointerEventData eventData) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileGridItem.cs:440)
+UnityEngine.EventSystems.ExecuteEvents.Execute (UnityEngine.EventSystems.IPointerExitHandler handler, UnityEngine.EventSystems.BaseEventData eventData) (at ./Library/PackageCache/com.unity.ugui@1.0.0/Runtime/EventSystem/ExecuteEvents.cs:36)
+UnityEngine.EventSystems.ExecuteEvents.Execute[T] (UnityEngine.GameObject target, UnityEngine.EventSystems.BaseEventData eventData, UnityEngine.EventSystems.ExecuteEvents+EventFunction`1[T1] functor) (at ./Library/PackageCache/com.unity.ugui@1.0.0/Runtime/EventSystem/ExecuteEvents.cs:272)
+UnityEngine.EventSystems.EventSystem:Update() (at ./Library/PackageCache/com.unity.ugui@1.0.0/Runtime/EventSystem/EventSystem.cs:530)
+
+[Detail] UpdateInfo: css name=0ms preview=0ms metadata=2ms total=2ms
+
+Destroying assets is not permitted to avoid data loss.
+If you really want to remove an asset use DestroyImmediate (theObject, true);
+UnityEngine.Object:Destroy (UnityEngine.Object)
+VRWorkspace.UI.HoverEffects.CursorChangeHoverEffect:Cleanup () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Effects/CursorChangeHoverEffect.cs:118)
+VRWorkspace.UI.HoverEffects.HoverEffectController:CleanupEffects () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Core/HoverEffectController.cs:311)
+VRWorkspace.UI.HoverEffects.HoverEffectController:OnDestroy () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Core/HoverEffectController.cs:318)
+
+[RTTManager] Closed app: folder
 

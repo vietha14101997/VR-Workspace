@@ -42,12 +42,19 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
     private bool _waitingForInitialBinding = false; // Track if we're waiting for grid binding before starting scan
     private Coroutine _filterCoroutine;
     private const int FILTER_BATCH_SIZE = 200; // Items to process per frame
-    
+
     // Category page position cache - remembers page for each category
     private Dictionary<string, int> _categoryPageCache = new Dictionary<string, int>();
-    
+
+    // Category selected item cache - remembers selected item path for each category
+    private Dictionary<string, string> _categorySelectedItemCache = new Dictionary<string, string>();
+
     // Pending page to navigate after data loads (for category switching)
     private int? _pendingPageNavigation = null;
+
+    // Selection/Hover State (like FileManager)
+    private MediaVideoInfo? _selectedVideo = null;
+    private MediaVideoInfo? _hoveredVideo = null;
 
     // Vietnamese culture for proper diacritics sorting (Đ with D, etc.) - synced with RTTFileManagerController
     private static readonly CultureInfo VietnameseCulture = new CultureInfo("vi-VN");
@@ -354,6 +361,110 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
     public void RecordPlayback(string videoPath)
     {
         _libraryService?.RecordPlayback(videoPath);
+    }
+
+    /// <summary>
+    /// Select a video item and update the detail panel.
+    /// </summary>
+    public void SelectVideo(MediaVideoInfo video)
+    {
+        _selectedVideo = video;
+
+        // Save selected item for current category
+        if (!string.IsNullOrEmpty(CurrentCategory))
+        {
+            _categorySelectedItemCache[CurrentCategory] = video.Path;
+        }
+
+        UpdateDetailView();
+    }
+
+    /// <summary>
+    /// Clear the selected video state.
+    /// Used when entering edit mode to ensure detail panel shows empty when not hovering.
+    /// </summary>
+    public void ClearSelectedVideo()
+    {
+        _selectedVideo = null;
+    }
+
+    /// <summary>
+    /// Handle hover enter on a video item.
+    /// </summary>
+    public void HoverVideo(MediaVideoInfo video)
+    {
+        _hoveredVideo = video;
+        UpdateDetailView();
+    }
+
+    /// <summary>
+    /// Handle hover exit from a video item.
+    /// </summary>
+    public void UnhoverVideo(MediaVideoInfo video)
+    {
+        if (_hoveredVideo.HasValue && _hoveredVideo.Value.Path == video.Path)
+        {
+            _hoveredVideo = null;
+            UpdateDetailView();
+        }
+    }
+
+    /// <summary>
+    /// Update the detail panel based on hover/selection state.
+    /// Shows hovered item if hovering, otherwise shows selected item.
+    /// </summary>
+    private void UpdateDetailView()
+    {
+        if (_view == null) return;
+
+        if (_hoveredVideo.HasValue)
+        {
+            _view.UpdateDetailPanel(_hoveredVideo.Value);
+        }
+        else if (_selectedVideo.HasValue)
+        {
+            _view.UpdateDetailPanel(_selectedVideo.Value);
+        }
+        else
+        {
+            _view.ClearDetailPanel();
+        }
+    }
+
+    /// <summary>
+    /// Auto-select the first item in the filtered list.
+    /// </summary>
+    private void AutoSelectFirstItem()
+    {
+        if (_filteredVideos.Count > 0 && _view?.Grid != null)
+        {
+            var firstVideo = _filteredVideos[0];
+            _view.Grid.SelectVideo(firstVideo);
+            SelectVideo(firstVideo);
+        }
+    }
+
+    /// <summary>
+    /// Restore cached selected item for current category, or select first item.
+    /// </summary>
+    private void RestoreOrSelectFirstItem()
+    {
+        if (_filteredVideos.Count == 0) return;
+
+        // Try to restore cached selection
+        if (_categorySelectedItemCache.TryGetValue(CurrentCategory, out string cachedPath))
+        {
+            var video = _filteredVideos.Find(v => v.Path == cachedPath);
+            if (!string.IsNullOrEmpty(video.Path))
+            {
+                _view?.Grid?.SelectVideo(video);
+                SelectVideo(video);
+                return;
+            }
+        }
+
+        // No cached selection or item no longer exists, select first
+        AutoSelectFirstItem();
     }
     #endregion
 
@@ -796,17 +907,20 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
 
         // Recalculate pagination AFTER SetVideos (grid now has computed TotalPages)
         RecalculatePagination();
-        
+
         // Navigate to pending page if set (from category switch)
         if (_pendingPageNavigation.HasValue)
         {
             int targetPage = Mathf.Clamp(_pendingPageNavigation.Value, 1, TotalPages);
             _pendingPageNavigation = null;
-            
+
             // Navigate instantly after data is ready
             _view?.Grid?.GoToPageInstant(targetPage);
             // Debug.Log($"[RTTMediaLibraryController] Navigated to pending page {targetPage}");
         }
+
+        // Restore cached selected item or select first item
+        RestoreOrSelectFirstItem();
 
         // Debug.Log($"[RTTMediaLibraryController] Showing {_filteredVideos.Count} videos in {_groups.Count} groups (Category: {CurrentCategory}, Search: '{CurrentSearchQuery}', Page: {CurrentPage}/{TotalPages})");
     }

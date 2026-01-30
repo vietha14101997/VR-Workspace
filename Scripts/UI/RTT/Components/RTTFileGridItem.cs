@@ -23,13 +23,17 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
     private GameObject _checkbox;
     private Image _checkmarkIcon;
     private HoverEffectController _checkboxHoverController;
-    private bool _isSelected = false;
+    private bool _isSelected = false;  // For edit mode checkbox
     private bool _isEditMode = false;
     private Action<string, bool> _onSelectionChanged; // path, isSelected
 
+    // Item Selection State (separate from edit mode)
+    private bool _isItemSelected = false;
+
     public string FilePath { get; private set; }
     public bool IsFolder { get; private set; }
-    public bool IsSelected => _isSelected;
+    public bool IsSelected => _isSelected;  // Edit mode checkbox selection
+    public bool IsItemSelected => _isItemSelected;  // Item selection (non-edit mode)
 
     // Callbacks
     private Action<string> _onHoverEnter;
@@ -402,6 +406,9 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
     #region Pointer Events
     public void OnPointerEnter(PointerEventData eventData)
     {
+        // Skip hover interaction if this item is selected (but allow in edit mode)
+        if (_isItemSelected && !_isEditMode) return;
+
         if (_bgImage != null)
             _bgImage.color = HoverColor;
 
@@ -417,6 +424,9 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
 
     public void OnPointerExit(PointerEventData eventData)
     {
+        // Skip hover interaction if this item is selected (but allow in edit mode)
+        if (_isItemSelected && !_isEditMode) return;
+
         if (_bgImage != null)
             _bgImage.color = NormalColor;
 
@@ -432,6 +442,9 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
 
     public void OnPointerClick(PointerEventData eventData)
     {
+        // Skip click interaction if this item is already selected (but allow in edit mode)
+        if (_isItemSelected && !_isEditMode) return;
+
         _onClick?.Invoke(FilePath, IsFolder);
     }
     #endregion
@@ -466,10 +479,46 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         }
         ClearHoverState();
 
+        // Reset item selection state to ensure clean state when recycled
+        _isItemSelected = false;
+
         // Reset hover state for recycled items
         if (_hoverController != null)
         {
             _hoverController.ResetHoverState(immediate: true);
+        }
+    }
+    #endregion
+
+    #region Item Selection (Non-Edit Mode)
+    /// <summary>
+    /// Set item selection state (not edit mode checkbox).
+    /// When selected: activates hover effects and blocks pointer interactions.
+    /// </summary>
+    public void SetItemSelected(bool selected)
+    {
+        _isItemSelected = selected;
+
+        // Force hover state on main hover controller
+        if (_hoverController != null)
+        {
+            _hoverController.SetForceHover(selected);
+        }
+
+        // Update background visual
+        if (_bgImage != null)
+        {
+            _bgImage.color = selected ? HoverColor : NormalColor;
+        }
+
+        // Start/stop marquee based on selection
+        if (selected)
+        {
+            _nameMarquee?.StartScroll();
+        }
+        else
+        {
+            _nameMarquee?.StopScroll();
         }
     }
     #endregion

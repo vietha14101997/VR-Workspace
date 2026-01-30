@@ -33,6 +33,8 @@ public class RTTFileManager : MonoBehaviour
     private RTTFileList _fileList;
     private RTTFilePagination _pagination;
     private RTTPopupInputable _createFolderPopup;
+    private RTTFileActionBar _fileActionBar;
+    private MockFile _currentDisplayedFile;
 
     // New Folder button reference (for enabling/disabling based on permissions)
     private Button _newFolderButton;
@@ -79,6 +81,10 @@ public class RTTFileManager : MonoBehaviour
     private List<string> _clipboardItems = new List<string>();
     private string _clipboardSourcePath;
 
+    // State to restore when exiting clipboard mode
+    private bool _preClipboardHasSelectedFile = false;
+    private MockFile _preClipboardDisplayedFile;
+
     private enum ClipboardOperation { None, Copy, Move }
 
     // Close button reference (for clipboard mode icon/function swap)
@@ -94,6 +100,12 @@ public class RTTFileManager : MonoBehaviour
     private RTTProgressPopup _progressPopup;
     private CancellationTokenSource _operationCts;
     private FileOperationService.PauseToken _pauseToken;
+
+    // Pending delete paths (for action bar delete or single file delete)
+    private List<string> _pendingDeletePaths;
+
+    // Track if there's an actual selected file (not just hovered)
+    private bool _hasSelectedFile = false;
 
     // Scan Status Text (for category filter mode - shown in Row2 next to breadcrumbs)
     private TextMeshProUGUI _scanStatusText;
@@ -204,6 +216,9 @@ public class RTTFileManager : MonoBehaviour
 
         if (_progressPopup != null) Destroy(_progressPopup.gameObject);
         _progressPopup = null;
+
+        if (_fileActionBar != null) Destroy(_fileActionBar.gameObject);
+        _fileActionBar = null;
 
         // Cancel any ongoing operation
         _operationCts?.Cancel();
@@ -477,7 +492,6 @@ public class RTTFileManager : MonoBehaviour
     private string _currentSortBy = "Name";
     private bool _isAscending = true;
     private bool _isGridView = true;
-    private Image _sortArrowImg; // Reference to arrow icon
     private TextMeshProUGUI _sortTriggerText; // Reference to sort trigger text
     private TextMeshProUGUI _itemCountText; // Reference to item count label
 
@@ -512,9 +526,7 @@ public class RTTFileManager : MonoBehaviour
         RectTransform closeRT = _closeButton.GetComponent<RectTransform>();
         SetupRowElement(closeRT, new Vector2(0, 0.5f), new Vector2(20, 0)); // Left align
 
-        // View Options Trigger Button (Custom Layout: Text Left, Icon Right)
-        Sprite arrowIcon = VRDropdownFactory.GetArrowSprite();
-
+        // View Options Trigger Button (text only)
         var sortConfig = new VRButtonFactory.ButtonConfig
         {
             label = _currentSortBy,
@@ -538,21 +550,6 @@ public class RTTFileManager : MonoBehaviour
             _sortTriggerText.alignment = TextAlignmentOptions.Center;
             _sortTriggerText.margin = Vector4.zero;
         }
-
-        // Add Arrow Icon manually (Right aligned)
-        GameObject iconObj = new GameObject("ArrowIcon");
-        iconObj.transform.SetParent(sortTrigger.transform, false);
-        _sortArrowImg = iconObj.AddComponent<Image>();
-        _sortArrowImg.sprite = arrowIcon;
-        _sortArrowImg.color = Color.white;
-        _sortArrowImg.raycastTarget = false;
-
-        RectTransform iconRT = iconObj.GetComponent<RectTransform>();
-        iconRT.anchorMin = new Vector2(1, 0.5f);
-        iconRT.anchorMax = new Vector2(1, 0.5f);
-        iconRT.pivot = new Vector2(0.5f, 0.5f);
-        iconRT.sizeDelta = new Vector2(18f, 18f); // +10% (was 16f)
-        iconRT.anchoredPosition = new Vector2(-36f, 0); // +10% (was -33f)
 
         RectTransform sortRT = sortTrigger.GetComponent<RectTransform>();
         // Position centered between Close button and SearchBar
@@ -655,22 +652,6 @@ public class RTTFileManager : MonoBehaviour
             BuildViewOptionsPopupContent();
             _viewOptionsPopup.Show();
         }
-        UpdateSortArrow();
-    }
-
-    private void OnViewOptionsPopupHide()
-    {
-        UpdateSortArrow();
-    }
-
-    private void UpdateSortArrow()
-    {
-        // Rotate arrow: up (180) when popup open, down (0) when closed
-        if (_sortArrowImg != null)
-        {
-            float targetZ = (_viewOptionsPopup != null && _viewOptionsPopup.IsVisible) ? 180f : 0f;
-            _sortArrowImg.rectTransform.localEulerAngles = new Vector3(0, 0, targetZ);
-        }
     }
     
     private void CreateViewOptionsPopup(Transform parent)
@@ -698,9 +679,6 @@ public class RTTFileManager : MonoBehaviour
         _viewOptionsPopup = RTTPopupMenu.CreateWorldSpace(config, _menuFrame.transform);
 
         Debug.Log($"[RTTFileManager] ViewOptionsPopup created, null: {_viewOptionsPopup == null}");
-
-        // Subscribe to OnHide to reset arrow when popup closes from click-outside
-        _viewOptionsPopup.OnHide += OnViewOptionsPopupHide;
 
         // Build popup content
         BuildViewOptionsPopupContent();
@@ -1415,9 +1393,12 @@ public class RTTFileManager : MonoBehaviour
     }
 
     #region Edit Mode
-    private void ToggleEditMode()
+    /// <summary>
+    /// Toggle edit mode. When skipRestore is true, don't restore detail panel (used when transitioning to clipboard mode).
+    /// </summary>
+    private void ToggleEditMode(bool skipRestore = false)
     {
-        Debug.Log($"[RTTFileManager] ToggleEditMode CALLED - _isEditMode before: {_isEditMode}");
+        Debug.Log($"[RTTFileManager] ToggleEditMode CALLED - _isEditMode before: {_isEditMode}, skipRestore: {skipRestore}");
 
         _isEditMode = !_isEditMode;
 
@@ -1478,17 +1459,73 @@ public class RTTFileManager : MonoBehaviour
         _fileGrid?.SetEditMode(_isEditMode);
         _fileList?.SetEditMode(_isEditMode);
 
-        // Clear selection when exiting edit mode
-        if (!_isEditMode)
+        // Handle detail panel and action bar visibility based on edit mode
+        if (_isEditMode)
         {
-            _selectedItems.Clear();
-            UpdateSelectAllCheckmark();
+            // Entering edit mode: clear controller's selected file state
+            // This ensures hover/unhover shows current folder when not hovering
+            _controller?.ClearSelectedFile();
+
+            // Show current folder info and hide action bar
+            if (_controller != null && _fileDetail != null)
+            {
+                var folderInfo = _controller.GetCurrentFolderInfo();
+                _fileDetail.UpdateInfo(folderInfo, isCurrentFolder: true);
+            }
+            _fileActionBar?.SetVisible(false);
+
+            // Update selected count when entering edit mode
             UpdateSelectedCountText();
         }
         else
         {
-            // Update selected count when entering edit mode
+            // Exiting edit mode: clear checkbox selection
+            _selectedItems.Clear();
+            UpdateSelectAllCheckmark();
             UpdateSelectedCountText();
+
+            // Only restore detail panel if not transitioning to clipboard mode
+            if (!skipRestore)
+            {
+                // Restore detail panel if there was a selected file
+                if (_hasSelectedFile && _currentDisplayedFile.Path != null)
+                {
+                    _fileDetail?.UpdateInfo(_currentDisplayedFile, isCurrentFolder: false);
+                    _fileActionBar?.SetVisible(true);
+                    // Restore controller's selected file so hover/unhover works correctly
+                    _controller?.SelectFile(_currentDisplayedFile.Path);
+                }
+                else
+                {
+                    // Check if grid/list has a visually selected file
+                    string selectedPath = _isGridView
+                        ? _fileGrid?.GetSelectedFilePath()
+                        : _fileList?.GetSelectedFilePath();
+
+                    if (!string.IsNullOrEmpty(selectedPath))
+                    {
+                        // Restore _hasSelectedFile since there's a visually selected item
+                        _hasSelectedFile = true;
+
+                        // Get file info and update detail panel
+                        var fileInfo = _controller?.GetFileInfo(selectedPath);
+                        if (fileInfo.HasValue)
+                        {
+                            _currentDisplayedFile = fileInfo.Value;
+                            _fileDetail?.UpdateInfo(_currentDisplayedFile, isCurrentFolder: false);
+                            _fileActionBar?.SetVisible(true);
+                            // Restore controller's selected file so hover/unhover works correctly
+                            _controller?.SelectFile(selectedPath);
+                        }
+                    }
+                    else if (_controller != null && _fileDetail != null)
+                    {
+                        // No selected file, show current folder info
+                        var folderInfo = _controller.GetCurrentFolderInfo();
+                        _fileDetail.UpdateInfo(folderInfo, isCurrentFolder: true);
+                    }
+                }
+            }
         }
 
         Debug.Log($"[RTTFileManager] Edit Mode: {_isEditMode}");
@@ -1708,32 +1745,49 @@ public class RTTFileManager : MonoBehaviour
 
     private void EnterClipboardMode(ClipboardOperation operation, HashSet<string> items)
     {
+        // 0. Save state to restore when exiting clipboard mode
+        _preClipboardHasSelectedFile = _hasSelectedFile;
+        _preClipboardDisplayedFile = _currentDisplayedFile;
+
         // 1. Store clipboard data
         _clipboardOperation = operation;
         _clipboardItems = new List<string>(items);
         _clipboardSourcePath = _controller.GetCurrentPath();
         _isClipboardMode = true;
 
-        // 2. Exit Edit Mode (hide edit controls, checkboxes)
+        // 2. Exit Edit Mode (hide edit controls, checkboxes) - skip restore since we'll handle it ourselves
         if (_isEditMode)
         {
-            ToggleEditMode();
+            ToggleEditMode(skipRestore: true);
         }
 
-        // 3. Change Close button to Back icon
+        // 2.5 Notify grid/list to disable visual selection
+        _fileGrid?.SetClipboardMode(true);
+        _fileList?.SetClipboardMode(true);
+
+        // 3. Clear selection state and show current folder info (like edit mode)
+        _controller?.ClearSelectedFile();
+        if (_controller != null && _fileDetail != null)
+        {
+            var folderInfo = _controller.GetCurrentFolderInfo();
+            _fileDetail.UpdateInfo(folderInfo, isCurrentFolder: true);
+        }
+        _fileActionBar?.SetVisible(false);
+
+        // 4. Change Close button to Back icon
         Sprite backIcon = Resources.Load<Sprite>("icon_back");
         if (_closeButtonIcon != null && backIcon != null)
         {
             _closeButtonIcon.sprite = backIcon;
         }
 
-        // 4. Change Edit button to Copy/Move icon
+        // 5. Change Edit button to Copy/Move icon
         string iconName = operation == ClipboardOperation.Copy ? "icon_copy" : "icon_move_folder";
         Sprite operationIcon = Resources.Load<Sprite>(iconName);
         UpdateEditButtonIcon(operationIcon);
         UpdateEditButtonColor(_accentColor); // Use accent color to indicate active state
 
-        // 5. Update paste button state (edit button enabled/disabled)
+        // 6. Update paste button state (edit button enabled/disabled)
         UpdatePasteButtonState();
 
         Debug.Log($"[RTTFileManager] Entered Clipboard Mode: {operation}, {items.Count} items from {_clipboardSourcePath}");
@@ -1745,6 +1799,10 @@ public class RTTFileManager : MonoBehaviour
         _clipboardOperation = ClipboardOperation.None;
         _clipboardItems.Clear();
         _clipboardSourcePath = null;
+
+        // Notify grid/list to restore visual selection
+        _fileGrid?.SetClipboardMode(false);
+        _fileList?.SetClipboardMode(false);
 
         // Restore Close button icon
         if (_closeButtonIcon != null && _originalCloseIcon != null)
@@ -1771,6 +1829,43 @@ public class RTTFileManager : MonoBehaviour
             editBtn.interactable = true;
         }
 
+        // Restore detail panel - prioritize grid's selected path (more reliable)
+        string selectedPath = _isGridView
+            ? _fileGrid?.GetSelectedFilePath()
+            : _fileList?.GetSelectedFilePath();
+
+        if (!string.IsNullOrEmpty(selectedPath))
+        {
+            // Grid has a selected file - use that
+            _hasSelectedFile = true;
+            var fileInfo = _controller?.GetFileInfo(selectedPath);
+            if (fileInfo.HasValue)
+            {
+                _currentDisplayedFile = fileInfo.Value;
+                _fileDetail?.UpdateInfo(_currentDisplayedFile, isCurrentFolder: false);
+                _fileActionBar?.SetVisible(true);
+                // Restore controller's selected file so hover/unhover works correctly
+                _controller?.SelectFile(selectedPath);
+            }
+        }
+        else if (_preClipboardHasSelectedFile && _preClipboardDisplayedFile.Path != null)
+        {
+            // Fall back to saved state from before entering clipboard mode
+            _hasSelectedFile = _preClipboardHasSelectedFile;
+            _currentDisplayedFile = _preClipboardDisplayedFile;
+            _fileDetail?.UpdateInfo(_currentDisplayedFile, isCurrentFolder: false);
+            _fileActionBar?.SetVisible(true);
+            // Restore controller's selected file so hover/unhover works correctly
+            _controller?.SelectFile(_preClipboardDisplayedFile.Path);
+        }
+        else if (_controller != null && _fileDetail != null)
+        {
+            // No selected file, show current folder info
+            _hasSelectedFile = false;
+            var folderInfo = _controller.GetCurrentFolderInfo();
+            _fileDetail.UpdateInfo(folderInfo, isCurrentFolder: true);
+        }
+
         Debug.Log("[RTTFileManager] Exited Clipboard Mode");
     }
 
@@ -1790,11 +1885,15 @@ public class RTTFileManager : MonoBehaviour
     {
         if (_editButton == null) return;
 
-        // Update glow border color
-        var glowEffect = _editButton.GetComponentInChildren<GlowBorderHoverEffect>();
-        if (glowEffect != null)
+        // Update glow border color - GlowBorderHoverEffect is accessed through HoverEffectController
+        var hoverController = _editButton.GetComponentInChildren<HoverEffectController>();
+        if (hoverController != null)
         {
-            glowEffect.UpdateSavedGlowColor(color);
+            var glowEffect = hoverController.GetEffect("glow_border") as GlowBorderHoverEffect;
+            if (glowEffect != null)
+            {
+                glowEffect.UpdateSavedGlowColor(color);
+            }
         }
     }
 
@@ -2181,14 +2280,14 @@ public class RTTFileManager : MonoBehaviour
         // Clear previous content and rebuild
         _deleteConfirmPopup.Clear();
 
-        // Build confirmation message
-        var selectedPaths = GetCurrentSelectedPaths();
-        int count = selectedPaths.Count;
+        // Build confirmation message - use pending paths if set, otherwise get from selection
+        var pathsToDelete = _pendingDeletePaths ?? new List<string>(GetCurrentSelectedPaths());
+        int count = pathsToDelete.Count;
         string itemText = count == 1 ? "item" : "items";
         string title = $"Delete {count} {itemText}?";
 
-        // Add title section
-        _deleteConfirmPopup.AddSectionBlock(title, new List<RTTPopupMenu.ButtonData>());
+        // Add title section (centered)
+        _deleteConfirmPopup.AddSectionBlock(title, new List<RTTPopupMenu.ButtonData>(), 2, centerTitle: true);
 
         // Add Yes/No buttons (accent for Yes, primary for No)
         var yesButton = new RTTPopupMenu.ButtonData(
@@ -2215,8 +2314,12 @@ public class RTTFileManager : MonoBehaviour
 
     private async void OnDeleteConfirmed()
     {
-        var selectedPaths = GetCurrentSelectedPaths();
-        Debug.Log("[RTTFileManager] Delete confirmed - deleting " + selectedPaths.Count + " items");
+        // Use pending paths if set, otherwise get from selection
+        var pathsToDelete = _pendingDeletePaths ?? new List<string>(GetCurrentSelectedPaths());
+        Debug.Log("[RTTFileManager] Delete confirmed - deleting " + pathsToDelete.Count + " items");
+
+        // Clear pending paths
+        _pendingDeletePaths = null;
 
         // Hide confirmation popup
         if (_deleteConfirmPopup != null)
@@ -2224,8 +2327,11 @@ public class RTTFileManager : MonoBehaviour
             _deleteConfirmPopup.Hide();
         }
 
-        // Exit edit mode first (which also clears selections in grid/list)
-        ToggleEditMode();
+        // Exit edit mode if we were in it
+        if (_isEditMode)
+        {
+            ToggleEditMode();
+        }
 
         // Create cancellation source and pause token
         _operationCts = new CancellationTokenSource();
@@ -2247,8 +2353,7 @@ public class RTTFileManager : MonoBehaviour
 
         try
         {
-            var itemsToDelete = new List<string>(selectedPaths);
-            await _controller.DeleteItemsAsync(itemsToDelete, progress, _operationCts.Token, _pauseToken);
+            await _controller.DeleteItemsAsync(pathsToDelete, progress, _operationCts.Token, _pauseToken);
         }
         catch (OperationCanceledException)
         {
@@ -2269,6 +2374,9 @@ public class RTTFileManager : MonoBehaviour
     private void OnDeleteCancelled()
     {
         Debug.Log("[RTTFileManager] Delete cancelled");
+
+        // Clear pending paths
+        _pendingDeletePaths = null;
 
         if (_deleteConfirmPopup != null)
         {
@@ -3006,12 +3114,25 @@ public class RTTFileManager : MonoBehaviour
 
         if (isFolder)
         {
+            // Clear file selection when navigating to folder
+            _hasSelectedFile = false;
+            if (_fileActionBar != null) _fileActionBar.SetVisible(false);
+
             // Navigate into the folder (saves clicked folder's index for accurate back navigation)
             _controller?.NavigateToFolder(path);
         }
         else
         {
-            // Select the file (could also open it in future)
+            // Mark that we have a selected file
+            _hasSelectedFile = true;
+
+            // Select the file visually on the grid/list
+            if (_fileGrid != null && _fileGrid.gameObject.activeInHierarchy)
+                _fileGrid.SelectFile(path);
+            else if (_fileList != null && _fileList.gameObject.activeInHierarchy)
+                _fileList.SelectFile(path);
+
+            // Notify controller of selection (updates detail panel)
             _controller?.SelectFile(path);
         }
     }
@@ -3081,6 +3202,16 @@ public class RTTFileManager : MonoBehaviour
 
     public void UpdateGrid(System.Collections.Generic.List<MockFile> files, string selectedPath = "")
     {
+        // Exit edit mode when folder changes (but not clipboard mode)
+        if (_isEditMode && !_isClipboardMode)
+        {
+            ToggleEditMode();
+        }
+
+        // Clear file selection when folder changes
+        _hasSelectedFile = false;
+        if (_fileActionBar != null) _fileActionBar.SetVisible(false);
+
         if (_isGridView)
         {
             if (_fileGrid != null)
@@ -3349,6 +3480,27 @@ public class RTTFileManager : MonoBehaviour
         {
             _fileDetail.UpdateInfo(file, isCurrentFolder);
         }
+
+        // Store current displayed file for action bar
+        _currentDisplayedFile = file;
+
+        // Only show action bar when there's an actual selected file (not just hover)
+        // AND not in edit mode or clipboard mode
+        if (_fileActionBar != null)
+        {
+            bool showActionBar = _hasSelectedFile && !_isEditMode && !_isClipboardMode;
+            _fileActionBar.SetVisible(showActionBar);
+
+            if (showActionBar)
+            {
+                // Update button states based on file type
+                bool canOpen = true;  // Can always open (navigate into folder or open file)
+                bool canRename = !isCurrentFolder;  // Can't rename current folder
+                bool canDelete = !isCurrentFolder;  // Can't delete current folder
+
+                _fileActionBar.UpdateButtonStates(canOpen, canRename, canDelete);
+            }
+        }
     }
 
     private IEnumerator CreateRightPanelContent()
@@ -3366,6 +3518,74 @@ public class RTTFileManager : MonoBehaviour
 
         _fileDetail = contentObj.AddComponent<RTTFileDetail>();
         _fileDetail.Initialize(_primaryColor, _accentColor, _font);
+
+        // Create action bar below the panel
+        CreateFileActionBar();
+    }
+
+    /// <summary>
+    /// Create RTTFileActionBar that follows the detail panel.
+    /// </summary>
+    private void CreateFileActionBar()
+    {
+        if (_rightFrame == null) return;
+
+        Vector2 panelSize = _rightFrame.GetWorldSize();
+        float targetHeight = panelSize.y;
+        float panelWidth = panelSize.x;
+
+        _fileActionBar = RTTFileActionBar.Create(
+            _rightFrame.transform,
+            targetHeight,
+            panelWidth,
+            _primaryColor,
+            _accentColor,
+            _font
+        );
+
+        // Wire up events
+        _fileActionBar.OnOpenClicked += OnActionBarOpenClicked;
+        _fileActionBar.OnRenameClicked += OnActionBarRenameClicked;
+        _fileActionBar.OnDeleteClicked += OnActionBarDeleteClicked;
+
+        // Hide initially until a file is selected
+        _fileActionBar.SetVisible(false);
+
+        Debug.Log("[RTTFileManager] File action bar created (hidden initially)");
+    }
+
+    private void OnActionBarOpenClicked()
+    {
+        if (_currentDisplayedFile.Path == null) return;
+
+        // Open functionality - navigate into folder or open file
+        if (_currentDisplayedFile.IsFolder)
+        {
+            _controller?.NavigateTo(_currentDisplayedFile.Path);
+        }
+        else
+        {
+            // TODO: Implement file open functionality
+            Debug.Log($"[RTTFileManager] Open file requested: {_currentDisplayedFile.Path}");
+        }
+    }
+
+    private void OnActionBarRenameClicked()
+    {
+        if (_currentDisplayedFile.Path == null) return;
+
+        // Set the rename target path and show popup
+        _renameTargetPath = _currentDisplayedFile.Path;
+        ShowRenamePopup();
+    }
+
+    private void OnActionBarDeleteClicked()
+    {
+        if (_currentDisplayedFile.Path == null) return;
+
+        // Temporarily select this file for deletion
+        _pendingDeletePaths = new List<string> { _currentDisplayedFile.Path };
+        ShowDeleteConfirmPopup();
     }
     #endregion
 

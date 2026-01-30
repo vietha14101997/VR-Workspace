@@ -543,7 +543,16 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController
          _selectedFile = _currentDirectoryFiles.Find(f => f.Path == path);
          UpdateDetailView();
     }
-    
+
+    /// <summary>
+    /// Clear the selected file state.
+    /// Used when entering edit mode to ensure detail panel shows current folder when not hovering.
+    /// </summary>
+    public void ClearSelectedFile()
+    {
+        _selectedFile = null;
+    }
+
     public void HoverFile(string path)
     {
          _hoveredFile = _currentDirectoryFiles.Find(f => f.Path == path);
@@ -1203,6 +1212,87 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController
     public string GetCurrentPath()
     {
         return _currentPath;
+    }
+
+    /// <summary>
+    /// Get MockFile info for the current folder.
+    /// Used to display current folder info in detail panel (e.g., during edit mode).
+    /// </summary>
+    public MockFile GetCurrentFolderInfo()
+    {
+        DateTime folderModified = DateTime.MinValue;
+        try
+        {
+            if (Directory.Exists(_currentPath))
+            {
+                folderModified = Directory.GetLastWriteTime(_currentPath);
+            }
+        }
+        catch { }
+
+        var folderInfo = new MockFile
+        {
+            Name = TextEncodingHelper.FixString(System.IO.Path.GetFileName(_currentPath)),
+            Path = _currentPath,
+            IsFolder = true,
+            Modified = folderModified
+        };
+        if (string.IsNullOrEmpty(folderInfo.Name)) folderInfo.Name = "Root";
+
+        return folderInfo;
+    }
+
+    /// <summary>
+    /// Get MockFile info for a specific file/folder by path.
+    /// Returns null if the file doesn't exist or can't be found.
+    /// </summary>
+    public MockFile? GetFileInfo(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return null;
+
+        // Try to find in current files list first (faster)
+        foreach (var file in _filteredFiles)
+        {
+            if (file.Path == path)
+            {
+                return file;
+            }
+        }
+
+        // If not found in current list, create from path
+        try
+        {
+            if (File.Exists(path))
+            {
+                var fileInfo = new FileInfo(path);
+                return new MockFile
+                {
+                    Name = TextEncodingHelper.FixString(fileInfo.Name),
+                    Path = path,
+                    IsFolder = false,
+                    Type = fileInfo.Extension.TrimStart('.').ToUpperInvariant(),
+                    Created = fileInfo.CreationTime,
+                    Modified = fileInfo.LastWriteTime,
+                    Size = fileInfo.Length
+                };
+            }
+            else if (Directory.Exists(path))
+            {
+                var dirInfo = new DirectoryInfo(path);
+                return new MockFile
+                {
+                    Name = TextEncodingHelper.FixString(dirInfo.Name),
+                    Path = path,
+                    IsFolder = true,
+                    Type = "Folder",
+                    Created = dirInfo.CreationTime,
+                    Modified = dirInfo.LastWriteTime
+                };
+            }
+        }
+        catch { }
+
+        return null;
     }
     #endregion
 }

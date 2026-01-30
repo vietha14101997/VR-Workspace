@@ -4,20 +4,15 @@ using TMPro;
 using System;
 
 /// <summary>
-/// RTTMediaActionBar - Floating action bar that follows the Media detail panel.
-/// Contains Play, Favourite, and Playlist buttons positioned below the detail panel.
-/// 
-/// Architecture:
-/// - Follows RTTMenuFrame (detail panel) position
-/// - Uses sphere positioning similar to RTTToolbar
-/// - Face is perpendicular to vector(center → camera)
+/// RTTFileActionBar - Floating action bar that follows the File Manager detail panel.
+/// Contains Open, Rename, and Delete buttons positioned below the detail panel.
 /// </summary>
-public class RTTMediaActionBar : MonoBehaviour
+public class RTTFileActionBar : MonoBehaviour
 {
     #region Events
-    public event Action OnPlayClicked;
-    public event Action OnFavouriteClicked;
-    public event Action OnPlaylistClicked;
+    public event Action OnOpenClicked;
+    public event Action OnRenameClicked;
+    public event Action OnDeleteClicked;
     #endregion
 
     #region Private Fields
@@ -27,18 +22,15 @@ public class RTTMediaActionBar : MonoBehaviour
     private bool _initialized = false;
 
     // Dimensions synced with RTTToolbar/RTTTaskbar
-    private float _frameHeight = 0.12f;      // Height of the invisible frame (matches Taskbar)
-    private float _spacingMult = 0.145f;      // Spacing multiplier (matches Row 1 of Toolbar)
+    private float _frameHeight = 0.12f;
+    private float _spacingMult = 0.145f;
 
     // Buttons
     private GameObject _container;
-    private Button _playButton;
-    private Button _favouriteButton;
-    private Button _playlistButton;
-    private Image _favouriteIcon;
-    private TextMeshProUGUI _favouriteText;
+    private Button _openButton;
+    private Button _renameButton;
+    private Button _deleteButton;
     private TMP_FontAsset _font;
-    private bool _isFavourite = false;
 
     // Theme
     private Color _primaryColor;
@@ -47,7 +39,6 @@ public class RTTMediaActionBar : MonoBehaviour
 
     #region Properties
     public bool IsInitialized => _initialized;
-    public Image FavouriteIcon => _favouriteIcon;
     #endregion
 
     #region Lifecycle
@@ -85,36 +76,13 @@ public class RTTMediaActionBar : MonoBehaviour
         if (toolbar != null && toolbar.TaskbarHeight > 0)
         {
             _frameHeight = toolbar.TaskbarHeight;
-            // Align with Pagination (Row 1) gap = 0.145f (0.095f toolbar gap + 0.05f row offset)
-            _spacingMult = 0.2f; 
+            _spacingMult = 0.2f;
         }
 
         CreateButtons(font);
 
         _initialized = true;
-        Debug.Log($"[RTTMediaActionBar] Initialized, following: {_followTarget?.name}, frameHeight: {_frameHeight}, gapMult: {_spacingMult}");
-    }
-
-    /// <summary>
-    /// Update favourite button visual state.
-    /// </summary>
-    public void UpdateFavouriteState(bool isFavourite)
-    {
-        _isFavourite = isFavourite;
-
-        // Update icon
-        if (_favouriteIcon != null)
-        {
-            Sprite icon = Resources.Load<Sprite>(isFavourite ? "icon_remove_favorite" : "icon_add_favorite");
-            if (icon != null) _favouriteIcon.sprite = icon;
-            _favouriteIcon.color = isFavourite ? _accentColor : Color.white;
-        }
-
-        // Update text label
-        if (_favouriteText != null)
-        {
-            _favouriteText.text = isFavourite ? "Unfavorite" : "Favorite";
-        }
+        Debug.Log($"[RTTFileActionBar] Initialized, following: {_followTarget?.name}");
     }
 
     /// <summary>
@@ -125,6 +93,28 @@ public class RTTMediaActionBar : MonoBehaviour
         if (_container != null)
         {
             _container.SetActive(visible);
+        }
+    }
+
+    /// <summary>
+    /// Update button states based on selection.
+    /// </summary>
+    public void UpdateButtonStates(bool canOpen, bool canRename, bool canDelete)
+    {
+        SetButtonEnabled(_openButton, canOpen);
+        SetButtonEnabled(_renameButton, canRename);
+        SetButtonEnabled(_deleteButton, canDelete);
+    }
+
+    private void SetButtonEnabled(Button btn, bool enabled)
+    {
+        if (btn == null) return;
+        btn.interactable = enabled;
+
+        var cg = btn.GetComponent<CanvasGroup>();
+        if (cg != null)
+        {
+            cg.alpha = enabled ? 1f : 0.4f;
         }
     }
     #endregion
@@ -141,40 +131,41 @@ public class RTTMediaActionBar : MonoBehaviour
         canvas.renderMode = RenderMode.WorldSpace;
 
         // Button configuration
-        float buttonHeight = 67.5f;  // Visual height of buttons
+        float buttonHeight = 67.5f;
         float iconSize = 28f;
         float fontSize = 20;
-        float spacing = 8f;          
+        float spacing = 8f;
         float charWidth = 12f;
-        float sidePadding = 25f;     
-        float buttonSpacing = 15f;   
+        float sidePadding = 25f;
+        float buttonSpacing = 15f;
 
         // Button labels
-        string playLabel = "Play";
-        string favLabel = "Favorite";
-        string playlistLabel = "Playlist";
-
-        // Calculate base width for each button based on text length
-        float playBaseWidth = iconSize + spacing + (playLabel.Length * charWidth) + (sidePadding * 2);
-        float favBaseWidth = iconSize + spacing + (favLabel.Length * charWidth) + (sidePadding * 2);
-        float playlistBaseWidth = iconSize + spacing + (playlistLabel.Length * charWidth) + (sidePadding * 2);
-        float totalBaseWidth = playBaseWidth + favBaseWidth + playlistBaseWidth + (buttonSpacing * 2);
+        string openLabel = "Open";
+        string renameLabel = "Rename";
+        string deleteLabel = "Delete";
 
         // Canvas Setup
         float logicalPanelWidth = _panelWidth * 1000f;
         float canvasWidth = logicalPanelWidth;
         float canvasHeight = _frameHeight * 1000f;
 
+        // Calculate base widths based on text length
+        float openBaseWidth = iconSize + spacing + (openLabel.Length * charWidth) + (sidePadding * 2);
+        float renameBaseWidth = iconSize + spacing + (renameLabel.Length * charWidth) + (sidePadding * 2);
+        float deleteBaseWidth = iconSize + spacing + (deleteLabel.Length * charWidth) + (sidePadding * 2);
+        float totalBaseWidth = openBaseWidth + renameBaseWidth + deleteBaseWidth + (buttonSpacing * 2);
+
         // Scale buttons to fill panel width while keeping text-based proportions
-        float targetWidth = canvasWidth - (buttonSpacing * 2);
+        // Use same approach as RTTMediaActionBar - no side margin
+        float targetWidth = canvasWidth - (buttonSpacing * 2);  // Full width minus spacing between buttons
         float scale = targetWidth / totalBaseWidth;
 
-        float playWidth = playBaseWidth * scale;
-        float favWidth = favBaseWidth * scale;
-        float playlistWidth = playlistBaseWidth * scale;
+        float openWidth = openBaseWidth * scale;
+        float renameWidth = renameBaseWidth * scale;
+        float deleteWidth = deleteBaseWidth * scale;
 
         // Total width of buttons
-        float totalButtonsWidth = playWidth + favWidth + playlistWidth + (buttonSpacing * 2);
+        float totalButtonsWidth = openWidth + renameWidth + deleteWidth + (buttonSpacing * 2);
 
         RectTransform canvasRT = _container.GetComponent<RectTransform>();
         canvasRT.sizeDelta = new Vector2(canvasWidth, canvasHeight);
@@ -185,42 +176,43 @@ public class RTTMediaActionBar : MonoBehaviour
 
         float groupStartX = -totalButtonsWidth / 2f;
 
-        // Play Button (Cyan)
-        float playX = groupStartX + playWidth / 2f;
-        Sprite playIcon = Resources.Load<Sprite>("icon_play");
-        Color cyanColor = new Color(0f, 0.9f, 1f);  // Cyan
-        var playConfig = new VRButtonFactory.ButtonConfig
+        // Open Button (Cyan)
+        float openX = groupStartX + openWidth / 2f;
+        Sprite openIcon = Resources.Load<Sprite>("icon_open_file");
+        Color cyanColor = new Color(0f, 0.9f, 1f);
+        var openConfig = new VRButtonFactory.ButtonConfig
         {
-            label = playLabel,
-            icon = playIcon,
+            label = openLabel,
+            icon = openIcon,
             themeColor = cyanColor,
-            width = playWidth,
+            width = openWidth,
             height = buttonHeight,
             horizontalLayout = true,
             iconSize = iconSize,
             fontSize = (int)fontSize,
             font = font,
             spacing = spacing,
-            cornerRadius = 0.15f,    
-            borderWidth = 0.055f,    
+            cornerRadius = 0.15f,
+            borderWidth = 0.055f,
             glowWidth = 0.06f,
             glowIntensity = 3f,
             popAmount = 0.03f
         };
-        GameObject playBtn = VRButtonFactory.CreateButton(canvasRT, playConfig, () => OnPlayClicked?.Invoke());
-        PositionButton(playBtn, playX);
-        _playButton = playBtn.GetComponent<Button>();
+        GameObject openBtn = VRButtonFactory.CreateButton(canvasRT, openConfig, () => OnOpenClicked?.Invoke());
+        PositionButton(openBtn, openX);
+        _openButton = openBtn.GetComponent<Button>();
+        openBtn.AddComponent<CanvasGroup>();
 
-        // Favourite Button (Purple)
-        float favX = groupStartX + playWidth + buttonSpacing + favWidth / 2f;
-        Sprite favIcon = Resources.Load<Sprite>("icon_add_favorite");
-        Color purpleColor = new Color(0.76f, 0.36f, 1f);  // Purple
-        var favConfig = new VRButtonFactory.ButtonConfig
+        // Rename Button (Purple)
+        float renameX = groupStartX + openWidth + buttonSpacing + renameWidth / 2f;
+        Sprite renameIcon = Resources.Load<Sprite>("icon_rename");
+        Color purpleColor = new Color(0.76f, 0.36f, 1f);
+        var renameConfig = new VRButtonFactory.ButtonConfig
         {
-            label = favLabel,
-            icon = favIcon,
+            label = renameLabel,
+            icon = renameIcon,
             themeColor = purpleColor,
-            width = favWidth,
+            width = renameWidth,
             height = buttonHeight,
             horizontalLayout = true,
             iconSize = iconSize,
@@ -233,22 +225,21 @@ public class RTTMediaActionBar : MonoBehaviour
             glowIntensity = 3f,
             popAmount = 0.03f
         };
-        GameObject favBtn = VRButtonFactory.CreateButton(canvasRT, favConfig, () => OnFavouriteClicked?.Invoke());
-        PositionButton(favBtn, favX);
-        _favouriteButton = favBtn.GetComponent<Button>();
-        _favouriteIcon = favBtn.transform.Find("HitArea/Visuals/Content/Icon")?.GetComponent<Image>();
-        _favouriteText = favBtn.transform.Find("HitArea/Visuals/Content/Text")?.GetComponent<TextMeshProUGUI>();
+        GameObject renameBtn = VRButtonFactory.CreateButton(canvasRT, renameConfig, () => OnRenameClicked?.Invoke());
+        PositionButton(renameBtn, renameX);
+        _renameButton = renameBtn.GetComponent<Button>();
+        renameBtn.AddComponent<CanvasGroup>();
 
-        // Playlist Button (Deep Sea Blue)
-        float playlistX = groupStartX + playWidth + buttonSpacing + favWidth + buttonSpacing + playlistWidth / 2f;
-        Sprite playlistIcon = Resources.Load<Sprite>("icon_add_playlist");
-        Color deepSeaBlue = new Color(0f, 0.4f, 0.65f);  // Deep sea blue
-        var playlistConfig = new VRButtonFactory.ButtonConfig
+        // Delete Button (Deep Sea Blue)
+        float deleteX = groupStartX + openWidth + buttonSpacing + renameWidth + buttonSpacing + deleteWidth / 2f;
+        Sprite deleteIcon = Resources.Load<Sprite>("icon_trash");
+        Color deepSeaBlue = new Color(0f, 0.4f, 0.65f);
+        var deleteConfig = new VRButtonFactory.ButtonConfig
         {
-            label = playlistLabel,
-            icon = playlistIcon,
+            label = deleteLabel,
+            icon = deleteIcon,
             themeColor = deepSeaBlue,
-            width = playlistWidth,
+            width = deleteWidth,
             height = buttonHeight,
             horizontalLayout = true,
             iconSize = iconSize,
@@ -261,11 +252,12 @@ public class RTTMediaActionBar : MonoBehaviour
             glowIntensity = 3f,
             popAmount = 0.03f
         };
-        GameObject playlistBtn = VRButtonFactory.CreateButton(canvasRT, playlistConfig, () => OnPlaylistClicked?.Invoke());
-        PositionButton(playlistBtn, playlistX);
-        _playlistButton = playlistBtn.GetComponent<Button>();
+        GameObject deleteBtn = VRButtonFactory.CreateButton(canvasRT, deleteConfig, () => OnDeleteClicked?.Invoke());
+        PositionButton(deleteBtn, deleteX);
+        _deleteButton = deleteBtn.GetComponent<Button>();
+        deleteBtn.AddComponent<CanvasGroup>();
 
-        Debug.Log($"[RTTMediaActionBar] Buttons created - CanvasHeight: {canvasHeight}px (World: {_frameHeight}m)");
+        Debug.Log($"[RTTFileActionBar] Buttons created");
     }
 
     private void PositionButton(GameObject btn, float xOffset)
@@ -274,7 +266,6 @@ public class RTTMediaActionBar : MonoBehaviour
         rt.anchorMin = new Vector2(0.5f, 0.5f);
         rt.anchorMax = new Vector2(0.5f, 0.5f);
         rt.pivot = new Vector2(0.5f, 0.5f);
-        // Anchor y=0 puts it in vertical center of the canvas (frame)
         rt.anchoredPosition = new Vector2(xOffset, 0);
     }
 
@@ -289,25 +280,19 @@ public class RTTMediaActionBar : MonoBehaviour
 
         float targetHalfHeight = _targetHeight / 2f;
         float frameHalfHeight = _frameHeight / 2f;
-        
-        // Gap calculation matching RTTToolbar
+
         float gap = _frameHeight * _spacingMult;
 
-        // Step 1: Calculate top edge position E (below panel bottom)
         Vector3 targetBottom = targetCenter - targetUp * targetHalfHeight;
         Vector3 E = targetBottom - Vector3.up * gap;
 
-        // Step 2: Calculate vector from camera to E
         Vector3 toE = E - cameraPos;
         float distToE = toE.magnitude;
 
         float h = frameHalfHeight;
 
-        // Edge case: camera too close
         if (distToE < 0.001f || distToE < h)
         {
-            // Fallback: simple linear positioning
-            // Position is E moved down by half height
             transform.position = E - Vector3.up * h;
             Vector3 toCam = cameraPos - transform.position;
             if (toCam.sqrMagnitude > 0.001f)
@@ -317,17 +302,14 @@ public class RTTMediaActionBar : MonoBehaviour
             return;
         }
 
-        // Step 3: Calculate distance from camera to action bar center
         float rSq = distToE * distToE - h * h;
         if (rSq < 0.0001f) rSq = 0.0001f;
         float r = Mathf.Sqrt(rSq);
 
-        // Step 4: Calculate direction and angle adjustment
         float sinBeta = h / distToE;
         sinBeta = Mathf.Clamp(sinBeta, -1f, 1f);
         float beta = Mathf.Asin(sinBeta);
 
-        // Step 5: Calculate action bar center position
         Vector3 horizontalDir = new Vector3(toE.x, 0, toE.z);
         float horizontalDist = horizontalDir.magnitude;
 
@@ -347,7 +329,6 @@ public class RTTMediaActionBar : MonoBehaviour
 
         transform.position = cameraPos + horizontalDir * newHorizontalDist + Vector3.up * newVerticalDist;
 
-        // Step 6: Calculate rotation to face camera
         Vector3 toCamera = cameraPos - transform.position;
         if (toCamera.sqrMagnitude > 0.001f)
         {
@@ -358,20 +339,19 @@ public class RTTMediaActionBar : MonoBehaviour
 
     #region Static Factory
     /// <summary>
-    /// Create RTTMediaActionBar in VirtualObjects.
+    /// Create RTTFileActionBar in VirtualObjects.
     /// </summary>
-    public static RTTMediaActionBar Create(Transform followTarget, float targetHeight, float panelWidth, Color primaryColor, Color accentColor, TMP_FontAsset font)
+    public static RTTFileActionBar Create(Transform followTarget, float targetHeight, float panelWidth, Color primaryColor, Color accentColor, TMP_FontAsset font)
     {
-        GameObject barObj = new GameObject("RTTMediaActionBar");
+        GameObject barObj = new GameObject("RTTFileActionBar");
 
-        // Parent to VirtualObjects
         GameObject virtualObjects = GameObject.Find("VirtualObjects");
         if (virtualObjects != null)
         {
             barObj.transform.SetParent(virtualObjects.transform, false);
         }
 
-        RTTMediaActionBar actionBar = barObj.AddComponent<RTTMediaActionBar>();
+        RTTFileActionBar actionBar = barObj.AddComponent<RTTFileActionBar>();
         actionBar.Initialize(followTarget, targetHeight, panelWidth, primaryColor, accentColor, font);
 
         return actionBar;

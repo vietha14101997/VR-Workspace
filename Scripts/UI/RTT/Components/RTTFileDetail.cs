@@ -202,6 +202,46 @@ public class RTTFileDetail : MonoBehaviour
         Debug.Log($"[Detail] UpdateInfo: {file.Name} name={nameTime}ms preview={previewTime - nameTime}ms metadata={metadataTime - previewTime}ms total={metadataTime}ms");
     }
 
+    /// <summary>
+    /// Show empty/placeholder state (used when entering edit mode).
+    /// Clears the current file reference so next UpdateInfo will work properly.
+    /// </summary>
+    public void ShowEmpty()
+    {
+        // Clear current file reference
+        _currentFile = default;
+
+        // Clear file name
+        if (_nameMarquee != null)
+        {
+            _nameMarquee.SetText("");
+        }
+        else if (_nameText != null)
+        {
+            _nameText.text = "";
+        }
+
+        // Hide preview
+        if (_previewImage != null)
+        {
+            _previewImage.gameObject.SetActive(false);
+        }
+        if (_previewPlaceholder != null)
+        {
+            _previewPlaceholder.gameObject.SetActive(false);
+        }
+
+        // Clear metadata
+        if (_metadataContainer != null)
+        {
+            foreach (Transform child in _metadataContainer)
+            {
+                Destroy(child.gameObject);
+            }
+            _metadataValueMarquees.Clear();
+        }
+    }
+
     private void UpdatePreview(MockFile file)
     {
         if (_previewImage == null || _previewPlaceholder == null) return;

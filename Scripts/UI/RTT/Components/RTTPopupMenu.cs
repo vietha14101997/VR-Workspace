@@ -96,6 +96,7 @@ public class RTTPopupMenu : MonoBehaviour
         public string title;
         public List<ButtonData> buttons;
         public int columns;
+        public bool centerTitle;
     }
 
     #endregion
@@ -282,14 +283,15 @@ public class RTTPopupMenu : MonoBehaviour
     /// <summary>
     /// Add a Section Block (Type 1): Title + Grid of buttons
     /// </summary>
-    public RTTPopupMenu AddSectionBlock(string title, List<ButtonData> buttons, int columns = 2)
+    public RTTPopupMenu AddSectionBlock(string title, List<ButtonData> buttons, int columns = 2, bool centerTitle = false)
     {
         _sections.Add(new PopupSection
         {
             type = PopupSectionType.SectionBlock,
             title = title,
             buttons = buttons,
-            columns = columns
+            columns = columns,
+            centerTitle = centerTitle
         });
         return this;
     }
@@ -1089,7 +1091,7 @@ public class RTTPopupMenu : MonoBehaviour
         // Only create label if title is not empty
         if (hasTitle)
         {
-            CreateSectionLabel(sectionObj.transform, section.title);
+            CreateSectionLabel(sectionObj.transform, section.title, section.centerTitle);
         }
 
         GameObject gridObj = new GameObject("Grid_" + section.title);
@@ -1151,7 +1153,7 @@ public class RTTPopupMenu : MonoBehaviour
         spacerLE.preferredHeight = spacerHeight;
     }
 
-    private void CreateSectionLabel(Transform parent, string text)
+    private void CreateSectionLabel(Transform parent, string text, bool centerTitle = false)
     {
         GameObject labelObj = new GameObject("Label_" + text);
         labelObj.transform.SetParent(parent, false);
@@ -1164,8 +1166,8 @@ public class RTTPopupMenu : MonoBehaviour
         label.font = _config.font;
         label.color = Color.white;
         label.fontStyle = FontStyles.Bold;
-        // Left align labels to match button alignment
-        label.alignment = TextAlignmentOptions.MidlineLeft;
+        // Center or left align based on parameter
+        label.alignment = centerTitle ? TextAlignmentOptions.Center : TextAlignmentOptions.MidlineLeft;
         // No extra left margin since VLG already has padding - align with buttons
         float leftMargin = 0f;
         float rightMargin = 0f;

@@ -28,6 +28,9 @@ public class RTTFileList : MonoBehaviour
     // Data
     private List<MockFile> _allFiles = new List<MockFile>();
 
+    // Item Selection State (non-edit mode visual selection)
+    private string _selectedFilePath = "";
+
     // Pool of reusable items
     private List<RTTFileListItem> _itemPool = new List<RTTFileListItem>();
     private Dictionary<int, RTTFileListItem> _visibleItems = new Dictionary<int, RTTFileListItem>();
@@ -391,6 +394,9 @@ public class RTTFileList : MonoBehaviour
     {
         _allFiles = files ?? new List<MockFile>();
 
+        // Store selected path for item selection
+        _selectedFilePath = selectedPath ?? "";
+
         // Hide all visible items and cancel their thumbnail requests
         foreach (var kvp in _visibleItems)
         {
@@ -410,6 +416,62 @@ public class RTTFileList : MonoBehaviour
 
         // Render visible items
         UpdateVisibleItems();
+    }
+
+    /// <summary>
+    /// Select a file visually (non-edit mode).
+    /// The selected item will have forced hover effects and won't respond to hover/click.
+    /// In edit mode, visual selection is disabled.
+    /// </summary>
+    public void SelectFile(string path)
+    {
+        string previousPath = _selectedFilePath;
+        _selectedFilePath = path ?? "";
+
+        // In edit mode or clipboard mode, don't apply visual selection effect
+        if (_isEditMode || _isClipboardMode) return;
+
+        // Update previous selected item (if visible)
+        if (!string.IsNullOrEmpty(previousPath))
+        {
+            foreach (var kvp in _visibleItems)
+            {
+                if (kvp.Value.FilePath == previousPath)
+                {
+                    kvp.Value.SetItemSelected(false);
+                    break;
+                }
+            }
+        }
+
+        // Update new selected item (if visible)
+        if (!string.IsNullOrEmpty(_selectedFilePath))
+        {
+            foreach (var kvp in _visibleItems)
+            {
+                if (kvp.Value.FilePath == _selectedFilePath)
+                {
+                    kvp.Value.SetItemSelected(true);
+                    break;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Clear file selection (non-edit mode).
+    /// </summary>
+    public void ClearFileSelection()
+    {
+        SelectFile("");
+    }
+
+    /// <summary>
+    /// Get the currently selected file path.
+    /// </summary>
+    public string GetSelectedFilePath()
+    {
+        return _selectedFilePath;
     }
 
     private void UpdateContentSize()
@@ -496,9 +558,13 @@ public class RTTFileList : MonoBehaviour
 
         item.Bind(file);
 
-        // Restore edit mode and selection state
+        // Restore edit mode and checkbox selection state
         item.SetEditMode(_isEditMode);
         item.SetSelected(_selectedPaths.Contains(file.Path));
+
+        // Restore item selection state (non-edit mode visual selection)
+        bool isItemSelected = !string.IsNullOrEmpty(_selectedFilePath) && _selectedFilePath == file.Path;
+        item.SetItemSelected(isItemSelected);
 
         item.gameObject.SetActive(true);
     }
@@ -609,6 +675,7 @@ public class RTTFileList : MonoBehaviour
 
     #region Edit Mode
     private bool _isEditMode = false;
+    private bool _isClipboardMode = false;
     private HashSet<string> _selectedPaths = new HashSet<string>();
     private Action _onSelectionChanged;
 
@@ -621,16 +688,77 @@ public class RTTFileList : MonoBehaviour
     {
         _isEditMode = editMode;
 
+        // When entering edit mode, clear visual selection (but keep _selectedFilePath for later)
+        if (editMode && !string.IsNullOrEmpty(_selectedFilePath))
+        {
+            foreach (var kvp in _visibleItems)
+            {
+                if (kvp.Value.FilePath == _selectedFilePath)
+                {
+                    kvp.Value.SetItemSelected(false);
+                    break;
+                }
+            }
+        }
+
         // Update all pooled items
         foreach (var item in _itemPool)
         {
             item.SetEditMode(editMode);
         }
 
-        // Clear selection when exiting edit mode
+        // Clear checkbox selection when exiting edit mode
         if (!editMode)
         {
             _selectedPaths.Clear();
+
+            // Restore visual selection if there was one (only if not in clipboard mode)
+            if (!_isClipboardMode && !string.IsNullOrEmpty(_selectedFilePath))
+            {
+                foreach (var kvp in _visibleItems)
+                {
+                    if (kvp.Value.FilePath == _selectedFilePath)
+                    {
+                        kvp.Value.SetItemSelected(true);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Set clipboard mode state.
+    /// In clipboard mode, visual selection is disabled (similar to edit mode).
+    /// </summary>
+    public void SetClipboardMode(bool clipboardMode)
+    {
+        _isClipboardMode = clipboardMode;
+
+        // When entering clipboard mode, clear visual selection (but keep _selectedFilePath for later)
+        if (clipboardMode && !string.IsNullOrEmpty(_selectedFilePath))
+        {
+            foreach (var kvp in _visibleItems)
+            {
+                if (kvp.Value.FilePath == _selectedFilePath)
+                {
+                    kvp.Value.SetItemSelected(false);
+                    break;
+                }
+            }
+        }
+
+        // When exiting clipboard mode, restore visual selection if there was one (only if not in edit mode)
+        if (!clipboardMode && !_isEditMode && !string.IsNullOrEmpty(_selectedFilePath))
+        {
+            foreach (var kvp in _visibleItems)
+            {
+                if (kvp.Value.FilePath == _selectedFilePath)
+                {
+                    kvp.Value.SetItemSelected(true);
+                    break;
+                }
+            }
         }
     }
 
