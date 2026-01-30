@@ -1,180 +1,258 @@
-Please initialize Cardboard XR loader before calling this function.
-UnityEngine.Debug:LogError (object)
-Google.XR.Cardboard.Api:UpdateScreenParams () (at ./Library/PackageCache/com.google.xr.cardboard@e91752ce4c/Runtime/Api.cs:317)
-CardboardStartup:Update () (at Assets/Samples/Google Cardboard XR Plugin for Unity/1.30.0/Hello Cardboard/Scripts/CardboardStartup.cs:70)
+[MainThreadDispatcher] Initialized on thread 1
 
-[Detail] UpdateInfo: zlapi-extension name=1ms preview=0ms metadata=3ms total=4ms
+[APBootstrap] AndroidStreamingHelper initialized
 
-[Controller] NavigateToInternal: path='C:\Users\Admin\Downloads\zlapi-extension', restorePage=False, clickedFolder='C:\Users\Admin\Downloads\zlapi-extension'
+[APBootstrap] AppPermissionManager initialized
 
-[Controller] Current state: _currentPath='C:\Users\Admin\Downloads', _currentPage=3, _pageSize=8
+Starting camera passthrough
 
-[Controller] Clicked folder index in list: 17
+Found 1 camera devices
 
-[Controller] SAVED: _itemIndexHistory['C:\Users\Admin\Downloads'] = 17
+Camera 0: Twitch Virtual Cam (front facing: True)
 
-[FileSystemService] Reading directory: C:\Users\Admin\Downloads\zlapi-extension
+Starting webcam texture: Twitch Virtual Cam at 1280x720
 
-[FileSystemService] Raw file count from Directory.GetFiles: 3
+[AndroidHelper] App resumed
 
-[FileSystemService] Checking file: background.js, Attributes: Archive
+[RTTMenu] Created main frame
 
-[FileSystemService] ADDED file: background.js
+[RTTBootstrapper] Created RTTMenu with RTTMenuFrame_main
 
-[FileSystemService] Checking file: manifest.json, Attributes: Archive
+[RTTBootstrapper] RTTMenu oriented towards camera
 
-[FileSystemService] ADDED file: manifest.json
+[RTTToolbar] Created
 
-[FileSystemService] Checking file: popup.html, Attributes: Archive
+[RTTTaskbar] Icons loaded - Quit:True, Settings:True, Eye:True, EyeClose:True, Recenter:True, Home:True
 
-[FileSystemService] ADDED file: popup.html
+[RTTToolbar] Initialized with taskbar. Size: 0.913x0.331m, followTarget: RTTMenu
 
-[FileSystemService] Found 7 items (4 folders, 3 files)
+[RTTBootstrapper] Created RTTTaskbar in RTTToolbar, following RTTMenu
 
-[Controller] restorePage=false, reset to page 1
+[RTTBootstrapper] RTTManager found, UI will be auto-detected
 
-[Controller] CalculateTotalPages: totalFiles=7, pageSize=8, totalPages=1
+[VirtualObjectsZoomController] Configured: min=1m, max=2m, default=1.8m, step=0.1m
 
-[RTTFileGrid] GetVisibleRowsForPagination: height=748.1688, availableHeight=728.1688, rowHeight=350, rowsFloat=2.080482, visibleRows=2
+[VirtualObjectsZoomController] Initialized. Already at default distance: 1.80m
 
-[Detail] UpdateInfo: zlapi-extension name=0ms preview=0ms metadata=2ms total=2ms
+[RTTBootstrapper] Created VirtualObjectsZoomController (range: 1m - 2m, default: 1.8m)
 
-[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\Downloads\zlapi-extension, container null: False, instance: -467462
+[RTTBootstrapper] Initialization complete
 
-[Controller] CanCreateFolderHere called, _currentPath: 'C:\Users\Admin\Downloads\zlapi-extension'
+[RTTRaycastManager] Auto-initialized layer mask to VirtualObjects (layer 3)
 
-[FileSystemService] CanCreateFolderInPath called with path: 'C:\Users\Admin\Downloads\zlapi-extension'
+[RTTMenuFrame] UI built: 1920x1080 logical pixels
 
-[FileSystemService] absolutePath: 'C:\Users\Admin\Downloads\zlapi-extension'
+[RTTMiniFrame] UI built: 1095.5x128 pixels
 
-[FileSystemService] Comparing normalizedAbsolute: 'C:\Users\Admin\Downloads\zlapi-extension' with normalizedRoot: 'C:\Users\Admin'
+[RTTMainMenuController] Icons loaded - Remote:True, Browser:True, Media:True, Files:False
 
-[FileSystemService] isDeviceRoot: False
+[HoverEffectController] AddEffect 'glow_border' to HitArea, TargetVisuals=Visuals
 
-[FileSystemService] Write permission OK for: C:\Users\Admin\Downloads\zlapi-extension
+[GlowBorderHoverEffect] Initialized successfully on HitArea, material=Custom/GlowingElementBorder
 
-[Controller] CanCreateFolderHere result: True
+[HoverEffectController] AddEffect 'background' to HitArea, TargetVisuals=Visuals
 
-[RTTFileManager] UpdateNewFolderButtonState: canCreate=True
+[HoverEffectController] AddEffect 'scale' to HitArea, TargetVisuals=Visuals
 
-[RTTFileManager] BoxCollider.enabled set to True
+[HoverEffectController] AddEffect 'z_pop' to HitArea, TargetVisuals=Visuals
 
-[RTTFileManager] New Folder button ENABLED - alpha=1
+[RTTMainMenu] Built 6 items in 3x2 grid
 
-[RTTFileManager] Created 2 breadcrumbs for path: C:\Users\Admin\Downloads\zlapi-extension
+[RTTMainMenuController] Main Menu created (useRegistry=True, itemCount=6)
 
-[Detail] UpdateInfo: fonts name=0ms preview=0ms metadata=2ms total=2ms
+[RTTManager] Main Menu initialized (persistent, cannot be closed)
 
-[Detail] UpdateInfo: manifest.json name=0ms preview=0ms metadata=3ms total=3ms
+Restarting webcam texture as it was not playing
 
-[Controller] Selected: C:\Users\Admin\Downloads\zlapi-extension\manifest.json
+Stopping camera passthrough
 
-[Detail] UpdateInfo: images name=0ms preview=0ms metadata=2ms total=2ms
+Destroying webcam texture
 
-[RTTFileManager] ToggleEditMode CALLED - _isEditMode before: False
+Webcam texture was destroyed during initialization
+UnityEngine.Debug:LogWarning (object)
+CameraPassthrough/<EnsureTextureStarted>d__11:MoveNext () (at Assets/VR-Workspace/Scripts/Camera/CameraPassthrough.cs:171)
+UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
-[RTTFileManager] ToggleEditMode - _isEditMode after toggle: True
+[RTTManager] Instant recenter: moved 2 objects to face camera
 
-[RTTFileManager] ToggleEditMode - _editControlsContainer: EditControls (ID:-470036), _breadcrumbContainer: Breadcrumbs
+[VirtualObjectsZoomController] Recenter: distance recalculated to 1.80m
 
-[RTTFileManager] EditControls activeSelf before: False, after: True, expected: True
+[RTTManager] Auto-recenter completed
 
-[RTTFileManager] EditControls SetActive(True) called, now activeSelf: True, activeInHierarchy: True
+[RTTMenu] Created app frame: media
 
-[RTTFileManager] Parent: Row2, activeSelf: True
+[RTTManager] Preparing app: media in slot 1
 
-[RTTFileManager] Parent: Header, activeSelf: True
+[RTTManager] Creating Media content...
 
-[RTTFileManager] Parent: ContentContainer, activeSelf: True
+[VRVideoProjectionSystem] Created FlatProjectionRenderer
 
-[RTTFileManager] Parent: Canvas_RTTMenuFrame, activeSelf: True
+[VRVideoProjectionSystem] Initialized
 
-[RTTFileManager] Parent: UICamera_RTTMenuFrame, activeSelf: True
+[MediaLibraryService] Loading 1307 items from cache...
 
-[RTTFileManager] Parent: RTTMenuFrame_folder, activeSelf: True
+[MediaLibraryService] Loaded 1307 items from cache (0 missing files)
 
-[RTTFileManager] Parent: RTTMenu, activeSelf: True
+[VirtualObjectsZoomController] Registered side panel: MediaNavigationPanel (side=-1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
-[RTTFileManager] Parent: VirtualObjects, activeSelf: True
+[RTTMenuFrame] UI built: 640x1080 logical pixels
 
-[RTTFileManager] Parent: AppRoot, activeSelf: True
+[HoverEffectController] AddEffect 'scale' to Item_all, TargetVisuals=Item_all
 
-[RTTFileManager] EditControls child count: 5
+[HoverEffectController] AddEffect 'color' to Item_all, TargetVisuals=Item_all
 
-[RTTFileManager] EditControls child[0]: SelectAllContainer, active: True, pos: (20.00, 0.00)
+[HoverEffectController] AddEffect 'scale' to Item_videos, TargetVisuals=Item_videos
 
-[RTTFileManager] EditControls child[1]: Btn_Rename, active: True, pos: (-435.00, 0.00)
+[HoverEffectController] AddEffect 'color' to Item_videos, TargetVisuals=Item_videos
 
-[RTTFileManager] EditControls child[2]: Btn_Copy, active: True, pos: (-198.00, 0.00)
+[HoverEffectController] AddEffect 'scale' to Item_images, TargetVisuals=Item_images
 
-[RTTFileManager] EditControls child[3]: Btn_Move, active: True, pos: (-19.00, 0.00)
+[HoverEffectController] AddEffect 'color' to Item_images, TargetVisuals=Item_images
 
-[RTTFileManager] EditControls child[4]: Btn_Delete, active: True, pos: (160.00, 0.00)
+[HoverEffectController] AddEffect 'scale' to Item_audio, TargetVisuals=Item_audio
 
-[Detail] UpdateInfo: zlapi-extension name=1ms preview=0ms metadata=2ms total=3ms
+[HoverEffectController] AddEffect 'color' to Item_audio, TargetVisuals=Item_audio
 
-[RTTFileManager] Edit Mode: True
+[HoverEffectController] AddEffect 'scale' to Item_recent, TargetVisuals=Item_recent
 
-[Detail] UpdateInfo: popup.html name=0ms preview=0ms metadata=3ms total=3ms
+[HoverEffectController] AddEffect 'color' to Item_recent, TargetVisuals=Item_recent
 
-[RTTFileManager] Copy clicked - selected items: 1
+[HoverEffectController] AddEffect 'scale' to Item_favorites, TargetVisuals=Item_favorites
 
-[RTTFileManager] ToggleEditMode CALLED - _isEditMode before: True
+[HoverEffectController] AddEffect 'color' to Item_favorites, TargetVisuals=Item_favorites
 
-[RTTFileManager] ToggleEditMode - _isEditMode after toggle: False
+[HoverEffectController] AddEffect 'scale' to Item_playlists, TargetVisuals=Item_playlists
 
-[RTTFileManager] EditControls activeSelf before: True, after: False, expected: False
+[HoverEffectController] AddEffect 'color' to Item_playlists, TargetVisuals=Item_playlists
 
-[RTTFileManager] EditControls SetActive(False) called, now activeSelf: False, activeInHierarchy: False
+[RTTMediaLibrary] Left panel content created
 
-[Controller] Selected: C:\Users\Admin\Downloads\zlapi-extension
+[VirtualObjectsZoomController] Registered side panel: MediaDetailPanel (side=1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
-NullReferenceException: Object reference not set to an instance of an object
-RTTFileDetail.CreateMetadataForOther (MockFile file) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:508)
-RTTFileDetail.UpdateMetadata (MockFile file, System.Boolean isCurrentFolder) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:355)
-RTTFileDetail.UpdateInfo (MockFile file, System.Boolean isCurrentFolder) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:198)
-RTTFileManager.UpdateDetail (MockFile file, System.Boolean isCurrentFolder) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:3474)
-RTTFileManagerController.UpdateDetailView () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:581)
-RTTFileManagerController.SelectFile (System.String path) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:544)
-RTTFileManager.ToggleEditMode () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:1490)
-RTTFileManager.EnterClipboardMode (RTTFileManager+ClipboardOperation operation, System.Collections.Generic.HashSet`1[T] items) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:1754)
-RTTFileManager.OnCopyClicked () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:1671)
-UnityEngine.Events.InvokableCall.Invoke () (at <37cc348edc804f4cb176b63962c716e7>:0)
-UnityEngine.Events.UnityEvent.Invoke () (at <37cc348edc804f4cb176b63962c716e7>:0)
-UnityEngine.UI.Button.Press () (at ./Library/PackageCache/com.unity.ugui@1.0.0/Runtime/UI/Core/Button.cs:70)
-UnityEngine.UI.Button.OnPointerClick (UnityEngine.EventSystems.PointerEventData eventData) (at ./Library/PackageCache/com.unity.ugui@1.0.0/Runtime/UI/Core/Button.cs:114)
-UnityEngine.EventSystems.ExecuteEvents.Execute (UnityEngine.EventSystems.IPointerClickHandler handler, UnityEngine.EventSystems.BaseEventData eventData) (at ./Library/PackageCache/com.unity.ugui@1.0.0/Runtime/EventSystem/ExecuteEvents.cs:57)
-UnityEngine.EventSystems.ExecuteEvents.Execute[T] (UnityEngine.GameObject target, UnityEngine.EventSystems.BaseEventData eventData, UnityEngine.EventSystems.ExecuteEvents+EventFunction`1[T1] functor) (at ./Library/PackageCache/com.unity.ugui@1.0.0/Runtime/EventSystem/ExecuteEvents.cs:272)
-UnityEngine.EventSystems.ExecuteEvents:Execute(GameObject, BaseEventData, EventFunction`1)
-RTTRaycastManager:SendClick() (at Assets/VR-Workspace/Scripts/UI/RTT/Input/RTTRaycastManager.cs:339)
-VRGazeReticle:SendRTTClickAndLock(GameObject) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:582)
-VRGazeReticle:ProcessDwellClickRTT(Vector3) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:836)
-VRGazeReticle:CheckGaze() (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:474)
-VRGazeReticle:Update() (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:314)
+[RTTMediaActionBar] Buttons created - CanvasHeight: 106.6667px (World: 0.1066667m)
 
-[Detail] UpdateInfo: css name=0ms preview=0ms metadata=5ms total=5ms
+[RTTMediaActionBar] Initialized, following: MediaDetailPanel, frameHeight: 0.1066667, gapMult: 0.2
 
-NullReferenceException: Object reference not set to an instance of an object
-RTTFileDetail.CreateMetadataForOther (MockFile file) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:508)
-RTTFileDetail.UpdateMetadata (MockFile file, System.Boolean isCurrentFolder) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:355)
-RTTFileDetail.UpdateInfo (MockFile file, System.Boolean isCurrentFolder) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:198)
-RTTFileManager.UpdateDetail (MockFile file, System.Boolean isCurrentFolder) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:3474)
-RTTFileManagerController.UpdateDetailView () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:581)
-RTTFileManagerController.UnhoverFile (System.String path) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:567)
-RTTFileManager.<CreateCenterGrid>b__77_1 (System.String path) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:404)
-RTTFileGridItem.OnPointerExit (UnityEngine.EventSystems.PointerEventData eventData) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileGridItem.cs:440)
-UnityEngine.EventSystems.ExecuteEvents.Execute (UnityEngine.EventSystems.IPointerExitHandler handler, UnityEngine.EventSystems.BaseEventData eventData) (at ./Library/PackageCache/com.unity.ugui@1.0.0/Runtime/EventSystem/ExecuteEvents.cs:36)
-UnityEngine.EventSystems.ExecuteEvents.Execute[T] (UnityEngine.GameObject target, UnityEngine.EventSystems.BaseEventData eventData, UnityEngine.EventSystems.ExecuteEvents+EventFunction`1[T1] functor) (at ./Library/PackageCache/com.unity.ugui@1.0.0/Runtime/EventSystem/ExecuteEvents.cs:272)
-UnityEngine.EventSystems.EventSystem:Update() (at ./Library/PackageCache/com.unity.ugui@1.0.0/Runtime/EventSystem/EventSystem.cs:530)
+[RTTMediaLibrary] Right panel content created with RTTFileDetail
 
-[Detail] UpdateInfo: css name=0ms preview=0ms metadata=2ms total=2ms
+[RTTPopupMenu] CreateWorldSpace: layer 'VirtualObjects' = 3, mainCam: VRCamera
 
-Destroying assets is not permitted to avoid data loss.
-If you really want to remove an asset use DestroyImmediate (theObject, true);
-UnityEngine.Object:Destroy (UnityEngine.Object)
-VRWorkspace.UI.HoverEffects.CursorChangeHoverEffect:Cleanup () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Effects/CursorChangeHoverEffect.cs:118)
-VRWorkspace.UI.HoverEffects.HoverEffectController:CleanupEffects () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Core/HoverEffectController.cs:311)
-VRWorkspace.UI.HoverEffects.HoverEffectController:OnDestroy () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Core/HoverEffectController.cs:318)
+[RTTPopupMenu] Created world-space popup
 
-[RTTManager] Closed app: folder
+[HoverEffectController] AddEffect 'cursor_change' to HitArea, TargetVisuals=Visuals
+
+[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-1100246
+
+[HoverEffectController] AddEffect 'scale' to Btn_Rename, TargetVisuals=Btn_Rename
+
+[HoverEffectController] AddEffect 'scale' to Btn_Delete, TargetVisuals=Btn_Delete
+
+[RTTMediaLibrary] After CreateHeaderRows: _headerRT=True, _breadcrumbContainer=True
+
+[HoverEffectController] AddEffect 'scale' to PooledItem, TargetVisuals=PooledItem
+
+[HoverEffectController] AddEffect 'scale' to Checkbox, TargetVisuals=Checkbox
+
+[RTTMediaLibrary] Creating 2 breadcrumb segments for: All Media > Videos
+
+[RTTMediaLibrary] Created 2 breadcrumb pills for path: All Media > Videos
+
+[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (115KB)
+
+[Cache] DISK DECODE: 3ms (512x267)
+
+[RTTMediaGrid] Auto-selecting first item: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51
+
+[RTTMediaLibrary] OnGridVideoSelected: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51, _isEditMode=False, _mediaActionBar=exists
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4
+
+[Detail] REQUEST: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4
+
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4
+
+[Cache] DISK READ: 0ms (100KB)
+
+[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4 wait=18ms assign=0ms
+
+[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4 name=0ms preview=19ms metadata=9ms total=28ms
+
+[RTTMediaLibrary] Center grid created
+
+[VRMediaAppController] Library UI built
+
+[VRMediaAppController] Media app created
+
+[RTTMediaActionBar] FollowTarget too far! cam=(0.00, 0.00, 0.00), target=(1.15, 1000.00, 1.60), dist=1000.002m. Waiting for valid position...
+UnityEngine.Debug:LogWarning (object)
+RTTMediaActionBar:UpdateSpherePosition () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaActionBar.cs:605)
+RTTMediaActionBar:LateUpdate () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaActionBar.cs:90)
+
+[RTTMediaActionBar] Initial state - Pos: (0.00, 0.00, 1.80), FollowTarget: (1.15, 1000.00, 1.60), Alpha: 0, Layer: 3
+
+[RTTMediaGridItem] Duration badge for 'videoplayback': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (206KB)
+
+[Cache] DISK DECODE: 3ms (512x288)
+
+First video frame not zero: 2 (0.066667s). Result may be out of sync. Please make sure tracks all start at 0 in C:\Users\Admin\Downloads\videoplayback.mp4
+
+[RTTMediaLibrary] InitializePageSizeDeferred: itemsPerPage=8
+
+[RTTMediaGridItem] Duration badge for 'Genshin-Impact 2026-1-26 12-24-11': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (199KB)
+
+[Cache] DISK DECODE: 5ms (512x288)
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\Genshin-Impact 2026-1-26 12-24-11.mp4
+
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\Genshin-Impact 2026-1-26 12-24-11.mp4
+
+[RTTMediaActionBar] ShowImmediate: position not valid, queued for later
+
+[RTTMediaLibrary] Media action bar shown after delay
+
+[RTTMediaGridItem] Duration badge for 'video_client': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (117KB)
+
+[Cache] DISK DECODE: 3ms (512x230)
+
+[RTTMediaGridItem] Duration badge for 'Phàm Nhân Tu Tiên Tập 173 Vietsub': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (122KB)
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Video\Phàm Nhân Tu Tiên Tập 173 Vietsub.mp4
+
+[RTTMediaGridItem] Duration badge for '7295785205012': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (120KB)
+
+[Cache] DISK DECODE: 2ms (512x230)
+
+[RTTManager] App media prepared
+
+[RTTMediaActionBar] FollowTarget now valid: (1.15, 0.00, 1.60), dist=1.97266m
+
+[RTTMediaActionBar] DoShowImmediate: alpha=1, active=true
+
+[RTTTaskbar] RegisterApp called - slotIndex=1, icon=icon_media
+
+[RTTTaskbar] SetSlotIcon - slot=AppBtn_AppSlot_1, icon=icon_media, slotIndex=1
+
+[RTTTaskbar] SetSlotIcon - removed 0 old children
+
+[RTTTaskbar] SetSlotIcon - created iconBtn=Btn_icon_media, slot.childCount now=1
+
+[RTTTaskbar] Registered app slot 1, total apps: 1
+
+[RTTTaskbar] SelectSlot(1) called, current active: 0
+
+[RTTTaskbar] Selected app with slot index 1
+
+[RTTTaskbar] SelectSlot(1) called, current active: 1
 

@@ -217,7 +217,11 @@ public class RTTFileManager : MonoBehaviour
         if (_progressPopup != null) Destroy(_progressPopup.gameObject);
         _progressPopup = null;
 
-        if (_fileActionBar != null) Destroy(_fileActionBar.gameObject);
+        if (_fileActionBar != null)
+        {
+            _fileActionBar.HideImmediate();
+            Destroy(_fileActionBar.gameObject);
+        }
         _fileActionBar = null;
 
         // Cancel any ongoing operation
@@ -243,6 +247,9 @@ public class RTTFileManager : MonoBehaviour
         if (_leftFrame != null) _leftFrame.gameObject.SetActive(false);
         if (_rightFrame != null) _rightFrame.gameObject.SetActive(false);
         if (_pagination != null) _pagination.Hide();
+
+        // Hide action bar immediately when switching apps
+        if (_fileActionBar != null) _fileActionBar.HideImmediate();
 
         // Hide world-space popup
         if (_viewOptionsPopup != null) _viewOptionsPopup.Hide();

@@ -108,6 +108,12 @@ public class RTTFilePagination : RTTCanvasBase
 
     public new void Show()
     {
+        // Skip if already fully visible
+        if (gameObject.activeSelf && GetQuadAlpha() >= 0.95f)
+        {
+            return;
+        }
+
         // Cancel any pending fade
         if (_fadeCoroutine != null)
         {

@@ -441,6 +441,8 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
             var firstVideo = _filteredVideos[0];
             _view.Grid.SelectVideo(firstVideo);
             SelectVideo(firstVideo);
+            // Notify view so it can show action bar
+            _view.NotifyVideoAutoSelected(firstVideo);
         }
     }
 
@@ -459,6 +461,8 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
             {
                 _view?.Grid?.SelectVideo(video);
                 SelectVideo(video);
+                // Notify view so it can show action bar
+                _view?.NotifyVideoAutoSelected(video);
                 return;
             }
         }

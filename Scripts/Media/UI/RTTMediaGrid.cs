@@ -313,6 +313,14 @@ public class RTTMediaGrid : MonoBehaviour
 
         // Initialize sticky header
         UpdateStickyHeader();
+
+        // Auto-select first item if there are videos and no current selection
+        // This fires OnVideoSelected event which shows the action bar
+        if (_allVideos.Count > 0 && !_isEditMode)
+        {
+            Debug.Log($"[RTTMediaGrid] Auto-selecting first item: {_allVideos[0].Title}");
+            SelectVideo(_allVideos[0]);
+        }
     }
 
     public void SelectVideo(MediaVideoInfo video)

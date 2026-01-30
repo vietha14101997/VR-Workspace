@@ -155,16 +155,40 @@ public class RTTMediaLibrary : MonoBehaviour
             if (_rightFrame != null) zoomController.UnregisterSidePanel(_rightFrame);
         }
 
-        if (_leftFrame != null) Destroy(_leftFrame.gameObject);
-        if (_rightFrame != null) Destroy(_rightFrame.gameObject);
-        if (_pagination != null) Destroy(_pagination.gameObject);
-        if (_mediaActionBar != null) Destroy(_mediaActionBar.gameObject);
+        if (_leftFrame != null)
+        {
+            Destroy(_leftFrame.gameObject);
+            _leftFrame = null;
+        }
+        if (_rightFrame != null)
+        {
+            Destroy(_rightFrame.gameObject);
+            _rightFrame = null;
+        }
+        if (_pagination != null)
+        {
+            Destroy(_pagination.gameObject);
+            _pagination = null;
+        }
+        if (_mediaActionBar != null)
+        {
+            Debug.Log("[RTTMediaLibrary] Cleanup: Destroying _mediaActionBar");
+            _mediaActionBar.HideImmediate();
+            Destroy(_mediaActionBar.gameObject);
+            _mediaActionBar = null;
+        }
 
-        if (_viewOptionsPopup != null) Destroy(_viewOptionsPopup.gameObject);
-        _viewOptionsPopup = null;
+        if (_viewOptionsPopup != null)
+        {
+            Destroy(_viewOptionsPopup.gameObject);
+            _viewOptionsPopup = null;
+        }
 
-        if (_groupOptionsPopup != null) Destroy(_groupOptionsPopup.gameObject);
-        _groupOptionsPopup = null;
+        if (_groupOptionsPopup != null)
+        {
+            Destroy(_groupOptionsPopup.gameObject);
+            _groupOptionsPopup = null;
+        }
     }
 
     private void OnEnable()
@@ -174,13 +198,25 @@ public class RTTMediaLibrary : MonoBehaviour
         if (_leftFrame != null) _leftFrame.gameObject.SetActive(true);
         if (_rightFrame != null) _rightFrame.gameObject.SetActive(true);
         if (_pagination != null) _pagination.Show();
+
+        // Show action bar when app is re-opened (if not in edit mode)
+        if (_mediaActionBar != null && !_isEditMode)
+        {
+            Invoke(nameof(ShowActionBarAfterDelay), 0.15f);
+        }
     }
 
     private void OnDisable()
     {
+        // Cancel any pending show
+        CancelInvoke(nameof(ShowActionBarAfterDelay));
+
         if (_leftFrame != null) _leftFrame.gameObject.SetActive(false);
         if (_rightFrame != null) _rightFrame.gameObject.SetActive(false);
         if (_pagination != null) _pagination.Hide();
+
+        // Hide action bar immediately when switching apps
+        if (_mediaActionBar != null) _mediaActionBar.HideImmediate();
 
         if (_viewOptionsPopup != null) _viewOptionsPopup.Hide();
         if (_groupOptionsPopup != null) _groupOptionsPopup.Hide();
@@ -410,6 +446,13 @@ public class RTTMediaLibrary : MonoBehaviour
     {
         if (_rightFrame == null) return;
 
+        // Don't create if already exists
+        if (_mediaActionBar != null)
+        {
+            Debug.Log("[RTTMediaLibrary] ActionBar already exists, skipping creation");
+            return;
+        }
+
         // Get panel world size for positioning calculations
         Vector2 panelSize = _rightFrame.GetWorldSize();
         float targetHeight = panelSize.y;
@@ -430,10 +473,22 @@ public class RTTMediaLibrary : MonoBehaviour
         _mediaActionBar.OnFavouriteClicked += OnFavouriteButtonClicked;
         _mediaActionBar.OnPlaylistClicked += OnPlaylistButtonClicked;
 
-        // Hide initially until a video is selected
-        _mediaActionBar.SetVisible(false);
+        // Container starts active but invisible (alpha=0) - positioning runs via LateUpdate
+        // For Media Library, always show action bar when app opens (if not in edit mode)
+        // Delay fade-in to wait for sphere positioning to complete
+        if (!_isEditMode)
+        {
+            Invoke(nameof(ShowActionBarAfterDelay), 0.15f);  // ~9 frames at 60fps
+        }
+    }
 
-        Debug.Log("[RTTMediaLibrary] Media action bar created (hidden initially)");
+    private void ShowActionBarAfterDelay()
+    {
+        if (_mediaActionBar != null && !_isEditMode)
+        {
+            _mediaActionBar.ShowImmediate();
+            Debug.Log("[RTTMediaLibrary] Media action bar shown after delay");
+        }
     }
     #endregion
 
@@ -1321,13 +1376,8 @@ public class RTTMediaLibrary : MonoBehaviour
         // Update favourite icon state based on displayed video
         UpdateFavouriteButtonState(video.IsFavorite);
 
-        // Only show action bar when there's an actual selected video (not just hover)
-        // AND not in edit mode
-        if (_mediaActionBar != null)
-        {
-            bool showActionBar = _hasSelectedVideo && !_isEditMode;
-            _mediaActionBar.SetVisible(showActionBar);
-        }
+        // ActionBar is always visible for Media Library (when not in edit mode)
+        // No need to toggle visibility here - it's managed in CreateMediaActionBar and ToggleEditMode
     }
 
     /// <summary>
@@ -1342,6 +1392,19 @@ public class RTTMediaLibrary : MonoBehaviour
             _detailPanel?.ShowEmpty();
         }
         // Outside edit mode, keep showing last item (auto-select behavior)
+    }
+
+    /// <summary>
+    /// Notify the view that a video was auto-selected by the controller.
+    /// This is called when controller auto-selects first item on startup.
+    /// </summary>
+    public void NotifyVideoAutoSelected(MediaVideoInfo video)
+    {
+        _hasSelectedVideo = true;
+        _currentVideo = video;
+
+        // ActionBar is always visible for Media Library (managed in CreateMediaActionBar)
+        // No need to toggle visibility here
     }
 
     public void UpdateBreadcrumb(string path)
@@ -1670,7 +1733,7 @@ public class RTTMediaLibrary : MonoBehaviour
 
         // Clear video selection when changing category
         _hasSelectedVideo = false;
-        if (_mediaActionBar != null) _mediaActionBar.SetVisible(false);
+        // ActionBar stays visible for Media Library - don't hide on category change
 
         _controller?.SelectCategory(categoryId);
         UpdateBreadcrumbForCategory(categoryId);
@@ -1713,6 +1776,8 @@ public class RTTMediaLibrary : MonoBehaviour
 
     private void OnGridVideoSelected(MediaVideoInfo video)
     {
+        Debug.Log($"[RTTMediaLibrary] OnGridVideoSelected: {video.Title}, _isEditMode={_isEditMode}, _mediaActionBar={((_mediaActionBar != null) ? "exists" : "NULL")}");
+
         // Mark that we have a selected video
         _hasSelectedVideo = true;
 
@@ -1724,6 +1789,9 @@ public class RTTMediaLibrary : MonoBehaviour
 
         // Update favourite icon state
         UpdateFavouriteButtonState(video.IsFavorite);
+
+        // ActionBar is always visible for Media Library (when not in edit mode)
+        // Visibility is managed in CreateMediaActionBar and ToggleEditMode
     }
 
     private void OnGridVideoHoverEnter(MediaVideoInfo video)

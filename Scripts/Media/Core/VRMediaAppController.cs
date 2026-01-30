@@ -125,7 +125,12 @@ public class VRMediaAppController : MonoBehaviour
             ProjectionSystem = null;
         }
 
-        _libraryView = null;
+        // Cleanup library view (destroys ActionBar, side panels, etc.)
+        if (_libraryView != null)
+        {
+            _libraryView.Cleanup();
+            _libraryView = null;
+        }
         _libraryController = null;
 
         // Cleanup player controller

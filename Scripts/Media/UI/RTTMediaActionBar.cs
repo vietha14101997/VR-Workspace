@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System;
+using System.Collections;
 
 /// <summary>
 /// RTTMediaActionBar - Floating action bar that follows the Media detail panel.
@@ -43,20 +44,109 @@ public class RTTMediaActionBar : MonoBehaviour
     // Theme
     private Color _primaryColor;
     private Color _accentColor;
+
+    // Animation
+    private CanvasGroup _canvasGroup;
+    private Coroutine _fadeCoroutine;
+    private const float FADE_DURATION = 0.2f;
+    private bool _isVisible = false;
+
+    // Pending show state - waits for valid position before showing
+    private bool _pendingShow = false;
+    private bool _pendingShowWithFade = false;
     #endregion
 
     #region Properties
     public bool IsInitialized => _initialized;
     public Image FavouriteIcon => _favouriteIcon;
+
+    /// <summary>
+    /// Check if follow target is at a valid position (not offscreen at y=1000).
+    /// </summary>
+    public bool IsFollowTargetValid
+    {
+        get
+        {
+            if (_followTarget == null) return false;
+            Camera cam = Camera.main;
+            if (cam == null) return false;
+
+            float dist = Vector3.Distance(cam.transform.position, _followTarget.position);
+            return dist < 100f;  // Same threshold used in UpdateSpherePosition
+        }
+    }
     #endregion
 
     #region Lifecycle
+    private bool _loggedPosition = false;
+    private bool _warnedBadPosition = false;
+    private int _alphaVerifyFrames = 0;
+    private const int ALPHA_VERIFY_FRAMES = 3;
+
     private void LateUpdate()
     {
         if (!_initialized || _followTarget == null) return;
 
         UpdateSpherePosition();
+
+        // Handle pending show - only show when position is valid
+        if ((_pendingShow || _pendingShowWithFade) && IsFollowTargetValid)
+        {
+            if (_pendingShow)
+            {
+                _pendingShow = false;
+                DoShowImmediate();
+            }
+            else if (_pendingShowWithFade)
+            {
+                _pendingShowWithFade = false;
+                DoShowWithFade();
+            }
+        }
+
+        // Debug: Log position and alpha once when container becomes active
+        if (_container != null && _container.activeSelf && !_loggedPosition)
+        {
+            _loggedPosition = true;
+            float alpha = _canvasGroup != null ? _canvasGroup.alpha : -1f;
+            Debug.Log($"[RTTMediaActionBar] Initial state - Pos: {transform.position}, FollowTarget: {_followTarget?.position}, Alpha: {alpha}, Layer: {gameObject.layer}");
+        }
+
+        // Backup mechanism: verify alpha is correct when visible
+        if (_isVisible && _canvasGroup != null && _fadeCoroutine == null)
+        {
+            if (_canvasGroup.alpha < 0.99f)
+            {
+                _alphaVerifyFrames++;
+                if (_alphaVerifyFrames >= ALPHA_VERIFY_FRAMES)
+                {
+                    Debug.LogWarning($"[RTTMediaActionBar] Forcing alpha to 1 (was {_canvasGroup.alpha})");
+                    _canvasGroup.alpha = 1f;
+                    _alphaVerifyFrames = 0;
+                }
+            }
+            else
+            {
+                _alphaVerifyFrames = 0;
+            }
+        }
     }
+
+    // Debug: Track alpha changes in editor
+    #if UNITY_EDITOR
+    private float _lastLoggedAlpha = -1f;
+    private void Update()
+    {
+        if (_canvasGroup != null && _isVisible && Mathf.Abs(_canvasGroup.alpha - _lastLoggedAlpha) > 0.01f)
+        {
+            _lastLoggedAlpha = _canvasGroup.alpha;
+            if (_canvasGroup.alpha < 0.99f && _fadeCoroutine == null)
+            {
+                Debug.LogWarning($"[RTTMediaActionBar] Alpha unexpectedly changed to {_canvasGroup.alpha} while visible and not fading!");
+            }
+        }
+    }
+    #endif
 
     private void OnDestroy()
     {
@@ -91,6 +181,10 @@ public class RTTMediaActionBar : MonoBehaviour
 
         CreateButtons(font);
 
+        // Container starts active but invisible (alpha=0) so LateUpdate can position it
+        // CanvasGroup with alpha=0 was already added in CreateButtons()
+        // Don't SetActive(false) - keep it active for positioning
+
         _initialized = true;
         Debug.Log($"[RTTMediaActionBar] Initialized, following: {_followTarget?.name}, frameHeight: {_frameHeight}, gapMult: {_spacingMult}");
     }
@@ -118,14 +212,223 @@ public class RTTMediaActionBar : MonoBehaviour
     }
 
     /// <summary>
-    /// Show/Hide the action bar.
+    /// Show/Hide the action bar with fade animation.
+    /// If showing and follow target is not at valid position, queues show for when it becomes valid.
     /// </summary>
     public void SetVisible(bool visible)
     {
+        Debug.Log($"[RTTMediaActionBar] SetVisible({visible}): _container={((_container != null) ? "exists" : "NULL")}, _isVisible={_isVisible}");
+
+        // Clear pending states
+        _pendingShow = false;
+        _pendingShowWithFade = false;
+
+        if (_container == null || _isVisible == visible)
+        {
+            Debug.Log($"[RTTMediaActionBar] SetVisible early return: container null={(_container == null)}, already visible={(_isVisible == visible)}");
+            return;
+        }
+
+        if (visible)
+        {
+            // If position is not valid, queue for later
+            if (!IsFollowTargetValid)
+            {
+                _pendingShowWithFade = true;
+                Debug.Log("[RTTMediaActionBar] SetVisible(true): position not valid, queued for later");
+                return;
+            }
+        }
+
+        _isVisible = visible;
+
+        // Stop any ongoing fade
+        if (_fadeCoroutine != null)
+        {
+            StopCoroutine(_fadeCoroutine);
+            _fadeCoroutine = null;
+        }
+
+        // Ensure CanvasGroup exists
+        if (_canvasGroup == null)
+        {
+            _canvasGroup = _container.GetComponent<CanvasGroup>();
+            if (_canvasGroup == null)
+            {
+                _canvasGroup = _container.AddComponent<CanvasGroup>();
+            }
+        }
+
+        if (visible)
+        {
+            Debug.Log($"[RTTMediaActionBar] Activating container, alpha before: {_canvasGroup.alpha}");
+            _canvasGroup.alpha = 0f;  // Ensure starting from 0
+            _container.SetActive(true);
+            _fadeCoroutine = StartCoroutine(FadeCoroutine(0f, 1f, FADE_DURATION));
+        }
+        else
+        {
+            _fadeCoroutine = StartCoroutine(FadeCoroutine(_canvasGroup.alpha, 0f, FADE_DURATION, deactivateOnComplete: true));
+        }
+    }
+
+    /// <summary>
+    /// Immediately hide without animation (for cleanup).
+    /// </summary>
+    public void HideImmediate()
+    {
+        // Clear pending show to prevent showing after hide
+        _pendingShow = false;
+        _pendingShowWithFade = false;
+
+        if (_fadeCoroutine != null)
+        {
+            StopCoroutine(_fadeCoroutine);
+            _fadeCoroutine = null;
+        }
+
+        if (_canvasGroup != null)
+        {
+            _canvasGroup.alpha = 0f;
+        }
+
         if (_container != null)
         {
-            _container.SetActive(visible);
+            _container.SetActive(false);
         }
+
+        _isVisible = false;
+    }
+
+    /// <summary>
+    /// Immediately show without animation (for startup).
+    /// If follow target is not at valid position, queues show for when it becomes valid.
+    /// </summary>
+    public void ShowImmediate()
+    {
+        // Clear any pending show states
+        _pendingShow = false;
+        _pendingShowWithFade = false;
+
+        // If position is not valid, queue for later
+        if (!IsFollowTargetValid)
+        {
+            _pendingShow = true;
+            Debug.Log("[RTTMediaActionBar] ShowImmediate: position not valid, queued for later");
+            return;
+        }
+
+        DoShowImmediate();
+    }
+
+    private void DoShowImmediate()
+    {
+        if (_fadeCoroutine != null)
+        {
+            StopCoroutine(_fadeCoroutine);
+            _fadeCoroutine = null;
+        }
+
+        // Ensure CanvasGroup exists
+        if (_canvasGroup == null && _container != null)
+        {
+            _canvasGroup = _container.GetComponent<CanvasGroup>();
+            if (_canvasGroup == null)
+            {
+                _canvasGroup = _container.AddComponent<CanvasGroup>();
+            }
+        }
+
+        if (_canvasGroup != null)
+        {
+            _canvasGroup.alpha = 1f;
+        }
+
+        if (_container != null)
+        {
+            _container.SetActive(true);
+        }
+
+        _isVisible = true;
+        Debug.Log("[RTTMediaActionBar] DoShowImmediate: alpha=1, active=true");
+    }
+
+    /// <summary>
+    /// Prepare for positioning: container active but invisible (alpha=0).
+    /// This allows LateUpdate to run and position the ActionBar correctly.
+    /// </summary>
+    public void PrepareForPositioning()
+    {
+        if (_fadeCoroutine != null)
+        {
+            StopCoroutine(_fadeCoroutine);
+            _fadeCoroutine = null;
+        }
+
+        // CanvasGroup was created in CreateButtons() with alpha=0
+        if (_canvasGroup != null)
+        {
+            _canvasGroup.alpha = 0f;
+        }
+
+        if (_container != null)
+        {
+            _container.SetActive(true);  // Active so LateUpdate runs for positioning
+        }
+
+        _isVisible = false;
+    }
+
+    /// <summary>
+    /// Show with fade animation (after positioning is ready).
+    /// If follow target is not at valid position, queues show for when it becomes valid.
+    /// </summary>
+    public void ShowWithFade()
+    {
+        if (_container == null) return;
+        if (_isVisible) return;  // Already visible
+
+        // Clear any pending show states
+        _pendingShow = false;
+        _pendingShowWithFade = false;
+
+        // If position is not valid, queue for later
+        if (!IsFollowTargetValid)
+        {
+            _pendingShowWithFade = true;
+            Debug.Log("[RTTMediaActionBar] ShowWithFade: position not valid, queued for later");
+            return;
+        }
+
+        DoShowWithFade();
+    }
+
+    private void DoShowWithFade()
+    {
+        if (_container == null) return;
+
+        // Ensure CanvasGroup exists
+        if (_canvasGroup == null)
+        {
+            _canvasGroup = _container.GetComponent<CanvasGroup>();
+            if (_canvasGroup == null)
+            {
+                _canvasGroup = _container.AddComponent<CanvasGroup>();
+            }
+        }
+
+        _isVisible = true;
+
+        // Stop any ongoing fade
+        if (_fadeCoroutine != null)
+        {
+            StopCoroutine(_fadeCoroutine);
+            _fadeCoroutine = null;
+        }
+
+        _container.SetActive(true);
+        _fadeCoroutine = StartCoroutine(FadeCoroutine(0f, 1f, FADE_DURATION));
+        Debug.Log("[RTTMediaActionBar] DoShowWithFade: starting fade animation");
     }
     #endregion
 
@@ -135,6 +438,12 @@ public class RTTMediaActionBar : MonoBehaviour
         // Create container for buttons
         _container = new GameObject("ActionButtonsContainer");
         _container.transform.SetParent(transform, false);
+
+        // Add CanvasGroup immediately with alpha=0 to prevent any flash
+        _canvasGroup = _container.AddComponent<CanvasGroup>();
+        _canvasGroup.alpha = 0f;
+        _canvasGroup.blocksRaycasts = true;
+        _canvasGroup.interactable = true;
 
         // Add Canvas for UI buttons
         Canvas canvas = _container.AddComponent<Canvas>();
@@ -285,6 +594,26 @@ public class RTTMediaActionBar : MonoBehaviour
 
         Vector3 cameraPos = cam.transform.position;
         Vector3 targetCenter = _followTarget.position;
+
+        // Sanity check: if followTarget is too far from camera (> 100m), skip positioning until it's valid
+        float distToTarget = Vector3.Distance(cameraPos, targetCenter);
+        if (distToTarget > 100f)
+        {
+            if (!_warnedBadPosition)
+            {
+                _warnedBadPosition = true;
+                Debug.LogWarning($"[RTTMediaActionBar] FollowTarget too far! cam={cameraPos}, target={targetCenter}, dist={distToTarget}m. Waiting for valid position...");
+            }
+            return; // Skip positioning until followTarget is at valid position
+        }
+
+        // Reset warning flag when position becomes valid
+        if (_warnedBadPosition)
+        {
+            _warnedBadPosition = false;
+            Debug.Log($"[RTTMediaActionBar] FollowTarget now valid: {targetCenter}, dist={distToTarget}m");
+        }
+
         Vector3 targetUp = _followTarget.up;
 
         float targetHalfHeight = _targetHeight / 2f;
@@ -356,6 +685,51 @@ public class RTTMediaActionBar : MonoBehaviour
     }
     #endregion
 
+    #region Animation
+    private IEnumerator FadeCoroutine(float from, float to, float duration, bool deactivateOnComplete = false)
+    {
+        Debug.Log($"[RTTMediaActionBar] FadeCoroutine started: from={from}, to={to}, canvasGroup={(_canvasGroup != null ? _canvasGroup.GetInstanceID().ToString() : "NULL")}");
+
+        if (_canvasGroup == null)
+        {
+            Debug.LogWarning("[RTTMediaActionBar] FadeCoroutine aborted: _canvasGroup is NULL!");
+            yield break;
+        }
+
+        _canvasGroup.alpha = from;
+        float elapsed = 0f;
+        int frameCount = 0;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float newAlpha = Mathf.Lerp(from, to, t);
+            _canvasGroup.alpha = newAlpha;
+            frameCount++;
+            yield return null;
+        }
+
+        _canvasGroup.alpha = to;
+
+        // Verify alpha was actually set
+        float verifyAlpha = _canvasGroup.alpha;
+        Debug.Log($"[RTTMediaActionBar] FadeCoroutine completed: set={to}, verify={verifyAlpha}, frames={frameCount}, container.active={_container?.activeSelf}");
+
+        if (Mathf.Abs(verifyAlpha - to) > 0.01f)
+        {
+            Debug.LogError($"[RTTMediaActionBar] Alpha verification FAILED! Expected {to}, got {verifyAlpha}");
+        }
+
+        if (deactivateOnComplete && _container != null)
+        {
+            _container.SetActive(false);
+        }
+
+        _fadeCoroutine = null;
+    }
+    #endregion
+
     #region Static Factory
     /// <summary>
     /// Create RTTMediaActionBar in VirtualObjects.
@@ -364,17 +738,37 @@ public class RTTMediaActionBar : MonoBehaviour
     {
         GameObject barObj = new GameObject("RTTMediaActionBar");
 
-        // Parent to VirtualObjects
+        // Parent to VirtualObjects and set layer
         GameObject virtualObjects = GameObject.Find("VirtualObjects");
+        int voLayer = LayerMask.NameToLayer("VirtualObjects");
         if (virtualObjects != null)
         {
             barObj.transform.SetParent(virtualObjects.transform, false);
+        }
+        if (voLayer >= 0)
+        {
+            SetLayerRecursively(barObj, voLayer);
         }
 
         RTTMediaActionBar actionBar = barObj.AddComponent<RTTMediaActionBar>();
         actionBar.Initialize(followTarget, targetHeight, panelWidth, primaryColor, accentColor, font);
 
+        // Set layer on container and all children after Initialize creates them
+        if (voLayer >= 0 && actionBar._container != null)
+        {
+            SetLayerRecursively(actionBar._container, voLayer);
+        }
+
         return actionBar;
+    }
+
+    private static void SetLayerRecursively(GameObject obj, int layer)
+    {
+        obj.layer = layer;
+        foreach (Transform child in obj.transform)
+        {
+            SetLayerRecursively(child.gameObject, layer);
+        }
     }
     #endregion
 }

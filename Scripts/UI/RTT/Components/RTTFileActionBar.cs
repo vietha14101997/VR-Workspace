@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System;
+using System.Collections;
 
 /// <summary>
 /// RTTFileActionBar - Floating action bar that follows the File Manager detail panel.
@@ -35,6 +36,12 @@ public class RTTFileActionBar : MonoBehaviour
     // Theme
     private Color _primaryColor;
     private Color _accentColor;
+
+    // Animation
+    private CanvasGroup _canvasGroup;
+    private Coroutine _fadeCoroutine;
+    private const float FADE_DURATION = 0.2f;
+    private bool _isVisible = false;
     #endregion
 
     #region Properties
@@ -81,19 +88,75 @@ public class RTTFileActionBar : MonoBehaviour
 
         CreateButtons(font);
 
+        // Hide container by default - will be shown when SetVisible(true) is called
+        if (_container != null)
+        {
+            _container.SetActive(false);
+        }
+
         _initialized = true;
         Debug.Log($"[RTTFileActionBar] Initialized, following: {_followTarget?.name}");
     }
 
     /// <summary>
-    /// Show/Hide the action bar.
+    /// Show/Hide the action bar with fade animation.
     /// </summary>
     public void SetVisible(bool visible)
     {
+        if (_container == null || _isVisible == visible) return;
+
+        _isVisible = visible;
+
+        // Stop any ongoing fade
+        if (_fadeCoroutine != null)
+        {
+            StopCoroutine(_fadeCoroutine);
+            _fadeCoroutine = null;
+        }
+
+        // Ensure CanvasGroup exists
+        if (_canvasGroup == null)
+        {
+            _canvasGroup = _container.GetComponent<CanvasGroup>();
+            if (_canvasGroup == null)
+            {
+                _canvasGroup = _container.AddComponent<CanvasGroup>();
+            }
+        }
+
+        if (visible)
+        {
+            _container.SetActive(true);
+            _fadeCoroutine = StartCoroutine(FadeCoroutine(0f, 1f, FADE_DURATION));
+        }
+        else
+        {
+            _fadeCoroutine = StartCoroutine(FadeCoroutine(_canvasGroup.alpha, 0f, FADE_DURATION, deactivateOnComplete: true));
+        }
+    }
+
+    /// <summary>
+    /// Immediately hide without animation (for cleanup).
+    /// </summary>
+    public void HideImmediate()
+    {
+        if (_fadeCoroutine != null)
+        {
+            StopCoroutine(_fadeCoroutine);
+            _fadeCoroutine = null;
+        }
+
+        if (_canvasGroup != null)
+        {
+            _canvasGroup.alpha = 0f;
+        }
+
         if (_container != null)
         {
-            _container.SetActive(visible);
+            _container.SetActive(false);
         }
+
+        _isVisible = false;
     }
 
     /// <summary>
@@ -334,6 +397,33 @@ public class RTTFileActionBar : MonoBehaviour
         {
             transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
         }
+    }
+    #endregion
+
+    #region Animation
+    private IEnumerator FadeCoroutine(float from, float to, float duration, bool deactivateOnComplete = false)
+    {
+        if (_canvasGroup == null) yield break;
+
+        _canvasGroup.alpha = from;
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            _canvasGroup.alpha = Mathf.Lerp(from, to, t);
+            yield return null;
+        }
+
+        _canvasGroup.alpha = to;
+
+        if (deactivateOnComplete && _container != null)
+        {
+            _container.SetActive(false);
+        }
+
+        _fadeCoroutine = null;
     }
     #endregion
 

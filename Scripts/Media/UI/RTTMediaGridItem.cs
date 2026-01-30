@@ -142,6 +142,9 @@ public class RTTMediaGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExi
         // 2. Thumbnail Container - positioned at top, full width
         CreateThumbnailContainer();
 
+        // 2b. Create badges outside mask (after thumbnail container)
+        CreateBadges();
+
         // 3. Text Container - positioned below thumbnail
         CreateTextContainer();
 
@@ -199,14 +202,24 @@ public class RTTMediaGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExi
         aspectFitter.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
         aspectFitter.aspectRatio = 16f / 9f;  // Default 16:9, will update when thumbnail loads
 
-        // Duration Badge (top-left)
-        CreateDurationBadge(container.transform);
+        // Note: Duration and Resolution badges are created OUTSIDE the mask
+        // They will be positioned relative to the thumbnail container but not clipped
+        // (CreateBadges is called separately after this)
+    }
 
-        // Resolution Badge (bottom-right)
-        CreateResolutionBadge(container.transform);
+    /// <summary>
+    /// Create badges outside the mask so they render properly.
+    /// Must be called after CreateThumbnailContainer.
+    /// </summary>
+    private void CreateBadges()
+    {
+        if (_thumbnailContainerRect == null) return;
 
-        // Favorite Icon (top-right)
-        CreateFavoriteIcon(container.transform);
+        // Duration Badge (bottom-right of thumbnail area)
+        CreateDurationBadge(transform);
+
+        // Resolution Badge (left of duration badge)
+        CreateResolutionBadge(transform);
     }
 
     private void CreateDurationBadge(Transform parent)
@@ -214,19 +227,23 @@ public class RTTMediaGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExi
         _durationBadge = new GameObject("DurationBadge");
         _durationBadge.transform.SetParent(parent, false);
 
-        // Position at bottom-right of thumbnail
+        // Position at bottom-right of thumbnail area (1.5x size)
+        // Thumbnail area: top-aligned with TOP_PADDING offset and THUMBNAIL_HEIGHT height
+        // So thumbnail bottom is at Y = -(TOP_PADDING + THUMBNAIL_HEIGHT) from item top
         RectTransform rt = _durationBadge.AddComponent<RectTransform>();
-        rt.anchorMin = new Vector2(1, 0);
-        rt.anchorMax = new Vector2(1, 0);
-        rt.pivot = new Vector2(1, 0);
-        rt.anchoredPosition = new Vector2(-6, 6);
-        rt.sizeDelta = new Vector2(58, 22);
+        rt.anchorMin = new Vector2(1, 1);  // Anchor to top-right of item
+        rt.anchorMax = new Vector2(1, 1);
+        rt.pivot = new Vector2(1, 0);      // Pivot at bottom-right of badge
+        // Position: 9px from right, at bottom of thumbnail + 9px padding (1.5x of original 6px)
+        float thumbnailBottom = -(TOP_PADDING + THUMBNAIL_HEIGHT);
+        rt.anchoredPosition = new Vector2(-9, thumbnailBottom + 9);
+        rt.sizeDelta = new Vector2(87, 33);  // 1.5x of 58x22
 
-        // Background - semi-transparent dark
+        // Background - dark semi-transparent (like hover effect)
         Image bg = _durationBadge.AddComponent<Image>();
         bg.sprite = GetBadgeSprite();
         bg.type = Image.Type.Sliced;
-        bg.color = new Color(0f, 0f, 0f, 0.7f);
+        bg.color = new Color(0f, 0f, 0f, 0.7f);  // Dark semi-transparent
         bg.raycastTarget = false;
 
         // Text
@@ -235,13 +252,13 @@ public class RTTMediaGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExi
         RectTransform textRT = textObj.AddComponent<RectTransform>();
         textRT.anchorMin = Vector2.zero;
         textRT.anchorMax = Vector2.one;
-        textRT.offsetMin = new Vector2(4, 0);
-        textRT.offsetMax = new Vector2(-4, 0);
+        textRT.offsetMin = new Vector2(6, 0);  // 1.5x of 4
+        textRT.offsetMax = new Vector2(-6, 0);
 
         _durationText = textObj.AddComponent<TextMeshProUGUI>();
         _durationText.text = "0:00";
-        if (_font != null) _durationText.font = _font;
-        _durationText.fontSize = 14;
+        _durationText.font = GetValidFont();
+        _durationText.fontSize = 21;  // 1.5x of 14
         _durationText.fontStyle = FontStyles.Bold;
         _durationText.color = Color.white;
         _durationText.alignment = TextAlignmentOptions.Center;
@@ -253,18 +270,20 @@ public class RTTMediaGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExi
         _resolutionBadge = new GameObject("ResolutionBadge");
         _resolutionBadge.transform.SetParent(parent, false);
 
+        // Position at bottom-LEFT of thumbnail (symmetrical to duration on right) (1.5x size)
         RectTransform rt = _resolutionBadge.AddComponent<RectTransform>();
-        rt.anchorMin = new Vector2(1, 0);
-        rt.anchorMax = new Vector2(1, 0);
-        rt.pivot = new Vector2(1, 0);
-        rt.anchoredPosition = new Vector2(-68, 6); // Left of duration badge (6 + 58 + 4 gap)
-        rt.sizeDelta = new Vector2(50, 22);
+        rt.anchorMin = new Vector2(0, 1);  // Anchor to top-left of item
+        rt.anchorMax = new Vector2(0, 1);
+        rt.pivot = new Vector2(0, 0);      // Pivot at bottom-left of badge
+        float thumbnailBottom = -(TOP_PADDING + THUMBNAIL_HEIGHT);
+        rt.anchoredPosition = new Vector2(9, thumbnailBottom + 9);  // 9px from left, same vertical as duration
+        rt.sizeDelta = new Vector2(75, 33);  // 1.5x of 50x22
 
-        // Background with accent color (cyan/teal like target)
+        // Background - dark semi-transparent (same as duration badge)
         Image bg = _resolutionBadge.AddComponent<Image>();
         bg.sprite = GetBadgeSprite();
         bg.type = Image.Type.Sliced;
-        bg.color = new Color(0.2f, 0.8f, 0.9f, 0.95f); // Cyan color like target
+        bg.color = new Color(0f, 0f, 0f, 0.7f);  // Dark semi-transparent like duration
         bg.raycastTarget = false;
 
         // Text
@@ -273,13 +292,13 @@ public class RTTMediaGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExi
         RectTransform textRT = textObj.AddComponent<RectTransform>();
         textRT.anchorMin = Vector2.zero;
         textRT.anchorMax = Vector2.one;
-        textRT.offsetMin = new Vector2(3, 0);
-        textRT.offsetMax = new Vector2(-3, 0);
+        textRT.offsetMin = new Vector2(5, 0);  // 1.5x of ~3
+        textRT.offsetMax = new Vector2(-5, 0);
 
         _resolutionText = textObj.AddComponent<TextMeshProUGUI>();
         _resolutionText.text = "1080p";
-        if (_font != null) _resolutionText.font = _font;
-        _resolutionText.fontSize = 12;
+        _resolutionText.font = GetValidFont();
+        _resolutionText.fontSize = 18;  // 1.5x of 12
         _resolutionText.fontStyle = FontStyles.Bold;
         _resolutionText.color = Color.white;
         _resolutionText.alignment = TextAlignmentOptions.Center;
@@ -301,8 +320,27 @@ public class RTTMediaGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExi
         rt.sizeDelta = new Vector2(20, 20);
 
         Image icon = _favoriteIcon.AddComponent<Image>();
-        icon.sprite = Resources.Load<Sprite>("icon_star");
-        icon.color = new Color(1f, 0.85f, 0.2f);
+
+        // Load favorite icon - use icon_favorite which exists in Resources
+        Sprite starSprite = Resources.Load<Sprite>("icon_favorite");
+        if (starSprite == null)
+            starSprite = Resources.Load<Sprite>("icon_star");
+        if (starSprite == null)
+            starSprite = Resources.Load<Sprite>("Icons/icon_favorite");
+
+        if (starSprite != null)
+        {
+            icon.sprite = starSprite;
+            icon.color = new Color(1f, 0.85f, 0.2f); // Gold color
+        }
+        else
+        {
+            // No sprite found - hide the icon completely instead of showing yellow square
+            Debug.LogWarning("[RTTMediaGridItem] Could not load star icon - favorite indicator will be hidden");
+            _favoriteIcon.SetActive(false);
+            return;
+        }
+
         icon.preserveAspect = true;
         icon.raycastTarget = false;
 
@@ -333,7 +371,7 @@ public class RTTMediaGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExi
         titleRT.offsetMax = new Vector2(-8, -4); // Right and top padding
 
         _titleText = titleObj.AddComponent<TextMeshProUGUI>();
-        if (_font != null) _titleText.font = _font;
+        _titleText.font = GetValidFont();
         _titleText.text = "Video Title";
         _titleText.fontSize = 32;  // Synced with RTTFileGridItem
         _titleText.fontStyle = FontStyles.Bold;
@@ -455,21 +493,38 @@ public class RTTMediaGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExi
         bool isAudio = ext == ".mp3" || ext == ".wav" || ext == ".flac" || ext == ".aac" || ext == ".ogg" || ext == ".m4a" || ext == ".wma";
         bool isImage = !isVideo && !isAudio;
 
-        // Update duration badge - only show for video/audio with duration > 0
+        // Update duration badge - show for all videos/audio (show placeholder if no duration)
         if (_durationBadge != null)
         {
-            bool showDuration = (isVideo || isAudio) && video.Duration.TotalSeconds > 0;
-            _durationBadge.SetActive(showDuration);
-            if (showDuration && _durationText != null)
-                _durationText.text = video.FormattedDuration;
+            bool showBadge = isVideo || isAudio;
+            _durationBadge.SetActive(showBadge);
+
+            if (showBadge && _durationText != null)
+            {
+                if (video.Duration.TotalSeconds > 0)
+                    _durationText.text = video.FormattedDuration;
+                else
+                {
+                    _durationText.text = "--:--";  // Placeholder when duration unknown
+                    // Fetch metadata to get duration
+                    FetchDurationMetadata(video.Path, isVideo);
+                }
+
+                Debug.Log($"[RTTMediaGridItem] Duration badge for '{video.Title}': show={showBadge}, duration={video.Duration.TotalSeconds}s, text='{_durationText.text}', font={((_durationText.font != null) ? _durationText.font.name : "NULL")}");
+            }
+        }
+        else
+        {
+            Debug.LogWarning($"[RTTMediaGridItem] _durationBadge is NULL for '{video.Title}'");
         }
 
         // Update resolution badge - only show for video with resolution
         UpdateResolutionBadge(video, isVideo);
 
         // Update favorite icon
-        if (_favoriteIcon != null)
-            _favoriteIcon.SetActive(video.IsFavorite);
+        // Favorite icon removed from grid items
+        // if (_favoriteIcon != null)
+        //     _favoriteIcon.SetActive(video.IsFavorite);
 
         // Reset thumbnail to placeholder
         if (_thumbnailImage != null)
@@ -484,6 +539,59 @@ public class RTTMediaGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExi
         // Reset background
         if (_bgImage != null)
             _bgImage.color = NormalColor;
+    }
+
+    /// <summary>
+    /// Fetch duration metadata for video/audio files asynchronously.
+    /// Updates the duration badge when metadata is received.
+    /// </summary>
+    private void FetchDurationMetadata(string filePath, bool isVideo)
+    {
+        if (FileMetadataService.Instance == null) return;
+
+        if (isVideo)
+        {
+            FileMetadataService.Instance.GetVideoMetadata(filePath, (metadata) =>
+            {
+                // Verify still showing same file
+                if (_currentFilePath != filePath) return;
+                if (this == null || _durationText == null) return;
+
+                if (metadata.Duration.TotalSeconds > 0)
+                {
+                    _durationText.text = FormatDuration(metadata.Duration);
+                    // Update cached video info
+                    _currentVideo.Duration = metadata.Duration;
+                    _currentVideo.Width = metadata.Width;
+                    _currentVideo.Height = metadata.Height;
+                    // Also update resolution badge now that we have dimensions
+                    UpdateResolutionBadge(_currentVideo, true);
+                }
+            });
+        }
+        else // Audio
+        {
+            FileMetadataService.Instance.GetAudioMetadata(filePath, (metadata) =>
+            {
+                // Verify still showing same file
+                if (_currentFilePath != filePath) return;
+                if (this == null || _durationText == null) return;
+
+                if (metadata.Duration.TotalSeconds > 0)
+                {
+                    _durationText.text = FormatDuration(metadata.Duration);
+                    _currentVideo.Duration = metadata.Duration;
+                }
+            });
+        }
+    }
+
+    private string FormatDuration(System.TimeSpan duration)
+    {
+        if (duration.TotalHours >= 1)
+            return $"{(int)duration.TotalHours}:{duration.Minutes:D2}:{duration.Seconds:D2}";
+        else
+            return $"{duration.Minutes}:{duration.Seconds:D2}";
     }
 
     private void UpdateResolutionBadge(MediaVideoInfo video, bool isVideo = true)
@@ -831,6 +939,70 @@ public class RTTMediaGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExi
         );
 
         return _cachedBadgeSprite;
+    }
+
+    // Static cached font for fallback
+    private static TMP_FontAsset _cachedFallbackFont;
+    private static bool _fontLookupDone = false;
+
+    /// <summary>
+    /// Get a valid TMP font - use _font if available, otherwise use cached fallback.
+    /// </summary>
+    private TMP_FontAsset GetValidFont()
+    {
+        if (_font != null) return _font;
+
+        // Return cached fallback if already found
+        if (_fontLookupDone && _cachedFallbackFont != null)
+            return _cachedFallbackFont;
+
+        // Try multiple fallback options
+        TMP_FontAsset defaultFont = null;
+
+        // Option 1: TMP Settings default font
+        defaultFont = TMP_Settings.defaultFontAsset;
+        if (defaultFont != null)
+        {
+            _cachedFallbackFont = defaultFont;
+            _fontLookupDone = true;
+            return defaultFont;
+        }
+
+        // Option 2: Try common font paths
+        string[] fontPaths = new string[]
+        {
+            "Fonts & Materials/LiberationSans SDF",
+            "Fonts/LiberationSans SDF",
+            "LiberationSans SDF",
+            "Fonts/Roboto-Regular SDF",
+            "Fonts/Arial SDF"
+        };
+
+        foreach (var path in fontPaths)
+        {
+            defaultFont = Resources.Load<TMP_FontAsset>(path);
+            if (defaultFont != null)
+            {
+                _cachedFallbackFont = defaultFont;
+                _fontLookupDone = true;
+                Debug.Log($"[RTTMediaGridItem] Using fallback font from: {path}");
+                return defaultFont;
+            }
+        }
+
+        // Option 3: Find any TMP font in scene
+        var existingTMP = FindObjectOfType<TextMeshProUGUI>();
+        if (existingTMP != null && existingTMP.font != null)
+        {
+            _cachedFallbackFont = existingTMP.font;
+            _fontLookupDone = true;
+            Debug.Log($"[RTTMediaGridItem] Using font from existing TMP: {existingTMP.font.name}");
+            return existingTMP.font;
+        }
+
+        _fontLookupDone = true;
+        Debug.LogError("[RTTMediaGridItem] No TMP font available! Text will not render. Please assign font in RTTManager.");
+        return null;
     }
     #endregion
 }
