@@ -54,9 +54,10 @@ public class RTTFilePagination : RTTCanvasBase
     {
         base.OnEnable();
 
-        // CRITICAL: If Show() was NOT called, this OnEnable is from app switching
+        // CRITICAL: If Show() was NOT called and fade is not in progress, this OnEnable is from app switching
         // Force alpha to 0 immediately to prevent flash before fade animation starts
-        if (_initialized)
+        // But don't reset if fade is already running (would cause flash)
+        if (_initialized && _fadeCoroutine == null)
         {
             SetQuadAlpha(0f);
         }
@@ -108,8 +109,8 @@ public class RTTFilePagination : RTTCanvasBase
 
     public new void Show()
     {
-        // Skip if already fully visible
-        if (gameObject.activeSelf && GetQuadAlpha() >= 0.95f)
+        // Skip if already fully visible or fade is in progress
+        if (gameObject.activeSelf && (GetQuadAlpha() >= 0.95f || _fadeCoroutine != null))
         {
             return;
         }

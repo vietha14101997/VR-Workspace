@@ -306,6 +306,8 @@ public class RTTMediaActionBar : MonoBehaviour
     /// </summary>
     public void ShowImmediate()
     {
+        if (_isVisible) return;  // Already visible
+
         // Clear any pending show states
         _pendingShow = false;
         _pendingShowWithFade = false;
@@ -387,6 +389,7 @@ public class RTTMediaActionBar : MonoBehaviour
     {
         if (_container == null) return;
         if (_isVisible) return;  // Already visible
+        if (_fadeCoroutine != null) return;  // Fade already in progress
 
         // Clear any pending show states
         _pendingShow = false;
