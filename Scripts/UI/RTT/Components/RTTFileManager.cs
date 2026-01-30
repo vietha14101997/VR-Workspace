@@ -1202,7 +1202,7 @@ public class RTTFileManager : MonoBehaviour
     {
         float checkboxSize = 50f;
         float labelWidth = 150f; // Increased to fit "Select all" on one line
-        float spacing = 10f;
+        float spacing = 20f;  // Doubled spacing between checkbox and label
         float leftPadding = 20f;
 
         // Container for checkbox + label
@@ -1223,23 +1223,12 @@ public class RTTFileManager : MonoBehaviour
         checkboxRT.sizeDelta = new Vector2(checkboxSize, checkboxSize);
         checkboxRT.anchoredPosition = Vector2.zero;
 
-        // Checkbox background (glass style)
+        // Checkbox background (solid dark color matching item hover)
         Image checkboxBg = _selectAllCheckbox.AddComponent<Image>();
         checkboxBg.raycastTarget = true;
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
-        if (glassShader != null)
-        {
-            Material mat = new Material(glassShader);
-            mat.SetFloat("_Aspect", 1f);
-            mat.SetFloat("_CornerRadius", 0.25f);
-            mat.SetFloat("_EdgePadding", 0.02f);
-            mat.SetColor("_ColorA", new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.3f));
-            mat.SetColor("_ColorB", new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.1f));
-            mat.SetFloat("_GlassAlpha", 0.2f);
-            mat.SetFloat("_FresnelStrength", 0.15f);
-            checkboxBg.material = mat;
-            checkboxBg.color = Color.white;
-        }
+        checkboxBg.sprite = GetRoundedRectSprite();
+        checkboxBg.type = Image.Type.Sliced;
+        checkboxBg.color = new Color(0f, 0f, 0f, 0.3f);  // Same as item hover color
 
         // Checkmark icon (hidden by default)
         GameObject checkmarkObj = new GameObject("Checkmark");
@@ -3919,5 +3908,58 @@ public class RTTFileManager : MonoBehaviour
         }
     }
 
+    #endregion
+
+    #region Sprite Helpers
+    // Cached rounded rectangle sprite for checkboxes
+    private static Sprite _cachedRoundedSprite;
+
+    private static Sprite GetRoundedRectSprite()
+    {
+        if (_cachedRoundedSprite != null) return _cachedRoundedSprite;
+
+        int size = 64;
+        int radius = 6;  // Small radius for square-ish checkbox with slight rounding
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        tex.filterMode = FilterMode.Bilinear;
+
+        Color[] pixels = new Color[size * size];
+        float halfSize = size * 0.5f;
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float dx = Mathf.Abs(x - halfSize + 0.5f);
+                float dy = Mathf.Abs(y - halfSize + 0.5f);
+
+                float innerHalfX = halfSize - radius;
+                float innerHalfY = halfSize - radius;
+
+                float qx = Mathf.Max(dx - innerHalfX, 0f);
+                float qy = Mathf.Max(dy - innerHalfY, 0f);
+                float dist = Mathf.Sqrt(qx * qx + qy * qy) - radius;
+
+                float alpha = 1f - Mathf.Clamp01((dist + 0.5f) / 1.5f);
+                pixels[y * size + x] = new Color(1f, 1f, 1f, alpha);
+            }
+        }
+
+        tex.SetPixels(pixels);
+        tex.Apply();
+
+        int border = radius + 2;
+        _cachedRoundedSprite = Sprite.Create(
+            tex,
+            new Rect(0, 0, size, size),
+            Vector2.one * 0.5f,
+            100f,
+            0,
+            SpriteMeshType.FullRect,
+            new Vector4(border, border, border, border)
+        );
+
+        return _cachedRoundedSprite;
+    }
     #endregion
 }

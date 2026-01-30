@@ -1211,6 +1211,12 @@ public class RTTMediaGrid : MonoBehaviour
 
     private void OnItemClicked(MediaVideoInfo video)
     {
+        // In edit mode, toggle checkbox instead of selecting
+        if (_isEditMode)
+        {
+            ToggleItemSelection(video.Path);
+            return;
+        }
         SelectVideo(video);
     }
 

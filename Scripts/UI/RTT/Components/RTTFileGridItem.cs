@@ -336,41 +336,30 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
     private void CreateCheckbox()
     {
         float checkboxSize = 45f;
-        float offset = 8f;
+        float inset = 10f;  // Small inset from thumbnail edges
+        float topPadding = 15f;  // Matches VerticalLayoutGroup padding.top
 
         _checkbox = new GameObject("Checkbox");
         _checkbox.transform.SetParent(transform, false);
 
-        // Position at top-left corner (outside VerticalLayoutGroup control)
+        // Position inset from top-left of thumbnail (thumbnail starts at topPadding from card top)
         RectTransform checkboxRT = _checkbox.AddComponent<RectTransform>();
         checkboxRT.anchorMin = new Vector2(0, 1);
         checkboxRT.anchorMax = new Vector2(0, 1);
         checkboxRT.pivot = new Vector2(0, 1);
         checkboxRT.sizeDelta = new Vector2(checkboxSize, checkboxSize);
-        checkboxRT.anchoredPosition = new Vector2(offset, -offset);
+        checkboxRT.anchoredPosition = new Vector2(inset, -(topPadding + inset));
 
         // Ignore layout so it stays in corner
         var layoutIgnorer = _checkbox.AddComponent<LayoutElement>();
         layoutIgnorer.ignoreLayout = true;
 
-        // Background (glass style)
+        // Background (solid dark color matching item hover)
         Image checkboxBg = _checkbox.AddComponent<Image>();
         checkboxBg.raycastTarget = true;
-        Color primaryColor = new Color(0f, 0.9f, 1f); // Default cyan
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
-        if (glassShader != null)
-        {
-            Material mat = new Material(glassShader);
-            mat.SetFloat("_Aspect", 1f);
-            mat.SetFloat("_CornerRadius", 0.25f);
-            mat.SetFloat("_EdgePadding", 0.02f);
-            mat.SetColor("_ColorA", new Color(primaryColor.r, primaryColor.g, primaryColor.b, 0.4f));
-            mat.SetColor("_ColorB", new Color(primaryColor.r, primaryColor.g, primaryColor.b, 0.15f));
-            mat.SetFloat("_GlassAlpha", 0.25f);
-            mat.SetFloat("_FresnelStrength", 0.15f);
-            checkboxBg.material = mat;
-            checkboxBg.color = Color.white;
-        }
+        checkboxBg.sprite = GetCheckboxSprite();
+        checkboxBg.type = Image.Type.Sliced;
+        checkboxBg.color = HoverColor;  // Same as item hover: new Color(0f, 0f, 0f, 0.3f)
 
         // Checkmark icon (hidden by default)
         GameObject checkmarkObj = new GameObject("Checkmark");
@@ -566,8 +555,10 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
     #region Helper Methods
     // Cached rounded rectangle sprite
     private static Sprite _cachedRoundedSprite;
+    private static Sprite _cachedCheckboxSprite;
     private const int ROUNDED_RECT_SIZE = 64;
     private const int CORNER_RADIUS = 16;
+    private const int CHECKBOX_CORNER_RADIUS = 6;  // Smaller radius for square-ish checkbox
 
     private static Sprite GetRoundedRectSprite()
     {
@@ -617,6 +608,56 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         );
 
         return _cachedRoundedSprite;
+    }
+
+    private static Sprite GetCheckboxSprite()
+    {
+        if (_cachedCheckboxSprite != null) return _cachedCheckboxSprite;
+
+        int size = ROUNDED_RECT_SIZE;
+        int radius = CHECKBOX_CORNER_RADIUS;
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        tex.filterMode = FilterMode.Bilinear;
+
+        Color[] pixels = new Color[size * size];
+        float halfSize = size * 0.5f;
+        float innerRadius = radius;
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float dx = Mathf.Abs(x - halfSize + 0.5f);
+                float dy = Mathf.Abs(y - halfSize + 0.5f);
+
+                float innerHalfX = halfSize - innerRadius;
+                float innerHalfY = halfSize - innerRadius;
+
+                float qx = Mathf.Max(dx - innerHalfX, 0f);
+                float qy = Mathf.Max(dy - innerHalfY, 0f);
+                float dist = Mathf.Sqrt(qx * qx + qy * qy) - innerRadius;
+
+                float alpha = 1f - Mathf.Clamp01((dist + 0.5f) / 1.5f);
+
+                pixels[y * size + x] = new Color(1f, 1f, 1f, alpha);
+            }
+        }
+
+        tex.SetPixels(pixels);
+        tex.Apply();
+
+        int border = radius + 2;
+        _cachedCheckboxSprite = Sprite.Create(
+            tex,
+            new Rect(0, 0, size, size),
+            Vector2.one * 0.5f,
+            100f,
+            0,
+            SpriteMeshType.FullRect,
+            new Vector4(border, border, border, border)
+        );
+
+        return _cachedCheckboxSprite;
     }
 
     /// <summary>

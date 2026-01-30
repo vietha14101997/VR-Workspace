@@ -193,16 +193,13 @@ public class RTTMediaLibrary : MonoBehaviour
 
     private void OnEnable()
     {
-        Debug.Log($"[RTTMediaLibrary] OnEnable: _viewReady={_viewReady}");
         if (!_viewReady) return;
 
-        Debug.Log("[RTTMediaLibrary] OnEnable: Activating side frames and showing Pagination/ActionBar");
         if (_leftFrame != null) _leftFrame.gameObject.SetActive(true);
         if (_rightFrame != null) _rightFrame.gameObject.SetActive(true);
         if (_pagination != null) _pagination.Show();
 
         // Show action bar when app is re-opened (if not in edit mode)
-        // ShowWithFade() will queue pending and fade when position becomes valid
         if (_mediaActionBar != null && !_isEditMode)
         {
             _mediaActionBar.ShowWithFade();
@@ -211,12 +208,10 @@ public class RTTMediaLibrary : MonoBehaviour
 
     private void OnDisable()
     {
-        Debug.Log("[RTTMediaLibrary] OnDisable: Hiding Pagination/ActionBar");
         if (_leftFrame != null) _leftFrame.gameObject.SetActive(false);
         if (_rightFrame != null) _rightFrame.gameObject.SetActive(false);
         if (_pagination != null) _pagination.Hide();
 
-        // Hide action bar immediately when switching apps
         if (_mediaActionBar != null) _mediaActionBar.HideImmediate();
 
         if (_viewOptionsPopup != null) _viewOptionsPopup.Hide();
@@ -564,6 +559,7 @@ public class RTTMediaLibrary : MonoBehaviour
         _grid.OnVideoHoverEnter += OnGridVideoHoverEnter;
         _grid.OnVideoHoverExit += OnGridVideoHoverExit;
         _grid.OnPageChanged += OnGridPageChanged;
+        _grid.SetSelectionChangedCallback(OnSelectionChanged);
 
         // Render Order
         headerObj.transform.SetAsLastSibling();
@@ -865,7 +861,7 @@ public class RTTMediaLibrary : MonoBehaviour
     {
         float checkboxSize = 50f;
         float labelWidth = 150f;
-        float spacing = 10f;
+        float spacing = 20f;  // Doubled spacing between checkbox and label
         float leftPadding = 20f;
 
         GameObject container = new GameObject("SelectAllContainer");
@@ -887,20 +883,9 @@ public class RTTMediaLibrary : MonoBehaviour
 
         Image checkboxBg = _selectAllCheckbox.AddComponent<Image>();
         checkboxBg.raycastTarget = true;
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
-        if (glassShader != null)
-        {
-            Material mat = new Material(glassShader);
-            mat.SetFloat("_Aspect", 1f);
-            mat.SetFloat("_CornerRadius", 0.25f);
-            mat.SetFloat("_EdgePadding", 0.02f);
-            mat.SetColor("_ColorA", new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.3f));
-            mat.SetColor("_ColorB", new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.1f));
-            mat.SetFloat("_GlassAlpha", 0.2f);
-            mat.SetFloat("_FresnelStrength", 0.15f);
-            checkboxBg.material = mat;
-            checkboxBg.color = Color.white;
-        }
+        checkboxBg.sprite = GetRoundedRectSprite();
+        checkboxBg.type = Image.Type.Sliced;
+        checkboxBg.color = new Color(0f, 0f, 0f, 0.3f);  // Same as item hover color
 
         // Checkmark icon
         GameObject checkmarkObj = new GameObject("Checkmark");
@@ -926,6 +911,14 @@ public class RTTMediaLibrary : MonoBehaviour
         var collider = _selectAllCheckbox.AddComponent<BoxCollider>();
         collider.size = new Vector3(checkboxSize, checkboxSize, 10);
         collider.center = new Vector3(checkboxSize / 2f, 0, -5);
+
+        // Hover effect
+        var hoverController = _selectAllCheckbox.AddComponent<HoverEffectController>();
+        hoverController.TargetVisuals = _selectAllCheckbox.transform;
+        var scaleEffect = new ScaleHoverEffect()
+            .WithHoverScale(1.1f)
+            .WithTransitionDuration(0.1f);
+        hoverController.AddEffect(scaleEffect);
 
         // Label
         GameObject labelObj = new GameObject("Label");
@@ -1612,17 +1605,21 @@ public class RTTMediaLibrary : MonoBehaviour
         if (_isEditMode)
         {
             // Entering edit mode: clear controller's selected video state
-            // This ensures hover/unhover shows empty state when not hovering
             _controller?.ClearSelectedVideo();
 
             // Clear detail panel and hide action bar
             _detailPanel?.ShowEmpty();
             _mediaActionBar?.SetVisible(false);
+
+            // Update selected count when entering edit mode
+            UpdateSelectedCountText();
         }
         else
         {
             // Exiting edit mode: clear checkbox selection
             ClearSelection();
+            UpdateSelectAllCheckmark();
+            UpdateSelectedCountText();
 
             // Restore detail panel if there was a selected video
             if (_hasSelectedVideo && _currentVideo.HasValue)
@@ -1630,10 +1627,32 @@ public class RTTMediaLibrary : MonoBehaviour
                 var mockFile = ConvertToMockFile(_currentVideo.Value);
                 _detailPanel?.UpdateInfo(mockFile, isCurrentFolder: false);
                 _mediaActionBar?.SetVisible(true);
+                // Restore controller's selected video so hover/unhover works correctly
+                _controller?.SelectVideo(_currentVideo.Value);
+            }
+            else
+            {
+                // Check if grid has a visually selected video
+                var selectedVideo = _grid?.SelectedVideo;
+                if (selectedVideo.HasValue)
+                {
+                    // Restore _hasSelectedVideo since there's a visually selected item
+                    _hasSelectedVideo = true;
+                    _currentVideo = selectedVideo.Value;
+
+                    var mockFile = ConvertToMockFile(selectedVideo.Value);
+                    _detailPanel?.UpdateInfo(mockFile, isCurrentFolder: false);
+                    _mediaActionBar?.SetVisible(true);
+                    // Restore controller's selected video
+                    _controller?.SelectVideo(selectedVideo.Value);
+                }
+                else
+                {
+                    // No selected video, show empty detail panel
+                    _detailPanel?.ShowEmpty();
+                }
             }
         }
-
-        Debug.Log($"[RTTMediaLibrary] Edit mode: {_isEditMode}");
     }
 
     private void UpdateEditButtonVisual()
@@ -1686,12 +1705,14 @@ public class RTTMediaLibrary : MonoBehaviour
     private void UpdateSelectAllCheckmark()
     {
         if (_selectAllCheckmark == null) return;
-        _selectAllCheckmark.gameObject.SetActive(_selectedItems.Count > 0);
+        bool allSelected = _grid != null && _grid.AreAllSelected();
+        _selectAllCheckmark.gameObject.SetActive(allSelected);
     }
 
     public void ClearSelection()
     {
         _selectedItems.Clear();
+        _grid?.SetAllSelected(false);
         UpdateSelectAllCheckmark();
         UpdateSelectedCountText();
         UpdateActionButtonsState();
@@ -1778,12 +1799,10 @@ public class RTTMediaLibrary : MonoBehaviour
 
     private void OnGridVideoSelected(MediaVideoInfo video)
     {
-        Debug.Log($"[RTTMediaLibrary] OnGridVideoSelected: {video.Title}, _isEditMode={_isEditMode}, _mediaActionBar={((_mediaActionBar != null) ? "exists" : "NULL")}");
+        // In edit mode, don't process video selection (checkboxes are handled separately)
+        if (_isEditMode) return;
 
-        // Mark that we have a selected video
         _hasSelectedVideo = true;
-
-        // Store current video for action buttons
         _currentVideo = video;
 
         // Notify controller of selection (controller manages detail panel via hover/select logic)
@@ -1791,9 +1810,6 @@ public class RTTMediaLibrary : MonoBehaviour
 
         // Update favourite icon state
         UpdateFavouriteButtonState(video.IsFavorite);
-
-        // ActionBar is always visible for Media Library (when not in edit mode)
-        // Visibility is managed in CreateMediaActionBar and ToggleEditMode
     }
 
     private void OnGridVideoHoverEnter(MediaVideoInfo video)
@@ -1804,6 +1820,23 @@ public class RTTMediaLibrary : MonoBehaviour
     private void OnGridVideoHoverExit(MediaVideoInfo video)
     {
         _controller?.UnhoverVideo(video);
+    }
+
+    private void OnSelectionChanged()
+    {
+        // Sync _selectedItems with grid's selection
+        _selectedItems.Clear();
+        if (_grid != null)
+        {
+            foreach (var path in _grid.GetSelectedPaths())
+            {
+                _selectedItems.Add(path);
+            }
+        }
+
+        UpdateSelectAllCheckmark();
+        UpdateSelectedCountText();
+        UpdateActionButtonsState();
     }
 
     /// <summary>
@@ -1897,16 +1930,21 @@ public class RTTMediaLibrary : MonoBehaviour
 
     private void OnSelectAllClicked()
     {
-        if (_selectedItems.Count > 0)
+        if (_grid == null) return;
+
+        bool allSelected = _grid.AreAllSelected();
+        _grid.SetAllSelected(!allSelected);
+
+        // Sync _selectedItems with grid's selection
+        _selectedItems.Clear();
+        foreach (var path in _grid.GetSelectedPaths())
         {
-            ClearSelection();
+            _selectedItems.Add(path);
         }
-        else
-        {
-            // Select all visible items - would need grid access
-            Debug.Log("[RTTMediaLibrary] Select all clicked");
-        }
+
         UpdateSelectAllCheckmark();
+        UpdateSelectedCountText();
+        UpdateActionButtonsState();
     }
 
     private void OnRenameClicked()
@@ -1937,6 +1975,59 @@ public class RTTMediaLibrary : MonoBehaviour
 
         Debug.Log($"[RTTMediaLibrary] Delete requested for {_selectedItems.Count} items");
         // TODO: Show confirmation dialog
+    }
+    #endregion
+
+    #region Helper Methods
+    // Cached rounded rectangle sprite for checkboxes
+    private static Sprite _cachedRoundedSprite;
+
+    private static Sprite GetRoundedRectSprite()
+    {
+        if (_cachedRoundedSprite != null) return _cachedRoundedSprite;
+
+        int size = 64;
+        int radius = 6;  // Small radius for square-ish checkbox with slight rounding
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        tex.filterMode = FilterMode.Bilinear;
+
+        Color[] pixels = new Color[size * size];
+        float halfSize = size * 0.5f;
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float dx = Mathf.Abs(x - halfSize + 0.5f);
+                float dy = Mathf.Abs(y - halfSize + 0.5f);
+
+                float innerHalfX = halfSize - radius;
+                float innerHalfY = halfSize - radius;
+
+                float qx = Mathf.Max(dx - innerHalfX, 0f);
+                float qy = Mathf.Max(dy - innerHalfY, 0f);
+                float dist = Mathf.Sqrt(qx * qx + qy * qy) - radius;
+
+                float alpha = 1f - Mathf.Clamp01((dist + 0.5f) / 1.5f);
+                pixels[y * size + x] = new Color(1f, 1f, 1f, alpha);
+            }
+        }
+
+        tex.SetPixels(pixels);
+        tex.Apply();
+
+        int border = radius + 2;
+        _cachedRoundedSprite = Sprite.Create(
+            tex,
+            new Rect(0, 0, size, size),
+            Vector2.one * 0.5f,
+            100f,
+            0,
+            SpriteMeshType.FullRect,
+            new Vector4(border, border, border, border)
+        );
+
+        return _cachedRoundedSprite;
     }
     #endregion
 }

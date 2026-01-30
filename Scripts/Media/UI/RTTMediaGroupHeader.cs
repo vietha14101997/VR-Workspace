@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System;
+using VRWorkspace.UI.HoverEffects;
 
 /// <summary>
 /// Group header component for RTTMediaGrid.
@@ -89,11 +90,12 @@ public class RTTMediaGroupHeader : MonoBehaviour
         checkboxRT.sizeDelta = new Vector2(CHECKBOX_SIZE, CHECKBOX_SIZE);
         checkboxRT.anchoredPosition = new Vector2(-PADDING_RIGHT, 0);
 
-        // Checkbox Background
+        // Checkbox Background (solid dark color matching item hover)
         _checkboxBg = _checkboxContainer.AddComponent<Image>();
-        _checkboxBg.color = new Color(0.2f, 0.2f, 0.2f, 0.8f);
-
-        // Rounded corners would need a custom shader/sprite, using simple square for now
+        _checkboxBg.raycastTarget = true;
+        _checkboxBg.sprite = GetRoundedRectSprite();
+        _checkboxBg.type = Image.Type.Sliced;
+        _checkboxBg.color = new Color(0f, 0f, 0f, 0.3f);  // Same as item hover color
 
         // Checkmark
         GameObject checkmarkObj = new GameObject("Checkmark");
@@ -117,6 +119,14 @@ public class RTTMediaGroupHeader : MonoBehaviour
         // Button component for click handling
         _checkboxButton = _checkboxContainer.AddComponent<Button>();
         _checkboxButton.onClick.AddListener(OnCheckboxClicked);
+
+        // Hover effect
+        var hoverController = _checkboxContainer.AddComponent<HoverEffectController>();
+        hoverController.TargetVisuals = _checkboxContainer.transform;
+        var scaleEffect = new ScaleHoverEffect()
+            .WithHoverScale(1.1f)
+            .WithTransitionDuration(0.1f);
+        hoverController.AddEffect(scaleEffect);
 
         // Hide checkbox by default (shown only in edit mode)
         _checkboxContainer.SetActive(false);
@@ -179,12 +189,51 @@ public class RTTMediaGroupHeader : MonoBehaviour
             _checkmarkImage.gameObject.SetActive(_isSelected);
         }
 
-        if (_checkboxBg != null)
+        // Checkbox background uses solid color - no color change needed
+        // The checkmark visibility is sufficient to indicate selection state
+    }
+
+    private Sprite GetRoundedRectSprite()
+    {
+        // Try to load a rounded rect sprite, or create a simple one
+        Sprite sprite = Resources.Load<Sprite>("rounded_rect");
+        if (sprite != null) return sprite;
+
+        // Create a simple rounded rect texture
+        int size = 32;
+        int radius = 4;  // Small radius for square-ish checkbox with slight rounding
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        Color[] pixels = new Color[size * size];
+
+        for (int y = 0; y < size; y++)
         {
-            _checkboxBg.color = _isSelected
-                ? new Color(_accentColor.r, _accentColor.g, _accentColor.b, 0.3f)
-                : new Color(0.2f, 0.2f, 0.2f, 0.8f);
+            for (int x = 0; x < size; x++)
+            {
+                // Check if pixel is inside rounded rect
+                bool inside = true;
+                int dx = 0, dy = 0;
+
+                if (x < radius) dx = radius - x;
+                else if (x >= size - radius) dx = x - (size - radius - 1);
+
+                if (y < radius) dy = radius - y;
+                else if (y >= size - radius) dy = y - (size - radius - 1);
+
+                if (dx > 0 && dy > 0)
+                {
+                    inside = (dx * dx + dy * dy) <= (radius * radius);
+                }
+
+                pixels[y * size + x] = inside ? Color.white : Color.clear;
+            }
         }
+
+        tex.SetPixels(pixels);
+        tex.Apply();
+
+        // Create sprite with proper border for 9-slicing
+        return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f,
+            0, SpriteMeshType.FullRect, new Vector4(radius, radius, radius, radius));
     }
     #endregion
 }
