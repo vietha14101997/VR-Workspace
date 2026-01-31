@@ -1,13 +1,14 @@
 using UnityEngine;
 using TMPro;
 using System;
+using System.Collections;
 
 /// <summary>
 /// Main controller for the Media App.
 /// Manages switching between Library mode (browse videos) and Player mode (playback).
 /// Follows the same MVVM pattern as RTTFileManagerController.
 /// </summary>
-public class VRMediaAppController : MonoBehaviour
+public class VRMediaAppController : MonoBehaviour, IDataBindable
 {
     #region Enums
     public enum AppMode
@@ -469,6 +470,61 @@ public class VRMediaAppController : MonoBehaviour
     private void HandleLibraryCloseRequested()
     {
         OnBackClicked?.Invoke();
+    }
+    #endregion
+
+    #region IDataBindable Implementation
+    /// <summary>
+    /// Delegate to library controller - check if data is ready
+    /// </summary>
+    public bool IsDataReady => _libraryController?.IsDataReady ?? false;
+
+    /// <summary>
+    /// Delegate to library controller - check if preparing data
+    /// </summary>
+    public bool IsPreparingData => _libraryController?.IsPreparingData ?? false;
+
+    /// <summary>
+    /// Start preparing data in background - delegate to library controller
+    /// </summary>
+    public void PrepareDataAsync()
+    {
+        _libraryController?.PrepareDataAsync();
+    }
+
+    /// <summary>
+    /// Bind data safely - delegate to library controller
+    /// </summary>
+    public IEnumerator BindDataSafely()
+    {
+        if (_libraryController != null)
+        {
+            yield return StartCoroutine(_libraryController.BindDataSafely());
+        }
+    }
+
+    /// <summary>
+    /// Show loading spinner - delegate to library controller
+    /// </summary>
+    public void ShowLoadingSpinner()
+    {
+        _libraryController?.ShowLoadingSpinner();
+    }
+
+    /// <summary>
+    /// Hide loading spinner - delegate to library controller
+    /// </summary>
+    public void HideLoadingSpinner()
+    {
+        _libraryController?.HideLoadingSpinner();
+    }
+
+    /// <summary>
+    /// Called when app is fully visible after transition - show side panels
+    /// </summary>
+    public void OnAppShown()
+    {
+        _libraryController?.OnAppShown();
     }
     #endregion
 

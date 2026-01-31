@@ -282,21 +282,44 @@ public class RTTMediaLibrary : MonoBehaviour
         float sideWidth = mainPanelWidth / 3f;
         float sideHeight = mainPanelHeight;
 
-        // Left Panel (Navigation)
+        // Left Panel (Navigation) - created hidden, shown when app opens
         PlaceSidePanelOnSphere("MediaNavigationPanel", -1, mainPanelWidth, sideWidth, sideHeight, SIDE_PANEL_GAP, ref _leftFrame);
         if (_leftFrame != null)
         {
-            _leftFrame.SetVisible(true);
+            _leftFrame.SetVisible(false); // Hidden during prepare phase
             StartCoroutine(CreateLeftPanelContent());
         }
 
-        // Right Panel (Detail)
+        // Right Panel (Detail) - created hidden, shown when app opens
         PlaceSidePanelOnSphere("MediaDetailPanel", 1, mainPanelWidth, sideWidth, sideHeight, SIDE_PANEL_GAP, ref _rightFrame);
         if (_rightFrame != null)
         {
-            _rightFrame.SetVisible(true);
+            _rightFrame.SetVisible(false); // Hidden during prepare phase
             StartCoroutine(CreateRightPanelContent());
         }
+    }
+
+    /// <summary>
+    /// Show side panels when app transition completes.
+    /// Called by controller after app is fully visible.
+    /// </summary>
+    public void ShowSidePanels()
+    {
+        if (_leftFrame != null)
+            _leftFrame.SetVisible(true);
+        if (_rightFrame != null)
+            _rightFrame.SetVisible(true);
+    }
+
+    /// <summary>
+    /// Hide side panels (for prepare phase or app closing).
+    /// </summary>
+    public void HideSidePanels()
+    {
+        if (_leftFrame != null)
+            _leftFrame.SetVisible(false);
+        if (_rightFrame != null)
+            _rightFrame.SetVisible(false);
     }
 
     private void PlaceSidePanelOnSphere(string name, int side, float mainWidth, float sideWidth, float sideHeight,

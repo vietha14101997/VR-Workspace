@@ -94,21 +94,21 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [RTTManager] Auto-recenter completed
 
-[RTTMainMenu] Click started: media at 7.738s
+[RTTMainMenu] Click started: media at 6.372s
 
-[RTTMainMenu] PrepareApp called: media at 7.738s (+0.1ms)
+[RTTMainMenu] PrepareApp called: media at 6.372s (+0.1ms)
 
-[RTTAppManager] PrepareAppFrameAsync started: media at 7.741s
+[RTTAppManager] PrepareAppFrameAsync started: media at 6.374s
 
 [RTTMenu] Created app frame: media
 
-[RTTAppManager] Frame created: media at 7.741s (+0.4ms)
+[RTTAppManager] Frame created: media at 6.375s (+0.4ms)
 
 [RTTAppManager] Preparing app: media in slot 1
 
-[RTTMainMenu] Button animation started: media at 7.742s (+3.3ms)
+[RTTMainMenu] Button animation started: media at 6.375s (+3.2ms)
 
-[RTTAppManager] Creating content: media at 7.770s (+29.6ms)
+[RTTAppManager] Creating content: media at 6.404s (+29.9ms)
 
 [RTTManager] Creating Media content...
 
@@ -116,45 +116,11 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [VRVideoProjectionSystem] Initialized
 
-[MediaLibraryService] Loading 1312 items from cache (async)...
+[MediaLibraryService] Loading 1313 items from cache (async)...
 
 [VirtualObjectsZoomController] Registered side panel: MediaNavigationPanel (side=-1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
-[RTTMenuFrame] UI built: 640x1080 logical pixels
-
-[HoverEffectController] AddEffect 'scale' to Item_all, TargetVisuals=Item_all
-
-[HoverEffectController] AddEffect 'color' to Item_all, TargetVisuals=Item_all
-
-[HoverEffectController] AddEffect 'scale' to Item_videos, TargetVisuals=Item_videos
-
-[HoverEffectController] AddEffect 'color' to Item_videos, TargetVisuals=Item_videos
-
-[HoverEffectController] AddEffect 'scale' to Item_images, TargetVisuals=Item_images
-
-[HoverEffectController] AddEffect 'color' to Item_images, TargetVisuals=Item_images
-
-[HoverEffectController] AddEffect 'scale' to Item_audio, TargetVisuals=Item_audio
-
-[HoverEffectController] AddEffect 'color' to Item_audio, TargetVisuals=Item_audio
-
-[HoverEffectController] AddEffect 'scale' to Item_recent, TargetVisuals=Item_recent
-
-[HoverEffectController] AddEffect 'color' to Item_recent, TargetVisuals=Item_recent
-
-[HoverEffectController] AddEffect 'scale' to Item_favorites, TargetVisuals=Item_favorites
-
-[HoverEffectController] AddEffect 'color' to Item_favorites, TargetVisuals=Item_favorites
-
-[HoverEffectController] AddEffect 'scale' to Item_playlists, TargetVisuals=Item_playlists
-
-[HoverEffectController] AddEffect 'color' to Item_playlists, TargetVisuals=Item_playlists
-
-[RTTMediaLibrary] Left panel content created
-
 [VirtualObjectsZoomController] Registered side panel: MediaDetailPanel (side=1, mainW=1.6, sideW=0.5333334, gap=0.05)
-
-[RTTMediaLibrary] Right panel content created with RTTFileDetail
 
 [RTTPopupMenu] CreateWorldSpace: layer 'VirtualObjects' = 3, mainCam: VRCamera
 
@@ -162,7 +128,7 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [HoverEffectController] AddEffect 'cursor_change' to HitArea, TargetVisuals=Visuals
 
-[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-767388
+[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-914094
 
 [HoverEffectController] AddEffect 'scale' to Checkbox, TargetVisuals=Checkbox
 
@@ -184,55 +150,61 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [VRMediaAppController] Media app created
 
-[RTTAppManager] Content created: media at 7.940s (+199.9ms)
+[RTTAppManager] Content created: media at 6.540s (+166.0ms)
 
-[RTTAppManager] App prepared (ready for transition): media at 7.941s (total: 199.9ms)
+[RTTAppManager] PrepareDataAsync started: media at 6.540s
 
-[RTTMediaLibrary] InitializePageSizeDeferred: itemsPerPage=8
+[RTTAppManager] App prepared (hidden): media at 6.544s (total: 169.4ms)
 
-[RTTMainMenu] Button animation ended: media at 7.988s (+250.3ms)
+[RTTMainMenu] Button animation ended: media at 6.565s (+192.6ms)
 
-[RTTMainMenu] OpenPreparedApp called: media at 7.989s (+250.4ms)
+[RTTMainMenu] OpenPreparedApp called: media at 6.565s (+192.6ms)
 
-[RTTAppManager] WaitAndSwitch started: media at 7.989s
+[RTTAppManager] WaitAndSwitch started: media at 6.565s
 
-[RTTAppManager] WaitAndSwitch app ready: media at 7.989s (waited 0.1ms)
+[RTTAppManager] WaitAndSwitch app ready: media at 6.565s (waited 0.1ms)
 
-[RTTAppManager] Starting transition: media at 7.989s
+[RTTAppManager] Starting transition: media at 6.566s
 
-[RTTAppManager] Transition started: media at 7.990s
+[RTTAppManager] Transition started: media at 6.566s
 
-[RTTAppManager] Fade out MainMenu: media at 7.990s
+[RTTAppManager] Fade out MainMenu: media at 6.566s
 
-[RTTMainMenu] Click flow completed: media at 7.990s (total: +252.2ms)
+[RTTMainMenu] Click flow completed: media at 6.567s (total: +194.9ms)
 
-[RTTAppManager] Fade out done: media at 8.105s (+115.2ms)
+[RTTAppManager] Fade out done: media at 6.682s (+115.6ms)
 
-[RTTAppManager] Frame visible: media at 8.106s (+116.3ms)
+[RTTAppManager] Frame visible: media at 6.687s (+120.6ms)
 
-[RTTAppManager] Fade in started: media at 8.106s
+[RTTAppManager] BindDataSafely started: media at 6.687s
 
-[MediaLibraryService] Loaded 1312 items from cache in 396ms (async, no File.Exists)
+[RTTMenuFrame] UI built: 640x1080 logical pixels
+
+[MediaLibraryService] Loaded 1313 items from cache in 365ms (async, no File.Exists)
 
 [RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
 [Cache] DISK READ: 0ms (110KB)
 
-[Cache] DISK DECODE: 2ms (512x267)
-
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46.mp4
-
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46.mp4
+[Cache] DISK DECODE: 3ms (512x267)
 
 [RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-17-43': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
 [Cache] DISK READ: 0ms (121KB)
 
-[Cache] DISK DECODE: 3ms (512x267)
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46.mp4
+
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46.mp4
 
 [RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-42-48': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[Cache] DISK READ: 0ms (116KB)
+[Cache] DISK READ: 1ms (116KB)
+
+[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 12-13-57': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (67KB)
+
+[Cache] DISK DECODE: 2ms (512x267)
 
 [RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
@@ -252,23 +224,19 @@ Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling b
 
 [Cache] DISK DECODE: 3ms (512x288)
 
+[RTTMediaGrid] Auto-selecting first item: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46
+
+[RTTMediaGrid] Progressive binding started: 12 items queued, budgetMs=6
+
 [RTTMediaGridItem] Duration badge for 'Genshin-Impact 2026-1-26 12-24-11': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
 [Cache] DISK READ: 0ms (199KB)
 
 [Cache] DISK DECODE: 4ms (512x288)
 
-[RTTMediaGrid] Auto-selecting first item: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46
+[RTTAppManager] BindDataSafely done: media at 6.996s (+429.4ms)
 
-[Detail] REQUEST: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46.mp4
-
-[Cache] DISK READ: 0ms (100KB)
-
-[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46.mp4 wait=13ms assign=0ms
-
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46.mp4 name=0ms preview=15ms metadata=10ms total=25ms
-
-[RTTMediaGrid] Progressive binding started: 11 items queued, budgetMs=6
+[RTTAppManager] Fade in started: media at 6.996s
 
 [RTTMediaGridItem] Duration badge for 'video_client': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
@@ -318,13 +286,19 @@ Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling b
 
 [Cache] DISK READ: 0ms (48KB)
 
+[Cache] DISK DECODE: 2ms (512x288)
+
 [RTTMediaGridItem] Duration badge for 'vết xước 1': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
 [Cache] DISK READ: 0ms (101KB)
 
 [Cache] DISK DECODE: 2ms (512x284)
 
-[RTTAppManager] Fade in done: media at 8.612s (+621.9ms)
+[RTTMediaGrid] Progressive binding complete: bound=4, skipped=8
+
+[MediaLibraryService] Starting background scan (existing: 1313 items)
+
+[RTTAppManager] Fade in done: media at 7.235s (+668.8ms)
 
 [RTTTaskbar] RegisterApp called - slotIndex=1, icon=icon_media
 
@@ -342,15 +316,21 @@ Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling b
 
 [RTTTaskbar] SelectSlot(1) called, current active: 1
 
-[RTTAppManager] Transition completed: media at 8.652s (total: 661.8ms)
+[RTTAppManager] Transition completed: media at 7.265s (total: 699.0ms)
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-17-43.mp4
 
 Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-17-43.mp4
 
+[MediaLibraryService] Background scan complete - no new items (157ms)
+
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-42-48.mp4
 
 Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-42-48.mp4
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 12-13-57.mp4
+
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 12-13-57.mp4
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4
 
@@ -388,15 +368,76 @@ Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling b
 
 Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\New folder\vết xước 1.mp4
 
-[Detail] REQUEST: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-51-25.mp4
+[RTTTaskbar] SelectSlot(0) called, current active: 1
 
-[Cache] DISK READ: 8ms (93KB)
+[RTTTaskbar] Selected app with slot index 0
 
-[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-51-25.mp4 wait=22ms assign=0ms
+[VRVideoProjectionSystem] Disposed
 
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-51-25.mp4 name=1ms preview=22ms metadata=11ms total=34ms
+[VirtualObjectsZoomController] Unregistered side panel: MediaNavigationPanel
 
-[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46.mp4 wait=0ms assign=0ms
+[VirtualObjectsZoomController] Unregistered side panel: MediaDetailPanel
 
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46.mp4 name=1ms preview=0ms metadata=11ms total=12ms
+[VRMediaAppController] Cleanup completed
+
+[RTTTaskbar] Unregistered app slot 1, remaining apps: 0
+
+[RTTAppManager] Closed app: media
+
+Destroying assets is not permitted to avoid data loss.
+If you really want to remove an asset use DestroyImmediate (theObject, true);
+UnityEngine.Object:Destroy (UnityEngine.Object)
+VRWorkspace.UI.HoverEffects.CursorChangeHoverEffect:Cleanup () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Effects/CursorChangeHoverEffect.cs:118)
+VRWorkspace.UI.HoverEffects.HoverEffectController:CleanupEffects () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Core/HoverEffectController.cs:311)
+VRWorkspace.UI.HoverEffects.HoverEffectController:OnDestroy () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Core/HoverEffectController.cs:318)
+
+[RTTMainMenu] Click started: media at 18.722s
+
+[RTTMainMenu] PrepareApp called: media at 18.722s (+0.1ms)
+
+[RTTAppManager] PrepareAppFrameAsync started: media at 18.722s
+
+[RTTAppManager] Frame created: media at 18.722s (+0.1ms)
+
+[RTTMainMenu] Button animation started: media at 18.722s (+0.4ms)
+
+[RTTAppManager] Creating content: media at 18.755s (+33.3ms)
+
+[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-923006
+
+[RTTAppManager] Content created: media at 18.853s (+131.4ms)
+
+[RTTAppManager] PrepareDataAsync started: media at 18.853s
+
+[RTTAppManager] App prepared (hidden): media at 18.856s (total: 133.9ms)
+
+[RTTMainMenu] Button animation ended: media at 18.876s (+154.7ms)
+
+[RTTMainMenu] OpenPreparedApp called: media at 18.876s (+154.7ms)
+
+[RTTAppManager] WaitAndSwitch started: media at 18.876s
+
+[RTTAppManager] WaitAndSwitch app ready: media at 18.876s (waited 0.0ms)
+
+[RTTAppManager] Starting transition: media at 18.876s
+
+[RTTAppManager] Transition started: media at 18.877s
+
+[RTTAppManager] Fade out MainMenu: media at 18.877s
+
+[RTTMainMenu] Click flow completed: media at 18.877s (total: +154.9ms)
+
+[RTTAppManager] Fade out done: media at 18.993s (+116.3ms)
+
+[RTTAppManager] Frame visible: media at 19.008s (+131.0ms)
+
+[RTTAppManager] BindDataSafely started: media at 19.008s
+
+[RTTAppManager] BindDataSafely done: media at 19.022s (+145.0ms)
+
+[RTTAppManager] Fade in started: media at 19.022s
+
+[RTTAppManager] Fade in done: media at 19.171s (+294.4ms)
+
+[RTTAppManager] Transition completed: media at 19.189s (total: 312.7ms)
 

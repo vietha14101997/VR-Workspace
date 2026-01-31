@@ -623,27 +623,22 @@ namespace VRWorkspace.UI.RTT
 
             Debug.Log($"[RTTAppManager] Content created: {instance.AppId} at {Time.realtimeSinceStartup:F3}s (+{(Time.realtimeSinceStartup - prepareStart) * 1000:F1}ms)");
 
-            // Start background data preparation AND bind data immediately (while alpha=0)
-            // This ensures grid is populated BEFORE fade-in animation starts
+            // Start background data loading (don't wait - binding happens during transition)
+            // This allows fade out to start immediately after button animation
             if (instance.Controller is IDataBindable bindable)
             {
                 Debug.Log($"[RTTAppManager] PrepareDataAsync started: {instance.AppId} at {Time.realtimeSinceStartup:F3}s");
                 bindable.PrepareDataAsync();
-
-                // Bind data now (frame is active but invisible with alpha=0)
-                // BindDataSafely waits for cache to load, then populates grid
-                Debug.Log($"[RTTAppManager] BindDataSafely started (during prepare): {instance.AppId} at {Time.realtimeSinceStartup:F3}s");
-                yield return StartCoroutine(bindable.BindDataSafely());
-                Debug.Log($"[RTTAppManager] BindDataSafely done: {instance.AppId} at {Time.realtimeSinceStartup:F3}s (+{(Time.realtimeSinceStartup - prepareStart) * 1000:F1}ms)");
             }
 
-            // Mark as prepared
+            // Mark as prepared immediately so transition can start
+            // BindDataSafely will be called during transition (after fade out)
             instance.IsPrepared = true;
 
-            // Keep frame active but invisible (SetVisible was already called with false earlier)
-            // Don't SetActive(false) - grid needs to stay ready for immediate fade-in
+            // Hide frame completely
+            instance.Frame.gameObject.SetActive(false);
 
-            Debug.Log($"[RTTAppManager] App prepared (ready for transition): {instance.AppId} at {Time.realtimeSinceStartup:F3}s (total: {(Time.realtimeSinceStartup - prepareStart) * 1000:F1}ms)");
+            Debug.Log($"[RTTAppManager] App prepared (hidden): {instance.AppId} at {Time.realtimeSinceStartup:F3}s (total: {(Time.realtimeSinceStartup - prepareStart) * 1000:F1}ms)");
         }
 
         private IEnumerator SwitchToPreparedAppWithTransition(RTTAppInstance instance)
@@ -684,7 +679,17 @@ namespace VRWorkspace.UI.RTT
 
             Debug.Log($"[RTTAppManager] Frame visible: {instance.AppId} at {Time.realtimeSinceStartup:F3}s (+{(Time.realtimeSinceStartup - transitionStart) * 1000:F1}ms)");
 
-            // Animate in (grid already populated from prepare phase)
+            // Bind data now (after fade out, before fade in)
+            // Frame is visible but alpha=0, so grid populates invisibly
+            IDataBindable bindable = instance.Controller as IDataBindable;
+            if (bindable != null)
+            {
+                Debug.Log($"[RTTAppManager] BindDataSafely started: {instance.AppId} at {Time.realtimeSinceStartup:F3}s");
+                yield return StartCoroutine(bindable.BindDataSafely());
+                Debug.Log($"[RTTAppManager] BindDataSafely done: {instance.AppId} at {Time.realtimeSinceStartup:F3}s (+{(Time.realtimeSinceStartup - transitionStart) * 1000:F1}ms)");
+            }
+
+            // Animate in (grid now populated)
             if (_useFadeTransition && _transitionInDuration > 0)
             {
                 Debug.Log($"[RTTAppManager] Fade in started: {instance.AppId} at {Time.realtimeSinceStartup:F3}s");
@@ -696,6 +701,9 @@ namespace VRWorkspace.UI.RTT
                 // No fade transition - ensure alpha is reset to 1 (was set to 0 during preparation)
                 ResetFrameAlpha(instance.Frame);
             }
+
+            // Show side panels now that app is visible
+            bindable?.OnAppShown();
 
             // Register with taskbar
             _taskbar?.RegisterApp(instance.TaskbarSlotIndex, instance.Icon, () => SwitchToApp(instance.AppId));

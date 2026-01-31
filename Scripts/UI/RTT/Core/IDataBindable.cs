@@ -38,4 +38,10 @@ public interface IDataBindable
     /// Hide loading spinner.
     /// </summary>
     void HideLoadingSpinner();
+
+    /// <summary>
+    /// Called when app transition completes and app is fully visible.
+    /// Use this to show side panels or perform post-transition setup.
+    /// </summary>
+    void OnAppShown();
 }

@@ -161,6 +161,15 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
     {
         _loadingSpinner?.Hide();
     }
+
+    /// <summary>
+    /// Called when app is fully visible after transition.
+    /// Shows side panels that were hidden during prepare phase.
+    /// </summary>
+    public void OnAppShown()
+    {
+        _view?.ShowSidePanels();
+    }
     #endregion
 
     #region Initialization

@@ -1388,6 +1388,15 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
         _loadingSpinner?.Hide();
     }
 
+    /// <summary>
+    /// Called when app is fully visible after transition.
+    /// FileManager has no side panels, so this is a no-op.
+    /// </summary>
+    public void OnAppShown()
+    {
+        // No side panels to show for FileManager
+    }
+
     private void OnDestroy()
     {
         // Cancel any ongoing scan
