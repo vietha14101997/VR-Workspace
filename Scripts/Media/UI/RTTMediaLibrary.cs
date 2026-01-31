@@ -201,7 +201,8 @@ public class RTTMediaLibrary : MonoBehaviour
         if (_pagination != null) _pagination.Show();
 
         // Show action bar when app is re-opened (if not in edit mode)
-        if (_mediaActionBar != null && !_isEditMode)
+        // BUT only if user previously selected a video - prevents showing during dwell pre-loading
+        if (_mediaActionBar != null && !_isEditMode && _hasSelectedVideo)
         {
             _mediaActionBar.ShowWithFade();
         }
@@ -428,6 +429,9 @@ public class RTTMediaLibrary : MonoBehaviour
         _detailPanel = contentObj.AddComponent<RTTFileDetail>();
         _detailPanel.Initialize(_primaryColor, _accentColor, _font);
 
+        // Start with empty state - will be populated when first video is selected
+        _detailPanel.ShowEmpty();
+
         _rightFrame.MarkDirty();
 
         // Create action bar below the panel (follows panel position)
@@ -470,14 +474,9 @@ public class RTTMediaLibrary : MonoBehaviour
         _mediaActionBar.OnFavouriteClicked += OnFavouriteButtonClicked;
         _mediaActionBar.OnPlaylistClicked += OnPlaylistButtonClicked;
 
-        // Container starts active but invisible (alpha=0) - positioning runs via LateUpdate
-        // For Media Library, always show action bar when app opens (if not in edit mode)
-        // Call ShowWithFade() immediately - it will queue pending and fade when position becomes valid
-        // This syncs the fade animation with Menu's appearance
-        if (!_isEditMode)
-        {
-            _mediaActionBar.ShowWithFade();
-        }
+        // Start hidden - will fade in when first video is selected
+        // This creates smooth progressive loading: grid groups → items → select first → detail + actionbar
+        _mediaActionBar.HideImmediate();
     }
 
     private void ShowActionBarAfterDelay()
@@ -1827,6 +1826,15 @@ public class RTTMediaLibrary : MonoBehaviour
 
         // Update favourite icon state
         UpdateFavouriteButtonState(video.IsFavorite);
+
+        // Show action bar with fade animation only if Media app is the current visible app
+        // During dwell pre-loading, CurrentVisibleAppId is null (main menu) or another app
+        // OnEnable will show ActionBar when app is actually opened/re-opened
+        bool isMediaAppVisible = RTTManager.Instance?.CurrentVisibleAppId == "media";
+        if (isMediaAppVisible)
+        {
+            _mediaActionBar?.ShowWithFade();
+        }
     }
 
     private void OnGridVideoHoverEnter(MediaVideoInfo video)

@@ -221,7 +221,7 @@ public class RTTMenuFrame : RTTCanvasBase
         Image img = bgObj.AddComponent<Image>();
         img.type = Image.Type.Simple;
         img.sprite = GetPixelSprite();
-        img.raycastTarget = true;
+        img.raycastTarget = false; // Frame should be inert - only buttons should receive pointer events
 
         float expansion = glowExpansion;
         // Small edge padding to fill more of the canvas

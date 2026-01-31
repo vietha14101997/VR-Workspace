@@ -6,10 +6,11 @@
 
 Starting camera passthrough
 
-No camera devices found
-UnityEngine.Debug:LogWarning (object)
-CameraPassthrough:StartCam () (at Assets/VR-Workspace/Scripts/Camera/CameraPassthrough.cs:61)
-CameraPassthrough:OnEnable () (at Assets/VR-Workspace/Scripts/Camera/CameraPassthrough.cs:17)
+Found 1 camera devices
+
+Camera 0: Twitch Virtual Cam (front facing: True)
+
+Starting webcam texture: Twitch Virtual Cam at 1280x720
 
 [AndroidHelper] App resumed
 
@@ -31,9 +32,7 @@ CameraPassthrough:OnEnable () (at Assets/VR-Workspace/Scripts/Camera/CameraPasst
 
 [VirtualObjectsZoomController] Configured: min=1m, max=2m, default=1.8m, step=0.1m
 
-[VirtualObjectsZoomController] Moving VirtualObjects from 0.00m to default 1.80m
-
-[VirtualObjectsZoomController] Zoom set to 1.80m (delta: 1.800m)
+[VirtualObjectsZoomController] Initialized. Already at default distance: 1.80m
 
 [RTTBootstrapper] Created VirtualObjectsZoomController (range: 1m - 2m, default: 1.8m)
 
@@ -63,7 +62,16 @@ CameraPassthrough:OnEnable () (at Assets/VR-Workspace/Scripts/Camera/CameraPasst
 
 [RTTManager] Main Menu initialized (persistent, cannot be closed)
 
+Restarting webcam texture as it was not playing
+
 Stopping camera passthrough
+
+Destroying webcam texture
+
+Webcam texture was destroyed during initialization
+UnityEngine.Debug:LogWarning (object)
+CameraPassthrough/<EnsureTextureStarted>d__11:MoveNext () (at Assets/VR-Workspace/Scripts/Camera/CameraPassthrough.cs:171)
+UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [RTTManager] Instant recenter: moved 2 objects to face camera
 
@@ -71,642 +79,9 @@ Stopping camera passthrough
 
 [RTTManager] Auto-recenter completed
 
-[RTTMenu] Created app frame: folder
-
-[RTTAppManager] Preparing app: folder in slot 1
-
-[RTTManager] Creating FileManager content...
-
-[RTTFileManager] Building UI...
-
-[RTTFileManager] Loaded preferences: sortBy=Name, ascending=True, gridView=True
-
-[RTTFileManager] PlaceSidePanel: innerEdge=(-0.92, 0.00, 1.77), panelPos=(-1.13, 0.00, 1.61)
-
-[VirtualObjectsZoomController] Registered side panel: FileNavigationPanel (side=-1, mainW=1.6, sideW=0.5333334, gap=0.05)
-
-[RTTFileManager] Registered FileNavigationPanel with VirtualObjectsZoomController
-
-[RTTFileManager] Placed FileNavigationPanel: pos=(-1.13, 0.00, 1.61)
-
-[RTTMenuFrame] UI built: 640x1080 logical pixels
-
-[HoverEffectController] AddEffect 'scale' to Item_internal, TargetVisuals=Item_internal
-
-[HoverEffectController] AddEffect 'color' to Item_internal, TargetVisuals=Item_internal
-
-[FileSystemService] Root path set to: C:\Users\super
-
-[HoverEffectController] AddEffect 'scale' to Item_downloads, TargetVisuals=Item_downloads
-
-[HoverEffectController] AddEffect 'color' to Item_downloads, TargetVisuals=Item_downloads
-
-[HoverEffectController] AddEffect 'scale' to Item_videos, TargetVisuals=Item_videos
-
-[HoverEffectController] AddEffect 'color' to Item_videos, TargetVisuals=Item_videos
-
-[HoverEffectController] AddEffect 'scale' to Item_music, TargetVisuals=Item_music
-
-[HoverEffectController] AddEffect 'color' to Item_music, TargetVisuals=Item_music
-
-[HoverEffectController] AddEffect 'scale' to Item_recent, TargetVisuals=Item_recent
-
-[HoverEffectController] AddEffect 'color' to Item_recent, TargetVisuals=Item_recent
-
-[RTTFileManager] PlaceSidePanel: innerEdge=(0.78, 0.00, 1.83), panelPos=(1.01, 0.00, 1.69)
-
-[VirtualObjectsZoomController] Registered side panel: FileDetailPanel (side=1, mainW=1.6, sideW=0.5333334, gap=0.05)
-
-[RTTFileManager] Registered FileDetailPanel with VirtualObjectsZoomController
-
-[RTTFileManager] Placed FileDetailPanel: pos=(1.01, 0.00, 1.69)
-
-[RTTFileActionBar] Buttons created
-
-[RTTFileActionBar] Initialized, following: FileDetailPanel
-
-[RTTFileManager] File action bar created (hidden initially)
-
-[RTTFileManager] CreateHeaderRows started, instance: -825342
-
-[RTTFileManager] CreateViewOptionsPopup, _menuFrame null: False
-
-[RTTPopupMenu] CreateWorldSpace: layer 'VirtualObjects' = 3, mainCam: VRCamera
-
-[RTTPopupMenu] Created world-space popup
-
-[RTTFileManager] ViewOptionsPopup created, null: False
-
-[RTTFileManager] ViewOptionsPopup position offset: (-351, 25)
-
-[RTTFileManager] New Folder button created, _newFolderButton null: False
-
-[Controller] CanCreateFolderHere called, _currentPath: 'root'
-
-[FileSystemService] CanCreateFolderInPath called with path: 'root'
-
-[FileSystemService] Path is 'root' or empty, returning false
-
-[Controller] CanCreateFolderHere result: False
-
-[RTTFileManager] UpdateNewFolderButtonState: canCreate=False
-
-[RTTFileManager] BoxCollider.enabled set to False
-
-[RTTFileManager] New Folder button DISABLED - alpha=0.4
-
-[HoverEffectController] AddEffect 'cursor_change' to HitArea, TargetVisuals=Visuals
-
-[RTTFileManager] Text Area found and offsetMin set to: (30.00, 0.00)
-
-[RTTFileManager] CreateRow2 called
-
-[RTTFileManager] Breadcrumb container set: True, instance: -825342
-
-[RTTFileManager] EditControls container created - parent: Row2, sizeDelta: (-340.00, 0.00), rect: (x:0.00, y:-48.51, width:1430.00, height:97.02), instanceID: -827928
-
-[RTTFileManager] CreateEditControlsInRow2 called, parent: EditControls, parent active: True
-
-[HoverEffectController] AddEffect 'scale' to Checkbox, TargetVisuals=Checkbox
-
-[RTTFileManager] CreateEditModeActionButton: Rename, icon 'icon_rename' loaded: True
-
-[HoverEffectController] AddEffect 'scale' to Btn_Rename, TargetVisuals=Btn_Rename
-
-[RTTFileManager] Rename button created: Btn_Rename
-
-[RTTFileManager] CreateEditModeActionButton: Copy, icon 'icon_copy' loaded: True
-
-[HoverEffectController] AddEffect 'scale' to Btn_Copy, TargetVisuals=Btn_Copy
-
-[RTTFileManager] Copy button created: Btn_Copy
-
-[RTTFileManager] CreateEditModeActionButton: Move, icon 'icon_move_folder' loaded: True
-
-[HoverEffectController] AddEffect 'scale' to Btn_Move, TargetVisuals=Btn_Move
-
-[RTTFileManager] CreateEditModeActionButton: Delete, icon 'icon_trash' loaded: True
-
-[HoverEffectController] AddEffect 'scale' to Btn_Delete, TargetVisuals=Btn_Delete
-
-[RTTFileManager] CreateEditControlsInRow2 completed - Rename: True, Copy: True (size: (164.00, 60.00)), Move: True (size: (164.00, 60.00)), Delete: True (size: (190.00, 60.00))
-
-[RTTFileManager] EditControls child count after creation: 5
-
-[RTTFileManager] _editControlsContainer reference instanceID: -827928, same object: True
-
-[RTTFileManager] EditControls set to inactive, activeSelf: False
-
-[RTTFileManager] CreateHeaderRows completed, breadcrumb null: True
-
-[RTTFileGrid] CalculateGridMetrics: width=1770, availableWidth=1730, columnsPerRow=4, cellWidth=395, spacingX=30
-
-[HoverEffectController] AddEffect 'scale' to PooledItem, TargetVisuals=PooledItem
-
-[RTTFileManager] Before OnViewReady - breadcrumb container null: True, instance: -825342
-
-[Controller] SetSortOptionsNoRefresh: sortBy=Name, ascending=True
-
-[Controller] View is ready. Checking storage permissions...
-
-[Controller] NavigateToInternal: path='root', restorePage=False, clickedFolder=''
-
-[Controller] Current state: _currentPath='root', _currentPage=1, _pageSize=10
-
-[Controller] Same path (normalized), skipping save
-
-[FileSystemService] Reading directory: C:\Users\super
-
-[FileSystemService] Raw file count from Directory.GetFiles: 16
-
-[FileSystemService] Checking file: .claude.json, Attributes: Archive
-
-[FileSystemService] ADDED file: .claude.json
-
-[FileSystemService] Checking file: .claude.json.backup, Attributes: Archive
-
-[FileSystemService] ADDED file: .claude.json.backup
-
-[FileSystemService] Checking file: .claude.json.backup.1769787790260, Attributes: Archive
-
-[FileSystemService] ADDED file: .claude.json.backup.1769787790260
-
-[FileSystemService] Checking file: .claude.json.backup.1769789912377, Attributes: Archive
-
-[FileSystemService] ADDED file: .claude.json.backup.1769789912377
-
-[FileSystemService] Checking file: .claude.json.backup.1769795331648, Attributes: Archive
-
-[FileSystemService] ADDED file: .claude.json.backup.1769795331648
-
-[FileSystemService] Checking file: .claude.json.backup.1769795331847, Attributes: Archive
-
-[FileSystemService] ADDED file: .claude.json.backup.1769795331847
-
-[FileSystemService] Checking file: .claude.json.backup.1769795371258, Attributes: Archive
-
-[FileSystemService] ADDED file: .claude.json.backup.1769795371258
-
-[FileSystemService] Checking file: .claude.json.corrupted.1766584464191, Attributes: Archive
-
-[FileSystemService] ADDED file: .claude.json.corrupted.1766584464191
-
-[FileSystemService] Checking file: .gitconfig, Attributes: Archive
-
-[FileSystemService] ADDED file: .gitconfig
-
-[FileSystemService] Checking file: NTUSER.DAT, Attributes: Hidden, Archive, NotContentIndexed
-
-[FileSystemService] SKIPPED (Hidden/System): NTUSER.DAT
-
-[FileSystemService] Checking file: ntuser.dat.LOG1, Attributes: Hidden, System, Archive
-
-[FileSystemService] SKIPPED (Hidden/System): ntuser.dat.LOG1
-
-[FileSystemService] Checking file: ntuser.dat.LOG2, Attributes: Hidden, System, Archive
-
-[FileSystemService] SKIPPED (Hidden/System): ntuser.dat.LOG2
-
-[FileSystemService] Checking file: NTUSER.DAT{2ad838bc-efea-11ee-a54d-000d3a94eaa1}.TM.blf, Attributes: Hidden, System, Archive
-
-[FileSystemService] SKIPPED (Hidden/System): NTUSER.DAT{2ad838bc-efea-11ee-a54d-000d3a94eaa1}.TM.blf
-
-[FileSystemService] Checking file: NTUSER.DAT{2ad838bc-efea-11ee-a54d-000d3a94eaa1}.TMContainer00000000000000000001.regtrans-ms, Attributes: Hidden, System, Archive
-
-[FileSystemService] SKIPPED (Hidden/System): NTUSER.DAT{2ad838bc-efea-11ee-a54d-000d3a94eaa1}.TMContainer00000000000000000001.regtrans-ms
-
-[FileSystemService] Checking file: NTUSER.DAT{2ad838bc-efea-11ee-a54d-000d3a94eaa1}.TMContainer00000000000000000002.regtrans-ms, Attributes: Hidden, System, Archive
-
-[FileSystemService] SKIPPED (Hidden/System): NTUSER.DAT{2ad838bc-efea-11ee-a54d-000d3a94eaa1}.TMContainer00000000000000000002.regtrans-ms
-
-[FileSystemService] Checking file: ntuser.ini, Attributes: Hidden, System
-
-[FileSystemService] SKIPPED (Hidden/System): ntuser.ini
-
-[FileSystemService] Found 39 items (30 folders, 9 files)
-
-[Controller] restorePage=false, reset to page 1
-
-[Controller] CalculateTotalPages: totalFiles=39, pageSize=10, totalPages=4
-
-[RTTFileGrid] GetVisibleRowsForPagination: height=748.1688, availableHeight=728.1688, rowHeight=350, rowsFloat=2.080482, visibleRows=2
-
-[Detail] UpdateInfo: root name=0ms preview=0ms metadata=3ms total=3ms
-
-[RTTFileManager] UpdateBreadcrumbs called with path: root, container null: True, instance: -825342
-
-[RTTFileManager] Breadcrumb container reference lost, searching in hierarchy...
-UnityEngine.Debug:LogWarning (object)
-RTTFileManager:UpdateBreadcrumbs (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:2540)
-RTTFileManagerController:NavigateToInternal (string,bool,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:293)
-RTTFileManagerController:NavigateTo (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:171)
-RTTFileManagerController:OnViewReady () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:137)
-RTTFileManager/<CreateCenterGrid>d__77:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:439)
-UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
-RTTFileManager:CreatePanels () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:299)
-RTTFileManager:BuildUI () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:160)
-RTTFileManagerController:CreateMenu (UnityEngine.RectTransform,single,single,TMPro.TMP_FontAsset,UnityEngine.Color,UnityEngine.Color) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:75)
-RTTManager:CreateFilesMenuContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:944)
-RTTManager:CreateAppContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:876)
-VRWorkspace.UI.RTT.RTTAppManager/<PrepareAppFrameAsync>d__61:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTAppManager.cs:604)
-UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
-
-[RTTFileManager] Found breadcrumb container from hierarchy: True
-
-[RTTFileManager] Created 1 breadcrumbs for path: C:\Users\super
-
-[RTTFileManagerController] Menu created
-
-[RTTAppManager] App prepared (hidden): folder
-
-[Detail] UpdateInfo: .claude name=0ms preview=0ms metadata=3ms total=3ms
-
-[RTTTaskbar] RegisterApp called - slotIndex=1, icon=icon_folder
-
-[RTTTaskbar] SetSlotIcon - slot=AppBtn_AppSlot_1, icon=icon_folder, slotIndex=1
-
-[RTTTaskbar] SetSlotIcon - removed 0 old children
-
-[RTTTaskbar] SetSlotIcon - created iconBtn=Btn_icon_folder, slot.childCount now=1
-
-[RTTTaskbar] Registered app slot 1, total apps: 1
-
-[RTTTaskbar] SelectSlot(1) called, current active: 0
-
-[RTTTaskbar] Selected app with slot index 1
-
-[RTTTaskbar] SelectSlot(1) called, current active: 1
-
-[Detail] UpdateInfo: root name=0ms preview=0ms metadata=2ms total=2ms
-
-[Detail] UpdateInfo: .claude-mem name=0ms preview=0ms metadata=2ms total=2ms
-
-[Detail] UpdateInfo: .android name=0ms preview=0ms metadata=2ms total=2ms
-
-[Controller] Side panel item selected: downloads
-
-[Controller] NavigateToInternal: path='C:\Users\super\Downloads', restorePage=False, clickedFolder=''
-
-[Controller] SAVED: _itemIndexHistory['C:\Users\super'] = 0
-
-[FileSystemService] Reading directory: C:\Users\super\Downloads
-
-[FileSystemService] Raw file count from Directory.GetFiles: 45
-
-[FileSystemService] Checking file: 301305223_5268766163237172_8900975927313691990_n.jpg, Attributes: Archive
-
-[FileSystemService] ADDED file: 301305223_5268766163237172_8900975927313691990_n.jpg
-
-[FileSystemService] Checking file: App đại lý.rar, Attributes: Archive
-
-[FileSystemService] Unicode file: 'App đại lý.rar' codes: U+0041 U+0070 U+0070 U+0020 U+0111 U+1EA1 U+0069 U+0020 U+006C U+00FD U+F028 U+002E U+0072 U+0061 U+0072
-
-[FileSystemService] ADDED file: App đại lý.rar
-
-[FileSystemService] Checking file: claudekit-engineer-main.zip, Attributes: Archive
-
-[FileSystemService] ADDED file: claudekit-engineer-main.zip
-
-[FileSystemService] Checking file: Cursor Capture.md, Attributes: Archive
-
-[FileSystemService] ADDED file: Cursor Capture.md
-
-[FileSystemService] Checking file: d1cc7819-cdd8-49bb-b751-439fda9cb96c.png, Attributes: Archive
-
-[FileSystemService] ADDED file: d1cc7819-cdd8-49bb-b751-439fda9cb96c.png
-
-[FileSystemService] Checking file: desktop.ini, Attributes: Hidden, System, Archive
-
-[FileSystemService] SKIPPED (Hidden/System): desktop.ini
-
-[FileSystemService] Checking file: GIẤY XIN NGHỈ PHÉP của Nguyễn Việt Hà.pdf, Attributes: Archive
-
-[FileSystemService] Unicode file: 'GIẤY XIN NGHỈ PHÉP của Nguyễn Việt Hà.pdf' codes: U+0047 U+0049 U+1EA4 U+0059 U+0020 U+0058 U+0049 U+004E U+0020 U+004E U+0047 U+0048 U+1EC8 U+0020 U+0050 U+0048 U+00C9 U+0050 U+0020 U+0063 U+1EE7 U+0061 U+0020 U+004E U+0067 U+0075 U+0079 U+1EC5 U+006E U+0020
-
-[FileSystemService] ADDED file: GIẤY XIN NGHỈ PHÉP của Nguyễn Việt Hà.pdf
-
-[FileSystemService] Checking file: GIẤY XIN NGHỈ PHÉP.doc, Attributes: Archive
-
-[FileSystemService] Unicode file: 'GIẤY XIN NGHỈ PHÉP.doc' codes: U+0047 U+0049 U+1EA4 U+0059 U+0020 U+0058 U+0049 U+004E U+0020 U+004E U+0047 U+0048 U+1EC8 U+0020 U+0050 U+0048 U+00C9 U+0050 U+002E U+0064 U+006F U+0063
-
-[FileSystemService] ADDED file: GIẤY XIN NGHỈ PHÉP.doc
-
-[FileSystemService] Checking file: icielBrandonText-Bold.ttf, Attributes: Archive
-
-[FileSystemService] ADDED file: icielBrandonText-Bold.ttf
-
-[FileSystemService] Checking file: icon_arrow_left.png, Attributes: Archive
-
-[FileSystemService] ADDED file: icon_arrow_left.png
-
-[FileSystemService] Checking file: icon_arrow_right.png, Attributes: Archive
-
-[FileSystemService] ADDED file: icon_arrow_right.png
-
-[FileSystemService] Checking file: icon_check_mark.png, Attributes: Archive
-
-[FileSystemService] ADDED file: icon_check_mark.png
-
-[FileSystemService] Checking file: icon_close.png, Attributes: Archive
-
-[FileSystemService] ADDED file: icon_close.png
-
-[FileSystemService] Checking file: icon_create_folder.png, Attributes: Archive
-
-[FileSystemService] ADDED file: icon_create_folder.png
-
-[FileSystemService] Checking file: icon_download_folder.png, Attributes: Archive
-
-[FileSystemService] ADDED file: icon_download_folder.png
-
-[FileSystemService] Checking file: icon_edit.png, Attributes: Archive
-
-[FileSystemService] ADDED file: icon_edit.png
-
-[FileSystemService] Checking file: icon_file_unknown.png, Attributes: Archive
-
-[FileSystemService] ADDED file: icon_file_unknown.png
-
-[FileSystemService] Checking file: icon_folder_empty.png, Attributes: Archive
-
-[FileSystemService] ADDED file: icon_folder_empty.png
-
-[FileSystemService] Checking file: icon_folder_not_empty.png, Attributes: Archive
-
-[FileSystemService] ADDED file: icon_folder_not_empty.png
-
-[FileSystemService] Checking file: icon_game_folder.png, Attributes: Archive
-
-[FileSystemService] ADDED file: icon_game_folder.png
-
-[FileSystemService] Checking file: icon_home.png, Attributes: Archive
-
-[FileSystemService] ADDED file: icon_home.png
-
-[FileSystemService] Checking file: icon_image.png, Attributes: Archive
-
-[FileSystemService] ADDED file: icon_image.png
-
-[FileSystemService] Checking file: icon_internal.png, Attributes: Archive
-
-[FileSystemService] ADDED file: icon_internal.png
-
-[FileSystemService] Checking file: icon_music_file.png, Attributes: Archive
-
-[FileSystemService] ADDED file: icon_music_file.png
-
-[FileSystemService] Checking file: icon_music_folder.png, Attributes: Archive
-
-[FileSystemService] ADDED file: icon_music_folder.png
-
-[FileSystemService] Checking file: icon_qr.png, Attributes: Archive
-
-[FileSystemService] ADDED file: icon_qr.png
-
-[FileSystemService] Checking file: icon_recent_folder.png, Attributes: Archive
-
-[FileSystemService] ADDED file: icon_recent_folder.png
-
-[FileSystemService] Checking file: icon_sd_card.png, Attributes: Archive
-
-[FileSystemService] ADDED file: icon_sd_card.png
-
-[FileSystemService] Checking file: icon_search.png, Attributes: Archive
-
-[FileSystemService] ADDED file: icon_search.png
-
-[FileSystemService] Checking file: icon_text_cursor.png, Attributes: Archive
-
-[FileSystemService] ADDED file: icon_text_cursor.png
-
-[FileSystemService] Checking file: icon_text_file.png, Attributes: Archive
-
-[FileSystemService] ADDED file: icon_text_file.png
-
-[FileSystemService] Checking file: icon_video_folder.png, Attributes: Archive
-
-[FileSystemService] ADDED file: icon_video_folder.png
-
-[FileSystemService] Checking file: icon_zip.png, Attributes: Archive
-
-[FileSystemService] ADDED file: icon_zip.png
-
-[FileSystemService] Checking file: image.png, Attributes: Archive
-
-[FileSystemService] ADDED file: image.png
-
-[FileSystemService] Checking file: New Text Document.txt, Attributes: Archive
-
-[FileSystemService] ADDED file: New Text Document.txt
-
-[FileSystemService] Checking file: Nightreign_RelicV13.CT, Attributes: Archive
-
-[FileSystemService] ADDED file: Nightreign_RelicV13.CT
-
-[FileSystemService] Checking file: Noto_Sans.zip, Attributes: Archive
-
-[FileSystemService] ADDED file: Noto_Sans.zip
-
-[FileSystemService] Checking file: Phá Kén.mp3, Attributes: Archive
-
-[FileSystemService] Unicode file: 'Phá Kén.mp3' codes: U+0050 U+0068 U+00E1 U+0020 U+004B U+00E9 U+006E U+002E U+006D U+0070 U+0033
-
-[FileSystemService] ADDED file: Phá Kén.mp3
-
-[FileSystemService] Checking file: radiant barrel-767-1-0-1736854664.zip, Attributes: Archive
-
-[FileSystemService] ADDED file: radiant barrel-767-1-0-1736854664.zip
-
-[FileSystemService] Checking file: Refine VR Menu Style.md, Attributes: Archive
-
-[FileSystemService] ADDED file: Refine VR Menu Style.md
-
-[FileSystemService] Checking file: Roboto.zip, Attributes: Archive
-
-[FileSystemService] ADDED file: Roboto.zip
-
-[FileSystemService] Checking file: sample_text.png, Attributes: Archive
-
-[FileSystemService] ADDED file: sample_text.png
-
-[FileSystemService] Checking file: Wabooks Android.rar, Attributes: Archive
-
-[FileSystemService] ADDED file: Wabooks Android.rar
-
-[FileSystemService] Checking file: zoom.txt, Attributes: Archive
-
-[FileSystemService] ADDED file: zoom.txt
-
-[FileSystemService] Checking file: zoom_comparison.md, Attributes: Archive
-
-[FileSystemService] ADDED file: zoom_comparison.md
-
-[FileSystemService] Found 47 items (3 folders, 44 files)
-
-[Controller] CalculateTotalPages: totalFiles=47, pageSize=10, totalPages=5
-
-[Cache] DISK READ: 0ms (492KB)
-
-[Cache] DISK DECODE: 6ms (512x512)
-
-The character with Unicode value \uF028 was not found in the [NotoSansKR-Regular_TMP_Primary] font asset or any potential fallbacks. It was replaced by Unicode character \u25A1 in text object [Name].
-UnityEngine.Debug:LogWarning (object,UnityEngine.Object)
-TMPro.TextMeshProUGUI:SetArraySizes (TMPro.TMP_Text/UnicodeChar[]) (at ./Library/PackageCache/com.unity.textmeshpro@3.0.9/Scripts/Runtime/TMPro_UGUI_Private.cs:1274)
-TMPro.TMP_Text:ParseInputText () (at ./Library/PackageCache/com.unity.textmeshpro@3.0.9/Scripts/Runtime/TMP_Text.cs:1902)
-TMPro.TextMeshProUGUI:OnPreRenderCanvas () (at ./Library/PackageCache/com.unity.textmeshpro@3.0.9/Scripts/Runtime/TMPro_UGUI_Private.cs:1644)
-TMPro.TextMeshProUGUI:ForceMeshUpdate (bool,bool) (at ./Library/PackageCache/com.unity.textmeshpro@3.0.9/Scripts/Runtime/TextMeshProUGUI.cs:547)
-MarqueeText:SetText (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/MarqueeText.cs:147)
-RTTFileGridItem:Bind (MockFile) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileGridItem.cs:96)
-RTTFileGrid:BindItemAtIndex (RTTFileGridItem,int) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileGrid.cs:377)
-RTTFileGrid:UpdateVisibleItems () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileGrid.cs:329)
-RTTFileGrid:Populate (System.Collections.Generic.List`1<MockFile>,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileGrid.cs:221)
-RTTFileManager:UpdateGrid (System.Collections.Generic.List`1<MockFile>,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:3225)
-RTTFileManagerController:UpdateView (bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:529)
-RTTFileManagerController:NavigateToInternal (string,bool,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:291)
-RTTFileManagerController:NavigateTo (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:171)
-RTTFileManagerController:OnSidePanelItemSelected (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:659)
-RTTFileSidePanel:OnItemClicked (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileSidePanel.cs:315)
-RTTFileSidePanel/<>c__DisplayClass28_0:<CreateNavItem>b__0 () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileSidePanel.cs:224)
-UnityEngine.EventSystems.ExecuteEvents:Execute<UnityEngine.EventSystems.IPointerClickHandler> (UnityEngine.GameObject,UnityEngine.EventSystems.BaseEventData,UnityEngine.EventSystems.ExecuteEvents/EventFunction`1<UnityEngine.EventSystems.IPointerClickHandler>)
-RTTRaycastManager:SendClick () (at Assets/VR-Workspace/Scripts/UI/RTT/Input/RTTRaycastManager.cs:339)
-VRGazeReticle:SendRTTClickAndLock (UnityEngine.GameObject) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:582)
-VRGazeReticle:ProcessDwellClickRTT (UnityEngine.Vector3) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:836)
-VRGazeReticle:CheckGaze () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:474)
-VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:314)
-
-The character with Unicode value \uF028 was not found in the [NotoSansKR-Regular_TMP_Primary] font asset or any potential fallbacks. It was replaced by Unicode character \u25A1 in text object [Name].
-UnityEngine.Debug:LogWarning (object,UnityEngine.Object)
-TMPro.TextMeshProUGUI:SetArraySizes (TMPro.TMP_Text/UnicodeChar[]) (at ./Library/PackageCache/com.unity.textmeshpro@3.0.9/Scripts/Runtime/TMPro_UGUI_Private.cs:1274)
-TMPro.TMP_Text:ParseInputText () (at ./Library/PackageCache/com.unity.textmeshpro@3.0.9/Scripts/Runtime/TMP_Text.cs:1902)
-TMPro.TMP_Text:GetPreferredWidth () (at ./Library/PackageCache/com.unity.textmeshpro@3.0.9/Scripts/Runtime/TMP_Text.cs:3755)
-TMPro.TMP_Text:get_preferredWidth () (at ./Library/PackageCache/com.unity.textmeshpro@3.0.9/Scripts/Runtime/TMP_Text.cs:1384)
-MarqueeText:CheckOverflow () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/MarqueeText.cs:182)
-MarqueeText:SetText (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/MarqueeText.cs:160)
-RTTFileGridItem:Bind (MockFile) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileGridItem.cs:96)
-RTTFileGrid:BindItemAtIndex (RTTFileGridItem,int) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileGrid.cs:377)
-RTTFileGrid:UpdateVisibleItems () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileGrid.cs:329)
-RTTFileGrid:Populate (System.Collections.Generic.List`1<MockFile>,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileGrid.cs:221)
-RTTFileManager:UpdateGrid (System.Collections.Generic.List`1<MockFile>,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:3225)
-RTTFileManagerController:UpdateView (bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:529)
-RTTFileManagerController:NavigateToInternal (string,bool,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:291)
-RTTFileManagerController:NavigateTo (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:171)
-RTTFileManagerController:OnSidePanelItemSelected (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:659)
-RTTFileSidePanel:OnItemClicked (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileSidePanel.cs:315)
-RTTFileSidePanel/<>c__DisplayClass28_0:<CreateNavItem>b__0 () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileSidePanel.cs:224)
-UnityEngine.EventSystems.ExecuteEvents:Execute<UnityEngine.EventSystems.IPointerClickHandler> (UnityEngine.GameObject,UnityEngine.EventSystems.BaseEventData,UnityEngine.EventSystems.ExecuteEvents/EventFunction`1<UnityEngine.EventSystems.IPointerClickHandler>)
-RTTRaycastManager:SendClick () (at Assets/VR-Workspace/Scripts/UI/RTT/Input/RTTRaycastManager.cs:339)
-VRGazeReticle:SendRTTClickAndLock (UnityEngine.GameObject) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:582)
-VRGazeReticle:ProcessDwellClickRTT (UnityEngine.Vector3) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:836)
-VRGazeReticle:CheckGaze () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:474)
-VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:314)
-
-[Cache] DISK READ: 0ms (112KB)
-
-[Cache] DISK DECODE: 2ms (512x312)
-
-[Cache] DISK READ: 0ms (2KB)
-
-[Cache] DISK DECODE: 0ms (128x128)
-
-[Cache] DISK READ: 0ms (1KB)
-
-[Cache] DISK READ: 0ms (8KB)
-
-[Cache] DISK READ: 0ms (3KB)
-
-[Cache] DISK DECODE: 0ms (256x256)
-
-[Cache] DISK READ: 0ms (22KB)
-
-[Cache] DISK READ: 0ms (18KB)
-
-[Cache] DISK READ: 0ms (12KB)
-
-[Cache] DISK DECODE: 0ms (212x212)
-
-[Cache] DISK READ: 0ms (4KB)
-
-[Cache] DISK READ: 0ms (5KB)
-
-[Cache] DISK READ: 0ms (6KB)
-
-[Detail] UpdateInfo: Downloads name=0ms preview=0ms metadata=2ms total=2ms
-
-[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\super\Downloads, container null: False, instance: -825342
-
-[Controller] CanCreateFolderHere called, _currentPath: 'C:\Users\super\Downloads'
-
-[FileSystemService] CanCreateFolderInPath called with path: 'C:\Users\super\Downloads'
-
-[FileSystemService] absolutePath: 'C:\Users\super\Downloads'
-
-[FileSystemService] Comparing normalizedAbsolute: 'C:\Users\super\Downloads' with normalizedRoot: 'C:\Users\super'
-
-[FileSystemService] isDeviceRoot: False
-
-[FileSystemService] Write permission OK for: C:\Users\super\Downloads
-
-[Controller] CanCreateFolderHere result: True
-
-[RTTFileManager] UpdateNewFolderButtonState: canCreate=True
-
-[RTTFileManager] BoxCollider.enabled set to True
-
-[RTTFileManager] New Folder button ENABLED - alpha=1
-
-[RTTFileManager] Created 1 breadcrumbs for path: C:\Users\super\Downloads
-
-[FileThumbnailService] Failed to load image: Data Processing Error, see Download Handler error
-UnityEngine.Debug:LogWarning (object)
-FileThumbnailService/<LoadImageThumbnail>d__33:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Services/FileThumbnailService.cs:415)
-UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
-
-[Detail] UpdateInfo: claudekit-engineer-main name=4ms preview=0ms metadata=2ms total=6ms
-
-[Detail] UpdateInfo: DD2 name=0ms preview=0ms metadata=2ms total=2ms
-
-[Detail] UpdateInfo: InventoryKamera1.4.0 name=0ms preview=0ms metadata=2ms total=2ms
-
-[Detail] UpdateInfo: Cursor Capture.md name=0ms preview=0ms metadata=4ms total=4ms
-
-[Controller] Selected: C:\Users\super\Downloads\Cursor Capture.md
-
-[Detail] UpdateInfo: Cursor Capture.md name=0ms preview=0ms metadata=3ms total=3ms
-
-[Detail] REQUEST: 301305223_5268766163237172_8900975927313691990_n.jpg
-
-[Detail] UpdateInfo: 301305223_5268766163237172_8900975927313691990_n.jpg name=0ms preview=1ms metadata=5ms total=6ms
-
-[FileThumbnailService] Async resize failed: LoadRawTextureData: not enough data provided (will result in overread)., falling back to sync
-UnityEngine.Debug:LogWarning (object)
-FileThumbnailService/<ResizeTextureAsync>d__40:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Services/FileThumbnailService.cs:1049)
-UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
-
-[Detail] RECEIVED: 301305223_5268766163237172_8900975927313691990_n.jpg wait=135ms assign=0ms
-
-[RTTPopupInputable] Created world-space popup: 575x345
-
-[RTTPopupInputable] Positioned at (-0.06, 0.00, 1.75), offset 0.05m in front of RTTMenuFrame_folder
-
-[RTTPopupInputable] Creating world overlay using camera: VRCamera
-
-[RTTPopupInputable] Flat world overlay created at distance 2.5
-
-[RTTPopupInputable] Shown in world-space mode, fixed position in front of reference frame
-
-[RTTFileManager] Create folder cancelled
-
-[Detail] UpdateInfo: icielBrandonText-Bold.ttf name=0ms preview=0ms metadata=3ms total=3ms
-
-[Detail] UpdateInfo: Cursor Capture.md name=0ms preview=0ms metadata=6ms total=6ms
-
-[RTTTaskbar] SelectSlot(0) called, current active: 1
-
-[RTTTaskbar] Selected app with slot index 0
-
 [RTTMenu] Created app frame: media
 
-[RTTAppManager] Preparing app: media in slot 2
+[RTTAppManager] Preparing app: media in slot 1
 
 [RTTManager] Creating Media content...
 
@@ -714,15 +89,19 @@ UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr
 
 [VRVideoProjectionSystem] Initialized
 
-[MediaLibraryService] Loading 311 items from cache...
-
-[MediaLibraryService] Loaded 311 items from cache (0 missing files)
+[MediaLibraryService] Loading 1312 items from cache (async)...
 
 [VirtualObjectsZoomController] Registered side panel: MediaNavigationPanel (side=-1, mainW=1.6, sideW=0.5333334, gap=0.05)
+
+[RTTMenuFrame] UI built: 640x1080 logical pixels
 
 [HoverEffectController] AddEffect 'scale' to Item_all, TargetVisuals=Item_all
 
 [HoverEffectController] AddEffect 'color' to Item_all, TargetVisuals=Item_all
+
+[HoverEffectController] AddEffect 'scale' to Item_videos, TargetVisuals=Item_videos
+
+[HoverEffectController] AddEffect 'color' to Item_videos, TargetVisuals=Item_videos
 
 [HoverEffectController] AddEffect 'scale' to Item_images, TargetVisuals=Item_images
 
@@ -731,6 +110,10 @@ UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr
 [HoverEffectController] AddEffect 'scale' to Item_audio, TargetVisuals=Item_audio
 
 [HoverEffectController] AddEffect 'color' to Item_audio, TargetVisuals=Item_audio
+
+[HoverEffectController] AddEffect 'scale' to Item_recent, TargetVisuals=Item_recent
+
+[HoverEffectController] AddEffect 'color' to Item_recent, TargetVisuals=Item_recent
 
 [HoverEffectController] AddEffect 'scale' to Item_favorites, TargetVisuals=Item_favorites
 
@@ -746,73 +129,27 @@ UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr
 
 [RTTMediaLibrary] Right panel content created with RTTFileDetail
 
-[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-838066
+[RTTPopupMenu] CreateWorldSpace: layer 'VirtualObjects' = 3, mainCam: VRCamera
+
+[RTTPopupMenu] Created world-space popup
+
+[HoverEffectController] AddEffect 'cursor_change' to HitArea, TargetVisuals=Visuals
+
+[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-699622
+
+[HoverEffectController] AddEffect 'scale' to Checkbox, TargetVisuals=Checkbox
+
+[HoverEffectController] AddEffect 'scale' to Btn_Rename, TargetVisuals=Btn_Rename
+
+[HoverEffectController] AddEffect 'scale' to Btn_Delete, TargetVisuals=Btn_Delete
 
 [RTTMediaLibrary] After CreateHeaderRows: _headerRT=True, _breadcrumbContainer=True
+
+[HoverEffectController] AddEffect 'scale' to PooledItem, TargetVisuals=PooledItem
 
 [RTTMediaLibrary] Creating 2 breadcrumb segments for: All Media > Videos
 
 [RTTMediaLibrary] Created 2 breadcrumb pills for path: All Media > Videos
-
-[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 21-02-40': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (103KB)
-
-[Cache] DISK DECODE: 2ms (512x265)
-
-[RTTMediaGridItem] Duration badge for 'Genshin Impact 2026-01-25 13-42-41': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (16KB)
-
-[Cache] DISK DECODE: 0ms (512x288)
-
-[RTTMediaGridItem] Duration badge for 'Genshin Impact 2026-01-25 13-44-38': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (250KB)
-
-[Cache] DISK DECODE: 3ms (512x288)
-
-[RTTMediaGridItem] Duration badge for 'Genshin Impact 2026-01-25 17-20-24': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\super\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 21-02-40.mp4
-
-[Cache] DISK READ: 0ms (256KB)
-
-[Cache] DISK DECODE: 4ms (512x288)
-
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\super\Videos\Captures\Genshin Impact 2026-01-25 13-42-41.mp4
-
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\super\Videos\Captures\Genshin Impact 2026-01-25 13-44-38.mp4
-
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\super\Videos\Captures\Genshin Impact 2026-01-25 17-20-24.mp4
-
-[RTTMediaGridItem] Duration badge for 'veo_generated_1763658722': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (258KB)
-
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\super\Downloads\claudekit-engineer-main\docs\assets\veo_generated_1763658722.mp4
-
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\super\Downloads\claudekit-engineer-main\docs\assets\veo_generated_1763658722.mp4
-
-[RTTMediaGridItem] Duration badge for 'veo_generated_1763659088': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (234KB)
-
-[Cache] DISK DECODE: 3ms (512x290)
-
-[RTTMediaGrid] Auto-selecting first item: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 21-02-40
-
-[Detail] REQUEST: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 21-02-40.mp4
-
-[Cache] DISK READ: 0ms (97KB)
-
-[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 21-02-40.mp4 wait=11ms assign=0ms
-
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\super\Downloads\claudekit-engineer-main\docs\assets\veo_generated_1763659088.mp4
-
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\super\Downloads\claudekit-engineer-main\docs\assets\veo_generated_1763659088.mp4
-
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 21-02-40.mp4 name=0ms preview=12ms metadata=5ms total=17ms
 
 [RTTMediaLibrary] Center grid created
 
@@ -822,43 +159,210 @@ Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling b
 
 [RTTAppManager] App prepared (hidden): media
 
-[RTTTaskbar] RegisterApp called - slotIndex=2, icon=icon_media
+[MediaLibraryService] Loaded 1312 items from cache in 397ms (async, no File.Exists)
 
-[RTTTaskbar] SetSlotIcon - removed 1 old children
+[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[RTTTaskbar] SetSlotIcon - created iconBtn=Btn_icon_folder, slot.childCount now=2
+[Cache] DISK READ: 0ms (110KB)
 
-[RTTTaskbar] SetSlotIcon - slot=AppBtn_AppSlot_2, icon=icon_media, slotIndex=2
+[Cache] DISK DECODE: 2ms (512x267)
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46.mp4
+
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46.mp4
+
+[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-17-43': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (121KB)
+
+[Cache] DISK DECODE: 3ms (512x267)
+
+[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-42-48': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (116KB)
+
+[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (115KB)
+
+[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-39-53': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (118KB)
+
+[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-51-25': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (99KB)
+
+[RTTMediaGridItem] Duration badge for 'videoplayback': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (206KB)
+
+[Cache] DISK DECODE: 3ms (512x288)
+
+[RTTMediaGridItem] Duration badge for 'Genshin-Impact 2026-1-26 12-24-11': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (199KB)
+
+[Cache] DISK DECODE: 4ms (512x288)
+
+[RTTMediaGrid] Auto-selecting first item: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46
+
+[Detail] REQUEST: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46.mp4
+
+[Cache] DISK READ: 0ms (100KB)
+
+[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46.mp4 wait=13ms assign=0ms
+
+[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46.mp4 name=0ms preview=15ms metadata=10ms total=25ms
+
+[RTTMediaGrid] Progressive binding started: 11 items queued, budgetMs=6
+
+[RTTMediaGridItem] Duration badge for 'video_client': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (117KB)
+
+[Cache] DISK DECODE: 2ms (512x230)
+
+[RTTMediaGridItem] Duration badge for 'Phàm Nhân Tu Tiên Tập 173 Vietsub': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (122KB)
+
+[RTTMediaGridItem] Duration badge for '7295785205012': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (120KB)
+
+[RTTMediaGridItem] Duration badge for '7077543476647': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (268KB)
+
+[Cache] DISK DECODE: 4ms (512x230)
+
+[RTTMediaGridItem] Duration badge for '7065774217733': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (75KB)
+
+[Cache] DISK DECODE: 2ms (512x238)
+
+[RTTMediaGridItem] Duration badge for 'Genshin_Impact_2025-09-10_11-32-27': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (215KB)
+
+[RTTMediaGridItem] Duration badge for 'FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD)': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (175KB)
+
+[RTTMediaGridItem] Duration badge for 'Honkai  Star Rail 2025.05.21 - 15.03.08.01': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (207KB)
+
+[RTTMediaGridItem] Duration badge for 'khác màu': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (38KB)
+
+[Cache] DISK DECODE: 1ms (512x288)
+
+[Detail] REQUEST: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-42-48.mp4
+
+[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-42-48.mp4
+
+[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-42-48.mp4 name=1ms preview=4ms metadata=9ms total=14ms
+
+[RTTMediaGridItem] Duration badge for 'vết xước 2': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (48KB)
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-42-48.mp4
+
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-42-48.mp4
+
+[RTTMediaGridItem] Duration badge for 'vết xước 1': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (101KB)
+
+[Cache] DISK DECODE: 2ms (512x284)
+
+[RTTTaskbar] RegisterApp called - slotIndex=1, icon=icon_media
+
+[RTTTaskbar] SetSlotIcon - slot=AppBtn_AppSlot_1, icon=icon_media, slotIndex=1
+
+[RTTTaskbar] SetSlotIcon - removed 0 old children
 
 [RTTTaskbar] SetSlotIcon - created iconBtn=Btn_icon_media, slot.childCount now=1
 
-[RTTTaskbar] Registered app slot 2, total apps: 2
+[RTTTaskbar] Registered app slot 1, total apps: 1
 
-[RTTTaskbar] SelectSlot(2) called, current active: 0
+[RTTTaskbar] SelectSlot(1) called, current active: 0
 
-[RTTTaskbar] Selected app with slot index 2
+[RTTTaskbar] Selected app with slot index 1
 
-[RTTTaskbar] SelectSlot(2) called, current active: 2
+[RTTTaskbar] SelectSlot(1) called, current active: 1
 
-[RTTTaskbar] SetSlotIcon - slot=AppBtn_AppSlot_1, icon=icon_media, slotIndex=2
+[VideoFrameExtractor] Seeking to 3.5s (video length: 11.6s)
 
-[RTTTaskbar] SetSlotIcon - created iconBtn=Btn_icon_media, slot.childCount now=2
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-17-43.mp4
 
-[RTTTaskbar] Unregistered app slot 1, remaining apps: 1
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-17-43.mp4
 
-[RTTAppManager] Closed app: folder
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4
 
-[VRVideoProjectionSystem] Disposed
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4
 
-[VirtualObjectsZoomController] Unregistered side panel: MediaNavigationPanel
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-39-53.mp4
 
-[VirtualObjectsZoomController] Unregistered side panel: MediaDetailPanel
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-39-53.mp4
 
-[RTTMediaLibrary] Cleanup: Destroying _mediaActionBar
+[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46.mp4 wait=0ms assign=0ms
 
-[VRMediaAppController] Cleanup completed
+[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46.mp4 name=0ms preview=1ms metadata=9ms total=10ms
 
-[RTTTaskbar] Unregistered app slot 2, remaining apps: 0
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-51-25.mp4
 
-[RTTAppManager] Closed app: media
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-51-25.mp4
+
+[VideoFrameExtractor] Async capture failed: LoadRawTextureData: not enough data provided (will result in overread)., using fallback
+UnityEngine.Debug:LogWarning (object)
+VideoFrameExtractor/<CaptureFrameAsync>d__20:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Services/VideoFrameExtractor.cs:511)
+UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
+
+[VideoFrameExtractor] Successfully extracted frame for: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-42-48.mp4
+
+[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-42-48.mp4 wait=658ms assign=0ms
+
+First video frame not zero: 2 (0.066667s). Result may be out of sync. Please make sure tracks all start at 0 in C:\Users\Admin\Downloads\videoplayback.mp4
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\Genshin-Impact 2026-1-26 12-24-11.mp4
+
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\Genshin-Impact 2026-1-26 12-24-11.mp4
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Video\Phàm Nhân Tu Tiên Tập 173 Vietsub.mp4
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Genshin_Impact_2025-09-10_11-32-27.mp4
+
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Downloads\Genshin_Impact_2025-09-10_11-32-27.mp4
+
+[Detail] REQUEST: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4
+
+[Cache] DISK READ: 8ms (100KB)
+
+[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4 wait=24ms assign=0ms
+
+[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4 name=1ms preview=24ms metadata=10ms total=35ms
+
+[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46.mp4 name=1ms preview=0ms metadata=9ms total=10ms
+
+[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4 wait=0ms assign=0ms
+
+[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4 name=1ms preview=0ms metadata=13ms total=14ms
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Compressed\FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD).mp4
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\New folder\khác màu.mp4
+
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\New folder\khác màu.mp4
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\New folder\vết xước 2.mp4
+
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\New folder\vết xước 2.mp4
+
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\New folder\vết xước 1.mp4
 

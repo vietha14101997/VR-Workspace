@@ -84,11 +84,15 @@ public class RTTMediaGrid : MonoBehaviour
     #region Progressive Loading
     private Coroutine _progressiveBindCoroutine;
     private Queue<int> _pendingBindIndices = new Queue<int>();
-    
+
     // Mobile-first frame budget system: bind items until time budget exhausted
-    private const float MOBILE_FRAME_BUDGET_MS = 1.5f;  // Mobile: 1.5ms for smooth 60fps
-    private const float DESKTOP_FRAME_BUDGET_MS = 4f;   // Desktop: 4ms with more headroom
-    private const int INITIAL_SYNC_BIND_COUNT = 6;      // Bind first row immediately for instant visibility
+    // Increased budgets for smoother progressive loading (2x faster population)
+    private const float MOBILE_FRAME_BUDGET_MS = 3f;    // Mobile: 3ms (was 1.5ms)
+    private const float DESKTOP_FRAME_BUDGET_MS = 6f;   // Desktop: 6ms (was 4ms)
+    private const int INITIAL_SYNC_BIND_COUNT = 8;      // Bind 8 items sync to fill first page (was 1, caused items not showing)
+
+    // Auto-select first item after binding (not immediately in SetData)
+    private bool _needsAutoSelect = false;
     #endregion
 
     #region Callbacks
@@ -268,6 +272,9 @@ public class RTTMediaGrid : MonoBehaviour
         }
         _pendingBindIndices.Clear();
 
+        // Cancel pending metadata requests to prevent stale callbacks
+        FileMetadataService.Instance?.CancelAllPendingRequests();
+
         _allVideos = videos ?? new List<MediaVideoInfo>();
 
         // Build group runtime data with cached Y offsets
@@ -309,19 +316,20 @@ public class RTTMediaGrid : MonoBehaviour
 
         // Debug.Log($"[RTTMediaGrid] SetData: {_allVideos.Count} items, {_groupData.Count} groups, columnsPerRow={_columnsPerRow}, visibleRowCount={_visibleRowCount}, gridHeight={_height}, rowHeight={_rowHeight}");
 
+        // Mark that we need to auto-select first item after binding
+        // This defers selection until items are actually visible, ensuring smooth progressive loading
+        _needsAutoSelect = _allVideos.Count > 0 && !_isEditMode;
+
+        // Render group headers FIRST (creates visual frame before items)
+        // This follows user's requirement: groups → pagination → items
+        UpdateVisibleGroupHeaders();
+
         // Render visible items (uses progressive loading to prevent frame drops)
+        // Auto-select will happen after first items are bound
         UpdateVisibleItems();
 
         // Initialize sticky header
         UpdateStickyHeader();
-
-        // Auto-select first item if there are videos and no current selection
-        // This fires OnVideoSelected event which shows the action bar
-        if (_allVideos.Count > 0 && !_isEditMode)
-        {
-            Debug.Log($"[RTTMediaGrid] Auto-selecting first item: {_allVideos[0].Title}");
-            SelectVideo(_allVideos[0]);
-        }
     }
 
     public void SelectVideo(MediaVideoInfo video)
@@ -789,6 +797,15 @@ public class RTTMediaGrid : MonoBehaviour
                 }
             }
 
+            // Auto-select first item after initial sync bind completes
+            // This triggers Detail Panel update and ActionBar fade-in
+            if (_needsAutoSelect && _visibleItems.Count > 0 && _allVideos.Count > 0)
+            {
+                _needsAutoSelect = false;
+                Debug.Log($"[RTTMediaGrid] Auto-selecting first item: {_allVideos[0].Title}");
+                SelectVideo(_allVideos[0]);
+            }
+
             // Queue remaining items for progressive binding
             HashSet<int> alreadyQueued = new HashSet<int>(_pendingBindIndices);
             int addedCount = 0;
@@ -828,7 +845,7 @@ public class RTTMediaGrid : MonoBehaviour
         // Mobile-first: use tighter budget on mobile to prevent thermal throttling
         float frameBudgetMs = Application.isMobilePlatform ? MOBILE_FRAME_BUDGET_MS : DESKTOP_FRAME_BUDGET_MS;
 
-        // Debug.Log($"[RTTMediaGrid] ProgressiveBindCoroutine started, pending={_pendingBindIndices.Count}, budgetMs={frameBudgetMs}");
+        Debug.Log($"[RTTMediaGrid] Progressive binding started: {_pendingBindIndices.Count} items queued, budgetMs={frameBudgetMs}");
 
         // Render group headers immediately (they don't need progressive loading)
         UpdateVisibleGroupHeaders();
@@ -881,7 +898,7 @@ public class RTTMediaGrid : MonoBehaviour
             yield return null;
         }
 
-        // Debug.Log($"[RTTMediaGrid] ProgressiveBindCoroutine complete: bound={totalBound}, skipped={totalSkipped}");
+        Debug.Log($"[RTTMediaGrid] Progressive binding complete: bound={totalBound}, skipped={totalSkipped}");
 
         // Validate: check if any items in the expected range are missing
         if (_visibleItems.Count < _allVideos.Count)

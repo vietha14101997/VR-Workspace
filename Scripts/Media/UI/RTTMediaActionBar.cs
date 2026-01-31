@@ -513,6 +513,10 @@ public class RTTMediaActionBar : MonoBehaviour
         GameObject playlistBtn = VRButtonFactory.CreateButton(canvasRT, playlistConfig, () => OnPlaylistClicked?.Invoke());
         PositionButton(playlistBtn, playlistX);
         _playlistButton = playlistBtn.GetComponent<Button>();
+
+        // Container starts INACTIVE - only becomes active when explicitly shown via ShowWithFade() or ShowImmediate()
+        // This prevents ActionBar from appearing during dwell pre-loading when frame is temporarily activated
+        _container.SetActive(false);
     }
 
     private void PositionButton(GameObject btn, float xOffset)

@@ -91,7 +91,7 @@ public class RTTManager : MonoBehaviour
     [SerializeField] private WorldPanelPlus panelPrefab;
 
     [Header("Transition Animation")]
-    [SerializeField] private float transitionOutDuration = 0.1f;
+    [SerializeField] private float transitionOutDuration = 0.15f;  // Increased for smoother transition
     [SerializeField] private float transitionInDuration = 0.15f;
     [SerializeField] private bool useFadeTransition = true;
     [SerializeField] private bool useScaleTransition = false;

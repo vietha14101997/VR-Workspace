@@ -46,6 +46,14 @@ public class RTTMainMenu : MonoBehaviour
     [Header("Typography")]
     [SerializeField] private int fontSize = 42;
     [SerializeField] private TMP_FontAsset customFont;
+
+    [Header("Button Animation")]
+    private const float BUTTON_PRESS_SCALE = 0.9f;
+    private const float BUTTON_PRESS_DURATION = 0.08f;  // 80ms total (40ms down + 40ms up)
+
+    [Header("Dwell Pre-loading")]
+    // Match VRGazeReticle's dwellStartDelay - start loading when dwell ring starts showing
+    private const float DWELL_PRELOAD_DELAY = 0.5f;
     #endregion
 
     #region Events
@@ -61,6 +69,11 @@ public class RTTMainMenu : MonoBehaviour
     private float _containerWidth;
     private float _containerHeight;
     private bool _isBuilt = false;
+
+    // Track hover pre-load coroutines per button (to cancel on hover exit)
+    private Dictionary<string, Coroutine> _hoverPreloadCoroutines = new Dictionary<string, Coroutine>();
+    // Track which apps have already been prepared (avoid redundant calls)
+    private HashSet<string> _preparedApps = new HashSet<string>();
     #endregion
 
     #region Public Properties
@@ -251,42 +264,102 @@ public class RTTMainMenu : MonoBehaviour
         // Get hover controller for hover state control
         HoverEffectController hoverController = buttonObj.GetComponentInChildren<HoverEffectController>();
 
+        // Get button transform for press animation
+        Transform buttonTransform = buttonObj.transform;
+
+        // NOTE: Dwell pre-loading has been disabled to prevent visual artifacts
+        // Pre-loading was causing alpha flicker when frame was created before actual click
+        // Apps now load only after user actually clicks the button
+
         // Wire click handler with hover clear and animation wait
         var button = buttonObj.GetComponentInChildren<UnityEngine.UI.Button>();
         if (button != null)
         {
             button.onClick.AddListener(() =>
             {
-                // Start coroutine to wait for hover animation before executing action
-                StartCoroutine(ExecuteAfterHoverClear(hoverController, itemId));
+                // Start coroutine to play button animation and open app
+                StartCoroutine(ExecuteWithButtonAnimation(hoverController, buttonTransform, itemId));
             });
         }
     }
 
     /// <summary>
-    /// Reset hover state immediately and execute action.
-    /// Starts async preparation immediately, then opens after hover animation.
+    /// Start delayed pre-loading of app data when user hovers over menu button.
+    /// Loading starts after DWELL_PRELOAD_DELAY (0.5s) to match when dwell ring appears.
     /// </summary>
-    private IEnumerator ExecuteAfterHoverClear(HoverEffectController hoverController, string itemId)
+    private void StartHoverPreload(string itemId)
     {
-        // Start preparing the app frame immediately (in background)
-        // This hides the initialization lag during hover animation
-        if (RTTManager.Instance != null)
+        // Cancel any existing preload for this item
+        CancelHoverPreload(itemId);
+
+        // Start new delayed preload
+        _hoverPreloadCoroutines[itemId] = StartCoroutine(DelayedPreloadCoroutine(itemId));
+    }
+
+    /// <summary>
+    /// Cancel pending pre-load if user looks away before delay completes.
+    /// </summary>
+    private void CancelHoverPreload(string itemId)
+    {
+        if (_hoverPreloadCoroutines.TryGetValue(itemId, out Coroutine coroutine))
         {
+            if (coroutine != null)
+            {
+                StopCoroutine(coroutine);
+            }
+            _hoverPreloadCoroutines.Remove(itemId);
+        }
+    }
+
+    /// <summary>
+    /// Wait for dwell delay then start background data loading.
+    /// </summary>
+    private IEnumerator DelayedPreloadCoroutine(string itemId)
+    {
+        // Wait for dwell start delay (matches when dwell ring starts appearing)
+        yield return new WaitForSeconds(DWELL_PRELOAD_DELAY);
+
+        // Only prepare if not already prepared
+        if (!_preparedApps.Contains(itemId))
+        {
+            _preparedApps.Add(itemId);
+
+            // Start background data loading
+            if (RTTManager.Instance != null)
+            {
+                Debug.Log($"[RTTMainMenu] Dwell pre-loading app: {itemId}");
+                RTTManager.Instance.PrepareApp(itemId);
+            }
+        }
+
+        // Remove from tracking
+        _hoverPreloadCoroutines.Remove(itemId);
+    }
+
+    /// <summary>
+    /// Execute button click with press animation and smooth transition.
+    /// Flow: Prepare App → Reset Hover → Press Animation → Open App with Transition
+    /// App preparation starts on click, loading happens during button animation.
+    /// </summary>
+    private IEnumerator ExecuteWithButtonAnimation(HoverEffectController hoverController, Transform buttonTransform, string itemId)
+    {
+        // 1. Start app preparation - frame created invisibly during button animation
+        if (RTTManager.Instance != null && !_preparedApps.Contains(itemId))
+        {
+            _preparedApps.Add(itemId);
             RTTManager.Instance.PrepareApp(itemId);
         }
 
-        // Reset hover state immediately (snap to default, no animation)
-        // This ensures button is in correct state when returning to menu
+        // 2. Reset hover state immediately (snap to default, no animation)
         if (hoverController != null)
         {
             hoverController.ResetHoverState(immediate: true);
         }
 
-        // Wait for hover reset animation + small delay for visual feedback
-        yield return new WaitForSeconds(0.08f);
+        // 3. Play button press animation (80ms)
+        yield return StartCoroutine(ButtonPressAnimation(buttonTransform));
 
-        // Now open the prepared app (will wait if still preparing)
+        // 4. Open the prepared app with smooth transition
         if (RTTManager.Instance != null)
         {
             RTTManager.Instance.OpenPreparedApp(itemId);
@@ -296,6 +369,48 @@ public class RTTMainMenu : MonoBehaviour
             // Fallback to event if no AppManager
             OnMenuItemClicked?.Invoke(itemId);
         }
+
+        // 5. Clear prepared state (allow re-preparation if user returns to menu)
+        _preparedApps.Remove(itemId);
+    }
+
+    /// <summary>
+    /// Play button press animation (scale down then up).
+    /// Similar to RTTMobileKeyboard key press animation.
+    /// </summary>
+    private IEnumerator ButtonPressAnimation(Transform buttonTransform)
+    {
+        if (buttonTransform == null) yield break;
+
+        Vector3 originalScale = buttonTransform.localScale;
+        Vector3 pressedScale = originalScale * BUTTON_PRESS_SCALE;
+        float halfDuration = BUTTON_PRESS_DURATION * 0.5f;
+
+        // Press down phase
+        float elapsed = 0f;
+        while (elapsed < halfDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / halfDuration;
+            // Smoothstep easing for natural feel
+            t = t * t * (3f - 2f * t);
+            buttonTransform.localScale = Vector3.Lerp(originalScale, pressedScale, t);
+            yield return null;
+        }
+
+        // Release up phase
+        elapsed = 0f;
+        while (elapsed < halfDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / halfDuration;
+            t = t * t * (3f - 2f * t);
+            buttonTransform.localScale = Vector3.Lerp(pressedScale, originalScale, t);
+            yield return null;
+        }
+
+        // Ensure final scale is exact
+        buttonTransform.localScale = originalScale;
     }
     #endregion
 
@@ -308,6 +423,22 @@ public class RTTMainMenu : MonoBehaviour
         if (!_isBuilt) return;
         LoadMissingIcons();
         BuildGrid();
+    }
+    #endregion
+
+    #region Cleanup
+    private void OnDestroy()
+    {
+        // Cancel all pending hover preload coroutines
+        foreach (var kvp in _hoverPreloadCoroutines)
+        {
+            if (kvp.Value != null)
+            {
+                StopCoroutine(kvp.Value);
+            }
+        }
+        _hoverPreloadCoroutines.Clear();
+        _preparedApps.Clear();
     }
     #endregion
 }

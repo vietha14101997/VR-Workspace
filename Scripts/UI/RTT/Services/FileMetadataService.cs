@@ -2,11 +2,13 @@ using UnityEngine;
 using UnityEngine.Video;
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 
 /// <summary>
 /// Service for reading file metadata (dimensions, duration, etc.)
 /// Uses Unity's native capabilities where possible.
+/// Queue-based processing to prevent main thread blocking.
 /// </summary>
 public class FileMetadataService : MonoBehaviour
 {
@@ -28,6 +30,27 @@ public class FileMetadataService : MonoBehaviour
     #endregion
 
     private VideoPlayer _videoPlayer;
+
+    #region Queue-Based Metadata Loading
+    /// <summary>
+    /// Request data for queued metadata loading.
+    /// </summary>
+    private struct MetadataRequest
+    {
+        public string FilePath;
+        public bool IsVideo;
+        public Action<VideoMetadata> VideoCallback;
+        public Action<AudioMetadata> AudioCallback;
+    }
+
+    private Queue<MetadataRequest> _metadataQueue = new Queue<MetadataRequest>();
+    private bool _isProcessingQueue = false;
+    private Coroutine _queueProcessorCoroutine;
+
+    // Configuration: delay between requests to prevent flooding
+    private const float DELAY_BETWEEN_REQUESTS_MS = 50f;  // 50ms = ~1 video every 3 frames at 60fps
+    private const int MAX_QUEUE_SIZE = 100;  // Prevent memory bloat
+    #endregion
 
     private void Awake()
     {
@@ -199,13 +222,102 @@ public class FileMetadataService : MonoBehaviour
 
     /// <summary>
     /// Read video metadata using VideoPlayer.
+    /// Queued to prevent main thread blocking when many requests come in at once.
     /// </summary>
     public void GetVideoMetadata(string filePath, Action<VideoMetadata> onComplete)
     {
-        StartCoroutine(LoadVideoMetadataCoroutine(filePath, onComplete));
+        // Limit queue size to prevent memory bloat
+        if (_metadataQueue.Count >= MAX_QUEUE_SIZE)
+        {
+            // Queue full - return empty metadata immediately
+            onComplete?.Invoke(new VideoMetadata());
+            return;
+        }
+
+        // Add to queue
+        _metadataQueue.Enqueue(new MetadataRequest
+        {
+            FilePath = filePath,
+            IsVideo = true,
+            VideoCallback = onComplete
+        });
+
+        // Start processor if not running
+        if (!_isProcessingQueue)
+        {
+            _queueProcessorCoroutine = StartCoroutine(ProcessMetadataQueue());
+        }
     }
 
-    private IEnumerator LoadVideoMetadataCoroutine(string filePath, Action<VideoMetadata> onComplete)
+    /// <summary>
+    /// Cancel all pending metadata requests (e.g., when switching categories).
+    /// </summary>
+    public void CancelAllPendingRequests()
+    {
+        _metadataQueue.Clear();
+    }
+
+    /// <summary>
+    /// Process queued metadata requests one at a time with delay.
+    /// </summary>
+    private IEnumerator ProcessMetadataQueue()
+    {
+        _isProcessingQueue = true;
+
+        while (_metadataQueue.Count > 0)
+        {
+            var request = _metadataQueue.Dequeue();
+
+            if (request.IsVideo)
+            {
+                // Process video metadata
+                VideoMetadata result = new VideoMetadata();
+
+                yield return StartCoroutine(LoadVideoMetadataCoroutineInternal(request.FilePath, (metadata) =>
+                {
+                    result = metadata;
+                }));
+
+                // Invoke callback
+                try
+                {
+                    request.VideoCallback?.Invoke(result);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[FileMetadataService] Callback error: {ex.Message}");
+                }
+            }
+            else
+            {
+                // Process audio metadata
+                AudioMetadata result = new AudioMetadata();
+
+                yield return StartCoroutine(LoadAudioMetadataCoroutineInternal(request.FilePath, (metadata) =>
+                {
+                    result = metadata;
+                }));
+
+                // Invoke callback
+                try
+                {
+                    request.AudioCallback?.Invoke(result);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[FileMetadataService] Callback error: {ex.Message}");
+                }
+            }
+
+            // Delay between requests to prevent flooding main thread
+            yield return new WaitForSeconds(DELAY_BETWEEN_REQUESTS_MS / 1000f);
+        }
+
+        _isProcessingQueue = false;
+        _queueProcessorCoroutine = null;
+    }
+
+    private IEnumerator LoadVideoMetadataCoroutineInternal(string filePath, Action<VideoMetadata> onComplete)
     {
         var metadata = new VideoMetadata();
 
@@ -273,13 +385,34 @@ public class FileMetadataService : MonoBehaviour
     /// Read audio metadata.
     /// Note: Unity doesn't support ID3 tags natively.
     /// For full metadata support, consider using TagLibSharp or similar.
+    /// Queued to prevent main thread blocking.
     /// </summary>
     public void GetAudioMetadata(string filePath, Action<AudioMetadata> onComplete)
     {
-        StartCoroutine(LoadAudioMetadataCoroutine(filePath, onComplete));
+        // Limit queue size to prevent memory bloat
+        if (_metadataQueue.Count >= MAX_QUEUE_SIZE)
+        {
+            // Queue full - return empty metadata immediately
+            onComplete?.Invoke(new AudioMetadata());
+            return;
+        }
+
+        // Add to queue
+        _metadataQueue.Enqueue(new MetadataRequest
+        {
+            FilePath = filePath,
+            IsVideo = false,
+            AudioCallback = onComplete
+        });
+
+        // Start processor if not running
+        if (!_isProcessingQueue)
+        {
+            _queueProcessorCoroutine = StartCoroutine(ProcessMetadataQueue());
+        }
     }
 
-    private IEnumerator LoadAudioMetadataCoroutine(string filePath, Action<AudioMetadata> onComplete)
+    private IEnumerator LoadAudioMetadataCoroutineInternal(string filePath, Action<AudioMetadata> onComplete)
     {
         var metadata = new AudioMetadata();
 
@@ -629,6 +762,17 @@ public class FileMetadataService : MonoBehaviour
         if (index >= 0 && index < genres.Length)
             return genres[index];
         return "";
+    }
+
+    private void OnDestroy()
+    {
+        if (_queueProcessorCoroutine != null)
+        {
+            StopCoroutine(_queueProcessorCoroutine);
+            _queueProcessorCoroutine = null;
+        }
+        _metadataQueue.Clear();
+        _isProcessingQueue = false;
     }
 }
 

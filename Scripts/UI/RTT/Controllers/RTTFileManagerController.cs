@@ -1,5 +1,6 @@
 using UnityEngine;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -11,11 +12,15 @@ using System.Threading.Tasks;
 /// Handles business logic, data fetching, and state management.
 /// Follows MVVM pattern where this controls the RTTFileManager View.
 /// </summary>
-public class RTTFileManagerController : MonoBehaviour, IPaginationController
+public class RTTFileManagerController : MonoBehaviour, IPaginationController, IDataBindable
 {
     #region Private Fields
     private RTTFileManager _view;
     private GameObject _viewObject;
+
+    // IDataBindable support
+    private RTTLoadingSpinner _loadingSpinner;
+    private bool _isPreparingData = false;
     #endregion
 
     #region Events
@@ -583,19 +588,21 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController
         else
         {
             // Get folder's actual modified date from file system
+            // Convert "root" to actual file system path for Directory operations
+            string absolutePath = FileSystemService.GetAbsolutePath(_currentPath);
             DateTime folderModified = DateTime.MinValue;
             try
             {
-                if (Directory.Exists(_currentPath))
+                if (Directory.Exists(absolutePath))
                 {
-                    folderModified = Directory.GetLastWriteTime(_currentPath);
+                    folderModified = Directory.GetLastWriteTime(absolutePath);
                 }
             }
             catch { }
 
             var folderInfo = new MockFile
             {
-                Name = TextEncodingHelper.FixString(System.IO.Path.GetFileName(_currentPath)),
+                Name = TextEncodingHelper.FixString(System.IO.Path.GetFileName(absolutePath)),
                 Path = _currentPath,
                 IsFolder = true,
                 Modified = folderModified
@@ -1220,19 +1227,21 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController
     /// </summary>
     public MockFile GetCurrentFolderInfo()
     {
+        // Convert "root" to actual file system path for Directory operations
+        string absolutePath = FileSystemService.GetAbsolutePath(_currentPath);
         DateTime folderModified = DateTime.MinValue;
         try
         {
-            if (Directory.Exists(_currentPath))
+            if (Directory.Exists(absolutePath))
             {
-                folderModified = Directory.GetLastWriteTime(_currentPath);
+                folderModified = Directory.GetLastWriteTime(absolutePath);
             }
         }
         catch { }
 
         var folderInfo = new MockFile
         {
-            Name = TextEncodingHelper.FixString(System.IO.Path.GetFileName(_currentPath)),
+            Name = TextEncodingHelper.FixString(System.IO.Path.GetFileName(absolutePath)),
             Path = _currentPath,
             IsFolder = true,
             Modified = folderModified
@@ -1293,6 +1302,107 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController
         catch { }
 
         return null;
+    }
+    #endregion
+
+    #region IDataBindable Implementation
+    /// <summary>
+    /// FileManager is ready when view exists and not actively scanning.
+    /// </summary>
+    public bool IsDataReady => _view != null && !_isScanning;
+
+    /// <summary>
+    /// True when scanning for files or preparing data.
+    /// </summary>
+    public bool IsPreparingData => _isPreparingData || _isScanning;
+
+    /// <summary>
+    /// Start preparing data in background.
+    /// For FileManager, this is a no-op since file listing is fast.
+    /// The main async operation (category scan) is triggered by navigation.
+    /// </summary>
+    public void PrepareDataAsync()
+    {
+        _isPreparingData = true;
+        // FileManager doesn't need to preload data - file listing is synchronous
+        // Category scans are triggered by side panel navigation
+    }
+
+    /// <summary>
+    /// Bind data safely after transition completes.
+    /// Shows spinner while scanning, hides when done.
+    /// </summary>
+    public IEnumerator BindDataSafely()
+    {
+        // If view is ready and we're not scanning, data is already bound
+        if (_view != null && !_isScanning)
+        {
+            _isPreparingData = false;
+            yield break;
+        }
+
+        // If we're scanning, show spinner and wait
+        if (_isScanning)
+        {
+            ShowLoadingSpinner();
+
+            // Wait for scan to complete (with timeout)
+            float timeout = 30f; // Category scan can take a while
+            float elapsed = 0f;
+            while (_isScanning && elapsed < timeout)
+            {
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            HideLoadingSpinner();
+        }
+
+        _isPreparingData = false;
+    }
+
+    /// <summary>
+    /// Show loading spinner centered in the file grid area.
+    /// </summary>
+    public void ShowLoadingSpinner()
+    {
+        if (_loadingSpinner != null)
+        {
+            _loadingSpinner.Show();
+            return;
+        }
+
+        // Create spinner centered in view
+        if (_viewObject != null)
+        {
+            _loadingSpinner = RTTLoadingSpinner.Create(_viewObject.transform, Color.white);
+            _loadingSpinner.Show();
+        }
+    }
+
+    /// <summary>
+    /// Hide loading spinner with fade out animation.
+    /// </summary>
+    public void HideLoadingSpinner()
+    {
+        _loadingSpinner?.Hide();
+    }
+
+    private void OnDestroy()
+    {
+        // Cancel any ongoing scan
+        if (_scanCoroutine != null)
+        {
+            StopCoroutine(_scanCoroutine);
+            _scanCoroutine = null;
+        }
+
+        // Cleanup loading spinner
+        if (_loadingSpinner != null)
+        {
+            Destroy(_loadingSpinner.gameObject);
+            _loadingSpinner = null;
+        }
     }
     #endregion
 }

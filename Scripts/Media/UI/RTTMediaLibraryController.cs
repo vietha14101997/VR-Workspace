@@ -8,8 +8,9 @@ using System.Linq;
 /// <summary>
 /// Controller for Media Library - manages data flow between MediaLibraryService and UI.
 /// Handles filtering, searching, category selection, and user actions.
+/// Implements IDataBindable for smooth transition with background data loading.
 /// </summary>
-public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
+public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, IDataBindable
 {
     #region Events
     public event Action<MediaVideoInfo> OnVideoPlayRequested;
@@ -40,6 +41,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
     private bool _isInitialized = false;
     private bool _isFirstLoad = true; // Use sync filtering for first load to ensure immediate display
     private bool _waitingForInitialBinding = false; // Track if we're waiting for grid binding before starting scan
+    private bool _waitingForCacheLoad = false; // Track if we're waiting for async cache load
     private Coroutine _filterCoroutine;
     private const int FILTER_BATCH_SIZE = 200; // Items to process per frame
 
@@ -59,6 +61,106 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
     // Vietnamese culture for proper diacritics sorting (Đ with D, etc.) - synced with RTTFileManagerController
     private static readonly CultureInfo VietnameseCulture = new CultureInfo("vi-VN");
     private static readonly StringComparer VietnameseComparer = StringComparer.Create(VietnameseCulture, ignoreCase: true);
+
+    // Loading spinner for IDataBindable
+    private RTTLoadingSpinner _loadingSpinner;
+    private bool _isPreparingData = false;
+    #endregion
+
+    #region IDataBindable Implementation
+    /// <summary>
+    /// Whether the data is ready to be bound to UI.
+    /// </summary>
+    public bool IsDataReady => _libraryService != null && _libraryService.IsCacheLoaded;
+
+    /// <summary>
+    /// Whether data is currently being prepared in background.
+    /// </summary>
+    public bool IsPreparingData => _isPreparingData || (_libraryService != null && _libraryService.IsCacheLoading);
+
+    /// <summary>
+    /// Start preparing data in background without blocking UI.
+    /// For Media app, cache is already loading from MediaLibraryService.Awake().
+    /// </summary>
+    public void PrepareDataAsync()
+    {
+        // MediaLibraryService already starts loading in Awake()
+        // Just mark that we're preparing
+        _isPreparingData = true;
+    }
+
+    /// <summary>
+    /// Bind data to UI safely with frame budget to prevent lag.
+    /// Called after fade-in animation completes.
+    /// Shows loading spinner if data not ready yet.
+    /// </summary>
+    public IEnumerator BindDataSafely()
+    {
+        // Check if data was already bound by OnViewReady
+        // (which happens during frame preparation)
+        bool dataAlreadyBound = _view?.Grid != null &&
+                                _filteredVideos != null &&
+                                _filteredVideos.Count > 0;
+
+        if (dataAlreadyBound)
+        {
+            // Data already displayed from OnViewReady, nothing to do
+            _isPreparingData = false;
+            yield break;
+        }
+
+        // Show loading spinner
+        ShowLoadingSpinner();
+
+        // Wait for cache to load (with timeout)
+        float timeout = 5f;
+        float elapsed = 0f;
+        while (!IsDataReady && elapsed < timeout)
+        {
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        // Hide spinner
+        HideLoadingSpinner();
+
+        // If data is ready now, trigger refresh
+        if (IsDataReady && (_filteredVideos == null || _filteredVideos.Count == 0))
+        {
+            RefreshLibraryInternal();
+        }
+
+        _isPreparingData = false;
+    }
+
+    /// <summary>
+    /// Show loading spinner in the content area.
+    /// </summary>
+    public void ShowLoadingSpinner()
+    {
+        if (_loadingSpinner != null)
+        {
+            _loadingSpinner.Show();
+            return;
+        }
+
+        // Create spinner if not exists
+        if (_view != null)
+        {
+            // Find content container to parent spinner
+            Transform spinnerParent = _view.Grid?.transform?.parent ?? _view.transform;
+            _loadingSpinner = RTTLoadingSpinner.Create(spinnerParent, Color.white);
+            _loadingSpinner.Show();
+        }
+    }
+
+    /// <summary>
+    /// Hide loading spinner.
+    /// </summary>
+    public void HideLoadingSpinner()
+    {
+        _loadingSpinner?.Hide();
+    }
     #endregion
 
     #region Initialization
@@ -83,6 +185,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
             _libraryService.OnScanProgress += HandleScanProgress;
             _libraryService.OnScanComplete += HandleScanComplete;
             _libraryService.OnNewItemsDetected += HandleNewItemsDetected;
+            _libraryService.OnLibraryCacheLoaded += HandleCacheLoaded;
         }
 
         // Note: Side panel events are now wired in OnViewReady() because panels are created asynchronously
@@ -97,6 +200,20 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
     {
         // Update UI during scan
         _view?.UpdateItemCount(current);
+    }
+
+    /// <summary>
+    /// Handle async cache load completion.
+    /// </summary>
+    private void HandleCacheLoaded()
+    {
+        // Debug.Log("[RTTMediaLibraryController] Cache loaded, refreshing library...");
+
+        if (!_waitingForCacheLoad) return;
+        _waitingForCacheLoad = false;
+
+        // Now safe to load data
+        RefreshLibraryInternal();
     }
 
     private void HandleScanComplete(List<MediaVideoInfo> videos)
@@ -135,6 +252,23 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
         // before OnViewReady, consuming the flag and causing async filtering to clear the view
         _isFirstLoad = true;
 
+        // Check if cache is still loading (async optimization)
+        if (_libraryService != null && _libraryService.IsCacheLoading)
+        {
+            // Wait for cache to finish loading
+            _waitingForCacheLoad = true;
+            // Debug.Log("[RTTMediaLibraryController] Waiting for cache to load...");
+            return;
+        }
+
+        RefreshLibraryInternal();
+    }
+
+    /// <summary>
+    /// Internal method to load library after cache is ready.
+    /// </summary>
+    private void RefreshLibraryInternal()
+    {
         // Check if we have cached data before subscribing to binding event
         int cachedCount = _libraryService?.GetAllVideos()?.Count ?? 0;
 
@@ -1053,6 +1187,13 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
             _filterCoroutine = null;
         }
 
+        // Cleanup loading spinner
+        if (_loadingSpinner != null)
+        {
+            Destroy(_loadingSpinner.gameObject);
+            _loadingSpinner = null;
+        }
+
         if (_view != null)
         {
             _view.OnVideoPlayRequested -= HandleVideoPlayRequested;
@@ -1070,6 +1211,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController
             _libraryService.OnScanProgress -= HandleScanProgress;
             _libraryService.OnScanComplete -= HandleScanComplete;
             _libraryService.OnNewItemsDetected -= HandleNewItemsDetected;
+            _libraryService.OnLibraryCacheLoaded -= HandleCacheLoaded;
         }
 
         // Note: Side panel events are now managed by RTTMediaLibrary

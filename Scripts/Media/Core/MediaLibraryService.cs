@@ -43,11 +43,22 @@ public class MediaLibraryService : MonoBehaviour
 #pragma warning disable CS0067 // Event reserved for error handling during scan
     public event Action<string> OnScanError;
 #pragma warning restore CS0067
+    /// <summary>
+    /// Fired when library cache has been loaded (async).
+    /// </summary>
+    public event Action OnLibraryCacheLoaded;
+    /// <summary>
+    /// Fired when background metadata refresh completes (DateAdded, FileSize updated).
+    /// UI can optionally refresh to reflect updated sorting.
+    /// </summary>
+    public event Action OnMetadataRefreshComplete;
     #endregion
 
     #region Properties
     public List<MediaVideoInfo> AllVideos { get; private set; } = new List<MediaVideoInfo>();
     public bool IsScanning { get; private set; }
+    public bool IsCacheLoaded { get; private set; }
+    public bool IsCacheLoading { get; private set; }
     public int TotalVideoCount => AllVideos.Count;
     #endregion
 
@@ -55,6 +66,7 @@ public class MediaLibraryService : MonoBehaviour
     private HashSet<string> _favorites = new HashSet<string>();
     private List<string> _playbackHistory = new List<string>();
     private Coroutine _scanCoroutine;
+    private Coroutine _cacheLoadCoroutine;
     #endregion
 
     #region Unity Lifecycle
@@ -70,7 +82,8 @@ public class MediaLibraryService : MonoBehaviour
 
         LoadFavorites();
         LoadHistory();
-        LoadLibraryCache();
+        // Load cache asynchronously to avoid blocking main thread
+        _cacheLoadCoroutine = StartCoroutine(LoadLibraryCacheAsync());
     }
     #endregion
 
@@ -716,65 +729,227 @@ public class MediaLibraryService : MonoBehaviour
 
     #region Library Cache
     /// <summary>
-    /// Load cached library data for faster startup.
+    /// Load cached library data asynchronously to avoid blocking main thread.
+    /// Uses batched processing with yield to maintain 60fps.
     /// </summary>
-    private void LoadLibraryCache()
+    private IEnumerator LoadLibraryCacheAsync()
     {
+        IsCacheLoading = true;
+        IsCacheLoaded = false;
+
         string json = PlayerPrefs.GetString(LIBRARY_CACHE_KEY, "");
         if (string.IsNullOrEmpty(json))
         {
             Debug.Log("[MediaLibraryService] No library cache found");
-            return;
+            IsCacheLoading = false;
+            IsCacheLoaded = true;
+            OnLibraryCacheLoaded?.Invoke();
+            yield break;
         }
 
+        LibraryCacheWrapper cache = null;
         try
         {
-            var cache = JsonUtility.FromJson<LibraryCacheWrapper>(json);
-            if (cache?.paths == null || cache.paths.Count == 0)
-            {
-                Debug.Log("[MediaLibraryService] Library cache is empty");
-                return;
-            }
-
-            Debug.Log($"[MediaLibraryService] Loading {cache.paths.Count} items from cache...");
-
-            // Rebuild MediaVideoInfo from cached paths
-            AllVideos.Clear();
-            int validCount = 0;
-            foreach (var path in cache.paths)
-            {
-                // Only add if file still exists
-                if (File.Exists(path))
-                {
-                    var info = CreateVideoInfo(path);
-                    AllVideos.Add(info);
-                    validCount++;
-                }
-            }
-
-            AllVideos = AllVideos.OrderBy(v => v.Title).ToList();
-            Debug.Log($"[MediaLibraryService] Loaded {validCount} items from cache ({cache.paths.Count - validCount} missing files)");
+            cache = JsonUtility.FromJson<LibraryCacheWrapper>(json);
         }
         catch (Exception ex)
         {
-            Debug.LogWarning($"[MediaLibraryService] Failed to load library cache: {ex.Message}");
-            AllVideos.Clear();
+            Debug.LogWarning($"[MediaLibraryService] Failed to parse library cache: {ex.Message}");
+            IsCacheLoading = false;
+            IsCacheLoaded = true;
+            OnLibraryCacheLoaded?.Invoke();
+            yield break;
+        }
+
+        if (cache?.paths == null || cache.paths.Count == 0)
+        {
+            Debug.Log("[MediaLibraryService] Library cache is empty");
+            IsCacheLoading = false;
+            IsCacheLoaded = true;
+            OnLibraryCacheLoaded?.Invoke();
+            yield break;
+        }
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        Debug.Log($"[MediaLibraryService] Loading {cache.paths.Count} items from cache (async)...");
+
+        // Clear existing
+        AllVideos.Clear();
+
+        // OPTIMIZATION: Skip File.Exists() during initial load
+        // Files will be validated lazily when accessed
+        // This saves ~0.5-1ms per file = 500-1000ms for 1000+ files
+        const int BATCH_SIZE = 100;  // Process 100 items per frame
+        int processedCount = 0;
+
+        // Check if cache has metadata (backward compatibility)
+        bool hasMetadata = cache.fileSizes != null && cache.fileSizes.Count == cache.paths.Count;
+
+        for (int i = 0; i < cache.paths.Count; i++)
+        {
+            string path = cache.paths[i];
+
+            // Use quick version that doesn't do File.Exists or FileInfo I/O
+            // Pass cached metadata if available
+            long fileSize = hasMetadata ? cache.fileSizes[i] : 0;
+            long dateAddedTicks = hasMetadata ? cache.dateAddedTicks[i] : 0;
+            long dateModifiedTicks = hasMetadata ? cache.dateModifiedTicks[i] : 0;
+
+            var info = CreateVideoInfoQuick(path, fileSize, dateAddedTicks, dateModifiedTicks);
+            AllVideos.Add(info);
+            processedCount++;
+
+            // Yield every BATCH_SIZE items to avoid blocking main thread
+            if (processedCount % BATCH_SIZE == 0)
+            {
+                yield return null;
+            }
+        }
+
+        // Sort once at the end
+        AllVideos = AllVideos.OrderBy(v => v.Title).ToList();
+
+        sw.Stop();
+        Debug.Log($"[MediaLibraryService] Loaded {AllVideos.Count} items from cache in {sw.ElapsedMilliseconds}ms (async, no File.Exists)");
+
+        IsCacheLoading = false;
+        IsCacheLoaded = true;
+        OnLibraryCacheLoaded?.Invoke();
+
+        // If cache didn't have metadata, refresh it in background
+        if (!hasMetadata && AllVideos.Count > 0)
+        {
+            Debug.Log("[MediaLibraryService] Cache missing metadata, starting background refresh...");
+            StartCoroutine(RefreshMetadataInBackground());
+        }
+    }
+
+    /// <summary>
+    /// Refresh file metadata (DateAdded, FileSize) in background.
+    /// Updates AllVideos and saves to cache when complete.
+    /// </summary>
+    private IEnumerator RefreshMetadataInBackground()
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        const int BATCH_SIZE = 50;  // Fewer per frame to minimize impact
+        int processedCount = 0;
+        int updatedCount = 0;
+
+        for (int i = 0; i < AllVideos.Count; i++)
+        {
+            var video = AllVideos[i];
+
+            // Only update if metadata is missing
+            if (video.DateModified == DateTime.MinValue || video.FileSizeBytes == 0)
+            {
+                try
+                {
+                    if (File.Exists(video.Path))
+                    {
+                        var fileInfo = new FileInfo(video.Path);
+                        video.FileSizeBytes = fileInfo.Length;
+                        video.DateModified = fileInfo.LastWriteTime;
+                        video.DateAdded = fileInfo.CreationTime;
+                        AllVideos[i] = video;
+                        updatedCount++;
+                    }
+                }
+                catch { }
+            }
+
+            processedCount++;
+
+            // Yield every BATCH_SIZE to avoid blocking
+            if (processedCount % BATCH_SIZE == 0)
+            {
+                yield return null;
+            }
+        }
+
+        sw.Stop();
+        Debug.Log($"[MediaLibraryService] Background metadata refresh complete: {updatedCount}/{AllVideos.Count} items in {sw.ElapsedMilliseconds}ms");
+
+        // Save updated cache
+        SaveLibraryCache();
+
+        // Notify listeners that metadata is now available
+        OnMetadataRefreshComplete?.Invoke();
+    }
+
+    /// <summary>
+    /// Quick version of CreateVideoInfo that doesn't perform disk I/O.
+    /// Uses cached metadata if available, otherwise lazy validation needed.
+    /// </summary>
+    private MediaVideoInfo CreateVideoInfoQuick(string filePath, long fileSize = 0, long dateAddedTicks = 0, long dateModifiedTicks = 0)
+    {
+        var info = new MediaVideoInfo
+        {
+            Path = filePath,
+            Title = Path.GetFileNameWithoutExtension(filePath),
+            Format = MediaVideoInfo.DetectFormat(filePath),
+            PlaylistIds = new List<string>(),
+            IsFavorite = _favorites.Contains(filePath),
+            // Use cached metadata if available
+            DateAdded = dateAddedTicks > 0 ? new DateTime(dateAddedTicks) : DateTime.MinValue,
+            DateModified = dateModifiedTicks > 0 ? new DateTime(dateModifiedTicks) : DateTime.MinValue,
+            FileSizeBytes = fileSize
+        };
+
+        // Detect projection from filename (no I/O needed)
+        info.Projection = ProjectionDetector.DetectProjection(filePath, 0, 0);
+
+        return info;
+    }
+
+    /// <summary>
+    /// Validate and update file metadata for a MediaVideoInfo.
+    /// Call this lazily when file details are actually needed.
+    /// Returns false if file doesn't exist.
+    /// </summary>
+    public bool ValidateAndUpdateFileInfo(ref MediaVideoInfo info)
+    {
+        if (string.IsNullOrEmpty(info.Path)) return false;
+
+        try
+        {
+            if (!File.Exists(info.Path)) return false;
+
+            // Only update if not already populated
+            if (info.DateModified == DateTime.MinValue || info.FileSizeBytes == 0)
+            {
+                var fileInfo = new FileInfo(info.Path);
+                info.FileSizeBytes = fileInfo.Length;
+                info.DateModified = fileInfo.LastWriteTime;
+                info.DateAdded = fileInfo.CreationTime;
+            }
+            return true;
+        }
+        catch
+        {
+            return false;
         }
     }
 
     /// <summary>
     /// Save library data to cache for faster startup.
+    /// Includes metadata (DateAdded, FileSize) to enable sorting without disk I/O.
     /// </summary>
     private void SaveLibraryCache()
     {
         try
         {
-            var paths = AllVideos.Select(v => v.Path).ToList();
-            var cache = new LibraryCacheWrapper { paths = paths };
+            var cache = new LibraryCacheWrapper();
+            foreach (var video in AllVideos)
+            {
+                cache.paths.Add(video.Path);
+                cache.fileSizes.Add(video.FileSizeBytes);
+                cache.dateAddedTicks.Add(video.DateAdded.Ticks);
+                cache.dateModifiedTicks.Add(video.DateModified.Ticks);
+            }
             string json = JsonUtility.ToJson(cache);
             PlayerPrefs.SetString(LIBRARY_CACHE_KEY, json);
             PlayerPrefs.Save();
-            Debug.Log($"[MediaLibraryService] Saved {paths.Count} items to cache");
+            Debug.Log($"[MediaLibraryService] Saved {cache.paths.Count} items to cache (with metadata)");
         }
         catch (Exception ex)
         {
@@ -857,6 +1032,10 @@ public class MediaLibraryService : MonoBehaviour
     private class LibraryCacheWrapper
     {
         public List<string> paths = new List<string>();
+        // Cached metadata to avoid disk I/O on load
+        public List<long> fileSizes = new List<long>();
+        public List<long> dateAddedTicks = new List<long>();
+        public List<long> dateModifiedTicks = new List<long>();
     }
     #endregion
 }

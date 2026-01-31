@@ -582,6 +582,10 @@ namespace VRWorkspace.UI.RTT
             instance.Frame.transform.position = _mainMenuFrame.transform.position;
             instance.Frame.transform.rotation = _mainMenuFrame.transform.rotation;
             instance.Frame.transform.localScale = Vector3.one;
+
+            // CRITICAL: Set visibility to false BEFORE SetActive to prevent 1-frame alpha flicker
+            // This ensures display quad is created with enabled=false from the start
+            instance.Frame.SetVisible(false);
             instance.Frame.gameObject.SetActive(true);
 
             // Wait for ContentContainer
@@ -602,6 +606,12 @@ namespace VRWorkspace.UI.RTT
 
             // Create content via callback
             _createAppContentCallback?.Invoke(instance);
+
+            // Start background data preparation if controller supports it
+            if (instance.Controller is IDataBindable bindable)
+            {
+                bindable.PrepareDataAsync();
+            }
 
             // Mark as prepared BEFORE hiding
             instance.IsPrepared = true;
@@ -639,6 +649,11 @@ namespace VRWorkspace.UI.RTT
                     quad.material.color = new Color(1f, 1f, 1f, 0f);
                 yield return StartCoroutine(AnimateFrameFade(instance.Frame, 0f, 1f, _transitionInDuration, false));
             }
+            else
+            {
+                // No fade transition - ensure alpha is reset to 1 (was set to 0 during preparation)
+                ResetFrameAlpha(instance.Frame);
+            }
 
             // Register with taskbar
             _taskbar?.RegisterApp(instance.TaskbarSlotIndex, instance.Icon, () => SwitchToApp(instance.AppId));
@@ -646,6 +661,13 @@ namespace VRWorkspace.UI.RTT
 
             _onMenuStateChanged?.Invoke(RTTManager.MenuState.RemoteMenu);
             _isTransitioning = false;
+
+            // Safe data binding after transition completes
+            // This shows loading spinner if data not ready yet
+            if (instance.Controller is IDataBindable bindable)
+            {
+                yield return StartCoroutine(bindable.BindDataSafely());
+            }
 
             OnAppOpened?.Invoke(instance.AppId, instance);
             OnVisibleAppChanged?.Invoke(instance.AppId);
@@ -688,6 +710,11 @@ namespace VRWorkspace.UI.RTT
                 if (quad?.material != null)
                     quad.material.color = new Color(1f, 1f, 1f, 0f);
                 yield return StartCoroutine(AnimateFrameFade(newApp.Frame, 0f, 1f, _transitionInDuration, false));
+            }
+            else if (newApp.Frame != null)
+            {
+                // No fade transition - ensure alpha is visible
+                ResetFrameAlpha(newApp.Frame);
             }
 
             _taskbar?.SelectSlot(newApp.TaskbarSlotIndex);
@@ -732,6 +759,11 @@ namespace VRWorkspace.UI.RTT
                 if (quad?.material != null)
                     quad.material.color = new Color(1f, 1f, 1f, 0f);
                 yield return StartCoroutine(AnimateFrameFade(_mainMenuFrame, 0f, 1f, _transitionInDuration, false));
+            }
+            else if (_mainMenuFrame != null)
+            {
+                // No fade transition - ensure alpha is visible
+                ResetFrameAlpha(_mainMenuFrame);
             }
 
             _taskbar?.SelectSlot(0);
