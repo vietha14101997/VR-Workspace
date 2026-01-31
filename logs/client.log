@@ -12,6 +12,11 @@ Camera 0: Twitch Virtual Cam (front facing: True)
 
 Starting webcam texture: Twitch Virtual Cam at 1280x720
 
+Could not connect pins - RenderStream()
+UnityEngine.StackTraceUtility:ExtractStackTrace ()
+CameraPassthrough:StartCam () (at Assets/VR-Workspace/Scripts/Camera/CameraPassthrough.cs:115)
+CameraPassthrough:OnEnable () (at Assets/VR-Workspace/Scripts/Camera/CameraPassthrough.cs:17)
+
 [AndroidHelper] App resumed
 
 [RTTMenu] Created main frame
@@ -44,6 +49,11 @@ Starting webcam texture: Twitch Virtual Cam at 1280x720
 
 [RTTMiniFrame] UI built: 1095.5x128 pixels
 
+Please initialize Cardboard XR loader before calling this function.
+UnityEngine.Debug:LogError (object)
+Google.XR.Cardboard.Api:UpdateScreenParams () (at ./Library/PackageCache/com.google.xr.cardboard@e91752ce4c/Runtime/Api.cs:317)
+CardboardStartup:Update () (at Assets/Samples/Google Cardboard XR Plugin for Unity/1.30.0/Hello Cardboard/Scripts/CardboardStartup.cs:70)
+
 [RTTMainMenuController] Icons loaded - Remote:True, Browser:True, Media:True, Files:False
 
 [HoverEffectController] AddEffect 'glow_border' to HitArea, TargetVisuals=Visuals
@@ -64,6 +74,11 @@ Starting webcam texture: Twitch Virtual Cam at 1280x720
 
 Restarting webcam texture as it was not playing
 
+Could not connect pins - RenderStream()
+UnityEngine.StackTraceUtility:ExtractStackTrace ()
+CameraPassthrough/<EnsureTextureStarted>d__11:MoveNext () (at Assets/VR-Workspace/Scripts/Camera/CameraPassthrough.cs:158)
+UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
+
 Stopping camera passthrough
 
 Destroying webcam texture
@@ -79,9 +94,21 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [RTTManager] Auto-recenter completed
 
+[RTTMainMenu] Click started: media at 7.738s
+
+[RTTMainMenu] PrepareApp called: media at 7.738s (+0.1ms)
+
+[RTTAppManager] PrepareAppFrameAsync started: media at 7.741s
+
 [RTTMenu] Created app frame: media
 
+[RTTAppManager] Frame created: media at 7.741s (+0.4ms)
+
 [RTTAppManager] Preparing app: media in slot 1
+
+[RTTMainMenu] Button animation started: media at 7.742s (+3.3ms)
+
+[RTTAppManager] Creating content: media at 7.770s (+29.6ms)
 
 [RTTManager] Creating Media content...
 
@@ -135,7 +162,7 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [HoverEffectController] AddEffect 'cursor_change' to HitArea, TargetVisuals=Visuals
 
-[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-699622
+[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-767388
 
 [HoverEffectController] AddEffect 'scale' to Checkbox, TargetVisuals=Checkbox
 
@@ -157,9 +184,35 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [VRMediaAppController] Media app created
 
-[RTTAppManager] App prepared (hidden): media
+[RTTAppManager] Content created: media at 7.940s (+199.9ms)
 
-[MediaLibraryService] Loaded 1312 items from cache in 397ms (async, no File.Exists)
+[RTTAppManager] App prepared (ready for transition): media at 7.941s (total: 199.9ms)
+
+[RTTMediaLibrary] InitializePageSizeDeferred: itemsPerPage=8
+
+[RTTMainMenu] Button animation ended: media at 7.988s (+250.3ms)
+
+[RTTMainMenu] OpenPreparedApp called: media at 7.989s (+250.4ms)
+
+[RTTAppManager] WaitAndSwitch started: media at 7.989s
+
+[RTTAppManager] WaitAndSwitch app ready: media at 7.989s (waited 0.1ms)
+
+[RTTAppManager] Starting transition: media at 7.989s
+
+[RTTAppManager] Transition started: media at 7.990s
+
+[RTTAppManager] Fade out MainMenu: media at 7.990s
+
+[RTTMainMenu] Click flow completed: media at 7.990s (total: +252.2ms)
+
+[RTTAppManager] Fade out done: media at 8.105s (+115.2ms)
+
+[RTTAppManager] Frame visible: media at 8.106s (+116.3ms)
+
+[RTTAppManager] Fade in started: media at 8.106s
+
+[MediaLibraryService] Loaded 1312 items from cache in 396ms (async, no File.Exists)
 
 [RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
@@ -183,7 +236,7 @@ Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling b
 
 [RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[Cache] DISK READ: 0ms (115KB)
+[Cache] DISK READ: 3ms (115KB)
 
 [RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-39-53': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
@@ -261,25 +314,17 @@ Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling b
 
 [Cache] DISK DECODE: 1ms (512x288)
 
-[Detail] REQUEST: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-42-48.mp4
-
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-42-48.mp4
-
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-42-48.mp4 name=1ms preview=4ms metadata=9ms total=14ms
-
 [RTTMediaGridItem] Duration badge for 'vết xước 2': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
 [Cache] DISK READ: 0ms (48KB)
-
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-42-48.mp4
-
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-42-48.mp4
 
 [RTTMediaGridItem] Duration badge for 'vết xước 1': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
 [Cache] DISK READ: 0ms (101KB)
 
 [Cache] DISK DECODE: 2ms (512x284)
+
+[RTTAppManager] Fade in done: media at 8.612s (+621.9ms)
 
 [RTTTaskbar] RegisterApp called - slotIndex=1, icon=icon_media
 
@@ -297,11 +342,15 @@ Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling b
 
 [RTTTaskbar] SelectSlot(1) called, current active: 1
 
-[VideoFrameExtractor] Seeking to 3.5s (video length: 11.6s)
+[RTTAppManager] Transition completed: media at 8.652s (total: 661.8ms)
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-17-43.mp4
 
 Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-17-43.mp4
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-42-48.mp4
+
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-42-48.mp4
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4
 
@@ -311,22 +360,9 @@ Unexpected timestamp values detected. This can occur in H.264 videos not encoded
 
 Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-39-53.mp4
 
-[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46.mp4 wait=0ms assign=0ms
-
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46.mp4 name=0ms preview=1ms metadata=9ms total=10ms
-
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-51-25.mp4
 
 Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-51-25.mp4
-
-[VideoFrameExtractor] Async capture failed: LoadRawTextureData: not enough data provided (will result in overread)., using fallback
-UnityEngine.Debug:LogWarning (object)
-VideoFrameExtractor/<CaptureFrameAsync>d__20:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Services/VideoFrameExtractor.cs:511)
-UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
-
-[VideoFrameExtractor] Successfully extracted frame for: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-42-48.mp4
-
-[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 11-42-48.mp4 wait=658ms assign=0ms
 
 First video frame not zero: 2 (0.066667s). Result may be out of sync. Please make sure tracks all start at 0 in C:\Users\Admin\Downloads\videoplayback.mp4
 
@@ -340,20 +376,6 @@ Unexpected timestamp values detected. This can occur in H.264 videos not encoded
 
 Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Downloads\Genshin_Impact_2025-09-10_11-32-27.mp4
 
-[Detail] REQUEST: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4
-
-[Cache] DISK READ: 8ms (100KB)
-
-[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4 wait=24ms assign=0ms
-
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4 name=1ms preview=24ms metadata=10ms total=35ms
-
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46.mp4 name=1ms preview=0ms metadata=9ms total=10ms
-
-[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4 wait=0ms assign=0ms
-
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-06-51.mp4 name=1ms preview=0ms metadata=13ms total=14ms
-
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Compressed\FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD).mp4
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\New folder\khác màu.mp4
@@ -365,4 +387,16 @@ Unexpected timestamp values detected. This can occur in H.264 videos not encoded
 Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\New folder\vết xước 2.mp4
 
 Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\New folder\vết xước 1.mp4
+
+[Detail] REQUEST: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-51-25.mp4
+
+[Cache] DISK READ: 8ms (93KB)
+
+[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-51-25.mp4 wait=22ms assign=0ms
+
+[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-30 17-51-25.mp4 name=1ms preview=22ms metadata=11ms total=34ms
+
+[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46.mp4 wait=0ms assign=0ms
+
+[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-01-31 10-10-46.mp4 name=1ms preview=0ms metadata=11ms total=12ms
 

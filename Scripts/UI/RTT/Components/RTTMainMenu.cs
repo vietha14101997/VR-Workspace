@@ -343,10 +343,14 @@ public class RTTMainMenu : MonoBehaviour
     /// </summary>
     private IEnumerator ExecuteWithButtonAnimation(HoverEffectController hoverController, Transform buttonTransform, string itemId)
     {
+        float startTime = Time.realtimeSinceStartup;
+        Debug.Log($"[RTTMainMenu] Click started: {itemId} at {startTime:F3}s");
+
         // 1. Start app preparation - frame created invisibly during button animation
         if (RTTManager.Instance != null && !_preparedApps.Contains(itemId))
         {
             _preparedApps.Add(itemId);
+            Debug.Log($"[RTTMainMenu] PrepareApp called: {itemId} at {Time.realtimeSinceStartup:F3}s (+{(Time.realtimeSinceStartup - startTime) * 1000:F1}ms)");
             RTTManager.Instance.PrepareApp(itemId);
         }
 
@@ -357,11 +361,14 @@ public class RTTMainMenu : MonoBehaviour
         }
 
         // 3. Play button press animation (80ms)
+        Debug.Log($"[RTTMainMenu] Button animation started: {itemId} at {Time.realtimeSinceStartup:F3}s (+{(Time.realtimeSinceStartup - startTime) * 1000:F1}ms)");
         yield return StartCoroutine(ButtonPressAnimation(buttonTransform));
+        Debug.Log($"[RTTMainMenu] Button animation ended: {itemId} at {Time.realtimeSinceStartup:F3}s (+{(Time.realtimeSinceStartup - startTime) * 1000:F1}ms)");
 
         // 4. Open the prepared app with smooth transition
         if (RTTManager.Instance != null)
         {
+            Debug.Log($"[RTTMainMenu] OpenPreparedApp called: {itemId} at {Time.realtimeSinceStartup:F3}s (+{(Time.realtimeSinceStartup - startTime) * 1000:F1}ms)");
             RTTManager.Instance.OpenPreparedApp(itemId);
         }
         else
@@ -372,6 +379,7 @@ public class RTTMainMenu : MonoBehaviour
 
         // 5. Clear prepared state (allow re-preparation if user returns to menu)
         _preparedApps.Remove(itemId);
+        Debug.Log($"[RTTMainMenu] Click flow completed: {itemId} at {Time.realtimeSinceStartup:F3}s (total: +{(Time.realtimeSinceStartup - startTime) * 1000:F1}ms)");
     }
 
     /// <summary>

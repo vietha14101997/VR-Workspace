@@ -439,14 +439,21 @@ namespace VRWorkspace.UI.RTT
 
         private IEnumerator WaitAndSwitchToPreparedApp(string appId)
         {
+            float waitStart = Time.realtimeSinceStartup;
+            Debug.Log($"[RTTAppManager] WaitAndSwitch started: {appId} at {waitStart:F3}s");
+
             while (_preparingApps.ContainsKey(appId) && !IsAppPrepared(appId))
                 yield return null;
+
+            float waitEnd = Time.realtimeSinceStartup;
+            Debug.Log($"[RTTAppManager] WaitAndSwitch app ready: {appId} at {waitEnd:F3}s (waited {(waitEnd - waitStart) * 1000:F1}ms)");
 
             if (_preparingApps.ContainsKey(appId))
             {
                 var instance = _preparingApps[appId];
                 _preparingApps.Remove(appId);
                 _activeApps[appId] = instance;
+                Debug.Log($"[RTTAppManager] Starting transition: {appId} at {Time.realtimeSinceStartup:F3}s");
                 StartCoroutine(SwitchToPreparedAppWithTransition(instance));
             }
         }
@@ -552,6 +559,9 @@ namespace VRWorkspace.UI.RTT
 
         private IEnumerator PrepareAppFrameAsync(RTTAppInstance instance)
         {
+            float prepareStart = Time.realtimeSinceStartup;
+            Debug.Log($"[RTTAppManager] PrepareAppFrameAsync started: {instance.AppId} at {prepareStart:F3}s");
+
             if (_mainMenuFrame == null)
             {
                 Debug.LogError("[RTTAppManager] MainMenuFrame is null");
@@ -579,6 +589,8 @@ namespace VRWorkspace.UI.RTT
                 );
             }
 
+            Debug.Log($"[RTTAppManager] Frame created: {instance.AppId} at {Time.realtimeSinceStartup:F3}s (+{(Time.realtimeSinceStartup - prepareStart) * 1000:F1}ms)");
+
             instance.Frame.transform.position = _mainMenuFrame.transform.position;
             instance.Frame.transform.rotation = _mainMenuFrame.transform.rotation;
             instance.Frame.transform.localScale = Vector3.one;
@@ -604,50 +616,80 @@ namespace VRWorkspace.UI.RTT
 
             yield return null;
 
+            Debug.Log($"[RTTAppManager] Creating content: {instance.AppId} at {Time.realtimeSinceStartup:F3}s (+{(Time.realtimeSinceStartup - prepareStart) * 1000:F1}ms)");
+
             // Create content via callback
             _createAppContentCallback?.Invoke(instance);
 
-            // Start background data preparation if controller supports it
+            Debug.Log($"[RTTAppManager] Content created: {instance.AppId} at {Time.realtimeSinceStartup:F3}s (+{(Time.realtimeSinceStartup - prepareStart) * 1000:F1}ms)");
+
+            // Start background data preparation AND bind data immediately (while alpha=0)
+            // This ensures grid is populated BEFORE fade-in animation starts
             if (instance.Controller is IDataBindable bindable)
             {
+                Debug.Log($"[RTTAppManager] PrepareDataAsync started: {instance.AppId} at {Time.realtimeSinceStartup:F3}s");
                 bindable.PrepareDataAsync();
+
+                // Bind data now (frame is active but invisible with alpha=0)
+                // BindDataSafely waits for cache to load, then populates grid
+                Debug.Log($"[RTTAppManager] BindDataSafely started (during prepare): {instance.AppId} at {Time.realtimeSinceStartup:F3}s");
+                yield return StartCoroutine(bindable.BindDataSafely());
+                Debug.Log($"[RTTAppManager] BindDataSafely done: {instance.AppId} at {Time.realtimeSinceStartup:F3}s (+{(Time.realtimeSinceStartup - prepareStart) * 1000:F1}ms)");
             }
 
-            // Mark as prepared BEFORE hiding
+            // Mark as prepared
             instance.IsPrepared = true;
 
-            // Now hide the frame
-            instance.Frame.gameObject.SetActive(false);
+            // Keep frame active but invisible (SetVisible was already called with false earlier)
+            // Don't SetActive(false) - grid needs to stay ready for immediate fade-in
 
-            Debug.Log($"[RTTAppManager] App prepared (hidden): {instance.AppId}");
+            Debug.Log($"[RTTAppManager] App prepared (ready for transition): {instance.AppId} at {Time.realtimeSinceStartup:F3}s (total: {(Time.realtimeSinceStartup - prepareStart) * 1000:F1}ms)");
         }
 
         private IEnumerator SwitchToPreparedAppWithTransition(RTTAppInstance instance)
         {
+            float transitionStart = Time.realtimeSinceStartup;
+            Debug.Log($"[RTTAppManager] Transition started: {instance.AppId} at {transitionStart:F3}s");
+
             _isTransitioning = true;
 
             // Animate out current
             if (_useFadeTransition && _transitionOutDuration > 0)
+            {
+                Debug.Log($"[RTTAppManager] Fade out MainMenu: {instance.AppId} at {Time.realtimeSinceStartup:F3}s");
                 yield return StartCoroutine(AnimateFrameFade(_mainMenuFrame, 1f, 0f, _transitionOutDuration, true));
+                Debug.Log($"[RTTAppManager] Fade out done: {instance.AppId} at {Time.realtimeSinceStartup:F3}s (+{(Time.realtimeSinceStartup - transitionStart) * 1000:F1}ms)");
+            }
 
             // Hide main menu
             _mainMenuFrame.gameObject.SetActive(false);
             ResetFrameAlpha(_mainMenuFrame);
 
-            // Show prepared frame
+            // Show prepared frame (grid already populated from PrepareAppFrameAsync)
             instance.Frame.gameObject.SetActive(true);
-            instance.Frame.SetVisible(true);
-            instance.Frame.SetAsPrimaryFrame();
-            instance.IsVisible = true;
-            _currentVisibleAppId = instance.AppId;
 
-            // Animate in
+            // Set alpha to 0 BEFORE enabling display quad to prevent flash
             if (_useFadeTransition && _transitionInDuration > 0)
             {
                 var quad = instance.Frame.GetDisplayQuad();
                 if (quad?.material != null)
                     quad.material.color = new Color(1f, 1f, 1f, 0f);
+            }
+
+            // Now enable display quad (with alpha already 0)
+            instance.Frame.SetVisible(true);
+            instance.Frame.SetAsPrimaryFrame();
+            instance.IsVisible = true;
+            _currentVisibleAppId = instance.AppId;
+
+            Debug.Log($"[RTTAppManager] Frame visible: {instance.AppId} at {Time.realtimeSinceStartup:F3}s (+{(Time.realtimeSinceStartup - transitionStart) * 1000:F1}ms)");
+
+            // Animate in (grid already populated from prepare phase)
+            if (_useFadeTransition && _transitionInDuration > 0)
+            {
+                Debug.Log($"[RTTAppManager] Fade in started: {instance.AppId} at {Time.realtimeSinceStartup:F3}s");
                 yield return StartCoroutine(AnimateFrameFade(instance.Frame, 0f, 1f, _transitionInDuration, false));
+                Debug.Log($"[RTTAppManager] Fade in done: {instance.AppId} at {Time.realtimeSinceStartup:F3}s (+{(Time.realtimeSinceStartup - transitionStart) * 1000:F1}ms)");
             }
             else
             {
@@ -662,12 +704,7 @@ namespace VRWorkspace.UI.RTT
             _onMenuStateChanged?.Invoke(RTTManager.MenuState.RemoteMenu);
             _isTransitioning = false;
 
-            // Safe data binding after transition completes
-            // This shows loading spinner if data not ready yet
-            if (instance.Controller is IDataBindable bindable)
-            {
-                yield return StartCoroutine(bindable.BindDataSafely());
-            }
+            Debug.Log($"[RTTAppManager] Transition completed: {instance.AppId} at {Time.realtimeSinceStartup:F3}s (total: {(Time.realtimeSinceStartup - transitionStart) * 1000:F1}ms)");
 
             OnAppOpened?.Invoke(instance.AppId, instance);
             OnVisibleAppChanged?.Invoke(instance.AppId);

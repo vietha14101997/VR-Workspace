@@ -24,7 +24,7 @@ public interface IDataBindable
 
     /// <summary>
     /// Bind data to UI safely with frame budget to prevent lag.
-    /// Called after fade-in animation completes.
+    /// Called BEFORE fade-in animation starts, so grid is populated when visible.
     /// Shows loading spinner if data not ready yet.
     /// </summary>
     IEnumerator BindDataSafely();
