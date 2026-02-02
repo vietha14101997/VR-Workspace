@@ -126,6 +126,11 @@ public class MediaLibraryService : MonoBehaviour
     /// </summary>
     public event Action<List<MediaVideoInfo>> OnNewItemsDetected;
 
+    /// <summary>
+    /// Event fired when items are removed (files no longer exist) during background scan.
+    /// </summary>
+    public event Action<List<string>> OnItemsRemoved;
+
     private Coroutine _backgroundScanCoroutine;
     private bool _isBackgroundScanning = false;
 
@@ -153,11 +158,35 @@ public class MediaLibraryService : MonoBehaviour
     {
         _isBackgroundScanning = true;
         var newItems = new List<MediaVideoInfo>();
+        var removedPaths = new List<string>();
         var existingPaths = new HashSet<string>(AllVideos.Select(v => v.Path));
 
         Debug.Log($"[MediaLibraryService] Starting background scan (existing: {existingPaths.Count} items)");
         var startTime = System.Diagnostics.Stopwatch.StartNew();
 
+        // STEP 1: Validate existing files - remove deleted ones
+        const int VALIDATE_BATCH_SIZE = 50;
+        int validateCount = 0;
+        for (int i = AllVideos.Count - 1; i >= 0; i--)
+        {
+            var video = AllVideos[i];
+            if (!File.Exists(video.Path))
+            {
+                removedPaths.Add(video.Path);
+                AllVideos.RemoveAt(i);
+            }
+
+            validateCount++;
+            if (validateCount % VALIDATE_BATCH_SIZE == 0)
+            {
+                yield return null; // Yield to keep UI responsive
+            }
+        }
+
+        // Update existingPaths after removal
+        existingPaths = new HashSet<string>(AllVideos.Select(v => v.Path));
+
+        // STEP 2: Scan for new items
 #if UNITY_ANDROID && !UNITY_EDITOR
         // Use MediaStore for fast query
         var mediaItems = AndroidMediaStoreHelper.QueryAllMedia();
@@ -214,23 +243,39 @@ public class MediaLibraryService : MonoBehaviour
 
         _isBackgroundScanning = false;
 
-        if (newItems.Count > 0)
-        {
-            Debug.Log($"[MediaLibraryService] Background scan found {newItems.Count} new items in {startTime.ElapsedMilliseconds}ms");
+        bool hasChanges = newItems.Count > 0 || removedPaths.Count > 0;
 
+        if (hasChanges)
+        {
             // Add new items to AllVideos
-            AllVideos.AddRange(newItems);
+            if (newItems.Count > 0)
+            {
+                AllVideos.AddRange(newItems);
+            }
+
+            // Sort if there were changes
             AllVideos = AllVideos.OrderBy(v => v.Title).ToList();
 
             // Update cache
             SaveLibraryCache();
 
-            // Notify listeners
-            OnNewItemsDetected?.Invoke(newItems);
+            Debug.Log($"[MediaLibraryService] Background scan complete: +{newItems.Count} new, -{removedPaths.Count} removed ({startTime.ElapsedMilliseconds}ms)");
+
+            // Notify listeners about changes
+            if (newItems.Count > 0)
+            {
+                OnNewItemsDetected?.Invoke(newItems);
+            }
+
+            // Fire event for removed items (UI can refresh)
+            if (removedPaths.Count > 0)
+            {
+                OnItemsRemoved?.Invoke(removedPaths);
+            }
         }
         else
         {
-            Debug.Log($"[MediaLibraryService] Background scan complete - no new items ({startTime.ElapsedMilliseconds}ms)");
+            Debug.Log($"[MediaLibraryService] Background scan complete - no changes ({startTime.ElapsedMilliseconds}ms)");
         }
     }
     #endregion

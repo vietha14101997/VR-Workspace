@@ -484,6 +484,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
             _libraryService.OnScanProgress += HandleScanProgress;
             _libraryService.OnScanComplete += HandleScanComplete;
             _libraryService.OnNewItemsDetected += HandleNewItemsDetected;
+            _libraryService.OnItemsRemoved += HandleItemsRemoved;
             _libraryService.OnLibraryCacheLoaded += HandleCacheLoaded;
         }
 
@@ -538,13 +539,50 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
     {
         if (newItems == null || newItems.Count == 0) return;
 
-        // Debug.Log($"[RTTMediaLibraryController] New items detected: {newItems.Count}");
+        Debug.Log($"[RTTMediaLibraryController] New items detected: {newItems.Count}");
 
         // Add new items to local list
         _allVideos.AddRange(newItems);
 
         // Re-apply filters to include new items (will update display)
         ApplyFilters();
+    }
+
+    /// <summary>
+    /// Handle items removed (files no longer exist) during background scan.
+    /// Removes from local data and refreshes display.
+    /// </summary>
+    private void HandleItemsRemoved(List<string> removedPaths)
+    {
+        if (removedPaths == null || removedPaths.Count == 0) return;
+
+        Debug.Log($"[RTTMediaLibraryController] Items removed: {removedPaths.Count}");
+
+        // Convert to HashSet for O(1) lookup
+        var removedSet = new HashSet<string>(removedPaths);
+
+        // Remove from local lists
+        _allVideos.RemoveAll(v => removedSet.Contains(v.Path));
+        _filteredVideos.RemoveAll(v => removedSet.Contains(v.Path));
+
+        // Clear selection if the selected video was removed
+        if (_selectedVideo.HasValue && removedSet.Contains(_selectedVideo.Value.Path))
+        {
+            _selectedVideo = null;
+            _view?.ClearDetailPanel();
+        }
+
+        // Clear hover if the hovered video was removed
+        if (_hoveredVideo.HasValue && removedSet.Contains(_hoveredVideo.Value.Path))
+        {
+            _hoveredVideo = null;
+        }
+
+        // Re-apply filters and refresh display
+        ApplyFilters();
+
+        // Invalidate app state cache since data changed
+        AppStateCache.Instance.InvalidateState(APP_ID);
     }
 
     /// <summary>
@@ -1530,6 +1568,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
             _libraryService.OnScanProgress -= HandleScanProgress;
             _libraryService.OnScanComplete -= HandleScanComplete;
             _libraryService.OnNewItemsDetected -= HandleNewItemsDetected;
+            _libraryService.OnItemsRemoved -= HandleItemsRemoved;
             _libraryService.OnLibraryCacheLoaded -= HandleCacheLoaded;
         }
 
