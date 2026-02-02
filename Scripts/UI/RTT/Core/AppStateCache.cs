@@ -19,6 +19,7 @@ namespace VRWorkspace.UI.RTT
         public string category;          // File category (video, image, music, etc.)
         public long fileSize;            // For display
         public string duration;          // For video/audio
+        public long dateAddedTicks;      // DateAdded as ticks for proper date grouping
     }
 
     /// <summary>

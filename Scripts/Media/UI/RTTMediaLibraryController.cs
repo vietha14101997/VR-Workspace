@@ -321,6 +321,17 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
                     FileSizeBytes = cachedItem.fileSize
                 };
 
+                // Restore DateAdded from ticks (prevents Jan 1 1970 display)
+                if (cachedItem.dateAddedTicks > 0)
+                {
+                    video.DateAdded = new DateTime(cachedItem.dateAddedTicks);
+                }
+                else
+                {
+                    // Fallback: use file modification time or current time
+                    video.DateAdded = DateTime.Now;
+                }
+
                 // Try to parse duration if available
                 if (!string.IsNullOrEmpty(cachedItem.duration) && TimeSpan.TryParse(cachedItem.duration, out var duration))
                 {
@@ -395,7 +406,8 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
                 isDirectory = false,
                 category = "video",
                 fileSize = video.FileSizeBytes,
-                duration = video.Duration.ToString()
+                duration = video.Duration.ToString(),
+                dateAddedTicks = video.DateAdded.Ticks
             };
 
             // Store thumbnail cache key if available
@@ -418,13 +430,19 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
 
     /// <summary>
     /// Bind prepared data buffer directly to UI.
+    /// Applies current category filter to show correct data.
     /// </summary>
     public void BindPreparedData(object dataBuffer)
     {
         if (dataBuffer is List<MediaVideoInfo> videos)
         {
             _allVideos = videos;
-            _filteredVideos = new List<MediaVideoInfo>(videos);
+
+            // CRITICAL: Apply category filter to _filteredVideos
+            // Without this, all media items are shown regardless of category selection
+            Func<MediaVideoInfo, bool> categoryFilter = GetCategoryFilter();
+            _filteredVideos = videos.FindAll(v => categoryFilter(v));
+
             ApplySort();
             ApplyGrouping();
             CurrentPage = 1;
@@ -437,7 +455,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
                 RestoreOrSelectFirstItem();
             }
 
-            Debug.Log($"[RTTMediaLibraryController] BindPreparedData: Bound {videos.Count} videos");
+            Debug.Log($"[RTTMediaLibraryController] BindPreparedData: Bound {_filteredVideos.Count} videos (filtered from {videos.Count} by category '{CurrentCategory}')");
         }
     }
 
