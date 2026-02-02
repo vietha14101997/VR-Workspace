@@ -338,7 +338,16 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
         }
 
         // === First batch ready - show immediately while loading continues ===
-        _currentDirectoryFiles = firstBatchFiles ?? new List<MockFile>();
+        // If data load already complete (fast folder), use full data instead of first batch
+        if (dataLoadComplete && loadedFiles != null)
+        {
+            _currentDirectoryFiles = loadedFiles;
+            Debug.Log($"[Controller] Using full data (load completed quickly): {loadedFiles.Count} items");
+        }
+        else
+        {
+            _currentDirectoryFiles = firstBatchFiles ?? new List<MockFile>();
+        }
         _filteredFiles = new List<MockFile>(_currentDirectoryFiles);
 
         // Apply current sort
@@ -347,7 +356,7 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
         // Reset to page 1 for now (will restore later if needed)
         _currentPage = 1;
 
-        // Update view with first batch
+        // Update view with first batch or full data
         if (!dataLoadComplete && quickCount > 0)
         {
             // Use quick count for early pagination display
