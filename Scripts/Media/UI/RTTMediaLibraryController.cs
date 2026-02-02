@@ -304,7 +304,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
         IsAscending = snapshot.sortAscending;
         GroupBy = !string.IsNullOrEmpty(snapshot.groupBy) ? snapshot.groupBy : "Date Added";
 
-        // Restore cached items
+        // Restore cached items with validation
         if (snapshot.items != null && snapshot.items.Count > 0)
         {
             _filteredVideos = new List<MediaVideoInfo>();
@@ -312,8 +312,16 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
             // Get category filter function to ensure cached items match current category
             Func<MediaVideoInfo, bool> categoryFilter = GetCategoryFilter();
 
+            int skippedCount = 0;
             foreach (var cachedItem in snapshot.items)
             {
+                // Validate file still exists before adding
+                if (!System.IO.File.Exists(cachedItem.path))
+                {
+                    skippedCount++;
+                    continue; // Skip deleted files
+                }
+
                 var video = new MediaVideoInfo
                 {
                     Title = cachedItem.name,
@@ -345,6 +353,13 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
                 }
             }
 
+            // Invalidate cache if items were skipped (deleted files detected)
+            if (skippedCount > 0)
+            {
+                Debug.Log($"[RTTMediaLibraryController] TryRestoreCachedState: Skipped {skippedCount} deleted files");
+                AppStateCache.Instance.InvalidateState(APP_ID);
+            }
+
             // Generate groups from filtered items
             _groups = MediaGroupHelper.CreateGroups(_filteredVideos, GroupBy);
 
@@ -359,7 +374,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
                 _view.SelectCategory(CurrentCategory);
             }
 
-            Debug.Log($"[RTTMediaLibraryController] TryRestoreCachedState: Restored {_filteredVideos.Count} items from cache (filtered from {snapshot.items.Count})");
+            Debug.Log($"[RTTMediaLibraryController] TryRestoreCachedState: Restored {_filteredVideos.Count} items from cache (filtered from {snapshot.items.Count}, skipped {skippedCount} deleted)");
             return true;
         }
 

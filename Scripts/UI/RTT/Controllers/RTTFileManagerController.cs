@@ -1493,14 +1493,27 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
         _sortBy = !string.IsNullOrEmpty(snapshot.sortBy) ? snapshot.sortBy : "Name";
         _sortAscending = snapshot.sortAscending;
 
-        // Restore cached items
+        // Restore cached items with validation
         if (snapshot.items != null && snapshot.items.Count > 0)
         {
             _currentDirectoryFiles = new List<MockFile>();
             _filteredFiles = new List<MockFile>();
+            int skippedCount = 0;
 
             foreach (var cachedItem in snapshot.items)
             {
+                // Validate file/folder still exists before adding
+                string absolutePath = FileSystemService.GetAbsolutePath(cachedItem.path);
+                bool exists = cachedItem.isDirectory
+                    ? Directory.Exists(absolutePath)
+                    : File.Exists(absolutePath);
+
+                if (!exists)
+                {
+                    skippedCount++;
+                    continue; // Skip deleted files/folders
+                }
+
                 var file = new MockFile
                 {
                     Name = cachedItem.name,
@@ -1520,14 +1533,31 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
                 _filteredFiles.Add(file);
             }
 
-            // Update view with cached data
+            // If all items were deleted, invalidate cache
+            if (_filteredFiles.Count == 0 && skippedCount > 0)
+            {
+                Debug.Log($"[RTTFileManagerController] TryRestoreCachedState: All {skippedCount} cached items no longer exist");
+                AppStateCache.Instance.InvalidateState(APP_ID);
+                return false;
+            }
+
+            // Update view with validated cached data
             if (_view != null)
             {
                 UpdateView(true);
                 _view.UpdateBreadcrumbs(_currentPath);
             }
 
-            Debug.Log($"[RTTFileManagerController] TryRestoreCachedState: Restored {snapshot.items.Count} items from cache");
+            if (skippedCount > 0)
+            {
+                Debug.Log($"[RTTFileManagerController] TryRestoreCachedState: Restored {_filteredFiles.Count} items, skipped {skippedCount} deleted items");
+                // Invalidate cache so it gets refreshed with current data
+                AppStateCache.Instance.InvalidateState(APP_ID);
+            }
+            else
+            {
+                Debug.Log($"[RTTFileManagerController] TryRestoreCachedState: Restored {snapshot.items.Count} items from cache");
+            }
             return true;
         }
 
