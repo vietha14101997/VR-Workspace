@@ -202,6 +202,110 @@ public class RTTFilePagination : RTTCanvasBase
         SetQuadAlpha(0f);
         gameObject.SetActive(false);
     }
+
+    #region Page Buttons Fade (for navigation transitions)
+    private Coroutine _pageButtonsFadeCoroutine = null;
+    private const float PAGE_BUTTONS_FADE_DURATION = 0.09f; // Match content fade duration
+    private bool _pageButtonsFadedOut = false; // Track if buttons are currently faded out
+
+    /// <summary>
+    /// Fade out page number buttons (keep frame and arrows visible).
+    /// Call this when starting folder navigation.
+    /// </summary>
+    public void FadeOutPageButtons(System.Action onComplete = null)
+    {
+        _pageButtonsFadedOut = true;
+        if (_pageButtonsFadeCoroutine != null)
+        {
+            StopCoroutine(_pageButtonsFadeCoroutine);
+        }
+        _pageButtonsFadeCoroutine = StartCoroutine(FadePageButtonsCoroutine(0f, onComplete));
+    }
+
+    /// <summary>
+    /// Fade in page number buttons.
+    /// Call this after folder navigation completes.
+    /// </summary>
+    public void FadeInPageButtons()
+    {
+        _pageButtonsFadedOut = false;
+        if (_pageButtonsFadeCoroutine != null)
+        {
+            StopCoroutine(_pageButtonsFadeCoroutine);
+        }
+        _pageButtonsFadeCoroutine = StartCoroutine(FadePageButtonsCoroutine(1f, null));
+    }
+
+    private System.Collections.IEnumerator FadePageButtonsCoroutine(float targetAlpha, System.Action onComplete)
+    {
+        if (_stackPagingTransform == null)
+        {
+            onComplete?.Invoke();
+            yield break;
+        }
+
+        // Get all CanvasGroup components or create temporary ones
+        List<CanvasGroup> canvasGroups = new List<CanvasGroup>();
+        foreach (Transform child in _stackPagingTransform)
+        {
+            CanvasGroup cg = child.GetComponent<CanvasGroup>();
+            if (cg == null)
+            {
+                cg = child.gameObject.AddComponent<CanvasGroup>();
+            }
+            canvasGroups.Add(cg);
+        }
+
+        if (canvasGroups.Count == 0)
+        {
+            onComplete?.Invoke();
+            yield break;
+        }
+
+        float startAlpha = canvasGroups[0].alpha;
+        float elapsed = 0f;
+
+        while (elapsed < PAGE_BUTTONS_FADE_DURATION)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / PAGE_BUTTONS_FADE_DURATION);
+            float alpha = Mathf.Lerp(startAlpha, targetAlpha, t);
+
+            foreach (var cg in canvasGroups)
+            {
+                if (cg != null) cg.alpha = alpha;
+            }
+            yield return null;
+        }
+
+        // Ensure final value
+        foreach (var cg in canvasGroups)
+        {
+            if (cg != null) cg.alpha = targetAlpha;
+        }
+
+        _pageButtonsFadeCoroutine = null;
+        onComplete?.Invoke();
+    }
+
+    /// <summary>
+    /// Set page buttons alpha immediately (no animation).
+    /// </summary>
+    public void SetPageButtonsAlpha(float alpha)
+    {
+        if (_stackPagingTransform == null) return;
+
+        foreach (Transform child in _stackPagingTransform)
+        {
+            CanvasGroup cg = child.GetComponent<CanvasGroup>();
+            if (cg == null)
+            {
+                cg = child.gameObject.AddComponent<CanvasGroup>();
+            }
+            cg.alpha = alpha;
+        }
+    }
+    #endregion
     
     protected override void OnDestroy()
     {
@@ -742,6 +846,12 @@ public class RTTFilePagination : RTTCanvasBase
             // 4. Force Layout Logic
             Canvas.ForceUpdateCanvases();
             LayoutRebuilder.ForceRebuildLayoutImmediate(_stackPagingTransform as RectTransform);
+
+            // 5. If buttons are currently faded out (during navigation), set new buttons to alpha 0
+            if (_pageButtonsFadedOut)
+            {
+                SetPageButtonsAlpha(0f);
+            }
         }
         catch (System.Exception e)
         {

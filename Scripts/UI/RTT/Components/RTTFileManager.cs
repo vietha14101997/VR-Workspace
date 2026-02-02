@@ -158,7 +158,8 @@ public class RTTFileManager : MonoBehaviour
     #region Content Fade Animation
 
     /// <summary>
-    /// Fade out the content area (grid/list). Returns immediately, fade runs async.
+    /// Fade out the content area (grid/list) and pagination page buttons.
+    /// Returns immediately, fade runs async.
     /// Call the callback when fade completes.
     /// </summary>
     public void FadeOutContent(Action onComplete)
@@ -167,17 +168,28 @@ public class RTTFileManager : MonoBehaviour
         {
             StopCoroutine(_fadeCoroutine);
         }
+        // Also fade out pagination page buttons (frame and arrows stay visible)
+        if (_pagination != null)
+        {
+            _pagination.FadeOutPageButtons();
+        }
         _fadeCoroutine = StartCoroutine(FadeContentCoroutine(1f, 0f, FOLDER_TRANSITION_DURATION, onComplete));
     }
 
     /// <summary>
-    /// Fade in the content area (grid/list). Returns immediately, fade runs async.
+    /// Fade in the content area (grid/list) and pagination page buttons.
+    /// Returns immediately, fade runs async.
     /// </summary>
     public void FadeInContent(Action onComplete = null)
     {
         if (_fadeCoroutine != null)
         {
             StopCoroutine(_fadeCoroutine);
+        }
+        // Also fade in pagination page buttons
+        if (_pagination != null)
+        {
+            _pagination.FadeInPageButtons();
         }
         _fadeCoroutine = StartCoroutine(FadeContentCoroutine(0f, 1f, FOLDER_TRANSITION_DURATION, onComplete));
     }
