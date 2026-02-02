@@ -2,6 +2,8 @@ using UnityEngine;
 using TMPro;
 using System;
 using System.Collections;
+using System.Collections.Generic;
+using VRWorkspace.UI.RTT;
 
 /// <summary>
 /// Main controller for the Media App.
@@ -493,14 +495,27 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
     }
 
     /// <summary>
-    /// Bind data safely - delegate to library controller
+    /// Get all frames (main + side panels) for coordinated fade animation.
     /// </summary>
-    public IEnumerator BindDataSafely()
+    public List<RTTMenuFrame> GetAllFrames()
     {
-        if (_libraryController != null)
-        {
-            yield return StartCoroutine(_libraryController.BindDataSafely());
-        }
+        return _libraryController?.GetAllFrames() ?? new List<RTTMenuFrame>();
+    }
+
+    /// <summary>
+    /// Bind cached data immediately (non-blocking) - delegate to library controller.
+    /// </summary>
+    public void BindCachedDataOrEmpty()
+    {
+        _libraryController?.BindCachedDataOrEmpty();
+    }
+
+    /// <summary>
+    /// Called when background data loading completes - delegate to library controller.
+    /// </summary>
+    public void OnBackgroundDataReady()
+    {
+        _libraryController?.OnBackgroundDataReady();
     }
 
     /// <summary>
@@ -520,12 +535,71 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
     }
 
     /// <summary>
-    /// Called when app is fully visible after transition - show side panels
+    /// Called when app is fully visible after transition
     /// </summary>
     public void OnAppShown()
     {
         _libraryController?.OnAppShown();
     }
+
+    #region State Caching Support (delegated to library controller)
+
+    /// <summary>
+    /// Whether this app supports state caching - delegate to library controller
+    /// </summary>
+    public bool SupportsStateCaching => _libraryController?.SupportsStateCaching ?? false;
+
+    /// <summary>
+    /// Try to restore UI state from cache - delegate to library controller
+    /// </summary>
+    public bool TryRestoreCachedState()
+    {
+        return _libraryController?.TryRestoreCachedState() ?? false;
+    }
+
+    /// <summary>
+    /// Save current UI state to cache - delegate to library controller
+    /// </summary>
+    public void CacheCurrentState()
+    {
+        _libraryController?.CacheCurrentState();
+    }
+
+    /// <summary>
+    /// Get prepared data buffer - delegate to library controller
+    /// </summary>
+    public object GetPreparedDataBuffer()
+    {
+        return _libraryController?.GetPreparedDataBuffer();
+    }
+
+    /// <summary>
+    /// Bind prepared data buffer - delegate to library controller
+    /// </summary>
+    public void BindPreparedData(object dataBuffer)
+    {
+        _libraryController?.BindPreparedData(dataBuffer);
+    }
+
+    /// <summary>
+    /// Event fired when background data preparation completes.
+    /// Forwards from library controller.
+    /// </summary>
+    public event Action OnDataPrepared
+    {
+        add
+        {
+            if (_libraryController != null)
+                _libraryController.OnDataPrepared += value;
+        }
+        remove
+        {
+            if (_libraryController != null)
+                _libraryController.OnDataPrepared -= value;
+        }
+    }
+
+    #endregion
     #endregion
 
     #region Unity Lifecycle

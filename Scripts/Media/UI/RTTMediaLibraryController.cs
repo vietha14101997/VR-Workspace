@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using VRWorkspace.UI.RTT;
 
 /// <summary>
 /// Controller for Media Library - manages data flow between MediaLibraryService and UI.
@@ -15,6 +16,11 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
     #region Events
     public event Action<MediaVideoInfo> OnVideoPlayRequested;
     public event Action OnCloseRequested;
+    public event Action OnDataPrepared; // IDataBindable event
+    #endregion
+
+    #region State Caching Constants
+    private const string APP_ID = "media";
     #endregion
 
     #region Properties
@@ -65,13 +71,15 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
     // Loading spinner for IDataBindable
     private RTTLoadingSpinner _loadingSpinner;
     private bool _isPreparingData = false;
+    private bool _isDataReady = false;
+    private List<MediaVideoInfo> _preparedDataBuffer = null;
     #endregion
 
     #region IDataBindable Implementation
     /// <summary>
     /// Whether the data is ready to be bound to UI.
     /// </summary>
-    public bool IsDataReady => _libraryService != null && _libraryService.IsCacheLoaded;
+    public bool IsDataReady => _isDataReady || (_libraryService != null && _libraryService.IsCacheLoaded);
 
     /// <summary>
     /// Whether data is currently being prepared in background.
@@ -87,6 +95,39 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
         // MediaLibraryService already starts loading in Awake()
         // Just mark that we're preparing
         _isPreparingData = true;
+        _isDataReady = false;
+
+        // Start coroutine to wait for cache and fire event
+        StartCoroutine(PrepareDataCoroutine());
+    }
+
+    private IEnumerator PrepareDataCoroutine()
+    {
+        Debug.Log("[RTTMediaLibraryController] PrepareDataAsync started");
+
+        // Wait for library service cache to load
+        while (_libraryService != null && _libraryService.IsCacheLoading)
+        {
+            yield return null;
+        }
+
+        // Get data from service
+        if (_libraryService != null && _libraryService.IsCacheLoaded)
+        {
+            _preparedDataBuffer = new List<MediaVideoInfo>(_libraryService.AllVideos);
+        }
+        else
+        {
+            _preparedDataBuffer = new List<MediaVideoInfo>();
+        }
+
+        _isPreparingData = false;
+        _isDataReady = true;
+
+        Debug.Log($"[RTTMediaLibraryController] PrepareDataAsync completed: {_preparedDataBuffer?.Count ?? 0} videos");
+
+        // Fire event to notify RTTAppManager
+        OnDataPrepared?.Invoke();
     }
 
     /// <summary>
@@ -164,12 +205,243 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
 
     /// <summary>
     /// Called when app is fully visible after transition.
-    /// Shows side panels that were hidden during prepare phase.
+    /// Side panels now fade in with main frame via coordinated animation.
     /// </summary>
     public void OnAppShown()
     {
-        _view?.ShowSidePanels();
+        Debug.Log($"[RTTMediaLibraryController] OnAppShown called, _view={((_view != null) ? "exists" : "null")}");
+        // Side panels now fade in with main frame via coordinated animation in RTTAppManager
+        // _view?.ShowSidePanels(); // No longer needed
     }
+
+    /// <summary>
+    /// Get all frames (main + side panels) for coordinated fade animation.
+    /// </summary>
+    public List<RTTMenuFrame> GetAllFrames()
+    {
+        return _view?.GetAllFrames() ?? new List<RTTMenuFrame>();
+    }
+
+    /// <summary>
+    /// Bind cached data immediately (non-blocking).
+    /// If cache not loaded yet, shows empty grid.
+    /// Background process will update when data is ready via OnBackgroundDataReady.
+    /// </summary>
+    public void BindCachedDataOrEmpty()
+    {
+        if (_libraryService == null || _view == null)
+        {
+            Debug.Log("[RTTMediaLibraryController] BindCachedDataOrEmpty: service or view is null");
+            return;
+        }
+
+        if (_libraryService.IsCacheLoaded && _libraryService.AllVideos.Count > 0)
+        {
+            // Cache is ready - bind immediately
+            _allVideos = new List<MediaVideoInfo>(_libraryService.AllVideos);
+            ApplyFiltersSync(); // Synchronous version
+            RefreshView();
+            Debug.Log($"[RTTMediaLibraryController] BindCachedDataOrEmpty: Bound {_filteredVideos.Count} items from cache");
+        }
+        else
+        {
+            // No cache yet - show empty grid (background will update later)
+            _allVideos.Clear();
+            _filteredVideos.Clear();
+            _groups.Clear();
+            _view?.SetVideos(_filteredVideos, _groups);
+            Debug.Log("[RTTMediaLibraryController] BindCachedDataOrEmpty: No cache, showing empty grid");
+        }
+
+        _isPreparingData = false;
+    }
+
+    /// <summary>
+    /// Called when background data loading completes.
+    /// Updates UI if app is visible.
+    /// </summary>
+    public void OnBackgroundDataReady()
+    {
+        if (_view == null || !_view.gameObject.activeInHierarchy)
+        {
+            Debug.Log("[RTTMediaLibraryController] OnBackgroundDataReady: view not active, skipping");
+            return;
+        }
+
+        // Reload from service and refresh
+        if (_libraryService != null && _libraryService.IsCacheLoaded)
+        {
+            _allVideos = new List<MediaVideoInfo>(_libraryService.AllVideos);
+            Debug.Log($"[RTTMediaLibraryController] OnBackgroundDataReady: Updating UI with {_allVideos.Count} items");
+            StartCoroutine(ApplyFiltersAsync());
+        }
+    }
+
+    #region State Caching Support
+
+    /// <summary>
+    /// MediaLibrary supports state caching for fast app switching.
+    /// </summary>
+    public bool SupportsStateCaching => true;
+
+    /// <summary>
+    /// Try to restore UI state from cache.
+    /// Returns true if valid cache exists and was restored.
+    /// </summary>
+    public bool TryRestoreCachedState()
+    {
+        if (!AppStateCache.Instance.TryGetState(APP_ID, out var snapshot))
+        {
+            Debug.Log("[RTTMediaLibraryController] TryRestoreCachedState: No cache found");
+            return false;
+        }
+
+        // Restore state properties
+        CurrentCategory = !string.IsNullOrEmpty(snapshot.category) ? snapshot.category : "videos";
+        CurrentPage = snapshot.currentPage > 0 ? snapshot.currentPage : 1;
+        PageSize = snapshot.pageSize > 0 ? snapshot.pageSize : 6;
+        SortBy = !string.IsNullOrEmpty(snapshot.sortBy) ? snapshot.sortBy : "Name";
+        IsAscending = snapshot.sortAscending;
+        GroupBy = !string.IsNullOrEmpty(snapshot.groupBy) ? snapshot.groupBy : "Date Added";
+
+        // Restore cached items
+        if (snapshot.items != null && snapshot.items.Count > 0)
+        {
+            _filteredVideos = new List<MediaVideoInfo>();
+
+            // Get category filter function to ensure cached items match current category
+            Func<MediaVideoInfo, bool> categoryFilter = GetCategoryFilter();
+
+            foreach (var cachedItem in snapshot.items)
+            {
+                var video = new MediaVideoInfo
+                {
+                    Title = cachedItem.name,
+                    Path = cachedItem.path,
+                    FileSizeBytes = cachedItem.fileSize
+                };
+
+                // Try to parse duration if available
+                if (!string.IsNullOrEmpty(cachedItem.duration) && TimeSpan.TryParse(cachedItem.duration, out var duration))
+                {
+                    video.Duration = duration;
+                }
+
+                // Only add items that match the current category filter
+                if (categoryFilter(video))
+                {
+                    _filteredVideos.Add(video);
+                }
+            }
+
+            // Generate groups from filtered items
+            _groups = MediaGroupHelper.CreateGroups(_filteredVideos, GroupBy);
+
+            // Update view with filtered cached data
+            if (_view != null)
+            {
+                _view.SetVideos(_filteredVideos, _groups);
+                RecalculatePagination();
+                _view.UpdatePagination();
+
+                // Update sidebar to match restored category
+                _view.SelectCategory(CurrentCategory);
+            }
+
+            Debug.Log($"[RTTMediaLibraryController] TryRestoreCachedState: Restored {_filteredVideos.Count} items from cache (filtered from {snapshot.items.Count})");
+            return true;
+        }
+
+        Debug.Log("[RTTMediaLibraryController] TryRestoreCachedState: Cache has no items");
+        return false;
+    }
+
+    /// <summary>
+    /// Save current UI state to cache.
+    /// </summary>
+    public void CacheCurrentState()
+    {
+        if (_filteredVideos == null || _filteredVideos.Count == 0)
+        {
+            Debug.Log("[RTTMediaLibraryController] CacheCurrentState: No videos to cache");
+            return;
+        }
+
+        var snapshot = new AppStateSnapshot
+        {
+            appId = APP_ID,
+            category = CurrentCategory,
+            currentPage = CurrentPage,
+            pageSize = PageSize,
+            sortBy = SortBy,
+            sortAscending = IsAscending,
+            groupBy = GroupBy,
+            selectedItemPath = _selectedVideo?.Path,
+            totalItemCount = _filteredVideos.Count,
+            items = new List<CachedItemRef>()
+        };
+
+        // Cache visible items (current page + surrounding pages for smooth scrolling)
+        int startIndex = Mathf.Max(0, (CurrentPage - 2) * PageSize);
+        int endIndex = Mathf.Min(_filteredVideos.Count, (CurrentPage + 2) * PageSize);
+
+        for (int i = startIndex; i < endIndex; i++)
+        {
+            var video = _filteredVideos[i];
+            var cachedRef = new CachedItemRef
+            {
+                path = video.Path,
+                name = video.Title,
+                isDirectory = false,
+                category = "video",
+                fileSize = video.FileSizeBytes,
+                duration = video.Duration.ToString()
+            };
+
+            // Store thumbnail cache key if available
+            cachedRef.thumbnailCacheKey = ThumbnailCacheKeyHelper.GetCacheKey(video.Path);
+
+            snapshot.items.Add(cachedRef);
+        }
+
+        AppStateCache.Instance.SaveState(APP_ID, snapshot);
+        Debug.Log($"[RTTMediaLibraryController] CacheCurrentState: Cached {snapshot.items.Count} items");
+    }
+
+    /// <summary>
+    /// Get the data buffer prepared by background thread.
+    /// </summary>
+    public object GetPreparedDataBuffer()
+    {
+        return _preparedDataBuffer;
+    }
+
+    /// <summary>
+    /// Bind prepared data buffer directly to UI.
+    /// </summary>
+    public void BindPreparedData(object dataBuffer)
+    {
+        if (dataBuffer is List<MediaVideoInfo> videos)
+        {
+            _allVideos = videos;
+            _filteredVideos = new List<MediaVideoInfo>(videos);
+            ApplySort();
+            ApplyGrouping();
+            CurrentPage = 1;
+
+            if (_view != null)
+            {
+                _view.SetVideos(_filteredVideos, _groups);
+                RecalculatePagination();
+                _view.UpdatePagination();
+                RestoreOrSelectFirstItem();
+            }
+
+            Debug.Log($"[RTTMediaLibraryController] BindPreparedData: Bound {videos.Count} videos");
+        }
+    }
+
+    #endregion
     #endregion
 
     #region Initialization
@@ -216,13 +488,21 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
     /// </summary>
     private void HandleCacheLoaded()
     {
-        // Debug.Log("[RTTMediaLibraryController] Cache loaded, refreshing library...");
+        Debug.Log("[RTTMediaLibraryController] HandleCacheLoaded called");
 
-        if (!_waitingForCacheLoad) return;
-        _waitingForCacheLoad = false;
+        // If waiting for initial load, do the first refresh
+        if (_waitingForCacheLoad)
+        {
+            _waitingForCacheLoad = false;
+            RefreshLibraryInternal();
+            return;
+        }
 
-        // Now safe to load data
-        RefreshLibraryInternal();
+        // If app is visible (already opened), update with new data
+        if (_view != null && _view.gameObject.activeInHierarchy)
+        {
+            OnBackgroundDataReady();
+        }
     }
 
     private void HandleScanComplete(List<MediaVideoInfo> videos)
@@ -421,6 +701,12 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
         _allVideos = videos;
         // Debug.Log($"[RTTMediaLibraryController] Scan complete: {_allVideos.Count} videos");
         ApplyFilters();
+
+        // Cache state after scan completes
+        if (SupportsStateCaching)
+        {
+            CacheCurrentState();
+        }
     }
 
     /// <summary>

@@ -282,37 +282,62 @@ public class RTTMediaLibrary : MonoBehaviour
         float sideWidth = mainPanelWidth / 3f;
         float sideHeight = mainPanelHeight;
 
-        // Left Panel (Navigation) - created hidden, shown when app opens
+        // Left Panel (Navigation) - created with alpha=0, will fade in with main frame
         PlaceSidePanelOnSphere("MediaNavigationPanel", -1, mainPanelWidth, sideWidth, sideHeight, SIDE_PANEL_GAP, ref _leftFrame);
         if (_leftFrame != null)
         {
-            _leftFrame.SetVisible(false); // Hidden during prepare phase
+            // Display quad enabled but transparent - ready for coordinated fade
+            _leftFrame.SetVisible(true);
+            SetFrameAlpha(_leftFrame, 0f);
             StartCoroutine(CreateLeftPanelContent());
         }
 
-        // Right Panel (Detail) - created hidden, shown when app opens
+        // Right Panel (Detail) - created with alpha=0, will fade in with main frame
         PlaceSidePanelOnSphere("MediaDetailPanel", 1, mainPanelWidth, sideWidth, sideHeight, SIDE_PANEL_GAP, ref _rightFrame);
         if (_rightFrame != null)
         {
-            _rightFrame.SetVisible(false); // Hidden during prepare phase
+            // Display quad enabled but transparent - ready for coordinated fade
+            _rightFrame.SetVisible(true);
+            SetFrameAlpha(_rightFrame, 0f);
             StartCoroutine(CreateRightPanelContent());
         }
     }
 
     /// <summary>
-    /// Show side panels when app transition completes.
-    /// Called by controller after app is fully visible.
+    /// Set alpha of a frame's display quad.
     /// </summary>
-    public void ShowSidePanels()
+    private void SetFrameAlpha(RTTMenuFrame frame, float alpha)
     {
-        if (_leftFrame != null)
-            _leftFrame.SetVisible(true);
-        if (_rightFrame != null)
-            _rightFrame.SetVisible(true);
+        if (frame == null) return;
+        var quad = frame.GetDisplayQuad();
+        if (quad?.material != null)
+            quad.material.color = new UnityEngine.Color(1f, 1f, 1f, alpha);
     }
 
     /// <summary>
-    /// Hide side panels (for prepare phase or app closing).
+    /// Get all frames (main + side panels) for coordinated fade animation.
+    /// </summary>
+    public List<RTTMenuFrame> GetAllFrames()
+    {
+        var frames = new List<RTTMenuFrame>();
+        if (_menuFrame != null) frames.Add(_menuFrame);
+        if (_leftFrame != null) frames.Add(_leftFrame);
+        if (_rightFrame != null) frames.Add(_rightFrame);
+        return frames;
+    }
+
+    /// <summary>
+    /// Show side panels (legacy - now handled by coordinated fade in RTTAppManager).
+    /// </summary>
+    public void ShowSidePanels()
+    {
+        Debug.Log($"[RTTMediaLibrary] ShowSidePanels called - left={(_leftFrame != null)}, right={(_rightFrame != null)}");
+        // Side panels now fade in with main frame via coordinated animation
+        // This method kept for backward compatibility
+    }
+
+    /// <summary>
+    /// Hide side panels (for app closing).
     /// </summary>
     public void HideSidePanels()
     {
@@ -409,6 +434,7 @@ public class RTTMediaLibrary : MonoBehaviour
 
     private IEnumerator CreateLeftPanelContent()
     {
+        Debug.Log($"[RTTMediaLibrary] CreateLeftPanelContent started at {Time.realtimeSinceStartup:F3}s");
         while (_leftFrame.ContentContainer == null) yield return null;
 
         var containerSize = _leftFrame.GetContentSize();
@@ -430,11 +456,12 @@ public class RTTMediaLibrary : MonoBehaviour
         _sidePanel.Initialize(_controller, containerSize.x, containerSize.y, _font, _primaryColor, _accentColor);
 
         _leftFrame.MarkDirty();
-        Debug.Log("[RTTMediaLibrary] Left panel content created");
+        Debug.Log($"[RTTMediaLibrary] Left panel content created at {Time.realtimeSinceStartup:F3}s");
     }
 
     private IEnumerator CreateRightPanelContent()
     {
+        Debug.Log($"[RTTMediaLibrary] CreateRightPanelContent started at {Time.realtimeSinceStartup:F3}s");
         while (_rightFrame.ContentContainer == null) yield return null;
 
         var containerSize = _rightFrame.GetContentSize();
@@ -460,7 +487,7 @@ public class RTTMediaLibrary : MonoBehaviour
         // Create action bar below the panel (follows panel position)
         CreateMediaActionBar();
 
-        Debug.Log("[RTTMediaLibrary] Right panel content created with RTTFileDetail");
+        Debug.Log($"[RTTMediaLibrary] Right panel content created at {Time.realtimeSinceStartup:F3}s");
     }
 
     /// <summary>

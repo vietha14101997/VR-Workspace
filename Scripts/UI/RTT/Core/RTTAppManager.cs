@@ -632,7 +632,7 @@ namespace VRWorkspace.UI.RTT
             }
 
             // Mark as prepared immediately so transition can start
-            // BindDataSafely will be called during transition (after fade out)
+            // BindCachedDataOrEmpty will be called during transition (after fade out)
             instance.IsPrepared = true;
 
             // Hide frame completely
@@ -647,8 +647,13 @@ namespace VRWorkspace.UI.RTT
             Debug.Log($"[RTTAppManager] Transition started: {instance.AppId} at {transitionStart:F3}s");
 
             _isTransitioning = true;
+            IDataBindable bindable = instance.Controller as IDataBindable;
 
-            // Animate out current
+            // 1. Get ALL frames to animate (main + side panels)
+            List<RTTMenuFrame> allFrames = bindable?.GetAllFrames() ?? new List<RTTMenuFrame> { instance.Frame };
+            Debug.Log($"[RTTAppManager] Got {allFrames.Count} frames to animate: {instance.AppId}");
+
+            // 2. Fade out Main Menu (PARALLEL with background data preparation which started in PrepareAppFrameAsync)
             if (_useFadeTransition && _transitionOutDuration > 0)
             {
                 Debug.Log($"[RTTAppManager] Fade out MainMenu: {instance.AppId} at {Time.realtimeSinceStartup:F3}s");
@@ -660,50 +665,93 @@ namespace VRWorkspace.UI.RTT
             _mainMenuFrame.gameObject.SetActive(false);
             ResetFrameAlpha(_mainMenuFrame);
 
-            // Show prepared frame (grid already populated from PrepareAppFrameAsync)
-            instance.Frame.gameObject.SetActive(true);
-
-            // Set alpha to 0 BEFORE enabling display quad to prevent flash
-            if (_useFadeTransition && _transitionInDuration > 0)
+            // 3. Activate ALL frames with alpha=0 (visible but transparent)
+            foreach (var frame in allFrames)
             {
-                var quad = instance.Frame.GetDisplayQuad();
-                if (quad?.material != null)
-                    quad.material.color = new Color(1f, 1f, 1f, 0f);
+                if (frame == null) continue;
+                frame.gameObject.SetActive(true);
+                frame.SetVisible(true);  // Display quad enabled
+                SetFrameAlpha(frame, 0f); // But alpha = 0
+            }
+            Debug.Log($"[RTTAppManager] All frames activated with alpha=0: {allFrames.Count} frames");
+
+            // 4. SYNCHRONIZATION POINT - Choose data binding strategy
+            if (bindable != null)
+            {
+                bool dataReady = bindable.IsDataReady;
+                Debug.Log($"[RTTAppManager] Sync point: {instance.AppId}, IsDataReady={dataReady} at {Time.realtimeSinceStartup:F3}s");
+
+                if (dataReady)
+                {
+                    // Case 2: Background data ready BEFORE UI - bind prepared data directly
+                    var dataBuffer = bindable.GetPreparedDataBuffer();
+                    if (dataBuffer != null)
+                    {
+                        Debug.Log($"[RTTAppManager] Data ready first - BindPreparedData: {instance.AppId}");
+                        bindable.BindPreparedData(dataBuffer);
+                    }
+                    else
+                    {
+                        // Fallback to cached/empty
+                        Debug.Log($"[RTTAppManager] Data ready but no buffer - BindCachedDataOrEmpty: {instance.AppId}");
+                        bindable.BindCachedDataOrEmpty();
+                    }
+                }
+                else
+                {
+                    // Case 1: UI ready BEFORE background data
+                    // Try to restore cached state first (for FileManager/Media)
+                    bool restoredFromCache = false;
+                    if (bindable.SupportsStateCaching)
+                    {
+                        restoredFromCache = bindable.TryRestoreCachedState();
+                        Debug.Log($"[RTTAppManager] TryRestoreCachedState: {instance.AppId}, success={restoredFromCache}");
+                    }
+
+                    if (!restoredFromCache)
+                    {
+                        // No cache - show empty/loading state
+                        Debug.Log($"[RTTAppManager] No cache - BindCachedDataOrEmpty: {instance.AppId}");
+                        bindable.BindCachedDataOrEmpty();
+                    }
+
+                    // Subscribe to OnDataPrepared event to handle when background completes
+                    SubscribeToDataPrepared(bindable, instance.AppId);
+                }
             }
 
-            // Now enable display quad (with alpha already 0)
-            instance.Frame.SetVisible(true);
+            // Set primary frame
             instance.Frame.SetAsPrimaryFrame();
             instance.IsVisible = true;
             _currentVisibleAppId = instance.AppId;
 
-            Debug.Log($"[RTTAppManager] Frame visible: {instance.AppId} at {Time.realtimeSinceStartup:F3}s (+{(Time.realtimeSinceStartup - transitionStart) * 1000:F1}ms)");
-
-            // Bind data now (after fade out, before fade in)
-            // Frame is visible but alpha=0, so grid populates invisibly
-            IDataBindable bindable = instance.Controller as IDataBindable;
-            if (bindable != null)
-            {
-                Debug.Log($"[RTTAppManager] BindDataSafely started: {instance.AppId} at {Time.realtimeSinceStartup:F3}s");
-                yield return StartCoroutine(bindable.BindDataSafely());
-                Debug.Log($"[RTTAppManager] BindDataSafely done: {instance.AppId} at {Time.realtimeSinceStartup:F3}s (+{(Time.realtimeSinceStartup - transitionStart) * 1000:F1}ms)");
-            }
-
-            // Animate in (grid now populated)
+            // 5. Fade in ALL frames together
             if (_useFadeTransition && _transitionInDuration > 0)
             {
-                Debug.Log($"[RTTAppManager] Fade in started: {instance.AppId} at {Time.realtimeSinceStartup:F3}s");
-                yield return StartCoroutine(AnimateFrameFade(instance.Frame, 0f, 1f, _transitionInDuration, false));
+                Debug.Log($"[RTTAppManager] Fade in started: {allFrames.Count} frames at {Time.realtimeSinceStartup:F3}s");
+                yield return StartCoroutine(AnimateMultipleFramesFade(allFrames, 0f, 1f, _transitionInDuration));
                 Debug.Log($"[RTTAppManager] Fade in done: {instance.AppId} at {Time.realtimeSinceStartup:F3}s (+{(Time.realtimeSinceStartup - transitionStart) * 1000:F1}ms)");
             }
             else
             {
-                // No fade transition - ensure alpha is reset to 1 (was set to 0 during preparation)
-                ResetFrameAlpha(instance.Frame);
+                // No fade transition - ensure alpha is reset to 1
+                foreach (var frame in allFrames)
+                    ResetFrameAlpha(frame);
             }
 
-            // Show side panels now that app is visible
-            bindable?.OnAppShown();
+            // 6. Notify app is visible (for post-transition setup)
+            if (bindable != null)
+            {
+                Debug.Log($"[RTTAppManager] OnAppShown called: {instance.AppId} at {Time.realtimeSinceStartup:F3}s");
+                bindable.OnAppShown();
+
+                // If data was ready, cache the state now
+                if (bindable.IsDataReady && bindable.SupportsStateCaching)
+                {
+                    bindable.CacheCurrentState();
+                    Debug.Log($"[RTTAppManager] State cached after transition: {instance.AppId}");
+                }
+            }
 
             // Register with taskbar
             _taskbar?.RegisterApp(instance.TaskbarSlotIndex, instance.Icon, () => SwitchToApp(instance.AppId));
@@ -716,6 +764,39 @@ namespace VRWorkspace.UI.RTT
 
             OnAppOpened?.Invoke(instance.AppId, instance);
             OnVisibleAppChanged?.Invoke(instance.AppId);
+        }
+
+        /// <summary>
+        /// Subscribe to OnDataPrepared event for handling background data completion.
+        /// Automatically unsubscribes after first invocation.
+        /// </summary>
+        private void SubscribeToDataPrepared(IDataBindable bindable, string appId)
+        {
+            Action handler = null;
+            handler = () =>
+            {
+                // Unsubscribe first to prevent multiple calls
+                bindable.OnDataPrepared -= handler;
+
+                Debug.Log($"[RTTAppManager] OnDataPrepared received: {appId}");
+
+                // Only process if this app is still visible
+                if (_currentVisibleAppId == appId)
+                {
+                    // Bind fresh data
+                    bindable.OnBackgroundDataReady();
+
+                    // Cache the new state
+                    if (bindable.SupportsStateCaching)
+                    {
+                        bindable.CacheCurrentState();
+                        Debug.Log($"[RTTAppManager] State cached after background ready: {appId}");
+                    }
+                }
+            };
+
+            bindable.OnDataPrepared += handler;
+            Debug.Log($"[RTTAppManager] Subscribed to OnDataPrepared: {appId}");
         }
 
         private IEnumerator SwitchToAppWithTransition(string appId)
@@ -881,6 +962,60 @@ namespace VRWorkspace.UI.RTT
             var quad = frame.GetDisplayQuad();
             if (quad?.material != null)
                 quad.material.color = Color.white;
+        }
+
+        /// <summary>
+        /// Set alpha of a single frame's display quad.
+        /// </summary>
+        private void SetFrameAlpha(RTTMenuFrame frame, float alpha)
+        {
+            if (frame == null) return;
+            var quad = frame.GetDisplayQuad();
+            if (quad?.material != null)
+                quad.material.color = new Color(1f, 1f, 1f, alpha);
+        }
+
+        /// <summary>
+        /// Animate multiple frames fading together in parallel.
+        /// All frames fade from 'from' to 'to' alpha over 'duration' seconds.
+        /// </summary>
+        private IEnumerator AnimateMultipleFramesFade(List<RTTMenuFrame> frames, float from, float to, float duration)
+        {
+            if (frames == null || frames.Count == 0) yield break;
+
+            // Collect all valid quads and their materials
+            var materials = new List<Material>();
+            foreach (var frame in frames)
+            {
+                if (frame == null) continue;
+                var quad = frame.GetDisplayQuad();
+                if (quad?.material != null)
+                    materials.Add(quad.material);
+            }
+
+            if (materials.Count == 0) yield break;
+
+            // Animate all together
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                float alpha = Mathf.Lerp(from, to, t);
+
+                foreach (var mat in materials)
+                {
+                    mat.color = new Color(1f, 1f, 1f, alpha);
+                }
+
+                yield return null;
+            }
+
+            // Ensure final value
+            foreach (var mat in materials)
+            {
+                mat.color = new Color(1f, 1f, 1f, to);
+            }
         }
 
         #endregion

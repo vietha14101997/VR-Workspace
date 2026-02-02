@@ -98,6 +98,11 @@ public class RTTFilePagination : RTTCanvasBase
         worldWidth = frameWidth * PixelToMeter;
         worldHeight = frameHeight * PixelToMeter;
 
+        // CRITICAL: Call base class Initialize() first to create canvas, camera, etc.
+        // This must happen AFTER controller and sizes are set, but BEFORE RebuildUI()
+        // because BuildUI() requires _canvas to be non-null.
+        base.Initialize();
+
         // Build UI while object is inactive (won't render)
         ResizeRenderTexture((int)frameWidth, (int)frameHeight);
         RebuildUI();
@@ -617,6 +622,12 @@ public class RTTFilePagination : RTTCanvasBase
         bool dataChanged = (_totalPages != total) || (_currentPage != current);
         _currentPage = current;
         _totalPages = Mathf.Max(1, total);
+
+        // Early return if UI not yet built
+        if (_stackPagingTransform == null)
+        {
+            return;
+        }
 
         // Defer UpdateDisplay() if fade is in progress to prevent flicker
         if (_fadeCoroutine != null)

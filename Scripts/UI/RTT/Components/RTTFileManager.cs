@@ -127,6 +127,29 @@ public class RTTFileManager : MonoBehaviour
         _menuFrame = GetComponentInParent<RTTMenuFrame>();
     }
 
+    /// <summary>
+    /// Get all frames (main + side panels) for coordinated fade animation.
+    /// </summary>
+    public List<RTTMenuFrame> GetAllFrames()
+    {
+        var frames = new List<RTTMenuFrame>();
+        if (_menuFrame != null) frames.Add(_menuFrame);
+        if (_leftFrame != null) frames.Add(_leftFrame);
+        if (_rightFrame != null) frames.Add(_rightFrame);
+        return frames;
+    }
+
+    /// <summary>
+    /// Set alpha of a frame's display quad.
+    /// </summary>
+    private void SetFrameAlpha(RTTMenuFrame frame, float alpha)
+    {
+        if (frame == null) return;
+        var quad = frame.GetDisplayQuad();
+        if (quad?.material != null)
+            quad.material.color = new Color(1f, 1f, 1f, alpha);
+    }
+
     // This method seems to be intended for the controller, not the view.
     // The view's responsibility is to display selection, not manage the selected file state directly.
     // The UpdateGrid method already takes a selectedPath to update the view's selection.
@@ -3262,20 +3285,24 @@ public class RTTFileManager : MonoBehaviour
         float sideHeight = mainPanelHeight;
         float gapMeters = 0.05f;
 
-        // Left Panel (Navigation) - sphere positioning
+        // Left Panel (Navigation) - created with alpha=0, will fade in with main frame
         PlaceSidePanelOnSphere("FileNavigationPanel", -1, mainPanelWidth, sideWidth, sideHeight, gapMeters, ref _leftFrame);
         if (_leftFrame != null)
         {
-            _leftFrame.SetVisible(true); // Make visible immediately for now
+            // Display quad enabled but transparent - ready for coordinated fade
+            _leftFrame.SetVisible(true);
+            SetFrameAlpha(_leftFrame, 0f);
             // Initialize Side Panel Content
             StartCoroutine(CreateLeftPanelContent());
         }
 
-        // Right Panel (Detail) - sphere positioning
+        // Right Panel (Detail) - created with alpha=0, will fade in with main frame
         PlaceSidePanelOnSphere("FileDetailPanel", 1, mainPanelWidth, sideWidth, sideHeight, gapMeters, ref _rightFrame);
         if (_rightFrame != null)
         {
-            _rightFrame.SetVisible(true); // Make visible immediately for now
+            // Display quad enabled but transparent - ready for coordinated fade
+            _rightFrame.SetVisible(true);
+            SetFrameAlpha(_rightFrame, 0f);
             // Initialize Right Panel Content (Placeholder)
             StartCoroutine(CreateRightPanelContent());
         }

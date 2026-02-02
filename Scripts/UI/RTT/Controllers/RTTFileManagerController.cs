@@ -6,6 +6,7 @@ using System.Globalization;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using VRWorkspace.UI.RTT;
 
 /// <summary>
 /// Controller for the File Manager app.
@@ -21,6 +22,15 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
     // IDataBindable support
     private RTTLoadingSpinner _loadingSpinner;
     private bool _isPreparingData = false;
+    private bool _isDataReady = false;
+    private List<MockFile> _preparedDataBuffer = null;
+
+    // State caching
+    private const string APP_ID = "files";
+    #endregion
+
+    #region Events (IDataBindable)
+    public event Action OnDataPrepared;
     #endregion
 
     #region Events
@@ -1307,9 +1317,9 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
 
     #region IDataBindable Implementation
     /// <summary>
-    /// FileManager is ready when view exists and not actively scanning.
+    /// FileManager is ready when view exists and data has been prepared.
     /// </summary>
-    public bool IsDataReady => _view != null && !_isScanning;
+    public bool IsDataReady => _isDataReady;
 
     /// <summary>
     /// True when scanning for files or preparing data.
@@ -1318,47 +1328,87 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
 
     /// <summary>
     /// Start preparing data in background.
-    /// For FileManager, this is a no-op since file listing is fast.
-    /// The main async operation (category scan) is triggered by navigation.
+    /// For FileManager, this loads files for current path asynchronously.
     /// </summary>
     public void PrepareDataAsync()
     {
         _isPreparingData = true;
-        // FileManager doesn't need to preload data - file listing is synchronous
-        // Category scans are triggered by side panel navigation
+        _isDataReady = false;
+
+        // Start background preparation
+        StartCoroutine(PrepareDataCoroutine());
+    }
+
+    private IEnumerator PrepareDataCoroutine()
+    {
+        Debug.Log("[RTTFileManagerController] PrepareDataAsync started");
+
+        // FileManager file listing is synchronous and fast
+        // Just yield one frame to allow UI to set up
+        yield return null;
+
+        // Prepare data buffer with current directory files
+        string pathToLoad = _currentPath;
+        if (string.IsNullOrEmpty(pathToLoad))
+        {
+            pathToLoad = "root";
+        }
+
+        _preparedDataBuffer = FileSystemService.GetFiles(pathToLoad);
+
+        _isPreparingData = false;
+        _isDataReady = true;
+
+        Debug.Log($"[RTTFileManagerController] PrepareDataAsync completed: {_preparedDataBuffer?.Count ?? 0} files");
+
+        // Fire event to notify RTTAppManager
+        OnDataPrepared?.Invoke();
     }
 
     /// <summary>
-    /// Bind data safely after transition completes.
-    /// Shows spinner while scanning, hides when done.
+    /// Get all frames (main + side panels) for coordinated fade animation.
     /// </summary>
-    public IEnumerator BindDataSafely()
+    public List<RTTMenuFrame> GetAllFrames()
     {
-        // If view is ready and we're not scanning, data is already bound
-        if (_view != null && !_isScanning)
-        {
-            _isPreparingData = false;
-            yield break;
-        }
+        return _view?.GetAllFrames() ?? new List<RTTMenuFrame>();
+    }
 
-        // If we're scanning, show spinner and wait
-        if (_isScanning)
-        {
-            ShowLoadingSpinner();
-
-            // Wait for scan to complete (with timeout)
-            float timeout = 30f; // Category scan can take a while
-            float elapsed = 0f;
-            while (_isScanning && elapsed < timeout)
-            {
-                elapsed += Time.deltaTime;
-                yield return null;
-            }
-
-            HideLoadingSpinner();
-        }
-
+    /// <summary>
+    /// Bind cached data immediately (non-blocking).
+    /// FileManager file listing is fast, so we just refresh immediately.
+    /// </summary>
+    public void BindCachedDataOrEmpty()
+    {
         _isPreparingData = false;
+
+        // FileManager data binding is synchronous and fast
+        // Just ensure view is updated with current directory
+        if (_view != null)
+        {
+            RefreshCurrentFolder();
+            Debug.Log("[RTTFileManagerController] BindCachedDataOrEmpty: Refreshed current folder");
+        }
+    }
+
+    /// <summary>
+    /// Called when background data loading completes.
+    /// For FileManager, this could be called after a category scan completes.
+    /// </summary>
+    public void OnBackgroundDataReady()
+    {
+        Debug.Log("[RTTFileManagerController] OnBackgroundDataReady called");
+
+        // Bind the prepared data buffer if available
+        if (_preparedDataBuffer != null)
+        {
+            _currentDirectoryFiles = _preparedDataBuffer;
+            _filteredFiles = new List<MockFile>(_currentDirectoryFiles);
+            ApplySort();
+            _currentPage = 1;
+            UpdateView(true);
+            UpdateDetailView();
+            _view?.UpdateBreadcrumbs(_currentPath);
+        }
     }
 
     /// <summary>
@@ -1390,12 +1440,187 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
 
     /// <summary>
     /// Called when app is fully visible after transition.
-    /// FileManager has no side panels, so this is a no-op.
+    /// Side panels now fade in with main frame via coordinated animation.
     /// </summary>
     public void OnAppShown()
     {
-        // No side panels to show for FileManager
+        // Side panels now fade in with main frame via coordinated animation in RTTAppManager
+        Debug.Log("[RTTFileManagerController] OnAppShown called");
     }
+
+    #region State Caching Support
+
+    /// <summary>
+    /// FileManager supports state caching for fast app switching.
+    /// </summary>
+    public bool SupportsStateCaching => true;
+
+    /// <summary>
+    /// Try to restore UI state from cache.
+    /// Returns true if valid cache exists and was restored.
+    /// </summary>
+    public bool TryRestoreCachedState()
+    {
+        if (!AppStateCache.Instance.TryGetState(APP_ID, out var snapshot))
+        {
+            Debug.Log("[RTTFileManagerController] TryRestoreCachedState: No cache found");
+            return false;
+        }
+
+        // Validate cache is still valid (path exists, not too old)
+        if (!string.IsNullOrEmpty(snapshot.currentPath) &&
+            snapshot.currentPath != "root" &&
+            !Directory.Exists(FileSystemService.GetAbsolutePath(snapshot.currentPath)))
+        {
+            Debug.Log($"[RTTFileManagerController] TryRestoreCachedState: Path no longer exists: {snapshot.currentPath}");
+            AppStateCache.Instance.InvalidateState(APP_ID);
+            return false;
+        }
+
+        // Check if folder has been modified since cache
+        if (AppStateCache.Instance.HasPathChanged(
+            FileSystemService.GetAbsolutePath(snapshot.currentPath),
+            snapshot.timestamp))
+        {
+            Debug.Log($"[RTTFileManagerController] TryRestoreCachedState: Folder modified since cache");
+            // Don't invalidate - we'll use cache but refresh in background
+        }
+
+        // Restore state
+        _currentPath = snapshot.currentPath ?? "root";
+        _currentPage = snapshot.currentPage > 0 ? snapshot.currentPage : 1;
+        _pageSize = snapshot.pageSize > 0 ? snapshot.pageSize : 10;
+        _sortBy = !string.IsNullOrEmpty(snapshot.sortBy) ? snapshot.sortBy : "Name";
+        _sortAscending = snapshot.sortAscending;
+
+        // Restore cached items
+        if (snapshot.items != null && snapshot.items.Count > 0)
+        {
+            _currentDirectoryFiles = new List<MockFile>();
+            _filteredFiles = new List<MockFile>();
+
+            foreach (var cachedItem in snapshot.items)
+            {
+                var file = new MockFile
+                {
+                    Name = cachedItem.name,
+                    Path = cachedItem.path,
+                    IsFolder = cachedItem.isDirectory,
+                    Type = cachedItem.isDirectory ? "Folder" : cachedItem.category,
+                    Size = cachedItem.fileSize
+                };
+
+                // Try to parse duration if available
+                if (!string.IsNullOrEmpty(cachedItem.duration) && TimeSpan.TryParse(cachedItem.duration, out var duration))
+                {
+                    file.Duration = duration;
+                }
+
+                _currentDirectoryFiles.Add(file);
+                _filteredFiles.Add(file);
+            }
+
+            // Update view with cached data
+            if (_view != null)
+            {
+                UpdateView(true);
+                _view.UpdateBreadcrumbs(_currentPath);
+            }
+
+            Debug.Log($"[RTTFileManagerController] TryRestoreCachedState: Restored {snapshot.items.Count} items from cache");
+            return true;
+        }
+
+        Debug.Log("[RTTFileManagerController] TryRestoreCachedState: Cache has no items");
+        return false;
+    }
+
+    /// <summary>
+    /// Save current UI state to cache.
+    /// </summary>
+    public void CacheCurrentState()
+    {
+        if (_filteredFiles == null || _filteredFiles.Count == 0)
+        {
+            Debug.Log("[RTTFileManagerController] CacheCurrentState: No files to cache");
+            return;
+        }
+
+        var snapshot = new AppStateSnapshot
+        {
+            appId = APP_ID,
+            currentPath = _currentPath,
+            currentPage = _currentPage,
+            pageSize = _pageSize,
+            sortBy = _sortBy,
+            sortAscending = _sortAscending,
+            selectedItemPath = _selectedFile?.Path,
+            totalItemCount = _filteredFiles.Count,
+            items = new List<CachedItemRef>()
+        };
+
+        // Cache visible items (current page + surrounding pages for smooth scrolling)
+        int startIndex = Mathf.Max(0, (_currentPage - 2) * _pageSize);
+        int endIndex = Mathf.Min(_filteredFiles.Count, (_currentPage + 2) * _pageSize);
+
+        for (int i = startIndex; i < endIndex; i++)
+        {
+            var file = _filteredFiles[i];
+            var cachedRef = new CachedItemRef
+            {
+                path = file.Path,
+                name = file.Name,
+                isDirectory = file.IsFolder,
+                category = file.Type,
+                fileSize = file.Size,
+                duration = file.Duration.ToString()
+            };
+
+            // Store thumbnail cache key if available
+            if (!file.IsFolder)
+            {
+                cachedRef.thumbnailCacheKey = ThumbnailCacheKeyHelper.GetCacheKey(file.Path);
+            }
+
+            snapshot.items.Add(cachedRef);
+        }
+
+        AppStateCache.Instance.SaveState(APP_ID, snapshot);
+        Debug.Log($"[RTTFileManagerController] CacheCurrentState: Cached {snapshot.items.Count} items");
+    }
+
+    /// <summary>
+    /// Get the data buffer prepared by background thread.
+    /// </summary>
+    public object GetPreparedDataBuffer()
+    {
+        return _preparedDataBuffer;
+    }
+
+    /// <summary>
+    /// Bind prepared data buffer directly to UI.
+    /// </summary>
+    public void BindPreparedData(object dataBuffer)
+    {
+        if (dataBuffer is List<MockFile> files)
+        {
+            _currentDirectoryFiles = files;
+            _filteredFiles = new List<MockFile>(files);
+            ApplySort();
+            _currentPage = 1;
+
+            if (_view != null)
+            {
+                UpdateView(true);
+                UpdateDetailView();
+                _view.UpdateBreadcrumbs(_currentPath);
+            }
+
+            Debug.Log($"[RTTFileManagerController] BindPreparedData: Bound {files.Count} files");
+        }
+    }
+
+    #endregion
 
     private void OnDestroy()
     {
