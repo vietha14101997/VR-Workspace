@@ -813,7 +813,9 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
     /// <summary>
     /// Select a video item and update the detail panel.
     /// </summary>
-    public void SelectVideo(MediaVideoInfo video)
+    /// <param name="video">Video to select</param>
+    /// <param name="forceRefresh">Force refresh detail panel even if same path (used after data reload)</param>
+    public void SelectVideo(MediaVideoInfo video, bool forceRefresh = false)
     {
         _selectedVideo = video;
 
@@ -823,7 +825,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
             _categorySelectedItemCache[CurrentCategory] = video.Path;
         }
 
-        UpdateDetailView();
+        UpdateDetailView(forceRefresh);
     }
 
     /// <summary>
@@ -860,17 +862,18 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
     /// Update the detail panel based on hover/selection state.
     /// Shows hovered item if hovering, otherwise shows selected item.
     /// </summary>
-    private void UpdateDetailView()
+    /// <param name="forceRefresh">Force refresh even if same path (used after data reload)</param>
+    private void UpdateDetailView(bool forceRefresh = false)
     {
         if (_view == null) return;
 
         if (_hoveredVideo.HasValue)
         {
-            _view.UpdateDetailPanel(_hoveredVideo.Value);
+            _view.UpdateDetailPanel(_hoveredVideo.Value, forceRefresh);
         }
         else if (_selectedVideo.HasValue)
         {
-            _view.UpdateDetailPanel(_selectedVideo.Value);
+            _view.UpdateDetailPanel(_selectedVideo.Value, forceRefresh);
         }
         else
         {
@@ -881,13 +884,14 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
     /// <summary>
     /// Auto-select the first item in the filtered list.
     /// </summary>
-    private void AutoSelectFirstItem()
+    /// <param name="forceRefresh">Force refresh detail panel (used after data reload)</param>
+    private void AutoSelectFirstItem(bool forceRefresh = true)
     {
         if (_filteredVideos.Count > 0 && _view?.Grid != null)
         {
             var firstVideo = _filteredVideos[0];
             _view.Grid.SelectVideo(firstVideo);
-            SelectVideo(firstVideo);
+            SelectVideo(firstVideo, forceRefresh);
             // Notify view so it can show action bar
             _view.NotifyVideoAutoSelected(firstVideo);
         }
@@ -895,6 +899,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
 
     /// <summary>
     /// Restore cached selected item for current category, or select first item.
+    /// Called after data reload, so always forces detail panel refresh.
     /// </summary>
     private void RestoreOrSelectFirstItem()
     {
@@ -907,7 +912,8 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
             if (!string.IsNullOrEmpty(video.Path))
             {
                 _view?.Grid?.SelectVideo(video);
-                SelectVideo(video);
+                // Force refresh because data may have changed (new metadata, etc.)
+                SelectVideo(video, forceRefresh: true);
                 // Notify view so it can show action bar
                 _view?.NotifyVideoAutoSelected(video);
                 return;
@@ -915,7 +921,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
         }
 
         // No cached selection or item no longer exists, select first
-        AutoSelectFirstItem();
+        AutoSelectFirstItem(forceRefresh: true);
     }
     #endregion
 

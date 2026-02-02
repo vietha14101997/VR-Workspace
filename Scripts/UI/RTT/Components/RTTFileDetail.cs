@@ -165,10 +165,11 @@ public class RTTFileDetail : MonoBehaviour
         _metadataContainer = containerObj.transform;
     }
 
-    public void UpdateInfo(MockFile file, bool isCurrentFolder = false)
+    public void UpdateInfo(MockFile file, bool isCurrentFolder = false, bool forceRefresh = false)
     {
         // Skip update if same file (prevents lag when hovering between same items)
-        if (_currentFile.Path == file.Path && !isCurrentFolder)
+        // Unless forceRefresh is true (used after data reload to update metadata/thumbnail)
+        if (_currentFile.Path == file.Path && !isCurrentFolder && !forceRefresh)
         {
             return;
         }

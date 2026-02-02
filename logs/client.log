@@ -94,21 +94,21 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [RTTManager] Auto-recenter completed
 
-[RTTMainMenu] Click started: media at 10.162s
+[RTTMainMenu] Click started: media at 5.898s
 
-[RTTMainMenu] PrepareApp called: media at 10.162s (+0.1ms)
+[RTTMainMenu] PrepareApp called: media at 5.898s (+0.1ms)
 
-[RTTAppManager] PrepareAppFrameAsync started: media at 10.164s
+[RTTAppManager] PrepareAppFrameAsync started: media at 5.901s
 
 [RTTMenu] Created app frame: media
 
-[RTTAppManager] Frame created: media at 10.165s (+0.4ms)
+[RTTAppManager] Frame created: media at 5.901s (+0.4ms)
 
 [RTTAppManager] Preparing app: media in slot 1
 
-[RTTMainMenu] Button animation started: media at 10.165s (+3.3ms)
+[RTTMainMenu] Button animation started: media at 5.902s (+3.2ms)
 
-[RTTAppManager] Creating content: media at 10.194s (+29.3ms)
+[RTTAppManager] Creating content: media at 5.930s (+29.9ms)
 
 [RTTManager] Creating Media content...
 
@@ -116,13 +116,13 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [VRVideoProjectionSystem] Initialized
 
-[MediaLibraryService] Loading 1308 items from cache (async)...
+[MediaLibraryService] Loading 1309 items from cache (async)...
 
 [VirtualObjectsZoomController] Registered side panel: MediaNavigationPanel (side=-1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
 [RTTMenuFrame] UI built: 640x1080 logical pixels
 
-[RTTMediaLibrary] CreateLeftPanelContent started at 10.224s
+[RTTMediaLibrary] CreateLeftPanelContent started at 5.961s
 
 [HoverEffectController] AddEffect 'scale' to Item_all, TargetVisuals=Item_all
 
@@ -152,13 +152,13 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [HoverEffectController] AddEffect 'color' to Item_playlists, TargetVisuals=Item_playlists
 
-[RTTMediaLibrary] Left panel content created at 10.239s
+[RTTMediaLibrary] Left panel content created at 5.971s
 
 [VirtualObjectsZoomController] Registered side panel: MediaDetailPanel (side=1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
-[RTTMediaLibrary] CreateRightPanelContent started at 10.242s
+[RTTMediaLibrary] CreateRightPanelContent started at 5.973s
 
-[RTTMediaLibrary] Right panel content created at 10.268s
+[RTTMediaLibrary] Right panel content created at 5.999s
 
 [RTTPopupMenu] CreateWorldSpace: layer 'VirtualObjects' = 3, mainCam: VRCamera
 
@@ -166,7 +166,7 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [HoverEffectController] AddEffect 'cursor_change' to HitArea, TargetVisuals=Visuals
 
-[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-63830
+[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-124192
 
 [HoverEffectController] AddEffect 'scale' to Checkbox, TargetVisuals=Checkbox
 
@@ -188,37 +188,37 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [VRMediaAppController] Media app created
 
-[RTTAppManager] Content created: media at 10.380s (+215.4ms)
+[RTTAppManager] Content created: media at 6.107s (+206.8ms)
 
-[RTTAppManager] PrepareDataAsync started: media at 10.380s
+[RTTAppManager] PrepareDataAsync started: media at 6.107s
 
 [RTTMediaLibraryController] PrepareDataAsync started
 
-[RTTAppManager] App prepared (hidden): media at 10.384s (total: 219.6ms)
+[RTTAppManager] App prepared (hidden): media at 6.111s (total: 210.9ms)
 
-[RTTMainMenu] Button animation ended: media at 10.406s (+244.4ms)
+[RTTMainMenu] Button animation ended: media at 6.134s (+235.4ms)
 
-[RTTMainMenu] OpenPreparedApp called: media at 10.406s (+244.5ms)
+[RTTMainMenu] OpenPreparedApp called: media at 6.134s (+235.4ms)
 
-[RTTAppManager] WaitAndSwitch started: media at 10.407s
+[RTTAppManager] WaitAndSwitch started: media at 6.134s
 
-[RTTAppManager] WaitAndSwitch app ready: media at 10.407s (waited 0.1ms)
+[RTTAppManager] WaitAndSwitch app ready: media at 6.134s (waited 0.1ms)
 
-[RTTAppManager] Starting transition: media at 10.407s
+[RTTAppManager] Starting transition: media at 6.134s
 
-[RTTAppManager] Transition started: media at 10.408s
+[RTTAppManager] Transition started: media at 6.136s
 
 [RTTAppManager] Got 3 frames to animate: media
 
-[RTTAppManager] Fade out MainMenu: media at 10.409s
+[RTTAppManager] Fade out MainMenu: media at 6.136s
 
-[RTTMainMenu] Click flow completed: media at 10.409s (total: +247.1ms)
+[RTTMainMenu] Click flow completed: media at 6.136s (total: +238.1ms)
 
-[RTTAppManager] Fade out done: media at 10.507s (+98.7ms)
+[RTTAppManager] Fade out done: media at 6.253s (+117.7ms)
 
 [RTTAppManager] All frames activated with alpha=0: 3 frames
 
-[RTTAppManager] Sync point: media, IsDataReady=False at 10.516s
+[RTTAppManager] Sync point: media, IsDataReady=False at 6.262s
 
 [AppStateCache] Disk cache hit for media
 
@@ -228,33 +228,115 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-38-48': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4
+
+[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4
+
 [RTTMediaGridItem] Duration badge for 'videoplayback': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[RTTMediaGridItem] Duration badge for 'Genshin-Impact 2026-1-26 12-24-11': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[RTTMediaGridItem] Duration badge for 'video_client': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[RTTMediaGridItem] Duration badge for 'Phàm Nhân Tu Tiên Tập 173 Vietsub': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[RTTMediaGridItem] Duration badge for '7295785205012': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
 [RTTMediaGrid] Auto-selecting first item: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57
 
 [Detail] REQUEST: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4
 
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4 name=0ms preview=1ms metadata=12ms total=13ms
+[Cache] DISK READ: 0ms (95KB)
 
-[RTTMediaLibraryController] TryRestoreCachedState: Restored 3 items from cache (filtered from 18)
+[Cache] DISK DECODE: 3ms (512x267)
+
+[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4 wait=20ms assign=0ms
+
+[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4 name=1ms preview=20ms metadata=10ms total=31ms
+
+[RTTMediaGrid] Progressive binding started: 8 items queued, budgetMs=6
+
+[RTTMediaGridItem] Duration badge for '7077543476647': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[RTTMediaGridItem] Duration badge for '7065774217733': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[RTTMediaGridItem] Duration badge for 'Genshin_Impact_2025-09-10_11-32-27': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[RTTMediaLibraryController] TryRestoreCachedState: Restored 16 items from cache (filtered from 16)
 
 [RTTAppManager] TryRestoreCachedState: media, success=True
 
 [RTTAppManager] Subscribed to OnDataPrepared: media
 
-[RTTAppManager] Fade in started: 3 frames at 10.579s
+[RTTAppManager] Fade in started: 3 frames at 6.373s
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4
+[RTTMediaGridItem] Duration badge for 'FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD)': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4
+[RTTMediaGridItem] Duration badge for 'Honkai  Star Rail 2025.05.21 - 15.03.08.01': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[RTTMediaGridItem] Duration badge for 'khác màu': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
 [VideoFrameExtractor] Seeking to 1.6s (video length: 7.9s)
 
-[RTTAppManager] Fade in done: media at 10.662s (+253.9ms)
+[RTTMediaGridItem] Duration badge for 'vết xước 2': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[RTTAppManager] OnAppShown called: media at 10.662s
+[RTTMediaGridItem] Duration badge for 'vết xước 1': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[RTTMediaGrid] Progressive binding complete: bound=8, skipped=0
+
+[MediaLibraryService] Loaded 1309 items from cache in 497ms (async, no File.Exists)
+
+[RTTMediaLibraryController] HandleCacheLoaded called
+
+[Cache] DISK READ: 0ms (99KB)
+
+[Cache] DISK DECODE: 2ms (512x267)
+
+[Cache] DISK READ: 0ms (109KB)
+
+[Cache] DISK READ: 0ms (115KB)
+
+[Cache] DISK READ: 0ms (206KB)
+
+[Cache] DISK DECODE: 3ms (512x288)
+
+[Cache] DISK READ: 0ms (199KB)
+
+[Cache] DISK DECODE: 4ms (512x288)
+
+[Cache] DISK READ: 0ms (117KB)
+
+[Cache] DISK DECODE: 2ms (512x230)
+
+[Cache] DISK READ: 0ms (122KB)
+
+[Cache] DISK READ: 0ms (120KB)
+
+[Cache] DISK READ: 1ms (265KB)
+
+[Cache] DISK DECODE: 4ms (512x230)
+
+[RTTFilePagination] UI Mismatch detected (TotalPages: 9 vs Children: 1). Forcing Rebuild.
+UnityEngine.Debug:LogWarning (object)
+RTTFilePagination:Update () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFilePagination.cs:613)
+
+[Cache] DISK READ: 0ms (77KB)
+
+[Cache] DISK DECODE: 2ms (512x238)
+
+[RTTAppManager] Fade in done: media at 6.647s (+511.3ms)
+
+[RTTAppManager] OnAppShown called: media at 6.647s
 
 [RTTMediaLibraryController] OnAppShown called, _view=exists
+
+[AppStateCache] Saved state for media with 16 items
+
+[RTTMediaLibraryController] CacheCurrentState: Cached 16 items
+
+[RTTAppManager] State cached after transition: media
 
 [RTTTaskbar] RegisterApp called - slotIndex=1, icon=icon_media
 
@@ -272,120 +354,15 @@ Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling b
 
 [RTTTaskbar] SelectSlot(1) called, current active: 1
 
-[RTTAppManager] Transition completed: media at 10.682s (total: 273.4ms)
-
-[MediaLibraryService] Loaded 1308 items from cache in 489ms (async, no File.Exists)
-
-[RTTMediaLibraryController] HandleCacheLoaded called
+[RTTAppManager] Transition completed: media at 6.673s (total: 537.4ms)
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-38-48.mp4
 
-[Cache] DISK READ: 0ms (101KB)
-
 Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-38-48.mp4
 
-[Cache] DISK DECODE: 2ms (512x267)
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
 
-[Cache] DISK READ: 0ms (109KB)
-
-[Cache] DISK DECODE: 3ms (512x267)
-
-[Cache] DISK READ: 0ms (206KB)
-
-[Cache] DISK DECODE: 3ms (512x288)
-
-[RTTMediaGridItem] Duration badge for 'Genshin-Impact 2026-1-26 12-24-11': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (199KB)
-
-[Cache] DISK DECODE: 4ms (512x288)
-
-[RTTMediaGridItem] Duration badge for 'video_client': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (116KB)
-
-[Cache] DISK DECODE: 2ms (512x230)
-
-[RTTMediaGridItem] Duration badge for 'Phàm Nhân Tu Tiên Tập 173 Vietsub': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (122KB)
-
-[RTTMediaGridItem] Duration badge for '7295785205012': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (120KB)
-
-[RTTMediaGridItem] Duration badge for '7077543476647': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (267KB)
-
-[Cache] DISK DECODE: 4ms (512x230)
-
-[RTTMediaGrid] Progressive binding started: 7 items queued, budgetMs=6
-
-[RTTMediaGridItem] Duration badge for '7065774217733': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (77KB)
-
-[Cache] DISK DECODE: 2ms (512x238)
-
-[RTTMediaGridItem] Duration badge for 'Genshin_Impact_2025-09-10_11-32-27': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (283KB)
-
-[Cache] DISK DECODE: 5ms (512x288)
-
-[RTTMediaGridItem] Duration badge for 'FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD)': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (175KB)
-
-[RTTMediaGridItem] Duration badge for 'Honkai  Star Rail 2025.05.21 - 15.03.08.01': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (200KB)
-
-[Cache] DISK DECODE: 6ms (512x288)
-
-[RTTMediaGridItem] Duration badge for 'khác màu': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (38KB)
-
-[Cache] DISK DECODE: 1ms (512x288)
-
-[RTTMediaGridItem] Duration badge for 'vết xước 2': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (48KB)
-
-[RTTMediaGridItem] Duration badge for 'vết xước 1': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK DECODE: 2ms (512x284)
-
-[RTTMediaGrid] Progressive binding complete: bound=1, skipped=6
-
-[MediaLibraryService] Starting background scan (existing: 1308 items)
-
-[MediaLibraryService] Background scan found 1 new items in 132ms
-
-[MediaLibraryService] Saved 1309 items to cache (with metadata)
-
-[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[VideoMetadataThumbnailExtractor] Failed to extract thumbnail from VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4: Sharing violation on path C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
-UnityEngine.Debug:LogWarning (object)
-VideoMetadataThumbnailExtractor:TryExtractEmbeddedThumbnail (string,UnityEngine.Texture2D&) (at Assets/VR-Workspace/Scripts/UI/RTT/Services/VideoMetadataThumbnailExtractor.cs:50)
-FileMetadataThumbnailExtractor:TryExtractMetadataThumbnail (string,FileCategory,UnityEngine.Texture2D&) (at Assets/VR-Workspace/Scripts/UI/RTT/Services/FileMetadataThumbnailExtractor.cs:54)
-FileThumbnailService:RequestThumbnail (MockFile,int,System.Action`1<UnityEngine.Sprite>,System.Action,int,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Services/FileThumbnailService.cs:189)
-RTTMediaGridItem:RequestThumbnail (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaGridItem.cs:631)
-RTTMediaGridItem:Bind (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaGridItem.cs:527)
-RTTMediaGrid:BindItemAtIndex (RTTMediaGridItem,int) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaGrid.cs:1122)
-RTTMediaGrid:UpdateVisibleItems () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaGrid.cs:794)
-RTTMediaGrid:SetData (System.Collections.Generic.List`1<MediaVideoInfo>,System.Collections.Generic.List`1<MediaGroupInfo>) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaGrid.cs:329)
-RTTMediaLibrary:SetVideos (System.Collections.Generic.List`1<MediaVideoInfo>,System.Collections.Generic.List`1<MediaGroupInfo>) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:1392)
-RTTMediaLibraryController:FinalizeAndUpdateView () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:1339)
-RTTMediaLibraryController/<ApplyFiltersAsync>d__139:MoveNext () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:1232)
-UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
-
-[RTTMediaGrid] Progressive binding started: 8 items queued, budgetMs=6
-
-[RTTMediaGrid] Progressive binding complete: bound=8, skipped=0
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
 
 [VideoFrameExtractor] Async capture failed: LoadRawTextureData: not enough data provided (will result in overread)., using fallback
 UnityEngine.Debug:LogWarning (object)
@@ -398,61 +375,59 @@ UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr
 
 [VideoFrameExtractor] Seeking to 1.7s (video length: 8.6s)
 
-WindowsVideoMedia error 0xc00d36c4 while reading C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
-
-Context: CreateObjectFromByteStream
-Error details: The byte stream type of the given URL is unsupported.
-Track types:
-
-
-VideoPlayer cannot play url : file://C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
-
-Cannot read file.
-
-[FileMetadataService] Video error: VideoPlayer cannot play url : file://C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
-
-Cannot read file.
-UnityEngine.Debug:LogWarning (object)
-FileMetadataService/<>c__DisplayClass18_0:<LoadVideoMetadataCoroutineInternal>b__1 (UnityEngine.Video.VideoPlayer,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Services/FileMetadataService.cs:345)
-UnityEngine.Video.VideoPlayer:InvokeErrorReceivedCallback_Internal (UnityEngine.Video.VideoPlayer,string)
-
 First video frame not zero: 2 (0.066667s). Result may be out of sync. Please make sure tracks all start at 0 in C:\Users\Admin\Downloads\videoplayback.mp4
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\Genshin-Impact 2026-1-26 12-24-11.mp4
 
 Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\Genshin-Impact 2026-1-26 12-24-11.mp4
 
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Video\Phàm Nhân Tu Tiên Tập 173 Vietsub.mp4
+
 [VideoFrameExtractor] Successfully extracted frame for: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-38-48.mp4
 
-[VideoMetadataThumbnailExtractor] Failed to extract thumbnail from VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4: Sharing violation on path C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
-UnityEngine.Debug:LogWarning (object)
-VideoMetadataThumbnailExtractor:TryExtractEmbeddedThumbnail (string,UnityEngine.Texture2D&) (at Assets/VR-Workspace/Scripts/UI/RTT/Services/VideoMetadataThumbnailExtractor.cs:50)
-VideoFrameExtractor/<ExtractFrameCoroutine>d__19:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Services/VideoFrameExtractor.cs:260)
-UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
-VideoFrameExtractor:TryProcessNextRequest () (at Assets/VR-Workspace/Scripts/UI/RTT/Services/VideoFrameExtractor.cs:152)
-VideoFrameExtractor:CompleteExtraction (UnityEngine.Texture2D) (at Assets/VR-Workspace/Scripts/UI/RTT/Services/VideoFrameExtractor.cs:561)
-VideoFrameExtractor/<ExtractFrameCoroutine>d__19:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Services/VideoFrameExtractor.cs:457)
-UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
+[Detail] REQUEST: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
 
 [VideoFrameExtractor] No embedded thumbnail, extracting frame from video: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
 
-[VideoFrameExtractor] Video error: VideoPlayer cannot play url : file://C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
+[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4 name=0ms preview=2ms metadata=8ms total=10ms
 
-Cannot read file.
-UnityEngine.Debug:LogWarning (object)
-VideoFrameExtractor:OnVideoError (UnityEngine.Video.VideoPlayer,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Services/VideoFrameExtractor.cs:740)
-UnityEngine.Video.VideoPlayer:InvokeErrorReceivedCallback_Internal (UnityEngine.Video.VideoPlayer,string)
+[VideoFrameExtractor] Seeking to 8.2s (video length: 27.4s)
 
-[RTTMediaGridItem] Thumbnail failed for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
-UnityEngine.Debug:LogWarning (object)
-RTTMediaGridItem/<>c__DisplayClass67_0:<RequestThumbnail>b__1 () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaGridItem.cs:679)
-FileThumbnailService/<>c__DisplayClass36_4:<CompleteRequest>b__3 () (at Assets/VR-Workspace/Scripts/UI/RTT/Services/FileThumbnailService.cs:862)
-FileThumbnailService:QueueUICallback (System.Action,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Services/FileThumbnailService.cs:884)
-FileThumbnailService:CompleteRequest (ThumbnailRequest,UnityEngine.Sprite) (at Assets/VR-Workspace/Scripts/UI/RTT/Services/FileThumbnailService.cs:862)
-FileThumbnailService/<LoadVideoThumbnail>d__34:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Services/FileThumbnailService.cs:667)
-UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
+[VideoFrameExtractor] Successfully extracted frame for: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Video\Phàm Nhân Tu Tiên Tập 173 Vietsub.mp4
+[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4 wait=638ms assign=0ms
+
+[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4 wait=0ms assign=0ms
+
+[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4 name=0ms preview=1ms metadata=8ms total=9ms
+
+[ThumbnailCache] Cleared 43 files from disk cache
+
+[MediaLibraryService] Library cache cleared
+
+[MediaLibraryService] Starting directory scan in 4 locations: C:\Users\Admin\Videos, C:\Users\Admin\Pictures, C:\Users\Admin\Music, C:\Users\Admin\Downloads
+
+[MediaLibraryService] Scanning: C:\Users\Admin\Videos
+
+[MediaLibraryService] Scanning: C:\Users\Admin\Pictures
+
+[MediaLibraryService] Scanning: C:\Users\Admin\Music
+
+[MediaLibraryService] Scanning: C:\Users\Admin\Downloads
+
+[MediaLibraryService] Found 1309 media files
+
+[MediaLibraryService] Saved 1309 items to cache (with metadata)
+
+[RTTMediaLibraryController] CacheCurrentState: No videos to cache
+
+[MediaLibraryService] Scan complete: 1309 media files (cached)
+
+[RTTMediaGrid] Progressive binding complete: bound=3, skipped=5
+
+[MediaLibraryService] Starting background scan (existing: 1309 items)
+
+[MediaLibraryService] Background scan complete - no new items (147ms)
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Genshin_Impact_2025-09-10_11-32-27.mp4
 
@@ -468,12 +443,29 @@ Unexpected timestamp values detected. This can occur in H.264 videos not encoded
 
 Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\New folder\vết xước 2.mp4
 
+[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: videoplayback.mp4
+
+[VideoFrameExtractor] Seeking to 10.0s (video length: 144.0s)
+
 Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\New folder\vết xước 1.mp4
 
-[VideoFrameExtractor] Preparation timeout for: C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
-UnityEngine.Debug:LogWarning (object)
-VideoFrameExtractor/<ExtractFrameCoroutine>d__19:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Services/VideoFrameExtractor.cs:305)
-UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
+[VideoFrameExtractor] Successfully extracted frame for: videoplayback.mp4
+
+[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: Genshin-Impact 2026-1-26 12-24-11.mp4
+
+[VideoFrameExtractor] Seeking to 10.0s (video length: 85.7s)
+
+[VideoFrameExtractor] Successfully extracted frame for: Genshin-Impact 2026-1-26 12-24-11.mp4
+
+[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: video_client.mp4
+
+[VideoFrameExtractor] Seeking to 3.4s (video length: 11.4s)
+
+[VideoFrameExtractor] Successfully extracted frame for: video_client.mp4
+
+[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: Phàm Nhân Tu Tiên Tập 173 Vietsub.mp4
+
+[VideoFrameExtractor] Seeking to 10.0s (video length: 1118.9s)
 
 [RTTTaskbar] SelectSlot(0) called, current active: 1
 
@@ -500,229 +492,143 @@ VRWorkspace.UI.HoverEffects.CursorChangeHoverEffect:Cleanup () (at Assets/VR-Wor
 VRWorkspace.UI.HoverEffects.HoverEffectController:CleanupEffects () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Core/HoverEffectController.cs:311)
 VRWorkspace.UI.HoverEffects.HoverEffectController:OnDestroy () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Core/HoverEffectController.cs:318)
 
-[RTTMainMenu] Click started: media at 28.336s
+[VideoFrameExtractor] Successfully extracted frame for: Phàm Nhân Tu Tiên Tập 173 Vietsub.mp4
 
-[RTTMainMenu] PrepareApp called: media at 28.337s (+0.1ms)
+[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: 7295785205012.mp4
 
-[RTTAppManager] PrepareAppFrameAsync started: media at 28.337s
+[VideoFrameExtractor] Seeking to 3.4s (video length: 11.2s)
 
-[RTTAppManager] Frame created: media at 28.337s (+0.1ms)
+[VideoFrameExtractor] Successfully extracted frame for: 7295785205012.mp4
 
-[RTTMainMenu] Button animation started: media at 28.337s (+0.4ms)
+[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: 7077543476647.mp4
 
-[RTTAppManager] Creating content: media at 28.370s (+33.3ms)
+[VideoFrameExtractor] Seeking to 1.8s (video length: 9.1s)
 
-[RTTMediaLibrary] CreateLeftPanelContent started at 28.376s
+[VideoFrameExtractor] Successfully extracted frame for: 7077543476647.mp4
 
-[RTTMediaLibrary] Left panel content created at 28.381s
+[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: 7065774217733.mp4
 
-[RTTMediaLibrary] CreateRightPanelContent started at 28.383s
+[VideoFrameExtractor] Seeking to 10.0s (video length: 77.6s)
 
-[RTTMediaLibrary] Right panel content created at 28.389s
+[VideoFrameExtractor] Successfully extracted frame for: 7065774217733.mp4
 
-[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-74274
+[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: Genshin_Impact_2025-09-10_11-32-27.mp4
 
-[VideoMetadataThumbnailExtractor] Failed to extract thumbnail from VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4: Sharing violation on path C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
-UnityEngine.Debug:LogWarning (object)
-VideoMetadataThumbnailExtractor:TryExtractEmbeddedThumbnail (string,UnityEngine.Texture2D&) (at Assets/VR-Workspace/Scripts/UI/RTT/Services/VideoMetadataThumbnailExtractor.cs:50)
-FileMetadataThumbnailExtractor:TryExtractMetadataThumbnail (string,FileCategory,UnityEngine.Texture2D&) (at Assets/VR-Workspace/Scripts/UI/RTT/Services/FileMetadataThumbnailExtractor.cs:54)
-FileThumbnailService:RequestThumbnail (MockFile,int,System.Action`1<UnityEngine.Sprite>,System.Action,int,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Services/FileThumbnailService.cs:189)
-RTTMediaGridItem:RequestThumbnail (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaGridItem.cs:631)
-RTTMediaGridItem:Bind (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaGridItem.cs:527)
-RTTMediaGrid:BindItemAtIndex (RTTMediaGridItem,int) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaGrid.cs:1122)
-RTTMediaGrid:UpdateVisibleItems () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaGrid.cs:794)
-RTTMediaGrid:SetData (System.Collections.Generic.List`1<MediaVideoInfo>,System.Collections.Generic.List`1<MediaGroupInfo>) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaGrid.cs:329)
-RTTMediaLibrary:SetVideos (System.Collections.Generic.List`1<MediaVideoInfo>,System.Collections.Generic.List`1<MediaGroupInfo>) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:1392)
-RTTMediaLibraryController:FinalizeAndUpdateView () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:1339)
-RTTMediaLibraryController:ApplyFiltersSync () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:1189)
-RTTMediaLibraryController:ApplyFilters () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:1154)
-RTTMediaLibraryController:RefreshLibrary () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:655)
-RTTMediaLibraryController:RefreshLibraryInternal () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:579)
-RTTMediaLibraryController:OnViewReady () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:553)
-RTTMediaLibrary/<CreateCenterGrid>d__81:MoveNext () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:623)
-UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
-RTTMediaLibrary:CreatePanels () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:257)
-RTTMediaLibrary:BuildUI () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:140)
-RTTMediaLibrary:Initialize (RTTMediaLibraryController,RTTMenuFrame,single,single,TMPro.TMP_FontAsset,UnityEngine.Color,UnityEngine.Color) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:128)
-VRMediaAppController:BuildLibraryUI () (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:324)
-VRMediaAppController:CreateMenu (UnityEngine.RectTransform,single,single,TMPro.TMP_FontAsset,UnityEngine.Color,UnityEngine.Color) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:97)
-RTTManager:CreateMediaContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:971)
-RTTManager:CreateAppContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:879)
-VRWorkspace.UI.RTT.RTTAppManager/<PrepareAppFrameAsync>d__61:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTAppManager.cs:622)
-UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
+[VideoFrameExtractor] Seeking to 4.6s (video length: 15.2s)
 
-[VideoMetadataThumbnailExtractor] Failed to extract thumbnail from VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4: Sharing violation on path C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
-UnityEngine.Debug:LogWarning (object)
-VideoMetadataThumbnailExtractor:TryExtractEmbeddedThumbnail (string,UnityEngine.Texture2D&) (at Assets/VR-Workspace/Scripts/UI/RTT/Services/VideoMetadataThumbnailExtractor.cs:50)
-VideoFrameExtractor/<ExtractFrameCoroutine>d__19:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Services/VideoFrameExtractor.cs:260)
-UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
-VideoFrameExtractor:TryProcessNextRequest () (at Assets/VR-Workspace/Scripts/UI/RTT/Services/VideoFrameExtractor.cs:152)
-VideoFrameExtractor:ExtractFrame (string,int,int,System.Action`1<UnityEngine.Texture2D>,System.Action) (at Assets/VR-Workspace/Scripts/UI/RTT/Services/VideoFrameExtractor.cs:134)
-FileThumbnailService/<LoadVideoThumbnail>d__34:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Services/FileThumbnailService.cs:574)
-UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
-FileThumbnailService:TryProcessNextRequest () (at Assets/VR-Workspace/Scripts/UI/RTT/Services/FileThumbnailService.cs:380)
-FileThumbnailService:RequestThumbnail (MockFile,int,System.Action`1<UnityEngine.Sprite>,System.Action,int,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Services/FileThumbnailService.cs:292)
-RTTMediaGridItem:RequestThumbnail (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaGridItem.cs:631)
-RTTMediaGridItem:Bind (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaGridItem.cs:527)
-RTTMediaGrid:BindItemAtIndex (RTTMediaGridItem,int) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaGrid.cs:1122)
-RTTMediaGrid:UpdateVisibleItems () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaGrid.cs:794)
-RTTMediaGrid:SetData (System.Collections.Generic.List`1<MediaVideoInfo>,System.Collections.Generic.List`1<MediaGroupInfo>) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaGrid.cs:329)
-RTTMediaLibrary:SetVideos (System.Collections.Generic.List`1<MediaVideoInfo>,System.Collections.Generic.List`1<MediaGroupInfo>) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:1392)
-RTTMediaLibraryController:FinalizeAndUpdateView () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:1339)
-RTTMediaLibraryController:ApplyFiltersSync () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:1189)
-RTTMediaLibraryController:ApplyFilters () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:1154)
-RTTMediaLibraryController:RefreshLibrary () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:655)
-RTTMediaLibraryController:RefreshLibraryInternal () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:579)
-RTTMediaLibraryController:OnViewReady () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:553)
-RTTMediaLibrary/<CreateCenterGrid>d__81:MoveNext () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:623)
-UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
-RTTMediaLibrary:CreatePanels () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:257)
-RTTMediaLibrary:BuildUI () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:140)
-RTTMediaLibrary:Initialize (RTTMediaLibraryController,RTTMenuFrame,single,single,TMPro.TMP_FontAsset,UnityEngine.Color,UnityEngine.Color) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:128)
-VRMediaAppController:BuildLibraryUI () (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:324)
-VRMediaAppController:CreateMenu (UnityEngine.RectTransform,single,single,TMPro.TMP_FontAsset,UnityEngine.Color,UnityEngine.Color) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:97)
-RTTManager:CreateMediaContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:971)
-RTTManager:CreateAppContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:879)
-VRWorkspace.UI.RTT.RTTAppManager/<PrepareAppFrameAsync>d__61:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTAppManager.cs:622)
-UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
+[RTTMainMenu] Click started: media at 102.277s
 
-[Cache] DISK READ: 0ms (93KB)
+[RTTMainMenu] PrepareApp called: media at 102.277s (+0.1ms)
 
-[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4 wait=17ms assign=0ms
+[RTTAppManager] PrepareAppFrameAsync started: media at 102.277s
 
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4 name=0ms preview=18ms metadata=8ms total=26ms
+[RTTAppManager] Frame created: media at 102.277s (+0.1ms)
 
-[RTTAppManager] Content created: media at 28.515s (+178.0ms)
+[RTTMainMenu] Button animation started: media at 102.278s (+0.4ms)
 
-[RTTAppManager] PrepareDataAsync started: media at 28.515s
+[RTTAppManager] Creating content: media at 102.310s (+33.2ms)
+
+[RTTMediaLibrary] CreateLeftPanelContent started at 102.316s
+
+[RTTMediaLibrary] Left panel content created at 102.320s
+
+[RTTMediaLibrary] CreateRightPanelContent started at 102.322s
+
+[RTTMediaLibrary] Right panel content created at 102.328s
+
+[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-140170
+
+[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4 name=0ms preview=1ms metadata=6ms total=7ms
+
+[RTTAppManager] Content created: media at 102.433s (+155.7ms)
+
+[RTTAppManager] PrepareDataAsync started: media at 102.433s
 
 [RTTMediaLibraryController] PrepareDataAsync completed: 1309 videos
 
-[RTTAppManager] App prepared (hidden): media at 28.518s (total: 181.2ms)
+[RTTAppManager] App prepared (hidden): media at 102.437s (total: 159.8ms)
 
-[RTTMainMenu] Button animation ended: media at 28.539s (+202.8ms)
+[RTTMainMenu] Button animation ended: media at 102.459s (+181.8ms)
 
-[RTTMainMenu] OpenPreparedApp called: media at 28.539s (+202.8ms)
+[RTTMainMenu] OpenPreparedApp called: media at 102.459s (+181.9ms)
 
-[RTTAppManager] WaitAndSwitch started: media at 28.539s
+[RTTAppManager] WaitAndSwitch started: media at 102.459s
 
-[RTTAppManager] WaitAndSwitch app ready: media at 28.539s (waited 0.0ms)
+[RTTAppManager] WaitAndSwitch app ready: media at 102.459s (waited 0.0ms)
 
-[RTTAppManager] Starting transition: media at 28.539s
+[RTTAppManager] Starting transition: media at 102.459s
 
-[RTTAppManager] Transition started: media at 28.539s
+[RTTAppManager] Transition started: media at 102.459s
 
-[RTTAppManager] Fade out MainMenu: media at 28.539s
+[RTTAppManager] Fade out MainMenu: media at 102.459s
 
-[RTTMainMenu] Click flow completed: media at 28.540s (total: +203.0ms)
+[RTTMainMenu] Click flow completed: media at 102.459s (total: +182.0ms)
 
-[RTTAppManager] Fade out done: media at 28.656s (+116.2ms)
+[RTTAppManager] Fade out done: media at 102.559s (+100.3ms)
 
-[RTTAppManager] Sync point: media, IsDataReady=True at 28.676s
+[RTTAppManager] Sync point: media, IsDataReady=True at 102.579s
 
 [RTTAppManager] Data ready first - BindPreparedData: media
 
-[VideoMetadataThumbnailExtractor] Failed to extract thumbnail from VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4: Sharing violation on path C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
-UnityEngine.Debug:LogWarning (object)
-VideoMetadataThumbnailExtractor:TryExtractEmbeddedThumbnail (string,UnityEngine.Texture2D&) (at Assets/VR-Workspace/Scripts/UI/RTT/Services/VideoMetadataThumbnailExtractor.cs:50)
-FileMetadataThumbnailExtractor:TryExtractMetadataThumbnail (string,FileCategory,UnityEngine.Texture2D&) (at Assets/VR-Workspace/Scripts/UI/RTT/Services/FileMetadataThumbnailExtractor.cs:54)
-FileThumbnailService:RequestThumbnail (MockFile,int,System.Action`1<UnityEngine.Sprite>,System.Action,int,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Services/FileThumbnailService.cs:189)
-RTTMediaGridItem:RequestThumbnail (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaGridItem.cs:631)
-RTTMediaGridItem:Bind (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaGridItem.cs:527)
-RTTMediaGrid:BindItemAtIndex (RTTMediaGridItem,int) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaGrid.cs:1122)
-RTTMediaGrid:UpdateVisibleItems () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaGrid.cs:794)
-RTTMediaGrid:SetData (System.Collections.Generic.List`1<MediaVideoInfo>,System.Collections.Generic.List`1<MediaGroupInfo>) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaGrid.cs:329)
-RTTMediaLibrary:SetVideos (System.Collections.Generic.List`1<MediaVideoInfo>,System.Collections.Generic.List`1<MediaGroupInfo>) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:1392)
-RTTMediaLibraryController:BindPreparedData (object) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:434)
-VRMediaAppController:BindPreparedData (object) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:581)
-VRWorkspace.UI.RTT.RTTAppManager/<SwitchToPreparedAppWithTransition>d__62:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTAppManager.cs:691)
-UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
+[RTTMediaLibraryController] BindPreparedData: Bound 16 videos (filtered from 1309 by category 'videos')
 
-[VideoMetadataThumbnailExtractor] Failed to extract thumbnail from VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4: Sharing violation on path C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
-UnityEngine.Debug:LogWarning (object)
-VideoMetadataThumbnailExtractor:TryExtractEmbeddedThumbnail (string,UnityEngine.Texture2D&) (at Assets/VR-Workspace/Scripts/UI/RTT/Services/VideoMetadataThumbnailExtractor.cs:50)
-VideoFrameExtractor/<ExtractFrameCoroutine>d__19:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Services/VideoFrameExtractor.cs:260)
-UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
-VideoFrameExtractor:TryProcessNextRequest () (at Assets/VR-Workspace/Scripts/UI/RTT/Services/VideoFrameExtractor.cs:152)
-VideoFrameExtractor:ExtractFrame (string,int,int,System.Action`1<UnityEngine.Texture2D>,System.Action) (at Assets/VR-Workspace/Scripts/UI/RTT/Services/VideoFrameExtractor.cs:134)
-FileThumbnailService/<LoadVideoThumbnail>d__34:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Services/FileThumbnailService.cs:574)
-UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
-FileThumbnailService:TryProcessNextRequest () (at Assets/VR-Workspace/Scripts/UI/RTT/Services/FileThumbnailService.cs:380)
-FileThumbnailService:RequestThumbnail (MockFile,int,System.Action`1<UnityEngine.Sprite>,System.Action,int,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Services/FileThumbnailService.cs:292)
-RTTMediaGridItem:RequestThumbnail (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaGridItem.cs:631)
-RTTMediaGridItem:Bind (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaGridItem.cs:527)
-RTTMediaGrid:BindItemAtIndex (RTTMediaGridItem,int) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaGrid.cs:1122)
-RTTMediaGrid:UpdateVisibleItems () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaGrid.cs:794)
-RTTMediaGrid:SetData (System.Collections.Generic.List`1<MediaVideoInfo>,System.Collections.Generic.List`1<MediaGroupInfo>) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaGrid.cs:329)
-RTTMediaLibrary:SetVideos (System.Collections.Generic.List`1<MediaVideoInfo>,System.Collections.Generic.List`1<MediaGroupInfo>) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:1392)
-RTTMediaLibraryController:BindPreparedData (object) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:434)
-VRMediaAppController:BindPreparedData (object) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:581)
-VRWorkspace.UI.RTT.RTTAppManager/<SwitchToPreparedAppWithTransition>d__62:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTAppManager.cs:691)
-UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
+[RTTAppManager] Fade in started: 3 frames at 102.598s
 
-[Cache] DISK READ: 0ms (99KB)
+[VideoFrameExtractor] Successfully extracted frame for: Genshin_Impact_2025-09-10_11-32-27.mp4
 
-[Cache] DISK DECODE: 3ms (512x512)
+[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD).mp4
 
-[Cache] DISK READ: 0ms (2KB)
+[RTTAppManager] Fade in done: media at 102.789s (+330.3ms)
 
-[Cache] DISK DECODE: 0ms (128x128)
+[RTTAppManager] OnAppShown called: media at 102.789s
 
-[Cache] DISK READ: 0ms (1KB)
+[RTTAppManager] Transition completed: media at 102.816s (total: 357.0ms)
 
-[RTTMediaGrid] Progressive binding started: 3 items queued, budgetMs=6
+[VideoFrameExtractor] Seeking to 6.0s (video length: 19.9s)
 
-[RTTMediaLibraryController] BindPreparedData: Bound 1309 videos
+[MediaLibraryService] Background scan complete - no new items (187ms)
 
-[RTTAppManager] Fade in started: 3 frames at 28.742s
+[VideoFrameExtractor] Successfully extracted frame for: FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD).mp4
 
-[RTTMediaGrid] Progressive binding complete: bound=2, skipped=1
+[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: Honkai  Star Rail 2025.05.21 - 15.03.08.01.mp4
 
-[MediaLibraryService] Starting background scan (existing: 1309 items)
+[VideoFrameExtractor] Seeking to 10.0s (video length: 86.4s)
 
-[RTTAppManager] Fade in done: media at 28.902s (+362.6ms)
+[VideoFrameExtractor] Successfully extracted frame for: Honkai  Star Rail 2025.05.21 - 15.03.08.01.mp4
 
-[RTTAppManager] OnAppShown called: media at 28.902s
+[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: khác màu.mp4
 
-[AppStateCache] Saved state for media with 18 items
+[VideoFrameExtractor] Seeking to 8.3s (video length: 27.8s)
 
-[RTTMediaLibraryController] CacheCurrentState: Cached 18 items
+[VideoFrameExtractor] Successfully extracted frame for: khác màu.mp4
 
-[RTTAppManager] State cached after transition: media
+[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: vết xước 2.mp4
 
-[RTTAppManager] Transition completed: media at 28.925s (total: 385.6ms)
+[VideoFrameExtractor] Seeking to 4.2s (video length: 14.1s)
 
-[MediaLibraryService] Background scan complete - no new items (162ms)
+[VideoFrameExtractor] Successfully extracted frame for: vết xước 2.mp4
+
+[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: vết xước 1.mp4
+
+[VideoFrameExtractor] Seeking to 4.0s (video length: 13.2s)
+
+[VideoFrameExtractor] Successfully extracted frame for: vết xước 1.mp4
+
+[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4 name=0ms preview=2ms metadata=10ms total=12ms
+
+[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4 name=1ms preview=0ms metadata=12ms total=13ms
 
 [Detail] REQUEST: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-38-48.mp4
 
-[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-38-48.mp4 wait=16ms assign=0ms
+[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-38-48.mp4 name=1ms preview=0ms metadata=9ms total=10ms
 
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-38-48.mp4 name=0ms preview=17ms metadata=8ms total=25ms
+[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4 name=0ms preview=1ms metadata=10ms total=11ms
 
-[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4 wait=0ms assign=0ms
+[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4 wait=649ms assign=0ms
 
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4 name=0ms preview=0ms metadata=9ms total=9ms
+[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4 wait=1176ms assign=0ms
 
-[Detail] REQUEST: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
+[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4 wait=1102ms assign=0ms
 
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4 name=0ms preview=1ms metadata=9ms total=10ms
-
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
-
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
-
-[VideoFrameExtractor] Seeking to 8.2s (video length: 27.4s)
-
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4 name=0ms preview=0ms metadata=8ms total=8ms
-
-[Detail] REQUEST: icon_open_file.png
-
-[Detail] UpdateInfo: icon_open_file.png name=0ms preview=5ms metadata=7ms total=12ms
-
-[Detail] RECEIVED: icon_open_file.png wait=65ms assign=0ms
-
-[VideoFrameExtractor] Successfully extracted frame for: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
-
-[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4 wait=617ms assign=0ms
+[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-38-48.mp4 wait=1717ms assign=0ms
 

@@ -1422,12 +1422,14 @@ public class RTTMediaLibrary : MonoBehaviour
     /// Update the detail panel with video info.
     /// Called by controller based on hover/select state.
     /// </summary>
-    public void UpdateDetailPanel(MediaVideoInfo video)
+    /// <param name="video">Video info to display</param>
+    /// <param name="forceRefresh">Force refresh even if same file path (used after data reload)</param>
+    public void UpdateDetailPanel(MediaVideoInfo video, bool forceRefresh = false)
     {
         if (_detailPanel != null)
         {
             var mockFile = ConvertToMockFile(video);
-            _detailPanel.UpdateInfo(mockFile, isCurrentFolder: false);
+            _detailPanel.UpdateInfo(mockFile, isCurrentFolder: false, forceRefresh: forceRefresh);
         }
 
         // Update current video for action buttons if this is the selected item (not just hovered)
