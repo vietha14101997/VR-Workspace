@@ -369,8 +369,8 @@ public class RTTFileGrid : MonoBehaviour
                 }
             }
 
-            // Start progressive binding if not already running
-            if (_pendingBindIndices.Count > 0 && _progressiveBindCoroutine == null)
+            // Start progressive binding if not already running (and gameObject is active)
+            if (_pendingBindIndices.Count > 0 && _progressiveBindCoroutine == null && gameObject.activeInHierarchy)
             {
                 _progressiveBindCoroutine = StartCoroutine(ProgressiveBindCoroutine());
             }
@@ -487,6 +487,9 @@ public class RTTFileGrid : MonoBehaviour
     public void ScrollToPage(int pageIndex, int rowsPerPage)
     {
         if (_scrollRect == null || _contentRect == null) return;
+
+        // Skip if gameObject is inactive (can't start coroutine)
+        if (!gameObject.activeInHierarchy) return;
 
         Canvas.ForceUpdateCanvases();
 

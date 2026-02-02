@@ -574,6 +574,9 @@ public class RTTFileList : MonoBehaviour
     {
         if (_scrollRect == null || _contentRect == null) return;
 
+        // Skip if gameObject is inactive (can't start coroutine)
+        if (!gameObject.activeInHierarchy) return;
+
         Canvas.ForceUpdateCanvases();
 
         int targetRow = (pageIndex - 1) * rowsPerPage;

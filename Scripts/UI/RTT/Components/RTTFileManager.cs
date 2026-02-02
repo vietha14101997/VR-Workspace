@@ -537,43 +537,19 @@ public class RTTFileManager : MonoBehaviour
         StartCoroutine(InitializePageSizeDeferred());
     }
 
+    // Fixed page sizes per user requirement
+    private const int GRID_PAGE_SIZE = 8;  // 2 rows x 4 columns
+    private const int LIST_PAGE_SIZE = 6;
+
     private IEnumerator InitializePageSizeDeferred()
     {
         // Wait one frame to ensure grid has populated
         yield return null;
 
-        // Initialize page size based on view mode (use actual visible rows)
-        int itemsPerPage;
-        if (_isGridView)
-        {
-            if (_fileGrid != null)
-            {
-                int columnsPerRow = _fileGrid.GetColumnsPerRow();
-                int visibleRows = _fileGrid.GetVisibleRowsForPagination();
-                itemsPerPage = _fileGrid.GetItemsPerPage(visibleRows);
-                Debug.Log($"[RTTFileManager] InitializePageSizeDeferred(Grid): columnsPerRow={columnsPerRow}, visibleRows={visibleRows}, itemsPerPage={itemsPerPage}");
-            }
-            else
-            {
-                // Fallback: 2 rows x 5 columns (typical layout)
-                itemsPerPage = 10;
-                Debug.LogWarning($"[RTTFileManager] InitializePageSizeDeferred(Grid): fileGrid is null, using fallback itemsPerPage={itemsPerPage}");
-            }
-        }
-        else
-        {
-            // List view: use actual visible rows
-            if (_fileList != null)
-            {
-                itemsPerPage = _fileList.GetVisibleRowsForPagination();
-                Debug.Log($"[RTTFileManager] InitializePageSizeDeferred(List): visibleRows={itemsPerPage}");
-            }
-            else
-            {
-                itemsPerPage = 6;
-                Debug.LogWarning($"[RTTFileManager] InitializePageSizeDeferred(List): fileList is null, using fallback itemsPerPage={itemsPerPage}");
-            }
-        }
+        // Use fixed page sizes: Grid=8, List=6
+        int itemsPerPage = _isGridView ? GRID_PAGE_SIZE : LIST_PAGE_SIZE;
+        Debug.Log($"[RTTFileManager] InitializePageSizeDeferred: view={(_isGridView ? "Grid" : "List")}, itemsPerPage={itemsPerPage}");
+
         _controller?.SetPageSize(itemsPerPage);
     }
 
@@ -891,40 +867,11 @@ public class RTTFileManager : MonoBehaviour
             }
         }
 
-        // Update page size based on view mode (use actual visible rows)
-        // Grid: visible rows × actual columns (calculated based on viewport)
-        // List: visible rows = items per page
-        int itemsPerPage;
-        if (isGrid)
-        {
-            if (_fileGrid != null)
-            {
-                int columnsPerRow = _fileGrid.GetColumnsPerRow();
-                int visibleRows = _fileGrid.GetVisibleRowsForPagination();
-                itemsPerPage = _fileGrid.GetItemsPerPage(visibleRows);
-                Debug.Log($"[RTTFileManager] SetDisplayMode(Grid): columnsPerRow={columnsPerRow}, visibleRows={visibleRows}, itemsPerPage={itemsPerPage}");
-            }
-            else
-            {
-                // Fallback for grid: 2 rows x 5 columns (typical layout)
-                itemsPerPage = 10;
-                Debug.LogWarning("[RTTFileManager] FileGrid is null, using default 10 items per page");
-            }
-        }
-        else
-        {
-            // List view: use actual visible rows
-            if (_fileList != null)
-            {
-                itemsPerPage = _fileList.GetVisibleRowsForPagination();
-                Debug.Log($"[RTTFileManager] SetDisplayMode(List): visibleRows={itemsPerPage}");
-            }
-            else
-            {
-                itemsPerPage = 6;
-                Debug.LogWarning("[RTTFileManager] FileList is null, using default 6 items per page");
-            }
-        }
+        // Update page size based on view mode (fixed sizes)
+        // Grid: 8 items (2 rows x 4 columns)
+        // List: 6 items
+        int itemsPerPage = isGrid ? GRID_PAGE_SIZE : LIST_PAGE_SIZE;
+        Debug.Log($"[RTTFileManager] SetDisplayMode({(isGrid ? "Grid" : "List")}): itemsPerPage={itemsPerPage}");
         _controller?.SetPageSize(itemsPerPage);
 
         // Refresh content with current data (keep page position)

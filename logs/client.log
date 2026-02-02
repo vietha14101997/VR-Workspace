@@ -94,21 +94,21 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [RTTManager] Auto-recenter completed
 
-[RTTMainMenu] Click started: folder at 6.285s
+[RTTMainMenu] Click started: folder at 6.571s
 
-[RTTMainMenu] PrepareApp called: folder at 6.286s (+0.1ms)
+[RTTMainMenu] PrepareApp called: folder at 6.571s (+0.1ms)
 
-[RTTAppManager] PrepareAppFrameAsync started: folder at 6.288s
+[RTTAppManager] PrepareAppFrameAsync started: folder at 6.573s
 
 [RTTMenu] Created app frame: folder
 
-[RTTAppManager] Frame created: folder at 6.288s (+0.4ms)
+[RTTAppManager] Frame created: folder at 6.573s (+0.4ms)
 
 [RTTAppManager] Preparing app: folder in slot 1
 
-[RTTMainMenu] Button animation started: folder at 6.289s (+3.3ms)
+[RTTMainMenu] Button animation started: folder at 6.574s (+3.2ms)
 
-[RTTAppManager] Creating content: folder at 6.318s (+29.8ms)
+[RTTAppManager] Creating content: folder at 6.603s (+30.0ms)
 
 [RTTManager] Creating FileManager content...
 
@@ -116,13 +116,13 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [RTTFileManager] Loaded preferences: sortBy=Name, ascending=True, gridView=True
 
-[RTTFileManager] PlaceSidePanel: innerEdge=(-0.83, 0.00, 1.81), panelPos=(-1.06, 0.00, 1.67)
+[RTTFileManager] PlaceSidePanel: innerEdge=(-0.80, 0.00, 1.82), panelPos=(-1.03, 0.00, 1.68)
 
 [VirtualObjectsZoomController] Registered side panel: FileNavigationPanel (side=-1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
 [RTTFileManager] Registered FileNavigationPanel with VirtualObjectsZoomController
 
-[RTTFileManager] Placed FileNavigationPanel: pos=(-1.06, 0.00, 1.67)
+[RTTFileManager] Placed FileNavigationPanel: pos=(-1.03, 0.00, 1.68)
 
 [RTTMenuFrame] UI built: 640x1080 logical pixels
 
@@ -148,13 +148,13 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [HoverEffectController] AddEffect 'color' to Item_recent, TargetVisuals=Item_recent
 
-[RTTFileManager] PlaceSidePanel: innerEdge=(0.87, 0.00, 1.79), panelPos=(1.09, 0.00, 1.64)
+[RTTFileManager] PlaceSidePanel: innerEdge=(0.90, 0.00, 1.78), panelPos=(1.12, 0.00, 1.63)
 
 [VirtualObjectsZoomController] Registered side panel: FileDetailPanel (side=1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
 [RTTFileManager] Registered FileDetailPanel with VirtualObjectsZoomController
 
-[RTTFileManager] Placed FileDetailPanel: pos=(1.09, 0.00, 1.64)
+[RTTFileManager] Placed FileDetailPanel: pos=(1.12, 0.00, 1.63)
 
 [RTTFileActionBar] Buttons created
 
@@ -162,7 +162,7 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [RTTFileManager] File action bar created (hidden initially)
 
-[RTTFileManager] CreateHeaderRows started, instance: -82974
+[RTTFileManager] CreateHeaderRows started, instance: -280180
 
 [RTTFileManager] CreateViewOptionsPopup, _menuFrame null: False
 
@@ -196,9 +196,9 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [RTTFileManager] CreateRow2 called
 
-[RTTFileManager] Breadcrumb container set: True, instance: -82974
+[RTTFileManager] Breadcrumb container set: True, instance: -280180
 
-[RTTFileManager] EditControls container created - parent: Row2, sizeDelta: (-340.00, 0.00), rect: (x:0.00, y:-48.51, width:1430.00, height:97.02), instanceID: -85874
+[RTTFileManager] EditControls container created - parent: Row2, sizeDelta: (-340.00, 0.00), rect: (x:0.00, y:-48.51, width:1430.00, height:97.02), instanceID: -283080
 
 [RTTFileManager] CreateEditControlsInRow2 called, parent: EditControls, parent active: True
 
@@ -228,7 +228,7 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [RTTFileManager] EditControls child count after creation: 5
 
-[RTTFileManager] _editControlsContainer reference instanceID: -85874, same object: True
+[RTTFileManager] _editControlsContainer reference instanceID: -283080, same object: True
 
 [RTTFileManager] EditControls set to inactive, activeSelf: False
 
@@ -238,7 +238,7 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [HoverEffectController] AddEffect 'scale' to PooledItem, TargetVisuals=PooledItem
 
-[RTTFileManager] Before OnViewReady - breadcrumb container null: True, instance: -82974
+[RTTFileManager] Before OnViewReady - breadcrumb container null: True, instance: -280180
 
 [Controller] SetSortOptionsNoRefresh: sortBy=Name, ascending=True
 
@@ -246,21 +246,21 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [Controller] NavigateToInternalAsync: path='root', restorePage=False, clickedFolder=''
 
-[RTTFileManager] UpdateBreadcrumbs called with path: root, container null: True, instance: -82974
+[RTTFileManager] UpdateBreadcrumbs called with path: root, container null: True, instance: -280180
 
 [RTTFileManager] Breadcrumb container reference lost, searching in hierarchy...
 UnityEngine.Debug:LogWarning (object)
-RTTFileManager:UpdateBreadcrumbs (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:2635)
-RTTFileManagerController/<NavigateToInternalAsync>d__40:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:283)
+RTTFileManager:UpdateBreadcrumbs (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:2582)
+RTTFileManagerController/<NavigateToInternalAsync>d__41:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:287)
 UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
-RTTFileManagerController:NavigateToInternal (string,bool,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:229)
-RTTFileManagerController:NavigateTo (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:189)
-RTTFileManagerController:OnViewReady () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:155)
+RTTFileManagerController:NavigateToInternal (string,bool,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:232)
+RTTFileManagerController:NavigateTo (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:192)
+RTTFileManagerController:OnViewReady () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:158)
 RTTFileManager/<CreateCenterGrid>d__86:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:534)
 UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
 RTTFileManager:CreatePanels () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:391)
 RTTFileManager:BuildUI () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:252)
-RTTFileManagerController:CreateMenu (UnityEngine.RectTransform,single,single,TMPro.TMP_FontAsset,UnityEngine.Color,UnityEngine.Color) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:93)
+RTTFileManagerController:CreateMenu (UnityEngine.RectTransform,single,single,TMPro.TMP_FontAsset,UnityEngine.Color,UnityEngine.Color) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:96)
 RTTManager:CreateFilesMenuContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:944)
 RTTManager:CreateAppContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:876)
 VRWorkspace.UI.RTT.RTTAppManager/<PrepareAppFrameAsync>d__61:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTAppManager.cs:622)
@@ -272,90 +272,51 @@ UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr
 
 [FileSystemService] Reading directory async: C:\Users\Admin
 
+[Controller] CalculateTotalPages: totalFiles=8, pageSize=10, totalPages=1
+
+[RTTFileGrid] GetVisibleRowsForPagination: height=748.1688, availableHeight=728.1688, rowHeight=350, rowsFloat=2.080482, visibleRows=2
+
+[Detail] UpdateInfo: Admin name=0ms preview=0ms metadata=5ms total=5ms
+
 [RTTFileManagerController] Menu created
 
-[RTTAppManager] Content created: folder at 6.481s (+193.6ms)
+[RTTAppManager] Content created: folder at 6.814s (+240.7ms)
 
-[RTTAppManager] PrepareDataAsync started: folder at 6.481s
+[RTTAppManager] PrepareDataAsync started: folder at 6.814s
 
 [RTTFileManagerController] PrepareDataAsync started
 
-[RTTAppManager] App prepared (hidden): folder at 6.485s (total: 197.3ms)
+[RTTAppManager] App prepared (hidden): folder at 6.818s (total: 245.1ms)
 
 [FileSystemService] Found 91 items async (69 folders, 22 files)
 
 [Controller] CalculateTotalPages: totalFiles=91, pageSize=10, totalPages=10
 
-Coroutine couldn't be started because the the game object 'FileGrid' is inactive!
-UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
-RTTFileGrid:UpdateVisibleItems () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileGrid.cs:375)
-RTTFileGrid:Populate (System.Collections.Generic.List`1<MockFile>,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileGrid.cs:236)
-RTTFileManager:UpdateGrid (System.Collections.Generic.List`1<MockFile>,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:3320)
-RTTFileManagerController:UpdateView (bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:653)
-RTTFileManagerController/<NavigateToInternalAsync>d__40:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:338)
-UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
-
-[RTTFileGrid] GetVisibleRowsForPagination: height=748.1688, availableHeight=728.1688, rowHeight=350, rowsFloat=2.080482, visibleRows=2
-
-Coroutine couldn't be started because the the game object 'FileGrid' is inactive!
-UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
-RTTFileGrid:ScrollToPage (int,int) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileGrid.cs:505)
-RTTFileManager:ScrollToPage (int) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:3264)
-RTTFileManagerController:UpdateView (bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:660)
-RTTFileManagerController/<NavigateToInternalAsync>d__40:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:338)
-UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
-
-Coroutine couldn't be started because the the game object 'MarqueeMask' is inactive!
-UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
-MarqueeText:SetText (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/MarqueeText.cs:156)
-RTTFileDetail:AddMetadataRow (string,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:566)
-RTTFileDetail:CreateMetadataForFolder (MockFile,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:443)
-RTTFileDetail:UpdateMetadata (MockFile,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:341)
-RTTFileDetail:UpdateInfo (MockFile,bool,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:199)
-RTTFileManager:UpdateDetail (MockFile,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:3586)
-RTTFileManagerController:UpdateDetailView () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:730)
-RTTFileManagerController/<NavigateToInternalAsync>d__40:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:339)
-UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
-
-Coroutine couldn't be started because the the game object 'MarqueeMask' is inactive!
-UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
-MarqueeText:SetText (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/MarqueeText.cs:156)
-RTTFileDetail:AddMetadataRow (string,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:566)
-RTTFileDetail:CreateMetadataForFolder (MockFile,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:444)
-RTTFileDetail:UpdateMetadata (MockFile,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:341)
-RTTFileDetail:UpdateInfo (MockFile,bool,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:199)
-RTTFileManager:UpdateDetail (MockFile,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:3586)
-RTTFileManagerController:UpdateDetailView () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:730)
-RTTFileManagerController/<NavigateToInternalAsync>d__40:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:339)
-UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
-
-[Detail] UpdateInfo: Admin name=0ms preview=0ms metadata=3ms total=3ms
-
 [RTTFileManagerController] PrepareDataAsync completed: 91 files
 
-[RTTMainMenu] Button animation ended: folder at 6.530s (+244.9ms)
+[RTTMainMenu] Button animation ended: folder at 6.845s (+274.4ms)
 
-[RTTMainMenu] OpenPreparedApp called: folder at 6.530s (+244.9ms)
+[RTTMainMenu] OpenPreparedApp called: folder at 6.845s (+274.5ms)
 
-[RTTAppManager] WaitAndSwitch started: folder at 6.531s
+[RTTAppManager] WaitAndSwitch started: folder at 6.846s
 
-[RTTAppManager] WaitAndSwitch app ready: folder at 6.531s (waited 0.1ms)
+[RTTAppManager] WaitAndSwitch app ready: folder at 6.846s (waited 0.1ms)
 
-[RTTAppManager] Starting transition: folder at 6.531s
+[RTTAppManager] Starting transition: folder at 6.846s
 
-[RTTAppManager] Transition started: folder at 6.532s
+[RTTAppManager] Transition started: folder at 6.847s
 
 [RTTAppManager] Got 3 frames to animate: folder
 
-[RTTAppManager] Fade out MainMenu: folder at 6.532s
+[RTTAppManager] Fade out MainMenu: folder at 6.847s
 
-[RTTMainMenu] Click flow completed: folder at 6.533s (total: +247.4ms)
+[RTTMainMenu] Click flow completed: folder at 6.848s (total: +277.0ms)
 
-[RTTAppManager] Fade out done: folder at 6.611s (+78.6ms)
+[RTTAppManager] Fade out done: folder at 6.943s (+95.7ms)
 
 [RTTAppManager] All frames activated with alpha=0: 3 frames
 
-[RTTAppManager] Sync point: folder, IsDataReady=True at 6.641s
+[RTTAppManager] Sync point: folder, IsDataReady=True at 6.960s
 
 [RTTAppManager] Data ready first - BindPreparedData: folder
 
@@ -363,23 +324,19 @@ UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr
 
 [RTTFileGrid] Progressive bind frame: 2 items, 26 remaining
 
-[Detail] UpdateInfo: Admin name=0ms preview=0ms metadata=5ms total=5ms
+[Detail] UpdateInfo: Admin name=0ms preview=0ms metadata=2ms total=2ms
 
-[RTTFileManager] UpdateBreadcrumbs called with path: root, container null: False, instance: -82974
+[RTTFileManager] UpdateBreadcrumbs called with path: root, container null: False, instance: -280180
 
 [RTTFileManagerController] BindPreparedData: Bound 91 files
 
-[RTTAppManager] Fade in started: 3 frames at 6.662s
-
-[Detail] UpdateInfo: .bun name=0ms preview=0ms metadata=2ms total=2ms
+[RTTAppManager] Fade in started: 3 frames at 6.976s
 
 [RTTFileGrid] Progressive bind frame: 3 items, 23 remaining
 
 [RTTFileGrid] Progressive bind frame: 2 items, 21 remaining
 
 [RTTFileGrid] Progressive bind frame: 2 items, 19 remaining
-
-[Detail] UpdateInfo: Admin name=0ms preview=0ms metadata=2ms total=2ms
 
 [RTTFileGrid] Progressive bind frame: 2 items, 17 remaining
 
@@ -389,9 +346,13 @@ UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr
 
 [RTTFileGrid] Progressive bind frame: 2 items, 11 remaining
 
-[RTTAppManager] Fade in done: folder at 6.775s (+243.4ms)
+[Detail] UpdateInfo: Admin name=0ms preview=0ms metadata=6ms total=6ms
 
-[RTTAppManager] OnAppShown called: folder at 6.776s
+[RTTFileGrid] Progressive bind frame: 2 items, 9 remaining
+
+[RTTAppManager] Fade in done: folder at 7.114s (+267.2ms)
+
+[RTTAppManager] OnAppShown called: folder at 7.114s
 
 [RTTFileManagerController] OnAppShown called
 
@@ -417,17 +378,13 @@ UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr
 
 [RTTTaskbar] SelectSlot(1) called, current active: 1
 
-[RTTAppManager] Transition completed: folder at 6.811s (total: 279.2ms)
+[RTTAppManager] Transition completed: folder at 7.152s (total: 305.1ms)
 
-[Detail] UpdateInfo: .cache name=0ms preview=0ms metadata=3ms total=3ms
-
-[Detail] UpdateInfo: .antigravity name=0ms preview=0ms metadata=3ms total=3ms
-
-[Detail] UpdateInfo: .android name=0ms preview=0ms metadata=3ms total=3ms
+[Detail] UpdateInfo: Admin name=0ms preview=0ms metadata=3ms total=3ms
 
 [Controller] NavigateToInternalAsync: path='C:\Users\Admin\.android', restorePage=False, clickedFolder='C:\Users\Admin\.android'
 
-[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android, container null: False, instance: -82974
+[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android, container null: False, instance: -280180
 
 [Controller] CanCreateFolderHere called, _currentPath: 'C:\Users\Admin\.android'
 
@@ -459,11 +416,9 @@ UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr
 
 [Detail] UpdateInfo: .android name=0ms preview=0ms metadata=2ms total=2ms
 
-[Detail] UpdateInfo: sdk name=0ms preview=0ms metadata=2ms total=2ms
-
 [Controller] NavigateToInternalAsync: path='C:\Users\Admin\.android\sdk', restorePage=False, clickedFolder='C:\Users\Admin\.android\sdk'
 
-[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android\sdk, container null: False, instance: -82974
+[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android\sdk, container null: False, instance: -280180
 
 [Controller] CanCreateFolderHere called, _currentPath: 'C:\Users\Admin\.android\sdk'
 
@@ -481,15 +436,11 @@ UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr
 
 [FileSystemService] Found 8 items async (7 folders, 1 files)
 
-[Controller] CalculateTotalPages: totalFiles=8, pageSize=10, totalPages=1
-
-[Detail] UpdateInfo: .temp name=0ms preview=0ms metadata=2ms total=2ms
-
-[Detail] UpdateInfo: platforms name=0ms preview=0ms metadata=2ms total=2ms
+[Detail] UpdateInfo: sdk name=0ms preview=0ms metadata=2ms total=2ms
 
 [Controller] NavigateToInternalAsync: path='C:\Users\Admin\.android\sdk\platforms', restorePage=False, clickedFolder='C:\Users\Admin\.android\sdk\platforms'
 
-[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android\sdk\platforms, container null: False, instance: -82974
+[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android\sdk\platforms, container null: False, instance: -280180
 
 [Controller] CanCreateFolderHere called, _currentPath: 'C:\Users\Admin\.android\sdk\platforms'
 
@@ -511,13 +462,11 @@ UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr
 
 [Detail] UpdateInfo: platforms name=0ms preview=0ms metadata=1ms total=1ms
 
-[Detail] UpdateInfo: android-35 name=0ms preview=0ms metadata=2ms total=2ms
-
-[Detail] UpdateInfo: android-36 name=0ms preview=0ms metadata=2ms total=2ms
+[Detail] UpdateInfo: platforms name=0ms preview=0ms metadata=2ms total=2ms
 
 [Controller] NavigateToInternalAsync: path='C:\Users\Admin\.android\sdk\platforms\android-36', restorePage=False, clickedFolder='C:\Users\Admin\.android\sdk\platforms\android-36'
 
-[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android\sdk\platforms\android-36, container null: False, instance: -82974
+[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android\sdk\platforms\android-36, container null: False, instance: -280180
 
 [Controller] CanCreateFolderHere called, _currentPath: 'C:\Users\Admin\.android\sdk\platforms\android-36'
 
@@ -535,21 +484,11 @@ UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr
 
 [FileSystemService] Found 12 items async (4 folders, 8 files)
 
-[Controller] CalculateTotalPages: totalFiles=12, pageSize=10, totalPages=2
-
-[RTTFileGrid] Progressive binding started: 4 items queued
-
-[RTTFileGrid] Progressive bind frame: 3 items, 1 remaining
-
-[RTTFileGrid] Progressive binding complete: 3 items bound total
-
-[Detail] UpdateInfo: optional name=0ms preview=0ms metadata=2ms total=2ms
-
-[Detail] UpdateInfo: data name=0ms preview=0ms metadata=2ms total=2ms
+[Detail] UpdateInfo: android-36 name=0ms preview=0ms metadata=2ms total=2ms
 
 [Controller] NavigateToInternalAsync: path='C:\Users\Admin\.android\sdk\platforms\android-36\data', restorePage=False, clickedFolder='C:\Users\Admin\.android\sdk\platforms\android-36\data'
 
-[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android\sdk\platforms\android-36\data, container null: False, instance: -82974
+[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android\sdk\platforms\android-36\data, container null: False, instance: -280180
 
 [Controller] CanCreateFolderHere called, _currentPath: 'C:\Users\Admin\.android\sdk\platforms\android-36\data'
 
@@ -567,21 +506,11 @@ UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr
 
 [FileSystemService] Found 10 items async (1 folders, 9 files)
 
-[Controller] CalculateTotalPages: totalFiles=10, pageSize=10, totalPages=1
-
-[RTTFileGrid] Progressive binding started: 2 items queued
-
-[RTTFileGrid] Progressive bind frame: 2 items, 0 remaining
-
-[RTTFileGrid] Progressive binding complete: 2 items bound total
-
-[Detail] UpdateInfo: activity_actions.txt name=0ms preview=0ms metadata=4ms total=4ms
-
-[Detail] UpdateInfo: res name=0ms preview=0ms metadata=2ms total=2ms
+[Detail] UpdateInfo: data name=0ms preview=0ms metadata=2ms total=2ms
 
 [Controller] NavigateToInternalAsync: path='C:\Users\Admin\.android\sdk\platforms\android-36\data\res', restorePage=False, clickedFolder='C:\Users\Admin\.android\sdk\platforms\android-36\data\res'
 
-[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android\sdk\platforms\android-36\data\res, container null: False, instance: -82974
+[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android\sdk\platforms\android-36\data\res, container null: False, instance: -280180
 
 [Controller] CanCreateFolderHere called, _currentPath: 'C:\Users\Admin\.android\sdk\platforms\android-36\data\res'
 
@@ -603,7 +532,7 @@ UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr
 
 [FileSystemService] Reading directory async: C:\Users\Admin\.android\sdk\platforms\android-36\data\res
 
-[Detail] UpdateInfo: activity_actions.txt name=0ms preview=0ms metadata=3ms total=3ms
+[Detail] UpdateInfo: res name=0ms preview=0ms metadata=2ms total=2ms
 
 [FileSystemService] Found 2838 items async (2838 folders, 0 files)
 
@@ -615,11 +544,1208 @@ UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr
 
 [RTTFileGrid] Progressive binding complete: 7 items bound total
 
-[Detail] UpdateInfo: color-car name=0ms preview=0ms metadata=4ms total=4ms
+[Detail] UpdateInfo: res name=0ms preview=0ms metadata=4ms total=4ms
+
+[Detail] UpdateInfo: res name=0ms preview=0ms metadata=7ms total=7ms
+
+[RTTFileGrid] Progressive bind frame: 3 items, 22 remaining
+
+[RTTFileGrid] Progressive bind frame: 3 items, 47 remaining
+
+[RTTFileGrid] Progressive bind frame: 3 items, 72 remaining
+
+[RTTFileGrid] Progressive bind frame: 3 items, 97 remaining
+
+[RTTFileGrid] Progressive bind frame: 3 items, 122 remaining
+
+[RTTFileGrid] Progressive bind frame: 3 items, 147 remaining
+
+[RTTFileGrid] Progressive bind frame: 3 items, 172 remaining
+
+[RTTFileGrid] Progressive bind frame: 3 items, 197 remaining
+
+[RTTFileGrid] Progressive bind frame: 3 items, 222 remaining
+
+[RTTFileGrid] Progressive bind frame: 3 items, 247 remaining
+
+[RTTFileGrid] Progressive bind frame: 3 items, 272 remaining
+
+[RTTFileGrid] Progressive bind frame: 3 items, 297 remaining
+
+[RTTFileGrid] Progressive bind frame: 3 items, 322 remaining
+
+[RTTFileGrid] Progressive bind frame: 3 items, 339 remaining
+
+[RTTFileGrid] Progressive bind frame: 3 items, 352 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 354 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 352 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 350 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 348 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 346 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 344 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 343 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 342 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 341 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 340 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 339 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 338 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 337 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 336 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 335 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 334 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 333 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 332 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 331 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 330 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 329 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 328 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 327 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 326 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 325 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 324 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 323 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 322 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 321 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 320 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 319 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 318 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 317 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 316 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 315 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 314 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 313 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 312 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 311 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 310 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 309 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 308 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 307 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 306 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 305 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 304 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 303 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 302 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 301 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 300 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 299 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 298 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 297 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 296 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 295 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 294 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 293 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 292 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 291 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 290 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 289 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 288 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 287 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 286 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 285 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 284 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 283 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 282 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 281 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 280 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 279 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 278 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 277 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 276 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 275 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 274 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 273 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 272 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 271 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 270 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 269 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 268 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 267 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 266 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 265 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 264 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 263 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 262 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 261 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 260 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 259 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 258 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 257 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 256 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 255 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 254 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 253 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 252 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 251 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 250 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 249 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 248 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 247 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 246 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 245 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 244 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 243 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 242 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 241 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 240 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 239 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 238 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 237 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 236 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 235 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 234 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 233 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 232 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 231 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 230 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 229 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 228 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 227 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 226 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 225 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 224 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 223 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 222 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 221 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 220 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 219 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 218 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 217 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 216 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 215 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 214 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 213 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 212 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 211 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 210 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 209 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 208 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 207 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 206 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 205 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 204 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 203 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 202 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 201 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 200 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 199 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 198 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 197 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 196 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 195 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 194 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 193 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 192 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 191 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 190 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 189 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 188 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 187 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 186 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 185 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 184 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 183 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 182 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 181 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 180 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 179 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 178 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 177 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 176 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 175 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 174 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 173 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 172 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 171 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 170 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 169 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 168 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 167 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 166 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 165 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 164 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 163 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 162 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 161 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 160 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 159 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 158 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 157 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 156 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 155 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 154 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 153 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 152 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 151 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 150 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 149 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 148 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 147 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 146 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 145 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 144 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 143 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 142 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 141 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 140 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 139 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 138 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 137 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 136 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 135 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 134 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 133 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 132 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 131 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 130 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 129 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 128 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 127 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 126 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 125 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 124 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 123 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 122 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 121 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 120 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 119 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 118 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 117 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 116 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 115 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 114 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 113 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 112 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 111 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 110 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 109 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 108 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 107 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 106 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 105 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 104 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 103 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 102 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 101 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 100 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 99 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 98 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 97 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 96 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 95 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 94 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 93 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 92 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 91 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 90 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 89 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 88 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 87 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 86 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 85 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 84 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 83 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 82 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 81 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 80 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 79 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 78 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 77 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 76 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 75 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 74 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 73 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 72 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 71 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 70 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 69 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 68 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 67 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 66 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 65 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 64 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 63 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 89 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 115 remaining
+
+[RTTFileGrid] Progressive bind frame: 3 items, 140 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 166 remaining
+
+[RTTFileGrid] Progressive bind frame: 3 items, 191 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 217 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 243 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 269 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 295 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 321 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 327 remaining
+
+[RTTFileGrid] Progressive bind frame: 3 items, 201 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 227 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 253 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 279 remaining
+
+[RTTFileGrid] Progressive bind frame: 3 items, 304 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 330 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 356 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 382 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 408 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 430 remaining
+
+[RTTFileGrid] Progressive bind frame: 3 items, 443 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 449 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 447 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 445 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 443 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 441 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 440 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 439 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 438 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 437 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 436 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 435 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 434 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 433 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 432 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 431 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 430 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 429 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 428 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 427 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 426 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 425 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 424 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 423 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 422 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 421 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 420 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 419 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 418 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 417 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 416 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 415 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 414 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 413 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 412 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 411 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 410 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 409 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 408 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 407 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 406 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 405 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 404 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 403 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 402 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 401 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 400 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 399 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 398 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 397 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 396 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 395 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 394 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 393 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 392 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 391 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 390 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 389 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 388 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 387 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 386 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 385 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 384 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 383 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 382 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 381 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 380 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 379 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 378 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 377 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 376 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 375 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 374 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 373 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 372 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 371 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 370 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 369 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 368 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 367 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 366 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 365 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 364 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 363 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 362 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 361 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 360 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 359 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 358 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 357 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 356 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 355 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 354 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 353 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 352 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 351 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 350 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 349 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 348 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 347 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 346 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 345 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 344 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 311 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 337 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 363 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 389 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 415 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 467 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 493 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 515 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 529 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 527 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 526 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 525 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 524 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 523 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 522 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 521 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 520 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 519 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 518 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 517 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 516 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 515 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 514 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 513 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 512 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 511 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 510 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 509 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 508 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 507 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 506 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 505 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 504 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 503 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 502 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 501 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 500 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 499 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 498 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 497 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 496 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 495 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 494 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 493 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 492 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 491 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 490 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 489 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 488 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 487 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 486 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 485 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 484 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 483 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 482 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 481 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 480 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 479 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 478 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 477 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 476 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 475 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 474 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 473 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 472 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 471 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 470 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 469 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 468 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 467 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 466 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 465 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 464 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 463 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 462 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 461 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 460 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 459 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 458 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 457 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 456 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 455 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 454 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 453 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 452 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 451 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 450 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 449 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 448 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 447 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 446 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 445 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 444 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 443 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 442 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 441 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 62 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 61 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 60 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 59 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 58 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 57 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 56 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 55 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 54 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 53 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 52 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 39 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 38 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 37 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 36 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 35 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 34 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 33 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 32 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 31 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 30 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 29 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 28 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 27 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 26 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 25 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 24 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 23 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 22 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 21 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 20 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 19 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 18 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 17 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 16 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 15 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 14 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 13 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 12 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 11 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 10 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 9 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 8 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 7 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 6 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 5 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 4 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 3 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 2 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 1 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 0 remaining
+
+[RTTFileGrid] Progressive binding complete: 1244 items bound total
+
+[RTTFileGrid] Progressive binding started: 12 items queued
+
+[RTTFileGrid] Progressive bind frame: 2 items, 10 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 35 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 41 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 44 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 47 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 50 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 49 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 48 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 46 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 45 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 43 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 42 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 41 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 40 remaining
+
+[Detail] UpdateInfo: res name=1ms preview=0ms metadata=4ms total=5ms
+
+[RTTFileGrid] Progressive binding complete: 52 items bound total
+
+[Detail] UpdateInfo: res name=2ms preview=0ms metadata=5ms total=7ms
+
+[Controller] NavigateToInternalAsync: path='C:\Users\Admin\.android\sdk\platforms\android-36\data', restorePage=True, clickedFolder=''
+
+[RTTFileGrid] Progressive binding complete: 6 items bound total
 
 [Detail] UpdateInfo: res name=1ms preview=0ms metadata=3ms total=4ms
 
-[Detail] UpdateInfo: color name=0ms preview=0ms metadata=4ms total=4ms
+[RTTTaskbar] Unregistered app slot 1, remaining apps: 0
 
-[Detail] UpdateInfo: res name=0ms preview=0ms metadata=4ms total=4ms
+[RTTAppManager] Closed app: folder
+
+Destroying assets is not permitted to avoid data loss.
+If you really want to remove an asset use DestroyImmediate (theObject, true);
+UnityEngine.Object:Destroy (UnityEngine.Object)
+VRWorkspace.UI.HoverEffects.CursorChangeHoverEffect:Cleanup () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Effects/CursorChangeHoverEffect.cs:118)
+VRWorkspace.UI.HoverEffects.HoverEffectController:CleanupEffects () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Core/HoverEffectController.cs:311)
+VRWorkspace.UI.HoverEffects.HoverEffectController:OnDestroy () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Core/HoverEffectController.cs:318)
 

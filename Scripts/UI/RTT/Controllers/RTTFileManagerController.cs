@@ -68,6 +68,9 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
 
     // Track if initial navigation has completed (skip fade on first load)
     private bool _hasNavigatedOnce = false;
+
+    // Lock detail panel to show current folder (ignore hover until user clicks)
+    private bool _lockDetailToCurrentFolder = false;
     #endregion
 
     #region Public API
@@ -275,9 +278,10 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
         _currentPath = path;
         _currentSearchQuery = ""; // Reset search state
 
-        // Reset selection/hover immediately for responsive UI
+        // Reset selection/hover and lock detail to current folder
         _selectedFile = null;
         _hoveredFile = null;
+        _lockDetailToCurrentFolder = true; // Lock until user clicks an item
 
         // Update breadcrumbs immediately (doesn't need fade)
         _view?.UpdateBreadcrumbs(_currentPath);
@@ -287,7 +291,9 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
 
         // === PARALLEL: Start fade out AND data loading simultaneously ===
         bool fadeOutComplete = !useFade; // Skip waiting if no fade
+        bool firstBatchReady = false;
         bool dataLoadComplete = false;
+        List<MockFile> firstBatchFiles = null;
         List<MockFile> loadedFiles = null;
 
         // Start fade out animation (non-blocking) - only if not first load
@@ -299,6 +305,11 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
         // Start loading files async (runs in parallel with fade)
         StartCoroutine(FileSystemService.GetFilesAsync(
             path,
+            onFirstBatch: (files) =>
+            {
+                firstBatchFiles = files;
+                firstBatchReady = true;
+            },
             onProgress: null,
             onComplete: (files) =>
             {
@@ -307,41 +318,73 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
             }
         ));
 
-        // Wait for BOTH fade out AND data load to complete
-        while (!fadeOutComplete || !dataLoadComplete)
+        // Wait for fade out AND first batch (show first 8 items immediately)
+        while (!fadeOutComplete || !firstBatchReady)
         {
+            // If data load finished before first batch ready (small folder), use that
+            if (dataLoadComplete && !firstBatchReady)
+            {
+                firstBatchFiles = loadedFiles;
+                firstBatchReady = true;
+            }
             yield return null;
         }
 
-        // === Now both are done - update view while content is invisible ===
-
-        // Update with loaded files
-        _currentDirectoryFiles = loadedFiles ?? new List<MockFile>();
+        // === First batch ready - show immediately while loading continues ===
+        _currentDirectoryFiles = firstBatchFiles ?? new List<MockFile>();
         _filteredFiles = new List<MockFile>(_currentDirectoryFiles);
 
         // Apply current sort
         ApplySort();
 
-        // Restore page from item index or reset to page 1
-        if (restorePage && _itemIndexHistory.TryGetValue(normalizedDestPath, out int savedItemIndex))
-        {
-            int calculatedPage = (savedItemIndex / Mathf.Max(1, _pageSize)) + 1;
-            int totalPages = CalculateTotalPages();
-            _currentPage = Mathf.Clamp(calculatedPage, 1, totalPages);
-        }
-        else
-        {
-            _currentPage = 1;
-        }
+        // Reset to page 1 for now (will restore later if needed)
+        _currentPage = 1;
 
-        // Update view while alpha is 0 (invisible)
-        UpdateView(true);
+        // Update view with first batch - skip pagination until we have full data
+        // This prevents pagination from showing wrong page count (e.g., 1 page for 8 items)
+        UpdateView(true, skipPagination: !dataLoadComplete);
         UpdateDetailView();
 
         // Fade in the new content (only if we used fade out)
         if (useFade)
         {
             _view.FadeInContent();
+        }
+
+        // === Background: Wait for full load to complete ===
+        if (!dataLoadComplete)
+        {
+            while (!dataLoadComplete)
+            {
+                yield return null;
+            }
+
+            // Update with full data
+            _currentDirectoryFiles = loadedFiles ?? new List<MockFile>();
+            _filteredFiles = new List<MockFile>(_currentDirectoryFiles);
+            ApplySort();
+
+            // Restore page from item index if needed
+            if (restorePage && _itemIndexHistory.TryGetValue(normalizedDestPath, out int savedItemIndex))
+            {
+                int calculatedPage = (savedItemIndex / Mathf.Max(1, _pageSize)) + 1;
+                int totalPages = CalculateTotalPages();
+                _currentPage = Mathf.Clamp(calculatedPage, 1, totalPages);
+            }
+
+            // Update view with full data - now show pagination with correct count
+            UpdateView(true);
+        }
+        else
+        {
+            // Small folder - already have full data, restore page if needed
+            if (restorePage && _itemIndexHistory.TryGetValue(normalizedDestPath, out int savedItemIndex))
+            {
+                int calculatedPage = (savedItemIndex / Mathf.Max(1, _pageSize)) + 1;
+                int totalPages = CalculateTotalPages();
+                _currentPage = Mathf.Clamp(calculatedPage, 1, totalPages);
+                UpdateView(false); // Just update pagination, don't reload grid
+            }
         }
 
         // Mark that we've navigated at least once
@@ -403,6 +446,7 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
         // Start loading files async
         StartCoroutine(FileSystemService.GetFilesAsync(
             _currentPath,
+            onFirstBatch: null, // Refresh doesn't need first batch
             onProgress: null,
             onComplete: (files) =>
             {
@@ -608,11 +652,7 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
     public void ScrollToStart()
     {
         _currentPage = 1;
-        if (_view != null)
-        {
-            _view.UpdatePagination(_currentPage, CalculateTotalPages());
-            _view.SetScrollPosition(1f); // 1 = top
-        }
+        UpdateView(false); // Use UpdateView for proper scroll animation
     }
 
     /// <summary>
@@ -622,11 +662,7 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
     {
         int totalPages = CalculateTotalPages();
         _currentPage = totalPages;
-        if (_view != null)
-        {
-            _view.UpdatePagination(_currentPage, totalPages);
-            _view.SetScrollPosition(0f); // 0 = bottom
-        }
+        UpdateView(false); // Use UpdateView for proper scroll animation
     }
 
     private int CalculateTotalPages()
@@ -639,7 +675,7 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
         return totalPages;
     }
 
-    private void UpdateView(bool fullReload)
+    private void UpdateView(bool fullReload, bool skipPagination = false)
     {
         int totalPages = CalculateTotalPages();
         _currentPage = Mathf.Clamp(_currentPage, 1, totalPages);
@@ -652,11 +688,18 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
                 string selectedPath = _selectedFile.HasValue ? _selectedFile.Value.Path : "";
                 _view.UpdateGrid(_filteredFiles, selectedPath);
 
-                // Update item count in header
-                _view.UpdateItemCount(_filteredFiles.Count);
+                // Update item count in header (skip if we don't have full data yet)
+                if (!skipPagination)
+                {
+                    _view.UpdateItemCount(_filteredFiles.Count);
+                }
             }
 
-            _view.UpdatePagination(_currentPage, totalPages);
+            // Update pagination and scroll (skip if loading first batch)
+            if (!skipPagination)
+            {
+                _view.UpdatePagination(_currentPage, totalPages);
+            }
             _view.ScrollToPage(_currentPage);
         }
     }
@@ -665,6 +708,8 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
     {
          Debug.Log($"[Controller] Selected: {path}");
          _selectedFile = _currentDirectoryFiles.Find(f => f.Path == path);
+         // Unlock detail panel when user explicitly selects an item
+         _lockDetailToCurrentFolder = false;
          UpdateDetailView();
     }
 
@@ -696,6 +741,13 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
     {
         if (_view == null) return;
 
+        // When locked to current folder, ignore hover and show folder info
+        if (_lockDetailToCurrentFolder)
+        {
+            ShowCurrentFolderInDetail();
+            return;
+        }
+
         if (_hoveredFile.HasValue)
         {
             _view.UpdateDetail(_hoveredFile.Value, false);
@@ -706,29 +758,36 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
         }
         else
         {
-            // Get folder's actual modified date from file system
-            // Convert "root" to actual file system path for Directory operations
-            string absolutePath = FileSystemService.GetAbsolutePath(_currentPath);
-            DateTime folderModified = DateTime.MinValue;
-            try
-            {
-                if (Directory.Exists(absolutePath))
-                {
-                    folderModified = Directory.GetLastWriteTime(absolutePath);
-                }
-            }
-            catch { }
-
-            var folderInfo = new MockFile
-            {
-                Name = TextEncodingHelper.FixString(System.IO.Path.GetFileName(absolutePath)),
-                Path = _currentPath,
-                IsFolder = true,
-                Modified = folderModified
-            };
-            if (string.IsNullOrEmpty(folderInfo.Name)) folderInfo.Name = "Root";
-            _view.UpdateDetail(folderInfo, true);
+            ShowCurrentFolderInDetail();
         }
+    }
+
+    private void ShowCurrentFolderInDetail()
+    {
+        if (_view == null) return;
+
+        // Get folder's actual modified date from file system
+        // Convert "root" to actual file system path for Directory operations
+        string absolutePath = FileSystemService.GetAbsolutePath(_currentPath);
+        DateTime folderModified = DateTime.MinValue;
+        try
+        {
+            if (Directory.Exists(absolutePath))
+            {
+                folderModified = Directory.GetLastWriteTime(absolutePath);
+            }
+        }
+        catch { }
+
+        var folderInfo = new MockFile
+        {
+            Name = TextEncodingHelper.FixString(System.IO.Path.GetFileName(absolutePath)),
+            Path = _currentPath,
+            IsFolder = true,
+            Modified = folderModified
+        };
+        if (string.IsNullOrEmpty(folderInfo.Name)) folderInfo.Name = "Root";
+        _view.UpdateDetail(folderInfo, true);
     }
 
     /// <summary>
@@ -1468,6 +1527,7 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
 
         yield return FileSystemService.GetFilesAsync(
             pathToLoad,
+            onFirstBatch: null, // PrepareDataAsync doesn't need first batch
             onProgress: null,
             onComplete: (files) =>
             {
@@ -2028,11 +2088,14 @@ public static class FileSystemService
     /// Use this for directories that may contain many items.
     /// </summary>
     /// <param name="path">Directory path to read</param>
+    /// <param name="onFirstBatch">Optional callback when first 8 items are ready (for immediate display)</param>
     /// <param name="onProgress">Optional callback for progress updates (items loaded so far)</param>
     /// <param name="onComplete">Callback with the final list of files</param>
-    public static System.Collections.IEnumerator GetFilesAsync(string path, Action<int> onProgress, Action<List<MockFile>> onComplete)
+    public static System.Collections.IEnumerator GetFilesAsync(string path, Action<List<MockFile>> onFirstBatch, Action<int> onProgress, Action<List<MockFile>> onComplete)
     {
         const int BATCH_SIZE = 50; // Yield every 50 items
+        const int FIRST_BATCH_SIZE = 8; // Show first 8 items immediately
+        bool firstBatchSent = false;
         var list = new List<MockFile>();
         string absolutePath = GetAbsolutePath(path);
         int processed = 0;
@@ -2099,6 +2162,14 @@ public static class FileSystemService
             {
                 list.Add(dirFile.Value);
                 processed++;
+
+                // Send first batch immediately for fast UI display
+                if (!firstBatchSent && list.Count >= FIRST_BATCH_SIZE)
+                {
+                    firstBatchSent = true;
+                    onFirstBatch?.Invoke(new List<MockFile>(list)); // Copy to avoid mutation
+                }
+
                 if (processed % BATCH_SIZE == 0)
                 {
                     shouldYield = true;
@@ -2173,6 +2244,14 @@ public static class FileSystemService
             {
                 list.Add(fileItem.Value);
                 processed++;
+
+                // Send first batch immediately for fast UI display
+                if (!firstBatchSent && list.Count >= FIRST_BATCH_SIZE)
+                {
+                    firstBatchSent = true;
+                    onFirstBatch?.Invoke(new List<MockFile>(list)); // Copy to avoid mutation
+                }
+
                 if (processed % BATCH_SIZE == 0)
                 {
                     shouldYield = true;
@@ -2186,6 +2265,12 @@ public static class FileSystemService
                 yield return null;
                 shouldYield = false;
             }
+        }
+
+        // If we finished but never sent first batch (less than 8 items), send what we have
+        if (!firstBatchSent && list.Count > 0)
+        {
+            onFirstBatch?.Invoke(new List<MockFile>(list));
         }
 
         Debug.Log($"[FileSystemService] Found {list.Count} items async ({list.FindAll(f => f.IsFolder).Count} folders, {list.FindAll(f => !f.IsFolder).Count} files)");
