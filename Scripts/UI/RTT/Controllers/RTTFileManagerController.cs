@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using VRWorkspace.UI.RTT;
@@ -464,6 +465,9 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
     {
         bool useFade = _view != null;
 
+        // Store old file paths to detect removed files
+        var oldFilePaths = new HashSet<string>(_currentDirectoryFiles.Select(f => f.Path));
+
         // === PARALLEL: Start fade out AND data loading simultaneously ===
         bool fadeOutComplete = !useFade;
         bool dataLoadComplete = false;
@@ -495,6 +499,15 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
         }
 
         _currentDirectoryFiles = loadedFiles ?? new List<MockFile>();
+
+        // Detect removed files and clean up their thumbnails
+        var newFilePaths = new HashSet<string>(_currentDirectoryFiles.Select(f => f.Path));
+        var removedPaths = oldFilePaths.Where(p => !newFilePaths.Contains(p)).ToList();
+        if (removedPaths.Count > 0)
+        {
+            Debug.Log($"[Controller] Refresh detected {removedPaths.Count} removed files");
+            FileThumbnailService.Instance?.RemoveThumbnailsForPaths(removedPaths);
+        }
 
         // Re-apply filter
         if (string.IsNullOrEmpty(_currentSearchQuery))

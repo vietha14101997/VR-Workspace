@@ -1066,8 +1066,9 @@ public class RTTFileManager : MonoBehaviour
             rowRT,
             refreshConfig,
             () => {
-                // Clear thumbnail cache to regenerate with current quality settings
-                FileThumbnailService.Instance?.ClearAllCache();
+                // Smart refresh: re-scan current folder to detect new/removed files
+                // Thumbnails for removed files are cleaned up automatically
+                // Existing valid thumbnails are preserved
                 _controller?.RefreshCurrentFolder();
             }
         );

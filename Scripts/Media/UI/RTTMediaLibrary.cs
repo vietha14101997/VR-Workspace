@@ -783,10 +783,10 @@ public class RTTMediaLibrary : MonoBehaviour
             rowRT,
             refreshConfig,
             () => {
-                // Clear thumbnail cache to regenerate with current settings
-                FileThumbnailService.Instance?.ClearAllCache();
-                // Force rescan to detect new/removed files (not just reload from cache)
-                _controller?.ForceRescan();
+                // Smart refresh: incremental scan to detect new/removed files
+                // Thumbnails for removed files are cleaned up automatically
+                // Existing valid thumbnails are preserved
+                _controller?.SmartRefresh();
             }
         );
         RectTransform refreshRT = refreshBtn.GetComponent<RectTransform>();

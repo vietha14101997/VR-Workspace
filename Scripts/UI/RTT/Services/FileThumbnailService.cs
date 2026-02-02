@@ -5,6 +5,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using VRWorkspace.UI.RTT;
 
 /// <summary>
 /// Request structure for thumbnail loading.
@@ -340,6 +341,33 @@ public class FileThumbnailService : MonoBehaviour
     public void CleanupOrphanedCache()
     {
         _cache.CleanupOrphanedCache();
+    }
+
+    /// <summary>
+    /// Remove thumbnails for specific file paths.
+    /// Use this when files are deleted to clean up their cached thumbnails.
+    /// </summary>
+    /// <param name="filePaths">List of file paths to remove from cache</param>
+    public void RemoveThumbnailsForPaths(IEnumerable<string> filePaths)
+    {
+        if (filePaths == null) return;
+
+        int removedCount = 0;
+        foreach (var path in filePaths)
+        {
+            string cacheKey = ThumbnailCacheKeyHelper.GetCacheKey(path);
+            if (!string.IsNullOrEmpty(cacheKey))
+            {
+                _cache.Remove(cacheKey);
+                _cache.DeleteFromDisk(cacheKey);
+                removedCount++;
+            }
+        }
+
+        if (removedCount > 0)
+        {
+            Debug.Log($"[FileThumbnailService] Removed {removedCount} thumbnails for deleted files");
+        }
     }
 
     /// <summary>

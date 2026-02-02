@@ -593,6 +593,9 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
             _hoveredVideo = null;
         }
 
+        // Clean up thumbnail cache for removed files
+        FileThumbnailService.Instance?.RemoveThumbnailsForPaths(removedPaths);
+
         // Re-apply filters and refresh display
         ApplyFilters();
 
@@ -728,8 +731,28 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
     }
 
     /// <summary>
+    /// Smart refresh - performs incremental scan to detect new/removed files.
+    /// Unlike ForceRescan, this keeps existing thumbnails and only cleans up removed files.
+    /// </summary>
+    public void SmartRefresh()
+    {
+        Debug.Log("[RTTMediaLibraryController] SmartRefresh called - performing incremental scan...");
+
+        if (_libraryService == null)
+        {
+            Debug.LogError("[RTTMediaLibraryController] LibraryService not available!");
+            return;
+        }
+
+        // Use incremental background scan - detects new and removed files
+        // Removed files trigger HandleItemsRemoved which cleans up their thumbnails
+        _libraryService.StartBackgroundScan();
+    }
+
+    /// <summary>
     /// Force a full rescan of the media library to detect new/removed files.
     /// Clears the library cache first then triggers a fresh scan.
+    /// Note: Prefer SmartRefresh() for normal refresh operations.
     /// </summary>
     public void ForceRescan()
     {
