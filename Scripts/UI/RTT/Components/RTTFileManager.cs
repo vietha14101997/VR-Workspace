@@ -111,6 +111,11 @@ public class RTTFileManager : MonoBehaviour
     // Scan Status Text (for category filter mode - shown in Row2 next to breadcrumbs)
     private TextMeshProUGUI _scanStatusText;
     private Coroutine _dotsAnimationCoroutine;
+
+    // Content fade animation
+    private CanvasGroup _bodyCanvasGroup;
+    private Coroutine _fadeCoroutine;
+    private const float FOLDER_TRANSITION_DURATION = 0.12f;
     #endregion
 
     #region Initialization
@@ -149,6 +154,70 @@ public class RTTFileManager : MonoBehaviour
         if (quad?.material != null)
             quad.material.color = new Color(1f, 1f, 1f, alpha);
     }
+
+    #region Content Fade Animation
+
+    /// <summary>
+    /// Fade out the content area (grid/list). Returns immediately, fade runs async.
+    /// Call the callback when fade completes.
+    /// </summary>
+    public void FadeOutContent(Action onComplete)
+    {
+        if (_fadeCoroutine != null)
+        {
+            StopCoroutine(_fadeCoroutine);
+        }
+        _fadeCoroutine = StartCoroutine(FadeContentCoroutine(1f, 0f, FOLDER_TRANSITION_DURATION, onComplete));
+    }
+
+    /// <summary>
+    /// Fade in the content area (grid/list). Returns immediately, fade runs async.
+    /// </summary>
+    public void FadeInContent(Action onComplete = null)
+    {
+        if (_fadeCoroutine != null)
+        {
+            StopCoroutine(_fadeCoroutine);
+        }
+        _fadeCoroutine = StartCoroutine(FadeContentCoroutine(0f, 1f, FOLDER_TRANSITION_DURATION, onComplete));
+    }
+
+    /// <summary>
+    /// Set content alpha immediately (no animation).
+    /// </summary>
+    public void SetContentAlpha(float alpha)
+    {
+        if (_bodyCanvasGroup != null)
+        {
+            _bodyCanvasGroup.alpha = alpha;
+        }
+    }
+
+    private IEnumerator FadeContentCoroutine(float from, float to, float duration, Action onComplete)
+    {
+        if (_bodyCanvasGroup == null)
+        {
+            onComplete?.Invoke();
+            yield break;
+        }
+
+        _bodyCanvasGroup.alpha = from;
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            _bodyCanvasGroup.alpha = Mathf.Lerp(from, to, t);
+            yield return null;
+        }
+
+        _bodyCanvasGroup.alpha = to;
+        _fadeCoroutine = null;
+        onComplete?.Invoke();
+    }
+
+    #endregion
 
     // This method seems to be intended for the controller, not the view.
     // The view's responsibility is to display selection, not manage the selected file state directly.
@@ -399,8 +468,11 @@ public class RTTFileManager : MonoBehaviour
         _bodyRT.anchorMax = Vector2.one;
         _bodyRT.offsetMax = new Vector2(0, -_headerHeight2Rows); // Top offset
         _bodyRT.offsetMin = new Vector2(0, bottomPadding); // Bottom offset
-        
-        bodyObj.AddComponent<RectMask2D>(); 
+
+        bodyObj.AddComponent<RectMask2D>();
+
+        // Add CanvasGroup for fade animations during folder navigation
+        _bodyCanvasGroup = bodyObj.AddComponent<CanvasGroup>(); 
 
         // 2. Create Header Container
         GameObject headerObj = new GameObject("Header");

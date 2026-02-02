@@ -65,6 +65,9 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
     private FileCategory _filterCategory = FileCategory.Unknown;
     private Coroutine _scanCoroutine = null;
     private bool _isScanning = false;
+
+    // Track if initial navigation has completed (skip fade on first load)
+    private bool _hasNavigatedOnce = false;
     #endregion
 
     #region Public API
@@ -276,35 +279,41 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
         _selectedFile = null;
         _hoveredFile = null;
 
-        // Show loading state with empty grid immediately
-        _currentDirectoryFiles = new List<MockFile>();
-        _filteredFiles = new List<MockFile>();
-        _view?.UpdateGrid(_filteredFiles, "");
+        // Update breadcrumbs immediately (doesn't need fade)
         _view?.UpdateBreadcrumbs(_currentPath);
 
-        // Load files asynchronously with progress updates
-        bool isLoading = true;
+        // Check if we should use fade animation (skip on first load)
+        bool useFade = _hasNavigatedOnce && _view != null;
+
+        // === PARALLEL: Start fade out AND data loading simultaneously ===
+        bool fadeOutComplete = !useFade; // Skip waiting if no fade
+        bool dataLoadComplete = false;
         List<MockFile> loadedFiles = null;
 
-        yield return FileSystemService.GetFilesAsync(
+        // Start fade out animation (non-blocking) - only if not first load
+        if (useFade)
+        {
+            _view.FadeOutContent(() => { fadeOutComplete = true; });
+        }
+
+        // Start loading files async (runs in parallel with fade)
+        StartCoroutine(FileSystemService.GetFilesAsync(
             path,
-            onProgress: (count) =>
-            {
-                // Optional: Update loading indicator with count
-                // _view?.ShowLoadingProgress(count);
-            },
+            onProgress: null,
             onComplete: (files) =>
             {
                 loadedFiles = files;
-                isLoading = false;
+                dataLoadComplete = true;
             }
-        );
+        ));
 
-        // Wait for completion (should be immediate after coroutine returns)
-        while (isLoading)
+        // Wait for BOTH fade out AND data load to complete
+        while (!fadeOutComplete || !dataLoadComplete)
         {
             yield return null;
         }
+
+        // === Now both are done - update view while content is invisible ===
 
         // Update with loaded files
         _currentDirectoryFiles = loadedFiles ?? new List<MockFile>();
@@ -325,8 +334,18 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
             _currentPage = 1;
         }
 
-        UpdateView(true); // true = full reload
-        UpdateDetailView(); // Update detail to show current folder
+        // Update view while alpha is 0 (invisible)
+        UpdateView(true);
+        UpdateDetailView();
+
+        // Fade in the new content (only if we used fade out)
+        if (useFade)
+        {
+            _view.FadeInContent();
+        }
+
+        // Mark that we've navigated at least once
+        _hasNavigatedOnce = true;
 
         _navigateCoroutine = null;
     }
@@ -368,20 +387,32 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
 
     private IEnumerator RefreshCurrentFolderAsync(bool keepPage)
     {
-        bool isLoading = true;
+        bool useFade = _view != null;
+
+        // === PARALLEL: Start fade out AND data loading simultaneously ===
+        bool fadeOutComplete = !useFade;
+        bool dataLoadComplete = false;
         List<MockFile> loadedFiles = null;
 
-        yield return FileSystemService.GetFilesAsync(
+        // Start fade out animation
+        if (useFade)
+        {
+            _view.FadeOutContent(() => { fadeOutComplete = true; });
+        }
+
+        // Start loading files async
+        StartCoroutine(FileSystemService.GetFilesAsync(
             _currentPath,
             onProgress: null,
             onComplete: (files) =>
             {
                 loadedFiles = files;
-                isLoading = false;
+                dataLoadComplete = true;
             }
-        );
+        ));
 
-        while (isLoading)
+        // Wait for BOTH fade out AND data load to complete
+        while (!fadeOutComplete || !dataLoadComplete)
         {
             yield return null;
         }
@@ -411,7 +442,15 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
             _currentPage = Mathf.Clamp(_currentPage, 1, totalPages);
         }
 
+        // Update view while alpha is 0
         UpdateView(true);
+
+        // Fade in the new content
+        if (useFade)
+        {
+            _view.FadeInContent();
+        }
+
         _refreshCoroutine = null;
     }
 

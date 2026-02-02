@@ -94,21 +94,21 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [RTTManager] Auto-recenter completed
 
-[RTTMainMenu] Click started: folder at 6.019s
+[RTTMainMenu] Click started: folder at 6.285s
 
-[RTTMainMenu] PrepareApp called: folder at 6.019s (+0.1ms)
+[RTTMainMenu] PrepareApp called: folder at 6.286s (+0.1ms)
 
-[RTTAppManager] PrepareAppFrameAsync started: folder at 6.021s
+[RTTAppManager] PrepareAppFrameAsync started: folder at 6.288s
 
 [RTTMenu] Created app frame: folder
 
-[RTTAppManager] Frame created: folder at 6.021s (+0.4ms)
+[RTTAppManager] Frame created: folder at 6.288s (+0.4ms)
 
 [RTTAppManager] Preparing app: folder in slot 1
 
-[RTTMainMenu] Button animation started: folder at 6.022s (+3.2ms)
+[RTTMainMenu] Button animation started: folder at 6.289s (+3.3ms)
 
-[RTTAppManager] Creating content: folder at 6.051s (+30.1ms)
+[RTTAppManager] Creating content: folder at 6.318s (+29.8ms)
 
 [RTTManager] Creating FileManager content...
 
@@ -116,13 +116,13 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [RTTFileManager] Loaded preferences: sortBy=Name, ascending=True, gridView=True
 
-[RTTFileManager] PlaceSidePanel: innerEdge=(-0.81, 0.00, 1.82), panelPos=(-1.03, 0.00, 1.68)
+[RTTFileManager] PlaceSidePanel: innerEdge=(-0.83, 0.00, 1.81), panelPos=(-1.06, 0.00, 1.67)
 
 [VirtualObjectsZoomController] Registered side panel: FileNavigationPanel (side=-1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
 [RTTFileManager] Registered FileNavigationPanel with VirtualObjectsZoomController
 
-[RTTFileManager] Placed FileNavigationPanel: pos=(-1.03, 0.00, 1.68)
+[RTTFileManager] Placed FileNavigationPanel: pos=(-1.06, 0.00, 1.67)
 
 [RTTMenuFrame] UI built: 640x1080 logical pixels
 
@@ -148,13 +148,13 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [HoverEffectController] AddEffect 'color' to Item_recent, TargetVisuals=Item_recent
 
-[RTTFileManager] PlaceSidePanel: innerEdge=(0.89, 0.00, 1.78), panelPos=(1.11, 0.00, 1.63)
+[RTTFileManager] PlaceSidePanel: innerEdge=(0.87, 0.00, 1.79), panelPos=(1.09, 0.00, 1.64)
 
 [VirtualObjectsZoomController] Registered side panel: FileDetailPanel (side=1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
 [RTTFileManager] Registered FileDetailPanel with VirtualObjectsZoomController
 
-[RTTFileManager] Placed FileDetailPanel: pos=(1.11, 0.00, 1.63)
+[RTTFileManager] Placed FileDetailPanel: pos=(1.09, 0.00, 1.64)
 
 [RTTFileActionBar] Buttons created
 
@@ -162,7 +162,7 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [RTTFileManager] File action bar created (hidden initially)
 
-[RTTFileManager] CreateHeaderRows started, instance: -66172
+[RTTFileManager] CreateHeaderRows started, instance: -82974
 
 [RTTFileManager] CreateViewOptionsPopup, _menuFrame null: False
 
@@ -196,9 +196,9 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [RTTFileManager] CreateRow2 called
 
-[RTTFileManager] Breadcrumb container set: True, instance: -66172
+[RTTFileManager] Breadcrumb container set: True, instance: -82974
 
-[RTTFileManager] EditControls container created - parent: Row2, sizeDelta: (-340.00, 0.00), rect: (x:0.00, y:-48.51, width:1430.00, height:97.02), instanceID: -69070
+[RTTFileManager] EditControls container created - parent: Row2, sizeDelta: (-340.00, 0.00), rect: (x:0.00, y:-48.51, width:1430.00, height:97.02), instanceID: -85874
 
 [RTTFileManager] CreateEditControlsInRow2 called, parent: EditControls, parent active: True
 
@@ -228,7 +228,7 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [RTTFileManager] EditControls child count after creation: 5
 
-[RTTFileManager] _editControlsContainer reference instanceID: -69070, same object: True
+[RTTFileManager] _editControlsContainer reference instanceID: -85874, same object: True
 
 [RTTFileManager] EditControls set to inactive, activeSelf: False
 
@@ -238,7 +238,7 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [HoverEffectController] AddEffect 'scale' to PooledItem, TargetVisuals=PooledItem
 
-[RTTFileManager] Before OnViewReady - breadcrumb container null: True, instance: -66172
+[RTTFileManager] Before OnViewReady - breadcrumb container null: True, instance: -82974
 
 [Controller] SetSortOptionsNoRefresh: sortBy=Name, ascending=True
 
@@ -246,21 +246,21 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [Controller] NavigateToInternalAsync: path='root', restorePage=False, clickedFolder=''
 
-[RTTFileManager] UpdateBreadcrumbs called with path: root, container null: True, instance: -66172
+[RTTFileManager] UpdateBreadcrumbs called with path: root, container null: True, instance: -82974
 
 [RTTFileManager] Breadcrumb container reference lost, searching in hierarchy...
 UnityEngine.Debug:LogWarning (object)
-RTTFileManager:UpdateBreadcrumbs (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:2563)
-RTTFileManagerController/<NavigateToInternalAsync>d__39:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:283)
+RTTFileManager:UpdateBreadcrumbs (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:2635)
+RTTFileManagerController/<NavigateToInternalAsync>d__40:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:283)
 UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
-RTTFileManagerController:NavigateToInternal (string,bool,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:226)
-RTTFileManagerController:NavigateTo (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:186)
-RTTFileManagerController:OnViewReady () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:152)
-RTTFileManager/<CreateCenterGrid>d__79:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:462)
+RTTFileManagerController:NavigateToInternal (string,bool,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:229)
+RTTFileManagerController:NavigateTo (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:189)
+RTTFileManagerController:OnViewReady () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:155)
+RTTFileManager/<CreateCenterGrid>d__86:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:534)
 UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
-RTTFileManager:CreatePanels () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:322)
-RTTFileManager:BuildUI () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:183)
-RTTFileManagerController:CreateMenu (UnityEngine.RectTransform,single,single,TMPro.TMP_FontAsset,UnityEngine.Color,UnityEngine.Color) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:90)
+RTTFileManager:CreatePanels () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:391)
+RTTFileManager:BuildUI () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:252)
+RTTFileManagerController:CreateMenu (UnityEngine.RectTransform,single,single,TMPro.TMP_FontAsset,UnityEngine.Color,UnityEngine.Color) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:93)
 RTTManager:CreateFilesMenuContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:944)
 RTTManager:CreateAppContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:876)
 VRWorkspace.UI.RTT.RTTAppManager/<PrepareAppFrameAsync>d__61:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTAppManager.cs:622)
@@ -274,13 +274,13 @@ UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr
 
 [RTTFileManagerController] Menu created
 
-[RTTAppManager] Content created: folder at 6.403s (+381.9ms)
+[RTTAppManager] Content created: folder at 6.481s (+193.6ms)
 
-[RTTAppManager] PrepareDataAsync started: folder at 6.403s
+[RTTAppManager] PrepareDataAsync started: folder at 6.481s
 
 [RTTFileManagerController] PrepareDataAsync started
 
-[RTTAppManager] App prepared (hidden): folder at 6.407s (total: 385.6ms)
+[RTTAppManager] App prepared (hidden): folder at 6.485s (total: 197.3ms)
 
 [FileSystemService] Found 91 items async (69 folders, 22 files)
 
@@ -290,9 +290,9 @@ Coroutine couldn't be started because the the game object 'FileGrid' is inactive
 UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
 RTTFileGrid:UpdateVisibleItems () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileGrid.cs:375)
 RTTFileGrid:Populate (System.Collections.Generic.List`1<MockFile>,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileGrid.cs:236)
-RTTFileManager:UpdateGrid (System.Collections.Generic.List`1<MockFile>,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:3248)
-RTTFileManagerController:UpdateView (bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:614)
-RTTFileManagerController/<NavigateToInternalAsync>d__39:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:328)
+RTTFileManager:UpdateGrid (System.Collections.Generic.List`1<MockFile>,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:3320)
+RTTFileManagerController:UpdateView (bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:653)
+RTTFileManagerController/<NavigateToInternalAsync>d__40:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:338)
 UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
 
 [RTTFileGrid] GetVisibleRowsForPagination: height=748.1688, availableHeight=728.1688, rowHeight=350, rowsFloat=2.080482, visibleRows=2
@@ -300,9 +300,9 @@ UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr
 Coroutine couldn't be started because the the game object 'FileGrid' is inactive!
 UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
 RTTFileGrid:ScrollToPage (int,int) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileGrid.cs:505)
-RTTFileManager:ScrollToPage (int) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:3192)
-RTTFileManagerController:UpdateView (bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:621)
-RTTFileManagerController/<NavigateToInternalAsync>d__39:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:328)
+RTTFileManager:ScrollToPage (int) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:3264)
+RTTFileManagerController:UpdateView (bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:660)
+RTTFileManagerController/<NavigateToInternalAsync>d__40:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:338)
 UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
 
 Coroutine couldn't be started because the the game object 'MarqueeMask' is inactive!
@@ -312,9 +312,9 @@ RTTFileDetail:AddMetadataRow (string,string) (at Assets/VR-Workspace/Scripts/UI/
 RTTFileDetail:CreateMetadataForFolder (MockFile,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:443)
 RTTFileDetail:UpdateMetadata (MockFile,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:341)
 RTTFileDetail:UpdateInfo (MockFile,bool,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:199)
-RTTFileManager:UpdateDetail (MockFile,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:3514)
-RTTFileManagerController:UpdateDetailView () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:691)
-RTTFileManagerController/<NavigateToInternalAsync>d__39:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:329)
+RTTFileManager:UpdateDetail (MockFile,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:3586)
+RTTFileManagerController:UpdateDetailView () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:730)
+RTTFileManagerController/<NavigateToInternalAsync>d__40:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:339)
 UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
 
 Coroutine couldn't be started because the the game object 'MarqueeMask' is inactive!
@@ -324,38 +324,38 @@ RTTFileDetail:AddMetadataRow (string,string) (at Assets/VR-Workspace/Scripts/UI/
 RTTFileDetail:CreateMetadataForFolder (MockFile,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:444)
 RTTFileDetail:UpdateMetadata (MockFile,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:341)
 RTTFileDetail:UpdateInfo (MockFile,bool,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:199)
-RTTFileManager:UpdateDetail (MockFile,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:3514)
-RTTFileManagerController:UpdateDetailView () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:691)
-RTTFileManagerController/<NavigateToInternalAsync>d__39:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:329)
+RTTFileManager:UpdateDetail (MockFile,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:3586)
+RTTFileManagerController:UpdateDetailView () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:730)
+RTTFileManagerController/<NavigateToInternalAsync>d__40:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:339)
 UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
 
-[Detail] UpdateInfo: Admin name=0ms preview=0ms metadata=4ms total=4ms
+[Detail] UpdateInfo: Admin name=0ms preview=0ms metadata=3ms total=3ms
 
 [RTTFileManagerController] PrepareDataAsync completed: 91 files
 
-[RTTMainMenu] Button animation ended: folder at 6.444s (+425.2ms)
+[RTTMainMenu] Button animation ended: folder at 6.530s (+244.9ms)
 
-[RTTMainMenu] OpenPreparedApp called: folder at 6.444s (+425.2ms)
+[RTTMainMenu] OpenPreparedApp called: folder at 6.530s (+244.9ms)
 
-[RTTAppManager] WaitAndSwitch started: folder at 6.445s
+[RTTAppManager] WaitAndSwitch started: folder at 6.531s
 
-[RTTAppManager] WaitAndSwitch app ready: folder at 6.445s (waited 0.1ms)
+[RTTAppManager] WaitAndSwitch app ready: folder at 6.531s (waited 0.1ms)
 
-[RTTAppManager] Starting transition: folder at 6.445s
+[RTTAppManager] Starting transition: folder at 6.531s
 
-[RTTAppManager] Transition started: folder at 6.446s
+[RTTAppManager] Transition started: folder at 6.532s
 
 [RTTAppManager] Got 3 frames to animate: folder
 
-[RTTAppManager] Fade out MainMenu: folder at 6.446s
+[RTTAppManager] Fade out MainMenu: folder at 6.532s
 
-[RTTMainMenu] Click flow completed: folder at 6.447s (total: +427.8ms)
+[RTTMainMenu] Click flow completed: folder at 6.533s (total: +247.4ms)
 
-[RTTAppManager] Fade out done: folder at 6.541s (+95.4ms)
+[RTTAppManager] Fade out done: folder at 6.611s (+78.6ms)
 
 [RTTAppManager] All frames activated with alpha=0: 3 frames
 
-[RTTAppManager] Sync point: folder, IsDataReady=True at 6.560s
+[RTTAppManager] Sync point: folder, IsDataReady=True at 6.641s
 
 [RTTAppManager] Data ready first - BindPreparedData: folder
 
@@ -363,19 +363,23 @@ UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr
 
 [RTTFileGrid] Progressive bind frame: 2 items, 26 remaining
 
-[Detail] UpdateInfo: Admin name=0ms preview=0ms metadata=2ms total=2ms
+[Detail] UpdateInfo: Admin name=0ms preview=0ms metadata=5ms total=5ms
 
-[RTTFileManager] UpdateBreadcrumbs called with path: root, container null: False, instance: -66172
+[RTTFileManager] UpdateBreadcrumbs called with path: root, container null: False, instance: -82974
 
 [RTTFileManagerController] BindPreparedData: Bound 91 files
 
-[RTTAppManager] Fade in started: 3 frames at 6.578s
+[RTTAppManager] Fade in started: 3 frames at 6.662s
+
+[Detail] UpdateInfo: .bun name=0ms preview=0ms metadata=2ms total=2ms
 
 [RTTFileGrid] Progressive bind frame: 3 items, 23 remaining
 
 [RTTFileGrid] Progressive bind frame: 2 items, 21 remaining
 
 [RTTFileGrid] Progressive bind frame: 2 items, 19 remaining
+
+[Detail] UpdateInfo: Admin name=0ms preview=0ms metadata=2ms total=2ms
 
 [RTTFileGrid] Progressive bind frame: 2 items, 17 remaining
 
@@ -385,11 +389,9 @@ UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr
 
 [RTTFileGrid] Progressive bind frame: 2 items, 11 remaining
 
-[RTTFileGrid] Progressive bind frame: 2 items, 9 remaining
+[RTTAppManager] Fade in done: folder at 6.775s (+243.4ms)
 
-[RTTAppManager] Fade in done: folder at 6.708s (+262.0ms)
-
-[RTTAppManager] OnAppShown called: folder at 6.708s
+[RTTAppManager] OnAppShown called: folder at 6.776s
 
 [RTTFileManagerController] OnAppShown called
 
@@ -415,11 +417,9 @@ UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr
 
 [RTTTaskbar] SelectSlot(1) called, current active: 1
 
-[RTTAppManager] Transition completed: folder at 6.745s (total: 299.1ms)
+[RTTAppManager] Transition completed: folder at 6.811s (total: 279.2ms)
 
 [Detail] UpdateInfo: .cache name=0ms preview=0ms metadata=3ms total=3ms
-
-[Detail] UpdateInfo: Admin name=0ms preview=0ms metadata=3ms total=3ms
 
 [Detail] UpdateInfo: .antigravity name=0ms preview=0ms metadata=3ms total=3ms
 
@@ -427,7 +427,7 @@ UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr
 
 [Controller] NavigateToInternalAsync: path='C:\Users\Admin\.android', restorePage=False, clickedFolder='C:\Users\Admin\.android'
 
-[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android, container null: False, instance: -66172
+[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android, container null: False, instance: -82974
 
 [Controller] CanCreateFolderHere called, _currentPath: 'C:\Users\Admin\.android'
 
@@ -459,13 +459,11 @@ UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr
 
 [Detail] UpdateInfo: .android name=0ms preview=0ms metadata=2ms total=2ms
 
-[Detail] UpdateInfo: cache name=0ms preview=0ms metadata=2ms total=2ms
-
 [Detail] UpdateInfo: sdk name=0ms preview=0ms metadata=2ms total=2ms
 
 [Controller] NavigateToInternalAsync: path='C:\Users\Admin\.android\sdk', restorePage=False, clickedFolder='C:\Users\Admin\.android\sdk'
 
-[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android\sdk, container null: False, instance: -66172
+[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android\sdk, container null: False, instance: -82974
 
 [Controller] CanCreateFolderHere called, _currentPath: 'C:\Users\Admin\.android\sdk'
 
@@ -485,15 +483,13 @@ UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr
 
 [Controller] CalculateTotalPages: totalFiles=8, pageSize=10, totalPages=1
 
-[Detail] UpdateInfo: build-tools name=0ms preview=0ms metadata=2ms total=2ms
-
 [Detail] UpdateInfo: .temp name=0ms preview=0ms metadata=2ms total=2ms
 
 [Detail] UpdateInfo: platforms name=0ms preview=0ms metadata=2ms total=2ms
 
 [Controller] NavigateToInternalAsync: path='C:\Users\Admin\.android\sdk\platforms', restorePage=False, clickedFolder='C:\Users\Admin\.android\sdk\platforms'
 
-[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android\sdk\platforms, container null: False, instance: -66172
+[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android\sdk\platforms, container null: False, instance: -82974
 
 [Controller] CanCreateFolderHere called, _currentPath: 'C:\Users\Admin\.android\sdk\platforms'
 
@@ -515,11 +511,13 @@ UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr
 
 [Detail] UpdateInfo: platforms name=0ms preview=0ms metadata=1ms total=1ms
 
+[Detail] UpdateInfo: android-35 name=0ms preview=0ms metadata=2ms total=2ms
+
 [Detail] UpdateInfo: android-36 name=0ms preview=0ms metadata=2ms total=2ms
 
 [Controller] NavigateToInternalAsync: path='C:\Users\Admin\.android\sdk\platforms\android-36', restorePage=False, clickedFolder='C:\Users\Admin\.android\sdk\platforms\android-36'
 
-[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android\sdk\platforms\android-36, container null: False, instance: -66172
+[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android\sdk\platforms\android-36, container null: False, instance: -82974
 
 [Controller] CanCreateFolderHere called, _currentPath: 'C:\Users\Admin\.android\sdk\platforms\android-36'
 
@@ -543,19 +541,15 @@ UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr
 
 [RTTFileGrid] Progressive bind frame: 3 items, 1 remaining
 
-[Detail] UpdateInfo: skins name=0ms preview=0ms metadata=2ms total=2ms
-
 [RTTFileGrid] Progressive binding complete: 3 items bound total
 
 [Detail] UpdateInfo: optional name=0ms preview=0ms metadata=2ms total=2ms
-
-[Detail] UpdateInfo: android-stubs-src.jar name=0ms preview=0ms metadata=4ms total=4ms
 
 [Detail] UpdateInfo: data name=0ms preview=0ms metadata=2ms total=2ms
 
 [Controller] NavigateToInternalAsync: path='C:\Users\Admin\.android\sdk\platforms\android-36\data', restorePage=False, clickedFolder='C:\Users\Admin\.android\sdk\platforms\android-36\data'
 
-[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android\sdk\platforms\android-36\data, container null: False, instance: -66172
+[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android\sdk\platforms\android-36\data, container null: False, instance: -82974
 
 [Controller] CanCreateFolderHere called, _currentPath: 'C:\Users\Admin\.android\sdk\platforms\android-36\data'
 
@@ -579,15 +573,15 @@ UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr
 
 [RTTFileGrid] Progressive bind frame: 2 items, 0 remaining
 
-[Detail] UpdateInfo: res name=0ms preview=0ms metadata=2ms total=2ms
-
 [RTTFileGrid] Progressive binding complete: 2 items bound total
 
-[Detail] UpdateInfo: activity_actions.txt name=0ms preview=0ms metadata=3ms total=3ms
+[Detail] UpdateInfo: activity_actions.txt name=0ms preview=0ms metadata=4ms total=4ms
+
+[Detail] UpdateInfo: res name=0ms preview=0ms metadata=2ms total=2ms
 
 [Controller] NavigateToInternalAsync: path='C:\Users\Admin\.android\sdk\platforms\android-36\data\res', restorePage=False, clickedFolder='C:\Users\Admin\.android\sdk\platforms\android-36\data\res'
 
-[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android\sdk\platforms\android-36\data\res, container null: False, instance: -66172
+[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android\sdk\platforms\android-36\data\res, container null: False, instance: -82974
 
 [Controller] CanCreateFolderHere called, _currentPath: 'C:\Users\Admin\.android\sdk\platforms\android-36\data\res'
 
@@ -609,29 +603,23 @@ UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr
 
 [FileSystemService] Reading directory async: C:\Users\Admin\.android\sdk\platforms\android-36\data\res
 
+[Detail] UpdateInfo: activity_actions.txt name=0ms preview=0ms metadata=3ms total=3ms
+
 [FileSystemService] Found 2838 items async (2838 folders, 0 files)
 
 [Controller] CalculateTotalPages: totalFiles=2838, pageSize=10, totalPages=284
 
 [RTTFileGrid] Progressive bind frame: 3 items, 25 remaining
 
-[Detail] UpdateInfo: animator name=0ms preview=0ms metadata=3ms total=3ms
-
 [RTTFileGrid] Progressive bind frame: 2 items, 5 remaining
 
 [RTTFileGrid] Progressive binding complete: 7 items bound total
 
-[Detail] UpdateInfo: res name=0ms preview=0ms metadata=3ms total=3ms
+[Detail] UpdateInfo: color-car name=0ms preview=0ms metadata=4ms total=4ms
 
-[Detail] UpdateInfo: anim-ldrtl name=0ms preview=0ms metadata=3ms total=3ms
+[Detail] UpdateInfo: res name=1ms preview=0ms metadata=3ms total=4ms
 
-[Detail] UpdateInfo: color-car name=0ms preview=0ms metadata=3ms total=3ms
-
-[Detail] UpdateInfo: res name=0ms preview=1ms metadata=3ms total=4ms
-
-[Detail] UpdateInfo: animator name=0ms preview=0ms metadata=4ms total=4ms
+[Detail] UpdateInfo: color name=0ms preview=0ms metadata=4ms total=4ms
 
 [Detail] UpdateInfo: res name=0ms preview=0ms metadata=4ms total=4ms
-
-[Detail] UpdateInfo: anim name=0ms preview=0ms metadata=4ms total=4ms
 
