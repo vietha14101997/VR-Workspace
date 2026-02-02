@@ -210,10 +210,25 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
         return path;
     }
 
+    // Coroutine for async navigation
+    private Coroutine _navigateCoroutine = null;
+
     private void NavigateToInternal(string path, bool restorePage, string clickedFolderPath)
     {
-        Debug.Log($"[Controller] NavigateToInternal: path='{path}', restorePage={restorePage}, clickedFolder='{clickedFolderPath}'");
-        Debug.Log($"[Controller] Current state: _currentPath='{_currentPath}', _currentPage={_currentPage}, _pageSize={_pageSize}");
+        // Cancel any ongoing navigation
+        if (_navigateCoroutine != null)
+        {
+            StopCoroutine(_navigateCoroutine);
+            _navigateCoroutine = null;
+        }
+
+        // Start async navigation
+        _navigateCoroutine = StartCoroutine(NavigateToInternalAsync(path, restorePage, clickedFolderPath));
+    }
+
+    private IEnumerator NavigateToInternalAsync(string path, bool restorePage, string clickedFolderPath)
+    {
+        Debug.Log($"[Controller] NavigateToInternalAsync: path='{path}', restorePage={restorePage}, clickedFolder='{clickedFolderPath}'");
 
         // Exit filter mode when navigating to a real folder
         if (_isFilterMode)
@@ -241,79 +256,96 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
             int itemIndexToSave;
 
             // If we clicked on a folder, use that folder's index in the list
-            // This gives more accurate position when navigating back
             if (!string.IsNullOrEmpty(clickedFolderPath))
             {
                 int folderIndex = _filteredFiles.FindIndex(f => f.Path == clickedFolderPath);
                 itemIndexToSave = folderIndex >= 0 ? folderIndex : (_currentPage - 1) * _pageSize;
-                Debug.Log($"[Controller] Clicked folder index in list: {folderIndex}");
             }
             else
             {
-                // Default: use first item of current page
                 itemIndexToSave = (_currentPage - 1) * _pageSize;
             }
 
-            // Use normalized path as key for consistent save/restore
             _itemIndexHistory[normalizedCurrentPath] = itemIndexToSave;
-            Debug.Log($"[Controller] SAVED: _itemIndexHistory['{normalizedCurrentPath}'] = {itemIndexToSave}");
-        }
-        else if (normalizedCurrentPath == normalizedDestPath)
-        {
-            Debug.Log($"[Controller] Same path (normalized), skipping save");
         }
 
         _currentPath = path;
         _currentSearchQuery = ""; // Reset search state
 
-        // Load all files for this path
-        _currentDirectoryFiles = FileSystemService.GetFiles(path);
+        // Reset selection/hover immediately for responsive UI
+        _selectedFile = null;
+        _hoveredFile = null;
 
-        // Reset filter to show all
+        // Show loading state with empty grid immediately
+        _currentDirectoryFiles = new List<MockFile>();
+        _filteredFiles = new List<MockFile>();
+        _view?.UpdateGrid(_filteredFiles, "");
+        _view?.UpdateBreadcrumbs(_currentPath);
+
+        // Load files asynchronously with progress updates
+        bool isLoading = true;
+        List<MockFile> loadedFiles = null;
+
+        yield return FileSystemService.GetFilesAsync(
+            path,
+            onProgress: (count) =>
+            {
+                // Optional: Update loading indicator with count
+                // _view?.ShowLoadingProgress(count);
+            },
+            onComplete: (files) =>
+            {
+                loadedFiles = files;
+                isLoading = false;
+            }
+        );
+
+        // Wait for completion (should be immediate after coroutine returns)
+        while (isLoading)
+        {
+            yield return null;
+        }
+
+        // Update with loaded files
+        _currentDirectoryFiles = loadedFiles ?? new List<MockFile>();
         _filteredFiles = new List<MockFile>(_currentDirectoryFiles);
 
         // Apply current sort
         ApplySort();
 
         // Restore page from item index or reset to page 1
-        // Use normalized path as key for consistent save/restore
         if (restorePage && _itemIndexHistory.TryGetValue(normalizedDestPath, out int savedItemIndex))
         {
-            // Calculate page from saved item index using current pageSize
-            // page = (itemIndex / pageSize) + 1
             int calculatedPage = (savedItemIndex / Mathf.Max(1, _pageSize)) + 1;
             int totalPages = CalculateTotalPages();
             _currentPage = Mathf.Clamp(calculatedPage, 1, totalPages);
-            Debug.Log($"[Controller] RESTORED: page={_currentPage} from _itemIndexHistory['{normalizedDestPath}']={savedItemIndex}, pageSize={_pageSize}, total={totalPages}");
         }
         else
         {
             _currentPage = 1;
-            if (restorePage)
-            {
-                Debug.Log($"[Controller] NO HISTORY for '{normalizedDestPath}' (path='{path}'), reset to page 1. History keys: [{string.Join(", ", _itemIndexHistory.Keys)}]");
-            }
-            else
-            {
-                Debug.Log($"[Controller] restorePage=false, reset to page 1");
-            }
         }
-
-        // Reset selection/hover on nav
-        _selectedFile = null;
-        _hoveredFile = null;
 
         UpdateView(true); // true = full reload
         UpdateDetailView(); // Update detail to show current folder
-        _view.UpdateBreadcrumbs(_currentPath);
+
+        _navigateCoroutine = null;
     }
+
+    // Coroutine for async refresh
+    private Coroutine _refreshCoroutine = null;
 
     public void RefreshCurrentFolder()
     {
         Debug.Log("[Controller] Refreshing current folder...");
-        // Reload files (Mock logic: just re-fetch)
-        _currentDirectoryFiles = FileSystemService.GetFiles(_currentPath);
-        SearchFiles(_currentSearchQuery); // Re-apply search/filter
+
+        // Cancel any ongoing refresh
+        if (_refreshCoroutine != null)
+        {
+            StopCoroutine(_refreshCoroutine);
+            _refreshCoroutine = null;
+        }
+
+        _refreshCoroutine = StartCoroutine(RefreshCurrentFolderAsync(false));
     }
 
     /// <summary>
@@ -323,10 +355,40 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
     public void RefreshCurrentFolderKeepPage()
     {
         Debug.Log("[Controller] Refreshing current folder (keep page)...");
-        // Reload files
-        _currentDirectoryFiles = FileSystemService.GetFiles(_currentPath);
 
-        // Re-apply filter without resetting page
+        // Cancel any ongoing refresh
+        if (_refreshCoroutine != null)
+        {
+            StopCoroutine(_refreshCoroutine);
+            _refreshCoroutine = null;
+        }
+
+        _refreshCoroutine = StartCoroutine(RefreshCurrentFolderAsync(true));
+    }
+
+    private IEnumerator RefreshCurrentFolderAsync(bool keepPage)
+    {
+        bool isLoading = true;
+        List<MockFile> loadedFiles = null;
+
+        yield return FileSystemService.GetFilesAsync(
+            _currentPath,
+            onProgress: null,
+            onComplete: (files) =>
+            {
+                loadedFiles = files;
+                isLoading = false;
+            }
+        );
+
+        while (isLoading)
+        {
+            yield return null;
+        }
+
+        _currentDirectoryFiles = loadedFiles ?? new List<MockFile>();
+
+        // Re-apply filter
         if (string.IsNullOrEmpty(_currentSearchQuery))
         {
             _filteredFiles = new List<MockFile>(_currentDirectoryFiles);
@@ -338,11 +400,19 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
 
         ApplySort();
 
-        // Clamp page to valid range (in case folder content changed)
-        int totalPages = CalculateTotalPages();
-        _currentPage = Mathf.Clamp(_currentPage, 1, totalPages);
+        if (!keepPage)
+        {
+            _currentPage = 1;
+        }
+        else
+        {
+            // Clamp page to valid range (in case folder content changed)
+            int totalPages = CalculateTotalPages();
+            _currentPage = Mathf.Clamp(_currentPage, 1, totalPages);
+        }
 
-        UpdateView(true); // Full reload to update Grid/List
+        UpdateView(true);
+        _refreshCoroutine = null;
     }
 
     /// <summary>
@@ -1343,8 +1413,7 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
     {
         Debug.Log("[RTTFileManagerController] PrepareDataAsync started");
 
-        // FileManager file listing is synchronous and fast
-        // Just yield one frame to allow UI to set up
+        // Yield one frame to allow UI to set up
         yield return null;
 
         // Prepare data buffer with current directory files
@@ -1354,7 +1423,26 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
             pathToLoad = "root";
         }
 
-        _preparedDataBuffer = FileSystemService.GetFiles(pathToLoad);
+        // Load files asynchronously to prevent UI freeze with large directories
+        bool isLoading = true;
+        List<MockFile> loadedFiles = null;
+
+        yield return FileSystemService.GetFilesAsync(
+            pathToLoad,
+            onProgress: null,
+            onComplete: (files) =>
+            {
+                loadedFiles = files;
+                isLoading = false;
+            }
+        );
+
+        while (isLoading)
+        {
+            yield return null;
+        }
+
+        _preparedDataBuffer = loadedFiles ?? new List<MockFile>();
 
         _isPreparingData = false;
         _isDataReady = true;
@@ -1823,30 +1911,13 @@ public static class FileSystemService
                         continue;
                     }
 
-                    // Check if folder is empty (has no visible children)
-                    bool isFolderEmpty = true;
-                    try
-                    {
-                        var entries = dirInfo.EnumerateFileSystemInfos();
-                        foreach (var entry in entries)
-                        {
-                            // Skip hidden/system entries
-                            if ((entry.Attributes & FileAttributes.Hidden) == 0 &&
-                                (entry.Attributes & FileAttributes.System) == 0)
-                            {
-                                isFolderEmpty = false;
-                                break;
-                            }
-                        }
-                    }
-                    catch { isFolderEmpty = true; } // If can't enumerate, treat as empty
-
+                    // Skip expensive empty check - will be done lazily if needed
                     list.Add(new MockFile
                     {
                         Name = TextEncodingHelper.FixString(dirInfo.Name),
                         Path = dirPath,
                         IsFolder = true,
-                        IsFolderEmpty = isFolderEmpty,
+                        IsFolderEmpty = false, // Default to not empty, check lazily
                         Type = "Folder",
                         Created = dirInfo.CreationTime,
                         Modified = dirInfo.LastWriteTime,
@@ -1863,20 +1934,17 @@ public static class FileSystemService
 
             // Get files
             string[] files = Directory.GetFiles(absolutePath);
-            Debug.Log($"[FileSystemService] Raw file count from Directory.GetFiles: {files.Length}");
 
             foreach (string filePath in files)
             {
                 try
                 {
                     FileInfo fileInfo = new FileInfo(filePath);
-                    Debug.Log($"[FileSystemService] Checking file: {fileInfo.Name}, Attributes: {fileInfo.Attributes}");
 
                     // Skip hidden and system files
                     if ((fileInfo.Attributes & FileAttributes.Hidden) != 0 ||
                         (fileInfo.Attributes & FileAttributes.System) != 0)
                     {
-                        Debug.Log($"[FileSystemService] SKIPPED (Hidden/System): {fileInfo.Name}");
                         continue;
                     }
 
@@ -1884,17 +1952,6 @@ public static class FileSystemService
                     if (string.IsNullOrEmpty(extension)) extension = "file";
 
                     string displayName = TextEncodingHelper.FixString(fileInfo.Name);
-
-                    // Debug: Log character codes for non-ASCII file names
-                    bool hasNonAscii = false;
-                    foreach (char c in displayName)
-                    {
-                        if (c > 127) { hasNonAscii = true; break; }
-                    }
-                    if (hasNonAscii)
-                    {
-                        Debug.Log($"[FileSystemService] Unicode file: '{displayName}' codes: {TextEncodingHelper.GetCharCodeDump(displayName, 30)}");
-                    }
 
                     list.Add(new MockFile
                     {
@@ -1907,16 +1964,13 @@ public static class FileSystemService
                         Size = fileInfo.Length,
                         Duration = GetMediaDuration(filePath, extension)
                     });
-                    Debug.Log($"[FileSystemService] ADDED file: {fileInfo.Name}");
                 }
-                catch (UnauthorizedAccessException ex)
+                catch (UnauthorizedAccessException)
                 {
-                    Debug.LogWarning($"[FileSystemService] UnauthorizedAccess for file: {filePath} - {ex.Message}");
                     continue;
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    Debug.LogWarning($"[FileSystemService] Error reading file {filePath}: {ex.Message}");
                     continue;
                 }
             }
@@ -1928,6 +1982,175 @@ public static class FileSystemService
 
         Debug.Log($"[FileSystemService] Found {list.Count} items ({list.FindAll(f => f.IsFolder).Count} folders, {list.FindAll(f => !f.IsFolder).Count} files)");
         return list;
+    }
+
+    /// <summary>
+    /// Async version of GetFiles that yields periodically to prevent UI freezing.
+    /// Use this for directories that may contain many items.
+    /// </summary>
+    /// <param name="path">Directory path to read</param>
+    /// <param name="onProgress">Optional callback for progress updates (items loaded so far)</param>
+    /// <param name="onComplete">Callback with the final list of files</param>
+    public static System.Collections.IEnumerator GetFilesAsync(string path, Action<int> onProgress, Action<List<MockFile>> onComplete)
+    {
+        const int BATCH_SIZE = 50; // Yield every 50 items
+        var list = new List<MockFile>();
+        string absolutePath = GetAbsolutePath(path);
+        int processed = 0;
+        bool shouldYield = false;
+
+        Debug.Log($"[FileSystemService] Reading directory async: {absolutePath}");
+
+        if (!Directory.Exists(absolutePath))
+        {
+            Debug.LogWarning($"[FileSystemService] Directory not found: {absolutePath}");
+            onComplete?.Invoke(list);
+            yield break;
+        }
+
+        // Get directories
+        string[] directories;
+        try
+        {
+            directories = Directory.GetDirectories(absolutePath);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[FileSystemService] Error getting directories: {ex.Message}");
+            onComplete?.Invoke(list);
+            yield break;
+        }
+
+        foreach (string dirPath in directories)
+        {
+            // Process directory in try block, set yield flag outside
+            MockFile? dirFile = null;
+            try
+            {
+                DirectoryInfo dirInfo = new DirectoryInfo(dirPath);
+
+                // Skip hidden and system directories
+                if ((dirInfo.Attributes & FileAttributes.Hidden) != 0 ||
+                    (dirInfo.Attributes & FileAttributes.System) != 0)
+                {
+                    continue;
+                }
+
+                // Skip expensive empty check - default to not empty
+                dirFile = new MockFile
+                {
+                    Name = TextEncodingHelper.FixString(dirInfo.Name),
+                    Path = dirPath,
+                    IsFolder = true,
+                    IsFolderEmpty = false,
+                    Type = "Folder",
+                    Created = dirInfo.CreationTime,
+                    Modified = dirInfo.LastWriteTime,
+                    Size = 0,
+                    Duration = TimeSpan.Zero
+                };
+            }
+            catch (UnauthorizedAccessException)
+            {
+                continue;
+            }
+
+            // Add and check yield outside try-catch
+            if (dirFile.HasValue)
+            {
+                list.Add(dirFile.Value);
+                processed++;
+                if (processed % BATCH_SIZE == 0)
+                {
+                    shouldYield = true;
+                }
+            }
+
+            // Yield outside try-catch block
+            if (shouldYield)
+            {
+                onProgress?.Invoke(list.Count);
+                yield return null;
+                shouldYield = false;
+            }
+        }
+
+        // Get files
+        string[] files;
+        try
+        {
+            files = Directory.GetFiles(absolutePath);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[FileSystemService] Error getting files: {ex.Message}");
+            onComplete?.Invoke(list);
+            yield break;
+        }
+
+        foreach (string filePath in files)
+        {
+            // Process file in try block
+            MockFile? fileItem = null;
+            try
+            {
+                FileInfo fileInfo = new FileInfo(filePath);
+
+                // Skip hidden and system files
+                if ((fileInfo.Attributes & FileAttributes.Hidden) != 0 ||
+                    (fileInfo.Attributes & FileAttributes.System) != 0)
+                {
+                    continue;
+                }
+
+                string extension = fileInfo.Extension.TrimStart('.').ToLower();
+                if (string.IsNullOrEmpty(extension)) extension = "file";
+
+                string displayName = TextEncodingHelper.FixString(fileInfo.Name);
+
+                fileItem = new MockFile
+                {
+                    Name = displayName,
+                    Path = filePath,
+                    IsFolder = false,
+                    Type = extension,
+                    Created = fileInfo.CreationTime,
+                    Modified = fileInfo.LastWriteTime,
+                    Size = fileInfo.Length,
+                    Duration = GetMediaDuration(filePath, extension)
+                };
+            }
+            catch (UnauthorizedAccessException)
+            {
+                continue;
+            }
+            catch (Exception)
+            {
+                continue;
+            }
+
+            // Add and check yield outside try-catch
+            if (fileItem.HasValue)
+            {
+                list.Add(fileItem.Value);
+                processed++;
+                if (processed % BATCH_SIZE == 0)
+                {
+                    shouldYield = true;
+                }
+            }
+
+            // Yield outside try-catch block
+            if (shouldYield)
+            {
+                onProgress?.Invoke(list.Count);
+                yield return null;
+                shouldYield = false;
+            }
+        }
+
+        Debug.Log($"[FileSystemService] Found {list.Count} items async ({list.FindAll(f => f.IsFolder).Count} folders, {list.FindAll(f => !f.IsFolder).Count} files)");
+        onComplete?.Invoke(list);
     }
 
     private static TimeSpan GetMediaDuration(string filePath, string extension)

@@ -94,257 +94,318 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [RTTManager] Auto-recenter completed
 
-[RTTMainMenu] Click started: media at 5.898s
+[RTTMainMenu] Click started: folder at 6.019s
 
-[RTTMainMenu] PrepareApp called: media at 5.898s (+0.1ms)
+[RTTMainMenu] PrepareApp called: folder at 6.019s (+0.1ms)
 
-[RTTAppManager] PrepareAppFrameAsync started: media at 5.901s
+[RTTAppManager] PrepareAppFrameAsync started: folder at 6.021s
 
-[RTTMenu] Created app frame: media
+[RTTMenu] Created app frame: folder
 
-[RTTAppManager] Frame created: media at 5.901s (+0.4ms)
+[RTTAppManager] Frame created: folder at 6.021s (+0.4ms)
 
-[RTTAppManager] Preparing app: media in slot 1
+[RTTAppManager] Preparing app: folder in slot 1
 
-[RTTMainMenu] Button animation started: media at 5.902s (+3.2ms)
+[RTTMainMenu] Button animation started: folder at 6.022s (+3.2ms)
 
-[RTTAppManager] Creating content: media at 5.930s (+29.9ms)
+[RTTAppManager] Creating content: folder at 6.051s (+30.1ms)
 
-[RTTManager] Creating Media content...
+[RTTManager] Creating FileManager content...
 
-[VRVideoProjectionSystem] Created FlatProjectionRenderer
+[RTTFileManager] Building UI...
 
-[VRVideoProjectionSystem] Initialized
+[RTTFileManager] Loaded preferences: sortBy=Name, ascending=True, gridView=True
 
-[MediaLibraryService] Loading 1309 items from cache (async)...
+[RTTFileManager] PlaceSidePanel: innerEdge=(-0.81, 0.00, 1.82), panelPos=(-1.03, 0.00, 1.68)
 
-[VirtualObjectsZoomController] Registered side panel: MediaNavigationPanel (side=-1, mainW=1.6, sideW=0.5333334, gap=0.05)
+[VirtualObjectsZoomController] Registered side panel: FileNavigationPanel (side=-1, mainW=1.6, sideW=0.5333334, gap=0.05)
+
+[RTTFileManager] Registered FileNavigationPanel with VirtualObjectsZoomController
+
+[RTTFileManager] Placed FileNavigationPanel: pos=(-1.03, 0.00, 1.68)
 
 [RTTMenuFrame] UI built: 640x1080 logical pixels
 
-[RTTMediaLibrary] CreateLeftPanelContent started at 5.961s
+[HoverEffectController] AddEffect 'scale' to Item_internal, TargetVisuals=Item_internal
 
-[HoverEffectController] AddEffect 'scale' to Item_all, TargetVisuals=Item_all
+[HoverEffectController] AddEffect 'color' to Item_internal, TargetVisuals=Item_internal
 
-[HoverEffectController] AddEffect 'color' to Item_all, TargetVisuals=Item_all
+[FileSystemService] Root path set to: C:\Users\Admin
+
+[HoverEffectController] AddEffect 'scale' to Item_downloads, TargetVisuals=Item_downloads
+
+[HoverEffectController] AddEffect 'color' to Item_downloads, TargetVisuals=Item_downloads
 
 [HoverEffectController] AddEffect 'scale' to Item_videos, TargetVisuals=Item_videos
 
 [HoverEffectController] AddEffect 'color' to Item_videos, TargetVisuals=Item_videos
 
-[HoverEffectController] AddEffect 'scale' to Item_images, TargetVisuals=Item_images
+[HoverEffectController] AddEffect 'scale' to Item_music, TargetVisuals=Item_music
 
-[HoverEffectController] AddEffect 'color' to Item_images, TargetVisuals=Item_images
-
-[HoverEffectController] AddEffect 'scale' to Item_audio, TargetVisuals=Item_audio
-
-[HoverEffectController] AddEffect 'color' to Item_audio, TargetVisuals=Item_audio
+[HoverEffectController] AddEffect 'color' to Item_music, TargetVisuals=Item_music
 
 [HoverEffectController] AddEffect 'scale' to Item_recent, TargetVisuals=Item_recent
 
 [HoverEffectController] AddEffect 'color' to Item_recent, TargetVisuals=Item_recent
 
-[HoverEffectController] AddEffect 'scale' to Item_favorites, TargetVisuals=Item_favorites
+[RTTFileManager] PlaceSidePanel: innerEdge=(0.89, 0.00, 1.78), panelPos=(1.11, 0.00, 1.63)
 
-[HoverEffectController] AddEffect 'color' to Item_favorites, TargetVisuals=Item_favorites
+[VirtualObjectsZoomController] Registered side panel: FileDetailPanel (side=1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
-[HoverEffectController] AddEffect 'scale' to Item_playlists, TargetVisuals=Item_playlists
+[RTTFileManager] Registered FileDetailPanel with VirtualObjectsZoomController
 
-[HoverEffectController] AddEffect 'color' to Item_playlists, TargetVisuals=Item_playlists
+[RTTFileManager] Placed FileDetailPanel: pos=(1.11, 0.00, 1.63)
 
-[RTTMediaLibrary] Left panel content created at 5.971s
+[RTTFileActionBar] Buttons created
 
-[VirtualObjectsZoomController] Registered side panel: MediaDetailPanel (side=1, mainW=1.6, sideW=0.5333334, gap=0.05)
+[RTTFileActionBar] Initialized, following: FileDetailPanel
 
-[RTTMediaLibrary] CreateRightPanelContent started at 5.973s
+[RTTFileManager] File action bar created (hidden initially)
 
-[RTTMediaLibrary] Right panel content created at 5.999s
+[RTTFileManager] CreateHeaderRows started, instance: -66172
+
+[RTTFileManager] CreateViewOptionsPopup, _menuFrame null: False
 
 [RTTPopupMenu] CreateWorldSpace: layer 'VirtualObjects' = 3, mainCam: VRCamera
 
 [RTTPopupMenu] Created world-space popup
 
+[RTTFileManager] ViewOptionsPopup created, null: False
+
+[RTTFileManager] ViewOptionsPopup position offset: (-351, 25)
+
+[RTTFileManager] New Folder button created, _newFolderButton null: False
+
+[Controller] CanCreateFolderHere called, _currentPath: 'root'
+
+[FileSystemService] CanCreateFolderInPath called with path: 'root'
+
+[FileSystemService] Path is 'root' or empty, returning false
+
+[Controller] CanCreateFolderHere result: False
+
+[RTTFileManager] UpdateNewFolderButtonState: canCreate=False
+
+[RTTFileManager] BoxCollider.enabled set to False
+
+[RTTFileManager] New Folder button DISABLED - alpha=0.4
+
 [HoverEffectController] AddEffect 'cursor_change' to HitArea, TargetVisuals=Visuals
 
-[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-124192
+[RTTFileManager] Text Area found and offsetMin set to: (30.00, 0.00)
+
+[RTTFileManager] CreateRow2 called
+
+[RTTFileManager] Breadcrumb container set: True, instance: -66172
+
+[RTTFileManager] EditControls container created - parent: Row2, sizeDelta: (-340.00, 0.00), rect: (x:0.00, y:-48.51, width:1430.00, height:97.02), instanceID: -69070
+
+[RTTFileManager] CreateEditControlsInRow2 called, parent: EditControls, parent active: True
 
 [HoverEffectController] AddEffect 'scale' to Checkbox, TargetVisuals=Checkbox
 
+[RTTFileManager] CreateEditModeActionButton: Rename, icon 'icon_rename' loaded: True
+
 [HoverEffectController] AddEffect 'scale' to Btn_Rename, TargetVisuals=Btn_Rename
+
+[RTTFileManager] Rename button created: Btn_Rename
+
+[RTTFileManager] CreateEditModeActionButton: Copy, icon 'icon_copy' loaded: True
+
+[HoverEffectController] AddEffect 'scale' to Btn_Copy, TargetVisuals=Btn_Copy
+
+[RTTFileManager] Copy button created: Btn_Copy
+
+[RTTFileManager] CreateEditModeActionButton: Move, icon 'icon_move_folder' loaded: True
+
+[HoverEffectController] AddEffect 'scale' to Btn_Move, TargetVisuals=Btn_Move
+
+[RTTFileManager] CreateEditModeActionButton: Delete, icon 'icon_trash' loaded: True
 
 [HoverEffectController] AddEffect 'scale' to Btn_Delete, TargetVisuals=Btn_Delete
 
-[RTTMediaLibrary] After CreateHeaderRows: _headerRT=True, _breadcrumbContainer=True
+[RTTFileManager] CreateEditControlsInRow2 completed - Rename: True, Copy: True (size: (164.00, 60.00)), Move: True (size: (164.00, 60.00)), Delete: True (size: (190.00, 60.00))
+
+[RTTFileManager] EditControls child count after creation: 5
+
+[RTTFileManager] _editControlsContainer reference instanceID: -69070, same object: True
+
+[RTTFileManager] EditControls set to inactive, activeSelf: False
+
+[RTTFileManager] CreateHeaderRows completed, breadcrumb null: True
+
+[RTTFileGrid] CalculateGridMetrics: width=1770, availableWidth=1730, columnsPerRow=4, cellWidth=395, spacingX=30
 
 [HoverEffectController] AddEffect 'scale' to PooledItem, TargetVisuals=PooledItem
 
-[RTTMediaLibrary] Creating 2 breadcrumb segments for: All Media > Videos
+[RTTFileManager] Before OnViewReady - breadcrumb container null: True, instance: -66172
 
-[RTTMediaLibrary] Created 2 breadcrumb pills for path: All Media > Videos
+[Controller] SetSortOptionsNoRefresh: sortBy=Name, ascending=True
 
-[RTTMediaLibrary] Center grid created
+[Controller] View is ready. Checking storage permissions...
 
-[VRMediaAppController] Library UI built
+[Controller] NavigateToInternalAsync: path='root', restorePage=False, clickedFolder=''
 
-[VRMediaAppController] Media app created
+[RTTFileManager] UpdateBreadcrumbs called with path: root, container null: True, instance: -66172
 
-[RTTAppManager] Content created: media at 6.107s (+206.8ms)
+[RTTFileManager] Breadcrumb container reference lost, searching in hierarchy...
+UnityEngine.Debug:LogWarning (object)
+RTTFileManager:UpdateBreadcrumbs (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:2563)
+RTTFileManagerController/<NavigateToInternalAsync>d__39:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:283)
+UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
+RTTFileManagerController:NavigateToInternal (string,bool,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:226)
+RTTFileManagerController:NavigateTo (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:186)
+RTTFileManagerController:OnViewReady () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:152)
+RTTFileManager/<CreateCenterGrid>d__79:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:462)
+UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
+RTTFileManager:CreatePanels () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:322)
+RTTFileManager:BuildUI () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:183)
+RTTFileManagerController:CreateMenu (UnityEngine.RectTransform,single,single,TMPro.TMP_FontAsset,UnityEngine.Color,UnityEngine.Color) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:90)
+RTTManager:CreateFilesMenuContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:944)
+RTTManager:CreateAppContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:876)
+VRWorkspace.UI.RTT.RTTAppManager/<PrepareAppFrameAsync>d__61:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTAppManager.cs:622)
+UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
 
-[RTTAppManager] PrepareDataAsync started: media at 6.107s
+[RTTFileManager] Found breadcrumb container from hierarchy: True
 
-[RTTMediaLibraryController] PrepareDataAsync started
+[RTTFileManager] Created 1 breadcrumbs for path: C:\Users\Admin
 
-[RTTAppManager] App prepared (hidden): media at 6.111s (total: 210.9ms)
+[FileSystemService] Reading directory async: C:\Users\Admin
 
-[RTTMainMenu] Button animation ended: media at 6.134s (+235.4ms)
+[RTTFileManagerController] Menu created
 
-[RTTMainMenu] OpenPreparedApp called: media at 6.134s (+235.4ms)
+[RTTAppManager] Content created: folder at 6.403s (+381.9ms)
 
-[RTTAppManager] WaitAndSwitch started: media at 6.134s
+[RTTAppManager] PrepareDataAsync started: folder at 6.403s
 
-[RTTAppManager] WaitAndSwitch app ready: media at 6.134s (waited 0.1ms)
+[RTTFileManagerController] PrepareDataAsync started
 
-[RTTAppManager] Starting transition: media at 6.134s
+[RTTAppManager] App prepared (hidden): folder at 6.407s (total: 385.6ms)
 
-[RTTAppManager] Transition started: media at 6.136s
+[FileSystemService] Found 91 items async (69 folders, 22 files)
 
-[RTTAppManager] Got 3 frames to animate: media
+[Controller] CalculateTotalPages: totalFiles=91, pageSize=10, totalPages=10
 
-[RTTAppManager] Fade out MainMenu: media at 6.136s
+Coroutine couldn't be started because the the game object 'FileGrid' is inactive!
+UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
+RTTFileGrid:UpdateVisibleItems () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileGrid.cs:375)
+RTTFileGrid:Populate (System.Collections.Generic.List`1<MockFile>,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileGrid.cs:236)
+RTTFileManager:UpdateGrid (System.Collections.Generic.List`1<MockFile>,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:3248)
+RTTFileManagerController:UpdateView (bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:614)
+RTTFileManagerController/<NavigateToInternalAsync>d__39:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:328)
+UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
 
-[RTTMainMenu] Click flow completed: media at 6.136s (total: +238.1ms)
+[RTTFileGrid] GetVisibleRowsForPagination: height=748.1688, availableHeight=728.1688, rowHeight=350, rowsFloat=2.080482, visibleRows=2
 
-[RTTAppManager] Fade out done: media at 6.253s (+117.7ms)
+Coroutine couldn't be started because the the game object 'FileGrid' is inactive!
+UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
+RTTFileGrid:ScrollToPage (int,int) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileGrid.cs:505)
+RTTFileManager:ScrollToPage (int) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:3192)
+RTTFileManagerController:UpdateView (bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:621)
+RTTFileManagerController/<NavigateToInternalAsync>d__39:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:328)
+UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
+
+Coroutine couldn't be started because the the game object 'MarqueeMask' is inactive!
+UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
+MarqueeText:SetText (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/MarqueeText.cs:156)
+RTTFileDetail:AddMetadataRow (string,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:566)
+RTTFileDetail:CreateMetadataForFolder (MockFile,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:443)
+RTTFileDetail:UpdateMetadata (MockFile,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:341)
+RTTFileDetail:UpdateInfo (MockFile,bool,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:199)
+RTTFileManager:UpdateDetail (MockFile,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:3514)
+RTTFileManagerController:UpdateDetailView () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:691)
+RTTFileManagerController/<NavigateToInternalAsync>d__39:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:329)
+UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
+
+Coroutine couldn't be started because the the game object 'MarqueeMask' is inactive!
+UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
+MarqueeText:SetText (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/MarqueeText.cs:156)
+RTTFileDetail:AddMetadataRow (string,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:566)
+RTTFileDetail:CreateMetadataForFolder (MockFile,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:444)
+RTTFileDetail:UpdateMetadata (MockFile,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:341)
+RTTFileDetail:UpdateInfo (MockFile,bool,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileDetail.cs:199)
+RTTFileManager:UpdateDetail (MockFile,bool) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:3514)
+RTTFileManagerController:UpdateDetailView () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:691)
+RTTFileManagerController/<NavigateToInternalAsync>d__39:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:329)
+UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
+
+[Detail] UpdateInfo: Admin name=0ms preview=0ms metadata=4ms total=4ms
+
+[RTTFileManagerController] PrepareDataAsync completed: 91 files
+
+[RTTMainMenu] Button animation ended: folder at 6.444s (+425.2ms)
+
+[RTTMainMenu] OpenPreparedApp called: folder at 6.444s (+425.2ms)
+
+[RTTAppManager] WaitAndSwitch started: folder at 6.445s
+
+[RTTAppManager] WaitAndSwitch app ready: folder at 6.445s (waited 0.1ms)
+
+[RTTAppManager] Starting transition: folder at 6.445s
+
+[RTTAppManager] Transition started: folder at 6.446s
+
+[RTTAppManager] Got 3 frames to animate: folder
+
+[RTTAppManager] Fade out MainMenu: folder at 6.446s
+
+[RTTMainMenu] Click flow completed: folder at 6.447s (total: +427.8ms)
+
+[RTTAppManager] Fade out done: folder at 6.541s (+95.4ms)
 
 [RTTAppManager] All frames activated with alpha=0: 3 frames
 
-[RTTAppManager] Sync point: media, IsDataReady=False at 6.262s
+[RTTAppManager] Sync point: folder, IsDataReady=True at 6.560s
 
-[AppStateCache] Disk cache hit for media
+[RTTAppManager] Data ready first - BindPreparedData: folder
 
-[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+[RTTFileGrid] Progressive binding started: 28 items queued
 
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4
+[RTTFileGrid] Progressive bind frame: 2 items, 26 remaining
 
-[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-38-48': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+[Detail] UpdateInfo: Admin name=0ms preview=0ms metadata=2ms total=2ms
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4
+[RTTFileManager] UpdateBreadcrumbs called with path: root, container null: False, instance: -66172
 
-[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+[RTTFileManagerController] BindPreparedData: Bound 91 files
 
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4
+[RTTAppManager] Fade in started: 3 frames at 6.578s
 
-[RTTMediaGridItem] Duration badge for 'videoplayback': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+[RTTFileGrid] Progressive bind frame: 3 items, 23 remaining
 
-[RTTMediaGridItem] Duration badge for 'Genshin-Impact 2026-1-26 12-24-11': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+[RTTFileGrid] Progressive bind frame: 2 items, 21 remaining
 
-[RTTMediaGridItem] Duration badge for 'video_client': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+[RTTFileGrid] Progressive bind frame: 2 items, 19 remaining
 
-[RTTMediaGridItem] Duration badge for 'Phàm Nhân Tu Tiên Tập 173 Vietsub': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+[RTTFileGrid] Progressive bind frame: 2 items, 17 remaining
 
-[RTTMediaGridItem] Duration badge for '7295785205012': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+[RTTFileGrid] Progressive bind frame: 2 items, 15 remaining
 
-[RTTMediaGrid] Auto-selecting first item: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57
+[RTTFileGrid] Progressive bind frame: 2 items, 13 remaining
 
-[Detail] REQUEST: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4
+[RTTFileGrid] Progressive bind frame: 2 items, 11 remaining
 
-[Cache] DISK READ: 0ms (95KB)
+[RTTFileGrid] Progressive bind frame: 2 items, 9 remaining
 
-[Cache] DISK DECODE: 3ms (512x267)
+[RTTAppManager] Fade in done: folder at 6.708s (+262.0ms)
 
-[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4 wait=20ms assign=0ms
+[RTTAppManager] OnAppShown called: folder at 6.708s
 
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4 name=1ms preview=20ms metadata=10ms total=31ms
+[RTTFileManagerController] OnAppShown called
 
-[RTTMediaGrid] Progressive binding started: 8 items queued, budgetMs=6
+[AppStateCache] Saved state for files with 30 items
 
-[RTTMediaGridItem] Duration badge for '7077543476647': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+[RTTFileManagerController] CacheCurrentState: Cached 30 items
 
-[RTTMediaGridItem] Duration badge for '7065774217733': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+[RTTAppManager] State cached after transition: folder
 
-[RTTMediaGridItem] Duration badge for 'Genshin_Impact_2025-09-10_11-32-27': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+[RTTTaskbar] RegisterApp called - slotIndex=1, icon=icon_folder
 
-[RTTMediaLibraryController] TryRestoreCachedState: Restored 16 items from cache (filtered from 16)
-
-[RTTAppManager] TryRestoreCachedState: media, success=True
-
-[RTTAppManager] Subscribed to OnDataPrepared: media
-
-[RTTAppManager] Fade in started: 3 frames at 6.373s
-
-[RTTMediaGridItem] Duration badge for 'FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD)': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[RTTMediaGridItem] Duration badge for 'Honkai  Star Rail 2025.05.21 - 15.03.08.01': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[RTTMediaGridItem] Duration badge for 'khác màu': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[VideoFrameExtractor] Seeking to 1.6s (video length: 7.9s)
-
-[RTTMediaGridItem] Duration badge for 'vết xước 2': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[RTTMediaGridItem] Duration badge for 'vết xước 1': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[RTTMediaGrid] Progressive binding complete: bound=8, skipped=0
-
-[MediaLibraryService] Loaded 1309 items from cache in 497ms (async, no File.Exists)
-
-[RTTMediaLibraryController] HandleCacheLoaded called
-
-[Cache] DISK READ: 0ms (99KB)
-
-[Cache] DISK DECODE: 2ms (512x267)
-
-[Cache] DISK READ: 0ms (109KB)
-
-[Cache] DISK READ: 0ms (115KB)
-
-[Cache] DISK READ: 0ms (206KB)
-
-[Cache] DISK DECODE: 3ms (512x288)
-
-[Cache] DISK READ: 0ms (199KB)
-
-[Cache] DISK DECODE: 4ms (512x288)
-
-[Cache] DISK READ: 0ms (117KB)
-
-[Cache] DISK DECODE: 2ms (512x230)
-
-[Cache] DISK READ: 0ms (122KB)
-
-[Cache] DISK READ: 0ms (120KB)
-
-[Cache] DISK READ: 1ms (265KB)
-
-[Cache] DISK DECODE: 4ms (512x230)
-
-[RTTFilePagination] UI Mismatch detected (TotalPages: 9 vs Children: 1). Forcing Rebuild.
-UnityEngine.Debug:LogWarning (object)
-RTTFilePagination:Update () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFilePagination.cs:613)
-
-[Cache] DISK READ: 0ms (77KB)
-
-[Cache] DISK DECODE: 2ms (512x238)
-
-[RTTAppManager] Fade in done: media at 6.647s (+511.3ms)
-
-[RTTAppManager] OnAppShown called: media at 6.647s
-
-[RTTMediaLibraryController] OnAppShown called, _view=exists
-
-[AppStateCache] Saved state for media with 16 items
-
-[RTTMediaLibraryController] CacheCurrentState: Cached 16 items
-
-[RTTAppManager] State cached after transition: media
-
-[RTTTaskbar] RegisterApp called - slotIndex=1, icon=icon_media
-
-[RTTTaskbar] SetSlotIcon - slot=AppBtn_AppSlot_1, icon=icon_media, slotIndex=1
+[RTTTaskbar] SetSlotIcon - slot=AppBtn_AppSlot_1, icon=icon_folder, slotIndex=1
 
 [RTTTaskbar] SetSlotIcon - removed 0 old children
 
-[RTTTaskbar] SetSlotIcon - created iconBtn=Btn_icon_media, slot.childCount now=1
+[RTTTaskbar] SetSlotIcon - created iconBtn=Btn_icon_folder, slot.childCount now=1
 
 [RTTTaskbar] Registered app slot 1, total apps: 1
 
@@ -354,281 +415,223 @@ RTTFilePagination:Update () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RT
 
 [RTTTaskbar] SelectSlot(1) called, current active: 1
 
-[RTTAppManager] Transition completed: media at 6.673s (total: 537.4ms)
+[RTTAppManager] Transition completed: folder at 6.745s (total: 299.1ms)
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-38-48.mp4
+[Detail] UpdateInfo: .cache name=0ms preview=0ms metadata=3ms total=3ms
 
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-38-48.mp4
+[Detail] UpdateInfo: Admin name=0ms preview=0ms metadata=3ms total=3ms
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
+[Detail] UpdateInfo: .antigravity name=0ms preview=0ms metadata=3ms total=3ms
 
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
+[Detail] UpdateInfo: .android name=0ms preview=0ms metadata=3ms total=3ms
 
-[VideoFrameExtractor] Async capture failed: LoadRawTextureData: not enough data provided (will result in overread)., using fallback
-UnityEngine.Debug:LogWarning (object)
-VideoFrameExtractor/<CaptureFrameAsync>d__20:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Services/VideoFrameExtractor.cs:511)
-UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
+[Controller] NavigateToInternalAsync: path='C:\Users\Admin\.android', restorePage=False, clickedFolder='C:\Users\Admin\.android'
 
-[VideoFrameExtractor] Successfully extracted frame for: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4
+[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android, container null: False, instance: -66172
 
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-38-48.mp4
+[Controller] CanCreateFolderHere called, _currentPath: 'C:\Users\Admin\.android'
 
-[VideoFrameExtractor] Seeking to 1.7s (video length: 8.6s)
+[FileSystemService] CanCreateFolderInPath called with path: 'C:\Users\Admin\.android'
 
-First video frame not zero: 2 (0.066667s). Result may be out of sync. Please make sure tracks all start at 0 in C:\Users\Admin\Downloads\videoplayback.mp4
+[FileSystemService] absolutePath: 'C:\Users\Admin\.android'
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\Genshin-Impact 2026-1-26 12-24-11.mp4
+[FileSystemService] Comparing normalizedAbsolute: 'C:\Users\Admin\.android' with normalizedRoot: 'C:\Users\Admin'
 
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\Genshin-Impact 2026-1-26 12-24-11.mp4
+[FileSystemService] isDeviceRoot: False
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Video\Phàm Nhân Tu Tiên Tập 173 Vietsub.mp4
+[FileSystemService] Write permission OK for: C:\Users\Admin\.android
 
-[VideoFrameExtractor] Successfully extracted frame for: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-38-48.mp4
+[Controller] CanCreateFolderHere result: True
 
-[Detail] REQUEST: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
+[RTTFileManager] UpdateNewFolderButtonState: canCreate=True
 
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
+[RTTFileManager] BoxCollider.enabled set to True
 
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4 name=0ms preview=2ms metadata=8ms total=10ms
+[RTTFileManager] New Folder button ENABLED - alpha=1
 
-[VideoFrameExtractor] Seeking to 8.2s (video length: 27.4s)
+[RTTFileManager] Created 2 breadcrumbs for path: C:\Users\Admin\.android
 
-[VideoFrameExtractor] Successfully extracted frame for: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
+[FileSystemService] Reading directory async: C:\Users\Admin\.android
 
-[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4 wait=638ms assign=0ms
+[FileSystemService] Found 7 items async (2 folders, 5 files)
 
-[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4 wait=0ms assign=0ms
+[Controller] CalculateTotalPages: totalFiles=7, pageSize=10, totalPages=1
 
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4 name=0ms preview=1ms metadata=8ms total=9ms
+[Detail] UpdateInfo: .android name=0ms preview=0ms metadata=2ms total=2ms
 
-[ThumbnailCache] Cleared 43 files from disk cache
+[Detail] UpdateInfo: cache name=0ms preview=0ms metadata=2ms total=2ms
 
-[MediaLibraryService] Library cache cleared
+[Detail] UpdateInfo: sdk name=0ms preview=0ms metadata=2ms total=2ms
 
-[MediaLibraryService] Starting directory scan in 4 locations: C:\Users\Admin\Videos, C:\Users\Admin\Pictures, C:\Users\Admin\Music, C:\Users\Admin\Downloads
+[Controller] NavigateToInternalAsync: path='C:\Users\Admin\.android\sdk', restorePage=False, clickedFolder='C:\Users\Admin\.android\sdk'
 
-[MediaLibraryService] Scanning: C:\Users\Admin\Videos
+[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android\sdk, container null: False, instance: -66172
 
-[MediaLibraryService] Scanning: C:\Users\Admin\Pictures
+[Controller] CanCreateFolderHere called, _currentPath: 'C:\Users\Admin\.android\sdk'
 
-[MediaLibraryService] Scanning: C:\Users\Admin\Music
+[FileSystemService] CanCreateFolderInPath called with path: 'C:\Users\Admin\.android\sdk'
 
-[MediaLibraryService] Scanning: C:\Users\Admin\Downloads
+[FileSystemService] absolutePath: 'C:\Users\Admin\.android\sdk'
 
-[MediaLibraryService] Found 1309 media files
+[FileSystemService] Comparing normalizedAbsolute: 'C:\Users\Admin\.android\sdk' with normalizedRoot: 'C:\Users\Admin'
 
-[MediaLibraryService] Saved 1309 items to cache (with metadata)
+[FileSystemService] Write permission OK for: C:\Users\Admin\.android\sdk
 
-[RTTMediaLibraryController] CacheCurrentState: No videos to cache
+[RTTFileManager] Created 3 breadcrumbs for path: C:\Users\Admin\.android\sdk
 
-[MediaLibraryService] Scan complete: 1309 media files (cached)
+[FileSystemService] Reading directory async: C:\Users\Admin\.android\sdk
 
-[RTTMediaGrid] Progressive binding complete: bound=3, skipped=5
+[FileSystemService] Found 8 items async (7 folders, 1 files)
 
-[MediaLibraryService] Starting background scan (existing: 1309 items)
+[Controller] CalculateTotalPages: totalFiles=8, pageSize=10, totalPages=1
 
-[MediaLibraryService] Background scan complete - no new items (147ms)
+[Detail] UpdateInfo: build-tools name=0ms preview=0ms metadata=2ms total=2ms
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Genshin_Impact_2025-09-10_11-32-27.mp4
+[Detail] UpdateInfo: .temp name=0ms preview=0ms metadata=2ms total=2ms
 
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Downloads\Genshin_Impact_2025-09-10_11-32-27.mp4
+[Detail] UpdateInfo: platforms name=0ms preview=0ms metadata=2ms total=2ms
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Compressed\FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD).mp4
+[Controller] NavigateToInternalAsync: path='C:\Users\Admin\.android\sdk\platforms', restorePage=False, clickedFolder='C:\Users\Admin\.android\sdk\platforms'
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\New folder\khác màu.mp4
+[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android\sdk\platforms, container null: False, instance: -66172
 
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\New folder\khác màu.mp4
+[Controller] CanCreateFolderHere called, _currentPath: 'C:\Users\Admin\.android\sdk\platforms'
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\New folder\vết xước 2.mp4
+[FileSystemService] CanCreateFolderInPath called with path: 'C:\Users\Admin\.android\sdk\platforms'
 
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\New folder\vết xước 2.mp4
+[FileSystemService] absolutePath: 'C:\Users\Admin\.android\sdk\platforms'
 
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: videoplayback.mp4
+[FileSystemService] Comparing normalizedAbsolute: 'C:\Users\Admin\.android\sdk\platforms' with normalizedRoot: 'C:\Users\Admin'
 
-[VideoFrameExtractor] Seeking to 10.0s (video length: 144.0s)
+[FileSystemService] No write permission for: C:\Users\Admin\.android\sdk\platforms
 
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\New folder\vết xước 1.mp4
+[RTTFileManager] Created 4 breadcrumbs for path: C:\Users\Admin\.android\sdk\platforms
 
-[VideoFrameExtractor] Successfully extracted frame for: videoplayback.mp4
+[FileSystemService] Reading directory async: C:\Users\Admin\.android\sdk\platforms
 
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: Genshin-Impact 2026-1-26 12-24-11.mp4
+[FileSystemService] Found 3 items async (3 folders, 0 files)
 
-[VideoFrameExtractor] Seeking to 10.0s (video length: 85.7s)
+[Controller] CalculateTotalPages: totalFiles=3, pageSize=10, totalPages=1
 
-[VideoFrameExtractor] Successfully extracted frame for: Genshin-Impact 2026-1-26 12-24-11.mp4
+[Detail] UpdateInfo: platforms name=0ms preview=0ms metadata=1ms total=1ms
 
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: video_client.mp4
+[Detail] UpdateInfo: android-36 name=0ms preview=0ms metadata=2ms total=2ms
 
-[VideoFrameExtractor] Seeking to 3.4s (video length: 11.4s)
+[Controller] NavigateToInternalAsync: path='C:\Users\Admin\.android\sdk\platforms\android-36', restorePage=False, clickedFolder='C:\Users\Admin\.android\sdk\platforms\android-36'
 
-[VideoFrameExtractor] Successfully extracted frame for: video_client.mp4
+[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android\sdk\platforms\android-36, container null: False, instance: -66172
 
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: Phàm Nhân Tu Tiên Tập 173 Vietsub.mp4
+[Controller] CanCreateFolderHere called, _currentPath: 'C:\Users\Admin\.android\sdk\platforms\android-36'
 
-[VideoFrameExtractor] Seeking to 10.0s (video length: 1118.9s)
+[FileSystemService] CanCreateFolderInPath called with path: 'C:\Users\Admin\.android\sdk\platforms\android-36'
 
-[RTTTaskbar] SelectSlot(0) called, current active: 1
+[FileSystemService] absolutePath: 'C:\Users\Admin\.android\sdk\platforms\android-36'
 
-[RTTTaskbar] Selected app with slot index 0
+[FileSystemService] Comparing normalizedAbsolute: 'C:\Users\Admin\.android\sdk\platforms\android-36' with normalizedRoot: 'C:\Users\Admin'
 
-[VRVideoProjectionSystem] Disposed
+[FileSystemService] No write permission for: C:\Users\Admin\.android\sdk\platforms\android-36
 
-[VirtualObjectsZoomController] Unregistered side panel: MediaNavigationPanel
+[RTTFileManager] Created 5 breadcrumbs for path: C:\Users\Admin\.android\sdk\platforms\android-36
 
-[VirtualObjectsZoomController] Unregistered side panel: MediaDetailPanel
+[FileSystemService] Reading directory async: C:\Users\Admin\.android\sdk\platforms\android-36
 
-[RTTMediaLibrary] Cleanup: Destroying _mediaActionBar
+[FileSystemService] Found 12 items async (4 folders, 8 files)
 
-[VRMediaAppController] Cleanup completed
+[Controller] CalculateTotalPages: totalFiles=12, pageSize=10, totalPages=2
 
-[RTTTaskbar] Unregistered app slot 1, remaining apps: 0
+[RTTFileGrid] Progressive binding started: 4 items queued
 
-[RTTAppManager] Closed app: media
+[RTTFileGrid] Progressive bind frame: 3 items, 1 remaining
 
-Destroying assets is not permitted to avoid data loss.
-If you really want to remove an asset use DestroyImmediate (theObject, true);
-UnityEngine.Object:Destroy (UnityEngine.Object)
-VRWorkspace.UI.HoverEffects.CursorChangeHoverEffect:Cleanup () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Effects/CursorChangeHoverEffect.cs:118)
-VRWorkspace.UI.HoverEffects.HoverEffectController:CleanupEffects () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Core/HoverEffectController.cs:311)
-VRWorkspace.UI.HoverEffects.HoverEffectController:OnDestroy () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Core/HoverEffectController.cs:318)
+[Detail] UpdateInfo: skins name=0ms preview=0ms metadata=2ms total=2ms
 
-[VideoFrameExtractor] Successfully extracted frame for: Phàm Nhân Tu Tiên Tập 173 Vietsub.mp4
+[RTTFileGrid] Progressive binding complete: 3 items bound total
 
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: 7295785205012.mp4
+[Detail] UpdateInfo: optional name=0ms preview=0ms metadata=2ms total=2ms
 
-[VideoFrameExtractor] Seeking to 3.4s (video length: 11.2s)
+[Detail] UpdateInfo: android-stubs-src.jar name=0ms preview=0ms metadata=4ms total=4ms
 
-[VideoFrameExtractor] Successfully extracted frame for: 7295785205012.mp4
+[Detail] UpdateInfo: data name=0ms preview=0ms metadata=2ms total=2ms
 
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: 7077543476647.mp4
+[Controller] NavigateToInternalAsync: path='C:\Users\Admin\.android\sdk\platforms\android-36\data', restorePage=False, clickedFolder='C:\Users\Admin\.android\sdk\platforms\android-36\data'
 
-[VideoFrameExtractor] Seeking to 1.8s (video length: 9.1s)
+[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android\sdk\platforms\android-36\data, container null: False, instance: -66172
 
-[VideoFrameExtractor] Successfully extracted frame for: 7077543476647.mp4
+[Controller] CanCreateFolderHere called, _currentPath: 'C:\Users\Admin\.android\sdk\platforms\android-36\data'
 
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: 7065774217733.mp4
+[FileSystemService] CanCreateFolderInPath called with path: 'C:\Users\Admin\.android\sdk\platforms\android-36\data'
 
-[VideoFrameExtractor] Seeking to 10.0s (video length: 77.6s)
+[FileSystemService] absolutePath: 'C:\Users\Admin\.android\sdk\platforms\android-36\data'
 
-[VideoFrameExtractor] Successfully extracted frame for: 7065774217733.mp4
+[FileSystemService] Comparing normalizedAbsolute: 'C:\Users\Admin\.android\sdk\platforms\android-36\data' with normalizedRoot: 'C:\Users\Admin'
 
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: Genshin_Impact_2025-09-10_11-32-27.mp4
+[FileSystemService] No write permission for: C:\Users\Admin\.android\sdk\platforms\android-36\data
 
-[VideoFrameExtractor] Seeking to 4.6s (video length: 15.2s)
+[RTTFileManager] Created 6 breadcrumbs for path: C:\Users\Admin\.android\sdk\platforms\android-36\data
 
-[RTTMainMenu] Click started: media at 102.277s
+[FileSystemService] Reading directory async: C:\Users\Admin\.android\sdk\platforms\android-36\data
 
-[RTTMainMenu] PrepareApp called: media at 102.277s (+0.1ms)
+[FileSystemService] Found 10 items async (1 folders, 9 files)
 
-[RTTAppManager] PrepareAppFrameAsync started: media at 102.277s
+[Controller] CalculateTotalPages: totalFiles=10, pageSize=10, totalPages=1
 
-[RTTAppManager] Frame created: media at 102.277s (+0.1ms)
+[RTTFileGrid] Progressive binding started: 2 items queued
 
-[RTTMainMenu] Button animation started: media at 102.278s (+0.4ms)
+[RTTFileGrid] Progressive bind frame: 2 items, 0 remaining
 
-[RTTAppManager] Creating content: media at 102.310s (+33.2ms)
+[Detail] UpdateInfo: res name=0ms preview=0ms metadata=2ms total=2ms
 
-[RTTMediaLibrary] CreateLeftPanelContent started at 102.316s
+[RTTFileGrid] Progressive binding complete: 2 items bound total
 
-[RTTMediaLibrary] Left panel content created at 102.320s
+[Detail] UpdateInfo: activity_actions.txt name=0ms preview=0ms metadata=3ms total=3ms
 
-[RTTMediaLibrary] CreateRightPanelContent started at 102.322s
+[Controller] NavigateToInternalAsync: path='C:\Users\Admin\.android\sdk\platforms\android-36\data\res', restorePage=False, clickedFolder='C:\Users\Admin\.android\sdk\platforms\android-36\data\res'
 
-[RTTMediaLibrary] Right panel content created at 102.328s
+[RTTFileManager] UpdateBreadcrumbs called with path: C:\Users\Admin\.android\sdk\platforms\android-36\data\res, container null: False, instance: -66172
 
-[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-140170
+[Controller] CanCreateFolderHere called, _currentPath: 'C:\Users\Admin\.android\sdk\platforms\android-36\data\res'
 
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4 name=0ms preview=1ms metadata=6ms total=7ms
+[FileSystemService] CanCreateFolderInPath called with path: 'C:\Users\Admin\.android\sdk\platforms\android-36\data\res'
 
-[RTTAppManager] Content created: media at 102.433s (+155.7ms)
+[FileSystemService] absolutePath: 'C:\Users\Admin\.android\sdk\platforms\android-36\data\res'
 
-[RTTAppManager] PrepareDataAsync started: media at 102.433s
+[FileSystemService] Comparing normalizedAbsolute: 'C:\Users\Admin\.android\sdk\platforms\android-36\data\res' with normalizedRoot: 'C:\Users\Admin'
 
-[RTTMediaLibraryController] PrepareDataAsync completed: 1309 videos
+[FileSystemService] No write permission for: C:\Users\Admin\.android\sdk\platforms\android-36\data\res
 
-[RTTAppManager] App prepared (hidden): media at 102.437s (total: 159.8ms)
+[EllipsisPopup] Creating popup: hiddenFolders=2, itemHeight=55, verticalPadding=13, popupHeight=136, width=264
 
-[RTTMainMenu] Button animation ended: media at 102.459s (+181.8ms)
+[EllipsisPopup] Item 0 '.android': yPos=-13, itemHeight=55
 
-[RTTMainMenu] OpenPreparedApp called: media at 102.459s (+181.9ms)
+[EllipsisPopup] Item 1 'sdk': yPos=-68, itemHeight=55
 
-[RTTAppManager] WaitAndSwitch started: media at 102.459s
+[RTTFileManager] Created 6 breadcrumbs for path: C:\Users\Admin\.android\sdk\platforms\android-36\data\res
 
-[RTTAppManager] WaitAndSwitch app ready: media at 102.459s (waited 0.0ms)
+[FileSystemService] Reading directory async: C:\Users\Admin\.android\sdk\platforms\android-36\data\res
 
-[RTTAppManager] Starting transition: media at 102.459s
+[FileSystemService] Found 2838 items async (2838 folders, 0 files)
 
-[RTTAppManager] Transition started: media at 102.459s
+[Controller] CalculateTotalPages: totalFiles=2838, pageSize=10, totalPages=284
 
-[RTTAppManager] Fade out MainMenu: media at 102.459s
+[RTTFileGrid] Progressive bind frame: 3 items, 25 remaining
 
-[RTTMainMenu] Click flow completed: media at 102.459s (total: +182.0ms)
+[Detail] UpdateInfo: animator name=0ms preview=0ms metadata=3ms total=3ms
 
-[RTTAppManager] Fade out done: media at 102.559s (+100.3ms)
+[RTTFileGrid] Progressive bind frame: 2 items, 5 remaining
 
-[RTTAppManager] Sync point: media, IsDataReady=True at 102.579s
+[RTTFileGrid] Progressive binding complete: 7 items bound total
 
-[RTTAppManager] Data ready first - BindPreparedData: media
+[Detail] UpdateInfo: res name=0ms preview=0ms metadata=3ms total=3ms
 
-[RTTMediaLibraryController] BindPreparedData: Bound 16 videos (filtered from 1309 by category 'videos')
+[Detail] UpdateInfo: anim-ldrtl name=0ms preview=0ms metadata=3ms total=3ms
 
-[RTTAppManager] Fade in started: 3 frames at 102.598s
+[Detail] UpdateInfo: color-car name=0ms preview=0ms metadata=3ms total=3ms
 
-[VideoFrameExtractor] Successfully extracted frame for: Genshin_Impact_2025-09-10_11-32-27.mp4
+[Detail] UpdateInfo: res name=0ms preview=1ms metadata=3ms total=4ms
 
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD).mp4
+[Detail] UpdateInfo: animator name=0ms preview=0ms metadata=4ms total=4ms
 
-[RTTAppManager] Fade in done: media at 102.789s (+330.3ms)
+[Detail] UpdateInfo: res name=0ms preview=0ms metadata=4ms total=4ms
 
-[RTTAppManager] OnAppShown called: media at 102.789s
-
-[RTTAppManager] Transition completed: media at 102.816s (total: 357.0ms)
-
-[VideoFrameExtractor] Seeking to 6.0s (video length: 19.9s)
-
-[MediaLibraryService] Background scan complete - no new items (187ms)
-
-[VideoFrameExtractor] Successfully extracted frame for: FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD).mp4
-
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: Honkai  Star Rail 2025.05.21 - 15.03.08.01.mp4
-
-[VideoFrameExtractor] Seeking to 10.0s (video length: 86.4s)
-
-[VideoFrameExtractor] Successfully extracted frame for: Honkai  Star Rail 2025.05.21 - 15.03.08.01.mp4
-
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: khác màu.mp4
-
-[VideoFrameExtractor] Seeking to 8.3s (video length: 27.8s)
-
-[VideoFrameExtractor] Successfully extracted frame for: khác màu.mp4
-
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: vết xước 2.mp4
-
-[VideoFrameExtractor] Seeking to 4.2s (video length: 14.1s)
-
-[VideoFrameExtractor] Successfully extracted frame for: vết xước 2.mp4
-
-[VideoFrameExtractor] No embedded thumbnail, extracting frame from video: vết xước 1.mp4
-
-[VideoFrameExtractor] Seeking to 4.0s (video length: 13.2s)
-
-[VideoFrameExtractor] Successfully extracted frame for: vết xước 1.mp4
-
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4 name=0ms preview=2ms metadata=10ms total=12ms
-
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4 name=1ms preview=0ms metadata=12ms total=13ms
-
-[Detail] REQUEST: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-38-48.mp4
-
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-38-48.mp4 name=1ms preview=0ms metadata=9ms total=10ms
-
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4 name=0ms preview=1ms metadata=10ms total=11ms
-
-[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4 wait=649ms assign=0ms
-
-[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4 wait=1176ms assign=0ms
-
-[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-23-57.mp4 wait=1102ms assign=0ms
-
-[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 09-38-48.mp4 wait=1717ms assign=0ms
+[Detail] UpdateInfo: anim name=0ms preview=0ms metadata=4ms total=4ms
 
