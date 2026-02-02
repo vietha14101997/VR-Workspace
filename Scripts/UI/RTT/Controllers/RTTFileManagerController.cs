@@ -293,6 +293,7 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
         bool fadeOutComplete = !useFade; // Skip waiting if no fade
         bool firstBatchReady = false;
         bool dataLoadComplete = false;
+        int quickCount = -1; // Estimated total count for pagination
         List<MockFile> firstBatchFiles = null;
         List<MockFile> loadedFiles = null;
 
@@ -305,6 +306,12 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
         // Start loading files async (runs in parallel with fade)
         StartCoroutine(FileSystemService.GetFilesAsync(
             path,
+            onQuickCount: (count) =>
+            {
+                // Quick count fires immediately - use for early pagination display
+                quickCount = count;
+                Debug.Log($"[Controller] Quick count received: {count} items");
+            },
             onFirstBatch: (files) =>
             {
                 firstBatchFiles = files;
@@ -340,10 +347,26 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
         // Reset to page 1 for now (will restore later if needed)
         _currentPage = 1;
 
-        // Update view with first batch - skip pagination until we have full data
-        // This prevents pagination from showing wrong page count (e.g., 1 page for 8 items)
-        UpdateView(true, skipPagination: !dataLoadComplete);
-        UpdateDetailView();
+        // Update view with first batch
+        if (!dataLoadComplete && quickCount > 0)
+        {
+            // Use quick count for early pagination display
+            // This shows pagination immediately with estimated total
+            UpdateView(true, skipPagination: true);
+            UpdateDetailView();
+
+            // Show pagination with estimated count
+            int estimatedTotalPages = Mathf.CeilToInt((float)quickCount / _pageSize);
+            _view?.UpdatePagination(_currentPage, estimatedTotalPages);
+            _view?.UpdateItemCount(quickCount);
+            Debug.Log($"[Controller] Showing early pagination with quick count: {quickCount} items, {estimatedTotalPages} pages");
+        }
+        else
+        {
+            // Small folder or data already complete - show actual pagination
+            UpdateView(true);
+            UpdateDetailView();
+        }
 
         // Fade in the new content (only if we used fade out)
         if (useFade)
@@ -446,6 +469,7 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
         // Start loading files async
         StartCoroutine(FileSystemService.GetFilesAsync(
             _currentPath,
+            onQuickCount: null, // Refresh doesn't need quick count
             onFirstBatch: null, // Refresh doesn't need first batch
             onProgress: null,
             onComplete: (files) =>
@@ -1527,6 +1551,7 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
 
         yield return FileSystemService.GetFilesAsync(
             pathToLoad,
+            onQuickCount: null, // PrepareDataAsync doesn't need quick count
             onFirstBatch: null, // PrepareDataAsync doesn't need first batch
             onProgress: null,
             onComplete: (files) =>
@@ -2088,10 +2113,11 @@ public static class FileSystemService
     /// Use this for directories that may contain many items.
     /// </summary>
     /// <param name="path">Directory path to read</param>
+    /// <param name="onQuickCount">Optional callback with estimated total count (fires immediately, before enumeration)</param>
     /// <param name="onFirstBatch">Optional callback when first 8 items are ready (for immediate display)</param>
     /// <param name="onProgress">Optional callback for progress updates (items loaded so far)</param>
     /// <param name="onComplete">Callback with the final list of files</param>
-    public static System.Collections.IEnumerator GetFilesAsync(string path, Action<List<MockFile>> onFirstBatch, Action<int> onProgress, Action<List<MockFile>> onComplete)
+    public static System.Collections.IEnumerator GetFilesAsync(string path, Action<int> onQuickCount, Action<List<MockFile>> onFirstBatch, Action<int> onProgress, Action<List<MockFile>> onComplete)
     {
         const int BATCH_SIZE = 50; // Yield every 50 items
         const int FIRST_BATCH_SIZE = 8; // Show first 8 items immediately
@@ -2106,6 +2132,7 @@ public static class FileSystemService
         if (!Directory.Exists(absolutePath))
         {
             Debug.LogWarning($"[FileSystemService] Directory not found: {absolutePath}");
+            onQuickCount?.Invoke(0);
             onComplete?.Invoke(list);
             yield break;
         }
@@ -2119,9 +2146,30 @@ public static class FileSystemService
         catch (Exception ex)
         {
             Debug.LogError($"[FileSystemService] Error getting directories: {ex.Message}");
+            onQuickCount?.Invoke(0);
             onComplete?.Invoke(list);
             yield break;
         }
+
+        // Get files array for quick count (very fast - just gets file names, no metadata)
+        string[] files;
+        try
+        {
+            files = Directory.GetFiles(absolutePath);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[FileSystemService] Error getting files: {ex.Message}");
+            onQuickCount?.Invoke(directories.Length);
+            onComplete?.Invoke(list);
+            yield break;
+        }
+
+        // === QUICK COUNT: Fire immediately with estimated total ===
+        // Note: This is an estimate - actual count may be less due to hidden/system files being filtered
+        int estimatedTotal = directories.Length + files.Length;
+        Debug.Log($"[FileSystemService] Quick count: {estimatedTotal} items (dirs={directories.Length}, files={files.Length})");
+        onQuickCount?.Invoke(estimatedTotal);
 
         foreach (string dirPath in directories)
         {
@@ -2185,19 +2233,7 @@ public static class FileSystemService
             }
         }
 
-        // Get files
-        string[] files;
-        try
-        {
-            files = Directory.GetFiles(absolutePath);
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError($"[FileSystemService] Error getting files: {ex.Message}");
-            onComplete?.Invoke(list);
-            yield break;
-        }
-
+        // Process files (files array already obtained for quick count above)
         foreach (string filePath in files)
         {
             // Process file in try block
