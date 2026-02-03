@@ -506,7 +506,8 @@ public class RTTFileDetail : MonoBehaviour
     private void CreateMetadataForOther(MockFile file)
     {
         // Other: Type, Size, Date modified
-        AddMetadataRow("Type", file.Type.ToUpper());
+        string fileType = !string.IsNullOrEmpty(file.Type) ? file.Type.ToUpper() : (file.IsFolder ? "FOLDER" : "FILE");
+        AddMetadataRow("Type", fileType);
         AddMetadataRow("Size", FileSystemService.FormatFileSize(file.Size));
         AddMetadataRow("Date modified", FormatDate(file.Modified));
     }

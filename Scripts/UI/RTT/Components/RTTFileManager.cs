@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Threading;
 using VRWorkspace.UI.HoverEffects;
 using VRWorkspace.UI.Config;
+using VRWorkspace.UI.Utilities;
 
 /// <summary>
 /// Main View for File Manager App.
@@ -245,8 +246,6 @@ public class RTTFileManager : MonoBehaviour
 
     public void BuildUI()
     {
-        Debug.Log("[RTTFileManager] Building UI...");
-
         // Load saved preferences
         LoadViewPreferences();
 
@@ -274,7 +273,6 @@ public class RTTFileManager : MonoBehaviour
         _currentSortBy = PlayerPrefs.GetString(PREF_SORT_BY, "Name");
         _isAscending = PlayerPrefs.GetInt(PREF_SORT_ASCENDING, 1) == 1;
         _isGridView = PlayerPrefs.GetInt(PREF_IS_GRID_VIEW, 1) == 1;
-        Debug.Log($"[RTTFileManager] Loaded preferences: sortBy={_currentSortBy}, ascending={_isAscending}, gridView={_isGridView}");
     }
 
     private void SaveViewPreferences()
@@ -538,8 +536,6 @@ public class RTTFileManager : MonoBehaviour
         // During preparation, the frame is at +1000 units but pagination is at normal position (near taskbar)
         _viewReady = true;
 
-        Debug.Log($"[RTTFileManager] Before OnViewReady - breadcrumb container null: {_breadcrumbContainer == null}, instance: {GetInstanceID()}");
-
         // Apply saved sort options to controller before loading data (without triggering refresh)
         _controller?.SetSortOptionsNoRefresh(_currentSortBy, _isAscending);
 
@@ -560,22 +556,16 @@ public class RTTFileManager : MonoBehaviour
 
         // Use fixed page sizes: Grid=8, List=6
         int itemsPerPage = _isGridView ? GRID_PAGE_SIZE : LIST_PAGE_SIZE;
-        Debug.Log($"[RTTFileManager] InitializePageSizeDeferred: view={(_isGridView ? "Grid" : "List")}, itemsPerPage={itemsPerPage}");
-
         _controller?.SetPageSize(itemsPerPage);
     }
 
     private void CreateHeaderRows(RectTransform parent)
     {
-        Debug.Log($"[RTTFileManager] CreateHeaderRows started, instance: {GetInstanceID()}");
-
         // Row 1: Sort | Search | Edit
         CreateRow1(parent);
 
         // Row 2: Breadcrumbs (or Edit Controls in Edit Mode) | Item Count | Refresh
         CreateRow2(parent);
-
-        Debug.Log($"[RTTFileManager] CreateHeaderRows completed, breadcrumb null: {_breadcrumbContainer == null}");
     }
 
     // View Options Popup References
@@ -717,8 +707,6 @@ public class RTTFileManager : MonoBehaviour
         _newFolderButton = newFolderBtn.GetComponentInChildren<Button>();
         _newFolderCanvasGroup = newFolderBtn.AddComponent<CanvasGroup>();
 
-        Debug.Log($"[RTTFileManager] New Folder button created, _newFolderButton null: {_newFolderButton == null}");
-
         // Update button state immediately based on current path permission
         UpdateNewFolderButtonState();
 
@@ -728,10 +716,7 @@ public class RTTFileManager : MonoBehaviour
     
     private void ToggleViewOptionsPopup()
     {
-        Debug.Log($"[RTTFileManager] ToggleViewOptionsPopup called, popup null: {_viewOptionsPopup == null}");
         if (_viewOptionsPopup == null) return;
-
-        Debug.Log($"[RTTFileManager] Popup IsVisible: {_viewOptionsPopup.IsVisible}");
 
         if (_viewOptionsPopup.IsVisible)
         {
@@ -747,8 +732,6 @@ public class RTTFileManager : MonoBehaviour
     
     private void CreateViewOptionsPopup(Transform parent)
     {
-        Debug.Log($"[RTTFileManager] CreateViewOptionsPopup, _menuFrame null: {_menuFrame == null}");
-
         // Create popup config with consistent button styling from UIConstants
         var config = new RTTPopupMenu.PopupConfig
         {
@@ -775,8 +758,6 @@ public class RTTFileManager : MonoBehaviour
         // Create world-space popup (like RTTPopupInputable)
         // Pass _menuFrame.transform as reference for positioning
         _viewOptionsPopup = RTTPopupMenu.CreateWorldSpace(config, _menuFrame.transform);
-
-        Debug.Log($"[RTTFileManager] ViewOptionsPopup created, null: {_viewOptionsPopup == null}");
 
         // Build popup content
         BuildViewOptionsPopupContent();
@@ -807,8 +788,6 @@ public class RTTFileManager : MonoBehaviour
         float offsetY = (_containerHeight / 2f) - headerHeight - gapFromButton - (estimatedPopupHeight / 2f);
 
         _viewOptionsPopup.SetPositionOffset(new Vector2(offsetX, offsetY));
-
-        Debug.Log($"[RTTFileManager] ViewOptionsPopup position offset: ({offsetX}, {offsetY})");
     }
     
     private void BuildViewOptionsPopupContent()
@@ -883,7 +862,6 @@ public class RTTFileManager : MonoBehaviour
         // Grid: 8 items (2 rows x 4 columns)
         // List: 6 items
         int itemsPerPage = isGrid ? GRID_PAGE_SIZE : LIST_PAGE_SIZE;
-        Debug.Log($"[RTTFileManager] SetDisplayMode({(isGrid ? "Grid" : "List")}): itemsPerPage={itemsPerPage}");
         _controller?.SetPageSize(itemsPerPage);
 
         // Refresh content with current data (keep page position)
@@ -896,7 +874,6 @@ public class RTTFileManager : MonoBehaviour
     private void SetSortBy(string sortBy)
     {
         _currentSortBy = sortBy;
-        Debug.Log($"[RTTFileManager] Sort by: {sortBy}");
 
         // Update sort trigger text
         if (_sortTriggerText != null)
@@ -923,7 +900,6 @@ public class RTTFileManager : MonoBehaviour
     private void ToggleSortOrder()
     {
         _isAscending = !_isAscending;
-        Debug.Log($"[RTTFileManager] Order: {(_isAscending ? "Ascending" : "Descending")}");
 
         // Update list view sort state if visible
         if (!_isGridView && _fileList != null)
@@ -986,8 +962,6 @@ public class RTTFileManager : MonoBehaviour
             onClick: (path, isFolder) => OnItemClicked(path, isFolder)
         );
         _fileList.SetSelectionChangedCallback(OnSelectionChanged);
-
-        Debug.Log("[RTTFileManager] List view created");
     }
 
     private void OnListHeaderColumnClicked(string columnName)
@@ -1041,7 +1015,6 @@ public class RTTFileManager : MonoBehaviour
 
     private void CreateRow2(RectTransform parent)
     {
-        Debug.Log("[RTTFileManager] CreateRow2 called");
         // Position Row2 below Row1 with spacing
         float row2Y = -(_singleRowHeight + _rowSpacing);
         RectTransform rowRT = CreateRowContainer(parent, "Row2", row2Y);
@@ -1127,7 +1100,6 @@ public class RTTFileManager : MonoBehaviour
         GameObject crumbContainer = new GameObject("Breadcrumbs");
         crumbContainer.transform.SetParent(rowRT, false);
         _breadcrumbContainer = crumbContainer.transform;
-        Debug.Log($"[RTTFileManager] Breadcrumb container set: {_breadcrumbContainer != null}, instance: {GetInstanceID()}");
 
         RectTransform crumbRT = crumbContainer.AddComponent<RectTransform>();
         crumbRT.anchorMin = new Vector2(0, 0);
@@ -1171,18 +1143,12 @@ public class RTTFileManager : MonoBehaviour
         editRT.offsetMin = new Vector2(20, 0);
         editRT.offsetMax = new Vector2(-320, 0);
 
-        Debug.Log($"[RTTFileManager] EditControls container created - parent: {rowRT.name}, sizeDelta: {editRT.sizeDelta}, rect: {editRT.rect}, instanceID: {editControlsObj.GetInstanceID()}");
-
         // Create Edit Controls inside the container BEFORE setting inactive
         // This ensures components initialize correctly
         CreateEditControlsInRow2(editRT);
 
-        Debug.Log($"[RTTFileManager] EditControls child count after creation: {editControlsObj.transform.childCount}");
-        Debug.Log($"[RTTFileManager] _editControlsContainer reference instanceID: {_editControlsContainer.GetInstanceID()}, same object: {_editControlsContainer == editControlsObj}");
-
         // Hide after creating children
         editControlsObj.SetActive(false);
-        Debug.Log($"[RTTFileManager] EditControls set to inactive, activeSelf: {editControlsObj.activeSelf}");
 
         // NOTE: NOT using HorizontalLayoutGroup to allow independent control of:
         // - Visual position (left to right)
@@ -1191,8 +1157,6 @@ public class RTTFileManager : MonoBehaviour
 
     private void CreateEditControlsInRow2(RectTransform parent)
     {
-        Debug.Log($"[RTTFileManager] CreateEditControlsInRow2 called, parent: {parent?.name}, parent active: {parent?.gameObject.activeInHierarchy}");
-
         // Select All Checkbox (at left edge)
         CreateSelectAllCheckbox(parent);
 
@@ -1211,7 +1175,6 @@ public class RTTFileManager : MonoBehaviour
 
         // Rename button - with wider width to prevent text wrapping
         var renameBtn = CreateEditModeActionButton(parent, "Rename", "icon_rename", OnRenameClicked, minTextWidth: 130f);
-        Debug.Log($"[RTTFileManager] Rename button created: {renameBtn?.name}");
         var renameRT = renameBtn.GetComponent<RectTransform>();
         renameRT.anchorMin = renameRT.anchorMax = new Vector2(0.5f, 0.5f);
         renameRT.pivot = new Vector2(0, 0.5f);
@@ -1222,7 +1185,6 @@ public class RTTFileManager : MonoBehaviour
 
         // Copy button
         var copyBtn = CreateEditModeActionButton(parent, "Copy", "icon_copy", OnCopyClicked);
-        Debug.Log($"[RTTFileManager] Copy button created: {copyBtn?.name}");
         var copyRT = copyBtn.GetComponent<RectTransform>();
         copyRT.anchorMin = copyRT.anchorMax = new Vector2(0.5f, 0.5f);
         copyRT.pivot = new Vector2(0, 0.5f);
@@ -1257,8 +1219,6 @@ public class RTTFileManager : MonoBehaviour
 
         // Initially disable buttons (no selection)
         UpdateActionButtonsState();
-
-        Debug.Log($"[RTTFileManager] CreateEditControlsInRow2 completed - Rename: {_renameButton != null}, Copy: {_copyButton != null} (size: {copyRT.sizeDelta}), Move: {_moveButton != null} (size: {moveRT.sizeDelta}), Delete: {_deleteButton != null} (size: {deleteRT.sizeDelta})");
     }
 
     private void CreateSelectAllCheckbox(RectTransform parent)
@@ -1380,7 +1340,6 @@ public class RTTFileManager : MonoBehaviour
 
         // Icon (white color)
         Sprite icon = Resources.Load<Sprite>(iconName);
-        Debug.Log($"[RTTFileManager] CreateEditModeActionButton: {label}, icon '{iconName}' loaded: {icon != null}");
         Image iconImg = null;
         if (icon != null)
         {
@@ -1457,12 +1416,7 @@ public class RTTFileManager : MonoBehaviour
     /// </summary>
     private void ToggleEditMode(bool skipRestore = false)
     {
-        Debug.Log($"[RTTFileManager] ToggleEditMode CALLED - _isEditMode before: {_isEditMode}, skipRestore: {skipRestore}");
-
         _isEditMode = !_isEditMode;
-
-        Debug.Log($"[RTTFileManager] ToggleEditMode - _isEditMode after toggle: {_isEditMode}");
-        Debug.Log($"[RTTFileManager] ToggleEditMode - _editControlsContainer: {(_editControlsContainer != null ? $"{_editControlsContainer.name} (ID:{_editControlsContainer.GetInstanceID()})" : "NULL")}, _breadcrumbContainer: {(_breadcrumbContainer != null ? _breadcrumbContainer.name : "NULL")}");
 
         UpdateEditButtonVisual();
 
@@ -1471,11 +1425,7 @@ public class RTTFileManager : MonoBehaviour
             _breadcrumbContainer.gameObject.SetActive(!_isEditMode);
         if (_editControlsContainer != null)
         {
-            // Explicitly set active state
-            bool beforeState = _editControlsContainer.activeSelf;
             _editControlsContainer.SetActive(_isEditMode);
-            bool afterState = _editControlsContainer.activeSelf;
-            Debug.Log($"[RTTFileManager] EditControls activeSelf before: {beforeState}, after: {afterState}, expected: {_isEditMode}");
 
             // Force layout rebuild if entering edit mode
             if (_isEditMode)
@@ -1487,27 +1437,6 @@ public class RTTFileManager : MonoBehaviour
                     LayoutRebuilder.ForceRebuildLayoutImmediate(rt);
                 }
             }
-
-            Debug.Log($"[RTTFileManager] EditControls SetActive({_isEditMode}) called, now activeSelf: {_editControlsContainer.activeSelf}, activeInHierarchy: {_editControlsContainer.activeInHierarchy}");
-            // Check parent hierarchy
-            Transform parent = _editControlsContainer.transform.parent;
-            while (parent != null)
-            {
-                Debug.Log($"[RTTFileManager] Parent: {parent.name}, activeSelf: {parent.gameObject.activeSelf}");
-                parent = parent.parent;
-            }
-            Debug.Log($"[RTTFileManager] EditControls child count: {_editControlsContainer.transform.childCount}");
-            // Log all children for debugging
-            for (int i = 0; i < _editControlsContainer.transform.childCount; i++)
-            {
-                var child = _editControlsContainer.transform.GetChild(i);
-                var childRT = child as RectTransform;
-                Debug.Log($"[RTTFileManager] EditControls child[{i}]: {child.name}, active: {child.gameObject.activeSelf}, pos: {(childRT != null ? childRT.anchoredPosition.ToString() : "N/A")}");
-            }
-        }
-        else
-        {
-            Debug.LogError("[RTTFileManager] _editControlsContainer is NULL in ToggleEditMode!");
         }
 
         // Show/hide selected count text
@@ -1521,9 +1450,8 @@ public class RTTFileManager : MonoBehaviour
         // Handle detail panel and action bar visibility based on edit mode
         if (_isEditMode)
         {
-            // Entering edit mode: clear controller's selected file state
-            // This ensures hover/unhover shows current folder when not hovering
-            _controller?.ClearSelectedFile();
+            // Entering edit mode: lock detail panel to current folder
+            _controller?.SetDetailLocked(true);
 
             // Show current folder info and hide action bar
             if (_controller != null && _fileDetail != null)
@@ -1546,6 +1474,9 @@ public class RTTFileManager : MonoBehaviour
             // Only restore detail panel if not transitioning to clipboard mode
             if (!skipRestore)
             {
+                // Unlock detail panel (allow hover to show file details)
+                _controller?.SetDetailLocked(false);
+
                 // Restore detail panel if there was a selected file
                 if (_hasSelectedFile && _currentDisplayedFile.Path != null)
                 {
@@ -1586,8 +1517,6 @@ public class RTTFileManager : MonoBehaviour
                 }
             }
         }
-
-        Debug.Log($"[RTTFileManager] Edit Mode: {_isEditMode}");
     }
 
     private void UpdateSelectedCountText()
@@ -1608,18 +1537,52 @@ public class RTTFileManager : MonoBehaviour
     {
         if (_editButton == null) return;
 
-        // Find icon and change sprite
-        var iconImg = _editButton.transform.Find("HitArea/Visuals/Content/Icon")?.GetComponent<Image>();
-        if (iconImg != null)
-        {
-            iconImg.sprite = Resources.Load<Sprite>(_isEditMode ? "icon_check_mark" : "icon_edit");
-        }
-
-        // Calculate target color (lerp with white like VRButtonFactory does)
+        // Determine target color based on mode (Edit/Clipboard = accent, normal = primary)
         Color themeColor = _isEditMode ? _accentColor : _primaryColor;
         Color glowColor = Color.Lerp(themeColor, Color.white, 0.75f);
 
-        // Update GlowBorderHoverEffect's saved color so it persists through hover state changes
+        // 1. Update icon sprite and tint color
+        var iconTransform = _editButton.transform.Find("HitArea/Visuals/Content/Icon");
+        if (iconTransform != null)
+        {
+            var iconImg = iconTransform.GetComponent<Image>();
+            if (iconImg != null)
+            {
+                iconImg.sprite = Resources.Load<Sprite>(_isEditMode ? "icon_check_mark" : "icon_edit");
+                iconImg.color = UIGlowEffects.CreateIconTintColor(themeColor);
+            }
+            // Update icon shadow glow colors
+            UIGlowEffects.UpdateShadowColors(iconTransform.gameObject, themeColor);
+        }
+
+        // 2. Update background material colors
+        var bgTransform = _editButton.transform.Find("HitArea/Visuals/Background");
+        if (bgTransform != null)
+        {
+            var bgImage = bgTransform.GetComponent<Image>();
+            if (bgImage != null && bgImage.material != null)
+            {
+                // Match MaterialFactory.CreateGlassBackground color formula
+                float backgroundAlpha = 0.08f;
+                Color colorA = new Color(themeColor.r, themeColor.g, themeColor.b, backgroundAlpha * 1.5f);
+                Color colorB = new Color(themeColor.r, themeColor.g, themeColor.b, backgroundAlpha * 0.5f);
+                bgImage.material.SetColor("_ColorA", colorA);
+                bgImage.material.SetColor("_ColorB", colorB);
+            }
+        }
+
+        // 3. Update border glow color
+        var borderTransform = _editButton.transform.Find("HitArea/Visuals/Border");
+        if (borderTransform != null)
+        {
+            var borderImage = borderTransform.GetComponent<Image>();
+            if (borderImage != null && borderImage.material != null && borderImage.material.HasProperty("_GlowColor"))
+            {
+                borderImage.material.SetColor("_GlowColor", glowColor);
+            }
+        }
+
+        // 4. Update GlowBorderHoverEffect's saved color so it persists through hover state changes
         var hoverController = _editButton.transform.Find("HitArea")?.GetComponent<HoverEffectController>();
         if (hoverController != null)
         {
@@ -1824,8 +1787,8 @@ public class RTTFileManager : MonoBehaviour
         _fileGrid?.SetClipboardMode(true);
         _fileList?.SetClipboardMode(true);
 
-        // 3. Clear selection state and show current folder info (like edit mode)
-        _controller?.ClearSelectedFile();
+        // 3. Lock detail panel and show current folder info (like edit mode)
+        _controller?.SetDetailLocked(true);
         if (_controller != null && _fileDetail != null)
         {
             var folderInfo = _controller.GetCurrentFolderInfo();
@@ -1888,6 +1851,9 @@ public class RTTFileManager : MonoBehaviour
             editBtn.interactable = true;
         }
 
+        // Unlock detail panel (allow hover to show file details)
+        _controller?.SetDetailLocked(false);
+
         // Restore detail panel - prioritize grid's selected path (more reliable)
         string selectedPath = _isGridView
             ? _fileGrid?.GetSelectedFilePath()
@@ -1944,15 +1910,56 @@ public class RTTFileManager : MonoBehaviour
     {
         if (_editButton == null) return;
 
-        // Update glow border color - GlowBorderHoverEffect is accessed through HoverEffectController
+        // Apply same color mixing as MaterialFactory.CreateGlowBorder:
+        // "Glow color is theme color mixed with white"
+        Color glowColor = Color.Lerp(color, Color.white, 0.75f);
+
+        // 1. Update icon tint color and shadow glow
+        var iconTransform = _editButton.transform.Find("HitArea/Visuals/Content/Icon");
+        if (iconTransform != null)
+        {
+            var iconImg = iconTransform.GetComponent<Image>();
+            if (iconImg != null)
+            {
+                iconImg.color = UIGlowEffects.CreateIconTintColor(color);
+            }
+            // Update icon shadow glow colors
+            UIGlowEffects.UpdateShadowColors(iconTransform.gameObject, color);
+        }
+
+        // 2. Update background material colors
+        var bgTransform = _editButton.transform.Find("HitArea/Visuals/Background");
+        if (bgTransform != null)
+        {
+            var bgImage = bgTransform.GetComponent<Image>();
+            if (bgImage != null && bgImage.material != null)
+            {
+                // Match MaterialFactory.CreateGlassBackground color formula
+                float backgroundAlpha = 0.08f;
+                Color colorA = new Color(color.r, color.g, color.b, backgroundAlpha * 1.5f);
+                Color colorB = new Color(color.r, color.g, color.b, backgroundAlpha * 0.5f);
+                bgImage.material.SetColor("_ColorA", colorA);
+                bgImage.material.SetColor("_ColorB", colorB);
+            }
+        }
+
+        // 3. Update border glow color directly
+        var borderTransform = _editButton.transform.Find("HitArea/Visuals/Border");
+        if (borderTransform != null)
+        {
+            var borderImage = borderTransform.GetComponent<Image>();
+            if (borderImage != null && borderImage.material != null && borderImage.material.HasProperty("_GlowColor"))
+            {
+                borderImage.material.SetColor("_GlowColor", glowColor);
+            }
+        }
+
+        // 4. Update GlowBorderHoverEffect's saved color so it persists through hover state changes
         var hoverController = _editButton.GetComponentInChildren<HoverEffectController>();
         if (hoverController != null)
         {
             var glowEffect = hoverController.GetEffect("glow_border") as GlowBorderHoverEffect;
-            if (glowEffect != null)
-            {
-                glowEffect.UpdateSavedGlowColor(color);
-            }
+            glowEffect?.UpdateSavedGlowColor(glowColor);
         }
     }
 
@@ -2388,33 +2395,47 @@ public class RTTFileManager : MonoBehaviour
             _deleteConfirmPopup.Hide();
         }
 
-        // Exit edit mode if we were in it
-        if (_isEditMode)
-        {
-            ToggleEditMode();
-        }
+        // Remember if we were in edit mode to exit after delete
+        bool wasInEditMode = _isEditMode;
 
         // Create cancellation source and pause token
         _operationCts = new CancellationTokenSource();
         _pauseToken = new FileOperationService.PauseToken();
 
-        // Create and show progress popup
-        if (_progressPopup == null)
-        {
-            CreateProgressPopup();
-        }
-
-        _progressPopup.Show("Deleting Files...", OnOperationCancel, OnOperationPauseToggle);
-
-        // Create progress reporter
-        var progress = new Progress<FileOperationService.FileOperationProgress>(p =>
-        {
-            _progressPopup.UpdateProgress(p);
-        });
-
         try
         {
-            await _controller.DeleteItemsAsync(pathsToDelete, progress, _operationCts.Token, _pauseToken);
+            // Create and show progress popup
+            if (_progressPopup == null)
+            {
+                Debug.Log("[RTTFileManager] Creating progress popup...");
+                CreateProgressPopup();
+            }
+
+            if (_progressPopup == null)
+            {
+                Debug.LogError("[RTTFileManager] Progress popup is null after creation!");
+            }
+            else
+            {
+                _progressPopup.Show("Deleting Files...", OnOperationCancel, OnOperationPauseToggle);
+            }
+
+            // Create progress reporter
+            var progress = new Progress<FileOperationService.FileOperationProgress>(p =>
+            {
+                _progressPopup?.UpdateProgress(p);
+            });
+
+            Debug.Log($"[RTTFileManager] Starting delete for paths: {string.Join(", ", pathsToDelete)}");
+
+            if (_controller == null)
+            {
+                Debug.LogError("[RTTFileManager] Controller is null! Cannot delete.");
+                return;
+            }
+
+            var result = await _controller.DeleteItemsAsync(pathsToDelete, progress, _operationCts.Token, _pauseToken);
+            Debug.Log($"[RTTFileManager] Delete operation completed: {result.SuccessCount} succeeded, {result.FailCount} failed");
         }
         catch (OperationCanceledException)
         {
@@ -2422,13 +2443,28 @@ public class RTTFileManager : MonoBehaviour
         }
         catch (Exception e)
         {
-            Debug.LogError($"[RTTFileManager] Delete operation failed: {e.Message}");
+            Debug.LogError($"[RTTFileManager] Delete operation failed: {e.Message}\n{e.StackTrace}");
         }
         finally
         {
             _progressPopup?.Hide();
             _operationCts?.Dispose();
             _operationCts = null;
+
+            // Exit edit mode AFTER delete is done (use skipRestore=true since files are deleted)
+            if (wasInEditMode && _isEditMode)
+            {
+                try
+                {
+                    ToggleEditMode(skipRestore: true);
+                }
+                catch (Exception e)
+                {
+                    Debug.LogWarning($"[RTTFileManager] Error exiting edit mode after delete: {e.Message}");
+                    // Force exit edit mode even if there's an error
+                    _isEditMode = false;
+                }
+            }
         }
     }
 

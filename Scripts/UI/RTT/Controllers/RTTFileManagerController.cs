@@ -770,8 +770,25 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
 
     public void HoverFile(string path)
     {
+         // Unlock detail panel when hovering (allows preview on hover)
+         _lockDetailToCurrentFolder = false;
          _hoveredFile = _currentDirectoryFiles.Find(f => f.Path == path);
          UpdateDetailView();
+    }
+
+    /// <summary>
+    /// Lock/unlock detail panel to current folder info.
+    /// Used by view when entering/exiting edit mode or clipboard mode.
+    /// </summary>
+    public void SetDetailLocked(bool locked)
+    {
+        _lockDetailToCurrentFolder = locked;
+        if (locked)
+        {
+            _hoveredFile = null;
+            _selectedFile = null;
+        }
+        UpdateDetailView();
     }
     
     public void UnhoverFile(string path)
