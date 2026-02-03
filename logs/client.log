@@ -1,0 +1,4 @@
+Assets\VR-Workspace\Scripts\UI\RTT\Services\FileThumbnailService.cs(389,32): error CS1061: 'ThumbnailCache' does not contain a definition for 'Get' and no accessible extension method 'Get' accepting a first argument of type 'ThumbnailCache' could be found (are you missing a using directive or an assembly reference?)
+
+Assets\VR-Workspace\Scripts\UI\RTT\Services\FileThumbnailService.cs(393,20): error CS1061: 'ThumbnailCache' does not contain a definition for 'Add' and no accessible extension method 'Add' accepting a first argument of type 'ThumbnailCache' could be found (are you missing a using directive or an assembly reference?)
+

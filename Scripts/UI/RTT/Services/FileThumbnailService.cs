@@ -371,6 +371,30 @@ public class FileThumbnailService : MonoBehaviour
     }
 
     /// <summary>
+    /// Rename thumbnail cache entry when a file is renamed.
+    /// Transfers the cached thumbnail from old path to new path.
+    /// </summary>
+    /// <param name="oldPath">Original file path</param>
+    /// <param name="newPath">New file path after rename</param>
+    public void RenameThumbnailCache(string oldPath, string newPath)
+    {
+        if (string.IsNullOrEmpty(oldPath) || string.IsNullOrEmpty(newPath)) return;
+
+        string oldCacheKey = ThumbnailCacheKeyHelper.GetCacheKey(oldPath);
+        string newCacheKey = ThumbnailCacheKeyHelper.GetCacheKey(newPath);
+
+        if (string.IsNullOrEmpty(oldCacheKey) || string.IsNullOrEmpty(newCacheKey)) return;
+
+        // Remove old cache key from memory (will be reloaded from disk with new key when needed)
+        _cache.Remove(oldCacheKey);
+
+        // Rename on disk cache
+        _cache.RenameOnDisk(oldCacheKey, newCacheKey);
+
+        Debug.Log($"[FileThumbnailService] Renamed thumbnail cache: {oldCacheKey} -> {newCacheKey}");
+    }
+
+    /// <summary>
     /// Get cache statistics for debugging.
     /// </summary>
     public string GetCacheStats()

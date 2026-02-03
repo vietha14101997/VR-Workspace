@@ -1012,6 +1012,24 @@ public class MediaLibraryService : MonoBehaviour
         AllVideos.Clear();
         Debug.Log("[MediaLibraryService] Library cache cleared");
     }
+
+    /// <summary>
+    /// Notify service that items were removed externally (e.g., user deleted via UI).
+    /// Updates internal cache and saves.
+    /// </summary>
+    public void NotifyItemsRemoved(List<string> removedPaths)
+    {
+        if (removedPaths == null || removedPaths.Count == 0) return;
+
+        var removedSet = new HashSet<string>(removedPaths);
+        int removedCount = AllVideos.RemoveAll(v => removedSet.Contains(v.Path));
+
+        if (removedCount > 0)
+        {
+            SaveLibraryCache();
+            Debug.Log($"[MediaLibraryService] NotifyItemsRemoved: removed {removedCount} items from cache");
+        }
+    }
     #endregion
 
     #region Sorting

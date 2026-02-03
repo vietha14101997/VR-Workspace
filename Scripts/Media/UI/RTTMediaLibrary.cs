@@ -110,6 +110,18 @@ public class RTTMediaLibrary : MonoBehaviour
     private string _currentGroupBy = "Date Added";
     private TextMeshProUGUI _groupTriggerText;
 
+    // Rename Popup
+    private RTTPopupInputable _renamePopup;
+    private string _renameTargetPath;
+
+    // Delete Confirmation Popup
+    private RTTPopupMenu _deleteConfirmPopup;
+
+    // Content fade animation
+    private CanvasGroup _bodyCanvasGroup;
+    private Coroutine _fadeCoroutine;
+    private const float CATEGORY_TRANSITION_DURATION = 0.12f;
+
     // Side Panel Gap
     private const float SIDE_PANEL_GAP = 0.05f;
     #endregion
@@ -190,6 +202,18 @@ public class RTTMediaLibrary : MonoBehaviour
         {
             Destroy(_groupOptionsPopup.gameObject);
             _groupOptionsPopup = null;
+        }
+
+        if (_renamePopup != null)
+        {
+            Destroy(_renamePopup.gameObject);
+            _renamePopup = null;
+        }
+
+        if (_deleteConfirmPopup != null)
+        {
+            Destroy(_deleteConfirmPopup.gameObject);
+            _deleteConfirmPopup = null;
         }
     }
 
@@ -326,6 +350,82 @@ public class RTTMediaLibrary : MonoBehaviour
         if (_rightFrame != null) frames.Add(_rightFrame);
         return frames;
     }
+
+    #region Content Fade Animation
+
+    /// <summary>
+    /// Fade out the content area (grid) and pagination page buttons.
+    /// Returns immediately, fade runs async.
+    /// Call the callback when fade completes.
+    /// </summary>
+    public void FadeOutContent(Action onComplete)
+    {
+        if (_fadeCoroutine != null)
+        {
+            StopCoroutine(_fadeCoroutine);
+        }
+        // Also fade out pagination page buttons (frame and arrows stay visible)
+        if (_pagination != null)
+        {
+            _pagination.FadeOutPageButtons();
+        }
+        _fadeCoroutine = StartCoroutine(FadeContentCoroutine(1f, 0f, CATEGORY_TRANSITION_DURATION, onComplete));
+    }
+
+    /// <summary>
+    /// Fade in the content area (grid) and pagination page buttons.
+    /// Returns immediately, fade runs async.
+    /// </summary>
+    public void FadeInContent(Action onComplete = null)
+    {
+        if (_fadeCoroutine != null)
+        {
+            StopCoroutine(_fadeCoroutine);
+        }
+        // Also fade in pagination page buttons
+        if (_pagination != null)
+        {
+            _pagination.FadeInPageButtons();
+        }
+        _fadeCoroutine = StartCoroutine(FadeContentCoroutine(0f, 1f, CATEGORY_TRANSITION_DURATION, onComplete));
+    }
+
+    /// <summary>
+    /// Set content alpha immediately (no animation).
+    /// </summary>
+    public void SetContentAlpha(float alpha)
+    {
+        if (_bodyCanvasGroup != null)
+        {
+            _bodyCanvasGroup.alpha = alpha;
+        }
+    }
+
+    private IEnumerator FadeContentCoroutine(float from, float to, float duration, Action onComplete)
+    {
+        if (_bodyCanvasGroup == null)
+        {
+            onComplete?.Invoke();
+            yield break;
+        }
+
+        _bodyCanvasGroup.alpha = from;
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            _bodyCanvasGroup.alpha = Mathf.Lerp(from, to, t);
+            yield return null;
+        }
+
+        _bodyCanvasGroup.alpha = to;
+        _fadeCoroutine = null;
+        onComplete?.Invoke();
+    }
+
+    #endregion
 
     /// <summary>
     /// Show side panels (legacy - now handled by coordinated fade in RTTAppManager).
@@ -576,6 +676,9 @@ public class RTTMediaLibrary : MonoBehaviour
         _bodyRT.offsetMin = new Vector2(0, bottomPadding);
 
         bodyObj.AddComponent<RectMask2D>();
+
+        // Add CanvasGroup for fade animations during category navigation
+        _bodyCanvasGroup = bodyObj.AddComponent<CanvasGroup>();
 
         // 2. Create Header Container
         GameObject headerObj = new GameObject("Header");
@@ -2101,14 +2204,15 @@ public class RTTMediaLibrary : MonoBehaviour
             return;
         }
 
-        string selectedPath = null;
+        // Get the selected path
         foreach (var path in _selectedItems)
         {
-            selectedPath = path;
+            _renameTargetPath = path;
             break;
         }
-        Debug.Log($"[RTTMediaLibrary] Rename requested for: {selectedPath}");
-        // TODO: Show rename dialog
+
+        Debug.Log($"[RTTMediaLibrary] Rename requested for: {_renameTargetPath}");
+        ShowRenamePopup();
     }
 
     private void OnDeleteClicked()
@@ -2120,8 +2224,214 @@ public class RTTMediaLibrary : MonoBehaviour
         }
 
         Debug.Log($"[RTTMediaLibrary] Delete requested for {_selectedItems.Count} items");
-        // TODO: Show confirmation dialog
+        ShowDeleteConfirmPopup();
     }
+    #endregion
+
+    #region Rename Item
+
+    private void CreateRenamePopup()
+    {
+        if (_renamePopup != null) return;
+
+        var config = new RTTPopupInputable.PopupConfig
+        {
+            title = "Rename",
+            inputLabel = "New Name",
+            inputPlaceholder = "Enter new name",
+            buttonText = "Rename",
+            width = 575f,
+            padding = 33f,
+            titleFontSize = 31,
+            labelFontSize = 24,
+            inputFontSize = 29,
+            buttonFontSize = 26,
+            buttonHeight = 72f,
+            inputHeight = 72f,
+            titleHeight = 55f,
+            closeButtonSize = 50f,
+            spacing = 22f,
+            primaryColor = _primaryColor,
+            accentColor = _accentColor,
+            overlayColor = new Color(0f, 0f, 0f, 0.4f),
+            font = _font,
+            layerName = "VirtualObjects"
+        };
+
+        _renamePopup = RTTPopupInputable.CreateWorldSpace(config, _menuFrame.transform);
+    }
+
+    private void ShowRenamePopup()
+    {
+        if (string.IsNullOrEmpty(_renameTargetPath))
+        {
+            Debug.LogWarning("[RTTMediaLibrary] No target path for rename");
+            return;
+        }
+
+        // Create popup if not exists
+        if (_renamePopup == null)
+        {
+            CreateRenamePopup();
+        }
+
+        // Get current name from path
+        string currentName = System.IO.Path.GetFileName(_renameTargetPath);
+
+        // Set default value to current name
+        _renamePopup.SetDefaultValue(currentName);
+
+        // Show with callbacks
+        _renamePopup.Show(
+            onConfirm: OnRenameConfirmed,
+            onCancel: OnRenameCancelled
+        );
+    }
+
+    private void OnRenameConfirmed(string newName)
+    {
+        Debug.Log($"[RTTMediaLibrary] Rename '{_renameTargetPath}' to '{newName}'");
+
+        if (string.IsNullOrEmpty(newName) || string.IsNullOrEmpty(_renameTargetPath))
+        {
+            Debug.LogWarning("[RTTMediaLibrary] Invalid rename parameters");
+            return;
+        }
+
+        // Request controller to rename the item
+        if (_controller != null)
+        {
+            _controller.RenameItem(_renameTargetPath, newName);
+        }
+
+        // Exit edit mode after rename (this will also clear selection)
+        if (_isEditMode)
+        {
+            ToggleEditMode();
+        }
+
+        _renameTargetPath = null;
+    }
+
+    private void OnRenameCancelled()
+    {
+        Debug.Log("[RTTMediaLibrary] Rename cancelled");
+        _renameTargetPath = null;
+    }
+
+    #endregion
+
+    #region Delete Items
+
+    private void CreateDeleteConfirmPopup()
+    {
+        if (_deleteConfirmPopup != null) return;
+
+        // Standardized Yes/No popup config using UIConstants for consistent styling
+        var config = new RTTPopupMenu.PopupConfig
+        {
+            width = 550f,
+            buttonHeight = 66f,
+            sideSpacing = 26f,
+            rowSpacing = 16f,
+            labelHeight = 52f,
+            labelFontSize = 32,
+            fontSize = 25,
+            borderWidth = UIConstants.PopupBorderWidth,
+            glassAlpha = UIConstants.PopupGlassAlpha,
+            primaryColor = _primaryColor,
+            accentColor = _accentColor,
+            overlayColor = new Color(0f, 0f, 0f, UIConstants.PopupOverlayAlpha),
+            font = _font,
+            layerName = UIConstants.VirtualObjectsLayer,
+            buttonBorderWidth = UIConstants.PopupButtonBorderWidth,
+            buttonGlowWidth = UIConstants.PopupButtonGlowWidth,
+            buttonGlowIntensity = UIConstants.PopupButtonGlowIntensity,
+            buttonCornerRadius = UIConstants.PopupButtonCornerRadius
+        };
+
+        _deleteConfirmPopup = RTTPopupMenu.CreateWorldSpace(config, _menuFrame.transform);
+    }
+
+    private void ShowDeleteConfirmPopup()
+    {
+        if (_deleteConfirmPopup == null)
+        {
+            CreateDeleteConfirmPopup();
+        }
+
+        // Clear previous content and rebuild
+        _deleteConfirmPopup.Clear();
+
+        // Build confirmation message
+        int count = _selectedItems.Count;
+        string itemText = count == 1 ? "item" : "items";
+        string title = $"Delete {count} {itemText}?";
+
+        // Add title section (centered)
+        _deleteConfirmPopup.AddSectionBlock(title, new List<RTTPopupMenu.ButtonData>(), 2, centerTitle: true);
+
+        // Add Yes/No buttons (accent for Yes, primary for No)
+        var yesButton = new RTTPopupMenu.ButtonData(
+            "Yes",
+            OnDeleteConfirmed,
+            null,
+            false,
+            _accentColor // Accent color (magenta/pink)
+        );
+
+        var noButton = new RTTPopupMenu.ButtonData(
+            "No",
+            OnDeleteCancelled,
+            null,
+            false,
+            _primaryColor // Primary color (cyan)
+        );
+
+        _deleteConfirmPopup.AddSectionBlock("", new List<RTTPopupMenu.ButtonData> { yesButton, noButton }, 2);
+
+        _deleteConfirmPopup.Build();
+        _deleteConfirmPopup.Show();
+    }
+
+    private void OnDeleteConfirmed()
+    {
+        // Copy paths before clearing selection
+        var pathsToDelete = new List<string>(_selectedItems);
+        Debug.Log("[RTTMediaLibrary] Delete confirmed - deleting " + pathsToDelete.Count + " items");
+
+        // Hide confirmation popup
+        if (_deleteConfirmPopup != null)
+        {
+            _deleteConfirmPopup.Hide();
+        }
+
+        // Remember if we were in edit mode to exit after delete
+        bool wasInEditMode = _isEditMode;
+
+        // Request controller to delete items
+        if (_controller != null)
+        {
+            _controller.DeleteItems(pathsToDelete);
+        }
+
+        // Exit edit mode after delete
+        if (wasInEditMode && _isEditMode)
+        {
+            ToggleEditMode();
+        }
+    }
+
+    private void OnDeleteCancelled()
+    {
+        Debug.Log("[RTTMediaLibrary] Delete cancelled");
+
+        if (_deleteConfirmPopup != null)
+        {
+            _deleteConfirmPopup.Hide();
+        }
+    }
+
     #endregion
 
     #region Helper Methods

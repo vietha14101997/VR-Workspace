@@ -60,6 +60,12 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
     // Pending page to navigate after data loads (for category switching)
     private int? _pendingPageNavigation = null;
 
+    // Flag to indicate category switch needs fade animation
+    private bool _pendingCategoryFade = false;
+    private bool _fadeOutComplete = false;
+    private bool _filteringComplete = false;
+    private Coroutine _categoryChangeCoroutine = null;
+
     // Selection/Hover State (like FileManager)
     private MediaVideoInfo? _selectedVideo = null;
     private MediaVideoInfo? _hoveredVideo = null;
@@ -1455,6 +1461,9 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
         // Restore cached selected item or select first item
         RestoreOrSelectFirstItem();
 
+        // Signal that filtering is complete (for parallel category change)
+        _filteringComplete = true;
+
         // Debug.Log($"[RTTMediaLibraryController] Showing {_filteredVideos.Count} videos in {_groups.Count} groups (Category: {CurrentCategory}, Search: '{CurrentSearchQuery}', Page: {CurrentPage}/{TotalPages})");
     }
 
@@ -1522,13 +1531,16 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
     private void HandleCategorySelected(string categoryId)
     {
         // Debug.Log($"[RTTMediaLibraryController] Category selected: {categoryId}");
-        
+
         // Save current page for the OLD category before switching
         if (!string.IsNullOrEmpty(CurrentCategory))
         {
             _categoryPageCache[CurrentCategory] = CurrentPage;
         }
-        
+
+        // Check if this is an actual category change (not initial load)
+        bool isCategoryChange = !string.IsNullOrEmpty(CurrentCategory) && CurrentCategory != categoryId;
+
         CurrentCategory = categoryId;
 
         // Trigger scan if no videos loaded yet
@@ -1552,8 +1564,54 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
             _pendingPageNavigation = 1;
         }
 
-        ApplyFilters();
+        // Start category change with parallel fade and data loading
+        if (isCategoryChange && _view != null)
+        {
+            // Cancel any existing category change coroutine
+            if (_categoryChangeCoroutine != null)
+            {
+                StopCoroutine(_categoryChangeCoroutine);
+            }
+            _categoryChangeCoroutine = StartCoroutine(CategoryChangeCoroutine());
+        }
+        else
+        {
+            // Initial load or same category - no fade needed
+            ApplyFilters();
+        }
         // Note: Navigation happens in FinalizeAndUpdateView() after data is loaded
+    }
+
+    /// <summary>
+    /// Coroutine that handles category change with parallel fade and data loading.
+    /// </summary>
+    private IEnumerator CategoryChangeCoroutine()
+    {
+        // Reset flags
+        _fadeOutComplete = false;
+        _filteringComplete = false;
+        _pendingCategoryFade = true;
+
+        // === PARALLEL: Start fade out AND data filtering simultaneously ===
+
+        // Start fade out animation (non-blocking)
+        _view.FadeOutContent(() => { _fadeOutComplete = true; });
+
+        // Start filtering data (runs in parallel with fade)
+        // ApplyFilters will set _filteringComplete = true when done via FinalizeAndUpdateView
+        ApplyFilters();
+
+        // Wait for BOTH fade out AND filtering to complete
+        while (!_fadeOutComplete || !_filteringComplete)
+        {
+            yield return null;
+        }
+
+        // Both complete - fade in the new content
+        _pendingCategoryFade = false;
+        _view?.FadeInContent();
+
+        _categoryChangeCoroutine = null;
     }
 
     private void HandleProjectionFilterChanged(VideoProjectionType? projection)
@@ -1570,6 +1628,172 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
     {
         SetDurationFilter(duration);
     }
+    #endregion
+
+    #region File Operations
+
+    /// <summary>
+    /// Rename a media file.
+    /// </summary>
+    public void RenameItem(string sourcePath, string newName)
+    {
+        if (string.IsNullOrWhiteSpace(sourcePath) || string.IsNullOrWhiteSpace(newName))
+        {
+            Debug.LogWarning("[RTTMediaLibraryController] Cannot rename: invalid parameters");
+            return;
+        }
+
+        // Sanitize new name - remove invalid characters
+        string sanitizedName = newName.Trim();
+        char[] invalidChars = System.IO.Path.GetInvalidFileNameChars();
+        foreach (char c in invalidChars)
+        {
+            sanitizedName = sanitizedName.Replace(c.ToString(), "");
+        }
+
+        if (string.IsNullOrEmpty(sanitizedName))
+        {
+            Debug.LogWarning("[RTTMediaLibraryController] Cannot rename: invalid name after sanitization");
+            return;
+        }
+
+        try
+        {
+            string directory = System.IO.Path.GetDirectoryName(sourcePath);
+
+            // Preserve file extension if user didn't provide one
+            string sourceExt = System.IO.Path.GetExtension(sourcePath);
+            string newExt = System.IO.Path.GetExtension(sanitizedName);
+            if (string.IsNullOrEmpty(newExt) && !string.IsNullOrEmpty(sourceExt))
+            {
+                sanitizedName = sanitizedName + sourceExt;
+            }
+
+            string newPath = System.IO.Path.Combine(directory, sanitizedName);
+
+            // Check if source and destination are the same
+            if (sourcePath.Equals(newPath, StringComparison.OrdinalIgnoreCase))
+            {
+                Debug.Log("[RTTMediaLibraryController] Rename skipped: same name");
+                return;
+            }
+
+            // Check if file exists
+            if (!System.IO.File.Exists(sourcePath))
+            {
+                Debug.LogWarning($"[RTTMediaLibraryController] Source does not exist: {sourcePath}");
+                return;
+            }
+
+            // Check if destination already exists
+            if (System.IO.File.Exists(newPath))
+            {
+                Debug.LogWarning($"[RTTMediaLibraryController] Cannot rename: destination already exists: {newPath}");
+                return;
+            }
+
+            // Perform rename
+            System.IO.File.Move(sourcePath, newPath);
+            Debug.Log($"[RTTMediaLibraryController] Renamed file: {sourcePath} -> {newPath}");
+
+            // Update thumbnail cache key
+            FileThumbnailService.Instance?.RenameThumbnailCache(sourcePath, newPath);
+
+            // Update in local data
+            for (int i = 0; i < _allVideos.Count; i++)
+            {
+                if (_allVideos[i].Path == sourcePath)
+                {
+                    var video = _allVideos[i];
+                    video.Path = newPath;
+                    video.Title = System.IO.Path.GetFileNameWithoutExtension(newPath);
+                    _allVideos[i] = video;
+                    break;
+                }
+            }
+
+            // Refresh display
+            ApplyFilters();
+
+            // Invalidate app state cache
+            AppStateCache.Instance.InvalidateState(APP_ID);
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[RTTMediaLibraryController] Failed to rename: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Delete multiple media files.
+    /// </summary>
+    public void DeleteItems(List<string> paths)
+    {
+        if (paths == null || paths.Count == 0)
+        {
+            Debug.LogWarning("[RTTMediaLibraryController] No items to delete");
+            return;
+        }
+
+        int successCount = 0;
+        int failCount = 0;
+        var deletedPaths = new List<string>();
+
+        foreach (string path in paths)
+        {
+            try
+            {
+                if (System.IO.File.Exists(path))
+                {
+                    // Delete file
+                    System.IO.File.Delete(path);
+                    Debug.Log($"[RTTMediaLibraryController] Deleted file: {path}");
+                    deletedPaths.Add(path);
+                    successCount++;
+                }
+                else
+                {
+                    Debug.LogWarning($"[RTTMediaLibraryController] File not found: {path}");
+                    failCount++;
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[RTTMediaLibraryController] Failed to delete {path}: {e.Message}");
+                failCount++;
+            }
+        }
+
+        Debug.Log($"[RTTMediaLibraryController] Delete completed: {successCount} succeeded, {failCount} failed");
+
+        if (successCount > 0)
+        {
+            // Remove from local lists
+            var deletedSet = new HashSet<string>(deletedPaths);
+            _allVideos.RemoveAll(v => deletedSet.Contains(v.Path));
+            _filteredVideos.RemoveAll(v => deletedSet.Contains(v.Path));
+
+            // Clear selection if selected item was deleted
+            if (_selectedVideo.HasValue && deletedSet.Contains(_selectedVideo.Value.Path))
+            {
+                _selectedVideo = null;
+                _view?.ClearDetailPanel();
+            }
+
+            // Clean up thumbnail cache for deleted files
+            FileThumbnailService.Instance?.RemoveThumbnailsForPaths(deletedPaths);
+
+            // Notify library service of removed items (so cache is updated)
+            _libraryService?.NotifyItemsRemoved(deletedPaths);
+
+            // Refresh display
+            ApplyFilters();
+
+            // Invalidate app state cache
+            AppStateCache.Instance.InvalidateState(APP_ID);
+        }
+    }
+
     #endregion
 
     #region Cleanup
