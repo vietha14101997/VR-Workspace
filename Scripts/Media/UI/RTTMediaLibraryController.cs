@@ -63,7 +63,6 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
     // Flag to indicate category switch needs fade animation
     private bool _pendingCategoryFade = false;
     private bool _fadeOutComplete = false;
-    private bool _filteringComplete = false;
     private Coroutine _categoryChangeCoroutine = null;
 
     // Selection/Hover State (like FileManager)
@@ -1461,9 +1460,6 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
         // Restore cached selected item or select first item
         RestoreOrSelectFirstItem();
 
-        // Signal that filtering is complete (for parallel category change)
-        _filteringComplete = true;
-
         // Debug.Log($"[RTTMediaLibraryController] Showing {_filteredVideos.Count} videos in {_groups.Count} groups (Category: {CurrentCategory}, Search: '{CurrentSearchQuery}', Page: {CurrentPage}/{TotalPages})");
     }
 
@@ -1584,12 +1580,12 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
 
     /// <summary>
     /// Coroutine that handles category change with parallel fade and data loading.
+    /// FadeIn starts immediately after FadeOut, data updates continuously in background.
     /// </summary>
     private IEnumerator CategoryChangeCoroutine()
     {
         // Reset flags
         _fadeOutComplete = false;
-        _filteringComplete = false;
         _pendingCategoryFade = true;
 
         // === PARALLEL: Start fade out AND data filtering simultaneously ===
@@ -1597,17 +1593,18 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
         // Start fade out animation (non-blocking)
         _view.FadeOutContent(() => { _fadeOutComplete = true; });
 
-        // Start filtering data (runs in parallel with fade)
-        // ApplyFilters will set _filteringComplete = true when done via FinalizeAndUpdateView
+        // Start filtering data in background (runs in parallel with fade)
+        // Data will update view automatically when ready via FinalizeAndUpdateView
         ApplyFilters();
 
-        // Wait for BOTH fade out AND filtering to complete
-        while (!_fadeOutComplete || !_filteringComplete)
+        // Wait for fade out only - don't wait for filtering
+        while (!_fadeOutComplete)
         {
             yield return null;
         }
 
-        // Both complete - fade in the new content
+        // Fade out complete - start fade in immediately
+        // Data may still be loading but will update view seamlessly
         _pendingCategoryFade = false;
         _view?.FadeInContent();
 
