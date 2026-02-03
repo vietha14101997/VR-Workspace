@@ -7,6 +7,7 @@ using System.Collections;
 using System.Collections.Generic;
 using VRWorkspace.UI.HoverEffects;
 using VRWorkspace.UI.Config;
+using VRWorkspace.UI.Utilities;
 
 /// <summary>
 /// Main View for Media Library App.
@@ -1029,9 +1030,30 @@ public class RTTMediaLibrary : MonoBehaviour
         btn.transition = Selectable.Transition.None;
         btn.onClick.AddListener(onClick);
 
-        // Hover effect
+        // Hover effects (Scale + Background Color)
         var hoverController = btnObj.AddComponent<HoverEffectController>();
-        hoverController.AddEffect(new ScaleHoverEffect().WithHoverScale(1.03f));
+        hoverController.TargetVisuals = btnObj.transform; // Set before adding effects
+
+        var scaleEffect = new ScaleHoverEffect()
+            .WithHoverScale(1.05f)
+            .WithTransitionDuration(0.15f);
+        hoverController.AddEffect(scaleEffect);
+
+        // Background color change on hover (keep alpha, change RGB to accent)
+        Material btnMaterial = bg.material;
+        Color normalColorA = new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.25f);
+        Color normalColorB = new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.1f);
+        Color hoverColorA = new Color(_accentColor.r, _accentColor.g, _accentColor.b, 0.3f);
+        Color hoverColorB = new Color(_accentColor.r, _accentColor.g, _accentColor.b, 0.1f);
+
+        hoverController.OnHoverStateChanged += (isHovered) =>
+        {
+            if (btnMaterial != null)
+            {
+                btnMaterial.SetColor("_ColorA", isHovered ? hoverColorA : normalColorA);
+                btnMaterial.SetColor("_ColorB", isHovered ? hoverColorB : normalColorB);
+            }
+        };
 
         // Icon
         Sprite iconSprite = Resources.Load<Sprite>(iconName);
@@ -1727,10 +1749,57 @@ public class RTTMediaLibrary : MonoBehaviour
     {
         if (_editButton == null) return;
 
-        var iconImg = _editButton.transform.Find("HitArea/Visuals/Content/Icon")?.GetComponent<Image>();
-        if (iconImg != null)
+        // Determine target color based on mode (Edit = accent, normal = primary)
+        Color themeColor = _isEditMode ? _accentColor : _primaryColor;
+        Color glowColor = Color.Lerp(themeColor, Color.white, 0.75f);
+
+        // 1. Update icon sprite and tint color
+        var iconTransform = _editButton.transform.Find("HitArea/Visuals/Content/Icon");
+        if (iconTransform != null)
         {
-            iconImg.sprite = Resources.Load<Sprite>(_isEditMode ? "icon_check_mark" : "icon_edit");
+            var iconImg = iconTransform.GetComponent<Image>();
+            if (iconImg != null)
+            {
+                iconImg.sprite = Resources.Load<Sprite>(_isEditMode ? "icon_check_mark" : "icon_edit");
+                iconImg.color = UIGlowEffects.CreateIconTintColor(themeColor);
+            }
+            // Update icon shadow glow colors
+            UIGlowEffects.UpdateShadowColors(iconTransform.gameObject, themeColor);
+        }
+
+        // 2. Update background material colors
+        var bgTransform = _editButton.transform.Find("HitArea/Visuals/Background");
+        if (bgTransform != null)
+        {
+            var bgImage = bgTransform.GetComponent<Image>();
+            if (bgImage != null && bgImage.material != null)
+            {
+                // Match MaterialFactory.CreateGlassBackground color formula
+                float backgroundAlpha = 0.08f;
+                Color colorA = new Color(themeColor.r, themeColor.g, themeColor.b, backgroundAlpha * 1.5f);
+                Color colorB = new Color(themeColor.r, themeColor.g, themeColor.b, backgroundAlpha * 0.5f);
+                bgImage.material.SetColor("_ColorA", colorA);
+                bgImage.material.SetColor("_ColorB", colorB);
+            }
+        }
+
+        // 3. Update border glow color
+        var borderTransform = _editButton.transform.Find("HitArea/Visuals/Border");
+        if (borderTransform != null)
+        {
+            var borderImage = borderTransform.GetComponent<Image>();
+            if (borderImage != null && borderImage.material != null && borderImage.material.HasProperty("_GlowColor"))
+            {
+                borderImage.material.SetColor("_GlowColor", glowColor);
+            }
+        }
+
+        // 4. Update GlowBorderHoverEffect's saved color so it persists through hover state changes
+        var hoverController = _editButton.transform.Find("HitArea")?.GetComponent<HoverEffectController>();
+        if (hoverController != null)
+        {
+            var glowEffect = hoverController.GetEffect("glow_border") as GlowBorderHoverEffect;
+            glowEffect?.UpdateSavedGlowColor(glowColor);
         }
     }
 
