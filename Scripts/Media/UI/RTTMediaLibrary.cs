@@ -6,6 +6,8 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using VRWorkspace.UI.HoverEffects;
+using VRWorkspace.UI.Config;
+using VRWorkspace.UI.Utilities;
 
 /// <summary>
 /// Main View for Media Library App.
@@ -108,6 +110,18 @@ public class RTTMediaLibrary : MonoBehaviour
     private string _currentGroupBy = "Date Added";
     private TextMeshProUGUI _groupTriggerText;
 
+    // Rename Popup
+    private RTTPopupInputable _renamePopup;
+    private string _renameTargetPath;
+
+    // Delete Confirmation Popup
+    private RTTPopupMenu _deleteConfirmPopup;
+
+    // Content fade animation
+    private CanvasGroup _bodyCanvasGroup;
+    private Coroutine _fadeCoroutine;
+    private const float CATEGORY_TRANSITION_DURATION = 0.12f;
+
     // Side Panel Gap
     private const float SIDE_PANEL_GAP = 0.05f;
     #endregion
@@ -189,6 +203,18 @@ public class RTTMediaLibrary : MonoBehaviour
             Destroy(_groupOptionsPopup.gameObject);
             _groupOptionsPopup = null;
         }
+
+        if (_renamePopup != null)
+        {
+            Destroy(_renamePopup.gameObject);
+            _renamePopup = null;
+        }
+
+        if (_deleteConfirmPopup != null)
+        {
+            Destroy(_deleteConfirmPopup.gameObject);
+            _deleteConfirmPopup = null;
+        }
     }
 
     private void OnEnable()
@@ -200,7 +226,8 @@ public class RTTMediaLibrary : MonoBehaviour
         if (_pagination != null) _pagination.Show();
 
         // Show action bar when app is re-opened (if not in edit mode)
-        if (_mediaActionBar != null && !_isEditMode)
+        // BUT only if user previously selected a video - prevents showing during dwell pre-loading
+        if (_mediaActionBar != null && !_isEditMode && _hasSelectedVideo)
         {
             _mediaActionBar.ShowWithFade();
         }
@@ -280,21 +307,145 @@ public class RTTMediaLibrary : MonoBehaviour
         float sideWidth = mainPanelWidth / 3f;
         float sideHeight = mainPanelHeight;
 
-        // Left Panel (Navigation)
+        // Left Panel (Navigation) - created with alpha=0, will fade in with main frame
         PlaceSidePanelOnSphere("MediaNavigationPanel", -1, mainPanelWidth, sideWidth, sideHeight, SIDE_PANEL_GAP, ref _leftFrame);
         if (_leftFrame != null)
         {
+            // Display quad enabled but transparent - ready for coordinated fade
             _leftFrame.SetVisible(true);
+            SetFrameAlpha(_leftFrame, 0f);
             StartCoroutine(CreateLeftPanelContent());
         }
 
-        // Right Panel (Detail)
+        // Right Panel (Detail) - created with alpha=0, will fade in with main frame
         PlaceSidePanelOnSphere("MediaDetailPanel", 1, mainPanelWidth, sideWidth, sideHeight, SIDE_PANEL_GAP, ref _rightFrame);
         if (_rightFrame != null)
         {
+            // Display quad enabled but transparent - ready for coordinated fade
             _rightFrame.SetVisible(true);
+            SetFrameAlpha(_rightFrame, 0f);
             StartCoroutine(CreateRightPanelContent());
         }
+    }
+
+    /// <summary>
+    /// Set alpha of a frame's display quad.
+    /// </summary>
+    private void SetFrameAlpha(RTTMenuFrame frame, float alpha)
+    {
+        if (frame == null) return;
+        var quad = frame.GetDisplayQuad();
+        if (quad?.material != null)
+            quad.material.color = new UnityEngine.Color(1f, 1f, 1f, alpha);
+    }
+
+    /// <summary>
+    /// Get all frames (main + side panels) for coordinated fade animation.
+    /// </summary>
+    public List<RTTMenuFrame> GetAllFrames()
+    {
+        var frames = new List<RTTMenuFrame>();
+        if (_menuFrame != null) frames.Add(_menuFrame);
+        if (_leftFrame != null) frames.Add(_leftFrame);
+        if (_rightFrame != null) frames.Add(_rightFrame);
+        return frames;
+    }
+
+    #region Content Fade Animation
+
+    /// <summary>
+    /// Fade out the content area (grid) and pagination page buttons.
+    /// Returns immediately, fade runs async.
+    /// Call the callback when fade completes.
+    /// </summary>
+    public void FadeOutContent(Action onComplete)
+    {
+        if (_fadeCoroutine != null)
+        {
+            StopCoroutine(_fadeCoroutine);
+        }
+        // Also fade out pagination page buttons (frame and arrows stay visible)
+        if (_pagination != null)
+        {
+            _pagination.FadeOutPageButtons();
+        }
+        _fadeCoroutine = StartCoroutine(FadeContentCoroutine(1f, 0f, CATEGORY_TRANSITION_DURATION, onComplete));
+    }
+
+    /// <summary>
+    /// Fade in the content area (grid) and pagination page buttons.
+    /// Returns immediately, fade runs async.
+    /// </summary>
+    public void FadeInContent(Action onComplete = null)
+    {
+        if (_fadeCoroutine != null)
+        {
+            StopCoroutine(_fadeCoroutine);
+        }
+        // Also fade in pagination page buttons
+        if (_pagination != null)
+        {
+            _pagination.FadeInPageButtons();
+        }
+        _fadeCoroutine = StartCoroutine(FadeContentCoroutine(0f, 1f, CATEGORY_TRANSITION_DURATION, onComplete));
+    }
+
+    /// <summary>
+    /// Set content alpha immediately (no animation).
+    /// </summary>
+    public void SetContentAlpha(float alpha)
+    {
+        if (_bodyCanvasGroup != null)
+        {
+            _bodyCanvasGroup.alpha = alpha;
+        }
+    }
+
+    private IEnumerator FadeContentCoroutine(float from, float to, float duration, Action onComplete)
+    {
+        if (_bodyCanvasGroup == null)
+        {
+            onComplete?.Invoke();
+            yield break;
+        }
+
+        _bodyCanvasGroup.alpha = from;
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            _bodyCanvasGroup.alpha = Mathf.Lerp(from, to, t);
+            yield return null;
+        }
+
+        _bodyCanvasGroup.alpha = to;
+        _fadeCoroutine = null;
+        onComplete?.Invoke();
+    }
+
+    #endregion
+
+    /// <summary>
+    /// Show side panels (legacy - now handled by coordinated fade in RTTAppManager).
+    /// </summary>
+    public void ShowSidePanels()
+    {
+        Debug.Log($"[RTTMediaLibrary] ShowSidePanels called - left={(_leftFrame != null)}, right={(_rightFrame != null)}");
+        // Side panels now fade in with main frame via coordinated animation
+        // This method kept for backward compatibility
+    }
+
+    /// <summary>
+    /// Hide side panels (for app closing).
+    /// </summary>
+    public void HideSidePanels()
+    {
+        if (_leftFrame != null)
+            _leftFrame.SetVisible(false);
+        if (_rightFrame != null)
+            _rightFrame.SetVisible(false);
     }
 
     private void PlaceSidePanelOnSphere(string name, int side, float mainWidth, float sideWidth, float sideHeight,
@@ -384,6 +535,7 @@ public class RTTMediaLibrary : MonoBehaviour
 
     private IEnumerator CreateLeftPanelContent()
     {
+        Debug.Log($"[RTTMediaLibrary] CreateLeftPanelContent started at {Time.realtimeSinceStartup:F3}s");
         while (_leftFrame.ContentContainer == null) yield return null;
 
         var containerSize = _leftFrame.GetContentSize();
@@ -405,11 +557,12 @@ public class RTTMediaLibrary : MonoBehaviour
         _sidePanel.Initialize(_controller, containerSize.x, containerSize.y, _font, _primaryColor, _accentColor);
 
         _leftFrame.MarkDirty();
-        Debug.Log("[RTTMediaLibrary] Left panel content created");
+        Debug.Log($"[RTTMediaLibrary] Left panel content created at {Time.realtimeSinceStartup:F3}s");
     }
 
     private IEnumerator CreateRightPanelContent()
     {
+        Debug.Log($"[RTTMediaLibrary] CreateRightPanelContent started at {Time.realtimeSinceStartup:F3}s");
         while (_rightFrame.ContentContainer == null) yield return null;
 
         var containerSize = _rightFrame.GetContentSize();
@@ -427,12 +580,15 @@ public class RTTMediaLibrary : MonoBehaviour
         _detailPanel = contentObj.AddComponent<RTTFileDetail>();
         _detailPanel.Initialize(_primaryColor, _accentColor, _font);
 
+        // Start with empty state - will be populated when first video is selected
+        _detailPanel.ShowEmpty();
+
         _rightFrame.MarkDirty();
 
         // Create action bar below the panel (follows panel position)
         CreateMediaActionBar();
 
-        Debug.Log("[RTTMediaLibrary] Right panel content created with RTTFileDetail");
+        Debug.Log($"[RTTMediaLibrary] Right panel content created at {Time.realtimeSinceStartup:F3}s");
     }
 
     /// <summary>
@@ -469,14 +625,9 @@ public class RTTMediaLibrary : MonoBehaviour
         _mediaActionBar.OnFavouriteClicked += OnFavouriteButtonClicked;
         _mediaActionBar.OnPlaylistClicked += OnPlaylistButtonClicked;
 
-        // Container starts active but invisible (alpha=0) - positioning runs via LateUpdate
-        // For Media Library, always show action bar when app opens (if not in edit mode)
-        // Call ShowWithFade() immediately - it will queue pending and fade when position becomes valid
-        // This syncs the fade animation with Menu's appearance
-        if (!_isEditMode)
-        {
-            _mediaActionBar.ShowWithFade();
-        }
+        // Start hidden - will fade in when first video is selected
+        // This creates smooth progressive loading: grid groups → items → select first → detail + actionbar
+        _mediaActionBar.HideImmediate();
     }
 
     private void ShowActionBarAfterDelay()
@@ -525,6 +676,9 @@ public class RTTMediaLibrary : MonoBehaviour
         _bodyRT.offsetMin = new Vector2(0, bottomPadding);
 
         bodyObj.AddComponent<RectMask2D>();
+
+        // Add CanvasGroup for fade animations during category navigation
+        _bodyCanvasGroup = bodyObj.AddComponent<CanvasGroup>();
 
         // 2. Create Header Container
         GameObject headerObj = new GameObject("Header");
@@ -733,10 +887,10 @@ public class RTTMediaLibrary : MonoBehaviour
             rowRT,
             refreshConfig,
             () => {
-                // Clear thumbnail cache to regenerate with current settings
-                FileThumbnailService.Instance?.ClearAllCache();
-                // Force rescan to detect new/removed files (not just reload from cache)
-                _controller?.ForceRescan();
+                // Smart refresh: incremental scan to detect new/removed files
+                // Thumbnails for removed files are cleaned up automatically
+                // Existing valid thumbnails are preserved
+                _controller?.SmartRefresh();
             }
         );
         RectTransform refreshRT = refreshBtn.GetComponent<RectTransform>();
@@ -979,9 +1133,30 @@ public class RTTMediaLibrary : MonoBehaviour
         btn.transition = Selectable.Transition.None;
         btn.onClick.AddListener(onClick);
 
-        // Hover effect
+        // Hover effects (Scale + Background Color)
         var hoverController = btnObj.AddComponent<HoverEffectController>();
-        hoverController.AddEffect(new ScaleHoverEffect().WithHoverScale(1.03f));
+        hoverController.TargetVisuals = btnObj.transform; // Set before adding effects
+
+        var scaleEffect = new ScaleHoverEffect()
+            .WithHoverScale(1.05f)
+            .WithTransitionDuration(0.15f);
+        hoverController.AddEffect(scaleEffect);
+
+        // Background color change on hover (keep alpha, change RGB to accent)
+        Material btnMaterial = bg.material;
+        Color normalColorA = new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.25f);
+        Color normalColorB = new Color(_primaryColor.r, _primaryColor.g, _primaryColor.b, 0.1f);
+        Color hoverColorA = new Color(_accentColor.r, _accentColor.g, _accentColor.b, 0.3f);
+        Color hoverColorB = new Color(_accentColor.r, _accentColor.g, _accentColor.b, 0.1f);
+
+        hoverController.OnHoverStateChanged += (isHovered) =>
+        {
+            if (btnMaterial != null)
+            {
+                btnMaterial.SetColor("_ColorA", isHovered ? hoverColorA : normalColorA);
+                btnMaterial.SetColor("_ColorB", isHovered ? hoverColorB : normalColorB);
+            }
+        };
 
         // Icon
         Sprite iconSprite = Resources.Load<Sprite>(iconName);
@@ -1133,19 +1308,27 @@ public class RTTMediaLibrary : MonoBehaviour
 
     private void CreateViewOptionsPopup(Transform parent)
     {
+        // Consistent popup config using UIConstants
         var config = new RTTPopupMenu.PopupConfig
         {
             width = _sortTriggerWidth * 2.5f,
             buttonHeight = 75f,
-            sideSpacing = 35f,  // Half of bottom padding for balanced section spacing
+            sideSpacing = 35f,
             rowSpacing = 11f,
-            fontSize = 24,  // Increased from 20 to match other popups
+            fontSize = 24,
             iconSize = 26f,
             primaryColor = _primaryColor,
             accentColor = _accentColor,
-            overlayColor = new Color(0f, 0f, 0f, 0.4f),
+            overlayColor = new Color(0f, 0f, 0f, UIConstants.PopupOverlayAlpha),
             font = _font,
-            layerName = "VirtualObjects"
+            layerName = UIConstants.VirtualObjectsLayer,
+            // Consistent button styling across all popups
+            borderWidth = UIConstants.PopupBorderWidth,
+            glassAlpha = UIConstants.PopupGlassAlpha,
+            buttonBorderWidth = UIConstants.PopupButtonBorderWidth,
+            buttonGlowWidth = UIConstants.PopupButtonGlowWidth,
+            buttonGlowIntensity = UIConstants.PopupButtonGlowIntensity,
+            buttonCornerRadius = UIConstants.PopupButtonCornerRadius
         };
 
         _viewOptionsPopup = RTTPopupMenu.CreateWorldSpace(config, _menuFrame.transform);
@@ -1255,6 +1438,7 @@ public class RTTMediaLibrary : MonoBehaviour
 
     private void CreateGroupOptionsPopup(Transform parent)
     {
+        // Consistent popup config using UIConstants
         var config = new RTTPopupMenu.PopupConfig
         {
             width = _sortTriggerWidth * 2.5f,
@@ -1265,9 +1449,16 @@ public class RTTMediaLibrary : MonoBehaviour
             iconSize = 26f,
             primaryColor = _primaryColor,
             accentColor = _accentColor,
-            overlayColor = new Color(0f, 0f, 0f, 0.4f),
+            overlayColor = new Color(0f, 0f, 0f, UIConstants.PopupOverlayAlpha),
             font = _font,
-            layerName = "VirtualObjects"
+            layerName = UIConstants.VirtualObjectsLayer,
+            // Consistent button styling across all popups
+            borderWidth = UIConstants.PopupBorderWidth,
+            glassAlpha = UIConstants.PopupGlassAlpha,
+            buttonBorderWidth = UIConstants.PopupButtonBorderWidth,
+            buttonGlowWidth = UIConstants.PopupButtonGlowWidth,
+            buttonGlowIntensity = UIConstants.PopupButtonGlowIntensity,
+            buttonCornerRadius = UIConstants.PopupButtonCornerRadius
         };
 
         _groupOptionsPopup = RTTPopupMenu.CreateWorldSpace(config, _menuFrame.transform);
@@ -1356,12 +1547,14 @@ public class RTTMediaLibrary : MonoBehaviour
     /// Update the detail panel with video info.
     /// Called by controller based on hover/select state.
     /// </summary>
-    public void UpdateDetailPanel(MediaVideoInfo video)
+    /// <param name="video">Video info to display</param>
+    /// <param name="forceRefresh">Force refresh even if same file path (used after data reload)</param>
+    public void UpdateDetailPanel(MediaVideoInfo video, bool forceRefresh = false)
     {
         if (_detailPanel != null)
         {
             var mockFile = ConvertToMockFile(video);
-            _detailPanel.UpdateInfo(mockFile, isCurrentFolder: false);
+            _detailPanel.UpdateInfo(mockFile, isCurrentFolder: false, forceRefresh: forceRefresh);
         }
 
         // Update current video for action buttons if this is the selected item (not just hovered)
@@ -1659,10 +1852,57 @@ public class RTTMediaLibrary : MonoBehaviour
     {
         if (_editButton == null) return;
 
-        var iconImg = _editButton.transform.Find("HitArea/Visuals/Content/Icon")?.GetComponent<Image>();
-        if (iconImg != null)
+        // Determine target color based on mode (Edit = accent, normal = primary)
+        Color themeColor = _isEditMode ? _accentColor : _primaryColor;
+        Color glowColor = Color.Lerp(themeColor, Color.white, 0.75f);
+
+        // 1. Update icon sprite and tint color
+        var iconTransform = _editButton.transform.Find("HitArea/Visuals/Content/Icon");
+        if (iconTransform != null)
         {
-            iconImg.sprite = Resources.Load<Sprite>(_isEditMode ? "icon_check_mark" : "icon_edit");
+            var iconImg = iconTransform.GetComponent<Image>();
+            if (iconImg != null)
+            {
+                iconImg.sprite = Resources.Load<Sprite>(_isEditMode ? "icon_check_mark" : "icon_edit");
+                iconImg.color = UIGlowEffects.CreateIconTintColor(themeColor);
+            }
+            // Update icon shadow glow colors
+            UIGlowEffects.UpdateShadowColors(iconTransform.gameObject, themeColor);
+        }
+
+        // 2. Update background material colors
+        var bgTransform = _editButton.transform.Find("HitArea/Visuals/Background");
+        if (bgTransform != null)
+        {
+            var bgImage = bgTransform.GetComponent<Image>();
+            if (bgImage != null && bgImage.material != null)
+            {
+                // Match MaterialFactory.CreateGlassBackground color formula
+                float backgroundAlpha = 0.08f;
+                Color colorA = new Color(themeColor.r, themeColor.g, themeColor.b, backgroundAlpha * 1.5f);
+                Color colorB = new Color(themeColor.r, themeColor.g, themeColor.b, backgroundAlpha * 0.5f);
+                bgImage.material.SetColor("_ColorA", colorA);
+                bgImage.material.SetColor("_ColorB", colorB);
+            }
+        }
+
+        // 3. Update border glow color
+        var borderTransform = _editButton.transform.Find("HitArea/Visuals/Border");
+        if (borderTransform != null)
+        {
+            var borderImage = borderTransform.GetComponent<Image>();
+            if (borderImage != null && borderImage.material != null && borderImage.material.HasProperty("_GlowColor"))
+            {
+                borderImage.material.SetColor("_GlowColor", glowColor);
+            }
+        }
+
+        // 4. Update GlowBorderHoverEffect's saved color so it persists through hover state changes
+        var hoverController = _editButton.transform.Find("HitArea")?.GetComponent<HoverEffectController>();
+        if (hoverController != null)
+        {
+            var glowEffect = hoverController.GetEffect("glow_border") as GlowBorderHoverEffect;
+            glowEffect?.UpdateSavedGlowColor(glowColor);
         }
     }
 
@@ -1810,6 +2050,15 @@ public class RTTMediaLibrary : MonoBehaviour
 
         // Update favourite icon state
         UpdateFavouriteButtonState(video.IsFavorite);
+
+        // Show action bar with fade animation only if Media app is the current visible app
+        // During dwell pre-loading, CurrentVisibleAppId is null (main menu) or another app
+        // OnEnable will show ActionBar when app is actually opened/re-opened
+        bool isMediaAppVisible = RTTManager.Instance?.CurrentVisibleAppId == "media";
+        if (isMediaAppVisible)
+        {
+            _mediaActionBar?.ShowWithFade();
+        }
     }
 
     private void OnGridVideoHoverEnter(MediaVideoInfo video)
@@ -1955,14 +2204,15 @@ public class RTTMediaLibrary : MonoBehaviour
             return;
         }
 
-        string selectedPath = null;
+        // Get the selected path
         foreach (var path in _selectedItems)
         {
-            selectedPath = path;
+            _renameTargetPath = path;
             break;
         }
-        Debug.Log($"[RTTMediaLibrary] Rename requested for: {selectedPath}");
-        // TODO: Show rename dialog
+
+        Debug.Log($"[RTTMediaLibrary] Rename requested for: {_renameTargetPath}");
+        ShowRenamePopup();
     }
 
     private void OnDeleteClicked()
@@ -1974,8 +2224,214 @@ public class RTTMediaLibrary : MonoBehaviour
         }
 
         Debug.Log($"[RTTMediaLibrary] Delete requested for {_selectedItems.Count} items");
-        // TODO: Show confirmation dialog
+        ShowDeleteConfirmPopup();
     }
+    #endregion
+
+    #region Rename Item
+
+    private void CreateRenamePopup()
+    {
+        if (_renamePopup != null) return;
+
+        var config = new RTTPopupInputable.PopupConfig
+        {
+            title = "Rename",
+            inputLabel = "New Name",
+            inputPlaceholder = "Enter new name",
+            buttonText = "Rename",
+            width = 575f,
+            padding = 33f,
+            titleFontSize = 31,
+            labelFontSize = 24,
+            inputFontSize = 29,
+            buttonFontSize = 26,
+            buttonHeight = 72f,
+            inputHeight = 72f,
+            titleHeight = 55f,
+            closeButtonSize = 50f,
+            spacing = 22f,
+            primaryColor = _primaryColor,
+            accentColor = _accentColor,
+            overlayColor = new Color(0f, 0f, 0f, 0.4f),
+            font = _font,
+            layerName = "VirtualObjects"
+        };
+
+        _renamePopup = RTTPopupInputable.CreateWorldSpace(config, _menuFrame.transform);
+    }
+
+    private void ShowRenamePopup()
+    {
+        if (string.IsNullOrEmpty(_renameTargetPath))
+        {
+            Debug.LogWarning("[RTTMediaLibrary] No target path for rename");
+            return;
+        }
+
+        // Create popup if not exists
+        if (_renamePopup == null)
+        {
+            CreateRenamePopup();
+        }
+
+        // Get current name from path
+        string currentName = System.IO.Path.GetFileName(_renameTargetPath);
+
+        // Set default value to current name
+        _renamePopup.SetDefaultValue(currentName);
+
+        // Show with callbacks
+        _renamePopup.Show(
+            onConfirm: OnRenameConfirmed,
+            onCancel: OnRenameCancelled
+        );
+    }
+
+    private void OnRenameConfirmed(string newName)
+    {
+        Debug.Log($"[RTTMediaLibrary] Rename '{_renameTargetPath}' to '{newName}'");
+
+        if (string.IsNullOrEmpty(newName) || string.IsNullOrEmpty(_renameTargetPath))
+        {
+            Debug.LogWarning("[RTTMediaLibrary] Invalid rename parameters");
+            return;
+        }
+
+        // Request controller to rename the item
+        if (_controller != null)
+        {
+            _controller.RenameItem(_renameTargetPath, newName);
+        }
+
+        // Exit edit mode after rename (this will also clear selection)
+        if (_isEditMode)
+        {
+            ToggleEditMode();
+        }
+
+        _renameTargetPath = null;
+    }
+
+    private void OnRenameCancelled()
+    {
+        Debug.Log("[RTTMediaLibrary] Rename cancelled");
+        _renameTargetPath = null;
+    }
+
+    #endregion
+
+    #region Delete Items
+
+    private void CreateDeleteConfirmPopup()
+    {
+        if (_deleteConfirmPopup != null) return;
+
+        // Standardized Yes/No popup config using UIConstants for consistent styling
+        var config = new RTTPopupMenu.PopupConfig
+        {
+            width = 550f,
+            buttonHeight = 66f,
+            sideSpacing = 26f,
+            rowSpacing = 16f,
+            labelHeight = 52f,
+            labelFontSize = 32,
+            fontSize = 25,
+            borderWidth = UIConstants.PopupBorderWidth,
+            glassAlpha = UIConstants.PopupGlassAlpha,
+            primaryColor = _primaryColor,
+            accentColor = _accentColor,
+            overlayColor = new Color(0f, 0f, 0f, UIConstants.PopupOverlayAlpha),
+            font = _font,
+            layerName = UIConstants.VirtualObjectsLayer,
+            buttonBorderWidth = UIConstants.PopupButtonBorderWidth,
+            buttonGlowWidth = UIConstants.PopupButtonGlowWidth,
+            buttonGlowIntensity = UIConstants.PopupButtonGlowIntensity,
+            buttonCornerRadius = UIConstants.PopupButtonCornerRadius
+        };
+
+        _deleteConfirmPopup = RTTPopupMenu.CreateWorldSpace(config, _menuFrame.transform);
+    }
+
+    private void ShowDeleteConfirmPopup()
+    {
+        if (_deleteConfirmPopup == null)
+        {
+            CreateDeleteConfirmPopup();
+        }
+
+        // Clear previous content and rebuild
+        _deleteConfirmPopup.Clear();
+
+        // Build confirmation message
+        int count = _selectedItems.Count;
+        string itemText = count == 1 ? "item" : "items";
+        string title = $"Delete {count} {itemText}?";
+
+        // Add title section (centered)
+        _deleteConfirmPopup.AddSectionBlock(title, new List<RTTPopupMenu.ButtonData>(), 2, centerTitle: true);
+
+        // Add Yes/No buttons (accent for Yes, primary for No)
+        var yesButton = new RTTPopupMenu.ButtonData(
+            "Yes",
+            OnDeleteConfirmed,
+            null,
+            false,
+            _accentColor // Accent color (magenta/pink)
+        );
+
+        var noButton = new RTTPopupMenu.ButtonData(
+            "No",
+            OnDeleteCancelled,
+            null,
+            false,
+            _primaryColor // Primary color (cyan)
+        );
+
+        _deleteConfirmPopup.AddSectionBlock("", new List<RTTPopupMenu.ButtonData> { yesButton, noButton }, 2);
+
+        _deleteConfirmPopup.Build();
+        _deleteConfirmPopup.Show();
+    }
+
+    private void OnDeleteConfirmed()
+    {
+        // Copy paths before clearing selection
+        var pathsToDelete = new List<string>(_selectedItems);
+        Debug.Log("[RTTMediaLibrary] Delete confirmed - deleting " + pathsToDelete.Count + " items");
+
+        // Hide confirmation popup
+        if (_deleteConfirmPopup != null)
+        {
+            _deleteConfirmPopup.Hide();
+        }
+
+        // Remember if we were in edit mode to exit after delete
+        bool wasInEditMode = _isEditMode;
+
+        // Request controller to delete items
+        if (_controller != null)
+        {
+            _controller.DeleteItems(pathsToDelete);
+        }
+
+        // Exit edit mode after delete
+        if (wasInEditMode && _isEditMode)
+        {
+            ToggleEditMode();
+        }
+    }
+
+    private void OnDeleteCancelled()
+    {
+        Debug.Log("[RTTMediaLibrary] Delete cancelled");
+
+        if (_deleteConfirmPopup != null)
+        {
+            _deleteConfirmPopup.Hide();
+        }
+    }
+
     #endregion
 
     #region Helper Methods

@@ -1,13 +1,16 @@
 using UnityEngine;
 using TMPro;
 using System;
+using System.Collections;
+using System.Collections.Generic;
+using VRWorkspace.UI.RTT;
 
 /// <summary>
 /// Main controller for the Media App.
 /// Manages switching between Library mode (browse videos) and Player mode (playback).
 /// Follows the same MVVM pattern as RTTFileManagerController.
 /// </summary>
-public class VRMediaAppController : MonoBehaviour
+public class VRMediaAppController : MonoBehaviour, IDataBindable
 {
     #region Enums
     public enum AppMode
@@ -470,6 +473,133 @@ public class VRMediaAppController : MonoBehaviour
     {
         OnBackClicked?.Invoke();
     }
+    #endregion
+
+    #region IDataBindable Implementation
+    /// <summary>
+    /// Delegate to library controller - check if data is ready
+    /// </summary>
+    public bool IsDataReady => _libraryController?.IsDataReady ?? false;
+
+    /// <summary>
+    /// Delegate to library controller - check if preparing data
+    /// </summary>
+    public bool IsPreparingData => _libraryController?.IsPreparingData ?? false;
+
+    /// <summary>
+    /// Start preparing data in background - delegate to library controller
+    /// </summary>
+    public void PrepareDataAsync()
+    {
+        _libraryController?.PrepareDataAsync();
+    }
+
+    /// <summary>
+    /// Get all frames (main + side panels) for coordinated fade animation.
+    /// </summary>
+    public List<RTTMenuFrame> GetAllFrames()
+    {
+        return _libraryController?.GetAllFrames() ?? new List<RTTMenuFrame>();
+    }
+
+    /// <summary>
+    /// Bind cached data immediately (non-blocking) - delegate to library controller.
+    /// </summary>
+    public void BindCachedDataOrEmpty()
+    {
+        _libraryController?.BindCachedDataOrEmpty();
+    }
+
+    /// <summary>
+    /// Called when background data loading completes - delegate to library controller.
+    /// </summary>
+    public void OnBackgroundDataReady()
+    {
+        _libraryController?.OnBackgroundDataReady();
+    }
+
+    /// <summary>
+    /// Show loading spinner - delegate to library controller
+    /// </summary>
+    public void ShowLoadingSpinner()
+    {
+        _libraryController?.ShowLoadingSpinner();
+    }
+
+    /// <summary>
+    /// Hide loading spinner - delegate to library controller
+    /// </summary>
+    public void HideLoadingSpinner()
+    {
+        _libraryController?.HideLoadingSpinner();
+    }
+
+    /// <summary>
+    /// Called when app is fully visible after transition
+    /// </summary>
+    public void OnAppShown()
+    {
+        _libraryController?.OnAppShown();
+    }
+
+    #region State Caching Support (delegated to library controller)
+
+    /// <summary>
+    /// Whether this app supports state caching - delegate to library controller
+    /// </summary>
+    public bool SupportsStateCaching => _libraryController?.SupportsStateCaching ?? false;
+
+    /// <summary>
+    /// Try to restore UI state from cache - delegate to library controller
+    /// </summary>
+    public bool TryRestoreCachedState()
+    {
+        return _libraryController?.TryRestoreCachedState() ?? false;
+    }
+
+    /// <summary>
+    /// Save current UI state to cache - delegate to library controller
+    /// </summary>
+    public void CacheCurrentState()
+    {
+        _libraryController?.CacheCurrentState();
+    }
+
+    /// <summary>
+    /// Get prepared data buffer - delegate to library controller
+    /// </summary>
+    public object GetPreparedDataBuffer()
+    {
+        return _libraryController?.GetPreparedDataBuffer();
+    }
+
+    /// <summary>
+    /// Bind prepared data buffer - delegate to library controller
+    /// </summary>
+    public void BindPreparedData(object dataBuffer)
+    {
+        _libraryController?.BindPreparedData(dataBuffer);
+    }
+
+    /// <summary>
+    /// Event fired when background data preparation completes.
+    /// Forwards from library controller.
+    /// </summary>
+    public event Action OnDataPrepared
+    {
+        add
+        {
+            if (_libraryController != null)
+                _libraryController.OnDataPrepared += value;
+        }
+        remove
+        {
+            if (_libraryController != null)
+                _libraryController.OnDataPrepared -= value;
+        }
+    }
+
+    #endregion
     #endregion
 
     #region Unity Lifecycle

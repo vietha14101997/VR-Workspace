@@ -165,10 +165,11 @@ public class RTTFileDetail : MonoBehaviour
         _metadataContainer = containerObj.transform;
     }
 
-    public void UpdateInfo(MockFile file, bool isCurrentFolder = false)
+    public void UpdateInfo(MockFile file, bool isCurrentFolder = false, bool forceRefresh = false)
     {
         // Skip update if same file (prevents lag when hovering between same items)
-        if (_currentFile.Path == file.Path && !isCurrentFolder)
+        // Unless forceRefresh is true (used after data reload to update metadata/thumbnail)
+        if (_currentFile.Path == file.Path && !isCurrentFolder && !forceRefresh)
         {
             return;
         }
@@ -505,7 +506,8 @@ public class RTTFileDetail : MonoBehaviour
     private void CreateMetadataForOther(MockFile file)
     {
         // Other: Type, Size, Date modified
-        AddMetadataRow("Type", file.Type.ToUpper());
+        string fileType = !string.IsNullOrEmpty(file.Type) ? file.Type.ToUpper() : (file.IsFolder ? "FOLDER" : "FILE");
+        AddMetadataRow("Type", fileType);
         AddMetadataRow("Size", FileSystemService.FormatFileSize(file.Size));
         AddMetadataRow("Date modified", FormatDate(file.Modified));
     }

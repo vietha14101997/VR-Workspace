@@ -2,6 +2,8 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using VRWorkspace.UI.HoverEffects;
+using VRWorkspace.UI.Utilities;
+using VRWorkspace.UI.Config;
 
 /// <summary>
 /// Factory class để tạo VR Button với đầy đủ hiệu ứng:
@@ -31,8 +33,6 @@ using VRWorkspace.UI.HoverEffects;
 /// </summary>
 public static class VRButtonFactory
 {
-    private static Sprite _pixelSprite;
-
     #region Theme Support
 
     /// <summary>
@@ -138,8 +138,8 @@ public static class VRButtonFactory
         public float cornerRadius = 0.12f;
         public float edgePadding = 0.06f;  // Match Space key value for Android compatibility
         public float backgroundAlpha = 0.08f;
-        public float borderWidth = 0.025f; 
-        public float glowWidth = 0.04f;    
+        public float borderWidth = 0.025f;
+        public float glowWidth = 0.04f;
         public float glowIntensity = 2.5f;
 
         // Animation
@@ -175,40 +175,23 @@ public static class VRButtonFactory
         // 2. HitArea - vùng click/collider
         GameObject hitArea = new GameObject("HitArea");
         hitArea.transform.SetParent(wrapper.transform, false);
-        RectTransform hitRT = hitArea.AddComponent<RectTransform>();
-        hitRT.anchorMin = Vector2.zero;
-        hitRT.anchorMax = Vector2.one;
-        hitRT.offsetMin = Vector2.zero;
-        hitRT.offsetMax = Vector2.zero;
 
-        // Transparent image cho UI raycast
-        Image hitImg = hitArea.AddComponent<Image>();
-        hitImg.color = Color.clear;
+        // Use UIElementBuilder for RectTransform setup
+        UIElementBuilder.CreateFullStretch(hitArea, wrapper.transform);
 
-        // BoxCollider cho VR raycast
-        BoxCollider col = hitArea.AddComponent<BoxCollider>();
-        col.size = new Vector3(config.width, config.height, 0.1f);
-        col.center = new Vector3(0, 0, -0.1f);
-
-        // Set layer
-        int vrLayer = LayerMask.NameToLayer(config.layerName);
-        if (vrLayer != -1) hitArea.layer = vrLayer;
+        // Use UIElementBuilder for hit area setup
+        var (hitImg, col) = UIElementBuilder.SetupHitArea(hitArea, config.width, config.height, config.layerName);
 
         // 3. Visuals - container cho visual elements với expansion
         GameObject visuals = new GameObject("Visuals");
         visuals.transform.SetParent(hitArea.transform, false);
-        RectTransform visRT = visuals.AddComponent<RectTransform>();
+        RectTransform visRT = UIElementBuilder.CreateFullStretch(visuals, hitArea.transform);
 
         Image bgImg = null;
 
         if (config.frameless)
         {
             // Frameless mode: không cần expansion, không có background/border
-            visRT.anchorMin = Vector2.zero;
-            visRT.anchorMax = Vector2.one;
-            visRT.offsetMin = Vector2.zero;
-            visRT.offsetMax = Vector2.zero;
-
             // Chỉ tạo Content (Icon)
             CreateContent(visuals.transform, config);
 
@@ -220,12 +203,6 @@ public static class VRButtonFactory
         else if (config.useConnectButtonShader)
         {
             // Special Connect Button: all-in-one shader with gradient + glow + shimmer
-            // Keep within bounds - edge padding in shader handles visual margin
-            visRT.anchorMin = Vector2.zero;
-            visRT.anchorMax = Vector2.one;
-            visRT.offsetMin = Vector2.zero;
-            visRT.offsetMax = Vector2.zero;
-
             // Single layer with Connect Button shader (combines background + border)
             bgImg = CreateConnectButtonBackground(visuals.transform, config);
 
@@ -234,12 +211,6 @@ public static class VRButtonFactory
         }
         else
         {
-            // Keep within bounds - edge padding in shader handles visual margin
-            visRT.anchorMin = Vector2.zero;
-            visRT.anchorMax = Vector2.one;
-            visRT.offsetMin = Vector2.zero;
-            visRT.offsetMax = Vector2.zero;
-
             // 4. Background
             bgImg = CreateBackground(visuals.transform, config);
 
@@ -411,35 +382,32 @@ public static class VRButtonFactory
     {
         GameObject bgObj = new GameObject("Background");
         bgObj.transform.SetParent(parent, false);
-        RectTransform rt = bgObj.AddComponent<RectTransform>();
-        rt.anchorMin = Vector2.zero;
-        rt.anchorMax = Vector2.one;
-        rt.offsetMin = Vector2.zero;
-        rt.offsetMax = Vector2.zero;
+        UIElementBuilder.CreateFullStretch(bgObj, parent);
 
         Image img = bgObj.AddComponent<Image>();
-        img.sprite = GetPixelSprite();
+        img.sprite = SpriteUtility.GetPixelSprite();
         img.raycastTarget = false;
 
         float aspect = config.width / config.height;
         Color col = config.themeColor;
 
-        // Use Wide shader for better Android GPU compatibility
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
-        if (glassShader != null)
+        // Use MaterialFactory to create glass background material
+        Material mat = MaterialFactory.CreateGlassBackground(
+            config.cornerRadius,
+            config.edgePadding,
+            aspect,
+            col,
+            config.backgroundAlpha
+        );
+
+        if (mat != null)
         {
-            Material mat = new Material(glassShader);
-            mat.SetFloat("_CornerRadius", config.cornerRadius);
-            mat.SetFloat("_EdgePadding", config.edgePadding);
-            mat.SetFloat("_Aspect", aspect);
-            mat.SetColor("_ColorA", new Color(col.r, col.g, col.b, config.backgroundAlpha * 1.5f));
-            mat.SetColor("_ColorB", new Color(col.r, col.g, col.b, config.backgroundAlpha * 0.5f));
-            mat.SetFloat("_GlassAlpha", config.backgroundAlpha);
             img.material = mat;
             img.color = Color.white;
         }
         else
         {
+            // Fallback if shader not found
             img.color = new Color(col.r, col.g, col.b, config.backgroundAlpha);
         }
 
@@ -453,90 +421,42 @@ public static class VRButtonFactory
     {
         GameObject bgObj = new GameObject("ConnectBackground");
         bgObj.transform.SetParent(parent, false);
-        RectTransform rt = bgObj.AddComponent<RectTransform>();
-        rt.anchorMin = Vector2.zero;
-        rt.anchorMax = Vector2.one;
-        rt.offsetMin = Vector2.zero;
-        rt.offsetMax = Vector2.zero;
+        UIElementBuilder.CreateFullStretch(bgObj, parent);
 
         Image img = bgObj.AddComponent<Image>();
-        img.sprite = GetPixelSprite();
+        img.sprite = SpriteUtility.GetPixelSprite();
         img.raycastTarget = false;
 
         float aspect = config.width / config.height;
 
-        // Try to find the shader first
-        Shader connectShader = Shader.Find("Custom/GlowingConnectButton");
-
-        // Load base material from Resources and clone it
-        Material baseMat = Resources.Load<Material>("GlowingConnectButton");
-
-        // Create material - prefer from shader directly for reliability
-        Material mat = null;
-        if (connectShader != null)
+        // Get colors (theme or config)
+        Color colorA, colorB, colorC;
+        if (config.useThemeColors)
         {
-            mat = new Material(connectShader);
+            GetConnectButtonColors(out colorA, out colorB, out colorC);
         }
-        else if (baseMat != null && baseMat.shader != null && baseMat.shader.name != "Hidden/InternalErrorShader")
+        else
         {
-            mat = new Material(baseMat);
+            colorA = config.connectColorA;
+            colorB = config.connectColorB;
+            colorC = config.connectColorC;
         }
+
+        // Use MaterialFactory to create connect button material
+        Material mat = MaterialFactory.CreateConnectButton(
+            aspect,
+            config.cornerRadius,
+            config.edgePadding,
+            colorA,
+            colorB,
+            colorC,
+            config.backgroundAlpha,
+            config.enablePulse,
+            config.pulseSpeed
+        );
 
         if (mat != null)
         {
-
-            // Border settings
-            mat.SetFloat("_EdgePadding", config.edgePadding);
-            mat.SetFloat("_BorderWidth", 0.028f); // Increased 40% (was 0.02f)
-            mat.SetFloat("_CornerRadius", config.cornerRadius);
-            mat.SetFloat("_Aspect", aspect);
-
-            // Gradient colors (3-color: 35% Cyan -> 35% Deep Sea Blue -> 30% Purple)
-            // Use theme colors if configured
-            Color colorA, colorB, colorC;
-            if (config.useThemeColors)
-            {
-                GetConnectButtonColors(out colorA, out colorB, out colorC);
-            }
-            else
-            {
-                colorA = config.connectColorA;
-                colorB = config.connectColorB;
-                colorC = config.connectColorC;
-            }
-            mat.SetColor("_ColorA", colorA);
-            mat.SetColor("_ColorB", colorB);
-            mat.SetColor("_ColorC", colorC);
-            mat.SetFloat("_GradientAngle", 0f);
-            mat.SetFloat("_MidPoint1", 0.35f);  // Cyan zone ends at 35%
-            mat.SetFloat("_MidPoint2", 0.70f);  // Blue zone ends at 70% (35%+35%)
-
-            // Background
-            mat.SetFloat("_BgAlpha", config.backgroundAlpha);
-            mat.SetFloat("_BgGradientStrength", 1.0f);
-
-            // Glow layers
-            mat.SetFloat("_Layer1Alpha", 1.5f);
-            mat.SetFloat("_Layer2Alpha", 1.0f);
-            mat.SetFloat("_Layer3Alpha", 0.5f);
-            mat.SetFloat("_Layer4Alpha", 0.25f);
-
-            // Pulse animation
-            mat.SetFloat("_PulseEnabled", config.enablePulse ? 1f : 0f);
-            mat.SetFloat("_PulseSpeed", config.pulseSpeed);
-            mat.SetFloat("_PulseIntensity", 0.2f);
-
-            // Shimmer effect
-            mat.SetFloat("_ShimmerEnabled", 1f);
-            mat.SetFloat("_ShimmerSpeed", 0.5f);
-            mat.SetFloat("_ShimmerWidth", 0.15f);
-            mat.SetFloat("_ShimmerIntensity", 1.0f);
-
-            // Inner glow
-            mat.SetFloat("_InnerGlowEnabled", 1f);
-            mat.SetFloat("_InnerGlowWidth", 0.08f);
-            mat.SetFloat("_InnerGlowAlpha", 0.3f);
-
             img.material = mat;
             img.color = Color.white;
 
@@ -545,10 +465,8 @@ public static class VRButtonFactory
         }
         else
         {
-            // Fallback nếu không tìm thấy shader hoặc material
-            Debug.LogError("[VRButtonFactory] GlowingConnectButton shader/material not found! Shader.Find returned: " +
-                (connectShader != null ? connectShader.name : "null"));
-            Color fallbackColor = Color.Lerp(config.connectColorA, config.connectColorB, 0.5f);
+            // Fallback if shader not found
+            Color fallbackColor = Color.Lerp(colorA, colorB, 0.5f);
             fallbackColor.a = config.backgroundAlpha;
             img.color = fallbackColor;
         }
@@ -560,40 +478,30 @@ public static class VRButtonFactory
     {
         GameObject borderObj = new GameObject("Border");
         borderObj.transform.SetParent(parent, false);
-        RectTransform rt = borderObj.AddComponent<RectTransform>();
-        rt.anchorMin = Vector2.zero;
-        rt.anchorMax = Vector2.one;
-        rt.offsetMin = Vector2.zero;
-        rt.offsetMax = Vector2.zero;
+        UIElementBuilder.CreateFullStretch(borderObj, parent);
 
         Image img = borderObj.AddComponent<Image>();
-        img.sprite = GetPixelSprite();
+        img.sprite = SpriteUtility.GetPixelSprite();
         img.raycastTarget = false;
 
         float aspect = config.width / config.height;
         Color col = config.themeColor;
 
-        Shader glowShader = Shader.Find("Custom/GlowingElementBorder");
-        if (glowShader != null)
+        // Use MaterialFactory to create glow border material
+        Material mat = MaterialFactory.CreateGlowBorder(
+            aspect,
+            config.cornerRadius,
+            config.edgePadding,
+            col,
+            config.borderWidth,
+            config.glowWidth,
+            config.glowIntensity,
+            config.enablePulse,
+            config.pulseSpeed
+        );
+
+        if (mat != null)
         {
-            Material mat = new Material(glowShader);
-            mat.SetFloat("_Aspect", aspect);
-            mat.SetFloat("_EdgePadding", config.edgePadding);
-            mat.SetFloat("_CornerRadius", config.cornerRadius);
-
-            Color borderGlowCol = Color.Lerp(col, Color.white, 0.75f);
-            mat.SetColor("_GlowColor", borderGlowCol);
-
-            mat.SetFloat("_BorderWidth", config.borderWidth);
-            mat.SetFloat("_GlowWidth", config.glowWidth);
-            mat.SetFloat("_GlowIntensity", config.glowIntensity);
-            mat.SetFloat("_PulseEnabled", config.enablePulse ? 1f : 0f);
-
-            if (config.enablePulse)
-            {
-                mat.SetFloat("_PulseSpeed", config.pulseSpeed);
-            }
-
             img.material = mat;
 
             // VRButtonRipple cho ripple effect
@@ -605,11 +513,7 @@ public static class VRButtonFactory
     {
         GameObject content = new GameObject("Content");
         content.transform.SetParent(parent, false);
-        RectTransform cRT = content.AddComponent<RectTransform>();
-        cRT.anchorMin = Vector2.zero;
-        cRT.anchorMax = Vector2.one;
-        cRT.offsetMin = Vector2.zero;
-        cRT.offsetMax = Vector2.zero;
+        UIElementBuilder.CreateFullStretch(content, parent);
 
         bool hasIcon = config.icon != null && !config.textOnly;
         bool hasText = !string.IsNullOrEmpty(config.label) && !config.iconOnly;
@@ -672,31 +576,17 @@ public static class VRButtonFactory
         img.sprite = sprite;
         img.preserveAspect = true;
         img.raycastTarget = false;
-        img.color = Color.Lerp(col, Color.white, 0.9f);
+        img.color = UIGlowEffects.CreateIconTintColor(col);
 
-        // Glow Layer 1 - Sharp inner halo
-        Color glowCol = Color.Lerp(col, Color.white, 0.7f);
-        glowCol.a = 0.4f;
-        float s1 = 2f;
-
-        Shadow shadow1 = iconObj.AddComponent<Shadow>();
-        shadow1.effectColor = glowCol;
-        shadow1.effectDistance = new Vector2(s1, -s1);
-
-        Shadow shadow2 = iconObj.AddComponent<Shadow>();
-        shadow2.effectColor = glowCol;
-        shadow2.effectDistance = new Vector2(-s1, s1);
+        // Use UIGlowEffects to add icon glow
+        UIGlowEffects.AddIconGlow(iconObj, col);
     }
 
     private static void CreateText(Transform parent, string text, int fontSize, TMP_FontAsset font, Color col, bool addGlow)
     {
         GameObject txtObj = new GameObject("TextTMP");
         txtObj.transform.SetParent(parent, false);
-        RectTransform rt = txtObj.AddComponent<RectTransform>();
-        rt.anchorMin = Vector2.zero;
-        rt.anchorMax = Vector2.one;
-        rt.offsetMin = Vector2.zero;
-        rt.offsetMax = Vector2.zero;
+        UIElementBuilder.CreateFullStretch(txtObj, parent);
 
         TextMeshProUGUI txt = txtObj.AddComponent<TextMeshProUGUI>();
         txt.text = text;
@@ -709,16 +599,8 @@ public static class VRButtonFactory
 
         if (addGlow)
         {
-            Color glow = Color.Lerp(col, Color.white, 0.8f);
-            glow.a = 0.55f;
-
-            Shadow s1 = txtObj.AddComponent<Shadow>();
-            s1.effectColor = glow;
-            s1.effectDistance = new Vector2(3, -3);
-
-            Shadow s2 = txtObj.AddComponent<Shadow>();
-            s2.effectColor = glow;
-            s2.effectDistance = new Vector2(-3, 3);
+            // Use UIGlowEffects to add text glow
+            UIGlowEffects.AddTextGlow(txtObj, col);
         }
     }
 
@@ -745,9 +627,6 @@ public static class VRButtonFactory
 
     /// <summary>
     /// Tạo layout ngang: Icon bên trái, Text bên phải
-    /// </summary>
-    /// <summary>
-    /// Tạo layout ngang: Icon bên trái, Text bên phải
     /// Uses a centered container with HorizontalLayoutGroup to ensure Icon + Text are centered as a unit
     /// </summary>
     private static void CreateHorizontalIconText(Transform parent, ButtonConfig config)
@@ -761,12 +640,12 @@ public static class VRButtonFactory
         containerRT.anchorMax = new Vector2(0.5f, 0.5f);
         containerRT.pivot = new Vector2(0.5f, 0.5f);
         containerRT.anchoredPosition = Vector2.zero;
-        
+
         // 2. Add Layout Group to the container
         HorizontalLayoutGroup layout = container.AddComponent<HorizontalLayoutGroup>();
         layout.childAlignment = TextAnchor.MiddleCenter;
         layout.spacing = config.spacing;
-        layout.childControlWidth = false; 
+        layout.childControlWidth = false;
         layout.childControlHeight = false;
         layout.childForceExpandWidth = false;
         layout.childForceExpandHeight = false;
@@ -786,25 +665,15 @@ public static class VRButtonFactory
         iconImg.sprite = config.icon;
         iconImg.preserveAspect = true;
         iconImg.raycastTarget = false;
-        iconImg.color = Color.Lerp(config.themeColor, Color.white, 0.9f);
+        iconImg.color = UIGlowEffects.CreateIconTintColor(config.themeColor);
 
-        // Icon glow effects
-        Color glowCol = Color.Lerp(config.themeColor, Color.white, 0.7f);
-        glowCol.a = 0.4f;
-        float s1 = 2f;
-
-        Shadow shadow1 = iconObj.AddComponent<Shadow>();
-        shadow1.effectColor = glowCol;
-        shadow1.effectDistance = new Vector2(s1, -s1);
-
-        Shadow shadow2 = iconObj.AddComponent<Shadow>();
-        shadow2.effectColor = glowCol;
-        shadow2.effectDistance = new Vector2(-s1, s1);
+        // Use UIGlowEffects to add icon glow
+        UIGlowEffects.AddIconGlow(iconObj, config.themeColor);
 
         // 5. Text Object
         GameObject txtObj = new GameObject("TextTMP");
         txtObj.transform.SetParent(container.transform, false);
-        
+
         TextMeshProUGUI txt = txtObj.AddComponent<TextMeshProUGUI>();
         txt.text = config.label;
         txt.fontSize = config.fontSize;
@@ -819,16 +688,6 @@ public static class VRButtonFactory
         ContentSizeFitter csf = txtObj.AddComponent<ContentSizeFitter>();
         csf.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
         csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-    }
-
-    private static Sprite GetPixelSprite()
-    {
-        if (_pixelSprite != null) return _pixelSprite;
-        Texture2D tex = new Texture2D(2, 2);
-        tex.SetPixels(new Color[] { Color.white, Color.white, Color.white, Color.white });
-        tex.Apply();
-        _pixelSprite = Sprite.Create(tex, new Rect(0, 0, 2, 2), Vector2.one * 0.5f);
-        return _pixelSprite;
     }
 
     // ==================== UTILITY METHODS ====================
@@ -879,18 +738,11 @@ public static class VRButtonFactory
         Image iconImg = iconTransform.GetComponent<Image>();
         if (iconImg != null)
         {
-            iconImg.color = Color.Lerp(newColor, Color.white, 0.9f);
+            iconImg.color = UIGlowEffects.CreateIconTintColor(newColor);
         }
 
-        // Update shadow glow colors
-        Color glowCol = Color.Lerp(newColor, Color.white, 0.7f);
-        glowCol.a = 0.4f;
-
-        Shadow[] shadows = iconTransform.GetComponents<Shadow>();
-        foreach (var shadow in shadows)
-        {
-            shadow.effectColor = glowCol;
-        }
+        // Update shadow glow colors using UIGlowEffects
+        UIGlowEffects.UpdateShadowColors(iconTransform.gameObject, newColor);
     }
 
     /// <summary>

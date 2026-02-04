@@ -350,6 +350,35 @@ public class ThumbnailCache
             Debug.LogWarning($"[ThumbnailCache] Failed to delete from disk: {ex.Message}");
         }
     }
+
+    /// <summary>
+    /// Rename a disk cache file from old key to new key.
+    /// </summary>
+    public void RenameOnDisk(string oldKey, string newKey)
+    {
+        if (!_enableDiskCache) return;
+        if (string.IsNullOrEmpty(oldKey) || string.IsNullOrEmpty(newKey)) return;
+
+        try
+        {
+            string oldPath = GetDiskCachePath(oldKey);
+            string newPath = GetDiskCachePath(newKey);
+
+            if (File.Exists(oldPath))
+            {
+                // Delete new path if exists (shouldn't happen, but just in case)
+                if (File.Exists(newPath))
+                {
+                    File.Delete(newPath);
+                }
+                File.Move(oldPath, newPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[ThumbnailCache] Failed to rename on disk: {ex.Message}");
+        }
+    }
     #endregion
 
     #region Garbage Collection

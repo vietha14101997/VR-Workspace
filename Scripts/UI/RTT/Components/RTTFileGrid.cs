@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 
 /// <summary>
@@ -51,6 +52,12 @@ public class RTTFileGrid : MonoBehaviour
     private float _rowHeight;
     private int _visibleRowCount;
     private int _bufferRows = 2;
+
+    // Progressive loading - bind items gradually to prevent frame lag
+    private Coroutine _progressiveBindCoroutine;
+    private Queue<int> _pendingBindIndices = new Queue<int>();
+    private const float FRAME_BUDGET_MS = 3f;         // Time budget per frame for binding items
+    private const int INITIAL_SYNC_BIND_COUNT = 8;    // Bind 8 items immediately to fill initial view
 
     public void Initialize(RTTFileManagerController controller, float w, float h, TMP_FontAsset font = null)
     {
@@ -195,6 +202,14 @@ public class RTTFileGrid : MonoBehaviour
 
     public void Populate(List<MockFile> files, string selectedPath = "")
     {
+        // Stop any pending progressive binding (prevents binding stale data)
+        if (_progressiveBindCoroutine != null)
+        {
+            StopCoroutine(_progressiveBindCoroutine);
+            _progressiveBindCoroutine = null;
+        }
+        _pendingBindIndices.Clear();
+
         _allFiles = files ?? new List<MockFile>();
 
         // Store selected path for item selection
@@ -217,7 +232,7 @@ public class RTTFileGrid : MonoBehaviour
         // Reset scroll position
         _scrollRect.verticalNormalizedPosition = 1f;
 
-        // Render visible items
+        // Render visible items (uses progressive loading)
         UpdateVisibleItems();
     }
 
@@ -318,19 +333,103 @@ public class RTTFileGrid : MonoBehaviour
             _visibleItems.Remove(idx);
         }
 
-        // Show items that should be visible
+        // Collect items that need to be bound
+        List<int> toBind = new List<int>();
         for (int i = firstVisibleIndex; i <= lastVisibleIndex && i < _allFiles.Count; i++)
         {
             if (!_visibleItems.ContainsKey(i))
             {
+                toBind.Add(i);
+            }
+        }
+
+        if (toBind.Count > 0)
+        {
+            // Bind first few items SYNCHRONOUSLY for immediate visibility
+            int syncCount = Mathf.Min(INITIAL_SYNC_BIND_COUNT, toBind.Count);
+            for (int i = 0; i < syncCount; i++)
+            {
+                int idx = toBind[i];
                 var item = GetPooledItem();
                 if (item != null)
                 {
-                    BindItemAtIndex(item, i);
-                    _visibleItems[i] = item;
+                    BindItemAtIndex(item, idx);
+                    _visibleItems[idx] = item;
                 }
             }
+
+            // Queue remaining items for progressive binding (reduces initial lag)
+            HashSet<int> alreadyQueued = new HashSet<int>(_pendingBindIndices);
+            for (int i = syncCount; i < toBind.Count; i++)
+            {
+                int idx = toBind[i];
+                if (!alreadyQueued.Contains(idx) && !_visibleItems.ContainsKey(idx))
+                {
+                    _pendingBindIndices.Enqueue(idx);
+                }
+            }
+
+            // Start progressive binding if not already running (and gameObject is active)
+            if (_pendingBindIndices.Count > 0 && _progressiveBindCoroutine == null && gameObject.activeInHierarchy)
+            {
+                _progressiveBindCoroutine = StartCoroutine(ProgressiveBindCoroutine());
+            }
         }
+    }
+
+    /// <summary>
+    /// Progressively bind items using frame-time budget system.
+    /// Binds items until frame budget is exhausted, then continues next frame.
+    /// </summary>
+    private IEnumerator ProgressiveBindCoroutine()
+    {
+        int totalToBind = _pendingBindIndices.Count;
+        int boundCount = 0;
+        Debug.Log($"[RTTFileGrid] Progressive binding started: {totalToBind} items queued");
+
+        while (_pendingBindIndices.Count > 0)
+        {
+            float frameStartTime = Time.realtimeSinceStartup * 1000f;
+            int boundThisFrame = 0;
+
+            while (_pendingBindIndices.Count > 0)
+            {
+                // Check frame budget before each bind
+                float elapsedMs = Time.realtimeSinceStartup * 1000f - frameStartTime;
+                if (elapsedMs >= FRAME_BUDGET_MS)
+                {
+                    // Budget exhausted, continue next frame
+                    break;
+                }
+
+                int idx = _pendingBindIndices.Dequeue();
+
+                // Skip if already bound or out of range
+                if (_visibleItems.ContainsKey(idx) || idx >= _allFiles.Count)
+                {
+                    continue;
+                }
+
+                var item = GetPooledItem();
+                if (item != null)
+                {
+                    BindItemAtIndex(item, idx);
+                    _visibleItems[idx] = item;
+                    boundCount++;
+                    boundThisFrame++;
+                }
+            }
+
+            if (boundThisFrame > 0)
+            {
+                Debug.Log($"[RTTFileGrid] Progressive bind frame: {boundThisFrame} items, {_pendingBindIndices.Count} remaining");
+            }
+
+            yield return null;
+        }
+
+        Debug.Log($"[RTTFileGrid] Progressive binding complete: {boundCount} items bound total");
+        _progressiveBindCoroutine = null;
     }
 
     private RTTFileGridItem GetPooledItem()
@@ -388,6 +487,9 @@ public class RTTFileGrid : MonoBehaviour
     public void ScrollToPage(int pageIndex, int rowsPerPage)
     {
         if (_scrollRect == null || _contentRect == null) return;
+
+        // Skip if gameObject is inactive (can't start coroutine)
+        if (!gameObject.activeInHierarchy) return;
 
         Canvas.ForceUpdateCanvases();
 
@@ -639,6 +741,26 @@ public class RTTFileGrid : MonoBehaviour
             _selectedPaths.Remove(path);
 
         _onSelectionChanged?.Invoke();
+    }
+    #endregion
+
+    #region Cleanup
+    private void OnDestroy()
+    {
+        // Stop progressive binding coroutine
+        if (_progressiveBindCoroutine != null)
+        {
+            StopCoroutine(_progressiveBindCoroutine);
+            _progressiveBindCoroutine = null;
+        }
+        _pendingBindIndices.Clear();
+
+        // Stop scroll animation
+        if (_scrollCoroutine != null)
+        {
+            StopCoroutine(_scrollCoroutine);
+            _scrollCoroutine = null;
+        }
     }
     #endregion
 }

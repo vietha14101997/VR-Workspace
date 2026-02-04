@@ -3,6 +3,8 @@ using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using TMPro;
 using VRWorkspace.UI.HoverEffects;
+using VRWorkspace.UI.Utilities;
+using VRWorkspace.UI.Config;
 
 /// <summary>
 /// Factory class để tạo VR Input Field với đầy đủ hiệu ứng:
@@ -20,13 +22,11 @@ using VRWorkspace.UI.HoverEffects;
 /// </summary>
 public static class VRInputFieldFactory
 {
-    private static Sprite _pixelSprite;
-
-    // Hằng số layout
-    private const float FONT_TO_BOX_RATIO = 2.2f;      // Tỷ lệ font size -> box height
-    private const float LABEL_HEIGHT = 32f;            // Chiều cao label cố định
-    private const float HORIZONTAL_PADDING = 30f;      // Padding trái/phải cho text
-    private const float VERTICAL_PADDING = 8f;         // Padding trên/dưới cho text
+    // Hằng số layout - use UIConstants values
+    private const float FONT_TO_BOX_RATIO = UIConstants.InputFontToBoxRatio;
+    private const float LABEL_HEIGHT = UIConstants.InputLabelHeight;
+    private const float HORIZONTAL_PADDING = UIConstants.InputHorizontalPadding;
+    private const float VERTICAL_PADDING = UIConstants.InputVerticalPadding;
 
     /// <summary>
     /// Cấu hình cho Input Field
@@ -37,10 +37,10 @@ public static class VRInputFieldFactory
         public string label = "Label";
         public string placeholder = "Enter text...";
         public string defaultValue = "";
-        public Color themeColor = new Color(0f, 0.9f, 1f);
+        public Color themeColor = UIConstants.DefaultPrimaryColor;
         public float width = 300f;
-        public int labelFontSize = 24;
-        public int inputFontSize = 36;
+        public int labelFontSize = UIConstants.InputDefaultLabelFontSize;
+        public int inputFontSize = UIConstants.InputDefaultFontSize;
         public TMP_FontAsset font;
 
         // Input settings
@@ -48,18 +48,18 @@ public static class VRInputFieldFactory
         public int characterLimit = 0;
 
         // Visual settings
-        public float cornerRadius = 0.12f;
-        public float edgePadding = 0.06f;  // Match Space key value for Android compatibility
-        public float backgroundAlpha = 0.08f;
-        public float borderWidth = 0.09f;
-        public float glowWidth = 0.04f;
-        public float glowIntensity = 2.5f;
+        public float cornerRadius = UIConstants.ButtonCornerRadius;
+        public float edgePadding = UIConstants.ButtonEdgePadding;  // Match Space key value for Android compatibility
+        public float backgroundAlpha = UIConstants.ButtonBackgroundAlpha;
+        public float borderWidth = UIConstants.InputBorderWidth;
+        public float glowWidth = UIConstants.ButtonGlowWidth;
+        public float glowIntensity = UIConstants.ButtonGlowIntensity;
 
         // Animation
-        public float popAmount = 0.005f;
+        public float popAmount = UIConstants.InputPopAmount;
 
         // Layer
-        public string layerName = "VirtualObjects";
+        public string layerName = UIConstants.VirtualObjectsLayer;
 
         // Tính chiều cao box từ font size
         public float BoxHeight => inputFontSize * FONT_TO_BOX_RATIO;
@@ -120,35 +120,25 @@ public static class VRInputFieldFactory
 
         // 4. HitArea - vùng click/collider
         GameObject hitArea = new GameObject("HitArea");
-        hitArea.transform.SetParent(inputBox.transform, false);
-        RectTransform hitRT = hitArea.AddComponent<RectTransform>();
-        hitRT.anchorMin = Vector2.zero;
-        hitRT.anchorMax = Vector2.one;
-        hitRT.offsetMin = Vector2.zero;
-        hitRT.offsetMax = Vector2.zero;
+        UIElementBuilder.CreateFullStretch(hitArea, inputBox.transform);
 
         // Nearly transparent image for UI raycast (needs minimal alpha to ensure raycasting works)
         Image hitImg = hitArea.AddComponent<Image>();
         hitImg.color = new Color(0f, 0f, 0f, 0.004f); // Minimal alpha, visually invisible but raycastable
 
-        // BoxCollider cho VR raycast
+        // BoxCollider for VR raycast
         BoxCollider col = hitArea.AddComponent<BoxCollider>();
-        col.size = new Vector3(config.width, boxHeight, 0.1f);
-        col.center = new Vector3(0, 0, -0.1f);
+        col.size = new Vector3(config.width, boxHeight, UIConstants.ColliderDepth);
+        col.center = new Vector3(0, 0, UIConstants.ColliderZOffset);
 
         // Set layer
         int vrLayer = LayerMask.NameToLayer(config.layerName);
         if (vrLayer != -1) hitArea.layer = vrLayer;
 
-        // 5. Visuals - container cho visual elements
+        // 5. Visuals - container for visual elements
         // Keep within bounds - edge padding in shader handles visual margin
         GameObject visuals = new GameObject("Visuals");
-        visuals.transform.SetParent(hitArea.transform, false);
-        RectTransform visRT = visuals.AddComponent<RectTransform>();
-        visRT.anchorMin = Vector2.zero;
-        visRT.anchorMax = Vector2.one;
-        visRT.offsetMin = Vector2.zero;
-        visRT.offsetMax = Vector2.zero;
+        UIElementBuilder.CreateFullStretch(visuals, hitArea.transform);
 
         // 6. Background
         CreateBackground(visuals.transform, config, boxHeight);
@@ -322,76 +312,62 @@ public static class VRInputFieldFactory
     private static void CreateBackground(Transform parent, InputFieldConfig config, float boxHeight)
     {
         GameObject bgObj = new GameObject("Background");
-        bgObj.transform.SetParent(parent, false);
-        RectTransform rt = bgObj.AddComponent<RectTransform>();
-        rt.anchorMin = Vector2.zero;
-        rt.anchorMax = Vector2.one;
-        rt.offsetMin = Vector2.zero;
-        rt.offsetMax = Vector2.zero;
+        UIElementBuilder.CreateFullStretch(bgObj, parent);
 
         Image img = bgObj.AddComponent<Image>();
-        img.sprite = GetPixelSprite();
+        img.sprite = SpriteUtility.GetPixelSprite();
         img.raycastTarget = false;
 
         float aspect = config.width / boxHeight;
-        Color col = config.themeColor;
 
-        // Use Wide shader for better Android GPU compatibility
-        Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
-        if (glassShader != null)
+        // Use MaterialFactory to create glass background
+        Material mat = MaterialFactory.CreateGlassBackground(
+            config.cornerRadius,
+            config.edgePadding,
+            aspect,
+            config.themeColor,
+            config.backgroundAlpha
+        );
+
+        if (mat != null)
         {
-            Material mat = new Material(glassShader);
-            mat.SetFloat("_CornerRadius", config.cornerRadius);
-            mat.SetFloat("_EdgePadding", config.edgePadding);
-            mat.SetFloat("_Aspect", aspect);
-            mat.SetColor("_ColorA", new Color(col.r, col.g, col.b, config.backgroundAlpha * 1.5f));
-            mat.SetColor("_ColorB", new Color(col.r, col.g, col.b, config.backgroundAlpha * 0.5f));
-            mat.SetFloat("_GlassAlpha", config.backgroundAlpha);
             img.material = mat;
             img.color = Color.white;
         }
         else
         {
-            img.color = new Color(col.r, col.g, col.b, config.backgroundAlpha);
+            img.color = new Color(config.themeColor.r, config.themeColor.g, config.themeColor.b, config.backgroundAlpha);
         }
     }
 
     private static void CreateBorder(Transform parent, InputFieldConfig config, float boxHeight)
     {
         GameObject borderObj = new GameObject("Border");
-        borderObj.transform.SetParent(parent, false);
-        RectTransform rt = borderObj.AddComponent<RectTransform>();
-        rt.anchorMin = Vector2.zero;
-        rt.anchorMax = Vector2.one;
-        rt.offsetMin = Vector2.zero;
-        rt.offsetMax = Vector2.zero;
+        UIElementBuilder.CreateFullStretch(borderObj, parent);
 
         Image img = borderObj.AddComponent<Image>();
-        img.sprite = GetPixelSprite();
+        img.sprite = SpriteUtility.GetPixelSprite();
         img.raycastTarget = false;
 
         float aspect = config.width / boxHeight;
-        Color col = config.themeColor;
 
-        Shader glowShader = Shader.Find("Custom/GlowingElementBorder");
-        if (glowShader != null)
+        // Use MaterialFactory to create glow border
+        Material mat = MaterialFactory.CreateGlowBorder(
+            aspect,
+            config.cornerRadius,
+            config.edgePadding,
+            config.themeColor,
+            config.borderWidth,
+            config.glowWidth,
+            config.glowIntensity,
+            false  // No pulse animation for input fields
+        );
+
+        if (mat != null)
         {
-            Material mat = new Material(glowShader);
-            mat.SetFloat("_Aspect", aspect);
-            mat.SetFloat("_EdgePadding", config.edgePadding);
-            mat.SetFloat("_CornerRadius", config.cornerRadius);
-
-            Color borderGlowCol = Color.Lerp(col, Color.white, 0.75f);
-            mat.SetColor("_GlowColor", borderGlowCol);
-
-            mat.SetFloat("_BorderWidth", config.borderWidth);
-            mat.SetFloat("_GlowWidth", config.glowWidth);
-            mat.SetFloat("_GlowIntensity", config.glowIntensity);
-            mat.SetFloat("_PulseEnabled", 0f);
-
             img.material = mat;
 
-            // VRButtonRipple cho ripple effect
+            // VRButtonRipple for ripple effect
             borderObj.AddComponent<VRButtonRipple>().Initialize(mat, img);
         }
     }
@@ -399,42 +375,27 @@ public static class VRInputFieldFactory
     private static TMP_InputField CreateInputContent(Transform parent, InputFieldConfig config)
     {
         GameObject content = new GameObject("Content");
-        content.transform.SetParent(parent, false);
-        RectTransform cRT = content.AddComponent<RectTransform>();
+        UIElementBuilder.CreateFullStretch(content, parent);
 
-        // Content fills Visuals (no expansion compensation needed)
-        cRT.anchorMin = Vector2.zero;
-        cRT.anchorMax = Vector2.one;
-        cRT.offsetMin = Vector2.zero;
-        cRT.offsetMax = Vector2.zero;
-
-        // InputField container - padding cố định từ các cạnh
+        // InputField container - fixed padding from edges
         GameObject inputContainer = new GameObject("InputField");
-        inputContainer.transform.SetParent(content.transform, false);
-        RectTransform inputContainerRT = inputContainer.AddComponent<RectTransform>();
-        inputContainerRT.anchorMin = Vector2.zero;
-        inputContainerRT.anchorMax = Vector2.one;
-        inputContainerRT.offsetMin = new Vector2(HORIZONTAL_PADDING, VERTICAL_PADDING);
-        inputContainerRT.offsetMax = new Vector2(-HORIZONTAL_PADDING, -VERTICAL_PADDING);
+        RectTransform inputContainerRT = UIElementBuilder.CreateAnchored(
+            inputContainer,
+            content.transform,
+            Vector2.zero,
+            Vector2.one,
+            new Vector2(HORIZONTAL_PADDING, VERTICAL_PADDING),
+            new Vector2(-HORIZONTAL_PADDING, -VERTICAL_PADDING)
+        );
 
-        // Text Area - fill hết InputContainer với RectMask2D
+        // Text Area - fills InputContainer with RectMask2D
         GameObject textArea = new GameObject("Text Area");
-        textArea.transform.SetParent(inputContainer.transform, false);
-        RectTransform textAreaRT = textArea.AddComponent<RectTransform>();
-        textAreaRT.anchorMin = Vector2.zero;
-        textAreaRT.anchorMax = Vector2.one;
-        textAreaRT.offsetMin = Vector2.zero;
-        textAreaRT.offsetMax = Vector2.zero;
+        RectTransform textAreaRT = UIElementBuilder.CreateFullStretch(textArea, inputContainer.transform);
         textArea.AddComponent<RectMask2D>();
 
         // Placeholder
         GameObject placeholderObj = new GameObject("Placeholder");
-        placeholderObj.transform.SetParent(textArea.transform, false);
-        RectTransform placeholderRT = placeholderObj.AddComponent<RectTransform>();
-        placeholderRT.anchorMin = Vector2.zero;
-        placeholderRT.anchorMax = Vector2.one;
-        placeholderRT.offsetMin = Vector2.zero;
-        placeholderRT.offsetMax = Vector2.zero;
+        UIElementBuilder.CreateFullStretch(placeholderObj, textArea.transform);
 
         TextMeshProUGUI placeholderTxt = placeholderObj.AddComponent<TextMeshProUGUI>();
         placeholderTxt.text = config.placeholder;
@@ -449,12 +410,7 @@ public static class VRInputFieldFactory
 
         // Input Text
         GameObject textObj = new GameObject("Text");
-        textObj.transform.SetParent(textArea.transform, false);
-        RectTransform textRT = textObj.AddComponent<RectTransform>();
-        textRT.anchorMin = Vector2.zero;
-        textRT.anchorMax = Vector2.one;
-        textRT.offsetMin = Vector2.zero;
-        textRT.offsetMax = Vector2.zero;
+        UIElementBuilder.CreateFullStretch(textObj, textArea.transform);
 
         TextMeshProUGUI inputTxt = textObj.AddComponent<TextMeshProUGUI>();
         inputTxt.text = config.defaultValue;
@@ -482,27 +438,12 @@ public static class VRInputFieldFactory
         // TMP_InputField's internal Caret can intercept raycasts, so we add this overlay
         // to guarantee the raycast always hits Content (child of HitArea) for proper hover effects
         GameObject raycastOverlay = new GameObject("RaycastOverlay");
-        raycastOverlay.transform.SetParent(content.transform, false);
-        RectTransform overlayRT = raycastOverlay.AddComponent<RectTransform>();
-        overlayRT.anchorMin = Vector2.zero;
-        overlayRT.anchorMax = Vector2.one;
-        overlayRT.offsetMin = Vector2.zero;
-        overlayRT.offsetMax = Vector2.zero;
+        UIElementBuilder.CreateFullStretch(raycastOverlay, content.transform);
 
         Image overlayImg = raycastOverlay.AddComponent<Image>();
         overlayImg.color = new Color(0f, 0f, 0f, 0f); // Completely transparent
         overlayImg.raycastTarget = true; // Captures all raycasts in the content area
 
         return inputField;
-    }
-
-    private static Sprite GetPixelSprite()
-    {
-        if (_pixelSprite != null) return _pixelSprite;
-        Texture2D tex = new Texture2D(2, 2);
-        tex.SetPixels(new Color[] { Color.white, Color.white, Color.white, Color.white });
-        tex.Apply();
-        _pixelSprite = Sprite.Create(tex, new Rect(0, 0, 2, 2), Vector2.one * 0.5f);
-        return _pixelSprite;
     }
 }

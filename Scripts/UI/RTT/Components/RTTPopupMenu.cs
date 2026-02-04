@@ -4,6 +4,7 @@ using UnityEngine.Events;
 using TMPro;
 using System;
 using System.Collections.Generic;
+using VRWorkspace.UI.Config;
 
 /// <summary>
 /// RTTPopupMenu - A reusable popup menu component using RTTMenuFrame style.
@@ -943,14 +944,12 @@ public class RTTPopupMenu : MonoBehaviour
         if (glassShader != null)
         {
             Material mat = new Material(glassShader);
-            mat.SetFloat("_CornerRadius", 0.04f);
-            mat.SetFloat("_EdgePadding", 0.01f);
+            mat.SetFloat("_CornerRadius", UIConstants.PopupCornerRadius + 0.01f); // Slightly larger than border
+            mat.SetFloat("_EdgePadding", UIConstants.PopupEdgePadding);
             mat.SetFloat("_Aspect", _config.width / 100f);
 
-            Color glassColorA = new Color(0.0f, 0.55f, 0.65f, 0.25f);
-            Color glassColorB = new Color(0.30f, 0.12f, 0.50f, 0.22f);
-            mat.SetColor("_ColorA", glassColorA);
-            mat.SetColor("_ColorB", glassColorB);
+            mat.SetColor("_ColorA", UIConstants.PopupGlassColorA);
+            mat.SetColor("_ColorB", UIConstants.PopupGlassColorB);
             mat.SetFloat("_GlassAlpha", _config.glassAlpha);
             mat.SetFloat("_GradientOffset", 0f);
             mat.SetFloat("_GradientAngle", -10f);
@@ -987,25 +986,23 @@ public class RTTPopupMenu : MonoBehaviour
         {
             Material mat = new Material(glowShader);
             mat.SetFloat("_StrokeEnabled", 0);
-            mat.SetFloat("_BorderWidth", 0.05f);  // Match RTTPopupInputable
-            mat.SetFloat("_CornerRadius", 0.03f); // Match RTTPopupInputable
-            mat.SetFloat("_EdgePadding", 0.01f);
+            mat.SetFloat("_BorderWidth", UIConstants.PopupBorderWidth);
+            mat.SetFloat("_CornerRadius", UIConstants.PopupCornerRadius);
+            mat.SetFloat("_EdgePadding", UIConstants.PopupEdgePadding);
             mat.SetFloat("_Aspect", _config.width / 100f);
 
-            // Fixed layer widths (same as RTTPopupInputable - no scaling)
-            mat.SetFloat("_Layer1Width", 0.006f);
-            mat.SetFloat("_Layer1Alpha", 1.2f);
-            mat.SetFloat("_Layer2Width", 0.01f);
-            mat.SetFloat("_Layer2Alpha", 0.8f);
-            mat.SetFloat("_Layer3Width", 0.015f);
-            mat.SetFloat("_Layer3Alpha", 0.4f);
-            mat.SetFloat("_Layer4Width", 0.02f);
-            mat.SetFloat("_Layer4Alpha", 0.2f);
+            // Glow border layer widths from UIConstants
+            mat.SetFloat("_Layer1Width", UIConstants.PopupGlowLayer1Width);
+            mat.SetFloat("_Layer1Alpha", UIConstants.PopupGlowLayer1Alpha);
+            mat.SetFloat("_Layer2Width", UIConstants.PopupGlowLayer2Width);
+            mat.SetFloat("_Layer2Alpha", UIConstants.PopupGlowLayer2Alpha);
+            mat.SetFloat("_Layer3Width", UIConstants.PopupGlowLayer3Width);
+            mat.SetFloat("_Layer3Alpha", UIConstants.PopupGlowLayer3Alpha);
+            mat.SetFloat("_Layer4Width", UIConstants.PopupGlowLayer4Width);
+            mat.SetFloat("_Layer4Alpha", UIConstants.PopupGlowLayer4Alpha);
 
-            Color glowColorA = new Color(0.3f, 1f, 1f, 1f);
-            Color glowColorB = new Color(1f, 0.4f, 1f, 1f);
-            mat.SetColor("_ColorA", glowColorA);
-            mat.SetColor("_ColorB", glowColorB);
+            mat.SetColor("_ColorA", UIConstants.PopupGlowColorA);
+            mat.SetColor("_ColorB", UIConstants.PopupGlowColorB);
             mat.SetFloat("_GradientMode", 2f);
             mat.SetFloat("_GradientAngle", -10f);
             mat.SetFloat("_GlassAlpha", 0.02f);
