@@ -58,10 +58,16 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
     private RTTMediaLibrary _libraryView;
     private RTTMediaLibraryController _libraryController;
     private RTTMediaControlsPanel _controlsPanel;
-    private RTTMediaSettingsPopup _settingsPopup;
-    private MediaLoadingOverlay _loadingOverlay;
-    private MediaErrorDialog _errorDialog;
     private VRVideoPlayerController _playerController;
+    
+    // Parent frame reference for hiding during video playback
+    private RTTMenuFrame _parentMenuFrame;
+    private List<RTTMenuFrame> _allMenuFrames;
+    
+    // Store menu frame transform for positioning video screen
+    private Vector3 _menuFramePosition;
+    private Quaternion _menuFrameRotation;
+    private Vector3 _menuFrameScale;
     #endregion
 
     #region Public API
@@ -143,19 +149,15 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             Destroy(_playerController.gameObject);
             _playerController = null;
         }
-
-        // Cleanup error dialog events
-        if (_errorDialog != null)
+        
+        // Cleanup controls frame
+        if (_controlsFrameObject != null)
         {
-            _errorDialog.OnRetryClicked -= HandleErrorRetry;
-            _errorDialog.OnBackClicked -= HandleErrorBack;
-            _errorDialog.OnDismissed -= HandleErrorDismissed;
+            Destroy(_controlsFrameObject);
+            _controlsFrameObject = null;
         }
 
         _controlsPanel = null;
-        _settingsPopup = null;
-        _loadingOverlay = null;
-        _errorDialog = null;
 
         if (_viewObject != null)
         {
@@ -251,6 +253,23 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             BuildPlayerUI();
         }
 
+        // Position projection at menu frame location (if we have saved position)
+        if (ProjectionSystem != null && _menuFramePosition != Vector3.zero)
+        {
+            ProjectionSystem.SetTargetPosition(_menuFramePosition, _menuFrameRotation);
+        }
+        
+        // Position controls frame below the video screen
+        if (_controlsFrameObject != null && _menuFramePosition != Vector3.zero)
+        {
+            // Calculate position below menu frame (offset downward in world space)
+            Vector3 controlsPos = _menuFramePosition + _menuFrameRotation * new Vector3(0, -0.5f, 0);
+            _controlsFrameObject.transform.position = controlsPos;
+            _controlsFrameObject.transform.rotation = _menuFrameRotation;
+            _controlsFrameObject.SetActive(true);
+            Debug.Log($"[VRMediaAppController] Controls frame positioned at: {controlsPos}");
+        }
+
         // Use player controller to handle playback
         if (_playerController != null)
         {
@@ -282,12 +301,36 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
     private void InitializeProjectionSystem()
     {
+        // Find VirtualObjects to parent the projection for zoom support
+        GameObject virtualObjects = GameObject.Find("VirtualObjects");
+        Transform projectionParent = virtualObjects != null ? virtualObjects.transform : transform;
+        
+        if (virtualObjects != null)
+        {
+            Debug.Log("[VRMediaAppController] Projection will be parented to VirtualObjects for zoom support");
+        }
+        else
+        {
+            Debug.LogWarning("[VRMediaAppController] VirtualObjects not found, zoom may not work");
+        }
+        
         GameObject projectionObj = new GameObject("VRVideoProjectionSystem");
-        projectionObj.transform.SetParent(transform);
+        projectionObj.transform.SetParent(projectionParent);
         ProjectionSystem = projectionObj.AddComponent<VRVideoProjectionSystem>();
 
         // Initialize with camera rig (or main camera if no rig)
         Transform cameraRig = Camera.main?.transform.parent ?? Camera.main?.transform;
+        
+        if (cameraRig == null)
+        {
+            Debug.LogWarning("[VRMediaAppController] Camera rig not found, using this transform as parent");
+            cameraRig = transform;
+        }
+        else
+        {
+            Debug.Log($"[VRMediaAppController] Found camera rig: {cameraRig.name}");
+        }
+        
         ProjectionSystem.Initialize(cameraRig);
     }
     #endregion
@@ -296,8 +339,8 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
     private void BuildLibraryUI()
     {
         // Get parent RTTMenuFrame for proper RTT rendering
-        RTTMenuFrame menuFrame = _viewObject.GetComponentInParent<RTTMenuFrame>();
-        if (menuFrame == null)
+        _parentMenuFrame = _viewObject.GetComponentInParent<RTTMenuFrame>();
+        if (_parentMenuFrame == null)
         {
             Debug.LogError("[VRMediaAppController] No parent RTTMenuFrame found! UI will not render correctly.");
         }
@@ -321,7 +364,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         _libraryController.Initialize(_libraryView);
 
         // Now initialize View - this starts coroutines that may call back to controller
-        _libraryView.Initialize(_libraryController, menuFrame, _containerWidth, _containerHeight,
+        _libraryView.Initialize(_libraryController, _parentMenuFrame, _containerWidth, _containerHeight,
             _font, _primaryColor, _accentColor);
 
         // Wire events
@@ -333,114 +376,152 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
     private void ShowLibraryUI()
     {
+        Debug.Log("[VRMediaAppController] ShowLibraryUI");
+        
+        // Hide player controls frame
+        if (_controlsFrameObject != null)
+        {
+            _controlsFrameObject.SetActive(false);
+        }
+        
+        // Hide video projection
+        if (ProjectionSystem != null)
+        {
+            ProjectionSystem.Hide();
+        }
+        
+        // Show main library view
         if (_libraryView != null)
         {
             _libraryView.gameObject.SetActive(true);
+        }
+        
+        // Show all menu frames (main + side panels)
+        _allMenuFrames = GetAllFrames();
+        foreach (var frame in _allMenuFrames)
+        {
+            if (frame != null && frame.gameObject != null)
+            {
+                frame.gameObject.SetActive(true);
+            }
+        }
+        
+        // Show parent menu frame
+        if (_parentMenuFrame != null)
+        {
+            _parentMenuFrame.gameObject.SetActive(true);
         }
     }
 
     private void HideLibraryUI()
     {
+        Debug.Log("[VRMediaAppController] HideLibraryUI - hiding all menu frames for video playback");
+        
+        // Store menu frame position before hiding (for positioning video screen)
+        if (_parentMenuFrame != null)
+        {
+            _menuFramePosition = _parentMenuFrame.transform.position;
+            _menuFrameRotation = _parentMenuFrame.transform.rotation;
+            _menuFrameScale = _parentMenuFrame.transform.localScale;
+            Debug.Log($"[VRMediaAppController] Saved menu frame position: {_menuFramePosition}, rotation: {_menuFrameRotation.eulerAngles}");
+        }
+        
+        // Hide main library view
         if (_libraryView != null)
         {
             _libraryView.gameObject.SetActive(false);
+        }
+        
+        // Hide all menu frames (main + side panels) so video is visible
+        _allMenuFrames = GetAllFrames();
+        foreach (var frame in _allMenuFrames)
+        {
+            if (frame != null && frame.gameObject != null)
+            {
+                frame.gameObject.SetActive(false);
+            }
+        }
+        
+        // Also hide parent menu frame
+        if (_parentMenuFrame != null)
+        {
+            _parentMenuFrame.gameObject.SetActive(false);
         }
     }
 
     private void BuildPlayerUI()
     {
-        // Create Controls Panel
+        // Find VirtualObjects for creating controls frame
+        GameObject virtualObjects = GameObject.Find("VirtualObjects");
+        if (virtualObjects == null)
+        {
+            Debug.LogError("[VRMediaAppController] VirtualObjects not found! Cannot create player controls.");
+            return;
+        }
+        
+        // Create a new RTTMenuFrame for controls - positioned below video screen
+        GameObject controlsFrameObj = new GameObject("VideoControlsFrame");
+        controlsFrameObj.transform.SetParent(virtualObjects.transform);
+        
+        // Add RTTMenuFrame component for proper RTT rendering
+        var controlsFrame = controlsFrameObj.AddComponent<RTTMenuFrame>();
+        
+        // Calculate controls frame size (same width as video, smaller height)
+        float controlsWidth = _containerWidth;
+        float controlsHeight = 150f;
+        
+        // Initialize the frame
+        // Calculate physical dimensions based on 1200 pixels/meter density (standard for 1920px = 1.6m)
+        float density = 1200f; 
+        float physicalWidth = controlsWidth / density;
+        float physicalHeight = controlsHeight / density;
+        
+        controlsFrame.Configure(physicalWidth, physicalHeight, controlsWidth);
+        controlsFrame.ForceInitialize();
+        
+        // Get the canvas container for adding UI
+        var container = controlsFrame.ContentContainer;
+        if (container == null)
+        {
+            Debug.LogError("[VRMediaAppController] Cannot find container in controls frame");
+            return;
+        }
+        
+        // Create Controls Panel inside the frame
         GameObject controlsObj = new GameObject("ControlsPanel");
-        controlsObj.transform.SetParent(_viewObject.transform, false);
+        controlsObj.transform.SetParent(container, false);
 
         var controlsRT = controlsObj.AddComponent<RectTransform>();
-        controlsRT.anchorMin = new Vector2(0.5f, 0);
-        controlsRT.anchorMax = new Vector2(0.5f, 0);
-        controlsRT.pivot = new Vector2(0.5f, 0);
-        controlsRT.anchoredPosition = new Vector2(0, 30);
-        controlsRT.sizeDelta = new Vector2(_containerWidth * 0.8f, 120);
+        controlsRT.anchorMin = Vector2.zero;
+        controlsRT.anchorMax = Vector2.one;
+        controlsRT.offsetMin = Vector2.zero;
+        controlsRT.offsetMax = Vector2.zero;
 
         _controlsPanel = controlsObj.AddComponent<RTTMediaControlsPanel>();
-        _controlsPanel.Initialize(_containerWidth * 0.8f, 120, _font, _primaryColor, _accentColor);
+        _controlsPanel.Initialize(controlsWidth, controlsHeight, _font, _primaryColor, _accentColor);
 
-        // Create Settings Popup
-        GameObject settingsObj = new GameObject("SettingsPopup");
-        settingsObj.transform.SetParent(_viewObject.transform, false);
-
-        var settingsRT = settingsObj.AddComponent<RectTransform>();
-        settingsRT.anchorMin = new Vector2(0.5f, 0.5f);
-        settingsRT.anchorMax = new Vector2(0.5f, 0.5f);
-        settingsRT.pivot = new Vector2(0.5f, 0.5f);
-        settingsRT.anchoredPosition = Vector2.zero;
-
-        _settingsPopup = settingsObj.AddComponent<RTTMediaSettingsPopup>();
-        _settingsPopup.Initialize(_font, _primaryColor, _accentColor);
-
-        // Create Loading Overlay
-        GameObject loadingObj = new GameObject("LoadingOverlay");
-        loadingObj.transform.SetParent(_viewObject.transform, false);
-
-        var loadingRT = loadingObj.AddComponent<RectTransform>();
-        loadingRT.anchorMin = Vector2.zero;
-        loadingRT.anchorMax = Vector2.one;
-        loadingRT.offsetMin = Vector2.zero;
-        loadingRT.offsetMax = Vector2.zero;
-
-        _loadingOverlay = loadingObj.AddComponent<MediaLoadingOverlay>();
-        _loadingOverlay.Initialize(_font, _primaryColor);
-
-        // Create Error Dialog
-        GameObject errorObj = new GameObject("ErrorDialog");
-        errorObj.transform.SetParent(_viewObject.transform, false);
-
-        var errorRT = errorObj.AddComponent<RectTransform>();
-        errorRT.anchorMin = Vector2.zero;
-        errorRT.anchorMax = Vector2.one;
-        errorRT.offsetMin = Vector2.zero;
-        errorRT.offsetMax = Vector2.zero;
-
-        _errorDialog = errorObj.AddComponent<MediaErrorDialog>();
-        _errorDialog.Initialize(_font, _primaryColor, _accentColor);
-        _errorDialog.OnRetryClicked += HandleErrorRetry;
-        _errorDialog.OnBackClicked += HandleErrorBack;
-        _errorDialog.OnDismissed += HandleErrorDismissed;
-
+        // Position controls frame at bottom of menu frame position
+        // (Will be repositioned in ShowPlayerUI based on video screen position)
+        _controlsFrameObject = controlsFrameObj;
+        
+        // Create Settings Popup (inside existing viewObject since we need it in UI space)
+        // For now keep it minimal - settings can be added later
+        
         // Create Player Controller
         GameObject playerObj = new GameObject("PlayerController");
         playerObj.transform.SetParent(transform);
 
         _playerController = playerObj.AddComponent<VRVideoPlayerController>();
         _playerController.Initialize(PlaybackEngine, ProjectionSystem, _controlsPanel);
-        _playerController.SetSettingsPopup(_settingsPopup);
 
         // Wire events
         _playerController.OnBackToLibrary += SwitchToLibrary;
 
-        // Start hidden
-        controlsObj.SetActive(false);
-
-        Debug.Log("[VRMediaAppController] Player UI built");
+        Debug.Log("[VRMediaAppController] Player UI built with controls frame");
     }
-
-    private void HandleErrorRetry()
-    {
-        _errorDialog.Hide();
-        if (CurrentVideo.HasValue)
-        {
-            StartPlayback(CurrentVideo.Value);
-        }
-    }
-
-    private void HandleErrorBack()
-    {
-        _errorDialog.Hide();
-        SwitchToLibrary();
-    }
-
-    private void HandleErrorDismissed()
-    {
-        _errorDialog.Hide();
-    }
+    
+    // Store controls frame reference
+    private GameObject _controlsFrameObject;
 
     private void ShowPlayerUI()
     {
@@ -454,6 +535,12 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             _controlsPanel.gameObject.SetActive(true);
             _controlsPanel.Show();
         }
+        
+        // Ensure controls frame is visible if it exists
+        if (_controlsFrameObject != null)
+        {
+            _controlsFrameObject.SetActive(true);
+        }
     }
 
     private void HidePlayerUI()
@@ -461,6 +548,11 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         if (_controlsPanel != null)
         {
             _controlsPanel.gameObject.SetActive(false);
+        }
+        
+        if (_controlsFrameObject != null)
+        {
+            _controlsFrameObject.SetActive(false);
         }
     }
 

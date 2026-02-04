@@ -53,9 +53,15 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
 
     public void SetTexture(Texture texture)
     {
-        if (_material == null) return;
+        if (_material == null)
+        {
+            Debug.LogError("[FlatProjectionRenderer] SetTexture called but _material is null!");
+            return;
+        }
 
         _material.SetTexture("_MainTex", texture);
+        
+        Debug.Log($"[FlatProjectionRenderer] SetTexture: {(texture != null ? $"{texture.width}x{texture.height}" : "null")}");
 
         // Update resolution for aspect ratio calculations
         if (texture != null)
@@ -96,29 +102,17 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
 
         if (_screenObject == null) return;
 
-        // Update position based on distance
-        Vector3 forward = _currentSettings.HeadLocked
-            ? Vector3.forward
-            : _recenterRotation * Vector3.forward;
-
-        Vector3 position = _parentTransform != null
-            ? _parentTransform.position + forward * settings.Distance + settings.PositionOffset
-            : forward * settings.Distance + settings.PositionOffset;
-
-        _screenObject.transform.position = position;
-
-        // Update rotation
-        if (_currentSettings.HeadLocked && Camera.main != null)
-        {
-            // Face the camera
-            _screenObject.transform.rotation = Quaternion.LookRotation(
-                _screenObject.transform.position - Camera.main.transform.position
-            );
-        }
-        else
-        {
-            _screenObject.transform.rotation = _recenterRotation * settings.RotationOffset;
-        }
+        // Position screen at local origin - parent transform handles world positioning
+        // Apply small Z offset based on distance setting for fine-tuning
+        Vector3 localPos = new Vector3(
+            settings.PositionOffset.x,
+            settings.PositionOffset.y,
+            settings.Distance // Use distance as Z offset from parent
+        );
+        _screenObject.transform.localPosition = localPos;
+        
+        // Keep facing away from parent origin (toward viewer)
+        _screenObject.transform.localRotation = settings.RotationOffset;
 
         // Update scale
         UpdateScreenAspect();
@@ -142,6 +136,12 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
         if (_screenObject != null)
         {
             _screenObject.SetActive(true);
+            UpdateDisplay(_currentSettings); // Ensure position is updated
+            Debug.Log($"[FlatProjectionRenderer] Show - screen at position: {_screenObject.transform.position}, scale: {_screenObject.transform.localScale}");
+        }
+        else
+        {
+            Debug.LogError("[FlatProjectionRenderer] Show called but _screenObject is null!");
         }
         _isActive = true;
     }
@@ -198,7 +198,15 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
     {
         _screenObject = new GameObject("FlatVideoScreen");
         _screenObject.transform.SetParent(_parentTransform, false);
-        _screenObject.layer = LayerMask.NameToLayer("VirtualObjects");
+        
+        // Set layer - use Default if VirtualObjects doesn't exist
+        int layer = LayerMask.NameToLayer("VirtualObjects");
+        if (layer < 0)
+        {
+            Debug.LogWarning("[FlatProjectionRenderer] 'VirtualObjects' layer not found, using Default layer");
+            layer = 0; // Default layer
+        }
+        _screenObject.layer = layer;
 
         _meshFilter = _screenObject.AddComponent<MeshFilter>();
         _meshRenderer = _screenObject.AddComponent<MeshRenderer>();

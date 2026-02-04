@@ -108,14 +108,23 @@ public class MediaEnvironmentController : MonoBehaviour
             }
         }
 
-        // Try to find by tag
-        GameObject taggedEnv = GameObject.FindWithTag("Environment");
-        if (taggedEnv != null)
+        // Try to find by tag - wrapped in try-catch because tag may not exist
+        try
         {
-            return taggedEnv;
+            GameObject taggedEnv = GameObject.FindWithTag("Environment");
+            if (taggedEnv != null)
+            {
+                Debug.Log("[MediaEnvironmentController] Found environment root by tag");
+                return taggedEnv;
+            }
+        }
+        catch (UnityException)
+        {
+            // Tag doesn't exist in project settings, skip
+            Debug.LogWarning("[MediaEnvironmentController] 'Environment' tag not defined, skipping tag search");
         }
 
-        Debug.LogWarning("[MediaEnvironmentController] Could not find environment root");
+        Debug.LogWarning("[MediaEnvironmentController] Could not find environment root - environment control will be limited");
         return null;
     }
 

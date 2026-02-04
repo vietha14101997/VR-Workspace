@@ -51,9 +51,18 @@ public class VRVideoPlayerController : MonoBehaviour
         _controlsPanel = controlsPanel;
         _displaySettings = DisplaySettings.Default;
 
-        // Setup environment controller
-        _environmentController = MediaEnvironmentController.Instance;
-        _environmentController.Initialize();
+        // Setup environment controller - optional, player can work without it
+        try
+        {
+            _environmentController = MediaEnvironmentController.Instance;
+            _environmentController.Initialize();
+            Debug.Log("[VRVideoPlayerController] Environment controller initialized");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[VRVideoPlayerController] Environment control disabled: {ex.Message}");
+            _environmentController = null;
+        }
 
         WireEvents();
         _isInitialized = true;
@@ -159,6 +168,13 @@ public class VRVideoPlayerController : MonoBehaviour
 
             _projectionSystem.SetProjection(projectionType, stereoMode);
             _projectionSystem.UpdateDisplay(_displaySettings);
+            _projectionSystem.RecenterView(); // Ensure screen is in front of user
+            
+            Debug.Log($"[VRVideoPlayerController] Projection configured: distance={_displaySettings.Distance}, scale={_displaySettings.Scale}");
+        }
+        else
+        {
+            Debug.LogError("[VRVideoPlayerController] ProjectionSystem is null!");
         }
 
         // Update environment based on projection type
@@ -387,8 +403,12 @@ public class VRVideoPlayerController : MonoBehaviour
         // Set video texture to projection
         if (_playbackEngine != null && _projectionSystem != null)
         {
+            var outputTexture = _playbackEngine.OutputTexture;
+            Debug.Log($"[VRVideoPlayerController] OutputTexture: {(outputTexture != null ? $"{outputTexture.width}x{outputTexture.height}" : "null")}");
+            
             if (_playbackEngine.UseNV12Output)
             {
+                Debug.Log("[VRVideoPlayerController] Using NV12 output");
                 _projectionSystem.SetTextureNV12(
                     _playbackEngine.YPlaneTexture,
                     _playbackEngine.UVPlaneTexture
@@ -396,10 +416,18 @@ public class VRVideoPlayerController : MonoBehaviour
             }
             else
             {
+                Debug.Log("[VRVideoPlayerController] Using standard texture output");
                 _projectionSystem.SetTexture(_playbackEngine.OutputTexture);
             }
 
+            Debug.Log("[VRVideoPlayerController] Calling ProjectionSystem.Show()");
             _projectionSystem.Show();
+            
+            Debug.Log($"[VRVideoPlayerController] Projection visible: {_projectionSystem.IsVisible}, ActiveRenderer: {_projectionSystem.ActiveRenderer?.GetType().Name ?? "null"}");
+        }
+        else
+        {
+            Debug.LogError($"[VRVideoPlayerController] Cannot set texture - PlaybackEngine: {_playbackEngine != null}, ProjectionSystem: {_projectionSystem != null}");
         }
 
         // Update controls with duration
@@ -409,6 +437,7 @@ public class VRVideoPlayerController : MonoBehaviour
         }
 
         // Auto-play
+        Debug.Log("[VRVideoPlayerController] Starting auto-play");
         _playbackEngine?.Play();
     }
 

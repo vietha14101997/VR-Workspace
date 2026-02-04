@@ -46,7 +46,15 @@ public class VRVideoProjectionSystem : MonoBehaviour
         // Create projection root
         GameObject rootObj = new GameObject("ProjectionRoot");
         rootObj.transform.SetParent(transform);
-        rootObj.layer = LayerMask.NameToLayer("VirtualObjects");
+        
+        // Set layer - use Default if VirtualObjects doesn't exist
+        int layer = LayerMask.NameToLayer("VirtualObjects");
+        if (layer < 0)
+        {
+            Debug.LogWarning("[VRVideoProjectionSystem] 'VirtualObjects' layer not found, using Default layer");
+            layer = 0; // Default layer
+        }
+        rootObj.layer = layer;
         _projectionRoot = rootObj.transform;
 
         // Position at camera rig
@@ -68,6 +76,20 @@ public class VRVideoProjectionSystem : MonoBehaviour
 
         _isInitialized = true;
         Debug.Log("[VRVideoProjectionSystem] Initialized");
+    }
+
+    /// <summary>
+    /// Set target position for the projection (e.g., menu frame position).
+    /// This overrides the default camera-relative positioning.
+    /// </summary>
+    public void SetTargetPosition(Vector3 position, Quaternion rotation)
+    {
+        if (_projectionRoot != null)
+        {
+            _projectionRoot.position = position;
+            _projectionRoot.rotation = rotation;
+            Debug.Log($"[VRVideoProjectionSystem] Set target position: {position}, rotation: {rotation.eulerAngles}");
+        }
     }
 
     /// <summary>
