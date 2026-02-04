@@ -1,4 +1,75 @@
-Assets\VR-Workspace\Scripts\UI\RTT\Services\FileThumbnailService.cs(389,32): error CS1061: 'ThumbnailCache' does not contain a definition for 'Get' and no accessible extension method 'Get' accepting a first argument of type 'ThumbnailCache' could be found (are you missing a using directive or an assembly reference?)
+[MainThreadDispatcher] Initialized on thread 1
 
-Assets\VR-Workspace\Scripts\UI\RTT\Services\FileThumbnailService.cs(393,20): error CS1061: 'ThumbnailCache' does not contain a definition for 'Add' and no accessible extension method 'Add' accepting a first argument of type 'ThumbnailCache' could be found (are you missing a using directive or an assembly reference?)
+Starting camera passthrough
+
+Found 1 camera devices
+
+Camera 0: Twitch Virtual Cam (front facing: True)
+
+Starting webcam texture: Twitch Virtual Cam at 1280x720
+
+Could not connect pins - RenderStream()
+UnityEngine.StackTraceUtility:ExtractStackTrace ()
+CameraPassthrough:StartCam () (at Assets/VR-Workspace/Scripts/Camera/CameraPassthrough.cs:115)
+CameraPassthrough:OnEnable () (at Assets/VR-Workspace/Scripts/Camera/CameraPassthrough.cs:17)
+
+[APBootstrap] AndroidStreamingHelper initialized
+
+[APBootstrap] AppPermissionManager initialized
+
+[AndroidHelper] App resumed
+
+[RTTRaycastManager] Auto-initialized layer mask to VirtualObjects (layer 3)
+
+[RTTMenu] Created main frame
+
+[RTTBootstrapper] Created RTTMenu with RTTMenuFrame_main
+
+[RTTBootstrapper] RTTMenu oriented towards camera
+
+[RTTToolbar] Created
+
+[RTTTaskbar] Icons loaded - Quit:True, Settings:True, Eye:True, EyeClose:True, Recenter:True, Home:True
+
+[RTTToolbar] Initialized with taskbar. Size: 0.913x0.331m, followTarget: RTTMenu
+
+[RTTBootstrapper] Created RTTTaskbar in RTTToolbar, following RTTMenu
+
+[RTTBootstrapper] RTTManager found, UI will be auto-detected
+
+[VirtualObjectsZoomController] Configured: min=1m, max=2m, default=1.8m, step=0.1m
+
+[VirtualObjectsZoomController] Moving VirtualObjects from 2.83m to default 1.80m
+
+[VirtualObjectsZoomController] Zoom set to 1.80m (delta: -1.028m)
+
+[RTTBootstrapper] Created VirtualObjectsZoomController (range: 1m - 2m, default: 1.8m)
+
+[RTTBootstrapper] Initialization complete
+
+There are 2 audio listeners in the scene. Please ensure there is always exactly one audio listener in the scene.
+
+[RTTMenuFrame] UI built: 1920x1080 logical pixels
+
+[RTTMiniFrame] UI built: 1095.5x128 pixels
+
+[HoverEffectController] AddEffect 'scale' to HitArea, TargetVisuals=Visuals
+
+[HoverEffectController] AddEffect 'z_pop' to HitArea, TargetVisuals=Visuals
+
+Restarting webcam texture as it was not playing
+
+Could not connect pins - RenderStream()
+UnityEngine.StackTraceUtility:ExtractStackTrace ()
+CameraPassthrough/<EnsureTextureStarted>d__11:MoveNext () (at Assets/VR-Workspace/Scripts/Camera/CameraPassthrough.cs:158)
+UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
+
+Stopping camera passthrough
+
+Destroying webcam texture
+
+Webcam texture was destroyed during initialization
+UnityEngine.Debug:LogWarning (object)
+CameraPassthrough/<EnsureTextureStarted>d__11:MoveNext () (at Assets/VR-Workspace/Scripts/Camera/CameraPassthrough.cs:171)
+UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 

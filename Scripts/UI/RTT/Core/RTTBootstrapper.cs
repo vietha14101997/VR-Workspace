@@ -227,9 +227,14 @@ public class RTTBootstrapper : MonoBehaviour
 
         if (manager != null)
         {
-            // RTTManager will auto-detect primary RTTMenuFrame via RTTMenuFrame.PrimaryInstance
-            // and auto-detect taskbar via FindObjectOfType in its initialization
-            Debug.Log("[RTTBootstrapper] RTTManager found, UI will be auto-detected");
+            // Explicitly register the new frame with the persistent manager
+            // This ensures the manager knows about the new UI (e.g. after scene change)
+            Debug.Log("[RTTBootstrapper] RTTManager found, registering new frame and taskbar");
+            manager.RegisterNewMenuFrame(_menuFrame);
+            if (_taskbar != null)
+            {
+                manager.RegisterNewTaskbar(_taskbar);
+            }
         }
         else
         {

@@ -569,14 +569,27 @@ public class RTTManager : MonoBehaviour
     {
         if (_mainMenuInitialized)
         {
-            Debug.LogWarning("[RTTManager] Main Menu already initialized - cannot create another");
-            return;
+            // Check if content was destroyed externally (e.g. scene change)
+            if (_mainMenuContent == null)
+            {
+                _mainMenuInitialized = false; // Reset status to allow recreation
+            }
+            else
+            {
+                Debug.LogWarning("[RTTManager] Main Menu already initialized - cannot create another");
+                return;
+            }
         }
 
+        // Re-validate frame reference if needed
         if (mainMenuFrame == null || mainMenuFrame.ContentContainer == null)
         {
-            Debug.LogWarning("[RTTManager] MenuFrame or ContentContainer not initialized");
-            return;
+             mainMenuFrame = RTTMenuFrame.PrimaryInstance;
+             if (mainMenuFrame == null || mainMenuFrame.ContentContainer == null)
+             {
+                 Debug.LogWarning("[RTTManager] MenuFrame or ContentContainer not initialized");
+                 return;
+             }
         }
 
         if (mainMenuController != null)
@@ -698,6 +711,12 @@ public class RTTManager : MonoBehaviour
     /// </summary>
     public void ShowMainMenu()
     {
+        // Re-validate frame if lost (e.g. scene change)
+        if (mainMenuFrame == null)
+        {
+            mainMenuFrame = RTTMenuFrame.PrimaryInstance;
+        }
+
         if (mainMenuFrame == null || mainMenuFrame.ContentContainer == null)
         {
             Debug.LogWarning("[RTTManager] MenuFrame or ContentContainer not initialized");
@@ -760,6 +779,54 @@ public class RTTManager : MonoBehaviour
         OnMenuStateChanged?.Invoke(_currentMenuState);
         mainMenuFrame.MarkDirty();
         Debug.Log("[RTTManager] Switched to Remote Menu");
+    }
+
+    /// <summary>
+    /// Register a new Main Menu Frame (e.g. from Bootstrapper when scene changes).
+    /// </summary>
+    public void RegisterNewMenuFrame(RTTMenuFrame frame)
+    {
+        if (frame == null) return;
+        
+        mainMenuFrame = frame;
+        
+        // Update references
+        if (menu == null && frame.transform.parent != null)
+        {
+            menu = frame.transform.parent.GetComponent<RTTMenu>();
+        }
+
+        // Re-initialize app manager if needed to update its references
+        InitializeAppManager();
+
+        if (autoShowMainMenu)
+        {
+            // If the content container is not yet ready (common during Awake/Start), wait for it
+            if (mainMenuFrame.ContentContainer == null)
+            {
+                StartCoroutine(WaitAndShowMainMenu());
+            }
+            else
+            {
+                ShowMainMenu();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Register a new Taskbar (e.g. from Bootstrapper when scene changes).
+    /// </summary>
+    public void RegisterNewTaskbar(RTTTaskbar newTaskbar)
+    {
+        if (newTaskbar == null) return;
+
+        taskbar = newTaskbar;
+        
+        // Update AppManager reference
+        if (_appManager != null)
+        {
+            _appManager.UpdateTaskbarReference(newTaskbar);
+        }
     }
 
     /// <summary>

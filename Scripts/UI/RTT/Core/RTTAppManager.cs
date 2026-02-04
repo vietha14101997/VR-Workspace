@@ -115,6 +115,31 @@ namespace VRWorkspace.UI.RTT
             _onMenuStateChanged = callback;
         }
 
+        /// <summary>
+        /// Update taskbar reference at runtime (e.g. after scene change).
+        /// </summary>
+        public void UpdateTaskbarReference(RTTTaskbar newTaskbar)
+        {
+            _taskbar = newTaskbar;
+            
+            // Re-register all active apps with the new taskbar
+            if (_taskbar != null)
+            {
+                foreach (var app in _activeApps.Values)
+                {
+                    _taskbar.RegisterApp(app.TaskbarSlotIndex, app.Icon, () => SwitchToApp(app.AppId));
+                    if (_currentVisibleAppId == app.AppId)
+                        _taskbar.SelectSlot(app.TaskbarSlotIndex);
+                }
+                
+                // If main menu is visible, select home slot
+                if (_currentVisibleAppId == null)
+                {
+                    _taskbar.SelectSlot(0);
+                }
+            }
+        }
+        
         #endregion
 
         #region Public API
