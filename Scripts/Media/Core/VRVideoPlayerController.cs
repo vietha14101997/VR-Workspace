@@ -91,6 +91,10 @@ public class VRVideoPlayerController : MonoBehaviour
             _controlsPanel.OnSpeedChanged += SetPlaybackSpeed;
             _controlsPanel.OnBackClicked += HandleBackClicked;
             _controlsPanel.OnSettingsClicked += ShowSettings;
+            _controlsPanel.OnPlaylistClicked += HandlePlaylistClicked;
+            _controlsPanel.OnVRModeClicked += HandleVRModeClicked;
+            _controlsPanel.OnHeadsetModeClicked += HandleHeadsetModeClicked;
+            _controlsPanel.OnRecenterClicked += HandleRecenter;
         }
     }
 
@@ -195,6 +199,7 @@ public class VRVideoPlayerController : MonoBehaviour
             _controlsPanel.SetPlayState(false);
             _controlsPanel.SetCurrentTime(0);
             _controlsPanel.SetDuration(0);
+            _controlsPanel.SetTitle(video.Title); // Set Title
             _controlsPanel.Show();
         }
     }
@@ -481,6 +486,22 @@ public class VRVideoPlayerController : MonoBehaviour
         OnBackToLibrary?.Invoke();
     }
 
+    private void HandlePlaylistClicked()
+    {
+        Debug.Log("[VRVideoPlayerController] Playlist clicked (Not implemented)");
+    }
+
+    private void HandleVRModeClicked()
+    {
+        Debug.Log("[VRVideoPlayerController] VR Mode clicked");
+        // Simple toggle for testing VR/3D mode
+    }
+
+    private void HandleHeadsetModeClicked()
+    {
+        Debug.Log("[VRVideoPlayerController] Headset Mode clicked (Not implemented)");
+    }
+
     private void HandleProjectionChanged(VideoProjectionType newProjection)
     {
         if (!_currentVideo.HasValue) return;
@@ -506,6 +527,14 @@ public class VRVideoPlayerController : MonoBehaviour
         _environmentController?.SetProjectionType(newProjection);
 
         Debug.Log($"[VRVideoPlayerController] Projection changed to {newProjection}");
+    }
+
+    private void HandleRecenter()
+    {
+        if (_projectionSystem != null)
+        {
+            _projectionSystem.RecenterView();
+        }
     }
     #endregion
 
@@ -549,6 +578,9 @@ public class VRVideoPlayerController : MonoBehaviour
             _controlsPanel.OnSpeedChanged -= SetPlaybackSpeed;
             _controlsPanel.OnBackClicked -= HandleBackClicked;
             _controlsPanel.OnSettingsClicked -= ShowSettings;
+            _controlsPanel.OnPlaylistClicked -= HandlePlaylistClicked;
+            _controlsPanel.OnVRModeClicked -= HandleVRModeClicked;
+            _controlsPanel.OnHeadsetModeClicked -= HandleHeadsetModeClicked;
         }
 
         UnwireSettingsEvents();

@@ -704,6 +704,52 @@ public class RTTManager : MonoBehaviour
     }
     #endregion
 
+    #region Immersive Mode
+    private bool _wasTaskbarVisible;
+    private bool _wasMenuVisible;
+    private bool _isImmersiveMode;
+
+    /// <summary>
+    /// Enter immersive mode: Hide global system UI (Taskbar, Main Menu).
+    /// Used by Video Player or other full-screen apps.
+    /// </summary>
+    public void EnterImmersiveMode()
+    {
+        if (_isImmersiveMode) return;
+        _isImmersiveMode = true;
+
+        // Save state
+        _wasTaskbarVisible = taskbar != null && taskbar.gameObject.activeSelf;
+        _wasMenuVisible = mainMenuFrame != null && mainMenuFrame.gameObject.activeSelf;
+
+        // Hide UI
+        if (taskbar != null) taskbar.gameObject.SetActive(false);
+        
+        // Hide menu frame (this hides the container for both Main Menu and App content)
+        // Note: We might need a more granular approach if we want to keep App content visible but hide the "Menu" styling?
+        // But for Video Player, the Video Projection is separate from the MenuFrame (it uses WorldPanelPlus in world space),
+        // so hiding the MenuFrame is correct to clear the view.
+        if (mainMenuFrame != null) mainMenuFrame.gameObject.SetActive(false);
+
+        Debug.Log("[RTTManager] Entered Immersive Mode");
+    }
+
+    /// <summary>
+    /// Exit immersive mode: Restore global system UI state.
+    /// </summary>
+    public void ExitImmersiveMode()
+    {
+        if (!_isImmersiveMode) return;
+        _isImmersiveMode = false;
+
+        // Restore state
+        if (taskbar != null && _wasTaskbarVisible) taskbar.gameObject.SetActive(true);
+        if (mainMenuFrame != null && _wasMenuVisible) mainMenuFrame.gameObject.SetActive(true);
+
+        Debug.Log("[RTTManager] Exited Immersive Mode");
+    }
+    #endregion
+
     #region Menu Navigation
     /// <summary>
     /// Show the persistent Main Menu. Does not recreate - only shows existing menu.
@@ -711,6 +757,9 @@ public class RTTManager : MonoBehaviour
     /// </summary>
     public void ShowMainMenu()
     {
+        // Cancel Immersive Mode if active, as showing menu implies leaving immersion
+        if (_isImmersiveMode) ExitImmersiveMode();
+
         // Re-validate frame if lost (e.g. scene change)
         if (mainMenuFrame == null)
         {

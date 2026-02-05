@@ -195,6 +195,9 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         StopPlayback();
         CurrentMode = AppMode.Library;
 
+        // Exit Immersive Mode (restores Taskbar and MenuFrame)
+        RTTManager.Instance?.ExitImmersiveMode();
+
         // Show library UI, hide player
         ShowLibraryUI();
         HidePlayerUI();
@@ -211,8 +214,12 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         CurrentVideo = video;
         CurrentMode = AppMode.Player;
 
-        // Hide library UI, show player
+        // Hide library UI (saves position), show player
         HideLibraryUI();
+
+        // Enter Immersive Mode (hides Taskbar and MenuFrame)
+        RTTManager.Instance?.EnterImmersiveMode();
+
         ShowPlayerUI();
 
         // Start playback
@@ -468,7 +475,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         
         // Calculate controls frame size (same width as video, smaller height)
         float controlsWidth = _containerWidth;
-        float controlsHeight = 150f;
+        float controlsHeight = 600f; // Increased from 150f per feedback (approx 0.5m)
         
         // Initialize the frame
         // Calculate physical dimensions based on 1200 pixels/meter density (standard for 1920px = 1.6m)
@@ -477,6 +484,12 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         float physicalHeight = controlsHeight / density;
         
         controlsFrame.Configure(physicalWidth, physicalHeight, controlsWidth);
+        
+        // Disable glass effects and floating data for video controls
+        controlsFrame.SetGlassBackgroundEnabled(false);
+        controlsFrame.SetFloatingDataEnabled(false);
+        controlsFrame.SetContentMargins(0, 0, 0, 0); // No margins for overlay style
+        
         controlsFrame.ForceInitialize();
         
         // Get the canvas container for adding UI

@@ -177,6 +177,18 @@ public static class VRSliderFactory
 
         return sliderControl;
     }
+
+    /// <summary>
+    /// Create a volume slider.
+    /// </summary>
+    public static VRSliderControl CreateVolumeSlider(
+        Transform parent,
+        float width,
+        TMP_FontAsset font,
+        Color primaryColor)
+    {
+        return CreateSlider(parent, width, DEFAULT_HEIGHT, font, primaryColor, SliderStyle.Volume, 0f, 1f);
+    }
     #endregion
 
     #region Build Methods

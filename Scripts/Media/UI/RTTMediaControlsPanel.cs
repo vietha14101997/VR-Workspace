@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using System;
 using System.Collections;
 using TMPro;
@@ -8,17 +9,41 @@ using VRWorkspace.UI.HoverEffects;
 /// <summary>
 /// Playback controls panel for VR video player.
 /// Contains play/pause, seek bar, volume, speed, and settings buttons.
-/// Auto-hides during playback after 3 seconds of inactivity.
+/// Auto-hides during playback after 10 seconds of inactivity (unless hovering).
 /// </summary>
-public class RTTMediaControlsPanel : MonoBehaviour
+public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 {
     #region Constants
-    private const float PANEL_HEIGHT = 120f;
-    private const float PANEL_PADDING = 30f;
-    private const float PLAY_BUTTON_SIZE = 80f;
-    private const float NAV_BUTTON_SIZE = 60f;
-    private const float SMALL_BUTTON_SIZE = 50f;
-    private const float AUTO_HIDE_DELAY = 3f;
+    // Layout - 3 Equal Zones (A, B, C)
+    private const float TOTAL_HEIGHT = 600f;
+    private const float ZONE_HEIGHT = 200f; // TOTAL_HEIGHT / 3
+    
+    // Zone A (Header) - Outside Background
+    private const float HEADER_BUTTON_SIZE = 100f; // 50% of ZONE_HEIGHT
+    
+    // Zone B & C - Inside Background
+    private const float BG_PADDING_HORIZONTAL_RATIO = 0.02f; // 2% margin from edge
+    private const float BG_PADDING_VERTICAL_RATIO = 0.03f; // 3% of zone height
+    private const float PANEL_EDGE_MARGIN_RATIO = 0.025f; // 2.5% cut from each edge
+    
+    // Zone B - Title & Timeline
+    private const float TITLE_WIDTH_RATIO = 0.95f; // 95% of available width
+    private const float TIMELINE_SLIDER_RATIO = 0.65f; // 65% of available width (shorter slider for more spacing to time labels)
+    private const float TIME_SLIDER_SPACING = 40f; // Fixed spacing between slider and time labels
+    
+    // Zone C - Controls
+    private const float PLAY_BUTTON_SIZE = 100f;
+    private const float NAV_BUTTON_SIZE = 70f;
+    private const float SMALL_BUTTON_SIZE = 60f;
+    
+    // Styling
+    private static readonly Color BG_COLOR = new Color(0f, 0f, 0f, 0.75f); // Darker transparent background (increased alpha)
+    private static readonly Color HEADER_BTN_BG_COLOR = new Color(0f, 0f, 0f, 0.65f); // Dark transparent circle (increased alpha)
+    private const float BG_CORNER_RADIUS = 20f; // Rounded corners for background
+    private const float ZONE_A_BOTTOM_MARGIN = 50f; // 1/4 of ZONE_HEIGHT for gap between Zone A and Background
+    
+    // Auto-hide
+    private const float AUTO_HIDE_DELAY = 10f;
     private const float FADE_DURATION = 0.3f;
     #endregion
 
@@ -34,6 +59,10 @@ public class RTTMediaControlsPanel : MonoBehaviour
     public event Action OnFullscreenToggle;
 #pragma warning restore CS0067
     public event Action OnBackClicked;
+    public event Action OnPlaylistClicked;
+    public event Action OnVRModeClicked;
+    public event Action OnHeadsetModeClicked;
+    public event Action OnRecenterClicked;
     #endregion
 
     #region Properties
@@ -55,6 +84,7 @@ public class RTTMediaControlsPanel : MonoBehaviour
     private Button _prevButton;
     private Button _nextButton;
     private VRSliderControl _seekSlider;
+    private TextMeshProUGUI _titleText;
     private TextMeshProUGUI _currentTimeText;
     private TextMeshProUGUI _totalTimeText;
     private Button _volumeButton;
@@ -63,6 +93,7 @@ public class RTTMediaControlsPanel : MonoBehaviour
     private TextMeshProUGUI _speedText;
     private Button _settingsButton;
     private Button _backButton;
+    private Button _recenterButton;
 
     // State
     private float _duration = 0f;
@@ -70,15 +101,34 @@ public class RTTMediaControlsPanel : MonoBehaviour
     private float _volume = 1f;
     private float _speed = 1f;
     private bool _isSeeking = false;
+    private bool _isHovering = false;
     private float _autoHideTimer = 0f;
     private Coroutine _fadeCoroutine;
+    
+    // Sprites
+    private static Sprite _circleSprite;
+    private static Sprite _circleOutlineSprite;
+    
+    // Icon names for each button (use icon_record as placeholder)
+    private const string ICON_BACK = "icon_record";           // Replace with icon_back later
+    private const string ICON_AB_LOOP = "icon_record";        // Replace with A-B loop icon
+    private const string ICON_SCREENSHOT = "icon_record";     // Replace with screenshot icon  
+    private const string ICON_REPEAT = "icon_record";         // Replace with repeat icon
+    private const string ICON_SETTINGS = "icon_record";       // Replace with icon_settings
+    private const string ICON_VOLUME = "icon_record";         // Replace with volume icon
+    private const string ICON_PREV = "icon_record";           // Replace with rewind icon
+    private const string ICON_PLAY = "icon_record";           // Replace with icon_play
+    private const string ICON_PAUSE = "icon_record";          // Replace with icon_pause
+    private const string ICON_NEXT = "icon_record";           // Replace with fast-forward icon
+    private const string ICON_PIP = "icon_record";            // Replace with picture-in-picture icon
+    private const string ICON_3D = "icon_record";             // Replace with 3D cube icon
     #endregion
 
     #region Initialization
     public void Initialize(float w, float h, TMP_FontAsset font, Color primary, Color accent)
     {
         _width = w;
-        _height = PANEL_HEIGHT;
+        _height = TOTAL_HEIGHT; // Use new constant
         _font = font;
         _primaryColor = primary;
         _accentColor = accent;
@@ -99,147 +149,286 @@ public class RTTMediaControlsPanel : MonoBehaviour
         // Canvas group for fade
         _canvasGroup = gameObject.AddComponent<CanvasGroup>();
 
-        // Background
-        var bg = gameObject.AddComponent<Image>();
-        bg.color = new Color(0, 0, 0, 0.7f);
+        // Calculate effective content width (after 2.5% margin each side)
+        float edgeMargin = _width * PANEL_EDGE_MARGIN_RATIO;
+        float contentWidth = _width - (edgeMargin * 2);
 
-        // Main container with horizontal layout
-        GameObject containerObj = new GameObject("Container");
-        containerObj.transform.SetParent(transform, false);
+        // Root Layout: Vertical Group for Zone A and Main Body (Zone B + C)
+        var layout = gameObject.AddComponent<VerticalLayoutGroup>();
+        layout.spacing = ZONE_A_BOTTOM_MARGIN; // Gap between Zone A and Background
+        layout.childControlHeight = false;
+        layout.childForceExpandHeight = false;
+        layout.childControlWidth = false; // Don't control width - children set their own
+        layout.childForceExpandWidth = false;
+        layout.childAlignment = TextAnchor.UpperCenter; // Center children horizontally
+        layout.padding = new RectOffset(0, 0, 0, 0); // No padding
 
-        var containerRT = containerObj.AddComponent<RectTransform>();
-        containerRT.anchorMin = Vector2.zero;
-        containerRT.anchorMax = Vector2.one;
-        containerRT.offsetMin = new Vector2(PANEL_PADDING, 15);
-        containerRT.offsetMax = new Vector2(-PANEL_PADDING, -15);
+        // === ZONE A: HEADER (Outside Background) ===
+        CreateZoneA(transform, contentWidth);
 
-        var containerLayout = containerObj.AddComponent<VerticalLayoutGroup>();
-        containerLayout.spacing = 10;
-        containerLayout.childControlWidth = true;
-        containerLayout.childControlHeight = false;
-        containerLayout.childForceExpandWidth = true;
-        containerLayout.childForceExpandHeight = false;
+        // === MAIN BODY CONTAINER (For Zone B & C) ===
+        GameObject mainBody = new GameObject("MainBodyContainer");
+        mainBody.transform.SetParent(transform, false);
+        
+        var bodyRT = mainBody.AddComponent<RectTransform>();
+        // Background height = remaining height after Zone A + gap
+        float bodyHeight = _height - ZONE_HEIGHT - ZONE_A_BOTTOM_MARGIN;
+        bodyRT.sizeDelta = new Vector2(contentWidth, bodyHeight); // Use contentWidth!
+        
+        var bodyLE = mainBody.AddComponent<LayoutElement>();
+        bodyLE.minHeight = bodyHeight;
+        bodyLE.preferredHeight = bodyHeight;
+        bodyLE.minWidth = contentWidth;
+        bodyLE.preferredWidth = contentWidth;
 
-        // Top row: Timeline
-        CreateTimelineRow(containerObj.transform);
+        // Background Image - Uniform Dark Transparent with rounded corners
+        var bg = mainBody.AddComponent<Image>();
+        bg.color = BG_COLOR;
+        // Apply rounded corners using a rounded rect sprite
+        bg.sprite = CreateRoundedRectSprite(BG_CORNER_RADIUS);
+        bg.type = Image.Type.Sliced;
+        
+        // Padding calculation
+        int paddingH = Mathf.RoundToInt(_width * BG_PADDING_HORIZONTAL_RATIO);
+        int paddingV = Mathf.RoundToInt(ZONE_HEIGHT * BG_PADDING_VERTICAL_RATIO);
+        
+        // Vertical Layout for Zone B & C - no horizontal padding, centered
+        var bodyLayout = mainBody.AddComponent<VerticalLayoutGroup>();
+        bodyLayout.spacing = 10;
+        bodyLayout.padding = new RectOffset(paddingH, paddingH, paddingV, paddingV);
+        bodyLayout.childControlHeight = true;
+        bodyLayout.childControlWidth = true;
+        bodyLayout.childForceExpandHeight = true;
+        bodyLayout.childForceExpandWidth = true;
+        bodyLayout.childAlignment = TextAnchor.MiddleCenter;
 
-        // Bottom row: Controls
-        CreateControlsRow(containerObj.transform);
+        // Add hover logic to background
+        AttachHoverEvents(mainBody);
+
+        // === ZONE B: INFO (Title & Timeline) ===
+        CreateZoneB(mainBody.transform);
+
+        // === ZONE C: CONTROLS (Audio, Playback, Advanced) ===
+        CreateZoneC(mainBody.transform);
     }
 
-    private void CreateTimelineRow(Transform parent)
+    /// <summary>
+    /// Zone A: Header row with 5 round buttons, outside the main background.
+    /// </summary>
+    private void CreateZoneA(Transform parent, float contentWidth)
     {
-        GameObject rowObj = new GameObject("TimelineRow");
-        rowObj.transform.SetParent(parent, false);
+        GameObject zoneA = new GameObject("ZoneA_Header");
+        zoneA.transform.SetParent(parent, false);
 
-        var rowLE = rowObj.AddComponent<LayoutElement>();
-        rowLE.minHeight = 40;
-        rowLE.preferredHeight = 40;
+        var le = zoneA.AddComponent<LayoutElement>();
+        le.minHeight = ZONE_HEIGHT;
+        le.preferredHeight = ZONE_HEIGHT;
+        le.minWidth = contentWidth;
+        le.preferredWidth = contentWidth;
 
-        var rowLayout = rowObj.AddComponent<HorizontalLayoutGroup>();
-        rowLayout.spacing = 15;
-        rowLayout.childAlignment = TextAnchor.MiddleCenter;
-        rowLayout.childControlWidth = false;
-        rowLayout.childControlHeight = true;
-        rowLayout.childForceExpandWidth = false;
-        rowLayout.childForceExpandHeight = true;
+        // Horizontal Layout - Distribute buttons with space between
+        var layout = zoneA.AddComponent<HorizontalLayoutGroup>();
+        layout.spacing = 0; // No direct spacing, using SpaceBetween distribution
+        // NO horizontal padding - buttons touch edges (left edge of first button at left, right edge of last button at right)
+        int verticalPadding = Mathf.RoundToInt((ZONE_HEIGHT - HEADER_BUTTON_SIZE) / 2f);
+        layout.padding = new RectOffset(0, 0, verticalPadding, verticalPadding);
+        layout.childAlignment = TextAnchor.MiddleCenter;
+        layout.childControlWidth = false;
+        layout.childControlHeight = false;
+        layout.childForceExpandWidth = false; // Don't force expand - use spacers instead
+        layout.childForceExpandHeight = false;
 
-        // Current time
-        _currentTimeText = CreateTimeText(rowObj.transform, "0:00", 80);
+        // Button 1: Exit (Left)
+        _backButton = CreateRoundIconButton(zoneA.transform, ICON_BACK, HEADER_BUTTON_SIZE);
+        _backButton.onClick.AddListener(() => OnBackClicked?.Invoke());
 
-        // Seek slider
-        float sliderWidth = _width - PANEL_PADDING * 2 - 80 * 2 - 15 * 2;
-        _seekSlider = VRSliderFactory.CreateTimelineSlider(rowObj.transform, sliderWidth, _font, _primaryColor);
+        // Spacer between button 1 and 2
+        CreateFlexibleSpacer(zoneA.transform);
 
-        var sliderLE = _seekSlider.gameObject.AddComponent<LayoutElement>();
-        sliderLE.minWidth = sliderWidth;
-        sliderLE.flexibleWidth = 1;
+        // Button 2: A-B Loop
+        var abLoopBtn = CreateRoundIconButton(zoneA.transform, ICON_AB_LOOP, HEADER_BUTTON_SIZE);
+        abLoopBtn.onClick.AddListener(() => OnVRModeClicked?.Invoke());
+
+        // Spacer between button 2 and 3
+        CreateFlexibleSpacer(zoneA.transform);
+
+        // Button 3: Screenshot
+        _recenterButton = CreateRoundIconButton(zoneA.transform, ICON_SCREENSHOT, HEADER_BUTTON_SIZE);
+        _recenterButton.onClick.AddListener(() => OnRecenterClicked?.Invoke());
+
+        // Spacer between button 3 and 4
+        CreateFlexibleSpacer(zoneA.transform);
+
+        // Button 4: Repeat
+        var repeatBtn = CreateRoundIconButton(zoneA.transform, ICON_REPEAT, HEADER_BUTTON_SIZE);
+        repeatBtn.onClick.AddListener(() => OnHeadsetModeClicked?.Invoke());
+
+        // Spacer between button 4 and 5
+        CreateFlexibleSpacer(zoneA.transform);
+
+        // Button 5: Settings (Right)
+        _settingsButton = CreateRoundIconButton(zoneA.transform, ICON_SETTINGS, HEADER_BUTTON_SIZE);
+        _settingsButton.onClick.AddListener(() => OnSettingsClicked?.Invoke());
+    }
+
+    /// <summary>
+    /// Zone B: Info section with Title (MarqueeText) and Timeline.
+    /// </summary>
+    private void CreateZoneB(Transform parent)
+    {
+        GameObject zoneB = new GameObject("ZoneB_Info");
+        zoneB.transform.SetParent(parent, false);
+        
+        var le = zoneB.AddComponent<LayoutElement>();
+        le.flexibleHeight = 1; // Share space equally with Zone C
+
+        var vLayout = zoneB.AddComponent<VerticalLayoutGroup>();
+        vLayout.spacing = 5;
+        vLayout.childControlHeight = true;
+        vLayout.childForceExpandHeight = true;
+        vLayout.childControlWidth = true;
+        vLayout.childForceExpandWidth = true;
+        vLayout.childAlignment = TextAnchor.MiddleCenter;
+
+        // --- Row 1: Title (Centered) ---
+        GameObject titleContainer = new GameObject("TitleContainer");
+        titleContainer.transform.SetParent(zoneB.transform, false);
+        
+        var titleContainerLE = titleContainer.AddComponent<LayoutElement>();
+        titleContainerLE.flexibleHeight = 0.35f; // Less height than timeline
+        titleContainerLE.flexibleWidth = 1;
+        
+        // HorizontalLayoutGroup to properly center title - must use childControlWidth for flexibleWidth to work
+        var titleLayout = titleContainer.AddComponent<HorizontalLayoutGroup>();
+        titleLayout.childAlignment = TextAnchor.MiddleCenter;
+        titleLayout.childControlWidth = true;  // Must be true for flexibleWidth to work
+        titleLayout.childForceExpandWidth = true;
+        titleLayout.childControlHeight = true;
+        titleLayout.childForceExpandHeight = true;
+        
+        // Title text with flexible width
+        GameObject titleTextObj = new GameObject("TitleText");
+        titleTextObj.transform.SetParent(titleContainer.transform, false);
+        
+        var titleTextLE = titleTextObj.AddComponent<LayoutElement>();
+        titleTextLE.flexibleWidth = 1;
+        titleTextLE.flexibleHeight = 1;
+        
+        _titleText = titleTextObj.AddComponent<TextMeshProUGUI>();
+        _titleText.text = "Video Title";
+        _titleText.font = _font;
+        _titleText.fontSize = 32; // Larger font
+        _titleText.color = Color.white;
+        _titleText.alignment = TextAlignmentOptions.Center;
+        _titleText.enableWordWrapping = false;
+        _titleText.overflowMode = TextOverflowModes.Ellipsis;
+        
+        // Add MarqueeText behavior (static factory method)
+        MarqueeText.Setup(_titleText, 80f, true, 40f);
+        
+        // --- Row 2: Timeline ---
+        GameObject timelineRow = new GameObject("TimelineRow");
+        timelineRow.transform.SetParent(zoneB.transform, false);
+        
+        var timelineRowLE = timelineRow.AddComponent<LayoutElement>();
+        timelineRowLE.flexibleHeight = 0.6f;
+        
+        // 3% edge padding for timeline row
+        int timelineEdgePadding = Mathf.RoundToInt(_width * 0.03f);
+        
+        var timelineLayout = timelineRow.AddComponent<HorizontalLayoutGroup>();
+        timelineLayout.childAlignment = TextAnchor.MiddleCenter;
+        timelineLayout.childControlWidth = false;
+        timelineLayout.childForceExpandWidth = false;
+        timelineLayout.spacing = TIME_SLIDER_SPACING; // Spacing between slider and time labels
+        timelineLayout.padding = new RectOffset(timelineEdgePadding, timelineEdgePadding, 0, 0); // 3% edge margin
+
+        // Current time (left edge) - larger font, HH:mm:ss format
+        _currentTimeText = CreateText(timelineRow.transform, "00:00:00", 30, TextAlignmentOptions.Right);
+        var tLe = _currentTimeText.gameObject.AddComponent<LayoutElement>();
+        tLe.minWidth = 130;
+        tLe.preferredWidth = 130;
+
+        // Seek slider (95% width)
+        float sliderWidth = _width * TIMELINE_SLIDER_RATIO;
+        _seekSlider = VRSliderFactory.CreateTimelineSlider(timelineRow.transform, sliderWidth, _font, _primaryColor);
+        var sLe = _seekSlider.gameObject.AddComponent<LayoutElement>();
+        sLe.minWidth = sliderWidth;
+        sLe.preferredWidth = sliderWidth;
 
         _seekSlider.OnValueChanged += OnSeekValueChanged;
         _seekSlider.OnDragStarted += OnSeekStart;
         _seekSlider.OnDragEnded += OnSeekEnd;
+        AttachHoverEvents(_seekSlider.gameObject);
 
-        // Total time
-        _totalTimeText = CreateTimeText(rowObj.transform, "0:00", 80);
+        // Total time (right edge) - larger font, HH:mm:ss format
+        _totalTimeText = CreateText(timelineRow.transform, "00:00:00", 30, TextAlignmentOptions.Left);
+        var ttLe = _totalTimeText.gameObject.AddComponent<LayoutElement>();
+        ttLe.minWidth = 130;
+        ttLe.preferredWidth = 130;
     }
 
-    private void CreateControlsRow(Transform parent)
+    /// <summary>
+    /// Zone C: Controls section with Volume, Playback, and Advanced buttons.
+    /// </summary>
+    private void CreateZoneC(Transform parent)
     {
-        GameObject rowObj = new GameObject("ControlsRow");
-        rowObj.transform.SetParent(parent, false);
+        GameObject zoneC = new GameObject("ZoneC_Controls");
+        zoneC.transform.SetParent(parent, false);
+        
+        var le = zoneC.AddComponent<LayoutElement>();
+        le.flexibleHeight = 1; // Share space equally with Zone B
 
-        var rowLE = rowObj.AddComponent<LayoutElement>();
-        rowLE.minHeight = 50;
-        rowLE.preferredHeight = 50;
+        // 3% edge padding for controls
+        int controlsEdgePadding = Mathf.RoundToInt(_width * 0.03f);
+        
+        var layout = zoneC.AddComponent<HorizontalLayoutGroup>();
+        layout.spacing = 15;
+        layout.childAlignment = TextAnchor.MiddleCenter;
+        layout.childControlWidth = false;
+        layout.childForceExpandWidth = true; // Must be TRUE for FlexibleSpacers to work!
+        layout.padding = new RectOffset(controlsEdgePadding, controlsEdgePadding, 0, 0); // 3% edge margin
+        // FlexibleSpacers will push Volume to left edge and right buttons to right edge
 
-        var rowLayout = rowObj.AddComponent<HorizontalLayoutGroup>();
-        rowLayout.spacing = 10;
-        rowLayout.childAlignment = TextAnchor.MiddleCenter;
-        rowLayout.childControlWidth = false;
-        rowLayout.childControlHeight = true;
-        rowLayout.childForceExpandWidth = false;
-        rowLayout.childForceExpandHeight = true;
+        // === Left Group: Volume (at left edge) ===
+        _volumeButton = CreateIconOnlyButton(zoneC.transform, ICON_VOLUME, SMALL_BUTTON_SIZE);
+        _volumeButton.onClick.AddListener(ToggleMute);
+        
+        _volumeSlider = VRSliderFactory.CreateVolumeSlider(zoneC.transform, 150, _font, _primaryColor);
+        _volumeSlider.OnValueChanged += (v) => OnVolumeChanged?.Invoke(v);
+        AttachHoverEvents(_volumeSlider.gameObject);
+        
+        // Flexible spacer to push playback controls to center
+        CreateFlexibleSpacer(zoneC.transform);
 
-        // Back button
-        _backButton = CreateControlButton(rowObj.transform, "<", SMALL_BUTTON_SIZE);
-        _backButton.onClick.AddListener(() => OnBackClicked?.Invoke());
-
-        // Flexible spacer
-        CreateFlexibleSpacer(rowObj.transform);
-
-        // Previous button
-        _prevButton = CreateControlButton(rowObj.transform, "<<", NAV_BUTTON_SIZE);
+        // === Center Group: Playback ===
+        _prevButton = CreateIconOnlyButton(zoneC.transform, ICON_PREV, NAV_BUTTON_SIZE);
         _prevButton.onClick.AddListener(() => OnPrevious?.Invoke());
 
-        // Play/Pause button
-        _playPauseButton = CreateControlButton(rowObj.transform, "Play", PLAY_BUTTON_SIZE, true);
+        _playPauseButton = CreateIconOnlyButton(zoneC.transform, ICON_PLAY, PLAY_BUTTON_SIZE, true);
         _playPauseButton.onClick.AddListener(() => OnPlayPause?.Invoke());
-        _playPauseIcon = _playPauseButton.GetComponentInChildren<Image>();
 
-        // Next button
-        _nextButton = CreateControlButton(rowObj.transform, ">>", NAV_BUTTON_SIZE);
+        _nextButton = CreateIconOnlyButton(zoneC.transform, ICON_NEXT, NAV_BUTTON_SIZE);
         _nextButton.onClick.AddListener(() => OnNext?.Invoke());
 
-        // Flexible spacer
-        CreateFlexibleSpacer(rowObj.transform);
+        // Flexible spacer to push right buttons to edge
+        CreateFlexibleSpacer(zoneC.transform);
 
-        // Volume button
-        _volumeButton = CreateControlButton(rowObj.transform, "Vol", SMALL_BUTTON_SIZE);
-        // Volume slider (compact)
-        CreateVolumeSlider(rowObj.transform);
+        // === Right Group: Advanced (at right edge) ===
+        Button pipBtn = CreateIconOnlyButton(zoneC.transform, ICON_PIP, SMALL_BUTTON_SIZE);
+        pipBtn.onClick.AddListener(() => Debug.Log("PIP clicked"));
 
-        // Speed button
-        _speedButton = CreateControlButton(rowObj.transform, "1x", SMALL_BUTTON_SIZE);
-        _speedText = _speedButton.GetComponentInChildren<TextMeshProUGUI>();
-        _speedButton.onClick.AddListener(CycleSpeed);
-
-        // Settings button
-        _settingsButton = CreateControlButton(rowObj.transform, "...", SMALL_BUTTON_SIZE);
-        _settingsButton.onClick.AddListener(() => OnSettingsClicked?.Invoke());
+        Button threeDBtn = CreateIconOnlyButton(zoneC.transform, ICON_3D, SMALL_BUTTON_SIZE);
+        threeDBtn.onClick.AddListener(() => Debug.Log("3D mode clicked"));
     }
 
-    private TextMeshProUGUI CreateTimeText(Transform parent, string initialText, float width)
+    /// <summary>
+    /// Creates a round icon button for Zone A header (BareIconButton style).
+    /// Uses icon sprite instead of text.
+    /// </summary>
+    private Button CreateRoundIconButton(Transform parent, string iconName, float size)
     {
-        GameObject textObj = new GameObject("TimeText");
-        textObj.transform.SetParent(parent, false);
-
-        var textLE = textObj.AddComponent<LayoutElement>();
-        textLE.minWidth = width;
-        textLE.preferredWidth = width;
-
-        var text = textObj.AddComponent<TextMeshProUGUI>();
-        text.text = initialText;
-        text.font = _font;
-        text.fontSize = 24;
-        text.color = Color.white;
-        text.alignment = TextAlignmentOptions.Center;
-
-        return text;
-    }
-
-    private Button CreateControlButton(Transform parent, string label, float size, bool isPrimary = false)
-    {
-        GameObject buttonObj = new GameObject($"Btn_{label}");
+        GameObject buttonObj = new GameObject($"Btn_{iconName}");
         buttonObj.transform.SetParent(parent, false);
 
         var buttonLE = buttonObj.AddComponent<LayoutElement>();
@@ -248,55 +437,270 @@ public class RTTMediaControlsPanel : MonoBehaviour
         buttonLE.preferredWidth = size;
         buttonLE.preferredHeight = size;
 
+        // Round background - dark transparent with circular sprite
         var bgImage = buttonObj.AddComponent<Image>();
-        bgImage.color = isPrimary ? _primaryColor : new Color(1, 1, 1, 0.15f);
+        bgImage.sprite = GetCircleSprite();
+        bgImage.color = HEADER_BTN_BG_COLOR;
+        bgImage.type = Image.Type.Simple;
 
         var button = buttonObj.AddComponent<Button>();
         button.targetGraphic = bgImage;
 
-        // Text
-        GameObject textObj = new GameObject("Text");
-        textObj.transform.SetParent(buttonObj.transform, false);
+        // Icon Image (instead of text)
+        GameObject iconObj = new GameObject("IconImage");
+        iconObj.transform.SetParent(buttonObj.transform, false);
+        var iconRT = iconObj.AddComponent<RectTransform>();
+        iconRT.anchorMin = new Vector2(0.2f, 0.2f);
+        iconRT.anchorMax = new Vector2(0.8f, 0.8f);
+        iconRT.offsetMin = Vector2.zero;
+        iconRT.offsetMax = Vector2.zero;
 
-        var textRT = textObj.AddComponent<RectTransform>();
-        textRT.anchorMin = Vector2.zero;
-        textRT.anchorMax = Vector2.one;
-        textRT.offsetMin = Vector2.zero;
-        textRT.offsetMax = Vector2.zero;
+        var iconImage = iconObj.AddComponent<Image>();
+        iconImage.sprite = Resources.Load<Sprite>(iconName);
+        iconImage.color = Color.white;
+        iconImage.preserveAspect = true;
 
-        var text = textObj.AddComponent<TextMeshProUGUI>();
-        text.text = label;
-        text.font = _font;
-        text.fontSize = isPrimary ? 28 : 22;
-        text.fontStyle = FontStyles.Bold;
-        text.color = Color.white;
-        text.alignment = TextAlignmentOptions.Center;
+        // Hover effect - scale up
+        var hoverController = buttonObj.AddComponent<HoverEffectController>();
+        hoverController.AddEffect(new ScaleHoverEffect().WithHoverScale(1.15f));
+
+        var collider = buttonObj.AddComponent<BoxCollider>();
+        collider.size = new Vector3(size, size, 10);
+        collider.center = new Vector3(0, 0, -5);
+
+        AttachHoverEvents(buttonObj);
+        return button;
+    }
+
+    /// <summary>
+    /// Creates an icon-only button (no background) for Zone C controls.
+    /// Uses icon sprite instead of text.
+    /// </summary>
+    private Button CreateIconOnlyButton(Transform parent, string iconName, float size, bool isPrimary = false)
+    {
+        GameObject buttonObj = new GameObject($"Btn_{iconName}");
+        buttonObj.transform.SetParent(parent, false);
+
+        var buttonLE = buttonObj.AddComponent<LayoutElement>();
+        buttonLE.minWidth = size;
+        buttonLE.minHeight = size;
+        buttonLE.preferredWidth = size;
+        buttonLE.preferredHeight = size;
+
+        Image bgImage;
+        
+        // Add RectTransform with fixed size to maintain aspect ratio
+        var buttonRT = buttonObj.GetComponent<RectTransform>() ?? buttonObj.AddComponent<RectTransform>();
+        buttonRT.sizeDelta = new Vector2(size, size);
+        
+        if (isPrimary)
+        {
+            // Primary button (Play/Pause) gets a circle outline
+            bgImage = buttonObj.AddComponent<Image>();
+            bgImage.sprite = GetCircleOutlineSprite();
+            bgImage.color = Color.white;
+            bgImage.type = Image.Type.Simple;
+            bgImage.preserveAspect = true; // Keep circle shape
+        }
+        else
+        {
+            // Transparent background (icon-only)
+            bgImage = buttonObj.AddComponent<Image>();
+            bgImage.color = Color.clear;
+        }
+
+        var button = buttonObj.AddComponent<Button>();
+        button.targetGraphic = bgImage;
+
+        // Icon Image (instead of text)
+        GameObject iconObj = new GameObject("IconImage");
+        iconObj.transform.SetParent(buttonObj.transform, false);
+        var iconRT = iconObj.AddComponent<RectTransform>();
+        
+        if (isPrimary)
+        {
+            // Center icon inside circle outline  
+            iconRT.anchorMin = new Vector2(0.25f, 0.25f);
+            iconRT.anchorMax = new Vector2(0.75f, 0.75f);
+        }
+        else
+        {
+            iconRT.anchorMin = new Vector2(0.1f, 0.1f);
+            iconRT.anchorMax = new Vector2(0.9f, 0.9f);
+        }
+        iconRT.offsetMin = Vector2.zero;
+        iconRT.offsetMax = Vector2.zero;
+
+        var iconImage = iconObj.AddComponent<Image>();
+        iconImage.sprite = Resources.Load<Sprite>(iconName);
+        iconImage.color = Color.white;
+        iconImage.preserveAspect = true;
 
         // Hover effect
         var hoverController = buttonObj.AddComponent<HoverEffectController>();
         hoverController.AddEffect(new ScaleHoverEffect().WithHoverScale(1.1f));
 
-        // VR Collider
         var collider = buttonObj.AddComponent<BoxCollider>();
         collider.size = new Vector3(size, size, 10);
         collider.center = new Vector3(0, 0, -5);
 
+        AttachHoverEvents(buttonObj);
         return button;
     }
 
-    private void CreateVolumeSlider(Transform parent)
+    private TextMeshProUGUI CreateText(Transform parent, string content, float fontSize, TextAlignmentOptions alignment)
     {
-        var volumeSlider = VRSliderFactory.CreateSlider(
-            parent, 100, 30, _font, _primaryColor,
-            VRSliderFactory.SliderStyle.Volume, 0, 1);
+        GameObject textObj = new GameObject("Text");
+        textObj.transform.SetParent(parent, false);
+        
+        var text = textObj.AddComponent<TextMeshProUGUI>();
+        text.text = content;
+        text.font = _font;
+        text.fontSize = fontSize;
+        text.color = Color.white;
+        text.alignment = alignment;
+        
+        return text;
+    }
 
-        var sliderLE = volumeSlider.gameObject.AddComponent<LayoutElement>();
-        sliderLE.minWidth = 100;
-        sliderLE.preferredWidth = 100;
+    /// <summary>
+    /// Creates a circular sprite for round buttons.
+    /// </summary>
+    private static Sprite GetCircleSprite()
+    {
+        if (_circleSprite != null) return _circleSprite;
+        
+        int size = 128;
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        Color[] colors = new Color[size * size];
+        
+        float center = size / 2f;
+        float radius = size / 2f - 1f;
+        
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float dist = Vector2.Distance(new Vector2(x, y), new Vector2(center, center));
+                float alpha = Mathf.Clamp01(radius - dist + 0.5f); // Anti-aliased edge
+                colors[y * size + x] = new Color(1f, 1f, 1f, alpha);
+            }
+        }
+        
+        tex.SetPixels(colors);
+        tex.Apply();
+        tex.filterMode = FilterMode.Bilinear;
+        
+        _circleSprite = Sprite.Create(tex, new Rect(0, 0, size, size), Vector2.one * 0.5f);
+        return _circleSprite;
+    }
 
-        _volumeSlider = volumeSlider;
-        _volumeSlider.SetValue(_volume, false);
-        _volumeSlider.OnValueChanged += (value) => OnVolumeChanged?.Invoke(value);
+    /// <summary>
+    /// Creates a circular outline sprite for the play/pause button.
+    /// </summary>
+    private static Sprite GetCircleOutlineSprite()
+    {
+        if (_circleOutlineSprite != null) return _circleOutlineSprite;
+        
+        int size = 128;
+        float strokeWidth = 4f;
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        Color[] colors = new Color[size * size];
+        
+        float center = size / 2f;
+        float outerRadius = size / 2f - 1f;
+        float innerRadius = outerRadius - strokeWidth;
+        
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float dist = Vector2.Distance(new Vector2(x, y), new Vector2(center, center));
+                
+                // Outer edge anti-aliasing
+                float outerAlpha = Mathf.Clamp01(outerRadius - dist + 0.5f);
+                // Inner edge anti-aliasing  
+                float innerAlpha = Mathf.Clamp01(dist - innerRadius + 0.5f);
+                
+                // Combine for ring shape
+                float alpha = Mathf.Min(outerAlpha, innerAlpha);
+                colors[y * size + x] = new Color(1f, 1f, 1f, alpha);
+            }
+        }
+        
+        tex.SetPixels(colors);
+        tex.Apply();
+        tex.filterMode = FilterMode.Bilinear;
+        
+        _circleOutlineSprite = Sprite.Create(tex, new Rect(0, 0, size, size), Vector2.one * 0.5f);
+        return _circleOutlineSprite;
+    }
+
+    /// <summary>
+    /// Creates a rounded rectangle sprite for background with 9-slice support.
+    /// </summary>
+    private static Sprite CreateRoundedRectSprite(float cornerRadius)
+    {
+        int size = 64;
+        int radius = Mathf.RoundToInt(cornerRadius * size / 100f); // Scale radius
+        if (radius < 4) radius = 4;
+        if (radius > size / 2 - 1) radius = size / 2 - 1;
+        
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        Color[] colors = new Color[size * size];
+        
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float alpha = 1f;
+                
+                // Check corners
+                Vector2 cornerCenter = Vector2.zero;
+                bool isCorner = false;
+                
+                // Bottom-left corner
+                if (x < radius && y < radius)
+                {
+                    cornerCenter = new Vector2(radius, radius);
+                    isCorner = true;
+                }
+                // Bottom-right corner
+                else if (x >= size - radius && y < radius)
+                {
+                    cornerCenter = new Vector2(size - radius - 1, radius);
+                    isCorner = true;
+                }
+                // Top-left corner
+                else if (x < radius && y >= size - radius)
+                {
+                    cornerCenter = new Vector2(radius, size - radius - 1);
+                    isCorner = true;
+                }
+                // Top-right corner
+                else if (x >= size - radius && y >= size - radius)
+                {
+                    cornerCenter = new Vector2(size - radius - 1, size - radius - 1);
+                    isCorner = true;
+                }
+                
+                if (isCorner)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), cornerCenter);
+                    alpha = Mathf.Clamp01(radius - dist + 0.5f);
+                }
+                
+                colors[y * size + x] = new Color(1f, 1f, 1f, alpha);
+            }
+        }
+        
+        tex.SetPixels(colors);
+        tex.Apply();
+        tex.filterMode = FilterMode.Bilinear;
+        
+        // Create 9-sliced sprite with borders at the corner radius
+        Vector4 border = new Vector4(radius + 1, radius + 1, radius + 1, radius + 1);
+        return Sprite.Create(tex, new Rect(0, 0, size, size), Vector2.one * 0.5f, 100f, 0, SpriteMeshType.FullRect, border);
     }
 
     private void CreateFlexibleSpacer(Transform parent)
@@ -307,9 +711,29 @@ public class RTTMediaControlsPanel : MonoBehaviour
         var le = spacer.AddComponent<LayoutElement>();
         le.flexibleWidth = 1;
     }
+
+    // Helper for mute toggle
+    private void ToggleMute()
+    {
+        if (_volume > 0)
+        {
+            OnVolumeChanged?.Invoke(0f);
+        }
+        else
+        {
+            OnVolumeChanged?.Invoke(1f);
+        }
+    }
     #endregion
 
     #region Public Methods
+    /// <summary>
+    /// Set the video title.
+    /// </summary>
+    public void SetTitle(string title)
+    {
+        if (_titleText != null) _titleText.text = title;
+    }
     /// <summary>
     /// Update playback state display.
     /// </summary>
@@ -317,11 +741,12 @@ public class RTTMediaControlsPanel : MonoBehaviour
     {
         IsPlaying = isPlaying;
 
-        // Update play/pause button text
-        var text = _playPauseButton.GetComponentInChildren<TextMeshProUGUI>();
-        if (text != null)
+        // Update play/pause button icon
+        var iconImage = _playPauseButton.GetComponentInChildren<Image>();
+        if (iconImage != null && iconImage.gameObject.name == "IconImage")
         {
-            text.text = isPlaying ? "||" : ">";
+            string iconName = isPlaying ? ICON_PAUSE : ICON_PLAY;
+            iconImage.sprite = Resources.Load<Sprite>(iconName);
         }
 
         // Reset auto-hide timer when state changes
@@ -415,15 +840,64 @@ public class RTTMediaControlsPanel : MonoBehaviour
     /// </summary>
     public void OnUserInteraction()
     {
+        ResetAutoHideTimer();
+        
         if (!IsVisible)
         {
             Show();
         }
+    }
+
+    #region Pointer Interfaces
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        _isHovering = true;
         ResetAutoHideTimer();
+        // Debug.Log("[RTTMediaControlsPanel] Pointer Enter - Hover Start");
+    }
+
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        _isHovering = false;
+        ResetAutoHideTimer(); // Reset timer when leaving so it counts down from full duration
+        // Debug.Log("[RTTMediaControlsPanel] Pointer Exit - Hover End");
+    }
+    #endregion
+    #endregion
+
+    #region Unity Lifecycle
+    private void Update()
+    {
+        // Auto-hide during playback
+        if (IsPlaying && IsVisible && !_isSeeking && !_isHovering)
+        {
+            _autoHideTimer -= Time.deltaTime;
+            if (_autoHideTimer <= 0)
+            {
+                Hide();
+            }
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (_seekSlider != null)
+        {
+            _seekSlider.OnValueChanged -= OnSeekValueChanged;
+            _seekSlider.OnDragStarted -= OnSeekStart;
+            _seekSlider.OnDragEnded -= OnSeekEnd;
+        }
     }
     #endregion
 
     #region Private Methods
+    private void AttachHoverEvents(GameObject go)
+    {
+        if (go == null) return;
+        var relay = go.AddComponent<HoverEventRelay>();
+        relay.Initialize(this);
+    }
+
     private void OnSeekValueChanged(float normalizedValue)
     {
         if (_isSeeking)
@@ -473,11 +947,8 @@ public class RTTMediaControlsPanel : MonoBehaviour
         int minutes = (int)((seconds % 3600) / 60);
         int secs = (int)(seconds % 60);
 
-        if (hours > 0)
-        {
-            return $"{hours}:{minutes:D2}:{secs:D2}";
-        }
-        return $"{minutes}:{secs:D2}";
+        // Always show HH:mm:ss format
+        return $"{hours:D2}:{minutes:D2}:{secs:D2}";
     }
 
     private IEnumerator FadeIn()
@@ -515,28 +986,14 @@ public class RTTMediaControlsPanel : MonoBehaviour
     }
     #endregion
 
-    #region Unity Lifecycle
-    private void Update()
-    {
-        // Auto-hide during playback
-        if (IsPlaying && IsVisible && !_isSeeking)
-        {
-            _autoHideTimer -= Time.deltaTime;
-            if (_autoHideTimer <= 0)
-            {
-                Hide();
-            }
-        }
-    }
 
-    private void OnDestroy()
-    {
-        if (_seekSlider != null)
-        {
-            _seekSlider.OnValueChanged -= OnSeekValueChanged;
-            _seekSlider.OnDragStarted -= OnSeekStart;
-            _seekSlider.OnDragEnded -= OnSeekEnd;
-        }
-    }
-    #endregion
+}
+
+public class HoverEventRelay : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
+{
+    private RTTMediaControlsPanel _panel;
+    public void Initialize(RTTMediaControlsPanel panel) => _panel = panel;
+
+    public void OnPointerEnter(PointerEventData eventData) => _panel?.OnPointerEnter(eventData);
+    public void OnPointerExit(PointerEventData eventData) => _panel?.OnPointerExit(eventData);
 }
