@@ -45,7 +45,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
 
     // Auto-hide
     private const float AUTO_HIDE_DELAY = 10f;
-    private const float FADE_DURATION = 0.3f;
+    private const float FADE_DURATION = 0.2f;
     #endregion
 
     #region Events
@@ -709,8 +709,8 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     {
         if (_circleOutlineSprite != null) return _circleOutlineSprite;
 
-        int size = 128;
-        float strokeWidth = 6f;  // Thicker stroke for Play/Pause button
+        int size = 256;
+        float strokeWidth = 10f;
         Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
         Color[] colors = new Color[size * size];
 
@@ -724,12 +724,10 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
             {
                 float dist = Vector2.Distance(new Vector2(x, y), new Vector2(center, center));
 
-                // Outer edge anti-aliasing
+                // Smooth anti-aliasing (high-res texture ensures quality)
                 float outerAlpha = Mathf.Clamp01(outerRadius - dist + 0.5f);
-                // Inner edge anti-aliasing  
                 float innerAlpha = Mathf.Clamp01(dist - innerRadius + 0.5f);
 
-                // Combine for ring shape
                 float alpha = Mathf.Min(outerAlpha, innerAlpha);
                 colors[y * size + x] = new Color(1f, 1f, 1f, alpha);
             }
@@ -1081,11 +1079,21 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
 
     private IEnumerator FadeIn()
     {
-        // Instant show — avoids gradual circle-outline drawing artifact on Play/Pause button
-        _canvasGroup.alpha = 1f;
         _canvasGroup.interactable = true;
         _canvasGroup.blocksRaycasts = true;
-        yield break;
+
+        float elapsed = 0f;
+        float startAlpha = _canvasGroup.alpha;
+
+        while (elapsed < FADE_DURATION)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / FADE_DURATION;
+            _canvasGroup.alpha = Mathf.Lerp(startAlpha, 1f, t);
+            yield return null;
+        }
+
+        _canvasGroup.alpha = 1f;
     }
 
     private IEnumerator FadeOut()
