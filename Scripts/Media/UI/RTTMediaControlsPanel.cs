@@ -31,7 +31,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
 
     // Zone C - Controls (sizes calculated dynamically based on Zone C height)
     private const float PLAY_BUTTON_HEIGHT_RATIO = 1.0f;   // 100% of Zone C height
-    private const float OTHER_BUTTON_HEIGHT_RATIO = 0.3f;  // 30% of Zone C height for all other buttons
+    private const float OTHER_BUTTON_HEIGHT_RATIO = 0.5f;  // 50% of Zone C height for all other buttons
 
     // Styling
     private static readonly Color BG_COLOR = new Color(0f, 0f, 0f, 0.75f);
@@ -83,6 +83,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     private Button _nextButton;
     private VRSliderControl _seekSlider;
     private TextMeshProUGUI _titleText;
+    private MarqueeText _titleMarquee;
     private TextMeshProUGUI _currentTimeText;
     private TextMeshProUGUI _totalTimeText;
     private Button _volumeButton;
@@ -294,26 +295,64 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         vLayout.childForceExpandWidth = true;
         vLayout.childAlignment = TextAnchor.UpperCenter;  // Align to top, timeline will be pushed to bottom
 
-        // --- Row 1: Title (Takes remaining space, centered) ---
-        GameObject titleContainer = new GameObject("TitleContainer");
-        titleContainer.transform.SetParent(zoneB.transform, false);
+        // 3% spacing (same as timeline row)
+        float horizontalSpacing = _width * BG_HORIZONTAL_SPACING_RATIO;
 
-        var titleContainerLE = titleContainer.AddComponent<LayoutElement>();
-        titleContainerLE.flexibleHeight = 1;  // Takes all remaining space
-        titleContainerLE.flexibleWidth = 1;
+        // --- Row 1: Title Row (same structure as Timeline Row for alignment) ---
+        GameObject titleRow = new GameObject("TitleRow");
+        titleRow.transform.SetParent(zoneB.transform, false);
 
-        // Title text directly in container
-        _titleText = titleContainer.AddComponent<TextMeshProUGUI>();
+        var titleRowLE = titleRow.AddComponent<LayoutElement>();
+        titleRowLE.minHeight = 60f;  // Fixed height for title row (fontSize 40)
+        titleRowLE.preferredHeight = 60f;
+
+        var titleRowLayout = titleRow.AddComponent<HorizontalLayoutGroup>();
+        titleRowLayout.childAlignment = TextAnchor.MiddleCenter;
+        titleRowLayout.childControlWidth = true;
+        titleRowLayout.childControlHeight = true;
+        titleRowLayout.childForceExpandWidth = false;
+        titleRowLayout.childForceExpandHeight = true;
+        titleRowLayout.spacing = horizontalSpacing;  // Same spacing as timeline
+
+        // Left spacer (same width as currentTime label = 130)
+        GameObject leftSpacer = new GameObject("LeftSpacer");
+        leftSpacer.transform.SetParent(titleRow.transform, false);
+        var leftSpacerLE = leftSpacer.AddComponent<LayoutElement>();
+        leftSpacerLE.minWidth = 130;
+        leftSpacerLE.preferredWidth = 130;
+
+        // Title text (flexible width, same as slider)
+        GameObject titleTextObj = new GameObject("TitleText");
+        titleTextObj.transform.SetParent(titleRow.transform, false);
+
+        var titleTextLE = titleTextObj.AddComponent<LayoutElement>();
+        titleTextLE.flexibleWidth = 1;  // Same as slider - takes remaining space
+
+        _titleText = titleTextObj.AddComponent<TextMeshProUGUI>();
         _titleText.text = "Video Title";
         _titleText.font = _font;
-        _titleText.fontSize = 32;
+        _titleText.fontSize = 40;
+        _titleText.fontStyle = FontStyles.Bold;
         _titleText.color = Color.white;
-        _titleText.alignment = TextAlignmentOptions.Center;  // Centered both horizontally and vertically
+        _titleText.alignment = TextAlignmentOptions.MidlineLeft;  // MidlineLeft for correct MarqueeText positioning
         _titleText.enableWordWrapping = false;
         _titleText.overflowMode = TextOverflowModes.Ellipsis;
 
-        // Add MarqueeText behavior
-        MarqueeText.Setup(_titleText, 80f, true, 40f);
+        // Add MarqueeText behavior with centerWhenFits for proper centering
+        _titleMarquee = MarqueeText.Setup(_titleText, 80f, centerWhenFits: true);
+
+        // Right spacer (same width as totalTime label = 130)
+        GameObject rightSpacer = new GameObject("RightSpacer");
+        rightSpacer.transform.SetParent(titleRow.transform, false);
+        var rightSpacerLE = rightSpacer.AddComponent<LayoutElement>();
+        rightSpacerLE.minWidth = 130;
+        rightSpacerLE.preferredWidth = 130;
+
+        // --- Spacer to push timeline down (fills remaining space) ---
+        GameObject bottomSpacer = new GameObject("BottomSpacer");
+        bottomSpacer.transform.SetParent(zoneB.transform, false);
+        var bottomSpacerLE = bottomSpacer.AddComponent<LayoutElement>();
+        bottomSpacerLE.flexibleHeight = 1f;  // Takes all remaining space, pushing timeline to bottom
 
         // --- Row 2: Timeline (Fixed height at bottom) ---
         GameObject timelineRow = new GameObject("TimelineRow");
@@ -322,9 +361,6 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         var timelineRowLE = timelineRow.AddComponent<LayoutElement>();
         timelineRowLE.minHeight = 50f;  // Fixed height for timeline row
         timelineRowLE.preferredHeight = 50f;
-
-        // 3% spacing between time labels and slider only
-        float horizontalSpacing = _width * BG_HORIZONTAL_SPACING_RATIO;
 
         var timelineLayout = timelineRow.AddComponent<HorizontalLayoutGroup>();
         timelineLayout.childAlignment = TextAnchor.MiddleCenter;
@@ -376,7 +412,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
 
         // Calculate button sizes based on Zone C height
         float playButtonSize = zoneCHeight * PLAY_BUTTON_HEIGHT_RATIO;      // 100% - full height
-        float otherButtonSize = zoneCHeight * OTHER_BUTTON_HEIGHT_RATIO;    // 30% - for all other buttons
+        float otherButtonSize = zoneCHeight * OTHER_BUTTON_HEIGHT_RATIO;    // 50% - for all other buttons
 
         // 3% horizontal spacing (used within groups)
         float horizontalSpacing = _width * BG_HORIZONTAL_SPACING_RATIO;
@@ -390,12 +426,23 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         layout.childControlHeight = false;
         layout.padding = new RectOffset(0, 0, 0, 0);
 
+        // Calculate group width for symmetric layout (ensures CenterGroup is centered)
+        // LeftGroup: button + spacing + slider = otherButtonSize + spacing + 150
+        // RightGroup: button + spacing + button = otherButtonSize + spacing + otherButtonSize
+        float leftGroupWidth = otherButtonSize + horizontalSpacing + 150f;
+        float rightGroupWidth = otherButtonSize + horizontalSpacing + otherButtonSize;
+        float symmetricWidth = Mathf.Max(leftGroupWidth, rightGroupWidth);
+
         // === Left Group Container: Volume button + Slider ===
         GameObject leftGroup = new GameObject("LeftGroup_Volume");
         leftGroup.transform.SetParent(zoneC.transform, false);
+
+        var leftGroupLE = leftGroup.AddComponent<LayoutElement>();
+        leftGroupLE.minWidth = symmetricWidth;  // Match right group for symmetric layout
+
         var leftLayout = leftGroup.AddComponent<HorizontalLayoutGroup>();
         leftLayout.spacing = horizontalSpacing;  // 3% spacing between volume button and slider
-        leftLayout.childAlignment = TextAnchor.MiddleCenter;
+        leftLayout.childAlignment = TextAnchor.MiddleLeft;  // Align content to left within group
         leftLayout.childControlWidth = false;
         leftLayout.childForceExpandWidth = false;
 
@@ -434,9 +481,13 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         // === Right Group Container: Environment + 3D ===
         GameObject rightGroup = new GameObject("RightGroup_Advanced");
         rightGroup.transform.SetParent(zoneC.transform, false);
+
+        var rightGroupLE = rightGroup.AddComponent<LayoutElement>();
+        rightGroupLE.minWidth = symmetricWidth;  // Match left group for symmetric layout
+
         var rightLayout = rightGroup.AddComponent<HorizontalLayoutGroup>();
         rightLayout.spacing = horizontalSpacing;  // 3% spacing between environment and 3D
-        rightLayout.childAlignment = TextAnchor.MiddleCenter;
+        rightLayout.childAlignment = TextAnchor.MiddleRight;  // Align content to right within group
         rightLayout.childControlWidth = false;
         rightLayout.childForceExpandWidth = false;
 
@@ -768,7 +819,11 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     /// </summary>
     public void SetTitle(string title)
     {
-        if (_titleText != null) _titleText.text = title;
+        // Use MarqueeText.SetText() for proper centering (calls CheckOverflow and UpdateTextPosition)
+        if (_titleMarquee != null)
+            _titleMarquee.SetText(title);
+        else if (_titleText != null)
+            _titleText.text = title;
     }
     /// <summary>
     /// Update playback state display.
