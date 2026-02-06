@@ -440,6 +440,7 @@ public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler,
     private float _value = 0f;
     private float _minValue = 0f;
     private float _maxValue = 1f;
+    private float _step = 0f; // 0 = continuous (no snapping)
     private float _width;
 
     private RectTransform _fillRT;
@@ -461,12 +462,29 @@ public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler,
         _minValue = min;
         _maxValue = max;
     }
+
+    /// <summary>
+    /// Set minimum step size. Value will snap to nearest step.
+    /// Set to 0 for continuous (no snapping).
+    /// </summary>
+    public void SetStep(float step)
+    {
+        _step = Mathf.Max(0f, step);
+    }
     #endregion
 
     #region Public Methods
     public void SetValue(float value, bool notify = true)
     {
         float newValue = Mathf.Clamp(value, _minValue, _maxValue);
+
+        // Snap to step if configured
+        if (_step > 0f)
+        {
+            newValue = Mathf.Round(newValue / _step) * _step;
+            newValue = Mathf.Clamp(newValue, _minValue, _maxValue);
+        }
+
         if (Mathf.Approximately(newValue, _value)) return;
 
         _value = newValue;

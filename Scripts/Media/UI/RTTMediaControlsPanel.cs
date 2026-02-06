@@ -913,6 +913,12 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     {
         _duration = seconds;
         _totalTimeText.text = FormatTime(seconds);
+
+        // Set timeline step: 0.125s minimum granularity (normalized)
+        if (_seekSlider != null && _duration > 0)
+        {
+            _seekSlider.SetStep(0.125f / _duration);
+        }
     }
 
     /// <summary>
