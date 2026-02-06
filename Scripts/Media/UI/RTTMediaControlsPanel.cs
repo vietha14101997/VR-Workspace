@@ -1081,20 +1081,11 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
 
     private IEnumerator FadeIn()
     {
-        float elapsed = 0f;
-        float startAlpha = _canvasGroup.alpha;
-
-        while (elapsed < FADE_DURATION)
-        {
-            elapsed += Time.deltaTime;
-            float t = elapsed / FADE_DURATION;
-            _canvasGroup.alpha = Mathf.Lerp(startAlpha, 1f, t);
-            yield return null;
-        }
-
+        // Instant show — avoids gradual circle-outline drawing artifact on Play/Pause button
         _canvasGroup.alpha = 1f;
         _canvasGroup.interactable = true;
         _canvasGroup.blocksRaycasts = true;
+        yield break;
     }
 
     private IEnumerator FadeOut()
