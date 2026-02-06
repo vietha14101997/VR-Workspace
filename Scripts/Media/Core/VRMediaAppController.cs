@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UI;
 using TMPro;
 using System;
 using System.Collections;
@@ -68,6 +69,20 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
     private Vector3 _menuFramePosition;
     private Quaternion _menuFrameRotation;
     private Vector3 _menuFrameScale;
+
+    // Controls container (NOT in VirtualObjects → not affected by Zoom)
+    private GameObject _controlsContainer;
+    private GameObject _controlsFrameObject;
+    private GameObject _overlayFrameObject;
+
+    // Menu button frame (IN VirtualObjects → follows video screen with Zoom)
+    private GameObject _menuButtonFrameObject;
+
+    // Controls frame reference for hover detection
+    private RTTCanvasBase _controlsCanvasBase;
+
+    // Cached rounded rect sprite for menu button
+    private static Sprite _cachedRoundedRectSprite;
     #endregion
 
     #region Public API
@@ -150,11 +165,21 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             _playerController = null;
         }
         
-        // Cleanup controls frame
-        if (_controlsFrameObject != null)
+        // Cleanup controls container (includes controls frame + overlay frame)
+        if (_controlsContainer != null)
         {
-            Destroy(_controlsFrameObject);
+            Destroy(_controlsContainer);
+            _controlsContainer = null;
             _controlsFrameObject = null;
+            _overlayFrameObject = null;
+            _controlsCanvasBase = null;
+        }
+
+        // Cleanup menu button frame (separate, in VirtualObjects)
+        if (_menuButtonFrameObject != null)
+        {
+            Destroy(_menuButtonFrameObject);
+            _menuButtonFrameObject = null;
         }
 
         _controlsPanel = null;
@@ -266,15 +291,24 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             ProjectionSystem.SetTargetPosition(_menuFramePosition, _menuFrameRotation);
         }
         
-        // Position controls frame below the video screen
-        if (_controlsFrameObject != null && _menuFramePosition != Vector3.zero)
+        // Position controls container below the video screen
+        if (_controlsContainer != null && _menuFramePosition != Vector3.zero)
         {
-            // Calculate position below menu frame (offset downward in world space)
-            Vector3 controlsPos = _menuFramePosition + _menuFrameRotation * new Vector3(0, -0.5f, 0);
-            _controlsFrameObject.transform.position = controlsPos;
-            _controlsFrameObject.transform.rotation = _menuFrameRotation;
-            _controlsFrameObject.SetActive(true);
-            Debug.Log($"[VRMediaAppController] Controls frame positioned at: {controlsPos}");
+            Vector3 controlsPos = _menuFramePosition + _menuFrameRotation * new Vector3(0, -0.625f, 0);
+            _controlsContainer.transform.position = controlsPos;
+            _controlsContainer.transform.rotation = _menuFrameRotation;
+            _controlsContainer.SetActive(true);
+        }
+
+        // Position menu button below the video screen (in VirtualObjects, follows zoom)
+        if (_menuButtonFrameObject != null && _menuFramePosition != Vector3.zero)
+        {
+            // Video screen bottom = _menuFramePosition - 0.5m (half of 1m screen height)
+            // Menu button center below that with a small gap
+            float menuBtnPhysical = 90f / 1200f; // 90px at density 1200
+            Vector3 menuBtnPos = _menuFramePosition + _menuFrameRotation * new Vector3(0, -0.5f - menuBtnPhysical * 1.5f, 0);
+            _menuButtonFrameObject.transform.position = menuBtnPos;
+            _menuButtonFrameObject.transform.rotation = _menuFrameRotation;
         }
 
         // Use player controller to handle playback
@@ -384,13 +418,19 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
     private void ShowLibraryUI()
     {
         Debug.Log("[VRMediaAppController] ShowLibraryUI");
-        
-        // Hide player controls frame
-        if (_controlsFrameObject != null)
+
+        // Hide controls container (includes both controls frame and overlay)
+        if (_controlsContainer != null)
         {
-            _controlsFrameObject.SetActive(false);
+            _controlsContainer.SetActive(false);
         }
-        
+
+        // Hide menu button frame
+        if (_menuButtonFrameObject != null)
+        {
+            _menuButtonFrameObject.SetActive(false);
+        }
+
         // Hide video projection
         if (ProjectionSystem != null)
         {
@@ -458,49 +498,91 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
     private void BuildPlayerUI()
     {
-        // Find VirtualObjects for creating controls frame
+        int vLayer = LayerMask.NameToLayer("VirtualObjects");
+        if (vLayer < 0) vLayer = 0;
+
         GameObject virtualObjects = GameObject.Find("VirtualObjects");
-        if (virtualObjects == null)
+
+        // === 1. Root container at scene root (NOT under VirtualObjects → not affected by Zoom) ===
+        _controlsContainer = new GameObject("VideoControlsContainer");
+        // Intentionally NOT parented to VirtualObjects
+
+        // === 2. Dismiss overlay frame (large transparent click-to-dismiss) ===
+        _overlayFrameObject = new GameObject("DismissOverlayFrame");
+        _overlayFrameObject.transform.SetParent(_controlsContainer.transform);
+        // Offset overlay behind controls frame so raycast hits controls first
+        _overlayFrameObject.transform.localPosition = new Vector3(0, 0, 0.01f);
+        _overlayFrameObject.layer = vLayer;
+
+        var overlayFrame = _overlayFrameObject.AddComponent<RTTMenuFrame>();
+        float overlaySize = 5f;
+        float overlayPixels = 64f;
+        overlayFrame.Configure(overlaySize, overlaySize, overlayPixels);
+        overlayFrame.SetGlassBackgroundEnabled(false);
+        overlayFrame.SetFloatingDataEnabled(false);
+        overlayFrame.SetContentMargins(0, 0, 0, 0);
+        overlayFrame.ForceInitialize();
+
+        var overlayQuad = overlayFrame.GetDisplayQuad();
+        if (overlayQuad != null && overlayQuad.material != null)
+            overlayQuad.material.renderQueue = 3050;
+
+        var overlayContainer = overlayFrame.ContentContainer;
+        if (overlayContainer != null)
         {
-            Debug.LogError("[VRMediaAppController] VirtualObjects not found! Cannot create player controls.");
-            return;
+            GameObject dismissObj = new GameObject("DismissButton");
+            dismissObj.transform.SetParent(overlayContainer, false);
+            var dismissRT = dismissObj.AddComponent<RectTransform>();
+            dismissRT.anchorMin = Vector2.zero;
+            dismissRT.anchorMax = Vector2.one;
+            dismissRT.offsetMin = Vector2.zero;
+            dismissRT.offsetMax = Vector2.zero;
+
+            var dismissImg = dismissObj.AddComponent<Image>();
+            dismissImg.color = Color.clear;
+            dismissImg.raycastTarget = true;
+
+            var dismissBtn = dismissObj.AddComponent<Button>();
+            dismissBtn.transition = Selectable.Transition.None;
+            dismissBtn.onClick.AddListener(() => _controlsPanel?.Hide());
+
+            var col = dismissObj.AddComponent<BoxCollider>();
+            col.size = new Vector3(overlayPixels, overlayPixels, 10);
+            col.center = new Vector3(0, 0, -5);
         }
-        
-        // Create a new RTTMenuFrame for controls - positioned below video screen
+        _overlayFrameObject.SetActive(false);
+
+        // === 3. Controls frame (RTTMenuFrame with higher render priority) ===
         GameObject controlsFrameObj = new GameObject("VideoControlsFrame");
-        controlsFrameObj.transform.SetParent(virtualObjects.transform);
-        
-        // Add RTTMenuFrame component for proper RTT rendering
+        controlsFrameObj.transform.SetParent(_controlsContainer.transform);
+        controlsFrameObj.layer = vLayer;
+
         var controlsFrame = controlsFrameObj.AddComponent<RTTMenuFrame>();
-        
-        // Calculate controls frame size (same width as video, smaller height)
+        _controlsCanvasBase = controlsFrame; // Store for hover detection
+
         float controlsWidth = _containerWidth;
-        float controlsHeight = 600f; // Increased from 150f per feedback (approx 0.5m)
-        
-        // Initialize the frame
-        // Calculate physical dimensions based on 1200 pixels/meter density (standard for 1920px = 1.6m)
-        float density = 1200f; 
+        float controlsHeight = 600f;
+        float density = 1200f;
         float physicalWidth = controlsWidth / density;
         float physicalHeight = controlsHeight / density;
-        
+
         controlsFrame.Configure(physicalWidth, physicalHeight, controlsWidth);
-        
-        // Disable glass effects and floating data for video controls
         controlsFrame.SetGlassBackgroundEnabled(false);
         controlsFrame.SetFloatingDataEnabled(false);
-        controlsFrame.SetContentMargins(0, 0, 0, 0); // No margins for overlay style
-        
+        controlsFrame.SetContentMargins(0, 0, 0, 0);
         controlsFrame.ForceInitialize();
-        
-        // Get the canvas container for adding UI
+
+        var controlsQuad = controlsFrame.GetDisplayQuad();
+        if (controlsQuad != null && controlsQuad.material != null)
+            controlsQuad.material.renderQueue = 3100;
+
         var container = controlsFrame.ContentContainer;
         if (container == null)
         {
             Debug.LogError("[VRMediaAppController] Cannot find container in controls frame");
             return;
         }
-        
-        // Create Controls Panel inside the frame
+
         GameObject controlsObj = new GameObject("ControlsPanel");
         controlsObj.transform.SetParent(container, false);
 
@@ -513,28 +595,93 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         _controlsPanel = controlsObj.AddComponent<RTTMediaControlsPanel>();
         _controlsPanel.Initialize(controlsWidth, controlsHeight, _font, _primaryColor, _accentColor);
 
-        // Position controls frame at bottom of menu frame position
-        // (Will be repositioned in ShowPlayerUI based on video screen position)
         _controlsFrameObject = controlsFrameObj;
-        
-        // Create Settings Popup (inside existing viewObject since we need it in UI space)
-        // For now keep it minimal - settings can be added later
-        
-        // Create Player Controller
+
+        // === 4. Menu button frame (in VirtualObjects → follows video screen with Zoom) ===
+        _menuButtonFrameObject = new GameObject("MenuButtonFrame");
+        if (virtualObjects != null)
+            _menuButtonFrameObject.transform.SetParent(virtualObjects.transform);
+        _menuButtonFrameObject.layer = vLayer;
+
+        var menuFrame = _menuButtonFrameObject.AddComponent<RTTMenuFrame>();
+        float menuBtnPixels = 90f;
+        float menuBtnPhysical = menuBtnPixels / density;
+        menuFrame.Configure(menuBtnPhysical, menuBtnPhysical, menuBtnPixels);
+        menuFrame.SetGlassBackgroundEnabled(false);
+        menuFrame.SetFloatingDataEnabled(false);
+        menuFrame.SetContentMargins(0, 0, 0, 0);
+        menuFrame.ForceInitialize();
+
+        var menuQuad = menuFrame.GetDisplayQuad();
+        if (menuQuad != null)
+        {
+            if (menuQuad.material != null)
+                menuQuad.material.renderQueue = 3100;
+            menuQuad.gameObject.layer = vLayer; // Ensure raycast detection on VirtualObjects layer
+        }
+
+        var menuContainer = menuFrame.ContentContainer;
+        if (menuContainer != null)
+        {
+            // Background
+            GameObject btnObj = new GameObject("MenuButton");
+            btnObj.transform.SetParent(menuContainer, false);
+            var btnRT = btnObj.AddComponent<RectTransform>();
+            btnRT.anchorMin = Vector2.zero;
+            btnRT.anchorMax = Vector2.one;
+            btnRT.offsetMin = Vector2.zero;
+            btnRT.offsetMax = Vector2.zero;
+
+            var btnBg = btnObj.AddComponent<Image>();
+            btnBg.sprite = CreateRoundedRectSprite();
+            btnBg.color = new Color(0f, 0f, 0f, 0.75f);
+            btnBg.type = Image.Type.Sliced;
+            btnBg.raycastTarget = true;
+
+            // Icon
+            GameObject iconObj = new GameObject("Icon");
+            iconObj.transform.SetParent(btnObj.transform, false);
+            var iconRT = iconObj.AddComponent<RectTransform>();
+            float pad = menuBtnPixels * 0.22f; // Icon ≈ 56% of button height
+            iconRT.anchorMin = Vector2.zero;
+            iconRT.anchorMax = Vector2.one;
+            iconRT.offsetMin = new Vector2(pad, pad);
+            iconRT.offsetMax = new Vector2(-pad, -pad);
+
+            var iconImg = iconObj.AddComponent<Image>();
+            iconImg.sprite = Resources.Load<Sprite>("icon_menu");
+            iconImg.preserveAspect = true;
+            iconImg.color = Color.white;
+            iconImg.raycastTarget = false;
+
+            // Button
+            var btn = btnObj.AddComponent<Button>();
+            btn.transition = Selectable.Transition.None;
+            btn.onClick.AddListener(() =>
+            {
+                _controlsPanel?.Show();
+                _controlsPanel?.ResetAutoHideTimer();
+            });
+
+            var btnCol = btnObj.AddComponent<BoxCollider>();
+            btnCol.size = new Vector3(menuBtnPixels, menuBtnPixels, 10);
+            btnCol.center = new Vector3(0, 0, -5);
+        }
+        _menuButtonFrameObject.SetActive(false); // Starts hidden (panel starts visible)
+
+        // Pass external frame references to panel for visibility toggling
+        _controlsPanel.SetExternalFrames(_overlayFrameObject, _menuButtonFrameObject);
+
+        // === 5. Player Controller ===
         GameObject playerObj = new GameObject("PlayerController");
         playerObj.transform.SetParent(transform);
 
         _playerController = playerObj.AddComponent<VRVideoPlayerController>();
         _playerController.Initialize(PlaybackEngine, ProjectionSystem, _controlsPanel);
-
-        // Wire events
         _playerController.OnBackToLibrary += SwitchToLibrary;
 
-        Debug.Log("[VRMediaAppController] Player UI built with controls frame");
+        Debug.Log("[VRMediaAppController] Player UI built with controls container");
     }
-    
-    // Store controls frame reference
-    private GameObject _controlsFrameObject;
 
     private void ShowPlayerUI()
     {
@@ -543,16 +690,15 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             BuildPlayerUI();
         }
 
+        if (_controlsContainer != null)
+        {
+            _controlsContainer.SetActive(true);
+        }
+
         if (_controlsPanel != null)
         {
             _controlsPanel.gameObject.SetActive(true);
             _controlsPanel.Show();
-        }
-        
-        // Ensure controls frame is visible if it exists
-        if (_controlsFrameObject != null)
-        {
-            _controlsFrameObject.SetActive(true);
         }
     }
 
@@ -562,10 +708,10 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         {
             _controlsPanel.gameObject.SetActive(false);
         }
-        
-        if (_controlsFrameObject != null)
+
+        if (_controlsContainer != null)
         {
-            _controlsFrameObject.SetActive(false);
+            _controlsContainer.SetActive(false);
         }
     }
 
@@ -707,7 +853,75 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
     #endregion
     #endregion
 
+    #region Helpers
+    private static Sprite CreateRoundedRectSprite()
+    {
+        if (_cachedRoundedRectSprite != null) return _cachedRoundedRectSprite;
+        int size = 64;
+        int radius = 8; // ~12% corner radius — subtle rounding
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        var colors = new Color[size * size];
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float alpha = 1f;
+                Vector2 corner = Vector2.zero;
+                bool isCorner = false;
+                if (x < radius && y < radius) { corner = new Vector2(radius, radius); isCorner = true; }
+                else if (x >= size - radius && y < radius) { corner = new Vector2(size - radius - 1, radius); isCorner = true; }
+                else if (x < radius && y >= size - radius) { corner = new Vector2(radius, size - radius - 1); isCorner = true; }
+                else if (x >= size - radius && y >= size - radius) { corner = new Vector2(size - radius - 1, size - radius - 1); isCorner = true; }
+                if (isCorner)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), corner);
+                    alpha = Mathf.Clamp01(radius - dist + 0.5f);
+                }
+                colors[y * size + x] = new Color(1f, 1f, 1f, alpha);
+            }
+        }
+        tex.SetPixels(colors);
+        tex.Apply();
+        tex.filterMode = FilterMode.Bilinear;
+        Vector4 border = new Vector4(radius + 1, radius + 1, radius + 1, radius + 1);
+        _cachedRoundedRectSprite = Sprite.Create(tex, new Rect(0, 0, size, size), Vector2.one * 0.5f, 100f, 0, SpriteMeshType.FullRect, border);
+        return _cachedRoundedRectSprite;
+    }
+    #endregion
+
     #region Unity Lifecycle
+    private void LateUpdate()
+    {
+        Camera cam = Camera.main;
+        if (cam == null) return;
+
+        // Face-to-camera for controls container
+        if (_controlsContainer != null && _controlsContainer.activeSelf)
+        {
+            Vector3 toCamera = cam.transform.position - _controlsContainer.transform.position;
+            if (toCamera.sqrMagnitude > 0.001f)
+                _controlsContainer.transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
+        }
+
+        // Face-to-camera for menu button (in VirtualObjects, follows video screen)
+        if (_menuButtonFrameObject != null && _menuButtonFrameObject.activeSelf)
+        {
+            Vector3 toCamera = cam.transform.position - _menuButtonFrameObject.transform.position;
+            if (toCamera.sqrMagnitude > 0.001f)
+                _menuButtonFrameObject.transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
+        }
+
+        // Reset auto-hide when reticle is hovering the controls frame
+        if (_controlsPanel != null && _controlsPanel.IsVisible && _controlsCanvasBase != null)
+        {
+            var raycastMgr = RTTRaycastManager.Instance;
+            if (raycastMgr != null && raycastMgr.CurrentHit.isValid && raycastMgr.CurrentHit.panel == _controlsCanvasBase)
+            {
+                _controlsPanel.ResetAutoHideTimer();
+            }
+        }
+    }
+
     private void OnDestroy()
     {
         Cleanup();

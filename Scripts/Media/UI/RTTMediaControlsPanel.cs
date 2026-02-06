@@ -40,6 +40,9 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     private const float BG_CORNER_RADIUS = 20f;
     private const float ZONE_A_BOTTOM_MARGIN = 50f;
 
+    // Menu Button
+    private const string ICON_MENU = "icon_menu";
+
     // Auto-hide
     private const float AUTO_HIDE_DELAY = 10f;
     private const float FADE_DURATION = 0.3f;
@@ -93,6 +96,9 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     private Button _settingsButton;
     private Button _backButton;
     private Button _recenterButton;
+    // External world-space menu button + dismiss overlay (managed by VRMediaAppController)
+    private GameObject _menuButtonFrameObject;
+    private GameObject _overlayFrameObject;
 
     // State
     private float _duration = 0f;
@@ -145,28 +151,42 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         rt.pivot = new Vector2(0.5f, 0);
         rt.sizeDelta = new Vector2(_width, _height);
 
-        // Canvas group for fade
-        _canvasGroup = gameObject.AddComponent<CanvasGroup>();
+        // Invisible raycast target covering entire panel for IPointerEnterHandler/IPointerExitHandler
+        var panelHitArea = gameObject.AddComponent<Image>();
+        panelHitArea.color = Color.clear;
+        panelHitArea.raycastTarget = true;
 
-        // Use full width - Zone A buttons touch edges, Background has internal padding
+        // === Content Wrapper (owns CanvasGroup for fade, separate from MenuButton) ===
+        GameObject content = new GameObject("Content");
+        content.transform.SetParent(transform, false);
+
+        var contentRT = content.AddComponent<RectTransform>();
+        contentRT.anchorMin = Vector2.zero;
+        contentRT.anchorMax = Vector2.one;
+        contentRT.offsetMin = Vector2.zero;
+        contentRT.offsetMax = Vector2.zero;
+
+        // CanvasGroup on Content (NOT root) so MenuButton can fade independently
+        _canvasGroup = content.AddComponent<CanvasGroup>();
+
         float contentWidth = _width;
 
-        // Root Layout: Vertical Group for Zone A and Main Body (Zone B + C)
-        var layout = gameObject.AddComponent<VerticalLayoutGroup>();
+        // VerticalLayoutGroup on Content (moved from root)
+        var layout = content.AddComponent<VerticalLayoutGroup>();
         layout.spacing = ZONE_A_BOTTOM_MARGIN; // Gap between Zone A and Background
         layout.childControlHeight = false;
         layout.childForceExpandHeight = false;
-        layout.childControlWidth = true;  // Control width so children stretch to full width
-        layout.childForceExpandWidth = true;  // Force children to expand to full width
+        layout.childControlWidth = true;
+        layout.childForceExpandWidth = true;
         layout.childAlignment = TextAnchor.UpperCenter;
-        layout.padding = new RectOffset(0, 0, 0, 0); // No padding
+        layout.padding = new RectOffset(0, 0, 0, 0);
 
         // === ZONE A: HEADER (Outside Background) ===
-        CreateZoneA(transform, contentWidth);
+        CreateZoneA(content.transform, contentWidth);
 
         // === MAIN BODY CONTAINER (For Zone B & C) ===
         GameObject mainBody = new GameObject("MainBodyContainer");
-        mainBody.transform.SetParent(transform, false);
+        mainBody.transform.SetParent(content.transform, false);
 
         var bodyRT = mainBody.AddComponent<RectTransform>();
         // Background height = remaining height after Zone A + gap
@@ -815,6 +835,15 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
 
     #region Public Methods
     /// <summary>
+    /// Set external world-space objects for overlay dismiss and menu button toggle.
+    /// </summary>
+    public void SetExternalFrames(GameObject overlayFrame, GameObject menuButtonFrame)
+    {
+        _overlayFrameObject = overlayFrame;
+        _menuButtonFrameObject = menuButtonFrame;
+    }
+
+    /// <summary>
     /// Set the video title.
     /// </summary>
     public void SetTitle(string title)
@@ -903,6 +932,10 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         _fadeCoroutine = StartCoroutine(FadeIn());
         IsVisible = true;
         ResetAutoHideTimer();
+
+        // Show overlay, hide menu button (controls visible → overlay catches dismiss clicks)
+        if (_overlayFrameObject != null) _overlayFrameObject.SetActive(true);
+        if (_menuButtonFrameObject != null) _menuButtonFrameObject.SetActive(false);
     }
 
     /// <summary>
@@ -916,6 +949,10 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         }
         _fadeCoroutine = StartCoroutine(FadeOut());
         IsVisible = false;
+
+        // Hide overlay, show menu button (only menu button remains near video screen)
+        if (_overlayFrameObject != null) _overlayFrameObject.SetActive(false);
+        if (_menuButtonFrameObject != null) _menuButtonFrameObject.SetActive(true);
     }
 
     /// <summary>
@@ -1050,7 +1087,8 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         while (elapsed < FADE_DURATION)
         {
             elapsed += Time.deltaTime;
-            _canvasGroup.alpha = Mathf.Lerp(startAlpha, 1f, elapsed / FADE_DURATION);
+            float t = elapsed / FADE_DURATION;
+            _canvasGroup.alpha = Mathf.Lerp(startAlpha, 1f, t);
             yield return null;
         }
 
@@ -1067,7 +1105,8 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         while (elapsed < FADE_DURATION)
         {
             elapsed += Time.deltaTime;
-            _canvasGroup.alpha = Mathf.Lerp(startAlpha, 0f, elapsed / FADE_DURATION);
+            float t = elapsed / FADE_DURATION;
+            _canvasGroup.alpha = Mathf.Lerp(startAlpha, 0f, t);
             yield return null;
         }
 

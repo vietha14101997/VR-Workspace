@@ -170,6 +170,12 @@ public class VRVideoPlayerController : MonoBehaviour
                 ? DisplaySettings.Default
                 : DisplaySettings.Immersive;
 
+            // Flat projection: Distance=0 so screen sits at _projectionRoot position (MenuFrame coordinates)
+            if (ProjectionDetector.SupportsScreenSettings(projectionType))
+            {
+                _displaySettings.Distance = 0f;
+            }
+
             _projectionSystem.SetProjection(projectionType, stereoMode);
             _projectionSystem.UpdateDisplay(_displaySettings);
             _projectionSystem.RecenterView(); // Ensure screen is in front of user
@@ -319,7 +325,7 @@ public class VRVideoPlayerController : MonoBehaviour
     /// </summary>
     public void SetScreenDistance(float meters)
     {
-        _displaySettings.Distance = Mathf.Clamp(meters, 1f, 5f);
+        _displaySettings.Distance = Mathf.Clamp(meters, 0f, 5f);
         _projectionSystem?.UpdateDisplay(_displaySettings);
     }
 
@@ -518,6 +524,12 @@ public class VRVideoPlayerController : MonoBehaviour
             _displaySettings = ProjectionDetector.SupportsScreenSettings(newProjection)
                 ? DisplaySettings.Default
                 : DisplaySettings.Immersive;
+
+            // Flat projection: Distance=0 so screen sits at _projectionRoot position (MenuFrame coordinates)
+            if (ProjectionDetector.SupportsScreenSettings(newProjection))
+            {
+                _displaySettings.Distance = 0f;
+            }
 
             _projectionSystem.SetProjection(newProjection, stereoMode);
             _projectionSystem.UpdateDisplay(_displaySettings);

@@ -326,11 +326,19 @@ public class VRVideoProjectionSystem : MonoBehaviour
     #region Unity Lifecycle
     private void LateUpdate()
     {
-        // Update projection root position to follow camera rig
-        if (_projectionRoot != null && _cameraRig != null)
+        // Only follow camera for immersive projections (360/dome) that surround the viewer.
+        // Flat projection stays at SetTargetPosition and follows VirtualObjects parent for zoom support.
+        if (_projectionRoot != null && _cameraRig != null && IsImmersiveProjection())
         {
             _projectionRoot.position = _cameraRig.position;
         }
+    }
+
+    private bool IsImmersiveProjection()
+    {
+        return CurrentProjection == VideoProjectionType.Dome180
+            || CurrentProjection == VideoProjectionType.VR180Stereo
+            || CurrentProjection == VideoProjectionType.Sphere360;
     }
 
     private void OnDestroy()
