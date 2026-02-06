@@ -15,8 +15,9 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
 {
     #region Constants
     // Layout - 3 Equal Zones (A, B, C)
-    private const float TOTAL_HEIGHT = 600f;
-    private const float ZONE_HEIGHT = 200f; // TOTAL_HEIGHT / 3
+    private const float TOTAL_HEIGHT = 700f;
+    private const float ZONE_HEIGHT = 200f;
+    private const float TOP_SPACER = 100f; // 50% of ZONE_HEIGHT — empty space above Zone A
 
     // Zone A (Header) - NO horizontal padding, buttons touch edges
     private const float HEADER_BUTTON_SIZE = 100f; // 50% of ZONE_HEIGHT
@@ -179,7 +180,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         layout.childControlWidth = true;
         layout.childForceExpandWidth = true;
         layout.childAlignment = TextAnchor.UpperCenter;
-        layout.padding = new RectOffset(0, 0, 0, 0);
+        layout.padding = new RectOffset(0, 0, (int)TOP_SPACER, 0);
 
         // === ZONE A: HEADER (Outside Background) ===
         CreateZoneA(content.transform, contentWidth);
@@ -189,8 +190,8 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         mainBody.transform.SetParent(content.transform, false);
 
         var bodyRT = mainBody.AddComponent<RectTransform>();
-        // Background height = remaining height after Zone A + gap
-        float bodyHeight = _height - ZONE_HEIGHT - ZONE_A_BOTTOM_MARGIN;
+        // Background height = remaining height after top spacer + Zone A + gap
+        float bodyHeight = _height - TOP_SPACER - ZONE_HEIGHT - ZONE_A_BOTTOM_MARGIN;
         bodyRT.sizeDelta = new Vector2(contentWidth, bodyHeight); // Use contentWidth!
 
         var bodyLE = mainBody.AddComponent<LayoutElement>();
@@ -425,7 +426,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         le.flexibleHeight = 1; // Share space equally with Zone B
 
         // Calculate Zone C height for button sizing
-        float bodyHeight = TOTAL_HEIGHT - ZONE_HEIGHT - ZONE_A_BOTTOM_MARGIN;
+        float bodyHeight = TOTAL_HEIGHT - TOP_SPACER - ZONE_HEIGHT - ZONE_A_BOTTOM_MARGIN;
         float bodyContentHeight = bodyHeight - 2 * (bodyHeight * BG_VERTICAL_SPACING_RATIO);
         float estimatedZoneHeight = bodyContentHeight / 2.25f;  // Account for 25% spacing
         float zoneCHeight = estimatedZoneHeight;
@@ -556,9 +557,16 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         iconImage.color = Color.white;
         iconImage.preserveAspect = true;
 
-        // Hover effect - scale up
+        // Hover effects - scale + subtle color tint on icon (white → light pastel accent)
         var hoverController = buttonObj.AddComponent<HoverEffectController>();
         hoverController.AddEffect(new ScaleHoverEffect().WithHoverScale(1.15f));
+        hoverController.AddEffect(new ColorHoverEffect()
+            .WithTargetChild("IconImage")
+            .WithHoverColor(new Color(
+                Mathf.Lerp(_accentColor.r, 1f, 0.7f),
+                Mathf.Lerp(_accentColor.g, 1f, 0.7f),
+                Mathf.Lerp(_accentColor.b, 1f, 0.7f),
+                1f)));
 
         var collider = buttonObj.AddComponent<BoxCollider>();
         collider.size = new Vector3(size, size, 10);
@@ -643,9 +651,16 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         iconImage.color = Color.white;
         iconImage.preserveAspect = true;
 
-        // Hover effect
+        // Hover effects - scale + subtle color tint on icon (white → light pastel accent)
         var hoverController = buttonObj.AddComponent<HoverEffectController>();
         hoverController.AddEffect(new ScaleHoverEffect().WithHoverScale(1.1f));
+        hoverController.AddEffect(new ColorHoverEffect()
+            .WithTargetChild("IconImage")
+            .WithHoverColor(new Color(
+                Mathf.Lerp(_accentColor.r, 1f, 0.7f),
+                Mathf.Lerp(_accentColor.g, 1f, 0.7f),
+                Mathf.Lerp(_accentColor.b, 1f, 0.7f),
+                1f)));
 
         var collider = buttonObj.AddComponent<BoxCollider>();
         collider.size = new Vector3(size, size, 10);

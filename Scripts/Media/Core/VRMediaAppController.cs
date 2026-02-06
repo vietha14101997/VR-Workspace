@@ -5,6 +5,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using VRWorkspace.UI.RTT;
+using VRWorkspace.UI.HoverEffects;
 
 /// <summary>
 /// Main controller for the Media App.
@@ -561,7 +562,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         _controlsCanvasBase = controlsFrame; // Store for hover detection
 
         float controlsWidth = _containerWidth;
-        float controlsHeight = 600f;
+        float controlsHeight = 700f;
         float density = 1200f;
         float physicalWidth = controlsWidth / density;
         float physicalHeight = controlsHeight / density;
@@ -662,6 +663,17 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
                 _controlsPanel?.Show();
                 _controlsPanel?.ResetAutoHideTimer();
             });
+
+            // Hover effects - scale + subtle color tint on icon (white → light pastel accent)
+            var hoverCtrl = btnObj.AddComponent<HoverEffectController>();
+            hoverCtrl.AddEffect(new ScaleHoverEffect().WithHoverScale(1.15f));
+            hoverCtrl.AddEffect(new ColorHoverEffect()
+                .WithTargetChild("Icon")
+                .WithHoverColor(new Color(
+                    Mathf.Lerp(_accentColor.r, 1f, 0.7f),
+                    Mathf.Lerp(_accentColor.g, 1f, 0.7f),
+                    Mathf.Lerp(_accentColor.b, 1f, 0.7f),
+                    1f)));
 
             var btnCol = btnObj.AddComponent<BoxCollider>();
             btnCol.size = new Vector3(menuBtnPixels, menuBtnPixels, 10);
