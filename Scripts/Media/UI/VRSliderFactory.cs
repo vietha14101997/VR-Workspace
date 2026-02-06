@@ -490,7 +490,9 @@ public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler,
     {
         if (_bufferRT != null)
         {
-            _bufferRT.sizeDelta = new Vector2(_width * Mathf.Clamp01(progress), _bufferRT.sizeDelta.y);
+            var rt = GetComponent<RectTransform>();
+            float actualWidth = (rt != null && rt.rect.width > 0) ? rt.rect.width : _width;
+            _bufferRT.sizeDelta = new Vector2(actualWidth * Mathf.Clamp01(progress), _bufferRT.sizeDelta.y);
         }
     }
     #endregion
@@ -540,16 +542,20 @@ public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler,
     {
         float normalized = NormalizedValue;
 
+        // Use actual RectTransform width (supports layout-driven sizing)
+        var rt = GetComponent<RectTransform>();
+        float actualWidth = (rt != null && rt.rect.width > 0) ? rt.rect.width : _width;
+
         // Update fill
         if (_fillRT != null)
         {
-            _fillRT.sizeDelta = new Vector2(_width * normalized, _fillRT.sizeDelta.y);
+            _fillRT.sizeDelta = new Vector2(actualWidth * normalized, _fillRT.sizeDelta.y);
         }
 
         // Update handle position
         if (_handleRT != null)
         {
-            _handleRT.anchoredPosition = new Vector2(_width * normalized, _handleRT.anchoredPosition.y);
+            _handleRT.anchoredPosition = new Vector2(actualWidth * normalized, _handleRT.anchoredPosition.y);
         }
     }
     #endregion

@@ -207,6 +207,9 @@ public class VRVideoPlayerController : MonoBehaviour
             _controlsPanel.SetDuration(0);
             _controlsPanel.SetTitle(video.Title); // Set Title
             _controlsPanel.Show();
+
+            // Apply persisted volume to playback engine
+            SetVolume(_controlsPanel.Volume);
         }
     }
 
@@ -458,6 +461,7 @@ public class VRVideoPlayerController : MonoBehaviour
 
         if (_controlsPanel != null)
         {
+            _controlsPanel.SetCurrentTime((float)(_playbackEngine?.Duration ?? 0));
             _controlsPanel.SetPlayState(false);
             _controlsPanel.Show();
         }

@@ -606,8 +606,9 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
         var menuFrame = _menuButtonFrameObject.AddComponent<RTTMenuFrame>();
         float menuBtnPixels = 90f;
-        float menuBtnPhysical = menuBtnPixels / density;
-        menuFrame.Configure(menuBtnPhysical, menuBtnPhysical, menuBtnPixels);
+        float menuFramePixels = 120f; // Larger than button so scale hover has room
+        float menuFramePhysical = menuFramePixels / density;
+        menuFrame.Configure(menuFramePhysical, menuFramePhysical, menuFramePixels);
         menuFrame.SetGlassBackgroundEnabled(false);
         menuFrame.SetFloatingDataEnabled(false);
         menuFrame.SetContentMargins(0, 0, 0, 0);
@@ -628,10 +629,10 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             GameObject btnObj = new GameObject("MenuButton");
             btnObj.transform.SetParent(menuContainer, false);
             var btnRT = btnObj.AddComponent<RectTransform>();
-            btnRT.anchorMin = Vector2.zero;
-            btnRT.anchorMax = Vector2.one;
-            btnRT.offsetMin = Vector2.zero;
-            btnRT.offsetMax = Vector2.zero;
+            btnRT.anchorMin = new Vector2(0.5f, 0.5f);
+            btnRT.anchorMax = new Vector2(0.5f, 0.5f);
+            btnRT.pivot = new Vector2(0.5f, 0.5f);
+            btnRT.sizeDelta = new Vector2(menuBtnPixels, menuBtnPixels);
 
             var btnBg = btnObj.AddComponent<Image>();
             btnBg.sprite = CreateRoundedRectSprite();
@@ -667,12 +668,14 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             // Hover effects - scale + subtle color tint on icon (white → light pastel accent)
             var hoverCtrl = btnObj.AddComponent<HoverEffectController>();
             hoverCtrl.AddEffect(new ScaleHoverEffect().WithHoverScale(1.15f));
+            // Use Recenter Circle magenta as theme color
+            Color themeColor = new Color(1f, 0.2f, 0.2f, 1f);
             hoverCtrl.AddEffect(new ColorHoverEffect()
                 .WithTargetChild("Icon")
                 .WithHoverColor(new Color(
-                    Mathf.Lerp(_accentColor.r, 1f, 0.7f),
-                    Mathf.Lerp(_accentColor.g, 1f, 0.7f),
-                    Mathf.Lerp(_accentColor.b, 1f, 0.7f),
+                    Mathf.Lerp(themeColor.r, 1f, 0.15f),
+                    Mathf.Lerp(themeColor.g, 1f, 0.15f),
+                    Mathf.Lerp(themeColor.b, 1f, 0.15f),
                     1f)));
 
             var btnCol = btnObj.AddComponent<BoxCollider>();

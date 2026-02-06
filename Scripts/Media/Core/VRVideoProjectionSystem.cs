@@ -326,11 +326,21 @@ public class VRVideoProjectionSystem : MonoBehaviour
     #region Unity Lifecycle
     private void LateUpdate()
     {
-        // Only follow camera for immersive projections (360/dome) that surround the viewer.
-        // Flat projection stays at SetTargetPosition and follows VirtualObjects parent for zoom support.
-        if (_projectionRoot != null && _cameraRig != null && IsImmersiveProjection())
+        if (_projectionRoot == null || _cameraRig == null) return;
+
+        if (IsImmersiveProjection())
         {
+            // Immersive projections (360/dome) surround the viewer — follow camera position
             _projectionRoot.position = _cameraRig.position;
+        }
+        else if (IsVisible)
+        {
+            // Flat projection: face-to-camera rotation (same as MenuFrame/ClusterRig panels)
+            Vector3 toCamera = _cameraRig.position - _projectionRoot.position;
+            if (toCamera.sqrMagnitude > 0.001f)
+            {
+                _projectionRoot.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
+            }
         }
     }
 

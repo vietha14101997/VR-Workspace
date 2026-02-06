@@ -37,7 +37,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     // Styling
     private static readonly Color BG_COLOR = new Color(0f, 0f, 0f, 0.75f);
     private static readonly Color HEADER_BTN_BG_COLOR = new Color(0f, 0f, 0f, 0.75f);
-    private static readonly Color TIMELINE_FILL_COLOR = new Color(0f, 0.8f, 1f, 1f); // Cyan color
+    private static readonly Color THEME_COLOR = new Color(1f, 0.2f, 0.2f, 1f); // Reticle red
     private const float BG_CORNER_RADIUS = 20f;
     private const float ZONE_A_BOTTOM_MARGIN = 50f;
 
@@ -70,6 +70,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     #region Properties
     public bool IsVisible { get; private set; } = true;
     public bool IsPlaying { get; private set; } = false;
+    public float Volume => _volume;
     #endregion
 
     #region Private Fields
@@ -91,6 +92,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     private TextMeshProUGUI _currentTimeText;
     private TextMeshProUGUI _totalTimeText;
     private Button _volumeButton;
+    private Image _volumeIcon;
     private VRSliderControl _volumeSlider;
     private Button _speedButton;
     private TextMeshProUGUI _speedText;
@@ -101,10 +103,14 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     private GameObject _menuButtonFrameObject;
     private GameObject _overlayFrameObject;
 
+    // Volume persistence
+    private const string PREF_VOLUME = "MediaPlayer_Volume";
+
     // State
     private float _duration = 0f;
     private float _currentTime = 0f;
     private float _volume = 1f;
+    private float _previousVolume = 1f;
     private float _speed = 1f;
     private bool _isSeeking = false;
     private bool _isHovering = false;
@@ -116,18 +122,19 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     private static Sprite _circleOutlineSprite;
 
     // Icon names for each button (use icon_record as placeholder)
-    private const string ICON_BACK = "icon_record";           // Replace with icon_back later
-    private const string ICON_AB_LOOP = "icon_record";        // Replace with A-B loop icon
-    private const string ICON_SCREENSHOT = "icon_record";     // Replace with screenshot icon  
-    private const string ICON_REPEAT = "icon_record";         // Replace with repeat icon
-    private const string ICON_SETTINGS = "icon_record";       // Replace with icon_settings
-    private const string ICON_VOLUME = "icon_record";         // Replace with volume icon
-    private const string ICON_PREV = "icon_record";           // Replace with rewind icon
-    private const string ICON_PLAY = "icon_record";           // Replace with icon_play
-    private const string ICON_PAUSE = "icon_record";          // Replace with icon_pause
-    private const string ICON_NEXT = "icon_record";           // Replace with fast-forward icon
-    private const string ICON_ENVIRONMENT = "icon_record";     // Replace with environment/display icon
-    private const string ICON_3D = "icon_record";             // Replace with 3D cube icon
+    private const string ICON_BACK = "icon_exit";
+    private const string ICON_AB_LOOP = "icon_record";
+    private const string ICON_RECENTER = "icon_recenter";
+    private const string ICON_REPEAT = "icon_loop";
+    private const string ICON_SETTINGS = "icon_settings";
+    private const string ICON_VOLUME = "icon_volume";
+    private const string ICON_VOLUME_MUTE = "icon_volume_mute";
+    private const string ICON_PREV = "icon_previous";
+    private const string ICON_PLAY = "icon_play";
+    private const string ICON_PAUSE = "icon_pause";
+    private const string ICON_NEXT = "icon_next";
+    private const string ICON_ENVIRONMENT = "icon_enviroment";
+    private const string ICON_3D = "icon_record";
     #endregion
 
     #region Initialization
@@ -139,7 +146,14 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         _primaryColor = primary;
         _accentColor = accent;
 
+        // Load persisted volume (default 100%)
+        _volume = PlayerPrefs.GetFloat(PREF_VOLUME, 1f);
+        _previousVolume = _volume;
+
         BuildUI();
+
+        // Apply loaded volume to slider and icon
+        SetVolume(_volume);
     }
 
     private void BuildUI()
@@ -180,7 +194,8 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         layout.childControlWidth = true;
         layout.childForceExpandWidth = true;
         layout.childAlignment = TextAnchor.UpperCenter;
-        layout.padding = new RectOffset(0, 0, (int)TOP_SPACER, 0);
+        int hoverMargin = 15; // Extra space so scale hover effects on edge buttons aren't clipped
+        layout.padding = new RectOffset(hoverMargin, hoverMargin, (int)TOP_SPACER, 0);
 
         // === ZONE A: HEADER (Outside Background) ===
         CreateZoneA(content.transform, contentWidth);
@@ -278,8 +293,8 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         // Spacer between button 2 and 3
         CreateFlexibleSpacer(zoneA.transform);
 
-        // Button 3: Screenshot
-        _recenterButton = CreateRoundIconButton(zoneA.transform, ICON_SCREENSHOT, HEADER_BUTTON_SIZE);
+        // Button 3: Recenter
+        _recenterButton = CreateRoundIconButton(zoneA.transform, ICON_RECENTER, HEADER_BUTTON_SIZE);
         _recenterButton.onClick.AddListener(() => OnRecenterClicked?.Invoke());
 
         // Spacer between button 3 and 4
@@ -397,7 +412,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         tLe.preferredWidth = 130;
 
         // Seek slider - flexible width to fill remaining space
-        _seekSlider = VRSliderFactory.CreateTimelineSlider(timelineRow.transform, 100, _font, TIMELINE_FILL_COLOR);
+        _seekSlider = VRSliderFactory.CreateTimelineSlider(timelineRow.transform, 100, _font, THEME_COLOR);
         var sLe = _seekSlider.gameObject.AddComponent<LayoutElement>();
         sLe.flexibleWidth = 1;  // Expand to fill remaining space
 
@@ -469,8 +484,9 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
 
         _volumeButton = CreateIconOnlyButton(leftGroup.transform, ICON_VOLUME, otherButtonSize);
         _volumeButton.onClick.AddListener(ToggleMute);
+        _volumeIcon = _volumeButton.transform.Find("IconImage")?.GetComponent<Image>();
 
-        _volumeSlider = VRSliderFactory.CreateVolumeSlider(leftGroup.transform, 150, _font, _primaryColor);
+        _volumeSlider = VRSliderFactory.CreateVolumeSlider(leftGroup.transform, 150, _font, THEME_COLOR);
         _volumeSlider.OnValueChanged += (v) => OnVolumeChanged?.Invoke(v);
         AttachHoverEvents(_volumeSlider.gameObject);
 
@@ -489,9 +505,10 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         _prevButton = CreateIconOnlyButton(centerGroup.transform, ICON_PREV, otherButtonSize);
         _prevButton.onClick.AddListener(() => OnPrevious?.Invoke());
 
-        // Play/Pause button: full Zone C height, but icon inside uses 30%
-        _playPauseButton = CreateIconOnlyButton(centerGroup.transform, ICON_PLAY, playButtonSize, true, otherButtonSize);
+        // Play/Pause button: full Zone C height, icon includes circle built-in
+        _playPauseButton = CreateIconOnlyButton(centerGroup.transform, ICON_PLAY, playButtonSize, true);
         _playPauseButton.onClick.AddListener(() => OnPlayPause?.Invoke());
+        _playPauseIcon = _playPauseButton.transform.Find("IconImage")?.GetComponent<Image>();
 
         _nextButton = CreateIconOnlyButton(centerGroup.transform, ICON_NEXT, otherButtonSize);
         _nextButton.onClick.AddListener(() => OnNext?.Invoke());
@@ -512,10 +529,11 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         rightLayout.childControlWidth = false;
         rightLayout.childForceExpandWidth = false;
 
-        Button envBtn = CreateIconOnlyButton(rightGroup.transform, ICON_ENVIRONMENT, otherButtonSize);
+        float advancedButtonSize = otherButtonSize * 1.2f; // 20% larger than standard buttons
+        Button envBtn = CreateIconOnlyButton(rightGroup.transform, ICON_ENVIRONMENT, advancedButtonSize);
         envBtn.onClick.AddListener(() => Debug.Log("Environment clicked"));
 
-        Button threeDBtn = CreateIconOnlyButton(rightGroup.transform, ICON_3D, otherButtonSize);
+        Button threeDBtn = CreateIconOnlyButton(rightGroup.transform, ICON_3D, advancedButtonSize);
         threeDBtn.onClick.AddListener(() => Debug.Log("3D mode clicked"));
     }
 
@@ -556,6 +574,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         iconImage.sprite = Resources.Load<Sprite>(iconName);
         iconImage.color = Color.white;
         iconImage.preserveAspect = true;
+        iconImage.raycastTarget = false; // Only button root handles raycasts
 
         // Hover effects - scale + subtle color tint on icon (white → light pastel accent)
         var hoverController = buttonObj.AddComponent<HoverEffectController>();
@@ -563,9 +582,9 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         hoverController.AddEffect(new ColorHoverEffect()
             .WithTargetChild("IconImage")
             .WithHoverColor(new Color(
-                Mathf.Lerp(_accentColor.r, 1f, 0.7f),
-                Mathf.Lerp(_accentColor.g, 1f, 0.7f),
-                Mathf.Lerp(_accentColor.b, 1f, 0.7f),
+                Mathf.Lerp(THEME_COLOR.r, 1f, 0.15f),
+                Mathf.Lerp(THEME_COLOR.g, 1f, 0.15f),
+                Mathf.Lerp(THEME_COLOR.b, 1f, 0.15f),
                 1f)));
 
         var collider = buttonObj.AddComponent<BoxCollider>();
@@ -598,21 +617,9 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         var buttonRT = buttonObj.GetComponent<RectTransform>() ?? buttonObj.AddComponent<RectTransform>();
         buttonRT.sizeDelta = new Vector2(size, size);
 
-        if (isPrimary)
-        {
-            // Primary button (Play/Pause) gets a circle outline
-            bgImage = buttonObj.AddComponent<Image>();
-            bgImage.sprite = GetCircleOutlineSprite();
-            bgImage.color = Color.white;
-            bgImage.type = Image.Type.Simple;
-            bgImage.preserveAspect = true; // Keep circle shape
-        }
-        else
-        {
-            // Transparent background (icon-only)
-            bgImage = buttonObj.AddComponent<Image>();
-            bgImage.color = Color.clear;
-        }
+        // Transparent background (icon-only) — play/pause icons include circle built-in
+        bgImage = buttonObj.AddComponent<Image>();
+        bgImage.color = Color.clear;
 
         var button = buttonObj.AddComponent<Button>();
         button.targetGraphic = bgImage;
@@ -622,19 +629,11 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         iconObj.transform.SetParent(buttonObj.transform, false);
         var iconRT = iconObj.AddComponent<RectTransform>();
 
-        if (isPrimary && iconSize > 0f)
+        if (isPrimary)
         {
-            // Primary button with custom icon size - center the icon with fixed size
-            iconRT.anchorMin = new Vector2(0.5f, 0.5f);
-            iconRT.anchorMax = new Vector2(0.5f, 0.5f);
-            iconRT.pivot = new Vector2(0.5f, 0.5f);
-            iconRT.sizeDelta = new Vector2(iconSize, iconSize);
-        }
-        else if (isPrimary)
-        {
-            // Center icon inside circle outline (default 50% of button)
-            iconRT.anchorMin = new Vector2(0.25f, 0.25f);
-            iconRT.anchorMax = new Vector2(0.75f, 0.75f);
+            // Icon fills full button (play/pause icons include circle built-in)
+            iconRT.anchorMin = Vector2.zero;
+            iconRT.anchorMax = Vector2.one;
             iconRT.offsetMin = Vector2.zero;
             iconRT.offsetMax = Vector2.zero;
         }
@@ -650,6 +649,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         iconImage.sprite = Resources.Load<Sprite>(iconName);
         iconImage.color = Color.white;
         iconImage.preserveAspect = true;
+        iconImage.raycastTarget = false; // Only button root handles raycasts
 
         // Hover effects - scale + subtle color tint on icon (white → light pastel accent)
         var hoverController = buttonObj.AddComponent<HoverEffectController>();
@@ -657,9 +657,9 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         hoverController.AddEffect(new ColorHoverEffect()
             .WithTargetChild("IconImage")
             .WithHoverColor(new Color(
-                Mathf.Lerp(_accentColor.r, 1f, 0.7f),
-                Mathf.Lerp(_accentColor.g, 1f, 0.7f),
-                Mathf.Lerp(_accentColor.b, 1f, 0.7f),
+                Mathf.Lerp(THEME_COLOR.r, 1f, 0.15f),
+                Mathf.Lerp(THEME_COLOR.g, 1f, 0.15f),
+                Mathf.Lerp(THEME_COLOR.b, 1f, 0.15f),
                 1f)));
 
         var collider = buttonObj.AddComponent<BoxCollider>();
@@ -837,11 +837,15 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     {
         if (_volume > 0)
         {
+            _previousVolume = _volume;
+            SetVolume(0f);
             OnVolumeChanged?.Invoke(0f);
         }
         else
         {
-            OnVolumeChanged?.Invoke(1f);
+            float restore = _previousVolume > 0 ? _previousVolume : 1f;
+            SetVolume(restore);
+            OnVolumeChanged?.Invoke(restore);
         }
     }
     #endregion
@@ -875,11 +879,10 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         IsPlaying = isPlaying;
 
         // Update play/pause button icon
-        var iconImage = _playPauseButton.GetComponentInChildren<Image>();
-        if (iconImage != null && iconImage.gameObject.name == "IconImage")
+        if (_playPauseIcon != null)
         {
             string iconName = isPlaying ? ICON_PAUSE : ICON_PLAY;
-            iconImage.sprite = Resources.Load<Sprite>(iconName);
+            _playPauseIcon.sprite = Resources.Load<Sprite>(iconName);
         }
 
         // Reset auto-hide timer when state changes
@@ -919,6 +922,19 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     {
         _volume = Mathf.Clamp01(volume);
         _volumeSlider?.SetValueWithoutNotify(_volume);
+
+        // Update volume icon (mute vs normal)
+        if (_volumeIcon != null)
+        {
+            string iconName = _volume <= 0 ? ICON_VOLUME_MUTE : ICON_VOLUME;
+            _volumeIcon.sprite = Resources.Load<Sprite>(iconName);
+        }
+
+        // Persist volume (save actual level, not muted state)
+        if (_volume > 0)
+        {
+            PlayerPrefs.SetFloat(PREF_VOLUME, _volume);
+        }
     }
 
     /// <summary>
