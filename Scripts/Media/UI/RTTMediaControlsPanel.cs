@@ -401,13 +401,14 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         var timelineLayout = timelineRow.AddComponent<HorizontalLayoutGroup>();
         timelineLayout.childAlignment = TextAnchor.MiddleCenter;
         timelineLayout.childControlWidth = true;  // Control width for flexible slider
+        timelineLayout.childControlHeight = true;
         timelineLayout.childForceExpandWidth = false;
-        timelineLayout.childForceExpandHeight = false;
+        timelineLayout.childForceExpandHeight = true; // Stretch children to fill row — slider track/handle at y=0.5, text uses MidlineRight/Left
         timelineLayout.spacing = horizontalSpacing;  // 3% spacing between elements
         timelineLayout.padding = new RectOffset(0, 0, 0, 0);  // No extra padding - time labels at edges
 
         // Current time (at left edge)
-        _currentTimeText = CreateText(timelineRow.transform, "00:00:00", 36, TextAlignmentOptions.Right);
+        _currentTimeText = CreateText(timelineRow.transform, "00:00:00", 36, TextAlignmentOptions.MidlineRight);
         var tLe = _currentTimeText.gameObject.AddComponent<LayoutElement>();
         tLe.minWidth = 160;
         tLe.preferredWidth = 160;
@@ -423,7 +424,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         AttachHoverEvents(_seekSlider.gameObject);
 
         // Total time (at right edge)
-        _totalTimeText = CreateText(timelineRow.transform, "00:00:00", 36, TextAlignmentOptions.Left);
+        _totalTimeText = CreateText(timelineRow.transform, "00:00:00", 36, TextAlignmentOptions.MidlineLeft);
         var ttLe = _totalTimeText.gameObject.AddComponent<LayoutElement>();
         ttLe.minWidth = 160;
         ttLe.preferredWidth = 160;
