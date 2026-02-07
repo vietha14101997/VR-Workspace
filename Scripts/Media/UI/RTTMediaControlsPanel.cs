@@ -350,12 +350,12 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         titleRowLayout.childForceExpandHeight = true;
         titleRowLayout.spacing = horizontalSpacing;  // Same spacing as timeline
 
-        // Left spacer (same width as currentTime label = 130)
+        // Left spacer (same width as currentTime label = 110)
         GameObject leftSpacer = new GameObject("LeftSpacer");
         leftSpacer.transform.SetParent(titleRow.transform, false);
         var leftSpacerLE = leftSpacer.AddComponent<LayoutElement>();
-        leftSpacerLE.minWidth = 130;
-        leftSpacerLE.preferredWidth = 130;
+        leftSpacerLE.minWidth = 110;
+        leftSpacerLE.preferredWidth = 110;
 
         // Title text (flexible width, same as slider)
         GameObject titleTextObj = new GameObject("TitleText");
@@ -377,12 +377,12 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         // Add MarqueeText behavior with centerWhenFits for proper centering
         _titleMarquee = MarqueeText.Setup(_titleText, 80f, centerWhenFits: true);
 
-        // Right spacer (same width as totalTime label = 130)
+        // Right spacer (same width as totalTime label = 110)
         GameObject rightSpacer = new GameObject("RightSpacer");
         rightSpacer.transform.SetParent(titleRow.transform, false);
         var rightSpacerLE = rightSpacer.AddComponent<LayoutElement>();
-        rightSpacerLE.minWidth = 130;
-        rightSpacerLE.preferredWidth = 130;
+        rightSpacerLE.minWidth = 110;
+        rightSpacerLE.preferredWidth = 110;
 
         // --- Spacer to push timeline down (fills remaining space) ---
         GameObject bottomSpacer = new GameObject("BottomSpacer");
@@ -402,14 +402,15 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         timelineLayout.childAlignment = TextAnchor.MiddleCenter;
         timelineLayout.childControlWidth = true;  // Control width for flexible slider
         timelineLayout.childForceExpandWidth = false;
+        timelineLayout.childForceExpandHeight = false;
         timelineLayout.spacing = horizontalSpacing;  // 3% spacing between elements
         timelineLayout.padding = new RectOffset(0, 0, 0, 0);  // No extra padding - time labels at edges
 
         // Current time (at left edge)
-        _currentTimeText = CreateText(timelineRow.transform, "00:00:00", 30, TextAlignmentOptions.Right);
+        _currentTimeText = CreateText(timelineRow.transform, "00:00:00", 36, TextAlignmentOptions.Right);
         var tLe = _currentTimeText.gameObject.AddComponent<LayoutElement>();
-        tLe.minWidth = 130;
-        tLe.preferredWidth = 130;
+        tLe.minWidth = 160;
+        tLe.preferredWidth = 160;
 
         // Seek slider - flexible width to fill remaining space
         _seekSlider = VRSliderFactory.CreateTimelineSlider(timelineRow.transform, 100, _font, THEME_COLOR);
@@ -422,10 +423,10 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         AttachHoverEvents(_seekSlider.gameObject);
 
         // Total time (at right edge)
-        _totalTimeText = CreateText(timelineRow.transform, "00:00:00", 30, TextAlignmentOptions.Left);
+        _totalTimeText = CreateText(timelineRow.transform, "00:00:00", 36, TextAlignmentOptions.Left);
         var ttLe = _totalTimeText.gameObject.AddComponent<LayoutElement>();
-        ttLe.minWidth = 130;
-        ttLe.preferredWidth = 130;
+        ttLe.minWidth = 160;
+        ttLe.preferredWidth = 160;
     }
 
     /// <summary>
@@ -678,6 +679,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         var text = textObj.AddComponent<TextMeshProUGUI>();
         text.text = content;
         text.font = _font;
+        text.fontStyle = FontStyles.Bold;
         text.fontSize = fontSize;
         text.color = Color.white;
         text.alignment = alignment;
