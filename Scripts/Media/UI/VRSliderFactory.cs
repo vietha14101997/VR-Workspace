@@ -711,11 +711,11 @@ public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler,
         float hoverValue = Mathf.Lerp(_minValue, _maxValue, normalized);
         _previewValueText.text = FormatPreviewValue(hoverValue);
 
-        // Adjust Y position based on frame visibility
-        // If frame is hidden (Volume), move text closer to bar (above)
-        // If frame is visible (Timeline), keep text below (-5f)
-        bool hasFrame = _previewImage != null && _previewImage.transform.parent != null && _previewImage.transform.parent.gameObject.activeSelf;
-        float textY = hasFrame ? -5f : 30f;
+        // Adjust Y position based on slider type
+        // Timeline (identified by buffer or preview height): Position below (-25f) to avoid handle overlap
+        // Volume/Settings: Position above (30f)
+        bool isTimeline = _bufferRT != null || _previewHeight > 0;
+        float textY = isTimeline ? -5f : 30f;
         
         tooltipRT.anchoredPosition = new Vector2(normalized * width, textY);
     }
@@ -829,7 +829,8 @@ public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler,
         _previewSeekBar.color = _previewColor;
         _previewSeekBar.raycastTarget = false;
 
-        // Preview frame (video thumbnail) above slider
+        // Preview frame (video thumbnail) above slider - DISABLED
+        /*
         GameObject frameObj = new GameObject("PreviewFrame");
         frameObj.transform.SetParent(_previewContainer.transform, false);
 
@@ -868,6 +869,7 @@ public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler,
         _previewImage = thumbObj.AddComponent<RawImage>();
         _previewImage.color = Color.black; // Default black to avoid white flash
         _previewImage.raycastTarget = false;
+        */
 
         // Preview value tooltip (below the slider)
         GameObject tooltipObj = new GameObject("PreviewValueText");
