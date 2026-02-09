@@ -25,6 +25,7 @@ public class VRVideoPlayerController : MonoBehaviour
     private VRVideoProjectionSystem _projectionSystem;
     private RTTMediaControlsPanel _controlsPanel;
     private RTTMediaSettingsPopup _settingsPopup;
+    private RTTMediaQueuePopup _queuePopup;
     private MediaEnvironmentController _environmentController;
 
     private MediaVideoInfo? _currentVideo;
@@ -91,6 +92,8 @@ public class VRVideoPlayerController : MonoBehaviour
             _controlsPanel.OnVolumeChanged += SetVolume;
             _controlsPanel.OnSpeedChanged += SetPlaybackSpeed;
             _controlsPanel.OnBackClicked += HandleBackClicked;
+            _controlsPanel.OnPrevious += PlayPreviousVideo;
+            _controlsPanel.OnNext += PlayNextVideo;
             _controlsPanel.OnSettingsClicked += ShowSettings;
             _controlsPanel.OnPlaylistClicked += HandlePlaylistClicked;
             _controlsPanel.OnVRModeClicked += HandleVRModeClicked;
@@ -139,6 +142,38 @@ public class VRVideoPlayerController : MonoBehaviour
         _settingsPopup.OnScreenCurvatureChanged -= SetScreenCurvature;
         _settingsPopup.OnLightsToggled -= SetLightsEnabled;
         _settingsPopup.OnCloseRequested -= HideSettings;
+    }
+
+    /// <summary>
+    /// Set the queue popup reference.
+    /// </summary>
+    public void SetQueuePopup(RTTMediaQueuePopup popup)
+    {
+        if (_queuePopup != null)
+        {
+            UnwireQueueEvents();
+        }
+
+        _queuePopup = popup;
+
+        if (_queuePopup != null)
+        {
+            WireQueueEvents();
+        }
+    }
+
+    private void WireQueueEvents()
+    {
+        if (_queuePopup == null) return;
+        _queuePopup.OnVideoSelected += PlayVideoSimple;
+        _queuePopup.OnCloseRequested += HideQueue;
+    }
+
+    private void UnwireQueueEvents()
+    {
+        if (_queuePopup == null) return;
+        _queuePopup.OnVideoSelected -= PlayVideoSimple;
+        _queuePopup.OnCloseRequested -= HideQueue;
     }
     #endregion
 
@@ -250,6 +285,9 @@ public class VRVideoPlayerController : MonoBehaviour
     /// <summary>
     /// Stop playback.
     /// </summary>
+    /// <summary>
+    /// Stop playback.
+    /// </summary>
     public void Stop()
     {
         _playbackEngine?.Stop();
@@ -257,6 +295,55 @@ public class VRVideoPlayerController : MonoBehaviour
 
         // Reset environment to default state
         _environmentController?.Reset();
+        
+        HideQueue();
+        HideSettings();
+    }
+
+    /// <summary>
+    /// Play next video in queue.
+    /// </summary>
+    public void PlayNextVideo()
+    {
+        var service = MediaPlaylistService.Instance;
+        if (service == null) return;
+
+        string nextPath = service.GetNextVideo();
+        if (!string.IsNullOrEmpty(nextPath))
+        {
+            PlayVideoSimple(nextPath);
+        }
+    }
+
+    /// <summary>
+    /// Play previous video in queue.
+    /// </summary>
+    public void PlayPreviousVideo()
+    {
+        var service = MediaPlaylistService.Instance;
+        if (service == null) return;
+
+        string prevPath = service.GetPreviousVideo();
+        if (!string.IsNullOrEmpty(prevPath))
+        {
+            PlayVideoSimple(prevPath);
+        }
+    }
+
+    private void PlayVideoSimple(string path)
+    {
+        // Construct basic info since we only need path for playback usually
+        // Note: Real metadata loading would happen effectively by checking MediaLibrary
+        var video = new MediaVideoInfo
+        {
+            Path = path,
+            Title = System.IO.Path.GetFileNameWithoutExtension(path),
+            Projection = VideoProjectionType.Flat // Default, will be detected
+        };
+
+        // Try to get projection from previously loaded metadata if possible?
+        // Actually PlayVideo calls ProjectionDetector, so it handles it.
+        PlayVideo(video);
     }
 
     /// <summary>
@@ -404,9 +491,17 @@ public class VRVideoPlayerController : MonoBehaviour
     /// <summary>
     /// Notify user interaction for auto-hide reset.
     /// </summary>
+    /// <summary>
+    /// Notify user interaction for auto-hide reset.
+    /// </summary>
     public void OnUserInteraction()
     {
         _controlsPanel?.OnUserInteraction();
+    }
+
+    private void HideQueue()
+    {
+        _queuePopup?.Hide();
     }
     #endregion
 
@@ -495,6 +590,9 @@ public class VRVideoPlayerController : MonoBehaviour
         {
             OnVideoEnded?.Invoke(_currentVideo.Value);
         }
+
+        // Auto-advance to next video
+        PlayNextVideo();
     }
 
     private void HandlePlaybackError(string error)
@@ -523,7 +621,21 @@ public class VRVideoPlayerController : MonoBehaviour
 
     private void HandlePlaylistClicked()
     {
-        Debug.Log("[VRVideoPlayerController] Playlist clicked (Not implemented)");
+        Debug.Log("[VRVideoPlayerController] Playlist clicked");
+        if (_queuePopup != null)
+        {
+            var service = MediaPlaylistService.Instance;
+            if (service != null)
+            {
+                var queue = service.GetPlaybackQueue();
+                _queuePopup.RefreshQueueWithList(queue);
+                if (_currentVideo.HasValue)
+                {
+                    _queuePopup.SetCurrentVideo(_currentVideo.Value.Path);
+                }
+                _queuePopup.Show();
+            }
+        }
     }
 
     private void HandleVRModeClicked()
@@ -745,6 +857,8 @@ public class VRVideoPlayerController : MonoBehaviour
             _controlsPanel.OnVolumeChanged -= SetVolume;
             _controlsPanel.OnSpeedChanged -= SetPlaybackSpeed;
             _controlsPanel.OnBackClicked -= HandleBackClicked;
+            _controlsPanel.OnPrevious -= PlayPreviousVideo;
+            _controlsPanel.OnNext -= PlayNextVideo;
             _controlsPanel.OnSettingsClicked -= ShowSettings;
             _controlsPanel.OnPlaylistClicked -= HandlePlaylistClicked;
             _controlsPanel.OnVRModeClicked -= HandleVRModeClicked;
@@ -753,6 +867,7 @@ public class VRVideoPlayerController : MonoBehaviour
         }
 
         UnwireSettingsEvents();
+        UnwireQueueEvents();
     }
     #endregion
 

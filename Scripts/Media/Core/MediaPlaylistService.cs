@@ -439,6 +439,14 @@ public class MediaPlaylistService : MonoBehaviour
             _playbackQueue[n] = temp;
         }
     }
+
+    /// <summary>
+    /// Get the current playback queue.
+    /// </summary>
+    public List<string> GetPlaybackQueue()
+    {
+        return new List<string>(_playbackQueue);
+    }
     #endregion
 
     #region Persistence

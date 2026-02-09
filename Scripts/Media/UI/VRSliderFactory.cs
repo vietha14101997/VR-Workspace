@@ -502,6 +502,12 @@ public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler,
         {
             _previewImage.texture = texture;
             _previewImage.color = texture != null ? Color.white : Color.black;
+
+            // Hide the frame container if no texture is available (e.g. volume slider)
+            if (_previewImage.transform.parent != null)
+            {
+                _previewImage.transform.parent.gameObject.SetActive(texture != null);
+            }
         }
     }
     #endregion
@@ -704,6 +710,14 @@ public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler,
         // Calculate and display value
         float hoverValue = Mathf.Lerp(_minValue, _maxValue, normalized);
         _previewValueText.text = FormatPreviewValue(hoverValue);
+
+        // Adjust Y position based on frame visibility
+        // If frame is hidden (Volume), move text closer to bar (above)
+        // If frame is visible (Timeline), keep text below (-5f)
+        bool hasFrame = _previewImage != null && _previewImage.transform.parent != null && _previewImage.transform.parent.gameObject.activeSelf;
+        float textY = hasFrame ? -5f : 30f;
+        
+        tooltipRT.anchoredPosition = new Vector2(normalized * width, textY);
     }
 
     /// <summary>
@@ -881,10 +895,8 @@ public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler,
             SetPreviewAspectRatio(_cachedAspectRatio);
         }
 
-        if (_cachedPreviewTexture != null)
-        {
-            SetPreviewImage(_cachedPreviewTexture);
-        }
+        // Apply cached preview texture (this updates frame visibility)
+        SetPreviewImage(_cachedPreviewTexture);
     }
     #endregion
 
