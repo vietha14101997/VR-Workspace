@@ -445,10 +445,34 @@ public class VRVideoPlayerController : MonoBehaviour
             Debug.LogError($"[VRVideoPlayerController] Cannot set texture - PlaybackEngine: {_playbackEngine != null}, ProjectionSystem: {_projectionSystem != null}");
         }
 
-        // Update controls with duration
+        // Update controls with duration and aspect ratio
         if (_controlsPanel != null && _playbackEngine != null)
         {
             _controlsPanel.SetDuration((float)_playbackEngine.Duration);
+            
+            // Set aspect ratio for preview frame
+            float ratio = 16f / 9f; // Default
+            if (_playbackEngine.UseNV12Output && _playbackEngine.YPlaneTexture != null)
+            {
+                ratio = (float)_playbackEngine.YPlaneTexture.width / _playbackEngine.YPlaneTexture.height;
+            }
+            else if (_playbackEngine.OutputTexture != null)
+            {
+                ratio = (float)_playbackEngine.OutputTexture.width / _playbackEngine.OutputTexture.height;
+            }
+            
+            if (ratio > 0)
+            {
+                _controlsPanel.SetPreviewAspectRatio(ratio);
+            }
+            
+            // Set the main video texture as the preview (mirrors playback)
+            // Note: NV12 textures might need shader conversion for RawImage, 
+            // but OutputTexture (RGB) usually works for preview if available.
+            if (_playbackEngine.OutputTexture != null)
+            {
+                _controlsPanel.SetPreviewTexture(_playbackEngine.OutputTexture);
+            }
         }
 
         // Auto-play
@@ -596,6 +620,28 @@ public class VRVideoPlayerController : MonoBehaviour
             _projectionSystem.RecenterView();
         }
 
+        // Recenter VideoControlsContainer (detached from VirtualObjects to avoid Zoom)
+        if (_controlsPanel != null)
+        {
+            // Traverse up to find VideoControlsContainer
+            // Hierarchy: VideoControlsContainer -> VideoControlsFrame -> ContentContainer -> ControlsPanel
+            Transform controlsContainer = _controlsPanel.transform.root; 
+            // Better to find by name or known structure to be safe, or just use the root of the panel prefab if it's the container
+            // In VRMediaAppController: _controlsContainer -> VideoControlsFrame -> Content -> ControlsPanel
+            
+            // Try to find the container via parent traversal
+            Transform current = _controlsPanel.transform;
+            while (current.parent != null && current.name != "VideoControlsContainer")
+            {
+                current = current.parent;
+            }
+
+            if (current.name == "VideoControlsContainer")
+            {
+                RecenterObject(current, cam);
+            }
+        }
+
         if (reticle != null)
         {
             reticle.ExitRecenterMode();
@@ -709,4 +755,29 @@ public class VRVideoPlayerController : MonoBehaviour
         UnwireSettingsEvents();
     }
     #endregion
+
+    private void RecenterObject(Transform objective, Camera cam)
+    {
+        if (objective == null || cam == null) return;
+
+        Vector3 camForward = cam.transform.forward;
+        camForward.y = 0;
+        if (camForward.sqrMagnitude < 0.001f) camForward = Vector3.forward;
+        camForward.Normalize();
+
+        Vector3 camPos = cam.transform.position;
+        
+        // Calculate new position based on current distance
+        // Maintain height (y) and distance from camera
+        Vector3 currentPos = objective.position;
+        float dist = Vector2.Distance(new Vector2(currentPos.x, currentPos.z), new Vector2(camPos.x, camPos.z));
+        
+        Vector3 newPos = camPos + camForward * dist;
+        newPos.y = currentPos.y; // Keep height
+
+        Quaternion newRot = Quaternion.LookRotation(camForward);
+
+        objective.position = newPos;
+        objective.rotation = newRot;
+    }
 }

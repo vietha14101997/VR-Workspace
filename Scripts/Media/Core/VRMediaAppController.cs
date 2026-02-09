@@ -504,12 +504,11 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
         GameObject virtualObjects = GameObject.Find("VirtualObjects");
 
-        // === 1. Root container under VirtualObjects (affected by Zoom and Recenter) ===
+        // === 1. Root container (NOT under VirtualObjects so it ignores Zoom) ===
+        // Note: This means Recenter must be handled manually in VRVideoPlayerController
         _controlsContainer = new GameObject("VideoControlsContainer");
-        if (virtualObjects != null)
-        {
-            _controlsContainer.transform.SetParent(virtualObjects.transform, false);
-        }
+        _controlsContainer.transform.SetParent(transform, false);
+
 
         // === 2. Dismiss overlay frame (large transparent click-to-dismiss) ===
         _overlayFrameObject = new GameObject("DismissOverlayFrame");

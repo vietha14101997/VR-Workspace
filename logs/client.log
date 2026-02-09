@@ -88,21 +88,21 @@ Destroying webcam texture
 
 [RTTManager] Auto-recenter completed
 
-[RTTMainMenu] Click started: media at 6.004s
+[RTTMainMenu] Click started: media at 6.586s
 
-[RTTMainMenu] PrepareApp called: media at 6.004s (+0.1ms)
+[RTTMainMenu] PrepareApp called: media at 6.586s (+0.1ms)
 
-[RTTAppManager] PrepareAppFrameAsync started: media at 6.007s
+[RTTAppManager] PrepareAppFrameAsync started: media at 6.588s
 
 [RTTMenu] Created app frame: media
 
-[RTTAppManager] Frame created: media at 6.007s (+0.4ms)
+[RTTAppManager] Frame created: media at 6.589s (+0.4ms)
 
 [RTTAppManager] Preparing app: media in slot 1
 
-[RTTMainMenu] Button animation started: media at 6.007s (+3.2ms)
+[RTTMainMenu] Button animation started: media at 6.589s (+3.2ms)
 
-[RTTAppManager] Creating content: media at 6.037s (+30.4ms)
+[RTTAppManager] Creating content: media at 6.619s (+30.5ms)
 
 [RTTManager] Creating Media content...
 
@@ -114,13 +114,13 @@ Destroying webcam texture
 
 [VRVideoProjectionSystem] Initialized
 
-[MediaLibraryService] Loading 3172 items from cache (async)...
+[MediaLibraryService] Loading 3173 items from cache (async)...
 
 [VirtualObjectsZoomController] Registered side panel: MediaNavigationPanel (side=-1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
 [RTTMenuFrame] UI built: 640x1080 logical pixels
 
-[RTTMediaLibrary] CreateLeftPanelContent started at 6.085s
+[RTTMediaLibrary] CreateLeftPanelContent started at 6.669s
 
 [HoverEffectController] AddEffect 'scale' to Item_all, TargetVisuals=Item_all
 
@@ -150,13 +150,13 @@ Destroying webcam texture
 
 [HoverEffectController] AddEffect 'color' to Item_playlists, TargetVisuals=Item_playlists
 
-[RTTMediaLibrary] Left panel content created at 6.097s
+[RTTMediaLibrary] Left panel content created at 6.682s
 
 [VirtualObjectsZoomController] Registered side panel: MediaDetailPanel (side=1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
-[RTTMediaLibrary] CreateRightPanelContent started at 6.100s
+[RTTMediaLibrary] CreateRightPanelContent started at 6.685s
 
-[RTTMediaLibrary] Right panel content created at 6.125s
+[RTTMediaLibrary] Right panel content created at 6.712s
 
 [RTTPopupMenu] CreateWorldSpace: layer 'VirtualObjects' = 3, mainCam: VRCamera
 
@@ -164,7 +164,7 @@ Destroying webcam texture
 
 [HoverEffectController] AddEffect 'cursor_change' to HitArea, TargetVisuals=Visuals
 
-[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-274388
+[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-798726
 
 [HoverEffectController] AddEffect 'scale' to Checkbox, TargetVisuals=Checkbox
 
@@ -186,57 +186,135 @@ Destroying webcam texture
 
 [VRMediaAppController] Media app created
 
-[RTTAppManager] Content created: media at 6.237s (+230.1ms)
+[RTTAppManager] Content created: media at 6.823s (+234.6ms)
 
-[RTTAppManager] PrepareDataAsync started: media at 6.237s
+[RTTAppManager] PrepareDataAsync started: media at 6.823s
 
 [RTTMediaLibraryController] PrepareDataAsync started
 
-[RTTAppManager] App prepared (hidden): media at 6.241s (total: 234.3ms)
+[RTTAppManager] App prepared (hidden): media at 6.827s (total: 238.6ms)
 
-[RTTMainMenu] Button animation ended: media at 6.263s (+259.1ms)
+[RTTMainMenu] Button animation ended: media at 6.852s (+265.5ms)
 
-[RTTMainMenu] OpenPreparedApp called: media at 6.263s (+259.2ms)
+[RTTMainMenu] OpenPreparedApp called: media at 6.852s (+265.6ms)
 
-[RTTAppManager] WaitAndSwitch started: media at 6.264s
+[RTTAppManager] WaitAndSwitch started: media at 6.852s
 
-[RTTAppManager] WaitAndSwitch app ready: media at 6.264s (waited 0.1ms)
+[RTTAppManager] WaitAndSwitch app ready: media at 6.852s (waited 0.1ms)
 
-[RTTAppManager] Starting transition: media at 6.264s
+[RTTAppManager] Starting transition: media at 6.852s
 
-[RTTAppManager] Transition started: media at 6.265s
+[RTTAppManager] Transition started: media at 6.854s
 
 [RTTAppManager] Got 3 frames to animate: media
 
-[RTTAppManager] Fade out MainMenu: media at 6.266s
+[RTTAppManager] Fade out MainMenu: media at 6.854s
 
-[RTTMainMenu] Click flow completed: media at 6.266s (total: +261.9ms)
+[RTTMainMenu] Click flow completed: media at 6.854s (total: +268.2ms)
 
-[RTTAppManager] Fade out done: media at 6.380s (+114.7ms)
+[RTTAppManager] Fade out done: media at 6.968s (+114.0ms)
 
 [RTTAppManager] All frames activated with alpha=0: 3 frames
 
-[RTTAppManager] Sync point: media, IsDataReady=False at 6.389s
+[RTTAppManager] Sync point: media, IsDataReady=False at 6.977s
 
-[AppStateCache] Cache expired for media (age: 50.7h)
+[AppStateCache] Disk cache hit for media
 
-[AppStateCache] Cache miss for media
+[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[RTTMediaLibraryController] TryRestoreCachedState: No cache found
+[Cache] DISK READ: 0ms (226KB)
 
-[RTTAppManager] TryRestoreCachedState: media, success=False
+[Cache] DISK DECODE: 4ms (512x267)
 
-[RTTAppManager] No cache - BindCachedDataOrEmpty: media
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37.mp4
 
-[RTTMediaLibraryController] BindCachedDataOrEmpty: No cache, showing empty grid
+[RTTMediaGridItem] Duration badge for 'ZZenlessZoneZero 2026-02-03 12-19-36': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (234KB)
+
+[Cache] DISK DECODE: 4ms (512x288)
+
+[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (16KB)
+
+[Cache] DISK DECODE: 0ms (512x267)
+
+[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 17-52-22': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (119KB)
+
+[Cache] DISK DECODE: 3ms (512x267)
+
+[RTTMediaGridItem] Duration badge for 'videoplayback': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (206KB)
+
+[Cache] DISK DECODE: 3ms (512x288)
+
+[RTTMediaGridItem] Duration badge for 'Genshin-Impact 2026-1-26 12-24-11': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (191KB)
+
+[RTTMediaGridItem] Duration badge for 'Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (85KB)
+
+[Cache] DISK DECODE: 2ms (512x213)
+
+[RTTMediaGridItem] Duration badge for 'video_client': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (116KB)
+
+[Cache] DISK DECODE: 2ms (512x230)
+
+[RTTMediaGrid] Auto-selecting first item: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37
+
+[Detail] REQUEST: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37.mp4
+
+[Cache] DISK READ: 0ms (208KB)
+
+[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37.mp4 wait=20ms assign=0ms
+
+[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37.mp4 name=0ms preview=22ms metadata=10ms total=32ms
+
+[RTTMediaGrid] Progressive binding started: 10 items queued, budgetMs=6
+
+[RTTMediaGridItem] Duration badge for 'Phàm Nhân Tu Tiên Tập 173 Vietsub': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (131KB)
+
+[RTTMediaLibraryController] TryRestoreCachedState: Restored 18 items from cache (filtered from 18, skipped 0 deleted)
+
+[RTTAppManager] TryRestoreCachedState: media, success=True
 
 [RTTAppManager] Subscribed to OnDataPrepared: media
 
-[RTTAppManager] Fade in started: 3 frames at 6.407s
+[RTTAppManager] Fade in started: 3 frames at 7.229s
 
-[RTTAppManager] Fade in done: media at 6.532s (+267.1ms)
+[RTTMediaGridItem] Duration badge for '7295785205012': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[RTTAppManager] OnAppShown called: media at 6.533s
+[RTTMediaGridItem] Duration badge for '7077543476647': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (270KB)
+
+[Cache] DISK DECODE: 4ms (512x230)
+
+[RTTMediaGridItem] Duration badge for '7065774217733': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (75KB)
+
+[Cache] DISK DECODE: 2ms (512x238)
+
+[RTTMediaGridItem] Duration badge for 'Genshin_Impact_2025-09-10_11-32-27': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (283KB)
+
+[Cache] DISK DECODE: 5ms (512x288)
+
+[RTTAppManager] Fade in done: media at 7.357s (+503.8ms)
+
+[RTTAppManager] OnAppShown called: media at 7.357s
 
 [RTTMediaLibraryController] OnAppShown called, _view=exists
 
@@ -256,99 +334,43 @@ Destroying webcam texture
 
 [RTTTaskbar] SelectSlot(1) called, current active: 1
 
-[RTTAppManager] Transition completed: media at 6.544s (total: 278.9ms)
-
-[MediaLibraryService] Loaded 3172 items from cache in 722ms (async, no File.Exists)
-
-[RTTMediaLibraryController] HandleCacheLoaded called
-
-[RTTMediaGridItem] Duration badge for 'ZZenlessZoneZero 2026-02-03 12-19-36': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (247KB)
-
-[Cache] DISK DECODE: 8ms (512x288)
-
-[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (115KB)
-
-[Cache] DISK DECODE: 3ms (512x267)
+[RTTAppManager] Transition completed: media at 7.388s (total: 534.1ms)
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\ZZenlessZoneZero 2026-02-03 12-19-36.mp4
 
-[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 17-52-22': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
 
-[Cache] DISK READ: 3ms (109KB)
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 17-52-22.mp4
 
-[RTTMediaGridItem] Duration badge for 'videoplayback': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+[MediaLibraryService] Loaded 3173 items from cache in 1056ms (async, no File.Exists)
 
-[Cache] DISK READ: 0ms (206KB)
+[RTTMediaLibraryController] HandleCacheLoaded called
 
-[Cache] DISK DECODE: 3ms (512x288)
+[Cache] DISK READ: 1ms (210KB)
 
-[RTTMediaGridItem] Duration badge for 'Genshin-Impact 2026-1-26 12-24-11': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+[Cache] DISK READ: 5ms (247KB)
+
+[Cache] DISK READ: 0ms (115KB)
+
+[Cache] DISK READ: 0ms (109KB)
 
 [Cache] DISK READ: 0ms (199KB)
-
-[Cache] DISK DECODE: 4ms (512x288)
-
-[RTTMediaGridItem] Duration badge for 'Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (85KB)
-
-[Cache] DISK DECODE: 1ms (512x213)
-
-[RTTMediaGridItem] Duration badge for 'video_client': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (116KB)
-
-[Cache] DISK DECODE: 2ms (512x230)
-
-[RTTMediaGridItem] Duration badge for 'Phàm Nhân Tu Tiên Tập 173 Vietsub': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
 [Cache] DISK READ: 0ms (113KB)
 
 [Cache] DISK DECODE: 2ms (512x288)
 
-[RTTMediaGrid] Auto-selecting first item: ZZenlessZoneZero 2026-02-03 12-19-36
+[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37.mp4 wait=0ms assign=0ms
 
-[Detail] REQUEST: ZZenlessZoneZero 2026-02-03 12-19-36.mp4
-
-[Cache] DISK READ: 0ms (235KB)
-
-[Detail] RECEIVED: ZZenlessZoneZero 2026-02-03 12-19-36.mp4 wait=41ms assign=0ms
-
-[Detail] UpdateInfo: ZZenlessZoneZero 2026-02-03 12-19-36.mp4 name=0ms preview=42ms metadata=11ms total=53ms
-
-[RTTMediaGrid] Progressive binding started: 9 items queued, budgetMs=6
-
-[RTTMediaGridItem] Duration badge for '7295785205012': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37.mp4 name=0ms preview=1ms metadata=8ms total=9ms
 
 [Cache] DISK READ: 0ms (120KB)
 
-[Detail] RECEIVED: ZZenlessZoneZero 2026-02-03 12-19-36.mp4 wait=0ms assign=0ms
-
-[Detail] UpdateInfo: ZZenlessZoneZero 2026-02-03 12-19-36.mp4 name=0ms preview=0ms metadata=9ms total=9ms
-
-[RTTMediaGridItem] Duration badge for '7077543476647': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
 [Cache] DISK READ: 0ms (265KB)
-
-[Cache] DISK DECODE: 4ms (512x230)
-
-[RTTMediaGridItem] Duration badge for '7065774217733': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (75KB)
-
-[Cache] DISK DECODE: 2ms (512x238)
-
-[RTTMediaGridItem] Duration badge for 'Genshin_Impact_2025-09-10_11-32-27': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (283KB)
 
 [RTTMediaGridItem] Duration badge for 'FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD)': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[Cache] DISK READ: 3ms (165KB)
+[Cache] DISK READ: 0ms (165KB)
 
 [RTTMediaGridItem] Duration badge for 'Honkai  Star Rail 2025.05.21 - 15.03.08.01': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
@@ -370,13 +392,9 @@ Unexpected timestamp values detected. This can occur in H.264 videos not encoded
 
 [Cache] DISK DECODE: 2ms (512x284)
 
-[RTTMediaGrid] Progressive binding complete: bound=1, skipped=8
+[RTTMediaGrid] Progressive binding complete: bound=10, skipped=0
 
-[MediaLibraryService] Starting background scan (existing: 3172 items)
-
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
-
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 17-52-22.mp4
+[MediaLibraryService] Starting background scan (existing: 3173 items)
 
 First video frame not zero: 2 (0.066667s). Result may be out of sync. Please make sure tracks all start at 0 in C:\Users\Admin\Downloads\videoplayback.mp4
 
@@ -386,7 +404,7 @@ Unexpected timestamp values detected. This can occur in H.264 videos not encoded
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Video\Phàm Nhân Tu Tiên Tập 173 Vietsub.mp4
 
-[MediaLibraryService] Background scan complete - no changes (1257ms)
+[MediaLibraryService] Background scan complete - no changes (1193ms)
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Genshin_Impact_2025-09-10_11-32-27.mp4
 
@@ -396,9 +414,19 @@ Unexpected timestamp values detected. This can occur in H.264 videos not encoded
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\New folder\vết xước 2.mp4
 
+[Detail] REQUEST: Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D.mp4
+
+[Cache] DISK READ: 0ms (81KB)
+
+[Cache] DISK DECODE: 1ms (512x213)
+
+[Detail] RECEIVED: Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D.mp4 wait=13ms assign=0ms
+
+[Detail] UpdateInfo: Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D.mp4 name=0ms preview=14ms metadata=11ms total=25ms
+
 [VRMediaAppController] HideLibraryUI - hiding all menu frames for video playback
 
-[VRMediaAppController] Saved menu frame position: (0.01, 0.00, 1.80), rotation: (0.00, 0.40, 0.00)
+[VRMediaAppController] Saved menu frame position: (0.03, 0.00, 1.80), rotation: (0.00, 1.10, 0.00)
 
 [RTTManager] Entered Immersive Mode
 
@@ -462,23 +490,23 @@ Unexpected timestamp values detected. This can occur in H.264 videos not encoded
 
 [VRMediaAppController] Player UI built with controls container
 
-[VRVideoProjectionSystem] Set target position: (0.01, 0.00, 1.80), rotation: (0.00, 0.40, 0.00)
+[VRVideoProjectionSystem] Set target position: (0.03, 0.00, 1.80), rotation: (0.00, 1.10, 0.00)
 
-[VRVideoPlayerController] Playing: ZZenlessZoneZero 2026-02-03 12-19-36, Projection: Flat, Stereo: Mono
+[VRVideoPlayerController] Playing: Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D, Projection: Flat, Stereo: Mono
 
 [VRVideoProjectionSystem] Set projection: Flat, stereo: Mono
 
 [VRVideoPlayerController] Projection configured: distance=0, scale=1
 
-[VRMediaAppController] Switched to Player mode: ZZenlessZoneZero 2026-02-03 12-19-36
+[VRMediaAppController] Switched to Player mode: Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D
 
 [VRVideoPlayerController] Video prepared
 
-[VRVideoPlayerController] OutputTexture: 1920x1080
+[VRVideoPlayerController] OutputTexture: 1920x800
 
 [VRVideoPlayerController] Using standard texture output
 
-[FlatProjectionRenderer] SetTexture: 1920x1080
+[FlatProjectionRenderer] SetTexture: 1920x800
 
 [VRVideoPlayerController] Calling ProjectionSystem.Show()
 
@@ -486,42 +514,13 @@ Unexpected timestamp values detected. This can occur in H.264 videos not encoded
 
 [VRVideoPlayerController] Starting auto-play
 
-[VideoPlaybackEngine] Video prepared: 1920x1080, 12.1s, 30.2fps
-
-[VRVideoPlayerController] HandleRecenter called - starting VR recenter
-
-[VRVideoPlayerController] VR recenter complete.
-
-[VRVideoPlayerController] Playback ended
+[VideoPlaybackEngine] Video prepared: 1920x800, 1224.1s, 25.0fps
 
 [VRSliderControl] OnPointerEnter called on TimelineSlider
 
 [VRSliderControl] OnPointerExit called on TimelineSlider
 
-[VRSliderControl] OnPointerClick called on TimelineSlider
+[VRSliderControl] OnPointerClick called on TimelineSlider, hoverNormPos=0.206
 
-[VirtualObjectsZoomController] Zoom set to 1.90m (delta: 0.100m)
-
-[VirtualObjectsZoomController] Zoom set to 2.00m (delta: 0.100m)
-
-[VirtualObjectsZoomController] Zoom set to 1.90m (delta: -0.100m)
-
-[VirtualObjectsZoomController] Zoom set to 1.80m (delta: -0.100m)
-
-[RTTMediaLibrary] Cleanup: Destroying _mediaActionBar
-
-Destroying assets is not permitted to avoid data loss.
-If you really want to remove an asset use DestroyImmediate (theObject, true);
-UnityEngine.Object:Destroy (UnityEngine.Object)
-VRWorkspace.UI.HoverEffects.CursorChangeHoverEffect:Cleanup () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Effects/CursorChangeHoverEffect.cs:118)
-VRWorkspace.UI.HoverEffects.HoverEffectController:CleanupEffects () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Core/HoverEffectController.cs:311)
-VRWorkspace.UI.HoverEffects.HoverEffectController:OnDestroy () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Core/HoverEffectController.cs:318)
-
-[VRVideoProjectionSystem] Disposed
-
-[MediaEnvironmentController] Reset to default state
-
-[VRMediaAppController] Cleanup completed
-
-[RTTAppManager] Closed app: media
+[VRSliderControl] Setting value to 0.2061675 (normalized: 0.206)
 

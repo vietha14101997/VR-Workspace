@@ -247,7 +247,8 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         AttachHoverEvents(mainBody);
 
         // === ZONE B: INFO (Title & Timeline) ===
-        CreateZoneB(mainBody.transform);
+        // bodyHeight is also the preview frame height
+        CreateZoneB(mainBody.transform, bodyHeight);
 
         // === ZONE C: CONTROLS (Audio, Playback, Advanced) ===
         CreateZoneC(mainBody.transform);
@@ -315,16 +316,17 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     /// <summary>
     /// Zone B: Info section with Title (MarqueeText) and Timeline.
     /// </summary>
-    private void CreateZoneB(Transform parent)
+    private void CreateZoneB(Transform parent, float previewHeight)
     {
         GameObject zoneB = new GameObject("ZoneB_Info");
         zoneB.transform.SetParent(parent, false);
 
         var le = zoneB.AddComponent<LayoutElement>();
-        le.flexibleHeight = 1; // Share space equally with Zone C
+        le.flexibleHeight = 1.3f; // Share space equally with Zone C (increased from 1.0 to give more room)
 
         var vLayout = zoneB.AddComponent<VerticalLayoutGroup>();
         vLayout.spacing = 0;  // No spacing - title expands, timeline at bottom
+        vLayout.padding = new RectOffset(0, 0, 0, 40); // 40px bottom padding to lift slider away from Zone C
         vLayout.childControlHeight = true;
         vLayout.childForceExpandHeight = false;  // Don't force expand - let flexibleHeight work
         vLayout.childControlWidth = true;
@@ -414,7 +416,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         tLe.preferredWidth = 160;
 
         // Seek slider - flexible width to fill remaining space
-        _seekSlider = VRSliderFactory.CreateTimelineSlider(timelineRow.transform, 100, _font, THEME_COLOR);
+        _seekSlider = VRSliderFactory.CreateTimelineSlider(timelineRow.transform, 100, _font, THEME_COLOR, previewHeight);
         var sLe = _seekSlider.gameObject.AddComponent<LayoutElement>();
         sLe.flexibleWidth = 1;  // Expand to fill remaining space
 
@@ -451,17 +453,22 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         zoneC.transform.SetParent(parent, false);
 
         var le = zoneC.AddComponent<LayoutElement>();
-        le.flexibleHeight = 1; // Share space equally with Zone B
+        le.flexibleHeight = 1.2f; // Share space (increased from 1.0)
 
         // Calculate Zone C height for button sizing
         float bodyHeight = TOTAL_HEIGHT - TOP_SPACER - ZONE_HEIGHT - ZONE_A_BOTTOM_MARGIN;
         float bodyContentHeight = bodyHeight - 2 * (bodyHeight * BG_VERTICAL_SPACING_RATIO);
-        float estimatedZoneHeight = bodyContentHeight / 2.25f;  // Account for 25% spacing
-        float zoneCHeight = estimatedZoneHeight;
+        
+        // Estimate spacing roughly (Zone B 1.3 + Zone C 1.2 = 2.5 parts, plus ~0.25 part spacing)
+        float zoneSpacing = bodyContentHeight * (0.25f / 2.75f);
+        float zoneCHeight = (bodyContentHeight - zoneSpacing) * (1.2f / 2.5f);
 
-        // Calculate button sizes based on Zone C height
-        float playButtonSize = zoneCHeight * PLAY_BUTTON_HEIGHT_RATIO;      // 100% - full height
-        float otherButtonSize = zoneCHeight * OTHER_BUTTON_HEIGHT_RATIO;    // 50% - for all other buttons
+        // Calculate button sizes based on Zone C height minus padding
+        float verticalPadding = 20f; // Bottom padding
+        float availableHeight = zoneCHeight - verticalPadding;
+        
+        float playButtonSize = availableHeight * 0.9f;     // 90% of available height
+        float otherButtonSize = playButtonSize * 0.5f;     // 50% of play button size
 
         // 3% horizontal spacing (used within groups)
         float horizontalSpacing = _width * BG_HORIZONTAL_SPACING_RATIO;
@@ -473,7 +480,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         layout.childControlWidth = true;
         layout.childForceExpandWidth = false;
         layout.childControlHeight = false;
-        layout.padding = new RectOffset(0, 0, 0, 0);
+        layout.padding = new RectOffset(0, 0, 0, (int)verticalPadding); // Add bottom padding
 
         // Calculate group width for symmetric layout (ensures CenterGroup is centered)
         // LeftGroup: button + spacing + slider = otherButtonSize + spacing + 150
@@ -773,7 +780,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     /// <summary>
     /// Creates a rounded rectangle sprite for background with 9-slice support.
     /// </summary>
-    private static Sprite CreateRoundedRectSprite(float cornerRadius)
+    public static Sprite CreateRoundedRectSprite(float cornerRadius)
     {
         int size = 64;
         int radius = Mathf.RoundToInt(cornerRadius * size / 100f); // Scale radius
@@ -973,6 +980,22 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         {
             _speedText.text = $"{speed:0.#}x";
         }
+    }
+
+    /// <summary>
+    /// Set the aspect ratio for the seek bar preview frame.
+    /// </summary>
+    public void SetPreviewAspectRatio(float ratio)
+    {
+        _seekSlider?.SetPreviewAspectRatio(ratio);
+    }
+
+    /// <summary>
+    /// Set the texture for the seek bar preview frame (e.g. video frame).
+    /// </summary>
+    public void SetPreviewTexture(Texture texture)
+    {
+        _seekSlider?.SetPreviewImage(texture);
     }
 
     /// <summary>

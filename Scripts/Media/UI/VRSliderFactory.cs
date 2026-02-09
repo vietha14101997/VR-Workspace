@@ -83,7 +83,8 @@ public static class VRSliderFactory
         Transform parent,
         float width,
         TMP_FontAsset font,
-        Color primaryColor)
+        Color primaryColor,
+        float previewHeight = 0f)
     {
         GameObject sliderObj = new GameObject("TimelineSlider");
         sliderObj.transform.SetParent(parent, false);
@@ -173,7 +174,7 @@ public static class VRSliderFactory
         collider.center = new Vector3(0, 0, -5);
 
         // Configure slider control
-        sliderControl.Initialize(fillRT, handleRT, bufferRT, width);
+        sliderControl.Initialize(fillRT, handleRT, bufferRT, width, previewHeight);
 
         return sliderControl;
     }
@@ -461,15 +462,18 @@ public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler,
     private TextMeshProUGUI _previewValueText;
     private RectTransform _previewRT;
     private Color _previewColor = new Color(1f, 1f, 1f, 0.4f); // White semi-transparent
+    private RawImage _previewImage; // Added for thumbnail
+    private float _previewHeight = 0f; // Height of the preview frame
     #endregion
 
     #region Initialization
-    public void Initialize(RectTransform fillRT, RectTransform handleRT, RectTransform bufferRT, float width)
+    public void Initialize(RectTransform fillRT, RectTransform handleRT, RectTransform bufferRT, float width, float previewHeight = 0f)
     {
         _fillRT = fillRT;
         _handleRT = handleRT;
         _bufferRT = bufferRT;
         _width = width;
+        _previewHeight = previewHeight;
     }
 
     public void SetRange(float min, float max)
@@ -485,6 +489,20 @@ public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler,
     public void SetStep(float step)
     {
         _step = Mathf.Max(0f, step);
+    }
+
+    /// <summary>
+    /// Set preview thumbnail image.
+    /// </summary>
+    public void SetPreviewImage(Texture texture)
+    {
+        _cachedPreviewTexture = texture;
+
+        if (_previewImage != null)
+        {
+            _previewImage.texture = texture;
+            _previewImage.color = texture != null ? Color.white : Color.black;
+        }
     }
     #endregion
 
@@ -652,73 +670,6 @@ public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler,
             OnHoverPositionChanged?.Invoke(normalized);
         }
     }
-    #endregion
-
-    #region Preview Methods
-    private void ShowPreview()
-    {
-        if (_previewContainer == null)
-        {
-            CreatePreviewUI();
-        }
-        _previewContainer?.SetActive(true);
-    }
-
-    private void HidePreview()
-    {
-        _previewContainer?.SetActive(false);
-    }
-
-    private void CreatePreviewUI()
-    {
-        RectTransform rt = GetComponent<RectTransform>();
-        if (rt == null) return;
-
-        // Preview container
-        _previewContainer = new GameObject("PreviewContainer");
-        _previewContainer.transform.SetParent(transform, false);
-
-        _previewRT = _previewContainer.AddComponent<RectTransform>();
-        _previewRT.anchorMin = Vector2.zero;
-        _previewRT.anchorMax = Vector2.one;
-        _previewRT.offsetMin = Vector2.zero;
-        _previewRT.offsetMax = Vector2.zero;
-
-        // Preview seek bar (semi-transparent fill from left to hover position)
-        GameObject seekBarObj = new GameObject("PreviewSeekBar");
-        seekBarObj.transform.SetParent(_previewContainer.transform, false);
-
-        var seekBarRT = seekBarObj.AddComponent<RectTransform>();
-        seekBarRT.anchorMin = new Vector2(0, 0.5f);
-        seekBarRT.anchorMax = new Vector2(0, 0.5f);
-        seekBarRT.pivot = new Vector2(0, 0.5f);
-        seekBarRT.anchoredPosition = Vector2.zero;
-        seekBarRT.sizeDelta = new Vector2(0, 8f); // Slightly smaller than main track
-
-        _previewSeekBar = seekBarObj.AddComponent<Image>();
-        _previewSeekBar.color = _previewColor;
-        _previewSeekBar.raycastTarget = false;
-
-        // Preview value tooltip (below the slider)
-        GameObject tooltipObj = new GameObject("PreviewValueText");
-        tooltipObj.transform.SetParent(_previewContainer.transform, false);
-
-        var tooltipRT = tooltipObj.AddComponent<RectTransform>();
-        tooltipRT.anchorMin = new Vector2(0, 0); // Left-aligned hook
-        tooltipRT.anchorMax = new Vector2(0, 0);
-        tooltipRT.pivot = new Vector2(0.5f, 1f); // Pivot top-center so it grows downwards
-        tooltipRT.anchoredPosition = new Vector2(0, -17.5f); // Reduced gap (was -35f)
-        tooltipRT.sizeDelta = new Vector2(160, 50); // Larger size for bigger font
-
-        _previewValueText = tooltipObj.AddComponent<TextMeshProUGUI>();
-        _previewValueText.fontSize = 32; 
-        _previewValueText.fontStyle = FontStyles.Bold; // Bold font
-        _previewValueText.color = Color.white;
-        _previewValueText.alignment = TextAlignmentOptions.Center;
-        _previewValueText.raycastTarget = false;
-
-        _previewContainer.SetActive(false);
-    }
 
     private void UpdatePreviewPosition(float normalized)
     {
@@ -739,6 +690,16 @@ public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler,
         // Update tooltip position and text
         var tooltipRT = _previewValueText.GetComponent<RectTransform>();
         tooltipRT.anchoredPosition = new Vector2(normalized * width, tooltipRT.anchoredPosition.y);
+
+        // Update preview frame position (if exists)
+        if (_previewImage != null && _previewImage.transform.parent != null)
+        {
+            var frameRT = _previewImage.transform.parent.GetComponent<RectTransform>();
+            if (frameRT != null)
+            {
+                frameRT.anchoredPosition = new Vector2(normalized * width, frameRT.anchoredPosition.y);
+            }
+        }
 
         // Calculate and display value
         float hoverValue = Mathf.Lerp(_minValue, _maxValue, normalized);
@@ -777,7 +738,161 @@ public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler,
     }
     #endregion
 
+    #region Preview Methods
+    private void ShowPreview()
+    {
+        if (_previewContainer == null)
+        {
+            CreatePreviewUI();
+        }
+        _previewContainer?.SetActive(true);
+    }
+
+    private void HidePreview()
+    {
+        _previewContainer?.SetActive(false);
+    }
+
+    /// <summary>
+    /// Set preview frame aspect ratio. 
+    /// If _previewHeight is set, width is calculated (height * ratio).
+    /// Otherwise width is fixed at 160, height is width / ratio.
+    /// </summary>
+    public void SetPreviewAspectRatio(float ratio)
+    {
+        _cachedAspectRatio = ratio;
+
+        if (_previewImage != null && _previewImage.transform.parent != null)
+        {
+            var frameRT = _previewImage.transform.parent.GetComponent<RectTransform>();
+            if (frameRT != null && ratio > 0)
+            {
+                float width, height;
+                if (_previewHeight > 0)
+                {
+                    // Fixed height (match panel), variable width
+                    height = _previewHeight;
+                    width = height * ratio;
+                }
+                else
+                {
+                    // Default: Fixed width, variable height
+                    width = 160f;
+                    height = width / ratio;
+                }
+                frameRT.sizeDelta = new Vector2(width, height);
+            }
+        }
+    }
+
+    private void CreatePreviewUI()
+    {
+        RectTransform rt = GetComponent<RectTransform>();
+        if (rt == null) return;
+
+        // Preview container
+        _previewContainer = new GameObject("PreviewContainer");
+        _previewContainer.transform.SetParent(transform, false);
+
+        _previewRT = _previewContainer.AddComponent<RectTransform>();
+        _previewRT.anchorMin = Vector2.zero;
+        _previewRT.anchorMax = Vector2.one;
+        _previewRT.offsetMin = Vector2.zero;
+        _previewRT.offsetMax = Vector2.zero;
+
+        // Preview seek bar (semi-transparent fill from left to hover position)
+        GameObject seekBarObj = new GameObject("PreviewSeekBar");
+        seekBarObj.transform.SetParent(_previewContainer.transform, false);
+
+        var seekBarRT = seekBarObj.AddComponent<RectTransform>();
+        seekBarRT.anchorMin = new Vector2(0, 0.5f);
+        seekBarRT.anchorMax = new Vector2(0, 0.5f);
+        seekBarRT.pivot = new Vector2(0, 0.5f);
+        seekBarRT.anchoredPosition = Vector2.zero;
+        seekBarRT.sizeDelta = new Vector2(0, 8f); // Slightly smaller than main track
+
+        _previewSeekBar = seekBarObj.AddComponent<Image>();
+        _previewSeekBar.color = _previewColor;
+        _previewSeekBar.raycastTarget = false;
+
+        // Preview frame (video thumbnail) above slider
+        GameObject frameObj = new GameObject("PreviewFrame");
+        frameObj.transform.SetParent(_previewContainer.transform, false);
+
+        var frameRT = frameObj.AddComponent<RectTransform>();
+        frameRT.anchorMin = new Vector2(0, 0); // Left-aligned hook
+        frameRT.anchorMax = new Vector2(0, 0);
+        frameRT.pivot = new Vector2(0.5f, 0f); // Pivot bottom-center so it grows upwards
+        frameRT.anchoredPosition = new Vector2(0, 15f); // Gap above slider (increased slightly)
+        
+        // Use provided height or default to 16:9
+        float pHeight = _previewHeight > 0 ? _previewHeight : 90f;
+        float pWidth = _previewHeight > 0 ? pHeight * (16f/9f) : 160f; // Default ratio 16:9
+        frameRT.sizeDelta = new Vector2(pWidth, pHeight); 
+
+        // Dark background for frame with Rounded Corners
+        var frameImage = frameObj.AddComponent<Image>();
+        frameImage.color = new Color(0, 0, 0, 0.9f); // Slightly darker
+        frameImage.sprite = RTTMediaControlsPanel.CreateRoundedRectSprite(10f); // 10% corner radius
+        frameImage.type = Image.Type.Sliced;
+        frameImage.raycastTarget = false;
+
+        // Mask to clip thumbnail to rounded corners
+        var mask = frameObj.AddComponent<Mask>();
+        mask.showMaskGraphic = true;
+
+        // Actual thumbnail image (RawImage for texture)
+        GameObject thumbObj = new GameObject("ThumbnailImage");
+        thumbObj.transform.SetParent(frameObj.transform, false);
+        
+        var thumbRT = thumbObj.AddComponent<RectTransform>();
+        thumbRT.anchorMin = Vector2.zero;
+        thumbRT.anchorMax = Vector2.one;
+        thumbRT.offsetMin = new Vector2(4, 4); // 4px padding for border effect
+        thumbRT.offsetMax = new Vector2(-4, -4);
+        
+        _previewImage = thumbObj.AddComponent<RawImage>();
+        _previewImage.color = Color.black; // Default black to avoid white flash
+        _previewImage.raycastTarget = false;
+
+        // Preview value tooltip (below the slider)
+        GameObject tooltipObj = new GameObject("PreviewValueText");
+        tooltipObj.transform.SetParent(_previewContainer.transform, false);
+
+        var tooltipRT = tooltipObj.AddComponent<RectTransform>();
+        tooltipRT.anchorMin = new Vector2(0, 0); // Left-aligned hook
+        tooltipRT.anchorMax = new Vector2(0, 0);
+        tooltipRT.pivot = new Vector2(0.5f, 1f); // Pivot top-center so it grows downwards
+        tooltipRT.anchoredPosition = new Vector2(0, -5f); // Reduced gap
+        tooltipRT.sizeDelta = new Vector2(160, 50); 
+
+        _previewValueText = tooltipObj.AddComponent<TextMeshProUGUI>();
+        _previewValueText.fontSize = 36; 
+        _previewValueText.fontStyle = FontStyles.Bold; 
+        _previewValueText.color = Color.white;
+        _previewValueText.alignment = TextAlignmentOptions.Center;
+        _previewValueText.raycastTarget = false;
+
+        _previewContainer.SetActive(false);
+
+        // Apply cached values if available
+        if (_cachedAspectRatio > 0)
+        {
+            SetPreviewAspectRatio(_cachedAspectRatio);
+        }
+
+        if (_cachedPreviewTexture != null)
+        {
+            SetPreviewImage(_cachedPreviewTexture);
+        }
+    }
+    #endregion
+
     #region Private Methods
+    // Cached values for lazy initialization
+    private Texture _cachedPreviewTexture;
+    private float _cachedAspectRatio = 0f;
+
     private void UpdateVisuals()
     {
         float normalized = NormalizedValue;
