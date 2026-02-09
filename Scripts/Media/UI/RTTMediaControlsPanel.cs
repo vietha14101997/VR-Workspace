@@ -421,6 +421,17 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         _seekSlider.OnValueChanged += OnSeekValueChanged;
         _seekSlider.OnDragStarted += OnSeekStart;
         _seekSlider.OnDragEnded += OnSeekEnd;
+        // Slider value is normalized (0-1), so multiply by duration for display
+        _seekSlider.OnFormatPreview = val => {
+            float seconds = val * _duration;
+            if (seconds < 3600f)
+            {
+                int m = (int)(seconds / 60);
+                int s = (int)(seconds % 60);
+                return $"{m:D2}:{s:D2}";
+            }
+            return FormatTime(seconds);
+        };
         AttachHoverEvents(_seekSlider.gameObject);
 
         // Total time (at right edge)
@@ -892,12 +903,18 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         ResetAutoHideTimer();
     }
 
+    private float _nextAllowedUpdateTime = 0f; // Prevent older time updates from overriding user seek
+    
     /// <summary>
     /// Update current playback time.
     /// </summary>
     public void SetCurrentTime(float seconds)
     {
         if (_isSeeking) return;
+
+        // If user just sought, ignore updates from engine for a moment 
+        // to prevent slider jumping back to old time before seek completes
+        if (Time.time < _nextAllowedUpdateTime) return;
 
         _currentTime = seconds;
         _currentTimeText.text = FormatTime(seconds);
@@ -1077,6 +1094,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         else
         {
             // Immediate seek on click (not dragging)
+            _nextAllowedUpdateTime = Time.time + 1.0f; // Block updates for 1s
             OnSeek?.Invoke(normalizedValue * _duration);
         }
     }
@@ -1089,6 +1107,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     private void OnSeekEnd()
     {
         _isSeeking = false;
+        _nextAllowedUpdateTime = Time.time + 1.0f; // Block updates for 1s after drag release
         // Invoke seek event with actual time
         OnSeek?.Invoke(_seekSlider.NormalizedValue * _duration);
     }

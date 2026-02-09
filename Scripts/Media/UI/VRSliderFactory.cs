@@ -427,7 +427,8 @@ public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler,
     /// <summary>
     /// Event fired when hover position changes. Parameter is normalized position (0-1).
     /// </summary>
-    public event Action<float> OnHoverPositionChanged;
+    public event Action<float> OnHoverPositionChanged; // Normalized position (0-1)
+    public Func<float, string> OnFormatPreview; // Custom formatter for preview text
     #endregion
 
     #region Properties
@@ -703,14 +704,15 @@ public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler,
         tooltipObj.transform.SetParent(_previewContainer.transform, false);
 
         var tooltipRT = tooltipObj.AddComponent<RectTransform>();
-        tooltipRT.anchorMin = new Vector2(0, 0);
+        tooltipRT.anchorMin = new Vector2(0, 0); // Left-aligned hook
         tooltipRT.anchorMax = new Vector2(0, 0);
-        tooltipRT.pivot = new Vector2(0.5f, 1f);
-        tooltipRT.anchoredPosition = new Vector2(0, -15f); // Below slider
-        tooltipRT.sizeDelta = new Vector2(80, 30);
+        tooltipRT.pivot = new Vector2(0.5f, 1f); // Pivot top-center so it grows downwards
+        tooltipRT.anchoredPosition = new Vector2(0, -17.5f); // Reduced gap (was -35f)
+        tooltipRT.sizeDelta = new Vector2(160, 50); // Larger size for bigger font
 
         _previewValueText = tooltipObj.AddComponent<TextMeshProUGUI>();
-        _previewValueText.fontSize = 18;
+        _previewValueText.fontSize = 32; 
+        _previewValueText.fontStyle = FontStyles.Bold; // Bold font
         _previewValueText.color = Color.white;
         _previewValueText.alignment = TextAlignmentOptions.Center;
         _previewValueText.raycastTarget = false;
@@ -748,7 +750,13 @@ public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler,
     /// </summary>
     protected virtual string FormatPreviewValue(float value)
     {
-        // Check if this looks like a time value (0-N seconds/minutes)
+        // Use custom formatter if provided
+        if (OnFormatPreview != null)
+        {
+            return OnFormatPreview(value);
+        }
+
+        // Default heuristic: Check if this looks like a time value (0-N seconds/minutes)
         if (_maxValue > 60f)
         {
             // Format as time (mm:ss)
