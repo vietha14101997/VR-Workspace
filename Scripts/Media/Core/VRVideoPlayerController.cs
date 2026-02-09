@@ -1,5 +1,6 @@
 using UnityEngine;
 using System;
+using System.Collections.Generic;
 
 /// <summary>
 /// Controller for VR video playback.
@@ -547,9 +548,114 @@ public class VRVideoPlayerController : MonoBehaviour
 
     private void HandleRecenter()
     {
+        Debug.Log("[VRVideoPlayerController] HandleRecenter called - starting VR recenter");
+        StartCoroutine(RecenterRoutine());
+    }
+
+    private System.Collections.IEnumerator RecenterRoutine()
+    {
+        VRGazeReticle reticle = VRGazeReticle.Instance;
+        if (reticle == null) reticle = FindObjectOfType<VRGazeReticle>();
+
+        // Load recenter icon from Resources (icon files are directly in Resources folder)
+        Sprite recenterIcon = Resources.Load<Sprite>("icon_recenter");
+        Debug.Log($"[VRVideoPlayerController] RecenterRoutine - reticle: {reticle != null}, icon: {recenterIcon != null}");
+
+        if (reticle != null && recenterIcon != null)
+        {
+            Debug.Log("[VRVideoPlayerController] Calling EnterRecenterMode");
+            reticle.EnterRecenterMode(recenterIcon);
+        }
+
+        float duration = 2.0f;
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsed / duration);
+
+            if (reticle != null)
+            {
+                reticle.UpdateRecenterProgress(progress);
+            }
+
+            yield return null;
+        }
+
+        // Recenter virtual objects and projection
+        Camera cam = Camera.main;
+        if (cam != null)
+        {
+            RecenterAllVirtualObjects(cam);
+        }
+
+        // Also recenter video projection if it exists
         if (_projectionSystem != null)
         {
             _projectionSystem.RecenterView();
+        }
+
+        if (reticle != null)
+        {
+            reticle.ExitRecenterMode();
+        }
+
+        Debug.Log("[VRVideoPlayerController] VR recenter complete.");
+    }
+
+    private void RecenterAllVirtualObjects(Camera cam)
+    {
+        GameObject virtualObjectsParent = GameObject.Find("VirtualObjects");
+        if (virtualObjectsParent == null)
+        {
+            Debug.LogWarning("[VRVideoPlayerController] VirtualObjects parent not found");
+            return;
+        }
+
+        RTTMenuFrame primary = RTTMenuFrame.PrimaryInstance;
+        if (primary == null)
+        {
+            Debug.LogWarning("[VRVideoPlayerController] No primary RTTMenuFrame found");
+            return;
+        }
+
+        Vector3 pivotPos = primary.transform.position;
+        Quaternion pivotRot = primary.transform.rotation;
+
+        List<Transform> children = new List<Transform>();
+        List<Vector3> relativePositions = new List<Vector3>();
+        List<Quaternion> relativeRotations = new List<Quaternion>();
+
+        foreach (Transform child in virtualObjectsParent.transform)
+        {
+            children.Add(child);
+            Vector3 relPos = Quaternion.Inverse(pivotRot) * (child.position - pivotPos);
+            relativePositions.Add(relPos);
+            Quaternion relRot = Quaternion.Inverse(pivotRot) * child.rotation;
+            relativeRotations.Add(relRot);
+        }
+
+        Vector3 camForward = cam.transform.forward;
+        camForward.y = 0;
+        if (camForward.sqrMagnitude < 0.001f) camForward = Vector3.forward;
+        camForward.Normalize();
+
+        Vector3 camPos = cam.transform.position;
+        float hDist = Vector2.Distance(
+            new Vector2(pivotPos.x, pivotPos.z),
+            new Vector2(camPos.x, camPos.z)
+        );
+
+        Vector3 newPivotPos = camPos + camForward * hDist;
+        newPivotPos.y = pivotPos.y;
+        Quaternion newPivotRot = Quaternion.LookRotation(camForward);
+
+        for (int i = 0; i < children.Count; i++)
+        {
+            Transform child = children[i];
+            child.position = newPivotPos + newPivotRot * relativePositions[i];
+            child.rotation = newPivotRot * relativeRotations[i];
         }
     }
     #endregion
@@ -597,6 +703,7 @@ public class VRVideoPlayerController : MonoBehaviour
             _controlsPanel.OnPlaylistClicked -= HandlePlaylistClicked;
             _controlsPanel.OnVRModeClicked -= HandleVRModeClicked;
             _controlsPanel.OnHeadsetModeClicked -= HandleHeadsetModeClicked;
+            _controlsPanel.OnRecenterClicked -= HandleRecenter;
         }
 
         UnwireSettingsEvents();

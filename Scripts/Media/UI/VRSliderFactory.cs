@@ -416,13 +416,18 @@ public static class VRSliderFactory
 
 /// <summary>
 /// VR-optimized slider control component.
+/// Supports VR gaze click and hover preview.
 /// </summary>
-public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler
+public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler, IPointerClickHandler, IPointerEnterHandler, IPointerExitHandler
 {
     #region Events
     public event Action<float> OnValueChanged;
     public event Action OnDragStarted;
     public event Action OnDragEnded;
+    /// <summary>
+    /// Event fired when hover position changes. Parameter is normalized position (0-1).
+    /// </summary>
+    public event Action<float> OnHoverPositionChanged;
     #endregion
 
     #region Properties
@@ -446,6 +451,15 @@ public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler,
     private RectTransform _fillRT;
     private RectTransform _handleRT;
     private RectTransform _bufferRT;  // Optional
+
+    // Hover preview
+    private bool _isHovering = false;
+    private float _hoverNormalizedPosition = 0f;
+    private GameObject _previewContainer;
+    private Image _previewSeekBar;
+    private TextMeshProUGUI _previewValueText;
+    private RectTransform _previewRT;
+    private Color _previewColor = new Color(1f, 1f, 1f, 0.4f); // White semi-transparent
     #endregion
 
     #region Initialization
@@ -551,6 +565,206 @@ public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler,
             // Convert to value
             float newValue = Mathf.Lerp(_minValue, _maxValue, normalized);
             SetValue(newValue);
+        }
+    }
+
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        Debug.Log($"[VRSliderControl] OnPointerClick called on {gameObject.name}, hoverNormPos={_hoverNormalizedPosition:F3}");
+        // VR gaze click - jump to clicked position using the hover position we calculated
+        if (!IsDragging)
+        {
+            // Use the hover normalized position instead of calculating from eventData
+            // because RTT panels use render texture coordinates, not screen coordinates
+            if (_hoverNormalizedPosition >= 0)
+            {
+                float newValue = Mathf.Lerp(_minValue, _maxValue, _hoverNormalizedPosition);
+                Debug.Log($"[VRSliderControl] Setting value to {newValue} (normalized: {_hoverNormalizedPosition:F3})");
+                SetValue(newValue);
+            }
+        }
+    }
+
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        Debug.Log($"[VRSliderControl] OnPointerEnter called on {gameObject.name}");
+        _isHovering = true;
+        ShowPreview();
+    }
+
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        Debug.Log($"[VRSliderControl] OnPointerExit called on {gameObject.name}");
+        _isHovering = false;
+        HidePreview();
+    }
+
+    private void Update()
+    {
+        if (_isHovering && _previewContainer != null && _previewContainer.activeSelf)
+        {
+            UpdatePreviewFromGaze();
+        }
+    }
+
+    private void UpdatePreviewFromGaze()
+    {
+        // Get current reticle position from RTTRaycastManager
+        if (RTTRaycastManager.Instance == null) return;
+
+        var hit = RTTRaycastManager.Instance.CurrentHit;
+        if (!hit.isValid) return;
+
+        // Check if this hit is actually on our slider (or a child of it)
+        if (hit.hitUIElement == null) return;
+        
+        // Verify the hit element is part of this slider
+        Transform hitTransform = hit.hitUIElement.transform;
+        bool isOurSlider = hitTransform == transform || hitTransform.IsChildOf(transform);
+        if (!isOurSlider) return;
+
+        RectTransform rt = GetComponent<RectTransform>();
+        if (rt == null) return;
+
+        // Get the panel that was hit to access its render texture resolution
+        if (hit.panel == null) return;
+        
+        // Convert screen position (in render texture space) to slider local position
+        // screenPosition is already in canvas pixel coordinates
+        Vector2 canvasPosition = hit.screenPosition;
+        
+        // Get the canvas to convert screen position to local position
+        Canvas canvas = GetComponentInParent<Canvas>();
+        if (canvas == null) return;
+        
+        Camera uiCamera = canvas.worldCamera;
+        
+        Vector2 localPoint;
+        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(rt, canvasPosition, uiCamera, out localPoint))
+        {
+            // Calculate normalized position based on local point within slider rect
+            float normalized = (localPoint.x + rt.rect.width * rt.pivot.x) / rt.rect.width;
+            normalized = Mathf.Clamp01(normalized);
+
+            _hoverNormalizedPosition = normalized;
+            UpdatePreviewPosition(normalized);
+            OnHoverPositionChanged?.Invoke(normalized);
+        }
+    }
+    #endregion
+
+    #region Preview Methods
+    private void ShowPreview()
+    {
+        if (_previewContainer == null)
+        {
+            CreatePreviewUI();
+        }
+        _previewContainer?.SetActive(true);
+    }
+
+    private void HidePreview()
+    {
+        _previewContainer?.SetActive(false);
+    }
+
+    private void CreatePreviewUI()
+    {
+        RectTransform rt = GetComponent<RectTransform>();
+        if (rt == null) return;
+
+        // Preview container
+        _previewContainer = new GameObject("PreviewContainer");
+        _previewContainer.transform.SetParent(transform, false);
+
+        _previewRT = _previewContainer.AddComponent<RectTransform>();
+        _previewRT.anchorMin = Vector2.zero;
+        _previewRT.anchorMax = Vector2.one;
+        _previewRT.offsetMin = Vector2.zero;
+        _previewRT.offsetMax = Vector2.zero;
+
+        // Preview seek bar (semi-transparent fill from left to hover position)
+        GameObject seekBarObj = new GameObject("PreviewSeekBar");
+        seekBarObj.transform.SetParent(_previewContainer.transform, false);
+
+        var seekBarRT = seekBarObj.AddComponent<RectTransform>();
+        seekBarRT.anchorMin = new Vector2(0, 0.5f);
+        seekBarRT.anchorMax = new Vector2(0, 0.5f);
+        seekBarRT.pivot = new Vector2(0, 0.5f);
+        seekBarRT.anchoredPosition = Vector2.zero;
+        seekBarRT.sizeDelta = new Vector2(0, 8f); // Slightly smaller than main track
+
+        _previewSeekBar = seekBarObj.AddComponent<Image>();
+        _previewSeekBar.color = _previewColor;
+        _previewSeekBar.raycastTarget = false;
+
+        // Preview value tooltip (below the slider)
+        GameObject tooltipObj = new GameObject("PreviewValueText");
+        tooltipObj.transform.SetParent(_previewContainer.transform, false);
+
+        var tooltipRT = tooltipObj.AddComponent<RectTransform>();
+        tooltipRT.anchorMin = new Vector2(0, 0);
+        tooltipRT.anchorMax = new Vector2(0, 0);
+        tooltipRT.pivot = new Vector2(0.5f, 1f);
+        tooltipRT.anchoredPosition = new Vector2(0, -15f); // Below slider
+        tooltipRT.sizeDelta = new Vector2(80, 30);
+
+        _previewValueText = tooltipObj.AddComponent<TextMeshProUGUI>();
+        _previewValueText.fontSize = 18;
+        _previewValueText.color = Color.white;
+        _previewValueText.alignment = TextAlignmentOptions.Center;
+        _previewValueText.raycastTarget = false;
+
+        _previewContainer.SetActive(false);
+    }
+
+    private void UpdatePreviewPosition(float normalized)
+    {
+        if (_previewSeekBar == null || _previewValueText == null) return;
+
+        RectTransform rt = GetComponent<RectTransform>();
+        float width = (rt != null && rt.rect.width > 0) ? rt.rect.width : _width;
+
+        // Update seek bar width (from fill end to hover position)
+        float fillNormalized = NormalizedValue;
+        float previewWidth = Mathf.Max(0, (normalized - fillNormalized) * width);
+        float startX = fillNormalized * width;
+
+        var seekBarRT = _previewSeekBar.GetComponent<RectTransform>();
+        seekBarRT.anchoredPosition = new Vector2(startX, 0);
+        seekBarRT.sizeDelta = new Vector2(previewWidth, seekBarRT.sizeDelta.y);
+
+        // Update tooltip position and text
+        var tooltipRT = _previewValueText.GetComponent<RectTransform>();
+        tooltipRT.anchoredPosition = new Vector2(normalized * width, tooltipRT.anchoredPosition.y);
+
+        // Calculate and display value
+        float hoverValue = Mathf.Lerp(_minValue, _maxValue, normalized);
+        _previewValueText.text = FormatPreviewValue(hoverValue);
+    }
+
+    /// <summary>
+    /// Format the preview value. Override-friendly for custom formatting.
+    /// </summary>
+    protected virtual string FormatPreviewValue(float value)
+    {
+        // Check if this looks like a time value (0-N seconds/minutes)
+        if (_maxValue > 60f)
+        {
+            // Format as time (mm:ss)
+            int totalSeconds = Mathf.RoundToInt(value);
+            int minutes = totalSeconds / 60;
+            int seconds = totalSeconds % 60;
+            return $"{minutes}:{seconds:D2}";
+        }
+        else if (_maxValue <= 1f)
+        {
+            // Percentage (for volume)
+            return $"{Mathf.RoundToInt(value * 100)}%";
+        }
+        else
+        {
+            return value.ToString("F1");
         }
     }
     #endregion

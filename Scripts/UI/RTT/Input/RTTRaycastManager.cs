@@ -593,8 +593,17 @@ public class RTTRaycastManager : MonoBehaviour
     {
         if (target == null) return;
 
-        // Standard Unity pointer enter event
-        ExecuteEvents.Execute(target, _pointerEventData, ExecuteEvents.pointerEnterHandler);
+        // Standard Unity pointer enter event - try target first, then parents
+        var enterHandler = target.GetComponent<IPointerEnterHandler>();
+        if (enterHandler == null)
+            enterHandler = target.GetComponentInParent<IPointerEnterHandler>();
+        
+        if (enterHandler != null)
+        {
+            var mb = enterHandler as MonoBehaviour;
+            if (mb != null)
+                ExecuteEvents.Execute(mb.gameObject, _pointerEventData, ExecuteEvents.pointerEnterHandler);
+        }
 
         // Unified HoverEffectController - handles all hover effects
         var hoverController = target.GetComponent<HoverEffectController>();
@@ -610,8 +619,17 @@ public class RTTRaycastManager : MonoBehaviour
     {
         if (target == null) return;
 
-        // Standard Unity pointer exit event
-        ExecuteEvents.Execute(target, _pointerEventData, ExecuteEvents.pointerExitHandler);
+        // Standard Unity pointer exit event - try target first, then parents
+        var exitHandler = target.GetComponent<IPointerExitHandler>();
+        if (exitHandler == null)
+            exitHandler = target.GetComponentInParent<IPointerExitHandler>();
+        
+        if (exitHandler != null)
+        {
+            var mb = exitHandler as MonoBehaviour;
+            if (mb != null)
+                ExecuteEvents.Execute(mb.gameObject, _pointerEventData, ExecuteEvents.pointerExitHandler);
+        }
 
         // Unified HoverEffectController - handles all hover effects
         var hoverController = target.GetComponent<HoverEffectController>();

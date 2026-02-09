@@ -504,9 +504,12 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
         GameObject virtualObjects = GameObject.Find("VirtualObjects");
 
-        // === 1. Root container at scene root (NOT under VirtualObjects → not affected by Zoom) ===
+        // === 1. Root container under VirtualObjects (affected by Zoom and Recenter) ===
         _controlsContainer = new GameObject("VideoControlsContainer");
-        // Intentionally NOT parented to VirtualObjects
+        if (virtualObjects != null)
+        {
+            _controlsContainer.transform.SetParent(virtualObjects.transform, false);
+        }
 
         // === 2. Dismiss overlay frame (large transparent click-to-dismiss) ===
         _overlayFrameObject = new GameObject("DismissOverlayFrame");
@@ -555,7 +558,9 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
         // === 3. Controls frame (RTTMenuFrame with higher render priority) ===
         GameObject controlsFrameObj = new GameObject("VideoControlsFrame");
-        controlsFrameObj.transform.SetParent(_controlsContainer.transform);
+        controlsFrameObj.transform.SetParent(_controlsContainer.transform, false); // Use false to keep local transform
+        controlsFrameObj.transform.localPosition = Vector3.zero; // Explicitly reset to zero
+        controlsFrameObj.transform.localRotation = Quaternion.identity;
         controlsFrameObj.layer = vLayer;
 
         var controlsFrame = controlsFrameObj.AddComponent<RTTMenuFrame>();

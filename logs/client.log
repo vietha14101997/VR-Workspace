@@ -19,8 +19,6 @@ CameraPassthrough:OnEnable () (at Assets/VR-Workspace/Scripts/Camera/CameraPasst
 
 [AndroidHelper] App resumed
 
-[RTTRaycastManager] Auto-initialized layer mask to VirtualObjects (layer 3)
-
 [RTTMenu] Created main frame
 
 [RTTBootstrapper] Created RTTMenu with RTTMenuFrame_main
@@ -41,13 +39,15 @@ CameraPassthrough:OnEnable () (at Assets/VR-Workspace/Scripts/Camera/CameraPasst
 
 [VirtualObjectsZoomController] Configured: min=1m, max=2m, default=1.8m, step=0.1m
 
-[VirtualObjectsZoomController] Moving VirtualObjects from 13.12m to default 1.80m
+[VirtualObjectsZoomController] Moving VirtualObjects from 0.00m to default 1.80m
 
-[VirtualObjectsZoomController] Zoom set to 1.80m (delta: -11.324m)
+[VirtualObjectsZoomController] Zoom set to 1.80m (delta: 1.800m)
 
 [RTTBootstrapper] Created VirtualObjectsZoomController (range: 1m - 2m, default: 1.8m)
 
 [RTTBootstrapper] Initialization complete
+
+[RTTRaycastManager] Auto-initialized layer mask to VirtualObjects (layer 3)
 
 [RTTMenuFrame] UI built: 1920x1080 logical pixels
 
@@ -82,34 +82,31 @@ Stopping camera passthrough
 
 Destroying webcam texture
 
-Webcam texture was destroyed during initialization
-UnityEngine.Debug:LogWarning (object)
-CameraPassthrough/<EnsureTextureStarted>d__11:MoveNext () (at Assets/VR-Workspace/Scripts/Camera/CameraPassthrough.cs:171)
-UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
-
 [RTTManager] Instant recenter: moved 2 objects to face camera
 
 [VirtualObjectsZoomController] Recenter: distance recalculated to 1.80m
 
 [RTTManager] Auto-recenter completed
 
-[RTTMainMenu] Click started: media at 6.970s
+[RTTMainMenu] Click started: media at 6.004s
 
-[RTTMainMenu] PrepareApp called: media at 6.970s (+0.1ms)
+[RTTMainMenu] PrepareApp called: media at 6.004s (+0.1ms)
 
-[RTTAppManager] PrepareAppFrameAsync started: media at 6.972s
+[RTTAppManager] PrepareAppFrameAsync started: media at 6.007s
 
 [RTTMenu] Created app frame: media
 
-[RTTAppManager] Frame created: media at 6.972s (+0.4ms)
+[RTTAppManager] Frame created: media at 6.007s (+0.4ms)
 
 [RTTAppManager] Preparing app: media in slot 1
 
-[RTTMainMenu] Button animation started: media at 6.973s (+3.1ms)
+[RTTMainMenu] Button animation started: media at 6.007s (+3.2ms)
 
-[RTTAppManager] Creating content: media at 7.002s (+29.6ms)
+[RTTAppManager] Creating content: media at 6.037s (+30.4ms)
 
 [RTTManager] Creating Media content...
+
+[VRMediaAppController] Projection will be parented to VirtualObjects for zoom support
 
 [VRMediaAppController] Found camera rig: Player
 
@@ -117,13 +114,13 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [VRVideoProjectionSystem] Initialized
 
-[MediaLibraryService] Loading 1311 items from cache (async)...
+[MediaLibraryService] Loading 3172 items from cache (async)...
 
 [VirtualObjectsZoomController] Registered side panel: MediaNavigationPanel (side=-1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
 [RTTMenuFrame] UI built: 640x1080 logical pixels
 
-[RTTMediaLibrary] CreateLeftPanelContent started at 7.033s
+[RTTMediaLibrary] CreateLeftPanelContent started at 6.085s
 
 [HoverEffectController] AddEffect 'scale' to Item_all, TargetVisuals=Item_all
 
@@ -153,13 +150,13 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [HoverEffectController] AddEffect 'color' to Item_playlists, TargetVisuals=Item_playlists
 
-[RTTMediaLibrary] Left panel content created at 7.043s
+[RTTMediaLibrary] Left panel content created at 6.097s
 
 [VirtualObjectsZoomController] Registered side panel: MediaDetailPanel (side=1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
-[RTTMediaLibrary] CreateRightPanelContent started at 7.049s
+[RTTMediaLibrary] CreateRightPanelContent started at 6.100s
 
-[RTTMediaLibrary] Right panel content created at 7.076s
+[RTTMediaLibrary] Right panel content created at 6.125s
 
 [RTTPopupMenu] CreateWorldSpace: layer 'VirtualObjects' = 3, mainCam: VRCamera
 
@@ -167,7 +164,7 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [HoverEffectController] AddEffect 'cursor_change' to HitArea, TargetVisuals=Visuals
 
-[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-442022
+[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-274388
 
 [HoverEffectController] AddEffect 'scale' to Checkbox, TargetVisuals=Checkbox
 
@@ -189,161 +186,59 @@ UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
 [VRMediaAppController] Media app created
 
-[RTTAppManager] Content created: media at 7.190s (+218.0ms)
+[RTTAppManager] Content created: media at 6.237s (+230.1ms)
 
-[RTTAppManager] PrepareDataAsync started: media at 7.190s
+[RTTAppManager] PrepareDataAsync started: media at 6.237s
 
 [RTTMediaLibraryController] PrepareDataAsync started
 
-[RTTAppManager] App prepared (hidden): media at 7.194s (total: 222.1ms)
+[RTTAppManager] App prepared (hidden): media at 6.241s (total: 234.3ms)
 
-[RTTMainMenu] Button animation ended: media at 7.219s (+249.1ms)
+[RTTMainMenu] Button animation ended: media at 6.263s (+259.1ms)
 
-[RTTMainMenu] OpenPreparedApp called: media at 7.219s (+249.2ms)
+[RTTMainMenu] OpenPreparedApp called: media at 6.263s (+259.2ms)
 
-[RTTAppManager] WaitAndSwitch started: media at 7.220s
+[RTTAppManager] WaitAndSwitch started: media at 6.264s
 
-[RTTAppManager] WaitAndSwitch app ready: media at 7.220s (waited 0.1ms)
+[RTTAppManager] WaitAndSwitch app ready: media at 6.264s (waited 0.1ms)
 
-[RTTAppManager] Starting transition: media at 7.220s
+[RTTAppManager] Starting transition: media at 6.264s
 
-[RTTAppManager] Transition started: media at 7.221s
+[RTTAppManager] Transition started: media at 6.265s
 
 [RTTAppManager] Got 3 frames to animate: media
 
-[RTTAppManager] Fade out MainMenu: media at 7.221s
+[RTTAppManager] Fade out MainMenu: media at 6.266s
 
-[RTTMainMenu] Click flow completed: media at 7.222s (total: +252.0ms)
+[RTTMainMenu] Click flow completed: media at 6.266s (total: +261.9ms)
 
-[RTTAppManager] Fade out done: media at 7.336s (+114.7ms)
+[RTTAppManager] Fade out done: media at 6.380s (+114.7ms)
 
 [RTTAppManager] All frames activated with alpha=0: 3 frames
 
-[RTTAppManager] Sync point: media, IsDataReady=False at 7.345s
+[RTTAppManager] Sync point: media, IsDataReady=False at 6.389s
 
-[AppStateCache] Disk cache hit for media
+[AppStateCache] Cache expired for media (age: 50.7h)
 
-[RTTMediaGridItem] Duration badge for 'ZZenlessZoneZero 2026-02-03 12-19-36': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+[AppStateCache] Cache miss for media
 
-[Cache] DISK READ: 0ms (234KB)
+[RTTMediaLibraryController] TryRestoreCachedState: No cache found
 
-[Cache] DISK DECODE: 4ms (512x288)
+[RTTAppManager] TryRestoreCachedState: media, success=False
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\ZZenlessZoneZero 2026-02-03 12-19-36.mp4
+[RTTAppManager] No cache - BindCachedDataOrEmpty: media
 
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\ZZenlessZoneZero 2026-02-03 12-19-36.mp4
-
-[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (16KB)
-
-[Cache] DISK DECODE: 0ms (512x267)
-
-[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 17-52-22': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (119KB)
-
-[Cache] DISK DECODE: 3ms (512x267)
-
-[RTTMediaGridItem] Duration badge for 'videoplayback': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (206KB)
-
-[RTTMediaGridItem] Duration badge for 'Genshin-Impact 2026-1-26 12-24-11': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (191KB)
-
-[RTTMediaGridItem] Duration badge for 'video_client': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (116KB)
-
-[Cache] DISK DECODE: 2ms (512x230)
-
-[RTTMediaGridItem] Duration badge for 'Phàm Nhân Tu Tiên Tập 173 Vietsub': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (131KB)
-
-[Cache] DISK DECODE: 3ms (512x288)
-
-[RTTMediaGridItem] Duration badge for '7295785205012': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[RTTMediaGrid] Auto-selecting first item: ZZenlessZoneZero 2026-02-03 12-19-36
-
-[Detail] REQUEST: ZZenlessZoneZero 2026-02-03 12-19-36.mp4
-
-[Cache] DISK READ: 0ms (235KB)
-
-[Detail] RECEIVED: ZZenlessZoneZero 2026-02-03 12-19-36.mp4 wait=22ms assign=0ms
-
-[Detail] UpdateInfo: ZZenlessZoneZero 2026-02-03 12-19-36.mp4 name=0ms preview=23ms metadata=11ms total=34ms
-
-[RTTMediaGrid] Progressive binding started: 8 items queued, budgetMs=6
-
-[RTTMediaGridItem] Duration badge for '7077543476647': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (270KB)
-
-[Cache] DISK DECODE: 4ms (512x230)
-
-[RTTMediaLibraryController] TryRestoreCachedState: Restored 16 items from cache (filtered from 16, skipped 0 deleted)
-
-[RTTAppManager] TryRestoreCachedState: media, success=True
+[RTTMediaLibraryController] BindCachedDataOrEmpty: No cache, showing empty grid
 
 [RTTAppManager] Subscribed to OnDataPrepared: media
 
-[RTTAppManager] Fade in started: 3 frames at 7.605s
+[RTTAppManager] Fade in started: 3 frames at 6.407s
 
-[RTTMediaGridItem] Duration badge for '7065774217733': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+[RTTAppManager] Fade in done: media at 6.532s (+267.1ms)
 
-[Cache] DISK READ: 0ms (75KB)
-
-[Cache] DISK DECODE: 2ms (512x238)
-
-[RTTMediaGridItem] Duration badge for 'Genshin_Impact_2025-09-10_11-32-27': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (283KB)
-
-[Cache] DISK DECODE: 5ms (512x288)
-
-[RTTMediaGridItem] Duration badge for 'FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD)': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (156KB)
-
-[MediaLibraryService] Loaded 1311 items from cache in 708ms (async, no File.Exists)
-
-[RTTMediaLibraryController] HandleCacheLoaded called
-
-[Cache] DISK READ: 0ms (247KB)
-
-[Cache] DISK READ: 0ms (115KB)
-
-[Cache] DISK READ: 0ms (109KB)
-
-[Cache] DISK READ: 0ms (199KB)
-
-[Cache] DISK READ: 0ms (113KB)
-
-[Cache] DISK DECODE: 2ms (512x288)
-
-[Cache] DISK READ: 0ms (120KB)
-
-[Cache] DISK READ: 0ms (265KB)
-
-[Detail] RECEIVED: ZZenlessZoneZero 2026-02-03 12-19-36.mp4 wait=0ms assign=0ms
-
-[Detail] UpdateInfo: ZZenlessZoneZero 2026-02-03 12-19-36.mp4 name=0ms preview=1ms metadata=7ms total=8ms
-
-[RTTAppManager] Fade in done: media at 7.911s (+690.1ms)
-
-[RTTAppManager] OnAppShown called: media at 7.911s
+[RTTAppManager] OnAppShown called: media at 6.533s
 
 [RTTMediaLibraryController] OnAppShown called, _view=exists
-
-[AppStateCache] Saved state for media with 16 items
-
-[RTTMediaLibraryController] CacheCurrentState: Cached 16 items
-
-[RTTAppManager] State cached after transition: media
 
 [RTTTaskbar] RegisterApp called - slotIndex=1, icon=icon_media
 
@@ -361,223 +256,99 @@ Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling b
 
 [RTTTaskbar] SelectSlot(1) called, current active: 1
 
-[RTTAppManager] Transition completed: media at 7.938s (total: 716.9ms)
+[RTTAppManager] Transition completed: media at 6.544s (total: 278.9ms)
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
+[MediaLibraryService] Loaded 3172 items from cache in 722ms (async, no File.Exists)
 
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
+[RTTMediaLibraryController] HandleCacheLoaded called
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 17-52-22.mp4
+[RTTMediaGridItem] Duration badge for 'ZZenlessZoneZero 2026-02-03 12-19-36': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 17-52-22.mp4
+[Cache] DISK READ: 0ms (247KB)
 
-First video frame not zero: 2 (0.066667s). Result may be out of sync. Please make sure tracks all start at 0 in C:\Users\Admin\Downloads\videoplayback.mp4
+[Cache] DISK DECODE: 8ms (512x288)
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\Genshin-Impact 2026-1-26 12-24-11.mp4
+[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\Genshin-Impact 2026-1-26 12-24-11.mp4
+[Cache] DISK READ: 0ms (115KB)
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Video\Phàm Nhân Tu Tiên Tập 173 Vietsub.mp4
+[Cache] DISK DECODE: 3ms (512x267)
 
-[MediaLibraryService] Starting background scan (existing: 1311 items)
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\ZZenlessZoneZero 2026-02-03 12-19-36.mp4
 
-[RTTMediaLibrary] Creating 2 breadcrumb segments for: All Media > Music
+[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 17-52-22': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[RTTMediaLibrary] Created 2 breadcrumb pills for path: All Media > Music
+[Cache] DISK READ: 3ms (109KB)
 
-[RTTMediaGridItem] Duration badge for '01. Moon Halo (feat. Chalili, TetraCalyx & Hanser) [Honkai Impact 3rd ''Everlasting Flames'' Animated Short Theme]': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+[RTTMediaGridItem] Duration badge for 'videoplayback': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[RTTMediaGrid] Auto-selecting first item: 01. Moon Halo (feat. Chalili, TetraCalyx & Hanser) [Honkai Impact 3rd ''Everlasting Flames'' Animated Short Theme]
+[Cache] DISK READ: 0ms (206KB)
 
-[Detail] REQUEST: 01. Moon Halo (feat. Chalili, TetraCalyx & Hanser) [Honkai Impact 3rd ''Everlasting Flames'' Animated Short Theme].mp3
+[Cache] DISK DECODE: 3ms (512x288)
 
-[Detail] RECEIVED: 01. Moon Halo (feat. Chalili, TetraCalyx & Hanser) [Honkai Impact 3rd ''Everlasting Flames'' Animated Short Theme].mp3 wait=22ms assign=0ms
+[RTTMediaGridItem] Duration badge for 'Genshin-Impact 2026-1-26 12-24-11': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[Detail] UpdateInfo: 01. Moon Halo (feat. Chalili, TetraCalyx & Hanser) [Honkai Impact 3rd ''Everlasting Flames'' Animated Short Theme].mp3 name=3ms preview=23ms metadata=9ms total=35ms
+[Cache] DISK READ: 0ms (199KB)
 
-[Detail] RECEIVED: 01. Moon Halo (feat. Chalili, TetraCalyx & Hanser) [Honkai Impact 3rd ''Everlasting Flames'' Animated Short Theme].mp3 wait=13ms assign=0ms
+[Cache] DISK DECODE: 4ms (512x288)
 
-[Detail] UpdateInfo: 01. Moon Halo (feat. Chalili, TetraCalyx & Hanser) [Honkai Impact 3rd ''Everlasting Flames'' Animated Short Theme].mp3 name=0ms preview=14ms metadata=9ms total=23ms
+[RTTMediaGridItem] Duration badge for 'Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[MediaLibraryService] Background scan complete - no changes (656ms)
+[Cache] DISK READ: 0ms (85KB)
 
-[VRMediaAppController] HideLibraryUI - hiding all menu frames for video playback
+[Cache] DISK DECODE: 1ms (512x213)
 
-[HoverEffectController] AddEffect 'scale' to Btn_<, TargetVisuals=
+[RTTMediaGridItem] Duration badge for 'video_client': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[HoverEffectController] AddEffect 'scale' to Btn_<<, TargetVisuals=
+[Cache] DISK READ: 0ms (116KB)
 
-[HoverEffectController] AddEffect 'scale' to Btn_Play, TargetVisuals=
+[Cache] DISK DECODE: 2ms (512x230)
 
-[HoverEffectController] AddEffect 'scale' to Btn_>>, TargetVisuals=
+[RTTMediaGridItem] Duration badge for 'Phàm Nhân Tu Tiên Tập 173 Vietsub': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[HoverEffectController] AddEffect 'scale' to Btn_Vol, TargetVisuals=
+[Cache] DISK READ: 0ms (113KB)
 
-[HoverEffectController] AddEffect 'scale' to Btn_1x, TargetVisuals=
+[Cache] DISK DECODE: 2ms (512x288)
 
-[HoverEffectController] AddEffect 'scale' to Btn_..., TargetVisuals=
+[RTTMediaGrid] Auto-selecting first item: ZZenlessZoneZero 2026-02-03 12-19-36
 
-Coroutine couldn't be started because the the game object 'LoadingOverlay' is inactive!
-UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
-MediaLoadingOverlay:Hide () (at Assets/VR-Workspace/Scripts/Media/UI/MediaLoadingOverlay.cs:237)
-MediaLoadingOverlay:Initialize (TMPro.TMP_FontAsset,UnityEngine.Color) (at Assets/VR-Workspace/Scripts/Media/UI/MediaLoadingOverlay.cs:39)
-VRMediaAppController:BuildPlayerUI () (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:443)
-VRMediaAppController:ShowPlayerUI () (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:502)
-VRMediaAppController:SwitchToPlayer (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:218)
-VRMediaAppController:HandleLibraryPlayRequested (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:522)
-RTTMediaLibraryController:HandleVideoPlayRequested (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:1519)
-RTTMediaLibrary:OnPlayButtonClicked () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:2133)
-RTTMediaActionBar:<CreateButtons>b__53_0 () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaActionBar.cs:459)
-UnityEngine.EventSystems.ExecuteEvents:Execute<UnityEngine.EventSystems.IPointerClickHandler> (UnityEngine.GameObject,UnityEngine.EventSystems.BaseEventData,UnityEngine.EventSystems.ExecuteEvents/EventFunction`1<UnityEngine.EventSystems.IPointerClickHandler>)
-VRGazeReticle:HandlePointerClick (UnityEngine.GameObject,UnityEngine.Vector2) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:1366)
-VRGazeReticle:ProcessDwellClick (UnityEngine.Vector3,UnityEngine.GameObject,UnityEngine.RaycastHit) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:1180)
-VRGazeReticle:CheckGaze () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:555)
-VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:314)
+[Detail] REQUEST: ZZenlessZoneZero 2026-02-03 12-19-36.mp4
 
-[HoverEffectController] AddEffect 'scale' to Btn_Go Back, TargetVisuals=
+[Cache] DISK READ: 0ms (235KB)
 
-[HoverEffectController] AddEffect 'scale' to Btn_Retry, TargetVisuals=
+[Detail] RECEIVED: ZZenlessZoneZero 2026-02-03 12-19-36.mp4 wait=41ms assign=0ms
 
-Coroutine couldn't be started because the the game object 'ErrorDialog' is inactive!
-UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
-MediaErrorDialog:Hide () (at Assets/VR-Workspace/Scripts/Media/UI/MediaErrorDialog.cs:358)
-MediaErrorDialog:Initialize (TMPro.TMP_FontAsset,UnityEngine.Color,UnityEngine.Color) (at Assets/VR-Workspace/Scripts/Media/UI/MediaErrorDialog.cs:62)
-VRMediaAppController:BuildPlayerUI () (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:456)
-VRMediaAppController:ShowPlayerUI () (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:502)
-VRMediaAppController:SwitchToPlayer (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:218)
-VRMediaAppController:HandleLibraryPlayRequested (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:522)
-RTTMediaLibraryController:HandleVideoPlayRequested (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:1519)
-RTTMediaLibrary:OnPlayButtonClicked () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:2133)
-RTTMediaActionBar:<CreateButtons>b__53_0 () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaActionBar.cs:459)
-UnityEngine.EventSystems.ExecuteEvents:Execute<UnityEngine.EventSystems.IPointerClickHandler> (UnityEngine.GameObject,UnityEngine.EventSystems.BaseEventData,UnityEngine.EventSystems.ExecuteEvents/EventFunction`1<UnityEngine.EventSystems.IPointerClickHandler>)
-VRGazeReticle:HandlePointerClick (UnityEngine.GameObject,UnityEngine.Vector2) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:1366)
-VRGazeReticle:ProcessDwellClick (UnityEngine.Vector3,UnityEngine.GameObject,UnityEngine.RaycastHit) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:1180)
-VRGazeReticle:CheckGaze () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:555)
-VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:314)
+[Detail] UpdateInfo: ZZenlessZoneZero 2026-02-03 12-19-36.mp4 name=0ms preview=42ms metadata=11ms total=53ms
 
-[MediaEnvironmentController] 'Environment' tag not defined, skipping tag search
-UnityEngine.Debug:LogWarning (object)
-MediaEnvironmentController:FindEnvironmentRoot () (at Assets/VR-Workspace/Scripts/Media/Core/MediaEnvironmentController.cs:124)
-MediaEnvironmentController:Initialize (UnityEngine.GameObject) (at Assets/VR-Workspace/Scripts/Media/Core/MediaEnvironmentController.cs:78)
-VRVideoPlayerController:Initialize (VideoPlaybackEngine,VRVideoProjectionSystem,RTTMediaControlsPanel) (at Assets/VR-Workspace/Scripts/Media/Core/VRVideoPlayerController.cs:58)
-VRMediaAppController:BuildPlayerUI () (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:466)
-VRMediaAppController:ShowPlayerUI () (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:502)
-VRMediaAppController:SwitchToPlayer (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:218)
-VRMediaAppController:HandleLibraryPlayRequested (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:522)
-RTTMediaLibraryController:HandleVideoPlayRequested (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:1519)
-RTTMediaLibrary:OnPlayButtonClicked () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:2133)
-RTTMediaActionBar:<CreateButtons>b__53_0 () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaActionBar.cs:459)
-UnityEngine.EventSystems.ExecuteEvents:Execute<UnityEngine.EventSystems.IPointerClickHandler> (UnityEngine.GameObject,UnityEngine.EventSystems.BaseEventData,UnityEngine.EventSystems.ExecuteEvents/EventFunction`1<UnityEngine.EventSystems.IPointerClickHandler>)
-VRGazeReticle:HandlePointerClick (UnityEngine.GameObject,UnityEngine.Vector2) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:1366)
-VRGazeReticle:ProcessDwellClick (UnityEngine.Vector3,UnityEngine.GameObject,UnityEngine.RaycastHit) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:1180)
-VRGazeReticle:CheckGaze () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:555)
-VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:314)
+[RTTMediaGrid] Progressive binding started: 9 items queued, budgetMs=6
 
-[MediaEnvironmentController] Could not find environment root - environment control will be limited
-UnityEngine.Debug:LogWarning (object)
-MediaEnvironmentController:FindEnvironmentRoot () (at Assets/VR-Workspace/Scripts/Media/Core/MediaEnvironmentController.cs:127)
-MediaEnvironmentController:Initialize (UnityEngine.GameObject) (at Assets/VR-Workspace/Scripts/Media/Core/MediaEnvironmentController.cs:78)
-VRVideoPlayerController:Initialize (VideoPlaybackEngine,VRVideoProjectionSystem,RTTMediaControlsPanel) (at Assets/VR-Workspace/Scripts/Media/Core/VRVideoPlayerController.cs:58)
-VRMediaAppController:BuildPlayerUI () (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:466)
-VRMediaAppController:ShowPlayerUI () (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:502)
-VRMediaAppController:SwitchToPlayer (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:218)
-VRMediaAppController:HandleLibraryPlayRequested (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:522)
-RTTMediaLibraryController:HandleVideoPlayRequested (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:1519)
-RTTMediaLibrary:OnPlayButtonClicked () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:2133)
-RTTMediaActionBar:<CreateButtons>b__53_0 () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaActionBar.cs:459)
-UnityEngine.EventSystems.ExecuteEvents:Execute<UnityEngine.EventSystems.IPointerClickHandler> (UnityEngine.GameObject,UnityEngine.EventSystems.BaseEventData,UnityEngine.EventSystems.ExecuteEvents/EventFunction`1<UnityEngine.EventSystems.IPointerClickHandler>)
-VRGazeReticle:HandlePointerClick (UnityEngine.GameObject,UnityEngine.Vector2) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:1366)
-VRGazeReticle:ProcessDwellClick (UnityEngine.Vector3,UnityEngine.GameObject,UnityEngine.RaycastHit) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:1180)
-VRGazeReticle:CheckGaze () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:555)
-VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:314)
+[RTTMediaGridItem] Duration badge for '7295785205012': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[MediaEnvironmentController] Cached 103 room lights
+[Cache] DISK READ: 0ms (120KB)
 
-[MediaEnvironmentController] Initialized
+[Detail] RECEIVED: ZZenlessZoneZero 2026-02-03 12-19-36.mp4 wait=0ms assign=0ms
 
-[VRVideoPlayerController] Environment controller initialized
+[Detail] UpdateInfo: ZZenlessZoneZero 2026-02-03 12-19-36.mp4 name=0ms preview=0ms metadata=9ms total=9ms
 
-[VRVideoPlayerController] Initialized
+[RTTMediaGridItem] Duration badge for '7077543476647': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[VRMediaAppController] Player UI built
+[Cache] DISK READ: 0ms (265KB)
 
-Coroutine couldn't be started because the the game object 'ControlsPanel' is inactive!
-UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
-RTTMediaControlsPanel:Show () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaControlsPanel.cs:387)
-VRMediaAppController:ShowPlayerUI () (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:508)
-VRMediaAppController:SwitchToPlayer (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:218)
-VRMediaAppController:HandleLibraryPlayRequested (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:522)
-RTTMediaLibraryController:HandleVideoPlayRequested (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:1519)
-RTTMediaLibrary:OnPlayButtonClicked () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:2133)
-RTTMediaActionBar:<CreateButtons>b__53_0 () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaActionBar.cs:459)
-UnityEngine.EventSystems.ExecuteEvents:Execute<UnityEngine.EventSystems.IPointerClickHandler> (UnityEngine.GameObject,UnityEngine.EventSystems.BaseEventData,UnityEngine.EventSystems.ExecuteEvents/EventFunction`1<UnityEngine.EventSystems.IPointerClickHandler>)
-VRGazeReticle:HandlePointerClick (UnityEngine.GameObject,UnityEngine.Vector2) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:1366)
-VRGazeReticle:ProcessDwellClick (UnityEngine.Vector3,UnityEngine.GameObject,UnityEngine.RaycastHit) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:1180)
-VRGazeReticle:CheckGaze () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:555)
-VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:314)
+[Cache] DISK DECODE: 4ms (512x230)
 
-[VRVideoPlayerController] Playing: 01. Moon Halo (feat. Chalili, TetraCalyx & Hanser) [Honkai Impact 3rd ''Everlasting Flames'' Animated Short Theme], Projection: Flat, Stereo: Mono
+[RTTMediaGridItem] Duration badge for '7065774217733': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[VRVideoProjectionSystem] Set projection: Flat, stereo: Mono
+[Cache] DISK READ: 0ms (75KB)
 
-[VRVideoPlayerController] Projection configured: distance=2, scale=1
+[Cache] DISK DECODE: 2ms (512x238)
 
-VideoPlayer cannot play url : file://C:\Users\Admin\Downloads\01. Moon Halo (feat. Chalili, TetraCalyx & Hanser) [Honkai Impact 3rd ''Everlasting Flames'' Animated Short Theme].mp3
-UnityEngine.StackTraceUtility:ExtractStackTrace ()
-VideoPlaybackEngine:PrepareLocal (string) (at Assets/VR-Workspace/Scripts/Media/Core/VideoPlaybackEngine.cs:213)
-VRVideoPlayerController:PlayVideo (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRVideoPlayerController.cs:189)
-VRMediaAppController:StartPlayback (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:261)
-VRMediaAppController:SwitchToPlayer (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:221)
-VRMediaAppController:HandleLibraryPlayRequested (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:522)
-RTTMediaLibraryController:HandleVideoPlayRequested (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:1519)
-RTTMediaLibrary:OnPlayButtonClicked () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:2133)
-RTTMediaActionBar:<CreateButtons>b__53_0 () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaActionBar.cs:459)
-UnityEngine.EventSystems.ExecuteEvents:Execute<UnityEngine.EventSystems.IPointerClickHandler> (UnityEngine.GameObject,UnityEngine.EventSystems.BaseEventData,UnityEngine.EventSystems.ExecuteEvents/EventFunction`1<UnityEngine.EventSystems.IPointerClickHandler>)
-VRGazeReticle:HandlePointerClick (UnityEngine.GameObject,UnityEngine.Vector2) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:1366)
-VRGazeReticle:ProcessDwellClick (UnityEngine.Vector3,UnityEngine.GameObject,UnityEngine.RaycastHit) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:1180)
-VRGazeReticle:CheckGaze () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:555)
-VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:314)
+[RTTMediaGridItem] Duration badge for 'Genshin_Impact_2025-09-10_11-32-27': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-Coroutine couldn't be started because the the game object 'ControlsPanel' is inactive!
-UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
-RTTMediaControlsPanel:Show () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaControlsPanel.cs:387)
-VRVideoPlayerController:PlayVideo (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRVideoPlayerController.cs:198)
-VRMediaAppController:StartPlayback (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:261)
-VRMediaAppController:SwitchToPlayer (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:221)
-VRMediaAppController:HandleLibraryPlayRequested (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:522)
-RTTMediaLibraryController:HandleVideoPlayRequested (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:1519)
-RTTMediaLibrary:OnPlayButtonClicked () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:2133)
-RTTMediaActionBar:<CreateButtons>b__53_0 () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaActionBar.cs:459)
-UnityEngine.EventSystems.ExecuteEvents:Execute<UnityEngine.EventSystems.IPointerClickHandler> (UnityEngine.GameObject,UnityEngine.EventSystems.BaseEventData,UnityEngine.EventSystems.ExecuteEvents/EventFunction`1<UnityEngine.EventSystems.IPointerClickHandler>)
-VRGazeReticle:HandlePointerClick (UnityEngine.GameObject,UnityEngine.Vector2) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:1366)
-VRGazeReticle:ProcessDwellClick (UnityEngine.Vector3,UnityEngine.GameObject,UnityEngine.RaycastHit) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:1180)
-VRGazeReticle:CheckGaze () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:555)
-VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:314)
+[Cache] DISK READ: 0ms (283KB)
 
-[VRMediaAppController] Switched to Player mode: 01. Moon Halo (feat. Chalili, TetraCalyx & Hanser) [Honkai Impact 3rd ''Everlasting Flames'' Animated Short Theme]
+[RTTMediaGridItem] Duration badge for 'FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD)': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[VideoPlaybackEngine] Error: VideoPlayer cannot play url : file://C:\Users\Admin\Downloads\01. Moon Halo (feat. Chalili, TetraCalyx & Hanser) [Honkai Impact 3rd ''Everlasting Flames'' Animated Short Theme].mp3
-UnityEngine.Debug:LogError (object)
-VideoPlaybackEngine:SetError (string) (at Assets/VR-Workspace/Scripts/Media/Core/VideoPlaybackEngine.cs:325)
-VideoPlaybackEngine:OnVideoError (UnityEngine.Video.VideoPlayer,string) (at Assets/VR-Workspace/Scripts/Media/Core/VideoPlaybackEngine.cs:447)
-UnityEngine.Video.VideoPlayer:InvokeErrorReceivedCallback_Internal (UnityEngine.Video.VideoPlayer,string)
-
-[VRVideoPlayerController] Playback error: VideoPlayer cannot play url : file://C:\Users\Admin\Downloads\01. Moon Halo (feat. Chalili, TetraCalyx & Hanser) [Honkai Impact 3rd ''Everlasting Flames'' Animated Short Theme].mp3
-UnityEngine.Debug:LogError (object)
-VRVideoPlayerController:HandlePlaybackError (string) (at Assets/VR-Workspace/Scripts/Media/Core/VRVideoPlayerController.cs:462)
-VideoPlaybackEngine:SetError (string) (at Assets/VR-Workspace/Scripts/Media/Core/VideoPlaybackEngine.cs:327)
-VideoPlaybackEngine:OnVideoError (UnityEngine.Video.VideoPlayer,string) (at Assets/VR-Workspace/Scripts/Media/Core/VideoPlaybackEngine.cs:447)
-UnityEngine.Video.VideoPlayer:InvokeErrorReceivedCallback_Internal (UnityEngine.Video.VideoPlayer,string)
-
-[MediaEnvironmentController] Reset to default state
-
-[VRMediaAppController] ShowLibraryUI
-
-[VRMediaAppController] Switched to Library mode
-
-[Detail] UpdateInfo: ZZenlessZoneZero 2026-02-03 12-19-36.mp4 name=0ms preview=0ms metadata=8ms total=8ms
-
-[Cache] DISK READ: 0ms (165KB)
+[Cache] DISK READ: 3ms (165KB)
 
 [RTTMediaGridItem] Duration badge for 'Honkai  Star Rail 2025.05.21 - 15.03.08.01': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
@@ -587,11 +358,11 @@ UnityEngine.Video.VideoPlayer:InvokeErrorReceivedCallback_Internal (UnityEngine.
 
 [Cache] DISK READ: 0ms (38KB)
 
+[Cache] DISK DECODE: 1ms (512x288)
+
 [RTTMediaGridItem] Duration badge for 'vết xước 2': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
 [Cache] DISK READ: 0ms (48KB)
-
-[Cache] DISK DECODE: 1ms (512x288)
 
 [RTTMediaGridItem] Duration badge for 'vết xước 1': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
@@ -599,266 +370,107 @@ UnityEngine.Video.VideoPlayer:InvokeErrorReceivedCallback_Internal (UnityEngine.
 
 [Cache] DISK DECODE: 2ms (512x284)
 
-[Detail] UpdateInfo: ZZenlessZoneZero 2026-02-03 12-19-36.mp4 name=0ms preview=0ms metadata=10ms total=10ms
+[RTTMediaGrid] Progressive binding complete: bound=1, skipped=8
 
-[RTTMediaGrid] Progressive binding complete: bound=2, skipped=6
+[MediaLibraryService] Starting background scan (existing: 3172 items)
 
-[MediaLibraryService] Background scan skipped - already scanning
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
 
-[MediaLibraryService] Background scan complete - no changes (726ms)
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 17-52-22.mp4
+
+First video frame not zero: 2 (0.066667s). Result may be out of sync. Please make sure tracks all start at 0 in C:\Users\Admin\Downloads\videoplayback.mp4
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\Genshin-Impact 2026-1-26 12-24-11.mp4
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Video\Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D.mp4
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Video\Phàm Nhân Tu Tiên Tập 173 Vietsub.mp4
+
+[MediaLibraryService] Background scan complete - no changes (1257ms)
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Genshin_Impact_2025-09-10_11-32-27.mp4
-
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Downloads\Genshin_Impact_2025-09-10_11-32-27.mp4
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Compressed\FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD).mp4
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\New folder\khác màu.mp4
 
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\New folder\khác màu.mp4
-
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\New folder\vết xước 2.mp4
 
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\New folder\vết xước 2.mp4
+[VRMediaAppController] HideLibraryUI - hiding all menu frames for video playback
 
-[RTTMediaLibrary] Creating 2 breadcrumb segments for: All Media > Images
+[VRMediaAppController] Saved menu frame position: (0.01, 0.00, 1.80), rotation: (0.00, 0.40, 0.00)
 
-[RTTMediaLibrary] Created 2 breadcrumb pills for path: All Media > Images
+[RTTManager] Entered Immersive Mode
 
-Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\New folder\vết xước 1.mp4
+[RTTMenuFrame] UI built: 64x64 logical pixels
 
-[Cache] DISK READ: 0ms (375KB)
+[RTTMenuFrame] UI built: 1770x699.9999 logical pixels
 
-[Cache] DISK DECODE: 7ms (512x512)
+[HoverEffectController] AddEffect 'scale' to Btn_icon_exit, TargetVisuals=Btn_icon_exit
 
-[Cache] DISK READ: 0ms (299KB)
+[HoverEffectController] AddEffect 'color' to Btn_icon_exit, TargetVisuals=Btn_icon_exit
 
-[Cache] DISK DECODE: 6ms (512x512)
+[HoverEffectController] AddEffect 'scale' to Btn_icon_record, TargetVisuals=Btn_icon_record
 
-[Cache] DISK READ: 0ms (99KB)
+[HoverEffectController] AddEffect 'color' to Btn_icon_record, TargetVisuals=Btn_icon_record
 
-[Cache] DISK DECODE: 3ms (512x512)
+[HoverEffectController] AddEffect 'scale' to Btn_icon_recenter, TargetVisuals=Btn_icon_recenter
 
-[Cache] DISK READ: 0ms (2KB)
+[HoverEffectController] AddEffect 'color' to Btn_icon_recenter, TargetVisuals=Btn_icon_recenter
 
-[Cache] DISK DECODE: 0ms (128x128)
+[HoverEffectController] AddEffect 'scale' to Btn_icon_loop, TargetVisuals=Btn_icon_loop
 
-[Cache] DISK READ: 0ms (1KB)
+[HoverEffectController] AddEffect 'color' to Btn_icon_loop, TargetVisuals=Btn_icon_loop
 
-[RTTMediaGrid] Auto-selecting first item: z7493450290573_bcc82eece7f5e5cb0df4f535258627c4
+[HoverEffectController] AddEffect 'scale' to Btn_icon_settings, TargetVisuals=Btn_icon_settings
 
-[Detail] REQUEST: z7493450290573_bcc82eece7f5e5cb0df4f535258627c4.jpg
+[HoverEffectController] AddEffect 'color' to Btn_icon_settings, TargetVisuals=Btn_icon_settings
 
-[Detail] UpdateInfo: z7493450290573_bcc82eece7f5e5cb0df4f535258627c4.jpg name=0ms preview=9ms metadata=7ms total=16ms
+[HoverEffectController] AddEffect 'scale' to Btn_icon_volume, TargetVisuals=Btn_icon_volume
 
-[RTTMediaGrid] Progressive binding started: 2 items queued, budgetMs=6
+[HoverEffectController] AddEffect 'color' to Btn_icon_volume, TargetVisuals=Btn_icon_volume
 
-[Detail] UpdateInfo: z7493450290573_bcc82eece7f5e5cb0df4f535258627c4.jpg name=0ms preview=1ms metadata=5ms total=6ms
+[HoverEffectController] AddEffect 'scale' to Btn_icon_previous, TargetVisuals=Btn_icon_previous
 
-[RTTMediaGrid] Progressive binding complete: bound=2, skipped=0
+[HoverEffectController] AddEffect 'color' to Btn_icon_previous, TargetVisuals=Btn_icon_previous
 
-[FileThumbnailService] Async resize failed: LoadRawTextureData: not enough data provided (will result in overread)., falling back to sync
-UnityEngine.Debug:LogWarning (object)
-FileThumbnailService/<ResizeTextureAsync>d__42:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Services/FileThumbnailService.cs:1101)
-UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
+[HoverEffectController] AddEffect 'scale' to Btn_icon_play, TargetVisuals=Btn_icon_play
 
-[Detail] RECEIVED: z7493450290573_bcc82eece7f5e5cb0df4f535258627c4.jpg wait=234ms assign=0ms
+[HoverEffectController] AddEffect 'color' to Btn_icon_play, TargetVisuals=Btn_icon_play
 
-[Detail] RECEIVED: z7493450290573_bcc82eece7f5e5cb0df4f535258627c4.jpg wait=204ms assign=0ms
+[HoverEffectController] AddEffect 'scale' to Btn_icon_next, TargetVisuals=Btn_icon_next
 
-[MediaLibraryService] Background scan complete - no changes (804ms)
+[HoverEffectController] AddEffect 'color' to Btn_icon_next, TargetVisuals=Btn_icon_next
 
-[Detail] RECEIVED: 01. Moon Halo (feat. Chalili, TetraCalyx & Hanser) [Honkai Impact 3rd ''Everlasting Flames'' Animated Short Theme].mp3 wait=19ms assign=0ms
+[HoverEffectController] AddEffect 'scale' to Btn_icon_enviroment, TargetVisuals=Btn_icon_enviroment
 
-[Detail] UpdateInfo: 01. Moon Halo (feat. Chalili, TetraCalyx & Hanser) [Honkai Impact 3rd ''Everlasting Flames'' Animated Short Theme].mp3 name=0ms preview=19ms metadata=8ms total=27ms
+[HoverEffectController] AddEffect 'color' to Btn_icon_enviroment, TargetVisuals=Btn_icon_enviroment
 
-[Detail] RECEIVED: 01. Moon Halo (feat. Chalili, TetraCalyx & Hanser) [Honkai Impact 3rd ''Everlasting Flames'' Animated Short Theme].mp3 wait=14ms assign=0ms
+[RTTMenuFrame] UI built: 120x120 logical pixels
 
-[Detail] UpdateInfo: 01. Moon Halo (feat. Chalili, TetraCalyx & Hanser) [Honkai Impact 3rd ''Everlasting Flames'' Animated Short Theme].mp3 name=0ms preview=14ms metadata=8ms total=22ms
+[HoverEffectController] AddEffect 'scale' to MenuButton, TargetVisuals=MenuButton
 
-[MediaLibraryService] Background scan complete - no changes (655ms)
+[HoverEffectController] AddEffect 'color' to MenuButton, TargetVisuals=MenuButton
 
-[RTTTaskbar] SelectSlot(0) called, current active: 1
+[MediaEnvironmentController] Cached 0 room lights
 
-[RTTTaskbar] Selected app with slot index 0
+[MediaEnvironmentController] Initialized
 
-[VRVideoProjectionSystem] Disposed
+[VRVideoPlayerController] Environment controller initialized
 
-[VirtualObjectsZoomController] Unregistered side panel: MediaNavigationPanel
+[VRVideoPlayerController] Initialized
 
-[VirtualObjectsZoomController] Unregistered side panel: MediaDetailPanel
+[VRMediaAppController] Player UI built with controls container
 
-[RTTMediaLibrary] Cleanup: Destroying _mediaActionBar
+[VRVideoProjectionSystem] Set target position: (0.01, 0.00, 1.80), rotation: (0.00, 0.40, 0.00)
 
-[VRMediaAppController] Cleanup completed
+[VRVideoPlayerController] Playing: ZZenlessZoneZero 2026-02-03 12-19-36, Projection: Flat, Stereo: Mono
 
-[RTTTaskbar] Unregistered app slot 1, remaining apps: 0
+[VRVideoProjectionSystem] Set projection: Flat, stereo: Mono
 
-[RTTAppManager] Closed app: media
+[VRVideoPlayerController] Projection configured: distance=0, scale=1
 
-Destroying assets is not permitted to avoid data loss.
-If you really want to remove an asset use DestroyImmediate (theObject, true);
-UnityEngine.Object:Destroy (UnityEngine.Object)
-VRWorkspace.UI.HoverEffects.CursorChangeHoverEffect:Cleanup () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Effects/CursorChangeHoverEffect.cs:118)
-VRWorkspace.UI.HoverEffects.HoverEffectController:CleanupEffects () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Core/HoverEffectController.cs:311)
-VRWorkspace.UI.HoverEffects.HoverEffectController:OnDestroy () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Core/HoverEffectController.cs:318)
-
-[RTTMainMenu] Click started: media at 46.339s
-
-[RTTMainMenu] PrepareApp called: media at 46.339s (+0.1ms)
-
-[RTTAppManager] PrepareAppFrameAsync started: media at 46.339s
-
-[RTTAppManager] Frame created: media at 46.340s (+0.2ms)
-
-[RTTMainMenu] Button animation started: media at 46.340s (+0.5ms)
-
-[RTTAppManager] Creating content: media at 46.372s (+33.0ms)
-
-[RTTMediaLibrary] CreateLeftPanelContent started at 46.378s
-
-[RTTMediaLibrary] Left panel content created at 46.383s
-
-[RTTMediaLibrary] CreateRightPanelContent started at 46.384s
-
-[RTTMediaLibrary] Right panel content created at 46.390s
-
-[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-456914
-
-[Detail] UpdateInfo: ZZenlessZoneZero 2026-02-03 12-19-36.mp4 name=0ms preview=0ms metadata=7ms total=7ms
-
-[Detail] UpdateInfo: ZZenlessZoneZero 2026-02-03 12-19-36.mp4 name=0ms preview=0ms metadata=15ms total=15ms
-
-[RTTAppManager] Content created: media at 46.512s (+172.2ms)
-
-[RTTAppManager] PrepareDataAsync started: media at 46.512s
-
-[RTTMediaLibraryController] PrepareDataAsync completed: 1311 videos
-
-[RTTAppManager] App prepared (hidden): media at 46.515s (total: 175.9ms)
-
-[RTTMainMenu] Button animation ended: media at 46.538s (+198.6ms)
-
-[RTTMainMenu] OpenPreparedApp called: media at 46.538s (+198.6ms)
-
-[RTTAppManager] WaitAndSwitch started: media at 46.538s
-
-[RTTAppManager] WaitAndSwitch app ready: media at 46.538s (waited 0.0ms)
-
-[RTTAppManager] Starting transition: media at 46.538s
-
-[RTTAppManager] Transition started: media at 46.538s
-
-[RTTAppManager] Fade out MainMenu: media at 46.538s
-
-[RTTMainMenu] Click flow completed: media at 46.538s (total: +198.8ms)
-
-[RTTAppManager] Fade out done: media at 46.659s (+121.3ms)
-
-[RTTAppManager] Sync point: media, IsDataReady=True at 46.681s
-
-[RTTAppManager] Data ready first - BindPreparedData: media
-
-[RTTMediaLibraryController] BindPreparedData: Bound 16 videos (filtered from 1311 by category 'videos')
-
-[RTTAppManager] Fade in started: 3 frames at 46.707s
-
-[RTTMediaGrid] Progressive binding complete: bound=8, skipped=0
-
-[RTTAppManager] Fade in done: media at 46.812s (+273.9ms)
-
-[RTTAppManager] OnAppShown called: media at 46.812s
-
-[RTTAppManager] Transition completed: media at 46.840s (total: 301.7ms)
-
-[MediaLibraryService] Background scan complete - no changes (592ms)
-
-[Detail] REQUEST: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 17-52-22.mp4
-
-[Cache] DISK READ: 0ms (100KB)
-
-[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 17-52-22.mp4 wait=15ms assign=0ms
-
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 17-52-22.mp4 name=0ms preview=16ms metadata=11ms total=27ms
-
-[Detail] UpdateInfo: ZZenlessZoneZero 2026-02-03 12-19-36.mp4 name=1ms preview=0ms metadata=11ms total=12ms
-
-[Detail] REQUEST: Phàm Nhân Tu Tiên Tập 173 Vietsub.mp4
-
-[Cache] DISK READ: 0ms (106KB)
-
-[Detail] RECEIVED: Phàm Nhân Tu Tiên Tập 173 Vietsub.mp4 wait=17ms assign=0ms
-
-[Detail] UpdateInfo: Phàm Nhân Tu Tiên Tập 173 Vietsub.mp4 name=0ms preview=18ms metadata=11ms total=29ms
-
-Coroutine couldn't be started because the the game object 'LoadingOverlay' is inactive!
-UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
-MediaLoadingOverlay:Hide () (at Assets/VR-Workspace/Scripts/Media/UI/MediaLoadingOverlay.cs:237)
-MediaLoadingOverlay:Initialize (TMPro.TMP_FontAsset,UnityEngine.Color) (at Assets/VR-Workspace/Scripts/Media/UI/MediaLoadingOverlay.cs:39)
-VRMediaAppController:BuildPlayerUI () (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:443)
-VRMediaAppController:ShowPlayerUI () (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:502)
-VRMediaAppController:SwitchToPlayer (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:218)
-VRMediaAppController:HandleLibraryPlayRequested (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:522)
-RTTMediaLibraryController:HandleVideoPlayRequested (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:1519)
-RTTMediaLibrary:OnPlayButtonClicked () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:2133)
-RTTMediaActionBar:<CreateButtons>b__53_0 () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaActionBar.cs:459)
-UnityEngine.EventSystems.ExecuteEvents:Execute<UnityEngine.EventSystems.IPointerClickHandler> (UnityEngine.GameObject,UnityEngine.EventSystems.BaseEventData,UnityEngine.EventSystems.ExecuteEvents/EventFunction`1<UnityEngine.EventSystems.IPointerClickHandler>)
-VRGazeReticle:HandlePointerClick (UnityEngine.GameObject,UnityEngine.Vector2) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:1366)
-VRGazeReticle:ProcessDwellClick (UnityEngine.Vector3,UnityEngine.GameObject,UnityEngine.RaycastHit) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:1180)
-VRGazeReticle:CheckGaze () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:555)
-VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:314)
-
-Coroutine couldn't be started because the the game object 'ErrorDialog' is inactive!
-UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
-MediaErrorDialog:Hide () (at Assets/VR-Workspace/Scripts/Media/UI/MediaErrorDialog.cs:358)
-MediaErrorDialog:Initialize (TMPro.TMP_FontAsset,UnityEngine.Color,UnityEngine.Color) (at Assets/VR-Workspace/Scripts/Media/UI/MediaErrorDialog.cs:62)
-VRMediaAppController:BuildPlayerUI () (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:456)
-VRMediaAppController:ShowPlayerUI () (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:502)
-VRMediaAppController:SwitchToPlayer (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:218)
-VRMediaAppController:HandleLibraryPlayRequested (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:522)
-RTTMediaLibraryController:HandleVideoPlayRequested (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:1519)
-RTTMediaLibrary:OnPlayButtonClicked () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:2133)
-RTTMediaActionBar:<CreateButtons>b__53_0 () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaActionBar.cs:459)
-UnityEngine.EventSystems.ExecuteEvents:Execute<UnityEngine.EventSystems.IPointerClickHandler> (UnityEngine.GameObject,UnityEngine.EventSystems.BaseEventData,UnityEngine.EventSystems.ExecuteEvents/EventFunction`1<UnityEngine.EventSystems.IPointerClickHandler>)
-VRGazeReticle:HandlePointerClick (UnityEngine.GameObject,UnityEngine.Vector2) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:1366)
-VRGazeReticle:ProcessDwellClick (UnityEngine.Vector3,UnityEngine.GameObject,UnityEngine.RaycastHit) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:1180)
-VRGazeReticle:CheckGaze () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:555)
-VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:314)
-
-Coroutine couldn't be started because the the game object 'ControlsPanel' is inactive!
-UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
-RTTMediaControlsPanel:Show () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaControlsPanel.cs:387)
-VRMediaAppController:ShowPlayerUI () (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:508)
-VRMediaAppController:SwitchToPlayer (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:218)
-VRMediaAppController:HandleLibraryPlayRequested (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:522)
-RTTMediaLibraryController:HandleVideoPlayRequested (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:1519)
-RTTMediaLibrary:OnPlayButtonClicked () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:2133)
-RTTMediaActionBar:<CreateButtons>b__53_0 () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaActionBar.cs:459)
-UnityEngine.EventSystems.ExecuteEvents:Execute<UnityEngine.EventSystems.IPointerClickHandler> (UnityEngine.GameObject,UnityEngine.EventSystems.BaseEventData,UnityEngine.EventSystems.ExecuteEvents/EventFunction`1<UnityEngine.EventSystems.IPointerClickHandler>)
-VRGazeReticle:HandlePointerClick (UnityEngine.GameObject,UnityEngine.Vector2) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:1366)
-VRGazeReticle:ProcessDwellClick (UnityEngine.Vector3,UnityEngine.GameObject,UnityEngine.RaycastHit) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:1180)
-VRGazeReticle:CheckGaze () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:555)
-VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:314)
-
-[VRVideoPlayerController] Playing: Phàm Nhân Tu Tiên Tập 173 Vietsub, Projection: Flat, Stereo: Mono
-
-Coroutine couldn't be started because the the game object 'ControlsPanel' is inactive!
-UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
-RTTMediaControlsPanel:Show () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaControlsPanel.cs:387)
-VRVideoPlayerController:PlayVideo (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRVideoPlayerController.cs:198)
-VRMediaAppController:StartPlayback (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:261)
-VRMediaAppController:SwitchToPlayer (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:221)
-VRMediaAppController:HandleLibraryPlayRequested (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:522)
-RTTMediaLibraryController:HandleVideoPlayRequested (MediaVideoInfo) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:1519)
-RTTMediaLibrary:OnPlayButtonClicked () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:2133)
-RTTMediaActionBar:<CreateButtons>b__53_0 () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaActionBar.cs:459)
-UnityEngine.EventSystems.ExecuteEvents:Execute<UnityEngine.EventSystems.IPointerClickHandler> (UnityEngine.GameObject,UnityEngine.EventSystems.BaseEventData,UnityEngine.EventSystems.ExecuteEvents/EventFunction`1<UnityEngine.EventSystems.IPointerClickHandler>)
-VRGazeReticle:HandlePointerClick (UnityEngine.GameObject,UnityEngine.Vector2) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:1366)
-VRGazeReticle:ProcessDwellClick (UnityEngine.Vector3,UnityEngine.GameObject,UnityEngine.RaycastHit) (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:1180)
-VRGazeReticle:CheckGaze () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:555)
-VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:314)
-
-[VRMediaAppController] Switched to Player mode: Phàm Nhân Tu Tiên Tập 173 Vietsub
+[VRMediaAppController] Switched to Player mode: ZZenlessZoneZero 2026-02-03 12-19-36
 
 [VRVideoPlayerController] Video prepared
 
@@ -870,19 +482,46 @@ VRGazeReticle:Update () (at Assets/VR-Workspace/Scripts/Input/VRGazeReticle.cs:3
 
 [VRVideoPlayerController] Calling ProjectionSystem.Show()
 
-[FlatProjectionRenderer] Show - screen at position: (-5.23, 1.50, 10.63), scale: (1.78, 1.00, 1.00)
-
 [VRVideoPlayerController] Projection visible: True, ActiveRenderer: FlatProjectionRenderer
 
 [VRVideoPlayerController] Starting auto-play
 
-[VideoPlaybackEngine] Video prepared: 1920x1080, 1118.9s, 25.0fps
+[VideoPlaybackEngine] Video prepared: 1920x1080, 12.1s, 30.2fps
 
-[VirtualObjectsZoomController] Zoom set to 1.70m (delta: -0.100m)
+[VRVideoPlayerController] HandleRecenter called - starting VR recenter
 
-[VirtualObjectsZoomController] Zoom set to 1.60m (delta: -0.100m)
+[VRVideoPlayerController] VR recenter complete.
 
-[VirtualObjectsZoomController] Zoom set to 1.70m (delta: 0.100m)
+[VRVideoPlayerController] Playback ended
 
-[VirtualObjectsZoomController] Zoom set to 1.80m (delta: 0.100m)
+[VRSliderControl] OnPointerEnter called on TimelineSlider
+
+[VRSliderControl] OnPointerExit called on TimelineSlider
+
+[VRSliderControl] OnPointerClick called on TimelineSlider
+
+[VirtualObjectsZoomController] Zoom set to 1.90m (delta: 0.100m)
+
+[VirtualObjectsZoomController] Zoom set to 2.00m (delta: 0.100m)
+
+[VirtualObjectsZoomController] Zoom set to 1.90m (delta: -0.100m)
+
+[VirtualObjectsZoomController] Zoom set to 1.80m (delta: -0.100m)
+
+[RTTMediaLibrary] Cleanup: Destroying _mediaActionBar
+
+Destroying assets is not permitted to avoid data loss.
+If you really want to remove an asset use DestroyImmediate (theObject, true);
+UnityEngine.Object:Destroy (UnityEngine.Object)
+VRWorkspace.UI.HoverEffects.CursorChangeHoverEffect:Cleanup () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Effects/CursorChangeHoverEffect.cs:118)
+VRWorkspace.UI.HoverEffects.HoverEffectController:CleanupEffects () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Core/HoverEffectController.cs:311)
+VRWorkspace.UI.HoverEffects.HoverEffectController:OnDestroy () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Core/HoverEffectController.cs:318)
+
+[VRVideoProjectionSystem] Disposed
+
+[MediaEnvironmentController] Reset to default state
+
+[VRMediaAppController] Cleanup completed
+
+[RTTAppManager] Closed app: media
 

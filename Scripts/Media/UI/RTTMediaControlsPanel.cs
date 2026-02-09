@@ -1066,10 +1066,18 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
 
     private void OnSeekValueChanged(float normalizedValue)
     {
+        // Update time display
+        _currentTimeText.text = FormatTime(normalizedValue * _duration);
+        
+        // If interactive seek (click/drag), update tooltip
         if (_isSeeking)
         {
-            // Update time display during seek
-            _currentTimeText.text = FormatTime(normalizedValue * _duration);
+            // Just update text while dragging
+        }
+        else
+        {
+            // Immediate seek on click (not dragging)
+            OnSeek?.Invoke(normalizedValue * _duration);
         }
     }
 
