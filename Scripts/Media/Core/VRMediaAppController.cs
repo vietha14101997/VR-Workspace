@@ -565,7 +565,11 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         var controlsFrame = controlsFrameObj.AddComponent<RTTMenuFrame>();
         _controlsCanvasBase = controlsFrame; // Store for hover detection
 
-        float controlsWidth = _containerWidth;
+        // Expand frame width by 5% on each side (10% total) to prevent button hover clipping
+        float padding = _containerWidth * 0.05f;
+        float expandedWidth = _containerWidth + (padding * 2);
+        
+        float controlsWidth = expandedWidth;
         float controlsHeight = 700f;
         float density = 1200f;
         float physicalWidth = controlsWidth / density;
@@ -594,11 +598,13 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         var controlsRT = controlsObj.AddComponent<RectTransform>();
         controlsRT.anchorMin = Vector2.zero;
         controlsRT.anchorMax = Vector2.one;
-        controlsRT.offsetMin = Vector2.zero;
-        controlsRT.offsetMax = Vector2.zero;
+        // Apply padding so panel stays original width centered
+        controlsRT.offsetMin = new Vector2(padding, 0);
+        controlsRT.offsetMax = new Vector2(-padding, 0);
 
         _controlsPanel = controlsObj.AddComponent<RTTMediaControlsPanel>();
-        _controlsPanel.Initialize(controlsWidth, controlsHeight, _font, _primaryColor, _accentColor);
+        // Initialize with original width so internal layout is correct
+        _controlsPanel.Initialize(_containerWidth, controlsHeight, _font, _primaryColor, _accentColor);
 
         _controlsFrameObject = controlsFrameObj;
 
