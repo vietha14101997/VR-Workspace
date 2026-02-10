@@ -42,7 +42,8 @@ public static class VRSliderFactory
         float minValue = 0f,
         float maxValue = 1f,
         bool showLabel = false,
-        string label = "")
+        string label = "",
+        float touchExpand = 0.025f)
     {
         GameObject sliderObj = new GameObject("VRSlider");
         sliderObj.transform.SetParent(parent, false);
@@ -57,16 +58,16 @@ public static class VRSliderFactory
         switch (style)
         {
             case SliderStyle.Progress:
-                BuildProgressSlider(sliderObj, width, height, font, primaryColor);
+                BuildProgressSlider(sliderObj, width, height, font, primaryColor, touchExpand);
                 break;
             case SliderStyle.Volume:
-                BuildVolumeSlider(sliderObj, width, height, font, primaryColor);
+                BuildVolumeSlider(sliderObj, width, height, font, primaryColor, touchExpand);
                 break;
             case SliderStyle.Setting:
-                BuildSettingSlider(sliderObj, width, height, font, primaryColor, showLabel, label);
+                BuildSettingSlider(sliderObj, width, height, font, primaryColor, showLabel, label, touchExpand);
                 break;
             default:
-                BuildDefaultSlider(sliderObj, width, height, font, primaryColor);
+                BuildDefaultSlider(sliderObj, width, height, font, primaryColor, touchExpand);
                 break;
         }
 
@@ -84,7 +85,8 @@ public static class VRSliderFactory
         float width,
         TMP_FontAsset font,
         Color primaryColor,
-        float previewHeight = 0f)
+        float previewHeight = 0f,
+        float touchExpand = 0.025f)
     {
         GameObject sliderObj = new GameObject("TimelineSlider");
         sliderObj.transform.SetParent(parent, false);
@@ -159,8 +161,10 @@ public static class VRSliderFactory
         touchObj.transform.SetParent(sliderObj.transform, false);
 
         var touchRT = touchObj.AddComponent<RectTransform>();
-        touchRT.anchorMin = Vector2.zero;
-        touchRT.anchorMax = Vector2.one;
+        // Expand horizontally by 2.5% on each side using anchors (scales with dynamic width)
+        touchRT.anchorMin = new Vector2(-touchExpand, 0f);
+        touchRT.anchorMax = new Vector2(1.0f + touchExpand, 1f);
+        // Expand vertically using offsets (fixed pixel amount)
         touchRT.offsetMin = new Vector2(0, -(TOUCH_AREA_HEIGHT - DEFAULT_HEIGHT) / 2);
         touchRT.offsetMax = new Vector2(0, (TOUCH_AREA_HEIGHT - DEFAULT_HEIGHT) / 2);
 
@@ -170,7 +174,8 @@ public static class VRSliderFactory
 
         // BoxCollider for VR interaction
         var collider = touchObj.AddComponent<BoxCollider>();
-        collider.size = new Vector3(width, TOUCH_AREA_HEIGHT, 10);
+        // Use dynamic width to match the visual extension
+        collider.size = new Vector3(width * (1f + touchExpand * 2f), TOUCH_AREA_HEIGHT, 10);
         collider.center = new Vector3(0, 0, -5);
 
         // Configure slider control
@@ -186,15 +191,16 @@ public static class VRSliderFactory
         Transform parent,
         float width,
         TMP_FontAsset font,
-        Color primaryColor)
+        Color primaryColor,
+        float touchExpand = 0.025f)
     {
-        return CreateSlider(parent, width, DEFAULT_HEIGHT, font, primaryColor, SliderStyle.Volume, 0f, 1f);
+        return CreateSlider(parent, width, DEFAULT_HEIGHT, font, primaryColor, SliderStyle.Volume, 0f, 1f, false, "", touchExpand);
     }
     #endregion
 
     #region Build Methods
     private static void BuildDefaultSlider(GameObject sliderObj, float width, float height,
-        TMP_FontAsset font, Color primaryColor)
+        TMP_FontAsset font, Color primaryColor, float touchExpand)
     {
         // Track background
         GameObject trackBgObj = new GameObject("TrackBackground");
@@ -244,8 +250,9 @@ public static class VRSliderFactory
         touchObj.transform.SetParent(sliderObj.transform, false);
 
         var touchRT = touchObj.AddComponent<RectTransform>();
-        touchRT.anchorMin = Vector2.zero;
-        touchRT.anchorMax = Vector2.one;
+        // Expand horizontally by touchExpand on each side
+        touchRT.anchorMin = new Vector2(-touchExpand, 0f);
+        touchRT.anchorMax = new Vector2(1.0f + touchExpand, 1f);
         touchRT.offsetMin = Vector2.zero;
         touchRT.offsetMax = Vector2.zero;
 
@@ -253,7 +260,8 @@ public static class VRSliderFactory
         touchImage.color = Color.clear;
 
         var collider = touchObj.AddComponent<BoxCollider>();
-        collider.size = new Vector3(width, height, 10);
+        // Use dynamic width to match the visual extension
+        collider.size = new Vector3(width * (1f + touchExpand * 2f), height, 10);
         collider.center = new Vector3(0, 0, -5);
 
         // Configure
@@ -262,21 +270,21 @@ public static class VRSliderFactory
     }
 
     private static void BuildProgressSlider(GameObject sliderObj, float width, float height,
-        TMP_FontAsset font, Color primaryColor)
+        TMP_FontAsset font, Color primaryColor, float touchExpand)
     {
         // Same as timeline slider but without buffer
-        BuildDefaultSlider(sliderObj, width, height, font, primaryColor);
+        BuildDefaultSlider(sliderObj, width, height, font, primaryColor, touchExpand);
     }
 
     private static void BuildVolumeSlider(GameObject sliderObj, float width, float height,
-        TMP_FontAsset font, Color primaryColor)
+        TMP_FontAsset font, Color primaryColor, float touchExpand)
     {
         // Similar to default but with volume-specific styling
-        BuildDefaultSlider(sliderObj, width, height, font, primaryColor);
+        BuildDefaultSlider(sliderObj, width, height, font, primaryColor, touchExpand);
     }
 
     private static void BuildSettingSlider(GameObject sliderObj, float width, float height,
-        TMP_FontAsset font, Color primaryColor, bool showLabel, string label)
+        TMP_FontAsset font, Color primaryColor, bool showLabel, string label, float touchExpand)
     {
         float labelWidth = showLabel ? 120f : 0f;
         float sliderWidth = width - labelWidth;
@@ -360,8 +368,9 @@ public static class VRSliderFactory
         touchObj.transform.SetParent(sliderAreaObj.transform, false);
 
         var touchRT = touchObj.AddComponent<RectTransform>();
-        touchRT.anchorMin = Vector2.zero;
-        touchRT.anchorMax = Vector2.one;
+        // Expand horizontally by touchExpand on each side (consistent default for all VR sliders)
+        touchRT.anchorMin = new Vector2(-touchExpand, 0f);
+        touchRT.anchorMax = new Vector2(1.0f + touchExpand, 1f);
         touchRT.offsetMin = Vector2.zero;
         touchRT.offsetMax = Vector2.zero;
 
@@ -369,7 +378,8 @@ public static class VRSliderFactory
         touchImage.color = Color.clear;
 
         var collider = touchObj.AddComponent<BoxCollider>();
-        collider.size = new Vector3(sliderWidth, height, 10);
+        // Use dynamic width to match the visual extension
+        collider.size = new Vector3(sliderWidth * (1f + touchExpand * 2f), height, 10);
         collider.center = new Vector3(0, 0, -5);
 
         // Configure
