@@ -736,6 +736,20 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         queuePopup.Initialize(_font, _primaryColor, _accentColor);
         _playerController.SetQueuePopup(queuePopup);
 
+        // Projection Settings Popup
+        GameObject projectionObj = new GameObject("ProjectionPopup_Root");
+        projectionObj.transform.SetParent(container, false);
+
+        var projectionRT = projectionObj.AddComponent<RectTransform>();
+        projectionRT.anchorMin = Vector2.zero;
+        projectionRT.anchorMax = Vector2.one;
+        projectionRT.offsetMin = Vector2.zero;
+        projectionRT.offsetMax = Vector2.zero;
+
+        var projectionPopup = projectionObj.AddComponent<RTTMediaProjectionPopup>();
+        projectionPopup.Initialize(_font, _primaryColor, _accentColor);
+        _playerController.SetProjectionPopup(projectionPopup);
+
         Debug.Log("[VRMediaAppController] Player UI built with controls container");
     }
 

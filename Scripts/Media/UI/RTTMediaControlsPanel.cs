@@ -134,7 +134,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     private const string ICON_PAUSE = "icon_pause";
     private const string ICON_NEXT = "icon_next";
     private const string ICON_ENVIRONMENT = "icon_enviroment";
-    private const string ICON_3D = "icon_record";
+    private const string ICON_3D = "icon_cube";
     #endregion
 
     #region Initialization
@@ -554,7 +554,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         envBtn.onClick.AddListener(() => Debug.Log("Environment clicked"));
 
         Button threeDBtn = CreateIconOnlyButton(rightGroup.transform, ICON_3D, advancedButtonSize);
-        threeDBtn.onClick.AddListener(() => Debug.Log("3D mode clicked"));
+        threeDBtn.onClick.AddListener(() => OnVRModeClicked?.Invoke());
     }
 
     /// <summary>
