@@ -40,9 +40,10 @@ public class RTTMediaProjectionPopup : MonoBehaviour
     private readonly Color POPUP_BG_COLOR = new Color(0.15f, 0.15f, 0.15f, 1.0f); // Body Color
     private readonly Color HEADER_BG_COLOR = new Color(0.25f, 0.25f, 0.25f, 1.0f); // Lighter Header
     private readonly Color ROW_BG_COLOR = new Color(0.1f, 0.1f, 0.1f, 1.0f);     // Darker Row Background
-    private readonly Color SELECTED_COLOR = new Color(1f, 0.0f, 0.4f, 1f);       // Hot Pink
+    private readonly Color THEME_COLOR = new Color(1f, 0.2f, 0.2f, 1f);          // Reticle red (from MediaControlsPanel)
+    private readonly Color SELECTED_COLOR = new Color(0.25f, 0.25f, 0.25f, 1.0f); // Matches Header BG
     private readonly Color TEXT_COLOR_NORMAL = new Color(0.9f, 0.9f, 0.9f, 1f);
-    private readonly Color TEXT_COLOR_SELECTED = Color.white;
+    private readonly Color TEXT_COLOR_SELECTED = new Color(1f, 0.32f, 0.32f, 1f);   // Matches Theme Color mixed with 15% white (like hover)
     #endregion
 
     #region Events
@@ -204,13 +205,11 @@ public class RTTMediaProjectionPopup : MonoBehaviour
                 float u = x + 0.5f;
                 float v = y + 0.5f;
 
-                // Check if in corner area
                 bool inX = (u < r) || (u > size - r);
                 bool inY = (v < r) || (v > size - r);
 
                 if (inX && inY)
                 {
-                    // Calculate distance to nearest corner center
                     float cx = (u < size / 2) ? r : size - r;
                     float cy = (v < size / 2) ? r : size - r;
                     
@@ -310,15 +309,21 @@ public class RTTMediaProjectionPopup : MonoBehaviour
         rowLayout.childForceExpandWidth = true;
         rowLayout.childControlHeight = true;
         rowLayout.childForceExpandHeight = true;
+        rowLayout.childAlignment = TextAnchor.MiddleCenter; // Fix: Ensure Middle alignment
 
         var le = rowObj.AddComponent<LayoutElement>();
         le.minHeight = RowHeight;
         le.preferredHeight = RowHeight;
+        
+        // Calculate dynamic button width: (Width - Spacing) / Count
+        // Width = POPUP_WIDTH - 2*PADDING_X (body) = 360 - 40 = 320
+        // 3 buttons, 2 spacings of 5 = 10 -> (320 - 10) / 3 = ~103.3f
+        float btnWidth = (POPUP_WIDTH - (2 * PADDING_X) - (2 * 5)) / 3f;
 
         // Buttons
-        CreateSegmentedButton(rowObj.transform, "FLAT", () => SetProjection(VideoProjectionType.Flat), _projectionButtons, VideoProjectionType.Flat);
-        CreateSegmentedButton(rowObj.transform, "180", () => SetProjection(VideoProjectionType.Dome180), _projectionButtons, VideoProjectionType.Dome180);
-        CreateSegmentedButton(rowObj.transform, "360", () => SetProjection(VideoProjectionType.Sphere360), _projectionButtons, VideoProjectionType.Sphere360);
+        CreateSegmentedButton(rowObj.transform, "FLAT", () => SetProjection(VideoProjectionType.Flat), _projectionButtons, VideoProjectionType.Flat, btnWidth);
+        CreateSegmentedButton(rowObj.transform, "180", () => SetProjection(VideoProjectionType.Dome180), _projectionButtons, VideoProjectionType.Dome180, btnWidth);
+        CreateSegmentedButton(rowObj.transform, "360", () => SetProjection(VideoProjectionType.Sphere360), _projectionButtons, VideoProjectionType.Sphere360, btnWidth);
         // FISH removed
     }
 
@@ -339,21 +344,30 @@ public class RTTMediaProjectionPopup : MonoBehaviour
         rowLayout.childForceExpandWidth = true;
         rowLayout.childControlHeight = true;
         rowLayout.childForceExpandHeight = true;
+        rowLayout.childAlignment = TextAnchor.MiddleCenter; // Fix: Ensure Middle alignment
 
         var le = rowObj.AddComponent<LayoutElement>();
         le.minHeight = RowHeight;
         le.preferredHeight = RowHeight;
 
+        // Calculate dynamic button width: (Width - Spacing) / Count
+        // Same calculation as above for 3 buttons
+        float btnWidth = (POPUP_WIDTH - (2 * PADDING_X) - (2 * 5)) / 3f;
+
         // Buttons (Lowercase as per image)
-        CreateSegmentedButton(rowObj.transform, "mono", () => SetStereo(StereoMode.Mono), _stereoButtons, StereoMode.Mono);
-        CreateSegmentedButton(rowObj.transform, "sbs", () => SetStereo(StereoMode.SideBySide), _stereoButtons, StereoMode.SideBySide);
-        CreateSegmentedButton(rowObj.transform, "ou", () => SetStereo(StereoMode.OverUnder), _stereoButtons, StereoMode.OverUnder);
+        CreateSegmentedButton(rowObj.transform, "mono", () => SetStereo(StereoMode.Mono), _stereoButtons, StereoMode.Mono, btnWidth);
+        CreateSegmentedButton(rowObj.transform, "sbs", () => SetStereo(StereoMode.SideBySide), _stereoButtons, StereoMode.SideBySide, btnWidth);
+        CreateSegmentedButton(rowObj.transform, "ou", () => SetStereo(StereoMode.OverUnder), _stereoButtons, StereoMode.OverUnder, btnWidth);
     }
 
-    private Button CreateSegmentedButton<T>(Transform parent, string label, Action onClick, Dictionary<T, Button> dict, T key)
+    private Button CreateSegmentedButton<T>(Transform parent, string label, Action onClick, Dictionary<T, Button> dict, T key, float colliderWidth)
     {
         GameObject btnObj = new GameObject(label);
         btnObj.transform.SetParent(parent, false);
+
+        // Fix: Explicitly set Pivot to (0.5, 0.5) to align Collider with Visuals
+        var rt = btnObj.AddComponent<RectTransform>();
+        rt.pivot = new Vector2(0.5f, 0.5f);
 
         // Background (Transparent by default, Pink when selected)
 
@@ -372,8 +386,11 @@ public class RTTMediaProjectionPopup : MonoBehaviour
         var textObj = new GameObject("Text");
         textObj.transform.SetParent(btnObj.transform, false);
         var textRT = textObj.AddComponent<RectTransform>();
+        // Reset text RectTransform to fill parent, but respect pivot
         textRT.anchorMin = Vector2.zero;
         textRT.anchorMax = Vector2.one;
+        textRT.offsetMin = Vector2.zero;
+        textRT.offsetMax = Vector2.zero;
 
         var text = textObj.AddComponent<TextMeshProUGUI>();
         text.text = label;
@@ -385,7 +402,8 @@ public class RTTMediaProjectionPopup : MonoBehaviour
 
         // BoxCollider for VR raycast
         var collider = btnObj.AddComponent<BoxCollider>();
-        collider.size = new Vector3(60, 30, 1); // Approximate, will be controlled by layout but collider needs size
+        collider.size = new Vector3(colliderWidth, RowHeight, 10f); // Increased depth 
+        collider.center = Vector3.zero; // Explicitly center collider
 
         if (dict != null)
         {

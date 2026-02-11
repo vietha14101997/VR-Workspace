@@ -545,7 +545,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
 
         var rightLayout = rightGroup.AddComponent<HorizontalLayoutGroup>();
         rightLayout.spacing = horizontalSpacing;  // 3% spacing between environment and 3D
-        rightLayout.childAlignment = TextAnchor.MiddleRight;  // Align content to right within group
+        rightLayout.childAlignment = TextAnchor.MiddleCenter;  // Align content to center within group (changed from MiddleRight)
         rightLayout.childControlWidth = false;
         rightLayout.childForceExpandWidth = false;
 
