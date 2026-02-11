@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using VRWorkspace.UI.HoverEffects;
@@ -66,6 +67,12 @@ public class RTTMediaProjectionPopup : MonoBehaviour
     // UI References
     private Dictionary<VideoProjectionType, Button> _projectionButtons = new Dictionary<VideoProjectionType, Button>();
     private Dictionary<StereoMode, Button> _stereoButtons = new Dictionary<StereoMode, Button>();
+    // Selector References
+    private RectTransform _projectionSelector;
+    private RectTransform _stereoSelector;
+    private Coroutine _projectionAnimCoroutine;
+    private Coroutine _stereoAnimCoroutine;
+
     #endregion
 
     #region Initialization
@@ -78,7 +85,7 @@ public class RTTMediaProjectionPopup : MonoBehaviour
         BuildUI();
         Hide();
     }
-
+    
     private void BuildUI()
     {
         // Cleanup existing
@@ -289,6 +296,12 @@ public class RTTMediaProjectionPopup : MonoBehaviour
         CreateStereoRow(bodyObj.transform);
     }
 
+    public void Hide()
+    {
+        _popup.SetActive(false);
+        gameObject.SetActive(false);
+    }
+
     private void CreateProjectionRow(Transform parent)
     {
         // Container for the segmented control
@@ -309,22 +322,22 @@ public class RTTMediaProjectionPopup : MonoBehaviour
         rowLayout.childForceExpandWidth = true;
         rowLayout.childControlHeight = true;
         rowLayout.childForceExpandHeight = true;
-        rowLayout.childAlignment = TextAnchor.MiddleCenter; // Fix: Ensure Middle alignment
+        rowLayout.childAlignment = TextAnchor.MiddleCenter;
 
         var le = rowObj.AddComponent<LayoutElement>();
         le.minHeight = RowHeight;
         le.preferredHeight = RowHeight;
         
-        // Calculate dynamic button width: (Width - Spacing) / Count
-        // Width = POPUP_WIDTH - 2*PADDING_X (body) = 360 - 40 = 320
-        // 3 buttons, 2 spacings of 5 = 10 -> (320 - 10) / 3 = ~103.3f
+        // Calculate dynamic button width
         float btnWidth = (POPUP_WIDTH - (2 * PADDING_X) - (2 * 5)) / 3f;
+
+        // Create Selector (First child -> renders behind buttons if they are transparent)
+        _projectionSelector = CreateSelector(rowObj.transform, btnWidth, RowHeight);
 
         // Buttons
         CreateSegmentedButton(rowObj.transform, "FLAT", () => SetProjection(VideoProjectionType.Flat), _projectionButtons, VideoProjectionType.Flat, btnWidth);
         CreateSegmentedButton(rowObj.transform, "180", () => SetProjection(VideoProjectionType.Dome180), _projectionButtons, VideoProjectionType.Dome180, btnWidth);
         CreateSegmentedButton(rowObj.transform, "360", () => SetProjection(VideoProjectionType.Sphere360), _projectionButtons, VideoProjectionType.Sphere360, btnWidth);
-        // FISH removed
     }
 
     private void CreateStereoRow(Transform parent)
@@ -344,20 +357,44 @@ public class RTTMediaProjectionPopup : MonoBehaviour
         rowLayout.childForceExpandWidth = true;
         rowLayout.childControlHeight = true;
         rowLayout.childForceExpandHeight = true;
-        rowLayout.childAlignment = TextAnchor.MiddleCenter; // Fix: Ensure Middle alignment
+        rowLayout.childAlignment = TextAnchor.MiddleCenter;
 
         var le = rowObj.AddComponent<LayoutElement>();
         le.minHeight = RowHeight;
         le.preferredHeight = RowHeight;
 
-        // Calculate dynamic button width: (Width - Spacing) / Count
-        // Same calculation as above for 3 buttons
+        // Calculate dynamic button width
         float btnWidth = (POPUP_WIDTH - (2 * PADDING_X) - (2 * 5)) / 3f;
 
-        // Buttons (Lowercase as per image)
+        // Create Selector
+        _stereoSelector = CreateSelector(rowObj.transform, btnWidth, RowHeight);
+
+        // Buttons
         CreateSegmentedButton(rowObj.transform, "mono", () => SetStereo(StereoMode.Mono), _stereoButtons, StereoMode.Mono, btnWidth);
         CreateSegmentedButton(rowObj.transform, "sbs", () => SetStereo(StereoMode.SideBySide), _stereoButtons, StereoMode.SideBySide, btnWidth);
         CreateSegmentedButton(rowObj.transform, "ou", () => SetStereo(StereoMode.OverUnder), _stereoButtons, StereoMode.OverUnder, btnWidth);
+    }
+    
+    private RectTransform CreateSelector(Transform parent, float width, float height)
+    {
+        GameObject selectorObj = new GameObject("Selector");
+        selectorObj.transform.SetParent(parent, false);
+        
+        var rt = selectorObj.AddComponent<RectTransform>();
+        rt.sizeDelta = new Vector2(width, height);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchorMin = new Vector2(0.5f, 0.5f); // Center anchor to start with
+        rt.anchorMax = new Vector2(0.5f, 0.5f);
+        
+        var img = selectorObj.AddComponent<Image>();
+        img.sprite = GetRoundedSprite();
+        img.type = Image.Type.Sliced;
+        img.color = SELECTED_COLOR;
+        
+        var le = selectorObj.AddComponent<LayoutElement>();
+        le.ignoreLayout = true; // Crucial: Ignore layout so we can animate position freely
+        
+        return rt;
     }
 
     private Button CreateSegmentedButton<T>(Transform parent, string label, Action onClick, Dictionary<T, Button> dict, T key, float colliderWidth)
@@ -365,16 +402,14 @@ public class RTTMediaProjectionPopup : MonoBehaviour
         GameObject btnObj = new GameObject(label);
         btnObj.transform.SetParent(parent, false);
 
-        // Fix: Explicitly set Pivot to (0.5, 0.5) to align Collider with Visuals
         var rt = btnObj.AddComponent<RectTransform>();
         rt.pivot = new Vector2(0.5f, 0.5f);
 
-        // Background (Transparent by default, Pink when selected)
-
+        // Background (Always Transparent now, Selector handles the color)
         var bg = btnObj.AddComponent<Image>();
         bg.sprite = GetRoundedSprite();
         bg.type = Image.Type.Sliced;
-        bg.color = Color.clear; // Start clear
+        bg.color = Color.clear; 
 
         var btn = btnObj.AddComponent<Button>();
         btn.targetGraphic = bg;
@@ -386,7 +421,6 @@ public class RTTMediaProjectionPopup : MonoBehaviour
         var textObj = new GameObject("Text");
         textObj.transform.SetParent(btnObj.transform, false);
         var textRT = textObj.AddComponent<RectTransform>();
-        // Reset text RectTransform to fill parent, but respect pivot
         textRT.anchorMin = Vector2.zero;
         textRT.anchorMax = Vector2.one;
         textRT.offsetMin = Vector2.zero;
@@ -402,8 +436,8 @@ public class RTTMediaProjectionPopup : MonoBehaviour
 
         // BoxCollider for VR raycast
         var collider = btnObj.AddComponent<BoxCollider>();
-        collider.size = new Vector3(colliderWidth, RowHeight, 10f); // Increased depth 
-        collider.center = Vector3.zero; // Explicitly center collider
+        collider.size = new Vector3(colliderWidth, RowHeight, 10f); 
+        collider.center = Vector3.zero;
 
         if (dict != null)
         {
@@ -419,35 +453,34 @@ public class RTTMediaProjectionPopup : MonoBehaviour
     {
         gameObject.SetActive(true);
         _popup.SetActive(true);
-        UpdateUI();
+        
+        // Force layout rebuild to ensure button positions are calculated before we snap selector
+        Canvas.ForceUpdateCanvases();
+        UpdateUI(true); // true = instant snap
     }
-
-    public void Hide()
-    {
-        _popup.SetActive(false);
-        gameObject.SetActive(false);
-    }
-
+    // ... (Hide and SetState remain) ...
     public void SetState(VideoProjectionType projection, StereoMode stereo)
     {
         _currentProjection = projection;
         _currentStereo = stereo;
-        UpdateUI();
+        UpdateUI(true); // Instant snap on external state set
     }
     #endregion
 
     #region Internal Logic
     private void SetProjection(VideoProjectionType type)
     {
+        if (_currentProjection == type) return;
         _currentProjection = type;
-        UpdateUI();
+        UpdateUI(false); // Animate
         NotifyChanged();
     }
 
     private void SetStereo(StereoMode mode)
     {
+        if (_currentStereo == mode) return;
         _currentStereo = mode;
-        UpdateUI();
+        UpdateUI(false); // Animate
         NotifyChanged();
     }
 
@@ -456,19 +489,28 @@ public class RTTMediaProjectionPopup : MonoBehaviour
         OnSettingsChanged?.Invoke(_currentProjection, _currentStereo);
     }
 
-    private void UpdateUI()
+    private void UpdateUI(bool instant = false)
     {
         // Update Projection Buttons
+        if (_projectionButtons.TryGetValue(_currentProjection, out Button targetProjBtn))
+        {
+            RectTransform targetRT = targetProjBtn.GetComponent<RectTransform>();
+            if (instant)
+            {
+                if (_projectionAnimCoroutine != null) StopCoroutine(_projectionAnimCoroutine);
+                _projectionSelector.localPosition = targetRT.localPosition;
+            }
+            else
+            {
+                if (_projectionAnimCoroutine != null) StopCoroutine(_projectionAnimCoroutine);
+                _projectionAnimCoroutine = StartCoroutine(AnimateSelector(_projectionSelector, targetRT.localPosition));
+            }
+        }
+
         foreach (var kvp in _projectionButtons)
         {
             var btn = kvp.Value;
             bool isActive = kvp.Key == _currentProjection;
-            
-            // Visual Update
-            // Active: Pink Background, White Text
-            // Inactive: Clear Background, Light Grey Text
-            btn.targetGraphic.color = isActive ? SELECTED_COLOR : Color.clear;
-            
             var text = btn.GetComponentInChildren<TextMeshProUGUI>();
             if (text)
             {
@@ -477,19 +519,50 @@ public class RTTMediaProjectionPopup : MonoBehaviour
         }
 
         // Update Stereo Buttons
+        if (_stereoButtons.TryGetValue(_currentStereo, out Button targetStereoBtn))
+        {
+            RectTransform targetRT = targetStereoBtn.GetComponent<RectTransform>();
+            if (instant)
+            {
+                if (_stereoAnimCoroutine != null) StopCoroutine(_stereoAnimCoroutine);
+                _stereoSelector.localPosition = targetRT.localPosition;
+            }
+            else
+            {
+                if (_stereoAnimCoroutine != null) StopCoroutine(_stereoAnimCoroutine);
+                _stereoAnimCoroutine = StartCoroutine(AnimateSelector(_stereoSelector, targetRT.localPosition));
+            }
+        }
+
         foreach (var kvp in _stereoButtons)
         {
             var btn = kvp.Value;
             bool isActive = kvp.Key == _currentStereo;
-
-            btn.targetGraphic.color = isActive ? SELECTED_COLOR : Color.clear;
-
             var text = btn.GetComponentInChildren<TextMeshProUGUI>();
             if (text)
             {
                 text.color = isActive ? TEXT_COLOR_SELECTED : TEXT_COLOR_NORMAL;
             }
         }
+    }
+
+    private IEnumerator AnimateSelector(RectTransform selector, Vector3 targetPos)
+    {
+        Vector3 startPos = selector.localPosition;
+        float elapsed = 0f;
+        float duration = 0.2f; // Fast, snappy animation
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / duration;
+            // EaseOutCubic
+            t = 1f - Mathf.Pow(1f - t, 3);
+            
+            selector.localPosition = Vector3.Lerp(startPos, targetPos, t);
+            yield return null;
+        }
+        selector.localPosition = targetPos;
     }
     #endregion
 
