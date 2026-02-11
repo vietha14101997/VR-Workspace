@@ -28,16 +28,13 @@ public enum VideoProjectionType
 public enum StereoMode
 {
     /// <summary>Mono - same image for both eyes</summary>
-    Mono,
+    Mono = 0,
 
-    /// <summary>Left eye only</summary>
-    LeftEye,
+    /// <summary>Side-by-Side stereoscopic 3D</summary>
+    SideBySide = 1,
 
-    /// <summary>Right eye only</summary>
-    RightEye,
-
-    /// <summary>Full stereo - different images for each eye</summary>
-    Stereo
+    /// <summary>Over-Under (Top-Bottom) stereoscopic 3D</summary>
+    OverUnder = 2
 }
 
 /// <summary>

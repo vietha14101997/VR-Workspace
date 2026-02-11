@@ -17,30 +17,17 @@ public static class ProjectionDetector
     {
         string name = Path.GetFileNameWithoutExtension(filename)?.ToLowerInvariant() ?? "";
 
-        // 1. Check filename patterns first (most reliable)
-
-        // VR180 patterns (must check before 180)
-        if (ContainsAny(name, "_vr180", "_180_3d", "_180_sbs", "_180sbs", "vr180"))
-            return VideoProjectionType.VR180Stereo;
+        // 1. Check filename patterns for immersive projections
 
         // 360 patterns
         if (ContainsAny(name, "_360", "360x180", "_360_", "360vr", "360degree"))
             return VideoProjectionType.Sphere360;
 
-        // 180 patterns
-        if (ContainsAny(name, "_180", "180x180", "_180_", "180vr", "180degree"))
+        // 180 patterns (including VR180)
+        if (ContainsAny(name, "_180", "180x180", "_180_", "180vr", "180degree", "vr180", "_vr180"))
             return VideoProjectionType.Dome180;
 
-        // SBS 3D patterns
-        if (ContainsAny(name, "_sbs", "_3d_sbs", "_3dsbs", "sbs3d", "side_by_side", "sidebyside", "_lr", "_leftright"))
-            return VideoProjectionType.SideBySide3D;
-
-        // Over-Under 3D patterns
-        if (ContainsAny(name, "_tb", "_ou", "_3d_ou", "_3dou", "_topbottom", "_overunder", "over_under"))
-            return VideoProjectionType.OverUnder3D;
-
-        // 2. Use resolution heuristics if filename doesn't match
-
+        // 2. Use resolution heuristics
         if (width > 0 && height > 0)
         {
             float ratio = (float)width / height;
@@ -48,43 +35,44 @@ public static class ProjectionDetector
             // 2:1 ratio is typical for 360 equirectangular
             if (Mathf.Approximately(ratio, 2f) || (ratio >= 1.9f && ratio <= 2.1f))
             {
-                // Could be 360 or SBS flat - check for common 360 resolutions
                 if (width >= 3840) // 4K+ is likely 360
                     return VideoProjectionType.Sphere360;
             }
 
-            // 1:1 ratio could be 180 equirectangular
+            // 1:1 ratio is typical for 180 equirectangular (Mono) or 180 Stereo (if 2:1 each eye? No, usually 180 SBS is 2:1 total)
             if (Mathf.Approximately(ratio, 1f) || (ratio >= 0.9f && ratio <= 1.1f))
             {
                 return VideoProjectionType.Dome180;
             }
-
-            // 4:1 ratio is SBS 360
-            if (ratio >= 3.8f && ratio <= 4.2f)
-            {
-                return VideoProjectionType.VR180Stereo;
-            }
         }
 
-        // 3. Default to flat screen
+        // 3. Default to flat screen (SBS/OU Flat will also reach here)
         return VideoProjectionType.Flat;
     }
 
     /// <summary>
-    /// Detect stereo mode from projection type and filename
+    /// Detect stereo mode from filename and video properties
     /// </summary>
     public static StereoMode DetectStereoMode(VideoProjectionType projection, string filename)
     {
-        switch (projection)
-        {
-            case VideoProjectionType.SideBySide3D:
-            case VideoProjectionType.OverUnder3D:
-            case VideoProjectionType.VR180Stereo:
-                return StereoMode.Stereo;
+        string name = Path.GetFileNameWithoutExtension(filename)?.ToLowerInvariant() ?? "";
 
-            default:
-                return StereoMode.Mono;
-        }
+        // VR180 is almost always SBS
+        if (projection == VideoProjectionType.Dome180 && (name.Contains("vr180") || name.Contains("_180_sbs") || name.Contains("_180sbs")))
+            return StereoMode.SideBySide;
+
+        // Explicit patterns
+        if (ContainsAny(name, "sbs", "side_by_side", "sidebyside", "_lr", "_leftright"))
+            return StereoMode.SideBySide;
+
+        if (ContainsAny(name, "ou", "topbottom", "overunder", "over_under", "_tb"))
+            return StereoMode.OverUnder;
+
+        // Logic check: if it's 360 and has 2:1 ratio, it might be mono.
+        // If it's 360 and has 1:1 ratio, it's likely OU/TB... 
+        // But naming is more reliable in VR.
+
+        return StereoMode.Mono;
     }
 
     /// <summary>

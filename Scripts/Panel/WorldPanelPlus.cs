@@ -13,6 +13,7 @@ public class WorldPanelPlus : MonoBehaviour
     public Color panelTint = Color.white;
     public bool boardVisible = true;
     [Range(0, 1)] public float boardAlpha = 1f;
+    public StereoMode stereoMode = StereoMode.Mono;
 
     [Header("Board edge feather (rounded border)")]
     public bool useBoardEdgeFeather = true;
@@ -427,6 +428,10 @@ public class WorldPanelPlus : MonoBehaviour
             // VR quality - mipmap bias for sharper textures at distance
             if (_panelMat.HasProperty("_MipMapBias"))
                 _panelMat.SetFloat("_MipMapBias", mipMapBias);
+
+            // Stereo support
+            if (_panelMat.HasProperty("_StereoMode"))
+                _panelMat.SetFloat("_StereoMode", (float)stereoMode);
         }
 
         if (_panelMat.HasProperty("_Surface")) _panelMat.SetFloat("_Surface", 1f);

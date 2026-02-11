@@ -71,6 +71,7 @@ public class Dome180Renderer : MonoBehaviour, IProjectionRenderer
         _stereoMode = mode;
         if (_material != null)
         {
+            // Shader expects: 0=Mono, 1=SBS, 2=OU
             _material.SetFloat("_StereoMode", (float)mode);
         }
     }

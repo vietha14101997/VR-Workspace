@@ -83,8 +83,10 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
 
     public void SetStereoMode(StereoMode mode)
     {
-        // WorldPanelPlus doesn't support stereo splitting natively through its properties.
-        // Would need material property overrides if WorldPanelPlus shader supported it.
+        if (_worldPanel == null) return;
+
+        _worldPanel.stereoMode = mode;
+        _worldPanel.Apply();
     }
 
     public void UpdateDisplay(DisplaySettings settings)
@@ -194,7 +196,20 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
     {
         if (_worldPanel == null) return;
 
-        float aspect = _resolution.y > 0 ? (float)_resolution.x / _resolution.y : 16f / 9f;
+        float resX = _resolution.x;
+        float resY = _resolution.y;
+
+        // Adjust resolution for aspect ratio calculation based on stereo mode
+        if (_worldPanel.stereoMode == StereoMode.SideBySide)
+        {
+            resX /= 2f;
+        }
+        else if (_worldPanel.stereoMode == StereoMode.OverUnder)
+        {
+            resY /= 2f;
+        }
+
+        float aspect = resY > 0 ? resX / resY : 16f / 9f;
 
         // Base height of 1 meter, adjust width by aspect ratio
         float baseHeight = 1.0f * _currentSettings.Scale;

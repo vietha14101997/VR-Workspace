@@ -191,7 +191,9 @@ Shader "VRWorkspace/Media/Video360Sphere"
                 float2 equirectUV = DirectionToEquirect360(viewDir);
 
                 // Apply stereo mode
-                float2 stereoUV = GetStereoUV(equirectUV, _StereoMode, _EyeIndex);
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
+                float eye = unity_StereoEyeIndex;
+                float2 stereoUV = GetStereoUV(equirectUV, _StereoMode, eye);
 
                 float3 color;
 

@@ -261,42 +261,14 @@ public class VRVideoPlayerController : MonoBehaviour
         _currentVideo = video;
         CurrentVideo = video;
 
-        // Detect projection and stereo mode
-        var projectionType = video.Projection;
+        // Detect projection and stereo mode automatically
+        var projectionType = ProjectionDetector.DetectProjection(video.Path, video.Width, video.Height);
         var stereoMode = ProjectionDetector.DetectStereoMode(projectionType, video.Path);
 
-        Debug.Log($"[VRVideoPlayerController] Playing: {video.Title}, Projection: {projectionType}, Stereo: {stereoMode}");
+        Debug.Log($"[VRVideoPlayerController] Playing: {video.Title}, Detected Projection: {projectionType}, Stereo: {stereoMode}");
 
         // Configure projection system
-        if (_projectionSystem != null)
-        {
-            // Choose appropriate display settings
-            _displaySettings = ProjectionDetector.SupportsScreenSettings(projectionType)
-                ? DisplaySettings.Default
-                : DisplaySettings.Immersive;
-
-            // Flat projection: Distance=0 so screen sits at _projectionRoot position (MenuFrame coordinates)
-            if (ProjectionDetector.SupportsScreenSettings(projectionType))
-            {
-                _displaySettings.Distance = 0f;
-            }
-
-            _projectionSystem.SetProjection(projectionType, stereoMode);
-            _projectionSystem.UpdateDisplay(_displaySettings);
-            _projectionSystem.RecenterView(); // Ensure screen is in front of user
-            
-            Debug.Log($"[VRVideoPlayerController] Projection configured: distance={_displaySettings.Distance}, scale={_displaySettings.Scale}");
-        }
-        else
-        {
-            Debug.LogError("[VRVideoPlayerController] ProjectionSystem is null!");
-        }
-
-        // Update environment based on projection type
-        if (_environmentController != null)
-        {
-            _environmentController.SetProjectionType(projectionType);
-        }
+        ApplyProjectionSettings(projectionType, stereoMode);
 
         // Load video
         if (_playbackEngine != null)
@@ -310,11 +282,59 @@ public class VRVideoPlayerController : MonoBehaviour
             _controlsPanel.SetPlayState(false);
             _controlsPanel.SetCurrentTime(0);
             _controlsPanel.SetDuration(0);
-            _controlsPanel.SetTitle(video.Title); // Set Title
+            _controlsPanel.SetTitle(video.Title);
             _controlsPanel.Show();
 
-            // Apply persisted volume to playback engine
             SetVolume(_controlsPanel.Volume);
+        }
+    }
+
+    private void ApplyProjectionSettings(VideoProjectionType projectionType, StereoMode stereoMode)
+    {
+        if (_projectionSystem == null) return;
+
+        // Choose appropriate display settings
+        _displaySettings = ProjectionDetector.SupportsScreenSettings(projectionType)
+            ? DisplaySettings.Default
+            : DisplaySettings.Immersive;
+
+        // Flat projection: Distance=0 so screen sits at _projectionRoot position
+        if (ProjectionDetector.SupportsScreenSettings(projectionType))
+        {
+            _displaySettings.Distance = 0f;
+        }
+
+        _projectionSystem.SetProjection(projectionType, stereoMode);
+        _projectionSystem.UpdateDisplay(_displaySettings);
+        _projectionSystem.RecenterView();
+
+        // Update environment based on projection type
+        if (_environmentController != null)
+        {
+            _environmentController.SetProjectionType(projectionType);
+        }
+
+        // Update popups if they are active
+        _projectionPopup?.SetState(projectionType, ConvertToUIStereo(stereoMode));
+    }
+
+    private RTTMediaProjectionPopup.StereoMode ConvertToUIStereo(StereoMode mode)
+    {
+        switch (mode)
+        {
+            case StereoMode.SideBySide: return RTTMediaProjectionPopup.StereoMode.SideBySide;
+            case StereoMode.OverUnder: return RTTMediaProjectionPopup.StereoMode.OverUnder;
+            default: return RTTMediaProjectionPopup.StereoMode.Mono;
+        }
+    }
+
+    private StereoMode ConvertFromUIStereo(RTTMediaProjectionPopup.StereoMode mode)
+    {
+        switch (mode)
+        {
+            case RTTMediaProjectionPopup.StereoMode.SideBySide: return StereoMode.SideBySide;
+            case RTTMediaProjectionPopup.StereoMode.OverUnder: return StereoMode.OverUnder;
+            default: return StereoMode.Mono;
         }
     }
 
@@ -351,9 +371,6 @@ public class VRVideoPlayerController : MonoBehaviour
         _playbackEngine?.Pause();
     }
 
-    /// <summary>
-    /// Stop playback.
-    /// </summary>
     /// <summary>
     /// Stop playback.
     /// </summary>
@@ -403,17 +420,11 @@ public class VRVideoPlayerController : MonoBehaviour
 
     private void PlayVideoSimple(string path)
     {
-        // Construct basic info since we only need path for playback usually
-        // Note: Real metadata loading would happen effectively by checking MediaLibrary
         var video = new MediaVideoInfo
         {
             Path = path,
-            Title = System.IO.Path.GetFileNameWithoutExtension(path),
-            Projection = VideoProjectionType.Flat // Default, will be detected
+            Title = System.IO.Path.GetFileNameWithoutExtension(path)
         };
-
-        // Try to get projection from previously loaded metadata if possible?
-        // Actually PlayVideo calls ProjectionDetector, so it handles it.
         PlayVideo(video);
     }
 
@@ -540,7 +551,6 @@ public class VRVideoPlayerController : MonoBehaviour
     {
         if (_settingsPopup == null) return;
 
-        // Update settings popup with current state
         if (_currentVideo.HasValue)
         {
             _settingsPopup.SetProjection(_currentVideo.Value.Projection);
@@ -561,63 +571,23 @@ public class VRVideoPlayerController : MonoBehaviour
     /// </summary>
     public void ShowProjectionSettings()
     {
-        if (_projectionPopup == null) return;
+        if (_projectionPopup == null || _projectionSystem == null) return;
 
-        // Update popup with current state
-        if (_currentVideo.HasValue)
-        {
-            // Map current state to UI StereoMode
-            // Logic: 
-            // - If Projection is SBS/OU, UI shows SBS/OU
-            // - If Projection is Flat/180/360, check StereoMode (internal)
-            RTTMediaProjectionPopup.StereoMode uiStereo = RTTMediaProjectionPopup.StereoMode.Mono;
-
-            if (_currentVideo.Value.Projection == VideoProjectionType.SideBySide3D)
-            {
-                uiStereo = RTTMediaProjectionPopup.StereoMode.SideBySide;
-            }
-            else if (_currentVideo.Value.Projection == VideoProjectionType.OverUnder3D)
-            {
-                uiStereo = RTTMediaProjectionPopup.StereoMode.OverUnder;
-            }
-            else
-            {
-                // For other projections, we are usually Mono, 
-                // unless we support VR180 Stereo which maps to StereoMode.Stereo internally
-                var currentStereo = _projectionSystem?.CurrentStereoMode ?? StereoMode.Mono;
-                if (currentStereo == StereoMode.Stereo || currentStereo == StereoMode.LeftEye || currentStereo == StereoMode.RightEye)
-                {
-                    // If it's VR180 with Stereo, we might want to show it? 
-                    // But UI only has Mono/SBS/OU. 
-                    // If it's VR180, it's implicitly determining stereo.
-                    // For now, default to Mono if not explicit SBS/OU projection type, 
-                    // or maybe add a "Stereo" option to UI later if needed for mesh-based stereo.
-                    uiStereo = RTTMediaProjectionPopup.StereoMode.Mono; 
-                }
-            }
-
-            // If the projection is one of the complex types (SBS/OU), the UI "Projection" should probably stay as "Flat" visually?
-            // OR we treat SBS3D as "Flat" + "SBS".
-            // Let's normalize:
-            // If Projection is SBS3D/OU3D -> UI Projection is Flat, UI Stereo is SBS/OU.
-            // If Projection is VR180Stereo -> UI Projection is 180, UI Stereo is SBS (or just implies stereo).
-            
-            // Simplified mapping for this specific UI design:
-            VideoProjectionType uiProj = _currentVideo.Value.Projection;
-            if (uiProj == VideoProjectionType.SideBySide3D || uiProj == VideoProjectionType.OverUnder3D)
-            {
-                uiProj = VideoProjectionType.Flat; // Visually show as Flat in UI
-            }
-            else if (uiProj == VideoProjectionType.VR180Stereo)
-            {
-                uiProj = VideoProjectionType.Dome180;
-                uiStereo = RTTMediaProjectionPopup.StereoMode.SideBySide; // VR180 is typically SBS
-            }
-
-            _projectionPopup.SetState(uiProj, uiStereo);
-        }
-        
+        _projectionPopup.SetState(_projectionSystem.CurrentProjection, ConvertToUIStereo(_projectionSystem.CurrentStereoMode));
         _projectionPopup.Show();
+    }
+
+    private void HandleProjectionSettingsChanged(VideoProjectionType projection, RTTMediaProjectionPopup.StereoMode uiStereo)
+    {
+        var stereo = ConvertFromUIStereo(uiStereo);
+        Debug.Log($"[VRVideoPlayerController] Manual projection change: {projection}, {stereo}");
+        ApplyProjectionSettings(projection, stereo);
+    }
+
+    private void HandleProjectionChanged(VideoProjectionType newProjection)
+    {
+        var stereoMode = ProjectionDetector.DetectStereoMode(newProjection, _currentVideo?.Path ?? "");
+        ApplyProjectionSettings(newProjection, stereoMode);
     }
 
     /// <summary>
@@ -673,14 +643,17 @@ public class VRVideoPlayerController : MonoBehaviour
         switch (type)
         {
             case RTTMediaProjectionPopup.EnvironmentType.Room:
+                _environmentController?.ShowEnvironment();
                 SetLightsEnabled(true);
                 // Potential: Call environment controller to switch to Room preset
                 break;
             case RTTMediaProjectionPopup.EnvironmentType.Cinema:
+                _environmentController?.ShowEnvironment();
                 SetLightsEnabled(false);
                 // Potential: Call environment controller to switch to Cinema preset
                 break;
             case RTTMediaProjectionPopup.EnvironmentType.LightOff:
+                _environmentController?.HideEnvironment();
                 SetLightsEnabled(false);
                 break;
         }
@@ -830,111 +803,6 @@ public class VRVideoPlayerController : MonoBehaviour
         Debug.Log("[VRVideoPlayerController] Headset Mode clicked (Not implemented)");
     }
 
-    private void HandleProjectionChanged(VideoProjectionType newProjection)
-    {
-        if (!_currentVideo.HasValue) return;
-
-        var video = _currentVideo.Value;
-        video.Projection = newProjection;
-        _currentVideo = video;
-
-        var stereoMode = ProjectionDetector.DetectStereoMode(newProjection, video.Path);
-
-        // Update projection system
-        if (_projectionSystem != null)
-        {
-            _displaySettings = ProjectionDetector.SupportsScreenSettings(newProjection)
-                ? DisplaySettings.Default
-                : DisplaySettings.Immersive;
-
-            // Flat projection: Distance=0 so screen sits at _projectionRoot position (MenuFrame coordinates)
-            if (ProjectionDetector.SupportsScreenSettings(newProjection))
-            {
-                _displaySettings.Distance = 0f;
-            }
-
-            _projectionSystem.SetProjection(newProjection, stereoMode);
-            _projectionSystem.UpdateDisplay(_displaySettings);
-        }
-
-        // Update environment
-        _environmentController?.SetProjectionType(newProjection);
-
-        Debug.Log($"[VRVideoPlayerController] Projection changed to {newProjection}");
-    }
-
-    private void HandleProjectionSettingsChanged(VideoProjectionType newUIProjection, RTTMediaProjectionPopup.StereoMode newUIStereo)
-    {
-        if (!_currentVideo.HasValue) return;
-
-        // Combine UI Projection and Stereo selection into actual system ProjectionType and StereoMode
-        VideoProjectionType finalProjection = newUIProjection;
-        StereoMode finalStereo = StereoMode.Mono;
-
-        // Logic:
-        // 1. If UI says SBS, we typically mean SideBySide3D projection (on flat screen) OR VR180Stereo (on dome)
-        // 2. If UI says OU, we mean OverUnder3D (flat)
-        // 3. If UI says Mono, we use the selected projection (Flat/180/360) and Mono mode
-
-        switch (newUIStereo)
-        {
-            case RTTMediaProjectionPopup.StereoMode.SideBySide:
-                if (newUIProjection == VideoProjectionType.Flat)
-                    finalProjection = VideoProjectionType.SideBySide3D;
-                else if (newUIProjection == VideoProjectionType.Dome180)
-                    finalProjection = VideoProjectionType.VR180Stereo;
-                else
-                {
-                    // 360 SBS -> Keep Sphere360 but enable Stereo mode
-                    finalProjection = VideoProjectionType.Sphere360;
-                    finalStereo = StereoMode.Stereo; // Use generic Stereo for 360 if supported handling SBS texture
-                }
-                break;
-
-            case RTTMediaProjectionPopup.StereoMode.OverUnder:
-                if (newUIProjection == VideoProjectionType.Flat)
-                    finalProjection = VideoProjectionType.OverUnder3D;
-                else
-                {
-                    // 180 or 360 OU
-                    finalProjection = newUIProjection;
-                    finalStereo = StereoMode.Stereo; // Generic stereo, renderer must handle OU layout if possible
-                }
-                break;
-
-            case RTTMediaProjectionPopup.StereoMode.Mono:
-            default:
-                finalProjection = newUIProjection;
-                finalStereo = StereoMode.Mono;
-                break;
-        }
-        
-        // Update Metadata
-        var video = _currentVideo.Value;
-        video.Projection = finalProjection;
-        _currentVideo = video;
-        
-        Debug.Log($"[VRVideoPlayerController] Manual Settings -> UI Proj: {newUIProjection}, UI Stereo: {newUIStereo} => System Proj: {finalProjection}, System Stereo: {finalStereo}");
-
-        // Configure projection system
-        if (_projectionSystem != null)
-        {
-             _displaySettings = ProjectionDetector.SupportsScreenSettings(finalProjection)
-                ? DisplaySettings.Default
-                : DisplaySettings.Immersive;
-
-            if (ProjectionDetector.SupportsScreenSettings(finalProjection))
-            {
-                _displaySettings.Distance = 0f;
-            }
-
-            _projectionSystem.SetProjection(finalProjection, finalStereo);
-            _projectionSystem.UpdateDisplay(_displaySettings);
-        }
-
-        // Update environment
-        _environmentController?.SetProjectionType(finalProjection);
-    }
 
     private void HandleRecenter()
     {

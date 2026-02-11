@@ -117,9 +117,6 @@ public struct MediaVideoInfo
             {
                 case VideoProjectionType.Sphere360: return "360";
                 case VideoProjectionType.Dome180: return "180";
-                case VideoProjectionType.SideBySide3D:
-                case VideoProjectionType.OverUnder3D: return "3D";
-                case VideoProjectionType.VR180Stereo: return "VR";
                 default: return null;
             }
         }

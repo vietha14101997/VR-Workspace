@@ -11,7 +11,7 @@ public class ModeController : MonoBehaviour
     public Camera backgroundVirtual;  // BackgroundCamera_Virtual
     public CameraPassthrough cameraPassthrough; // Script trên PassthroughQuad
     public GameObject virtualEnvironment; // Virtual environment objects
-    public float transitionDuration = 0.5f;
+    public float transitionDuration = 0f;
 
     private bool isTransitioning;
     private Coroutine transitionCoroutine;
@@ -31,6 +31,12 @@ public class ModeController : MonoBehaviour
         {
             Debug.LogError("CameraPassthrough reference not set in ModeController!");
             return;
+        }
+
+        // Initialize MediaEnvironmentController
+        if (MediaEnvironmentController.Instance != null)
+        {
+            MediaEnvironmentController.Instance.Initialize();
         }
 
         Apply();
@@ -59,7 +65,6 @@ public class ModeController : MonoBehaviour
         if (isTransitioning) yield break;
         isTransitioning = true;
 
-        float startTime = Time.time;
         bool real = (mode == ViewMode.RealWorld);
 
         // Enable necessary cameras for transition
@@ -70,35 +75,36 @@ public class ModeController : MonoBehaviour
             yield return new WaitForEndOfFrame(); // Wait for camera to initialize
         }
 
-        // Animate transition
-        while (Time.time - startTime < transitionDuration)
-        {
-            float t = (Time.time - startTime) / transitionDuration;
-
-            // Apply smoothstep for more natural easing
-            t = t * t * (3f - 2f * t); // Smoothstep formula
-
-            // Fade virtual environment opacity if needed
-            if (virtualEnvironment)
-            {
-                // You can add fade effect here if needed
-            }
-
-            yield return null;
-        }
-
         // Set final states
         if (real)
         {
             backgroundVirtual.enabled = false;
-            if (virtualEnvironment) virtualEnvironment.SetActive(false);
+            
+            // Use MediaEnvironmentController for robust visibility tracking
+            if (MediaEnvironmentController.Instance != null)
+            {
+                MediaEnvironmentController.Instance.UpdateEnvironmentVisibility(false, "Passthrough");
+            }
+            else if (virtualEnvironment)
+            {
+                virtualEnvironment.SetActive(false);
+            }
         }
         else
         {
             backgroundReal.enabled = false;
             cameraPassthrough.enabled = false;
             backgroundVirtual.enabled = true;
-            if (virtualEnvironment) virtualEnvironment.SetActive(true);
+
+            // Use MediaEnvironmentController for robust visibility tracking
+            if (MediaEnvironmentController.Instance != null)
+            {
+                MediaEnvironmentController.Instance.UpdateEnvironmentVisibility(true, "Passthrough");
+            }
+            else if (virtualEnvironment)
+            {
+                virtualEnvironment.SetActive(true);
+            }
         }
 
         isTransitioning = false;

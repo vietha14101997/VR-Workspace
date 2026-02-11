@@ -139,8 +139,14 @@ Shader "VRWorkspace/Media/VideoFlatProjection"
 
             fixed4 frag(v2f i) : SV_Target
             {
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
+                
+                // Use unity_StereoEyeIndex for automatic left/right eye detection in VR
+                // Fallback to manual _EyeIndex for editor testing if needed
+                float eye = unity_StereoEyeIndex;
+                
                 // Get stereo-adjusted UV
-                float2 stereoUV = GetStereoUV(i.uv, _StereoMode, _EyeIndex);
+                float2 stereoUV = GetStereoUV(i.uv, _StereoMode, eye);
 
                 float3 color;
 

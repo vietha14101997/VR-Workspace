@@ -35,6 +35,10 @@ Shader "Unlit/WorldPanelBoard"
         // VR quality - negative bias for sharper textures at distance
         [Header(VR Quality)]
         _MipMapBias ("Mipmap Bias", Range(-2, 0)) = 0
+
+        [Header(Stereo)]
+        _StereoMode ("Stereo Mode", Float) = 0  // 0=Mono, 1=SBS, 2=OU
+        _EyeIndex ("Eye Index", Float) = 0      // 0=Left, 1=Right
     }
 
     SubShader
@@ -79,24 +83,58 @@ Shader "Unlit/WorldPanelBoard"
 
             float4  _EdgeMask; // (Left, Right, Top, Bottom): 1=show corner, 0=no corner
 
+            // Stereo properties
+            float _StereoMode;
+            float _EyeIndex;
+
             struct appdata
             {
                 float4 vertex : POSITION;
                 float2 uv     : TEXCOORD0;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
             struct v2f
             {
                 float4 pos : SV_POSITION;
                 float2 uv  : TEXCOORD0;
+                UNITY_VERTEX_OUTPUT_STEREO
             };
-
+            
             v2f vert (appdata v)
             {
                 v2f o;
+                UNITY_SETUP_INSTANCE_ID(v);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
                 o.pos = UnityObjectToClipPos(v.vertex);
                 o.uv  = TRANSFORM_TEX(v.uv, _MainTex);
                 return o;
+            }
+
+            // Get stereo UV based on mode and eye
+            float2 GetStereoUV(float2 uv, float stereoMode, float eyeIndex)
+            {
+                if (stereoMode < 0.5)
+                {
+                    // Mono - no modification
+                    return uv;
+                }
+                else if (stereoMode < 1.5)
+                {
+                    // Side-by-Side
+                    float halfU = uv.x * 0.5;
+                    if (eyeIndex > 0.5)
+                        halfU += 0.5;
+                    return float2(halfU, uv.y);
+                }
+                else
+                {
+                    // Over-Under
+                    float halfV = uv.y * 0.5;
+                    if (eyeIndex < 0.5)
+                        halfV += 0.5; // Left eye is top half
+                    return float2(uv.x, halfV);
+                }
             }
 
             // Tính alpha fade viền theo mét quanh cạnh trái/phải & trên/dưới
@@ -246,19 +284,24 @@ Shader "Unlit/WorldPanelBoard"
                 clip(aRound - 0.001);
 
                 // ---- Lấy màu texture với sharpening (nếu enabled) ----
+                // Apply Stereo UV before sampling
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
+                float eye = unity_StereoEyeIndex;
+                float2 stereoUV = GetStereoUV(i.uv, _StereoMode, eye);
+
                 // Uses tex2Dbias with _MipMapBias for sharper VR viewing at distance
                 fixed4 col;
                 if (_EnableSharpening > 0.5)
                 {
                     // Apply Unsharp Mask to combat H.264 decode blur
-                    col = UnsharpMask(_MainTex, i.uv, _MainTex_TexelSize.xy, _Sharpness, _SharpnessRadius, _MipMapBias);
+                    col = UnsharpMask(_MainTex, stereoUV, _MainTex_TexelSize.xy, _Sharpness, _SharpnessRadius, _MipMapBias);
 
                     // Apply chroma correction to reduce YUV 4:2:0 color bleeding
                     col = ChromaCorrect(col, _ChromaSharpness);
                 }
                 else
                 {
-                    col = tex2Dbias(_MainTex, float4(i.uv, 0, _MipMapBias));
+                    col = tex2Dbias(_MainTex, float4(stereoUV, 0, _MipMapBias));
                 }
                 col *= _Color;
 

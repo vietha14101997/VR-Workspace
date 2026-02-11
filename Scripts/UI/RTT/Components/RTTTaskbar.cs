@@ -84,6 +84,12 @@ public class RTTTaskbar : MonoBehaviour
         AddControlButtons();
         AddAppButtons();
 
+        // Initialize environment controller
+        if (MediaEnvironmentController.Instance != null)
+        {
+            MediaEnvironmentController.Instance.Initialize();
+        }
+
         // Sync passthrough state
         SyncPassthroughWithModeController();
 
@@ -247,11 +253,18 @@ public class RTTTaskbar : MonoBehaviour
         _isLightOn = isOn;
         Debug.Log($"[RTTTaskbar] Light toggled: {(_isLightOn ? "ON" : "OFF")}");
 
+        // Use MediaEnvironmentController for unified light/environment management
+        var envController = MediaEnvironmentController.Instance;
+        if (envController != null)
+        {
+            envController.SetLightsEnabled(isOn);
+        }
+
         var modeController = FindObjectOfType<ModeController>();
 
         if (!_isLightOn)
         {
-            // Tắt đèn: lưu trạng thái passthrough, ẩn environment, tắt passthrough
+            // Tắt đèn: lưu trạng thái passthrough, tắt passthrough
             _savedPassthroughState = _isPassthroughOn;
 
             if (modeController != null)
@@ -272,12 +285,6 @@ public class RTTTaskbar : MonoBehaviour
                 if (modeController.backgroundVirtual != null)
                 {
                     modeController.backgroundVirtual.enabled = true;
-                }
-
-                // Ẩn virtual environment
-                if (modeController.virtualEnvironment != null)
-                {
-                    modeController.virtualEnvironment.SetActive(false);
                 }
             }
 
@@ -303,11 +310,7 @@ public class RTTTaskbar : MonoBehaviour
                 }
                 else
                 {
-                    // Không có passthrough: hiện virtual environment bình thường
-                    if (modeController.virtualEnvironment != null)
-                    {
-                        modeController.virtualEnvironment.SetActive(true);
-                    }
+                    // No passthrough mode changes needed, environment visibility handled by MediaEnvironmentController
                 }
             }
 
@@ -600,14 +603,11 @@ public class RTTTaskbar : MonoBehaviour
             _isLightOn = isOn;
             UpdateEyeButtonColor();
 
-            // Toggle directional lights
-            var lights = FindObjectsOfType<Light>();
-            foreach (var light in lights)
+            // Use MediaEnvironmentController for all lights
+            var envController = MediaEnvironmentController.Instance;
+            if (envController != null)
             {
-                if (light.type == LightType.Directional)
-                {
-                    light.enabled = _isLightOn;
-                }
+                envController.SetLightsEnabled(isOn);
             }
 
             _miniFrame.MarkDirty();

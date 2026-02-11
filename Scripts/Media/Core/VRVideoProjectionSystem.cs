@@ -254,13 +254,10 @@ public class VRVideoProjectionSystem : MonoBehaviour
         switch (type)
         {
             case VideoProjectionType.Flat:
-            case VideoProjectionType.SideBySide3D:
-            case VideoProjectionType.OverUnder3D:
                 CreateFlatRenderer();
                 break;
 
             case VideoProjectionType.Dome180:
-            case VideoProjectionType.VR180Stereo:
                 CreateDome180Renderer();
                 break;
 
@@ -282,10 +279,6 @@ public class VRVideoProjectionSystem : MonoBehaviour
 
         _renderers[VideoProjectionType.Flat] = renderer;
 
-        // Flat renderer is also used for SBS and OU
-        _renderers[VideoProjectionType.SideBySide3D] = renderer;
-        _renderers[VideoProjectionType.OverUnder3D] = renderer;
-
         Debug.Log("[VRVideoProjectionSystem] Created FlatProjectionRenderer");
     }
 
@@ -300,9 +293,6 @@ public class VRVideoProjectionSystem : MonoBehaviour
         renderer.Initialize(_projectionRoot);
 
         _renderers[VideoProjectionType.Dome180] = renderer;
-
-        // Dome180 renderer is also used for VR180 Stereo
-        _renderers[VideoProjectionType.VR180Stereo] = renderer;
 
         Debug.Log("[VRVideoProjectionSystem] Created Dome180Renderer");
     }

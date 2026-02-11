@@ -701,8 +701,8 @@ public class RTTMediaProjectionPopup : MonoBehaviour
 
     public enum StereoMode
     {
-        Mono,
-        SideBySide,
-        OverUnder
+        Mono = 0,
+        SideBySide = 1,
+        OverUnder = 2
     }
 }

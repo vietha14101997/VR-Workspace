@@ -33,6 +33,9 @@ public class MediaEnvironmentController : MonoBehaviour
     private Coroutine _fadeCoroutine;
     private bool _isInitialized;
 
+    // Visibility Reason Tracking
+    private System.Collections.Generic.HashSet<string> _visibilityBlockers = new System.Collections.Generic.HashSet<string>();
+
     // Cached references
     private Material _skyboxMaterial;
     private Color _originalAmbientColor;
@@ -96,7 +99,7 @@ public class MediaEnvironmentController : MonoBehaviour
     private GameObject FindEnvironmentRoot()
     {
         // Try to find common environment root names
-        string[] possibleNames = { "Environment", "VREnvironment", "Room", "Scene", "World" };
+        string[] possibleNames = { "Environment", "VREnvironment", "VirtualEnvironment", "Room", "Scene", "World" };
 
         foreach (string name in possibleNames)
         {
@@ -173,16 +176,9 @@ public class MediaEnvironmentController : MonoBehaviour
         CurrentProjection = projection;
         bool shouldHide = ProjectionDetector.ShouldHideEnvironment(projection);
 
-        if (shouldHide)
-        {
-            HideEnvironment();
-        }
-        else
-        {
-            ShowEnvironment();
-        }
+        UpdateEnvironmentVisibility(!shouldHide, "Projection");
 
-        Debug.Log($"[MediaEnvironmentController] Projection set to {projection}, environment {(shouldHide ? "hidden" : "visible")}");
+        Debug.Log($"[MediaEnvironmentController] Projection set to {projection}, environment {(shouldHide ? "blocked by Projection" : "allowed by Projection")}");
     }
 
     /// <summary>
@@ -192,9 +188,11 @@ public class MediaEnvironmentController : MonoBehaviour
     public void SetLightsEnabled(bool enabled)
     {
         if (LightsEnabled == enabled) return;
-        if (!EnvironmentVisible) return; // No lights control in immersive mode
-
+        
         LightsEnabled = enabled;
+
+        // "Light Off" also hides the environment for immersion
+        UpdateEnvironmentVisibility(enabled, "Lights");
 
         if (_fadeCoroutine != null)
         {
@@ -216,21 +214,42 @@ public class MediaEnvironmentController : MonoBehaviour
     }
 
     /// <summary>
+    /// Update environment visibility based on a specific source/reason.
+    /// The environment is only visible if NO system is blocking it.
+    /// </summary>
+    public void UpdateEnvironmentVisibility(bool visible, string source)
+    {
+        if (visible)
+        {
+            _visibilityBlockers.Remove(source);
+        }
+        else
+        {
+            _visibilityBlockers.Add(source);
+        }
+
+        bool shouldBeVisible = _visibilityBlockers.Count == 0;
+
+        if (EnvironmentVisible != shouldBeVisible)
+        {
+            EnvironmentVisible = shouldBeVisible;
+
+            if (_fadeCoroutine != null)
+            {
+                StopCoroutine(_fadeCoroutine);
+            }
+
+            _fadeCoroutine = StartCoroutine(FadeEnvironment(shouldBeVisible));
+            OnEnvironmentVisibilityChanged?.Invoke(shouldBeVisible);
+        }
+    }
+
+    /// <summary>
     /// Show environment (for Flat/Mono mode).
     /// </summary>
     public void ShowEnvironment()
     {
-        if (EnvironmentVisible) return;
-
-        EnvironmentVisible = true;
-
-        if (_fadeCoroutine != null)
-        {
-            StopCoroutine(_fadeCoroutine);
-        }
-
-        _fadeCoroutine = StartCoroutine(FadeEnvironment(true));
-        OnEnvironmentVisibilityChanged?.Invoke(true);
+        UpdateEnvironmentVisibility(true, "Manual");
     }
 
     /// <summary>
@@ -238,17 +257,7 @@ public class MediaEnvironmentController : MonoBehaviour
     /// </summary>
     public void HideEnvironment()
     {
-        if (!EnvironmentVisible) return;
-
-        EnvironmentVisible = false;
-
-        if (_fadeCoroutine != null)
-        {
-            StopCoroutine(_fadeCoroutine);
-        }
-
-        _fadeCoroutine = StartCoroutine(FadeEnvironment(false));
-        OnEnvironmentVisibilityChanged?.Invoke(false);
+        UpdateEnvironmentVisibility(false, "Manual");
     }
 
     /// <summary>
@@ -265,6 +274,7 @@ public class MediaEnvironmentController : MonoBehaviour
         RestoreEnvironmentImmediate();
         RestoreLightsImmediate();
 
+        _visibilityBlockers.Clear();
         EnvironmentVisible = true;
         LightsEnabled = true;
         CurrentProjection = VideoProjectionType.Flat;
@@ -288,54 +298,22 @@ public class MediaEnvironmentController : MonoBehaviour
     #region Private Methods
     private IEnumerator FadeLights(bool fadeIn)
     {
-        float elapsed = 0f;
-        float[] startIntensities = new float[_sceneLights.Length];
-        float startAmbient = RenderSettings.ambientIntensity;
-
-        // Cache start values
-        for (int i = 0; i < _sceneLights.Length; i++)
-        {
-            if (_sceneLights[i] != null)
-            {
-                startIntensities[i] = _sceneLights[i].intensity;
-            }
-        }
+        Debug.Log($"[MediaEnvironmentController] {(fadeIn ? "Fading in" : "Fading out")} lights instantly");
 
         float targetAmbient = fadeIn ? _originalAmbientIntensity : _originalAmbientIntensity * 0.1f;
+        RenderSettings.ambientIntensity = targetAmbient;
 
-        while (elapsed < FADE_DURATION)
-        {
-            elapsed += Time.deltaTime;
-            float t = Mathf.Clamp01(elapsed / FADE_DURATION);
-            t = Mathf.SmoothStep(0, 1, t); // Smooth easing
-
-            // Fade each light
-            for (int i = 0; i < _sceneLights.Length; i++)
-            {
-                if (_sceneLights[i] != null)
-                {
-                    float target = fadeIn ? _originalLightIntensities[i] : 0f;
-                    _sceneLights[i].intensity = Mathf.Lerp(startIntensities[i], target, t);
-                }
-            }
-
-            // Fade ambient
-            RenderSettings.ambientIntensity = Mathf.Lerp(startAmbient, targetAmbient, t);
-
-            yield return null;
-        }
-
-        // Ensure final values
         for (int i = 0; i < _sceneLights.Length; i++)
         {
             if (_sceneLights[i] != null)
             {
-                _sceneLights[i].intensity = fadeIn ? _originalLightIntensities[i] : 0f;
+                float target = fadeIn ? _originalLightIntensities[i] : 0f;
+                _sceneLights[i].intensity = target;
             }
         }
-        RenderSettings.ambientIntensity = targetAmbient;
 
         _fadeCoroutine = null;
+        yield break;
     }
 
     private IEnumerator FadeEnvironment(bool show)
@@ -345,65 +323,30 @@ public class MediaEnvironmentController : MonoBehaviour
             yield break;
         }
 
-        float elapsed = 0f;
-        Vector3 startScale = _environmentRoot.transform.localScale;
-        Vector3 targetScale = show ? _originalEnvironmentScale : Vector3.one * ENVIRONMENT_SCALE_HIDDEN;
+        Debug.Log($"[MediaEnvironmentController] {(show ? "Showing" : "Hiding")} environment instantly");
 
-        // Also fade lights when hiding environment
-        float[] startLightIntensities = new float[_sceneLights.Length];
-        for (int i = 0; i < _sceneLights.Length; i++)
+        // 1. Instant scale and active state for children
+        _environmentRoot.transform.localScale = show ? _originalEnvironmentScale : Vector3.one * ENVIRONMENT_SCALE_HIDDEN;
+        
+        // Toggle top-level children directly as requested
+        foreach (Transform child in _environmentRoot.transform)
         {
-            if (_sceneLights[i] != null)
-            {
-                startLightIntensities[i] = _sceneLights[i].intensity;
-            }
+            child.gameObject.SetActive(show);
         }
 
-        float startAmbient = RenderSettings.ambientIntensity;
+        // Ensure root itself is active so children can be visible
+        _environmentRoot.SetActive(true);
+
+        // 2. Instant light and ambient settings
         float targetAmbient = show ? _originalAmbientIntensity : 0f;
-
-        // Handle skybox
-        if (!show)
-        {
-            RenderSettings.skybox = null;
-        }
-
-        while (elapsed < FADE_DURATION)
-        {
-            elapsed += Time.deltaTime;
-            float t = Mathf.Clamp01(elapsed / FADE_DURATION);
-            t = Mathf.SmoothStep(0, 1, t);
-
-            // Scale environment
-            _environmentRoot.transform.localScale = Vector3.Lerp(startScale, targetScale, t);
-
-            // Fade lights
-            for (int i = 0; i < _sceneLights.Length; i++)
-            {
-                if (_sceneLights[i] != null)
-                {
-                    float target = show ? (LightsEnabled ? _originalLightIntensities[i] : 0f) : 0f;
-                    _sceneLights[i].intensity = Mathf.Lerp(startLightIntensities[i], target, t);
-                }
-            }
-
-            // Fade ambient
-            RenderSettings.ambientIntensity = Mathf.Lerp(startAmbient, targetAmbient, t);
-
-            yield return null;
-        }
-
-        // Final state
-        _environmentRoot.transform.localScale = targetScale;
         RenderSettings.ambientIntensity = targetAmbient;
 
         if (!show)
         {
-            _environmentRoot.SetActive(false);
+            RenderSettings.skybox = null;
         }
         else
         {
-            _environmentRoot.SetActive(true);
             RenderSettings.skybox = _skyboxMaterial;
         }
 
@@ -416,6 +359,7 @@ public class MediaEnvironmentController : MonoBehaviour
         }
 
         _fadeCoroutine = null;
+        yield break;
     }
 
     private void RestoreEnvironmentImmediate()

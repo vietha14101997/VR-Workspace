@@ -221,10 +221,7 @@ public class RTTMediaSettingsPopup : MonoBehaviour
         {
             "2D Flat",
             "180° VR",
-            "360° VR",
-            "3D Side-by-Side",
-            "3D Over-Under",
-            "VR180 3D"
+            "360° VR"
         });
 
         _projectionDropdown = dropdown;
@@ -713,10 +710,8 @@ public class RTTMediaSettingsPopup : MonoBehaviour
     {
         if (_screenSettingsSection != null)
         {
-            // Only show screen settings for Flat, SBS, and OU projections
-            bool showScreenSettings = _currentProjection == VideoProjectionType.Flat ||
-                                      _currentProjection == VideoProjectionType.SideBySide3D ||
-                                      _currentProjection == VideoProjectionType.OverUnder3D;
+            // Only show screen settings for Flat projection
+            bool showScreenSettings = _currentProjection == VideoProjectionType.Flat;
 
             _screenSettingsSection.SetActive(showScreenSettings);
         }

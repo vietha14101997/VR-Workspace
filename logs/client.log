@@ -1,8 +1,172 @@
-Assets\VR-Workspace\Scripts\Media\Core\VRVideoPlayerController.cs(539,33): error CS0117: 'StereoMode' does not contain a definition for 'SideBySide'
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(811,9): error CS1519: Invalid token 'if' in class, record, struct, or interface member declaration
 
-Assets\VR-Workspace\Scripts\Media\Core\VRVideoPlayerController.cs(540,33): error CS0117: 'StereoMode' does not contain a definition for 'OverUnder'
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(811,27): error CS8124: Tuple must contain at least two elements.
 
-Assets\VR-Workspace\Scripts\Media\Core\VRVideoPlayerController.cs(755,91): error CS0117: 'StereoMode' does not contain a definition for 'SideBySide'
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(811,27): error CS1026: ) expected
 
-Assets\VR-Workspace\Scripts\Media\Core\VRVideoPlayerController.cs(756,90): error CS0117: 'StereoMode' does not contain a definition for 'OverUnder'
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(811,27): error CS1519: Invalid token '!=' in class, record, struct, or interface member declaration
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(813,43): error CS1519: Invalid token '(' in class, record, struct, or interface member declaration
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(813,48): error CS8124: Tuple must contain at least two elements.
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(813,49): error CS1519: Invalid token ';' in class, record, struct, or interface member declaration
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(816,9): error CS8803: Top-level statements must precede namespace and type declarations.
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(886,5): error CS1022: Type or namespace definition, or end-of-file expected
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(891,5): error CS0106: The modifier 'public' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(920,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(964,5): error CS0106: The modifier 'public' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(981,5): error CS0106: The modifier 'public' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(991,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(997,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1038,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1095,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1104,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1124,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1146,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1160,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1184,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1215,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1243,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1263,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1280,5): error CS0106: The modifier 'public' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1298,5): error CS0106: The modifier 'public' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1310,5): error CS0106: The modifier 'public' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1319,5): error CS0106: The modifier 'public' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1335,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1384,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1394,1): error CS1022: Type or namespace definition, or end-of-file expected
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(253,9): error CS1519: Invalid token 'if' in class, record, struct, or interface member declaration
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(253,27): error CS8124: Tuple must contain at least two elements.
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(253,27): error CS1026: ) expected
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(253,27): error CS1519: Invalid token '!=' in class, record, struct, or interface member declaration
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(255,43): error CS1519: Invalid token '(' in class, record, struct, or interface member declaration
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(255,48): error CS8124: Tuple must contain at least two elements.
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(255,49): error CS1519: Invalid token ';' in class, record, struct, or interface member declaration
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(258,9): error CS8803: Top-level statements must precede namespace and type declarations.
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(328,5): error CS1022: Type or namespace definition, or end-of-file expected
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(333,5): error CS0106: The modifier 'public' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(362,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(367,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(396,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(424,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(465,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(483,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(513,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(529,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(576,5): error CS0106: The modifier 'public' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(594,5): error CS0106: The modifier 'public' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(613,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(619,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(660,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(716,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(731,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(752,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(778,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(815,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(831,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(882,5): error CS0106: The modifier 'public' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(898,5): error CS0106: The modifier 'public' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(922,5): error CS0106: The modifier 'public' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(924,5): error CS0106: The modifier 'public' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(929,5): error CS0106: The modifier 'public' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(941,5): error CS0106: The modifier 'public' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(981,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1060,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1071,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1101,5): error CS0106: The modifier 'public' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1119,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1132,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1137,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1152,5): error CS0106: The modifier 'public' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1183,5): error CS0106: The modifier 'public' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1222,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1269,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1283,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1298,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1332,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1369,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1385,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1397,5): error CS0106: The modifier 'private' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1411,5): error CS0106: The modifier 'public' is not valid for this item
+
+Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1422,1): error CS1022: Type or namespace definition, or end-of-file expected
 

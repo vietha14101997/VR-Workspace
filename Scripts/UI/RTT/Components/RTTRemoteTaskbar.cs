@@ -112,6 +112,12 @@ public class RTTRemoteTaskbar : MonoBehaviour
         AddSection2Slots();
         SetupLatencyDisplay();
 
+        // Initialize environment controller
+        if (MediaEnvironmentController.Instance != null)
+        {
+            MediaEnvironmentController.Instance.Initialize();
+        }
+
         // Create expansion panel
         CreateExpansionPanel();
 
@@ -805,11 +811,18 @@ public class RTTRemoteTaskbar : MonoBehaviour
         _isLightOn = isOn;
         Debug.Log($"[RTTRemoteTaskbar] Light toggled: {(_isLightOn ? "ON" : "OFF")}");
 
+        // Use MediaEnvironmentController for unified light/environment management
+        var envController = MediaEnvironmentController.Instance;
+        if (envController != null)
+        {
+            envController.SetLightsEnabled(isOn);
+        }
+
         var modeController = FindObjectOfType<ModeController>();
 
         if (!_isLightOn)
         {
-            // Tắt đèn: lưu trạng thái passthrough, ẩn environment, tắt passthrough
+            // Tắt đèn: lưu trạng thái passthrough, tắt passthrough
             _savedPassthroughState = _isPassthroughOn;
 
             if (modeController != null)
@@ -831,12 +844,6 @@ public class RTTRemoteTaskbar : MonoBehaviour
                 {
                     modeController.backgroundVirtual.enabled = true;
                 }
-
-                // Ẩn virtual environment
-                if (modeController.virtualEnvironment != null)
-                {
-                    modeController.virtualEnvironment.SetActive(false);
-                }
             }
 
             // Cập nhật trạng thái passthrough trong expansion panel
@@ -844,7 +851,7 @@ public class RTTRemoteTaskbar : MonoBehaviour
             if (_expansionPanel != null)
             {
                 _expansionPanel.SetPassthroughState(false);
-                _expansionPanel.SetPassthroughInteractable(false);
+                _expansionPanel.SetPassthroughInteractable(false); // Disable nút passthrough
             }
         }
         else
@@ -856,15 +863,12 @@ public class RTTRemoteTaskbar : MonoBehaviour
                 if (_savedPassthroughState)
                 {
                     _isPassthroughOn = true;
+                    // Dùng SetMode để khôi phục đầy đủ (bật backgroundReal, passthrough, ẩn virtualEnv)
                     modeController.SetMode(ViewMode.RealWorld);
                 }
                 else
                 {
-                    // Không có passthrough: hiện virtual environment bình thường
-                    if (modeController.virtualEnvironment != null)
-                    {
-                        modeController.virtualEnvironment.SetActive(true);
-                    }
+                    // No passthrough mode changes needed, environment visibility handled by MediaEnvironmentController
                 }
             }
 

@@ -182,7 +182,9 @@ Shader "VRWorkspace/Media/Video180Dome"
                 equirectUV = saturate(equirectUV);
 
                 // Apply stereo mode
-                float2 stereoUV = GetStereoUV(equirectUV, _StereoMode, _EyeIndex);
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
+                float eye = unity_StereoEyeIndex;
+                float2 stereoUV = GetStereoUV(equirectUV, _StereoMode, eye);
 
                 float3 color;
 
