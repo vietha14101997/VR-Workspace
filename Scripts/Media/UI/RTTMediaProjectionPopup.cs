@@ -14,8 +14,8 @@ using VRWorkspace.UI.HoverEffects;
 public class RTTMediaProjectionPopup : MonoBehaviour
 {
     #region Constants
-    private const float POPUP_WIDTH = 360f;
-    private const float POPUP_HEIGHT = 240f; 
+    private const float POPUP_WIDTH = 450f;
+    private const float POPUP_HEIGHT = 300f; 
     
     // Height Ratios
     private const float HEADER_RATIO = 0.25f;
@@ -23,9 +23,9 @@ public class RTTMediaProjectionPopup : MonoBehaviour
     private const float ROW_RATIO_OF_BODY = 0.25f;
 
     // Calculated Dimensions
-    private float HeaderHeight => POPUP_HEIGHT * HEADER_RATIO; // 60
-    private float BodyHeight => POPUP_HEIGHT * BODY_RATIO; // 180
-    private float RowHeight => BodyHeight * ROW_RATIO_OF_BODY; // 45
+    private float HeaderHeight => POPUP_HEIGHT * 0.25f; // 75f
+    private float BodyHeight => POPUP_HEIGHT * 0.75f;   // 225f
+    private float RowHeight => 63.75f; // Scaled from 75f (-15%)
     
     // Spacing Calculation:
     // Body Height = 180. 
@@ -341,7 +341,7 @@ public class RTTMediaProjectionPopup : MonoBehaviour
         var text = textObj.AddComponent<TextMeshProUGUI>();
         text.text = _mode == PopupMode.Projection ? "Projection" : "Environment";
         text.font = _font;
-        text.fontSize = 20; // Slightly larger for header
+        text.fontSize = 30; // Scaled from 25 (+20%)
         text.fontStyle = FontStyles.Bold;
         text.color = Color.white;
         text.alignment = TextAlignmentOptions.Center;
@@ -402,9 +402,9 @@ public class RTTMediaProjectionPopup : MonoBehaviour
         float btnWidth = (POPUP_WIDTH - (2 * PADDING_X) - (2 * 5)) / 3f;
         _stereoSelector = CreateSelector(rowObj.transform, btnWidth, RowHeight);
 
-        CreateSegmentedButton(rowObj.transform, "mono", null, () => SetStereo(StereoMode.Mono), _stereoButtons, StereoMode.Mono, btnWidth);
-        CreateSegmentedButton(rowObj.transform, "sbs", null, () => SetStereo(StereoMode.SideBySide), _stereoButtons, StereoMode.SideBySide, btnWidth);
-        CreateSegmentedButton(rowObj.transform, "ou", null, () => SetStereo(StereoMode.OverUnder), _stereoButtons, StereoMode.OverUnder, btnWidth);
+        CreateSegmentedButton(rowObj.transform, "Mono", null, () => SetStereo(StereoMode.Mono), _stereoButtons, StereoMode.Mono, btnWidth);
+        CreateSegmentedButton(rowObj.transform, "SBS", null, () => SetStereo(StereoMode.SideBySide), _stereoButtons, StereoMode.SideBySide, btnWidth);
+        CreateSegmentedButton(rowObj.transform, "OU", null, () => SetStereo(StereoMode.OverUnder), _stereoButtons, StereoMode.OverUnder, btnWidth);
     }
 
     private void CreateMonitorTypeRow(Transform parent)
@@ -509,7 +509,7 @@ public class RTTMediaProjectionPopup : MonoBehaviour
             var text = textObj.AddComponent<TextMeshProUGUI>();
             text.text = label;
             text.font = _font;
-            text.fontSize = 16;
+            text.fontSize = 24; // Scaled from 20 (+20%)
             text.color = TEXT_COLOR_NORMAL;
             text.alignment = TextAlignmentOptions.Center;
             text.fontStyle = FontStyles.Bold;
