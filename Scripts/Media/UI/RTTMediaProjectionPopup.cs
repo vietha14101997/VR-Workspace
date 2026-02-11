@@ -37,7 +37,8 @@ public class RTTMediaProjectionPopup : MonoBehaviour
     private const float PADDING_X = 20f;
     
     // Colors
-    private readonly Color POPUP_BG_COLOR = new Color(0.15f, 0.15f, 0.15f, 1.0f); // Dark Grey Panel
+    private readonly Color POPUP_BG_COLOR = new Color(0.15f, 0.15f, 0.15f, 1.0f); // Body Color
+    private readonly Color HEADER_BG_COLOR = new Color(0.25f, 0.25f, 0.25f, 1.0f); // Lighter Header
     private readonly Color ROW_BG_COLOR = new Color(0.1f, 0.1f, 0.1f, 1.0f);     // Darker Row Background
     private readonly Color SELECTED_COLOR = new Color(1f, 0.0f, 0.4f, 1f);       // Hot Pink
     private readonly Color TEXT_COLOR_NORMAL = new Color(0.9f, 0.9f, 0.9f, 1f);
@@ -92,6 +93,11 @@ public class RTTMediaProjectionPopup : MonoBehaviour
         // Background (Rounded Panel)
         var bg = _popup.AddComponent<Image>();
         bg.color = POPUP_BG_COLOR;
+        bg.sprite = GetPillSprite();
+        bg.type = Image.Type.Sliced;
+        
+        var mask = _popup.AddComponent<Mask>();
+        mask.showMaskGraphic = true;
         
         // Canvas group
         _canvasGroup = _popup.AddComponent<CanvasGroup>();
@@ -143,10 +149,101 @@ public class RTTMediaProjectionPopup : MonoBehaviour
         return _pillSprite;
     }
 
+    private static Sprite _headerSprite;
+    private static Sprite GetHeaderSprite()
+    {
+        if (_headerSprite != null) return _headerSprite;
+
+        int size = 32; 
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        Color[] colors = new Color[size * size];
+
+        float center = size / 2f;
+        float radius = size / 2f; 
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                if (y < center)
+                {
+                    colors[y * size + x] = Color.white;
+                }
+                else
+                {
+                    float dist = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(center, center));
+                    float alpha = Mathf.Clamp01(radius - dist + 0.5f);
+                    colors[y * size + x] = new Color(1, 1, 1, alpha);
+                }
+            }
+        }
+
+        tex.SetPixels(colors);
+        tex.Apply();
+
+        Vector4 border = new Vector4(size / 2, size / 2, size / 2, size / 2);
+        _headerSprite = Sprite.Create(tex, new Rect(0, 0, size, size), Vector2.one * 0.5f, 100f, 0, SpriteMeshType.FullRect, border);
+        
+        return _headerSprite;
+    }
+
+    private static Sprite _roundedSprite;
+    private static Sprite GetRoundedSprite()
+    {
+        if (_roundedSprite != null) return _roundedSprite;
+
+        int size = 128; 
+        float r = 20f; 
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        Color[] colors = new Color[size * size];
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float u = x + 0.5f;
+                float v = y + 0.5f;
+
+                // Check if in corner area
+                bool inX = (u < r) || (u > size - r);
+                bool inY = (v < r) || (v > size - r);
+
+                if (inX && inY)
+                {
+                    // Calculate distance to nearest corner center
+                    float cx = (u < size / 2) ? r : size - r;
+                    float cy = (v < size / 2) ? r : size - r;
+                    
+                    float dist = Vector2.Distance(new Vector2(u, v), new Vector2(cx, cy));
+                    float alpha = Mathf.Clamp01(r - dist + 0.5f);
+                    colors[y * size + x] = new Color(1, 1, 1, alpha);
+                }
+                else
+                {
+                    colors[y * size + x] = Color.white;
+                }
+            }
+        }
+
+        tex.SetPixels(colors);
+        tex.Apply();
+
+        Vector4 border = new Vector4(r, r, r, r);
+        _roundedSprite = Sprite.Create(tex, new Rect(0, 0, size, size), Vector2.one * 0.5f, 100f, 0, SpriteMeshType.FullRect, border);
+        
+        return _roundedSprite;
+    }
+
     private void CreateHeaderSection()
     {
         GameObject headerObj = new GameObject("Header");
         headerObj.transform.SetParent(_popup.transform, false);
+
+        // Header Background
+        var headerBg = headerObj.AddComponent<Image>();
+        headerBg.sprite = GetHeaderSprite();
+        headerBg.type = Image.Type.Sliced;
+        headerBg.color = HEADER_BG_COLOR;
 
         var le = headerObj.AddComponent<LayoutElement>();
         le.minHeight = HeaderHeight;
@@ -202,10 +299,12 @@ public class RTTMediaProjectionPopup : MonoBehaviour
         // Background for the row (Dark Pill)
         var bg = rowObj.AddComponent<Image>();
         bg.color = ROW_BG_COLOR;
+        bg.sprite = GetRoundedSprite();
+        bg.type = Image.Type.Sliced;
         
         var rowLayout = rowObj.AddComponent<HorizontalLayoutGroup>();
-        // Increased padding to 8 to "shrink" the inner buttons slightly as requested
-        rowLayout.padding = new RectOffset(8, 8, 8, 8); 
+        // Zero padding so buttons fill the rounded row completely
+        rowLayout.padding = new RectOffset(0, 0, 0, 0); 
         rowLayout.spacing = 5;
         rowLayout.childControlWidth = true;
         rowLayout.childForceExpandWidth = true;
@@ -220,7 +319,7 @@ public class RTTMediaProjectionPopup : MonoBehaviour
         CreateSegmentedButton(rowObj.transform, "FLAT", () => SetProjection(VideoProjectionType.Flat), _projectionButtons, VideoProjectionType.Flat);
         CreateSegmentedButton(rowObj.transform, "180", () => SetProjection(VideoProjectionType.Dome180), _projectionButtons, VideoProjectionType.Dome180);
         CreateSegmentedButton(rowObj.transform, "360", () => SetProjection(VideoProjectionType.Sphere360), _projectionButtons, VideoProjectionType.Sphere360);
-        CreateSegmentedButton(rowObj.transform, "FISH", null, null, (VideoProjectionType)999); // Dummy visual
+        // FISH removed
     }
 
     private void CreateStereoRow(Transform parent)
@@ -230,9 +329,11 @@ public class RTTMediaProjectionPopup : MonoBehaviour
 
         var bg = rowObj.AddComponent<Image>();
         bg.color = ROW_BG_COLOR;
+        bg.sprite = GetRoundedSprite();
+        bg.type = Image.Type.Sliced;
 
         var rowLayout = rowObj.AddComponent<HorizontalLayoutGroup>();
-        rowLayout.padding = new RectOffset(8, 8, 8, 8);
+        rowLayout.padding = new RectOffset(0, 0, 0, 0);
         rowLayout.spacing = 5;
         rowLayout.childControlWidth = true;
         rowLayout.childForceExpandWidth = true;
@@ -255,8 +356,9 @@ public class RTTMediaProjectionPopup : MonoBehaviour
         btnObj.transform.SetParent(parent, false);
 
         // Background (Transparent by default, Pink when selected)
+
         var bg = btnObj.AddComponent<Image>();
-        bg.sprite = GetPillSprite();
+        bg.sprite = GetRoundedSprite();
         bg.type = Image.Type.Sliced;
         bg.color = Color.clear; // Start clear
 
