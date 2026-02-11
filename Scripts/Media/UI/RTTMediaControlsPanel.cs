@@ -65,6 +65,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     public event Action OnVRModeClicked;
     public event Action OnHeadsetModeClicked;
     public event Action OnRecenterClicked;
+    public event Action OnEnvironmentClicked;
     #endregion
 
     #region Properties
@@ -551,7 +552,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
 
         float advancedButtonSize = otherButtonSize * 1.2f; // 20% larger than standard buttons
         Button envBtn = CreateIconOnlyButton(rightGroup.transform, ICON_ENVIRONMENT, advancedButtonSize);
-        envBtn.onClick.AddListener(() => Debug.Log("Environment clicked"));
+        envBtn.onClick.AddListener(() => OnEnvironmentClicked?.Invoke());
 
         Button threeDBtn = CreateIconOnlyButton(rightGroup.transform, ICON_3D, advancedButtonSize);
         threeDBtn.onClick.AddListener(() => OnVRModeClicked?.Invoke());

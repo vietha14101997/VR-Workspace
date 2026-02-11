@@ -748,8 +748,22 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
         float bottomOffset = RTTMediaControlsPanel.GetZoneBBottomOffset();
         var projectionPopup = projectionObj.AddComponent<RTTMediaProjectionPopup>();
-        projectionPopup.Initialize(_font, _primaryColor, _accentColor, padding, bottomOffset);
+        projectionPopup.Initialize(_font, _primaryColor, _accentColor, padding, bottomOffset, RTTMediaProjectionPopup.PopupMode.Projection);
         _playerController.SetProjectionPopup(projectionPopup);
+
+        // Environment Popup
+        GameObject envPopupObj = new GameObject("EnvironmentPopup_Root");
+        envPopupObj.transform.SetParent(container, false);
+
+        var envPopupRT = envPopupObj.AddComponent<RectTransform>();
+        envPopupRT.anchorMin = Vector2.zero;
+        envPopupRT.anchorMax = Vector2.one;
+        envPopupRT.offsetMin = Vector2.zero;
+        envPopupRT.offsetMax = Vector2.zero;
+
+        var environmentPopup = envPopupObj.AddComponent<RTTMediaProjectionPopup>();
+        environmentPopup.Initialize(_font, _primaryColor, _accentColor, padding, bottomOffset, RTTMediaProjectionPopup.PopupMode.Environment);
+        _playerController.SetEnvironmentPopup(environmentPopup);
 
         Debug.Log("[VRMediaAppController] Player UI built with controls container");
     }

@@ -26,6 +26,7 @@ public class VRVideoPlayerController : MonoBehaviour
     private RTTMediaControlsPanel _controlsPanel;
     private RTTMediaSettingsPopup _settingsPopup;
     private RTTMediaProjectionPopup _projectionPopup;
+    private RTTMediaProjectionPopup _environmentPopup;
     private RTTMediaQueuePopup _queuePopup;
     private MediaEnvironmentController _environmentController;
 
@@ -100,6 +101,7 @@ public class VRVideoPlayerController : MonoBehaviour
             _controlsPanel.OnVRModeClicked += HandleVRModeClicked;
             _controlsPanel.OnHeadsetModeClicked += HandleHeadsetModeClicked;
             _controlsPanel.OnRecenterClicked += HandleRecenter;
+            _controlsPanel.OnEnvironmentClicked += ShowEnvironmentPopup;
         }
     }
 
@@ -175,6 +177,40 @@ public class VRVideoPlayerController : MonoBehaviour
         if (_projectionPopup == null) return;
         _projectionPopup.OnSettingsChanged -= HandleProjectionSettingsChanged;
         _projectionPopup.OnCloseRequested -= HideProjectionPopup;
+    }
+
+    /// <summary>
+    /// Set the environment popup reference.
+    /// </summary>
+    public void SetEnvironmentPopup(RTTMediaProjectionPopup popup)
+    {
+        if (_environmentPopup != null)
+        {
+            UnwireEnvironmentEvents();
+        }
+
+        _environmentPopup = popup;
+
+        if (_environmentPopup != null)
+        {
+            WireEnvironmentEvents();
+        }
+    }
+
+    private void WireEnvironmentEvents()
+    {
+        if (_environmentPopup == null) return;
+        _environmentPopup.OnMonitorTypeChanged += HandleMonitorTypeChanged;
+        _environmentPopup.OnEnvironmentChanged += HandleEnvironmentSettingsChanged;
+        _environmentPopup.OnCloseRequested += HideEnvironmentPopup;
+    }
+
+    private void UnwireEnvironmentEvents()
+    {
+        if (_environmentPopup == null) return;
+        _environmentPopup.OnMonitorTypeChanged -= HandleMonitorTypeChanged;
+        _environmentPopup.OnEnvironmentChanged -= HandleEnvironmentSettingsChanged;
+        _environmentPopup.OnCloseRequested -= HideEnvironmentPopup;
     }
 
     /// <summary>
@@ -332,6 +368,7 @@ public class VRVideoPlayerController : MonoBehaviour
         HideQueue();
         HideSettings();
         HideProjectionPopup();
+        HideEnvironmentPopup();
     }
 
     /// <summary>
@@ -591,13 +628,64 @@ public class VRVideoPlayerController : MonoBehaviour
         _projectionPopup?.Hide();
     }
 
+    /// <summary>
+    /// Show environment settings popup.
+    /// </summary>
+    public void ShowEnvironmentPopup()
+    {
+        if (_environmentPopup == null) return;
+
+        // Update with current state
+        _environmentPopup.SetEnvironmentState(_currentMonitor, _currentEnv);
+        _environmentPopup.Show();
+    }
+
+    /// <summary>
+    /// Hide environment settings popup.
+    /// </summary>
+    public void HideEnvironmentPopup()
+    {
+        _environmentPopup?.Hide();
+    }
+
     private void HideQueue()
     {
         _queuePopup?.Hide();
     }
-    #endregion
+#endregion
 
-    #region Event Handlers
+#region Event Handlers
+    // Monitory Type Logic
+    private RTTMediaProjectionPopup.MonitorType _currentMonitor = RTTMediaProjectionPopup.MonitorType.Flat;
+    private void HandleMonitorTypeChanged(RTTMediaProjectionPopup.MonitorType type)
+    {
+        _currentMonitor = type;
+        float curvature = (type == RTTMediaProjectionPopup.MonitorType.Curved) ? 0.25f : 0f;
+        SetScreenCurvature(curvature);
+        Debug.Log($"[VRVideoPlayerController] Monitor type changed to {type}, curvature set to {curvature}");
+    }
+
+    // Environment Settings Logic
+    private RTTMediaProjectionPopup.EnvironmentType _currentEnv = RTTMediaProjectionPopup.EnvironmentType.Room;
+    private void HandleEnvironmentSettingsChanged(RTTMediaProjectionPopup.EnvironmentType type)
+    {
+        _currentEnv = type;
+        switch (type)
+        {
+            case RTTMediaProjectionPopup.EnvironmentType.Room:
+                SetLightsEnabled(true);
+                // Potential: Call environment controller to switch to Room preset
+                break;
+            case RTTMediaProjectionPopup.EnvironmentType.Cinema:
+                SetLightsEnabled(false);
+                // Potential: Call environment controller to switch to Cinema preset
+                break;
+            case RTTMediaProjectionPopup.EnvironmentType.LightOff:
+                SetLightsEnabled(false);
+                break;
+        }
+        Debug.Log($"[VRVideoPlayerController] Environment changed to {type}");
+    }
     private void HandleVideoPrepared()
     {
         Debug.Log("[VRVideoPlayerController] Video prepared");
