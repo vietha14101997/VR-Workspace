@@ -746,8 +746,9 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         projectionRT.offsetMin = Vector2.zero;
         projectionRT.offsetMax = Vector2.zero;
 
+        float bottomOffset = RTTMediaControlsPanel.GetZoneBBottomOffset();
         var projectionPopup = projectionObj.AddComponent<RTTMediaProjectionPopup>();
-        projectionPopup.Initialize(_font, _primaryColor, _accentColor);
+        projectionPopup.Initialize(_font, _primaryColor, _accentColor, padding, bottomOffset);
         _playerController.SetProjectionPopup(projectionPopup);
 
         Debug.Log("[VRMediaAppController] Player UI built with controls container");

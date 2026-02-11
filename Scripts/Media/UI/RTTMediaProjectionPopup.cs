@@ -56,6 +56,8 @@ public class RTTMediaProjectionPopup : MonoBehaviour
     private TMP_FontAsset _font;
     private Color _primaryColor;
     private Color _accentColor;
+    private float _rightMargin;
+    private float _bottomMargin;
 
     private GameObject _popup;
     private CanvasGroup _canvasGroup;
@@ -76,11 +78,13 @@ public class RTTMediaProjectionPopup : MonoBehaviour
     #endregion
 
     #region Initialization
-    public void Initialize(TMP_FontAsset font, Color primary, Color accent)
+    public void Initialize(TMP_FontAsset font, Color primary, Color accent, float rightMargin = 0f, float bottomMargin = 0f)
     {
         _font = font;
         _primaryColor = primary;
         _accentColor = accent;
+        _rightMargin = rightMargin;
+        _bottomMargin = bottomMargin;
 
         BuildUI();
         Hide();
@@ -97,7 +101,15 @@ public class RTTMediaProjectionPopup : MonoBehaviour
 
         var popupRT = _popup.AddComponent<RectTransform>();
         popupRT.sizeDelta = new Vector2(POPUP_WIDTH, POPUP_HEIGHT);
-
+        
+        // Align to bottom-right (relative to controls panel area)
+        popupRT.anchorMin = new Vector2(1, 0); // Bottom Right
+        popupRT.anchorMax = new Vector2(1, 0);
+        popupRT.pivot = new Vector2(1, 0); 
+        
+        // Apply margin
+        popupRT.anchoredPosition = new Vector2(-_rightMargin, _bottomMargin); 
+        
         // Background (Rounded Panel)
         var bg = _popup.AddComponent<Image>();
         bg.color = POPUP_BG_COLOR;

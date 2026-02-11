@@ -1206,6 +1206,30 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     #endregion
 
 
+    /// <summary>
+    /// Calculates the distance from the bottom of the panel to the bottom of Zone B.
+    /// Used to align external popups (like ProjectionPopup) with Zone B.
+    /// </summary>
+    public static float GetZoneBBottomOffset()
+    {
+        float bodyHeight = TOTAL_HEIGHT - TOP_SPACER - ZONE_HEIGHT - ZONE_A_BOTTOM_MARGIN; // 350
+        float paddingV = bodyHeight * BG_VERTICAL_SPACING_RATIO; // 17.5
+        float availableHeight = bodyHeight - (2 * paddingV); // 315
+        
+        float estimatedZoneHeight = availableHeight / 2.25f; // 140
+        float zoneSpacing = Mathf.RoundToInt(estimatedZoneHeight * ZONE_SPACING_RATIO); // 35
+        
+        float relativeHeightB = 1.3f;
+        float relativeHeightC = 1.2f;
+        float totalRelative = relativeHeightB + relativeHeightC;
+        
+        float actualHeightAvailableForZones = availableHeight - zoneSpacing; // 280
+        float heightC = actualHeightAvailableForZones * (relativeHeightC / totalRelative); // 134.4
+        
+        // Bottom of Zone B is (PaddingBottom + HeightC + Spacing) from bottom of panel background
+        // Added +58 buffer to account for Zone B's internal bottom margin (40px) and spacing to feel correct
+        return paddingV + heightC + zoneSpacing + 58f;
+    }
 }
 
 public class HoverEventRelay : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
