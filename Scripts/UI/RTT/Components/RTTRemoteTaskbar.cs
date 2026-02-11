@@ -116,6 +116,7 @@ public class RTTRemoteTaskbar : MonoBehaviour
         if (MediaEnvironmentController.Instance != null)
         {
             MediaEnvironmentController.Instance.Initialize();
+            MediaEnvironmentController.Instance.OnLightsChanged += HandleLightsChanged;
         }
 
         // Create expansion panel
@@ -132,6 +133,11 @@ public class RTTRemoteTaskbar : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (MediaEnvironmentController.Instance != null)
+        {
+            MediaEnvironmentController.Instance.OnLightsChanged -= HandleLightsChanged;
+        }
+
         if (_instance == this) _instance = null;
         UnbindFromViewModel();
         CleanupExpansionPanel();
@@ -806,6 +812,22 @@ public class RTTRemoteTaskbar : MonoBehaviour
         _miniFrame.MarkDirty();
     }
 
+    private void HandleLightsChanged(bool isOn)
+    {
+        if (_isLightOn == isOn) return;
+
+        _isLightOn = isOn;
+        UpdateEyeButtonColor();
+
+        if (_expansionPanel != null)
+        {
+            _expansionPanel.SetLightState(isOn);
+        }
+
+        _miniFrame.MarkDirty();
+        Debug.Log($"[RTTRemoteTaskbar] Light state synchronized to: {(isOn ? "ON" : "OFF")}");
+    }
+
     private void OnLightToggled(bool isOn)
     {
         _isLightOn = isOn;
@@ -1252,11 +1274,7 @@ public class RTTRemoteTaskbar : MonoBehaviour
         // Find icon in VRButtonFactory structure: container > HitArea > Visuals > Content > Icon
         Transform iconTransform = container.transform.Find("HitArea/Visuals/Content/Icon");
 
-        if (iconTransform == null)
-        {
-            Debug.LogWarning($"[RTTRemoteTaskbar] SetBareIconButtonIcon: Icon not found in {container.name}");
-            return;
-        }
+        if (iconTransform == null) return;
 
         Image iconImg = iconTransform.GetComponent<Image>();
         if (iconImg != null)

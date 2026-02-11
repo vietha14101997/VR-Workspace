@@ -1,172 +1,623 @@
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(811,9): error CS1519: Invalid token 'if' in class, record, struct, or interface member declaration
+[MainThreadDispatcher] Initialized on thread 1
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(811,27): error CS8124: Tuple must contain at least two elements.
+[APBootstrap] AndroidStreamingHelper initialized
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(811,27): error CS1026: ) expected
+[APBootstrap] AppPermissionManager initialized
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(811,27): error CS1519: Invalid token '!=' in class, record, struct, or interface member declaration
+Starting camera passthrough
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(813,43): error CS1519: Invalid token '(' in class, record, struct, or interface member declaration
+Found 1 camera devices
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(813,48): error CS8124: Tuple must contain at least two elements.
+Camera 0: Twitch Virtual Cam (front facing: True)
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(813,49): error CS1519: Invalid token ';' in class, record, struct, or interface member declaration
+Starting webcam texture: Twitch Virtual Cam at 1280x720
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(816,9): error CS8803: Top-level statements must precede namespace and type declarations.
+Could not connect pins - RenderStream()
+UnityEngine.StackTraceUtility:ExtractStackTrace ()
+CameraPassthrough:StartCam () (at Assets/VR-Workspace/Scripts/Camera/CameraPassthrough.cs:115)
+CameraPassthrough:OnEnable () (at Assets/VR-Workspace/Scripts/Camera/CameraPassthrough.cs:17)
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(886,5): error CS1022: Type or namespace definition, or end-of-file expected
+[AndroidHelper] App resumed
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(891,5): error CS0106: The modifier 'public' is not valid for this item
+[RTTMenu] Created main frame
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(920,5): error CS0106: The modifier 'private' is not valid for this item
+[RTTBootstrapper] Created RTTMenu with RTTMenuFrame_main
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(964,5): error CS0106: The modifier 'public' is not valid for this item
+[RTTBootstrapper] RTTMenu oriented towards camera
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(981,5): error CS0106: The modifier 'public' is not valid for this item
+[RTTToolbar] Created
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(991,5): error CS0106: The modifier 'private' is not valid for this item
+[RTTTaskbar] Icons loaded - Quit:True, Settings:True, Eye:True, EyeClose:True, Recenter:True, Home:True
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(997,5): error CS0106: The modifier 'private' is not valid for this item
+[RTTToolbar] Initialized with taskbar. Size: 0.913x0.331m, followTarget: RTTMenu
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1038,5): error CS0106: The modifier 'private' is not valid for this item
+[RTTBootstrapper] Created RTTTaskbar in RTTToolbar, following RTTMenu
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1095,5): error CS0106: The modifier 'private' is not valid for this item
+[RTTBootstrapper] RTTManager found, registering new frame and taskbar
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1104,5): error CS0106: The modifier 'private' is not valid for this item
+[RTTTaskbar] SelectSlot(0) called, current active: 0
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1124,5): error CS0106: The modifier 'private' is not valid for this item
+[VirtualObjectsZoomController] Configured: min=1m, max=2m, default=1.8m, step=0.1m
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1146,5): error CS0106: The modifier 'private' is not valid for this item
+[VirtualObjectsZoomController] Moving VirtualObjects from 0.00m to default 1.80m
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1160,5): error CS0106: The modifier 'private' is not valid for this item
+[VirtualObjectsZoomController] Zoom set to 1.80m (delta: 1.800m)
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1184,5): error CS0106: The modifier 'private' is not valid for this item
+[RTTBootstrapper] Created VirtualObjectsZoomController (range: 1m - 2m, default: 1.8m)
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1215,5): error CS0106: The modifier 'private' is not valid for this item
+[RTTBootstrapper] Initialization complete
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1243,5): error CS0106: The modifier 'private' is not valid for this item
+[MediaEnvironmentController] Found environment root: VirtualEnvironment
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1263,5): error CS0106: The modifier 'private' is not valid for this item
+[MediaEnvironmentController] Cached 0 room lights
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1280,5): error CS0106: The modifier 'public' is not valid for this item
+[MediaEnvironmentController] Initialized
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1298,5): error CS0106: The modifier 'public' is not valid for this item
+Stopping camera passthrough
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1310,5): error CS0106: The modifier 'public' is not valid for this item
+Destroying webcam texture
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1319,5): error CS0106: The modifier 'public' is not valid for this item
+[RTTRaycastManager] Auto-initialized layer mask to VirtualObjects (layer 3)
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1335,5): error CS0106: The modifier 'private' is not valid for this item
+[RTTMenuFrame] UI built: 1920x1080 logical pixels
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1384,5): error CS0106: The modifier 'private' is not valid for this item
+[RTTMiniFrame] UI built: 1095.5x128 pixels
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTRemoteTaskbar.cs(1394,1): error CS1022: Type or namespace definition, or end-of-file expected
+[RTTMainMenuController] Icons loaded - Remote:True, Browser:True, Media:True, Files:False
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(253,9): error CS1519: Invalid token 'if' in class, record, struct, or interface member declaration
+[HoverEffectController] AddEffect 'glow_border' to HitArea, TargetVisuals=Visuals
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(253,27): error CS8124: Tuple must contain at least two elements.
+[GlowBorderHoverEffect] Initialized successfully on HitArea, material=Custom/GlowingElementBorder
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(253,27): error CS1026: ) expected
+[HoverEffectController] AddEffect 'background' to HitArea, TargetVisuals=Visuals
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(253,27): error CS1519: Invalid token '!=' in class, record, struct, or interface member declaration
+[HoverEffectController] AddEffect 'scale' to HitArea, TargetVisuals=Visuals
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(255,43): error CS1519: Invalid token '(' in class, record, struct, or interface member declaration
+[HoverEffectController] AddEffect 'z_pop' to HitArea, TargetVisuals=Visuals
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(255,48): error CS8124: Tuple must contain at least two elements.
+[RTTMainMenu] Built 6 items in 3x2 grid
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(255,49): error CS1519: Invalid token ';' in class, record, struct, or interface member declaration
+[RTTMainMenuController] Main Menu created (useRegistry=True, itemCount=6)
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(258,9): error CS8803: Top-level statements must precede namespace and type declarations.
+[RTTManager] Main Menu initialized (persistent, cannot be closed)
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(328,5): error CS1022: Type or namespace definition, or end-of-file expected
+[RTTManager] Instant recenter: moved 2 objects to face camera
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(333,5): error CS0106: The modifier 'public' is not valid for this item
+[VirtualObjectsZoomController] Recenter: distance recalculated to 1.80m
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(362,5): error CS0106: The modifier 'private' is not valid for this item
+[RTTManager] Auto-recenter completed
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(367,5): error CS0106: The modifier 'private' is not valid for this item
+[RTTMainMenu] Click started: media at 6.168s
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(396,5): error CS0106: The modifier 'private' is not valid for this item
+[RTTMainMenu] PrepareApp called: media at 6.168s (+0.1ms)
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(424,5): error CS0106: The modifier 'private' is not valid for this item
+[RTTAppManager] PrepareAppFrameAsync started: media at 6.170s
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(465,5): error CS0106: The modifier 'private' is not valid for this item
+[RTTMenu] Created app frame: media
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(483,5): error CS0106: The modifier 'private' is not valid for this item
+[RTTAppManager] Frame created: media at 6.171s (+0.4ms)
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(513,5): error CS0106: The modifier 'private' is not valid for this item
+[RTTAppManager] Preparing app: media in slot 1
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(529,5): error CS0106: The modifier 'private' is not valid for this item
+[RTTMainMenu] Button animation started: media at 6.171s (+3.4ms)
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(576,5): error CS0106: The modifier 'public' is not valid for this item
+[RTTAppManager] Creating content: media at 6.201s (+30.6ms)
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(594,5): error CS0106: The modifier 'public' is not valid for this item
+[RTTManager] Creating Media content...
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(613,5): error CS0106: The modifier 'private' is not valid for this item
+[VRMediaAppController] Projection will be parented to VirtualObjects for zoom support
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(619,5): error CS0106: The modifier 'private' is not valid for this item
+[VRMediaAppController] Found camera rig: Player
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(660,5): error CS0106: The modifier 'private' is not valid for this item
+[VRVideoProjectionSystem] Created FlatProjectionRenderer
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(716,5): error CS0106: The modifier 'private' is not valid for this item
+[VRVideoProjectionSystem] Initialized
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(731,5): error CS0106: The modifier 'private' is not valid for this item
+[MediaLibraryService] Loading 3178 items from cache (async)...
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(752,5): error CS0106: The modifier 'private' is not valid for this item
+[VirtualObjectsZoomController] Registered side panel: MediaNavigationPanel (side=-1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(778,5): error CS0106: The modifier 'private' is not valid for this item
+[RTTMenuFrame] UI built: 640x1080 logical pixels
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(815,5): error CS0106: The modifier 'private' is not valid for this item
+[RTTMediaLibrary] CreateLeftPanelContent started at 6.249s
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(831,5): error CS0106: The modifier 'private' is not valid for this item
+[HoverEffectController] AddEffect 'scale' to Item_all, TargetVisuals=Item_all
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(882,5): error CS0106: The modifier 'public' is not valid for this item
+[HoverEffectController] AddEffect 'color' to Item_all, TargetVisuals=Item_all
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(898,5): error CS0106: The modifier 'public' is not valid for this item
+[HoverEffectController] AddEffect 'scale' to Item_videos, TargetVisuals=Item_videos
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(922,5): error CS0106: The modifier 'public' is not valid for this item
+[HoverEffectController] AddEffect 'color' to Item_videos, TargetVisuals=Item_videos
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(924,5): error CS0106: The modifier 'public' is not valid for this item
+[HoverEffectController] AddEffect 'scale' to Item_images, TargetVisuals=Item_images
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(929,5): error CS0106: The modifier 'public' is not valid for this item
+[HoverEffectController] AddEffect 'color' to Item_images, TargetVisuals=Item_images
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(941,5): error CS0106: The modifier 'public' is not valid for this item
+[HoverEffectController] AddEffect 'scale' to Item_audio, TargetVisuals=Item_audio
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(981,5): error CS0106: The modifier 'private' is not valid for this item
+[HoverEffectController] AddEffect 'color' to Item_audio, TargetVisuals=Item_audio
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1060,5): error CS0106: The modifier 'private' is not valid for this item
+[HoverEffectController] AddEffect 'scale' to Item_recent, TargetVisuals=Item_recent
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1071,5): error CS0106: The modifier 'private' is not valid for this item
+[HoverEffectController] AddEffect 'color' to Item_recent, TargetVisuals=Item_recent
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1101,5): error CS0106: The modifier 'public' is not valid for this item
+[HoverEffectController] AddEffect 'scale' to Item_favorites, TargetVisuals=Item_favorites
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1119,5): error CS0106: The modifier 'private' is not valid for this item
+[HoverEffectController] AddEffect 'color' to Item_favorites, TargetVisuals=Item_favorites
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1132,5): error CS0106: The modifier 'private' is not valid for this item
+[HoverEffectController] AddEffect 'scale' to Item_playlists, TargetVisuals=Item_playlists
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1137,5): error CS0106: The modifier 'private' is not valid for this item
+[HoverEffectController] AddEffect 'color' to Item_playlists, TargetVisuals=Item_playlists
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1152,5): error CS0106: The modifier 'public' is not valid for this item
+[RTTMediaLibrary] Left panel content created at 6.262s
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1183,5): error CS0106: The modifier 'public' is not valid for this item
+[VirtualObjectsZoomController] Registered side panel: MediaDetailPanel (side=1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1222,5): error CS0106: The modifier 'private' is not valid for this item
+[RTTMediaLibrary] CreateRightPanelContent started at 6.264s
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1269,5): error CS0106: The modifier 'private' is not valid for this item
+[RTTMediaLibrary] Right panel content created at 6.291s
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1283,5): error CS0106: The modifier 'private' is not valid for this item
+[RTTPopupMenu] CreateWorldSpace: layer 'VirtualObjects' = 3, mainCam: VRCamera
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1298,5): error CS0106: The modifier 'private' is not valid for this item
+[RTTPopupMenu] Created world-space popup
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1332,5): error CS0106: The modifier 'private' is not valid for this item
+[HoverEffectController] AddEffect 'cursor_change' to HitArea, TargetVisuals=Visuals
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1369,5): error CS0106: The modifier 'private' is not valid for this item
+[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-614502
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1385,5): error CS0106: The modifier 'private' is not valid for this item
+[HoverEffectController] AddEffect 'scale' to Checkbox, TargetVisuals=Checkbox
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1397,5): error CS0106: The modifier 'private' is not valid for this item
+[HoverEffectController] AddEffect 'scale' to Btn_Rename, TargetVisuals=Btn_Rename
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1411,5): error CS0106: The modifier 'public' is not valid for this item
+[HoverEffectController] AddEffect 'scale' to Btn_Delete, TargetVisuals=Btn_Delete
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTTaskbar.cs(1422,1): error CS1022: Type or namespace definition, or end-of-file expected
+[RTTMediaLibrary] After CreateHeaderRows: _headerRT=True, _breadcrumbContainer=True
+
+[HoverEffectController] AddEffect 'scale' to PooledItem, TargetVisuals=PooledItem
+
+[RTTMediaLibrary] Creating 2 breadcrumb segments for: All Media > Videos
+
+[RTTMediaLibrary] Created 2 breadcrumb pills for path: All Media > Videos
+
+[RTTMediaLibrary] Center grid created
+
+[VRMediaAppController] Library UI built
+
+[VRMediaAppController] Media app created
+
+[RTTAppManager] Content created: media at 6.406s (+236.3ms)
+
+[RTTAppManager] PrepareDataAsync started: media at 6.407s
+
+[RTTMediaLibraryController] PrepareDataAsync started
+
+[RTTAppManager] App prepared (hidden): media at 6.411s (total: 240.4ms)
+
+[RTTMainMenu] Button animation ended: media at 6.434s (+265.8ms)
+
+[RTTMainMenu] OpenPreparedApp called: media at 6.434s (+265.9ms)
+
+[RTTAppManager] WaitAndSwitch started: media at 6.434s
+
+[RTTAppManager] WaitAndSwitch app ready: media at 6.434s (waited 0.2ms)
+
+[RTTAppManager] Starting transition: media at 6.434s
+
+[RTTAppManager] Transition started: media at 6.436s
+
+[RTTAppManager] Got 3 frames to animate: media
+
+[RTTAppManager] Fade out MainMenu: media at 6.436s
+
+[RTTMainMenu] Click flow completed: media at 6.436s (total: +268.7ms)
+
+[RTTAppManager] Fade out done: media at 6.555s (+119.5ms)
+
+[RTTAppManager] All frames activated with alpha=0: 3 frames
+
+[RTTAppManager] Sync point: media, IsDataReady=False at 6.565s
+
+[AppStateCache] Disk cache hit for media
+
+[RTTMediaGridItem] Duration badge for 'YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (144KB)
+
+[Cache] DISK DECODE: 6ms (512x288)
+
+[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (226KB)
+
+[Cache] DISK DECODE: 4ms (512x267)
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4
+
+[RTTMediaGridItem] Duration badge for 'ZZenlessZoneZero 2026-02-03 12-19-36': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 4ms (234KB)
+
+[Cache] DISK DECODE: 5ms (512x288)
+
+[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (16KB)
+
+[Cache] DISK DECODE: 0ms (512x267)
+
+[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 17-52-22': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (119KB)
+
+[Cache] DISK DECODE: 3ms (512x267)
+
+[RTTMediaGridItem] Duration badge for 'videoplayback': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (206KB)
+
+[Cache] DISK DECODE: 3ms (512x288)
+
+[RTTMediaGridItem] Duration badge for 'Genshin-Impact 2026-1-26 12-24-11': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (191KB)
+
+[RTTMediaGridItem] Duration badge for 'Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (85KB)
+
+[Cache] DISK DECODE: 2ms (512x213)
+
+[RTTMediaGrid] Auto-selecting first item: YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p
+
+[Detail] REQUEST: YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4
+
+[Cache] DISK READ: 0ms (127KB)
+
+[Detail] RECEIVED: YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4 wait=18ms assign=0ms
+
+[Detail] UpdateInfo: YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4 name=0ms preview=19ms metadata=11ms total=30ms
+
+[RTTMediaGrid] Progressive binding started: 10 items queued, budgetMs=6
+
+[RTTMediaGridItem] Duration badge for 'video_client': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (116KB)
+
+[Cache] DISK DECODE: 2ms (512x230)
+
+[RTTMediaLibraryController] TryRestoreCachedState: Restored 18 items from cache (filtered from 18, skipped 0 deleted)
+
+[RTTAppManager] TryRestoreCachedState: media, success=True
+
+[RTTAppManager] Subscribed to OnDataPrepared: media
+
+[RTTAppManager] Fade in started: 3 frames at 6.831s
+
+[RTTMediaGridItem] Duration badge for 'Phàm Nhân Tu Tiên Tập 173 Vietsub': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (131KB)
+
+[RTTMediaGridItem] Duration badge for '7295785205012': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[RTTMediaGridItem] Duration badge for '7077543476647': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (270KB)
+
+[Cache] DISK DECODE: 4ms (512x230)
+
+[RTTAppManager] Fade in done: media at 6.929s (+493.6ms)
+
+[RTTAppManager] OnAppShown called: media at 6.929s
+
+[RTTMediaLibraryController] OnAppShown called, _view=exists
+
+[RTTTaskbar] RegisterApp called - slotIndex=1, icon=icon_media
+
+[RTTTaskbar] SetSlotIcon - slot=AppBtn_AppSlot_1, icon=icon_media, slotIndex=1
+
+[RTTTaskbar] SetSlotIcon - removed 0 old children
+
+[RTTTaskbar] SetSlotIcon - created iconBtn=Btn_icon_media, slot.childCount now=1
+
+[RTTTaskbar] Registered app slot 1, total apps: 1
+
+[RTTTaskbar] SelectSlot(1) called, current active: 0
+
+[RTTTaskbar] Selected app with slot index 1
+
+[RTTTaskbar] SelectSlot(1) called, current active: 1
+
+[RTTAppManager] Transition completed: media at 6.958s (total: 522.5ms)
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37.mp4
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\ZZenlessZoneZero 2026-02-03 12-19-36.mp4
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
+
+[MediaLibraryService] Loaded 3178 items from cache in 1056ms (async, no File.Exists)
+
+[RTTMediaLibraryController] HandleCacheLoaded called
+
+[RTTMediaGridItem] Duration badge for 'YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (113KB)
+
+[Cache] DISK DECODE: 2ms (512x144)
+
+[RTTMediaGridItem] Duration badge for 'YTDown.com_YouTube_Chuyen-Di-Tau-Luon-Sieu-Toc-Thuc-Te-Ao-3_Media_EqL0I1-gg7c_001_1080s': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 1ms (190KB)
+
+[Cache] DISK READ: 1ms (129KB)
+
+[Cache] DISK READ: 0ms (210KB)
+
+[Cache] DISK READ: 0ms (247KB)
+
+[Cache] DISK DECODE: 4ms (512x288)
+
+[Cache] DISK READ: 0ms (115KB)
+
+[Cache] DISK DECODE: 2ms (512x267)
+
+[Cache] DISK READ: 0ms (109KB)
+
+[RTTMediaGrid] Auto-selecting first item: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p
+
+[Detail] REQUEST: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4
+
+[Cache] DISK READ: 0ms (112KB)
+
+[Detail] RECEIVED: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 wait=11ms assign=0ms
+
+[Detail] UpdateInfo: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 name=0ms preview=12ms metadata=8ms total=20ms
+
+[RTTMediaGrid] Progressive binding started: 13 items queued, budgetMs=6
+
+[Cache] DISK READ: 0ms (199KB)
+
+[Detail] RECEIVED: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 wait=0ms assign=0ms
+
+[Detail] UpdateInfo: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 name=0ms preview=1ms metadata=8ms total=9ms
+
+[Cache] DISK DECODE: 1ms (512x213)
+
+[Cache] DISK DECODE: 3ms (512x230)
+
+[Cache] DISK DECODE: 2ms (512x288)
+
+[Cache] DISK READ: 0ms (120KB)
+
+[Cache] DISK READ: 0ms (265KB)
+
+[RTTMediaGridItem] Duration badge for '7065774217733': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (75KB)
+
+[Cache] DISK DECODE: 2ms (512x238)
+
+[RTTMediaGridItem] Duration badge for 'Genshin_Impact_2025-09-10_11-32-27': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (283KB)
+
+[RTTMediaGridItem] Duration badge for 'FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD)': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (165KB)
+
+[Detail] RECEIVED: YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4 wait=0ms assign=0ms
+
+[Detail] UpdateInfo: YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4 name=0ms preview=1ms metadata=9ms total=10ms
+
+[RTTMediaGridItem] Duration badge for 'Honkai  Star Rail 2025.05.21 - 15.03.08.01': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (207KB)
+
+[RTTMediaGridItem] Duration badge for 'khác màu': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (38KB)
+
+[Cache] DISK DECODE: 1ms (512x288)
+
+[RTTMediaGridItem] Duration badge for 'vết xước 2': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (48KB)
+
+[RTTMediaGridItem] Duration badge for 'vết xước 1': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (101KB)
+
+[Cache] DISK DECODE: 2ms (512x284)
+
+[RTTMediaGrid] Progressive binding complete: bound=5, skipped=8
+
+[MediaLibraryService] Starting background scan (existing: 3178 items)
+
+First video frame not zero: 2 (0.066667s). Result may be out of sync. Please make sure tracks all start at 0 in C:\Users\Admin\Videos\YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\YTDown.com_YouTube_Chuyen-Di-Tau-Luon-Sieu-Toc-Thuc-Te-Ao-3_Media_EqL0I1-gg7c_001_1080s.mp4
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 17-52-22.mp4
+
+First video frame not zero: 2 (0.066667s). Result may be out of sync. Please make sure tracks all start at 0 in C:\Users\Admin\Downloads\videoplayback.mp4
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\Genshin-Impact 2026-1-26 12-24-11.mp4
+
+[Detail] UpdateInfo: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 name=1ms preview=0ms metadata=10ms total=11ms
+
+[MediaLibraryService] Background scan complete - no changes (1272ms)
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Video\Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D.mp4
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Video\Phàm Nhân Tu Tiên Tập 173 Vietsub.mp4
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Genshin_Impact_2025-09-10_11-32-27.mp4
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Compressed\FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD).mp4
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\New folder\khác màu.mp4
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\New folder\vết xước 2.mp4
+
+[Detail] UpdateInfo: YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4 name=1ms preview=0ms metadata=10ms total=11ms
+
+[Detail] REQUEST: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37.mp4
+
+[Cache] DISK READ: 0ms (208KB)
+
+[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37.mp4 wait=20ms assign=0ms
+
+[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37.mp4 name=1ms preview=20ms metadata=13ms total=34ms
+
+[VRMediaAppController] HideLibraryUI - hiding all menu frames for video playback
+
+[VRMediaAppController] Saved menu frame position: (-0.07, 0.00, 1.80), rotation: (0.00, 357.80, 0.00)
+
+[RTTManager] Entered Immersive Mode
+
+[RTTMenuFrame] UI built: 64x64 logical pixels
+
+[RTTMenuFrame] UI built: 1947x700 logical pixels
+
+[HoverEffectController] AddEffect 'scale' to Btn_icon_exit, TargetVisuals=Btn_icon_exit
+
+[HoverEffectController] AddEffect 'color' to Btn_icon_exit, TargetVisuals=Btn_icon_exit
+
+[HoverEffectController] AddEffect 'scale' to Btn_icon_record, TargetVisuals=Btn_icon_record
+
+[HoverEffectController] AddEffect 'color' to Btn_icon_record, TargetVisuals=Btn_icon_record
+
+[HoverEffectController] AddEffect 'scale' to Btn_icon_recenter, TargetVisuals=Btn_icon_recenter
+
+[HoverEffectController] AddEffect 'color' to Btn_icon_recenter, TargetVisuals=Btn_icon_recenter
+
+[HoverEffectController] AddEffect 'scale' to Btn_icon_loop, TargetVisuals=Btn_icon_loop
+
+[HoverEffectController] AddEffect 'color' to Btn_icon_loop, TargetVisuals=Btn_icon_loop
+
+[HoverEffectController] AddEffect 'scale' to Btn_icon_settings, TargetVisuals=Btn_icon_settings
+
+[HoverEffectController] AddEffect 'color' to Btn_icon_settings, TargetVisuals=Btn_icon_settings
+
+[HoverEffectController] AddEffect 'scale' to Btn_icon_volume, TargetVisuals=Btn_icon_volume
+
+[HoverEffectController] AddEffect 'color' to Btn_icon_volume, TargetVisuals=Btn_icon_volume
+
+[HoverEffectController] AddEffect 'scale' to Btn_icon_previous, TargetVisuals=Btn_icon_previous
+
+[HoverEffectController] AddEffect 'color' to Btn_icon_previous, TargetVisuals=Btn_icon_previous
+
+[HoverEffectController] AddEffect 'scale' to Btn_icon_play, TargetVisuals=Btn_icon_play
+
+[HoverEffectController] AddEffect 'color' to Btn_icon_play, TargetVisuals=Btn_icon_play
+
+[HoverEffectController] AddEffect 'scale' to Btn_icon_next, TargetVisuals=Btn_icon_next
+
+[HoverEffectController] AddEffect 'color' to Btn_icon_next, TargetVisuals=Btn_icon_next
+
+[HoverEffectController] AddEffect 'scale' to Btn_icon_enviroment, TargetVisuals=Btn_icon_enviroment
+
+[HoverEffectController] AddEffect 'color' to Btn_icon_enviroment, TargetVisuals=Btn_icon_enviroment
+
+[HoverEffectController] AddEffect 'scale' to Btn_icon_cube, TargetVisuals=Btn_icon_cube
+
+[HoverEffectController] AddEffect 'color' to Btn_icon_cube, TargetVisuals=Btn_icon_cube
+
+[RTTMenuFrame] UI built: 120x120 logical pixels
+
+[HoverEffectController] AddEffect 'scale' to MenuButton, TargetVisuals=MenuButton
+
+[HoverEffectController] AddEffect 'color' to MenuButton, TargetVisuals=MenuButton
+
+[VRVideoPlayerController] Environment controller initialized
+
+[VRVideoPlayerController] Initialized
+
+[VRMediaAppController] Player UI built with controls container
+
+[VRVideoProjectionSystem] Set target position: (-0.07, 0.00, 1.80), rotation: (0.00, 357.80, 0.00)
+
+[VRVideoPlayerController] Playing: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37, Detected Projection: Flat, Stereo: Mono
+
+[VRVideoProjectionSystem] Set projection: Flat, stereo: Mono
+
+[VRMediaAppController] Switched to Player mode: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37
+
+[VRVideoPlayerController] Video prepared
+
+[VRVideoPlayerController] OutputTexture: 1920x1000
+
+[VRVideoPlayerController] Using standard texture output
+
+[FlatProjectionRenderer] SetTexture: 1920x1000
+
+[VRVideoPlayerController] Calling ProjectionSystem.Show()
+
+[VRVideoPlayerController] Projection visible: True, ActiveRenderer: FlatProjectionRenderer
+
+[VRVideoPlayerController] Starting auto-play
+
+[VideoPlaybackEngine] Video prepared: 1920x1000, 11.0s, 30.3fps
+
+[VRSliderControl] OnPointerEnter called on TimelineSlider
+
+[VRSliderControl] OnPointerExit called on TimelineSlider
+
+[MediaEnvironmentController] Hiding environment instantly
+
+[MediaEnvironmentController] Fading out lights instantly
+
+[RTTTaskbar] Light state synchronized to: OFF
+
+[MediaEnvironmentController] Lights disabled
+
+[VRVideoPlayerController] Environment changed to LightOff
+
+[MediaEnvironmentController] Reset to default state
+
+[RTTManager] Exited Immersive Mode
+
+[VRMediaAppController] ShowLibraryUI
+
+[VRMediaAppController] Switched to Library mode
+
+[RTTTaskbarExpansion] Icons loaded - Bitrate: 5/5, FPS: 3/3, Passthrough: True, LightOn: True, LightOff: True
+
+[RTTTaskbar] Eye expansion panel created
+
+[RTTTaskbarExpansion] UI built: 530x128 pixels
+
+[RTTTaskbar] Eye expansion dismissed
+
+[RTTTaskbarExpansion] UI built: 224x128 pixels
+
+[RTTTaskbarExpansion] Showing Eye options, width=224px, worldWidth=0.1866667m, xOffset=-0.243
+
+[RTTTaskbar] Eye expansion shown
+
+[RTTTaskbar] Light toggled: ON
+
+[RTTTaskbar] Light toggled: OFF
+
+[MediaEnvironmentController] Showing environment instantly
+
+[MediaEnvironmentController] Fading in lights instantly
+
+[MediaEnvironmentController] Lights enabled
+
+[Detail] REQUEST: YTDown.com_YouTube_Chuyen-Di-Tau-Luon-Sieu-Toc-Thuc-Te-Ao-3_Media_EqL0I1-gg7c_001_1080s.mp4
+
+[Cache] DISK READ: 0ms (185KB)
+
+[Detail] RECEIVED: YTDown.com_YouTube_Chuyen-Di-Tau-Luon-Sieu-Toc-Thuc-Te-Ao-3_Media_EqL0I1-gg7c_001_1080s.mp4 wait=20ms assign=0ms
+
+[Detail] UpdateInfo: YTDown.com_YouTube_Chuyen-Di-Tau-Luon-Sieu-Toc-Thuc-Te-Ao-3_Media_EqL0I1-gg7c_001_1080s.mp4 name=1ms preview=20ms metadata=11ms total=32ms
+
+[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37.mp4 wait=0ms assign=0ms
+
+[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37.mp4 name=1ms preview=0ms metadata=11ms total=12ms
+
+[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37.mp4 name=1ms preview=0ms metadata=10ms total=11ms
+
+[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37.mp4 name=1ms preview=0ms metadata=15ms total=16ms
 

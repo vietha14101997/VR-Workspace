@@ -88,6 +88,7 @@ public class RTTTaskbar : MonoBehaviour
         if (MediaEnvironmentController.Instance != null)
         {
             MediaEnvironmentController.Instance.Initialize();
+            MediaEnvironmentController.Instance.OnLightsChanged += HandleLightsChanged;
         }
 
         // Sync passthrough state
@@ -248,6 +249,22 @@ public class RTTTaskbar : MonoBehaviour
         _miniFrame.MarkDirty();
     }
 
+    private void HandleLightsChanged(bool isOn)
+    {
+        if (_isLightOn == isOn) return;
+
+        _isLightOn = isOn;
+        UpdateEyeButtonColor();
+        
+        if (_eyeExpansion != null)
+        {
+            _eyeExpansion.SetLightState(isOn);
+        }
+
+        _miniFrame.MarkDirty();
+        Debug.Log($"[RTTTaskbar] Light state synchronized to: {(isOn ? "ON" : "OFF")}");
+    }
+
     private void OnLightToggled(bool isOn)
     {
         _isLightOn = isOn;
@@ -371,6 +388,11 @@ public class RTTTaskbar : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (MediaEnvironmentController.Instance != null)
+        {
+            MediaEnvironmentController.Instance.OnLightsChanged -= HandleLightsChanged;
+        }
+
         if (_instance == this) _instance = null;
 
         // Cleanup eye expansion

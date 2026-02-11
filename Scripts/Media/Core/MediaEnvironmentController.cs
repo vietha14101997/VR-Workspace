@@ -277,6 +277,11 @@ public class MediaEnvironmentController : MonoBehaviour
         _visibilityBlockers.Clear();
         EnvironmentVisible = true;
         LightsEnabled = true;
+
+        // Fire events to sync UI (e.g., Taskbar buttons)
+        OnLightsChanged?.Invoke(true);
+        OnEnvironmentVisibilityChanged?.Invoke(true);
+
         CurrentProjection = VideoProjectionType.Flat;
 
         Debug.Log("[MediaEnvironmentController] Reset to default state");
@@ -368,6 +373,12 @@ public class MediaEnvironmentController : MonoBehaviour
         {
             _environmentRoot.SetActive(true);
             _environmentRoot.transform.localScale = _originalEnvironmentScale;
+
+            // Restore children visibility
+            foreach (Transform child in _environmentRoot.transform)
+            {
+                child.gameObject.SetActive(true);
+            }
         }
 
         RenderSettings.skybox = _skyboxMaterial;

@@ -316,6 +316,22 @@ public class RTTTaskbarExpansion : RTTCanvasBase
     }
 
     /// <summary>
+    /// Set light state from external source (e.g., Video Player).
+    /// </summary>
+    public void SetLightState(bool isOn)
+    {
+        if (_isLightOn == isOn) return;
+
+        _isLightOn = isOn;
+        if (_currentType == ExpansionType.Eye)
+        {
+            UpdateEyeButtonStates();
+            SetPassthroughInteractable(isOn);
+            MarkDirty();
+        }
+    }
+
+    /// <summary>
     /// Set whether passthrough button is interactable (disabled when light is OFF).
     /// </summary>
     public void SetPassthroughInteractable(bool interactable)
