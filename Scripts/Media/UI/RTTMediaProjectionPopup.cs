@@ -69,11 +69,12 @@ public class RTTMediaProjectionPopup : MonoBehaviour
     // UI References
     private Dictionary<VideoProjectionType, Button> _projectionButtons = new Dictionary<VideoProjectionType, Button>();
     private Dictionary<StereoMode, Button> _stereoButtons = new Dictionary<StereoMode, Button>();
-    // Selector References
     private RectTransform _projectionSelector;
     private RectTransform _stereoSelector;
     private Coroutine _projectionAnimCoroutine;
     private Coroutine _stereoAnimCoroutine;
+
+    private HashSet<Button> _hoveredButtons = new HashSet<Button>();
 
     #endregion
 
@@ -456,6 +457,15 @@ public class RTTMediaProjectionPopup : MonoBehaviour
             dict[key] = btn;
         }
 
+        // Hover Effect for Text
+        var hover = btnObj.AddComponent<HoverEffectController>();
+        hover.OnHoverStateChanged += (isHovered) =>
+        {
+            if (isHovered) _hoveredButtons.Add(btn);
+            else _hoveredButtons.Remove(btn);
+            UpdateTextColors();
+        };
+
         return btn;
     }
     #endregion
@@ -519,18 +529,6 @@ public class RTTMediaProjectionPopup : MonoBehaviour
             }
         }
 
-        foreach (var kvp in _projectionButtons)
-        {
-            var btn = kvp.Value;
-            bool isActive = kvp.Key == _currentProjection;
-            var text = btn.GetComponentInChildren<TextMeshProUGUI>();
-            if (text)
-            {
-                text.color = isActive ? TEXT_COLOR_SELECTED : TEXT_COLOR_NORMAL;
-            }
-        }
-
-        // Update Stereo Buttons
         if (_stereoButtons.TryGetValue(_currentStereo, out Button targetStereoBtn))
         {
             RectTransform targetRT = targetStereoBtn.GetComponent<RectTransform>();
@@ -546,14 +544,36 @@ public class RTTMediaProjectionPopup : MonoBehaviour
             }
         }
 
+        UpdateTextColors();
+    }
+
+    private void UpdateTextColors()
+    {
+        // Update Projection Buttons
+        foreach (var kvp in _projectionButtons)
+        {
+            var btn = kvp.Value;
+            bool isActive = kvp.Key == _currentProjection;
+            bool isHovered = _hoveredButtons.Contains(btn);
+            
+            var text = btn.GetComponentInChildren<TextMeshProUGUI>();
+            if (text)
+            {
+                text.color = (isActive || isHovered) ? TEXT_COLOR_SELECTED : TEXT_COLOR_NORMAL;
+            }
+        }
+
+        // Update Stereo Buttons
         foreach (var kvp in _stereoButtons)
         {
             var btn = kvp.Value;
             bool isActive = kvp.Key == _currentStereo;
+            bool isHovered = _hoveredButtons.Contains(btn);
+            
             var text = btn.GetComponentInChildren<TextMeshProUGUI>();
             if (text)
             {
-                text.color = isActive ? TEXT_COLOR_SELECTED : TEXT_COLOR_NORMAL;
+                text.color = (isActive || isHovered) ? TEXT_COLOR_SELECTED : TEXT_COLOR_NORMAL;
             }
         }
     }
