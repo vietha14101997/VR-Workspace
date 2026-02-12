@@ -1328,6 +1328,15 @@ public class RTTRemoteTaskbar : MonoBehaviour
     }
 
     /// <summary>
+    /// Set the ClusterRig reference for panel enable/disable functionality,
+    /// without changing the follow target.
+    /// </summary>
+    public void SetClusterRig(WorldPanelClusterRig clusterRig)
+    {
+        _clusterRig = clusterRig;
+    }
+
+    /// <summary>
     /// Hide the taskbar.
     /// </summary>
     public void Hide()
