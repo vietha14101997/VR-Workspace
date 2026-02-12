@@ -56,8 +56,8 @@ public class RTTFileGrid : MonoBehaviour
     // Progressive loading - bind items gradually to prevent frame lag
     private Coroutine _progressiveBindCoroutine;
     private Queue<int> _pendingBindIndices = new Queue<int>();
-    private const float FRAME_BUDGET_MS = 3f;         // Time budget per frame for binding items
-    private const int INITIAL_SYNC_BIND_COUNT = 8;    // Bind 8 items immediately to fill initial view
+    private const float FRAME_BUDGET_MS = 6f;          // Increased budget (was 3ms)
+    private const int INITIAL_SYNC_BIND_COUNT = 12;    // Bind 12 items sync to fill initial view (3 rows)
 
     public void Initialize(RTTFileManagerController controller, float w, float h, TMP_FontAsset font = null)
     {

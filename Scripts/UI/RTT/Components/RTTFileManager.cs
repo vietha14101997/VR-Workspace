@@ -145,6 +145,25 @@ public class RTTFileManager : MonoBehaviour
         return frames;
     }
 
+    private void OnEnable()
+    {
+        // Ensure content is fully opaque when enabled 
+        // This prevents being stuck at low alpha if a fade coroutine was interrupted during background reset
+        SetContentAlpha(1f);
+
+        if (!_viewReady) return;
+
+        if (_leftFrame != null) _leftFrame.gameObject.SetActive(true);
+        if (_rightFrame != null) _rightFrame.gameObject.SetActive(true);
+        if (_pagination != null) _pagination.Show();
+        
+        // Show action bar if a file was selected
+        if (_fileActionBar != null && _hasSelectedFile && !_isClipboardMode)
+        {
+            _fileActionBar.SetVisible(true);
+        }
+    }
+
     /// <summary>
     /// Set alpha of a frame's display quad.
     /// </summary>
@@ -192,6 +211,15 @@ public class RTTFileManager : MonoBehaviour
         {
             _pagination.FadeInPageButtons();
         }
+
+        // If not active, coroutine won't run. Set alpha immediately.
+        if (!gameObject.activeInHierarchy)
+        {
+            SetContentAlpha(1f);
+            onComplete?.Invoke();
+            return;
+        }
+
         _fadeCoroutine = StartCoroutine(FadeContentCoroutine(0f, 1f, FOLDER_TRANSITION_DURATION, onComplete));
     }
 
@@ -332,17 +360,6 @@ public class RTTFileManager : MonoBehaviour
         _operationCts?.Dispose();
         _operationCts = null;
     }
-    
-    private void OnEnable()
-    {
-        // Only restore external components after initial setup is complete (app switching)
-        // During initial setup, CreateCenterGrid() handles showing pagination
-        if (!_viewReady) return;
-
-        if (_leftFrame != null) _leftFrame.gameObject.SetActive(true);
-        if (_rightFrame != null) _rightFrame.gameObject.SetActive(true);
-        if (_pagination != null) _pagination.Show();
-    }
 
     private void OnDisable()
     {
@@ -470,19 +487,20 @@ public class RTTFileManager : MonoBehaviour
 
         float bottomPadding = panelHeight * 0.02f;
 
-        // 1. Create Body Object (Grid Container)
+        // 1. Create Body Object (Grid/List Container)
         GameObject bodyObj = new GameObject("Body");
         bodyObj.transform.SetParent(_menuFrame.ContentContainer, false);
         _bodyRT = bodyObj.AddComponent<RectTransform>();
         _bodyRT.anchorMin = Vector2.zero;
         _bodyRT.anchorMax = Vector2.one;
-        _bodyRT.offsetMax = new Vector2(0, -_headerHeight2Rows); // Top offset
-        _bodyRT.offsetMin = new Vector2(0, bottomPadding); // Bottom offset
+        _bodyRT.offsetMax = new Vector2(0, -_headerHeight2Rows);
+        _bodyRT.offsetMin = new Vector2(0, bottomPadding);
 
         bodyObj.AddComponent<RectMask2D>();
-
-        // Add CanvasGroup for fade animations during folder navigation
-        _bodyCanvasGroup = bodyObj.AddComponent<CanvasGroup>(); 
+        
+        // Add CanvasGroup for smooth transitions and fade animations during folder navigation
+        _bodyCanvasGroup = bodyObj.AddComponent<CanvasGroup>();
+        _bodyCanvasGroup.alpha = 0f; // Start hidden for smooth fade-in
 
         // 2. Create Header Container
         GameObject headerObj = new GameObject("Header");
@@ -543,6 +561,9 @@ public class RTTFileManager : MonoBehaviour
 
         // Initialize page size AFTER OnViewReady has loaded data (deferred to next frame for safety)
         StartCoroutine(InitializePageSizeDeferred());
+
+        // Smooth fade-in of content after construction
+        FadeInContent();
     }
 
     // Fixed page sizes per user requirement

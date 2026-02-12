@@ -14,7 +14,7 @@ Starting webcam texture: Twitch Virtual Cam at 1280x720
 
 Could not connect pins - RenderStream()
 UnityEngine.StackTraceUtility:ExtractStackTrace ()
-CameraPassthrough:StartCam () (at Assets/VR-Workspace/Scripts/Camera/CameraPassthrough.cs:115)
+CameraPassthrough:StartCam () (at Assets/VR-Workspace/Scripts/Camera/CameraPassthrough.cs:119)
 CameraPassthrough:OnEnable () (at Assets/VR-Workspace/Scripts/Camera/CameraPassthrough.cs:17)
 
 [AndroidHelper] App resumed
@@ -81,27 +81,131 @@ Destroying webcam texture
 
 [RTTManager] Main Menu initialized (persistent, cannot be closed)
 
-[RTTManager] Instant recenter: moved 2 objects to face camera
+[RTTAppManager] Background pre-init started
 
-[VirtualObjectsZoomController] Recenter: distance recalculated to 1.80m
+[RTTMenu] Created app frame: remote
 
-[RTTManager] Auto-recenter completed
+[RTTManager] Background app pre-initialization triggered
 
-[RTTMainMenu] Click started: media at 7.532s
+[RTTManager] Creating RemoteMenu content...
 
-[RTTMainMenu] PrepareApp called: media at 7.532s (+0.1ms)
+[RTTRemoteMenu] OnEnable called
 
-[RTTAppManager] PrepareAppFrameAsync started: media at 7.534s
+[HoverEffectController] AddEffect 'cursor_change' to HitArea, TargetVisuals=Visuals
+
+[HoverEffectController] AddEffect 'color' to Option_0, TargetVisuals=Option_0
+
+[HoverEffectController] AddEffect 'color' to Option_1, TargetVisuals=Option_1
+
+[HoverEffectController] AddEffect 'color' to Option_2, TargetVisuals=Option_2
+
+[HoverEffectController] AddEffect 'color' to Option_3, TargetVisuals=Option_3
+
+[HoverEffectController] AddEffect 'color' to Option_4, TargetVisuals=Option_4
+
+[RTTRemoteMenu] UI built
+
+[RTTRemoteMenu] Monitor selection changed: index=0, value=----
+
+[RTTRemoteMenu] No cached info, skipping recalculation
+
+[RTTRemoteMenu] Style changed: index=0, value=Flat Planar
+
+[RTTRemoteMenu] WorldPanelClusterRig not found - style will apply on next stream start
+
+[RTTRemoteMenu] Bitrate changed: index=0, value=----
+
+[RTTRemoteMenu] FPS changed: index=0, value=----
+
+[RTTRemoteMenu] CreateSidePanels called, _menuFrame null: False
+
+[RTTRemoteMenu] Creating Hardware Info Panel (left) with sphere positioning...
+
+[VirtualObjectsZoomController] Registered side panel: HardwareInfoPanel (side=-1, mainW=1.6, sideW=0.5333334, gap=0.05)
+
+[RTTRemoteMenu] Registered HardwareInfoPanel with VirtualObjectsZoomController
+
+[RTTRemoteMenu] PlaceSidePanel: mainPos=(0.00, 0.00, 1.80), panelPos=(-1.07, 0.00, 1.65)
+
+[RTTRemoteMenu] CreateSidePanelContent started for HardwareInfo
+
+[RTTRemoteMenu] Hardware frame created: True
+
+[RTTRemoteMenu] Creating Network Info Panel (right) with sphere positioning...
+
+[VirtualObjectsZoomController] Registered side panel: NetworkInfoPanel (side=1, mainW=1.6, sideW=0.5333334, gap=0.05)
+
+[RTTRemoteMenu] Registered NetworkInfoPanel with VirtualObjectsZoomController
+
+[RTTRemoteMenu] PlaceSidePanel: mainPos=(0.00, 0.00, 1.80), panelPos=(1.07, 0.00, 1.65)
+
+[RTTRemoteMenu] CreateSidePanelContent started for NetworkInfo
+
+[RTTRemoteMenu] Network frame created: True
+
+[RTTRemoteMenu] Side panels created (0.53m x 0.90m) gap=0.05m with sphere positioning (hidden)
+
+[RemotePreferences] Loaded: monitors=1, res=Flat Planar, bitrate=15 Mbps, fps=60 FPS
+
+[ServiceLocator] Registered: ConnectionViewModel
+
+[RTTRemoteMenu] HandlePhaseChanged: Disconnected -> Disconnected
+
+[RTTRemoteMenu] Hardware frame hidden
+
+[RTTRemoteMenu] Network frame hidden
+
+[RTTRemoteMenu] HideSidePanels completed
+
+[RTTRemoteMenu] Bound to ConnectionViewModel
+
+[RTTRemoteMenu] Frame not initialized for HardwareInfo, calling EnsureInitialized()
+
+[RTTMenuFrame] UI built: 640x1080 logical pixels
+
+[RTTRemoteMenu] Frame initialized for HardwareInfo after 0 frames, ContentContainer valid
+
+[RTTRemoteMenu] Frame not initialized for NetworkInfo, calling EnsureInitialized()
+
+[RTTRemoteMenu] Frame initialized for NetworkInfo after 0 frames, ContentContainer valid
+
+[RTTRemoteMenu] Created InfoPanel_HardwareInfo, parent set to ContentContainer
+
+[RTTInfoSidePanel] BuildUI started for HardwareInfo, container=ContentContainer
+
+[RTTInfoSidePanel] Already parented to ContentContainer
+
+[RTTInfoSidePanel] Calculated max label width for HardwareInfo: 155 (Base: 130 + 25)
+
+[RTTInfoSidePanel] Built for type: HardwareInfo, _isBuilt=True, parent=ContentContainer
+
+[RTTRemoteMenu] InfoPanel_HardwareInfo BuildUI completed, parent=ContentContainer
+
+[RTTInfoSidePanel] ShowLoadingState called for HardwareInfo, _isBuilt=True
+
+[RTTRemoteMenu] Created InfoPanel_NetworkInfo, parent set to ContentContainer
+
+[RTTInfoSidePanel] BuildUI started for NetworkInfo, container=ContentContainer
+
+[RTTInfoSidePanel] Calculated max label width for NetworkInfo: 225 (Base: 200 + 25)
+
+[RTTInfoSidePanel] Built for type: NetworkInfo, _isBuilt=True, parent=ContentContainer
+
+[RTTRemoteMenu] InfoPanel_NetworkInfo BuildUI completed, parent=ContentContainer
+
+[RTTInfoSidePanel] ShowSpeedTestLoadingState called for NetworkInfo, _isBuilt=True
+
+[RTTRemoteMenu] Side panel content created for HardwareInfo, frame hidden (not connecting)
+
+[RTTRemoteMenu] Side panel content created for HardwareInfo. ContentContainer children count: 1
+
+[RTTRemoteMenu] Side panel content created for NetworkInfo, frame hidden (not connecting)
+
+[RTTRemoteMenu] Side panel content created for NetworkInfo. ContentContainer children count: 1
+
+[RTTAppManager] Pre-initialized app: remote in 236.4ms
 
 [RTTMenu] Created app frame: media
-
-[RTTAppManager] Frame created: media at 7.535s (+0.4ms)
-
-[RTTAppManager] Preparing app: media in slot 1
-
-[RTTMainMenu] Button animation started: media at 7.535s (+3.2ms)
-
-[RTTAppManager] Creating content: media at 7.564s (+29.8ms)
 
 [RTTManager] Creating Media content...
 
@@ -117,9 +221,7 @@ Destroying webcam texture
 
 [VirtualObjectsZoomController] Registered side panel: MediaNavigationPanel (side=-1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
-[RTTMenuFrame] UI built: 640x1080 logical pixels
-
-[RTTMediaLibrary] CreateLeftPanelContent started at 7.609s
+[RTTMediaLibrary] CreateLeftPanelContent started at 4.035s
 
 [HoverEffectController] AddEffect 'scale' to Item_all, TargetVisuals=Item_all
 
@@ -149,21 +251,19 @@ Destroying webcam texture
 
 [HoverEffectController] AddEffect 'color' to Item_playlists, TargetVisuals=Item_playlists
 
-[RTTMediaLibrary] Left panel content created at 7.620s
+[RTTMediaLibrary] Left panel content created at 4.043s
 
 [VirtualObjectsZoomController] Registered side panel: MediaDetailPanel (side=1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
-[RTTMediaLibrary] CreateRightPanelContent started at 7.622s
+[RTTMediaLibrary] CreateRightPanelContent started at 4.046s
 
-[RTTMediaLibrary] Right panel content created at 7.648s
+[RTTMediaLibrary] Right panel content created at 4.065s
 
 [RTTPopupMenu] CreateWorldSpace: layer 'VirtualObjects' = 3, mainCam: VRCamera
 
 [RTTPopupMenu] Created world-space popup
 
-[HoverEffectController] AddEffect 'cursor_change' to HitArea, TargetVisuals=Visuals
-
-[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-153932
+[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-1197090
 
 [HoverEffectController] AddEffect 'scale' to Checkbox, TargetVisuals=Checkbox
 
@@ -185,113 +285,75 @@ Destroying webcam texture
 
 [VRMediaAppController] Media app created
 
-[RTTAppManager] Content created: media at 7.764s (+229.2ms)
+[RTTMediaLibrary] InitializePageSizeDeferred: itemsPerPage=8
 
-[RTTAppManager] PrepareDataAsync started: media at 7.764s
+[RTTAppManager] Pre-initialized app: media in 328.2ms
 
-[RTTMediaLibraryController] PrepareDataAsync started
+[RTTManager] Instant recenter: moved 4 objects to face camera
 
-[RTTAppManager] App prepared (hidden): media at 7.768s (total: 233.1ms)
+[VirtualObjectsZoomController] Recenter: distance recalculated to 1.80m
 
-[RTTMainMenu] Button animation ended: media at 7.792s (+259.4ms)
+[RTTManager] Auto-recenter completed
 
-[RTTMainMenu] OpenPreparedApp called: media at 7.792s (+259.5ms)
+[MediaLibraryService] Loaded 3178 items from cache in 688ms (async, no File.Exists)
 
-[RTTAppManager] WaitAndSwitch started: media at 7.792s
-
-[RTTAppManager] WaitAndSwitch app ready: media at 7.792s (waited 0.1ms)
-
-[RTTAppManager] Starting transition: media at 7.792s
-
-[RTTAppManager] Transition started: media at 7.794s
-
-[RTTAppManager] Got 3 frames to animate: media
-
-[RTTAppManager] Fade out MainMenu: media at 7.794s
-
-[RTTMainMenu] Click flow completed: media at 7.794s (total: +262.2ms)
-
-[RTTAppManager] Fade out done: media at 7.908s (+114.5ms)
-
-[RTTAppManager] All frames activated with alpha=0: 3 frames
-
-[RTTAppManager] Sync point: media, IsDataReady=False at 7.917s
-
-[AppStateCache] Disk cache hit for media
+[RTTMediaLibraryController] HandleCacheLoaded called
 
 [RTTMediaGridItem] Duration badge for 'YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[Cache] DISK READ: 0ms (104KB)
+[Cache] DISK READ: 0ms (113KB)
 
 [Cache] DISK DECODE: 2ms (512x144)
 
 [RTTMediaGridItem] Duration badge for 'YTDown.com_YouTube_Chuyen-Di-Tau-Luon-Sieu-Toc-Thuc-Te-Ao-3_Media_EqL0I1-gg7c_001_1080s': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[Cache] DISK READ: 0ms (191KB)
+First video frame not zero: 2 (0.066667s). Result may be out of sync. Please make sure tracks all start at 0 in C:\Users\Admin\Videos\YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4
+
+[Cache] DISK READ: 0ms (190KB)
 
 [Cache] DISK DECODE: 4ms (512x288)
 
 [RTTMediaGridItem] Duration badge for 'YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[Cache] DISK READ: 0ms (144KB)
+[Cache] DISK READ: 0ms (129KB)
 
 [Cache] DISK DECODE: 3ms (512x288)
 
-First video frame not zero: 2 (0.066667s). Result may be out of sync. Please make sure tracks all start at 0 in C:\Users\Admin\Videos\YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4
-
 [RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[Cache] DISK READ: 0ms (226KB)
+[Cache] DISK READ: 0ms (210KB)
 
 [Cache] DISK DECODE: 4ms (512x267)
 
 [RTTMediaGridItem] Duration badge for 'ZZenlessZoneZero 2026-02-03 12-19-36': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[Cache] DISK READ: 0ms (234KB)
+[Cache] DISK READ: 3ms (247KB)
 
 [RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[Cache] DISK READ: 2ms (16KB)
+[Cache] DISK READ: 0ms (115KB)
 
-[Cache] DISK DECODE: 0ms (512x267)
+[Cache] DISK DECODE: 3ms (512x267)
 
 [RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 17-52-22': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[Cache] DISK READ: 0ms (119KB)
+[Cache] DISK READ: 0ms (109KB)
 
-[Cache] DISK DECODE: 3ms (512x267)
+[Cache] DISK DECODE: 2ms (512x267)
 
 [RTTMediaGridItem] Duration badge for 'videoplayback': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
 [Cache] DISK READ: 0ms (206KB)
 
-[RTTMediaGrid] Auto-selecting first item: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p
-
-[Detail] REQUEST: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4
-
-[Cache] DISK READ: 0ms (112KB)
-
-[Detail] RECEIVED: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 wait=12ms assign=0ms
-
-[Detail] UpdateInfo: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 name=0ms preview=13ms metadata=10ms total=23ms
-
-[RTTMediaGrid] Progressive binding started: 10 items queued, budgetMs=6
-
 [RTTMediaGridItem] Duration badge for 'Genshin-Impact 2026-1-26 12-24-11': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[RTTMediaLibraryController] TryRestoreCachedState: Restored 18 items from cache (filtered from 18, skipped 0 deleted)
-
-[RTTAppManager] TryRestoreCachedState: media, success=True
-
-[RTTAppManager] Subscribed to OnDataPrepared: media
-
-[RTTAppManager] Fade in started: 3 frames at 8.175s
+[Cache] DISK READ: 0ms (199KB)
 
 [RTTMediaGridItem] Duration badge for 'Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
 [Cache] DISK READ: 0ms (85KB)
 
-[Cache] DISK DECODE: 1ms (512x213)
+[Cache] DISK DECODE: 2ms (512x213)
 
 [RTTMediaGridItem] Duration badge for 'video_client': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
@@ -301,137 +363,143 @@ First video frame not zero: 2 (0.066667s). Result may be out of sync. Please mak
 
 [RTTMediaGridItem] Duration badge for 'Phàm Nhân Tu Tiên Tập 173 Vietsub': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[Cache] DISK READ: 0ms (131KB)
+[Cache] DISK DECODE: 2ms (512x288)
 
-[RTTMediaGridItem] Duration badge for '7295785205012': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+[RTTMediaGrid] Auto-selecting first item: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p
 
-[RTTAppManager] Fade in done: media at 8.279s (+485.3ms)
+[Detail] REQUEST: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4
 
-[RTTAppManager] OnAppShown called: media at 8.279s
+[Cache] DISK READ: 0ms (112KB)
 
-[RTTMediaLibraryController] OnAppShown called, _view=exists
+[Detail] RECEIVED: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 wait=11ms assign=0ms
 
-[RTTTaskbar] RegisterApp called - slotIndex=1, icon=icon_media
+[Detail] UpdateInfo: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 name=0ms preview=12ms metadata=5ms total=17ms
 
-[RTTTaskbar] SetSlotIcon - slot=AppBtn_AppSlot_1, icon=icon_media, slotIndex=1
+[Detail] RECEIVED: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 wait=0ms assign=0ms
 
-[RTTTaskbar] SetSlotIcon - removed 0 old children
+[Detail] UpdateInfo: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 name=0ms preview=0ms metadata=2ms total=2ms
 
-[RTTTaskbar] SetSlotIcon - created iconBtn=Btn_icon_media, slot.childCount now=1
+[RTTMenu] Created app frame: folder
 
-[RTTTaskbar] Registered app slot 1, total apps: 1
+[RTTManager] Creating FileManager content...
 
-[RTTTaskbar] SelectSlot(1) called, current active: 0
+[RTTFileManager] PlaceSidePanel: innerEdge=(-0.83, 0.00, 1.81), panelPos=(-1.06, 0.00, 1.67)
 
-[RTTTaskbar] Selected app with slot index 1
+[VirtualObjectsZoomController] Registered side panel: FileNavigationPanel (side=-1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
-[RTTTaskbar] SelectSlot(1) called, current active: 1
+[RTTFileManager] Registered FileNavigationPanel with VirtualObjectsZoomController
 
-[RTTAppManager] Transition completed: media at 8.308s (total: 514.5ms)
+[RTTFileManager] Placed FileNavigationPanel: pos=(-1.06, 0.00, 1.67)
+
+[HoverEffectController] AddEffect 'scale' to Item_internal, TargetVisuals=Item_internal
+
+[HoverEffectController] AddEffect 'color' to Item_internal, TargetVisuals=Item_internal
+
+[FileSystemService] Root path set to: C:\Users\Admin
+
+[HoverEffectController] AddEffect 'scale' to Item_downloads, TargetVisuals=Item_downloads
+
+[HoverEffectController] AddEffect 'color' to Item_downloads, TargetVisuals=Item_downloads
+
+[HoverEffectController] AddEffect 'scale' to Item_music, TargetVisuals=Item_music
+
+[HoverEffectController] AddEffect 'color' to Item_music, TargetVisuals=Item_music
+
+[RTTFileManager] PlaceSidePanel: innerEdge=(0.87, 0.00, 1.79), panelPos=(1.09, 0.00, 1.64)
+
+[VirtualObjectsZoomController] Registered side panel: FileDetailPanel (side=1, mainW=1.6, sideW=0.5333334, gap=0.05)
+
+[RTTFileManager] Registered FileDetailPanel with VirtualObjectsZoomController
+
+[RTTFileManager] Placed FileDetailPanel: pos=(1.09, 0.00, 1.64)
+
+[RTTFileActionBar] Buttons created
+
+[RTTFileActionBar] Initialized, following: FileDetailPanel
+
+[RTTFileManager] File action bar created (hidden initially)
+
+[Controller] CanCreateFolderHere called, _currentPath: 'root'
+
+[FileSystemService] CanCreateFolderInPath called with path: 'root'
+
+[FileSystemService] Path is 'root' or empty, returning false
+
+[Controller] CanCreateFolderHere result: False
+
+[RTTFileManager] UpdateNewFolderButtonState: canCreate=False
+
+[RTTFileManager] BoxCollider.enabled set to False
+
+[RTTFileManager] New Folder button DISABLED - alpha=0.4
+
+[RTTFileManager] Text Area found and offsetMin set to: (30.00, 0.00)
+
+[HoverEffectController] AddEffect 'scale' to Btn_Copy, TargetVisuals=Btn_Copy
+
+[HoverEffectController] AddEffect 'scale' to Btn_Move, TargetVisuals=Btn_Move
+
+[RTTFileGrid] CalculateGridMetrics: width=1770, availableWidth=1730, columnsPerRow=4, cellWidth=395, spacingX=30
+
+[Controller] SetSortOptionsNoRefresh: sortBy=Name, ascending=True
+
+[Controller] View is ready. Checking storage permissions...
+
+[Controller] NavigateToInternalAsync: path='root', restorePage=False, clickedFolder=''
+
+[RTTFileManager] UpdateBreadcrumbs called with path: root, container null: True, instance: -1206202
+
+[RTTFileManager] Found breadcrumb container from hierarchy: True
+
+[RTTFileManager] Created 1 breadcrumbs for path: C:\Users\Admin
+
+[FileSystemService] Reading directory async: C:\Users\Admin
+
+[FileSystemService] Quick count: 126 items (dirs=83, files=43)
+
+[Controller] Quick count received: 126 items
+
+[Controller] CalculateTotalPages: totalFiles=8, pageSize=8, totalPages=1
+
+[RTTFileGrid] GetVisibleRowsForPagination: height=748.1688, availableHeight=728.1688, rowHeight=350, rowsFloat=2.080482, visibleRows=2
+
+[Detail] UpdateInfo: Admin name=0ms preview=0ms metadata=2ms total=2ms
+
+[Controller] Showing early pagination with quick count: 126 items, 16 pages
+
+[RTTFileManagerController] Menu created
+
+[FileSystemService] Found 93 items async (71 folders, 22 files)
+
+[Controller] CalculateTotalPages: totalFiles=93, pageSize=8, totalPages=12
+
+[RTTFileGrid] Progressive binding started: 24 items queued
+
+[RTTFileGrid] Progressive bind frame: 4 items, 20 remaining
+
+[Controller] SetPageSize: no change (already 8)
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\YTDown.com_YouTube_Chuyen-Di-Tau-Luon-Sieu-Toc-Thuc-Te-Ao-3_Media_EqL0I1-gg7c_001_1080s.mp4
 
-[Detail] REQUEST: YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4
+[RTTFileGrid] Progressive bind frame: 3 items, 5 remaining
 
-[Cache] DISK READ: 0ms (127KB)
+[RTTFileGrid] Progressive bind frame: 3 items, 2 remaining
 
-[Detail] RECEIVED: YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4 wait=16ms assign=0ms
+[RTTFileGrid] Progressive bind frame: 2 items, 0 remaining
 
-[Detail] UpdateInfo: YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4 name=0ms preview=17ms metadata=9ms total=26ms
+[RTTFileGrid] Progressive binding complete: 12 items bound total
+
+[RTTAppManager] Pre-initialized app: folder in 355.2ms
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37.mp4
 
-[MediaLibraryService] Loaded 3178 items from cache in 1062ms (async, no File.Exists)
-
-[RTTMediaLibraryController] HandleCacheLoaded called
-
-[Cache] DISK READ: 0ms (113KB)
-
-[Cache] DISK READ: 3ms (190KB)
-
-[Cache] DISK READ: 0ms (129KB)
-
-[Cache] DISK READ: 0ms (210KB)
-
-[Cache] DISK READ: 0ms (247KB)
-
-[Cache] DISK READ: 0ms (115KB)
-
-[Cache] DISK READ: 0ms (109KB)
-
-[RTTMediaGrid] Progressive binding started: 13 items queued, budgetMs=6
-
-[Cache] DISK READ: 0ms (199KB)
-
-[Detail] RECEIVED: YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4 wait=0ms assign=0ms
-
-[Detail] UpdateInfo: YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4 name=0ms preview=0ms metadata=8ms total=8ms
-
-[Cache] DISK DECODE: 2ms (512x213)
-
-[Cache] DISK DECODE: 2ms (512x288)
-
-[Cache] DISK READ: 0ms (120KB)
-
-[Cache] DISK DECODE: 3ms (512x230)
-
-[RTTMediaGridItem] Duration badge for '7077543476647': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (265KB)
-
-[Cache] DISK DECODE: 4ms (512x230)
-
-[RTTMediaGridItem] Duration badge for '7065774217733': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (75KB)
-
-[Cache] DISK DECODE: 2ms (512x238)
-
-[RTTMediaGridItem] Duration badge for 'Genshin_Impact_2025-09-10_11-32-27': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (283KB)
-
-[Cache] DISK DECODE: 5ms (512x288)
-
-[RTTMediaGridItem] Duration badge for 'FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD)': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (165KB)
-
-[Detail] RECEIVED: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 wait=0ms assign=0ms
-
-[Detail] UpdateInfo: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 name=0ms preview=1ms metadata=8ms total=9ms
-
-[RTTMediaGridItem] Duration badge for 'Honkai  Star Rail 2025.05.21 - 15.03.08.01': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (207KB)
-
-[RTTMediaGridItem] Duration badge for 'khác màu': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (38KB)
-
-[Cache] DISK DECODE: 1ms (512x288)
-
-[RTTMediaGridItem] Duration badge for 'vết xước 2': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (48KB)
-
-[RTTMediaGridItem] Duration badge for 'vết xước 1': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (101KB)
-
-[Cache] DISK DECODE: 2ms (512x284)
-
-[RTTMediaGrid] Progressive binding complete: bound=5, skipped=8
-
-[MediaLibraryService] Starting background scan (existing: 3178 items)
-
-First video frame not zero: 2 (0.066733s). Result may be out of sync. Please make sure tracks all start at 0 in C:\Users\Admin\Videos\YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4
-
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\ZZenlessZoneZero 2026-02-03 12-19-36.mp4
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
+
+[RTTAppManager] Background pre-init complete: 3 apps in 2643.3ms
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 17-52-22.mp4
 
@@ -441,167 +509,103 @@ Unexpected timestamp values detected. This can occur in H.264 videos not encoded
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Video\Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D.mp4
 
-[MediaLibraryService] Background scan complete - no changes (1336ms)
-
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Video\Phàm Nhân Tu Tiên Tập 173 Vietsub.mp4
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Genshin_Impact_2025-09-10_11-32-27.mp4
+[RTTMainMenu] Click started: folder at 8.250s
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Compressed\FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD).mp4
+[RTTMainMenu] PrepareApp called: folder at 8.250s (+0.1ms)
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\New folder\khác màu.mp4
+[RTTAppManager] PrepareApp: folder already active, preparing, or pre-initialized. Skipping redundant creation.
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\New folder\vết xước 2.mp4
+[RTTMainMenu] Button animation started: folder at 8.251s (+0.6ms)
 
-[Detail] REQUEST: Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D.mp4
+[RTTMainMenu] Button animation ended: folder at 8.349s (+98.5ms)
 
-[Cache] DISK READ: 0ms (81KB)
+[RTTMainMenu] OpenPreparedApp called: folder at 8.349s (+98.6ms)
 
-[Detail] RECEIVED: Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D.mp4 wait=12ms assign=0ms
+[RTTAppManager] OpenPreparedApp: Using pre-initialized instance for folder
 
-[Detail] UpdateInfo: Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D.mp4 name=1ms preview=12ms metadata=11ms total=24ms
+[RTTMainMenu] Click flow completed: folder at 8.351s (total: +100.8ms)
 
-[VRMediaAppController] HideLibraryUI - hiding all menu frames for video playback
+[RTTFileManagerController] PrepareDataAsync started
 
-[VRMediaAppController] Saved menu frame position: (0.00, 0.00, 1.80), rotation: (0.00, 0.00, 0.00)
+[AppStateCache] Disk cache hit for files
 
-[RTTManager] Entered Immersive Mode
+[Controller] CalculateTotalPages: totalFiles=30, pageSize=10, totalPages=3
 
-[RTTMenuFrame] UI built: 64x64 logical pixels
+[RTTFileGrid] Progressive binding started: 18 items queued
 
-[RTTMenuFrame] UI built: 1947x700 logical pixels
+[RTTFileGrid] Progressive bind frame: 5 items, 13 remaining
 
-[HoverEffectController] AddEffect 'scale' to Btn_icon_exit, TargetVisuals=Btn_icon_exit
+[RTTFileManager] UpdateBreadcrumbs called with path: root, container null: False, instance: -1206202
 
-[HoverEffectController] AddEffect 'color' to Btn_icon_exit, TargetVisuals=Btn_icon_exit
+[RTTFileManagerController] TryRestoreCachedState: Restored 30 items from cache
 
-[HoverEffectController] AddEffect 'scale' to Btn_icon_record, TargetVisuals=Btn_icon_record
+[RTTAppManager] Subscribed to OnDataPrepared: folder
 
-[HoverEffectController] AddEffect 'color' to Btn_icon_record, TargetVisuals=Btn_icon_record
+[Detail] UpdateInfo: .bun name=0ms preview=0ms metadata=3ms total=3ms
 
-[HoverEffectController] AddEffect 'scale' to Btn_icon_recenter, TargetVisuals=Btn_icon_recenter
+[RTTFileGrid] Progressive bind frame: 1 items, 0 remaining
 
-[HoverEffectController] AddEffect 'color' to Btn_icon_recenter, TargetVisuals=Btn_icon_recenter
+[RTTFileManagerController] PrepareDataAsync completed: 93 files
 
-[HoverEffectController] AddEffect 'scale' to Btn_icon_loop, TargetVisuals=Btn_icon_loop
+[RTTAppManager] OnDataPrepared received: folder
 
-[HoverEffectController] AddEffect 'color' to Btn_icon_loop, TargetVisuals=Btn_icon_loop
+[RTTFileManagerController] OnBackgroundDataReady called
 
-[HoverEffectController] AddEffect 'scale' to Btn_icon_settings, TargetVisuals=Btn_icon_settings
+[Controller] CalculateTotalPages: totalFiles=93, pageSize=10, totalPages=10
 
-[HoverEffectController] AddEffect 'color' to Btn_icon_settings, TargetVisuals=Btn_icon_settings
+[RTTFileGrid] Progressive bind frame: 5 items, 19 remaining
 
-[HoverEffectController] AddEffect 'scale' to Btn_icon_volume, TargetVisuals=Btn_icon_volume
+[AppStateCache] Saved state for files with 30 items
 
-[HoverEffectController] AddEffect 'color' to Btn_icon_volume, TargetVisuals=Btn_icon_volume
+[RTTFileManagerController] CacheCurrentState: Cached 30 items
 
-[HoverEffectController] AddEffect 'scale' to Btn_icon_previous, TargetVisuals=Btn_icon_previous
+[RTTAppManager] State cached after background ready: folder
 
-[HoverEffectController] AddEffect 'color' to Btn_icon_previous, TargetVisuals=Btn_icon_previous
+[RTTFileGrid] Progressive bind frame: 3 items, 4 remaining
 
-[HoverEffectController] AddEffect 'scale' to Btn_icon_play, TargetVisuals=Btn_icon_play
+[RTTFileGrid] Progressive bind frame: 3 items, 1 remaining
 
-[HoverEffectController] AddEffect 'color' to Btn_icon_play, TargetVisuals=Btn_icon_play
+[RTTFileManagerController] OnAppShown called
 
-[HoverEffectController] AddEffect 'scale' to Btn_icon_next, TargetVisuals=Btn_icon_next
+[RTTTaskbar] RegisterApp called - slotIndex=1, icon=icon_folder
 
-[HoverEffectController] AddEffect 'color' to Btn_icon_next, TargetVisuals=Btn_icon_next
+[RTTTaskbar] SetSlotIcon - slot=AppBtn_AppSlot_1, icon=icon_folder, slotIndex=1
 
-[HoverEffectController] AddEffect 'scale' to Btn_icon_enviroment, TargetVisuals=Btn_icon_enviroment
+[RTTTaskbar] SetSlotIcon - removed 0 old children
 
-[HoverEffectController] AddEffect 'color' to Btn_icon_enviroment, TargetVisuals=Btn_icon_enviroment
+[RTTTaskbar] SetSlotIcon - created iconBtn=Btn_icon_folder, slot.childCount now=1
 
-[HoverEffectController] AddEffect 'scale' to Btn_icon_cube, TargetVisuals=Btn_icon_cube
+[RTTTaskbar] Registered app slot 1, total apps: 1
 
-[HoverEffectController] AddEffect 'color' to Btn_icon_cube, TargetVisuals=Btn_icon_cube
+[RTTTaskbar] SelectSlot(1) called, current active: 0
 
-[RTTMenuFrame] UI built: 120x120 logical pixels
+[RTTTaskbar] Selected app with slot index 1
 
-[HoverEffectController] AddEffect 'scale' to MenuButton, TargetVisuals=MenuButton
+[RTTTaskbar] SelectSlot(1) called, current active: 1
 
-[HoverEffectController] AddEffect 'color' to MenuButton, TargetVisuals=MenuButton
+[RTTAppManager] Pre-init app shown: folder in 359.5ms
 
-[VRVideoPlayerController] Environment controller initialized
+[Detail] UpdateInfo: Admin name=0ms preview=0ms metadata=3ms total=3ms
 
-[VRVideoPlayerController] Synced UI state to Room (Lights: True, Blocked: False)
+[Detail] UpdateInfo: .cache name=0ms preview=0ms metadata=3ms total=3ms
 
-[VRVideoPlayerController] Initialized
+[Detail] UpdateInfo: .cargo name=0ms preview=0ms metadata=3ms total=3ms
 
-[VRMediaAppController] Player UI built with controls container
+[Detail] UpdateInfo: .codex name=0ms preview=0ms metadata=3ms total=3ms
 
-[VRVideoProjectionSystem] Set target position: (0.00, 0.00, 1.80), rotation: (0.00, 0.00, 0.00)
+[Detail] UpdateInfo: Admin name=0ms preview=0ms metadata=4ms total=4ms
 
-[VRVideoPlayerController] Playing: Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D, Detected Projection: Flat, Stereo: Mono
+[Detail] UpdateInfo: Admin name=0ms preview=0ms metadata=7ms total=7ms
 
-[VRVideoProjectionSystem] Set projection: Flat, stereo: Mono
+[Detail] UpdateInfo: .android name=0ms preview=0ms metadata=3ms total=3ms
 
-[VRMediaAppController] Switched to Player mode: Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D
+[Detail] UpdateInfo: .cargo name=1ms preview=0ms metadata=3ms total=4ms
 
-[VRVideoPlayerController] Video prepared
+[Detail] UpdateInfo: .cache name=0ms preview=0ms metadata=4ms total=4ms
 
-[VRVideoPlayerController] OutputTexture: 1920x800
+[Detail] UpdateInfo: .cargo name=0ms preview=0ms metadata=4ms total=4ms
 
-[VRVideoPlayerController] Using standard texture output
-
-[FlatProjectionRenderer] SetTexture: 1920x800
-
-[VRVideoPlayerController] Calling ProjectionSystem.Show()
-
-[VRVideoPlayerController] Projection visible: True, ActiveRenderer: FlatProjectionRenderer
-
-[VRVideoPlayerController] Starting auto-play
-
-[VideoPlaybackEngine] Video prepared: 1920x800, 1224.1s, 25.0fps
-
-[VRSliderControl] OnPointerEnter called on TimelineSlider
-
-[VRSliderControl] OnPointerExit called on TimelineSlider
-
-[MediaEnvironmentController] Hiding environment instantly
-
-[VRVideoPlayerController] Synced UI state to LightOff (Lights: True, Blocked: True)
-
-[MediaEnvironmentController] Fading out lights instantly
-
-[RTTTaskbar] Light state synchronized to: OFF
-
-[VRVideoPlayerController] Synced UI state to LightOff (Lights: False, Blocked: True)
-
-[MediaEnvironmentController] Lights disabled
-
-[VRVideoPlayerController] Environment changed to LightOff
-
-[MediaEnvironmentController] Reset to default state (Preserve: True)
-
-[RTTManager] Exited Immersive Mode
-
-[VRMediaAppController] ShowLibraryUI
-
-[VRMediaAppController] Switched to Library mode
-
-[VRVideoProjectionSystem] Disposed
-
-[VirtualObjectsZoomController] Unregistered side panel: MediaNavigationPanel
-
-[VirtualObjectsZoomController] Unregistered side panel: MediaDetailPanel
-
-[RTTMediaLibrary] Cleanup: Destroying _mediaActionBar
-
-[VRMediaAppController] Cleanup completed
-
-[RTTTaskbar] Unregistered app slot 1, remaining apps: 0
-
-[RTTAppManager] Closed app: media
-
-Destroying assets is not permitted to avoid data loss.
-If you really want to remove an asset use DestroyImmediate (theObject, true);
-UnityEngine.Object:Destroy (UnityEngine.Object)
-VRWorkspace.UI.HoverEffects.CursorChangeHoverEffect:Cleanup () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Effects/CursorChangeHoverEffect.cs:118)
-VRWorkspace.UI.HoverEffects.HoverEffectController:CleanupEffects () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Core/HoverEffectController.cs:311)
-VRWorkspace.UI.HoverEffects.HoverEffectController:OnDestroy () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Core/HoverEffectController.cs:318)
-
-Some objects were not cleaned up when closing the scene. (Did you spawn new GameObjects from OnDestroy?)
-The following scene GameObjects were found:
-MediaEnvironmentController
-
+[Detail] UpdateInfo: .cache name=1ms preview=0ms metadata=3ms total=4ms
 

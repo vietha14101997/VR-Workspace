@@ -123,19 +123,21 @@ public class RTTFilePagination : RTTCanvasBase
         // Skip if fade is already in progress
         if (_fadeCoroutine != null) return;
 
-        // Track when Show() was called to prevent rapid hide/show flicker
         _lastShowTime = Time.time;
 
-        // CRITICAL: Set alpha to 0 BEFORE activating to prevent flash
+        // Ensure visible if was hidden
         SetQuadAlpha(0f);
-
-        // Activate the object (OnEnable will NOT reset alpha because _isShown check comes after)
         gameObject.SetActive(true);
 
-        // Double-check alpha is 0 after activation
-        SetQuadAlpha(0f);
-
-        // Start fade in animation
+        if (_fadeCoroutine != null) StopCoroutine(_fadeCoroutine);
+        
+        // Process pending display update IMMEDIATELY if we were inactive
+        if (_pendingDisplayUpdate)
+        {
+            _pendingDisplayUpdate = false;
+            UpdateDisplay();
+        }
+        
         _fadeCoroutine = StartCoroutine(FadeIn());
     }
 
@@ -219,6 +221,14 @@ public class RTTFilePagination : RTTCanvasBase
         {
             StopCoroutine(_pageButtonsFadeCoroutine);
         }
+
+        if (!gameObject.activeInHierarchy)
+        {
+            SetPageButtonsAlpha(0f);
+            onComplete?.Invoke();
+            return;
+        }
+
         _pageButtonsFadeCoroutine = StartCoroutine(FadePageButtonsCoroutine(0f, onComplete));
     }
 
@@ -233,6 +243,13 @@ public class RTTFilePagination : RTTCanvasBase
         {
             StopCoroutine(_pageButtonsFadeCoroutine);
         }
+
+        if (!gameObject.activeInHierarchy)
+        {
+            SetPageButtonsAlpha(1f);
+            return;
+        }
+
         _pageButtonsFadeCoroutine = StartCoroutine(FadePageButtonsCoroutine(1f, null));
     }
 

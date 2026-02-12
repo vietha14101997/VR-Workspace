@@ -152,8 +152,12 @@ public class MarqueeText : MonoBehaviour
         // If container has no width yet, delay the check
         if (_maskRT != null && _maskRT.rect.width <= 0)
         {
-            // Start coroutine to check after layout is ready
-            StartCoroutine(DelayedCheckOverflow());
+            // Guard: Can't start coroutine on inactive GameObject (e.g. during background pre-init)
+            if (gameObject.activeInHierarchy)
+            {
+                StartCoroutine(DelayedCheckOverflow());
+            }
+            // else: OnEnable will re-call SetText when activated
         }
         else
         {

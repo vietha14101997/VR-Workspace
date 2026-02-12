@@ -31,7 +31,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
     public DurationRange? CurrentDurationFilter { get; private set; } = null;
     public int CurrentPage { get; private set; } = 1;
     public int TotalPages { get; private set; } = 1;
-    public int PageSize { get; private set; } = 6;
+    public int PageSize { get; private set; } = 8;
     public string SortBy { get; private set; } = "Name";
     public bool IsAscending { get; private set; } = true;
     public string GroupBy { get; private set; } = "Date Added";
@@ -304,7 +304,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
         // Restore state properties
         CurrentCategory = !string.IsNullOrEmpty(snapshot.category) ? snapshot.category : "videos";
         CurrentPage = snapshot.currentPage > 0 ? snapshot.currentPage : 1;
-        PageSize = snapshot.pageSize > 0 ? snapshot.pageSize : 6;
+        PageSize = 8; // Force to current default, view will refine it later via SetPageSize
         SortBy = !string.IsNullOrEmpty(snapshot.sortBy) ? snapshot.sortBy : "Name";
         IsAscending = snapshot.sortAscending;
         GroupBy = !string.IsNullOrEmpty(snapshot.groupBy) ? snapshot.groupBy : "Date Added";
@@ -1012,6 +1012,14 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
     /// </summary>
     public void SetPageSize(int size)
     {
+        // Emergency fix: if something is trying to set 6 (old design), force it to 8
+        if (size == 6)
+        {
+            Debug.LogWarning("[RTTMediaLibraryController] Something attempted to set PageSize to 6 (old design). Forcing to 8.");
+            size = 8;
+        }
+
+        if (PageSize == size) return;
         PageSize = Mathf.Max(1, size);
         RecalculatePagination();
         // Debug.Log($"[RTTMediaLibraryController] PageSize set to {PageSize}");

@@ -105,11 +105,15 @@ public class CameraPassthrough : MonoBehaviour
         // Set the texture and ensure it's properly configured
         _mr.material.mainTexture = _tex;
         _mr.material.renderQueue = 1000; // Ensure it renders before other objects but after background
-        _mr.material.SetFloat("_Glossiness", 0f); // Reduce any potential glossiness
-        _mr.material.SetFloat("_Metallic", 0f); // Reduce any potential metallic effect
+        
+        if (_mr.material.HasProperty("_Glossiness"))
+            _mr.material.SetFloat("_Glossiness", 0f);
+        if (_mr.material.HasProperty("_Metallic"))
+            _mr.material.SetFloat("_Metallic", 0f);
         
         // Ensure the material is not culled and is visible from both sides
-        _mr.material.SetInt("_Cull", 0); // 0 = Off (double-sided)
+        if (_mr.material.HasProperty("_Cull"))
+            _mr.material.SetInt("_Cull", 0); // 0 = Off (double-sided)
         
         Debug.Log("Starting webcam texture: " + devs[idx].name + " at 1280x720");
         _tex.Play();
@@ -175,7 +179,13 @@ public class CameraPassthrough : MonoBehaviour
             
             if (attempts >= 30)
             {
-                Debug.LogWarning("Webcam texture did not initialize properly after 30 frames");
+                Debug.LogWarning("Webcam texture did not initialize properly. Retrying with default resolution/fps...");
+                string deviceName = _tex.deviceName;
+                StopCam();
+                
+                _tex = new WebCamTexture(deviceName);
+                if (_mr != null && _mr.material != null) _mr.material.mainTexture = _tex;
+                _tex.Play();
             }
             else
             {

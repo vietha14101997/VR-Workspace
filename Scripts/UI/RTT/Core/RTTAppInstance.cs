@@ -47,11 +47,18 @@ public class RTTAppInstance
     /// </summary>
     public bool IsPrepared { get; set; }
 
+    /// <summary>
+    /// Whether this app was pre-initialized in background and is ready to be shown.
+    /// Pre-initialized apps have frame + content created but hidden.
+    /// </summary>
+    public bool IsPreInitialized { get; set; }
+
     public RTTAppInstance(string appId)
     {
         AppId = appId;
         IsVisible = false;
         IsPrepared = false;
+        IsPreInitialized = false;
         TaskbarSlotIndex = -1;
     }
 }

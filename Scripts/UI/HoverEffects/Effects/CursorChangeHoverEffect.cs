@@ -24,6 +24,7 @@ namespace VRWorkspace.UI.HoverEffects
 
         // Runtime
         private Sprite _loadedSprite;
+        private bool _isSpriteCreated = false;
         private bool _isCursorChanged = false;
 
         public override void Initialize(HoverEffectController controller)
@@ -34,6 +35,7 @@ namespace VRWorkspace.UI.HoverEffects
             if (loadFromResources && customCursorSprite == null && !string.IsNullOrEmpty(cursorResourcePath))
             {
                 _loadedSprite = Resources.Load<Sprite>(cursorResourcePath);
+                _isSpriteCreated = false;
 
                 // Try loading as Texture2D and creating sprite
                 if (_loadedSprite == null)
@@ -46,6 +48,7 @@ namespace VRWorkspace.UI.HoverEffects
                             new Rect(0, 0, tex.width, tex.height),
                             new Vector2(0.5f, 0.5f)
                         );
+                        _isSpriteCreated = true;
                     }
                 }
             }
@@ -112,11 +115,12 @@ namespace VRWorkspace.UI.HoverEffects
             // Reset cursor on cleanup
             ResetCursor();
 
-            // Destroy dynamically created sprite
-            if (_loadedSprite != null && customCursorSprite == null)
+            // Destroy dynamically created sprite if it was created by us
+            if (_loadedSprite != null && _isSpriteCreated)
             {
                 Object.Destroy(_loadedSprite);
                 _loadedSprite = null;
+                _isSpriteCreated = false;
             }
         }
 
@@ -126,6 +130,8 @@ namespace VRWorkspace.UI.HoverEffects
         {
             customCursorSprite = sprite;
             loadFromResources = false;
+            // If a custom sprite is set via fluent API, it's not created by us
+            _isSpriteCreated = false;
             return this;
         }
 

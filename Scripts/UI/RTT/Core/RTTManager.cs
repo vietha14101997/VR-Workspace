@@ -99,6 +99,9 @@ public class RTTManager : MonoBehaviour
     [Header("Auto Init")]
     [SerializeField] private bool autoShowMainMenu = true;
 
+    [Tooltip("Pre-initialize all app menus in background after main menu stabilizes")]
+    [SerializeField] private bool enableBackgroundPreInit = true;
+
     [Header("Auto Recenter")]
     [Tooltip("Automatically recenter objects in front of user when app starts")]
     [SerializeField] private bool autoRecenterOnStart = true;
@@ -447,6 +450,13 @@ public class RTTManager : MonoBehaviour
         // Create the Main Menu once - it will never be destroyed
         CreatePersistentMainMenu();
         Debug.Log("[RTTManager] Main Menu initialized (persistent, cannot be closed)");
+
+        // Background pre-init all apps after main menu is ready
+        if (enableBackgroundPreInit && _appManager != null)
+        {
+            _appManager.PrepareAllApps();
+            Debug.Log("[RTTManager] Background app pre-initialization triggered");
+        }
 
         // Auto-recenter after camera stabilizes
         if (autoRecenterOnStart && !_hasAutoRecentered)
