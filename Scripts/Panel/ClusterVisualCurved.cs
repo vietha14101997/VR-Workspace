@@ -464,6 +464,10 @@ public class ClusterVisualCurved : MonoBehaviour
         _borderMeshFilter = _borderObject.GetComponent<MeshFilter>();
         _borderRenderer = _borderObject.GetComponent<MeshRenderer>();
         _borderMeshFilter.sharedMesh = _expandedMesh;
+
+        // Hide background and border - only show remote screen content
+        _backgroundObject.SetActive(false);
+        _borderObject.SetActive(false);
     }
 
     /// <summary>

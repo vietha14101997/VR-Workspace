@@ -481,7 +481,11 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
         _borderRenderer = _borderObject.GetComponent<MeshRenderer>();
         _borderMeshFilter.sharedMesh = _expandedMesh;
 
-        Debug.Log($"[ClusterVisualFlatPlanar] Created visual layers: background, content, border");
+        // Hide background and border - only show remote screen content
+        _backgroundObject.SetActive(false);
+        _borderObject.SetActive(false);
+
+        Debug.Log($"[ClusterVisualFlatPlanar] Created visual layers: background and border hidden, content only");
     }
 
     /// <summary>
