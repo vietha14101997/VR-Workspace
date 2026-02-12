@@ -35,7 +35,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     private const float OTHER_BUTTON_HEIGHT_RATIO = 0.5f;  // 50% of Zone C height for all other buttons
 
     // Styling
-    private static readonly Color BG_COLOR = new Color(0f, 0f, 0f, 0.75f);
+    private static readonly Color BG_COLOR = new Color(0.173f, 0.173f, 0.173f, 0.75f);
     private static readonly Color HEADER_BTN_BG_COLOR = new Color(0f, 0f, 0f, 0.75f);
     private static readonly Color THEME_COLOR = new Color(1f, 0.2f, 0.2f, 1f); // Reticle red
     private const float BG_CORNER_RADIUS = 20f;

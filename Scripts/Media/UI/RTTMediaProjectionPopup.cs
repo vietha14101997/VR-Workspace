@@ -550,6 +550,8 @@ public class RTTMediaProjectionPopup : MonoBehaviour
             UpdateVisualStates();
         };
 
+        btnObj.AddComponent<VRSelectedButton>();
+
         return btn;
     }
     #endregion
@@ -584,6 +586,7 @@ public class RTTMediaProjectionPopup : MonoBehaviour
     #region Internal Logic
     private void SetProjection(VideoProjectionType type)
     {
+        Hide();
         if (_currentProjection == type) return;
         _currentProjection = type;
         UpdateUI(false); // Animate
@@ -592,6 +595,7 @@ public class RTTMediaProjectionPopup : MonoBehaviour
 
     private void SetStereo(StereoMode mode)
     {
+        Hide();
         if (_currentStereo == mode) return;
         _currentStereo = mode;
         UpdateUI(false); // Animate
@@ -600,6 +604,7 @@ public class RTTMediaProjectionPopup : MonoBehaviour
 
     private void SetMonitor(MonitorType type)
     {
+        Hide();
         if (_currentMonitor == type) return;
         _currentMonitor = type;
         UpdateUI(false);
@@ -608,6 +613,7 @@ public class RTTMediaProjectionPopup : MonoBehaviour
 
     private void SetEnvironment(EnvironmentType type)
     {
+        Hide();
         if (_currentEnv == type) return;
         _currentEnv = type;
         UpdateUI(false);
@@ -676,6 +682,9 @@ public class RTTMediaProjectionPopup : MonoBehaviour
 
             var icon = btn.transform.Find("Icon")?.GetComponent<Image>();
             if (icon) icon.color = targetColor;
+
+            var selectedComp = btn.GetComponent<VRSelectedButton>();
+            if (selectedComp) selectedComp.IsSelected = isActive;
         }
     }
 
