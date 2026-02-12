@@ -935,9 +935,25 @@ public class VRVideoPlayerController : MonoBehaviour
         Vector3 newPos = camPos + camForward * dist;
         newPos.y = currentPos.y; // Keep height
 
-        Quaternion newRot = Quaternion.LookRotation(camForward);
-
         objective.position = newPos;
-        objective.rotation = newRot;
+
+        // Custom logic for VideoControlsContainer
+        if (objective.name == "VideoControlsContainer")
+        {
+            // Container always (0,0,0) like VirtualObjects
+            objective.rotation = Quaternion.identity;
+
+            // Child frame faces the camera
+            Transform frame = objective.Find("VideoControlsFrame");
+            if (frame != null)
+            {
+                frame.rotation = Quaternion.LookRotation(camForward);
+            }
+        }
+        else
+        {
+            // Standard behavior for other objects
+            objective.rotation = Quaternion.LookRotation(camForward);
+        }
     }
 }

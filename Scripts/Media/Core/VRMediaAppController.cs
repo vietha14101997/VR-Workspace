@@ -297,7 +297,16 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         {
             Vector3 controlsPos = _menuFramePosition + _menuFrameRotation * new Vector3(0, -0.625f, 0);
             _controlsContainer.transform.position = controlsPos;
-            _controlsContainer.transform.rotation = _menuFrameRotation;
+            
+            // VideoControlsContainer is always (0,0,0) like VirtualObjects
+            _controlsContainer.transform.rotation = Quaternion.identity;
+            
+            // VideoControlsFrame faces the camera
+            if (_controlsFrameObject != null)
+            {
+                _controlsFrameObject.transform.rotation = _menuFrameRotation;
+            }
+
             _controlsContainer.SetActive(true);
         }
 
@@ -952,16 +961,16 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         Camera cam = Camera.main;
         if (cam == null) return;
 
-        // Face-to-camera for controls container
-        if (_controlsContainer != null && _controlsContainer.activeSelf)
+        // Face-to-camera for VideoControlsFrame (child of the identity-rotated container)
+        if (_controlsFrameObject != null && _controlsFrameObject.activeInHierarchy)
         {
-            Vector3 toCamera = cam.transform.position - _controlsContainer.transform.position;
+            Vector3 toCamera = cam.transform.position - _controlsFrameObject.transform.position;
             if (toCamera.sqrMagnitude > 0.001f)
-                _controlsContainer.transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
+                _controlsFrameObject.transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
         }
 
-        // Face-to-camera for menu button (in VirtualObjects, follows video screen)
-        if (_menuButtonFrameObject != null && _menuButtonFrameObject.activeSelf)
+        // Face-to-camera for menu button (stays consistent with the frame)
+        if (_menuButtonFrameObject != null && _menuButtonFrameObject.activeInHierarchy)
         {
             Vector3 toCamera = cam.transform.position - _menuButtonFrameObject.transform.position;
             if (toCamera.sqrMagnitude > 0.001f)

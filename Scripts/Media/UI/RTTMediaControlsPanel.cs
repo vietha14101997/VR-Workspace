@@ -93,6 +93,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     private VRSliderControl _volumeSlider;
     private Button _speedButton;
     private TextMeshProUGUI _speedText;
+    private Button _settingsButton;
     private Button _backButton;
     private Button _recenterButton;
     // External world-space menu button + dismiss overlay (managed by VRMediaAppController)
@@ -122,6 +123,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     private const string ICON_AB_LOOP = "icon_record";
     private const string ICON_RECENTER = "icon_recenter";
     private const string ICON_REPEAT = "icon_loop";
+    private const string ICON_SETTINGS = "icon_settings";
     private const string ICON_VOLUME = "icon_volume";
     private const string ICON_VOLUME_MUTE = "icon_volume_mute";
     private const string ICON_PREV = "icon_previous";
@@ -303,8 +305,9 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         // Spacer between button 4 and 5
         CreateFlexibleSpacer(zoneA.transform);
 
-        // Button 5: Empty space (Right)
-        CreateFlexibleSpacer(zoneA.transform);
+        // Button 5: Settings (Right)
+        _settingsButton = CreateRoundIconButton(zoneA.transform, ICON_SETTINGS, HEADER_BUTTON_SIZE);
+        // User requested button to be present but no function on click
     }
 
     /// <summary>
