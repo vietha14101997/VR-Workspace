@@ -705,37 +705,9 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         _playerController.Initialize(PlaybackEngine, ProjectionSystem, _controlsPanel);
         _playerController.OnBackToLibrary += SwitchToLibrary;
 
-        // === 6. Popups (Settings & Queue) ===
+        // === 6. Popups (Projection & Environment) ===
         // Create them inside the controls frame container so they render on top of controls
         
-        // Settings Popup
-        GameObject settingsObj = new GameObject("SettingsPopup_Root");
-        settingsObj.transform.SetParent(container, false);
-        
-        var settingsRT = settingsObj.AddComponent<RectTransform>();
-        settingsRT.anchorMin = Vector2.zero;
-        settingsRT.anchorMax = Vector2.one;
-        settingsRT.offsetMin = Vector2.zero;
-        settingsRT.offsetMax = Vector2.zero;
-        
-        var settingsPopup = settingsObj.AddComponent<RTTMediaSettingsPopup>();
-        settingsPopup.Initialize(_font, _primaryColor, _accentColor);
-        _playerController.SetSettingsPopup(settingsPopup);
-        
-        // Queue Popup
-        GameObject queueObj = new GameObject("QueuePopup_Root");
-        queueObj.transform.SetParent(container, false);
-        
-        var queueRT = queueObj.AddComponent<RectTransform>();
-        queueRT.anchorMin = Vector2.zero;
-        queueRT.anchorMax = Vector2.one;
-        queueRT.offsetMin = Vector2.zero;
-        queueRT.offsetMax = Vector2.zero;
-        
-        var queuePopup = queueObj.AddComponent<RTTMediaQueuePopup>();
-        queuePopup.Initialize(_font, _primaryColor, _accentColor);
-        _playerController.SetQueuePopup(queuePopup);
-
         // Projection Settings Popup
         GameObject projectionObj = new GameObject("ProjectionPopup_Root");
         projectionObj.transform.SetParent(container, false);

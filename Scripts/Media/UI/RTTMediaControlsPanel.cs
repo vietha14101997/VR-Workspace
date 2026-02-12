@@ -56,10 +56,6 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     public event Action<float> OnSeek;
     public event Action<float> OnVolumeChanged;
     public event Action<float> OnSpeedChanged;
-    public event Action OnSettingsClicked;
-#pragma warning disable CS0067 // Event reserved for fullscreen toggle feature
-    public event Action OnFullscreenToggle;
-#pragma warning restore CS0067
     public event Action OnBackClicked;
     public event Action OnPlaylistClicked;
     public event Action OnVRModeClicked;
@@ -97,7 +93,6 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     private VRSliderControl _volumeSlider;
     private Button _speedButton;
     private TextMeshProUGUI _speedText;
-    private Button _settingsButton;
     private Button _backButton;
     private Button _recenterButton;
     // External world-space menu button + dismiss overlay (managed by VRMediaAppController)
@@ -127,7 +122,6 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     private const string ICON_AB_LOOP = "icon_record";
     private const string ICON_RECENTER = "icon_recenter";
     private const string ICON_REPEAT = "icon_loop";
-    private const string ICON_SETTINGS = "icon_settings";
     private const string ICON_VOLUME = "icon_volume";
     private const string ICON_VOLUME_MUTE = "icon_volume_mute";
     private const string ICON_PREV = "icon_previous";
@@ -309,9 +303,8 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         // Spacer between button 4 and 5
         CreateFlexibleSpacer(zoneA.transform);
 
-        // Button 5: Settings (Right)
-        _settingsButton = CreateRoundIconButton(zoneA.transform, ICON_SETTINGS, HEADER_BUTTON_SIZE);
-        _settingsButton.onClick.AddListener(() => OnSettingsClicked?.Invoke());
+        // Button 5: Empty space (Right)
+        CreateFlexibleSpacer(zoneA.transform);
     }
 
     /// <summary>

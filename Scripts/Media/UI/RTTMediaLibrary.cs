@@ -623,7 +623,6 @@ public class RTTMediaLibrary : MonoBehaviour
         // Wire up events
         _mediaActionBar.OnPlayClicked += OnPlayButtonClicked;
         _mediaActionBar.OnFavouriteClicked += OnFavouriteButtonClicked;
-        _mediaActionBar.OnPlaylistClicked += OnPlaylistButtonClicked;
 
         // Start hidden - will fade in when first video is selected
         // This creates smooth progressive loading: grid groups → items → select first → detail + actionbar

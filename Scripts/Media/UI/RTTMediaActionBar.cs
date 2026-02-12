@@ -18,7 +18,6 @@ public class RTTMediaActionBar : MonoBehaviour
     #region Events
     public event Action OnPlayClicked;
     public event Action OnFavouriteClicked;
-    public event Action OnPlaylistClicked;
     #endregion
 
     #region Private Fields
@@ -35,7 +34,6 @@ public class RTTMediaActionBar : MonoBehaviour
     private GameObject _container;
     private Button _playButton;
     private Button _favouriteButton;
-    private Button _playlistButton;
     private Image _favouriteIcon;
     private TextMeshProUGUI _favouriteText;
     private TMP_FontAsset _font;
@@ -401,13 +399,11 @@ public class RTTMediaActionBar : MonoBehaviour
         // Button labels
         string playLabel = "Play";
         string favLabel = "Favorite";
-        string playlistLabel = "Playlist";
 
         // Calculate base width for each button based on text length
         float playBaseWidth = iconSize + spacing + (playLabel.Length * charWidth) + (sidePadding * 2);
         float favBaseWidth = iconSize + spacing + (favLabel.Length * charWidth) + (sidePadding * 2);
-        float playlistBaseWidth = iconSize + spacing + (playlistLabel.Length * charWidth) + (sidePadding * 2);
-        float totalBaseWidth = playBaseWidth + favBaseWidth + playlistBaseWidth + (buttonSpacing * 2);
+        float totalBaseWidth = playBaseWidth + favBaseWidth + buttonSpacing;
 
         // Canvas Setup
         float logicalPanelWidth = _panelWidth * 1000f;
@@ -415,15 +411,14 @@ public class RTTMediaActionBar : MonoBehaviour
         float canvasHeight = _frameHeight * 1000f;
 
         // Scale buttons to fill panel width while keeping text-based proportions
-        float targetWidth = canvasWidth - (buttonSpacing * 2);
+        float targetWidth = canvasWidth - buttonSpacing;
         float scale = targetWidth / totalBaseWidth;
 
         float playWidth = playBaseWidth * scale;
         float favWidth = favBaseWidth * scale;
-        float playlistWidth = playlistBaseWidth * scale;
 
         // Total width of buttons
-        float totalButtonsWidth = playWidth + favWidth + playlistWidth + (buttonSpacing * 2);
+        float totalButtonsWidth = playWidth + favWidth + buttonSpacing;
 
         RectTransform canvasRT = _container.GetComponent<RectTransform>();
         canvasRT.sizeDelta = new Vector2(canvasWidth, canvasHeight);
@@ -487,32 +482,6 @@ public class RTTMediaActionBar : MonoBehaviour
         _favouriteButton = favBtn.GetComponent<Button>();
         _favouriteIcon = favBtn.transform.Find("HitArea/Visuals/Content/Icon")?.GetComponent<Image>();
         _favouriteText = favBtn.transform.Find("HitArea/Visuals/Content/Text")?.GetComponent<TextMeshProUGUI>();
-
-        // Playlist Button (Deep Sea Blue)
-        float playlistX = groupStartX + playWidth + buttonSpacing + favWidth + buttonSpacing + playlistWidth / 2f;
-        Sprite playlistIcon = Resources.Load<Sprite>("icon_add_playlist");
-        Color deepSeaBlue = new Color(0f, 0.4f, 0.65f);  // Deep sea blue
-        var playlistConfig = new VRButtonFactory.ButtonConfig
-        {
-            label = playlistLabel,
-            icon = playlistIcon,
-            themeColor = deepSeaBlue,
-            width = playlistWidth,
-            height = buttonHeight,
-            horizontalLayout = true,
-            iconSize = iconSize,
-            fontSize = (int)fontSize,
-            font = font,
-            spacing = spacing,
-            cornerRadius = 0.15f,
-            borderWidth = 0.055f,
-            glowWidth = 0.06f,
-            glowIntensity = 3f,
-            popAmount = 0.03f
-        };
-        GameObject playlistBtn = VRButtonFactory.CreateButton(canvasRT, playlistConfig, () => OnPlaylistClicked?.Invoke());
-        PositionButton(playlistBtn, playlistX);
-        _playlistButton = playlistBtn.GetComponent<Button>();
 
         // Container starts INACTIVE - only becomes active when explicitly shown via ShowWithFade() or ShowImmediate()
         // This prevents ActionBar from appearing during dwell pre-loading when frame is temporarily activated

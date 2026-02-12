@@ -24,10 +24,8 @@ public class VRVideoPlayerController : MonoBehaviour
     private VideoPlaybackEngine _playbackEngine;
     private VRVideoProjectionSystem _projectionSystem;
     private RTTMediaControlsPanel _controlsPanel;
-    private RTTMediaSettingsPopup _settingsPopup;
     private RTTMediaProjectionPopup _projectionPopup;
     private RTTMediaProjectionPopup _environmentPopup;
-    private RTTMediaQueuePopup _queuePopup;
     private MediaEnvironmentController _environmentController;
 
     private MediaVideoInfo? _currentVideo;
@@ -105,8 +103,6 @@ public class VRVideoPlayerController : MonoBehaviour
             _controlsPanel.OnBackClicked += HandleBackClicked;
             _controlsPanel.OnPrevious += PlayPreviousVideo;
             _controlsPanel.OnNext += PlayNextVideo;
-            _controlsPanel.OnSettingsClicked += ShowSettings;
-            _controlsPanel.OnPlaylistClicked += HandlePlaylistClicked;
             _controlsPanel.OnVRModeClicked += HandleVRModeClicked;
             _controlsPanel.OnHeadsetModeClicked += HandleHeadsetModeClicked;
             _controlsPanel.OnRecenterClicked += HandleRecenter;
@@ -114,47 +110,7 @@ public class VRVideoPlayerController : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Set the settings popup reference.
-    /// </summary>
-    public void SetSettingsPopup(RTTMediaSettingsPopup popup)
-    {
-        if (_settingsPopup != null)
-        {
-            UnwireSettingsEvents();
-        }
 
-        _settingsPopup = popup;
-
-        if (_settingsPopup != null)
-        {
-            WireSettingsEvents();
-        }
-    }
-
-    private void WireSettingsEvents()
-    {
-        if (_settingsPopup == null) return;
-
-        _settingsPopup.OnProjectionChanged += HandleProjectionChanged;
-        _settingsPopup.OnScreenDistanceChanged += SetScreenDistance;
-        _settingsPopup.OnScreenScaleChanged += SetScreenScale;
-        _settingsPopup.OnScreenCurvatureChanged += SetScreenCurvature;
-        _settingsPopup.OnLightsToggled += SetLightsEnabled;
-        _settingsPopup.OnCloseRequested += HideSettings;
-    }
-
-    private void UnwireSettingsEvents()
-    {
-        if (_settingsPopup == null) return;
-
-        _settingsPopup.OnProjectionChanged -= HandleProjectionChanged;
-        _settingsPopup.OnScreenDistanceChanged -= SetScreenDistance;
-        _settingsPopup.OnScreenScaleChanged -= SetScreenScale;
-        _settingsPopup.OnScreenCurvatureChanged -= SetScreenCurvature;
-        _settingsPopup.OnLightsToggled -= SetLightsEnabled;
-        _settingsPopup.OnCloseRequested -= HideSettings;
-    }
 
     /// <summary>
     /// Set the projection popup reference.
@@ -222,37 +178,7 @@ public class VRVideoPlayerController : MonoBehaviour
         _environmentPopup.OnCloseRequested -= HideEnvironmentPopup;
     }
 
-    /// <summary>
-    /// Set the queue popup reference.
-    /// </summary>
-    public void SetQueuePopup(RTTMediaQueuePopup popup)
-    {
-        if (_queuePopup != null)
-        {
-            UnwireQueueEvents();
-        }
 
-        _queuePopup = popup;
-
-        if (_queuePopup != null)
-        {
-            WireQueueEvents();
-        }
-    }
-
-    private void WireQueueEvents()
-    {
-        if (_queuePopup == null) return;
-        _queuePopup.OnVideoSelected += PlayVideoSimple;
-        _queuePopup.OnCloseRequested += HideQueue;
-    }
-
-    private void UnwireQueueEvents()
-    {
-        if (_queuePopup == null) return;
-        _queuePopup.OnVideoSelected -= PlayVideoSimple;
-        _queuePopup.OnCloseRequested -= HideQueue;
-    }
     #endregion
 
     #region Public API
@@ -393,8 +319,6 @@ public class VRVideoPlayerController : MonoBehaviour
         // Reset environment to default state (preserve user preferences)
         _environmentController?.Reset(true);
         
-        HideQueue();
-        HideSettings();
         HideProjectionPopup();
         HideEnvironmentPopup();
     }
@@ -555,27 +479,7 @@ public class VRVideoPlayerController : MonoBehaviour
         _controlsPanel?.Hide();
     }
 
-    /// <summary>
-    /// Show settings popup.
-    /// </summary>
-    public void ShowSettings()
-    {
-        if (_settingsPopup == null) return;
 
-        if (_currentVideo.HasValue)
-        {
-            _settingsPopup.SetProjection(_currentVideo.Value.Projection);
-        }
-        _settingsPopup.SetScreenSettings(_displaySettings.Distance, _displaySettings.Scale, _displaySettings.Curvature);
-        _settingsPopup.SetLightsState(AreLightsEnabled());
-
-        _settingsPopup.Show();
-    }
-
-    private void HideSettings()
-    {
-        _settingsPopup?.Hide();
-    }
 
     /// <summary>
     /// Show projection settings popup.
@@ -630,10 +534,7 @@ public class VRVideoPlayerController : MonoBehaviour
         _environmentPopup?.Hide();
     }
 
-    private void HideQueue()
-    {
-        _queuePopup?.Hide();
-    }
+
 #endregion
 
 #region Event Handlers
@@ -813,24 +714,7 @@ public class VRVideoPlayerController : MonoBehaviour
         OnBackToLibrary?.Invoke();
     }
 
-    private void HandlePlaylistClicked()
-    {
-        Debug.Log("[VRVideoPlayerController] Playlist clicked");
-        if (_queuePopup != null)
-        {
-            var service = MediaPlaylistService.Instance;
-            if (service != null)
-            {
-                var queue = service.GetPlaybackQueue();
-                _queuePopup.RefreshQueueWithList(queue);
-                if (_currentVideo.HasValue)
-                {
-                    _queuePopup.SetCurrentVideo(_currentVideo.Value.Path);
-                }
-                _queuePopup.Show();
-            }
-        }
-    }
+
 
 
     private void HandleVRModeClicked()
@@ -1022,15 +906,13 @@ public class VRVideoPlayerController : MonoBehaviour
             _controlsPanel.OnBackClicked -= HandleBackClicked;
             _controlsPanel.OnPrevious -= PlayPreviousVideo;
             _controlsPanel.OnNext -= PlayNextVideo;
-            _controlsPanel.OnSettingsClicked -= ShowSettings;
-            _controlsPanel.OnPlaylistClicked -= HandlePlaylistClicked;
             _controlsPanel.OnVRModeClicked -= HandleVRModeClicked;
             _controlsPanel.OnHeadsetModeClicked -= HandleHeadsetModeClicked;
             _controlsPanel.OnRecenterClicked -= HandleRecenter;
         }
 
-        UnwireSettingsEvents();
-        UnwireQueueEvents();
+        UnwireProjectionEvents();
+        UnwireEnvironmentEvents();
     }
     #endregion
 
