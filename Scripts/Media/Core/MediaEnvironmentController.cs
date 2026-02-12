@@ -182,27 +182,30 @@ public class MediaEnvironmentController : MonoBehaviour
     }
 
     /// <summary>
-    /// Toggle room lights on/off.
-    /// Only works in Flat/Mono mode where environment is visible.
+    /// Enable or disable scene lights.
     /// </summary>
-    public void SetLightsEnabled(bool enabled)
+    public void SetLightsEnabled(bool enabled, bool updateVisibility = true)
     {
         if (LightsEnabled == enabled) return;
         
         LightsEnabled = enabled;
 
         // "Light Off" also hides the environment for immersion
-        UpdateEnvironmentVisibility(enabled, "Lights");
+        if (updateVisibility)
+        {
+            UpdateEnvironmentVisibility(enabled, "Lights");
+        }
 
         if (_fadeCoroutine != null)
         {
             StopCoroutine(_fadeCoroutine);
+            _fadeCoroutine = null;
         }
 
-        _fadeCoroutine = StartCoroutine(FadeLights(enabled));
+        ApplyVisualStateImmediate();
         OnLightsChanged?.Invoke(enabled);
 
-        Debug.Log($"[MediaEnvironmentController] Lights {(enabled ? "enabled" : "disabled")}");
+        Debug.Log($"[MediaEnvironmentController] Lights {(enabled ? "enabled" : "disabled")} (Immediate)");
     }
 
     /// <summary>
@@ -237,9 +240,10 @@ public class MediaEnvironmentController : MonoBehaviour
             if (_fadeCoroutine != null)
             {
                 StopCoroutine(_fadeCoroutine);
+                _fadeCoroutine = null;
             }
 
-            _fadeCoroutine = StartCoroutine(FadeEnvironment(shouldBeVisible));
+            ApplyVisualStateImmediate();
             OnEnvironmentVisibilityChanged?.Invoke(shouldBeVisible);
         }
     }
@@ -261,30 +265,50 @@ public class MediaEnvironmentController : MonoBehaviour
     }
 
     /// <summary>
-    /// Reset to default state (environment visible, lights on).
+    /// Reset everything to default (Flat UI, Room environment).
     /// </summary>
-    public void Reset()
+    public void Reset(bool preserveUserPrefs = false)
     {
+        // Stop ongoing fades
         if (_fadeCoroutine != null)
         {
             StopCoroutine(_fadeCoroutine);
+            _fadeCoroutine = null;
         }
 
-        // Immediately restore
-        RestoreEnvironmentImmediate();
-        RestoreLightsImmediate();
+        // Immediately restore technical state (scale/active root)
+        if (_environmentRoot != null)
+        {
+            _environmentRoot.SetActive(true);
+            _environmentRoot.transform.localScale = _originalEnvironmentScale;
+            foreach (Transform child in _environmentRoot.transform) child.gameObject.SetActive(true);
+        }
 
-        _visibilityBlockers.Clear();
-        EnvironmentVisible = true;
-        LightsEnabled = true;
+        // Clear projection blocker (always reset projection on exit)
+        _visibilityBlockers.Remove("Projection");
 
-        // Fire events to sync UI (e.g., Taskbar buttons)
-        OnLightsChanged?.Invoke(true);
-        OnEnvironmentVisibilityChanged?.Invoke(true);
+        if (!preserveUserPrefs)
+        {
+            _visibilityBlockers.Clear();
+            EnvironmentVisible = true;
+            LightsEnabled = true;
+
+            // Fire events to sync UI
+            OnLightsChanged?.Invoke(true);
+            OnEnvironmentVisibilityChanged?.Invoke(true);
+        }
+        else
+        {
+            // If preserving, update the logically visible state based on remaining blockers
+            EnvironmentVisible = (_visibilityBlockers.Count == 0);
+        }
+
+        // Apply whatever state we ended up with
+        ApplyVisualStateImmediate();
 
         CurrentProjection = VideoProjectionType.Flat;
 
-        Debug.Log("[MediaEnvironmentController] Reset to default state");
+        Debug.Log($"[MediaEnvironmentController] Reset to default state (Preserve: {preserveUserPrefs})");
     }
 
     /// <summary>
@@ -301,100 +325,55 @@ public class MediaEnvironmentController : MonoBehaviour
     #endregion
 
     #region Private Methods
-    private IEnumerator FadeLights(bool fadeIn)
+    private void ApplyVisualStateImmediate()
     {
-        Debug.Log($"[MediaEnvironmentController] {(fadeIn ? "Fading in" : "Fading out")} lights instantly");
+        if (!_isInitialized) return;
 
-        float targetAmbient = fadeIn ? _originalAmbientIntensity : _originalAmbientIntensity * 0.1f;
-        RenderSettings.ambientIntensity = targetAmbient;
+        bool isVisible = EnvironmentVisible;
+        bool lightsOn = LightsEnabled;
 
-        for (int i = 0; i < _sceneLights.Length; i++)
-        {
-            if (_sceneLights[i] != null)
-            {
-                float target = fadeIn ? _originalLightIntensities[i] : 0f;
-                _sceneLights[i].intensity = target;
-            }
-        }
-
-        _fadeCoroutine = null;
-        yield break;
-    }
-
-    private IEnumerator FadeEnvironment(bool show)
-    {
-        if (_environmentRoot == null)
-        {
-            yield break;
-        }
-
-        Debug.Log($"[MediaEnvironmentController] {(show ? "Showing" : "Hiding")} environment instantly");
-
-        // 1. Instant scale and active state for children
-        _environmentRoot.transform.localScale = show ? _originalEnvironmentScale : Vector3.one * ENVIRONMENT_SCALE_HIDDEN;
-        
-        // Toggle top-level children directly as requested
-        foreach (Transform child in _environmentRoot.transform)
-        {
-            child.gameObject.SetActive(show);
-        }
-
-        // Ensure root itself is active so children can be visible
-        _environmentRoot.SetActive(true);
-
-        // 2. Instant light and ambient settings
-        float targetAmbient = show ? _originalAmbientIntensity : 0f;
-        RenderSettings.ambientIntensity = targetAmbient;
-
-        if (!show)
-        {
-            RenderSettings.skybox = null;
-        }
-        else
-        {
-            RenderSettings.skybox = _skyboxMaterial;
-        }
-
-        for (int i = 0; i < _sceneLights.Length; i++)
-        {
-            if (_sceneLights[i] != null)
-            {
-                _sceneLights[i].intensity = show ? (LightsEnabled ? _originalLightIntensities[i] : 0f) : 0f;
-            }
-        }
-
-        _fadeCoroutine = null;
-        yield break;
-    }
-
-    private void RestoreEnvironmentImmediate()
-    {
+        // 1. Environment Visibility (Scale + Children)
         if (_environmentRoot != null)
         {
-            _environmentRoot.SetActive(true);
-            _environmentRoot.transform.localScale = _originalEnvironmentScale;
-
-            // Restore children visibility
+            _environmentRoot.transform.localScale = isVisible ? _originalEnvironmentScale : Vector3.one * ENVIRONMENT_SCALE_HIDDEN;
+            
             foreach (Transform child in _environmentRoot.transform)
             {
-                child.gameObject.SetActive(true);
+                child.gameObject.SetActive(isVisible);
             }
         }
 
-        RenderSettings.skybox = _skyboxMaterial;
-        RenderSettings.ambientIntensity = _originalAmbientIntensity;
-        RenderSettings.ambientLight = _originalAmbientColor;
-    }
+        // 2. Skybox
+        RenderSettings.skybox = isVisible ? _skyboxMaterial : null;
 
-    private void RestoreLightsImmediate()
-    {
+        // 3. Ambient Light
+        // If invisible: 0
+        // If visible but lights off: 10%
+        // If visible and lights on: 100%
+        float targetAmbient = 0f;
+        if (isVisible)
+        {
+            targetAmbient = lightsOn ? _originalAmbientIntensity : _originalAmbientIntensity * 0.1f;
+        }
+        RenderSettings.ambientIntensity = targetAmbient;
+
+        // 4. Scene Lights
+        // Only ON if both environment is visible AND lights are enabled
         for (int i = 0; i < _sceneLights.Length; i++)
         {
             if (_sceneLights[i] != null)
             {
-                _sceneLights[i].intensity = _originalLightIntensities[i];
+                float targetIntensity = (isVisible && lightsOn) ? _originalLightIntensities[i] : 0f;
+                _sceneLights[i].intensity = targetIntensity;
             }
         }
+
+        Debug.Log($"[MediaEnvironmentController] Applied Visual State: Visible={isVisible}, Lights={lightsOn}, Ambient={targetAmbient}");
+    }
+
+    public bool IsSourceBlockingVisibility(string source)
+    {
+        return _visibilityBlockers.Contains(source);
     }
     #endregion
 
@@ -404,8 +383,9 @@ public class MediaEnvironmentController : MonoBehaviour
         // Restore original state
         if (_isInitialized)
         {
-            RestoreEnvironmentImmediate();
-            RestoreLightsImmediate();
+            EnvironmentVisible = true;
+            LightsEnabled = true;
+            ApplyVisualStateImmediate();
         }
 
         if (_instance == this)

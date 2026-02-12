@@ -87,21 +87,21 @@ Destroying webcam texture
 
 [RTTManager] Auto-recenter completed
 
-[RTTMainMenu] Click started: media at 6.168s
+[RTTMainMenu] Click started: media at 7.532s
 
-[RTTMainMenu] PrepareApp called: media at 6.168s (+0.1ms)
+[RTTMainMenu] PrepareApp called: media at 7.532s (+0.1ms)
 
-[RTTAppManager] PrepareAppFrameAsync started: media at 6.170s
+[RTTAppManager] PrepareAppFrameAsync started: media at 7.534s
 
 [RTTMenu] Created app frame: media
 
-[RTTAppManager] Frame created: media at 6.171s (+0.4ms)
+[RTTAppManager] Frame created: media at 7.535s (+0.4ms)
 
 [RTTAppManager] Preparing app: media in slot 1
 
-[RTTMainMenu] Button animation started: media at 6.171s (+3.4ms)
+[RTTMainMenu] Button animation started: media at 7.535s (+3.2ms)
 
-[RTTAppManager] Creating content: media at 6.201s (+30.6ms)
+[RTTAppManager] Creating content: media at 7.564s (+29.8ms)
 
 [RTTManager] Creating Media content...
 
@@ -119,7 +119,7 @@ Destroying webcam texture
 
 [RTTMenuFrame] UI built: 640x1080 logical pixels
 
-[RTTMediaLibrary] CreateLeftPanelContent started at 6.249s
+[RTTMediaLibrary] CreateLeftPanelContent started at 7.609s
 
 [HoverEffectController] AddEffect 'scale' to Item_all, TargetVisuals=Item_all
 
@@ -149,13 +149,13 @@ Destroying webcam texture
 
 [HoverEffectController] AddEffect 'color' to Item_playlists, TargetVisuals=Item_playlists
 
-[RTTMediaLibrary] Left panel content created at 6.262s
+[RTTMediaLibrary] Left panel content created at 7.620s
 
 [VirtualObjectsZoomController] Registered side panel: MediaDetailPanel (side=1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
-[RTTMediaLibrary] CreateRightPanelContent started at 6.264s
+[RTTMediaLibrary] CreateRightPanelContent started at 7.622s
 
-[RTTMediaLibrary] Right panel content created at 6.291s
+[RTTMediaLibrary] Right panel content created at 7.648s
 
 [RTTPopupMenu] CreateWorldSpace: layer 'VirtualObjects' = 3, mainCam: VRCamera
 
@@ -163,7 +163,7 @@ Destroying webcam texture
 
 [HoverEffectController] AddEffect 'cursor_change' to HitArea, TargetVisuals=Visuals
 
-[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-614502
+[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-153932
 
 [HoverEffectController] AddEffect 'scale' to Checkbox, TargetVisuals=Checkbox
 
@@ -185,45 +185,59 @@ Destroying webcam texture
 
 [VRMediaAppController] Media app created
 
-[RTTAppManager] Content created: media at 6.406s (+236.3ms)
+[RTTAppManager] Content created: media at 7.764s (+229.2ms)
 
-[RTTAppManager] PrepareDataAsync started: media at 6.407s
+[RTTAppManager] PrepareDataAsync started: media at 7.764s
 
 [RTTMediaLibraryController] PrepareDataAsync started
 
-[RTTAppManager] App prepared (hidden): media at 6.411s (total: 240.4ms)
+[RTTAppManager] App prepared (hidden): media at 7.768s (total: 233.1ms)
 
-[RTTMainMenu] Button animation ended: media at 6.434s (+265.8ms)
+[RTTMainMenu] Button animation ended: media at 7.792s (+259.4ms)
 
-[RTTMainMenu] OpenPreparedApp called: media at 6.434s (+265.9ms)
+[RTTMainMenu] OpenPreparedApp called: media at 7.792s (+259.5ms)
 
-[RTTAppManager] WaitAndSwitch started: media at 6.434s
+[RTTAppManager] WaitAndSwitch started: media at 7.792s
 
-[RTTAppManager] WaitAndSwitch app ready: media at 6.434s (waited 0.2ms)
+[RTTAppManager] WaitAndSwitch app ready: media at 7.792s (waited 0.1ms)
 
-[RTTAppManager] Starting transition: media at 6.434s
+[RTTAppManager] Starting transition: media at 7.792s
 
-[RTTAppManager] Transition started: media at 6.436s
+[RTTAppManager] Transition started: media at 7.794s
 
 [RTTAppManager] Got 3 frames to animate: media
 
-[RTTAppManager] Fade out MainMenu: media at 6.436s
+[RTTAppManager] Fade out MainMenu: media at 7.794s
 
-[RTTMainMenu] Click flow completed: media at 6.436s (total: +268.7ms)
+[RTTMainMenu] Click flow completed: media at 7.794s (total: +262.2ms)
 
-[RTTAppManager] Fade out done: media at 6.555s (+119.5ms)
+[RTTAppManager] Fade out done: media at 7.908s (+114.5ms)
 
 [RTTAppManager] All frames activated with alpha=0: 3 frames
 
-[RTTAppManager] Sync point: media, IsDataReady=False at 6.565s
+[RTTAppManager] Sync point: media, IsDataReady=False at 7.917s
 
 [AppStateCache] Disk cache hit for media
+
+[RTTMediaGridItem] Duration badge for 'YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (104KB)
+
+[Cache] DISK DECODE: 2ms (512x144)
+
+[RTTMediaGridItem] Duration badge for 'YTDown.com_YouTube_Chuyen-Di-Tau-Luon-Sieu-Toc-Thuc-Te-Ao-3_Media_EqL0I1-gg7c_001_1080s': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (191KB)
+
+[Cache] DISK DECODE: 4ms (512x288)
 
 [RTTMediaGridItem] Duration badge for 'YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
 [Cache] DISK READ: 0ms (144KB)
 
-[Cache] DISK DECODE: 6ms (512x288)
+[Cache] DISK DECODE: 3ms (512x288)
+
+First video frame not zero: 2 (0.066667s). Result may be out of sync. Please make sure tracks all start at 0 in C:\Users\Admin\Videos\YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4
 
 [RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
@@ -231,17 +245,13 @@ Destroying webcam texture
 
 [Cache] DISK DECODE: 4ms (512x267)
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4
-
 [RTTMediaGridItem] Duration badge for 'ZZenlessZoneZero 2026-02-03 12-19-36': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[Cache] DISK READ: 4ms (234KB)
-
-[Cache] DISK DECODE: 5ms (512x288)
+[Cache] DISK READ: 0ms (234KB)
 
 [RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[Cache] DISK READ: 0ms (16KB)
+[Cache] DISK READ: 2ms (16KB)
 
 [Cache] DISK DECODE: 0ms (512x267)
 
@@ -255,35 +265,19 @@ Unexpected timestamp values detected. This can occur in H.264 videos not encoded
 
 [Cache] DISK READ: 0ms (206KB)
 
-[Cache] DISK DECODE: 3ms (512x288)
+[RTTMediaGrid] Auto-selecting first item: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p
 
-[RTTMediaGridItem] Duration badge for 'Genshin-Impact 2026-1-26 12-24-11': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+[Detail] REQUEST: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4
 
-[Cache] DISK READ: 0ms (191KB)
+[Cache] DISK READ: 0ms (112KB)
 
-[RTTMediaGridItem] Duration badge for 'Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+[Detail] RECEIVED: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 wait=12ms assign=0ms
 
-[Cache] DISK READ: 0ms (85KB)
-
-[Cache] DISK DECODE: 2ms (512x213)
-
-[RTTMediaGrid] Auto-selecting first item: YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p
-
-[Detail] REQUEST: YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4
-
-[Cache] DISK READ: 0ms (127KB)
-
-[Detail] RECEIVED: YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4 wait=18ms assign=0ms
-
-[Detail] UpdateInfo: YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4 name=0ms preview=19ms metadata=11ms total=30ms
+[Detail] UpdateInfo: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 name=0ms preview=13ms metadata=10ms total=23ms
 
 [RTTMediaGrid] Progressive binding started: 10 items queued, budgetMs=6
 
-[RTTMediaGridItem] Duration badge for 'video_client': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (116KB)
-
-[Cache] DISK DECODE: 2ms (512x230)
+[RTTMediaGridItem] Duration badge for 'Genshin-Impact 2026-1-26 12-24-11': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
 [RTTMediaLibraryController] TryRestoreCachedState: Restored 18 items from cache (filtered from 18, skipped 0 deleted)
 
@@ -291,7 +285,19 @@ Unexpected timestamp values detected. This can occur in H.264 videos not encoded
 
 [RTTAppManager] Subscribed to OnDataPrepared: media
 
-[RTTAppManager] Fade in started: 3 frames at 6.831s
+[RTTAppManager] Fade in started: 3 frames at 8.175s
+
+[RTTMediaGridItem] Duration badge for 'Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (85KB)
+
+[Cache] DISK DECODE: 1ms (512x213)
+
+[RTTMediaGridItem] Duration badge for 'video_client': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (116KB)
+
+[Cache] DISK DECODE: 2ms (512x230)
 
 [RTTMediaGridItem] Duration badge for 'Phàm Nhân Tu Tiên Tập 173 Vietsub': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
@@ -299,15 +305,9 @@ Unexpected timestamp values detected. This can occur in H.264 videos not encoded
 
 [RTTMediaGridItem] Duration badge for '7295785205012': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[RTTMediaGridItem] Duration badge for '7077543476647': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+[RTTAppManager] Fade in done: media at 8.279s (+485.3ms)
 
-[Cache] DISK READ: 0ms (270KB)
-
-[Cache] DISK DECODE: 4ms (512x230)
-
-[RTTAppManager] Fade in done: media at 6.929s (+493.6ms)
-
-[RTTAppManager] OnAppShown called: media at 6.929s
+[RTTAppManager] OnAppShown called: media at 8.279s
 
 [RTTMediaLibraryController] OnAppShown called, _view=exists
 
@@ -327,69 +327,61 @@ Unexpected timestamp values detected. This can occur in H.264 videos not encoded
 
 [RTTTaskbar] SelectSlot(1) called, current active: 1
 
-[RTTAppManager] Transition completed: media at 6.958s (total: 522.5ms)
+[RTTAppManager] Transition completed: media at 8.308s (total: 514.5ms)
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\YTDown.com_YouTube_Chuyen-Di-Tau-Luon-Sieu-Toc-Thuc-Te-Ao-3_Media_EqL0I1-gg7c_001_1080s.mp4
+
+[Detail] REQUEST: YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4
+
+[Cache] DISK READ: 0ms (127KB)
+
+[Detail] RECEIVED: YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4 wait=16ms assign=0ms
+
+[Detail] UpdateInfo: YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4 name=0ms preview=17ms metadata=9ms total=26ms
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37.mp4
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\ZZenlessZoneZero 2026-02-03 12-19-36.mp4
-
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
-
-[MediaLibraryService] Loaded 3178 items from cache in 1056ms (async, no File.Exists)
+[MediaLibraryService] Loaded 3178 items from cache in 1062ms (async, no File.Exists)
 
 [RTTMediaLibraryController] HandleCacheLoaded called
 
-[RTTMediaGridItem] Duration badge for 'YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
 [Cache] DISK READ: 0ms (113KB)
 
-[Cache] DISK DECODE: 2ms (512x144)
+[Cache] DISK READ: 3ms (190KB)
 
-[RTTMediaGridItem] Duration badge for 'YTDown.com_YouTube_Chuyen-Di-Tau-Luon-Sieu-Toc-Thuc-Te-Ao-3_Media_EqL0I1-gg7c_001_1080s': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 1ms (190KB)
-
-[Cache] DISK READ: 1ms (129KB)
+[Cache] DISK READ: 0ms (129KB)
 
 [Cache] DISK READ: 0ms (210KB)
 
 [Cache] DISK READ: 0ms (247KB)
 
-[Cache] DISK DECODE: 4ms (512x288)
-
 [Cache] DISK READ: 0ms (115KB)
 
-[Cache] DISK DECODE: 2ms (512x267)
-
 [Cache] DISK READ: 0ms (109KB)
-
-[RTTMediaGrid] Auto-selecting first item: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p
-
-[Detail] REQUEST: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4
-
-[Cache] DISK READ: 0ms (112KB)
-
-[Detail] RECEIVED: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 wait=11ms assign=0ms
-
-[Detail] UpdateInfo: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 name=0ms preview=12ms metadata=8ms total=20ms
 
 [RTTMediaGrid] Progressive binding started: 13 items queued, budgetMs=6
 
 [Cache] DISK READ: 0ms (199KB)
 
-[Detail] RECEIVED: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 wait=0ms assign=0ms
+[Detail] RECEIVED: YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4 wait=0ms assign=0ms
 
-[Detail] UpdateInfo: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 name=0ms preview=1ms metadata=8ms total=9ms
+[Detail] UpdateInfo: YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4 name=0ms preview=0ms metadata=8ms total=8ms
 
-[Cache] DISK DECODE: 1ms (512x213)
-
-[Cache] DISK DECODE: 3ms (512x230)
+[Cache] DISK DECODE: 2ms (512x213)
 
 [Cache] DISK DECODE: 2ms (512x288)
 
 [Cache] DISK READ: 0ms (120KB)
 
+[Cache] DISK DECODE: 3ms (512x230)
+
+[RTTMediaGridItem] Duration badge for '7077543476647': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
 [Cache] DISK READ: 0ms (265KB)
+
+[Cache] DISK DECODE: 4ms (512x230)
 
 [RTTMediaGridItem] Duration badge for '7065774217733': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
@@ -401,13 +393,15 @@ Unexpected timestamp values detected. This can occur in H.264 videos not encoded
 
 [Cache] DISK READ: 0ms (283KB)
 
+[Cache] DISK DECODE: 5ms (512x288)
+
 [RTTMediaGridItem] Duration badge for 'FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD)': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
 [Cache] DISK READ: 0ms (165KB)
 
-[Detail] RECEIVED: YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4 wait=0ms assign=0ms
+[Detail] RECEIVED: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 wait=0ms assign=0ms
 
-[Detail] UpdateInfo: YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4 name=0ms preview=1ms metadata=9ms total=10ms
+[Detail] UpdateInfo: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 name=0ms preview=1ms metadata=8ms total=9ms
 
 [RTTMediaGridItem] Duration badge for 'Honkai  Star Rail 2025.05.21 - 15.03.08.01': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
@@ -433,9 +427,11 @@ Unexpected timestamp values detected. This can occur in H.264 videos not encoded
 
 [MediaLibraryService] Starting background scan (existing: 3178 items)
 
-First video frame not zero: 2 (0.066667s). Result may be out of sync. Please make sure tracks all start at 0 in C:\Users\Admin\Videos\YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4
+First video frame not zero: 2 (0.066733s). Result may be out of sync. Please make sure tracks all start at 0 in C:\Users\Admin\Videos\YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\YTDown.com_YouTube_Chuyen-Di-Tau-Luon-Sieu-Toc-Thuc-Te-Ao-3_Media_EqL0I1-gg7c_001_1080s.mp4
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\ZZenlessZoneZero 2026-02-03 12-19-36.mp4
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 17-52-22.mp4
 
@@ -443,11 +439,9 @@ First video frame not zero: 2 (0.066667s). Result may be out of sync. Please mak
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\Genshin-Impact 2026-1-26 12-24-11.mp4
 
-[Detail] UpdateInfo: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 name=1ms preview=0ms metadata=10ms total=11ms
-
-[MediaLibraryService] Background scan complete - no changes (1272ms)
-
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Video\Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D.mp4
+
+[MediaLibraryService] Background scan complete - no changes (1336ms)
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Video\Phàm Nhân Tu Tiên Tập 173 Vietsub.mp4
 
@@ -459,19 +453,17 @@ Unexpected timestamp values detected. This can occur in H.264 videos not encoded
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\New folder\vết xước 2.mp4
 
-[Detail] UpdateInfo: YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4 name=1ms preview=0ms metadata=10ms total=11ms
+[Detail] REQUEST: Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D.mp4
 
-[Detail] REQUEST: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37.mp4
+[Cache] DISK READ: 0ms (81KB)
 
-[Cache] DISK READ: 0ms (208KB)
+[Detail] RECEIVED: Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D.mp4 wait=12ms assign=0ms
 
-[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37.mp4 wait=20ms assign=0ms
-
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37.mp4 name=1ms preview=20ms metadata=13ms total=34ms
+[Detail] UpdateInfo: Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D.mp4 name=1ms preview=12ms metadata=11ms total=24ms
 
 [VRMediaAppController] HideLibraryUI - hiding all menu frames for video playback
 
-[VRMediaAppController] Saved menu frame position: (-0.07, 0.00, 1.80), rotation: (0.00, 357.80, 0.00)
+[VRMediaAppController] Saved menu frame position: (0.00, 0.00, 1.80), rotation: (0.00, 0.00, 0.00)
 
 [RTTManager] Entered Immersive Mode
 
@@ -531,25 +523,27 @@ Unexpected timestamp values detected. This can occur in H.264 videos not encoded
 
 [VRVideoPlayerController] Environment controller initialized
 
+[VRVideoPlayerController] Synced UI state to Room (Lights: True, Blocked: False)
+
 [VRVideoPlayerController] Initialized
 
 [VRMediaAppController] Player UI built with controls container
 
-[VRVideoProjectionSystem] Set target position: (-0.07, 0.00, 1.80), rotation: (0.00, 357.80, 0.00)
+[VRVideoProjectionSystem] Set target position: (0.00, 0.00, 1.80), rotation: (0.00, 0.00, 0.00)
 
-[VRVideoPlayerController] Playing: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37, Detected Projection: Flat, Stereo: Mono
+[VRVideoPlayerController] Playing: Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D, Detected Projection: Flat, Stereo: Mono
 
 [VRVideoProjectionSystem] Set projection: Flat, stereo: Mono
 
-[VRMediaAppController] Switched to Player mode: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37
+[VRMediaAppController] Switched to Player mode: Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D
 
 [VRVideoPlayerController] Video prepared
 
-[VRVideoPlayerController] OutputTexture: 1920x1000
+[VRVideoPlayerController] OutputTexture: 1920x800
 
 [VRVideoPlayerController] Using standard texture output
 
-[FlatProjectionRenderer] SetTexture: 1920x1000
+[FlatProjectionRenderer] SetTexture: 1920x800
 
 [VRVideoPlayerController] Calling ProjectionSystem.Show()
 
@@ -557,7 +551,7 @@ Unexpected timestamp values detected. This can occur in H.264 videos not encoded
 
 [VRVideoPlayerController] Starting auto-play
 
-[VideoPlaybackEngine] Video prepared: 1920x1000, 11.0s, 30.3fps
+[VideoPlaybackEngine] Video prepared: 1920x800, 1224.1s, 25.0fps
 
 [VRSliderControl] OnPointerEnter called on TimelineSlider
 
@@ -565,15 +559,19 @@ Unexpected timestamp values detected. This can occur in H.264 videos not encoded
 
 [MediaEnvironmentController] Hiding environment instantly
 
+[VRVideoPlayerController] Synced UI state to LightOff (Lights: True, Blocked: True)
+
 [MediaEnvironmentController] Fading out lights instantly
 
 [RTTTaskbar] Light state synchronized to: OFF
+
+[VRVideoPlayerController] Synced UI state to LightOff (Lights: False, Blocked: True)
 
 [MediaEnvironmentController] Lights disabled
 
 [VRVideoPlayerController] Environment changed to LightOff
 
-[MediaEnvironmentController] Reset to default state
+[MediaEnvironmentController] Reset to default state (Preserve: True)
 
 [RTTManager] Exited Immersive Mode
 
@@ -581,43 +579,29 @@ Unexpected timestamp values detected. This can occur in H.264 videos not encoded
 
 [VRMediaAppController] Switched to Library mode
 
-[RTTTaskbarExpansion] Icons loaded - Bitrate: 5/5, FPS: 3/3, Passthrough: True, LightOn: True, LightOff: True
+[VRVideoProjectionSystem] Disposed
 
-[RTTTaskbar] Eye expansion panel created
+[VirtualObjectsZoomController] Unregistered side panel: MediaNavigationPanel
 
-[RTTTaskbarExpansion] UI built: 530x128 pixels
+[VirtualObjectsZoomController] Unregistered side panel: MediaDetailPanel
 
-[RTTTaskbar] Eye expansion dismissed
+[RTTMediaLibrary] Cleanup: Destroying _mediaActionBar
 
-[RTTTaskbarExpansion] UI built: 224x128 pixels
+[VRMediaAppController] Cleanup completed
 
-[RTTTaskbarExpansion] Showing Eye options, width=224px, worldWidth=0.1866667m, xOffset=-0.243
+[RTTTaskbar] Unregistered app slot 1, remaining apps: 0
 
-[RTTTaskbar] Eye expansion shown
+[RTTAppManager] Closed app: media
 
-[RTTTaskbar] Light toggled: ON
+Destroying assets is not permitted to avoid data loss.
+If you really want to remove an asset use DestroyImmediate (theObject, true);
+UnityEngine.Object:Destroy (UnityEngine.Object)
+VRWorkspace.UI.HoverEffects.CursorChangeHoverEffect:Cleanup () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Effects/CursorChangeHoverEffect.cs:118)
+VRWorkspace.UI.HoverEffects.HoverEffectController:CleanupEffects () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Core/HoverEffectController.cs:311)
+VRWorkspace.UI.HoverEffects.HoverEffectController:OnDestroy () (at Assets/VR-Workspace/Scripts/UI/HoverEffects/Core/HoverEffectController.cs:318)
 
-[RTTTaskbar] Light toggled: OFF
+Some objects were not cleaned up when closing the scene. (Did you spawn new GameObjects from OnDestroy?)
+The following scene GameObjects were found:
+MediaEnvironmentController
 
-[MediaEnvironmentController] Showing environment instantly
-
-[MediaEnvironmentController] Fading in lights instantly
-
-[MediaEnvironmentController] Lights enabled
-
-[Detail] REQUEST: YTDown.com_YouTube_Chuyen-Di-Tau-Luon-Sieu-Toc-Thuc-Te-Ao-3_Media_EqL0I1-gg7c_001_1080s.mp4
-
-[Cache] DISK READ: 0ms (185KB)
-
-[Detail] RECEIVED: YTDown.com_YouTube_Chuyen-Di-Tau-Luon-Sieu-Toc-Thuc-Te-Ao-3_Media_EqL0I1-gg7c_001_1080s.mp4 wait=20ms assign=0ms
-
-[Detail] UpdateInfo: YTDown.com_YouTube_Chuyen-Di-Tau-Luon-Sieu-Toc-Thuc-Te-Ao-3_Media_EqL0I1-gg7c_001_1080s.mp4 name=1ms preview=20ms metadata=11ms total=32ms
-
-[Detail] RECEIVED: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37.mp4 wait=0ms assign=0ms
-
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37.mp4 name=1ms preview=0ms metadata=11ms total=12ms
-
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37.mp4 name=1ms preview=0ms metadata=10ms total=11ms
-
-[Detail] UpdateInfo: VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37.mp4 name=1ms preview=0ms metadata=15ms total=16ms
 

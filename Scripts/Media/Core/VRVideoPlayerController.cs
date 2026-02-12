@@ -69,6 +69,15 @@ public class VRVideoPlayerController : MonoBehaviour
         }
 
         WireEvents();
+        
+        // Sync initial state and subscribe to changes
+        if (_environmentController != null)
+        {
+            _environmentController.OnLightsChanged += _ => SyncEnvironmentStateFromController();
+            _environmentController.OnEnvironmentVisibilityChanged += _ => SyncEnvironmentStateFromController();
+            SyncEnvironmentStateFromController();
+        }
+
         _isInitialized = true;
 
         Debug.Log("[VRVideoPlayerController] Initialized");
@@ -287,6 +296,8 @@ public class VRVideoPlayerController : MonoBehaviour
 
             SetVolume(_controlsPanel.Volume);
         }
+
+        SyncEnvironmentStateFromController();
     }
 
     private void ApplyProjectionSettings(VideoProjectionType projectionType, StereoMode stereoMode)
@@ -379,8 +390,8 @@ public class VRVideoPlayerController : MonoBehaviour
         _playbackEngine?.Stop();
         _projectionSystem?.Hide();
 
-        // Reset environment to default state
-        _environmentController?.Reset();
+        // Reset environment to default state (preserve user preferences)
+        _environmentController?.Reset(true);
         
         HideQueue();
         HideSettings();
@@ -605,7 +616,8 @@ public class VRVideoPlayerController : MonoBehaviour
     {
         if (_environmentPopup == null) return;
 
-        // Update with current state
+        // Update with current state from controller
+        SyncEnvironmentStateFromController();
         _environmentPopup.SetEnvironmentState(_currentMonitor, _currentEnv);
         _environmentPopup.Show();
     }
@@ -644,20 +656,49 @@ public class VRVideoPlayerController : MonoBehaviour
         {
             case RTTMediaProjectionPopup.EnvironmentType.Room:
                 _environmentController?.ShowEnvironment();
-                SetLightsEnabled(true);
-                // Potential: Call environment controller to switch to Room preset
+                _environmentController?.SetLightsEnabled(true);
                 break;
             case RTTMediaProjectionPopup.EnvironmentType.Cinema:
                 _environmentController?.ShowEnvironment();
-                SetLightsEnabled(false);
-                // Potential: Call environment controller to switch to Cinema preset
+                // Cinema mode: Lights OFF but don't hide environment (decoupled)
+                _environmentController?.SetLightsEnabled(false, false);
                 break;
             case RTTMediaProjectionPopup.EnvironmentType.LightOff:
-                _environmentController?.HideEnvironment();
-                SetLightsEnabled(false);
+                // Clear Manual blocker, and let SetLightsEnabled(false) handle immersion hiding via "Lights" blocker
+                _environmentController?.ShowEnvironment();
+                _environmentController?.SetLightsEnabled(false);
                 break;
         }
         Debug.Log($"[VRVideoPlayerController] Environment changed to {type}");
+    }
+
+    private void SyncEnvironmentStateFromController()
+    {
+        if (_environmentController == null) return;
+
+        bool lightsOn = _environmentController.LightsEnabled;
+        bool manualBlocked = _environmentController.IsSourceBlockingVisibility("Manual");
+        bool lightsBlocked = _environmentController.IsSourceBlockingVisibility("Lights");
+
+        if (manualBlocked || lightsBlocked)
+        {
+            _currentEnv = RTTMediaProjectionPopup.EnvironmentType.LightOff;
+        }
+        else if (!lightsOn)
+        {
+            _currentEnv = RTTMediaProjectionPopup.EnvironmentType.Cinema;
+        }
+        else
+        {
+            _currentEnv = RTTMediaProjectionPopup.EnvironmentType.Room;
+        }
+
+        if (_environmentPopup != null && _environmentPopup.isActiveAndEnabled)
+        {
+            _environmentPopup.SetEnvironmentState(_currentMonitor, _currentEnv);
+        }
+
+        Debug.Log($"[VRVideoPlayerController] Synced UI state to {_currentEnv} (Lights: {lightsOn}, Blocked: {manualBlocked || lightsBlocked})");
     }
     private void HandleVideoPrepared()
     {
