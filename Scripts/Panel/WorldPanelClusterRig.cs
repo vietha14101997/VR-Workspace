@@ -90,7 +90,7 @@ public class WorldPanelClusterRig : MonoBehaviour
 
     /// <summary>
     /// Get arc radius for panel positioning.
-    /// Uses VirtualObjectsZoomController.CurrentDistance when available, otherwise default 1.8m.
+    /// The user wants R to match distance, capped at 1.8m (1800R).
     /// </summary>
     public float ArcRadius
     {
@@ -99,9 +99,26 @@ public class WorldPanelClusterRig : MonoBehaviour
             var zoomController = VirtualObjectsZoomController.Instance;
             if (zoomController != null && zoomController.IsInitialized)
             {
-                return zoomController.CurrentDistance;
+                return Mathf.Min(zoomController.CurrentDistance, 1.8f);
             }
             return 1.8f; // Default fallback
+        }
+    }
+
+    /// <summary>
+    /// Gets the actual distance to the viewer.
+    /// Used for cluster positioning, while ArcRadius is used for curvature.
+    /// </summary>
+    private float ViewerDistance
+    {
+        get
+        {
+            var zoomController = VirtualObjectsZoomController.Instance;
+            if (zoomController != null && zoomController.IsInitialized)
+            {
+                return zoomController.CurrentDistance;
+            }
+            return 1.8f;
         }
     }
 
@@ -613,9 +630,24 @@ public class WorldPanelClusterRig : MonoBehaviour
         }
     }
 
+    private float _lastUpdateArcRadius = -1f;
+
     void Update()
     {
-        if (!Application.isPlaying && _panels.Count > 0) LayoutFromCamera();
+        if (!Application.isPlaying && _panels.Count > 0)
+        {
+            LayoutFromCamera();
+        }
+        else if (Application.isPlaying && _panels.Count > 0)
+        {
+            // Detect arc radius changes (e.g. from zoom controller) and trigger layout refresh
+            float currentR = ArcRadius;
+            if (Mathf.Abs(currentR - _lastUpdateArcRadius) > 0.001f)
+            {
+                _lastUpdateArcRadius = currentR;
+                LayoutFromCamera();
+            }
+        }
     }
 
     void LayoutFromCamera()
@@ -639,11 +671,14 @@ public class WorldPanelClusterRig : MonoBehaviour
             camFwd.Normalize();
         }
 
-        Vector3 clusterCenter = cam.transform.position + camFwd * ArcRadius + camUp * verticalOffset;
+        Vector3 clusterCenter = cam.transform.position + camFwd * ViewerDistance + camUp * verticalOffset;
         transform.SetPositionAndRotation(clusterCenter, Quaternion.LookRotation(camFwd, camUp));
 
         var refPanel = _panels[_panels.Count / 2];
         float panelWidth = refPanel ? refPanel.width : 1f;
+
+        // Use ArcRadius for curvature math (this is now capped at 1.8m)
+        float currentArcRadius = ArcRadius;
 
         // For Flat Planar mode (FixedThreeSlot + !useCurvedVisual), use FULL panel width for spacing
         // because boards are NOT scaled down by margins - they fill the entire panel area
@@ -660,10 +695,10 @@ public class WorldPanelClusterRig : MonoBehaviour
             spacingWidth = panelWidth * (1f - 2f * contentMarginHorizontal);
         }
 
-        float boardAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(spacingWidth / 2f / ArcRadius);
-        float gapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(edgeGapMeters / 2f / ArcRadius);
+        float boardAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(spacingWidth / 2f / currentArcRadius);
+        float gapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(edgeGapMeters / 2f / currentArcRadius);
         // Apply overlap to eliminate seams between adjacent panels
-        float overlapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(panelOverlap / 2f / ArcRadius);
+        float overlapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(panelOverlap / 2f / currentArcRadius);
         float angleDeg = boardAngleDeg + gapAngleDeg - overlapAngleDeg;
 
         // Create list of ONLY enabled panels to allow reflow into primary slots
@@ -774,9 +809,10 @@ public class WorldPanelClusterRig : MonoBehaviour
         {
             // Curved Surround mode: panels on arc around origin
             // Arc center at local (0, 0, 0)
-            float boardAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(spacingWidth / 2f / ArcRadius);
-            float gapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(edgeGapMeters / 2f / ArcRadius);
-            float overlapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(panelOverlap / 2f / ArcRadius);
+            float currentArcRadius = ArcRadius;
+            float boardAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(spacingWidth / 2f / currentArcRadius);
+            float gapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(edgeGapMeters / 2f / currentArcRadius);
+            float overlapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(panelOverlap / 2f / currentArcRadius);
             float angleDeg = boardAngleDeg + gapAngleDeg - overlapAngleDeg;
 
             for (int i = 0; i < enabledCount; i++)
@@ -792,8 +828,8 @@ public class WorldPanelClusterRig : MonoBehaviour
                 // Position on arc: sin for X, cos for Z offset from radius
                 // Panel at angle θ: x = sin(θ) * r, z = cos(θ) * r - r
                 // This puts center panel at (0, 0, 0) and others on arc
-                float x = Mathf.Sin(yawRad) * ArcRadius;
-                float z = Mathf.Cos(yawRad) * ArcRadius - ArcRadius;
+                float x = Mathf.Sin(yawRad) * currentArcRadius;
+                float z = Mathf.Cos(yawRad) * currentArcRadius - currentArcRadius;
 
                 Vector3 localPos = new Vector3(x, verticalOffset, z);
 
@@ -832,6 +868,7 @@ public class WorldPanelClusterRig : MonoBehaviour
 
         var refPanel = _panels[_panels.Count / 2];
         float panelWidth = refPanel ? refPanel.width : 1f;
+        float currentArcRadius = ArcRadius;
 
         // For Flat Planar mode (FixedThreeSlot + !useCurvedVisual), use FULL panel width for spacing
         // because boards are NOT scaled down by margins - they fill the entire panel area
@@ -847,10 +884,10 @@ public class WorldPanelClusterRig : MonoBehaviour
             // Curved mode: use board width (panel minus margins) for spacing so Board edges touch
             spacingWidth = panelWidth * (1f - 2f * contentMarginHorizontal);
         }
-        float boardAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(spacingWidth / 2f / ArcRadius);
-        float gapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(edgeGapMeters / 2f / ArcRadius);
+        float boardAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(spacingWidth / 2f / currentArcRadius);
+        float gapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(edgeGapMeters / 2f / currentArcRadius);
         // Apply overlap to eliminate seams between adjacent panels
-        float overlapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(panelOverlap / 2f / ArcRadius);
+        float overlapAngleDeg = 2f * Mathf.Rad2Deg * Mathf.Atan(panelOverlap / 2f / currentArcRadius);
         float angleDeg = boardAngleDeg + gapAngleDeg - overlapAngleDeg;
 
         // Create list of ONLY enabled panels to allow reflow into primary slots
@@ -898,7 +935,8 @@ public class WorldPanelClusterRig : MonoBehaviour
 
         Quaternion yaw = Quaternion.AngleAxis(yawDeg, clusterUp);
         Vector3 dir = yaw * clusterFwd;
-        Vector3 pos = clusterCenter + dir * ArcRadius - clusterFwd * ArcRadius;
+        float currentArcRadius = ArcRadius;
+        Vector3 pos = clusterCenter + dir * currentArcRadius - clusterFwd * currentArcRadius;
 
         Quaternion rot;
         if (panelsFaceCamera)
@@ -919,7 +957,8 @@ public class WorldPanelClusterRig : MonoBehaviour
 
         Quaternion yaw = Quaternion.AngleAxis(yawDeg, camUp);
         Vector3 dir = yaw * camFwd;
-        Vector3 pos = cam.transform.position + dir * ArcRadius + camUp * verticalOffset;
+        float currentArcRadius = ArcRadius;
+        Vector3 pos = cam.transform.position + dir * currentArcRadius + camUp * verticalOffset;
 
         Quaternion rot;
         if (panelsFaceCamera)

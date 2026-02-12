@@ -45,7 +45,8 @@ public class RTTTaskbarExpansion : RTTCanvasBase
         Bitrate,
         Fps,
         Eye,
-        Apps
+        Apps,
+        MonitorType
     }
     #endregion
 
@@ -56,6 +57,7 @@ public class RTTTaskbarExpansion : RTTCanvasBase
     public event Action<bool> OnLightToggled;
     public event Action OnDismissed;
     public event Action<int> OnAppSlotClicked;
+    public event Action<bool> OnMonitorTypeSelected;
     #endregion
 
     #region Private Fields
@@ -85,10 +87,13 @@ public class RTTTaskbarExpansion : RTTCanvasBase
     private Sprite _iconPassthrough;
     private Sprite _iconLightOn;
     private Sprite _iconLightOff;
+    private Sprite _iconFlatMonitor;
+    private Sprite _iconCurvedMonitor;
 
     // Eye expansion state
     private bool _isPassthroughOn = false;
     private bool _isLightOn = true; // Default ON
+    private bool _isCurved = true; // Default for monitor type
 
     // App expansion state
     private List<AppSlotData> _appSlots = new List<AppSlotData>();
@@ -223,6 +228,18 @@ public class RTTTaskbarExpansion : RTTCanvasBase
         _isLightOn = isLightOn;
         CalculateLocalXOffset(triggerButtonWorldPos);
         ShowExpansion(ExpansionType.Eye);
+    }
+
+    /// <summary>
+    /// Show expansion panel with Monitor Type options (Flat and Curved).
+    /// </summary>
+    /// <param name="isCurved">Current curvature state</param>
+    /// <param name="triggerButtonWorldPos">World position of the trigger button (for X-axis alignment)</param>
+    public void ShowMonitorTypeOptions(bool isCurved, Vector3? triggerButtonWorldPos = null)
+    {
+        _isCurved = isCurved;
+        CalculateLocalXOffset(triggerButtonWorldPos);
+        ShowExpansion(ExpansionType.MonitorType);
     }
 
     /// <summary>
@@ -606,6 +623,7 @@ public class RTTTaskbarExpansion : RTTCanvasBase
             ExpansionType.Fps => _fpsOptions.Length,
             ExpansionType.Eye => 2, // Passthrough + Light
             ExpansionType.Apps => appExpansionCapacity, // Fixed 4 slots
+            ExpansionType.MonitorType => 2, // Flat + Curved
             _ => 3
         };
         _totalWidth = contentPadding * 2 + (buttonCount * buttonSize) + ((buttonCount - 1) * buttonSpacing);
@@ -694,6 +712,10 @@ public class RTTTaskbarExpansion : RTTCanvasBase
         else if (_currentType == ExpansionType.Apps)
         {
             CreateAppButtons();
+        }
+        else if (_currentType == ExpansionType.MonitorType)
+        {
+            CreateMonitorTypeButtons();
         }
     }
 
@@ -940,6 +962,57 @@ public class RTTTaskbarExpansion : RTTCanvasBase
         Hide();
     }
 
+    private void CreateMonitorTypeButtons()
+    {
+        // Flat button
+        Color flatColor = !_isCurved ? _purpleColor : _cyanColor;
+        var flatBtn = VRButtonFactory.CreateBareIconButton(
+            _contentContainer, buttonSize, _iconFlatMonitor, flatColor,
+            () => OnMonitorTypeButtonClicked(false),
+            0.05f, 0.6f
+        );
+        flatBtn.name = "Btn_Monitor_Flat";
+        SetLayerRecursively(flatBtn, LayerMask.NameToLayer("UI"));
+        _optionButtons.Add(flatBtn);
+
+        // Curved button
+        Color curvedColor = _isCurved ? _purpleColor : _cyanColor;
+        var curvedBtn = VRButtonFactory.CreateBareIconButton(
+            _contentContainer, buttonSize, _iconCurvedMonitor, curvedColor,
+            () => OnMonitorTypeButtonClicked(true),
+            0.05f, 0.6f
+        );
+        curvedBtn.name = "Btn_Monitor_Curved";
+        SetLayerRecursively(curvedBtn, LayerMask.NameToLayer("UI"));
+        _optionButtons.Add(curvedBtn);
+    }
+
+    private void OnMonitorTypeButtonClicked(bool isCurved)
+    {
+        if (_isCurved == isCurved) return;
+
+        _isCurved = isCurved;
+        UpdateMonitorTypeButtonStates();
+        OnMonitorTypeSelected?.Invoke(isCurved);
+        MarkDirty();
+
+        // Hide after selection
+        Hide();
+    }
+
+    private void UpdateMonitorTypeButtonStates()
+    {
+        if (_currentType != ExpansionType.MonitorType || _optionButtons.Count < 2) return;
+
+        // Flat button (Index 0)
+        Color flatColor = !_isCurved ? _purpleColor : _cyanColor;
+        VRButtonFactory.SetBareIconButtonGlowColor(_optionButtons[0], flatColor);
+
+        // Curved button (Index 1)
+        Color curvedColor = _isCurved ? _purpleColor : _cyanColor;
+        VRButtonFactory.SetBareIconButtonGlowColor(_optionButtons[1], curvedColor);
+    }
+
     private void UpdateButtonStates()
     {
         if (_currentType == ExpansionType.Bitrate)
@@ -1164,9 +1237,14 @@ public class RTTTaskbarExpansion : RTTCanvasBase
         _iconLightOn = Resources.Load<Sprite>("icon_light_on");
         _iconLightOff = Resources.Load<Sprite>("icon_light_off");
 
+        // Monitor type icons
+        _iconFlatMonitor = Resources.Load<Sprite>("icon_flat_monitor");
+        _iconCurvedMonitor = Resources.Load<Sprite>("icon_curved_monitor");
+
         Debug.Log($"[RTTTaskbarExpansion] Icons loaded - Bitrate: {_bitrateIcons.Count}/{_bitrateOptions.Length}, " +
             $"FPS: {_fpsIcons.Count}/{_fpsOptions.Length}, " +
-            $"Passthrough: {_iconPassthrough != null}, LightOn: {_iconLightOn != null}, LightOff: {_iconLightOff != null}");
+            $"Passthrough: {_iconPassthrough != null}, LightOn: {_iconLightOn != null}, LightOff: {_iconLightOff != null}, " +
+            $"FlatMonitor: {_iconFlatMonitor != null}, CurvedMonitor: {_iconCurvedMonitor != null}");
     }
     #endregion
 

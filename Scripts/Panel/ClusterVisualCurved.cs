@@ -338,10 +338,12 @@ public class ClusterVisualCurved : MonoBehaviour
     /// </summary>
     private float GetArcRadius()
     {
+        if (_clusterRig != null) return _clusterRig.ArcRadius;
+        
         var zoomController = VirtualObjectsZoomController.Instance;
         if (zoomController != null && zoomController.IsInitialized)
         {
-            return zoomController.CurrentDistance;
+            return Mathf.Min(zoomController.CurrentDistance, 1.8f);
         }
         return 1.8f; // Default fallback
     }

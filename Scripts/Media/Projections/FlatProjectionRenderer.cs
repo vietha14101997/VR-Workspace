@@ -111,10 +111,11 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
         // Keep facing away from parent origin (toward viewer)
         _worldPanel.transform.localRotation = settings.RotationOffset;
 
-        // Detect curvature change and rebuild mesh if needed
-        if (Mathf.Abs(settings.Curvature - _currentCurvature) > 0.001f)
+        // Initial curvature and mesh update
+        float targetCurvature = settings.Curvature;
+        if (Mathf.Abs(targetCurvature - _currentCurvature) > 0.001f)
         {
-            _currentCurvature = settings.Curvature;
+            _currentCurvature = targetCurvature;
             RebuildMesh();
         }
 
@@ -122,12 +123,52 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
         UpdateScreenAspect();
     }
 
+    private void Update()
+    {
+        if (!_isActive || _worldPanel == null) return;
+
+        // Dynamic curvature check: if curvature > 0, track actual world distance to camera
+        if (_currentCurvature > 0.001f)
+        {
+            float actualDistance = 1.8f;
+            if (Camera.main != null)
+            {
+                actualDistance = Vector3.ProjectOnPlane(_worldPanel.transform.position - Camera.main.transform.position, Camera.main.transform.up).magnitude;
+            }
+
+            // Detect if distance changed significantly enough to rebuild mesh
+            // We use a slightly larger threshold here for performance
+            float trackedDistance = _currentSettings.Distance > 0.001f ? _currentSettings.Distance : actualDistance;
+            
+            // If settings.Distance is NOT being manually adjusted, we can follow world distance
+            // Actually, let's just track world distance for curvature R if it's dynamic
+            
+            // For now, let's stick to theApproved logic: R matches distance (settings OR world)
+            // If the user zooms the WHOLE parent, settings.Distance is constant. 
+            // So we MUST track world distance for it to be "dynamic".
+            
+            if (Mathf.Abs(actualDistance - _lastTrackedWorldDistance) > 0.01f)
+            {
+                _lastTrackedWorldDistance = actualDistance;
+                RebuildMesh();
+            }
+        }
+    }
+
+    private float _lastTrackedWorldDistance = -1f;
+
     public void Show()
     {
         if (_worldPanel != null)
         {
             _worldPanel.gameObject.SetActive(true);
             UpdateDisplay(_currentSettings); // Ensure position is updated
+            
+            // Initial distance tracking
+            if (Camera.main != null)
+            {
+                _lastTrackedWorldDistance = Vector3.ProjectOnPlane(_worldPanel.transform.position - Camera.main.transform.position, Camera.main.transform.up).magnitude;
+            }
         }
         _isActive = true;
     }
@@ -139,6 +180,7 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
             _worldPanel.gameObject.SetActive(false);
         }
         _isActive = false;
+        _lastTrackedWorldDistance = -1f;
     }
 
     public void RecenterView()
@@ -322,13 +364,23 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
 
         if (width <= 0 || height <= 0) return;
 
-        // Calculate arc radius from curvature parameter
-        // curvature 0.25 = gentle curve, 1.0 = tight wrap
-        // arcRadius = width / (2 * curvature) gives intuitive control:
-        //   curvature=0.25 -> radius = 2*width (gentle)
-        //   curvature=1.0  -> radius = 0.5*width (tight)
-        float arcRadius = width / (2f * _currentCurvature);
-        arcRadius = Mathf.Max(arcRadius, 0.3f); // Minimum radius to prevent extreme distortion
+        // Calculate arc radius
+        // The user wants R to match distance, capped at 1.8m (1800R)
+        // If _currentCurvature > 0, we use this dynamic radius logic.
+        float arcRadius = 1.8f; // Default cap
+        
+        // Prefer tracked world distance for dynamic curvature updates
+        float effectiveDistance = (_lastTrackedWorldDistance > 0) ? _lastTrackedWorldDistance : _currentSettings.Distance;
+
+        if (effectiveDistance > 0)
+        {
+            arcRadius = Mathf.Min(effectiveDistance, 1.8f);
+        }
+        
+        // Ensure radius is not smaller than half-width to avoid invalid Atan
+        arcRadius = Mathf.Max(arcRadius, width * 0.51f); 
+        
+        Debug.Log($"[FlatProjectionRenderer] RebuildMesh: width={width:F2}, effectiveDist={effectiveDistance:F2}, R={arcRadius:F2}");
 
         // Arc angle: 2 * atan(width / 2 / radius) - matches CurvedClusterMeshGenerator
         float totalArcAngleRad = 2f * Mathf.Atan(width / 2f / arcRadius);
