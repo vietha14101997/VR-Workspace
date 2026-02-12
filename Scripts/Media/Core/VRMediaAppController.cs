@@ -523,7 +523,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         _overlayFrameObject = new GameObject("DismissOverlayFrame");
         _overlayFrameObject.transform.SetParent(_controlsContainer.transform);
         // Offset overlay behind controls frame so raycast hits controls first
-        _overlayFrameObject.transform.localPosition = new Vector3(0, 0, 0.01f);
+        _overlayFrameObject.transform.localPosition = new Vector3(0, 0, 0.2f);
         _overlayFrameObject.layer = vLayer;
 
         var overlayFrame = _overlayFrameObject.AddComponent<RTTMenuFrame>();
@@ -560,7 +560,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
             var col = dismissObj.AddComponent<BoxCollider>();
             col.size = new Vector3(overlayPixels, overlayPixels, 10);
-            col.center = new Vector3(0, 0, -5);
+            col.center = new Vector3(0, 0, 5);
         }
         _overlayFrameObject.SetActive(false);
 

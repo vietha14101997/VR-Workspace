@@ -937,23 +937,29 @@ public class VRVideoPlayerController : MonoBehaviour
 
         objective.position = newPos;
 
-        // Custom logic for VideoControlsContainer
-        if (objective.name == "VideoControlsContainer")
-        {
-            // Container always (0,0,0) like VirtualObjects
-            objective.rotation = Quaternion.identity;
+    // Custom logic for VideoControlsContainer
+    if (objective.name == "VideoControlsContainer")
+    {
+        // Rotate container to face the camera so children keep their relative positions
+        objective.rotation = Quaternion.LookRotation(camForward);
 
-            // Child frame faces the camera
-            Transform frame = objective.Find("VideoControlsFrame");
-            if (frame != null)
-            {
-                frame.rotation = Quaternion.LookRotation(camForward);
-            }
-        }
-        else
+        // Reset child frames to local identity
+        Transform frame = objective.Find("VideoControlsFrame");
+        if (frame != null)
         {
-            // Standard behavior for other objects
-            objective.rotation = Quaternion.LookRotation(camForward);
+            frame.localRotation = Quaternion.identity;
+        }
+
+        Transform overlay = objective.Find("DismissOverlayFrame");
+        if (overlay != null)
+        {
+            overlay.localRotation = Quaternion.identity;
         }
     }
+    else
+    {
+        // Standard behavior for other objects
+        objective.rotation = Quaternion.LookRotation(camForward);
+    }
+}
 }

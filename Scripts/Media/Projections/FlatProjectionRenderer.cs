@@ -26,6 +26,10 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
     private Vector2Int _resolution = new Vector2Int(1920, 1080);
     private DisplaySettings _currentSettings = DisplaySettings.Default;
 
+    // Curvature tracking
+    private float _currentCurvature = 0f;
+    private Mesh _curvedMesh;
+
     // Recenter tracking
     private Quaternion _recenterRotation = Quaternion.identity;
     #endregion
@@ -107,6 +111,13 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
         // Keep facing away from parent origin (toward viewer)
         _worldPanel.transform.localRotation = settings.RotationOffset;
 
+        // Detect curvature change and rebuild mesh if needed
+        if (Mathf.Abs(settings.Curvature - _currentCurvature) > 0.001f)
+        {
+            _currentCurvature = settings.Curvature;
+            RebuildMesh();
+        }
+
         // Update size based on scale and aspect ratio
         UpdateScreenAspect();
     }
@@ -152,6 +163,12 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
 
     public void Dispose()
     {
+        if (_curvedMesh != null)
+        {
+            Destroy(_curvedMesh);
+            _curvedMesh = null;
+        }
+
         if (_worldPanel != null)
         {
             Destroy(_worldPanel.gameObject);
@@ -187,9 +204,18 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
         _worldPanel.sharpnessStrength = 0.5f;
         _worldPanel.anisoLevel = 16;
         _worldPanel.mipMapBias = -0.5f;
+        _worldPanel.cursorEnable = false; // No cursor for video projection
         
         // Initialize
         _worldPanel.Rebuild();
+
+        // Remove BoxCollider — video screen is a projection, not an interactable entity.
+        // This prevents the board from blocking raycasts to the controls panel behind it.
+        if (_worldPanel.board != null)
+        {
+            var col = _worldPanel.board.GetComponent<BoxCollider>();
+            if (col != null) Destroy(col);
+        }
     }
 
     private void UpdateScreenAspect()
@@ -231,6 +257,170 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
         {
             // Apply scale changes (WorldPanelPlus Apply handles localScale based on width/height)
             _worldPanel.Apply();
+
+            // Regenerate curved mesh if active (arc radius depends on width)
+            if (_currentCurvature > 0.001f)
+            {
+                ApplyCurvedMesh();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Rebuild mesh based on current curvature setting.
+    /// Curvature 0 = flat quad, curvature > 0 = curved cylindrical arc.
+    /// </summary>
+    private void RebuildMesh()
+    {
+        if (_worldPanel == null || _worldPanel.board == null) return;
+
+        if (_currentCurvature <= 0.001f)
+        {
+            // Flat mode: restore standard quad
+            ApplyFlatQuad();
+        }
+        else
+        {
+            // Curved mode: generate cylindrical arc mesh
+            ApplyCurvedMesh();
+        }
+
+        Debug.Log($"[FlatProjectionRenderer] RebuildMesh: curvature={_currentCurvature:F3}");
+    }
+
+    /// <summary>
+    /// Restore WorldPanelPlus board to standard flat quad.
+    /// </summary>
+    private void ApplyFlatQuad()
+    {
+        if (_curvedMesh != null)
+        {
+            Destroy(_curvedMesh);
+            _curvedMesh = null;
+        }
+
+        // Restore quad mesh on the board
+        MeshFilter mf = _worldPanel.board.GetComponent<MeshFilter>();
+        if (mf != null)
+        {
+            // Unity's built-in quad mesh
+            var quadGo = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            mf.sharedMesh = quadGo.GetComponent<MeshFilter>().sharedMesh;
+            Destroy(quadGo);
+        }
+    }
+
+    /// <summary>
+    /// Generate and apply a curved cylindrical arc mesh.
+    /// Uses the same algorithm as CurvedClusterMeshGenerator:
+    /// vertices at (sin(θ)*R, y, cos(θ)*R - R).
+    /// </summary>
+    private void ApplyCurvedMesh()
+    {
+        float width = _worldPanel.width;
+        float height = _worldPanel.height;
+
+        if (width <= 0 || height <= 0) return;
+
+        // Calculate arc radius from curvature parameter
+        // curvature 0.25 = gentle curve, 1.0 = tight wrap
+        // arcRadius = width / (2 * curvature) gives intuitive control:
+        //   curvature=0.25 -> radius = 2*width (gentle)
+        //   curvature=1.0  -> radius = 0.5*width (tight)
+        float arcRadius = width / (2f * _currentCurvature);
+        arcRadius = Mathf.Max(arcRadius, 0.3f); // Minimum radius to prevent extreme distortion
+
+        // Arc angle: 2 * atan(width / 2 / radius) - matches CurvedClusterMeshGenerator
+        float totalArcAngleRad = 2f * Mathf.Atan(width / 2f / arcRadius);
+
+        int segX = CURVED_SEGMENTS;
+        int segY = 2; // Vertical segments (minimal needed)
+        int vertexCountX = segX + 1;
+        int vertexCountY = segY + 1;
+        int vertexCount = vertexCountX * vertexCountY;
+
+        Vector3[] vertices = new Vector3[vertexCount];
+        Vector3[] normals = new Vector3[vertexCount];
+        Vector2[] uvs = new Vector2[vertexCount];
+
+        for (int y = 0; y <= segY; y++)
+        {
+            float vt = (float)y / segY;
+            float yPos = (vt - 0.5f); // -0.5 to 0.5 (unit mesh, scaled by board localScale)
+
+            for (int x = 0; x <= segX; x++)
+            {
+                float ut = (float)x / segX;
+
+                // Arc angle centered: ut=0 -> left edge, ut=1 -> right edge
+                float angle = (ut - 0.5f) * totalArcAngleRad;
+
+                // Cylindrical coordinates (same as CurvedClusterMeshGenerator)
+                // But normalized to unit mesh (-0.5 to 0.5 range) since WorldPanelPlus
+                // applies width/height via board localScale
+                float xPos = Mathf.Sin(angle) * arcRadius / width;
+                float zPos = (Mathf.Cos(angle) * arcRadius - arcRadius) / width;
+
+                int idx = y * vertexCountX + x;
+                vertices[idx] = new Vector3(xPos, yPos, zPos);
+
+                // Normal points toward arc center (viewer)
+                normals[idx] = new Vector3(-Mathf.Sin(angle), 0f, -Mathf.Cos(angle));
+
+                // Standard UV mapping 0-1
+                uvs[idx] = new Vector2(ut, vt);
+            }
+        }
+
+        // Generate triangles
+        int quadCount = segX * segY;
+        int[] triangles = new int[quadCount * 6];
+        int triIdx = 0;
+
+        for (int y = 0; y < segY; y++)
+        {
+            for (int x = 0; x < segX; x++)
+            {
+                int bl = y * vertexCountX + x;
+                int br = bl + 1;
+                int tl = bl + vertexCountX;
+                int tr = tl + 1;
+
+                // First triangle
+                triangles[triIdx++] = bl;
+                triangles[triIdx++] = tl;
+                triangles[triIdx++] = tr;
+
+                // Second triangle
+                triangles[triIdx++] = bl;
+                triangles[triIdx++] = tr;
+                triangles[triIdx++] = br;
+            }
+        }
+
+        // Create or update mesh
+        if (_curvedMesh == null)
+        {
+            _curvedMesh = new Mesh();
+            _curvedMesh.name = "CurvedVideoScreen";
+        }
+        else
+        {
+            _curvedMesh.Clear();
+        }
+
+        _curvedMesh.vertices = vertices;
+        _curvedMesh.normals = normals;
+        _curvedMesh.uv = uvs;
+        _curvedMesh.triangles = triangles;
+        _curvedMesh.RecalculateBounds();
+        _curvedMesh.RecalculateTangents();
+
+        // Apply to board MeshFilter
+        MeshFilter mf = _worldPanel.board.GetComponent<MeshFilter>();
+        if (mf != null)
+        {
+            mf.sharedMesh = _curvedMesh;
         }
     }
     #endregion
