@@ -1130,8 +1130,10 @@ namespace VRWorkspace.UI.RTT
                 yield return StartCoroutine(PreInitAppAsync(appDef.id));
                 preInitCount++;
 
-                // Wait 0.5s between apps to let GPU/CPU settle and avoid lag spikes
-                yield return new WaitForSeconds(0.5f);
+                // OPTIMIZATION: Reduced wait time from 0.5s to 0.1s
+                // Spreads initialization across frames to reduce FPS spikes
+                // while still completing faster overall
+                yield return new WaitForSeconds(0.1f);
             }
 
             _backgroundPreInitRunning = false;

@@ -348,8 +348,8 @@ public class FileMetadataService : MonoBehaviour
 
         vp.Prepare();
 
-        // Wait for prepare with timeout
-        float timeout = 5f;
+        // Wait for prepare with timeout (increased for high-res videos)
+        float timeout = 15f;
         float elapsed = 0f;
         while (!isPrepared && !hasFailed && elapsed < timeout)
         {
@@ -364,16 +364,44 @@ public class FileMetadataService : MonoBehaviour
             metadata.Duration = TimeSpan.FromSeconds(vp.length);
             metadata.FrameRate = vp.frameRate;
 
+            // If duration is 0, try header parsing fallback
+            if (vp.length <= 0)
+            {
+                Debug.LogWarning($"[FileMetadataService] VideoPlayer returned 0 duration, trying header fallback");
+                double headerDuration = VideoHeaderParser.TryGetDurationFromMP4(filePath);
+                if (headerDuration > 0)
+                {
+                    metadata.Duration = TimeSpan.FromSeconds(headerDuration);
+                    Debug.Log($"[FileMetadataService] Recovered duration from headers: {headerDuration}s");
+                }
+            }
+
             // Estimate bitrate from file size and duration
-            if (vp.length > 0)
+            if (metadata.Duration.TotalSeconds > 0)
             {
                 try
                 {
                     FileInfo fi = new FileInfo(filePath);
-                    metadata.TotalBitrate = (long)(fi.Length * 8 / vp.length); // bits per second
+                    metadata.TotalBitrate = (long)(fi.Length * 8 / metadata.Duration.TotalSeconds); // bits per second
                     metadata.DataRate = metadata.TotalBitrate; // Approximate
                 }
                 catch { }
+            }
+        }
+        else if (hasFailed || elapsed >= timeout)
+        {
+            // Even if VideoPlayer completely fails, try to get SOMETHING
+            Debug.LogWarning($"[FileMetadataService] VideoPlayer failed, attempting header-only metadata");
+
+            string ext = System.IO.Path.GetExtension(filePath)?.ToLowerInvariant();
+            if (ext == ".mp4" || ext == ".m4v" || ext == ".mov")
+            {
+                double headerDuration = VideoHeaderParser.TryGetDurationFromMP4(filePath);
+                if (headerDuration > 0)
+                {
+                    metadata.Duration = TimeSpan.FromSeconds(headerDuration);
+                    Debug.Log($"[FileMetadataService] Header-only fallback: duration={headerDuration}s");
+                }
             }
         }
 
@@ -774,6 +802,103 @@ public class FileMetadataService : MonoBehaviour
         _metadataQueue.Clear();
         _isProcessingQueue = false;
     }
+
+    #region Video Header Parser
+    /// <summary>
+    /// Fallback duration extraction from MP4 file headers.
+    /// Used when VideoPlayer fails for high-resolution videos.
+    /// </summary>
+    private static class VideoHeaderParser
+    {
+        public static double TryGetDurationFromMP4(string filePath)
+        {
+            try
+            {
+                using (System.IO.FileStream fs = new System.IO.FileStream(filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read))
+                using (System.IO.BinaryReader reader = new System.IO.BinaryReader(fs))
+                {
+                    // Find 'mvhd' atom which contains duration
+                    long mvhdPos = FindMP4Atom(reader, fs.Length, "mvhd");
+                    if (mvhdPos < 0) return 0;
+
+                    fs.Position = mvhdPos + 8;  // Skip size + type
+                    byte version = reader.ReadByte();
+                    reader.ReadBytes(3);  // Skip flags
+
+                    // Skip creation/modification times
+                    if (version == 1)
+                        reader.ReadBytes(16);  // 64-bit timestamps
+                    else
+                        reader.ReadBytes(8);   // 32-bit timestamps
+
+                    // Read timescale and duration
+                    uint timeScale = ReadUInt32BE(reader);
+                    ulong duration = (version == 1) ? ReadUInt64BE(reader) : ReadUInt32BE(reader);
+
+                    if (timeScale > 0)
+                        return (double)duration / timeScale;
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"[VideoHeaderParser] Failed to parse MP4 duration: {ex.Message}");
+            }
+            return 0;
+        }
+
+        private static long FindMP4Atom(System.IO.BinaryReader reader, long endPos, string atomType)
+        {
+            System.IO.FileStream fs = (System.IO.FileStream)reader.BaseStream;
+            long startPos = fs.Position;
+
+            byte[] targetType = System.Text.Encoding.ASCII.GetBytes(atomType);
+
+            while (fs.Position < endPos - 8)
+            {
+                long atomPos = fs.Position;
+
+                // Read atom size (4 bytes, big-endian)
+                uint size = ReadUInt32BE(reader);
+                if (size < 8) break; // Invalid atom
+
+                // Read atom type (4 bytes)
+                byte[] type = reader.ReadBytes(4);
+
+                // Check if this is the atom we're looking for
+                if (type[0] == targetType[0] && type[1] == targetType[1] &&
+                    type[2] == targetType[2] && type[3] == targetType[3])
+                {
+                    return atomPos;
+                }
+
+                // Skip to next atom
+                fs.Position = atomPos + size;
+            }
+
+            return -1;
+        }
+
+        private static uint ReadUInt32BE(System.IO.BinaryReader reader)
+        {
+            byte[] bytes = reader.ReadBytes(4);
+            if (System.BitConverter.IsLittleEndian)
+            {
+                System.Array.Reverse(bytes);
+            }
+            return System.BitConverter.ToUInt32(bytes, 0);
+        }
+
+        private static ulong ReadUInt64BE(System.IO.BinaryReader reader)
+        {
+            byte[] bytes = reader.ReadBytes(8);
+            if (System.BitConverter.IsLittleEndian)
+            {
+                System.Array.Reverse(bytes);
+            }
+            return System.BitConverter.ToUInt64(bytes, 0);
+        }
+    }
+    #endregion
 }
 
 public struct VideoMetadata

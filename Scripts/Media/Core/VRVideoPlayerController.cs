@@ -196,9 +196,10 @@ public class VRVideoPlayerController : MonoBehaviour
         _currentVideo = video;
         CurrentVideo = video;
 
-        // Detect projection and stereo mode automatically
-        var projectionType = ProjectionDetector.DetectProjection(video.Path, video.Width, video.Height);
-        var stereoMode = ProjectionDetector.DetectStereoMode(projectionType, video.Path);
+        // Detect projection and stereo mode automatically (metadata -> filename -> resolution)
+        ProjectionDetector.DetectProjectionAndStereo(
+            video.Path, video.Width, video.Height,
+            out var projectionType, out var stereoMode);
 
         Debug.Log($"[VRVideoPlayerController] Playing: {video.Title}, Detected Projection: {projectionType}, Stereo: {stereoMode}");
 

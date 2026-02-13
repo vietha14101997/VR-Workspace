@@ -69,10 +69,7 @@ public class VRVideoProjectionSystem : MonoBehaviour
         // Create flat projection renderer (default)
         CreateFlatRenderer();
 
-        // Other renderers will be created on demand in Phase 3
-        // CreateDome180Renderer();
-        // CreateSphere360Renderer();
-        // CreateStereoscopicRenderer();
+        // Immersive renderer (ImmersiveSphereRenderer) created on demand when needed
 
         _isInitialized = true;
         Debug.Log("[VRVideoProjectionSystem] Initialized");
@@ -125,6 +122,22 @@ public class VRVideoProjectionSystem : MonoBehaviour
         CurrentProjection = type;
         CurrentStereoMode = stereo;
         ActiveRenderer = _renderers[type];
+
+        // Configure immersive renderer projection mode (180 vs 360)
+        if (ActiveRenderer is ImmersiveSphereRenderer immersive)
+        {
+            switch (type)
+            {
+                case VideoProjectionType.Dome180:
+                case VideoProjectionType.VR180Stereo:
+                    immersive.SetProjectionMode(ImmersiveSphereRenderer.ProjectionMode.Equirect180);
+                    break;
+                case VideoProjectionType.Sphere360:
+                    immersive.SetProjectionMode(ImmersiveSphereRenderer.ProjectionMode.Equirect360);
+                    break;
+            }
+        }
+
         ActiveRenderer.SetStereoMode(stereo);
         ActiveRenderer.UpdateDisplay(_currentSettings);
 
@@ -230,9 +243,16 @@ public class VRVideoProjectionSystem : MonoBehaviour
     {
         if (_renderers != null)
         {
+            // Use HashSet to avoid disposing shared instances multiple times
+            // (ImmersiveSphereRenderer is registered under Dome180, Sphere360, and VR180Stereo)
+            var disposed = new System.Collections.Generic.HashSet<IProjectionRenderer>();
             foreach (var renderer in _renderers.Values)
             {
-                renderer.Dispose();
+                if (!disposed.Contains(renderer))
+                {
+                    renderer.Dispose();
+                    disposed.Add(renderer);
+                }
             }
             _renderers.Clear();
         }
@@ -258,11 +278,9 @@ public class VRVideoProjectionSystem : MonoBehaviour
                 break;
 
             case VideoProjectionType.Dome180:
-                CreateDome180Renderer();
-                break;
-
             case VideoProjectionType.Sphere360:
-                CreateSphere360Renderer();
+            case VideoProjectionType.VR180Stereo:
+                CreateImmersiveRenderer();
                 break;
         }
     }
@@ -282,34 +300,27 @@ public class VRVideoProjectionSystem : MonoBehaviour
         Debug.Log("[VRVideoProjectionSystem] Created FlatProjectionRenderer");
     }
 
-    private void CreateDome180Renderer()
+    /// <summary>
+    /// Create a single ImmersiveSphereRenderer shared by all immersive projection types.
+    /// Uses one inverted sphere mesh with shader-based 180/360 mode switching.
+    /// </summary>
+    private void CreateImmersiveRenderer()
     {
+        // Single instance shared across Dome180, Sphere360, and VR180Stereo
         if (_renderers.ContainsKey(VideoProjectionType.Dome180)) return;
 
-        GameObject rendererObj = new GameObject("Dome180Projection");
+        GameObject rendererObj = new GameObject("ImmersiveProjection");
         rendererObj.transform.SetParent(_projectionRoot);
 
-        Dome180Renderer renderer = rendererObj.AddComponent<Dome180Renderer>();
+        ImmersiveSphereRenderer renderer = rendererObj.AddComponent<ImmersiveSphereRenderer>();
         renderer.Initialize(_projectionRoot);
 
+        // Register same instance under all immersive projection keys
         _renderers[VideoProjectionType.Dome180] = renderer;
-
-        Debug.Log("[VRVideoProjectionSystem] Created Dome180Renderer");
-    }
-
-    private void CreateSphere360Renderer()
-    {
-        if (_renderers.ContainsKey(VideoProjectionType.Sphere360)) return;
-
-        GameObject rendererObj = new GameObject("Sphere360Projection");
-        rendererObj.transform.SetParent(_projectionRoot);
-
-        Sphere360Renderer renderer = rendererObj.AddComponent<Sphere360Renderer>();
-        renderer.Initialize(_projectionRoot);
-
         _renderers[VideoProjectionType.Sphere360] = renderer;
+        _renderers[VideoProjectionType.VR180Stereo] = renderer;
 
-        Debug.Log("[VRVideoProjectionSystem] Created Sphere360Renderer");
+        Debug.Log("[VRVideoProjectionSystem] Created ImmersiveSphereRenderer (shared for 180/360/VR180)");
     }
     #endregion
 

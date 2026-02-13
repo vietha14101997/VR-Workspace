@@ -1,21 +1,46 @@
 using UnityEngine;
 
 /// <summary>
-/// 360° sphere projection renderer for equirectangular video.
-/// Renders video on an inside-out sphere for full immersive viewing.
+/// Unified immersive sphere renderer for 180/360 equirectangular video.
+/// Uses a single full inverted sphere with shader-based projection mode switching.
+/// Based on the YouTube VR / Google Cardboard approach:
+/// - One sphere mesh for all immersive content
+/// - Direction-based equirectangular UV sampling in fragment shader
+/// - Shader parameter switches between 180 and 360 mode
 /// </summary>
-public class Sphere360Renderer : MonoBehaviour, IProjectionRenderer
+public class ImmersiveSphereRenderer : MonoBehaviour, IProjectionRenderer
 {
+    /// <summary>
+    /// Projection mode controlling how equirectangular video maps onto the sphere.
+    /// </summary>
+    public enum ProjectionMode
+    {
+        /// <summary>Full 360 equirectangular (video wraps entire sphere)</summary>
+        Equirect360 = 0,
+
+        /// <summary>180 equirectangular (video covers front hemisphere only)</summary>
+        Equirect180 = 1
+    }
+
     #region Constants
-    private const string SHADER_NAME = "VRWorkspace/Media/Video360Sphere";
+    private const string SHADER_NAME = "VRWorkspace/Media/VideoImmersive";
     private const string FALLBACK_SHADER = "Unlit/Texture";
-    private const int SPHERE_SEGMENTS = 64;
-    private const int SPHERE_RINGS = 32;
-    private const float SPHERE_RADIUS = 100f;  // Large radius for immersive view
+    private const int SPHERE_SEGMENTS = 128;
+    private const int SPHERE_RINGS = 64;
+    private const float SPHERE_RADIUS = 100f;
     #endregion
 
     #region Properties
-    public VideoProjectionType Type => VideoProjectionType.Sphere360;
+    public VideoProjectionType Type
+    {
+        get
+        {
+            return _projectionMode == ProjectionMode.Equirect180
+                ? VideoProjectionType.Dome180
+                : VideoProjectionType.Sphere360;
+        }
+    }
+
     public bool IsActive => _isActive;
     #endregion
 
@@ -29,10 +54,10 @@ public class Sphere360Renderer : MonoBehaviour, IProjectionRenderer
     private Material _material;
 
     private Transform _parentTransform;
+    private ProjectionMode _projectionMode = ProjectionMode.Equirect360;
     private StereoMode _stereoMode = StereoMode.Mono;
     private DisplaySettings _currentSettings = DisplaySettings.Immersive;
-    private float _rotationOffset = 0f;
-    private float _tiltOffset = 0f;
+    private float _shaderRotationOffset = 0f;
     #endregion
 
     #region IProjectionRenderer Implementation
@@ -40,14 +65,14 @@ public class Sphere360Renderer : MonoBehaviour, IProjectionRenderer
     {
         if (_isInitialized)
         {
-            Debug.LogWarning("[Sphere360Renderer] Already initialized");
+            Debug.LogWarning("[ImmersiveSphereRenderer] Already initialized");
             return;
         }
 
         _parentTransform = parent;
         CreateSphereObject();
         _isInitialized = true;
-        Hide();  // Start hidden
+        Hide();
     }
 
     public void SetTexture(Texture texture)
@@ -72,7 +97,6 @@ public class Sphere360Renderer : MonoBehaviour, IProjectionRenderer
         _stereoMode = mode;
         if (_material != null)
         {
-            // Shader expects: 0=Mono, 1=SBS, 2=OU
             _material.SetFloat("_StereoMode", (float)mode);
         }
     }
@@ -83,21 +107,13 @@ public class Sphere360Renderer : MonoBehaviour, IProjectionRenderer
 
         if (_sphereObject == null) return;
 
-        // Position sphere at parent (camera) position
+        // Position sphere at parent (camera) position — always centered on viewer
         if (_parentTransform != null)
         {
             _sphereObject.transform.position = _parentTransform.position;
         }
 
-        // Apply rotation offset (from recenter)
-        _sphereObject.transform.rotation = Quaternion.Euler(_tiltOffset, _rotationOffset, 0);
-
-        // Update material settings
-        if (_material != null)
-        {
-            _material.SetFloat("_Rotation", settings.RotationOffset.eulerAngles.y);
-            _material.SetFloat("_Tilt", settings.RotationOffset.eulerAngles.x);
-        }
+        // No transform rotation — all rotation is shader-based
     }
 
     public void Show()
@@ -120,21 +136,20 @@ public class Sphere360Renderer : MonoBehaviour, IProjectionRenderer
 
     public void RecenterView()
     {
+        // Shader-only rotation: capture current camera Y angle as offset
         if (Camera.main != null)
         {
-            // Get current camera rotation and use as offset
-            Vector3 euler = Camera.main.transform.eulerAngles;
-            _rotationOffset = euler.y;
-            // Don't recenter tilt for 360 videos (keep horizon level)
-            _tiltOffset = 0f;
+            _shaderRotationOffset = Camera.main.transform.eulerAngles.y;
         }
         else
         {
-            _rotationOffset = 0f;
-            _tiltOffset = 0f;
+            _shaderRotationOffset = 0f;
         }
 
-        UpdateDisplay(_currentSettings);
+        if (_material != null)
+        {
+            _material.SetFloat("_Rotation", _shaderRotationOffset);
+        }
     }
 
     public void Dispose()
@@ -150,133 +165,49 @@ public class Sphere360Renderer : MonoBehaviour, IProjectionRenderer
             _sphereObject = null;
         }
 
+        _meshFilter = null;
+        _meshRenderer = null;
         _isInitialized = false;
         _isActive = false;
     }
     #endregion
 
-    #region Private Methods
-    private void CreateSphereObject()
-    {
-        _sphereObject = new GameObject("Sphere360Video");
-        _sphereObject.transform.SetParent(_parentTransform, false);
-        _sphereObject.layer = LayerMask.NameToLayer("VirtualObjects");
-
-        _meshFilter = _sphereObject.AddComponent<MeshFilter>();
-        _meshRenderer = _sphereObject.AddComponent<MeshRenderer>();
-
-        // Create material
-        Shader shader = Shader.Find(SHADER_NAME);
-        if (shader == null)
-        {
-            Debug.LogWarning($"[Sphere360Renderer] Shader '{SHADER_NAME}' not found, using fallback");
-            shader = Shader.Find(FALLBACK_SHADER);
-        }
-
-        _material = new Material(shader);
-        _material.SetFloat("_Brightness", 1);
-        _material.SetFloat("_Contrast", 1);
-        _material.SetFloat("_Saturation", 1);
-        _material.SetFloat("_StereoMode", 0);
-        _material.SetFloat("_UseNV12", 0);
-        _material.SetFloat("_Rotation", 0);
-        _material.SetFloat("_Tilt", 0);
-
-        _meshRenderer.material = _material;
-        _meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        _meshRenderer.receiveShadows = false;
-
-        // Generate sphere mesh
-        GenerateSphereMesh();
-    }
-
+    #region Projection Mode
     /// <summary>
-    /// Generate a sphere mesh for 360° video.
-    /// The mesh is rendered inside-out (viewer is at center).
+    /// Switch between 180 and 360 equirectangular projection.
+    /// Only sets a shader parameter — no mesh regeneration needed.
     /// </summary>
-    private void GenerateSphereMesh()
+    public void SetProjectionMode(ProjectionMode mode)
     {
-        Mesh mesh = new Mesh();
-        mesh.name = "Sphere360Mesh";
+        _projectionMode = mode;
 
-        int segments = SPHERE_SEGMENTS;  // Horizontal segments
-        int rings = SPHERE_RINGS;        // Vertical rings
-        float radius = SPHERE_RADIUS;
-
-        int vertexCount = (segments + 1) * (rings + 1);
-        int triangleCount = segments * rings * 6;
-
-        Vector3[] vertices = new Vector3[vertexCount];
-        Vector2[] uvs = new Vector2[vertexCount];
-        int[] triangles = new int[triangleCount];
-
-        // Generate vertices
-        int v = 0;
-        for (int ring = 0; ring <= rings; ring++)
+        if (_material != null)
         {
-            // Vertical angle: -PI/2 (bottom) to PI/2 (top)
-            float phi = ((float)ring / rings - 0.5f) * Mathf.PI;
-            float sinPhi = Mathf.Sin(phi);
-            float cosPhi = Mathf.Cos(phi);
+            _material.SetFloat("_ProjectionMode", (float)mode);
 
-            for (int seg = 0; seg <= segments; seg++)
+            // Set appropriate default FOV
+            if (mode == ProjectionMode.Equirect180)
             {
-                // Horizontal angle: 0 to 2*PI
-                float theta = (float)seg / segments * Mathf.PI * 2f;
-                float sinTheta = Mathf.Sin(theta);
-                float cosTheta = Mathf.Cos(theta);
-
-                // Position on sphere
-                vertices[v] = new Vector3(
-                    radius * cosPhi * sinTheta,   // X
-                    radius * sinPhi,               // Y
-                    radius * cosPhi * cosTheta     // Z
-                );
-
-                // UV: equirectangular mapping
-                // u: 0 at center-back, wrapping around
-                // v: 0 at bottom, 1 at top
-                uvs[v] = new Vector2(
-                    (float)seg / segments,
-                    (float)ring / rings
-                );
-
-                v++;
+                _material.SetFloat("_FOV", 180f);
             }
         }
 
-        // Generate triangles (inside-out winding for backface rendering)
-        int t = 0;
-        for (int ring = 0; ring < rings; ring++)
-        {
-            for (int seg = 0; seg < segments; seg++)
-            {
-                int current = ring * (segments + 1) + seg;
-                int next = current + segments + 1;
-
-                // Triangle 1 (reversed winding for inside-out)
-                triangles[t++] = current;
-                triangles[t++] = current + 1;
-                triangles[t++] = next;
-
-                // Triangle 2 (reversed winding for inside-out)
-                triangles[t++] = current + 1;
-                triangles[t++] = next + 1;
-                triangles[t++] = next;
-            }
-        }
-
-        mesh.vertices = vertices;
-        mesh.uv = uvs;
-        mesh.triangles = triangles;
-        mesh.RecalculateNormals();
-        mesh.RecalculateBounds();
-
-        _meshFilter.mesh = mesh;
+        Debug.Log($"[ImmersiveSphereRenderer] Projection mode: {mode}");
     }
     #endregion
 
-    #region Public Methods
+    #region Public Adjustments
+    /// <summary>
+    /// Set the field of view for 180 mode (for non-standard content).
+    /// </summary>
+    public void SetFieldOfView(float fov)
+    {
+        if (_material != null)
+        {
+            _material.SetFloat("_FOV", Mathf.Clamp(fov, 90f, 360f));
+        }
+    }
+
     /// <summary>
     /// Set brightness adjustment.
     /// </summary>
@@ -311,10 +242,11 @@ public class Sphere360Renderer : MonoBehaviour, IProjectionRenderer
     }
 
     /// <summary>
-    /// Set manual rotation offset.
+    /// Set manual rotation offset (Y-axis).
     /// </summary>
     public void SetRotation(float rotation)
     {
+        _shaderRotationOffset = rotation;
         if (_material != null)
         {
             _material.SetFloat("_Rotation", rotation);
@@ -322,7 +254,7 @@ public class Sphere360Renderer : MonoBehaviour, IProjectionRenderer
     }
 
     /// <summary>
-    /// Set manual tilt offset.
+    /// Set manual tilt offset (X-axis).
     /// </summary>
     public void SetTilt(float tilt)
     {
@@ -330,6 +262,128 @@ public class Sphere360Renderer : MonoBehaviour, IProjectionRenderer
         {
             _material.SetFloat("_Tilt", tilt);
         }
+    }
+    #endregion
+
+    #region Private Methods
+    private void CreateSphereObject()
+    {
+        _sphereObject = new GameObject("ImmersiveSphereVideo");
+        _sphereObject.transform.SetParent(_parentTransform, false);
+
+        int layer = LayerMask.NameToLayer("VirtualObjects");
+        _sphereObject.layer = layer >= 0 ? layer : 0;
+
+        _meshFilter = _sphereObject.AddComponent<MeshFilter>();
+        _meshRenderer = _sphereObject.AddComponent<MeshRenderer>();
+
+        // Create material with unified immersive shader
+        Shader shader = Shader.Find(SHADER_NAME);
+        if (shader == null)
+        {
+            Debug.LogWarning($"[ImmersiveSphereRenderer] Shader '{SHADER_NAME}' not found, using fallback");
+            shader = Shader.Find(FALLBACK_SHADER);
+        }
+
+        _material = new Material(shader);
+        _material.SetFloat("_Brightness", 1);
+        _material.SetFloat("_Contrast", 1);
+        _material.SetFloat("_Saturation", 1);
+        _material.SetFloat("_StereoMode", 0);
+        _material.SetFloat("_UseNV12", 0);
+        _material.SetFloat("_ProjectionMode", (float)_projectionMode);
+        _material.SetFloat("_FOV", 180);
+        _material.SetFloat("_Rotation", 0);
+        _material.SetFloat("_Tilt", 0);
+        _material.SetFloat("_FadeSharpness", 8);
+
+        _meshRenderer.material = _material;
+        _meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        _meshRenderer.receiveShadows = false;
+
+        GenerateSphereMesh();
+    }
+
+    /// <summary>
+    /// Generate a full inverted sphere mesh for immersive video.
+    /// Uses inside-out winding with Cull Front shader for rendering from inside.
+    /// Same mesh is used for both 180 and 360 — the shader handles projection clipping.
+    /// </summary>
+    private void GenerateSphereMesh()
+    {
+        Mesh mesh = new Mesh();
+        mesh.name = "ImmersiveSphereMesh";
+
+        int segments = SPHERE_SEGMENTS;
+        int rings = SPHERE_RINGS;
+        float radius = SPHERE_RADIUS;
+
+        int vertexCount = (segments + 1) * (rings + 1);
+        int triangleCount = segments * rings * 6;
+
+        Vector3[] vertices = new Vector3[vertexCount];
+        Vector2[] uvs = new Vector2[vertexCount];
+        int[] triangles = new int[triangleCount];
+
+        // Generate vertices on sphere surface
+        int v = 0;
+        for (int ring = 0; ring <= rings; ring++)
+        {
+            // Vertical angle: -PI/2 (south pole) to PI/2 (north pole)
+            float phi = ((float)ring / rings - 0.5f) * Mathf.PI;
+            float sinPhi = Mathf.Sin(phi);
+            float cosPhi = Mathf.Cos(phi);
+
+            for (int seg = 0; seg <= segments; seg++)
+            {
+                // Horizontal angle: 0 to 2*PI (full circle)
+                float theta = (float)seg / segments * Mathf.PI * 2f;
+                float sinTheta = Mathf.Sin(theta);
+                float cosTheta = Mathf.Cos(theta);
+
+                vertices[v] = new Vector3(
+                    radius * cosPhi * sinTheta,   // X
+                    radius * sinPhi,               // Y (up)
+                    radius * cosPhi * cosTheta     // Z (forward)
+                );
+
+                // Equirectangular UV mapping
+                uvs[v] = new Vector2(
+                    (float)seg / segments,
+                    (float)ring / rings
+                );
+
+                v++;
+            }
+        }
+
+        // Generate triangles with standard winding order
+        // Combined with shader's Cull Front, this renders inside-out
+        int t = 0;
+        for (int ring = 0; ring < rings; ring++)
+        {
+            for (int seg = 0; seg < segments; seg++)
+            {
+                int current = ring * (segments + 1) + seg;
+                int next = current + segments + 1;
+
+                triangles[t++] = current;
+                triangles[t++] = current + 1;
+                triangles[t++] = next;
+
+                triangles[t++] = current + 1;
+                triangles[t++] = next + 1;
+                triangles[t++] = next;
+            }
+        }
+
+        mesh.vertices = vertices;
+        mesh.uv = uvs;
+        mesh.triangles = triangles;
+        mesh.RecalculateNormals();
+        mesh.RecalculateBounds();
+
+        _meshFilter.mesh = mesh;
     }
     #endregion
 

@@ -1,4 +1,4 @@
-Shader "VRWorkspace/Media/Video360Sphere"
+Shader "VRWorkspace/Media/VideoImmersive"
 {
     Properties
     {
@@ -7,25 +7,28 @@ Shader "VRWorkspace/Media/Video360Sphere"
         _Contrast ("Contrast", Range(0, 2)) = 1
         _Saturation ("Saturation", Range(0, 2)) = 1
 
+        [Header(Projection)]
+        _ProjectionMode ("Projection Mode", Float) = 0  // 0=Equirect360, 1=Equirect180
+        _FOV ("Field of View", Range(90, 360)) = 180    // Horizontal FOV for 180 mode
+        _Rotation ("Rotation Offset", Float) = 0        // Y-axis rotation (degrees)
+        _Tilt ("Tilt Offset", Float) = 0                // X-axis tilt (degrees)
+        _FadeSharpness ("Fade Sharpness", Range(1, 20)) = 8  // Back hemisphere fade for 180 mode
+
         [Header(Stereo)]
         _StereoMode ("Stereo Mode", Float) = 0  // 0=Mono, 1=SBS, 2=OU
-        _EyeIndex ("Eye Index", Float) = 0      // 0=Left, 1=Right
+        _EyeIndex ("Eye Index", Float) = 0      // 0=Left, 1=Right (editor fallback)
 
         [Header(NV12 Support)]
         _UseNV12 ("Use NV12", Float) = 0
         _YTex ("Y Plane", 2D) = "black" {}
         _UVTex ("UV Plane", 2D) = "gray" {}
-
-        [Header(360 Settings)]
-        _Rotation ("Rotation Offset", Range(-180, 180)) = 0
-        _Tilt ("Tilt Offset", Range(-90, 90)) = 0
     }
 
     SubShader
     {
         Tags { "Queue"="Background" "RenderType"="Opaque" }
 
-        // Render inside-out (backface)
+        // Inside-out rendering: cull front faces so back faces (visible from inside) render
         Cull Front
         ZWrite On
         ZTest LEqual
@@ -38,41 +41,45 @@ Shader "VRWorkspace/Media/Video360Sphere"
             #pragma multi_compile_instancing
             #include "UnityCG.cginc"
 
+            // ===== Uniforms =====
             sampler2D _MainTex;
             float4 _MainTex_ST;
 
-            // NV12 textures
             sampler2D _YTex;
             sampler2D _UVTex;
             float _UseNV12;
 
-            // Color correction
             float _Brightness;
             float _Contrast;
             float _Saturation;
 
-            // Stereo
+            float _ProjectionMode;
+            float _FOV;
+            float _Rotation;
+            float _Tilt;
+            float _FadeSharpness;
+
             float _StereoMode;
             float _EyeIndex;
 
-            // 360 Settings
-            float _Rotation;
-            float _Tilt;
-
+            // ===== Structures =====
             struct appdata
             {
                 float4 vertex : POSITION;
                 float3 normal : NORMAL;
+                float2 uv : TEXCOORD0;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
             struct v2f
             {
                 float4 pos : SV_POSITION;
-                float3 viewDir : TEXCOORD0;
+                float3 objPos : TEXCOORD0;    // Object-space position (NOT normalized) - interpolates correctly
+                float2 meshUV : TEXCOORD1;
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
+            // ===== Vertex Shader =====
             v2f vert(appdata v)
             {
                 v2f o;
@@ -81,15 +88,18 @@ Shader "VRWorkspace/Media/Video360Sphere"
 
                 o.pos = UnityObjectToClipPos(v.vertex);
 
-                // Get world space direction from center to vertex
-                float3 worldPos = mul(unity_ObjectToWorld, v.vertex).xyz;
-                float3 worldCenter = mul(unity_ObjectToWorld, float4(0, 0, 0, 1)).xyz;
-                o.viewDir = normalize(worldPos - worldCenter);
+                // Pass object-space position directly (interpolates correctly)
+                // For centered sphere: normalize(objPos) in fragment = view direction
+                // This fixes pole distortion caused by interpolating normalized vectors
+                o.objPos = v.vertex.xyz;
+
+                // Pass mesh UVs for seam-free equirectangular mapping
+                o.meshUV = v.uv;
 
                 return o;
             }
 
-            // Convert YUV (BT.709) to RGB
+            // ===== Helper: YUV (BT.709) to RGB =====
             float3 YUVtoRGB(float y, float2 uv)
             {
                 float3 yuv = float3(y, uv.x - 0.5, uv.y - 0.5);
@@ -101,7 +111,7 @@ Shader "VRWorkspace/Media/Video360Sphere"
                 return mul(bt709, yuv);
             }
 
-            // Apply color correction
+            // ===== Helper: Color Correction =====
             float3 ColorCorrect(float3 color, float brightness, float contrast, float saturation)
             {
                 color *= brightness;
@@ -111,13 +121,14 @@ Shader "VRWorkspace/Media/Video360Sphere"
                 return saturate(color);
             }
 
-            // Rotate direction by Y (rotation) and X (tilt) angles
+            // ===== Helper: Rotate Direction Vector =====
+            // Applies Y-axis rotation (horizontal) then X-axis tilt (vertical)
             float3 RotateDirection(float3 dir, float rotationDeg, float tiltDeg)
             {
-                float rotRad = rotationDeg * 0.01745329;
+                float rotRad = rotationDeg * 0.01745329;  // deg to rad
                 float tiltRad = tiltDeg * 0.01745329;
 
-                // Rotation around Y axis (horizontal rotation)
+                // Y-axis rotation (horizontal pan)
                 float cosRot = cos(rotRad);
                 float sinRot = sin(rotRad);
                 float3 rotated = float3(
@@ -126,7 +137,7 @@ Shader "VRWorkspace/Media/Video360Sphere"
                     dir.x * sinRot + dir.z * cosRot
                 );
 
-                // Tilt around X axis (vertical tilt)
+                // X-axis tilt (vertical)
                 float cosTilt = cos(tiltRad);
                 float sinTilt = sin(tiltRad);
                 return float3(
@@ -136,36 +147,17 @@ Shader "VRWorkspace/Media/Video360Sphere"
                 );
             }
 
-            // Convert 3D direction to equirectangular UV for 360 sphere
-            float2 DirectionToEquirect360(float3 dir)
-            {
-                // Convert to spherical coordinates
-                // phi: horizontal angle (-PI to PI)
-                // theta: vertical angle (-PI/2 to PI/2)
-                float phi = atan2(dir.x, dir.z);
-                float theta = asin(clamp(dir.y, -1, 1));
-
-                // Map to UV (0-1)
-                // U: 0 at center-back, 0.25 at right, 0.5 at center-front, 0.75 at left
-                float u = phi / (2.0 * 3.14159265) + 0.5;
-
-                // V: 0 at bottom, 1 at top
-                float v = theta / 3.14159265 + 0.5;
-
-                return float2(u, v);
-            }
-
-            // Get stereo UV based on mode and eye
+            // ===== Helper: Stereo UV Offset =====
             float2 GetStereoUV(float2 uv, float stereoMode, float eyeIndex)
             {
                 if (stereoMode < 0.5)
                 {
-                    // Mono
+                    // Mono: no change
                     return uv;
                 }
                 else if (stereoMode < 1.5)
                 {
-                    // Side-by-Side (common for 360 3D)
+                    // Side-by-Side: left eye = left half, right eye = right half
                     float halfU = uv.x * 0.5;
                     if (eyeIndex > 0.5)
                         halfU += 0.5;
@@ -173,7 +165,7 @@ Shader "VRWorkspace/Media/Video360Sphere"
                 }
                 else
                 {
-                    // Over-Under (top-bottom 360 3D)
+                    // Over-Under: left eye = top half, right eye = bottom half
                     float halfV = uv.y * 0.5;
                     if (eyeIndex < 0.5)
                         halfV += 0.5;  // Left eye is top half
@@ -181,22 +173,60 @@ Shader "VRWorkspace/Media/Video360Sphere"
                 }
             }
 
+            // ===== Fragment Shader =====
             fixed4 frag(v2f i) : SV_Target
             {
-                // Normalize and rotate view direction
-                float3 viewDir = normalize(i.viewDir);
-                viewDir = RotateDirection(viewDir, _Rotation, _Tilt);
+                // Normalize AFTER interpolation - this is the key fix for pole distortion!
+                // Object-space positions interpolate correctly, then we derive direction per-pixel
+                float3 viewDir = normalize(i.objPos);
 
-                // Convert to equirectangular UV
-                float2 equirectUV = DirectionToEquirect360(viewDir);
+                float2 equirectUV;
+                float alpha = 1.0;
 
-                // Apply stereo mode
+                if (_ProjectionMode > 0.5)
+                {
+                    // === Equirect 180 mode ===
+                    // Uses viewDir-based mapping (needed for angular clamping + back fade)
+                    viewDir = RotateDirection(viewDir, _Rotation, _Tilt);
+
+                    float phi = atan2(viewDir.x, viewDir.z);
+                    float theta = asin(clamp(viewDir.y, -1.0, 1.0));
+
+                    float fovRad = _FOV * 0.01745329 * 0.5;  // Half FOV in radians
+
+                    equirectUV.x = (phi / fovRad) * 0.5 + 0.5;
+                    equirectUV.y = 0.5 + (theta / (3.14159265 * 0.5)) * 0.5;
+
+                    // Clamp UV to valid [0,1] range
+                    equirectUV = saturate(equirectUV);
+
+                    // Fade out back hemisphere smoothly
+                    alpha = saturate(viewDir.z * _FadeSharpness + 0.5);
+                }
+                else
+                {
+                    // === Equirect 360 mode ===
+                    // Use viewDir-based mapping for correct pole rendering
+                    // (Mesh UV causes pinwheel distortion at poles due to UV interpolation)
+                    viewDir = RotateDirection(viewDir, _Rotation, _Tilt);
+
+                    // Convert view direction to equirectangular UV
+                    // phi: horizontal angle (-PI to PI) -> U (0 to 1)
+                    // theta: vertical angle (-PI/2 to PI/2) -> V (0 to 1)
+                    float phi = atan2(viewDir.x, viewDir.z);
+                    float theta = asin(clamp(viewDir.y, -1.0, 1.0));
+
+                    equirectUV.x = phi / (2.0 * 3.14159265) + 0.5;
+                    equirectUV.y = theta / 3.14159265 + 0.5;
+                }
+
+                // Apply stereo eye offset
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
                 float eye = unity_StereoEyeIndex;
                 float2 stereoUV = GetStereoUV(equirectUV, _StereoMode, eye);
 
+                // Sample video texture
                 float3 color;
-
                 if (_UseNV12 > 0.5)
                 {
                     float y = tex2D(_YTex, stereoUV).r;
@@ -210,6 +240,9 @@ Shader "VRWorkspace/Media/Video360Sphere"
 
                 // Apply color correction
                 color = ColorCorrect(color, _Brightness, _Contrast, _Saturation);
+
+                // Apply 180 back-hemisphere fade
+                color *= alpha;
 
                 return fixed4(color, 1.0);
             }

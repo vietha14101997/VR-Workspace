@@ -87,6 +87,12 @@ Destroying webcam texture
 
 [RTTManager] Background app pre-initialization triggered
 
+[RTTManager] Main Menu already initialized - cannot create another
+UnityEngine.Debug:LogWarning (object)
+RTTManager:CreatePersistentMainMenu () (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:589)
+RTTManager/<WaitAndShowMainMenu>d__118:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:451)
+UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
+
 [RTTManager] Creating RemoteMenu content...
 
 [RTTRemoteMenu] OnEnable called
@@ -203,7 +209,7 @@ Destroying webcam texture
 
 [RTTRemoteMenu] Side panel content created for NetworkInfo. ContentContainer children count: 1
 
-[RTTAppManager] Pre-initialized app: remote in 236.4ms
+[RTTAppManager] Pre-initialized app: remote in 226.6ms
 
 [RTTMenu] Created app frame: media
 
@@ -217,11 +223,11 @@ Destroying webcam texture
 
 [VRVideoProjectionSystem] Initialized
 
-[MediaLibraryService] Loading 3178 items from cache (async)...
+[MediaLibraryService] Loading 3179 items from cache (async)...
 
 [VirtualObjectsZoomController] Registered side panel: MediaNavigationPanel (side=-1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
-[RTTMediaLibrary] CreateLeftPanelContent started at 4.035s
+[RTTMediaLibrary] CreateLeftPanelContent started at 5.212s
 
 [HoverEffectController] AddEffect 'scale' to Item_all, TargetVisuals=Item_all
 
@@ -251,19 +257,19 @@ Destroying webcam texture
 
 [HoverEffectController] AddEffect 'color' to Item_playlists, TargetVisuals=Item_playlists
 
-[RTTMediaLibrary] Left panel content created at 4.043s
+[RTTMediaLibrary] Left panel content created at 5.223s
 
 [VirtualObjectsZoomController] Registered side panel: MediaDetailPanel (side=1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
-[RTTMediaLibrary] CreateRightPanelContent started at 4.046s
+[RTTMediaLibrary] CreateRightPanelContent started at 5.225s
 
-[RTTMediaLibrary] Right panel content created at 4.065s
+[RTTMediaLibrary] Right panel content created at 5.243s
 
 [RTTPopupMenu] CreateWorldSpace: layer 'VirtualObjects' = 3, mainCam: VRCamera
 
 [RTTPopupMenu] Created world-space popup
 
-[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-1197090
+[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-7398
 
 [HoverEffectController] AddEffect 'scale' to Checkbox, TargetVisuals=Checkbox
 
@@ -287,109 +293,19 @@ Destroying webcam texture
 
 [RTTMediaLibrary] InitializePageSizeDeferred: itemsPerPage=8
 
-[RTTAppManager] Pre-initialized app: media in 328.2ms
-
-[RTTManager] Instant recenter: moved 4 objects to face camera
-
-[VirtualObjectsZoomController] Recenter: distance recalculated to 1.80m
-
-[RTTManager] Auto-recenter completed
-
-[MediaLibraryService] Loaded 3178 items from cache in 688ms (async, no File.Exists)
-
-[RTTMediaLibraryController] HandleCacheLoaded called
-
-[RTTMediaGridItem] Duration badge for 'YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (113KB)
-
-[Cache] DISK DECODE: 2ms (512x144)
-
-[RTTMediaGridItem] Duration badge for 'YTDown.com_YouTube_Chuyen-Di-Tau-Luon-Sieu-Toc-Thuc-Te-Ao-3_Media_EqL0I1-gg7c_001_1080s': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-First video frame not zero: 2 (0.066667s). Result may be out of sync. Please make sure tracks all start at 0 in C:\Users\Admin\Videos\YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4
-
-[Cache] DISK READ: 0ms (190KB)
-
-[Cache] DISK DECODE: 4ms (512x288)
-
-[RTTMediaGridItem] Duration badge for 'YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (129KB)
-
-[Cache] DISK DECODE: 3ms (512x288)
-
-[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (210KB)
-
-[Cache] DISK DECODE: 4ms (512x267)
-
-[RTTMediaGridItem] Duration badge for 'ZZenlessZoneZero 2026-02-03 12-19-36': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 3ms (247KB)
-
-[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (115KB)
-
-[Cache] DISK DECODE: 3ms (512x267)
-
-[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 17-52-22': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (109KB)
-
-[Cache] DISK DECODE: 2ms (512x267)
-
-[RTTMediaGridItem] Duration badge for 'videoplayback': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (206KB)
-
-[RTTMediaGridItem] Duration badge for 'Genshin-Impact 2026-1-26 12-24-11': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (199KB)
-
-[RTTMediaGridItem] Duration badge for 'Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (85KB)
-
-[Cache] DISK DECODE: 2ms (512x213)
-
-[RTTMediaGridItem] Duration badge for 'video_client': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK READ: 0ms (116KB)
-
-[Cache] DISK DECODE: 2ms (512x230)
-
-[RTTMediaGridItem] Duration badge for 'Phàm Nhân Tu Tiên Tập 173 Vietsub': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
-
-[Cache] DISK DECODE: 2ms (512x288)
-
-[RTTMediaGrid] Auto-selecting first item: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p
-
-[Detail] REQUEST: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4
-
-[Cache] DISK READ: 0ms (112KB)
-
-[Detail] RECEIVED: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 wait=11ms assign=0ms
-
-[Detail] UpdateInfo: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 name=0ms preview=12ms metadata=5ms total=17ms
-
-[Detail] RECEIVED: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 wait=0ms assign=0ms
-
-[Detail] UpdateInfo: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 name=0ms preview=0ms metadata=2ms total=2ms
+[RTTAppManager] Pre-initialized app: media in 403.7ms
 
 [RTTMenu] Created app frame: folder
 
 [RTTManager] Creating FileManager content...
 
-[RTTFileManager] PlaceSidePanel: innerEdge=(-0.83, 0.00, 1.81), panelPos=(-1.06, 0.00, 1.67)
+[RTTFileManager] PlaceSidePanel: innerEdge=(-0.85, 0.00, 1.80), panelPos=(-1.07, 0.00, 1.65)
 
 [VirtualObjectsZoomController] Registered side panel: FileNavigationPanel (side=-1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
 [RTTFileManager] Registered FileNavigationPanel with VirtualObjectsZoomController
 
-[RTTFileManager] Placed FileNavigationPanel: pos=(-1.06, 0.00, 1.67)
+[RTTFileManager] Placed FileNavigationPanel: pos=(-1.07, 0.00, 1.65)
 
 [HoverEffectController] AddEffect 'scale' to Item_internal, TargetVisuals=Item_internal
 
@@ -405,13 +321,13 @@ First video frame not zero: 2 (0.066667s). Result may be out of sync. Please mak
 
 [HoverEffectController] AddEffect 'color' to Item_music, TargetVisuals=Item_music
 
-[RTTFileManager] PlaceSidePanel: innerEdge=(0.87, 0.00, 1.79), panelPos=(1.09, 0.00, 1.64)
+[RTTFileManager] PlaceSidePanel: innerEdge=(0.85, 0.00, 1.80), panelPos=(1.07, 0.00, 1.65)
 
 [VirtualObjectsZoomController] Registered side panel: FileDetailPanel (side=1, mainW=1.6, sideW=0.5333334, gap=0.05)
 
 [RTTFileManager] Registered FileDetailPanel with VirtualObjectsZoomController
 
-[RTTFileManager] Placed FileDetailPanel: pos=(1.09, 0.00, 1.64)
+[RTTFileManager] Placed FileDetailPanel: pos=(1.07, 0.00, 1.65)
 
 [RTTFileActionBar] Buttons created
 
@@ -447,7 +363,25 @@ First video frame not zero: 2 (0.066667s). Result may be out of sync. Please mak
 
 [Controller] NavigateToInternalAsync: path='root', restorePage=False, clickedFolder=''
 
-[RTTFileManager] UpdateBreadcrumbs called with path: root, container null: True, instance: -1206202
+[RTTFileManager] UpdateBreadcrumbs called with path: root, container null: True, instance: -15528
+
+[RTTFileManager] Breadcrumb container reference lost, searching in hierarchy...
+UnityEngine.Debug:LogWarning (object)
+RTTFileManager:UpdateBreadcrumbs (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:2652)
+RTTFileManagerController/<NavigateToInternalAsync>d__41:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:288)
+UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
+RTTFileManagerController:NavigateToInternal (string,bool,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:233)
+RTTFileManagerController:NavigateTo (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:193)
+RTTFileManagerController:OnViewReady () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:159)
+RTTFileManager/<CreateCenterGrid>d__86:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:560)
+UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
+RTTFileManager:CreatePanels () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:418)
+RTTFileManager:BuildUI () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:291)
+RTTFileManagerController:CreateMenu (UnityEngine.RectTransform,single,single,TMPro.TMP_FontAsset,UnityEngine.Color,UnityEngine.Color) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:97)
+RTTManager:CreateFilesMenuContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:1070)
+RTTManager:CreateAppContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:1002)
+VRWorkspace.UI.RTT.RTTAppManager/<PreInitAppAsync>d__79:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTAppManager.cs:1226)
+UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
 
 [RTTFileManager] Found breadcrumb container from hierarchy: True
 
@@ -455,127 +389,231 @@ First video frame not zero: 2 (0.066667s). Result may be out of sync. Please mak
 
 [FileSystemService] Reading directory async: C:\Users\Admin
 
-[FileSystemService] Quick count: 126 items (dirs=83, files=43)
+[FileSystemService] Quick count: 128 items (dirs=84, files=44)
 
-[Controller] Quick count received: 126 items
+[Controller] Quick count received: 128 items
 
 [Controller] CalculateTotalPages: totalFiles=8, pageSize=8, totalPages=1
 
 [RTTFileGrid] GetVisibleRowsForPagination: height=748.1688, availableHeight=728.1688, rowHeight=350, rowsFloat=2.080482, visibleRows=2
 
-[Detail] UpdateInfo: Admin name=0ms preview=0ms metadata=2ms total=2ms
+[Detail] UpdateInfo: Admin name=0ms preview=0ms metadata=5ms total=5ms
 
-[Controller] Showing early pagination with quick count: 126 items, 16 pages
+[Controller] Showing early pagination with quick count: 128 items, 16 pages
 
 [RTTFileManagerController] Menu created
 
-[FileSystemService] Found 93 items async (71 folders, 22 files)
+[FileSystemService] Found 95 items async (72 folders, 23 files)
 
-[Controller] CalculateTotalPages: totalFiles=93, pageSize=8, totalPages=12
+[Controller] CalculateTotalPages: totalFiles=95, pageSize=8, totalPages=12
 
 [RTTFileGrid] Progressive binding started: 24 items queued
 
-[RTTFileGrid] Progressive bind frame: 4 items, 20 remaining
+[RTTFileGrid] Progressive bind frame: 5 items, 19 remaining
 
-[Controller] SetPageSize: no change (already 8)
+[RTTFileGrid] Progressive bind frame: 3 items, 4 remaining
+
+[RTTManager] Instant recenter: moved 5 objects to face camera
+
+[VirtualObjectsZoomController] Recenter: distance recalculated to 1.80m
+
+[RTTManager] Auto-recenter completed
+
+[RTTFileGrid] Progressive bind frame: 1 items, 3 remaining
+
+[RTTFileGrid] Progressive bind frame: 2 items, 1 remaining
+
+[RTTFileGrid] Progressive bind frame: 1 items, 0 remaining
+
+[RTTAppManager] Pre-initialized app: folder in 455.4ms
+
+[RTTAppManager] Background pre-init complete: 3 apps in 1385.7ms
+
+[MediaLibraryService] Loaded 3179 items from cache in 1091ms (async, no File.Exists)
+
+[RTTMediaLibraryController] HandleCacheLoaded called
+
+[RTTMediaGridItem] Duration badge for 'Rhythm_of_Shibuya_H264': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (16KB)
+
+[Cache] DISK DECODE: 1ms (512x256)
+
+[RTTMediaGridItem] Duration badge for 'YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (113KB)
+
+[Cache] DISK DECODE: 2ms (512x144)
+
+[RTTMediaGridItem] Duration badge for 'YTDown.com_YouTube_Chuyen-Di-Tau-Luon-Sieu-Toc-Thuc-Te-Ao-3_Media_EqL0I1-gg7c_001_1080s': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (190KB)
+
+[Cache] DISK DECODE: 3ms (512x288)
+
+[RTTMediaGridItem] Duration badge for 'YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (129KB)
+
+[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (210KB)
+
+[Cache] DISK DECODE: 4ms (512x267)
+
+[RTTMediaGridItem] Duration badge for 'ZZenlessZoneZero 2026-02-03 12-19-36': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (247KB)
+
+[Cache] DISK DECODE: 4ms (512x288)
+
+[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (115KB)
+
+[Cache] DISK DECODE: 3ms (512x267)
+
+[RTTMediaGridItem] Duration badge for 'VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 17-52-22': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (109KB)
+
+[RTTMediaGridItem] Duration badge for 'videoplayback': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (206KB)
+
+[RTTMediaGridItem] Duration badge for 'Genshin-Impact 2026-1-26 12-24-11': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (199KB)
+
+[Cache] DISK DECODE: 5ms (512x288)
+
+[RTTMediaGridItem] Duration badge for 'Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (85KB)
+
+[Cache] DISK DECODE: 1ms (512x213)
+
+[RTTMediaGridItem] Duration badge for 'video_client': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (116KB)
+
+[Cache] DISK DECODE: 2ms (512x230)
+
+[RTTMediaGrid] Auto-selecting first item: Rhythm_of_Shibuya_H264
+
+[Detail] REQUEST: Rhythm_of_Shibuya_H264.mp4
+
+[Cache] DISK READ: 0ms (2KB)
+
+[Cache] DISK DECODE: 0ms (512x256)
+
+[Detail] RECEIVED: Rhythm_of_Shibuya_H264.mp4 wait=9ms assign=0ms
+
+[Detail] UpdateInfo: Rhythm_of_Shibuya_H264.mp4 name=0ms preview=9ms metadata=3ms total=12ms
+
+[Detail] RECEIVED: Rhythm_of_Shibuya_H264.mp4 wait=0ms assign=0ms
+
+[Detail] UpdateInfo: Rhythm_of_Shibuya_H264.mp4 name=0ms preview=0ms metadata=2ms total=2ms
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Rhythm_of_Shibuya_H264.mp4
+
+First video frame not zero: 2 (0.066667s). Result may be out of sync. Please make sure tracks all start at 0 in C:\Users\Admin\Videos\YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\YTDown.com_YouTube_Chuyen-Di-Tau-Luon-Sieu-Toc-Thuc-Te-Ao-3_Media_EqL0I1-gg7c_001_1080s.mp4
-
-[RTTFileGrid] Progressive bind frame: 3 items, 5 remaining
-
-[RTTFileGrid] Progressive bind frame: 3 items, 2 remaining
-
-[RTTFileGrid] Progressive bind frame: 2 items, 0 remaining
-
-[RTTFileGrid] Progressive binding complete: 12 items bound total
-
-[RTTAppManager] Pre-initialized app: folder in 355.2ms
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\YTDown.com_YouTube_Full-SBS-3D-Test_Media_GfcCjkJMvb8_001_1080p.mp4
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37.mp4
 
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-09 15-17-37.mp4
+
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\ZZenlessZoneZero 2026-02-03 12-19-36.mp4
+
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\ZZenlessZoneZero 2026-02-03 12-19-36.mp4
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
 
-[RTTAppManager] Background pre-init complete: 3 apps in 2643.3ms
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 13-25-06.mp4
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 17-52-22.mp4
+
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\VRWorkSpace - MainScene - Android - Unity 2022.3.62f3 _DX11_ 2026-02-02 17-52-22.mp4
 
 First video frame not zero: 2 (0.066667s). Result may be out of sync. Please make sure tracks all start at 0 in C:\Users\Admin\Downloads\videoplayback.mp4
 
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\Genshin-Impact 2026-1-26 12-24-11.mp4
 
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\Genshin-Impact 2026-1-26 12-24-11.mp4
+
 Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Video\Đấu Phá Thương Khung Phần 5 Tập 182 Việt Sub - HH3D.mp4
 
-Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Video\Phàm Nhân Tu Tiên Tập 173 Vietsub.mp4
+[RTTMainMenu] Click started: media at 11.256s
 
-[RTTMainMenu] Click started: folder at 8.250s
+[RTTMainMenu] PrepareApp called: media at 11.256s (+0.1ms)
 
-[RTTMainMenu] PrepareApp called: folder at 8.250s (+0.1ms)
+[RTTAppManager] PrepareApp: media already active, preparing, or pre-initialized. Skipping redundant creation.
 
-[RTTAppManager] PrepareApp: folder already active, preparing, or pre-initialized. Skipping redundant creation.
+[RTTMainMenu] Button animation started: media at 11.257s (+0.6ms)
 
-[RTTMainMenu] Button animation started: folder at 8.251s (+0.6ms)
+[RTTMainMenu] Button animation ended: media at 11.355s (+98.7ms)
 
-[RTTMainMenu] Button animation ended: folder at 8.349s (+98.5ms)
+[RTTMainMenu] OpenPreparedApp called: media at 11.355s (+98.7ms)
 
-[RTTMainMenu] OpenPreparedApp called: folder at 8.349s (+98.6ms)
+[RTTAppManager] OpenPreparedApp: Using pre-initialized instance for media
 
-[RTTAppManager] OpenPreparedApp: Using pre-initialized instance for folder
+[RTTMainMenu] Click flow completed: media at 11.357s (total: +100.9ms)
 
-[RTTMainMenu] Click flow completed: folder at 8.351s (total: +100.8ms)
+[RTTMediaGrid] Progressive binding started: 10 items queued, budgetMs=8
 
-[RTTFileManagerController] PrepareDataAsync started
+[RTTMediaGridItem] Duration badge for 'Phàm Nhân Tu Tiên Tập 173 Vietsub': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[AppStateCache] Disk cache hit for files
+[Cache] DISK DECODE: 2ms (512x288)
 
-[Controller] CalculateTotalPages: totalFiles=30, pageSize=10, totalPages=3
+[Detail] UpdateInfo: Rhythm_of_Shibuya_H264.mp4 name=0ms preview=0ms metadata=37ms total=37ms
 
-[RTTFileGrid] Progressive binding started: 18 items queued
+[RTTMediaGridItem] Duration badge for '7295785205012': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[RTTFileGrid] Progressive bind frame: 5 items, 13 remaining
+[Cache] DISK READ: 0ms (120KB)
 
-[RTTFileManager] UpdateBreadcrumbs called with path: root, container null: False, instance: -1206202
+[RTTMediaLibraryController] BindCachedDataOrEmpty: Bound 22 items from cache
 
-[RTTFileManagerController] TryRestoreCachedState: Restored 30 items from cache
+[RTTMediaGridItem] Duration badge for '7077543476647': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[RTTAppManager] Subscribed to OnDataPrepared: folder
+[Cache] DISK READ: 0ms (265KB)
 
-[Detail] UpdateInfo: .bun name=0ms preview=0ms metadata=3ms total=3ms
+[Cache] DISK DECODE: 4ms (512x230)
 
-[RTTFileGrid] Progressive bind frame: 1 items, 0 remaining
+[RTTMediaGridItem] Duration badge for '7065774217733': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[RTTFileManagerController] PrepareDataAsync completed: 93 files
+[Cache] DISK READ: 0ms (75KB)
 
-[RTTAppManager] OnDataPrepared received: folder
+[Cache] DISK DECODE: 2ms (512x238)
 
-[RTTFileManagerController] OnBackgroundDataReady called
+[RTTMediaGridItem] Duration badge for 'Genshin_Impact_2025-09-10_11-32-27': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[Controller] CalculateTotalPages: totalFiles=93, pageSize=10, totalPages=10
+[Cache] DISK READ: 2ms (283KB)
 
-[RTTFileGrid] Progressive bind frame: 5 items, 19 remaining
+[RTTMediaGridItem] Duration badge for 'FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD)': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
 
-[AppStateCache] Saved state for files with 30 items
+[Cache] DISK READ: 0ms (165KB)
 
-[RTTFileManagerController] CacheCurrentState: Cached 30 items
+[RTTMediaLibraryController] OnAppShown called, _view=exists
 
-[RTTAppManager] State cached after background ready: folder
+[RTTMediaLibraryController] OnAppShown: Starting background scan to detect changes
 
-[RTTFileGrid] Progressive bind frame: 3 items, 4 remaining
+[MediaLibraryService] Starting background scan (existing: 3179 items)
 
-[RTTFileGrid] Progressive bind frame: 3 items, 1 remaining
+[AppStateCache] Saved state for media with 22 items
 
-[RTTFileManagerController] OnAppShown called
+[RTTMediaLibraryController] CacheCurrentState: Cached 22 items
 
-[RTTTaskbar] RegisterApp called - slotIndex=1, icon=icon_folder
+[RTTTaskbar] RegisterApp called - slotIndex=1, icon=icon_media
 
-[RTTTaskbar] SetSlotIcon - slot=AppBtn_AppSlot_1, icon=icon_folder, slotIndex=1
+[RTTTaskbar] SetSlotIcon - slot=AppBtn_AppSlot_1, icon=icon_media, slotIndex=1
 
 [RTTTaskbar] SetSlotIcon - removed 0 old children
 
-[RTTTaskbar] SetSlotIcon - created iconBtn=Btn_icon_folder, slot.childCount now=1
+[RTTTaskbar] SetSlotIcon - created iconBtn=Btn_icon_media, slot.childCount now=1
 
 [RTTTaskbar] Registered app slot 1, total apps: 1
 
@@ -585,27 +623,113 @@ Unexpected timestamp values detected. This can occur in H.264 videos not encoded
 
 [RTTTaskbar] SelectSlot(1) called, current active: 1
 
-[RTTAppManager] Pre-init app shown: folder in 359.5ms
+[RTTAppManager] Pre-init app shown: media in 447.2ms
 
-[Detail] UpdateInfo: Admin name=0ms preview=0ms metadata=3ms total=3ms
+[MediaLibraryService] Background scan complete - no changes (1346ms)
 
-[Detail] UpdateInfo: .cache name=0ms preview=0ms metadata=3ms total=3ms
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Video\Phàm Nhân Tu Tiên Tập 173 Vietsub.mp4
 
-[Detail] UpdateInfo: .cargo name=0ms preview=0ms metadata=3ms total=3ms
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Genshin_Impact_2025-09-10_11-32-27.mp4
 
-[Detail] UpdateInfo: .codex name=0ms preview=0ms metadata=3ms total=3ms
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Downloads\Genshin_Impact_2025-09-10_11-32-27.mp4
 
-[Detail] UpdateInfo: Admin name=0ms preview=0ms metadata=4ms total=4ms
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Downloads\Compressed\FDownloader.Net_AQOhc0h8XAxx2cqxQbqnKT26d_IbmOoK_k7vsRSsSuvYTweRMlebewdmkkJvnRC5MxO8CWwrCLYFSaJN334-rVuZPAEMUO0HGTUYc_J6u08s-Q_720p_(HD).mp4
 
-[Detail] UpdateInfo: Admin name=0ms preview=0ms metadata=7ms total=7ms
+[RTTMediaLibraryController] SmartRefresh called - performing incremental scan...
 
-[Detail] UpdateInfo: .android name=0ms preview=0ms metadata=3ms total=3ms
+[MediaLibraryService] Background scan complete - no changes (1207ms)
 
-[Detail] UpdateInfo: .cargo name=1ms preview=0ms metadata=3ms total=4ms
+[RTTTaskbar] SelectSlot(0) called, current active: 1
 
-[Detail] UpdateInfo: .cache name=0ms preview=0ms metadata=4ms total=4ms
+[RTTTaskbar] Selected app with slot index 0
 
-[Detail] UpdateInfo: .cargo name=0ms preview=0ms metadata=4ms total=4ms
+[RTTTaskbar] Unregistered app slot 1, remaining apps: 0
 
-[Detail] UpdateInfo: .cache name=1ms preview=0ms metadata=3ms total=4ms
+[RTTAppManager] Resetting app: media
+
+[VRVideoProjectionSystem] Disposed
+
+[VirtualObjectsZoomController] Unregistered side panel: MediaNavigationPanel
+
+[VirtualObjectsZoomController] Unregistered side panel: MediaDetailPanel
+
+[RTTMediaLibrary] Cleanup: Destroying _mediaActionBar
+
+[VRMediaAppController] Cleanup completed
+
+[RTTAppManager] Closed app: media (preInit=True)
+
+[RTTMediaLibrary] CreateLeftPanelContent started at 37.803s
+
+[RTTMediaLibrary] Left panel content created at 37.807s
+
+[RTTMediaLibrary] CreateRightPanelContent started at 37.809s
+
+[RTTMediaLibrary] Right panel content created at 37.815s
+
+[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-26104
+
+[Detail] UpdateInfo: Rhythm_of_Shibuya_H264.mp4 name=0ms preview=0ms metadata=8ms total=8ms
+
+[Detail] UpdateInfo: Rhythm_of_Shibuya_H264.mp4 name=0ms preview=0ms metadata=14ms total=14ms
+
+[RTTAppManager] App reset complete: media
+
+[RTTMainMenu] Click started: media at 40.453s
+
+[RTTMainMenu] PrepareApp called: media at 40.454s (+0.1ms)
+
+[RTTMainMenu] Button animation started: media at 40.454s (+0.2ms)
+
+[RTTMainMenu] Button animation ended: media at 40.553s (+100.0ms)
+
+[RTTMainMenu] OpenPreparedApp called: media at 40.554s (+100.1ms)
+
+[RTTMainMenu] Click flow completed: media at 40.554s (total: +100.2ms)
+
+[Detail] UpdateInfo: Rhythm_of_Shibuya_H264.mp4 name=0ms preview=0ms metadata=13ms total=13ms
+
+[RTTMediaGridItem] Duration badge for 'Honkai  Star Rail 2025.05.21 - 15.03.08.01': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (207KB)
+
+[RTTMediaGridItem] Duration badge for 'khác màu': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (38KB)
+
+[Cache] DISK DECODE: 1ms (512x288)
+
+[RTTMediaGridItem] Duration badge for 'vết xước 2': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (48KB)
+
+[RTTAppManager] Pre-init app shown: media in 460.7ms
+
+First video frame not zero: 4 (0.080000s). Result may be out of sync. Please make sure tracks all start at 0 in C:\Users\Admin\Videos\Rhythm_of_Shibuya_H264.mp4
+
+[MediaLibraryService] Background scan complete - no changes (1288ms)
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\New folder\khác màu.mp4
+
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\New folder\khác màu.mp4
+
+Unexpected timestamp values detected. This can occur in H.264 videos not encoded with the baseline profile. Timestamps will be skewed to correct the playback for C:\Users\Admin\Videos\Captures\New folder\vết xước 2.mp4
+
+Color primaries 0 is unknown or unsupported by WindowsMediaFoundation. Falling back to default may result in color shift. C:\Users\Admin\Videos\Captures\New folder\vết xước 2.mp4
+
+[Detail] REQUEST: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4
+
+[Cache] DISK READ: 0ms (112KB)
+
+[Detail] RECEIVED: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 wait=12ms assign=0ms
+
+[Detail] UpdateInfo: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 name=1ms preview=13ms metadata=10ms total=24ms
+
+[Detail] UpdateInfo: Rhythm_of_Shibuya_H264.mp4 name=0ms preview=1ms metadata=10ms total=11ms
+
+[Detail] RECEIVED: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 wait=0ms assign=0ms
+
+[Detail] UpdateInfo: YTDown.com_YouTube_3DNY-Piles-of-Snow-2-3-26-3D-Full-SBS_Media_tIC8WXq1MlM_001_1080p.mp4 name=1ms preview=0ms metadata=10ms total=11ms
+
+[Detail] UpdateInfo: Rhythm_of_Shibuya_H264.mp4 name=1ms preview=0ms metadata=10ms total=11ms
 

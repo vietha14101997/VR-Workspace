@@ -18,7 +18,12 @@ public class VideoFrameExtractor : MonoBehaviour
     private bool _isExtracting = false;
     private Action<Texture2D> _onComplete;
     private Action _onFailed;
-    private float _extractionTimeout = 10f;  // Timeout in seconds
+    private float _extractionTimeout = 10f;  // Timeout in seconds (will be adaptive for high-res videos)
+
+    // High-resolution video handling constants
+    private const int HIGH_RES_THRESHOLD = 2160;          // 4K (2160p)
+    private const int MAX_RENDER_SIZE = 2048;             // Max RenderTexture dimension (mobile-safe)
+    private const int ULTRA_HIGH_RES_THRESHOLD = 3840;    // 4K width
 
     // Request queue for handling multiple concurrent requests
     private Queue<ExtractionRequest> _requestQueue = new Queue<ExtractionRequest>();
@@ -242,6 +247,42 @@ public class VideoFrameExtractor : MonoBehaviour
         GL.PopMatrix();
         RenderTexture.active = previous;
     }
+
+    /// <summary>
+    /// Calculate adaptive extraction timeout based on video resolution and file size.
+    /// Higher resolution and larger files need more time for VideoPlayer preparation.
+    /// </summary>
+    private float CalculateExtractionTimeout(int videoWidth, int videoHeight, string filePath)
+    {
+        float baseTimeout = 10f;
+
+        // Factor 1: Resolution multiplier
+        int pixels = videoWidth * videoHeight;
+        float resolutionMultiplier = 1f;
+
+        if (pixels > 3840 * 2160)      // > 4K
+            resolutionMultiplier = 3f;
+        else if (pixels > 2560 * 1440) // > 1440p
+            resolutionMultiplier = 2f;
+        else if (pixels > 1920 * 1080) // > 1080p
+            resolutionMultiplier = 1.5f;
+
+        // Factor 2: File size (high bitrate = longer decode time)
+        try
+        {
+            System.IO.FileInfo fi = new System.IO.FileInfo(filePath);
+            long fileSizeMB = fi.Length / (1024 * 1024);
+
+            if (fileSizeMB > 500)  // > 500MB
+                resolutionMultiplier *= 1.5f;
+            else if (fileSizeMB > 200)  // > 200MB
+                resolutionMultiplier *= 1.25f;
+        }
+        catch { }
+
+        float adaptiveTimeout = baseTimeout * resolutionMultiplier;
+        return Mathf.Clamp(adaptiveTimeout, 10f, 30f);  // Cap at 30s
+    }
     #endregion
 
     #region Frame Extraction
@@ -309,7 +350,7 @@ public class VideoFrameExtractor : MonoBehaviour
             yield return null;
         }
 
-        // Get video's native dimensions and calculate target size maintaining aspect ratio
+        // Get video's native dimensions
         int videoWidth = (int)_videoPlayer.width;
         int videoHeight = (int)_videoPlayer.height;
 
@@ -320,20 +361,35 @@ public class VideoFrameExtractor : MonoBehaviour
             yield break;
         }
 
-        // Calculate dimensions maintaining aspect ratio (like ResizeTexture for images)
+        // Detect high-resolution videos
+        bool isHighRes = videoWidth > HIGH_RES_THRESHOLD || videoHeight > HIGH_RES_THRESHOLD;
+        bool isUltraHighRes = videoWidth > ULTRA_HIGH_RES_THRESHOLD || videoHeight > ULTRA_HIGH_RES_THRESHOLD;
+
+        if (isUltraHighRes)
+        {
+            Debug.Log($"[VideoFrameExtractor] Ultra-high-res video detected ({videoWidth}x{videoHeight}), scaling to max {MAX_RENDER_SIZE}");
+        }
+        else if (isHighRes)
+        {
+            Debug.Log($"[VideoFrameExtractor] High-res video detected ({videoWidth}x{videoHeight}), scaling for mobile compatibility");
+        }
+
+        // Calculate target dimensions with resolution cap for mobile-safety
         int targetWidth, targetHeight;
-        if (videoWidth > maxSize || videoHeight > maxSize)
+        int effectiveMaxSize = Math.Min(maxSize, MAX_RENDER_SIZE);  // Never exceed 2048 for mobile
+
+        if (videoWidth > effectiveMaxSize || videoHeight > effectiveMaxSize)
         {
             float ratio = (float)videoWidth / videoHeight;
             if (videoWidth > videoHeight)
             {
-                targetWidth = maxSize;
-                targetHeight = Mathf.RoundToInt(maxSize / ratio);
+                targetWidth = effectiveMaxSize;
+                targetHeight = Mathf.RoundToInt(effectiveMaxSize / ratio);
             }
             else
             {
-                targetHeight = maxSize;
-                targetWidth = Mathf.RoundToInt(maxSize * ratio);
+                targetHeight = effectiveMaxSize;
+                targetWidth = Mathf.RoundToInt(effectiveMaxSize * ratio);
             }
         }
         else
@@ -342,6 +398,9 @@ public class VideoFrameExtractor : MonoBehaviour
             targetWidth = videoWidth;
             targetHeight = videoHeight;
         }
+
+        // Update extraction timeout for high-res videos
+        _extractionTimeout = CalculateExtractionTimeout(videoWidth, videoHeight, videoPath);
 
         // Now create RenderTexture with correct aspect ratio
         _renderTexture = new RenderTexture(targetWidth, targetHeight, 0, RenderTextureFormat.ARGB32);
@@ -370,11 +429,21 @@ public class VideoFrameExtractor : MonoBehaviour
             seekTime = _videoPlayer.length * 0.2;
         }
         
+        // Calculate adaptive capture timeout based on video resolution
+        float baseCaptureTimeout = 5f;
+        float captureTimeout = baseCaptureTimeout;
+
+        // For high-res videos, increase capture timeout
+        if (videoWidth * videoHeight > 3840 * 2160)  // > 4K
+            captureTimeout = 10f;
+        else if (videoWidth * videoHeight > 1920 * 1080)  // > 1080p
+            captureTimeout = 7f;
+
         // Try to extract frame with retry logic for problematic videos
         Texture2D capturedFrame = null;
         int maxRetries = 3;
         double[] seekPositions = new double[] { seekTime, 0.5, _videoPlayer.length * 0.5 }; // Try original, start, middle
-        
+
         for (int attempt = 0; attempt < maxRetries && capturedFrame == null; attempt++)
         {
             double currentSeekTime = (attempt < seekPositions.Length) ? seekPositions[attempt] : seekTime;
@@ -420,8 +489,7 @@ public class VideoFrameExtractor : MonoBehaviour
                 captureComplete = true;
             }));
 
-            // Wait for async capture to complete
-            float captureTimeout = 5f;
+            // Wait for async capture to complete (using adaptive timeout calculated earlier)
             float captureStartTime = Time.time;
             while (!captureComplete)
             {

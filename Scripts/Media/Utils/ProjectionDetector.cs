@@ -2,20 +2,127 @@ using System.IO;
 using UnityEngine;
 
 /// <summary>
-/// Utility class to auto-detect video projection type from filename and resolution
+/// Utility class to auto-detect video projection type from metadata, filename, and resolution.
+/// Detection priority: 1) File metadata (sv3d/st3d/XMP) 2) Filename patterns 3) Resolution heuristics
 /// </summary>
 public static class ProjectionDetector
 {
     /// <summary>
-    /// Detect projection type from filename patterns and resolution
+    /// Detect both projection and stereo mode in one pass (single file I/O).
+    /// Uses metadata reading first, then falls back to filename/resolution.
     /// </summary>
-    /// <param name="filename">Video filename (with or without path)</param>
-    /// <param name="width">Video width in pixels</param>
-    /// <param name="height">Video height in pixels</param>
-    /// <returns>Detected projection type</returns>
+    public static void DetectProjectionAndStereo(
+        string filePath, int width, int height,
+        out VideoProjectionType projection, out StereoMode stereo)
+    {
+        // 1. Try metadata (single file read)
+        var metadata = VideoSphericalMetadataReader.ReadMetadata(filePath);
+
+        if (metadata.HasMetadata)
+        {
+            projection = InterpretProjection(metadata, width, height);
+            stereo = InterpretStereo(metadata);
+
+            Debug.Log($"[ProjectionDetector] Metadata detected ({metadata.Source}): {projection}, {stereo}");
+            return;
+        }
+
+        // 2. Fall back to filename + resolution
+        projection = DetectProjectionFromFilenameAndResolution(filePath, width, height);
+        stereo = DetectStereoModeFromFilename(projection, filePath);
+    }
+
+    /// <summary>
+    /// Detect projection type from filename patterns and resolution.
+    /// Also attempts metadata reading as highest priority.
+    /// </summary>
     public static VideoProjectionType DetectProjection(string filename, int width, int height)
     {
-        string name = Path.GetFileNameWithoutExtension(filename)?.ToLowerInvariant() ?? "";
+        // Try metadata first
+        var metadata = VideoSphericalMetadataReader.ReadMetadata(filename);
+        if (metadata.HasMetadata)
+        {
+            return InterpretProjection(metadata, width, height);
+        }
+
+        return DetectProjectionFromFilenameAndResolution(filename, width, height);
+    }
+
+    /// <summary>
+    /// Detect stereo mode from filename and video properties.
+    /// Also attempts metadata reading as highest priority.
+    /// </summary>
+    public static StereoMode DetectStereoMode(VideoProjectionType projection, string filename)
+    {
+        // Try metadata first (cached from previous call)
+        var metadata = VideoSphericalMetadataReader.ReadMetadata(filename);
+        if (metadata.HasMetadata && metadata.StereoMode >= 0)
+        {
+            return InterpretStereo(metadata);
+        }
+
+        return DetectStereoModeFromFilename(projection, filename);
+    }
+
+    #region Metadata Interpretation
+
+    private static VideoProjectionType InterpretProjection(SphericalVideoMetadata meta, int width, int height)
+    {
+        if (!meta.HasMetadata) return VideoProjectionType.Flat;
+
+        if (meta.ProjectionType == "equirectangular")
+        {
+            if (!meta.IsFullSphere)
+                return VideoProjectionType.Dome180;
+
+            // Full sphere equirectangular, but check resolution for 180 SBS case
+            // 180 SBS videos have 1:1 ratio (each eye is 1:1, total is 2:1 but each half is 1:1)
+            // True 360 mono is 2:1, true 360 SBS is 1:1 but with stereo mode set
+            if (width > 0 && height > 0)
+            {
+                float ratio = (float)width / height;
+                // 1:1 ratio with stereo left-right = VR180 SBS
+                if (ratio >= 0.9f && ratio <= 1.1f && meta.StereoMode == 2)
+                    return VideoProjectionType.Dome180;
+            }
+
+            // XMP: check FullPanoWidth vs CroppedAreaImageWidth
+            if (meta.FullPanoWidthPixels > 0 && meta.CroppedAreaImageWidthPixels > 0)
+            {
+                float cropRatio = (float)meta.CroppedAreaImageWidthPixels / meta.FullPanoWidthPixels;
+                if (cropRatio <= 0.75f) // Cropped area is less than 75% of full pano = 180
+                    return VideoProjectionType.Dome180;
+            }
+
+            return VideoProjectionType.Sphere360;
+        }
+
+        if (meta.ProjectionType == "cubemap")
+            return VideoProjectionType.Sphere360;
+
+        return VideoProjectionType.Flat;
+    }
+
+    private static StereoMode InterpretStereo(SphericalVideoMetadata meta)
+    {
+        if (!meta.HasMetadata || meta.StereoMode < 0) return StereoMode.Mono;
+
+        switch (meta.StereoMode)
+        {
+            case 0: return StereoMode.Mono;
+            case 1: return StereoMode.OverUnder;
+            case 2: return StereoMode.SideBySide;
+            default: return StereoMode.Mono;
+        }
+    }
+
+    #endregion
+
+    #region Filename & Resolution Detection (existing logic)
+
+    private static VideoProjectionType DetectProjectionFromFilenameAndResolution(string filename, int width, int height)
+    {
+        string name = StripDownloadPrefixes(Path.GetFileNameWithoutExtension(filename)?.ToLowerInvariant() ?? "");
 
         // 1. Check filename patterns for immersive projections
 
@@ -35,45 +142,43 @@ public static class ProjectionDetector
             // 2:1 ratio is typical for 360 equirectangular
             if (Mathf.Approximately(ratio, 2f) || (ratio >= 1.9f && ratio <= 2.1f))
             {
-                if (width >= 3840) // 4K+ is likely 360
+                if (width >= 1920) // Many YouTube 360 videos are 1920x960 or 2048x1024
                     return VideoProjectionType.Sphere360;
             }
 
-            // 1:1 ratio is typical for 180 equirectangular (Mono) or 180 Stereo (if 2:1 each eye? No, usually 180 SBS is 2:1 total)
+            // 1:1 ratio is typical for 180 equirectangular
             if (Mathf.Approximately(ratio, 1f) || (ratio >= 0.9f && ratio <= 1.1f))
             {
                 return VideoProjectionType.Dome180;
             }
         }
 
-        // 3. Default to flat screen (SBS/OU Flat will also reach here)
+        // 3. Default to flat screen
         return VideoProjectionType.Flat;
     }
 
-    /// <summary>
-    /// Detect stereo mode from filename and video properties
-    /// </summary>
-    public static StereoMode DetectStereoMode(VideoProjectionType projection, string filename)
+    private static StereoMode DetectStereoModeFromFilename(VideoProjectionType projection, string filename)
     {
-        string name = Path.GetFileNameWithoutExtension(filename)?.ToLowerInvariant() ?? "";
+        string name = StripDownloadPrefixes(Path.GetFileNameWithoutExtension(filename)?.ToLowerInvariant() ?? "");
 
         // VR180 is almost always SBS
         if (projection == VideoProjectionType.Dome180 && (name.Contains("vr180") || name.Contains("_180_sbs") || name.Contains("_180sbs")))
             return StereoMode.SideBySide;
 
-        // Explicit patterns
-        if (ContainsAny(name, "sbs", "side_by_side", "sidebyside", "_lr", "_leftright"))
+        // Explicit patterns - use delimiter-prefixed patterns to avoid false positives
+        // (e.g. "sbs" could match words, "ou" matches "YouTube", "about", etc.)
+        if (ContainsAny(name, "_sbs", "-sbs", ".sbs", "side_by_side", "sidebyside", "_lr", "_leftright"))
             return StereoMode.SideBySide;
 
-        if (ContainsAny(name, "ou", "topbottom", "overunder", "over_under", "_tb"))
+        if (ContainsAny(name, "_ou", "-ou", ".ou", "_tb", "-tb", "topbottom", "overunder", "over_under", "top_bottom"))
             return StereoMode.OverUnder;
-
-        // Logic check: if it's 360 and has 2:1 ratio, it might be mono.
-        // If it's 360 and has 1:1 ratio, it's likely OU/TB... 
-        // But naming is more reliable in VR.
 
         return StereoMode.Mono;
     }
+
+    #endregion
+
+    #region Display Helpers
 
     /// <summary>
     /// Get user-friendly name for projection type
@@ -161,6 +266,8 @@ public static class ProjectionDetector
         }
     }
 
+    #endregion
+
     #region Private Helpers
     private static bool ContainsAny(string text, params string[] patterns)
     {
@@ -170,6 +277,24 @@ public static class ProjectionDetector
                 return true;
         }
         return false;
+    }
+
+    /// <summary>
+    /// Strip common download site prefixes from filenames to avoid false pattern matches.
+    /// e.g. "ytdown.com_youtube_MyVideo" → "MyVideo"
+    /// </summary>
+    private static string StripDownloadPrefixes(string name)
+    {
+        string[] prefixes = {
+            "ytdown.com_youtube_", "ytdown.com_",
+            "fdownloader.net_", "savefrom.net_"
+        };
+        foreach (var prefix in prefixes)
+        {
+            if (name.StartsWith(prefix))
+                return name.Substring(prefix.Length);
+        }
+        return name;
     }
     #endregion
 }

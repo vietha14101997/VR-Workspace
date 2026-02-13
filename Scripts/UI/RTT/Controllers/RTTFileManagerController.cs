@@ -1704,6 +1704,21 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
     {
         // Side panels now fade in with main frame via coordinated animation in RTTAppManager
         Debug.Log("[RTTFileManagerController] OnAppShown called");
+
+        // OPTIMIZATION: Refresh current directory if it has changed since last view
+        // This ensures the file list is up-to-date with new/deleted files
+        if (!string.IsNullOrEmpty(_currentPath) && _currentPath != "root")
+        {
+            string absolutePath = FileSystemService.GetAbsolutePath(_currentPath);
+
+            // Check if folder has been modified (new/deleted files)
+            if (AppStateCache.Instance != null &&
+                AppStateCache.Instance.HasPathChanged(absolutePath, DateTime.Now.AddMinutes(-1).Ticks))
+            {
+                Debug.Log($"[RTTFileManagerController] OnAppShown: Directory changed, refreshing: {_currentPath}");
+                NavigateTo(_currentPath);
+            }
+        }
     }
 
     #region State Caching Support
