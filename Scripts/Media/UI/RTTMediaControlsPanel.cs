@@ -57,7 +57,9 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     public event Action<float> OnVolumeChanged;
     public event Action<float> OnSpeedChanged;
     public event Action OnBackClicked;
+#pragma warning disable CS0067 // Event not yet used - reserved for future playlist feature
     public event Action OnPlaylistClicked;
+#pragma warning restore CS0067
     public event Action OnVRModeClicked;
     public event Action OnHeadsetModeClicked;
     public event Action OnRecenterClicked;

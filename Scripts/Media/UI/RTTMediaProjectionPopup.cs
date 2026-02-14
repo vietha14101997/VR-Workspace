@@ -70,7 +70,9 @@ public class RTTMediaProjectionPopup : MonoBehaviour
     public event Action<VideoProjectionType, StereoMode> OnSettingsChanged;
     public event Action<MonitorType> OnMonitorTypeChanged;
     public event Action<EnvironmentType> OnEnvironmentChanged;
+#pragma warning disable CS0067 // Event not yet used - reserved for future close handling
     public event Action OnCloseRequested;
+#pragma warning restore CS0067
     #endregion
 
     #region Private Fields

@@ -85,6 +85,7 @@ public class MediaLibraryService : MonoBehaviour
         LoadHistory();
 
         // Make cache loading conditional
+#pragma warning disable CS0162 // Unreachable code - ENABLE_CACHE_LOADING is compile-time constant
         if (ENABLE_CACHE_LOADING)
         {
             // Load cache asynchronously to avoid blocking main thread
@@ -96,6 +97,7 @@ public class MediaLibraryService : MonoBehaviour
             IsCacheLoaded = true;
             Debug.Log("[MediaLibraryService] Cache loading disabled - will scan on demand");
         }
+#pragma warning restore CS0162
     }
     #endregion
 
@@ -304,6 +306,16 @@ public class MediaLibraryService : MonoBehaviour
         // Fallback to directory scanning for Editor/Desktop
         yield return ScanUsingDirectories();
 #endif
+
+        // Deduplicate by path - prevents duplicates from MediaStore cross-table queries
+        // (same file can appear in video, image, and audio tables on some Android devices)
+        int beforeDedup = AllVideos.Count;
+        var seenPaths = new HashSet<string>();
+        AllVideos = AllVideos.Where(v => seenPaths.Add(v.Path)).ToList();
+        if (AllVideos.Count < beforeDedup)
+        {
+            Debug.Log($"[MediaLibraryService] Deduplicated: {beforeDedup} -> {AllVideos.Count} (removed {beforeDedup - AllVideos.Count} duplicates)");
+        }
 
         // Sort by name
         AllVideos = AllVideos.OrderBy(v => v.Title).ToList();

@@ -60,8 +60,6 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
     // Pending page to navigate after data loads (for category switching)
     private int? _pendingPageNavigation = null;
 
-    // Flag to indicate category switch needs fade animation
-    private bool _pendingCategoryFade = false;
     private bool _fadeOutComplete = false;
     private Coroutine _categoryChangeCoroutine = null;
 
@@ -566,8 +564,26 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
     private void HandleScanComplete(List<MediaVideoInfo> videos)
     {
         // Debug.Log($"[RTTMediaLibraryController] HandleScanComplete: {videos.Count} files");
-        _allVideos = videos;
+        // IMPORTANT: Create a copy to avoid sharing the same reference as MediaLibraryService.AllVideos.
+        // Sharing the reference causes double-add bugs when background scan modifies AllVideos
+        // and HandleNewItemsDetected also adds to _allVideos (which would be the same list).
+        _allVideos = new List<MediaVideoInfo>(videos);
+
+        // Update prepared data buffer so BindPreparedData uses fresh data
+        // (prevents stale empty buffer from pre-init clearing scan results)
+        if (videos.Count > 0)
+        {
+            _preparedDataBuffer = new List<MediaVideoInfo>(videos);
+            _isDataReady = true;
+        }
+
         ApplyFilters();
+
+        // Cache state after scan completes
+        if (SupportsStateCaching)
+        {
+            CacheCurrentState();
+        }
     }
 
     /// <summary>
@@ -580,7 +596,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
 
         Debug.Log($"[RTTMediaLibraryController] New items detected: {newItems.Count}");
 
-        // Add new items to local list
+        // Add new items to local list (safe because _allVideos is always a separate copy)
         _allVideos.AddRange(newItems);
 
         // Re-apply filters to include new items (will update display)
@@ -678,10 +694,12 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
         RefreshLibrary();
 
         // If no cached items, start scan immediately
+        // Note: RefreshLibrary() above already calls ScanMediaLibrary() when _allVideos is empty,
+        // so this is a safety net. ScanMediaLibrary blocks duplicate calls via IsScanning check.
         if (cachedCount == 0)
         {
             Debug.Log("[RTTMediaLibraryController] Starting fresh scan (no cache)");
-            _libraryService?.ScanMediaLibrary(OnScanComplete);
+            _libraryService?.ScanMediaLibrary();
         }
         else if (!_waitingForInitialBinding)
         {
@@ -745,7 +763,9 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
         if (_allVideos.Count == 0 && !_libraryService.IsScanning)
         {
             Debug.Log("[RTTMediaLibraryController] No data available, starting scan...");
-            _libraryService.ScanMediaLibrary(OnScanComplete);
+            // Don't pass OnScanComplete as callback - we already subscribe to the OnScanComplete EVENT
+            // via HandleScanComplete. Passing both causes double ApplyFilters() on scan completion.
+            _libraryService.ScanMediaLibrary();
         }
         else if (_libraryService.IsScanning)
         {
@@ -812,24 +832,8 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
         // Update UI to show scanning state
         _view?.UpdateItemCount(0);
 
-        // Start fresh scan
-        _libraryService.ScanMediaLibrary(OnScanComplete);
-    }
-
-    /// <summary>
-    /// Called when media scan completes.
-    /// </summary>
-    private void OnScanComplete(List<MediaVideoInfo> videos)
-    {
-        _allVideos = videos;
-        // Debug.Log($"[RTTMediaLibraryController] Scan complete: {_allVideos.Count} videos");
-        ApplyFilters();
-
-        // Cache state after scan completes
-        if (SupportsStateCaching)
-        {
-            CacheCurrentState();
-        }
+        // Start fresh scan (HandleScanComplete event will update UI when done)
+        _libraryService.ScanMediaLibrary();
     }
 
     /// <summary>
@@ -1575,7 +1579,7 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
         if (_allVideos.Count == 0 && _libraryService != null && !_libraryService.IsScanning)
         {
             // Debug.Log("[RTTMediaLibraryController] No videos loaded, triggering scan from category selection...");
-            _libraryService.ScanMediaLibrary(OnScanComplete);
+            _libraryService.ScanMediaLibrary();
             return;
         }
 
@@ -1618,7 +1622,6 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
     {
         // Reset flags
         _fadeOutComplete = false;
-        _pendingCategoryFade = true;
 
         // === PARALLEL: Start fade out AND data filtering simultaneously ===
 
@@ -1637,7 +1640,6 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
 
         // Fade out complete - start fade in immediately
         // Data may still be loading but will update view seamlessly
-        _pendingCategoryFade = false;
         _view?.FadeInContent();
 
         _categoryChangeCoroutine = null;
