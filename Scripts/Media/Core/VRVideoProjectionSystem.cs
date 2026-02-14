@@ -100,8 +100,11 @@ public class VRVideoProjectionSystem : MonoBehaviour
         {
             _projectionRoot.position = position;
             _projectionRoot.rotation = rotation;
-            // New target position invalidates any saved flat transform from previous session
-            _hasSavedFlatTransform = false;
+            // Always save as flat reference — used for controls alignment in immersive mode
+            // and for restoring flat screen position when switching back from immersive
+            _savedFlatPosition = position;
+            _savedFlatRotation = rotation;
+            _hasSavedFlatTransform = true;
             Debug.Log($"[VRVideoProjectionSystem] Set target position: {position}, rotation: {rotation.eulerAngles}");
         }
     }
@@ -181,9 +184,9 @@ public class VRVideoProjectionSystem : MonoBehaviour
         ActiveRenderer.SetStereoMode(stereo);
         ActiveRenderer.UpdateDisplay(_currentSettings);
 
-        // Align immersive sphere center to the flat screen direction (from camera).
-        // Only on flat→immersive transition; immersive→immersive keeps current rotation.
-        if (willBeImmersive && !wasImmersive && ActiveRenderer is ImmersiveSphereRenderer immersiveRenderer && _cameraRig != null)
+        // Align immersive sphere center to the saved flat screen direction (menu frame).
+        // Runs for any transition TO immersive (flat→immersive AND immersive→immersive on new video).
+        if (willBeImmersive && _hasSavedFlatTransform && ActiveRenderer is ImmersiveSphereRenderer immersiveRenderer && _cameraRig != null)
         {
             Vector3 toScreen = _savedFlatPosition - _cameraRig.position;
             toScreen.y = 0;
