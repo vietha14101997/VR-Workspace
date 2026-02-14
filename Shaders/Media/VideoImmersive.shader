@@ -9,7 +9,7 @@ Shader "VRWorkspace/Media/VideoImmersive"
 
         [Header(Projection)]
         _ProjectionMode ("Projection Mode", Float) = 0  // 0=Equirect360, 1=Equirect180
-        _FOV ("Field of View", Range(90, 360)) = 180    // Horizontal FOV for 180 mode
+        _FOV ("Field of View", Range(60, 360)) = 180    // Visible FOV (lower = more zoom)
         _Rotation ("Rotation Offset", Float) = 0        // Y-axis rotation (degrees)
         _Tilt ("Tilt Offset", Float) = 0                // X-axis tilt (degrees)
         _FadeSharpness ("Fade Sharpness", Range(1, 20)) = 8  // Back hemisphere fade for 180 mode
@@ -61,6 +61,8 @@ Shader "VRWorkspace/Media/VideoImmersive"
 
             float _StereoMode;
             float _EyeIndex;
+
+            float4 _CameraForward;  // Set from C# each frame (camera look direction)
 
             // ===== Structures =====
             struct appdata
@@ -147,6 +149,34 @@ Shader "VRWorkspace/Media/VideoImmersive"
                 );
             }
 
+            // ===== Helper: Spherical Zoom =====
+            // Zooms by scaling angular distance from zoomCenter toward viewDir.
+            // Unlike axis-aligned phi/theta scaling, this produces uniform magnification
+            // without pole convergence or off-axis drift.
+            float3 SphericalZoom(float3 viewDir, float3 zoomCenter, float zoomFactor)
+            {
+                float cosAngle = clamp(dot(viewDir, zoomCenter), -1.0, 1.0);
+                float angle = acos(cosAngle);
+
+                // Perpendicular direction on the great circle from zoomCenter to viewDir
+                float3 perp = viewDir - cosAngle * zoomCenter;
+                float perpLen = length(perp);
+
+                if (perpLen < 0.0001)
+                {
+                    // viewDir is at or opposite zoomCenter — return as-is
+                    return viewDir;
+                }
+
+                perp /= perpLen;
+
+                // Scale angular distance (larger zoomFactor = more magnification)
+                float newAngle = angle / zoomFactor;
+
+                // Reconstruct direction at reduced angle from zoomCenter
+                return zoomCenter * cos(newAngle) + perp * sin(newAngle);
+            }
+
             // ===== Helper: Stereo UV Offset =====
             float2 GetStereoUV(float2 uv, float stereoMode, float eyeIndex)
             {
@@ -186,36 +216,45 @@ Shader "VRWorkspace/Media/VideoImmersive"
                 if (_ProjectionMode > 0.5)
                 {
                     // === Equirect 180 mode ===
-                    // Uses viewDir-based mapping (needed for angular clamping + back fade)
                     viewDir = RotateDirection(viewDir, _Rotation, _Tilt);
+
+                    // Fade based on original direction (before zoom) — keeps back hemisphere hidden
+                    alpha = saturate(viewDir.z * _FadeSharpness + 0.5);
+
+                    // Spherical zoom centered on camera's look direction
+                    float zoomFactor = 180.0 / max(_FOV, 1.0);
+                    if (zoomFactor > 1.001)
+                    {
+                        float3 zoomCenter = normalize(RotateDirection(_CameraForward.xyz, _Rotation, _Tilt));
+                        viewDir = SphericalZoom(viewDir, zoomCenter, zoomFactor);
+                    }
 
                     float phi = atan2(viewDir.x, viewDir.z);
                     float theta = asin(clamp(viewDir.y, -1.0, 1.0));
 
-                    float fovRad = _FOV * 0.01745329 * 0.5;  // Half FOV in radians
-
-                    equirectUV.x = (phi / fovRad) * 0.5 + 0.5;
+                    // Standard 180° equirectangular UV mapping (no angle scaling)
+                    float baseFovRad = 3.14159265 * 0.5;
+                    equirectUV.x = (phi / baseFovRad) * 0.5 + 0.5;
                     equirectUV.y = 0.5 + (theta / (3.14159265 * 0.5)) * 0.5;
-
-                    // Clamp UV to valid [0,1] range
                     equirectUV = saturate(equirectUV);
-
-                    // Fade out back hemisphere smoothly
-                    alpha = saturate(viewDir.z * _FadeSharpness + 0.5);
                 }
                 else
                 {
                     // === Equirect 360 mode ===
-                    // Use viewDir-based mapping for correct pole rendering
-                    // (Mesh UV causes pinwheel distortion at poles due to UV interpolation)
                     viewDir = RotateDirection(viewDir, _Rotation, _Tilt);
 
-                    // Convert view direction to equirectangular UV
-                    // phi: horizontal angle (-PI to PI) -> U (0 to 1)
-                    // theta: vertical angle (-PI/2 to PI/2) -> V (0 to 1)
+                    // Spherical zoom centered on camera's look direction
+                    float zoomFactor = 360.0 / max(_FOV, 1.0);
+                    if (zoomFactor > 1.001)
+                    {
+                        float3 zoomCenter = normalize(RotateDirection(_CameraForward.xyz, _Rotation, _Tilt));
+                        viewDir = SphericalZoom(viewDir, zoomCenter, zoomFactor);
+                    }
+
                     float phi = atan2(viewDir.x, viewDir.z);
                     float theta = asin(clamp(viewDir.y, -1.0, 1.0));
 
+                    // Standard 360° equirectangular UV mapping (no angle scaling)
                     equirectUV.x = phi / (2.0 * 3.14159265) + 0.5;
                     equirectUV.y = theta / 3.14159265 + 0.5;
                 }

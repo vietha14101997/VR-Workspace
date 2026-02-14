@@ -325,6 +325,7 @@ public class ImmersiveSphereRenderer : MonoBehaviour, IProjectionRenderer
         _material.SetFloat("_Rotation", 0);
         _material.SetFloat("_Tilt", 0);
         _material.SetFloat("_FadeSharpness", 8);
+        _material.SetVector("_CameraForward", Vector3.forward);
 
         _meshRenderer.material = _material;
         _meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -417,6 +418,17 @@ public class ImmersiveSphereRenderer : MonoBehaviour, IProjectionRenderer
     #endregion
 
     #region Unity Lifecycle
+    private void Update()
+    {
+        if (!_isActive || _material == null) return;
+
+        Camera cam = Camera.main;
+        if (cam != null)
+        {
+            _material.SetVector("_CameraForward", cam.transform.forward);
+        }
+    }
+
     private void OnDestroy()
     {
         Dispose();
