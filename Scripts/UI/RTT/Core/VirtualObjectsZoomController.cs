@@ -23,10 +23,10 @@ public class VirtualObjectsZoomController : MonoBehaviour
     [SerializeField] private float minDistance = 1.0f;
 
     [Tooltip("Maximum distance from camera (farthest zoom)")]
-    [SerializeField] private float maxDistance = 2.0f;
+    [SerializeField] private float maxDistance = 2.5f;
 
     [Tooltip("Default/initial distance from camera")]
-    [SerializeField] private float defaultDistance = 1.8f;
+    [SerializeField] private float defaultDistance = 2.0f;
 
     [Tooltip("Distance change per zoom step")]
     [SerializeField] private float zoomStep = 0.1f;

@@ -295,8 +295,8 @@ public class VRVideoPlayerController : MonoBehaviour
 
         if (isImmersive)
         {
-            // Immersive: place controls in front of camera at fixed distance (1.8m)
-            newPos = camPos + camForward * 1.8f;
+            // Immersive: place controls in front of camera at comfortable stereo distance
+            newPos = camPos + camForward * 2.0f;
             newPos.y = camPos.y - 0.625f;
             facingDir = camForward;
         }

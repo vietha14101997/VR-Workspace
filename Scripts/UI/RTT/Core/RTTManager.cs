@@ -186,7 +186,7 @@ public class RTTManager : MonoBehaviour
 
     #region Properties - Zoom
     /// <summary>Get current zoom distance from camera</summary>
-    public float ZoomDistance => VirtualObjectsZoomController.Instance?.CurrentDistance ?? 1.8f;
+    public float ZoomDistance => VirtualObjectsZoomController.Instance?.CurrentDistance ?? 2.0f;
 
     /// <summary>Get minimum zoom distance</summary>
     public float ZoomMinDistance => VirtualObjectsZoomController.Instance?.MinDistance ?? 1.0f;

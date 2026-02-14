@@ -23,13 +23,17 @@ public static class ProjectionDetector
             projection = InterpretProjection(metadata, width, height);
             stereo = InterpretStereo(metadata);
 
-            Debug.Log($"[ProjectionDetector] Metadata detected ({metadata.Source}): {projection}, {stereo}");
+            Debug.Log($"[ProjectionDetector] Metadata detected ({metadata.Source}): " +
+                $"projection={projection}, stereo={stereo}, " +
+                $"projType={metadata.ProjectionType}, fullSphere={metadata.IsFullSphere}, " +
+                $"metaStereo={metadata.StereoMode}, res={width}x{height}");
             return;
         }
 
         // 2. Fall back to filename + resolution
         projection = DetectProjectionFromFilenameAndResolution(filePath, width, height);
         stereo = DetectStereoModeFromFilename(projection, filePath);
+        Debug.Log($"[ProjectionDetector] Filename/resolution fallback: {projection}, {stereo}, res={width}x{height}");
     }
 
     /// <summary>
@@ -75,14 +79,21 @@ public static class ProjectionDetector
             if (!meta.IsFullSphere)
                 return VideoProjectionType.Dome180;
 
-            // Full sphere equirectangular, but check resolution for 180 SBS case
-            // 180 SBS videos have 1:1 ratio (each eye is 1:1, total is 2:1 but each half is 1:1)
-            // True 360 mono is 2:1, true 360 SBS is 1:1 but with stereo mode set
-            if (width > 0 && height > 0)
+            // Full sphere equirectangular, but check for 180 SBS cases.
+            // Common formats:
+            //   180 SBS: 2:1 total (each eye 1:1, e.g. 3840x1920)
+            //   180 SBS: 1:1 total (less common, e.g. 1920x1920 per eye stacked)
+            //   360 Mono: 2:1 total (e.g. 3840x1920)
+            //   360 SBS:  1:1 total (each eye 2:1, combined = 1:1)
+            // Key rule: 2:1 + SBS metadata = 180 SBS (not 360 SBS, which would be 1:1)
+            if (width > 0 && height > 0 && meta.StereoMode == 2)
             {
                 float ratio = (float)width / height;
-                // 1:1 ratio with stereo left-right = VR180 SBS
-                if (ratio >= 0.9f && ratio <= 1.1f && meta.StereoMode == 2)
+                // 2:1 ratio + SBS = 180 SBS (most common VR180 format)
+                if (ratio >= 1.9f && ratio <= 2.1f)
+                    return VideoProjectionType.Dome180;
+                // 1:1 ratio + SBS = also 180 SBS (less common)
+                if (ratio >= 0.9f && ratio <= 1.1f)
                     return VideoProjectionType.Dome180;
             }
 
@@ -134,20 +145,26 @@ public static class ProjectionDetector
         if (ContainsAny(name, "_180", "180x180", "_180_", "180vr", "180degree", "vr180", "_vr180"))
             return VideoProjectionType.Dome180;
 
-        // 2. Use resolution heuristics
+        // 2. Use resolution heuristics (combined with filename SBS hints)
         if (width > 0 && height > 0)
         {
             float ratio = (float)width / height;
+            bool hasSbsHint = ContainsAny(name, "_sbs", "-sbs", ".sbs", "side_by_side", "sidebyside", "_lr", "_leftright");
+            bool hasOuHint = ContainsAny(name, "_ou", "-ou", ".ou", "_tb", "-tb", "topbottom", "overunder", "over_under", "top_bottom");
 
-            // 2:1 ratio is typical for 360 equirectangular
-            if (Mathf.Approximately(ratio, 2f) || (ratio >= 1.9f && ratio <= 2.1f))
+            // 2:1 ratio + SBS hint = 180 SBS (each eye 1:1, total 2:1)
+            // Without SBS hint, 2:1 = 360 equirectangular mono
+            if (ratio >= 1.9f && ratio <= 2.1f)
             {
-                if (width >= 1920) // Many YouTube 360 videos are 1920x960 or 2048x1024
+                if (hasSbsHint)
+                    return VideoProjectionType.Dome180;
+                if (width >= 1920)
                     return VideoProjectionType.Sphere360;
             }
 
-            // 1:1 ratio is typical for 180 equirectangular
-            if (Mathf.Approximately(ratio, 1f) || (ratio >= 0.9f && ratio <= 1.1f))
+            // 1:1 ratio is typical for 180 equirectangular mono
+            // or 360 SBS (each eye 2:1, combined 1:1) — but without metadata we default to 180
+            if (ratio >= 0.9f && ratio <= 1.1f)
             {
                 return VideoProjectionType.Dome180;
             }

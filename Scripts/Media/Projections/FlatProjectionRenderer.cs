@@ -130,7 +130,7 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
         // Dynamic curvature check: if curvature > 0, track actual world distance to camera
         if (_currentCurvature > 0.001f)
         {
-            float actualDistance = 1.8f;
+            float actualDistance = 2.0f;
             if (Camera.main != null)
             {
                 actualDistance = Vector3.ProjectOnPlane(_worldPanel.transform.position - Camera.main.transform.position, Camera.main.transform.up).magnitude;
@@ -365,16 +365,16 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
         if (width <= 0 || height <= 0) return;
 
         // Calculate arc radius
-        // The user wants R to match distance, capped at 1.8m (1800R)
+        // R matches actual viewing distance, capped at 2.0m
         // If _currentCurvature > 0, we use this dynamic radius logic.
-        float arcRadius = 1.8f; // Default cap
-        
+        float arcRadius = 2.0f; // Default cap
+
         // Prefer tracked world distance for dynamic curvature updates
         float effectiveDistance = (_lastTrackedWorldDistance > 0) ? _lastTrackedWorldDistance : _currentSettings.Distance;
 
         if (effectiveDistance > 0)
         {
-            arcRadius = Mathf.Min(effectiveDistance, 1.8f);
+            arcRadius = Mathf.Min(effectiveDistance, 2.0f);
         }
         
         // Ensure radius is not smaller than half-width to avoid invalid Atan

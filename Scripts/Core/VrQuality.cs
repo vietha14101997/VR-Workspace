@@ -15,6 +15,6 @@ public class VrQuality : MonoBehaviour
             ?.GetLoadedSubsystem<XRDisplaySubsystem>();
 
         if (display != null)
-            display.scaleOfAllRenderTargets = 1.5f; // thử 1.3 / 1.4 / 1.5 / 1.6
+            display.scaleOfAllRenderTargets = 1.2f; // Cardboard-friendly: 1.2 balances quality vs FPS
     }
 }

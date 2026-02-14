@@ -60,11 +60,11 @@ public class ImmersiveSphereRenderer : MonoBehaviour, IProjectionRenderer
     private float _shaderRotationOffset = 0f;
 
     // FOV zoom state
-    private float _defaultFOV = 180f;
-    private float _currentFOV = 180f;
-    private const float MIN_FOV = 60f;
+    private float _defaultFOV = 300f;
+    private float _currentFOV = 300f;
+    private const float MIN_FOV = 180f;
     private const float MAX_FOV = 300f;
-    private const float FOV_STEP = 10f;
+    private const float FOV_STEP = 12f;
     #endregion
 
     #region IProjectionRenderer Implementation
@@ -188,8 +188,8 @@ public class ImmersiveSphereRenderer : MonoBehaviour, IProjectionRenderer
     {
         _projectionMode = mode;
 
-        // Set default FOV based on projection mode
-        _defaultFOV = (mode == ProjectionMode.Equirect180) ? 180f : 360f;
+        // Set default FOV — 240 for both modes (min 180, max 300)
+        _defaultFOV = 240f;
         _currentFOV = _defaultFOV;
 
         if (_material != null)
@@ -322,7 +322,7 @@ public class ImmersiveSphereRenderer : MonoBehaviour, IProjectionRenderer
         _material.SetFloat("_StereoMode", 0);
         _material.SetFloat("_UseNV12", 0);
         _material.SetFloat("_ProjectionMode", (float)_projectionMode);
-        _material.SetFloat("_FOV", 180);
+        _material.SetFloat("_FOV", 300);
         _material.SetFloat("_Rotation", 0);
         _material.SetFloat("_Tilt", 0);
         _material.SetFloat("_FadeSharpness", 8);

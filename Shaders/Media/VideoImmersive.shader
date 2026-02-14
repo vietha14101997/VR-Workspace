@@ -9,7 +9,7 @@ Shader "VRWorkspace/Media/VideoImmersive"
 
         [Header(Projection)]
         _ProjectionMode ("Projection Mode", Float) = 0  // 0=Equirect360, 1=Equirect180
-        _FOV ("Field of View", Range(60, 300)) = 180    // Visible FOV (lower = more zoom, higher = zoom out)
+        _FOV ("Field of View", Range(180, 300)) = 240    // Visible FOV (lower = more zoom, higher = zoom out)
         _Rotation ("Rotation Offset", Float) = 0        // Y-axis rotation (degrees)
         _Tilt ("Tilt Offset", Float) = 0                // X-axis tilt (degrees)
         _FadeSharpness ("Fade Sharpness", Range(1, 20)) = 8  // Back hemisphere fade for 180 mode
