@@ -48,7 +48,7 @@ public class VRVideoPlayerController : MonoBehaviour
     private Dictionary<Transform, Vector3> _controlsQuadOriginalScales = new Dictionary<Transform, Vector3>();
 
     // Stereo depth matching for controls in immersive SBS/OU mode
-    private const float STEREO_DEPTH_OFFSET = 0.024f; // ~8m virtual depth (reduces vergence conflict)
+    private const float STEREO_DEPTH_OFFSET = 0.032f; // ~half avg IPD → near-infinity depth (matches immersive sphere)
     private const string STEREO_UI_SHADER = "VRWorkspace/UI/StereoUIPanel";
     #endregion
 
@@ -225,12 +225,9 @@ public class VRVideoPlayerController : MonoBehaviour
         // Configure projection system
         ApplyProjectionSettings(projectionType, stereoMode);
 
-        // Reposition controls for immersive mode on initial playback.
+        // Reposition controls on initial playback (both flat and immersive)
         bool isImmersive = !ProjectionDetector.SupportsScreenSettings(projectionType);
-        if (isImmersive)
-        {
-            RepositionControlsForProjection(true);
-        }
+        RepositionControlsForProjection(isImmersive, forceReposition: true);
 
         // Load video
         if (_playbackEngine != null)
@@ -285,14 +282,12 @@ public class VRVideoPlayerController : MonoBehaviour
         // Update popups if they are active
         _projectionPopup?.SetState(projectionType, ConvertToUIStereo(stereoMode));
 
-        // Reposition controls to match new projection mode
-        // Keep current position when staying in/entering immersive (no visible jump)
-        // Force reposition only when returning to flat (initial play & recenter use default forceReposition=true)
-        RepositionControlsForProjection(isImmersive, forceReposition: !isImmersive);
+        // NOTE: Controls are NOT repositioned here — position stays stable during mode switches.
+        // Repositioning only happens in PlayVideo() (initial) and HandleRecenter() (explicit).
 
-        // Stereo depth matching: shift controls per-eye to reduce vergence conflict in SBS/OU
-        bool needsStereoOffset = isImmersive && stereoMode != StereoMode.Mono;
-        SetControlsStereoDepthOffset(needsStereoOffset ? STEREO_DEPTH_OFFSET : 0f);
+        // Stereo depth offset: always active in immersive (including Mono) so that
+        // switching stereo modes never changes the controls shader — zero visual disruption.
+        SetControlsStereoDepthOffset(isImmersive ? STEREO_DEPTH_OFFSET : 0f);
 
         // Setup/teardown immersive zoom override
         SetupZoomOverride(isImmersive);
@@ -779,22 +774,33 @@ public class VRVideoPlayerController : MonoBehaviour
         var stereo = ConvertFromUIStereo(uiStereo);
         Debug.Log($"[VRVideoPlayerController] Manual projection change: {projection}, {stereo}");
 
-        // Animate scale transition for stereo-only changes in Flat mode
-        bool isCurrentlyFlat = _projectionSystem != null && !_projectionSystem.IsImmersiveProjection();
-        bool isStereoOnlyChange = isCurrentlyFlat
+        // Detect stereo-only changes (same projection type, different stereo mode)
+        bool isStereoOnlyChange = _projectionSystem != null
             && projection == _projectionSystem.CurrentProjection
             && stereo != _projectionSystem.CurrentStereoMode;
+        bool isCurrentlyFlat = _projectionSystem != null && !_projectionSystem.IsImmersiveProjection();
 
-        if (isStereoOnlyChange && _projectionSystem.ActiveRenderer is FlatProjectionRenderer flatRenderer)
+        if (isStereoOnlyChange && isCurrentlyFlat && _projectionSystem.ActiveRenderer is FlatProjectionRenderer flatRenderer)
         {
+            // Flat stereo-only: animated scale transition, no repositioning
             flatRenderer.SetStereoModeAnimated(stereo);
             _projectionSystem.UpdateStereoModeOnly(stereo);
             _projectionPopup?.SetState(projection, ConvertToUIStereo(stereo));
             SetupZoomOverride(false);
             SetControlsStereoDepthOffset(0f); // Flat mode: no stereo depth offset
         }
+        else if (isStereoOnlyChange && !isCurrentlyFlat)
+        {
+            // Immersive stereo-only: lightweight update without full SetProjection()
+            // Avoids re-running sphere alignment which can cause subtle position shifts.
+            // Stereo depth offset stays unchanged (already applied when entering immersive).
+            _projectionSystem.ActiveRenderer?.SetStereoMode(stereo);
+            _projectionSystem.UpdateStereoModeOnly(stereo);
+            _projectionPopup?.SetState(projection, ConvertToUIStereo(stereo));
+        }
         else
         {
+            // Full projection type change
             ApplyProjectionSettings(projection, stereo);
         }
 

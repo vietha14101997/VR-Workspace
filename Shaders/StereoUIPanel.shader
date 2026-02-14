@@ -4,7 +4,7 @@ Shader "VRWorkspace/UI/StereoUIPanel"
     {
         _MainTex ("Sprite Texture", 2D) = "white" {}
         _Color ("Tint", Color) = (1,1,1,1)
-        _StereoOffset ("Stereo Depth Offset", Range(0, 0.05)) = 0
+        _StereoOffset ("Stereo Depth Offset", Range(0, 0.06)) = 0
     }
 
     SubShader
