@@ -43,6 +43,9 @@ public class VRVideoPlayerController : MonoBehaviour
     private MediaVideoInfo? _currentVideo;
     private DisplaySettings _displaySettings;
     private bool _isInitialized = false;
+
+    // Original DisplayQuad scales for controls/overlay frames (for immersive scaling)
+    private Dictionary<Transform, Vector3> _controlsQuadOriginalScales = new Dictionary<Transform, Vector3>();
     #endregion
 
     #region Initialization
@@ -252,6 +255,9 @@ public class VRVideoPlayerController : MonoBehaviour
 
         bool isImmersive = !ProjectionDetector.SupportsScreenSettings(projectionType);
 
+        // Capture previous state BEFORE changing projection
+        bool wasImmersive = _projectionSystem.IsImmersiveProjection();
+
         // Choose appropriate display settings
         _displaySettings = isImmersive ? DisplaySettings.Immersive : DisplaySettings.Default;
 
@@ -276,7 +282,9 @@ public class VRVideoPlayerController : MonoBehaviour
         _projectionPopup?.SetState(projectionType, ConvertToUIStereo(stereoMode));
 
         // Reposition controls to match new projection mode
-        RepositionControlsForProjection(isImmersive);
+        // Keep current position when staying in/entering immersive (no visible jump)
+        // Force reposition only when returning to flat (initial play & recenter use default forceReposition=true)
+        RepositionControlsForProjection(isImmersive, forceReposition: !isImmersive);
 
         // Setup/teardown immersive zoom override
         SetupZoomOverride(isImmersive);
@@ -287,7 +295,7 @@ public class VRVideoPlayerController : MonoBehaviour
     /// For immersive (180/360): centers in front of camera at 2m distance.
     /// For flat: centers below the flat screen position.
     /// </summary>
-    private void RepositionControlsForProjection(bool isImmersive)
+    private void RepositionControlsForProjection(bool isImmersive, bool forceReposition = true)
     {
         Camera cam = Camera.main;
         if (cam == null || _controlsPanel == null) return;
@@ -302,26 +310,47 @@ public class VRVideoPlayerController : MonoBehaviour
         if (camForward.sqrMagnitude < 0.001f) camForward = Vector3.forward;
         camForward.Normalize();
 
-        Vector3 newPos;
-        Vector3 facingDir; // direction FROM camera TOWARD controls (container forward)
+        Vector3 newPos = container.position;
+        Vector3 facingDir = camForward;
+
+        bool keptPosition = false;
 
         if (isImmersive)
         {
-            // Use saved flat position direction (menu frame direction) so controls
-            // align with where the video content center is projected.
-            // Falls back to camera forward if no saved position available.
-            Vector3 contentDir = camForward;
-            if (_projectionSystem != null && _projectionSystem.HasSavedFlatTransform)
+            if (!forceReposition)
             {
-                Vector3 toContent = _projectionSystem.SavedFlatPosition - camPos;
-                toContent.y = 0;
-                if (toContent.sqrMagnitude > 0.001f)
-                    contentDir = toContent.normalized;
+                // Flat→immersive transition: keep current world position (no visible jump)
+                Vector3 currentPos = container.position;
+                Vector3 toControls = currentPos - camPos;
+                toControls.y = 0;
+                float dist = toControls.magnitude;
+
+                if (dist > 0.5f)
+                {
+                    newPos = currentPos;
+                    facingDir = toControls.normalized;
+                    keptPosition = true;
+                }
             }
 
-            newPos = camPos + contentDir * 2.0f;
-            newPos.y = camPos.y - 0.625f;
-            facingDir = contentDir;
+            if (!keptPosition)
+            {
+                // Force reposition or no valid current position:
+                // use saved flat position direction so controls align with video content center
+                Vector3 contentDir = camForward;
+                if (_projectionSystem != null && _projectionSystem.HasSavedFlatTransform)
+                {
+                    Vector3 toContent = _projectionSystem.SavedFlatPosition - camPos;
+                    toContent.y = 0;
+                    if (toContent.sqrMagnitude > 0.001f)
+                        contentDir = toContent.normalized;
+                }
+
+                // Distance 2.5m matches menu button — reduces vergence-accommodation conflict
+                newPos = camPos + contentDir * 2.5f;
+                newPos.y = camPos.y - 0.625f;
+                facingDir = contentDir;
+            }
         }
         else
         {
@@ -344,14 +373,35 @@ public class VRVideoPlayerController : MonoBehaviour
         container.position = newPos;
         container.rotation = Quaternion.LookRotation(facingDir);
 
-        // Reset child frames to local identity
+        // Scale: kept position = 1.0 (same as flat), force repositioned = distance-based
+        float scaleFactor;
+        if (isImmersive && !keptPosition)
+        {
+            Vector3 toContainer = newPos - camPos;
+            toContainer.y = 0;
+            float actualDist = Mathf.Max(toContainer.magnitude, 0.5f);
+            scaleFactor = actualDist / 2.0f;
+        }
+        else
+        {
+            scaleFactor = 1.0f;
+        }
+
         Transform frame = container.Find("VideoControlsFrame");
-        if (frame != null) frame.localRotation = Quaternion.identity;
+        if (frame != null)
+        {
+            frame.localRotation = Quaternion.identity;
+            ScaleFrameQuad(frame, scaleFactor);
+        }
 
         Transform overlay = container.Find("DismissOverlayFrame");
-        if (overlay != null) overlay.localRotation = Quaternion.identity;
+        if (overlay != null)
+        {
+            overlay.localRotation = Quaternion.identity;
+            ScaleFrameQuad(overlay, scaleFactor);
+        }
 
-        Debug.Log($"[VRVideoPlayerController] Controls repositioned (immersive={isImmersive}) at {newPos}");
+        Debug.Log($"[VRVideoPlayerController] Controls repositioned (immersive={isImmersive}, force={forceReposition}, scale={scaleFactor:F2}) at {newPos}");
     }
 
     /// <summary>
@@ -367,6 +417,32 @@ public class VRVideoPlayerController : MonoBehaviour
             current = current.parent;
         }
         return current.name == "VideoControlsContainer" ? current : null;
+    }
+
+    /// <summary>
+    /// Scale an RTTMenuFrame's DisplayQuad to maintain angular size at different distances.
+    /// scaleFactor=1.0 for standard 2m distance, 1.25 for 2.5m immersive distance.
+    /// </summary>
+    private void ScaleFrameQuad(Transform frameTransform, float scaleFactor)
+    {
+        var menuFrame = frameTransform.GetComponent<RTTMenuFrame>();
+        if (menuFrame == null) return;
+
+        var quad = menuFrame.GetDisplayQuad();
+        if (quad == null) return;
+
+        // Store original scale on first access
+        if (!_controlsQuadOriginalScales.ContainsKey(frameTransform))
+        {
+            _controlsQuadOriginalScales[frameTransform] = quad.transform.localScale;
+        }
+
+        Vector3 orig = _controlsQuadOriginalScales[frameTransform];
+        quad.transform.localScale = new Vector3(
+            orig.x * scaleFactor,
+            orig.y * scaleFactor,
+            orig.z
+        );
     }
 
     /// <summary>
