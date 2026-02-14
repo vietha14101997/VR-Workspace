@@ -205,6 +205,15 @@ public class VRVideoProjectionSystem : MonoBehaviour
     }
 
     /// <summary>
+    /// Update stereo mode state without re-applying projection.
+    /// Used when FlatProjectionRenderer handles the animated transition itself.
+    /// </summary>
+    public void UpdateStereoModeOnly(StereoMode stereo)
+    {
+        CurrentStereoMode = stereo;
+    }
+
+    /// <summary>
     /// Set video texture for current projection.
     /// </summary>
     public void SetTexture(Texture texture)

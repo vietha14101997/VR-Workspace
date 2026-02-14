@@ -9,7 +9,7 @@ Shader "VRWorkspace/Media/VideoImmersive"
 
         [Header(Projection)]
         _ProjectionMode ("Projection Mode", Float) = 0  // 0=Equirect360, 1=Equirect180
-        _FOV ("Field of View", Range(180, 300)) = 240    // Visible FOV (lower = more zoom, higher = zoom out)
+        _FOV ("Field of View", Range(180, 420)) = 300    // Visible FOV (lower = more zoom, higher = zoom out)
         _Rotation ("Rotation Offset", Float) = 0        // Y-axis rotation (degrees)
         _Tilt ("Tilt Offset", Float) = 0                // X-axis tilt (degrees)
         _FadeSharpness ("Fade Sharpness", Range(1, 20)) = 8  // Back hemisphere fade for 180 mode
@@ -230,9 +230,13 @@ Shader "VRWorkspace/Media/VideoImmersive"
                     // === Equirect 180 mode ===
                     viewDir = RotateDirection(viewDir, _Rotation, _Tilt);
 
-                    // Zoom centered on camera's look direction
                     float zoomFactor = 180.0 / max(_FOV, 1.0);
-                    float3 zoomCenter = normalize(RotateDirection(_CameraForward.xyz, _Rotation, _Tilt));
+                    // Zoom-in: center on camera look direction (zoom into what you're viewing)
+                    // Zoom-out: center on video front — content stays fixed in space,
+                    // preventing UI elements from appearing to slide across the video.
+                    float3 zoomCenter = (zoomFactor > 1.0)
+                        ? normalize(RotateDirection(_CameraForward.xyz, _Rotation, _Tilt))
+                        : float3(0, 0, 1);
                     viewDir = ZoomDirection(viewDir, zoomCenter, zoomFactor);
 
                     // Fade based on ZOOMED direction — hides anything pushed outside 180° content
@@ -254,9 +258,10 @@ Shader "VRWorkspace/Media/VideoImmersive"
                     // === Equirect 360 mode ===
                     viewDir = RotateDirection(viewDir, _Rotation, _Tilt);
 
-                    // Zoom centered on camera's look direction
                     float zoomFactor = 360.0 / max(_FOV, 1.0);
-                    float3 zoomCenter = normalize(RotateDirection(_CameraForward.xyz, _Rotation, _Tilt));
+                    float3 zoomCenter = (zoomFactor > 1.0)
+                        ? normalize(RotateDirection(_CameraForward.xyz, _Rotation, _Tilt))
+                        : float3(0, 0, 1);
                     viewDir = ZoomDirection(viewDir, zoomCenter, zoomFactor);
 
                     float phi = atan2(viewDir.x, viewDir.z);

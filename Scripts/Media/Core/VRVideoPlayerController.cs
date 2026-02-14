@@ -18,6 +18,11 @@ public class VRVideoPlayerController : MonoBehaviour
     /// containerFormat is non-null when the file is NOT a standard MP4.
     /// </summary>
     public event Action<string, bool, string, string> OnPlaybackFailed;
+    /// <summary>
+    /// Fired when user manually changes projection/stereo settings via the popup.
+    /// Params: (projectionType, stereoMode)
+    /// </summary>
+    public event Action<VideoProjectionType, StereoMode> OnProjectionSettingsUpdated;
     #endregion
 
     #region Properties
@@ -213,6 +218,13 @@ public class VRVideoPlayerController : MonoBehaviour
         // Configure projection system
         ApplyProjectionSettings(projectionType, stereoMode);
 
+        // Reposition controls for immersive mode on initial playback.
+        bool isImmersive = !ProjectionDetector.SupportsScreenSettings(projectionType);
+        if (isImmersive)
+        {
+            RepositionControlsForProjection(true);
+        }
+
         // Load video
         if (_playbackEngine != null)
         {
@@ -272,7 +284,7 @@ public class VRVideoPlayerController : MonoBehaviour
 
     /// <summary>
     /// Reposition the controls container to be centered in front of the video.
-    /// For immersive (180/360): centers in front of camera at fixed distance.
+    /// For immersive (180/360): centers in front of camera at 2m distance.
     /// For flat: centers below the flat screen position.
     /// </summary>
     private void RepositionControlsForProjection(bool isImmersive)
@@ -295,7 +307,9 @@ public class VRVideoPlayerController : MonoBehaviour
 
         if (isImmersive)
         {
-            // Immersive: place controls in front of camera at comfortable stereo distance
+            // Always position controls at 2m for immersive mode.
+            // Controls panel becomes too small at greater distances since RTT quad
+            // sizing can't be externally scaled. Menu button is handled separately.
             newPos = camPos + camForward * 2.0f;
             newPos.y = camPos.y - 0.625f;
             facingDir = camForward;
@@ -616,7 +630,27 @@ public class VRVideoPlayerController : MonoBehaviour
     {
         var stereo = ConvertFromUIStereo(uiStereo);
         Debug.Log($"[VRVideoPlayerController] Manual projection change: {projection}, {stereo}");
-        ApplyProjectionSettings(projection, stereo);
+
+        // Animate scale transition for stereo-only changes in Flat mode
+        bool isCurrentlyFlat = _projectionSystem != null && !_projectionSystem.IsImmersiveProjection();
+        bool isStereoOnlyChange = isCurrentlyFlat
+            && projection == _projectionSystem.CurrentProjection
+            && stereo != _projectionSystem.CurrentStereoMode;
+
+        if (isStereoOnlyChange && _projectionSystem.ActiveRenderer is FlatProjectionRenderer flatRenderer)
+        {
+            flatRenderer.SetStereoModeAnimated(stereo);
+            _projectionSystem.UpdateStereoModeOnly(stereo);
+            _projectionPopup?.SetState(projection, ConvertToUIStereo(stereo));
+            SetupZoomOverride(false);
+        }
+        else
+        {
+            ApplyProjectionSettings(projection, stereo);
+        }
+
+        // Notify VRMediaAppController to reposition menu button for new projection/stereo mode
+        OnProjectionSettingsUpdated?.Invoke(projection, stereo);
     }
 
     private void HandleProjectionChanged(VideoProjectionType newProjection)
@@ -991,26 +1025,11 @@ public class VRVideoPlayerController : MonoBehaviour
             _projectionSystem.RecenterView();
         }
 
-        // Recenter VideoControlsContainer (detached from VirtualObjects to avoid Zoom)
-        if (_controlsPanel != null)
+        // Recenter VideoControlsContainer
+        if (_controlsPanel != null && _projectionSystem != null)
         {
-            // Traverse up to find VideoControlsContainer
-            // Hierarchy: VideoControlsContainer -> VideoControlsFrame -> ContentContainer -> ControlsPanel
-            Transform controlsContainer = _controlsPanel.transform.root; 
-            // Better to find by name or known structure to be safe, or just use the root of the panel prefab if it's the container
-            // In VRMediaAppController: _controlsContainer -> VideoControlsFrame -> Content -> ControlsPanel
-            
-            // Try to find the container via parent traversal
-            Transform current = _controlsPanel.transform;
-            while (current.parent != null && current.name != "VideoControlsContainer")
-            {
-                current = current.parent;
-            }
-
-            if (current.name == "VideoControlsContainer")
-            {
-                RecenterObject(current, cam);
-            }
+            bool isImmersive = !ProjectionDetector.SupportsScreenSettings(_projectionSystem.CurrentProjection);
+            RepositionControlsForProjection(isImmersive);
         }
 
         if (reticle != null)

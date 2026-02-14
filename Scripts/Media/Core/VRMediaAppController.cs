@@ -86,6 +86,13 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
     // Menu button frame (IN VirtualObjects → follows video screen with Zoom)
     private GameObject _menuButtonFrameObject;
+    private Vector3 _menuButtonQuadOriginalScale;
+
+    // Immersive mode: menu button follows camera to stay fixed on the video sphere
+    private bool _menuButtonFollowCamera;
+    private Vector3 _menuButtonOffsetDir;  // unit direction from camera to button
+    private float _menuButtonOffsetDist;   // distance from camera
+    private float _menuButtonOffsetY;      // Y offset from camera eye height
 
     // Controls frame reference for hover detection
     private RTTCanvasBase _controlsCanvasBase;
@@ -171,6 +178,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         {
             _playerController.OnBackToLibrary -= SwitchToLibrary;
             _playerController.OnPlaybackFailed -= HandlePlaybackFailed;
+            _playerController.OnProjectionSettingsUpdated -= HandleProjectionSettingsUpdated;
             Destroy(_playerController.gameObject);
             _playerController = null;
         }
@@ -322,12 +330,20 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         // Position menu button below the video screen (in VirtualObjects, follows zoom)
         if (_menuButtonFrameObject != null && _menuFramePosition != Vector3.zero)
         {
-            // Video screen bottom = _menuFramePosition - 0.5m (half of 1m screen height)
-            // Menu button center below that with a small gap
-            float menuBtnPhysical = 90f / 1200f; // 90px at density 1200
-            Vector3 menuBtnPos = _menuFramePosition + _menuFrameRotation * new Vector3(0, -0.5f - menuBtnPhysical * 1.5f, 0);
-            _menuButtonFrameObject.transform.position = menuBtnPos;
-            _menuButtonFrameObject.transform.rotation = _menuFrameRotation;
+            // Detect projection to position menu button appropriately
+            ProjectionDetector.DetectProjectionAndStereo(
+                video.Path, video.Width, video.Height,
+                out var projType, out _);
+            bool willBeImmersive = !ProjectionDetector.SupportsScreenSettings(projType);
+
+            if (willBeImmersive && Camera.main != null)
+            {
+                PositionMenuButtonImmersive(Camera.main);
+            }
+            else
+            {
+                PositionMenuButtonFlat();
+            }
         }
 
         // Use player controller to handle playback
@@ -565,7 +581,11 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
             var dismissBtn = dismissObj.AddComponent<Button>();
             dismissBtn.transition = Selectable.Transition.None;
-            dismissBtn.onClick.AddListener(() => _controlsPanel?.Hide());
+            dismissBtn.onClick.AddListener(() => {
+                _controlsPanel?.Hide();
+                _playerController?.HideProjectionPopup();
+                _playerController?.HideEnvironmentPopup();
+            });
 
             var col = dismissObj.AddComponent<BoxCollider>();
             col.size = new Vector3(overlayPixels, overlayPixels, 10);
@@ -645,6 +665,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         var menuQuad = menuFrame.GetDisplayQuad();
         if (menuQuad != null)
         {
+            _menuButtonQuadOriginalScale = menuQuad.transform.localScale;
             if (menuQuad.material != null)
                 menuQuad.material.renderQueue = 3100;
             menuQuad.gameObject.layer = vLayer; // Ensure raycast detection on VirtualObjects layer
@@ -723,6 +744,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         _playerController.Initialize(PlaybackEngine, ProjectionSystem, _controlsPanel);
         _playerController.OnBackToLibrary += SwitchToLibrary;
         _playerController.OnPlaybackFailed += HandlePlaybackFailed;
+        _playerController.OnProjectionSettingsUpdated += HandleProjectionSettingsUpdated;
 
         // === 5b. Error Dialog ===
         GameObject errorDialogObj = new GameObject("MediaErrorDialog");
@@ -824,6 +846,113 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
     private void HandleLibraryCloseRequested()
     {
         OnBackClicked?.Invoke();
+    }
+
+    /// <summary>
+    /// Scale the menu button's display quad without affecting the RTT canvas/camera.
+    /// Scaling the frame object breaks RTT rendering (pixelation, lost corners).
+    /// Scaling only the display quad preserves rendering quality while changing world size.
+    /// </summary>
+    private void ScaleMenuButtonQuad(float scaleFactor)
+    {
+        if (_menuButtonFrameObject == null) return;
+
+        var menuFrame = _menuButtonFrameObject.GetComponent<RTTMenuFrame>();
+        if (menuFrame == null) return;
+
+        var quad = menuFrame.GetDisplayQuad();
+        if (quad == null) return;
+
+        quad.transform.localScale = new Vector3(
+            _menuButtonQuadOriginalScale.x * scaleFactor,
+            _menuButtonQuadOriginalScale.y * scaleFactor,
+            _menuButtonQuadOriginalScale.z
+        );
+    }
+
+    /// <summary>
+    /// Position menu button to the LEFT of the video front direction in immersive mode.
+    /// Button follows camera position each frame (via LateUpdate) so it appears
+    /// fixed on the video sphere — no sliding across the video background.
+    /// </summary>
+    private void PositionMenuButtonImmersive(Camera cam)
+    {
+        if (_menuButtonFrameObject == null) return;
+
+        Vector3 camForward = cam.transform.forward;
+        camForward.y = 0;
+        if (camForward.sqrMagnitude < 0.001f) camForward = Vector3.forward;
+        camForward.Normalize();
+
+        // Left = rotate forward -60° around Y axis (not full 90° — visible in peripheral vision)
+        Vector3 leftDir = Quaternion.AngleAxis(-60f, Vector3.up) * camForward;
+        float distance = 2.5f;
+        float scaleFactor = distance / 2.0f; // 1.25x to maintain angular size
+
+        Vector3 menuBtnPos = cam.transform.position + leftDir * distance;
+        menuBtnPos.y = cam.transform.position.y; // eye height
+        _menuButtonFrameObject.transform.position = menuBtnPos;
+        _menuButtonFrameObject.transform.rotation = Quaternion.LookRotation(-leftDir, Vector3.up);
+        ScaleMenuButtonQuad(scaleFactor);
+
+        // Store offset for LateUpdate camera-follow (keeps button fixed on video sphere)
+        _menuButtonFollowCamera = true;
+        _menuButtonOffsetDir = leftDir;
+        _menuButtonOffsetDist = distance;
+        _menuButtonOffsetY = 0f; // eye height = no Y offset
+
+        // Expand DisplayQuad collider for easier reticle targeting in VR
+        var menuFrame = _menuButtonFrameObject.GetComponent<RTTMenuFrame>();
+        if (menuFrame != null)
+        {
+            var quad = menuFrame.GetDisplayQuad();
+            if (quad != null)
+            {
+                var col = quad.GetComponent<BoxCollider>();
+                if (col != null) col.size = new Vector3(3f, 3f, 0.01f);
+            }
+        }
+    }
+
+    private void PositionMenuButtonFlat()
+    {
+        if (_menuButtonFrameObject == null) return;
+
+        float menuBtnPhysical = 90f / 1200f;
+        Vector3 menuBtnPos = _menuFramePosition + _menuFrameRotation * new Vector3(0, -0.5f - menuBtnPhysical * 1.5f, 0);
+        _menuButtonFrameObject.transform.position = menuBtnPos;
+        _menuButtonFrameObject.transform.rotation = _menuFrameRotation;
+        ScaleMenuButtonQuad(1.0f);
+
+        _menuButtonFollowCamera = false;
+
+        // Reset DisplayQuad collider to normal size
+        var menuFrame = _menuButtonFrameObject.GetComponent<RTTMenuFrame>();
+        if (menuFrame != null)
+        {
+            var quad = menuFrame.GetDisplayQuad();
+            if (quad != null)
+            {
+                var col = quad.GetComponent<BoxCollider>();
+                if (col != null) col.size = new Vector3(1f, 1f, 0.01f);
+            }
+        }
+    }
+
+    private void HandleProjectionSettingsUpdated(VideoProjectionType projection, StereoMode stereo)
+    {
+        if (_menuButtonFrameObject == null) return;
+
+        bool isImmersive = !ProjectionDetector.SupportsScreenSettings(projection);
+
+        if (isImmersive && Camera.main != null)
+        {
+            PositionMenuButtonImmersive(Camera.main);
+        }
+        else
+        {
+            PositionMenuButtonFlat();
+        }
     }
 
     private void HandlePlaybackFailed(string error, bool isCodecError, string codecName, string containerFormat)
@@ -1501,9 +1630,19 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
                 _controlsFrameObject.transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
         }
 
-        // Face-to-camera for menu button (stays consistent with the frame)
+        // Menu button: follow camera position in immersive mode (appears fixed on video sphere)
         if (_menuButtonFrameObject != null && _menuButtonFrameObject.activeInHierarchy)
         {
+            if (_menuButtonFollowCamera)
+            {
+                // Immersive: keep button at fixed angular offset from camera center,
+                // matching the video sphere which also follows camera position.
+                Vector3 pos = cam.transform.position + _menuButtonOffsetDir * _menuButtonOffsetDist;
+                pos.y = cam.transform.position.y + _menuButtonOffsetY;
+                _menuButtonFrameObject.transform.position = pos;
+            }
+
+            // Face-to-camera rotation (both flat and immersive)
             Vector3 toCamera = cam.transform.position - _menuButtonFrameObject.transform.position;
             if (toCamera.sqrMagnitude > 0.001f)
                 _menuButtonFrameObject.transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);

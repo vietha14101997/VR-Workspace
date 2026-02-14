@@ -101,6 +101,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     // External world-space menu button + dismiss overlay (managed by VRMediaAppController)
     private GameObject _menuButtonFrameObject;
     private GameObject _overlayFrameObject;
+    private BoxCollider _parentFrameCollider; // Cached collider of parent RTT frame's display quad
 
     // Volume persistence
     private const string PREF_VOLUME = "MediaPlayer_Volume";
@@ -410,6 +411,9 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
 
         // Current time (at left edge)
         _currentTimeText = CreateText(timelineRow.transform, "00:00:00", 36, TextAlignmentOptions.MidlineRight);
+        _currentTimeText.enableAutoSizing = true;
+        _currentTimeText.fontSizeMin = 16;
+        _currentTimeText.fontSizeMax = 36;
         var tLe = _currentTimeText.gameObject.AddComponent<LayoutElement>();
         tLe.minWidth = 160;
         tLe.preferredWidth = 160;
@@ -437,6 +441,9 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
 
         // Total time (at right edge)
         _totalTimeText = CreateText(timelineRow.transform, "00:00:00", 36, TextAlignmentOptions.MidlineLeft);
+        _totalTimeText.enableAutoSizing = true;
+        _totalTimeText.fontSizeMin = 16;
+        _totalTimeText.fontSizeMax = 36;
         var ttLe = _totalTimeText.gameObject.AddComponent<LayoutElement>();
         ttLe.minWidth = 160;
         ttLe.preferredWidth = 160;
@@ -1010,6 +1017,9 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         IsVisible = true;
         ResetAutoHideTimer();
 
+        // Re-enable parent frame's display quad collider (was disabled on hide)
+        SetParentFrameColliderEnabled(true);
+
         // Show overlay, hide menu button (controls visible → overlay catches dismiss clicks)
         if (_overlayFrameObject != null) _overlayFrameObject.SetActive(true);
         if (_menuButtonFrameObject != null) _menuButtonFrameObject.SetActive(false);
@@ -1201,6 +1211,26 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         _canvasGroup.alpha = 0f;
         _canvasGroup.interactable = false;
         _canvasGroup.blocksRaycasts = false;
+
+        // Disable parent frame's display quad collider so it doesn't block
+        // Physics.Raycast from reaching the menu button behind it (at 3.5m).
+        SetParentFrameColliderEnabled(false);
+    }
+
+    private void SetParentFrameColliderEnabled(bool enabled)
+    {
+        if (_parentFrameCollider == null)
+        {
+            var parentFrame = GetComponentInParent<RTTCanvasBase>();
+            if (parentFrame != null)
+            {
+                _parentFrameCollider = parentFrame.GetQuadCollider();
+            }
+        }
+        if (_parentFrameCollider != null)
+        {
+            _parentFrameCollider.enabled = enabled;
+        }
     }
     #endregion
 

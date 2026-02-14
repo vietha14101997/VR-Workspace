@@ -63,7 +63,7 @@ public class ImmersiveSphereRenderer : MonoBehaviour, IProjectionRenderer
     private float _defaultFOV = 300f;
     private float _currentFOV = 300f;
     private const float MIN_FOV = 180f;
-    private const float MAX_FOV = 300f;
+    private const float MAX_FOV = 420f;
     private const float FOV_STEP = 12f;
     #endregion
 
@@ -188,8 +188,10 @@ public class ImmersiveSphereRenderer : MonoBehaviour, IProjectionRenderer
     {
         _projectionMode = mode;
 
-        // Set default FOV — 240 for both modes (min 180, max 300)
-        _defaultFOV = 240f;
+        // Set default FOV per projection mode:
+        // 180°: FOV=300 for comfortable Cardboard viewing (reduces stereo parallax)
+        // 360°: FOV=240 for standard immersive zoom-in
+        _defaultFOV = (mode == ProjectionMode.Equirect180) ? 300f : 240f;
         _currentFOV = _defaultFOV;
 
         if (_material != null)

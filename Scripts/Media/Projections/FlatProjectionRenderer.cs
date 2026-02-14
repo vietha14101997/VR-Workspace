@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 
 /// <summary>
 /// Flat screen projection renderer for standard 2D video.
@@ -91,6 +92,74 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
 
         _worldPanel.stereoMode = mode;
         _worldPanel.Apply();
+    }
+
+    private Coroutine _stereoTransitionCoroutine;
+    private const float STEREO_TRANSITION_DURATION = 0.2f;
+
+    /// <summary>
+    /// Switch stereo mode with scale animation (shrink → switch → grow).
+    /// </summary>
+    public void SetStereoModeAnimated(StereoMode mode)
+    {
+        if (_worldPanel == null) return;
+        if (_stereoTransitionCoroutine != null)
+            StopCoroutine(_stereoTransitionCoroutine);
+        _stereoTransitionCoroutine = StartCoroutine(StereoTransitionCoroutine(mode));
+    }
+
+    private IEnumerator StereoTransitionCoroutine(StereoMode mode)
+    {
+        // 1. Tính trước kích thước đích
+        Vector3 targetScale = CalculateBoardScale(mode);
+        float origW = _worldPanel.width;
+        float origH = _worldPanel.height;
+        float targetW = targetScale.x;
+        float targetH = targetScale.y;
+
+        // 2. Chuyển hình chiếu sang dạng đích trước (width/height giữ nguyên → board scale không đổi)
+        _worldPanel.stereoMode = mode;
+        _worldPanel.Apply();
+
+        // 3. Animation kích thước (EaseOut: nhanh đầu, chậm cuối)
+        float elapsed = 0f;
+        float duration = STEREO_TRANSITION_DURATION * 2f; // 0.4s total
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float linear = Mathf.Clamp01(elapsed / duration);
+            float t = 1f - (1f - linear) * (1f - linear) * (1f - linear); // EaseOutCubic
+            _worldPanel.width = Mathf.Lerp(origW, targetW, t);
+            _worldPanel.height = Mathf.Lerp(origH, targetH, t);
+            _worldPanel.Apply();
+            yield return null;
+        }
+
+        // 4. Gắn kích thước đích
+        _worldPanel.width = targetW;
+        _worldPanel.height = targetH;
+        _worldPanel.Apply();
+
+        _stereoTransitionCoroutine = null;
+    }
+
+    /// <summary>
+    /// Calculate board scale for a given stereo mode without modifying any state.
+    /// Mirrors the logic in UpdateScreenAspect().
+    /// </summary>
+    private Vector3 CalculateBoardScale(StereoMode mode)
+    {
+        float resX = _resolution.x;
+        float resY = _resolution.y;
+
+        if (mode == StereoMode.SideBySide) resX /= 2f;
+        else if (mode == StereoMode.OverUnder) resY /= 2f;
+
+        float aspect = resY > 0 ? resX / resY : 16f / 9f;
+        float baseHeight = 1.0f * _currentSettings.Scale;
+        float baseWidth = baseHeight * aspect;
+
+        return new Vector3(baseWidth, baseHeight, 1f);
     }
 
     public void UpdateDisplay(DisplaySettings settings)
