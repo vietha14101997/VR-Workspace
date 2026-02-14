@@ -9,7 +9,7 @@ Shader "VRWorkspace/Media/VideoImmersive"
 
         [Header(Projection)]
         _ProjectionMode ("Projection Mode", Float) = 0  // 0=Equirect360, 1=Equirect180
-        _FOV ("Field of View", Range(60, 360)) = 180    // Visible FOV (lower = more zoom)
+        _FOV ("Field of View", Range(60, 300)) = 180    // Visible FOV (lower = more zoom, higher = zoom out)
         _Rotation ("Rotation Offset", Float) = 0        // Y-axis rotation (degrees)
         _Tilt ("Tilt Offset", Float) = 0                // X-axis tilt (degrees)
         _FadeSharpness ("Fade Sharpness", Range(1, 20)) = 8  // Back hemisphere fade for 180 mode
@@ -149,32 +149,44 @@ Shader "VRWorkspace/Media/VideoImmersive"
                 );
             }
 
-            // ===== Helper: Spherical Zoom =====
-            // Zooms by scaling angular distance from zoomCenter toward viewDir.
-            // Unlike axis-aligned phi/theta scaling, this produces uniform magnification
-            // without pole convergence or off-axis drift.
-            float3 SphericalZoom(float3 viewDir, float3 zoomCenter, float zoomFactor)
+            // ===== Helper: Zoom Direction =====
+            // Unified zoom: picks the best projection for the zoom direction.
+            // Zoom IN  (zoomFactor > 1): gnomonic/rectilinear — preserves straight lines.
+            // Zoom OUT (zoomFactor < 1): spherical — handles full sphere without edge stretching.
+            float3 ZoomDirection(float3 viewDir, float3 zoomCenter, float zoomFactor)
             {
-                float cosAngle = clamp(dot(viewDir, zoomCenter), -1.0, 1.0);
-                float angle = acos(cosAngle);
-
-                // Perpendicular direction on the great circle from zoomCenter to viewDir
-                float3 perp = viewDir - cosAngle * zoomCenter;
-                float perpLen = length(perp);
-
-                if (perpLen < 0.0001)
+                if (zoomFactor > 1.001)
                 {
-                    // viewDir is at or opposite zoomCenter — return as-is
+                    // === Zoom IN: gnomonic (rectilinear) projection ===
+                    // Projects onto tangent plane at zoomCenter, scales, projects back.
+                    // This preserves straight lines (no barrel distortion).
+                    float d = dot(viewDir, zoomCenter);
+                    if (d > 0.001)
+                    {
+                        float3 offset = (viewDir / d) - zoomCenter;
+                        offset /= zoomFactor;
+                        return normalize(zoomCenter + offset);
+                    }
                     return viewDir;
                 }
+                else if (zoomFactor < 0.999)
+                {
+                    // === Zoom OUT: spherical angle scaling ===
+                    // Scales angular distance from zoomCenter outward.
+                    // Handles the full sphere without the edge-stretching that gnomonic causes.
+                    float cosAngle = clamp(dot(viewDir, zoomCenter), -1.0, 1.0);
+                    float angle = acos(cosAngle);
 
-                perp /= perpLen;
+                    float3 perp = viewDir - cosAngle * zoomCenter;
+                    float perpLen = length(perp);
+                    if (perpLen < 0.0001) return viewDir;
+                    perp /= perpLen;
 
-                // Scale angular distance (larger zoomFactor = more magnification)
-                float newAngle = angle / zoomFactor;
+                    float newAngle = min(angle / zoomFactor, 3.14159265);
+                    return zoomCenter * cos(newAngle) + perp * sin(newAngle);
+                }
 
-                // Reconstruct direction at reduced angle from zoomCenter
-                return zoomCenter * cos(newAngle) + perp * sin(newAngle);
+                return viewDir; // zoomFactor ≈ 1, no change
             }
 
             // ===== Helper: Stereo UV Offset =====
@@ -218,16 +230,15 @@ Shader "VRWorkspace/Media/VideoImmersive"
                     // === Equirect 180 mode ===
                     viewDir = RotateDirection(viewDir, _Rotation, _Tilt);
 
-                    // Fade based on original direction (before zoom) — keeps back hemisphere hidden
-                    alpha = saturate(viewDir.z * _FadeSharpness + 0.5);
-
-                    // Spherical zoom centered on camera's look direction
+                    // Zoom centered on camera's look direction
                     float zoomFactor = 180.0 / max(_FOV, 1.0);
-                    if (zoomFactor > 1.001)
-                    {
-                        float3 zoomCenter = normalize(RotateDirection(_CameraForward.xyz, _Rotation, _Tilt));
-                        viewDir = SphericalZoom(viewDir, zoomCenter, zoomFactor);
-                    }
+                    float3 zoomCenter = normalize(RotateDirection(_CameraForward.xyz, _Rotation, _Tilt));
+                    viewDir = ZoomDirection(viewDir, zoomCenter, zoomFactor);
+
+                    // Fade based on ZOOMED direction — hides anything pushed outside 180° content
+                    // Scale sharpness inversely with zoom: zoom-out → crisper edge (content is smaller)
+                    float effectiveSharpness = _FadeSharpness / max(zoomFactor, 0.1);
+                    alpha = saturate(viewDir.z * effectiveSharpness);
 
                     float phi = atan2(viewDir.x, viewDir.z);
                     float theta = asin(clamp(viewDir.y, -1.0, 1.0));
@@ -243,13 +254,10 @@ Shader "VRWorkspace/Media/VideoImmersive"
                     // === Equirect 360 mode ===
                     viewDir = RotateDirection(viewDir, _Rotation, _Tilt);
 
-                    // Spherical zoom centered on camera's look direction
+                    // Zoom centered on camera's look direction
                     float zoomFactor = 360.0 / max(_FOV, 1.0);
-                    if (zoomFactor > 1.001)
-                    {
-                        float3 zoomCenter = normalize(RotateDirection(_CameraForward.xyz, _Rotation, _Tilt));
-                        viewDir = SphericalZoom(viewDir, zoomCenter, zoomFactor);
-                    }
+                    float3 zoomCenter = normalize(RotateDirection(_CameraForward.xyz, _Rotation, _Tilt));
+                    viewDir = ZoomDirection(viewDir, zoomCenter, zoomFactor);
 
                     float phi = atan2(viewDir.x, viewDir.z);
                     float theta = asin(clamp(viewDir.y, -1.0, 1.0));

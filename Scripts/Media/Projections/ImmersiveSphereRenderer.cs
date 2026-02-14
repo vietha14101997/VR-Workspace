@@ -63,6 +63,7 @@ public class ImmersiveSphereRenderer : MonoBehaviour, IProjectionRenderer
     private float _defaultFOV = 180f;
     private float _currentFOV = 180f;
     private const float MIN_FOV = 60f;
+    private const float MAX_FOV = 300f;
     private const float FOV_STEP = 10f;
     #endregion
 
@@ -207,7 +208,7 @@ public class ImmersiveSphereRenderer : MonoBehaviour, IProjectionRenderer
     /// </summary>
     public void SetFieldOfView(float fov)
     {
-        _currentFOV = Mathf.Clamp(fov, MIN_FOV, _defaultFOV);
+        _currentFOV = Mathf.Clamp(fov, MIN_FOV, MAX_FOV);
         if (_material != null)
         {
             _material.SetFloat("_FOV", _currentFOV);
