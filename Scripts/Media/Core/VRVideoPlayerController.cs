@@ -275,8 +275,8 @@ public class VRVideoPlayerController : MonoBehaviour
         // Update popups if they are active
         _projectionPopup?.SetState(projectionType, ConvertToUIStereo(stereoMode));
 
-        // NOTE: No RepositionControlsForProjection() here — controls stay in place
-        // when switching projection types. Only explicit recenter moves them.
+        // Reposition controls to match new projection mode
+        RepositionControlsForProjection(isImmersive);
 
         // Setup/teardown immersive zoom override
         SetupZoomOverride(isImmersive);
@@ -307,12 +307,21 @@ public class VRVideoPlayerController : MonoBehaviour
 
         if (isImmersive)
         {
-            // Always position controls at 2m for immersive mode.
-            // Controls panel becomes too small at greater distances since RTT quad
-            // sizing can't be externally scaled. Menu button is handled separately.
-            newPos = camPos + camForward * 2.0f;
+            // Use saved flat position direction (menu frame direction) so controls
+            // align with where the video content center is projected.
+            // Falls back to camera forward if no saved position available.
+            Vector3 contentDir = camForward;
+            if (_projectionSystem != null && _projectionSystem.HasSavedFlatTransform)
+            {
+                Vector3 toContent = _projectionSystem.SavedFlatPosition - camPos;
+                toContent.y = 0;
+                if (toContent.sqrMagnitude > 0.001f)
+                    contentDir = toContent.normalized;
+            }
+
+            newPos = camPos + contentDir * 2.0f;
             newPos.y = camPos.y - 0.625f;
-            facingDir = camForward;
+            facingDir = contentDir;
         }
         else
         {

@@ -38,6 +38,10 @@ public class VRVideoProjectionSystem : MonoBehaviour
     private Vector3 _savedFlatPosition;
     private Quaternion _savedFlatRotation;
     private bool _hasSavedFlatTransform = false;
+
+    /// <summary>Saved flat screen position (for controls alignment in immersive mode)</summary>
+    public Vector3 SavedFlatPosition => _savedFlatPosition;
+    public bool HasSavedFlatTransform => _hasSavedFlatTransform;
     #endregion
 
     #region Public API
