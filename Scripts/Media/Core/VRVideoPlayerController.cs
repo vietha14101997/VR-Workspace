@@ -1,6 +1,7 @@
 using UnityEngine;
 using System;
 using System.Collections.Generic;
+using System.IO;
 
 /// <summary>
 /// Controller for VR video playback.
@@ -11,6 +12,12 @@ public class VRVideoPlayerController : MonoBehaviour
     #region Events
     public event Action OnBackToLibrary;
     public event Action<MediaVideoInfo> OnVideoEnded;
+    /// <summary>
+    /// Fired when playback fails with error details.
+    /// Parameters: (errorMessage, isCodecError, codecName, containerFormat)
+    /// containerFormat is non-null when the file is NOT a standard MP4.
+    /// </summary>
+    public event Action<string, bool, string, string> OnPlaybackFailed;
     #endregion
 
     #region Properties
@@ -231,20 +238,21 @@ public class VRVideoPlayerController : MonoBehaviour
     {
         if (_projectionSystem == null) return;
 
+        bool isImmersive = !ProjectionDetector.SupportsScreenSettings(projectionType);
+
         // Choose appropriate display settings
-        _displaySettings = ProjectionDetector.SupportsScreenSettings(projectionType)
-            ? DisplaySettings.Default
-            : DisplaySettings.Immersive;
+        _displaySettings = isImmersive ? DisplaySettings.Immersive : DisplaySettings.Default;
 
         // Flat projection: Distance=0 so screen sits at _projectionRoot position
-        if (ProjectionDetector.SupportsScreenSettings(projectionType))
+        if (!isImmersive)
         {
             _displaySettings.Distance = 0f;
         }
 
         _projectionSystem.SetProjection(projectionType, stereoMode);
         _projectionSystem.UpdateDisplay(_displaySettings);
-        _projectionSystem.RecenterView();
+        // NOTE: No RecenterView() here — sphere center syncs to flat screen direction
+        // automatically in SetProjection(). Explicit recenter only via RecenterRoutine().
 
         // Update environment based on projection type
         if (_environmentController != null)
@@ -254,6 +262,114 @@ public class VRVideoPlayerController : MonoBehaviour
 
         // Update popups if they are active
         _projectionPopup?.SetState(projectionType, ConvertToUIStereo(stereoMode));
+
+        // NOTE: No RepositionControlsForProjection() here — controls stay in place
+        // when switching projection types. Only explicit recenter moves them.
+
+        // Setup/teardown immersive zoom override
+        SetupZoomOverride(isImmersive);
+    }
+
+    /// <summary>
+    /// Reposition the controls container to be centered in front of the video.
+    /// For immersive (180/360): centers in front of camera at fixed distance.
+    /// For flat: centers below the flat screen position.
+    /// </summary>
+    private void RepositionControlsForProjection(bool isImmersive)
+    {
+        Camera cam = Camera.main;
+        if (cam == null || _controlsPanel == null) return;
+
+        // Find VideoControlsContainer by traversing up from controls panel
+        Transform container = FindControlsContainer();
+        if (container == null) return;
+
+        Vector3 camPos = cam.transform.position;
+        Vector3 camForward = cam.transform.forward;
+        camForward.y = 0;
+        if (camForward.sqrMagnitude < 0.001f) camForward = Vector3.forward;
+        camForward.Normalize();
+
+        Vector3 newPos;
+        Vector3 facingDir; // direction FROM camera TOWARD controls (container forward)
+
+        if (isImmersive)
+        {
+            // Immersive: place controls in front of camera at fixed distance (1.8m)
+            newPos = camPos + camForward * 1.8f;
+            newPos.y = camPos.y - 0.625f;
+            facingDir = camForward;
+        }
+        else
+        {
+            // Flat: position controls below the screen, facing same direction as screen
+            Vector3 screenPos = _projectionSystem != null
+                ? _projectionSystem.ProjectionPosition
+                : container.position;
+
+            newPos = screenPos;
+            newPos.y = camPos.y - 0.625f;
+
+            // Face direction = from camera toward screen (horizontal)
+            Vector3 toScreen = screenPos - camPos;
+            toScreen.y = 0;
+            if (toScreen.sqrMagnitude < 0.001f) toScreen = camForward;
+            toScreen.Normalize();
+            facingDir = toScreen;
+        }
+
+        container.position = newPos;
+        container.rotation = Quaternion.LookRotation(facingDir);
+
+        // Reset child frames to local identity
+        Transform frame = container.Find("VideoControlsFrame");
+        if (frame != null) frame.localRotation = Quaternion.identity;
+
+        Transform overlay = container.Find("DismissOverlayFrame");
+        if (overlay != null) overlay.localRotation = Quaternion.identity;
+
+        Debug.Log($"[VRVideoPlayerController] Controls repositioned (immersive={isImmersive}) at {newPos}");
+    }
+
+    /// <summary>
+    /// Find the VideoControlsContainer transform by traversing up from controls panel.
+    /// </summary>
+    private Transform FindControlsContainer()
+    {
+        if (_controlsPanel == null) return null;
+
+        Transform current = _controlsPanel.transform;
+        while (current.parent != null && current.name != "VideoControlsContainer")
+        {
+            current = current.parent;
+        }
+        return current.name == "VideoControlsContainer" ? current : null;
+    }
+
+    /// <summary>
+    /// Setup zoom override so zoom inside video player never affects VirtualObjects.
+    /// Flat: zoom adjusts screen scale. Immersive: zoom adjusts FOV.
+    /// </summary>
+    private void SetupZoomOverride(bool isImmersive)
+    {
+        var zoomController = VirtualObjectsZoomController.Instance;
+        if (zoomController == null) return;
+
+        if (isImmersive && _projectionSystem != null)
+        {
+            zoomController.SetZoomOverride(
+                () => _projectionSystem.ZoomImmersive(-10f),  // zoom in = decrease FOV
+                () => _projectionSystem.ZoomImmersive(10f)    // zoom out = increase FOV
+            );
+        }
+        else
+        {
+            // Flat mode: zoom adjusts screen scale (isolated from VirtualObjects)
+            zoomController.SetZoomOverride(
+                () => SetScreenScale(_displaySettings.Scale + 0.1f),  // zoom in = bigger
+                () => SetScreenScale(_displaySettings.Scale - 0.1f)   // zoom out = smaller
+            );
+        }
     }
 
     private RTTMediaProjectionPopup.StereoMode ConvertToUIStereo(StereoMode mode)
@@ -317,9 +433,12 @@ public class VRVideoPlayerController : MonoBehaviour
         _playbackEngine?.Stop();
         _projectionSystem?.Hide();
 
+        // Clear immersive zoom override
+        VirtualObjectsZoomController.Instance?.ClearZoomOverride();
+
         // Reset environment to default state (preserve user preferences)
         _environmentController?.Reset(true);
-        
+
         HideProjectionPopup();
         HideEnvironmentPopup();
     }
@@ -695,7 +814,99 @@ public class VRVideoPlayerController : MonoBehaviour
     {
         Debug.LogError($"[VRVideoPlayerController] Playback error: {error}");
         Stop();
-        OnBackToLibrary?.Invoke();
+
+        string filePath = _currentVideo.HasValue ? _currentVideo.Value.Path : null;
+        string containerFormat = null;
+        bool isCodecError = false;
+        string codecName = null;
+
+        // Step 1: Check if file uses a non-MP4 container (MPEG-TS, MKV, etc.)
+        if (!string.IsNullOrEmpty(filePath))
+        {
+            containerFormat = DetectContainerFormat(filePath);
+        }
+
+        // Step 2: If it's a standard MP4, check for codec issues
+        if (containerFormat == null)
+        {
+            isCodecError = error.Contains("0xc00d36c4") ||
+                           error.Contains("byte stream type") ||
+                           error.Contains("Cannot read file") ||
+                           (error.Contains("unsupported") && error.Contains("format"));
+
+            if (isCodecError && !string.IsNullOrEmpty(filePath))
+            {
+                codecName = FileMetadataService.TryGetCodecFromHeaders(filePath);
+            }
+        }
+
+        Debug.Log($"[VRVideoPlayerController] Error analysis - container: {containerFormat ?? "MP4"}, isCodecError: {isCodecError}, codec: {codecName ?? "unknown"}");
+
+        // Fire event for UI layer to show error dialog
+        if (OnPlaybackFailed != null)
+        {
+            OnPlaybackFailed.Invoke(error, isCodecError, codecName, containerFormat);
+        }
+        else
+        {
+            OnBackToLibrary?.Invoke();
+        }
+    }
+
+    /// <summary>
+    /// Detect the actual container format by reading file magic bytes.
+    /// Returns null if the file is standard MP4, otherwise returns format name.
+    /// </summary>
+    private static string DetectContainerFormat(string filePath)
+    {
+        try
+        {
+            using (var fs = File.OpenRead(filePath))
+            {
+                if (fs.Length < 12) return null;
+
+                byte[] header = new byte[512];
+                int bytesRead = fs.Read(header, 0, Math.Min(512, (int)fs.Length));
+                if (bytesRead < 8) return null;
+
+                // Check for standard MP4/MOV: ftyp atom at offset 4
+                if (header[4] == 0x66 && header[5] == 0x74 && header[6] == 0x79 && header[7] == 0x70)
+                    return null; // Standard MP4
+
+                // Check for MKV/WebM: EBML signature 1A 45 DF A3
+                for (int i = 0; i < bytesRead - 4; i++)
+                {
+                    if (header[i] == 0x1A && header[i + 1] == 0x45 && header[i + 2] == 0xDF && header[i + 3] == 0xA3)
+                        return "MKV/WebM";
+                }
+
+                // Check for MPEG-TS: sync byte 0x47 (search in first 256 bytes)
+                if (bytesRead >= 188)
+                {
+                    for (int i = 0; i < bytesRead - 188; i++)
+                    {
+                        if (header[i] == 0x47 && header[i + 188] == 0x47)
+                            return "MPEG-TS";
+                    }
+                }
+
+                // Check for AVI: RIFF....AVI
+                if (header[0] == 0x52 && header[1] == 0x49 && header[2] == 0x46 && header[3] == 0x46)
+                    return "AVI";
+
+                // Check for FLV: FLV signature
+                if (header[0] == 0x46 && header[1] == 0x4C && header[2] == 0x56)
+                    return "FLV";
+
+                // Not recognized - might be MP4 with unusual structure or corrupted
+                return "Unknown";
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[VRVideoPlayerController] Failed to detect container format: {ex.Message}");
+            return null;
+        }
     }
 
     private void HandleStateChanged(VideoPlaybackEngine.PlaybackState state)
@@ -914,6 +1125,9 @@ public class VRVideoPlayerController : MonoBehaviour
 
         UnwireProjectionEvents();
         UnwireEnvironmentEvents();
+
+        // Clear zoom override
+        VirtualObjectsZoomController.Instance?.ClearZoomOverride();
     }
     #endregion
 

@@ -23,6 +23,7 @@ public class MediaErrorDialog : MonoBehaviour
     public event Action OnRetryClicked;
     public event Action OnBackClicked;
     public event Action OnDismissed;
+    public event Action OnOpenExternalClicked;
     #endregion
 
     #region Error Types
@@ -30,6 +31,7 @@ public class MediaErrorDialog : MonoBehaviour
     {
         FileNotFound,
         CodecNotSupported,
+        UnsupportedContainer,
         NetworkError,
         PermissionDenied,
         UnknownError
@@ -47,7 +49,9 @@ public class MediaErrorDialog : MonoBehaviour
     private TextMeshProUGUI _titleText;
     private TextMeshProUGUI _messageText;
     private Button _retryButton;
+    private TextMeshProUGUI _retryButtonText;
     private Button _backButton;
+    private Button _openExternalButton;
     private Coroutine _fadeCoroutine;
     #endregion
 
@@ -208,8 +212,14 @@ public class MediaErrorDialog : MonoBehaviour
         _backButton = CreateButton(buttonContainer.transform, "Go Back", false);
         _backButton.onClick.AddListener(() => OnBackClicked?.Invoke());
 
-        // Retry button
+        // Open in external player button (hidden by default)
+        _openExternalButton = CreateButton(buttonContainer.transform, "Open in Player", true);
+        _openExternalButton.onClick.AddListener(() => OnOpenExternalClicked?.Invoke());
+        _openExternalButton.gameObject.SetActive(false);
+
+        // Retry button (also used as "Convert & Play")
         _retryButton = CreateButton(buttonContainer.transform, "Retry", true);
+        _retryButtonText = _retryButton.GetComponentInChildren<TextMeshProUGUI>();
         _retryButton.onClick.AddListener(() => OnRetryClicked?.Invoke());
     }
 
@@ -259,11 +269,12 @@ public class MediaErrorDialog : MonoBehaviour
     /// <summary>
     /// Show error dialog with custom message.
     /// </summary>
-    public void Show(string title, string message, bool showRetry = true)
+    public void Show(string title, string message, bool showRetry = true, bool showOpenExternal = false)
     {
         _titleText.text = title;
         _messageText.text = message;
         _retryButton.gameObject.SetActive(showRetry);
+        _openExternalButton.gameObject.SetActive(showOpenExternal);
 
         if (_fadeCoroutine != null)
             StopCoroutine(_fadeCoroutine);
@@ -279,36 +290,43 @@ public class MediaErrorDialog : MonoBehaviour
     {
         string title;
         string message;
-        bool showRetry = true;
+        bool showRetry = false;
+        bool showOpenExternal = false;
 
         switch (errorType)
         {
             case ErrorType.FileNotFound:
                 title = "File Not Found";
                 message = "The video file could not be found. It may have been moved or deleted.";
-                showRetry = false;
                 break;
 
             case ErrorType.CodecNotSupported:
+                title = "Unsupported Codec";
+                message = "This video uses a codec that is not supported by the built-in player.\n\nYou can open it in your system's default video player, or convert it to H.264 (MP4) for compatibility.";
+                showOpenExternal = true;
+                break;
+
+            case ErrorType.UnsupportedContainer:
                 title = "Unsupported Format";
-                message = "This video format is not supported. Try converting it to MP4 (H.264/H.265).";
-                showRetry = false;
+                message = "This video file uses a container format that is not supported by the built-in player.\n\nYou can try opening it in your system's default video player instead.";
+                showOpenExternal = true;
                 break;
 
             case ErrorType.NetworkError:
                 title = "Network Error";
                 message = "Failed to load the video. Please check your connection and try again.";
+                showRetry = true;
                 break;
 
             case ErrorType.PermissionDenied:
                 title = "Permission Denied";
                 message = "Cannot access the video file. Please check file permissions.";
-                showRetry = false;
                 break;
 
             default:
                 title = "Playback Error";
                 message = "An unexpected error occurred while playing the video.";
+                showOpenExternal = true;
                 break;
         }
 
@@ -317,7 +335,26 @@ public class MediaErrorDialog : MonoBehaviour
             message += $"\n\nDetails: {additionalInfo}";
         }
 
-        Show(title, message, showRetry);
+        Show(title, message, showRetry, showOpenExternal);
+    }
+
+    /// <summary>
+    /// Change the retry button label (e.g., "Convert & Play") and make it visible.
+    /// </summary>
+    public void SetRetryLabel(string label)
+    {
+        if (_retryButtonText != null)
+            _retryButtonText.text = label;
+        _retryButton.gameObject.SetActive(true);
+    }
+
+    /// <summary>
+    /// Update the message text while dialog is visible (for download/convert progress).
+    /// </summary>
+    public void UpdateProgress(string message)
+    {
+        if (_messageText != null)
+            _messageText.text = message;
     }
 
     /// <summary>

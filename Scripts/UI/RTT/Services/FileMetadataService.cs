@@ -390,17 +390,42 @@ public class FileMetadataService : MonoBehaviour
         }
         else if (hasFailed || elapsed >= timeout)
         {
-            // Even if VideoPlayer completely fails, try to get SOMETHING
+            // Even if VideoPlayer completely fails, try to get SOMETHING from file headers
             Debug.LogWarning($"[FileMetadataService] VideoPlayer failed, attempting header-only metadata");
 
             string ext = System.IO.Path.GetExtension(filePath)?.ToLowerInvariant();
             if (ext == ".mp4" || ext == ".m4v" || ext == ".mov")
             {
-                double headerDuration = VideoHeaderParser.TryGetDurationFromMP4(filePath);
-                if (headerDuration > 0)
+                var headerInfo = VideoHeaderParser.TryGetVideoInfoFromMP4Headers(filePath);
+                if (headerInfo.Duration > 0)
                 {
-                    metadata.Duration = TimeSpan.FromSeconds(headerDuration);
-                    Debug.Log($"[FileMetadataService] Header-only fallback: duration={headerDuration}s");
+                    metadata.Duration = TimeSpan.FromSeconds(headerInfo.Duration);
+                }
+                if (headerInfo.Width > 0 && headerInfo.Height > 0)
+                {
+                    metadata.Width = headerInfo.Width;
+                    metadata.Height = headerInfo.Height;
+                }
+
+                bool hasAny = headerInfo.Duration > 0 || headerInfo.Width > 0;
+                if (hasAny)
+                {
+                    // Estimate bitrate from file size and duration
+                    if (headerInfo.Duration > 0)
+                    {
+                        try
+                        {
+                            System.IO.FileInfo fi = new System.IO.FileInfo(filePath);
+                            metadata.TotalBitrate = (long)(fi.Length * 8 / headerInfo.Duration);
+                            metadata.DataRate = metadata.TotalBitrate;
+                        }
+                        catch { }
+                    }
+                    Debug.Log($"[FileMetadataService] Header-only fallback: {headerInfo.Width}x{headerInfo.Height}, {headerInfo.Duration:F1}s, codec={headerInfo.Codec ?? "unknown"}");
+                }
+                else
+                {
+                    Debug.LogWarning($"[FileMetadataService] Header parsing also failed for: {System.IO.Path.GetFileName(filePath)}");
                 }
             }
         }
@@ -803,98 +828,345 @@ public class FileMetadataService : MonoBehaviour
         _isProcessingQueue = false;
     }
 
+    #region Public Static Helpers
+    /// <summary>
+    /// Try to detect codec from MP4 file headers without VideoPlayer.
+    /// Returns codec FourCC (e.g., "hev1", "hvc1", "avc1", "av01") or null.
+    /// </summary>
+    public static string TryGetCodecFromHeaders(string filePath)
+    {
+        string ext = Path.GetExtension(filePath)?.ToLowerInvariant();
+        if (ext != ".mp4" && ext != ".m4v" && ext != ".mov") return null;
+
+        try
+        {
+            return VideoHeaderParser.TryGetVideoInfoFromMP4Headers(filePath).Codec;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+    #endregion
+
     #region Video Header Parser
     /// <summary>
-    /// Fallback duration extraction from MP4 file headers.
-    /// Used when VideoPlayer fails for high-resolution videos.
+    /// Fallback metadata extraction from MP4/MOV file headers.
+    /// Used when VideoPlayer fails (unsupported codec, high-res, etc.).
+    /// Traverses nested MP4 atom structure to extract duration, dimensions, and codec.
     /// </summary>
     private static class VideoHeaderParser
     {
-        public static double TryGetDurationFromMP4(string filePath)
+        public struct MP4HeaderInfo
         {
+            public double Duration;
+            public int Width;
+            public int Height;
+            public string Codec;
+        }
+
+        /// <summary>
+        /// Extract comprehensive video info from MP4 headers.
+        /// Returns duration, width, height, and codec FourCC.
+        /// </summary>
+        public static MP4HeaderInfo TryGetVideoInfoFromMP4Headers(string filePath)
+        {
+            var info = new MP4HeaderInfo();
             try
             {
-                using (System.IO.FileStream fs = new System.IO.FileStream(filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read))
-                using (System.IO.BinaryReader reader = new System.IO.BinaryReader(fs))
+                using (var fs = new System.IO.FileStream(filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read))
+                using (var reader = new System.IO.BinaryReader(fs))
                 {
-                    // Find 'mvhd' atom which contains duration
-                    long mvhdPos = FindMP4Atom(reader, fs.Length, "mvhd");
-                    if (mvhdPos < 0) return 0;
+                    long fileLength = fs.Length;
 
-                    fs.Position = mvhdPos + 8;  // Skip size + type
-                    byte version = reader.ReadByte();
-                    reader.ReadBytes(3);  // Skip flags
+                    // 1. Find moov atom first
+                    long moovPos = FindAtomAt(reader, 0, fileLength, "moov");
+                    if (moovPos < 0)
+                    {
+                        Debug.LogWarning("[VideoHeaderParser] moov atom not found");
+                        return info;
+                    }
 
-                    // Skip creation/modification times
-                    if (version == 1)
-                        reader.ReadBytes(16);  // 64-bit timestamps
-                    else
-                        reader.ReadBytes(8);   // 32-bit timestamps
+                    fs.Position = moovPos;
+                    uint moovSize = ReadUInt32BE(reader);
+                    long moovDataStart = moovPos + 8;  // Skip size + type
+                    long moovDataEnd = moovPos + moovSize;
 
-                    // Read timescale and duration
-                    uint timeScale = ReadUInt32BE(reader);
-                    ulong duration = (version == 1) ? ReadUInt64BE(reader) : ReadUInt32BE(reader);
+                    // 2. Extract duration from moov/mvhd
+                    long mvhdPos = FindAtomAt(reader, moovDataStart, moovDataEnd, "mvhd");
+                    if (mvhdPos >= 0)
+                    {
+                        info.Duration = ParseMvhdDuration(reader, mvhdPos);
+                        if (info.Duration > 0)
+                            Debug.Log($"[VideoHeaderParser] Duration from mvhd: {info.Duration:F1}s");
+                    }
 
-                    if (timeScale > 0)
-                        return (double)duration / timeScale;
+                    // 3. Find first video track: moov/trak
+                    long searchPos = moovDataStart;
+                    while (searchPos < moovDataEnd)
+                    {
+                        long trakPos = FindAtomAt(reader, searchPos, moovDataEnd, "trak");
+                        if (trakPos < 0) break;
+
+                        fs.Position = trakPos;
+                        uint trakSize = ReadUInt32BE(reader);
+                        long trakDataStart = trakPos + 8;
+                        long trakDataEnd = trakPos + trakSize;
+
+                        // Check if this is a video track via mdia/hdlr
+                        if (IsVideoTrack(reader, trakDataStart, trakDataEnd))
+                        {
+                            // Extract width/height from tkhd
+                            long tkhdPos = FindAtomAt(reader, trakDataStart, trakDataEnd, "tkhd");
+                            if (tkhdPos >= 0)
+                            {
+                                ParseTkhdDimensions(reader, tkhdPos, out int w, out int h);
+                                if (w > 0 && h > 0)
+                                {
+                                    info.Width = w;
+                                    info.Height = h;
+                                    Debug.Log($"[VideoHeaderParser] Dimensions from tkhd: {w}x{h}");
+                                }
+                            }
+
+                            // Extract codec from mdia/minf/stbl/stsd
+                            info.Codec = ExtractCodecFromTrack(reader, trakDataStart, trakDataEnd);
+                            if (!string.IsNullOrEmpty(info.Codec))
+                                Debug.Log($"[VideoHeaderParser] Codec: {info.Codec}");
+
+                            break; // Found video track, done
+                        }
+
+                        // Move to next trak
+                        searchPos = trakPos + trakSize;
+                    }
                 }
             }
             catch (System.Exception ex)
             {
-                Debug.LogWarning($"[VideoHeaderParser] Failed to parse MP4 duration: {ex.Message}");
+                Debug.LogWarning($"[VideoHeaderParser] Failed to parse MP4 headers: {ex.Message}");
             }
-            return 0;
+            return info;
         }
 
-        private static long FindMP4Atom(System.IO.BinaryReader reader, long endPos, string atomType)
+        /// <summary>
+        /// Legacy method for backward compatibility. Now uses nested traversal.
+        /// </summary>
+        public static double TryGetDurationFromMP4(string filePath)
         {
-            System.IO.FileStream fs = (System.IO.FileStream)reader.BaseStream;
-            long startPos = fs.Position;
+            return TryGetVideoInfoFromMP4Headers(filePath).Duration;
+        }
 
-            byte[] targetType = System.Text.Encoding.ASCII.GetBytes(atomType);
+        /// <summary>
+        /// Find an atom at a specific level within the given range.
+        /// Does NOT recurse into children - searches siblings only.
+        /// </summary>
+        private static long FindAtomAt(System.IO.BinaryReader reader, long startPos, long endPos, string atomType)
+        {
+            var fs = reader.BaseStream;
+            fs.Position = startPos;
+
+            byte[] target = System.Text.Encoding.ASCII.GetBytes(atomType);
 
             while (fs.Position < endPos - 8)
             {
                 long atomPos = fs.Position;
 
-                // Read atom size (4 bytes, big-endian)
                 uint size = ReadUInt32BE(reader);
-                if (size < 8) break; // Invalid atom
 
-                // Read atom type (4 bytes)
+                // Handle extended size (size == 1 means 64-bit size follows)
+                long atomSize;
+                if (size == 1)
+                {
+                    atomSize = (long)ReadUInt64BE(reader);
+                    if (atomSize < 16) break;
+                }
+                else if (size == 0)
+                {
+                    // size 0 means atom extends to end of file
+                    atomSize = endPos - atomPos;
+                }
+                else if (size < 8)
+                {
+                    break; // Invalid atom
+                }
+                else
+                {
+                    atomSize = size;
+                }
+
                 byte[] type = reader.ReadBytes(4);
+                if (type.Length < 4) break;
 
-                // Check if this is the atom we're looking for
-                if (type[0] == targetType[0] && type[1] == targetType[1] &&
-                    type[2] == targetType[2] && type[3] == targetType[3])
+                if (type[0] == target[0] && type[1] == target[1] &&
+                    type[2] == target[2] && type[3] == target[3])
                 {
                     return atomPos;
                 }
 
-                // Skip to next atom
-                fs.Position = atomPos + size;
+                // Move to next sibling atom
+                long nextPos = atomPos + atomSize;
+                if (nextPos <= atomPos) break; // Prevent infinite loop
+                fs.Position = nextPos;
             }
 
             return -1;
         }
 
+        /// <summary>
+        /// Parse duration from mvhd atom (movie header).
+        /// </summary>
+        private static double ParseMvhdDuration(System.IO.BinaryReader reader, long mvhdPos)
+        {
+            reader.BaseStream.Position = mvhdPos + 8; // Skip size + type
+            byte version = reader.ReadByte();
+            reader.ReadBytes(3); // Skip flags
+
+            // Skip creation/modification times
+            if (version == 1)
+                reader.ReadBytes(16); // 64-bit timestamps
+            else
+                reader.ReadBytes(8);  // 32-bit timestamps
+
+            uint timeScale = ReadUInt32BE(reader);
+            ulong duration = (version == 1) ? ReadUInt64BE(reader) : ReadUInt32BE(reader);
+
+            if (timeScale > 0)
+                return (double)duration / timeScale;
+
+            return 0;
+        }
+
+        /// <summary>
+        /// Parse width/height from tkhd atom (track header).
+        /// Width/height are stored as fixed-point 16.16 values.
+        /// </summary>
+        private static void ParseTkhdDimensions(System.IO.BinaryReader reader, long tkhdPos, out int width, out int height)
+        {
+            width = 0;
+            height = 0;
+
+            reader.BaseStream.Position = tkhdPos + 8; // Skip size + type
+            byte version = reader.ReadByte();
+            reader.ReadBytes(3); // Skip flags
+
+            if (version == 1)
+            {
+                reader.ReadBytes(16); // creation_time + modification_time (64-bit)
+                reader.ReadBytes(4);  // track_ID
+                reader.ReadBytes(4);  // reserved
+                reader.ReadBytes(8);  // duration (64-bit)
+            }
+            else
+            {
+                reader.ReadBytes(8);  // creation_time + modification_time (32-bit)
+                reader.ReadBytes(4);  // track_ID
+                reader.ReadBytes(4);  // reserved
+                reader.ReadBytes(4);  // duration (32-bit)
+            }
+
+            reader.ReadBytes(8);  // reserved (2x uint32)
+            reader.ReadBytes(2);  // layer
+            reader.ReadBytes(2);  // alternate_group
+            reader.ReadBytes(2);  // volume
+            reader.ReadBytes(2);  // reserved
+            reader.ReadBytes(36); // matrix (9x int32)
+
+            // Width and height are fixed-point 16.16
+            uint rawWidth = ReadUInt32BE(reader);
+            uint rawHeight = ReadUInt32BE(reader);
+            width = (int)(rawWidth >> 16);
+            height = (int)(rawHeight >> 16);
+        }
+
+        /// <summary>
+        /// Check if a trak atom contains a video track by examining mdia/hdlr handler type.
+        /// </summary>
+        private static bool IsVideoTrack(System.IO.BinaryReader reader, long trakDataStart, long trakDataEnd)
+        {
+            long mdiaPos = FindAtomAt(reader, trakDataStart, trakDataEnd, "mdia");
+            if (mdiaPos < 0) return false;
+
+            reader.BaseStream.Position = mdiaPos;
+            uint mdiaSize = ReadUInt32BE(reader);
+            long mdiaDataStart = mdiaPos + 8;
+            long mdiaDataEnd = mdiaPos + mdiaSize;
+
+            long hdlrPos = FindAtomAt(reader, mdiaDataStart, mdiaDataEnd, "hdlr");
+            if (hdlrPos < 0) return false;
+
+            // hdlr: size(4) + type(4) + version(1) + flags(3) + pre_defined(4) + handler_type(4)
+            reader.BaseStream.Position = hdlrPos + 8 + 4 + 4; // Skip to handler_type
+            byte[] handlerType = reader.ReadBytes(4);
+
+            // "vide" = video track
+            return handlerType.Length == 4 &&
+                   handlerType[0] == (byte)'v' && handlerType[1] == (byte)'i' &&
+                   handlerType[2] == (byte)'d' && handlerType[3] == (byte)'e';
+        }
+
+        /// <summary>
+        /// Extract codec FourCC from mdia/minf/stbl/stsd within a video track.
+        /// </summary>
+        private static string ExtractCodecFromTrack(System.IO.BinaryReader reader, long trakDataStart, long trakDataEnd)
+        {
+            try
+            {
+                // Navigate: trak > mdia > minf > stbl > stsd
+                long mdiaPos = FindAtomAt(reader, trakDataStart, trakDataEnd, "mdia");
+                if (mdiaPos < 0) return null;
+
+                reader.BaseStream.Position = mdiaPos;
+                uint mdiaSize = ReadUInt32BE(reader);
+                long mdiaEnd = mdiaPos + mdiaSize;
+
+                long minfPos = FindAtomAt(reader, mdiaPos + 8, mdiaEnd, "minf");
+                if (minfPos < 0) return null;
+
+                reader.BaseStream.Position = minfPos;
+                uint minfSize = ReadUInt32BE(reader);
+                long minfEnd = minfPos + minfSize;
+
+                long stblPos = FindAtomAt(reader, minfPos + 8, minfEnd, "stbl");
+                if (stblPos < 0) return null;
+
+                reader.BaseStream.Position = stblPos;
+                uint stblSize = ReadUInt32BE(reader);
+                long stblEnd = stblPos + stblSize;
+
+                long stsdPos = FindAtomAt(reader, stblPos + 8, stblEnd, "stsd");
+                if (stsdPos < 0) return null;
+
+                // stsd: size(4) + type(4) + version(1) + flags(3) + entry_count(4) + first_entry...
+                // First entry starts at stsdPos + 16
+                // Entry format: size(4) + codec_fourcc(4) + ...
+                reader.BaseStream.Position = stsdPos + 16;
+                reader.ReadBytes(4); // entry size
+                byte[] codecBytes = reader.ReadBytes(4);
+                if (codecBytes.Length == 4)
+                {
+                    return System.Text.Encoding.ASCII.GetString(codecBytes).Trim('\0');
+                }
+            }
+            catch { }
+            return null;
+        }
+
         private static uint ReadUInt32BE(System.IO.BinaryReader reader)
         {
             byte[] bytes = reader.ReadBytes(4);
+            if (bytes.Length < 4) return 0;
             if (System.BitConverter.IsLittleEndian)
-            {
                 System.Array.Reverse(bytes);
-            }
             return System.BitConverter.ToUInt32(bytes, 0);
         }
 
         private static ulong ReadUInt64BE(System.IO.BinaryReader reader)
         {
             byte[] bytes = reader.ReadBytes(8);
+            if (bytes.Length < 8) return 0;
             if (System.BitConverter.IsLittleEndian)
-            {
                 System.Array.Reverse(bytes);
-            }
             return System.BitConverter.ToUInt64(bytes, 0);
         }
     }

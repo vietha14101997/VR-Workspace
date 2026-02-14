@@ -273,6 +273,18 @@ public class ThumbnailCache
             if (texture.LoadImage(data))
             {
                 Debug.Log($"[Cache] DISK DECODE: {sw.ElapsedMilliseconds}ms ({texture.width}x{texture.height})");
+
+                // Validate that the cached thumbnail is not blank/all-black
+                if (IsThumbnailBlank(texture))
+                {
+                    Debug.LogWarning($"[ThumbnailCache] Detected blank cached thumbnail, removing: {key}");
+                    UnityEngine.Object.Destroy(texture);
+                    // Delete the invalid cache file so it gets regenerated
+                    try { File.Delete(filePath); }
+                    catch (Exception delEx) { Debug.LogWarning($"[ThumbnailCache] Failed to delete invalid cache: {delEx.Message}"); }
+                    return false;
+                }
+
                 sprite = Sprite.Create(
                     texture,
                     new Rect(0, 0, texture.width, texture.height),
@@ -562,6 +574,42 @@ public class ThumbnailCache
     /// Get the current number of entries in memory cache.
     /// </summary>
     public int MemoryCacheCount => _memoryCache.Count;
+
+    /// <summary>
+    /// Check if a thumbnail texture is blank (all black or transparent).
+    /// Samples 9 points in a 3x3 grid to detect blank frames.
+    /// </summary>
+    private bool IsThumbnailBlank(Texture2D texture)
+    {
+        if (texture == null || texture.width < 4 || texture.height < 4) return true;
+
+        try
+        {
+            int w = texture.width;
+            int h = texture.height;
+            int validSamples = 0;
+            const float THRESHOLD = 0.05f;
+
+            for (int row = 1; row <= 3; row++)
+            {
+                for (int col = 1; col <= 3; col++)
+                {
+                    int x = Mathf.Clamp(w * col / 4, 0, w - 1);
+                    int y = Mathf.Clamp(h * row / 4, 0, h - 1);
+                    Color pixel = texture.GetPixel(x, y);
+                    if (pixel.a > THRESHOLD && (pixel.r + pixel.g + pixel.b) > THRESHOLD)
+                        validSamples++;
+                }
+            }
+
+            return validSamples < 3;
+        }
+        catch
+        {
+            // If texture is not readable, assume it's valid
+            return false;
+        }
+    }
 
     /// <summary>
     /// Get estimated memory usage in bytes.

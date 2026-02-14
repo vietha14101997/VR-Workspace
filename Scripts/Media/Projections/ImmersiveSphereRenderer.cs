@@ -58,6 +58,12 @@ public class ImmersiveSphereRenderer : MonoBehaviour, IProjectionRenderer
     private StereoMode _stereoMode = StereoMode.Mono;
     private DisplaySettings _currentSettings = DisplaySettings.Immersive;
     private float _shaderRotationOffset = 0f;
+
+    // FOV zoom state
+    private float _defaultFOV = 180f;
+    private float _currentFOV = 180f;
+    private const float MIN_FOV = 60f;
+    private const float FOV_STEP = 10f;
     #endregion
 
     #region IProjectionRenderer Implementation
@@ -181,18 +187,17 @@ public class ImmersiveSphereRenderer : MonoBehaviour, IProjectionRenderer
     {
         _projectionMode = mode;
 
+        // Set default FOV based on projection mode
+        _defaultFOV = (mode == ProjectionMode.Equirect180) ? 180f : 360f;
+        _currentFOV = _defaultFOV;
+
         if (_material != null)
         {
             _material.SetFloat("_ProjectionMode", (float)mode);
-
-            // Set appropriate default FOV
-            if (mode == ProjectionMode.Equirect180)
-            {
-                _material.SetFloat("_FOV", 180f);
-            }
+            _material.SetFloat("_FOV", _currentFOV);
         }
 
-        Debug.Log($"[ImmersiveSphereRenderer] Projection mode: {mode}");
+        Debug.Log($"[ImmersiveSphereRenderer] Projection mode: {mode}, FOV: {_currentFOV}");
     }
     #endregion
 
@@ -202,11 +207,35 @@ public class ImmersiveSphereRenderer : MonoBehaviour, IProjectionRenderer
     /// </summary>
     public void SetFieldOfView(float fov)
     {
+        _currentFOV = Mathf.Clamp(fov, MIN_FOV, _defaultFOV);
         if (_material != null)
         {
-            _material.SetFloat("_FOV", Mathf.Clamp(fov, 90f, 360f));
+            _material.SetFloat("_FOV", _currentFOV);
         }
     }
+
+    /// <summary>
+    /// Zoom by adjusting FOV. Negative delta = zoom in (decrease FOV), positive = zoom out.
+    /// </summary>
+    public void ZoomByFOV(float delta)
+    {
+        SetFieldOfView(_currentFOV + delta);
+        Debug.Log($"[ImmersiveSphereRenderer] FOV zoom: {_currentFOV:F0} / {_defaultFOV:F0}");
+    }
+
+    /// <summary>
+    /// Reset FOV zoom to default for current projection mode.
+    /// </summary>
+    public void ResetFOVZoom()
+    {
+        SetFieldOfView(_defaultFOV);
+    }
+
+    /// <summary>Current FOV value</summary>
+    public float CurrentFOV => _currentFOV;
+
+    /// <summary>Default FOV for current projection mode</summary>
+    public float DefaultFOV => _defaultFOV;
 
     /// <summary>
     /// Set brightness adjustment.

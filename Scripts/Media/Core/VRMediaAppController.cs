@@ -4,8 +4,13 @@ using TMPro;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
+using System.Diagnostics;
+using System.IO.Compression;
+using UnityEngine.Networking;
 using VRWorkspace.UI.RTT;
 using VRWorkspace.UI.HoverEffects;
+using Debug = UnityEngine.Debug;
 
 /// <summary>
 /// Main controller for the Media App.
@@ -75,6 +80,9 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
     private GameObject _controlsContainer;
     private GameObject _controlsFrameObject;
     private GameObject _overlayFrameObject;
+    private MediaErrorDialog _errorDialog;
+    private string _lastFailedVideoPath;
+    private string _lastFailedContainerFormat;
 
     // Menu button frame (IN VirtualObjects → follows video screen with Zoom)
     private GameObject _menuButtonFrameObject;
@@ -162,6 +170,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         if (_playerController != null)
         {
             _playerController.OnBackToLibrary -= SwitchToLibrary;
+            _playerController.OnPlaybackFailed -= HandlePlaybackFailed;
             Destroy(_playerController.gameObject);
             _playerController = null;
         }
@@ -713,6 +722,32 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         _playerController = playerObj.AddComponent<VRVideoPlayerController>();
         _playerController.Initialize(PlaybackEngine, ProjectionSystem, _controlsPanel);
         _playerController.OnBackToLibrary += SwitchToLibrary;
+        _playerController.OnPlaybackFailed += HandlePlaybackFailed;
+
+        // === 5b. Error Dialog ===
+        GameObject errorDialogObj = new GameObject("MediaErrorDialog");
+        errorDialogObj.transform.SetParent(container, false);
+
+        var errorDialogRT = errorDialogObj.AddComponent<RectTransform>();
+        errorDialogRT.anchorMin = Vector2.zero;
+        errorDialogRT.anchorMax = Vector2.one;
+        errorDialogRT.offsetMin = Vector2.zero;
+        errorDialogRT.offsetMax = Vector2.zero;
+
+        _errorDialog = errorDialogObj.AddComponent<MediaErrorDialog>();
+        _errorDialog.Initialize(_font, _primaryColor, _accentColor);
+        _errorDialog.OnBackClicked += () =>
+        {
+            _errorDialog.Hide();
+            SwitchToLibrary();
+        };
+        _errorDialog.OnDismissed += () =>
+        {
+            _errorDialog.Hide();
+            SwitchToLibrary();
+        };
+        _errorDialog.OnOpenExternalClicked += HandleOpenInExternalPlayer;
+        _errorDialog.OnRetryClicked += HandleRetryOrConvert;
 
         // === 6. Popups (Projection & Environment) ===
         // Create them inside the controls frame container so they render on top of controls
@@ -790,6 +825,503 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
     {
         OnBackClicked?.Invoke();
     }
+
+    private void HandlePlaybackFailed(string error, bool isCodecError, string codecName, string containerFormat)
+    {
+        if (_errorDialog == null)
+        {
+            SwitchToLibrary();
+            return;
+        }
+
+        // Store info for action buttons
+        _lastFailedVideoPath = _playerController?.CurrentVideo?.Path;
+        _lastFailedContainerFormat = containerFormat;
+
+        bool needsRemux = !string.IsNullOrEmpty(containerFormat) || isCodecError;
+
+        if (needsRemux)
+        {
+            bool canRemux = !string.IsNullOrEmpty(FindFFmpeg());
+
+            if (canRemux && !string.IsNullOrEmpty(_lastFailedVideoPath))
+            {
+                // FFmpeg available - auto-remux immediately without user interaction
+                Debug.Log($"[VRMediaAppController] Auto-remuxing: container={containerFormat ?? "MP4"}, codec={codecName ?? "unknown"}");
+                StartCoroutine(RemuxAndPlayCoroutine(_lastFailedVideoPath));
+                return;
+            }
+
+            // FFmpeg not found - show dialog with appropriate options
+            string formatInfo = !string.IsNullOrEmpty(containerFormat)
+                ? $"Format: {containerFormat}"
+                : $"Codec: {GetFriendlyCodecName(codecName ?? "unknown")}";
+
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+            // Windows: offer to download FFmpeg
+            _errorDialog.ShowError(
+                !string.IsNullOrEmpty(containerFormat) ? MediaErrorDialog.ErrorType.UnsupportedContainer : MediaErrorDialog.ErrorType.CodecNotSupported,
+                $"{formatInfo}\n\nFFmpeg is needed to convert this video.\nIt will be downloaded automatically (~80 MB).");
+            _errorDialog.SetRetryLabel("Download & Convert");
+#else
+            // Mobile/other: no download option, show Open in Player
+            _errorDialog.ShowError(
+                !string.IsNullOrEmpty(containerFormat) ? MediaErrorDialog.ErrorType.UnsupportedContainer : MediaErrorDialog.ErrorType.CodecNotSupported,
+                formatInfo);
+#endif
+        }
+        else
+        {
+            _errorDialog.Show("Playback Error", error, showRetry: false, showOpenExternal: true);
+        }
+    }
+
+    private void HandleRetryOrConvert()
+    {
+        if (string.IsNullOrEmpty(_lastFailedVideoPath))
+        {
+            _errorDialog?.Hide();
+            SwitchToLibrary();
+            return;
+        }
+
+        // If FFmpeg is available, remux directly
+        if (!string.IsNullOrEmpty(FindFFmpeg()))
+        {
+            _errorDialog?.Hide();
+            StartCoroutine(RemuxAndPlayCoroutine(_lastFailedVideoPath));
+            return;
+        }
+
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+        // FFmpeg not found - download it first, then remux
+        StartCoroutine(DownloadAndConvertCoroutine(_lastFailedVideoPath));
+#else
+        _errorDialog?.Hide();
+        SwitchToLibrary();
+#endif
+    }
+
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+    private IEnumerator DownloadAndConvertCoroutine(string videoPath)
+    {
+        // Show the dialog as progress display (keep it visible)
+        _errorDialog?.Show("Preparing...", "Setting up video converter...", showRetry: false, showOpenExternal: false);
+
+        bool downloadSuccess = false;
+        yield return StartCoroutine(DownloadFFmpegCoroutine(success => downloadSuccess = success));
+
+        if (downloadSuccess && !string.IsNullOrEmpty(FindFFmpeg()))
+        {
+            _errorDialog?.Hide();
+            StartCoroutine(RemuxAndPlayCoroutine(videoPath));
+        }
+        else
+        {
+            _errorDialog?.Show("Download Failed",
+                "Could not download FFmpeg.\nCheck your internet connection and try again.",
+                showRetry: true, showOpenExternal: true);
+            _errorDialog?.SetRetryLabel("Retry Download");
+        }
+    }
+#endif
+
+    private IEnumerator RemuxAndPlayCoroutine(string sourcePath)
+    {
+        string ffmpegPath = FindFFmpeg();
+        if (string.IsNullOrEmpty(ffmpegPath))
+        {
+            Debug.LogError("[VRMediaAppController] FFmpeg not found");
+            SwitchToLibrary();
+            yield break;
+        }
+
+        // Create temp output path (same dir, .remuxed.mp4)
+        string dir = Path.GetDirectoryName(sourcePath);
+        string nameNoExt = Path.GetFileNameWithoutExtension(sourcePath);
+        string outputPath = Path.Combine(dir, $"{nameNoExt}.remuxed.mp4");
+
+        // Skip remux if already done
+        if (File.Exists(outputPath) && new FileInfo(outputPath).Length > 1024)
+        {
+            Debug.Log($"[VRMediaAppController] Using existing remuxed file: {outputPath}");
+            PlayRemuxedVideo(outputPath, sourcePath);
+            yield break;
+        }
+
+        Debug.Log($"[VRMediaAppController] Starting FFmpeg remux: {sourcePath} -> {outputPath}");
+
+        // Show a simple progress indication
+        _errorDialog?.Show("Converting...", "Remuxing video to MP4 format.\nThis should be fast (no re-encoding).", showRetry: false, showOpenExternal: false);
+
+        // Run FFmpeg: copy all streams to MP4 container
+        bool processComplete = false;
+        bool processSuccess = false;
+        string processError = null;
+
+        System.Threading.Tasks.Task.Run(() =>
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = ffmpegPath,
+                    Arguments = $"-i \"{sourcePath}\" -c copy -movflags faststart -y \"{outputPath}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardError = true
+                };
+
+                using (var process = Process.Start(psi))
+                {
+                    string stderr = process.StandardError.ReadToEnd();
+                    process.WaitForExit(120000); // 2 minute timeout
+
+                    if (process.ExitCode == 0 && File.Exists(outputPath) && new FileInfo(outputPath).Length > 1024)
+                    {
+                        processSuccess = true;
+                    }
+                    else
+                    {
+                        processError = $"FFmpeg exit code: {process.ExitCode}";
+                        if (stderr.Length > 200)
+                            processError += $"\n{stderr.Substring(stderr.Length - 200)}";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                processError = ex.Message;
+            }
+            processComplete = true;
+        });
+
+        // Wait for FFmpeg to finish
+        float remuxStart = Time.time;
+        while (!processComplete)
+        {
+            if (Time.time - remuxStart > 130f) // 130s safety timeout
+            {
+                processError = "Remux timeout";
+                break;
+            }
+            yield return null;
+        }
+
+        if (processSuccess)
+        {
+            Debug.Log($"[VRMediaAppController] Remux complete in {Time.time - remuxStart:F1}s: {outputPath}");
+            _errorDialog?.Hide();
+            PlayRemuxedVideo(outputPath, sourcePath);
+        }
+        else
+        {
+            Debug.LogError($"[VRMediaAppController] Remux failed: {processError}");
+            // Show error and offer "Open in Player" instead
+            _errorDialog?.Show("Conversion Failed", $"FFmpeg could not convert this video.\n\n{processError}", showRetry: false, showOpenExternal: true);
+        }
+    }
+
+    private void PlayRemuxedVideo(string remuxedPath, string originalPath)
+    {
+        if (_playerController == null)
+        {
+            Debug.LogError("[VRMediaAppController] PlayerController is null, cannot play remuxed video");
+            SwitchToLibrary();
+            return;
+        }
+
+        // Create a MediaVideoInfo for the remuxed file based on the original
+        var video = _playerController.CurrentVideo;
+        if (video.HasValue)
+        {
+            var remuxedVideo = video.Value;
+            remuxedVideo.Path = remuxedPath;
+
+            Debug.Log($"[VRMediaAppController] Playing remuxed video: {remuxedPath}");
+            _playerController.PlayVideo(remuxedVideo);
+        }
+        else
+        {
+            var remuxedVideo = MediaVideoInfo.FromPath(remuxedPath);
+            _playerController.PlayVideo(remuxedVideo);
+        }
+    }
+
+    private void HandleOpenInExternalPlayer()
+    {
+        _errorDialog?.Hide();
+
+        if (!string.IsNullOrEmpty(_lastFailedVideoPath))
+        {
+            Debug.Log($"[VRMediaAppController] Opening in system player: {_lastFailedVideoPath}");
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = _lastFailedVideoPath,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[VRMediaAppController] Failed to open external player: {ex.Message}");
+            }
+        }
+
+        SwitchToLibrary();
+    }
+
+    private static string GetFriendlyCodecName(string fourcc)
+    {
+        if (string.IsNullOrEmpty(fourcc)) return "Unknown";
+
+        switch (fourcc.ToLowerInvariant())
+        {
+            case "hev1":
+            case "hvc1":
+                return "HEVC (H.265)";
+            case "av01":
+                return "AV1";
+            case "avc1":
+            case "avc3":
+                return "H.264";
+            case "vp09":
+                return "VP9";
+            default:
+                return fourcc.ToUpperInvariant();
+        }
+    }
+
+    private static string _cachedFFmpegPath = null;
+    private static bool _ffmpegSearched = false;
+
+    /// <summary>
+    /// Find FFmpeg executable in PATH or common locations.
+    /// Searches auto-download location, system PATH, common install dirs,
+    /// package managers (Scoop, Chocolatey), and sibling project directories.
+    /// </summary>
+    private static string FindFFmpeg()
+    {
+        if (_ffmpegSearched) return _cachedFFmpegPath;
+        _ffmpegSearched = true;
+
+        var searchPaths = new List<string>
+        {
+            // Auto-downloaded FFmpeg (highest priority - known good)
+            Path.Combine(Application.persistentDataPath, "ffmpeg", "ffmpeg.exe"),
+            // System PATH
+            "ffmpeg",
+            // Common install locations
+            @"C:\ffmpeg\bin\ffmpeg.exe",
+            @"C:\Program Files\ffmpeg\bin\ffmpeg.exe",
+            @"C:\Program Files (x86)\ffmpeg\bin\ffmpeg.exe",
+            // Unity project locations
+            Path.Combine(Application.streamingAssetsPath, "ffmpeg.exe"),
+            Path.Combine(Application.dataPath, "..", "ffmpeg", "ffmpeg.exe"),
+            // Chocolatey
+            @"C:\ProgramData\chocolatey\bin\ffmpeg.exe",
+        };
+
+        // Scoop (user-specific)
+        string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (!string.IsNullOrEmpty(userProfile))
+        {
+            searchPaths.Add(Path.Combine(userProfile, "scoop", "apps", "ffmpeg", "current", "bin", "ffmpeg.exe"));
+        }
+
+        // Sibling RemotePlayServer project (development environment)
+        try
+        {
+            string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, "..", ".."));
+            string remotePlayDir = Path.Combine(projectRoot, "RemotePlayServer", "bin");
+            if (Directory.Exists(remotePlayDir))
+            {
+                foreach (string config in new[] { "Debug", "Release" })
+                {
+                    string configDir = Path.Combine(remotePlayDir, config);
+                    if (Directory.Exists(configDir))
+                    {
+                        // Search in net* subdirectories (e.g. net9.0-windows10.0.26100.0)
+                        foreach (string netDir in Directory.GetDirectories(configDir, "net*"))
+                        {
+                            string candidate = Path.Combine(netDir, "bin", "ffmpeg.exe");
+                            searchPaths.Add(candidate);
+                        }
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Ignore errors searching sibling projects
+        }
+
+        foreach (string path in searchPaths)
+        {
+            try
+            {
+                // For file paths, check existence first to avoid slow process spawn
+                if (path != "ffmpeg" && !File.Exists(path))
+                    continue;
+
+                var psi = new ProcessStartInfo
+                {
+                    FileName = path,
+                    Arguments = "-version",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+
+                using (var process = Process.Start(psi))
+                {
+                    process.WaitForExit(3000);
+                    if (process.ExitCode == 0)
+                    {
+                        _cachedFFmpegPath = path;
+                        Debug.Log($"[VRMediaAppController] Found FFmpeg at: {path}");
+                        return path;
+                    }
+                }
+            }
+            catch
+            {
+                // Not found at this path, try next
+            }
+        }
+
+        Debug.LogWarning("[VRMediaAppController] FFmpeg not found in PATH or common locations");
+        return null;
+    }
+
+    /// <summary>
+    /// Reset FFmpeg search cache so next FindFFmpeg() call re-searches.
+    /// Call after auto-downloading FFmpeg.
+    /// </summary>
+    private static void ResetFFmpegCache()
+    {
+        _ffmpegSearched = false;
+        _cachedFFmpegPath = null;
+    }
+
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+    private const string FFMPEG_DOWNLOAD_URL = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
+    private bool _isDownloadingFFmpeg = false;
+
+    /// <summary>
+    /// Download FFmpeg binary and save to persistentDataPath.
+    /// Shows progress in the error dialog.
+    /// </summary>
+    private IEnumerator DownloadFFmpegCoroutine(System.Action<bool> onComplete)
+    {
+        if (_isDownloadingFFmpeg)
+        {
+            onComplete?.Invoke(false);
+            yield break;
+        }
+        _isDownloadingFFmpeg = true;
+
+        string destDir = Path.Combine(Application.persistentDataPath, "ffmpeg");
+        string destPath = Path.Combine(destDir, "ffmpeg.exe");
+
+        // Already downloaded?
+        if (File.Exists(destPath))
+        {
+            ResetFFmpegCache();
+            _isDownloadingFFmpeg = false;
+            onComplete?.Invoke(true);
+            yield break;
+        }
+
+        _errorDialog?.UpdateProgress("Downloading FFmpeg...\nThis is a one-time download (~80 MB).");
+
+        string zipPath = Path.Combine(Application.temporaryCachePath, "ffmpeg-download.zip");
+
+        // Download
+        using (var request = UnityWebRequest.Get(FFMPEG_DOWNLOAD_URL))
+        {
+            request.downloadHandler = new DownloadHandlerFile(zipPath) { removeFileOnAbort = true };
+            var op = request.SendWebRequest();
+
+            while (!op.isDone)
+            {
+                float progress = request.downloadProgress;
+                if (progress >= 0)
+                {
+                    int pct = Mathf.RoundToInt(progress * 100f);
+                    _errorDialog?.UpdateProgress($"Downloading FFmpeg... {pct}%\nThis is a one-time download (~80 MB).");
+                }
+                yield return null;
+            }
+
+            if (request.result != UnityWebRequest.Result.Success)
+            {
+                Debug.LogError($"[VRMediaAppController] FFmpeg download failed: {request.error}");
+                _isDownloadingFFmpeg = false;
+                onComplete?.Invoke(false);
+                yield break;
+            }
+        }
+
+        _errorDialog?.UpdateProgress("Extracting FFmpeg...");
+        yield return null;
+
+        // Extract ffmpeg.exe from zip in background thread
+        bool extractSuccess = false;
+        string extractError = null;
+        bool extractDone = false;
+
+        System.Threading.Tasks.Task.Run(() =>
+        {
+            try
+            {
+                if (!Directory.Exists(destDir))
+                    Directory.CreateDirectory(destDir);
+
+                using (var archive = ZipFile.OpenRead(zipPath))
+                {
+                    foreach (var entry in archive.Entries)
+                    {
+                        if (entry.Name.Equals("ffmpeg.exe", StringComparison.OrdinalIgnoreCase)
+                            && entry.Length > 0)
+                        {
+                            entry.ExtractToFile(destPath, overwrite: true);
+                            extractSuccess = true;
+                            break;
+                        }
+                    }
+                }
+
+                // Clean up zip
+                if (File.Exists(zipPath))
+                    File.Delete(zipPath);
+            }
+            catch (Exception ex)
+            {
+                extractError = ex.Message;
+            }
+            extractDone = true;
+        });
+
+        while (!extractDone) yield return null;
+
+        _isDownloadingFFmpeg = false;
+
+        if (extractSuccess)
+        {
+            Debug.Log($"[VRMediaAppController] FFmpeg downloaded to: {destPath}");
+            ResetFFmpegCache();
+            onComplete?.Invoke(true);
+        }
+        else
+        {
+            Debug.LogError($"[VRMediaAppController] FFmpeg extraction failed: {extractError}");
+            onComplete?.Invoke(false);
+        }
+    }
+#endif
     #endregion
 
     #region IDataBindable Implementation

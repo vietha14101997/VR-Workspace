@@ -43,6 +43,10 @@ public class VirtualObjectsZoomController : MonoBehaviour
     private RTTMiniFrame _taskbarFrame;
     private bool _initialized = false;
 
+    // Zoom override for immersive video mode (FOV-based zoom)
+    private System.Action _zoomInOverride;
+    private System.Action _zoomOutOverride;
+
     /// <summary>
     /// Stores information needed to recalculate side panel position on zoom
     /// </summary>
@@ -295,19 +299,42 @@ public class VirtualObjectsZoomController : MonoBehaviour
     }
 
     /// <summary>
-    /// Zoom in by one step (move closer to camera)
+    /// Zoom in by one step (move closer to camera).
+    /// If a zoom override is set (e.g. immersive video FOV zoom), delegates to it.
     /// </summary>
     public void ZoomIn()
     {
+        if (_zoomInOverride != null) { _zoomInOverride(); return; }
         SetZoomDistance(_currentDistance - zoomStep);
     }
 
     /// <summary>
-    /// Zoom out by one step (move farther from camera)
+    /// Zoom out by one step (move farther from camera).
+    /// If a zoom override is set (e.g. immersive video FOV zoom), delegates to it.
     /// </summary>
     public void ZoomOut()
     {
+        if (_zoomOutOverride != null) { _zoomOutOverride(); return; }
         SetZoomDistance(_currentDistance + zoomStep);
+    }
+
+    /// <summary>
+    /// Set zoom override callbacks. When set, ZoomIn/ZoomOut delegate to these
+    /// instead of moving VirtualObjects. Used by immersive video for FOV-based zoom.
+    /// </summary>
+    public void SetZoomOverride(System.Action zoomIn, System.Action zoomOut)
+    {
+        _zoomInOverride = zoomIn;
+        _zoomOutOverride = zoomOut;
+    }
+
+    /// <summary>
+    /// Clear zoom override, restoring normal VirtualObjects movement zoom.
+    /// </summary>
+    public void ClearZoomOverride()
+    {
+        _zoomInOverride = null;
+        _zoomOutOverride = null;
     }
 
     /// <summary>
