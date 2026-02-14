@@ -46,6 +46,10 @@ public class VRVideoPlayerController : MonoBehaviour
 
     // Original DisplayQuad scales for controls/overlay frames (for immersive scaling)
     private Dictionary<Transform, Vector3> _controlsQuadOriginalScales = new Dictionary<Transform, Vector3>();
+
+    // Stereo depth matching for controls in immersive SBS/OU mode
+    private const float STEREO_DEPTH_OFFSET = 0.024f; // ~8m virtual depth (reduces vergence conflict)
+    private const string STEREO_UI_SHADER = "VRWorkspace/UI/StereoUIPanel";
     #endregion
 
     #region Initialization
@@ -286,6 +290,10 @@ public class VRVideoPlayerController : MonoBehaviour
         // Force reposition only when returning to flat (initial play & recenter use default forceReposition=true)
         RepositionControlsForProjection(isImmersive, forceReposition: !isImmersive);
 
+        // Stereo depth matching: shift controls per-eye to reduce vergence conflict in SBS/OU
+        bool needsStereoOffset = isImmersive && stereoMode != StereoMode.Mono;
+        SetControlsStereoDepthOffset(needsStereoOffset ? STEREO_DEPTH_OFFSET : 0f);
+
         // Setup/teardown immersive zoom override
         SetupZoomOverride(isImmersive);
     }
@@ -443,6 +451,61 @@ public class VRVideoPlayerController : MonoBehaviour
             orig.y * scaleFactor,
             orig.z
         );
+    }
+
+    /// <summary>
+    /// Set stereo depth offset on controls panel to reduce vergence-accommodation conflict.
+    /// offset > 0 shifts vertices per-eye in the shader, making controls appear further away
+    /// in stereo mode (SBS/OU) without changing physical position.
+    /// </summary>
+    private void SetControlsStereoDepthOffset(float offset)
+    {
+        Transform container = FindControlsContainer();
+        if (container == null) return;
+
+        Shader stereoShader = offset > 0.001f ? Shader.Find(STEREO_UI_SHADER) : null;
+
+        Transform frame = container.Find("VideoControlsFrame");
+        if (frame != null) ApplyStereoShader(frame, stereoShader, offset);
+
+        Transform overlay = container.Find("DismissOverlayFrame");
+        if (overlay != null) ApplyStereoShader(overlay, stereoShader, offset);
+    }
+
+    private void ApplyStereoShader(Transform frameTransform, Shader stereoShader, float offset)
+    {
+        var menuFrame = frameTransform.GetComponent<RTTMenuFrame>();
+        if (menuFrame == null) return;
+        var quad = menuFrame.GetDisplayQuad();
+        if (quad?.material == null) return;
+
+        if (stereoShader != null && quad.material.shader != stereoShader)
+        {
+            Texture tex = quad.material.mainTexture;
+            Color color = quad.material.color;
+            int queue = quad.material.renderQueue;
+            quad.material.shader = stereoShader;
+            quad.material.mainTexture = tex;
+            quad.material.color = color;
+            quad.material.renderQueue = queue;
+        }
+        else if (stereoShader == null && quad.material.HasProperty("_StereoOffset"))
+        {
+            Shader defaultShader = Shader.Find("Sprites/Default");
+            if (defaultShader != null)
+            {
+                Texture tex = quad.material.mainTexture;
+                Color color = quad.material.color;
+                int queue = quad.material.renderQueue;
+                quad.material.shader = defaultShader;
+                quad.material.mainTexture = tex;
+                quad.material.color = color;
+                quad.material.renderQueue = queue;
+            }
+        }
+
+        if (quad.material.HasProperty("_StereoOffset"))
+            quad.material.SetFloat("_StereoOffset", offset);
     }
 
     /// <summary>
@@ -728,6 +791,7 @@ public class VRVideoPlayerController : MonoBehaviour
             _projectionSystem.UpdateStereoModeOnly(stereo);
             _projectionPopup?.SetState(projection, ConvertToUIStereo(stereo));
             SetupZoomOverride(false);
+            SetControlsStereoDepthOffset(0f); // Flat mode: no stereo depth offset
         }
         else
         {
