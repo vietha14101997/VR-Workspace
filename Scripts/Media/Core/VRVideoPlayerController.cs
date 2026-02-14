@@ -285,9 +285,10 @@ public class VRVideoPlayerController : MonoBehaviour
         // NOTE: Controls are NOT repositioned here — position stays stable during mode switches.
         // Repositioning only happens in PlayVideo() (initial) and HandleRecenter() (explicit).
 
-        // Stereo depth offset: always active in immersive (including Mono) so that
-        // switching stereo modes never changes the controls shader — zero visual disruption.
-        SetControlsStereoDepthOffset(isImmersive ? STEREO_DEPTH_OFFSET : 0f);
+        // Stereo depth offset: applied once on first call, then never changes.
+        // Constant offset avoids any visual disruption when switching projection/stereo modes.
+        // Works in both flat and immersive modes (mild depth shift in flat is acceptable).
+        SetControlsStereoDepthOffset(STEREO_DEPTH_OFFSET);
 
         // Setup/teardown immersive zoom override
         SetupZoomOverride(isImmersive);
@@ -787,7 +788,7 @@ public class VRVideoPlayerController : MonoBehaviour
             _projectionSystem.UpdateStereoModeOnly(stereo);
             _projectionPopup?.SetState(projection, ConvertToUIStereo(stereo));
             SetupZoomOverride(false);
-            SetControlsStereoDepthOffset(0f); // Flat mode: no stereo depth offset
+            // NOTE: No SetControlsStereoDepthOffset here — offset stays constant from initial setup
         }
         else if (isStereoOnlyChange && !isCurrentlyFlat)
         {
