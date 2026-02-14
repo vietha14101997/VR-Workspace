@@ -48,7 +48,7 @@ public class VRVideoPlayerController : MonoBehaviour
     private Dictionary<Transform, Vector3> _controlsQuadOriginalScales = new Dictionary<Transform, Vector3>();
 
     // Stereo depth matching for controls in immersive SBS/OU mode
-    private const float STEREO_DEPTH_OFFSET = 0.032f; // ~half avg IPD → near-infinity depth (matches immersive sphere)
+    private const float STEREO_DEPTH_OFFSET = 0f; // No artificial depth offset — natural parallax works (menu button proves it)
     private const string STEREO_UI_SHADER = "VRWorkspace/UI/StereoUIPanel";
     #endregion
 
