@@ -50,6 +50,9 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
     /// <summary>Projection system for video display</summary>
     public VRVideoProjectionSystem ProjectionSystem { get; private set; }
+
+    /// <summary>Side controls frame for content injection (queue, settings, etc.)</summary>
+    public RTTMenuFrame SideControlsFrame => _sideControlsFrameObject?.GetComponent<RTTMenuFrame>();
     #endregion
 
     #region Private Fields
@@ -96,6 +99,11 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
     // Controls frame reference for hover detection
     private RTTCanvasBase _controlsCanvasBase;
+
+    // Side controls panel (generic container beside controls)
+    private GameObject _sideControlsFrameObject;
+    private int _sideControlsSide = 1; // 1=right, -1=left
+    private RTTMediaQueuePanel _queuePanel;
 
     // Cached rounded rect sprite for menu button
     private static Sprite _cachedRoundedRectSprite;
@@ -144,11 +152,16 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
     {
         StopPlayback();
 
-        // Unwire library events
+        // Unwire events
         if (_libraryController != null)
         {
             _libraryController.OnVideoPlayRequested -= HandleLibraryPlayRequested;
             _libraryController.OnCloseRequested -= HandleLibraryCloseRequested;
+        }
+
+        if (_queuePanel != null)
+        {
+            _queuePanel.OnItemClicked -= HandleQueueItemClicked;
         }
 
         if (PlaybackEngine != null)
@@ -179,6 +192,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             _playerController.OnBackToLibrary -= SwitchToLibrary;
             _playerController.OnPlaybackFailed -= HandlePlaybackFailed;
             _playerController.OnProjectionSettingsUpdated -= HandleProjectionSettingsUpdated;
+            _playerController.OnVideoChanged -= HandleVideoChanged;
             Destroy(_playerController.gameObject);
             _playerController = null;
         }
@@ -324,6 +338,9 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
                 _controlsFrameObject.transform.rotation = _menuFrameRotation;
             }
 
+            // SideControlsFrame faces camera independently
+            UpdateSideControlsFacing();
+
             _controlsContainer.SetActive(true);
         }
 
@@ -350,6 +367,14 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         if (_playerController != null)
         {
             _playerController.PlayVideo(video);
+        }
+
+        // Update queue panel with current queue state
+        if (_queuePanel != null)
+        {
+            var queue = MediaPlaylistService.Instance.GetPlaybackQueue();
+            int currentIdx = MediaPlaylistService.Instance.CurrentQueueIndex;
+            _queuePanel.SetQueue(queue, currentIdx);
         }
     }
 
@@ -646,6 +671,63 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
         _controlsFrameObject = controlsFrameObj;
 
+        // === 3b. Side Controls Frame (generic container beside controls) ===
+        _sideControlsFrameObject = new GameObject("SideControlsFrame");
+        _sideControlsFrameObject.transform.SetParent(_controlsContainer.transform, false);
+        _sideControlsFrameObject.layer = vLayer;
+
+        var sideFrame = _sideControlsFrameObject.AddComponent<RTTMenuFrame>();
+        float sideLogicalWidth = 400f;
+        float sideLogicalHeight = 600f;
+        float sidePhysicalW = sideLogicalWidth / density;
+        float sidePhysicalH = sideLogicalHeight / density;
+
+        sideFrame.Configure(sidePhysicalW, sidePhysicalH, sideLogicalWidth);
+        sideFrame.SetGlassBackgroundEnabled(false);
+        sideFrame.SetFloatingDataEnabled(false);
+        sideFrame.SetContentMargins(0, 0, 0, 0);
+        sideFrame.ForceInitialize();
+
+        var sideQuad = sideFrame.GetDisplayQuad();
+        if (sideQuad?.material != null)
+            sideQuad.material.renderQueue = 3100;
+
+        // Add background matching ControlsPanel style
+        var sideContainer = sideFrame.ContentContainer;
+        if (sideContainer != null)
+        {
+            var sideBg = sideContainer.gameObject.AddComponent<Image>();
+            sideBg.color = new Color(0.173f, 0.173f, 0.173f, 0.75f);
+            sideBg.sprite = RTTMediaControlsPanel.CreateRoundedRectSprite(20f);
+            sideBg.type = Image.Type.Sliced;
+            sideBg.raycastTarget = false;
+        }
+
+        // Create queue panel inside side controls frame
+        if (sideContainer != null)
+        {
+            GameObject queueObj = new GameObject("QueuePanel");
+            queueObj.transform.SetParent(sideContainer, false);
+            var queueRT = queueObj.AddComponent<RectTransform>();
+            queueRT.anchorMin = Vector2.zero;
+            queueRT.anchorMax = Vector2.one;
+            queueRT.offsetMin = Vector2.zero;
+            queueRT.offsetMax = Vector2.zero;
+
+            _queuePanel = queueObj.AddComponent<RTTMediaQueuePanel>();
+            _queuePanel.Initialize(sideLogicalWidth, sideLogicalHeight, _font);
+            _queuePanel.OnItemClicked += HandleQueueItemClicked;
+        }
+
+        // Position beside controls frame
+        float controlsPhysicalW = expandedWidth / density;
+        float gapMeters = 0.02f;
+        float xOffset = (controlsPhysicalW / 2f + gapMeters + sidePhysicalW / 2f) * _sideControlsSide;
+        float yOffset = 0.625f; // Raise to camera height (container is 0.625m below camera)
+        _sideControlsFrameObject.transform.localPosition = new Vector3(xOffset, yOffset, 0);
+
+        _sideControlsFrameObject.SetActive(false);
+
         // === 4. Menu button frame (in VirtualObjects → follows video screen with Zoom) ===
         _menuButtonFrameObject = new GameObject("MenuButtonFrame");
         if (virtualObjects != null)
@@ -735,6 +817,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
         // Pass external frame references to panel for visibility toggling
         _controlsPanel.SetExternalFrames(_overlayFrameObject, _menuButtonFrameObject);
+        _controlsPanel.SetSideControlsFrame(_sideControlsFrameObject);
 
         // === 5. Player Controller ===
         GameObject playerObj = new GameObject("PlayerController");
@@ -745,6 +828,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         _playerController.OnBackToLibrary += SwitchToLibrary;
         _playerController.OnPlaybackFailed += HandlePlaybackFailed;
         _playerController.OnProjectionSettingsUpdated += HandleProjectionSettingsUpdated;
+        _playerController.OnVideoChanged += HandleVideoChanged;
 
         // === 5b. Error Dialog ===
         GameObject errorDialogObj = new GameObject("MediaErrorDialog");
@@ -848,6 +932,28 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         OnBackClicked?.Invoke();
     }
 
+    private void HandleQueueItemClicked(int index)
+    {
+        var service = MediaPlaylistService.Instance;
+        if (service == null) return;
+
+        string path = service.JumpToIndex(index);
+        if (!string.IsNullOrEmpty(path))
+        {
+            _playerController?.PlayVideoSimple(path);
+        }
+    }
+
+    private void HandleVideoChanged(string path)
+    {
+        if (_queuePanel != null)
+        {
+            var queue = MediaPlaylistService.Instance.GetPlaybackQueue();
+            int idx = queue.IndexOf(path);
+            if (idx >= 0) _queuePanel.SetCurrentIndex(idx);
+        }
+    }
+
     /// <summary>
     /// Scale the menu button's display quad without affecting the RTT canvas/camera.
     /// Scaling the frame object breaks RTT rendering (pixelation, lost corners).
@@ -936,6 +1042,25 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
                 var col = quad.GetComponent<BoxCollider>();
                 if (col != null) col.size = new Vector3(3f, 2.5f, 0.01f);
             }
+        }
+    }
+
+    /// <summary>
+    /// Update SideControlsFrame rotation to face camera horizontally.
+    /// Called after container positioning to ensure correct facing direction.
+    /// </summary>
+    private void UpdateSideControlsFacing()
+    {
+        if (_sideControlsFrameObject == null) return;
+        Camera cam = Camera.main;
+        if (cam == null) return;
+
+        Vector3 toCamera = cam.transform.position - _sideControlsFrameObject.transform.position;
+        toCamera.y = 0;
+        if (toCamera.sqrMagnitude > 0.001f)
+        {
+            // Z+ away from camera (same convention as VideoControlsFrame)
+            _sideControlsFrameObject.transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
         }
     }
 

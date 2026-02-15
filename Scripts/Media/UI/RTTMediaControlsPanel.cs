@@ -103,6 +103,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     // External world-space menu button + dismiss overlay (managed by VRMediaAppController)
     private GameObject _menuButtonFrameObject;
     private GameObject _overlayFrameObject;
+    private GameObject _sideControlsFrameObject;
     private BoxCollider _parentFrameCollider; // Cached collider of parent RTT frame's display quad
 
     // Volume persistence
@@ -890,6 +891,14 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     }
 
     /// <summary>
+    /// Set the side controls frame reference for synchronized visibility.
+    /// </summary>
+    public void SetSideControlsFrame(GameObject sideFrame)
+    {
+        _sideControlsFrameObject = sideFrame;
+    }
+
+    /// <summary>
     /// Set the video title.
     /// </summary>
     public void SetTitle(string title)
@@ -1025,6 +1034,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         // Show overlay, hide menu button (controls visible → overlay catches dismiss clicks)
         if (_overlayFrameObject != null) _overlayFrameObject.SetActive(true);
         if (_menuButtonFrameObject != null) _menuButtonFrameObject.SetActive(false);
+        if (_sideControlsFrameObject != null) _sideControlsFrameObject.SetActive(true);
 
         OnVisibilityChanged?.Invoke(true);
     }
@@ -1044,6 +1054,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         // Hide overlay, show menu button (only menu button remains near video screen)
         if (_overlayFrameObject != null) _overlayFrameObject.SetActive(false);
         if (_menuButtonFrameObject != null) _menuButtonFrameObject.SetActive(true);
+        if (_sideControlsFrameObject != null) _sideControlsFrameObject.SetActive(false);
 
         OnVisibilityChanged?.Invoke(false);
     }

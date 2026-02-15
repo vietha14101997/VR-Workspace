@@ -1552,6 +1552,13 @@ public class RTTMediaLibraryController : MonoBehaviour, IPaginationController, I
     {
         // Debug.Log($"[RTTMediaLibraryController] Play requested: {video.Title}");
         RecordPlayback(video.Path);
+
+        // Set playback queue from current filtered list
+        var paths = _filteredVideos.Select(v => v.Path).ToList();
+        int startIndex = paths.IndexOf(video.Path);
+        if (startIndex < 0) startIndex = 0;
+        MediaPlaylistService.Instance.SetPlaybackQueueDirect(paths, startIndex);
+
         OnVideoPlayRequested?.Invoke(video);
     }
 

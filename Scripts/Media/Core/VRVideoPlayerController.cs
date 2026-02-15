@@ -23,6 +23,11 @@ public class VRVideoPlayerController : MonoBehaviour
     /// Params: (projectionType, stereoMode)
     /// </summary>
     public event Action<VideoProjectionType, StereoMode> OnProjectionSettingsUpdated;
+    /// <summary>
+    /// Fired when the current video changes (play, next, previous, queue jump).
+    /// Parameter: video file path.
+    /// </summary>
+    public event Action<string> OnVideoChanged;
     #endregion
 
     #region Properties
@@ -215,6 +220,7 @@ public class VRVideoPlayerController : MonoBehaviour
 
         _currentVideo = video;
         CurrentVideo = video;
+        OnVideoChanged?.Invoke(video.Path);
 
         // Detect projection and stereo mode automatically (metadata -> filename -> resolution)
         ProjectionDetector.DetectProjectionAndStereo(
@@ -411,6 +417,12 @@ public class VRVideoPlayerController : MonoBehaviour
             ScaleFrameQuad(overlay, scaleFactor);
         }
 
+        Transform sideFrame = container.Find("SideControlsFrame");
+        if (sideFrame != null)
+        {
+            ScaleFrameQuad(sideFrame, scaleFactor);
+        }
+
         Debug.Log($"[VRVideoPlayerController] Controls repositioned (immersive={isImmersive}, force={forceReposition}, scale={scaleFactor:F2}) at {newPos}");
     }
 
@@ -490,6 +502,9 @@ public class VRVideoPlayerController : MonoBehaviour
 
         Transform overlay = container.Find("DismissOverlayFrame");
         if (overlay != null) ApplyStereoShader(overlay, stereoShader, offset);
+
+        Transform sideFrame = container.Find("SideControlsFrame");
+        if (sideFrame != null) ApplyStereoShader(sideFrame, stereoShader, offset);
     }
 
     private void ApplyStereoShader(Transform frameTransform, Shader stereoShader, float offset)
@@ -642,7 +657,7 @@ public class VRVideoPlayerController : MonoBehaviour
         }
     }
 
-    private void PlayVideoSimple(string path)
+    public void PlayVideoSimple(string path)
     {
         var video = new MediaVideoInfo
         {
