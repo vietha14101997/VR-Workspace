@@ -17,7 +17,7 @@ Shader "VRWorkspace/Media/VideoImmersive"
         [Header(Stereo)]
         _StereoMode ("Stereo Mode", Float) = 0  // 0=Mono, 1=SBS, 2=OU
         _EyeIndex ("Eye Index", Float) = 0      // 0=Left, 1=Right (editor fallback)
-        _ForceMono ("Force Mono", Float) = 0    // 1=both eyes see left eye image (disables 3D)
+        _StereoStrength ("Stereo Strength", Range(0, 1)) = 1  // 1=full 3D, 0=mono (both eyes see left)
 
         [Header(NV12 Support)]
         _UseNV12 ("Use NV12", Float) = 0
@@ -62,7 +62,7 @@ Shader "VRWorkspace/Media/VideoImmersive"
 
             float _StereoMode;
             float _EyeIndex;
-            float _ForceMono;
+            float _StereoStrength;
 
             float4 _CameraForward;  // Set from C# each frame (camera look direction)
 
@@ -192,6 +192,8 @@ Shader "VRWorkspace/Media/VideoImmersive"
             }
 
             // ===== Helper: Stereo UV Offset =====
+            // eyeIndex supports continuous values [0,1] for smooth mono↔stereo transitions.
+            // 0.0 = left eye, 1.0 = right eye, intermediate = blend between halves.
             float2 GetStereoUV(float2 uv, float stereoMode, float eyeIndex)
             {
                 if (stereoMode < 0.5)
@@ -201,19 +203,13 @@ Shader "VRWorkspace/Media/VideoImmersive"
                 }
                 else if (stereoMode < 1.5)
                 {
-                    // Side-by-Side: left eye = left half, right eye = right half
-                    float halfU = uv.x * 0.5;
-                    if (eyeIndex > 0.5)
-                        halfU += 0.5;
-                    return float2(halfU, uv.y);
+                    // Side-by-Side: smooth blend between left half and right half
+                    return float2(uv.x * 0.5 + eyeIndex * 0.5, uv.y);
                 }
                 else
                 {
-                    // Over-Under: left eye = top half, right eye = bottom half
-                    float halfV = uv.y * 0.5;
-                    if (eyeIndex < 0.5)
-                        halfV += 0.5;  // Left eye is top half
-                    return float2(uv.x, halfV);
+                    // Over-Under: smooth blend between top half and bottom half
+                    return float2(uv.x, uv.y * 0.5 + (1.0 - eyeIndex) * 0.5);
                 }
             }
 
@@ -274,11 +270,9 @@ Shader "VRWorkspace/Media/VideoImmersive"
                     equirectUV.y = theta / 3.14159265 + 0.5;
                 }
 
-                // Apply stereo eye offset
+                // Apply stereo eye offset with strength control
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
-                float eye = unity_StereoEyeIndex;
-                // Force mono: both eyes see left eye image (disables 3D while UI is visible)
-                if (_ForceMono > 0.5) eye = 0.0;
+                float eye = unity_StereoEyeIndex * _StereoStrength;
                 float2 stereoUV = GetStereoUV(equirectUV, _StereoMode, eye);
 
                 // Sample video texture

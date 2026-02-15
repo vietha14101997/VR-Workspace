@@ -47,9 +47,12 @@ public class VRVideoPlayerController : MonoBehaviour
     // Original DisplayQuad scales for controls/overlay frames (for immersive scaling)
     private Dictionary<Transform, Vector3> _controlsQuadOriginalScales = new Dictionary<Transform, Vector3>();
 
-    // Stereo depth matching for controls in immersive SBS/OU mode
+    // Stereo UI shader for controls panel (supports per-eye offset, used even with offset=0)
     private const string STEREO_UI_SHADER = "VRWorkspace/UI/StereoUIPanel";
-    private const float DEFAULT_HALF_IPD = 0.032f; // Fallback: 64mm average IPD / 2
+
+    // Animated stereo strength transition
+    private Coroutine _stereoStrengthCoroutine;
+    private const float STEREO_STRENGTH_FADE_DURATION = 0.2f; // Match controls fade duration
     #endregion
 
     #region Initialization
@@ -286,16 +289,15 @@ public class VRVideoPlayerController : MonoBehaviour
         // NOTE: Controls are NOT repositioned here — position stays stable during mode switches.
         // Repositioning only happens in PlayVideo() (initial) and HandleRecenter() (explicit).
 
-        // Stereo depth offset: dynamic based on projection + stereo mode.
-        // Immersive SBS/OU: offset = halfIPD for monoscopic controls (eliminates vergence conflict).
-        // Flat/Mono: offset = 0 for natural rendering.
-        SetControlsStereoDepthOffset(ComputeStereoOffset(projectionType, stereoMode));
+        // Stereo depth offset: always 0 (no per-eye shift on controls).
+        // Vergence conflict is handled by force-mono on the video instead.
+        SetControlsStereoDepthOffset(0f);
 
-        // Force mono sync: if controls are visible during projection change,
-        // apply force-mono to the new renderer to prevent vergence conflict.
+        // Stereo strength sync: if controls are visible during projection change,
+        // set stereo strength to 0 (mono) on the new renderer to prevent vergence conflict.
         bool isStereo = stereoMode != StereoMode.Mono;
         bool controlsVisible = _controlsPanel != null && _controlsPanel.IsVisible;
-        _projectionSystem.ActiveRenderer?.SetForceMonoscopic(isImmersive && isStereo && controlsVisible);
+        _projectionSystem.ActiveRenderer?.SetStereoStrength(isStereo && controlsVisible ? 0f : 1f);
 
         // Setup/teardown immersive zoom override
         SetupZoomOverride(isImmersive);
@@ -457,50 +459,59 @@ public class VRVideoPlayerController : MonoBehaviour
     }
 
     /// <summary>
-    /// Get half of the headset's interpupillary distance from the VR camera.
-    /// Used to compute the exact stereo offset needed for monoscopic UI rendering.
-    /// </summary>
-    private float GetHalfIPD()
-    {
-        Camera cam = Camera.main;
-        if (cam != null && cam.stereoEnabled && cam.stereoSeparation > 0.01f)
-            return cam.stereoSeparation / 2f;
-        return DEFAULT_HALF_IPD;
-    }
-
-    /// <summary>
-    /// Compute the stereo depth offset for controls based on current projection and stereo mode.
-    /// Returns halfIPD for immersive stereo modes (monoscopic rendering), 0 otherwise.
-    /// </summary>
-    private float ComputeStereoOffset(VideoProjectionType projection, StereoMode stereo)
-    {
-        bool isImmersive = !ProjectionDetector.SupportsScreenSettings(projection);
-        bool isStereo = stereo != StereoMode.Mono;
-        return (isImmersive && isStereo) ? GetHalfIPD() : 0f;
-    }
-
-    /// <summary>
     /// Handle controls panel visibility changes.
-    /// In immersive stereo mode: temporarily disable 3D (force mono) when controls are visible
-    /// to eliminate vergence-accommodation conflict.
+    /// When controls are visible in stereo mode: smoothly reduce stereo strength to 0 (mono)
+    /// to eliminate vergence-accommodation conflict. Works for both immersive and flat modes.
     /// </summary>
     private void HandleControlsVisibilityChanged(bool visible)
     {
         if (_projectionSystem?.ActiveRenderer == null) return;
 
-        bool isImmersive = _projectionSystem.IsImmersiveProjection();
         bool isStereo = _projectionSystem.CurrentStereoMode != StereoMode.Mono;
+        if (!isStereo) return;
 
-        if (isImmersive && isStereo)
-        {
-            _projectionSystem.ActiveRenderer.SetForceMonoscopic(visible);
-        }
+        // Target: 0 = mono when controls visible, 1 = full stereo when hidden
+        float targetStrength = visible ? 0f : 1f;
+        AnimateStereoStrength(targetStrength);
     }
 
     /// <summary>
-    /// Set stereo depth offset on controls panel to reduce vergence-accommodation conflict.
-    /// When offset = halfIPD, cancels natural binocular parallax for monoscopic rendering.
-    /// When offset = 0, renders with natural parallax (for flat/mono modes).
+    /// Smoothly animate stereo strength on the active renderer.
+    /// </summary>
+    private void AnimateStereoStrength(float targetStrength)
+    {
+        if (_stereoStrengthCoroutine != null)
+            StopCoroutine(_stereoStrengthCoroutine);
+        _stereoStrengthCoroutine = StartCoroutine(StereoStrengthCoroutine(targetStrength));
+    }
+
+    private System.Collections.IEnumerator StereoStrengthCoroutine(float targetStrength)
+    {
+        var renderer = _projectionSystem?.ActiveRenderer;
+        if (renderer == null) yield break;
+
+        // Read current strength from material (approximate from last set value)
+        float startStrength = 1f - targetStrength; // Invert: if target is 0, start is ~1 and vice versa
+        float elapsed = 0f;
+
+        while (elapsed < STEREO_STRENGTH_FADE_DURATION)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / STEREO_STRENGTH_FADE_DURATION);
+            // EaseInOutQuad for smooth perceptual transition
+            t = t < 0.5f ? 2f * t * t : 1f - Mathf.Pow(-2f * t + 2f, 2f) / 2f;
+            float strength = Mathf.Lerp(startStrength, targetStrength, t);
+            renderer.SetStereoStrength(strength);
+            yield return null;
+        }
+
+        renderer.SetStereoStrength(targetStrength);
+        _stereoStrengthCoroutine = null;
+    }
+
+    /// <summary>
+    /// Ensure controls panel uses StereoUIPanel shader with given stereo offset.
+    /// Currently always called with offset=0 (vergence handled by force-mono on video).
     /// </summary>
     private void SetControlsStereoDepthOffset(float offset)
     {
@@ -825,8 +836,7 @@ public class VRVideoPlayerController : MonoBehaviour
             _projectionSystem.UpdateStereoModeOnly(stereo);
             _projectionPopup?.SetState(projection, ConvertToUIStereo(stereo));
             SetupZoomOverride(false);
-            // Flat mode: offset is always 0 (no vergence issue), but update to stay consistent
-            SetControlsStereoDepthOffset(0f);
+            // NOTE: No stereo offset or force-mono changes in flat mode — no vergence issue.
         }
         else if (isStereoOnlyChange && !isCurrentlyFlat)
         {
@@ -835,12 +845,11 @@ public class VRVideoPlayerController : MonoBehaviour
             _projectionSystem.ActiveRenderer?.SetStereoMode(stereo);
             _projectionSystem.UpdateStereoModeOnly(stereo);
             _projectionPopup?.SetState(projection, ConvertToUIStereo(stereo));
-            // Update stereo offset: mono→SBS needs halfIPD offset, SBS→mono needs 0
-            SetControlsStereoDepthOffset(ComputeStereoOffset(projection, stereo));
-            // Sync force-mono with controls visibility for new stereo mode
+            // NOTE: No SetControlsStereoDepthOffset — offset stays 0 to keep controls stable.
+            // Sync stereo strength with controls visibility for new stereo mode
             bool controlsVisible = _controlsPanel != null && _controlsPanel.IsVisible;
-            bool isStereo = stereo != StereoMode.Mono;
-            _projectionSystem.ActiveRenderer?.SetForceMonoscopic(isStereo && controlsVisible);
+            bool isStereoMode = stereo != StereoMode.Mono;
+            _projectionSystem.ActiveRenderer?.SetStereoStrength(isStereoMode && controlsVisible ? 0f : 1f);
         }
         else
         {

@@ -63,10 +63,12 @@ public interface IProjectionRenderer
     void RecenterView();
 
     /// <summary>
-    /// Force monoscopic rendering: both eyes see the left eye's image.
-    /// Used to temporarily disable 3D when UI overlays are visible.
+    /// Set stereo rendering strength.
+    /// 1.0 = full stereoscopic 3D, 0.0 = monoscopic (both eyes see left eye's image).
+    /// Supports continuous values for smooth animated transitions.
+    /// Used to temporarily reduce 3D when UI overlays are visible.
     /// </summary>
-    void SetForceMonoscopic(bool force);
+    void SetStereoStrength(float strength);
 
     /// <summary>
     /// Cleanup và release resources

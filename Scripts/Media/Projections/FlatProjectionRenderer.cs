@@ -94,9 +94,14 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
         _worldPanel.Apply();
     }
 
-    public void SetForceMonoscopic(bool force)
+    public void SetStereoStrength(float strength)
     {
-        // No-op for flat projection — vergence conflict only occurs in immersive modes
+        if (_worldPanel == null) return;
+        var rend = _worldPanel.board != null ? _worldPanel.board.GetComponent<Renderer>() : null;
+        if (rend != null && rend.material.HasProperty("_StereoStrength"))
+        {
+            rend.material.SetFloat("_StereoStrength", Mathf.Clamp01(strength));
+        }
     }
 
     private Coroutine _stereoTransitionCoroutine;

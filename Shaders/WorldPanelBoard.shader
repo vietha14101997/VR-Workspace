@@ -39,6 +39,7 @@ Shader "Unlit/WorldPanelBoard"
         [Header(Stereo)]
         _StereoMode ("Stereo Mode", Float) = 0  // 0=Mono, 1=SBS, 2=OU
         _EyeIndex ("Eye Index", Float) = 0      // 0=Left, 1=Right
+        _StereoStrength ("Stereo Strength", Range(0, 1)) = 1  // 1=full 3D, 0=mono
     }
 
     SubShader
@@ -86,6 +87,7 @@ Shader "Unlit/WorldPanelBoard"
             // Stereo properties
             float _StereoMode;
             float _EyeIndex;
+            float _StereoStrength;
 
             struct appdata
             {
@@ -112,6 +114,8 @@ Shader "Unlit/WorldPanelBoard"
             }
 
             // Get stereo UV based on mode and eye
+            // eyeIndex supports continuous values [0,1] for smooth mono↔stereo transitions
+            // 0.0 = left eye, 1.0 = right eye, intermediate = blend between halves
             float2 GetStereoUV(float2 uv, float stereoMode, float eyeIndex)
             {
                 if (stereoMode < 0.5)
@@ -121,19 +125,13 @@ Shader "Unlit/WorldPanelBoard"
                 }
                 else if (stereoMode < 1.5)
                 {
-                    // Side-by-Side
-                    float halfU = uv.x * 0.5;
-                    if (eyeIndex > 0.5)
-                        halfU += 0.5;
-                    return float2(halfU, uv.y);
+                    // Side-by-Side: smooth blend between left half and right half
+                    return float2(uv.x * 0.5 + eyeIndex * 0.5, uv.y);
                 }
                 else
                 {
-                    // Over-Under
-                    float halfV = uv.y * 0.5;
-                    if (eyeIndex < 0.5)
-                        halfV += 0.5; // Left eye is top half
-                    return float2(uv.x, halfV);
+                    // Over-Under: smooth blend between top half and bottom half
+                    return float2(uv.x, uv.y * 0.5 + (1.0 - eyeIndex) * 0.5);
                 }
             }
 
@@ -286,7 +284,7 @@ Shader "Unlit/WorldPanelBoard"
                 // ---- Lấy màu texture với sharpening (nếu enabled) ----
                 // Apply Stereo UV before sampling
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
-                float eye = unity_StereoEyeIndex;
+                float eye = unity_StereoEyeIndex * _StereoStrength;
                 float2 stereoUV = GetStereoUV(i.uv, _StereoMode, eye);
 
                 // Uses tex2Dbias with _MipMapBias for sharper VR viewing at distance

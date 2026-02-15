@@ -108,11 +108,11 @@ public class ImmersiveSphereRenderer : MonoBehaviour, IProjectionRenderer
         }
     }
 
-    public void SetForceMonoscopic(bool force)
+    public void SetStereoStrength(float strength)
     {
         if (_material != null)
         {
-            _material.SetFloat("_ForceMono", force ? 1f : 0f);
+            _material.SetFloat("_StereoStrength", Mathf.Clamp01(strength));
         }
     }
 
@@ -335,6 +335,7 @@ public class ImmersiveSphereRenderer : MonoBehaviour, IProjectionRenderer
         _material.SetFloat("_FOV", 300);
         _material.SetFloat("_Rotation", 0);
         _material.SetFloat("_Tilt", 0);
+        _material.SetFloat("_StereoStrength", 1);
         _material.SetFloat("_FadeSharpness", 8);
         _material.SetVector("_CameraForward", Vector3.forward);
 
