@@ -17,6 +17,7 @@ Shader "VRWorkspace/Media/VideoImmersive"
         [Header(Stereo)]
         _StereoMode ("Stereo Mode", Float) = 0  // 0=Mono, 1=SBS, 2=OU
         _EyeIndex ("Eye Index", Float) = 0      // 0=Left, 1=Right (editor fallback)
+        _ForceMono ("Force Mono", Float) = 0    // 1=both eyes see left eye image (disables 3D)
 
         [Header(NV12 Support)]
         _UseNV12 ("Use NV12", Float) = 0
@@ -61,6 +62,7 @@ Shader "VRWorkspace/Media/VideoImmersive"
 
             float _StereoMode;
             float _EyeIndex;
+            float _ForceMono;
 
             float4 _CameraForward;  // Set from C# each frame (camera look direction)
 
@@ -275,6 +277,8 @@ Shader "VRWorkspace/Media/VideoImmersive"
                 // Apply stereo eye offset
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
                 float eye = unity_StereoEyeIndex;
+                // Force mono: both eyes see left eye image (disables 3D while UI is visible)
+                if (_ForceMono > 0.5) eye = 0.0;
                 float2 stereoUV = GetStereoUV(equirectUV, _StereoMode, eye);
 
                 // Sample video texture

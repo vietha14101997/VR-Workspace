@@ -64,6 +64,8 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     public event Action OnHeadsetModeClicked;
     public event Action OnRecenterClicked;
     public event Action OnEnvironmentClicked;
+    /// <summary>Fired when controls panel visibility changes. Parameter: true=visible, false=hidden.</summary>
+    public event Action<bool> OnVisibilityChanged;
     #endregion
 
     #region Properties
@@ -1023,6 +1025,8 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         // Show overlay, hide menu button (controls visible → overlay catches dismiss clicks)
         if (_overlayFrameObject != null) _overlayFrameObject.SetActive(true);
         if (_menuButtonFrameObject != null) _menuButtonFrameObject.SetActive(false);
+
+        OnVisibilityChanged?.Invoke(true);
     }
 
     /// <summary>
@@ -1040,6 +1044,8 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         // Hide overlay, show menu button (only menu button remains near video screen)
         if (_overlayFrameObject != null) _overlayFrameObject.SetActive(false);
         if (_menuButtonFrameObject != null) _menuButtonFrameObject.SetActive(true);
+
+        OnVisibilityChanged?.Invoke(false);
     }
 
     /// <summary>

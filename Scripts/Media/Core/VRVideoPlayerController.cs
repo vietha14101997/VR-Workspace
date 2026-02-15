@@ -126,6 +126,7 @@ public class VRVideoPlayerController : MonoBehaviour
             _controlsPanel.OnHeadsetModeClicked += HandleHeadsetModeClicked;
             _controlsPanel.OnRecenterClicked += HandleRecenter;
             _controlsPanel.OnEnvironmentClicked += ShowEnvironmentPopup;
+            _controlsPanel.OnVisibilityChanged += HandleControlsVisibilityChanged;
         }
     }
 
@@ -289,6 +290,12 @@ public class VRVideoPlayerController : MonoBehaviour
         // Immersive SBS/OU: offset = halfIPD for monoscopic controls (eliminates vergence conflict).
         // Flat/Mono: offset = 0 for natural rendering.
         SetControlsStereoDepthOffset(ComputeStereoOffset(projectionType, stereoMode));
+
+        // Force mono sync: if controls are visible during projection change,
+        // apply force-mono to the new renderer to prevent vergence conflict.
+        bool isStereo = stereoMode != StereoMode.Mono;
+        bool controlsVisible = _controlsPanel != null && _controlsPanel.IsVisible;
+        _projectionSystem.ActiveRenderer?.SetForceMonoscopic(isImmersive && isStereo && controlsVisible);
 
         // Setup/teardown immersive zoom override
         SetupZoomOverride(isImmersive);
@@ -470,6 +477,24 @@ public class VRVideoPlayerController : MonoBehaviour
         bool isImmersive = !ProjectionDetector.SupportsScreenSettings(projection);
         bool isStereo = stereo != StereoMode.Mono;
         return (isImmersive && isStereo) ? GetHalfIPD() : 0f;
+    }
+
+    /// <summary>
+    /// Handle controls panel visibility changes.
+    /// In immersive stereo mode: temporarily disable 3D (force mono) when controls are visible
+    /// to eliminate vergence-accommodation conflict.
+    /// </summary>
+    private void HandleControlsVisibilityChanged(bool visible)
+    {
+        if (_projectionSystem?.ActiveRenderer == null) return;
+
+        bool isImmersive = _projectionSystem.IsImmersiveProjection();
+        bool isStereo = _projectionSystem.CurrentStereoMode != StereoMode.Mono;
+
+        if (isImmersive && isStereo)
+        {
+            _projectionSystem.ActiveRenderer.SetForceMonoscopic(visible);
+        }
     }
 
     /// <summary>
@@ -812,6 +837,10 @@ public class VRVideoPlayerController : MonoBehaviour
             _projectionPopup?.SetState(projection, ConvertToUIStereo(stereo));
             // Update stereo offset: mono→SBS needs halfIPD offset, SBS→mono needs 0
             SetControlsStereoDepthOffset(ComputeStereoOffset(projection, stereo));
+            // Sync force-mono with controls visibility for new stereo mode
+            bool controlsVisible = _controlsPanel != null && _controlsPanel.IsVisible;
+            bool isStereo = stereo != StereoMode.Mono;
+            _projectionSystem.ActiveRenderer?.SetForceMonoscopic(isStereo && controlsVisible);
         }
         else
         {
@@ -1331,6 +1360,7 @@ public class VRVideoPlayerController : MonoBehaviour
             _controlsPanel.OnVRModeClicked -= HandleVRModeClicked;
             _controlsPanel.OnHeadsetModeClicked -= HandleHeadsetModeClicked;
             _controlsPanel.OnRecenterClicked -= HandleRecenter;
+            _controlsPanel.OnVisibilityChanged -= HandleControlsVisibilityChanged;
         }
 
         UnwireProjectionEvents();

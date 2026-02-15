@@ -108,6 +108,14 @@ public class ImmersiveSphereRenderer : MonoBehaviour, IProjectionRenderer
         }
     }
 
+    public void SetForceMonoscopic(bool force)
+    {
+        if (_material != null)
+        {
+            _material.SetFloat("_ForceMono", force ? 1f : 0f);
+        }
+    }
+
     public void UpdateDisplay(DisplaySettings settings)
     {
         _currentSettings = settings;

@@ -63,6 +63,12 @@ public interface IProjectionRenderer
     void RecenterView();
 
     /// <summary>
+    /// Force monoscopic rendering: both eyes see the left eye's image.
+    /// Used to temporarily disable 3D when UI overlays are visible.
+    /// </summary>
+    void SetForceMonoscopic(bool force);
+
+    /// <summary>
     /// Cleanup và release resources
     /// </summary>
     void Dispose();

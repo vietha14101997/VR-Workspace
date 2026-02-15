@@ -94,6 +94,11 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
         _worldPanel.Apply();
     }
 
+    public void SetForceMonoscopic(bool force)
+    {
+        // No-op for flat projection — vergence conflict only occurs in immersive modes
+    }
+
     private Coroutine _stereoTransitionCoroutine;
     private const float STEREO_TRANSITION_DURATION = 0.2f;
 
