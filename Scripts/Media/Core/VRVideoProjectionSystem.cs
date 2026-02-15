@@ -42,6 +42,17 @@ public class VRVideoProjectionSystem : MonoBehaviour
     /// <summary>Saved flat screen position (for controls alignment in immersive mode)</summary>
     public Vector3 SavedFlatPosition => _savedFlatPosition;
     public bool HasSavedFlatTransform => _hasSavedFlatTransform;
+
+    /// <summary>
+    /// Update saved flat transform without moving the projection root.
+    /// Used during recenter to point controls/sphere alignment toward the new forward direction.
+    /// </summary>
+    public void UpdateSavedFlatTransform(Vector3 position, Quaternion rotation)
+    {
+        _savedFlatPosition = position;
+        _savedFlatRotation = rotation;
+        _hasSavedFlatTransform = true;
+    }
     #endregion
 
     #region Public API

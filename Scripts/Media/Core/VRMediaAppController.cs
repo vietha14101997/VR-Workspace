@@ -926,7 +926,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
         _menuButtonFollowCamera = false;
 
-        // Reset DisplayQuad collider to normal size
+        // Expand DisplayQuad collider for easier reticle targeting (same as immersive)
         var menuFrame = _menuButtonFrameObject.GetComponent<RTTMenuFrame>();
         if (menuFrame != null)
         {
@@ -934,7 +934,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             if (quad != null)
             {
                 var col = quad.GetComponent<BoxCollider>();
-                if (col != null) col.size = new Vector3(1f, 1f, 0.01f);
+                if (col != null) col.size = new Vector3(3f, 2.5f, 0.01f);
             }
         }
     }

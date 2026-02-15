@@ -48,8 +48,8 @@ public class VRVideoPlayerController : MonoBehaviour
     private Dictionary<Transform, Vector3> _controlsQuadOriginalScales = new Dictionary<Transform, Vector3>();
 
     // Stereo depth matching for controls in immersive SBS/OU mode
-    private const float STEREO_DEPTH_OFFSET = 0f; // No artificial depth offset — natural parallax works (menu button proves it)
     private const string STEREO_UI_SHADER = "VRWorkspace/UI/StereoUIPanel";
+    private const float DEFAULT_HALF_IPD = 0.032f; // Fallback: 64mm average IPD / 2
     #endregion
 
     #region Initialization
@@ -285,10 +285,10 @@ public class VRVideoPlayerController : MonoBehaviour
         // NOTE: Controls are NOT repositioned here — position stays stable during mode switches.
         // Repositioning only happens in PlayVideo() (initial) and HandleRecenter() (explicit).
 
-        // Stereo depth offset: applied once on first call, then never changes.
-        // Constant offset avoids any visual disruption when switching projection/stereo modes.
-        // Works in both flat and immersive modes (mild depth shift in flat is acceptable).
-        SetControlsStereoDepthOffset(STEREO_DEPTH_OFFSET);
+        // Stereo depth offset: dynamic based on projection + stereo mode.
+        // Immersive SBS/OU: offset = halfIPD for monoscopic controls (eliminates vergence conflict).
+        // Flat/Mono: offset = 0 for natural rendering.
+        SetControlsStereoDepthOffset(ComputeStereoOffset(projectionType, stereoMode));
 
         // Setup/teardown immersive zoom override
         SetupZoomOverride(isImmersive);
@@ -450,16 +450,41 @@ public class VRVideoPlayerController : MonoBehaviour
     }
 
     /// <summary>
+    /// Get half of the headset's interpupillary distance from the VR camera.
+    /// Used to compute the exact stereo offset needed for monoscopic UI rendering.
+    /// </summary>
+    private float GetHalfIPD()
+    {
+        Camera cam = Camera.main;
+        if (cam != null && cam.stereoEnabled && cam.stereoSeparation > 0.01f)
+            return cam.stereoSeparation / 2f;
+        return DEFAULT_HALF_IPD;
+    }
+
+    /// <summary>
+    /// Compute the stereo depth offset for controls based on current projection and stereo mode.
+    /// Returns halfIPD for immersive stereo modes (monoscopic rendering), 0 otherwise.
+    /// </summary>
+    private float ComputeStereoOffset(VideoProjectionType projection, StereoMode stereo)
+    {
+        bool isImmersive = !ProjectionDetector.SupportsScreenSettings(projection);
+        bool isStereo = stereo != StereoMode.Mono;
+        return (isImmersive && isStereo) ? GetHalfIPD() : 0f;
+    }
+
+    /// <summary>
     /// Set stereo depth offset on controls panel to reduce vergence-accommodation conflict.
-    /// offset > 0 shifts vertices per-eye in the shader, making controls appear further away
-    /// in stereo mode (SBS/OU) without changing physical position.
+    /// When offset = halfIPD, cancels natural binocular parallax for monoscopic rendering.
+    /// When offset = 0, renders with natural parallax (for flat/mono modes).
     /// </summary>
     private void SetControlsStereoDepthOffset(float offset)
     {
         Transform container = FindControlsContainer();
         if (container == null) return;
 
-        Shader stereoShader = offset > 0.001f ? Shader.Find(STEREO_UI_SHADER) : null;
+        // Always use StereoUIPanel shader — avoid shader swapping artifacts.
+        // With offset=0, StereoUIPanel renders identically to Sprites/Default.
+        Shader stereoShader = Shader.Find(STEREO_UI_SHADER);
 
         Transform frame = container.Find("VideoControlsFrame");
         if (frame != null) ApplyStereoShader(frame, stereoShader, offset);
@@ -475,6 +500,7 @@ public class VRVideoPlayerController : MonoBehaviour
         var quad = menuFrame.GetDisplayQuad();
         if (quad?.material == null) return;
 
+        // Swap to StereoUIPanel shader once (subsequent calls skip if already applied)
         if (stereoShader != null && quad.material.shader != stereoShader)
         {
             Texture tex = quad.material.mainTexture;
@@ -484,20 +510,6 @@ public class VRVideoPlayerController : MonoBehaviour
             quad.material.mainTexture = tex;
             quad.material.color = color;
             quad.material.renderQueue = queue;
-        }
-        else if (stereoShader == null && quad.material.HasProperty("_StereoOffset"))
-        {
-            Shader defaultShader = Shader.Find("Sprites/Default");
-            if (defaultShader != null)
-            {
-                Texture tex = quad.material.mainTexture;
-                Color color = quad.material.color;
-                int queue = quad.material.renderQueue;
-                quad.material.shader = defaultShader;
-                quad.material.mainTexture = tex;
-                quad.material.color = color;
-                quad.material.renderQueue = queue;
-            }
         }
 
         if (quad.material.HasProperty("_StereoOffset"))
@@ -788,16 +800,18 @@ public class VRVideoPlayerController : MonoBehaviour
             _projectionSystem.UpdateStereoModeOnly(stereo);
             _projectionPopup?.SetState(projection, ConvertToUIStereo(stereo));
             SetupZoomOverride(false);
-            // NOTE: No SetControlsStereoDepthOffset here — offset stays constant from initial setup
+            // Flat mode: offset is always 0 (no vergence issue), but update to stay consistent
+            SetControlsStereoDepthOffset(0f);
         }
         else if (isStereoOnlyChange && !isCurrentlyFlat)
         {
             // Immersive stereo-only: lightweight update without full SetProjection()
             // Avoids re-running sphere alignment which can cause subtle position shifts.
-            // Stereo depth offset stays unchanged (already applied when entering immersive).
             _projectionSystem.ActiveRenderer?.SetStereoMode(stereo);
             _projectionSystem.UpdateStereoModeOnly(stereo);
             _projectionPopup?.SetState(projection, ConvertToUIStereo(stereo));
+            // Update stereo offset: mono→SBS needs halfIPD offset, SBS→mono needs 0
+            SetControlsStereoDepthOffset(ComputeStereoOffset(projection, stereo));
         }
         else
         {
@@ -1179,13 +1193,34 @@ public class VRVideoPlayerController : MonoBehaviour
         if (_projectionSystem != null)
         {
             _projectionSystem.RecenterView();
+
+            // Update saved flat transform to camera forward — so controls and sphere alignment
+            // point toward the new forward direction instead of the old flat screen position
+            if (cam != null)
+            {
+                Vector3 camFwd = cam.transform.forward;
+                camFwd.y = 0;
+                if (camFwd.sqrMagnitude < 0.001f) camFwd = Vector3.forward;
+                camFwd.Normalize();
+                Vector3 newPos = cam.transform.position + camFwd * 2.0f;
+                newPos.y = cam.transform.position.y;
+                _projectionSystem.UpdateSavedFlatTransform(newPos, Quaternion.LookRotation(camFwd));
+            }
         }
 
-        // Recenter VideoControlsContainer
+        // Recenter VideoControlsContainer (now uses updated saved flat transform → camera forward)
         if (_controlsPanel != null && _projectionSystem != null)
         {
             bool isImmersive = !ProjectionDetector.SupportsScreenSettings(_projectionSystem.CurrentProjection);
             RepositionControlsForProjection(isImmersive);
+        }
+
+        // Notify VRMediaAppController to reposition menu button in the new forward direction
+        if (_projectionSystem != null)
+        {
+            OnProjectionSettingsUpdated?.Invoke(
+                _projectionSystem.CurrentProjection,
+                _projectionSystem.CurrentStereoMode);
         }
 
         if (reticle != null)
