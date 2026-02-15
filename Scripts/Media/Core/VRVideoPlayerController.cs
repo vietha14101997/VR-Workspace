@@ -50,9 +50,6 @@ public class VRVideoPlayerController : MonoBehaviour
     // Stereo UI shader for controls panel (supports per-eye offset, used even with offset=0)
     private const string STEREO_UI_SHADER = "VRWorkspace/UI/StereoUIPanel";
 
-    // Animated stereo strength transition
-    private Coroutine _stereoStrengthCoroutine;
-    private const float STEREO_STRENGTH_FADE_DURATION = 0.2f; // Match controls fade duration
     #endregion
 
     #region Initialization
@@ -460,8 +457,10 @@ public class VRVideoPlayerController : MonoBehaviour
 
     /// <summary>
     /// Handle controls panel visibility changes.
-    /// When controls are visible in stereo mode: smoothly reduce stereo strength to 0 (mono)
+    /// When controls are visible in stereo mode: instantly set mono rendering
     /// to eliminate vergence-accommodation conflict. Works for both immersive and flat modes.
+    /// Note: Animation was tested but causes worse dizziness (sustained rotation from UV shift).
+    /// Instant switch produces only a brief "pop" which the brain dismisses easily.
     /// </summary>
     private void HandleControlsVisibilityChanged(bool visible)
     {
@@ -470,43 +469,7 @@ public class VRVideoPlayerController : MonoBehaviour
         bool isStereo = _projectionSystem.CurrentStereoMode != StereoMode.Mono;
         if (!isStereo) return;
 
-        // Target: 0 = mono when controls visible, 1 = full stereo when hidden
-        float targetStrength = visible ? 0f : 1f;
-        AnimateStereoStrength(targetStrength);
-    }
-
-    /// <summary>
-    /// Smoothly animate stereo strength on the active renderer.
-    /// </summary>
-    private void AnimateStereoStrength(float targetStrength)
-    {
-        if (_stereoStrengthCoroutine != null)
-            StopCoroutine(_stereoStrengthCoroutine);
-        _stereoStrengthCoroutine = StartCoroutine(StereoStrengthCoroutine(targetStrength));
-    }
-
-    private System.Collections.IEnumerator StereoStrengthCoroutine(float targetStrength)
-    {
-        var renderer = _projectionSystem?.ActiveRenderer;
-        if (renderer == null) yield break;
-
-        // Read current strength from material (approximate from last set value)
-        float startStrength = 1f - targetStrength; // Invert: if target is 0, start is ~1 and vice versa
-        float elapsed = 0f;
-
-        while (elapsed < STEREO_STRENGTH_FADE_DURATION)
-        {
-            elapsed += Time.deltaTime;
-            float t = Mathf.Clamp01(elapsed / STEREO_STRENGTH_FADE_DURATION);
-            // EaseInOutQuad for smooth perceptual transition
-            t = t < 0.5f ? 2f * t * t : 1f - Mathf.Pow(-2f * t + 2f, 2f) / 2f;
-            float strength = Mathf.Lerp(startStrength, targetStrength, t);
-            renderer.SetStereoStrength(strength);
-            yield return null;
-        }
-
-        renderer.SetStereoStrength(targetStrength);
-        _stereoStrengthCoroutine = null;
+        _projectionSystem.ActiveRenderer.SetStereoStrength(visible ? 0f : 1f);
     }
 
     /// <summary>
