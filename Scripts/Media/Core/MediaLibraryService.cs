@@ -291,6 +291,12 @@ public class MediaLibraryService : MonoBehaviour
         {
             Debug.Log($"[MediaLibraryService] Background scan complete - no changes ({startTime.ElapsedMilliseconds}ms)");
         }
+
+        // Pre-load metadata for any new items (existing items should already be cached)
+        if (newItems.Count > 0)
+        {
+            PreloadMetadataForAllFiles();
+        }
     }
     #endregion
 
@@ -329,6 +335,9 @@ public class MediaLibraryService : MonoBehaviour
         onComplete?.Invoke(AllVideos);
 
         Debug.Log($"[MediaLibraryService] Scan complete: {AllVideos.Count} media files (cached)");
+
+        // Pre-load metadata in background so it's ready when UI opens
+        PreloadMetadataForAllFiles();
     }
 
 #if UNITY_ANDROID && !UNITY_EDITOR
@@ -888,6 +897,12 @@ public class MediaLibraryService : MonoBehaviour
         IsCacheLoaded = true;
         OnLibraryCacheLoaded?.Invoke();
 
+        // Pre-load detailed metadata (duration, dimensions) in background
+        if (AllVideos.Count > 0)
+        {
+            PreloadMetadataForAllFiles();
+        }
+
         // If cache didn't have metadata, refresh it in background
         if (!hasMetadata && AllVideos.Count > 0)
         {
@@ -1030,6 +1045,21 @@ public class MediaLibraryService : MonoBehaviour
         catch (Exception ex)
         {
             Debug.LogWarning($"[MediaLibraryService] Failed to save library cache: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Trigger background metadata pre-loading for all files in the library.
+    /// This ensures metadata (duration, resolution, bitrate) is cached and
+    /// available instantly when the UI requests it.
+    /// </summary>
+    private void PreloadMetadataForAllFiles()
+    {
+        var allPaths = AllVideos.Select(v => v.Path).ToList();
+        if (allPaths.Count > 0)
+        {
+            Debug.Log($"[MediaLibraryService] Triggering metadata preload for {allPaths.Count} files");
+            FileMetadataService.Instance.PreloadMetadata(allPaths);
         }
     }
 

@@ -216,10 +216,8 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         if (_bgImage != null)
             _bgImage.color = NormalColor;
 
-        // Force layout rebuild to ensure MarqueeText gets correct dimensions immediately
-        // This is critical when reusing items from pool
-        Canvas.ForceUpdateCanvases();
-        LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)transform);
+        // Mark layout for deferred rebuild (avoids expensive ForceUpdateCanvases per item)
+        LayoutRebuilder.MarkLayoutForRebuild((RectTransform)transform);
     }
 
     /// <summary>

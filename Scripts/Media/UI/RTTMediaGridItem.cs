@@ -478,10 +478,9 @@ public class RTTMediaGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExi
         else if (_titleText != null)
             _titleText.text = fileName;
 
-        // Force layout rebuild to ensure MarqueeText gets correct dimensions
-        Canvas.ForceUpdateCanvases();
-        if (_thumbnailRect != null) LayoutRebuilder.ForceRebuildLayoutImmediate(_thumbnailRect);
-        LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)transform);
+        // Mark layout for deferred rebuild (avoids expensive ForceUpdateCanvases per item)
+        if (_thumbnailRect != null) LayoutRebuilder.MarkLayoutForRebuild(_thumbnailRect);
+        LayoutRebuilder.MarkLayoutForRebuild((RectTransform)transform);
 
         // Determine media type from extension
         string ext = System.IO.Path.GetExtension(video.Path)?.ToLowerInvariant() ?? "";

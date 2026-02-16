@@ -47,9 +47,18 @@ public class FileMetadataService : MonoBehaviour
     private bool _isProcessingQueue = false;
     private Coroutine _queueProcessorCoroutine;
 
-    // Configuration: delay between requests to prevent flooding
-    private const float DELAY_BETWEEN_REQUESTS_MS = 50f;  // 50ms = ~1 video every 3 frames at 60fps
-    private const int MAX_QUEUE_SIZE = 100;  // Prevent memory bloat
+    // Configuration: frame budget for processing metadata requests
+    private const float FAST_PATH_BUDGET_MS = 12f;  // Generous budget for header parsing (no GPU impact)
+    private const float SLOW_PATH_BUDGET_MS = 4f;   // Tight budget when using VideoPlayer
+    private const int MAX_QUEUE_SIZE = 200;  // Allow larger queue since processing is faster
+    #endregion
+
+    #region Metadata Cache
+    // Pre-loaded metadata cache: path -> metadata (persists across app opens)
+    private Dictionary<string, VideoMetadata> _videoMetadataCache = new Dictionary<string, VideoMetadata>();
+    private Dictionary<string, AudioMetadata> _audioMetadataCache = new Dictionary<string, AudioMetadata>();
+    private Coroutine _preloadCoroutine;
+    private bool _isPreloading = false;
     #endregion
 
     private void Awake()
@@ -222,10 +231,17 @@ public class FileMetadataService : MonoBehaviour
 
     /// <summary>
     /// Read video metadata using VideoPlayer.
-    /// Queued to prevent main thread blocking when many requests come in at once.
+    /// Returns from cache instantly if available, otherwise queued for processing.
     /// </summary>
     public void GetVideoMetadata(string filePath, Action<VideoMetadata> onComplete)
     {
+        // Check cache first - return instantly if we have pre-loaded data
+        if (_videoMetadataCache.TryGetValue(filePath, out var cached) && cached.Duration.TotalSeconds > 0)
+        {
+            onComplete?.Invoke(cached);
+            return;
+        }
+
         // Limit queue size to prevent memory bloat
         if (_metadataQueue.Count >= MAX_QUEUE_SIZE)
         {
@@ -258,66 +274,230 @@ public class FileMetadataService : MonoBehaviour
     }
 
     /// <summary>
-    /// Process queued metadata requests one at a time with delay.
+    /// Process queued metadata requests in two phases:
+    /// Phase 1: Fast inline processing (header parsing + audio) with generous budget
+    /// Phase 2: Slow VideoPlayer fallback for remaining items
     /// </summary>
     private IEnumerator ProcessMetadataQueue()
     {
         _isProcessingQueue = true;
 
+        // Collect requests that need slow path (VideoPlayer)
+        Queue<MetadataRequest> slowQueue = new Queue<MetadataRequest>();
+
+        // PHASE 1: Process all fast-path requests inline
         while (_metadataQueue.Count > 0)
         {
-            var request = _metadataQueue.Dequeue();
+            float frameStartTime = Time.realtimeSinceStartup * 1000f;
 
-            if (request.IsVideo)
+            while (_metadataQueue.Count > 0)
             {
-                // Process video metadata
-                VideoMetadata result = new VideoMetadata();
+                var request = _metadataQueue.Dequeue();
 
-                yield return StartCoroutine(LoadVideoMetadataCoroutineInternal(request.FilePath, (metadata) =>
+                if (!request.IsVideo)
                 {
-                    result = metadata;
-                }));
+                    // Audio metadata: synchronous (~<1ms)
+                    ProcessAudioMetadataInline(request, storeInCache: true);
+                }
+                else
+                {
+                    // Check cache first
+                    if (_videoMetadataCache.TryGetValue(request.FilePath, out var cached) && cached.Duration.TotalSeconds > 0)
+                    {
+                        try { request.VideoCallback?.Invoke(cached); }
+                        catch (Exception ex) { Debug.LogWarning($"[FileMetadataService] Callback error: {ex.Message}"); }
+                    }
+                    else
+                    {
+                        // Try header parsing inline first (~1-5ms)
+                        VideoMetadata fastResult = TryGetVideoMetadataFromHeaders(request.FilePath);
+                        if (fastResult.Duration.TotalSeconds > 0)
+                        {
+                            _videoMetadataCache[request.FilePath] = fastResult;
+                            try { request.VideoCallback?.Invoke(fastResult); }
+                            catch (Exception ex) { Debug.LogWarning($"[FileMetadataService] Callback error: {ex.Message}"); }
+                        }
+                        else
+                        {
+                            // Header parsing failed - defer to slow queue
+                            slowQueue.Enqueue(request);
+                        }
+                    }
+                }
 
-                // Invoke callback
-                try
-                {
-                    request.VideoCallback?.Invoke(result);
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogWarning($"[FileMetadataService] Callback error: {ex.Message}");
-                }
+                // Check generous budget for fast path
+                float elapsedMs = Time.realtimeSinceStartup * 1000f - frameStartTime;
+                if (elapsedMs >= FAST_PATH_BUDGET_MS)
+                    break;
             }
-            else
+
+            yield return null;
+        }
+
+        // PHASE 2: Process slow-path requests (VideoPlayer) one at a time
+        while (slowQueue.Count > 0)
+        {
+            var request = slowQueue.Dequeue();
+            VideoMetadata slowResult = new VideoMetadata();
+
+            yield return StartCoroutine(LoadVideoMetadataViaVideoPlayer(request.FilePath, (metadata) =>
             {
-                // Process audio metadata
-                AudioMetadata result = new AudioMetadata();
+                slowResult = metadata;
+            }));
 
-                yield return StartCoroutine(LoadAudioMetadataCoroutineInternal(request.FilePath, (metadata) =>
-                {
-                    result = metadata;
-                }));
+            // Cache slow-path result too
+            if (slowResult.Duration.TotalSeconds > 0)
+                _videoMetadataCache[request.FilePath] = slowResult;
 
-                // Invoke callback
-                try
+            try { request.VideoCallback?.Invoke(slowResult); }
+            catch (Exception ex) { Debug.LogWarning($"[FileMetadataService] Callback error: {ex.Message}"); }
+
+            // Also process any new requests that arrived during VideoPlayer wait
+            while (_metadataQueue.Count > 0)
+            {
+                float batchStart = Time.realtimeSinceStartup * 1000f;
+                while (_metadataQueue.Count > 0)
                 {
-                    request.AudioCallback?.Invoke(result);
+                    var newReq = _metadataQueue.Dequeue();
+                    if (!newReq.IsVideo)
+                    {
+                        ProcessAudioMetadataInline(newReq, storeInCache: true);
+                    }
+                    else
+                    {
+                        if (_videoMetadataCache.TryGetValue(newReq.FilePath, out var c) && c.Duration.TotalSeconds > 0)
+                        {
+                            try { newReq.VideoCallback?.Invoke(c); }
+                            catch { }
+                        }
+                        else
+                        {
+                            VideoMetadata fr = TryGetVideoMetadataFromHeaders(newReq.FilePath);
+                            if (fr.Duration.TotalSeconds > 0)
+                            {
+                                _videoMetadataCache[newReq.FilePath] = fr;
+                                try { newReq.VideoCallback?.Invoke(fr); }
+                                catch { }
+                            }
+                            else
+                            {
+                                slowQueue.Enqueue(newReq);
+                            }
+                        }
+                    }
+
+                    float el = Time.realtimeSinceStartup * 1000f - batchStart;
+                    if (el >= SLOW_PATH_BUDGET_MS) break;
                 }
-                catch (Exception ex)
-                {
-                    Debug.LogWarning($"[FileMetadataService] Callback error: {ex.Message}");
-                }
+                break; // Process one batch then continue with slow queue
             }
-
-            // Delay between requests to prevent flooding main thread
-            yield return new WaitForSeconds(DELAY_BETWEEN_REQUESTS_MS / 1000f);
         }
 
         _isProcessingQueue = false;
         _queueProcessorCoroutine = null;
     }
 
-    private IEnumerator LoadVideoMetadataCoroutineInternal(string filePath, Action<VideoMetadata> onComplete)
+    /// <summary>
+    /// Try to get video metadata from file headers synchronously (~1-5ms).
+    /// Returns metadata with Duration > 0 if successful.
+    /// </summary>
+    private VideoMetadata TryGetVideoMetadataFromHeaders(string filePath)
+    {
+        var metadata = new VideoMetadata();
+
+        if (!File.Exists(filePath)) return metadata;
+
+        string ext = System.IO.Path.GetExtension(filePath)?.ToLowerInvariant();
+        bool isMP4Family = ext == ".mp4" || ext == ".m4v" || ext == ".mov";
+
+        if (!isMP4Family) return metadata;
+
+        try
+        {
+            var headerInfo = VideoHeaderParser.TryGetVideoInfoFromMP4Headers(filePath);
+            if (headerInfo.Duration > 0)
+            {
+                metadata.Duration = TimeSpan.FromSeconds(headerInfo.Duration);
+                metadata.Width = headerInfo.Width;
+                metadata.Height = headerInfo.Height;
+
+                try
+                {
+                    FileInfo fi = new FileInfo(filePath);
+                    metadata.TotalBitrate = (long)(fi.Length * 8 / headerInfo.Duration);
+                    metadata.DataRate = metadata.TotalBitrate;
+                }
+                catch { }
+            }
+        }
+        catch { }
+
+        return metadata;
+    }
+
+    /// <summary>
+    /// Process audio metadata synchronously inline (no coroutine overhead).
+    /// Audio metadata reading is pure file I/O that completes in <1ms.
+    /// </summary>
+    private void ProcessAudioMetadataInline(MetadataRequest request, bool storeInCache = false)
+    {
+        // Check cache first
+        if (_audioMetadataCache.TryGetValue(request.FilePath, out var cached) && cached.Duration.TotalSeconds > 0)
+        {
+            try { request.AudioCallback?.Invoke(cached); }
+            catch (Exception ex) { Debug.LogWarning($"[FileMetadataService] Callback error: {ex.Message}"); }
+            return;
+        }
+
+        var metadata = new AudioMetadata();
+
+        try
+        {
+            if (File.Exists(request.FilePath))
+            {
+                FileInfo fi = new FileInfo(request.FilePath);
+                string ext = fi.Extension.ToLower();
+
+                if (ext == ".mp3")
+                {
+                    ReadMP3Metadata(request.FilePath, ref metadata, fi.Length);
+                }
+                else
+                {
+                    int estimatedBitrate = 128;
+                    if (ext == ".wav") estimatedBitrate = 1411;
+                    else if (ext == ".ogg") estimatedBitrate = 160;
+
+                    metadata.BitRate = estimatedBitrate;
+                    double durationSeconds = fi.Length / (estimatedBitrate * 125.0);
+                    metadata.Duration = TimeSpan.FromSeconds(durationSeconds);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[FileMetadataService] Failed to read audio metadata: {ex.Message}");
+        }
+
+        // Store in cache if requested
+        if (storeInCache && metadata.Duration.TotalSeconds > 0)
+            _audioMetadataCache[request.FilePath] = metadata;
+
+        try
+        {
+            request.AudioCallback?.Invoke(metadata);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[FileMetadataService] Callback error: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// VideoPlayer fallback for video metadata (non-MP4 formats or header parse failure).
+    /// This is the slow path - only called when inline header parsing fails.
+    /// </summary>
+    private IEnumerator LoadVideoMetadataViaVideoPlayer(string filePath, Action<VideoMetadata> onComplete)
     {
         var metadata = new VideoMetadata();
 
@@ -327,7 +507,6 @@ public class FileMetadataService : MonoBehaviour
             yield break;
         }
 
-        // Create temporary VideoPlayer (must stay active for Prepare to work)
         GameObject tempGO = new GameObject("TempVideoPlayer");
         VideoPlayer vp = tempGO.AddComponent<VideoPlayer>();
 
@@ -348,8 +527,8 @@ public class FileMetadataService : MonoBehaviour
 
         vp.Prepare();
 
-        // Wait for prepare with timeout (increased for high-res videos)
-        float timeout = 15f;
+        // Wait for prepare with timeout
+        float timeout = 10f;
         float elapsed = 0f;
         while (!isPrepared && !hasFailed && elapsed < timeout)
         {
@@ -364,69 +543,16 @@ public class FileMetadataService : MonoBehaviour
             metadata.Duration = TimeSpan.FromSeconds(vp.length);
             metadata.FrameRate = vp.frameRate;
 
-            // If duration is 0, try header parsing fallback
-            if (vp.length <= 0)
-            {
-                Debug.LogWarning($"[FileMetadataService] VideoPlayer returned 0 duration, trying header fallback");
-                double headerDuration = VideoHeaderParser.TryGetDurationFromMP4(filePath);
-                if (headerDuration > 0)
-                {
-                    metadata.Duration = TimeSpan.FromSeconds(headerDuration);
-                    Debug.Log($"[FileMetadataService] Recovered duration from headers: {headerDuration}s");
-                }
-            }
-
             // Estimate bitrate from file size and duration
             if (metadata.Duration.TotalSeconds > 0)
             {
                 try
                 {
                     FileInfo fi = new FileInfo(filePath);
-                    metadata.TotalBitrate = (long)(fi.Length * 8 / metadata.Duration.TotalSeconds); // bits per second
-                    metadata.DataRate = metadata.TotalBitrate; // Approximate
+                    metadata.TotalBitrate = (long)(fi.Length * 8 / metadata.Duration.TotalSeconds);
+                    metadata.DataRate = metadata.TotalBitrate;
                 }
                 catch { }
-            }
-        }
-        else if (hasFailed || elapsed >= timeout)
-        {
-            // Even if VideoPlayer completely fails, try to get SOMETHING from file headers
-            Debug.LogWarning($"[FileMetadataService] VideoPlayer failed, attempting header-only metadata");
-
-            string ext = System.IO.Path.GetExtension(filePath)?.ToLowerInvariant();
-            if (ext == ".mp4" || ext == ".m4v" || ext == ".mov")
-            {
-                var headerInfo = VideoHeaderParser.TryGetVideoInfoFromMP4Headers(filePath);
-                if (headerInfo.Duration > 0)
-                {
-                    metadata.Duration = TimeSpan.FromSeconds(headerInfo.Duration);
-                }
-                if (headerInfo.Width > 0 && headerInfo.Height > 0)
-                {
-                    metadata.Width = headerInfo.Width;
-                    metadata.Height = headerInfo.Height;
-                }
-
-                bool hasAny = headerInfo.Duration > 0 || headerInfo.Width > 0;
-                if (hasAny)
-                {
-                    // Estimate bitrate from file size and duration
-                    if (headerInfo.Duration > 0)
-                    {
-                        try
-                        {
-                            System.IO.FileInfo fi = new System.IO.FileInfo(filePath);
-                            metadata.TotalBitrate = (long)(fi.Length * 8 / headerInfo.Duration);
-                            metadata.DataRate = metadata.TotalBitrate;
-                        }
-                        catch { }
-                    }
-                    Debug.Log($"[FileMetadataService] Header-only fallback: {headerInfo.Width}x{headerInfo.Height}, {headerInfo.Duration:F1}s, codec={headerInfo.Codec ?? "unknown"}");
-                }
-                else
-                {
-                    Debug.LogWarning($"[FileMetadataService] Header parsing also failed for: {System.IO.Path.GetFileName(filePath)}");
-                }
             }
         }
 
@@ -442,6 +568,13 @@ public class FileMetadataService : MonoBehaviour
     /// </summary>
     public void GetAudioMetadata(string filePath, Action<AudioMetadata> onComplete)
     {
+        // Check cache first - return instantly if we have pre-loaded data
+        if (_audioMetadataCache.TryGetValue(filePath, out var cached) && cached.Duration.TotalSeconds > 0)
+        {
+            onComplete?.Invoke(cached);
+            return;
+        }
+
         // Limit queue size to prevent memory bloat
         if (_metadataQueue.Count >= MAX_QUEUE_SIZE)
         {
@@ -817,6 +950,149 @@ public class FileMetadataService : MonoBehaviour
         return "";
     }
 
+    #region Background Pre-loading
+    /// <summary>
+    /// Pre-load metadata for all given file paths in background.
+    /// Call this after media library scan to have metadata ready before UI opens.
+    /// Uses frame budget to avoid blocking main thread.
+    /// </summary>
+    public void PreloadMetadata(List<string> filePaths)
+    {
+        if (_isPreloading)
+        {
+            Debug.Log("[FileMetadataService] Already preloading, skipping");
+            return;
+        }
+
+        if (filePaths == null || filePaths.Count == 0) return;
+
+        if (_preloadCoroutine != null)
+            StopCoroutine(_preloadCoroutine);
+
+        _preloadCoroutine = StartCoroutine(PreloadMetadataCoroutine(filePaths));
+    }
+
+    /// <summary>
+    /// Stop any running preload operation.
+    /// </summary>
+    public void StopPreload()
+    {
+        if (_preloadCoroutine != null)
+        {
+            StopCoroutine(_preloadCoroutine);
+            _preloadCoroutine = null;
+        }
+        _isPreloading = false;
+    }
+
+    private IEnumerator PreloadMetadataCoroutine(List<string> filePaths)
+    {
+        _isPreloading = true;
+        int preloaded = 0;
+        int skipped = 0;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        Debug.Log($"[FileMetadataService] Starting background preload for {filePaths.Count} files");
+
+        for (int i = 0; i < filePaths.Count; i++)
+        {
+            string filePath = filePaths[i];
+
+            // Determine file type
+            string ext = Path.GetExtension(filePath)?.ToLowerInvariant();
+            bool isVideo = ext == ".mp4" || ext == ".mkv" || ext == ".avi" || ext == ".webm" ||
+                           ext == ".mov" || ext == ".wmv" || ext == ".m4v" || ext == ".flv";
+            bool isAudio = ext == ".mp3" || ext == ".wav" || ext == ".flac" || ext == ".aac" ||
+                           ext == ".ogg" || ext == ".m4a" || ext == ".wma";
+
+            if (isVideo)
+            {
+                // Skip if already cached
+                if (_videoMetadataCache.ContainsKey(filePath))
+                {
+                    skipped++;
+                    continue;
+                }
+
+                // Try fast header parsing
+                VideoMetadata metadata = TryGetVideoMetadataFromHeaders(filePath);
+                if (metadata.Duration.TotalSeconds > 0)
+                {
+                    _videoMetadataCache[filePath] = metadata;
+                    preloaded++;
+                }
+            }
+            else if (isAudio)
+            {
+                // Skip if already cached
+                if (_audioMetadataCache.ContainsKey(filePath))
+                {
+                    skipped++;
+                    continue;
+                }
+
+                // Read audio metadata synchronously
+                var metadata = ReadAudioMetadataSync(filePath);
+                if (metadata.Duration.TotalSeconds > 0)
+                {
+                    _audioMetadataCache[filePath] = metadata;
+                    preloaded++;
+                }
+            }
+
+            // Yield every 20 items to keep UI responsive
+            if ((i + 1) % 20 == 0)
+                yield return null;
+        }
+
+        sw.Stop();
+        _isPreloading = false;
+        _preloadCoroutine = null;
+
+        Debug.Log($"[FileMetadataService] Preload complete: {preloaded} loaded, {skipped} cached, {filePaths.Count - preloaded - skipped} failed ({sw.ElapsedMilliseconds}ms)");
+    }
+
+    /// <summary>
+    /// Read audio metadata synchronously (for preloading).
+    /// </summary>
+    private AudioMetadata ReadAudioMetadataSync(string filePath)
+    {
+        var metadata = new AudioMetadata();
+        try
+        {
+            if (!File.Exists(filePath)) return metadata;
+
+            FileInfo fi = new FileInfo(filePath);
+            string ext = fi.Extension.ToLower();
+
+            if (ext == ".mp3")
+            {
+                ReadMP3Metadata(filePath, ref metadata, fi.Length);
+            }
+            else
+            {
+                int estimatedBitrate = 128;
+                if (ext == ".wav") estimatedBitrate = 1411;
+                else if (ext == ".ogg") estimatedBitrate = 160;
+
+                metadata.BitRate = estimatedBitrate;
+                double durationSeconds = fi.Length / (estimatedBitrate * 125.0);
+                metadata.Duration = TimeSpan.FromSeconds(durationSeconds);
+            }
+        }
+        catch { }
+        return metadata;
+    }
+
+    /// <summary>
+    /// Check if metadata is already cached for a file path.
+    /// </summary>
+    public bool HasCachedMetadata(string filePath)
+    {
+        return _videoMetadataCache.ContainsKey(filePath) || _audioMetadataCache.ContainsKey(filePath);
+    }
+    #endregion
+
     private void OnDestroy()
     {
         if (_queueProcessorCoroutine != null)
@@ -824,8 +1100,14 @@ public class FileMetadataService : MonoBehaviour
             StopCoroutine(_queueProcessorCoroutine);
             _queueProcessorCoroutine = null;
         }
+        if (_preloadCoroutine != null)
+        {
+            StopCoroutine(_preloadCoroutine);
+            _preloadCoroutine = null;
+        }
         _metadataQueue.Clear();
         _isProcessingQueue = false;
+        _isPreloading = false;
     }
 
     #region Public Static Helpers
