@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using TMPro;
@@ -8,9 +9,10 @@ using VRWorkspace.UI.HoverEffects;
 
 /// <summary>
 /// Video queue panel displayed inside SideControlsFrame.
-/// Shows scrollable list of queued videos as card-style items matching Media Library grid.
+/// Shows paginated list of queued videos as card-style items matching Media Library grid.
+/// Implements IPaginationController for external RTTFilePagination component.
 /// </summary>
-public class RTTMediaQueuePanel : MonoBehaviour
+public class RTTMediaQueuePanel : MonoBehaviour, IPaginationController
 {
     #region Constants
     // Layout ratios
@@ -19,9 +21,8 @@ public class RTTMediaQueuePanel : MonoBehaviour
     private const float IMAGE_RATIO = 5f / 7f;        // Image = 5/7 chiều cao item
     private const float IMAGE_WIDTH_RATIO = 0.90f;    // Image max width = 90% queue width
 
-    // Margins riêng từng thành phần
-    private const float HEADER_MARGIN_H = 20f;
-    private const float TITLE_MARGIN_H = 12f;
+    // Side margin ratio (5.5% of Queue width)
+    private const float SIDE_MARGIN_RATIO = 0.055f;
 
     private const float TOP_GAP_RATIO = 1f / 12f;    // 1/12 item height = gap trên image
 
@@ -34,6 +35,9 @@ public class RTTMediaQueuePanel : MonoBehaviour
     // Hover scale
     private const float HOVER_SCALE = 1.03f;
 
+    // Pagination
+    private const int ITEMS_PER_PAGE = 2;
+
     // Colors
     private static readonly Color ITEM_BG = new Color(0.14f, 0.14f, 0.16f, 0.6f);
     private static readonly Color TEXT_COLOR = new Color(0.9f, 0.9f, 0.9f, 1f);
@@ -41,6 +45,7 @@ public class RTTMediaQueuePanel : MonoBehaviour
 
     private const string ICON_SHUFFLE = "icon_shuffle";
     private const string ICON_PLAYING = "icon_playing";
+    private const float PLAYING_SCROLL_SPEED = 25f; // UI pixels/sec for playing icon scroll
 
     // Queue background gradient (top → bottom)
     private static readonly Color QUEUE_BG_TOP = ITEM_BG;
@@ -52,6 +57,8 @@ public class RTTMediaQueuePanel : MonoBehaviour
     public event Action<int> OnItemClicked;
     /// <summary>Fired when shuffle button is clicked.</summary>
     public event Action OnShuffleClicked;
+    /// <summary>Fired when page changes. Parameters: currentPage (1-based), totalPages.</summary>
+    public event Action<int, int> OnPageChanged;
     #endregion
 
     #region Private Fields
@@ -64,15 +71,30 @@ public class RTTMediaQueuePanel : MonoBehaviour
     private float _imageHeight;
     private float _textHeight;
     private float _imageMaxWidth;
+    private float _sideMargin;
+    private float _shuffleBtnSize;
     private TMP_FontAsset _font;
 
     private RectTransform _contentRoot;
-    private ScrollRect _scrollRect;
-    private RectTransform _scrollContent;
+    private RectTransform _itemsContainer;
 
     private List<string> _queuePaths = new List<string>();
     private int _currentIndex = -1;
     private List<QueueItemUI> _items = new List<QueueItemUI>();
+
+    // Pagination state
+    private int _currentPage = 1;
+    private int _totalPages = 1;
+
+    // Scroll animation
+    private const float SCROLL_DURATION = 0.2f;
+    private RectTransform _bodyClipContainer; // fixed clip parent (RectMask2D)
+    private Coroutine _scrollAnim;
+    private int _scrollDirection; // -1 = scroll up (next page), +1 = scroll down (prev page)
+
+    // Playing icon scrolling animation
+    private static Sprite _scrollingPlayingSprite;
+    private Coroutine _playingAnim;
 
     // Cached sprites
     private static Sprite _roundedRectSprite;
@@ -86,6 +108,7 @@ public class RTTMediaQueuePanel : MonoBehaviour
         public Image Background;
         public Image ThumbnailImage;
         public GameObject PlayingIcon;
+        public Image PlayingIconImage;
         public TextMeshProUGUI TitleText;
         public Button Button;
         public HoverEffectController HoverController;
@@ -108,6 +131,8 @@ public class RTTMediaQueuePanel : MonoBehaviour
         _imageHeight = Mathf.Round(_itemHeight * IMAGE_RATIO) - _topGap;
         _textHeight = _itemHeight - _imageHeight - _topGap;
         _imageMaxWidth = Mathf.Round(_width * IMAGE_WIDTH_RATIO);
+        _sideMargin = Mathf.Round(_width * SIDE_MARGIN_RATIO);
+        _shuffleBtnSize = Mathf.Round(HEADER_BTN_SIZE * 1.3f);
 
         BuildUI();
     }
@@ -119,9 +144,10 @@ public class RTTMediaQueuePanel : MonoBehaviour
     {
         _queuePaths = paths ?? new List<string>();
         _currentIndex = currentIndex;
+        _totalPages = Mathf.Max(1, Mathf.CeilToInt(_queuePaths.Count / (float)ITEMS_PER_PAGE));
 
-        RebuildItems();
-        ScrollToCurrentItem();
+        // Navigate to the page containing the current item
+        GoToCurrentItemPage(forceRebuild: true);
     }
 
     /// <summary>
@@ -132,30 +158,94 @@ public class RTTMediaQueuePanel : MonoBehaviour
         int oldIndex = _currentIndex;
         _currentIndex = index;
 
-        if (oldIndex >= 0 && oldIndex < _items.Count)
-            UpdateItemHighlight(_items[oldIndex], false);
-        if (index >= 0 && index < _items.Count)
-            UpdateItemHighlight(_items[index], true);
+        int newPage = GetPageForIndex(index);
+        if (newPage != _currentPage)
+        {
+            // Different page - rebuild (GoToCurrentItemPage sets scroll direction)
+            GoToCurrentItemPage(forceRebuild: true);
+        }
+        else
+        {
+            // Same page - just update highlights
+            int pageStartIndex = (_currentPage - 1) * ITEMS_PER_PAGE;
+            int oldLocal = oldIndex - pageStartIndex;
+            int newLocal = index - pageStartIndex;
 
-        ScrollToCurrentItem();
+            if (oldLocal >= 0 && oldLocal < _items.Count)
+                UpdateItemHighlight(_items[oldLocal], false);
+            if (newLocal >= 0 && newLocal < _items.Count)
+                UpdateItemHighlight(_items[newLocal], true);
+        }
     }
 
     /// <summary>
-    /// Scroll to make the current item visible.
+    /// Navigate to the page containing the current playing item.
     /// </summary>
-    public void ScrollToCurrentItem()
+    private void GoToCurrentItemPage(bool forceRebuild = false)
     {
-        if (_scrollRect == null || _scrollContent == null) return;
-        if (_currentIndex < 0 || _currentIndex >= _items.Count) return;
-
-        float viewportHeight = _bodyHeight - _topGap; // viewport có bottom gap
-        float totalHeight = _queuePaths.Count * _itemHeight;
-        if (totalHeight <= viewportHeight) return;
-
-        float itemTop = _currentIndex * _itemHeight;
-        float normalizedPos = 1f - Mathf.Clamp01(itemTop / (totalHeight - viewportHeight));
-        _scrollRect.verticalNormalizedPosition = normalizedPos;
+        int targetPage = GetPageForIndex(_currentIndex);
+        if (targetPage != _currentPage || forceRebuild)
+        {
+            _scrollDirection = targetPage > _currentPage ? -1 : (targetPage < _currentPage ? 1 : 0);
+            _currentPage = targetPage;
+            RebuildItems();
+        }
     }
+
+    /// <summary>
+    /// Get the page number (1-based) that contains the given queue index.
+    /// </summary>
+    private int GetPageForIndex(int index)
+    {
+        if (index < 0 || _queuePaths.Count == 0) return 1;
+        return Mathf.Clamp((index / ITEMS_PER_PAGE) + 1, 1, _totalPages);
+    }
+
+    /// <summary>
+    /// Change page by delta (-1 = previous, +1 = next).
+    /// </summary>
+    public void ChangePage(int delta)
+    {
+        int newPage = Mathf.Clamp(_currentPage + delta, 1, _totalPages);
+        if (newPage == _currentPage) return;
+
+        _scrollDirection = delta > 0 ? -1 : 1; // next page = items slide up, prev = slide down
+        _currentPage = newPage;
+        RebuildItems();
+    }
+
+    /// <summary>
+    /// Notify external pagination component of page state change.
+    /// </summary>
+    private void NotifyPageChanged()
+    {
+        OnPageChanged?.Invoke(_currentPage, _totalPages);
+    }
+
+    #region IPaginationController
+    /// <summary>Go to specific page number (1-based).</summary>
+    public void GoToPage(int pageNumber)
+    {
+        int newPage = Mathf.Clamp(pageNumber, 1, _totalPages);
+        if (newPage == _currentPage) return;
+
+        _scrollDirection = newPage > _currentPage ? -1 : 1;
+        _currentPage = newPage;
+        RebuildItems();
+    }
+
+    /// <summary>Scroll to first page.</summary>
+    public void ScrollToStart()
+    {
+        GoToPage(1);
+    }
+
+    /// <summary>Scroll to last page.</summary>
+    public void ScrollToEnd()
+    {
+        GoToPage(_totalPages);
+    }
+    #endregion
     #endregion
 
     #region UI Building
@@ -172,7 +262,7 @@ public class RTTMediaQueuePanel : MonoBehaviour
 
         CreateGradientBackground();
         CreateHeader();
-        CreateScrollArea();
+        CreateItemsContainer();
     }
 
     private void CreateGradientBackground()
@@ -245,8 +335,8 @@ public class RTTMediaQueuePanel : MonoBehaviour
         headerRT.anchorMin = new Vector2(0, 1);
         headerRT.anchorMax = new Vector2(1, 1);
         headerRT.pivot = new Vector2(0.5f, 1);
-        headerRT.offsetMin = new Vector2(HEADER_MARGIN_H, -_headerHeight);
-        headerRT.offsetMax = new Vector2(-HEADER_MARGIN_H, 0);
+        headerRT.offsetMin = new Vector2(_sideMargin, -_headerHeight);
+        headerRT.offsetMax = new Vector2(-_sideMargin, 0);
 
         var headerLayout = headerObj.AddComponent<HorizontalLayoutGroup>();
         headerLayout.childControlWidth = true;
@@ -265,7 +355,7 @@ public class RTTMediaQueuePanel : MonoBehaviour
         var headerText = titleObj.AddComponent<TextMeshProUGUI>();
         headerText.font = _font;
         headerText.text = "Queue";
-        headerText.fontSize = 28;
+        headerText.fontSize = 35;
         headerText.color = TEXT_COLOR;
         headerText.alignment = TextAlignmentOptions.MidlineLeft;
         headerText.fontStyle = FontStyles.Bold;
@@ -281,10 +371,10 @@ public class RTTMediaQueuePanel : MonoBehaviour
         btnObj.transform.SetParent(parent, false);
 
         var btnLE = btnObj.AddComponent<LayoutElement>();
-        btnLE.minWidth = HEADER_BTN_SIZE;
-        btnLE.minHeight = HEADER_BTN_SIZE;
-        btnLE.preferredWidth = HEADER_BTN_SIZE;
-        btnLE.preferredHeight = HEADER_BTN_SIZE;
+        btnLE.minWidth = _shuffleBtnSize;
+        btnLE.minHeight = _shuffleBtnSize;
+        btnLE.preferredWidth = _shuffleBtnSize;
+        btnLE.preferredHeight = _shuffleBtnSize;
 
         // No background - transparent raycast target
         var bgImage = btnObj.AddComponent<Image>();
@@ -317,84 +407,165 @@ public class RTTMediaQueuePanel : MonoBehaviour
 
         // Collider for VR raycast
         var col = btnObj.AddComponent<BoxCollider>();
-        col.size = new Vector3(HEADER_BTN_SIZE, HEADER_BTN_SIZE, 10);
+        col.size = new Vector3(_shuffleBtnSize, _shuffleBtnSize, 10);
         col.center = new Vector3(0, 0, -5);
     }
 
-    private void CreateScrollArea()
+    private void CreateItemsContainer()
     {
-        // Viewport - full width, ngay dưới header
-        GameObject viewportObj = new GameObject("Viewport");
-        viewportObj.transform.SetParent(_contentRoot, false);
+        // Fixed clip container - below header, clips children during scroll animation
+        GameObject clipObj = new GameObject("BodyClip");
+        clipObj.transform.SetParent(_contentRoot, false);
 
-        var viewportRT = viewportObj.AddComponent<RectTransform>();
-        viewportRT.anchorMin = Vector2.zero;
-        viewportRT.anchorMax = Vector2.one;
-        viewportRT.offsetMin = new Vector2(0, _topGap);              // bottom gap = _topGap
-        viewportRT.offsetMax = new Vector2(0, -_headerHeight);    // top = dưới header
+        _bodyClipContainer = clipObj.AddComponent<RectTransform>();
+        _bodyClipContainer.anchorMin = new Vector2(0, 0);
+        _bodyClipContainer.anchorMax = new Vector2(1, 1);
+        // Lấy 1 nửa khoảng cách phía trên (topGap) đưa cho phía dưới
+        float redistribute = Mathf.Round(_topGap);
+        _bodyClipContainer.offsetMin = new Vector2(0, redistribute);
+        _bodyClipContainer.offsetMax = new Vector2(0, -_headerHeight + redistribute);
+        clipObj.AddComponent<RectMask2D>();
 
-        viewportObj.AddComponent<RectMask2D>();
+        // Animated items container inside clip - this one moves during scroll
+        GameObject containerObj = new GameObject("ItemsContainer");
+        containerObj.transform.SetParent(clipObj.transform, false);
 
-        // Content container
-        GameObject contentObj = new GameObject("Content");
-        contentObj.transform.SetParent(viewportObj.transform, false);
+        _itemsContainer = containerObj.AddComponent<RectTransform>();
+        _itemsContainer.anchorMin = Vector2.zero;
+        _itemsContainer.anchorMax = Vector2.one;
+        _itemsContainer.offsetMin = Vector2.zero;
+        _itemsContainer.offsetMax = Vector2.zero;
 
-        _scrollContent = contentObj.AddComponent<RectTransform>();
-        _scrollContent.anchorMin = new Vector2(0, 1);
-        _scrollContent.anchorMax = new Vector2(1, 1);
-        _scrollContent.pivot = new Vector2(0.5f, 1);
-        _scrollContent.offsetMin = Vector2.zero;
-        _scrollContent.offsetMax = Vector2.zero;
-
-        var layout = contentObj.AddComponent<VerticalLayoutGroup>();
+        var layout = containerObj.AddComponent<VerticalLayoutGroup>();
         layout.spacing = 0f;
         layout.childControlWidth = true;
         layout.childControlHeight = false;
         layout.childForceExpandWidth = true;
         layout.childForceExpandHeight = false;
         layout.padding = new RectOffset(0, 0, 0, 0);
-
-        var fitter = contentObj.AddComponent<ContentSizeFitter>();
-        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-        // ScrollRect
-        _scrollRect = viewportObj.AddComponent<ScrollRect>();
-        _scrollRect.content = _scrollContent;
-        _scrollRect.viewport = viewportRT;
-        _scrollRect.horizontal = false;
-        _scrollRect.vertical = true;
-        _scrollRect.scrollSensitivity = 30f;
-        _scrollRect.movementType = ScrollRect.MovementType.Elastic;
-        _scrollRect.elasticity = 0.1f;
     }
+
     #endregion
 
     #region Item Management
     private void RebuildItems()
     {
+        // Stop any running scroll animation
+        if (_scrollAnim != null)
+        {
+            StopCoroutine(_scrollAnim);
+            _scrollAnim = null;
+        }
+
         foreach (var item in _items)
         {
             if (item.Root != null) Destroy(item.Root);
         }
         _items.Clear();
 
-        if (_scrollContent == null) return;
+        if (_itemsContainer == null) return;
 
-        for (int i = 0; i < _queuePaths.Count; i++)
+        // Calculate page range
+        int startIndex = (_currentPage - 1) * ITEMS_PER_PAGE;
+        int endIndex = Mathf.Min(startIndex + ITEMS_PER_PAGE, _queuePaths.Count);
+
+        for (int i = startIndex; i < endIndex; i++)
         {
             var item = CreateQueueItem(i, _queuePaths[i]);
             _items.Add(item);
         }
+
+        // Peek item: show partial next item (clipped by RectMask2D) to hint more content
+        int peekIndex = endIndex;
+        if (peekIndex < _queuePaths.Count)
+        {
+            var peekItem = CreateQueueItem(peekIndex, _queuePaths[peekIndex]);
+            _items.Add(peekItem);
+        }
+
+        // Animate scroll transition
+        if (_scrollDirection != 0 && gameObject.activeInHierarchy)
+        {
+            _scrollAnim = StartCoroutine(AnimateScroll(_scrollDirection));
+            _scrollDirection = 0;
+        }
+        else
+        {
+            _itemsContainer.anchoredPosition = Vector2.zero;
+        }
+
+        NotifyPageChanged();
+
+        // Restart playing icon animation for current page's active item
+        StartPlayingAnimation();
     }
 
-    private QueueItemUI CreateQueueItem(int index, string path)
+    private IEnumerator AnimateScroll(int direction)
+    {
+        // direction: -1 = slide up (next page), +1 = slide down (prev page)
+        float offset = direction * _bodyHeight * 0.5f;
+        float elapsed = 0f;
+
+        _itemsContainer.anchoredPosition = new Vector2(0, offset);
+
+        while (elapsed < SCROLL_DURATION)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / SCROLL_DURATION);
+            // Ease out cubic: 1 - (1-t)^3
+            float eased = 1f - (1f - t) * (1f - t) * (1f - t);
+            _itemsContainer.anchoredPosition = new Vector2(0, Mathf.Lerp(offset, 0f, eased));
+            yield return null;
+        }
+
+        _itemsContainer.anchoredPosition = Vector2.zero;
+        _scrollAnim = null;
+    }
+
+    private void StartPlayingAnimation()
+    {
+        StopPlayingAnimation();
+        if (gameObject.activeInHierarchy)
+            _playingAnim = StartCoroutine(PlayingIconAnimCoroutine());
+    }
+
+    private void StopPlayingAnimation()
+    {
+        if (_playingAnim != null)
+        {
+            StopCoroutine(_playingAnim);
+            _playingAnim = null;
+        }
+    }
+
+    private IEnumerator PlayingIconAnimCoroutine()
+    {
+        while (true)
+        {
+            foreach (var item in _items)
+            {
+                if (item.PlayingIconImage != null && item.PlayingIcon != null && item.PlayingIcon.activeSelf)
+                {
+                    var rt = item.PlayingIconImage.rectTransform;
+                    float scrollRange = rt.sizeDelta.x - PLAYING_ICON_SIZE;
+                    if (scrollRange <= 0f) continue;
+                    float x = rt.anchoredPosition.x - PLAYING_SCROLL_SPEED * Time.deltaTime;
+                    if (x < -scrollRange) x += scrollRange;
+                    rt.anchoredPosition = new Vector2(x, 0f);
+                }
+            }
+            yield return null;
+        }
+    }
+
+    private QueueItemUI CreateQueueItem(int index, string path, bool isPeek = false)
     {
         var item = new QueueItemUI { Index = index };
         bool isActive = (index == _currentIndex);
 
         // === Root (full width, height = _itemHeight) ===
         item.Root = new GameObject($"QueueItem_{index}");
-        item.Root.transform.SetParent(_scrollContent, false);
+        item.Root.transform.SetParent(_itemsContainer, false);
 
         var rootRT = item.Root.AddComponent<RectTransform>();
         rootRT.sizeDelta = new Vector2(0, _itemHeight);
@@ -408,18 +579,21 @@ public class RTTMediaQueuePanel : MonoBehaviour
         item.Background.color = Color.clear;
         item.Background.sprite = GetRoundedRect();
         item.Background.type = Image.Type.Sliced;
-        item.Background.raycastTarget = true;
+        item.Background.raycastTarget = !isPeek;
 
-        // === Button for click ===
-        item.Button = item.Root.AddComponent<Button>();
-        item.Button.transition = Selectable.Transition.None;
-        int capturedIndex = index;
-        item.Button.onClick.AddListener(() => OnItemClicked?.Invoke(capturedIndex));
+        if (!isPeek)
+        {
+            // === Button for click ===
+            item.Button = item.Root.AddComponent<Button>();
+            item.Button.transition = Selectable.Transition.None;
+            int capturedIndex = index;
+            item.Button.onClick.AddListener(() => OnItemClicked?.Invoke(capturedIndex));
 
-        // === Collider for VR raycast (full width) ===
-        var col = item.Root.AddComponent<BoxCollider>();
-        col.size = new Vector3(_width, _itemHeight, 10);
-        col.center = new Vector3(0, 0, -5);
+            // === Collider for VR raycast (full width) ===
+            var col = item.Root.AddComponent<BoxCollider>();
+            col.size = new Vector3(_width, _itemHeight, 10);
+            col.center = new Vector3(0, 0, -5);
+        }
 
         // === Thumbnail Container (top, centered 90% width, offset down by _topGap) ===
         GameObject thumbContainer = new GameObject("ThumbnailContainer");
@@ -465,7 +639,8 @@ public class RTTMediaQueuePanel : MonoBehaviour
         LoadThumbnail(path, item.ThumbnailImage);
 
         // === Playing Icon (overlay trên thumbnail, child of Root to avoid RectMask2D/material interference) ===
-        item.PlayingIcon = CreatePlayingIcon(item.Root.transform, _topGap, _imageHeight);
+        item.PlayingIcon = CreatePlayingIcon(item.Root.transform, _topGap, _imageHeight, out var playingImg);
+        item.PlayingIconImage = playingImg;
         item.PlayingIcon.SetActive(isActive);
 
         // === Title Text (bottom, margin riêng) ===
@@ -476,8 +651,8 @@ public class RTTMediaQueuePanel : MonoBehaviour
         titleRT.anchorMin = new Vector2(0, 0);
         titleRT.anchorMax = new Vector2(1, 0);
         titleRT.pivot = new Vector2(0, 0);
-        titleRT.offsetMin = new Vector2(TITLE_MARGIN_H, 0);
-        titleRT.offsetMax = new Vector2(-TITLE_MARGIN_H, _textHeight);
+        titleRT.offsetMin = new Vector2(_sideMargin, 0);
+        titleRT.offsetMax = new Vector2(-_sideMargin, _textHeight);
 
         item.TitleText = titleObj.AddComponent<TextMeshProUGUI>();
         item.TitleText.font = _font;
@@ -490,31 +665,34 @@ public class RTTMediaQueuePanel : MonoBehaviour
         item.TitleText.enableWordWrapping = false;
         item.TitleText.raycastTarget = false;
 
-        // === Hover Effects (scale + background color) ===
-        item.HoverController = item.Root.AddComponent<HoverEffectController>();
-        item.HoverController.AddEffect(new ScaleHoverEffect()
-            .WithHoverScale(HOVER_SCALE)
-            .WithTransitionDuration(0.1f));
-        item.HoverController.AddEffect(new ColorHoverEffect()
-            .WithTargetChild("")
-            .WithHoverColor(ITEM_BG)
-            .WithTransitionDuration(0.1f));
-
-        // Disable interaction on currently playing item
-        if (isActive)
+        if (!isPeek)
         {
-            item.Button.interactable = false;
-            item.HoverController.enabled = false;
+            // === Hover Effects (scale + background color) ===
+            item.HoverController = item.Root.AddComponent<HoverEffectController>();
+            item.HoverController.AddEffect(new ScaleHoverEffect()
+                .WithHoverScale(HOVER_SCALE)
+                .WithTransitionDuration(0.1f));
+            item.HoverController.AddEffect(new ColorHoverEffect()
+                .WithTargetChild("")
+                .WithHoverColor(ITEM_BG)
+                .WithTransitionDuration(0.1f));
+
+            // Disable interaction on currently playing item
+            if (isActive)
+            {
+                item.Button.interactable = false;
+                item.HoverController.enabled = false;
+            }
         }
 
         return item;
     }
 
-    private GameObject CreatePlayingIcon(Transform rootTransform, float topGap, float imageHeight)
+    private GameObject CreatePlayingIcon(Transform rootTransform, float topGap, float imageHeight, out Image iconImage)
     {
         float bgSize = PLAYING_ICON_SIZE * 1.875f;
 
-        // Container
+        // Container with circle background
         GameObject iconObj = new GameObject("PlayingIcon");
         iconObj.transform.SetParent(rootTransform, false);
 
@@ -531,20 +709,34 @@ public class RTTMediaQueuePanel : MonoBehaviour
         bgImage.color = new Color(0f, 0f, 0f, 0.45f);
         bgImage.raycastTarget = false;
 
-        // Icon sprite (centered, original size)
-        var spriteObj = new GameObject("Icon");
-        spriteObj.transform.SetParent(iconObj.transform, false);
+        // Viewport clips the scrolling strip to original icon size
+        var viewportObj = new GameObject("ScrollViewport");
+        viewportObj.transform.SetParent(iconObj.transform, false);
+        var vpRT = viewportObj.AddComponent<RectTransform>();
+        vpRT.anchorMin = new Vector2(0.5f, 0.5f);
+        vpRT.anchorMax = new Vector2(0.5f, 0.5f);
+        vpRT.pivot = new Vector2(0.5f, 0.5f);
+        vpRT.sizeDelta = new Vector2(PLAYING_ICON_SIZE, PLAYING_ICON_SIZE);
+        viewportObj.AddComponent<RectMask2D>();
 
-        var spriteRT = spriteObj.AddComponent<RectTransform>();
-        spriteRT.anchorMin = new Vector2(0.5f, 0.5f);
-        spriteRT.anchorMax = new Vector2(0.5f, 0.5f);
-        spriteRT.pivot = new Vector2(0.5f, 0.5f);
-        spriteRT.sizeDelta = new Vector2(PLAYING_ICON_SIZE, PLAYING_ICON_SIZE);
+        // Wide scrolling strip inside viewport
+        var stripObj = new GameObject("ScrollStrip");
+        stripObj.transform.SetParent(viewportObj.transform, false);
+        var stripRT = stripObj.AddComponent<RectTransform>();
+        stripRT.anchorMin = new Vector2(0f, 0.5f);
+        stripRT.anchorMax = new Vector2(0f, 0.5f);
+        stripRT.pivot = new Vector2(0f, 0.5f);
 
-        var iconImage = spriteObj.AddComponent<Image>();
-        iconImage.sprite = Resources.Load<Sprite>(ICON_PLAYING);
+        var scrollSprite = GetScrollingPlayingSprite();
+        float stripAspect = (float)scrollSprite.texture.width / scrollSprite.texture.height;
+        float stripDisplayW = PLAYING_ICON_SIZE * stripAspect;
+        stripRT.sizeDelta = new Vector2(stripDisplayW, PLAYING_ICON_SIZE);
+        stripRT.anchoredPosition = Vector2.zero;
+
+        iconImage = stripObj.AddComponent<Image>();
+        iconImage.sprite = scrollSprite;
         iconImage.color = Color.white;
-        iconImage.preserveAspect = true;
+        iconImage.preserveAspect = false;
         iconImage.raycastTarget = false;
 
         return iconObj;
@@ -602,6 +794,92 @@ public class RTTMediaQueuePanel : MonoBehaviour
     #endregion
 
     #region Sprite Helpers
+    /// <summary>
+    /// Create a seamless scrolling strip from icon_playing:
+    /// 1. Double the source image side by side (24 parts)
+    /// 2. Crossfade parts 12+13 (middle junction)
+    /// 3. Crossfade parts 24+1 (loop junction)
+    /// Result: 22-part wide strip that loops seamlessly when scrolled.
+    /// </summary>
+    private static Sprite GetScrollingPlayingSprite()
+    {
+        if (_scrollingPlayingSprite != null) return _scrollingPlayingSprite;
+
+        var sourceSprite = Resources.Load<Sprite>(ICON_PLAYING);
+        var sourceTex = sourceSprite.texture;
+        int W = sourceTex.width;
+        int H = sourceTex.height;
+        int partW = Mathf.Max(1, W / 12);
+
+        // Read pixels via RenderTexture (handles non-readable textures)
+        var rt = RenderTexture.GetTemporary(W, H, 0, RenderTextureFormat.ARGB32);
+        Graphics.Blit(sourceTex, rt);
+        var prev = RenderTexture.active;
+        RenderTexture.active = rt;
+        var readable = new Texture2D(W, H, TextureFormat.RGBA32, false);
+        readable.ReadPixels(new Rect(0, 0, W, H), 0, 0);
+        readable.Apply();
+        RenderTexture.active = prev;
+        RenderTexture.ReleaseTemporary(rt);
+
+        Color[] src = readable.GetPixels();
+
+        // Strip = 22 parts (doubled 24 minus 2 overlaps)
+        int stripW = 22 * partW;
+        Color[] strip = new Color[stripW * H];
+
+        for (int y = 0; y < H; y++)
+        {
+            // Parts 1-11: direct copy from source
+            for (int x = 0; x < 11 * partW && x < W; x++)
+                strip[y * stripW + x] = src[y * W + x];
+
+            // Part 12+13 blend: crossfade end of first copy → start of second copy
+            for (int lx = 0; lx < partW; lx++)
+            {
+                float t = (partW > 1) ? lx / (float)(partW - 1) : 0.5f;
+                int x12 = Mathf.Min(11 * partW + lx, W - 1);
+                int x13 = lx;
+                strip[y * stripW + 11 * partW + lx] = Color.Lerp(src[y * W + x12], src[y * W + x13], t);
+            }
+
+            // Parts 14-23: parts 2-11 from source (second copy after overlap)
+            for (int p = 0; p < 10; p++)
+            {
+                for (int lx = 0; lx < partW; lx++)
+                {
+                    int srcX = Mathf.Min((p + 1) * partW + lx, W - 1);
+                    strip[y * stripW + (12 + p) * partW + lx] = src[y * W + srcX];
+                }
+            }
+        }
+
+        // Blend part 24+1 for seamless loop (last partW crossfades to first partW)
+        for (int y = 0; y < H; y++)
+        {
+            for (int lx = 0; lx < partW; lx++)
+            {
+                float t = (partW > 1) ? lx / (float)(partW - 1) : 0.5f;
+                int endIdx = y * stripW + (stripW - partW + lx);
+                int startIdx = y * stripW + lx;
+                strip[endIdx] = Color.Lerp(strip[endIdx], strip[startIdx], t);
+            }
+        }
+
+        var stripTex = new Texture2D(stripW, H, TextureFormat.RGBA32, false);
+        stripTex.SetPixels(strip);
+        stripTex.Apply();
+        stripTex.wrapMode = TextureWrapMode.Clamp;
+        stripTex.filterMode = FilterMode.Bilinear;
+
+        _scrollingPlayingSprite = Sprite.Create(
+            stripTex, new Rect(0, 0, stripW, H),
+            new Vector2(0f, 0.5f), 100f);
+
+        UnityEngine.Object.Destroy(readable);
+        return _scrollingPlayingSprite;
+    }
+
     private static Sprite GetRoundedRect()
     {
         if (_roundedRectSprite == null)

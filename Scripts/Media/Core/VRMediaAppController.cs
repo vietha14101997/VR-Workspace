@@ -104,6 +104,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
     private GameObject _sideControlsFrameObject;
     private int _sideControlsSide = 1; // 1=right, -1=left
     private RTTMediaQueuePanel _queuePanel;
+    private RTTFilePagination _queuePagination;
 
     // Cached rounded rect sprite for menu button
     private static Sprite _cachedRoundedRectSprite;
@@ -679,8 +680,8 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         _sideControlsFrameObject.layer = vLayer;
 
         var sideFrame = _sideControlsFrameObject.AddComponent<RTTMenuFrame>();
-        float sideLogicalWidth = 570f;
-        float sideLogicalHeight = 990f;  // 19:33 ratio
+        float sideLogicalWidth = 741f;
+        float sideLogicalHeight = 1351f;
         float sidePhysicalW = sideLogicalWidth / density;
         float sidePhysicalH = sideLogicalHeight / density;
 
@@ -718,10 +719,55 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         float controlsPhysicalW = expandedWidth / density;
         float gapMeters = 0.02f;
         float xOffset = (controlsPhysicalW / 2f + gapMeters + sidePhysicalW / 2f) * _sideControlsSide;
-        float yOffset = 0.625f; // Raise to camera height (container is 0.625m below camera)
+        float oneItemHeight = sidePhysicalH * 0.9f * 0.4f; // body(90%) × itemRatio(40%)
+        float yOffset = 0.625f + oneItemHeight * 0.5f;
         _sideControlsFrameObject.transform.localPosition = new Vector3(xOffset, yOffset, 0);
 
         _sideControlsFrameObject.SetActive(false);
+
+        // === 3c. Queue Pagination (floating glass panel below SideControlsFrame) ===
+        if (_queuePanel != null)
+        {
+            GameObject paginationObj = new GameObject("QueuePagination");
+            paginationObj.transform.SetParent(_controlsContainer.transform, false);
+            paginationObj.layer = vLayer;
+
+            _queuePagination = paginationObj.AddComponent<RTTFilePagination>();
+
+            // Pagination width = Queue width + 2 arrow buttons
+            float paginationPixelToMeter = 1.6f / 1920f;
+            float queuePixelW = sidePhysicalW / paginationPixelToMeter; // Queue width in RTT pixels
+            float btnSize = Mathf.Round(Mathf.Clamp(queuePixelW * 0.16f, 50f, 90f));
+            float paginationFrameW = queuePixelW + 2f * btnSize;
+            _queuePagination.Initialize((IPaginationController)_queuePanel, paginationFrameW, 3);
+
+            // Dark transparent background matching Queue theme
+            _queuePagination.SetGlassColors(
+                new Color(0f, 0f, 0f, 0.45f),
+                new Color(0f, 0f, 0f, 0.45f),
+                0.5f, cyanRatio: 0f, fresnelStrength: 0f);
+
+            // Selected page text = controls panel hover color (pastel red)
+            _queuePagination.SetSelectedTextColor(new Color(1f, 0.32f, 0.32f, 1f));
+
+            // Match render queue with SideControlsFrame for consistent z-ordering
+            var paginationQuad = _queuePagination.GetDisplayQuad();
+            if (paginationQuad?.material != null)
+                paginationQuad.material.renderQueue = 3100;
+
+            // Position below SideControlsFrame
+            float paginationWorldH = 115f * paginationPixelToMeter; // RTTFilePagination default height
+            float paginationGap = 0.015f;
+            float paginationY = yOffset - (sidePhysicalH / 2f) - paginationGap - (paginationWorldH / 2f);
+            paginationObj.transform.localPosition = new Vector3(xOffset, paginationY, 0);
+
+            // Wire up page change notifications
+            _queuePanel.OnPageChanged += (current, total) =>
+            {
+                if (_queuePagination != null)
+                    _queuePagination.SetPage(current, total);
+            };
+        }
 
         // === 4. Menu button frame (in VirtualObjects → follows video screen with Zoom) ===
         _menuButtonFrameObject = new GameObject("MenuButtonFrame");
@@ -813,6 +859,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         // Pass external frame references to panel for visibility toggling
         _controlsPanel.SetExternalFrames(_overlayFrameObject, _menuButtonFrameObject);
         _controlsPanel.SetSideControlsFrame(_sideControlsFrameObject);
+        _controlsPanel.SetQueuePagination(_queuePagination);
 
         // === 5. Player Controller ===
         GameObject playerObj = new GameObject("PlayerController");
@@ -1071,7 +1118,12 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         if (toCamera.sqrMagnitude > 0.001f)
         {
             // Z+ away from camera (same convention as VideoControlsFrame)
-            _sideControlsFrameObject.transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
+            Quaternion rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
+            _sideControlsFrameObject.transform.rotation = rotation;
+
+            // Queue pagination follows same facing
+            if (_queuePagination != null)
+                _queuePagination.transform.rotation = rotation;
         }
     }
 

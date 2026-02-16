@@ -104,6 +104,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     private GameObject _menuButtonFrameObject;
     private GameObject _overlayFrameObject;
     private GameObject _sideControlsFrameObject;
+    private RTTFilePagination _queuePagination;
     private BoxCollider _parentFrameCollider; // Cached collider of parent RTT frame's display quad
 
     // Volume persistence
@@ -899,6 +900,14 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     }
 
     /// <summary>
+    /// Set the queue pagination reference for synchronized visibility.
+    /// </summary>
+    public void SetQueuePagination(RTTFilePagination pagination)
+    {
+        _queuePagination = pagination;
+    }
+
+    /// <summary>
     /// Set the video title.
     /// </summary>
     public void SetTitle(string title)
@@ -1035,6 +1044,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         if (_overlayFrameObject != null) _overlayFrameObject.SetActive(true);
         if (_menuButtonFrameObject != null) _menuButtonFrameObject.SetActive(false);
         if (_sideControlsFrameObject != null) _sideControlsFrameObject.SetActive(true);
+        if (_queuePagination != null) _queuePagination.ShowImmediate();
 
         OnVisibilityChanged?.Invoke(true);
     }
@@ -1055,6 +1065,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         if (_overlayFrameObject != null) _overlayFrameObject.SetActive(false);
         if (_menuButtonFrameObject != null) _menuButtonFrameObject.SetActive(true);
         if (_sideControlsFrameObject != null) _sideControlsFrameObject.SetActive(false);
+        if (_queuePagination != null) _queuePagination.HideImmediate();
 
         OnVisibilityChanged?.Invoke(false);
     }
