@@ -135,6 +135,11 @@ public class RTTFileDetail : MonoBehaviour
         _previewImage = previewObj.AddComponent<Image>();
         _previewImage.color = Color.white;
         _previewImage.preserveAspect = true;
+        _previewImage.material = RoundedCorners.SharedMaterial;
+
+        var roundedCorners = previewObj.AddComponent<RoundedCorners>();
+        roundedCorners.Radius = 16f;
+        roundedCorners.UseParentRect = false;
 
         _previewImage.gameObject.SetActive(false);
     }

@@ -18,6 +18,7 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
     private Image _bgImage;
     private LayoutElement _iconContainerLE;
     private RectTransform _iconContainerRect;
+    private RoundedCorners _roundedCorners;
 
     // Edit Mode Checkbox
     private GameObject _checkbox;
@@ -149,10 +150,12 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
                                     if (spriteAspect >= targetAspect)
                                     {
                                         aspectFitter.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
+                                        if (_roundedCorners != null) _roundedCorners.UseParentRect = true;
                                     }
                                     else
                                     {
                                         aspectFitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+                                        if (_roundedCorners != null) _roundedCorners.UseParentRect = false;
                                     }
                                     aspectFitter.aspectRatio = spriteAspect;
 
@@ -185,6 +188,9 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
                         aspectFitter.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
                         aspectFitter.aspectRatio = 16f / 9f;  // Default, will update when thumbnail loads
                     }
+
+                    // Enable rounded corners for thumbnails
+                    if (_roundedCorners != null) _roundedCorners.enabled = true;
                 }
                 else
                 {
@@ -199,6 +205,9 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
                     {
                         aspectFitter.aspectMode = AspectRatioFitter.AspectMode.None;
                     }
+
+                    // Disable rounded corners for resource icons
+                    if (_roundedCorners != null) _roundedCorners.enabled = false;
                 }
             }
         }
@@ -252,7 +261,7 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         _iconContainerLE.preferredWidth = 200f;
         _iconContainerLE.flexibleHeight = 0;  // Don't expand - let text have its space
 
-        // Add RectMask2D for thumbnail cropping (center-crop overflow)
+        // RectMask2D for thumbnail cropping (center-crop overflow)
         iconContainer.AddComponent<RectMask2D>();
 
         // 3. Icon Image - inside container, centered
@@ -268,6 +277,12 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         _iconImage = iconObj.AddComponent<Image>();
         _iconImage.preserveAspect = true;
         _iconImage.raycastTarget = false;
+        _iconImage.material = RoundedCorners.SharedMaterial;
+
+        _roundedCorners = iconObj.AddComponent<RoundedCorners>();
+        _roundedCorners.Radius = 16f;
+        _roundedCorners.UseParentRect = true;
+        _roundedCorners.enabled = false;  // Disabled by default, enabled when showing thumbnails
 
         // Add AspectRatioFitter for thumbnail center-crop (same as RTTMediaGridItem)
         var aspectFitter = iconObj.AddComponent<AspectRatioFitter>();

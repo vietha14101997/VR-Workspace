@@ -162,6 +162,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         if (_queuePanel != null)
         {
             _queuePanel.OnItemClicked -= HandleQueueItemClicked;
+            _queuePanel.OnShuffleClicked -= HandleQueueShuffleClicked;
         }
 
         if (PlaybackEngine != null)
@@ -279,6 +280,15 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
         ShowPlayerUI();
 
+        // Populate queue AFTER ShowPlayerUI (items need active parent for HoverEffectController.Awake)
+        // but BEFORE StartPlayback so RTT frame renders correct content
+        if (_queuePanel != null)
+        {
+            var queue = MediaPlaylistService.Instance.GetPlaybackQueue();
+            int currentIdx = MediaPlaylistService.Instance.CurrentQueueIndex;
+            _queuePanel.SetQueue(queue, currentIdx);
+        }
+
         // Start playback
         StartPlayback(video);
 
@@ -367,14 +377,6 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         if (_playerController != null)
         {
             _playerController.PlayVideo(video);
-        }
-
-        // Update queue panel with current queue state
-        if (_queuePanel != null)
-        {
-            var queue = MediaPlaylistService.Instance.GetPlaybackQueue();
-            int currentIdx = MediaPlaylistService.Instance.CurrentQueueIndex;
-            _queuePanel.SetQueue(queue, currentIdx);
         }
     }
 
@@ -677,8 +679,8 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         _sideControlsFrameObject.layer = vLayer;
 
         var sideFrame = _sideControlsFrameObject.AddComponent<RTTMenuFrame>();
-        float sideLogicalWidth = 400f;
-        float sideLogicalHeight = 600f;
+        float sideLogicalWidth = 570f;
+        float sideLogicalHeight = 990f;  // 19:33 ratio
         float sidePhysicalW = sideLogicalWidth / density;
         float sidePhysicalH = sideLogicalHeight / density;
 
@@ -692,16 +694,8 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         if (sideQuad?.material != null)
             sideQuad.material.renderQueue = 3100;
 
-        // Add background matching ControlsPanel style
+        // Queue panel provides its own gradient background
         var sideContainer = sideFrame.ContentContainer;
-        if (sideContainer != null)
-        {
-            var sideBg = sideContainer.gameObject.AddComponent<Image>();
-            sideBg.color = new Color(0.173f, 0.173f, 0.173f, 0.75f);
-            sideBg.sprite = RTTMediaControlsPanel.CreateRoundedRectSprite(20f);
-            sideBg.type = Image.Type.Sliced;
-            sideBg.raycastTarget = false;
-        }
 
         // Create queue panel inside side controls frame
         if (sideContainer != null)
@@ -717,6 +711,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             _queuePanel = queueObj.AddComponent<RTTMediaQueuePanel>();
             _queuePanel.Initialize(sideLogicalWidth, sideLogicalHeight, _font);
             _queuePanel.OnItemClicked += HandleQueueItemClicked;
+            _queuePanel.OnShuffleClicked += HandleQueueShuffleClicked;
         }
 
         // Position beside controls frame
@@ -941,6 +936,22 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         if (!string.IsNullOrEmpty(path))
         {
             _playerController?.PlayVideoSimple(path);
+        }
+    }
+
+    private void HandleQueueShuffleClicked()
+    {
+        var service = MediaPlaylistService.Instance;
+        if (service == null) return;
+
+        service.SetShuffle(true);
+
+        // Refresh queue display
+        if (_queuePanel != null)
+        {
+            var queue = service.GetPlaybackQueue();
+            int currentIdx = service.CurrentQueueIndex;
+            _queuePanel.SetQueue(queue, currentIdx);
         }
     }
 
