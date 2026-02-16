@@ -540,11 +540,18 @@ namespace VRWorkspace.UI.RTT
 
             _isTransitioning = true;
 
+            // Determine which frame to animate out (current app or main menu)
+            RTTMenuFrame outFrame = _mainMenuFrame;
+            if (_currentVisibleAppId != null && _activeApps.ContainsKey(_currentVisibleAppId))
+            {
+                outFrame = _activeApps[_currentVisibleAppId].Frame ?? _mainMenuFrame;
+            }
+
             // Animate out
             if (_useFadeTransition && _transitionOutDuration > 0)
-                yield return StartCoroutine(AnimateFrameFade(_mainMenuFrame, 1f, 0f, _transitionOutDuration, true));
+                yield return StartCoroutine(AnimateFrameFade(outFrame, 1f, 0f, _transitionOutDuration, true));
             else if (_useScaleTransition && _transitionOutDuration > 0)
-                yield return StartCoroutine(AnimateFrameScale(_mainMenuFrame.transform, 1f, 0.9f, _transitionOutDuration, true));
+                yield return StartCoroutine(AnimateFrameScale(outFrame.transform, 1f, 0.9f, _transitionOutDuration, true));
 
             // Create frame
             if (_menu != null)
@@ -592,9 +599,9 @@ namespace VRWorkspace.UI.RTT
             // Create content via callback
             _createAppContentCallback?.Invoke(instance);
 
-            // Hide MainMenu, show new frame
-            _mainMenuFrame.gameObject.SetActive(false);
-            ResetFrameAlpha(_mainMenuFrame);
+            // Hide current view (main menu or another app), show new frame
+            HideCurrentView();
+            ResetFrameAlpha(outFrame);
 
             instance.Frame.SetVisible(true);
             ResetFrameAlpha(instance.Frame);
@@ -725,17 +732,24 @@ namespace VRWorkspace.UI.RTT
             List<RTTMenuFrame> allFrames = bindable?.GetAllFrames() ?? new List<RTTMenuFrame> { instance.Frame };
             Debug.Log($"[RTTAppManager] Got {allFrames.Count} frames to animate: {instance.AppId}");
 
-            // 2. Fade out Main Menu (PARALLEL with background data preparation which started in PrepareAppFrameAsync)
+            // 2. Determine which frame to animate out (current app or main menu)
+            RTTMenuFrame outFrame = _mainMenuFrame;
+            if (_currentVisibleAppId != null && _activeApps.ContainsKey(_currentVisibleAppId))
+            {
+                outFrame = _activeApps[_currentVisibleAppId].Frame ?? _mainMenuFrame;
+            }
+
+            // Fade out current view
             if (_useFadeTransition && _transitionOutDuration > 0)
             {
-                Debug.Log($"[RTTAppManager] Fade out MainMenu: {instance.AppId} at {Time.realtimeSinceStartup:F3}s");
-                yield return StartCoroutine(AnimateFrameFade(_mainMenuFrame, 1f, 0f, _transitionOutDuration, true));
+                Debug.Log($"[RTTAppManager] Fade out current view: {instance.AppId} at {Time.realtimeSinceStartup:F3}s");
+                yield return StartCoroutine(AnimateFrameFade(outFrame, 1f, 0f, _transitionOutDuration, true));
                 Debug.Log($"[RTTAppManager] Fade out done: {instance.AppId} at {Time.realtimeSinceStartup:F3}s (+{(Time.realtimeSinceStartup - transitionStart) * 1000:F1}ms)");
             }
 
-            // Hide main menu
-            _mainMenuFrame.gameObject.SetActive(false);
-            ResetFrameAlpha(_mainMenuFrame);
+            // Hide current view (main menu or another app)
+            HideCurrentView();
+            ResetFrameAlpha(outFrame);
 
             // 3. Activate ALL frames with alpha=0 (visible but transparent)
             foreach (var frame in allFrames)
@@ -1265,13 +1279,20 @@ namespace VRWorkspace.UI.RTT
             IDataBindable bindable = instance.Controller as IDataBindable;
             List<RTTMenuFrame> allFrames = bindable?.GetAllFrames() ?? new List<RTTMenuFrame> { instance.Frame };
 
-            // Fade out Main Menu
-            if (_useFadeTransition && _transitionOutDuration > 0)
-                yield return StartCoroutine(AnimateFrameFade(_mainMenuFrame, 1f, 0f, _transitionOutDuration, true));
+            // Determine which frame to animate out (current app or main menu)
+            RTTMenuFrame outFrame = _mainMenuFrame;
+            if (_currentVisibleAppId != null && _activeApps.ContainsKey(_currentVisibleAppId))
+            {
+                outFrame = _activeApps[_currentVisibleAppId].Frame ?? _mainMenuFrame;
+            }
 
-            // Hide main menu
-            _mainMenuFrame.gameObject.SetActive(false);
-            ResetFrameAlpha(_mainMenuFrame);
+            // Fade out current view
+            if (_useFadeTransition && _transitionOutDuration > 0)
+                yield return StartCoroutine(AnimateFrameFade(outFrame, 1f, 0f, _transitionOutDuration, true));
+
+            // Hide current view (main menu or another app)
+            HideCurrentView();
+            ResetFrameAlpha(outFrame);
 
             // Activate ALL frames with alpha=0
             foreach (var frame in allFrames)

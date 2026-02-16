@@ -3676,21 +3676,159 @@ public class RTTFileManager : MonoBehaviour
         Debug.Log("[RTTFileManager] File action bar created (hidden initially)");
     }
 
+    private static readonly HashSet<string> _videoExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "mp4", "mkv", "avi", "webm", "mov", "wmv", "m4v", "flv"
+    };
+
     private void OnActionBarOpenClicked()
     {
         if (_currentDisplayedFile.Path == null) return;
 
-        // Open functionality - navigate into folder or open file
         if (_currentDisplayedFile.IsFolder)
         {
             _controller?.NavigateTo(_currentDisplayedFile.Path);
         }
+        else if (_videoExtensions.Contains(_currentDisplayedFile.Type))
+        {
+            OpenVideoInPlayer(_currentDisplayedFile.Path);
+        }
         else
         {
-            // TODO: Implement file open functionality
             Debug.Log($"[RTTFileManager] Open file requested: {_currentDisplayedFile.Path}");
         }
     }
+
+    private void OpenVideoInPlayer(string videoPath)
+    {
+        var videoPaths = _controller?.GetVideoFilePaths();
+        if (videoPaths == null || videoPaths.Count == 0) return;
+
+        int startIndex = videoPaths.IndexOf(videoPath);
+        if (startIndex < 0) startIndex = 0;
+        MediaPlaylistService.Instance?.SetPlaybackQueueDirect(videoPaths, startIndex);
+
+        var manager = RTTManager.Instance;
+        if (manager == null) return;
+
+        // Capture state before fade (position may change during animation)
+        Vector3 framePos = _menuFrame != null ? _menuFrame.transform.position : Vector3.zero;
+        Quaternion frameRot = _menuFrame != null ? _menuFrame.transform.rotation : Quaternion.identity;
+        TMP_FontAsset font = manager.Font;
+        Color primaryColor = manager.PrimaryColor;
+        Color accentColor = manager.AccentColor;
+        float width = _containerWidth;
+        float height = _containerHeight;
+
+        // Hide action bar immediately (has its own CanvasGroup fade)
+        if (_fileActionBar != null) _fileActionBar.HideImmediate();
+
+        // Fade out all File Manager frames, then create player
+        FadeOutAllFrames(() =>
+        {
+            // Deactivate main frame — triggers OnDisable which handles
+            // side frames, pagination.Hide(), and actionbar.HideImmediate()
+            foreach (var frame in GetAllFrames())
+            {
+                if (frame != null && frame.gameObject != null)
+                    frame.gameObject.SetActive(false);
+            }
+
+            // Create standalone video player (completely independent from Media app)
+            var playerGO = new GameObject("DirectVideoPlayer");
+            playerGO.transform.SetParent(manager.transform);
+            var playerController = playerGO.AddComponent<VRMediaAppController>();
+
+            playerController.InitializeForDirectPlay(
+                width, height, font, primaryColor, accentColor,
+                framePos, frameRot,
+                onExit: () =>
+                {
+                    // Re-show all File Manager frames at alpha=0, then fade in
+                    // Set alpha=0 on materials before activating (materials exist even when inactive)
+                    foreach (var frame in GetAllFrames())
+                    {
+                        if (frame != null && frame.gameObject != null)
+                            SetFrameAlpha(frame, 0f);
+                    }
+
+                    // Activate main frame — triggers OnEnable which handles:
+                    // - Side frames activation
+                    // - _pagination.Show() (own fade-in)
+                    // - _fileActionBar.SetVisible() if file selected
+                    foreach (var frame in GetAllFrames())
+                    {
+                        if (frame != null && frame.gameObject != null)
+                            frame.gameObject.SetActive(true);
+                    }
+
+                    // Fade in the frame quads
+                    FadeInAllFrames();
+                }
+            );
+
+            // Start playing the video directly (includes player fade-in)
+            playerController.PlayVideoDirectly(videoPath);
+        });
+
+        Debug.Log($"[RTTFileManager] Opened direct video player for: {videoPath}");
+    }
+
+    #region Direct Play Fade Animation
+    private const float DIRECT_PLAY_FADE_OUT_DURATION = 0.15f;
+    private const float DIRECT_PLAY_FADE_IN_DURATION = 0.2f;
+    private Coroutine _directPlayFadeCoroutine;
+
+    private void FadeOutAllFrames(Action onComplete)
+    {
+        if (_directPlayFadeCoroutine != null)
+            StopCoroutine(_directPlayFadeCoroutine);
+        _directPlayFadeCoroutine = StartCoroutine(FadeAllFramesCoroutine(1f, 0f, DIRECT_PLAY_FADE_OUT_DURATION, onComplete));
+    }
+
+    private void FadeInAllFrames(Action onComplete = null)
+    {
+        if (_directPlayFadeCoroutine != null)
+            StopCoroutine(_directPlayFadeCoroutine);
+        _directPlayFadeCoroutine = StartCoroutine(FadeAllFramesCoroutine(0f, 1f, DIRECT_PLAY_FADE_IN_DURATION, onComplete));
+    }
+
+    private IEnumerator FadeAllFramesCoroutine(float from, float to, float duration, Action onComplete)
+    {
+        // Collect all valid materials from RTTMenuFrame quads (main + side panels)
+        // Note: pagination is NOT included here — it uses its own Show/Hide fade
+        // triggered by OnEnable/OnDisable to avoid concurrent material writes
+        var materials = new List<Material>();
+        foreach (var frame in GetAllFrames())
+        {
+            if (frame == null) continue;
+            var quad = frame.GetDisplayQuad();
+            if (quad?.material != null)
+                materials.Add(quad.material);
+        }
+
+        // Animate
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float alpha = Mathf.Lerp(from, to, t);
+
+            foreach (var mat in materials)
+                mat.color = new Color(1f, 1f, 1f, alpha);
+
+            yield return null;
+        }
+
+        // Ensure final value
+        foreach (var mat in materials)
+            mat.color = new Color(1f, 1f, 1f, to);
+
+        _directPlayFadeCoroutine = null;
+        onComplete?.Invoke();
+    }
+    #endregion
 
     private void OnActionBarRenameClicked()
     {

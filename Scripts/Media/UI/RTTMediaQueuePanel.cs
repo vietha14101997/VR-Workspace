@@ -522,6 +522,22 @@ public class RTTMediaQueuePanel : MonoBehaviour, IPaginationController
         _scrollAnim = null;
     }
 
+    private void OnEnable()
+    {
+        // Restart playing animation when side controls frame is re-activated
+        // (auto-hide kills coroutines via SetActive(false))
+        if (_items != null && _items.Count > 0)
+            StartPlayingAnimation();
+    }
+
+    private void OnDisable()
+    {
+        // Coroutines are killed by Unity when GameObject becomes inactive;
+        // clear the reference so StopPlayingAnimation doesn't try to stop a dead coroutine
+        _playingAnim = null;
+        _scrollAnim = null;
+    }
+
     private void StartPlayingAnimation()
     {
         StopPlayingAnimation();

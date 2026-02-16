@@ -108,6 +108,22 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
         }
     }
 
+    private static readonly HashSet<string> _videoExtensions = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase)
+    {
+        "mp4", "mkv", "avi", "webm", "mov", "wmv", "m4v", "flv"
+    };
+
+    public List<string> GetVideoFilePaths()
+    {
+        var paths = new List<string>();
+        foreach (var file in _filteredFiles)
+        {
+            if (!file.IsFolder && _videoExtensions.Contains(file.Type))
+                paths.Add(file.Path);
+        }
+        return paths;
+    }
+
     public void HandleBack()
     {
         OnBackClicked?.Invoke();

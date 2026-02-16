@@ -108,6 +108,16 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
     // Cached rounded rect sprite for menu button
     private static Sprite _cachedRoundedRectSprite;
+
+    // Direct play mode (standalone player from File Manager, no Library)
+    private bool _isDirectPlay = false;
+    private Action _onDirectPlayExit;
+    private static VRMediaAppController _activeDirectPlayer = null;
+
+    // Fade animation
+    private const float FADE_OUT_DURATION = 0.15f;
+    private const float FADE_IN_DURATION = 0.2f;
+    private Coroutine _transitionCoroutine;
     #endregion
 
     #region Public API
@@ -144,6 +154,120 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
         Debug.Log("[VRMediaAppController] Media app created");
         return _viewObject;
+    }
+
+    /// <summary>
+    /// Initialize for direct video playback (standalone, no Library UI).
+    /// Used by File Manager to open videos without creating the Media app.
+    /// </summary>
+    public void InitializeForDirectPlay(float width, float height,
+        TMP_FontAsset font, Color primaryColor, Color accentColor,
+        Vector3 framePosition, Quaternion frameRotation, Action onExit)
+    {
+        // Close any existing direct player first
+        if (_activeDirectPlayer != null && _activeDirectPlayer != this)
+        {
+            _activeDirectPlayer.ExitDirectPlay();
+        }
+        _activeDirectPlayer = this;
+
+        _isDirectPlay = true;
+        _onDirectPlayExit = onExit;
+        _containerWidth = width;
+        _containerHeight = height;
+        _font = font;
+        _primaryColor = primaryColor;
+        _accentColor = accentColor;
+        _menuFramePosition = framePosition;
+        _menuFrameRotation = frameRotation;
+
+        // Initialize playback + projection only (no Library)
+        InitializePlaybackSystem();
+        InitializeProjectionSystem();
+
+        Debug.Log("[VRMediaAppController] Initialized for direct play (standalone, no Library)");
+    }
+
+    /// <summary>
+    /// Play a video directly (standalone mode). Enters immersive, builds player UI, starts playback.
+    /// </summary>
+    public void PlayVideoDirectly(string path)
+    {
+        var videoInfo = MediaVideoInfo.FromPath(path);
+
+        // Detect projection type
+        videoInfo.Projection = ProjectionDetector.DetectProjection(
+            path, videoInfo.Width, videoInfo.Height);
+
+        CurrentVideo = videoInfo;
+        CurrentMode = AppMode.Player;
+
+        // Enter Immersive Mode (hides Taskbar and MenuFrame)
+        RTTManager.Instance?.EnterImmersiveMode();
+
+        // Build player UI on demand and show it
+        ShowPlayerUI();
+
+        // Populate queue
+        if (_queuePanel != null)
+        {
+            var queue = MediaPlaylistService.Instance.GetPlaybackQueue();
+            int currentIdx = MediaPlaylistService.Instance.CurrentQueueIndex;
+            _queuePanel.SetQueue(queue, currentIdx);
+        }
+
+        // Start playback with player at alpha=0, then fade in
+        SetAllPlayerFramesAlpha(0f);
+        StartPlayback(videoInfo);
+
+        if (_transitionCoroutine != null)
+            StopCoroutine(_transitionCoroutine);
+        _transitionCoroutine = StartCoroutine(FadeInPlayerAfterDirectPlay(videoInfo));
+    }
+
+    private IEnumerator FadeInPlayerAfterDirectPlay(MediaVideoInfo videoInfo)
+    {
+        yield return StartCoroutine(AnimatePlayerFade(0f, 1f, FADE_IN_DURATION));
+
+        _transitionCoroutine = null;
+        OnModeChanged?.Invoke(AppMode.Player);
+        OnVideoStarted?.Invoke(videoInfo);
+        Debug.Log($"[VRMediaAppController] Direct play started: {videoInfo.Title}");
+    }
+
+    /// <summary>
+    /// Exit direct play mode - stops playback, restores caller state, destroys self.
+    /// </summary>
+    public void ExitDirectPlay()
+    {
+        Debug.Log("[VRMediaAppController] Exiting direct play mode");
+
+        StopPlayback();
+
+        if (_transitionCoroutine != null)
+            StopCoroutine(_transitionCoroutine);
+        _transitionCoroutine = StartCoroutine(FadeOutAndCleanupDirectPlay());
+    }
+
+    private IEnumerator FadeOutAndCleanupDirectPlay()
+    {
+        // Fade out player
+        yield return StartCoroutine(AnimatePlayerFade(1f, 0f, FADE_OUT_DURATION));
+
+        RTTManager.Instance?.ExitImmersiveMode();
+        HidePlayerUI();
+
+        // Invoke callback to re-show the caller (File Manager)
+        _onDirectPlayExit?.Invoke();
+        _onDirectPlayExit = null;
+
+        // Cleanup and destroy
+        Cleanup();
+
+        if (_activeDirectPlayer == this)
+            _activeDirectPlayer = null;
+
+        Destroy(gameObject);
     }
 
     /// <summary>
@@ -234,6 +358,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
     /// </summary>
     public void HandleBack()
     {
+        if (_isDirectPlay) { ExitDirectPlay(); return; }
         if (CurrentMode == AppMode.Player)
         {
             SwitchToLibrary();
@@ -249,18 +374,34 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
     /// </summary>
     public void SwitchToLibrary()
     {
+        if (_isDirectPlay) { ExitDirectPlay(); return; }
         if (CurrentMode == AppMode.Library) return;
 
         StopPlayback();
         CurrentMode = AppMode.Library;
 
+        if (_transitionCoroutine != null)
+            StopCoroutine(_transitionCoroutine);
+        _transitionCoroutine = StartCoroutine(SwitchToLibraryWithFade());
+    }
+
+    private IEnumerator SwitchToLibraryWithFade()
+    {
+        // Fade out player
+        yield return StartCoroutine(AnimatePlayerFade(1f, 0f, FADE_OUT_DURATION));
+
         // Exit Immersive Mode (restores Taskbar and MenuFrame)
         RTTManager.Instance?.ExitImmersiveMode();
 
-        // Show library UI, hide player
+        // Show library UI at alpha=0, hide player
         ShowLibraryUI();
         HidePlayerUI();
+        SetAllLibraryFramesAlpha(0f);
 
+        // Fade in library frames
+        yield return StartCoroutine(AnimateLibraryFade(0f, 1f, FADE_IN_DURATION));
+
+        _transitionCoroutine = null;
         OnModeChanged?.Invoke(AppMode.Library);
         Debug.Log("[VRMediaAppController] Switched to Library mode");
     }
@@ -273,7 +414,17 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         CurrentVideo = video;
         CurrentMode = AppMode.Player;
 
-        // Hide library UI (saves position), show player
+        if (_transitionCoroutine != null)
+            StopCoroutine(_transitionCoroutine);
+        _transitionCoroutine = StartCoroutine(SwitchToPlayerWithFade(video));
+    }
+
+    private IEnumerator SwitchToPlayerWithFade(MediaVideoInfo video)
+    {
+        // Fade out library frames
+        yield return StartCoroutine(AnimateLibraryFade(1f, 0f, FADE_OUT_DURATION));
+
+        // Hide library UI (saves position)
         HideLibraryUI();
 
         // Enter Immersive Mode (hides Taskbar and MenuFrame)
@@ -290,9 +441,14 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             _queuePanel.SetQueue(queue, currentIdx);
         }
 
-        // Start playback
+        // Start playback with player at alpha=0
+        SetAllPlayerFramesAlpha(0f);
         StartPlayback(video);
 
+        // Fade in player
+        yield return StartCoroutine(AnimatePlayerFade(0f, 1f, FADE_IN_DURATION));
+
+        _transitionCoroutine = null;
         OnModeChanged?.Invoke(AppMode.Player);
         OnVideoStarted?.Invoke(video);
         Debug.Log($"[VRMediaAppController] Switched to Player mode: {video.Title}");
@@ -314,6 +470,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
         SwitchToPlayer(videoInfo);
     }
+
     #endregion
 
     #region Playback Control
@@ -1850,6 +2007,147 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
     private void OnDestroy()
     {
         Cleanup();
+    }
+    #endregion
+
+    #region Fade Animation
+    private void SetRTTFrameAlpha(GameObject frameObj, float alpha)
+    {
+        if (frameObj == null) return;
+        var frame = frameObj.GetComponent<RTTMenuFrame>();
+        if (frame == null) return;
+        var quad = frame.GetDisplayQuad();
+        if (quad?.material != null)
+            quad.material.color = new Color(1f, 1f, 1f, alpha);
+    }
+
+    private void CollectFrameMaterial(GameObject frameObj, List<Material> materials)
+    {
+        if (frameObj == null) return;
+        var frame = frameObj.GetComponent<RTTMenuFrame>();
+        if (frame == null) return;
+        var quad = frame.GetDisplayQuad();
+        if (quad?.material != null)
+            materials.Add(quad.material);
+    }
+
+    private void SetProjectionAlpha(float alpha)
+    {
+        if (ProjectionSystem == null || ProjectionSystem.ActiveRenderer == null) return;
+
+        if (ProjectionSystem.ActiveRenderer is FlatProjectionRenderer flatRenderer)
+        {
+            flatRenderer.SetBoardAlpha(alpha);
+        }
+        else if (ProjectionSystem.ActiveRenderer is ImmersiveSphereRenderer sphereRenderer)
+        {
+            sphereRenderer.SetBrightness(alpha);
+        }
+    }
+
+    private void SetAllPlayerFramesAlpha(float alpha)
+    {
+        SetRTTFrameAlpha(_controlsFrameObject, alpha);
+        SetRTTFrameAlpha(_overlayFrameObject, alpha);
+        SetRTTFrameAlpha(_sideControlsFrameObject, alpha);
+        SetRTTFrameAlpha(_menuButtonFrameObject, alpha);
+
+        if (_queuePagination != null)
+        {
+            var quad = _queuePagination.GetDisplayQuad();
+            if (quad?.material != null)
+                quad.material.color = new Color(1f, 1f, 1f, alpha);
+        }
+
+        SetProjectionAlpha(alpha);
+    }
+
+    private void SetAllLibraryFramesAlpha(float alpha)
+    {
+        if (_parentMenuFrame != null)
+        {
+            var quad = _parentMenuFrame.GetDisplayQuad();
+            if (quad?.material != null)
+                quad.material.color = new Color(1f, 1f, 1f, alpha);
+        }
+
+        foreach (var frame in GetAllFrames())
+        {
+            if (frame == null) continue;
+            var quad = frame.GetDisplayQuad();
+            if (quad?.material != null)
+                quad.material.color = new Color(1f, 1f, 1f, alpha);
+        }
+    }
+
+    private IEnumerator AnimatePlayerFade(float from, float to, float duration)
+    {
+        var materials = new List<Material>();
+        CollectFrameMaterial(_controlsFrameObject, materials);
+        CollectFrameMaterial(_overlayFrameObject, materials);
+        CollectFrameMaterial(_sideControlsFrameObject, materials);
+        CollectFrameMaterial(_menuButtonFrameObject, materials);
+
+        if (_queuePagination != null)
+        {
+            var quad = _queuePagination.GetDisplayQuad();
+            if (quad?.material != null)
+                materials.Add(quad.material);
+        }
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float alpha = Mathf.Lerp(from, to, t);
+
+            foreach (var mat in materials)
+                mat.color = new Color(1f, 1f, 1f, alpha);
+
+            SetProjectionAlpha(alpha);
+            yield return null;
+        }
+
+        foreach (var mat in materials)
+            mat.color = new Color(1f, 1f, 1f, to);
+        SetProjectionAlpha(to);
+    }
+
+    private IEnumerator AnimateLibraryFade(float from, float to, float duration)
+    {
+        var materials = new List<Material>();
+
+        if (_parentMenuFrame != null)
+        {
+            var quad = _parentMenuFrame.GetDisplayQuad();
+            if (quad?.material != null)
+                materials.Add(quad.material);
+        }
+
+        foreach (var frame in GetAllFrames())
+        {
+            if (frame == null) continue;
+            var quad = frame.GetDisplayQuad();
+            if (quad?.material != null)
+                materials.Add(quad.material);
+        }
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float alpha = Mathf.Lerp(from, to, t);
+
+            foreach (var mat in materials)
+                mat.color = new Color(1f, 1f, 1f, alpha);
+
+            yield return null;
+        }
+
+        foreach (var mat in materials)
+            mat.color = new Color(1f, 1f, 1f, to);
     }
     #endregion
 }

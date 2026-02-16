@@ -262,6 +262,13 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
         _lastTrackedWorldDistance = -1f;
     }
 
+    public void SetBoardAlpha(float alpha)
+    {
+        if (_worldPanel == null) return;
+        _worldPanel.boardAlpha = Mathf.Clamp01(alpha);
+        _worldPanel.Apply();
+    }
+
     public void RecenterView()
     {
         if (Camera.main != null)
