@@ -105,8 +105,8 @@ public class RTTManager : MonoBehaviour
     [Header("Auto Recenter")]
     [Tooltip("Automatically recenter objects in front of user when app starts")]
     [SerializeField] private bool autoRecenterOnStart = true;
-    [Tooltip("Delay in seconds before auto-recenter (allows camera tracking to stabilize)")]
-    [SerializeField] private float autoRecenterDelay = 0.5f;
+    [Tooltip("Duration to continuously follow camera at startup (seconds)")]
+    [SerializeField] private float startupFollowDuration = 3.0f;
     #endregion
 
     #region Panel Management Fields
@@ -130,6 +130,11 @@ public class RTTManager : MonoBehaviour
     private GameObject _mainMenuContent;
     private bool _mainMenuInitialized = false;
     private bool _hasAutoRecentered = false;
+
+    // Startup camera-follow state
+    private bool _startupCameraFollowActive = false;
+    private float _startupFollowStartTime = 0f;
+    private GameObject _cachedVirtualObjects;
     #endregion
 
     #region Events
@@ -458,37 +463,19 @@ public class RTTManager : MonoBehaviour
             Debug.Log("[RTTManager] Background app pre-initialization triggered");
         }
 
-        // Auto-recenter after camera stabilizes
+        // Start continuous camera-follow instead of one-shot recenter
         if (autoRecenterOnStart && !_hasAutoRecentered)
         {
-            StartCoroutine(AutoRecenterRoutine());
+            StartStartupCameraFollow();
         }
     }
 
     /// <summary>
-    /// Auto-recenter routine that waits for camera to stabilize then recenters all objects.
-    /// No visual countdown - performs instant recenter.
+    /// Start continuous camera-follow at startup.
+    /// VirtualObjects will track camera's horizontal axis until startupFollowDuration expires.
     /// </summary>
-    private IEnumerator AutoRecenterRoutine()
+    private void StartStartupCameraFollow()
     {
-        // Wait for camera tracking to stabilize
-        yield return new WaitForSeconds(autoRecenterDelay);
-
-        // Perform instant recenter
-        PerformInstantRecenter();
-        _hasAutoRecentered = true;
-
-        Debug.Log("[RTTManager] Auto-recenter completed");
-    }
-
-    /// <summary>
-    /// Perform instant recenter without animation.
-    /// Moves all VirtualObjects to face the camera.
-    /// Also calls Cardboard API Recenter on Android to reset headset tracking.
-    /// </summary>
-    public void PerformInstantRecenter()
-    {
-        // Call Cardboard API Recenter on Android to reset headset tracking
 #if UNITY_ANDROID && !UNITY_EDITOR
         try
         {
@@ -501,73 +488,108 @@ public class RTTManager : MonoBehaviour
         }
 #endif
 
+        _startupCameraFollowActive = true;
+        _startupFollowStartTime = Time.time;
+        Debug.Log($"[RTTManager] Startup camera-follow started (duration: {startupFollowDuration}s)");
+    }
+
+    private void LateUpdate()
+    {
+        if (!_startupCameraFollowActive) return;
+
+        float elapsed = Time.time - _startupFollowStartTime;
+        if (elapsed >= startupFollowDuration)
+        {
+            _startupCameraFollowActive = false;
+            _hasAutoRecentered = true;
+            VirtualObjectsZoomController.Instance?.OnRecenter();
+            Debug.Log("[RTTManager] Startup camera-follow ended - VirtualObjects released");
+            return;
+        }
+
+        RepositionToFaceCamera();
+    }
+
+    /// <summary>
+    /// Reposition VirtualObjects children to face camera (horizontal lock).
+    /// Lightweight method for per-frame updates during startup camera-follow.
+    /// </summary>
+    private void RepositionToFaceCamera()
+    {
         Camera cam = Camera.main;
         if (cam == null) return;
 
-        // Find VirtualObjects parent
-        GameObject virtualObjectsParent = GameObject.Find("VirtualObjects");
-        if (virtualObjectsParent == null)
-        {
-            Debug.LogWarning("[RTTManager] VirtualObjects parent not found for recenter");
-            return;
-        }
+        if (_cachedVirtualObjects == null)
+            _cachedVirtualObjects = GameObject.Find("VirtualObjects");
+        if (_cachedVirtualObjects == null) return;
 
         RTTMenuFrame primary = RTTMenuFrame.PrimaryInstance;
-        if (primary == null)
-        {
-            Debug.LogWarning("[RTTManager] No primary RTTMenuFrame found for recenter");
-            return;
-        }
+        if (primary == null) return;
 
-        // Store pivot point (primary's position and rotation)
+        // Store pivot (primary frame position/rotation)
         Vector3 pivotPos = primary.transform.position;
         Quaternion pivotRot = primary.transform.rotation;
 
-        // Collect all children and their relative transforms
-        var children = new List<Transform>();
-        var relativePositions = new List<Vector3>();
-        var relativeRotations = new List<Quaternion>();
+        // Collect children and relative transforms
+        var virtualObjectsTransform = _cachedVirtualObjects.transform;
+        int childCount = virtualObjectsTransform.childCount;
+        var children = new Transform[childCount];
+        var relPositions = new Vector3[childCount];
+        var relRotations = new Quaternion[childCount];
 
-        foreach (Transform child in virtualObjectsParent.transform)
+        Quaternion invPivotRot = Quaternion.Inverse(pivotRot);
+        for (int i = 0; i < childCount; i++)
         {
-            children.Add(child);
-            // Calculate position relative to pivot
-            Vector3 relPos = Quaternion.Inverse(pivotRot) * (child.position - pivotPos);
-            relativePositions.Add(relPos);
-            // Calculate rotation relative to pivot
-            Quaternion relRot = Quaternion.Inverse(pivotRot) * child.rotation;
-            relativeRotations.Add(relRot);
+            Transform child = virtualObjectsTransform.GetChild(i);
+            children[i] = child;
+            relPositions[i] = invPivotRot * (child.position - pivotPos);
+            relRotations[i] = invPivotRot * child.rotation;
         }
 
-        // Calculate new pivot position and rotation (facing camera)
+        // Calculate new pivot facing camera (horizontal only)
         Vector3 camForward = cam.transform.forward;
         camForward.y = 0;
         if (camForward.sqrMagnitude < 0.001f) camForward = Vector3.forward;
         camForward.Normalize();
 
         Vector3 camPos = cam.transform.position;
-        // Maintain horizontal distance from camera
         float hDist = Vector2.Distance(
             new Vector2(pivotPos.x, pivotPos.z),
-            new Vector2(camPos.x, camPos.z)
-        );
+            new Vector2(camPos.x, camPos.z));
 
         Vector3 newPivotPos = camPos + camForward * hDist;
-        newPivotPos.y = pivotPos.y; // Preserve Y position
+        newPivotPos.y = pivotPos.y;
         Quaternion newPivotRot = Quaternion.LookRotation(camForward);
 
-        // Apply new transforms to all children
-        for (int i = 0; i < children.Count; i++)
+        for (int i = 0; i < childCount; i++)
         {
-            Transform child = children[i];
-            // Restore relative position and rotation with new pivot
-            child.position = newPivotPos + newPivotRot * relativePositions[i];
-            child.rotation = newPivotRot * relativeRotations[i];
+            children[i].position = newPivotPos + newPivotRot * relPositions[i];
+            children[i].rotation = newPivotRot * relRotations[i];
         }
+    }
 
-        Debug.Log($"[RTTManager] Instant recenter: moved {children.Count} objects to face camera");
+    /// <summary>
+    /// Perform instant recenter without animation.
+    /// Moves all VirtualObjects to face the camera.
+    /// Also calls Cardboard API Recenter on Android to reset headset tracking.
+    /// </summary>
+    public void PerformInstantRecenter()
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        try
+        {
+            Api.Recenter();
+            Debug.Log("[RTTManager] Cardboard API Recenter called");
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[RTTManager] Cardboard Recenter failed: {e.Message}");
+        }
+#endif
 
-        // Notify ZoomController to recalculate distance after recenter
+        RepositionToFaceCamera();
+
+        Debug.Log("[RTTManager] Instant recenter completed");
         VirtualObjectsZoomController.Instance?.OnRecenter();
     }
 
