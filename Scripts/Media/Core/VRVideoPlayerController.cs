@@ -116,6 +116,7 @@ public class VRVideoPlayerController : MonoBehaviour
             _playbackEngine.OnStateChanged += HandleStateChanged;
             _playbackEngine.OnTimeUpdate += HandleTimeUpdate;
             _playbackEngine.OnSeekCompleted += HandleSeekCompleted;
+            _playbackEngine.OnBufferingCompleted += HandleBufferingCompleted;
         }
 
         // Controls panel events
@@ -1016,8 +1017,13 @@ public class VRVideoPlayerController : MonoBehaviour
             }
         }
 
-        // Auto-play
-        Debug.Log("[VRVideoPlayerController] Starting auto-play");
+        // Auto-play moved to HandleBufferingCompleted() - first frame will be primed before playback starts
+        Debug.Log("[VRVideoPlayerController] Buffering first frame...");
+    }
+
+    private void HandleBufferingCompleted()
+    {
+        Debug.Log("[VRVideoPlayerController] Buffering complete - starting playback");
         _playbackEngine?.Play();
     }
 
@@ -1144,6 +1150,20 @@ public class VRVideoPlayerController : MonoBehaviour
     {
         bool isPlaying = state == VideoPlaybackEngine.PlaybackState.Playing;
         _controlsPanel?.SetPlayState(isPlaying);
+
+        // Show loading status during preparation/buffering
+        if (state == VideoPlaybackEngine.PlaybackState.Loading)
+        {
+            _controlsPanel?.SetTitle("Preparing...");
+        }
+        else if (state == VideoPlaybackEngine.PlaybackState.Buffering)
+        {
+            _controlsPanel?.SetTitle("Buffering...");
+        }
+        else if (state == VideoPlaybackEngine.PlaybackState.Playing && _currentVideo.HasValue)
+        {
+            _controlsPanel?.SetTitle(_currentVideo.Value.Title);
+        }
     }
 
     private void HandleTimeUpdate(double currentTime)
@@ -1350,6 +1370,7 @@ public class VRVideoPlayerController : MonoBehaviour
             _playbackEngine.OnStateChanged -= HandleStateChanged;
             _playbackEngine.OnTimeUpdate -= HandleTimeUpdate;
             _playbackEngine.OnSeekCompleted -= HandleSeekCompleted;
+            _playbackEngine.OnBufferingCompleted -= HandleBufferingCompleted;
         }
 
         if (_controlsPanel != null)
