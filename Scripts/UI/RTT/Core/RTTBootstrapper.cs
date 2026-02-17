@@ -34,9 +34,9 @@ public class RTTBootstrapper : MonoBehaviour
     [Tooltip("Minimum zoom distance from camera")]
     [SerializeField] private float zoomMinDistance = 1.0f;
     [Tooltip("Maximum zoom distance from camera")]
-    [SerializeField] private float zoomMaxDistance = 2.0f;
+    [SerializeField] private float zoomMaxDistance = 2.5f;
     [Tooltip("Default/initial zoom distance")]
-    [SerializeField] private float zoomDefaultDistance = 1.8f;
+    [SerializeField] private float zoomDefaultDistance = 2.0f;
     #endregion
 
     #region Private Fields

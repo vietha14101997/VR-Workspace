@@ -87,9 +87,9 @@ public class RTTMediaGrid : MonoBehaviour
 
     // Mobile-first frame budget system: bind items until time budget exhausted
     // Increased budgets for smoother progressive loading (2x faster population)
-    private const float MOBILE_FRAME_BUDGET_MS = 3f;    // Mobile: 3ms (was 1.5ms)
-    private const float DESKTOP_FRAME_BUDGET_MS = 6f;   // Desktop: 6ms (was 4ms)
-    private const int INITIAL_SYNC_BIND_COUNT = 8;      // Bind 8 items sync to fill first page (was 1, caused items not showing)
+    private const float MOBILE_FRAME_BUDGET_MS = 4f;    // Mobile: 4ms
+    private const float DESKTOP_FRAME_BUDGET_MS = 8f;   // Desktop: 8ms
+    private const int INITIAL_SYNC_BIND_COUNT = 12;     // Bind 12 items sync to fill first page (3 rows)
 
     // Auto-select first item after binding (not immediately in SetData)
     private bool _needsAutoSelect = false;
@@ -822,7 +822,8 @@ public class RTTMediaGrid : MonoBehaviour
             }
 
             // Start progressive binding for remaining items if not already running
-            if (_pendingBindIndices.Count > 0 && _progressiveBindCoroutine == null)
+            // Guard: Can't start coroutine on inactive GameObject (e.g. during background pre-init)
+            if (_pendingBindIndices.Count > 0 && _progressiveBindCoroutine == null && gameObject.activeInHierarchy)
             {
                 _progressiveBindCoroutine = StartCoroutine(ProgressiveBindCoroutine());
             }

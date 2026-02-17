@@ -24,14 +24,17 @@ public class RTTFilePagination : RTTCanvasBase
     private const float PixelToMeter = 1.6f / 1920f;
 
     // Shared highlight color for both hover and selected (dark transparent)
-    private static readonly Color HighlightColorA = new Color(0f, 0f, 0f, 0.27f);
-    private static readonly Color HighlightColorB = new Color(0f, 0f, 0f, 0.22f);
+    private static readonly Color HighlightColorA = new Color(0f, 0f, 0f, 0.35f);
+    private static readonly Color HighlightColorB = new Color(0f, 0f, 0f, 0.30f);
     private static readonly Color TransparentColor = new Color(0f, 0f, 0f, 0f);
-    private const float HighlightGlassAlpha = 0.45f;
+    private const float HighlightGlassAlpha = 0.55f;
 
     private IPaginationController _controller;
     private int _currentPage = 1;
     private int _totalPages = 1;
+    private int _maxCentralButtons = 7;
+    private bool _skipTaskbarSizing = false;
+    private Color _selectedTextColor = Color.white;
 
     private Material _glassMaterial;
     private Sprite _pixelSprite;
@@ -71,6 +74,21 @@ public class RTTFilePagination : RTTCanvasBase
         Initialize((IPaginationController)controller);
     }
 
+    /// <summary>
+    /// Initialize with custom dimensions for non-taskbar contexts (e.g., Queue pagination).
+    /// Skips RTTTaskbar sizing and uses provided values directly.
+    /// </summary>
+    public void Initialize(IPaginationController controller, float customWidth, int maxButtons)
+    {
+        frameWidth = customWidth;
+        // Scale button size proportionally, capped at 90
+        buttonSize = Mathf.Round(Mathf.Clamp(customWidth * 0.16f, 50f, 90f));
+        contentPadding = Mathf.Round(Mathf.Clamp(customWidth * 0.049f, 14f, 32f));
+        _maxCentralButtons = maxButtons;
+        _skipTaskbarSizing = true;
+        Initialize(controller);
+    }
+
     public void Initialize(IPaginationController controller)
     {
         // CRITICAL: Disable object BEFORE creating any visuals to prevent flicker
@@ -81,17 +99,20 @@ public class RTTFilePagination : RTTCanvasBase
 
         // Width Calculation: Get size from RTTTaskbar's RTTMiniFrame (not from followTarget)
         // followTarget is now the main menu, but we still want pagination sized relative to taskbar
-        RTTMiniFrame taskbarMiniFrame = null;
-        if (RTTTaskbar.Instance != null)
+        if (!_skipTaskbarSizing)
         {
-            taskbarMiniFrame = RTTTaskbar.Instance.GetComponent<RTTMiniFrame>();
-        }
+            RTTMiniFrame taskbarMiniFrame = null;
+            if (RTTTaskbar.Instance != null)
+            {
+                taskbarMiniFrame = RTTTaskbar.Instance.GetComponent<RTTMiniFrame>();
+            }
 
-        if (taskbarMiniFrame != null)
-        {
-            frameWidth = taskbarMiniFrame.TotalWidth * (4f / 3f);
-            frameHeight = taskbarMiniFrame.TotalHeight * 0.9f; // Reduced height by 10%
-            buttonSize = taskbarMiniFrame.ButtonSize; // Sync button size
+            if (taskbarMiniFrame != null)
+            {
+                frameWidth = taskbarMiniFrame.TotalWidth * (4f / 3f);
+                frameHeight = taskbarMiniFrame.TotalHeight * 0.9f; // Reduced height by 10%
+                buttonSize = taskbarMiniFrame.ButtonSize; // Sync button size
+            }
         }
 
         // Initial setup
@@ -123,19 +144,21 @@ public class RTTFilePagination : RTTCanvasBase
         // Skip if fade is already in progress
         if (_fadeCoroutine != null) return;
 
-        // Track when Show() was called to prevent rapid hide/show flicker
         _lastShowTime = Time.time;
 
-        // CRITICAL: Set alpha to 0 BEFORE activating to prevent flash
+        // Ensure visible if was hidden
         SetQuadAlpha(0f);
-
-        // Activate the object (OnEnable will NOT reset alpha because _isShown check comes after)
         gameObject.SetActive(true);
 
-        // Double-check alpha is 0 after activation
-        SetQuadAlpha(0f);
-
-        // Start fade in animation
+        if (_fadeCoroutine != null) StopCoroutine(_fadeCoroutine);
+        
+        // Process pending display update IMMEDIATELY if we were inactive
+        if (_pendingDisplayUpdate)
+        {
+            _pendingDisplayUpdate = false;
+            UpdateDisplay();
+        }
+        
         _fadeCoroutine = StartCoroutine(FadeIn());
     }
 
@@ -203,6 +226,69 @@ public class RTTFilePagination : RTTCanvasBase
         gameObject.SetActive(false);
     }
 
+    /// <summary>
+    /// Show immediately without fade animation.
+    /// Used for contexts where parent controls visibility (e.g., Queue pagination).
+    /// </summary>
+    public void ShowImmediate()
+    {
+        if (_fadeCoroutine != null)
+        {
+            StopCoroutine(_fadeCoroutine);
+            _fadeCoroutine = null;
+        }
+
+        gameObject.SetActive(true);
+        SetQuadAlpha(1f);
+        _isShown = true;
+        _lastShowTime = Time.time;
+
+        if (_pendingDisplayUpdate)
+        {
+            _pendingDisplayUpdate = false;
+            UpdateDisplay();
+        }
+    }
+
+    /// <summary>
+    /// Hide immediately without fade animation or grace period.
+    /// Used for contexts where parent controls visibility (e.g., Queue pagination).
+    /// </summary>
+    public void HideImmediate()
+    {
+        if (_fadeCoroutine != null)
+        {
+            StopCoroutine(_fadeCoroutine);
+            _fadeCoroutine = null;
+        }
+
+        _pendingDisplayUpdate = false;
+        _isShown = false;
+        SetQuadAlpha(0f);
+        gameObject.SetActive(false);
+    }
+
+    /// <summary>
+    /// Set text color for the selected/active page button. Call before first SetPage().
+    /// </summary>
+    public void SetSelectedTextColor(Color color)
+    {
+        _selectedTextColor = color;
+    }
+
+    /// <summary>
+    /// Override glass background colors. Call after Initialize().
+    /// </summary>
+    public void SetGlassColors(Color colorA, Color colorB, float glassAlpha, float cyanRatio = 0.5f, float fresnelStrength = 0f)
+    {
+        if (_glassMaterial == null) return;
+        _glassMaterial.SetColor("_ColorA", colorA);
+        _glassMaterial.SetColor("_ColorB", colorB);
+        _glassMaterial.SetFloat("_GlassAlpha", glassAlpha);
+        _glassMaterial.SetFloat("_CyanRatio", cyanRatio);
+        _glassMaterial.SetFloat("_FresnelStrength", fresnelStrength);
+    }
+
     #region Page Buttons Fade (for navigation transitions)
     private Coroutine _pageButtonsFadeCoroutine = null;
     private const float PAGE_BUTTONS_FADE_DURATION = 0.09f; // Match content fade duration
@@ -219,6 +305,14 @@ public class RTTFilePagination : RTTCanvasBase
         {
             StopCoroutine(_pageButtonsFadeCoroutine);
         }
+
+        if (!gameObject.activeInHierarchy)
+        {
+            SetPageButtonsAlpha(0f);
+            onComplete?.Invoke();
+            return;
+        }
+
         _pageButtonsFadeCoroutine = StartCoroutine(FadePageButtonsCoroutine(0f, onComplete));
     }
 
@@ -233,6 +327,13 @@ public class RTTFilePagination : RTTCanvasBase
         {
             StopCoroutine(_pageButtonsFadeCoroutine);
         }
+
+        if (!gameObject.activeInHierarchy)
+        {
+            SetPageButtonsAlpha(1f);
+            return;
+        }
+
         _pageButtonsFadeCoroutine = StartCoroutine(FadePageButtonsCoroutine(1f, null));
     }
 
@@ -618,13 +719,14 @@ public class RTTFilePagination : RTTCanvasBase
         hoverEffect.Initialize(circleMat, false); // Arrow buttons are never "active"
     }
 
-    private void AddPageButtonHoverEffect(GameObject target, Material circleMat, bool isActive)
+    private void AddPageButtonHoverEffect(GameObject target, Material circleMat, bool isActive, Color textColor)
     {
         if (circleMat == null) return;
 
         // Use IPointerEnterHandler/IPointerExitHandler for VR compatibility
         var hoverEffect = target.AddComponent<PaginationButtonHover>();
-        hoverEffect.Initialize(circleMat, isActive);
+        // Non-active buttons: hover changes text to selected color; active buttons already have selected color
+        hoverEffect.Initialize(circleMat, isActive, textColor, _selectedTextColor, !isActive);
     }
     
     /// <summary>
@@ -677,10 +779,7 @@ public class RTTFilePagination : RTTCanvasBase
             btn.onClick.AddListener(() => _controller.GoToPage(pageNumber));
         }
 
-        // Hover Effect - apply to ALL buttons (even active)
-        AddPageButtonHoverEffect(btnObj, circleMat, isActive);
-
-        // Text
+        // Text (create before hover effect so hover can find it)
         GameObject textObj = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
         textObj.layer = LayerMask.NameToLayer("UI");
         textObj.transform.SetParent(btnObj.transform, false);
@@ -696,9 +795,12 @@ public class RTTFilePagination : RTTCanvasBase
         tmp.text = pageNumber.ToString();
         tmp.fontSize = 40;
         tmp.alignment = TextAlignmentOptions.Center;
-        tmp.color = Color.white;
+        tmp.color = isActive ? _selectedTextColor : Color.white;
         tmp.fontStyle = FontStyles.Bold;
         tmp.raycastTarget = false; // CRITICAL: Disable raycast on text so it doesn't block hover events on the button
+
+        // Hover Effect - apply to ALL buttons (even active), after text is created so hover can find it
+        AddPageButtonHoverEffect(btnObj, circleMat, isActive, tmp.color);
 
         return btnObj;
     }
@@ -791,7 +893,7 @@ public class RTTFilePagination : RTTCanvasBase
             ClearTransform(_stackPagingTransform);
             // Left/Right groups are gone, only stack remains
 
-            int maxCentralButtons = 7;
+            int maxCentralButtons = _maxCentralButtons;
             int startPage = 1;
             int endPage = _totalPages;
 
@@ -923,15 +1025,27 @@ public class PaginationButtonHover : MonoBehaviour, IPointerEnterHandler, IPoint
     private Color _hoverColorA;
     private Color _hoverColorB;
     private float _hoverAlpha;
+    private TextMeshProUGUI _text;
+    private Color _originalTextColor;
+    private Color _hoverTextColor;
+    private bool _hasTextHover;
 
     public void Initialize(Material mat, bool isActive)
     {
+        Initialize(mat, isActive, Color.white, Color.white, false);
+    }
+
+    public void Initialize(Material mat, bool isActive, Color originalTextColor, Color hoverTextColor, bool enableTextHover)
+    {
         _material = mat;
+        _hasTextHover = enableTextHover;
+        _originalTextColor = originalTextColor;
+        _hoverTextColor = hoverTextColor;
 
         // Shared highlight color for both hover and selected
-        Color highlightA = new Color(0f, 0f, 0f, 0.27f);
-        Color highlightB = new Color(0f, 0f, 0f, 0.22f);
-        float highlightAlpha = 0.45f;
+        Color highlightA = new Color(0f, 0f, 0f, 0.35f);
+        Color highlightB = new Color(0f, 0f, 0f, 0.30f);
+        float highlightAlpha = 0.55f;
 
         // Original colors based on active state
         _originalColorA = isActive ? highlightA : new Color(0f, 0f, 0f, 0f);
@@ -942,6 +1056,13 @@ public class PaginationButtonHover : MonoBehaviour, IPointerEnterHandler, IPoint
         _hoverColorA = highlightA;
         _hoverColorB = highlightB;
         _hoverAlpha = highlightAlpha;
+
+        // Cache text component
+        if (_hasTextHover)
+        {
+            var textObj = transform.Find("Text");
+            if (textObj != null) _text = textObj.GetComponent<TextMeshProUGUI>();
+        }
     }
 
     public void OnPointerEnter(PointerEventData eventData)
@@ -953,6 +1074,9 @@ public class PaginationButtonHover : MonoBehaviour, IPointerEnterHandler, IPoint
         _material.SetColor("_ColorA", _hoverColorA);
         _material.SetColor("_ColorB", _hoverColorB);
         _material.SetFloat("_GlassAlpha", _hoverAlpha);
+
+        if (_hasTextHover && _text != null)
+            _text.color = _hoverTextColor;
     }
 
     public void OnPointerExit(PointerEventData eventData)
@@ -961,5 +1085,8 @@ public class PaginationButtonHover : MonoBehaviour, IPointerEnterHandler, IPoint
         _material.SetColor("_ColorA", _originalColorA);
         _material.SetColor("_ColorB", _originalColorB);
         _material.SetFloat("_GlassAlpha", _originalAlpha);
+
+        if (_hasTextHover && _text != null)
+            _text.color = _originalTextColor;
     }
 }

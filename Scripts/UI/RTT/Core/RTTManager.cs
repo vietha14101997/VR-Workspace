@@ -99,11 +99,12 @@ public class RTTManager : MonoBehaviour
     [Header("Auto Init")]
     [SerializeField] private bool autoShowMainMenu = true;
 
+    [Tooltip("Pre-initialize all app menus in background after main menu stabilizes")]
+    [SerializeField] private bool enableBackgroundPreInit = true;
+
     [Header("Auto Recenter")]
     [Tooltip("Automatically recenter objects in front of user when app starts")]
     [SerializeField] private bool autoRecenterOnStart = true;
-    [Tooltip("Delay in seconds before auto-recenter (allows camera tracking to stabilize)")]
-    [SerializeField] private float autoRecenterDelay = 0.5f;
     #endregion
 
     #region Panel Management Fields
@@ -127,6 +128,16 @@ public class RTTManager : MonoBehaviour
     private GameObject _mainMenuContent;
     private bool _mainMenuInitialized = false;
     private bool _hasAutoRecentered = false;
+
+    // Startup camera-follow state
+    private bool _startupCameraFollowActive = false;
+    private float _startupFollowStartTime = 0f;
+    private GameObject _cachedVirtualObjects;
+    private Quaternion _initialCameraRotation;
+    private bool _cameraTrackingDetected = false;
+    private const float kCameraTrackingAngleThreshold = 1.0f; // Degrees of rotation change to confirm tracking
+    private const float kCameraTrackingFallbackTime = 2.0f;   // Assume tracking active after this time
+    private const float kMaxStartupFollowTime = 5.0f;         // Safety timeout
     #endregion
 
     #region Events
@@ -183,7 +194,7 @@ public class RTTManager : MonoBehaviour
 
     #region Properties - Zoom
     /// <summary>Get current zoom distance from camera</summary>
-    public float ZoomDistance => VirtualObjectsZoomController.Instance?.CurrentDistance ?? 1.8f;
+    public float ZoomDistance => VirtualObjectsZoomController.Instance?.CurrentDistance ?? 2.0f;
 
     /// <summary>Get minimum zoom distance</summary>
     public float ZoomMinDistance => VirtualObjectsZoomController.Instance?.MinDistance ?? 1.0f;
@@ -440,6 +451,13 @@ public class RTTManager : MonoBehaviour
 
     private IEnumerator WaitAndShowMainMenu()
     {
+        // Start camera-follow immediately (before waiting for MainMenu)
+        // LateUpdate will unlock once camera tracking is detected AND MainMenu is initialized
+        if (autoRecenterOnStart && !_hasAutoRecentered)
+        {
+            StartStartupCameraFollow();
+        }
+
         while (mainMenuFrame.ContentContainer == null)
             yield return null;
         yield return null;
@@ -448,37 +466,21 @@ public class RTTManager : MonoBehaviour
         CreatePersistentMainMenu();
         Debug.Log("[RTTManager] Main Menu initialized (persistent, cannot be closed)");
 
-        // Auto-recenter after camera stabilizes
-        if (autoRecenterOnStart && !_hasAutoRecentered)
+        // Background pre-init all apps after main menu is ready
+        if (enableBackgroundPreInit && _appManager != null)
         {
-            StartCoroutine(AutoRecenterRoutine());
+            _appManager.PrepareAllApps();
+            Debug.Log("[RTTManager] Background app pre-initialization triggered");
         }
     }
 
     /// <summary>
-    /// Auto-recenter routine that waits for camera to stabilize then recenters all objects.
-    /// No visual countdown - performs instant recenter.
+    /// Start continuous camera-follow at startup.
+    /// VirtualObjects track camera's horizontal axis until camera tracking is detected
+    /// AND MainMenu initialization is complete.
     /// </summary>
-    private IEnumerator AutoRecenterRoutine()
+    private void StartStartupCameraFollow()
     {
-        // Wait for camera tracking to stabilize
-        yield return new WaitForSeconds(autoRecenterDelay);
-
-        // Perform instant recenter
-        PerformInstantRecenter();
-        _hasAutoRecentered = true;
-
-        Debug.Log("[RTTManager] Auto-recenter completed");
-    }
-
-    /// <summary>
-    /// Perform instant recenter without animation.
-    /// Moves all VirtualObjects to face the camera.
-    /// Also calls Cardboard API Recenter on Android to reset headset tracking.
-    /// </summary>
-    public void PerformInstantRecenter()
-    {
-        // Call Cardboard API Recenter on Android to reset headset tracking
 #if UNITY_ANDROID && !UNITY_EDITOR
         try
         {
@@ -492,72 +494,136 @@ public class RTTManager : MonoBehaviour
 #endif
 
         Camera cam = Camera.main;
+        _initialCameraRotation = cam != null ? cam.transform.rotation : Quaternion.identity;
+        _cameraTrackingDetected = false;
+        _startupCameraFollowActive = true;
+        _startupFollowStartTime = Time.time;
+        Debug.Log("[RTTManager] Startup camera-follow started");
+    }
+
+    private void LateUpdate()
+    {
+        if (!_startupCameraFollowActive) return;
+
+        Camera cam = Camera.main;
         if (cam == null) return;
 
-        // Find VirtualObjects parent
-        GameObject virtualObjectsParent = GameObject.Find("VirtualObjects");
-        if (virtualObjectsParent == null)
+        float elapsed = Time.time - _startupFollowStartTime;
+
+        // Detect camera tracking activation
+        if (!_cameraTrackingDetected)
         {
-            Debug.LogWarning("[RTTManager] VirtualObjects parent not found for recenter");
+            float angleDiff = Quaternion.Angle(_initialCameraRotation, cam.transform.rotation);
+            if (angleDiff > kCameraTrackingAngleThreshold)
+            {
+                _cameraTrackingDetected = true;
+                Debug.Log($"[RTTManager] Camera tracking detected (delta: {angleDiff:F1}°)");
+            }
+            else if (elapsed >= kCameraTrackingFallbackTime)
+            {
+                _cameraTrackingDetected = true;
+                Debug.Log("[RTTManager] Camera tracking assumed active (fallback timeout)");
+            }
+        }
+
+        // Unlock when: camera tracking active AND MainMenu initialized
+        // Safety timeout: unlock regardless after kMaxStartupFollowTime
+        bool shouldUnlock = (_cameraTrackingDetected && _mainMenuInitialized)
+                         || elapsed >= kMaxStartupFollowTime;
+
+        if (shouldUnlock)
+        {
+            _startupCameraFollowActive = false;
+            _hasAutoRecentered = true;
+            RepositionToFaceCamera(); // Final reposition with correct camera direction
+            VirtualObjectsZoomController.Instance?.OnRecenter();
+            Debug.Log($"[RTTManager] Startup camera-follow ended after {elapsed:F1}s (tracking={_cameraTrackingDetected}, menu={_mainMenuInitialized})");
             return;
         }
+
+        RepositionToFaceCamera();
+    }
+
+    /// <summary>
+    /// Reposition VirtualObjects children to face camera (horizontal lock).
+    /// Lightweight method for per-frame updates during startup camera-follow.
+    /// </summary>
+    private void RepositionToFaceCamera()
+    {
+        Camera cam = Camera.main;
+        if (cam == null) return;
+
+        if (_cachedVirtualObjects == null)
+            _cachedVirtualObjects = GameObject.Find("VirtualObjects");
+        if (_cachedVirtualObjects == null) return;
 
         RTTMenuFrame primary = RTTMenuFrame.PrimaryInstance;
-        if (primary == null)
-        {
-            Debug.LogWarning("[RTTManager] No primary RTTMenuFrame found for recenter");
-            return;
-        }
+        if (primary == null) return;
 
-        // Store pivot point (primary's position and rotation)
+        // Store pivot (primary frame position/rotation)
         Vector3 pivotPos = primary.transform.position;
         Quaternion pivotRot = primary.transform.rotation;
 
-        // Collect all children and their relative transforms
-        var children = new List<Transform>();
-        var relativePositions = new List<Vector3>();
-        var relativeRotations = new List<Quaternion>();
+        // Collect children and relative transforms
+        var virtualObjectsTransform = _cachedVirtualObjects.transform;
+        int childCount = virtualObjectsTransform.childCount;
+        var children = new Transform[childCount];
+        var relPositions = new Vector3[childCount];
+        var relRotations = new Quaternion[childCount];
 
-        foreach (Transform child in virtualObjectsParent.transform)
+        Quaternion invPivotRot = Quaternion.Inverse(pivotRot);
+        for (int i = 0; i < childCount; i++)
         {
-            children.Add(child);
-            // Calculate position relative to pivot
-            Vector3 relPos = Quaternion.Inverse(pivotRot) * (child.position - pivotPos);
-            relativePositions.Add(relPos);
-            // Calculate rotation relative to pivot
-            Quaternion relRot = Quaternion.Inverse(pivotRot) * child.rotation;
-            relativeRotations.Add(relRot);
+            Transform child = virtualObjectsTransform.GetChild(i);
+            children[i] = child;
+            relPositions[i] = invPivotRot * (child.position - pivotPos);
+            relRotations[i] = invPivotRot * child.rotation;
         }
 
-        // Calculate new pivot position and rotation (facing camera)
+        // Calculate new pivot facing camera (horizontal only)
         Vector3 camForward = cam.transform.forward;
         camForward.y = 0;
         if (camForward.sqrMagnitude < 0.001f) camForward = Vector3.forward;
         camForward.Normalize();
 
         Vector3 camPos = cam.transform.position;
-        // Maintain horizontal distance from camera
         float hDist = Vector2.Distance(
             new Vector2(pivotPos.x, pivotPos.z),
-            new Vector2(camPos.x, camPos.z)
-        );
+            new Vector2(camPos.x, camPos.z));
 
         Vector3 newPivotPos = camPos + camForward * hDist;
-        newPivotPos.y = pivotPos.y; // Preserve Y position
+        newPivotPos.y = pivotPos.y;
         Quaternion newPivotRot = Quaternion.LookRotation(camForward);
 
-        // Apply new transforms to all children
-        for (int i = 0; i < children.Count; i++)
+        for (int i = 0; i < childCount; i++)
         {
-            Transform child = children[i];
-            // Restore relative position and rotation with new pivot
-            child.position = newPivotPos + newPivotRot * relativePositions[i];
-            child.rotation = newPivotRot * relativeRotations[i];
+            children[i].position = newPivotPos + newPivotRot * relPositions[i];
+            children[i].rotation = newPivotRot * relRotations[i];
         }
+    }
 
-        Debug.Log($"[RTTManager] Instant recenter: moved {children.Count} objects to face camera");
+    /// <summary>
+    /// Perform instant recenter without animation.
+    /// Moves all VirtualObjects to face the camera.
+    /// Also calls Cardboard API Recenter on Android to reset headset tracking.
+    /// </summary>
+    public void PerformInstantRecenter()
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        try
+        {
+            Api.Recenter();
+            Debug.Log("[RTTManager] Cardboard API Recenter called");
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[RTTManager] Cardboard Recenter failed: {e.Message}");
+        }
+#endif
 
-        // Notify ZoomController to recalculate distance after recenter
+        RepositionToFaceCamera();
+
+        Debug.Log("[RTTManager] Instant recenter completed");
         VirtualObjectsZoomController.Instance?.OnRecenter();
     }
 
@@ -704,6 +770,52 @@ public class RTTManager : MonoBehaviour
     }
     #endregion
 
+    #region Immersive Mode
+    private bool _wasTaskbarVisible;
+    private bool _wasMenuVisible;
+    private bool _isImmersiveMode;
+
+    /// <summary>
+    /// Enter immersive mode: Hide global system UI (Taskbar, Main Menu).
+    /// Used by Video Player or other full-screen apps.
+    /// </summary>
+    public void EnterImmersiveMode()
+    {
+        if (_isImmersiveMode) return;
+        _isImmersiveMode = true;
+
+        // Save state
+        _wasTaskbarVisible = taskbar != null && taskbar.gameObject.activeSelf;
+        _wasMenuVisible = mainMenuFrame != null && mainMenuFrame.gameObject.activeSelf;
+
+        // Hide UI
+        if (taskbar != null) taskbar.gameObject.SetActive(false);
+        
+        // Hide menu frame (this hides the container for both Main Menu and App content)
+        // Note: We might need a more granular approach if we want to keep App content visible but hide the "Menu" styling?
+        // But for Video Player, the Video Projection is separate from the MenuFrame (it uses WorldPanelPlus in world space),
+        // so hiding the MenuFrame is correct to clear the view.
+        if (mainMenuFrame != null) mainMenuFrame.gameObject.SetActive(false);
+
+        Debug.Log("[RTTManager] Entered Immersive Mode");
+    }
+
+    /// <summary>
+    /// Exit immersive mode: Restore global system UI state.
+    /// </summary>
+    public void ExitImmersiveMode()
+    {
+        if (!_isImmersiveMode) return;
+        _isImmersiveMode = false;
+
+        // Restore state
+        if (taskbar != null && _wasTaskbarVisible) taskbar.gameObject.SetActive(true);
+        if (mainMenuFrame != null && _wasMenuVisible) mainMenuFrame.gameObject.SetActive(true);
+
+        Debug.Log("[RTTManager] Exited Immersive Mode");
+    }
+    #endregion
+
     #region Menu Navigation
     /// <summary>
     /// Show the persistent Main Menu. Does not recreate - only shows existing menu.
@@ -711,6 +823,9 @@ public class RTTManager : MonoBehaviour
     /// </summary>
     public void ShowMainMenu()
     {
+        // Cancel Immersive Mode if active, as showing menu implies leaving immersion
+        if (_isImmersiveMode) ExitImmersiveMode();
+
         // Re-validate frame if lost (e.g. scene change)
         if (mainMenuFrame == null)
         {

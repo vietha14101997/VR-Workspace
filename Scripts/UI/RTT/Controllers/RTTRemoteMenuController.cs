@@ -540,7 +540,7 @@ public class RTTRemoteMenuController : MonoBehaviour
     }
 
     /// <summary>
-    /// Create RTTRemoteTaskbar that follows the ClusterRig.
+    /// Create RTTRemoteTaskbar that follows RTTMenu (same position as RTTTaskbar).
     /// </summary>
     private void CreateRemoteTaskbar()
     {
@@ -572,7 +572,21 @@ public class RTTRemoteMenuController : MonoBehaviour
 
         // Add RTTRemoteTaskbar controller
         _remoteTaskbar = taskbarObj.AddComponent<RTTRemoteTaskbar>();
-        _remoteTaskbar.SetFollowTarget(_clusterRig);
+
+        // Follow RTTMenu (same target as RTTTaskbar) for consistent positioning
+        RTTMenu menu = RTTMenu.Instance;
+        if (menu != null)
+        {
+            _remoteTaskbar.SetFollowTarget(menu.transform);
+        }
+        else
+        {
+            // Fallback to ClusterRig if RTTMenu not available
+            _remoteTaskbar.SetFollowTarget(_clusterRig.transform);
+        }
+
+        // Set ClusterRig reference separately for panel enable/disable
+        _remoteTaskbar.SetClusterRig(_clusterRig);
 
         // Register with RTTToolbar for sphere positioning
         toolbar.SetActiveTaskbar(frame);
@@ -580,7 +594,7 @@ public class RTTRemoteMenuController : MonoBehaviour
         // Subscribe to taskbar events
         _remoteTaskbar.OnMenuRequested += HandleTaskbarMenuRequest;
 
-        Debug.Log("[RTTRemoteMenuController] Created RTTRemoteTaskbar in RTTToolbar, following ClusterRig");
+        Debug.Log("[RTTRemoteMenuController] Created RTTRemoteTaskbar in RTTToolbar, following RTTMenu");
     }
 
     /// <summary>

@@ -50,7 +50,7 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
     private MockFile? _hoveredFile = null;
 
     private int _currentPage = 1;
-    private int _pageSize = 10; // Default: ~2 rows x 5 cols for grid view (will be recalculated by view)
+    private int _pageSize = 8; // Default: ~2 rows x 4 cols for grid view (will be recalculated by view)
 
     // Sort State
     private string _sortBy = "Name";
@@ -106,6 +106,22 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
         {
             Destroy(_viewObject);
         }
+    }
+
+    private static readonly HashSet<string> _videoExtensions = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase)
+    {
+        "mp4", "mkv", "avi", "webm", "mov", "wmv", "m4v", "flv"
+    };
+
+    public List<string> GetVideoFilePaths()
+    {
+        var paths = new List<string>();
+        foreach (var file in _filteredFiles)
+        {
+            if (!file.IsFolder && _videoExtensions.Contains(file.Type))
+                paths.Add(file.Path);
+        }
+        return paths;
     }
 
     public void HandleBack()
@@ -598,14 +614,21 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
     {
         if (_pageSize == itemsPerPage)
         {
-            Debug.Log($"[Controller] SetPageSize: no change (already {_pageSize})");
             return;
+        }
+
+        // Emergency fix: if something is trying to set 10 (old design), force it to 8 for Grid
+        if (itemsPerPage == 10) 
+        {
+            Debug.LogWarning($"[Controller] Something attempted to set pageSize to 10. Forcing to 8. StackTrace: {StackTraceUtility.ExtractStackTrace()}");
+            itemsPerPage = 8;
+            if (_pageSize == 8) return;
         }
 
         // Calculate current item index before changing page size
         int currentItemIndex = (_currentPage - 1) * _pageSize;
 
-        Debug.Log($"[Controller] Page size changed: {_pageSize} -> {itemsPerPage}, currentItemIndex: {currentItemIndex}");
+        Debug.Log($"[Controller] SetPageSize: {_pageSize} -> {itemsPerPage}, currentItemIndex: {currentItemIndex}");
         _pageSize = Mathf.Max(1, itemsPerPage);
 
         // Calculate new page from item index with new page size
@@ -1697,6 +1720,21 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
     {
         // Side panels now fade in with main frame via coordinated animation in RTTAppManager
         Debug.Log("[RTTFileManagerController] OnAppShown called");
+
+        // OPTIMIZATION: Refresh current directory if it has changed since last view
+        // This ensures the file list is up-to-date with new/deleted files
+        if (!string.IsNullOrEmpty(_currentPath) && _currentPath != "root")
+        {
+            string absolutePath = FileSystemService.GetAbsolutePath(_currentPath);
+
+            // Check if folder has been modified (new/deleted files)
+            if (AppStateCache.Instance != null &&
+                AppStateCache.Instance.HasPathChanged(absolutePath, DateTime.Now.AddMinutes(-1).Ticks))
+            {
+                Debug.Log($"[RTTFileManagerController] OnAppShown: Directory changed, refreshing: {_currentPath}");
+                NavigateTo(_currentPath);
+            }
+        }
     }
 
     #region State Caching Support
@@ -1740,7 +1778,7 @@ public class RTTFileManagerController : MonoBehaviour, IPaginationController, ID
         // Restore state
         _currentPath = snapshot.currentPath ?? "root";
         _currentPage = snapshot.currentPage > 0 ? snapshot.currentPage : 1;
-        _pageSize = snapshot.pageSize > 0 ? snapshot.pageSize : 10;
+        _pageSize = 8; // Force to current default, view will refine it later via SetPageSize
         _sortBy = !string.IsNullOrEmpty(snapshot.sortBy) ? snapshot.sortBy : "Name";
         _sortAscending = snapshot.sortAscending;
 

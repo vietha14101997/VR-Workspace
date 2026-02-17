@@ -338,10 +338,12 @@ public class ClusterVisualCurved : MonoBehaviour
     /// </summary>
     private float GetArcRadius()
     {
+        if (_clusterRig != null) return _clusterRig.ArcRadius;
+        
         var zoomController = VirtualObjectsZoomController.Instance;
         if (zoomController != null && zoomController.IsInitialized)
         {
-            return zoomController.CurrentDistance;
+            return Mathf.Min(zoomController.CurrentDistance, 1.8f);
         }
         return 1.8f; // Default fallback
     }
@@ -464,6 +466,10 @@ public class ClusterVisualCurved : MonoBehaviour
         _borderMeshFilter = _borderObject.GetComponent<MeshFilter>();
         _borderRenderer = _borderObject.GetComponent<MeshRenderer>();
         _borderMeshFilter.sharedMesh = _expandedMesh;
+
+        // Hide background and border - only show remote screen content
+        _backgroundObject.SetActive(false);
+        _borderObject.SetActive(false);
     }
 
     /// <summary>

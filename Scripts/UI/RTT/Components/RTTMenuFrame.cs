@@ -56,6 +56,9 @@ public class RTTMenuFrame : RTTCanvasBase
     [Header("Floating Data Effect")]
     [SerializeField] private bool enableFloatingData = true;
     [SerializeField] private int particleCount = 20;
+    
+    [Header("Background Options")]
+    [SerializeField] private bool enableGlassBackground = true;
     #endregion
 
     #region Private Fields
@@ -155,8 +158,11 @@ public class RTTMenuFrame : RTTCanvasBase
         float w = logicalWidth;
         float h = LogicalHeight;
 
-        // 1. Create Glass Background with Border
-        CreateGlassPanel(canvasRect, w, h);
+        // 1. Create Glass Background with Border (optional)
+        if (enableGlassBackground)
+        {
+            CreateGlassPanel(canvasRect, w, h);
+        }
 
         // 2. Create Content Container
         CreateContentContainer(canvasRect);
@@ -468,6 +474,15 @@ public class RTTMenuFrame : RTTCanvasBase
     {
         enableFloatingData = enabled;
         particleCount = particles;
+    }
+    
+    /// <summary>
+    /// Enable or disable glass background and glowing border.
+    /// Call before ForceInitialize().
+    /// </summary>
+    public void SetGlassBackgroundEnabled(bool enabled)
+    {
+        enableGlassBackground = enabled;
     }
 
     /// <summary>

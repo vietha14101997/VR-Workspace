@@ -135,6 +135,11 @@ public class RTTFileDetail : MonoBehaviour
         _previewImage = previewObj.AddComponent<Image>();
         _previewImage.color = Color.white;
         _previewImage.preserveAspect = true;
+        _previewImage.material = RoundedCorners.SharedMaterial;
+
+        var roundedCorners = previewObj.AddComponent<RoundedCorners>();
+        roundedCorners.Radius = 16f;
+        roundedCorners.UseParentRect = false;
 
         _previewImage.gameObject.SetActive(false);
     }
@@ -389,9 +394,6 @@ public class RTTFileDetail : MonoBehaviour
             if (metadata.Duration.TotalSeconds > 0)
                 UpdateMetadataValue("Length", FormatDuration(metadata.Duration));
 
-            if (metadata.FrameRate > 0)
-                UpdateMetadataValue("Frame rate", $"{metadata.FrameRate:F2} fps");
-
             if (metadata.TotalBitrate > 0)
                 UpdateMetadataValue("Total bitrate", FormatBitrate(metadata.TotalBitrate));
         });
@@ -470,9 +472,6 @@ public class RTTFileDetail : MonoBehaviour
         AddMetadataRow("Dimensions", dimensions);
 
         AddMetadataRow("Length", FormatDuration(file.Duration));
-
-        string frameRate = file.FrameRate > 0 ? $"{file.FrameRate:F2} fps" : "-";
-        AddMetadataRow("Frame rate", frameRate);
 
         string totalBitrate = file.TotalBitrate > 0 ? FormatBitrate(file.TotalBitrate) : "-";
         AddMetadataRow("Total bitrate", totalBitrate);

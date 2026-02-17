@@ -44,6 +44,7 @@ public class RTTMediaGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExi
     private Image _thumbnailImage;
     private RectTransform _thumbnailRect;
     private RectTransform _thumbnailContainerRect;
+    private RoundedCorners _roundedCorners;
     private TextMeshProUGUI _titleText;
     private MarqueeText _titleMarquee;  // For hover scrolling
     private Image _bgImage;
@@ -176,11 +177,11 @@ public class RTTMediaGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExi
         Image containerBg = container.AddComponent<Image>();
         containerBg.sprite = GetRoundedRectSprite();
         containerBg.type = Image.Type.Sliced;
-        containerBg.color = Color.clear;  // Transparent background
+        containerBg.color = Color.clear;
         containerBg.raycastTarget = false;
 
-        // Mask for rounded corners clipping and crop overflow
-        var mask = container.AddComponent<RectMask2D>();
+        // RectMask2D for rectangular overflow clipping
+        container.AddComponent<RectMask2D>();
 
         // Thumbnail Image - center crop to fill container (maintains aspect ratio)
         GameObject thumbObj = new GameObject("Thumbnail");
@@ -196,6 +197,11 @@ public class RTTMediaGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExi
         _thumbnailImage.preserveAspect = true;  // Maintain aspect ratio
         _thumbnailImage.raycastTarget = false;
         _thumbnailImage.color = new Color(0.12f, 0.12f, 0.14f, 1f);
+        _thumbnailImage.material = RoundedCorners.SharedMaterial;
+
+        _roundedCorners = thumbObj.AddComponent<RoundedCorners>();
+        _roundedCorners.Radius = 16f;
+        _roundedCorners.UseParentRect = true;  // Clip to container edges
 
         // AspectRatioFitter with EnvelopeParent = cover/crop mode
         var aspectFitter = thumbObj.AddComponent<AspectRatioFitter>();
@@ -472,10 +478,9 @@ public class RTTMediaGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExi
         else if (_titleText != null)
             _titleText.text = fileName;
 
-        // Force layout rebuild to ensure MarqueeText gets correct dimensions
-        Canvas.ForceUpdateCanvases();
-        if (_thumbnailRect != null) LayoutRebuilder.ForceRebuildLayoutImmediate(_thumbnailRect);
-        LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)transform);
+        // Mark layout for deferred rebuild (avoids expensive ForceUpdateCanvases per item)
+        if (_thumbnailRect != null) LayoutRebuilder.MarkLayoutForRebuild(_thumbnailRect);
+        LayoutRebuilder.MarkLayoutForRebuild((RectTransform)transform);
 
         // Determine media type from extension
         string ext = System.IO.Path.GetExtension(video.Path)?.ToLowerInvariant() ?? "";
@@ -660,10 +665,12 @@ public class RTTMediaGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExi
                         if (spriteAspect >= targetAspect)
                         {
                             aspectFitter.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
+                            if (_roundedCorners != null) _roundedCorners.UseParentRect = true;
                         }
                         else
                         {
                             aspectFitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+                            if (_roundedCorners != null) _roundedCorners.UseParentRect = false;
                         }
                         aspectFitter.aspectRatio = spriteAspect;
 

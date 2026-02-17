@@ -32,6 +32,7 @@ public class RTTRemoteTaskbar : MonoBehaviour
     [SerializeField] private Sprite iconRecenter;
     [SerializeField] private Sprite iconZoom;
     [SerializeField] private Sprite iconMonitor;
+    [SerializeField] private Sprite iconEnviroment;
 
     // Dynamic icons for bitrate (10, 15, 20, 25, 30 Mbps)
     private Dictionary<int, Sprite> _bitrateIcons = new Dictionary<int, Sprite>();
@@ -63,7 +64,7 @@ public class RTTRemoteTaskbar : MonoBehaviour
     private int _currentFps = 60;
 
     // Section 2 references
-    private GameObject _zoomButton;
+    private GameObject _monitorTypeButton;
     private List<GameObject> _monitorSlots = new List<GameObject>();
 
     // Section 3 reference
@@ -112,6 +113,13 @@ public class RTTRemoteTaskbar : MonoBehaviour
         AddSection2Slots();
         SetupLatencyDisplay();
 
+        // Initialize environment controller
+        if (MediaEnvironmentController.Instance != null)
+        {
+            MediaEnvironmentController.Instance.Initialize();
+            MediaEnvironmentController.Instance.OnLightsChanged += HandleLightsChanged;
+        }
+
         // Create expansion panel
         CreateExpansionPanel();
 
@@ -126,6 +134,11 @@ public class RTTRemoteTaskbar : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (MediaEnvironmentController.Instance != null)
+        {
+            MediaEnvironmentController.Instance.OnLightsChanged -= HandleLightsChanged;
+        }
+
         if (_instance == this) _instance = null;
         UnbindFromViewModel();
         CleanupExpansionPanel();
@@ -228,8 +241,8 @@ public class RTTRemoteTaskbar : MonoBehaviour
         var defaultFpsIcon = GetFpsIcon(_currentFps);
         _fpsButton = CreateIconButton(section1, defaultFpsIcon, "FPS", _cyanColor, buttonSize, OnFpsClicked);
 
-        // 4. Zoom display button (icon only)
-        _zoomButton = CreateDisplayIconButton(section1, iconZoom, "Zoom", _cyanColor, buttonSize);
+        // 4. Monitor Type button (clickable to show expansion panel)
+        _monitorTypeButton = CreateIconButton(section1, iconEnviroment, "MonitorType", _cyanColor, buttonSize, OnMonitorTypeClicked);
 
         // 5. Eye button (opens expansion with Passthrough + Light)
         _eyeButton = CreateIconButton(section1, iconEye, "Eye", _cyanColor, buttonSize, OnEyeClicked);
@@ -282,6 +295,29 @@ public class RTTRemoteTaskbar : MonoBehaviour
             Debug.Log("[RTTRemoteTaskbar] FPS clicked - showing expansion panel");
             Vector3? buttonWorldPos = GetButtonWorldPosition(_fpsButton);
             _expansionPanel.ShowFpsOptions(_currentFps, buttonWorldPos);
+        }
+        _miniFrame.MarkDirty();
+    }
+
+    private void OnMonitorTypeClicked()
+    {
+        if (_expansionPanel == null || _clusterRig == null) return;
+
+        // Toggle behavior: if already showing MonitorType options, hide it
+        if (_expansionPanel.IsVisible && _expansionPanel.CurrentType == RTTTaskbarExpansion.ExpansionType.MonitorType)
+        {
+            Debug.Log("[RTTRemoteTaskbar] MonitorType clicked - hiding expansion panel (toggle)");
+            _expansionPanel.Hide();
+        }
+        else
+        {
+            // Show MonitorType options
+            Debug.Log("[RTTRemoteTaskbar] MonitorType clicked - showing expansion panel");
+            Vector3? buttonWorldPos = GetButtonWorldPosition(_monitorTypeButton);
+            
+            // Sync current state from ClusterRig
+            bool isCurved = _clusterRig.useCurvedVisual;
+            _expansionPanel.ShowMonitorTypeOptions(isCurved, buttonWorldPos);
         }
         _miniFrame.MarkDirty();
     }
@@ -360,6 +396,7 @@ public class RTTRemoteTaskbar : MonoBehaviour
         _expansionPanel.OnFpsSelected += OnExpansionFpsSelected;
         _expansionPanel.OnPassthroughToggled += OnPassthroughToggled;
         _expansionPanel.OnLightToggled += OnLightToggled;
+        _expansionPanel.OnMonitorTypeSelected += OnExpansionMonitorTypeSelected;
 
         Debug.Log("[RTTRemoteTaskbar] Expansion panel created in RTTToolbar");
     }
@@ -372,6 +409,7 @@ public class RTTRemoteTaskbar : MonoBehaviour
             _expansionPanel.OnFpsSelected -= OnExpansionFpsSelected;
             _expansionPanel.OnPassthroughToggled -= OnPassthroughToggled;
             _expansionPanel.OnLightToggled -= OnLightToggled;
+            _expansionPanel.OnMonitorTypeSelected -= OnExpansionMonitorTypeSelected;
 
             if (Application.isPlaying)
                 Destroy(_expansionPanel.gameObject);
@@ -406,6 +444,18 @@ public class RTTRemoteTaskbar : MonoBehaviour
         {
             // Fire and forget - the async update will trigger OnFpsChanged
             _ = _viewModel.UpdateConfigAsync(fps, null);
+        }
+
+        _miniFrame.MarkDirty();
+    }
+
+    private void OnExpansionMonitorTypeSelected(bool isCurved)
+    {
+        Debug.Log($"[RTTRemoteTaskbar] Monitor Type selected from expansion: {(isCurved ? "Curved" : "Flat")}");
+
+        if (_clusterRig != null)
+        {
+            _clusterRig.SetStyle(isCurved);
         }
 
         _miniFrame.MarkDirty();
@@ -800,16 +850,39 @@ public class RTTRemoteTaskbar : MonoBehaviour
         _miniFrame.MarkDirty();
     }
 
+    private void HandleLightsChanged(bool isOn)
+    {
+        if (_isLightOn == isOn) return;
+
+        _isLightOn = isOn;
+        UpdateEyeButtonColor();
+
+        if (_expansionPanel != null)
+        {
+            _expansionPanel.SetLightState(isOn);
+        }
+
+        _miniFrame.MarkDirty();
+        Debug.Log($"[RTTRemoteTaskbar] Light state synchronized to: {(isOn ? "ON" : "OFF")}");
+    }
+
     private void OnLightToggled(bool isOn)
     {
         _isLightOn = isOn;
         Debug.Log($"[RTTRemoteTaskbar] Light toggled: {(_isLightOn ? "ON" : "OFF")}");
 
+        // Use MediaEnvironmentController for unified light/environment management
+        var envController = MediaEnvironmentController.Instance;
+        if (envController != null)
+        {
+            envController.SetLightsEnabled(isOn);
+        }
+
         var modeController = FindObjectOfType<ModeController>();
 
         if (!_isLightOn)
         {
-            // Tắt đèn: lưu trạng thái passthrough, ẩn environment, tắt passthrough
+            // Tắt đèn: lưu trạng thái passthrough, tắt passthrough
             _savedPassthroughState = _isPassthroughOn;
 
             if (modeController != null)
@@ -831,12 +904,6 @@ public class RTTRemoteTaskbar : MonoBehaviour
                 {
                     modeController.backgroundVirtual.enabled = true;
                 }
-
-                // Ẩn virtual environment
-                if (modeController.virtualEnvironment != null)
-                {
-                    modeController.virtualEnvironment.SetActive(false);
-                }
             }
 
             // Cập nhật trạng thái passthrough trong expansion panel
@@ -844,7 +911,7 @@ public class RTTRemoteTaskbar : MonoBehaviour
             if (_expansionPanel != null)
             {
                 _expansionPanel.SetPassthroughState(false);
-                _expansionPanel.SetPassthroughInteractable(false);
+                _expansionPanel.SetPassthroughInteractable(false); // Disable nút passthrough
             }
         }
         else
@@ -856,15 +923,12 @@ public class RTTRemoteTaskbar : MonoBehaviour
                 if (_savedPassthroughState)
                 {
                     _isPassthroughOn = true;
+                    // Dùng SetMode để khôi phục đầy đủ (bật backgroundReal, passthrough, ẩn virtualEnv)
                     modeController.SetMode(ViewMode.RealWorld);
                 }
                 else
                 {
-                    // Không có passthrough: hiện virtual environment bình thường
-                    if (modeController.virtualEnvironment != null)
-                    {
-                        modeController.virtualEnvironment.SetActive(true);
-                    }
+                    // No passthrough mode changes needed, environment visibility handled by MediaEnvironmentController
                 }
             }
 
@@ -1248,11 +1312,7 @@ public class RTTRemoteTaskbar : MonoBehaviour
         // Find icon in VRButtonFactory structure: container > HitArea > Visuals > Content > Icon
         Transform iconTransform = container.transform.Find("HitArea/Visuals/Content/Icon");
 
-        if (iconTransform == null)
-        {
-            Debug.LogWarning($"[RTTRemoteTaskbar] SetBareIconButtonIcon: Icon not found in {container.name}");
-            return;
-        }
+        if (iconTransform == null) return;
 
         Image iconImg = iconTransform.GetComponent<Image>();
         if (iconImg != null)
@@ -1306,6 +1366,15 @@ public class RTTRemoteTaskbar : MonoBehaviour
     }
 
     /// <summary>
+    /// Set the ClusterRig reference for panel enable/disable functionality,
+    /// without changing the follow target.
+    /// </summary>
+    public void SetClusterRig(WorldPanelClusterRig clusterRig)
+    {
+        _clusterRig = clusterRig;
+    }
+
+    /// <summary>
     /// Hide the taskbar.
     /// </summary>
     public void Hide()
@@ -1342,6 +1411,7 @@ public class RTTRemoteTaskbar : MonoBehaviour
         if (iconRecenter == null) iconRecenter = LoadIcon("recenter");
         if (iconZoom == null) iconZoom = LoadIcon("zoom");
         if (iconMonitor == null) iconMonitor = LoadIcon("monitor");
+        if (iconEnviroment == null) iconEnviroment = LoadIcon("enviroment");
 
         // Dynamic bitrate icons (10, 15, 20, 25, 30 Mbps)
         // Naming: icon_{bitrate}_mbps (e.g., icon_10_mbps, icon_20_mbps)

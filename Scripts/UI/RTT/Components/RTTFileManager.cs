@@ -145,6 +145,25 @@ public class RTTFileManager : MonoBehaviour
         return frames;
     }
 
+    private void OnEnable()
+    {
+        // Ensure content is fully opaque when enabled 
+        // This prevents being stuck at low alpha if a fade coroutine was interrupted during background reset
+        SetContentAlpha(1f);
+
+        if (!_viewReady) return;
+
+        if (_leftFrame != null) _leftFrame.gameObject.SetActive(true);
+        if (_rightFrame != null) _rightFrame.gameObject.SetActive(true);
+        if (_pagination != null) _pagination.Show();
+        
+        // Show action bar if a file was selected
+        if (_fileActionBar != null && _hasSelectedFile && !_isClipboardMode)
+        {
+            _fileActionBar.SetVisible(true);
+        }
+    }
+
     /// <summary>
     /// Set alpha of a frame's display quad.
     /// </summary>
@@ -192,6 +211,15 @@ public class RTTFileManager : MonoBehaviour
         {
             _pagination.FadeInPageButtons();
         }
+
+        // If not active, coroutine won't run. Set alpha immediately.
+        if (!gameObject.activeInHierarchy)
+        {
+            SetContentAlpha(1f);
+            onComplete?.Invoke();
+            return;
+        }
+
         _fadeCoroutine = StartCoroutine(FadeContentCoroutine(0f, 1f, FOLDER_TRANSITION_DURATION, onComplete));
     }
 
@@ -332,17 +360,6 @@ public class RTTFileManager : MonoBehaviour
         _operationCts?.Dispose();
         _operationCts = null;
     }
-    
-    private void OnEnable()
-    {
-        // Only restore external components after initial setup is complete (app switching)
-        // During initial setup, CreateCenterGrid() handles showing pagination
-        if (!_viewReady) return;
-
-        if (_leftFrame != null) _leftFrame.gameObject.SetActive(true);
-        if (_rightFrame != null) _rightFrame.gameObject.SetActive(true);
-        if (_pagination != null) _pagination.Show();
-    }
 
     private void OnDisable()
     {
@@ -470,19 +487,20 @@ public class RTTFileManager : MonoBehaviour
 
         float bottomPadding = panelHeight * 0.02f;
 
-        // 1. Create Body Object (Grid Container)
+        // 1. Create Body Object (Grid/List Container)
         GameObject bodyObj = new GameObject("Body");
         bodyObj.transform.SetParent(_menuFrame.ContentContainer, false);
         _bodyRT = bodyObj.AddComponent<RectTransform>();
         _bodyRT.anchorMin = Vector2.zero;
         _bodyRT.anchorMax = Vector2.one;
-        _bodyRT.offsetMax = new Vector2(0, -_headerHeight2Rows); // Top offset
-        _bodyRT.offsetMin = new Vector2(0, bottomPadding); // Bottom offset
+        _bodyRT.offsetMax = new Vector2(0, -_headerHeight2Rows);
+        _bodyRT.offsetMin = new Vector2(0, bottomPadding);
 
         bodyObj.AddComponent<RectMask2D>();
-
-        // Add CanvasGroup for fade animations during folder navigation
-        _bodyCanvasGroup = bodyObj.AddComponent<CanvasGroup>(); 
+        
+        // Add CanvasGroup for smooth transitions and fade animations during folder navigation
+        _bodyCanvasGroup = bodyObj.AddComponent<CanvasGroup>();
+        _bodyCanvasGroup.alpha = 0f; // Start hidden for smooth fade-in
 
         // 2. Create Header Container
         GameObject headerObj = new GameObject("Header");
@@ -543,6 +561,9 @@ public class RTTFileManager : MonoBehaviour
 
         // Initialize page size AFTER OnViewReady has loaded data (deferred to next frame for safety)
         StartCoroutine(InitializePageSizeDeferred());
+
+        // Smooth fade-in of content after construction
+        FadeInContent();
     }
 
     // Fixed page sizes per user requirement
@@ -3655,21 +3676,159 @@ public class RTTFileManager : MonoBehaviour
         Debug.Log("[RTTFileManager] File action bar created (hidden initially)");
     }
 
+    private static readonly HashSet<string> _videoExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "mp4", "mkv", "avi", "webm", "mov", "wmv", "m4v", "flv"
+    };
+
     private void OnActionBarOpenClicked()
     {
         if (_currentDisplayedFile.Path == null) return;
 
-        // Open functionality - navigate into folder or open file
         if (_currentDisplayedFile.IsFolder)
         {
             _controller?.NavigateTo(_currentDisplayedFile.Path);
         }
+        else if (_videoExtensions.Contains(_currentDisplayedFile.Type))
+        {
+            OpenVideoInPlayer(_currentDisplayedFile.Path);
+        }
         else
         {
-            // TODO: Implement file open functionality
             Debug.Log($"[RTTFileManager] Open file requested: {_currentDisplayedFile.Path}");
         }
     }
+
+    private void OpenVideoInPlayer(string videoPath)
+    {
+        var videoPaths = _controller?.GetVideoFilePaths();
+        if (videoPaths == null || videoPaths.Count == 0) return;
+
+        int startIndex = videoPaths.IndexOf(videoPath);
+        if (startIndex < 0) startIndex = 0;
+        MediaPlaylistService.Instance?.SetPlaybackQueueDirect(videoPaths, startIndex);
+
+        var manager = RTTManager.Instance;
+        if (manager == null) return;
+
+        // Capture state before fade (position may change during animation)
+        Vector3 framePos = _menuFrame != null ? _menuFrame.transform.position : Vector3.zero;
+        Quaternion frameRot = _menuFrame != null ? _menuFrame.transform.rotation : Quaternion.identity;
+        TMP_FontAsset font = manager.Font;
+        Color primaryColor = manager.PrimaryColor;
+        Color accentColor = manager.AccentColor;
+        float width = _containerWidth;
+        float height = _containerHeight;
+
+        // Hide action bar immediately (has its own CanvasGroup fade)
+        if (_fileActionBar != null) _fileActionBar.HideImmediate();
+
+        // Fade out all File Manager frames, then create player
+        FadeOutAllFrames(() =>
+        {
+            // Deactivate main frame — triggers OnDisable which handles
+            // side frames, pagination.Hide(), and actionbar.HideImmediate()
+            foreach (var frame in GetAllFrames())
+            {
+                if (frame != null && frame.gameObject != null)
+                    frame.gameObject.SetActive(false);
+            }
+
+            // Create standalone video player (completely independent from Media app)
+            var playerGO = new GameObject("DirectVideoPlayer");
+            playerGO.transform.SetParent(manager.transform);
+            var playerController = playerGO.AddComponent<VRMediaAppController>();
+
+            playerController.InitializeForDirectPlay(
+                width, height, font, primaryColor, accentColor,
+                framePos, frameRot,
+                onExit: () =>
+                {
+                    // Re-show all File Manager frames at alpha=0, then fade in
+                    // Set alpha=0 on materials before activating (materials exist even when inactive)
+                    foreach (var frame in GetAllFrames())
+                    {
+                        if (frame != null && frame.gameObject != null)
+                            SetFrameAlpha(frame, 0f);
+                    }
+
+                    // Activate main frame — triggers OnEnable which handles:
+                    // - Side frames activation
+                    // - _pagination.Show() (own fade-in)
+                    // - _fileActionBar.SetVisible() if file selected
+                    foreach (var frame in GetAllFrames())
+                    {
+                        if (frame != null && frame.gameObject != null)
+                            frame.gameObject.SetActive(true);
+                    }
+
+                    // Fade in the frame quads
+                    FadeInAllFrames();
+                }
+            );
+
+            // Start playing the video directly (includes player fade-in)
+            playerController.PlayVideoDirectly(videoPath);
+        });
+
+        Debug.Log($"[RTTFileManager] Opened direct video player for: {videoPath}");
+    }
+
+    #region Direct Play Fade Animation
+    private const float DIRECT_PLAY_FADE_OUT_DURATION = 0.15f;
+    private const float DIRECT_PLAY_FADE_IN_DURATION = 0.2f;
+    private Coroutine _directPlayFadeCoroutine;
+
+    private void FadeOutAllFrames(Action onComplete)
+    {
+        if (_directPlayFadeCoroutine != null)
+            StopCoroutine(_directPlayFadeCoroutine);
+        _directPlayFadeCoroutine = StartCoroutine(FadeAllFramesCoroutine(1f, 0f, DIRECT_PLAY_FADE_OUT_DURATION, onComplete));
+    }
+
+    private void FadeInAllFrames(Action onComplete = null)
+    {
+        if (_directPlayFadeCoroutine != null)
+            StopCoroutine(_directPlayFadeCoroutine);
+        _directPlayFadeCoroutine = StartCoroutine(FadeAllFramesCoroutine(0f, 1f, DIRECT_PLAY_FADE_IN_DURATION, onComplete));
+    }
+
+    private IEnumerator FadeAllFramesCoroutine(float from, float to, float duration, Action onComplete)
+    {
+        // Collect all valid materials from RTTMenuFrame quads (main + side panels)
+        // Note: pagination is NOT included here — it uses its own Show/Hide fade
+        // triggered by OnEnable/OnDisable to avoid concurrent material writes
+        var materials = new List<Material>();
+        foreach (var frame in GetAllFrames())
+        {
+            if (frame == null) continue;
+            var quad = frame.GetDisplayQuad();
+            if (quad?.material != null)
+                materials.Add(quad.material);
+        }
+
+        // Animate
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float alpha = Mathf.Lerp(from, to, t);
+
+            foreach (var mat in materials)
+                mat.color = new Color(1f, 1f, 1f, alpha);
+
+            yield return null;
+        }
+
+        // Ensure final value
+        foreach (var mat in materials)
+            mat.color = new Color(1f, 1f, 1f, to);
+
+        _directPlayFadeCoroutine = null;
+        onComplete?.Invoke();
+    }
+    #endregion
 
     private void OnActionBarRenameClicked()
     {

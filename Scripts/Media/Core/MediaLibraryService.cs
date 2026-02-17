@@ -34,6 +34,7 @@ public class MediaLibraryService : MonoBehaviour
     private const string FAVORITES_KEY = "MediaLibrary_Favorites";
     private const string HISTORY_KEY = "MediaLibrary_History";
     private const string LIBRARY_CACHE_KEY = "MediaLibrary_Cache";
+    private const bool ENABLE_CACHE_LOADING = false; // Set false to skip cache loading
     private const int MAX_HISTORY = 50;
     #endregion
 
@@ -82,8 +83,21 @@ public class MediaLibraryService : MonoBehaviour
 
         LoadFavorites();
         LoadHistory();
-        // Load cache asynchronously to avoid blocking main thread
-        _cacheLoadCoroutine = StartCoroutine(LoadLibraryCacheAsync());
+
+        // Make cache loading conditional
+#pragma warning disable CS0162 // Unreachable code - ENABLE_CACHE_LOADING is compile-time constant
+        if (ENABLE_CACHE_LOADING)
+        {
+            // Load cache asynchronously to avoid blocking main thread
+            _cacheLoadCoroutine = StartCoroutine(LoadLibraryCacheAsync());
+        }
+        else
+        {
+            // Mark as loaded immediately to unblock UI
+            IsCacheLoaded = true;
+            Debug.Log("[MediaLibraryService] Cache loading disabled - will scan on demand");
+        }
+#pragma warning restore CS0162
     }
     #endregion
 
@@ -277,6 +291,12 @@ public class MediaLibraryService : MonoBehaviour
         {
             Debug.Log($"[MediaLibraryService] Background scan complete - no changes ({startTime.ElapsedMilliseconds}ms)");
         }
+
+        // Pre-load metadata for any new items (existing items should already be cached)
+        if (newItems.Count > 0)
+        {
+            PreloadMetadataForAllFiles();
+        }
     }
     #endregion
 
@@ -293,6 +313,16 @@ public class MediaLibraryService : MonoBehaviour
         yield return ScanUsingDirectories();
 #endif
 
+        // Deduplicate by path - prevents duplicates from MediaStore cross-table queries
+        // (same file can appear in video, image, and audio tables on some Android devices)
+        int beforeDedup = AllVideos.Count;
+        var seenPaths = new HashSet<string>();
+        AllVideos = AllVideos.Where(v => seenPaths.Add(v.Path)).ToList();
+        if (AllVideos.Count < beforeDedup)
+        {
+            Debug.Log($"[MediaLibraryService] Deduplicated: {beforeDedup} -> {AllVideos.Count} (removed {beforeDedup - AllVideos.Count} duplicates)");
+        }
+
         // Sort by name
         AllVideos = AllVideos.OrderBy(v => v.Title).ToList();
 
@@ -305,6 +335,9 @@ public class MediaLibraryService : MonoBehaviour
         onComplete?.Invoke(AllVideos);
 
         Debug.Log($"[MediaLibraryService] Scan complete: {AllVideos.Count} media files (cached)");
+
+        // Pre-load metadata in background so it's ready when UI opens
+        PreloadMetadataForAllFiles();
     }
 
 #if UNITY_ANDROID && !UNITY_EDITOR
@@ -829,6 +862,7 @@ public class MediaLibraryService : MonoBehaviour
 
         // Check if cache has metadata (backward compatibility)
         bool hasMetadata = cache.fileSizes != null && cache.fileSizes.Count == cache.paths.Count;
+        bool hasDimensions = cache.widths != null && cache.widths.Count == cache.paths.Count;
 
         for (int i = 0; i < cache.paths.Count; i++)
         {
@@ -839,8 +873,10 @@ public class MediaLibraryService : MonoBehaviour
             long fileSize = hasMetadata ? cache.fileSizes[i] : 0;
             long dateAddedTicks = hasMetadata ? cache.dateAddedTicks[i] : 0;
             long dateModifiedTicks = hasMetadata ? cache.dateModifiedTicks[i] : 0;
+            int width = hasDimensions ? cache.widths[i] : 0;
+            int height = hasDimensions ? cache.heights[i] : 0;
 
-            var info = CreateVideoInfoQuick(path, fileSize, dateAddedTicks, dateModifiedTicks);
+            var info = CreateVideoInfoQuick(path, fileSize, dateAddedTicks, dateModifiedTicks, width, height);
             AllVideos.Add(info);
             processedCount++;
 
@@ -860,6 +896,12 @@ public class MediaLibraryService : MonoBehaviour
         IsCacheLoading = false;
         IsCacheLoaded = true;
         OnLibraryCacheLoaded?.Invoke();
+
+        // Pre-load detailed metadata (duration, dimensions) in background
+        if (AllVideos.Count > 0)
+        {
+            PreloadMetadataForAllFiles();
+        }
 
         // If cache didn't have metadata, refresh it in background
         if (!hasMetadata && AllVideos.Count > 0)
@@ -925,7 +967,7 @@ public class MediaLibraryService : MonoBehaviour
     /// Quick version of CreateVideoInfo that doesn't perform disk I/O.
     /// Uses cached metadata if available, otherwise lazy validation needed.
     /// </summary>
-    private MediaVideoInfo CreateVideoInfoQuick(string filePath, long fileSize = 0, long dateAddedTicks = 0, long dateModifiedTicks = 0)
+    private MediaVideoInfo CreateVideoInfoQuick(string filePath, long fileSize = 0, long dateAddedTicks = 0, long dateModifiedTicks = 0, int width = 0, int height = 0)
     {
         var info = new MediaVideoInfo
         {
@@ -940,8 +982,9 @@ public class MediaLibraryService : MonoBehaviour
             FileSizeBytes = fileSize
         };
 
-        // Detect projection from filename (no I/O needed)
-        info.Projection = ProjectionDetector.DetectProjection(filePath, 0, 0);
+        // FIX: Detect projection with width/height from cache for accurate 360 detection
+        // Resolution heuristic requires dimensions (2:1 ratio = 360, 1:1 ratio = 180)
+        info.Projection = ProjectionDetector.DetectProjection(filePath, width, height);
 
         return info;
     }
@@ -990,15 +1033,33 @@ public class MediaLibraryService : MonoBehaviour
                 cache.fileSizes.Add(video.FileSizeBytes);
                 cache.dateAddedTicks.Add(video.DateAdded.Ticks);
                 cache.dateModifiedTicks.Add(video.DateModified.Ticks);
+                // FIX: Cache video dimensions for accurate 360 detection on next load
+                cache.widths.Add(video.Width);
+                cache.heights.Add(video.Height);
             }
             string json = JsonUtility.ToJson(cache);
             PlayerPrefs.SetString(LIBRARY_CACHE_KEY, json);
             PlayerPrefs.Save();
-            Debug.Log($"[MediaLibraryService] Saved {cache.paths.Count} items to cache (with metadata)");
+            Debug.Log($"[MediaLibraryService] Saved {cache.paths.Count} items to cache (with metadata & dimensions)");
         }
         catch (Exception ex)
         {
             Debug.LogWarning($"[MediaLibraryService] Failed to save library cache: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Trigger background metadata pre-loading for all files in the library.
+    /// This ensures metadata (duration, resolution, bitrate) is cached and
+    /// available instantly when the UI requests it.
+    /// </summary>
+    private void PreloadMetadataForAllFiles()
+    {
+        var allPaths = AllVideos.Select(v => v.Path).ToList();
+        if (allPaths.Count > 0)
+        {
+            Debug.Log($"[MediaLibraryService] Triggering metadata preload for {allPaths.Count} files");
+            FileMetadataService.Instance.PreloadMetadata(allPaths);
         }
     }
 
@@ -1099,6 +1160,9 @@ public class MediaLibraryService : MonoBehaviour
         public List<long> fileSizes = new List<long>();
         public List<long> dateAddedTicks = new List<long>();
         public List<long> dateModifiedTicks = new List<long>();
+        // FIX: Cache video dimensions for accurate projection detection
+        public List<int> widths = new List<int>();
+        public List<int> heights = new List<int>();
     }
     #endregion
 }

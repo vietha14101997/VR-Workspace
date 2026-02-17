@@ -219,6 +219,10 @@ public class RTTMediaLibrary : MonoBehaviour
 
     private void OnEnable()
     {
+        // Ensure content is fully opaque when enabled 
+        // This prevents being stuck at low alpha if a fade coroutine was interrupted during background reset
+        SetContentAlpha(1f);
+
         if (!_viewReady) return;
 
         if (_leftFrame != null) _leftFrame.gameObject.SetActive(true);
@@ -387,6 +391,15 @@ public class RTTMediaLibrary : MonoBehaviour
         {
             _pagination.FadeInPageButtons();
         }
+
+        // If not active, coroutine won't run. Set alpha immediately.
+        if (!gameObject.activeInHierarchy)
+        {
+            SetContentAlpha(1f);
+            onComplete?.Invoke();
+            return;
+        }
+
         _fadeCoroutine = StartCoroutine(FadeContentCoroutine(0f, 1f, CATEGORY_TRANSITION_DURATION, onComplete));
     }
 
@@ -623,7 +636,6 @@ public class RTTMediaLibrary : MonoBehaviour
         // Wire up events
         _mediaActionBar.OnPlayClicked += OnPlayButtonClicked;
         _mediaActionBar.OnFavouriteClicked += OnFavouriteButtonClicked;
-        _mediaActionBar.OnPlaylistClicked += OnPlaylistButtonClicked;
 
         // Start hidden - will fade in when first video is selected
         // This creates smooth progressive loading: grid groups → items → select first → detail + actionbar
@@ -679,6 +691,7 @@ public class RTTMediaLibrary : MonoBehaviour
 
         // Add CanvasGroup for fade animations during category navigation
         _bodyCanvasGroup = bodyObj.AddComponent<CanvasGroup>();
+        _bodyCanvasGroup.alpha = 0f; // Start hidden for smooth fade-in
 
         // 2. Create Header Container
         GameObject headerObj = new GameObject("Header");
@@ -728,6 +741,9 @@ public class RTTMediaLibrary : MonoBehaviour
 
         StartCoroutine(InitializePageSizeDeferred());
 
+        // Smooth fade-in of content after construction
+        FadeInContent();
+
         Debug.Log("[RTTMediaLibrary] Center grid created");
     }
 
@@ -735,7 +751,7 @@ public class RTTMediaLibrary : MonoBehaviour
     {
         yield return null;
 
-        int itemsPerPage = _grid?.ItemsPerPage ?? 6;
+        int itemsPerPage = _grid?.ItemsPerPage ?? 8;
         _controller?.SetPageSize(itemsPerPage);
         Debug.Log($"[RTTMediaLibrary] InitializePageSizeDeferred: itemsPerPage={itemsPerPage}");
     }

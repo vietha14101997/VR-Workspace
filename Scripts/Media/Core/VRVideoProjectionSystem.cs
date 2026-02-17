@@ -19,6 +19,12 @@ public class VRVideoProjectionSystem : MonoBehaviour
 
     /// <summary>Is projection currently visible</summary>
     public bool IsVisible { get; private set; }
+
+    /// <summary>Current projection root world position</summary>
+    public Vector3 ProjectionPosition => _projectionRoot != null ? _projectionRoot.position : Vector3.zero;
+
+    /// <summary>Current projection root world rotation</summary>
+    public Quaternion ProjectionRotation => _projectionRoot != null ? _projectionRoot.rotation : Quaternion.identity;
     #endregion
 
     #region Private Fields
@@ -27,6 +33,26 @@ public class VRVideoProjectionSystem : MonoBehaviour
     private Transform _projectionRoot;
     private DisplaySettings _currentSettings = DisplaySettings.Default;
     private bool _isInitialized = false;
+
+    // Save flat position when switching to immersive so we can restore it
+    private Vector3 _savedFlatPosition;
+    private Quaternion _savedFlatRotation;
+    private bool _hasSavedFlatTransform = false;
+
+    /// <summary>Saved flat screen position (for controls alignment in immersive mode)</summary>
+    public Vector3 SavedFlatPosition => _savedFlatPosition;
+    public bool HasSavedFlatTransform => _hasSavedFlatTransform;
+
+    /// <summary>
+    /// Update saved flat transform without moving the projection root.
+    /// Used during recenter to point controls/sphere alignment toward the new forward direction.
+    /// </summary>
+    public void UpdateSavedFlatTransform(Vector3 position, Quaternion rotation)
+    {
+        _savedFlatPosition = position;
+        _savedFlatRotation = rotation;
+        _hasSavedFlatTransform = true;
+    }
     #endregion
 
     #region Public API
@@ -46,7 +72,15 @@ public class VRVideoProjectionSystem : MonoBehaviour
         // Create projection root
         GameObject rootObj = new GameObject("ProjectionRoot");
         rootObj.transform.SetParent(transform);
-        rootObj.layer = LayerMask.NameToLayer("VirtualObjects");
+        
+        // Set layer - use Default if VirtualObjects doesn't exist
+        int layer = LayerMask.NameToLayer("VirtualObjects");
+        if (layer < 0)
+        {
+            Debug.LogWarning("[VRVideoProjectionSystem] 'VirtualObjects' layer not found, using Default layer");
+            layer = 0; // Default layer
+        }
+        rootObj.layer = layer;
         _projectionRoot = rootObj.transform;
 
         // Position at camera rig
@@ -61,13 +95,29 @@ public class VRVideoProjectionSystem : MonoBehaviour
         // Create flat projection renderer (default)
         CreateFlatRenderer();
 
-        // Other renderers will be created on demand in Phase 3
-        // CreateDome180Renderer();
-        // CreateSphere360Renderer();
-        // CreateStereoscopicRenderer();
+        // Immersive renderer (ImmersiveSphereRenderer) created on demand when needed
 
         _isInitialized = true;
         Debug.Log("[VRVideoProjectionSystem] Initialized");
+    }
+
+    /// <summary>
+    /// Set target position for the projection (e.g., menu frame position).
+    /// This overrides the default camera-relative positioning.
+    /// </summary>
+    public void SetTargetPosition(Vector3 position, Quaternion rotation)
+    {
+        if (_projectionRoot != null)
+        {
+            _projectionRoot.position = position;
+            _projectionRoot.rotation = rotation;
+            // Always save as flat reference — used for controls alignment in immersive mode
+            // and for restoring flat screen position when switching back from immersive
+            _savedFlatPosition = position;
+            _savedFlatRotation = rotation;
+            _hasSavedFlatTransform = true;
+            Debug.Log($"[VRVideoProjectionSystem] Set target position: {position}, rotation: {rotation.eulerAngles}");
+        }
     }
 
     /// <summary>
@@ -79,6 +129,29 @@ public class VRVideoProjectionSystem : MonoBehaviour
         {
             Debug.LogWarning("[VRVideoProjectionSystem] Not initialized");
             return;
+        }
+
+        bool wasImmersive = IsImmersiveProjection();
+        bool willBeImmersive = IsImmersiveType(type);
+
+        // Save flat position before switching TO immersive
+        if (!wasImmersive && willBeImmersive && _projectionRoot != null)
+        {
+            _savedFlatPosition = _projectionRoot.position;
+            _savedFlatRotation = _projectionRoot.rotation;
+            _hasSavedFlatTransform = true;
+            // Reset rotation to identity — immersive sphere uses shader-based rotation only.
+            // Must happen before RecenterView() so the shader offset is calculated correctly.
+            _projectionRoot.rotation = Quaternion.identity;
+            Debug.Log($"[VRVideoProjectionSystem] Saved flat position: {_savedFlatPosition}");
+        }
+
+        // Restore flat position when switching FROM immersive TO flat
+        if (wasImmersive && !willBeImmersive && _hasSavedFlatTransform && _projectionRoot != null)
+        {
+            _projectionRoot.position = _savedFlatPosition;
+            _projectionRoot.rotation = _savedFlatRotation;
+            Debug.Log($"[VRVideoProjectionSystem] Restored flat position: {_savedFlatPosition}");
         }
 
         // Hide current renderer
@@ -103,8 +176,43 @@ public class VRVideoProjectionSystem : MonoBehaviour
         CurrentProjection = type;
         CurrentStereoMode = stereo;
         ActiveRenderer = _renderers[type];
+
+        // Configure immersive renderer projection mode (180 vs 360)
+        if (ActiveRenderer is ImmersiveSphereRenderer immersive)
+        {
+            switch (type)
+            {
+                case VideoProjectionType.Dome180:
+                case VideoProjectionType.VR180Stereo:
+                    immersive.SetProjectionMode(ImmersiveSphereRenderer.ProjectionMode.Equirect180);
+                    break;
+                case VideoProjectionType.Sphere360:
+                    immersive.SetProjectionMode(ImmersiveSphereRenderer.ProjectionMode.Equirect360);
+                    break;
+            }
+        }
+
         ActiveRenderer.SetStereoMode(stereo);
         ActiveRenderer.UpdateDisplay(_currentSettings);
+
+        // Align immersive sphere center to the saved flat screen direction (menu frame).
+        // Runs for any transition TO immersive (flat→immersive AND immersive→immersive on new video).
+        if (willBeImmersive && _hasSavedFlatTransform && ActiveRenderer is ImmersiveSphereRenderer immersiveRenderer && _cameraRig != null)
+        {
+            Vector3 toScreen = _savedFlatPosition - _cameraRig.position;
+            toScreen.y = 0;
+            if (toScreen.sqrMagnitude > 0.001f)
+            {
+                float yAngle = Mathf.Atan2(toScreen.x, toScreen.z) * Mathf.Rad2Deg;
+                immersiveRenderer.SetRotation(yAngle);
+                Debug.Log($"[VRVideoProjectionSystem] Aligned immersive center to flat direction: {yAngle:F1}°");
+            }
+            else
+            {
+                // Fallback: flat screen at camera position, use camera forward
+                immersiveRenderer.RecenterView();
+            }
+        }
 
         if (IsVisible)
         {
@@ -112,6 +220,15 @@ public class VRVideoProjectionSystem : MonoBehaviour
         }
 
         Debug.Log($"[VRVideoProjectionSystem] Set projection: {type}, stereo: {stereo}");
+    }
+
+    /// <summary>
+    /// Update stereo mode state without re-applying projection.
+    /// Used when FlatProjectionRenderer handles the animated transition itself.
+    /// </summary>
+    public void UpdateStereoModeOnly(StereoMode stereo)
+    {
+        CurrentStereoMode = stereo;
     }
 
     /// <summary>
@@ -176,6 +293,47 @@ public class VRVideoProjectionSystem : MonoBehaviour
     }
 
     /// <summary>
+    /// Get the immersive sphere renderer (if active or available).
+    /// </summary>
+    public ImmersiveSphereRenderer GetImmersiveRenderer()
+    {
+        if (ActiveRenderer is ImmersiveSphereRenderer immersive)
+            return immersive;
+
+        // Try to find from renderers dictionary
+        if (_renderers != null)
+        {
+            foreach (var r in _renderers.Values)
+            {
+                if (r is ImmersiveSphereRenderer imm)
+                    return imm;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Set vertical offset for flat screen position.
+    /// </summary>
+    public void SetVerticalOffset(float meters)
+    {
+        _currentSettings.PositionOffset = new Vector3(
+            _currentSettings.PositionOffset.x,
+            meters,
+            _currentSettings.PositionOffset.z);
+        ActiveRenderer?.UpdateDisplay(_currentSettings);
+    }
+
+    /// <summary>
+    /// Set aspect ratio override for flat projection.
+    /// </summary>
+    public void SetAspectRatioOverride(string ratio)
+    {
+        if (ActiveRenderer is FlatProjectionRenderer flat)
+            flat.SetAspectRatioOverride(ratio);
+    }
+
+    /// <summary>
     /// Recenter the view.
     /// </summary>
     public void RecenterView()
@@ -208,9 +366,16 @@ public class VRVideoProjectionSystem : MonoBehaviour
     {
         if (_renderers != null)
         {
+            // Use HashSet to avoid disposing shared instances multiple times
+            // (ImmersiveSphereRenderer is registered under Dome180, Sphere360, and VR180Stereo)
+            var disposed = new System.Collections.Generic.HashSet<IProjectionRenderer>();
             foreach (var renderer in _renderers.Values)
             {
-                renderer.Dispose();
+                if (!disposed.Contains(renderer))
+                {
+                    renderer.Dispose();
+                    disposed.Add(renderer);
+                }
             }
             _renderers.Clear();
         }
@@ -232,18 +397,13 @@ public class VRVideoProjectionSystem : MonoBehaviour
         switch (type)
         {
             case VideoProjectionType.Flat:
-            case VideoProjectionType.SideBySide3D:
-            case VideoProjectionType.OverUnder3D:
                 CreateFlatRenderer();
                 break;
 
             case VideoProjectionType.Dome180:
-            case VideoProjectionType.VR180Stereo:
-                CreateDome180Renderer();
-                break;
-
             case VideoProjectionType.Sphere360:
-                CreateSphere360Renderer();
+            case VideoProjectionType.VR180Stereo:
+                CreateImmersiveRenderer();
                 break;
         }
     }
@@ -260,54 +420,95 @@ public class VRVideoProjectionSystem : MonoBehaviour
 
         _renderers[VideoProjectionType.Flat] = renderer;
 
-        // Flat renderer is also used for SBS and OU
-        _renderers[VideoProjectionType.SideBySide3D] = renderer;
-        _renderers[VideoProjectionType.OverUnder3D] = renderer;
-
         Debug.Log("[VRVideoProjectionSystem] Created FlatProjectionRenderer");
     }
 
-    private void CreateDome180Renderer()
+    /// <summary>
+    /// Create a single ImmersiveSphereRenderer shared by all immersive projection types.
+    /// Uses one inverted sphere mesh with shader-based 180/360 mode switching.
+    /// </summary>
+    private void CreateImmersiveRenderer()
     {
+        // Single instance shared across Dome180, Sphere360, and VR180Stereo
         if (_renderers.ContainsKey(VideoProjectionType.Dome180)) return;
 
-        GameObject rendererObj = new GameObject("Dome180Projection");
+        GameObject rendererObj = new GameObject("ImmersiveProjection");
         rendererObj.transform.SetParent(_projectionRoot);
 
-        Dome180Renderer renderer = rendererObj.AddComponent<Dome180Renderer>();
+        ImmersiveSphereRenderer renderer = rendererObj.AddComponent<ImmersiveSphereRenderer>();
         renderer.Initialize(_projectionRoot);
 
+        // Register same instance under all immersive projection keys
         _renderers[VideoProjectionType.Dome180] = renderer;
-
-        // Dome180 renderer is also used for VR180 Stereo
+        _renderers[VideoProjectionType.Sphere360] = renderer;
         _renderers[VideoProjectionType.VR180Stereo] = renderer;
 
-        Debug.Log("[VRVideoProjectionSystem] Created Dome180Renderer");
-    }
-
-    private void CreateSphere360Renderer()
-    {
-        if (_renderers.ContainsKey(VideoProjectionType.Sphere360)) return;
-
-        GameObject rendererObj = new GameObject("Sphere360Projection");
-        rendererObj.transform.SetParent(_projectionRoot);
-
-        Sphere360Renderer renderer = rendererObj.AddComponent<Sphere360Renderer>();
-        renderer.Initialize(_projectionRoot);
-
-        _renderers[VideoProjectionType.Sphere360] = renderer;
-
-        Debug.Log("[VRVideoProjectionSystem] Created Sphere360Renderer");
+        Debug.Log("[VRVideoProjectionSystem] Created ImmersiveSphereRenderer (shared for 180/360/VR180)");
     }
     #endregion
 
     #region Unity Lifecycle
     private void LateUpdate()
     {
-        // Update projection root position to follow camera rig
-        if (_projectionRoot != null && _cameraRig != null)
+        if (_projectionRoot == null) return;
+
+        // Use Camera.main for consistent face-to-camera with controls UI
+        Camera cam = Camera.main;
+        if (cam == null) return;
+
+        if (IsImmersiveProjection())
         {
-            _projectionRoot.position = _cameraRig.position;
+            // Immersive projections (360/dome) surround the viewer — follow camera position
+            // Rotation must stay identity: shader uses object-space directions for UV mapping,
+            // so any parent rotation would misalign the projection center.
+            _projectionRoot.position = cam.transform.position;
+            _projectionRoot.rotation = Quaternion.identity;
+        }
+        else if (IsVisible)
+        {
+            // Flat projection: face-to-camera rotation (same as MenuFrame/ClusterRig panels)
+            Vector3 toCamera = cam.transform.position - _projectionRoot.position;
+            if (toCamera.sqrMagnitude > 0.001f)
+            {
+                _projectionRoot.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Whether the current projection type is immersive (180/360).
+    /// </summary>
+    public bool IsImmersiveProjection()
+    {
+        return IsImmersiveType(CurrentProjection);
+    }
+
+    private static bool IsImmersiveType(VideoProjectionType type)
+    {
+        return type == VideoProjectionType.Dome180
+            || type == VideoProjectionType.VR180Stereo
+            || type == VideoProjectionType.Sphere360;
+    }
+
+    /// <summary>
+    /// Zoom in immersive mode by adjusting FOV. Negative delta = zoom in, positive = zoom out.
+    /// </summary>
+    public void ZoomImmersive(float delta)
+    {
+        if (ActiveRenderer is ImmersiveSphereRenderer immersive)
+        {
+            immersive.ZoomByFOV(delta);
+        }
+    }
+
+    /// <summary>
+    /// Reset immersive zoom to default FOV.
+    /// </summary>
+    public void ResetImmersiveZoom()
+    {
+        if (ActiveRenderer is ImmersiveSphereRenderer immersive)
+        {
+            immersive.ResetFOVZoom();
         }
     }
 

@@ -7,9 +7,14 @@ Shader "VRWorkspace/Media/VideoFlatProjection"
         _Contrast ("Contrast", Range(0, 2)) = 1
         _Saturation ("Saturation", Range(0, 2)) = 1
 
+        [Header(Adjustments)]
+        _Tint ("Tint", Range(-1, 1)) = 0
+        _Temperature ("Temperature", Range(-1, 1)) = 0
+
         [Header(Stereo)]
         _StereoMode ("Stereo Mode", Float) = 0  // 0=Mono, 1=SBS, 2=OU
         _EyeIndex ("Eye Index", Float) = 0      // 0=Left, 1=Right
+        _LRInverse ("LR Inverse", Float) = 0    // 1=swap left/right eye
 
         [Header(NV12 Support)]
         _UseNV12 ("Use NV12", Float) = 0
@@ -49,9 +54,14 @@ Shader "VRWorkspace/Media/VideoFlatProjection"
             float _Contrast;
             float _Saturation;
 
+            // Adjustments
+            float _Tint;
+            float _Temperature;
+
             // Stereo
             float _StereoMode;
             float _EyeIndex;
+            float _LRInverse;
 
             // Curvature (not used in vertex shader, kept for future)
             float _Curvature;
@@ -111,6 +121,15 @@ Shader "VRWorkspace/Media/VideoFlatProjection"
                 return saturate(color);
             }
 
+            // Apply tint and temperature adjustments
+            float3 ApplyTintTemperature(float3 color, float tint, float temperature)
+            {
+                color.r += temperature * 0.1;
+                color.b -= temperature * 0.1;
+                color.g += tint * 0.1;
+                return saturate(color);
+            }
+
             // Get stereo UV based on mode and eye
             float2 GetStereoUV(float2 uv, float stereoMode, float eyeIndex)
             {
@@ -139,8 +158,15 @@ Shader "VRWorkspace/Media/VideoFlatProjection"
 
             fixed4 frag(v2f i) : SV_Target
             {
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
+                
+                // Use unity_StereoEyeIndex for automatic left/right eye detection in VR
+                float eye = unity_StereoEyeIndex;
+                // LR Inverse: swap left/right eye
+                if (_LRInverse > 0.5) eye = 1.0 - eye;
+                
                 // Get stereo-adjusted UV
-                float2 stereoUV = GetStereoUV(i.uv, _StereoMode, _EyeIndex);
+                float2 stereoUV = GetStereoUV(i.uv, _StereoMode, eye);
 
                 float3 color;
 
@@ -159,6 +185,9 @@ Shader "VRWorkspace/Media/VideoFlatProjection"
 
                 // Apply color correction
                 color = ColorCorrect(color, _Brightness, _Contrast, _Saturation);
+
+                // Apply tint and temperature
+                color = ApplyTintTemperature(color, _Tint, _Temperature);
 
                 return fixed4(color, 1.0);
             }

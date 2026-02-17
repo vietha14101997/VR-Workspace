@@ -21,6 +21,7 @@ public class VideoPlaybackEngine : MonoBehaviour
         Idle,
         Loading,
         Ready,
+        Buffering,
         Playing,
         Paused,
         Seeking,
@@ -44,6 +45,12 @@ public class VideoPlaybackEngine : MonoBehaviour
 
     /// <summary>Fired when time updates (approximately 4 times per second)</summary>
     public event Action<double> OnTimeUpdate;
+
+    /// <summary>Fired when a seek operation completes</summary>
+    public event Action OnSeekCompleted;
+
+    /// <summary>Fired when buffering completes and first frame is ready on RenderTexture</summary>
+    public event Action OnBufferingCompleted;
     #endregion
 
     #region Properties
@@ -141,6 +148,11 @@ public class VideoPlaybackEngine : MonoBehaviour
     private float _playbackSpeed = 1.0f;
     private double _lastReportedTime = -1;
     private Coroutine _timeUpdateCoroutine;
+    private PlaybackState _preSeekState = PlaybackState.Idle;
+    private Coroutine _seekCoroutine;
+    private Coroutine _bufferingCoroutine;
+    private int _prepareSequenceId = 0;
+    private bool _frameReadyReceived = false;
     #endregion
 
     #region Unity Lifecycle
@@ -170,11 +182,14 @@ public class VideoPlaybackEngine : MonoBehaviour
         _videoPlayer.skipOnDrop = true;
         _videoPlayer.isLooping = false;
         _videoPlayer.aspectRatio = VideoAspectRatio.NoScaling;
+        _videoPlayer.waitForFirstFrame = true;
 
         // Event handlers
         _videoPlayer.prepareCompleted += OnVideoPrepared;
         _videoPlayer.loopPointReached += OnVideoEnded;
         _videoPlayer.errorReceived += OnVideoError;
+        _videoPlayer.seekCompleted += OnVideoSeekCompleted;
+        _videoPlayer.frameReady += OnFrameReady;
     }
     #endregion
 
@@ -189,6 +204,9 @@ public class VideoPlaybackEngine : MonoBehaviour
             SetError("File path is empty");
             return;
         }
+
+        CancelBuffering();
+        _prepareSequenceId++;
 
         CurrentPath = filePath;
         SetState(PlaybackState.Loading);
@@ -224,6 +242,7 @@ public class VideoPlaybackEngine : MonoBehaviour
             return;
         }
 
+        CancelBuffering();
         _videoPlayer.Play();
         SetState(PlaybackState.Playing);
         StartTimeUpdateCoroutine();
@@ -258,6 +277,7 @@ public class VideoPlaybackEngine : MonoBehaviour
     /// </summary>
     public void Stop()
     {
+        CancelBuffering();
         _videoPlayer.Stop();
         _videoPlayer.time = 0;
         SetState(PlaybackState.Ready);
@@ -271,13 +291,26 @@ public class VideoPlaybackEngine : MonoBehaviour
     {
         if (!IsPrepared) return;
 
-        var previousState = State;
-        SetState(PlaybackState.Seeking);
+        // Cancel any pending seek timeout
+        if (_seekCoroutine != null)
+        {
+            StopCoroutine(_seekCoroutine);
+            _seekCoroutine = null;
+        }
 
+        // Only capture pre-seek state if not already mid-seek
+        // (preserves original state during rapid seek chains)
+        if (State != PlaybackState.Seeking)
+        {
+            _preSeekState = State;
+        }
+
+        SetState(PlaybackState.Seeking);
         _videoPlayer.time = Mathf.Clamp((float)timeSeconds, 0, (float)Duration);
 
-        // Restore previous state after seek
-        StartCoroutine(RestoreStateAfterSeek(previousState));
+        // seekCompleted callback will handle state restoration.
+        // Fallback timeout ensures recovery if seekCompleted never fires.
+        _seekCoroutine = StartCoroutine(SeekTimeoutFallback());
     }
 
     /// <summary>
@@ -293,6 +326,7 @@ public class VideoPlaybackEngine : MonoBehaviour
     /// </summary>
     public void Dispose()
     {
+        CancelBuffering();
         StopTimeUpdateCoroutine();
 
         if (_videoPlayer != null)
@@ -300,6 +334,8 @@ public class VideoPlaybackEngine : MonoBehaviour
             _videoPlayer.prepareCompleted -= OnVideoPrepared;
             _videoPlayer.loopPointReached -= OnVideoEnded;
             _videoPlayer.errorReceived -= OnVideoError;
+            _videoPlayer.seekCompleted -= OnVideoSeekCompleted;
+            _videoPlayer.frameReady -= OnFrameReady;
             _videoPlayer.Stop();
         }
 
@@ -322,6 +358,7 @@ public class VideoPlaybackEngine : MonoBehaviour
 
     private void SetError(string message)
     {
+        CancelBuffering();
         Debug.LogError($"[VideoPlaybackEngine] Error: {message}");
         SetState(PlaybackState.Error);
         OnError?.Invoke(message);
@@ -398,12 +435,105 @@ public class VideoPlaybackEngine : MonoBehaviour
         }
     }
 
-    private IEnumerator RestoreStateAfterSeek(PlaybackState previousState)
+    private void OnFrameReady(VideoPlayer source, long frameIdx)
     {
-        // Wait a frame for seek to complete
+        _frameReadyReceived = true;
+    }
+
+    private void StartBuffering()
+    {
+        CancelBuffering();
+        _prepareSequenceId++;
+        _bufferingCoroutine = StartCoroutine(BufferingCoroutine(_prepareSequenceId));
+    }
+
+    private void CancelBuffering()
+    {
+        if (_bufferingCoroutine != null)
+        {
+            StopCoroutine(_bufferingCoroutine);
+            _bufferingCoroutine = null;
+        }
+        if (_videoPlayer != null)
+            _videoPlayer.sendFrameReadyEvents = false;
+    }
+
+    private IEnumerator BufferingCoroutine(int sequenceId)
+    {
+        SetState(PlaybackState.Buffering);
+
+        // Enable frameReady events for reliable first-frame detection
+        // (proven pattern from VideoFrameExtractor)
+        _frameReadyReceived = false;
+        _videoPlayer.sendFrameReadyEvents = true;
+
+        // Play to trigger decoder pipeline
+        _videoPlayer.Play();
+
+        // Wait for first frame to render to RenderTexture
+        float timeout = 5.0f;
+        float elapsed = 0f;
+
+        while (!_frameReadyReceived && elapsed < timeout)
+        {
+            if (_prepareSequenceId != sequenceId || State == PlaybackState.Error)
+                yield break;
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        // Extra frame for GPU to finalize render-to-texture
         yield return null;
 
-        if (previousState == PlaybackState.Playing)
+        if (_prepareSequenceId != sequenceId) yield break;
+
+        // Disable frameReady events (performance impact during normal playback)
+        _videoPlayer.sendFrameReadyEvents = false;
+
+        // Pause - first frame is now on RenderTexture
+        _videoPlayer.Pause();
+
+        // Seek back to beginning so playback starts from frame 0
+        _videoPlayer.time = 0;
+        yield return null;
+
+        if (_prepareSequenceId != sequenceId) yield break;
+
+        _bufferingCoroutine = null;
+        SetState(PlaybackState.Ready);
+        OnBufferingCompleted?.Invoke();
+
+        Debug.Log($"[VideoPlaybackEngine] Buffering complete in {elapsed:F2}s - first frame ready");
+    }
+
+    private void OnVideoSeekCompleted(VideoPlayer source)
+    {
+        // Cancel timeout fallback
+        if (_seekCoroutine != null)
+        {
+            StopCoroutine(_seekCoroutine);
+            _seekCoroutine = null;
+        }
+
+        RestorePreSeekState();
+    }
+
+    private IEnumerator SeekTimeoutFallback()
+    {
+        // Safety timeout: if seekCompleted hasn't fired after 3 seconds,
+        // restore state anyway (handles edge cases like seek to same position).
+        yield return new WaitForSeconds(3.0f);
+
+        Debug.LogWarning("[VideoPlaybackEngine] Seek timeout - restoring state via fallback");
+        _seekCoroutine = null;
+        RestorePreSeekState();
+    }
+
+    private void RestorePreSeekState()
+    {
+        if (State != PlaybackState.Seeking) return; // Already restored
+
+        if (_preSeekState == PlaybackState.Playing)
         {
             SetState(PlaybackState.Playing);
         }
@@ -411,6 +541,8 @@ public class VideoPlaybackEngine : MonoBehaviour
         {
             SetState(PlaybackState.Paused);
         }
+
+        OnSeekCompleted?.Invoke();
     }
     #endregion
 
@@ -431,6 +563,9 @@ public class VideoPlaybackEngine : MonoBehaviour
 
         SetState(PlaybackState.Ready);
         OnPrepareCompleted?.Invoke();
+
+        // Start buffering to prime decoder and render first frame to RenderTexture
+        StartBuffering();
 
         Debug.Log($"[VideoPlaybackEngine] Video prepared: {width}x{height}, {Duration:F1}s, {FrameRate:F1}fps");
     }

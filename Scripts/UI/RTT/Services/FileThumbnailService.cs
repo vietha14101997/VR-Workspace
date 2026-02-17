@@ -48,7 +48,7 @@ public class FileThumbnailService : MonoBehaviour
     #region Configuration
     [SerializeField] private int _maxCacheEntries = 200;  // Increased for larger thumbnails
     // Mobile-first: reduce concurrent loads to prevent CPU spikes
-    [SerializeField] private int _concurrentLoadLimit = 2;  // Mobile: 2, was 6
+    [SerializeField] private int _concurrentLoadLimit = 4;  // VR/Mobile balanced: 4
     #endregion
 
     #region Private Fields
@@ -72,11 +72,11 @@ public class FileThumbnailService : MonoBehaviour
     // UI callback throttling to prevent stutters - Mobile-optimized
     private Queue<Action> _uiCallbackQueue = new Queue<Action>();
     private Queue<Action> _highPriorityUIQueue = new Queue<Action>(); // For detail panel
-    private const int MAX_UI_CALLBACKS_PER_FRAME = 3; // Mobile: 3, was 8
+    private const int MAX_UI_CALLBACKS_PER_FRAME = 6; // VR/Mobile balanced: 6
 
     // Disk cache load throttling to prevent frame drops on first category switch
     private int _diskLoadsThisFrame = 0;
-    private const int MAX_DISK_LOADS_PER_FRAME = 2; // Mobile: 2, was 4
+    private const int MAX_DISK_LOADS_PER_FRAME = 4; // VR/Mobile balanced: 4
     private Queue<ThumbnailRequest> _deferredDiskLoads = new Queue<ThumbnailRequest>();
     #endregion
 

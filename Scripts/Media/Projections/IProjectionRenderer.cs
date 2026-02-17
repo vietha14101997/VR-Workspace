@@ -63,6 +63,14 @@ public interface IProjectionRenderer
     void RecenterView();
 
     /// <summary>
+    /// Set stereo rendering strength.
+    /// 1.0 = full stereoscopic 3D, 0.0 = monoscopic (both eyes see left eye's image).
+    /// Supports continuous values for smooth animated transitions.
+    /// Used to temporarily reduce 3D when UI overlays are visible.
+    /// </summary>
+    void SetStereoStrength(float strength);
+
+    /// <summary>
     /// Cleanup và release resources
     /// </summary>
     void Dispose();

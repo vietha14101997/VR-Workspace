@@ -18,7 +18,16 @@ public class VideoFrameExtractor : MonoBehaviour
     private bool _isExtracting = false;
     private Action<Texture2D> _onComplete;
     private Action _onFailed;
-    private float _extractionTimeout = 10f;  // Timeout in seconds
+    private float _extractionTimeout = 10f;  // Timeout in seconds (will be adaptive for high-res videos)
+
+    // High-resolution video handling constants
+    private const int HIGH_RES_THRESHOLD = 2160;          // 4K (2160p)
+    private const int MAX_RENDER_SIZE = 2048;             // Max RenderTexture dimension (mobile-safe)
+    private const int ULTRA_HIGH_RES_THRESHOLD = 3840;    // 4K width
+
+    // Frame-ready tracking for reliable frame capture
+    private bool _frameReadyReceived = false;
+    private long _frameReadyIndex = -1;
 
     // Request queue for handling multiple concurrent requests
     private Queue<ExtractionRequest> _requestQueue = new Queue<ExtractionRequest>();
@@ -60,7 +69,14 @@ public class VideoFrameExtractor : MonoBehaviour
             // Event handlers
             _videoPlayer.prepareCompleted += OnVideoPrepared;
             _videoPlayer.errorReceived += OnVideoError;
+            _videoPlayer.frameReady += OnFrameReady;
         }
+    }
+
+    private void OnFrameReady(VideoPlayer source, long frameIdx)
+    {
+        _frameReadyReceived = true;
+        _frameReadyIndex = frameIdx;
     }
 
     private void Cleanup()
@@ -69,11 +85,15 @@ public class VideoFrameExtractor : MonoBehaviour
         _requestQueue.Clear();
         _onComplete = null;
         _onFailed = null;
+        _frameReadyReceived = false;
+        _frameReadyIndex = -1;
 
         if (_videoPlayer != null)
         {
+            _videoPlayer.sendFrameReadyEvents = false;
             _videoPlayer.prepareCompleted -= OnVideoPrepared;
             _videoPlayer.errorReceived -= OnVideoError;
+            _videoPlayer.frameReady -= OnFrameReady;
             _videoPlayer.Stop();
         }
 
@@ -242,6 +262,42 @@ public class VideoFrameExtractor : MonoBehaviour
         GL.PopMatrix();
         RenderTexture.active = previous;
     }
+
+    /// <summary>
+    /// Calculate adaptive extraction timeout based on video resolution and file size.
+    /// Higher resolution and larger files need more time for VideoPlayer preparation.
+    /// </summary>
+    private float CalculateExtractionTimeout(int videoWidth, int videoHeight, string filePath)
+    {
+        float baseTimeout = 10f;
+
+        // Factor 1: Resolution multiplier
+        int pixels = videoWidth * videoHeight;
+        float resolutionMultiplier = 1f;
+
+        if (pixels > 3840 * 2160)      // > 4K
+            resolutionMultiplier = 3f;
+        else if (pixels > 2560 * 1440) // > 1440p
+            resolutionMultiplier = 2f;
+        else if (pixels > 1920 * 1080) // > 1080p
+            resolutionMultiplier = 1.5f;
+
+        // Factor 2: File size (high bitrate = longer decode time)
+        try
+        {
+            System.IO.FileInfo fi = new System.IO.FileInfo(filePath);
+            long fileSizeMB = fi.Length / (1024 * 1024);
+
+            if (fileSizeMB > 500)  // > 500MB
+                resolutionMultiplier *= 1.5f;
+            else if (fileSizeMB > 200)  // > 200MB
+                resolutionMultiplier *= 1.25f;
+        }
+        catch { }
+
+        float adaptiveTimeout = baseTimeout * resolutionMultiplier;
+        return Mathf.Clamp(adaptiveTimeout, 10f, 30f);  // Cap at 30s
+    }
     #endregion
 
     #region Frame Extraction
@@ -309,7 +365,7 @@ public class VideoFrameExtractor : MonoBehaviour
             yield return null;
         }
 
-        // Get video's native dimensions and calculate target size maintaining aspect ratio
+        // Get video's native dimensions
         int videoWidth = (int)_videoPlayer.width;
         int videoHeight = (int)_videoPlayer.height;
 
@@ -320,20 +376,35 @@ public class VideoFrameExtractor : MonoBehaviour
             yield break;
         }
 
-        // Calculate dimensions maintaining aspect ratio (like ResizeTexture for images)
+        // Detect high-resolution videos
+        bool isHighRes = videoWidth > HIGH_RES_THRESHOLD || videoHeight > HIGH_RES_THRESHOLD;
+        bool isUltraHighRes = videoWidth > ULTRA_HIGH_RES_THRESHOLD || videoHeight > ULTRA_HIGH_RES_THRESHOLD;
+
+        if (isUltraHighRes)
+        {
+            Debug.Log($"[VideoFrameExtractor] Ultra-high-res video detected ({videoWidth}x{videoHeight}), scaling to max {MAX_RENDER_SIZE}");
+        }
+        else if (isHighRes)
+        {
+            Debug.Log($"[VideoFrameExtractor] High-res video detected ({videoWidth}x{videoHeight}), scaling for mobile compatibility");
+        }
+
+        // Calculate target dimensions with resolution cap for mobile-safety
         int targetWidth, targetHeight;
-        if (videoWidth > maxSize || videoHeight > maxSize)
+        int effectiveMaxSize = Math.Min(maxSize, MAX_RENDER_SIZE);  // Never exceed 2048 for mobile
+
+        if (videoWidth > effectiveMaxSize || videoHeight > effectiveMaxSize)
         {
             float ratio = (float)videoWidth / videoHeight;
             if (videoWidth > videoHeight)
             {
-                targetWidth = maxSize;
-                targetHeight = Mathf.RoundToInt(maxSize / ratio);
+                targetWidth = effectiveMaxSize;
+                targetHeight = Mathf.RoundToInt(effectiveMaxSize / ratio);
             }
             else
             {
-                targetHeight = maxSize;
-                targetWidth = Mathf.RoundToInt(maxSize * ratio);
+                targetHeight = effectiveMaxSize;
+                targetWidth = Mathf.RoundToInt(effectiveMaxSize * ratio);
             }
         }
         else
@@ -342,6 +413,9 @@ public class VideoFrameExtractor : MonoBehaviour
             targetWidth = videoWidth;
             targetHeight = videoHeight;
         }
+
+        // Update extraction timeout for high-res videos
+        _extractionTimeout = CalculateExtractionTimeout(videoWidth, videoHeight, videoPath);
 
         // Now create RenderTexture with correct aspect ratio
         _renderTexture = new RenderTexture(targetWidth, targetHeight, 0, RenderTextureFormat.ARGB32);
@@ -370,16 +444,29 @@ public class VideoFrameExtractor : MonoBehaviour
             seekTime = _videoPlayer.length * 0.2;
         }
         
+        // Calculate adaptive capture timeout based on video resolution
+        float baseCaptureTimeout = 5f;
+        float captureTimeout = baseCaptureTimeout;
+
+        // For high-res videos, increase capture timeout
+        if (videoWidth * videoHeight > 3840 * 2160)  // > 4K
+            captureTimeout = 10f;
+        else if (videoWidth * videoHeight > 1920 * 1080)  // > 1080p
+            captureTimeout = 7f;
+
         // Try to extract frame with retry logic for problematic videos
         Texture2D capturedFrame = null;
         int maxRetries = 3;
         double[] seekPositions = new double[] { seekTime, 0.5, _videoPlayer.length * 0.5 }; // Try original, start, middle
-        
+
+        // Enable frame-ready events for reliable frame detection
+        _videoPlayer.sendFrameReadyEvents = true;
+
         for (int attempt = 0; attempt < maxRetries && capturedFrame == null; attempt++)
         {
             double currentSeekTime = (attempt < seekPositions.Length) ? seekPositions[attempt] : seekTime;
             _videoPlayer.time = currentSeekTime;
-            
+
             if (attempt == 0)
             {
                 Debug.Log($"[VideoFrameExtractor] Seeking to {currentSeekTime:F1}s (video length: {_videoPlayer.length:F1}s)");
@@ -389,26 +476,34 @@ public class VideoFrameExtractor : MonoBehaviour
                 Debug.Log($"[VideoFrameExtractor] Retry {attempt}: Seeking to {currentSeekTime:F1}s");
             }
 
-            // Start playback briefly to render a frame
+            // Reset frame-ready flag and start playback
+            _frameReadyReceived = false;
             _videoPlayer.Play();
 
-            // Wait longer for videos with timestamp issues (0.3s instead of 0.1s)
-            yield return new WaitForSeconds(0.3f);
-
-            // Wait more frames for the render texture to update (10 instead of 5)
-            int waitFrames = 10;
-            while (waitFrames > 0)
+            // Wait for frameReady event (guarantees RenderTexture has actual content)
+            float frameWaitStart = Time.time;
+            float frameWaitTimeout = isUltraHighRes ? 8f : 5f;
+            while (!_frameReadyReceived)
             {
+                if (Time.time - frameWaitStart > frameWaitTimeout)
+                {
+                    Debug.LogWarning($"[VideoFrameExtractor] frameReady timeout ({frameWaitTimeout}s) at attempt {attempt}");
+                    break;
+                }
                 yield return null;
-                waitFrames--;
             }
 
-            // Check if video is actually playing and rendering
-            if (!_videoPlayer.isPlaying)
+            if (_frameReadyReceived)
             {
-                Debug.LogWarning($"[VideoFrameExtractor] Video stopped unexpectedly at attempt {attempt}");
-                _videoPlayer.Play();
-                yield return new WaitForSeconds(0.2f);
+                Debug.Log($"[VideoFrameExtractor] Frame ready (idx={_frameReadyIndex}) after {Time.time - frameWaitStart:F2}s");
+                // Give one extra frame for GPU to finalize rendering
+                yield return null;
+            }
+            else if (!_videoPlayer.isPlaying)
+            {
+                // Video stopped before producing a frame
+                Debug.LogWarning($"[VideoFrameExtractor] Video stopped before frame ready at attempt {attempt}");
+                continue;
             }
 
             // Capture the frame asynchronously
@@ -421,25 +516,35 @@ public class VideoFrameExtractor : MonoBehaviour
             }));
 
             // Wait for async capture to complete
-            float captureTimeout = 5f;
             float captureStartTime = Time.time;
             while (!captureComplete)
             {
                 if (Time.time - captureStartTime > captureTimeout)
                 {
                     Debug.LogWarning($"[VideoFrameExtractor] Capture timeout at attempt {attempt}");
-                    captureComplete = true; // Break out of wait
+                    captureComplete = true;
                 }
                 yield return null;
+            }
+
+            // Validate captured frame has actual content (not all-black)
+            if (capturedFrame != null && IsFrameBlank(capturedFrame))
+            {
+                Debug.LogWarning($"[VideoFrameExtractor] Frame captured but blank at attempt {attempt}, retrying...");
+                Destroy(capturedFrame);
+                capturedFrame = null;
             }
 
             // If capture failed, pause and try next position
             if (capturedFrame == null && attempt < maxRetries - 1)
             {
                 _videoPlayer.Pause();
-                yield return new WaitForSeconds(0.1f);
+                yield return new WaitForSeconds(0.2f);
             }
         }
+
+        // Disable frame-ready events (performance impact)
+        _videoPlayer.sendFrameReadyEvents = false;
 
         // Stop and cleanup
         _videoPlayer.Stop();
@@ -480,12 +585,12 @@ public class VideoFrameExtractor : MonoBehaviour
             {
                 try
                 {
-                    frame = new Texture2D(_renderTexture.width, _renderTexture.height, TextureFormat.RGBA32, true);
+                    frame = new Texture2D(_renderTexture.width, _renderTexture.height, TextureFormat.RGBA32, false);
                     frame.filterMode = FilterMode.Trilinear;
                     frame.anisoLevel = 16;
                     frame.wrapMode = TextureWrapMode.Clamp;
                     frame.LoadRawTextureData(request.GetData<byte>());
-                    frame.Apply(true);
+                    frame.Apply(true);  // Generate mipmaps from base level
                 }
                 catch (Exception ex)
                 {
@@ -524,12 +629,12 @@ public class VideoFrameExtractor : MonoBehaviour
             RenderTexture previous = RenderTexture.active;
             RenderTexture.active = _renderTexture;
 
-            Texture2D frame = new Texture2D(_renderTexture.width, _renderTexture.height, TextureFormat.RGBA32, true);
+            Texture2D frame = new Texture2D(_renderTexture.width, _renderTexture.height, TextureFormat.RGBA32, false);
             frame.filterMode = FilterMode.Trilinear;
             frame.anisoLevel = 16;
             frame.wrapMode = TextureWrapMode.Clamp;
             frame.ReadPixels(new Rect(0, 0, _renderTexture.width, _renderTexture.height), 0, 0);
-            frame.Apply(true);
+            frame.Apply(true);  // Generate mipmaps from base level
 
             RenderTexture.active = previous;
             return frame;
@@ -538,6 +643,48 @@ public class VideoFrameExtractor : MonoBehaviour
         {
             Debug.LogWarning($"[VideoFrameExtractor] Failed to capture frame: {ex.Message}");
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Check if a captured frame is effectively blank (all-black or transparent).
+    /// Samples 9 points in a 3x3 grid to detect empty frames quickly.
+    /// </summary>
+    private bool IsFrameBlank(Texture2D frame)
+    {
+        if (frame == null) return true;
+
+        try
+        {
+            int w = frame.width;
+            int h = frame.height;
+            int validSamples = 0;
+            const float THRESHOLD = 0.05f;
+
+            // Sample 9 points in a 3x3 grid (at 25%, 50%, 75% positions)
+            for (int row = 1; row <= 3; row++)
+            {
+                for (int col = 1; col <= 3; col++)
+                {
+                    int x = Mathf.Clamp(w * col / 4, 0, w - 1);
+                    int y = Mathf.Clamp(h * row / 4, 0, h - 1);
+                    Color pixel = frame.GetPixel(x, y);
+
+                    // Pixel has visible content if it's not pure black/transparent
+                    if (pixel.a > THRESHOLD && (pixel.r + pixel.g + pixel.b) > THRESHOLD)
+                    {
+                        validSamples++;
+                    }
+                }
+            }
+
+            // Need at least 3 out of 9 samples to have visible content
+            return validSamples < 3;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[VideoFrameExtractor] Cannot validate frame: {ex.Message}");
+            return false; // Assume not blank if we can't read pixels
         }
     }
 

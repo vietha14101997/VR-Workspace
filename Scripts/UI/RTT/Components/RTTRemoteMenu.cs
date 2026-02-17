@@ -1030,7 +1030,7 @@ public class RTTRemoteMenu : MonoBehaviour
                 break;
 
             case ConnectionPhase.ReadyToStream:
-                UpdateButtonText("START REMOTE");
+                UpdateButtonText("STARTING...");
                 break;
 
             case ConnectionPhase.StartingStream:
@@ -1561,7 +1561,7 @@ public class RTTRemoteMenu : MonoBehaviour
 
     /// <summary>
     /// Lock all dropdowns, input fields, and QR button (disable interaction).
-    /// Called when state changes to Ready (START REMOTE).
+    /// Called when state changes to Ready (STARTING...).
     /// </summary>
     private void LockAllInputs()
     {

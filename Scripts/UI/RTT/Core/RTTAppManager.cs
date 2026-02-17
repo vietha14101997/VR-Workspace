@@ -16,9 +16,12 @@ namespace VRWorkspace.UI.RTT
         // App state tracking
         private Dictionary<string, RTTAppInstance> _activeApps = new Dictionary<string, RTTAppInstance>();
         private Dictionary<string, RTTAppInstance> _preparingApps = new Dictionary<string, RTTAppInstance>();
+        private Dictionary<string, RTTAppInstance> _preInitApps = new Dictionary<string, RTTAppInstance>();
         private string _currentVisibleAppId = null;
         private string _pendingOpenAppId = null;
         private bool _isTransitioning = false;
+        private bool _backgroundPreInitRunning = false;
+        private bool _backgroundPreInitComplete = false;
 
         // References (set by RTTManager)
         private RTTMenu _menu;
@@ -152,6 +155,17 @@ namespace VRWorkspace.UI.RTT
                 return _activeApps[appId];
             }
 
+            // Check pre-initialized apps first
+            if (_preInitApps.ContainsKey(appId))
+            {
+                var preInitInstance = _preInitApps[appId];
+                _preInitApps.Remove(appId);
+                _activeApps[appId] = preInitInstance;
+                StartCoroutine(ShowPreInitApp(preInitInstance));
+                Debug.Log($"[RTTAppManager] Opening pre-initialized app: {appId}");
+                return preInitInstance;
+            }
+
             if (_preparingApps.ContainsKey(appId))
             {
                 StartCoroutine(WaitAndSwitchToPreparedApp(appId));
@@ -183,8 +197,12 @@ namespace VRWorkspace.UI.RTT
         {
             _pendingOpenAppId = appId;
 
-            if (_activeApps.ContainsKey(appId) || _preparingApps.ContainsKey(appId))
+            if (_activeApps.ContainsKey(appId) || _preparingApps.ContainsKey(appId) || _preInitApps.ContainsKey(appId))
+            {
+                // App is already ready or being readied
+                Debug.Log($"[RTTAppManager] PrepareApp: {appId} already active, preparing, or pre-initialized. Skipping redundant creation.");
                 return;
+            }
 
             CancelAllPreparations();
 
@@ -228,6 +246,16 @@ namespace VRWorkspace.UI.RTT
             if (_activeApps.ContainsKey(appId))
             {
                 SwitchToApp(appId);
+                return;
+            }
+
+            if (_preInitApps.ContainsKey(appId))
+            {
+                var preInstance = _preInitApps[appId];
+                _preInitApps.Remove(appId);
+                _activeApps[appId] = preInstance;
+                StartCoroutine(ShowPreInitApp(preInstance));
+                Debug.Log($"[RTTAppManager] OpenPreparedApp: Using pre-initialized instance for {appId}");
                 return;
             }
 
@@ -355,7 +383,32 @@ namespace VRWorkspace.UI.RTT
                 _taskbar?.SelectSlot(0);
             }
 
-            // Cleanup controller
+            // Unregister from taskbar
+            if (_taskbar != null && app.TaskbarSlotIndex > 0)
+                _taskbar.UnregisterApp(app.TaskbarSlotIndex);
+
+            _activeApps.Remove(appId);
+
+            // If pre-init is enabled and this app was pre-initialized, reset instead of destroy
+            if (app.IsPreInitialized && !skipSwitchToHome)
+            {
+                StartCoroutine(ResetAppAsync(app));
+            }
+            else
+            {
+                // Full destroy (original behavior)
+                DestroyAppResources(app);
+            }
+
+            OnAppClosed?.Invoke(appId);
+            Debug.Log($"[RTTAppManager] Closed app: {appId} (preInit={app.IsPreInitialized})");
+        }
+
+        /// <summary>
+        /// Destroy app controller and frame resources completely.
+        /// </summary>
+        private void DestroyAppResources(RTTAppInstance app)
+        {
             if (app.Controller != null)
             {
                 var cleanupMethod = app.Controller.GetType().GetMethod("Cleanup");
@@ -375,13 +428,6 @@ namespace VRWorkspace.UI.RTT
                 else
                     Destroy(app.Frame.gameObject);
             }
-
-            if (_taskbar != null && app.TaskbarSlotIndex > 0)
-                _taskbar.UnregisterApp(app.TaskbarSlotIndex);
-
-            _activeApps.Remove(appId);
-            OnAppClosed?.Invoke(appId);
-            Debug.Log($"[RTTAppManager] Closed app: {appId}");
         }
 
         private int GetNextAvailableSlot()
@@ -404,6 +450,7 @@ namespace VRWorkspace.UI.RTT
                         if (app.TaskbarSlotIndex == i) { slotUsed = true; break; }
                     }
                 }
+                // Also check pre-init apps (they don't use taskbar slots, so skip)
                 if (!slotUsed) return i;
             }
             return -1;
@@ -493,11 +540,18 @@ namespace VRWorkspace.UI.RTT
 
             _isTransitioning = true;
 
+            // Determine which frame to animate out (current app or main menu)
+            RTTMenuFrame outFrame = _mainMenuFrame;
+            if (_currentVisibleAppId != null && _activeApps.ContainsKey(_currentVisibleAppId))
+            {
+                outFrame = _activeApps[_currentVisibleAppId].Frame ?? _mainMenuFrame;
+            }
+
             // Animate out
             if (_useFadeTransition && _transitionOutDuration > 0)
-                yield return StartCoroutine(AnimateFrameFade(_mainMenuFrame, 1f, 0f, _transitionOutDuration, true));
+                yield return StartCoroutine(AnimateFrameFade(outFrame, 1f, 0f, _transitionOutDuration, true));
             else if (_useScaleTransition && _transitionOutDuration > 0)
-                yield return StartCoroutine(AnimateFrameScale(_mainMenuFrame.transform, 1f, 0.9f, _transitionOutDuration, true));
+                yield return StartCoroutine(AnimateFrameScale(outFrame.transform, 1f, 0.9f, _transitionOutDuration, true));
 
             // Create frame
             if (_menu != null)
@@ -545,9 +599,9 @@ namespace VRWorkspace.UI.RTT
             // Create content via callback
             _createAppContentCallback?.Invoke(instance);
 
-            // Hide MainMenu, show new frame
-            _mainMenuFrame.gameObject.SetActive(false);
-            ResetFrameAlpha(_mainMenuFrame);
+            // Hide current view (main menu or another app), show new frame
+            HideCurrentView();
+            ResetFrameAlpha(outFrame);
 
             instance.Frame.SetVisible(true);
             ResetFrameAlpha(instance.Frame);
@@ -678,17 +732,24 @@ namespace VRWorkspace.UI.RTT
             List<RTTMenuFrame> allFrames = bindable?.GetAllFrames() ?? new List<RTTMenuFrame> { instance.Frame };
             Debug.Log($"[RTTAppManager] Got {allFrames.Count} frames to animate: {instance.AppId}");
 
-            // 2. Fade out Main Menu (PARALLEL with background data preparation which started in PrepareAppFrameAsync)
+            // 2. Determine which frame to animate out (current app or main menu)
+            RTTMenuFrame outFrame = _mainMenuFrame;
+            if (_currentVisibleAppId != null && _activeApps.ContainsKey(_currentVisibleAppId))
+            {
+                outFrame = _activeApps[_currentVisibleAppId].Frame ?? _mainMenuFrame;
+            }
+
+            // Fade out current view
             if (_useFadeTransition && _transitionOutDuration > 0)
             {
-                Debug.Log($"[RTTAppManager] Fade out MainMenu: {instance.AppId} at {Time.realtimeSinceStartup:F3}s");
-                yield return StartCoroutine(AnimateFrameFade(_mainMenuFrame, 1f, 0f, _transitionOutDuration, true));
+                Debug.Log($"[RTTAppManager] Fade out current view: {instance.AppId} at {Time.realtimeSinceStartup:F3}s");
+                yield return StartCoroutine(AnimateFrameFade(outFrame, 1f, 0f, _transitionOutDuration, true));
                 Debug.Log($"[RTTAppManager] Fade out done: {instance.AppId} at {Time.realtimeSinceStartup:F3}s (+{(Time.realtimeSinceStartup - transitionStart) * 1000:F1}ms)");
             }
 
-            // Hide main menu
-            _mainMenuFrame.gameObject.SetActive(false);
-            ResetFrameAlpha(_mainMenuFrame);
+            // Hide current view (main menu or another app)
+            HideCurrentView();
+            ResetFrameAlpha(outFrame);
 
             // 3. Activate ALL frames with alpha=0 (visible but transparent)
             foreach (var frame in allFrames)
@@ -1045,6 +1106,338 @@ namespace VRWorkspace.UI.RTT
 
         #endregion
 
+        #region Background Pre-initialization
+
+        /// <summary>
+        /// Pre-initialize all implemented apps in background after main menu stabilizes.
+        /// Creates frames and content hidden, one app per frame interval to avoid lag spikes.
+        /// </summary>
+        public void PrepareAllApps()
+        {
+            if (_appRegistry == null || _backgroundPreInitRunning || _backgroundPreInitComplete)
+                return;
+
+            _backgroundPreInitRunning = true;
+            StartCoroutine(PrepareAllAppsAsync());
+        }
+
+        private IEnumerator PrepareAllAppsAsync()
+        {
+            Debug.Log("[RTTAppManager] Background pre-init started");
+            float startTime = Time.realtimeSinceStartup;
+
+            var apps = _appRegistry.GetSortedEnabledApps();
+            int preInitCount = 0;
+
+            foreach (var appDef in apps)
+            {
+                // Skip non-implemented, quit, already active/preparing/preinit
+                if (appDef.appType == RTTAppRegistry.AppType.NotImplemented ||
+                    appDef.appType == RTTAppRegistry.AppType.Quit ||
+                    appDef.appType == RTTAppRegistry.AppType.Browser ||
+                    appDef.appType == RTTAppRegistry.AppType.Settings ||
+                    _activeApps.ContainsKey(appDef.id) ||
+                    _preparingApps.ContainsKey(appDef.id) ||
+                    _preInitApps.ContainsKey(appDef.id))
+                    continue;
+
+                yield return StartCoroutine(PreInitAppAsync(appDef.id));
+                preInitCount++;
+
+                // OPTIMIZATION: Reduced wait time from 0.5s to 0.1s
+                // Spreads initialization across frames to reduce FPS spikes
+                // while still completing faster overall
+                yield return new WaitForSeconds(0.1f);
+            }
+
+            _backgroundPreInitRunning = false;
+            _backgroundPreInitComplete = true;
+
+            float elapsed = (Time.realtimeSinceStartup - startTime) * 1000f;
+            Debug.Log($"[RTTAppManager] Background pre-init complete: {preInitCount} apps in {elapsed:F1}ms");
+        }
+
+        /// <summary>
+        /// Pre-initialize a single app: create frame + content hidden.
+        /// </summary>
+        private IEnumerator PreInitAppAsync(string appId)
+        {
+            if (_mainMenuFrame == null)
+            {
+                Debug.LogError($"[RTTAppManager] MainMenuFrame is null, cannot pre-init {appId}");
+                yield break;
+            }
+
+            float appStart = Time.realtimeSinceStartup;
+
+            // Assign a temporary slot index (will be reassigned on actual open)
+            Sprite icon = GetAppIcon(appId);
+            var instance = new RTTAppInstance(appId)
+            {
+                TaskbarSlotIndex = -1, // No taskbar slot until actually opened
+                Icon = icon,
+                IsPreInitialized = true
+            };
+
+            // Double check if app was opened/prepared by user while we were starting pre-init
+            if (_activeApps.ContainsKey(appId) || _preparingApps.ContainsKey(appId))
+            {
+                Debug.Log($"[RTTAppManager] PreInitAppAsync: {appId} was opened/preparing during pre-init startup. Aborting.");
+                yield break;
+            }
+
+            // Create frame (hidden)
+            if (_menu != null)
+            {
+                instance.Frame = _menu.CreateAppFrame(
+                    instance.AppId,
+                    _mainMenuFrame.PanelWidth,
+                    _mainMenuFrame.PanelHeight,
+                    _mainMenuFrame.LogicalWidthValue
+                );
+            }
+            else
+            {
+                instance.Frame = RTTMenuFrame.Create(
+                    _frameParent,
+                    _mainMenuFrame.PanelWidth,
+                    _mainMenuFrame.PanelHeight,
+                    _mainMenuFrame.LogicalWidthValue,
+                    name: $"RTTMenuFrame_{instance.AppId}"
+                );
+            }
+
+            instance.Frame.transform.position = _mainMenuFrame.transform.position;
+            instance.Frame.transform.rotation = _mainMenuFrame.transform.rotation;
+            instance.Frame.transform.localScale = Vector3.one;
+
+            // Hide frame - prevent visual flash
+            instance.Frame.SetVisible(false);
+            instance.Frame.gameObject.SetActive(true);
+
+            // Let frame initialize over a few frames
+            yield return null;
+            yield return null;
+            yield return null;
+
+            // Wait for ContentContainer
+            int waitFrames = 0;
+            while (instance.Frame.ContentContainer == null && waitFrames < 60)
+            {
+                waitFrames++;
+                yield return null;
+            }
+
+            if (instance.Frame.ContentContainer == null)
+            {
+                Debug.LogError($"[RTTAppManager] ContentContainer not ready for pre-init: {appId}");
+                yield break;
+            }
+
+            yield return null;
+
+            // Create content via callback
+            _createAppContentCallback?.Invoke(instance);
+
+            // Let content settle over several frames before hiding
+            // This allows Unity to process layout, mesh generation, etc.
+            for (int i = 0; i < 5; i++)
+                yield return null;
+
+            // Hide frame completely
+            instance.Frame.gameObject.SetActive(false);
+            instance.IsPrepared = true;
+
+            // Final check before adding to pre-init pool: did user open it in the meantime?
+            if (_activeApps.ContainsKey(appId) || _preparingApps.ContainsKey(appId))
+            {
+                Debug.Log($"[RTTAppManager] PreInitAppAsync: {appId} became active/preparing during pre-init. Destroying pre-init instance.");
+                if (instance.Frame != null) Destroy(instance.Frame.gameObject);
+                yield break;
+            }
+
+            // Store in pre-init dictionary
+            _preInitApps[appId] = instance;
+
+            float elapsed = (Time.realtimeSinceStartup - appStart) * 1000f;
+            Debug.Log($"[RTTAppManager] Pre-initialized app: {appId} in {elapsed:F1}ms");
+        }
+
+        /// <summary>
+        /// Show a pre-initialized app with transition animation.
+        /// </summary>
+        private IEnumerator ShowPreInitApp(RTTAppInstance instance)
+        {
+            float transitionStart = Time.realtimeSinceStartup;
+            _isTransitioning = true;
+
+            // Assign taskbar slot
+            int slotIndex = GetNextAvailableSlot();
+            if (slotIndex == -1) slotIndex = 1; // Fallback
+            instance.TaskbarSlotIndex = slotIndex;
+
+            IDataBindable bindable = instance.Controller as IDataBindable;
+            List<RTTMenuFrame> allFrames = bindable?.GetAllFrames() ?? new List<RTTMenuFrame> { instance.Frame };
+
+            // Determine which frame to animate out (current app or main menu)
+            RTTMenuFrame outFrame = _mainMenuFrame;
+            if (_currentVisibleAppId != null && _activeApps.ContainsKey(_currentVisibleAppId))
+            {
+                outFrame = _activeApps[_currentVisibleAppId].Frame ?? _mainMenuFrame;
+            }
+
+            // Fade out current view
+            if (_useFadeTransition && _transitionOutDuration > 0)
+                yield return StartCoroutine(AnimateFrameFade(outFrame, 1f, 0f, _transitionOutDuration, true));
+
+            // Hide current view (main menu or another app)
+            HideCurrentView();
+            ResetFrameAlpha(outFrame);
+
+            // Activate ALL frames with alpha=0
+            foreach (var frame in allFrames)
+            {
+                if (frame == null) continue;
+                frame.gameObject.SetActive(true);
+                frame.SetVisible(true);
+                SetFrameAlpha(frame, 0f);
+            }
+
+            // Data binding for pre-init apps
+            if (bindable != null)
+            {
+                // Trigger background data loading
+                if (!bindable.IsDataReady && !bindable.IsPreparingData)
+                {
+                    bindable.PrepareDataAsync();
+                }
+
+                if (bindable.IsDataReady)
+                {
+                    var dataBuffer = bindable.GetPreparedDataBuffer();
+                    if (dataBuffer != null)
+                        bindable.BindPreparedData(dataBuffer);
+                    else
+                        bindable.BindCachedDataOrEmpty();
+                }
+                else
+                {
+                    bool restoredFromCache = false;
+                    if (bindable.SupportsStateCaching)
+                        restoredFromCache = bindable.TryRestoreCachedState();
+
+                    if (!restoredFromCache)
+                        bindable.BindCachedDataOrEmpty();
+
+                    SubscribeToDataPrepared(bindable, instance.AppId);
+                }
+            }
+
+            // Set primary frame
+            instance.Frame.SetAsPrimaryFrame();
+            instance.IsVisible = true;
+            _currentVisibleAppId = instance.AppId;
+
+            // Fade in ALL frames together
+            if (_useFadeTransition && _transitionInDuration > 0)
+                yield return StartCoroutine(AnimateMultipleFramesFade(allFrames, 0f, 1f, _transitionInDuration));
+            else
+            {
+                foreach (var frame in allFrames)
+                    ResetFrameAlpha(frame);
+            }
+
+            // Notify app is visible
+            if (bindable != null)
+            {
+                bindable.OnAppShown();
+                if (bindable.IsDataReady && bindable.SupportsStateCaching)
+                    bindable.CacheCurrentState();
+            }
+
+            // Register with taskbar
+            _taskbar?.RegisterApp(instance.TaskbarSlotIndex, instance.Icon, () => SwitchToApp(instance.AppId));
+            _taskbar?.SelectSlot(instance.TaskbarSlotIndex);
+
+            _onMenuStateChanged?.Invoke(RTTManager.MenuState.RemoteMenu);
+            _isTransitioning = false;
+
+            float elapsed = (Time.realtimeSinceStartup - transitionStart) * 1000f;
+            Debug.Log($"[RTTAppManager] Pre-init app shown: {instance.AppId} in {elapsed:F1}ms");
+
+            OnAppOpened?.Invoke(instance.AppId, instance);
+            OnVisibleAppChanged?.Invoke(instance.AppId);
+        }
+
+        /// <summary>
+        /// Reset (restart) a pre-initialized app: cleanup controller, re-create content on same frame.
+        /// Then store back in _preInitApps for next open.
+        /// </summary>
+        private IEnumerator ResetAppAsync(RTTAppInstance app)
+        {
+            string appId = app.AppId;
+            Debug.Log($"[RTTAppManager] Resetting app: {appId}");
+
+            if (app.Controller != null)
+            {
+                if (app.Controller.gameObject != null)
+                    DestroyImmediate(app.Controller.gameObject);
+                app.Controller = null;
+            }
+
+            // Clear old content from frame's content container IMMEDIATELY
+            // Use DestroyImmediate to ensure container is empty before new content is built
+            if (app.Frame != null && app.Frame.ContentContainer != null)
+            {
+                int childCount = app.Frame.ContentContainer.childCount;
+                for (int i = childCount - 1; i >= 0; i--)
+                {
+                    DestroyImmediate(app.Frame.ContentContainer.GetChild(i).gameObject);
+                }
+            }
+
+            if (app.MenuContent != null)
+            {
+                Destroy(app.MenuContent);
+                app.MenuContent = null;
+            }
+
+            // Ensure frame is hidden
+            if (app.Frame != null)
+            {
+                app.Frame.SetVisible(false);
+                app.Frame.gameObject.SetActive(true);
+
+                // Wait for ContentContainer
+                int waitFrames = 0;
+                while (app.Frame.ContentContainer == null && waitFrames < 60)
+                {
+                    waitFrames++;
+                    yield return null;
+                }
+
+                yield return null;
+
+                // Re-create content via callback
+                _createAppContentCallback?.Invoke(app);
+
+                // Hide frame
+                app.Frame.gameObject.SetActive(false);
+            }
+
+            // Reset state
+            app.IsVisible = false;
+            app.IsPrepared = true;
+            app.TaskbarSlotIndex = -1;
+
+            // Store back in pre-init pool
+            _preInitApps[appId] = app;
+
+            Debug.Log($"[RTTAppManager] App reset complete: {appId}");
+        }
+
+        #endregion
+
         #region Cleanup
 
         public void CleanupAllApps()
@@ -1054,6 +1447,14 @@ namespace VRWorkspace.UI.RTT
                 CloseAppInternal(appId, skipSwitchToHome: true);
             }
             CancelAllPreparations();
+
+            // Also cleanup pre-initialized apps
+            foreach (var kvp in _preInitApps)
+            {
+                DestroyAppResources(kvp.Value);
+            }
+            _preInitApps.Clear();
+            _backgroundPreInitComplete = false;
         }
 
         private void OnDestroy()

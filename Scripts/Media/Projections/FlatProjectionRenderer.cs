@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 
 /// <summary>
 /// Flat screen projection renderer for standard 2D video.
@@ -21,16 +22,14 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
     private bool _isActive = false;
     private bool _isInitialized = false;
 
-    private GameObject _screenObject;
-    private MeshFilter _meshFilter;
-    private MeshRenderer _meshRenderer;
-    private Material _material;
-
+    private WorldPanelPlus _worldPanel;
     private Transform _parentTransform;
     private Vector2Int _resolution = new Vector2Int(1920, 1080);
-    private float _currentCurvature = 0f;
-    private StereoMode _stereoMode = StereoMode.Mono;
     private DisplaySettings _currentSettings = DisplaySettings.Default;
+
+    // Curvature tracking
+    private float _currentCurvature = 0f;
+    private Mesh _curvedMesh;
 
     // Recenter tracking
     private Quaternion _recenterRotation = Quaternion.identity;
@@ -53,9 +52,12 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
 
     public void SetTexture(Texture texture)
     {
-        if (_material == null) return;
+        if (_worldPanel == null) return;
 
-        _material.SetTexture("_MainTex", texture);
+        _worldPanel.contentTexture = texture;
+        _worldPanel.Apply();
+        
+        Debug.Log($"[FlatProjectionRenderer] SetTexture: {(texture != null ? $"{texture.width}x{texture.height}" : "null")}");
 
         // Update resolution for aspect ratio calculations
         if (texture != null)
@@ -67,12 +69,15 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
 
     public void SetTextureNV12(Texture2D yPlane, Texture2D uvPlane)
     {
-        if (_material == null) return;
-
-        // For NV12, we need to use a different shader or shader variant
-        _material.SetTexture("_YTex", yPlane);
-        _material.SetTexture("_UVTex", uvPlane);
-        _material.SetFloat("_UseNV12", 1);
+        // WorldPanelPlus standard shader doesn't support NV12 out of the box with edge feathering.
+        // For now, we fallback to setting the Y plane as content (grayscale) or would need a custom shader.
+        // Assuming Windows platform where direct texture is mostly used.
+        // If NV12 is strict requirement, we would need to swap the WorldPanelPlus material shader here.
+        
+        if (_worldPanel == null) return;
+        
+        _worldPanel.contentTexture = yPlane; // Fallback
+        _worldPanel.Apply();
 
         if (yPlane != null)
         {
@@ -83,76 +88,214 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
 
     public void SetStereoMode(StereoMode mode)
     {
-        _stereoMode = mode;
-        if (_material != null)
+        if (_worldPanel == null) return;
+
+        _worldPanel.stereoMode = mode;
+        _worldPanel.Apply();
+    }
+
+    public void SetStereoStrength(float strength)
+    {
+        if (_worldPanel == null) return;
+        var rend = _worldPanel.board != null ? _worldPanel.board.GetComponent<Renderer>() : null;
+        if (rend != null && rend.material.HasProperty("_StereoStrength"))
         {
-            _material.SetFloat("_StereoMode", (float)mode);
+            rend.material.SetFloat("_StereoStrength", Mathf.Clamp01(strength));
         }
+    }
+
+    private Coroutine _stereoTransitionCoroutine;
+    private const float STEREO_TRANSITION_DURATION = 0.2f;
+
+    /// <summary>
+    /// Switch stereo mode with scale animation (shrink → switch → grow).
+    /// </summary>
+    public void SetStereoModeAnimated(StereoMode mode)
+    {
+        if (_worldPanel == null) return;
+        if (_stereoTransitionCoroutine != null)
+            StopCoroutine(_stereoTransitionCoroutine);
+        _stereoTransitionCoroutine = StartCoroutine(StereoTransitionCoroutine(mode));
+    }
+
+    private IEnumerator StereoTransitionCoroutine(StereoMode mode)
+    {
+        // 1. Tính trước kích thước đích
+        Vector3 targetScale = CalculateBoardScale(mode);
+        float origW = _worldPanel.width;
+        float origH = _worldPanel.height;
+        float targetW = targetScale.x;
+        float targetH = targetScale.y;
+
+        // 2. Chuyển hình chiếu sang dạng đích trước (width/height giữ nguyên → board scale không đổi)
+        _worldPanel.stereoMode = mode;
+        _worldPanel.Apply();
+
+        // 3. Animation kích thước (EaseOut: nhanh đầu, chậm cuối)
+        float elapsed = 0f;
+        float duration = STEREO_TRANSITION_DURATION * 2f; // 0.4s total
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float linear = Mathf.Clamp01(elapsed / duration);
+            float t = 1f - (1f - linear) * (1f - linear) * (1f - linear); // EaseOutCubic
+            _worldPanel.width = Mathf.Lerp(origW, targetW, t);
+            _worldPanel.height = Mathf.Lerp(origH, targetH, t);
+            _worldPanel.Apply();
+            yield return null;
+        }
+
+        // 4. Gắn kích thước đích
+        _worldPanel.width = targetW;
+        _worldPanel.height = targetH;
+        _worldPanel.Apply();
+
+        _stereoTransitionCoroutine = null;
+    }
+
+    /// <summary>
+    /// Calculate board scale for a given stereo mode without modifying any state.
+    /// Mirrors the logic in UpdateScreenAspect().
+    /// </summary>
+    private Vector3 CalculateBoardScale(StereoMode mode)
+    {
+        float resX = _resolution.x;
+        float resY = _resolution.y;
+
+        if (mode == StereoMode.SideBySide) resX /= 2f;
+        else if (mode == StereoMode.OverUnder) resY /= 2f;
+
+        float aspect = resY > 0 ? resX / resY : 16f / 9f;
+        float baseHeight = 1.0f * _currentSettings.Scale;
+        float baseWidth = baseHeight * aspect;
+
+        return new Vector3(baseWidth, baseHeight, 1f);
     }
 
     public void UpdateDisplay(DisplaySettings settings)
     {
         _currentSettings = settings;
 
-        if (_screenObject == null) return;
+        if (_worldPanel == null) return;
 
-        // Update position based on distance
-        Vector3 forward = _currentSettings.HeadLocked
-            ? Vector3.forward
-            : _recenterRotation * Vector3.forward;
+        // Position screen at local origin - parent transform handles world positioning
+        // Apply small Z offset based on distance setting for fine-tuning
+        Vector3 localPos = new Vector3(
+            settings.PositionOffset.x,
+            settings.PositionOffset.y,
+            settings.Distance // Use distance as Z offset from parent
+        );
+        _worldPanel.transform.localPosition = localPos;
+        
+        // Keep facing away from parent origin (toward viewer)
+        _worldPanel.transform.localRotation = settings.RotationOffset;
 
-        Vector3 position = _parentTransform != null
-            ? _parentTransform.position + forward * settings.Distance + settings.PositionOffset
-            : forward * settings.Distance + settings.PositionOffset;
-
-        _screenObject.transform.position = position;
-
-        // Update rotation
-        if (_currentSettings.HeadLocked && Camera.main != null)
+        // Initial curvature and mesh update
+        float targetCurvature = settings.Curvature;
+        if (Mathf.Abs(targetCurvature - _currentCurvature) > 0.001f)
         {
-            // Face the camera
-            _screenObject.transform.rotation = Quaternion.LookRotation(
-                _screenObject.transform.position - Camera.main.transform.position
-            );
-        }
-        else
-        {
-            _screenObject.transform.rotation = _recenterRotation * settings.RotationOffset;
+            _currentCurvature = targetCurvature;
+            RebuildMesh();
         }
 
-        // Update scale
+        // Update size based on scale and aspect ratio
         UpdateScreenAspect();
+    }
 
-        // Update curvature if changed
-        if (!Mathf.Approximately(_currentCurvature, settings.Curvature))
-        {
-            _currentCurvature = settings.Curvature;
-            RegenerateMesh(settings.Curvature);
-        }
+    private void Update()
+    {
+        if (!_isActive || _worldPanel == null) return;
 
-        // Update material properties
-        if (_material != null)
+        // Dynamic curvature check: if curvature > 0, track actual world distance to camera
+        if (_currentCurvature > 0.001f)
         {
-            _material.SetFloat("_Curvature", settings.Curvature);
+            float actualDistance = 2.0f;
+            if (Camera.main != null)
+            {
+                actualDistance = Vector3.ProjectOnPlane(_worldPanel.transform.position - Camera.main.transform.position, Camera.main.transform.up).magnitude;
+            }
+
+            // Detect if distance changed significantly enough to rebuild mesh
+            // We use a slightly larger threshold here for performance
+            float trackedDistance = _currentSettings.Distance > 0.001f ? _currentSettings.Distance : actualDistance;
+            
+            // If settings.Distance is NOT being manually adjusted, we can follow world distance
+            // Actually, let's just track world distance for curvature R if it's dynamic
+            
+            // For now, let's stick to theApproved logic: R matches distance (settings OR world)
+            // If the user zooms the WHOLE parent, settings.Distance is constant. 
+            // So we MUST track world distance for it to be "dynamic".
+            
+            if (Mathf.Abs(actualDistance - _lastTrackedWorldDistance) > 0.01f)
+            {
+                _lastTrackedWorldDistance = actualDistance;
+                RebuildMesh();
+            }
         }
     }
 
+    private float _lastTrackedWorldDistance = -1f;
+
     public void Show()
     {
-        if (_screenObject != null)
+        if (_worldPanel != null)
         {
-            _screenObject.SetActive(true);
+            _worldPanel.gameObject.SetActive(true);
+            UpdateDisplay(_currentSettings); // Ensure position is updated
+            
+            // Initial distance tracking
+            if (Camera.main != null)
+            {
+                _lastTrackedWorldDistance = Vector3.ProjectOnPlane(_worldPanel.transform.position - Camera.main.transform.position, Camera.main.transform.up).magnitude;
+            }
         }
         _isActive = true;
     }
 
     public void Hide()
     {
-        if (_screenObject != null)
+        if (_worldPanel != null)
         {
-            _screenObject.SetActive(false);
+            _worldPanel.gameObject.SetActive(false);
         }
         _isActive = false;
+        _lastTrackedWorldDistance = -1f;
+    }
+
+    public void SetBoardAlpha(float alpha)
+    {
+        if (_worldPanel == null) return;
+        _worldPanel.boardAlpha = Mathf.Clamp01(alpha);
+        _worldPanel.Apply();
+    }
+
+    /// <summary>
+    /// Set a shader float property on the board material (WorldPanelBoard shader).
+    /// </summary>
+    public void SetBoardShaderFloat(string property, float value)
+    {
+        if (_worldPanel == null || _worldPanel.board == null) return;
+        var rend = _worldPanel.board.GetComponent<Renderer>();
+        if (rend != null && rend.material.HasProperty(property))
+            rend.material.SetFloat(property, value);
+    }
+
+    /// <summary>
+    /// Set aspect ratio override. Pass "default" to use video native aspect.
+    /// </summary>
+    private float _aspectRatioOverride = 0f;
+
+    public void SetAspectRatioOverride(string ratio)
+    {
+        switch (ratio)
+        {
+            case "4:3": _aspectRatioOverride = 4f / 3f; break;
+            case "3:2": _aspectRatioOverride = 3f / 2f; break;
+            case "16:9": _aspectRatioOverride = 16f / 9f; break;
+            case "2:1": _aspectRatioOverride = 2f / 1f; break;
+            default: _aspectRatioOverride = 0f; break; // "default" = use native
+        }
+        UpdateScreenAspect();
     }
 
     public void RecenterView()
@@ -177,15 +320,16 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
 
     public void Dispose()
     {
-        if (_screenObject != null)
+        if (_curvedMesh != null)
         {
-            if (_material != null)
-            {
-                Destroy(_material);
-                _material = null;
-            }
-            Destroy(_screenObject);
-            _screenObject = null;
+            Destroy(_curvedMesh);
+            _curvedMesh = null;
+        }
+
+        if (_worldPanel != null)
+        {
+            Destroy(_worldPanel.gameObject);
+            _worldPanel = null;
         }
 
         _isInitialized = false;
@@ -196,159 +340,261 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
     #region Private Methods
     private void CreateScreenObject()
     {
-        _screenObject = new GameObject("FlatVideoScreen");
-        _screenObject.transform.SetParent(_parentTransform, false);
-        _screenObject.layer = LayerMask.NameToLayer("VirtualObjects");
+        GameObject go = new GameObject("FlatVideoScreen");
+        go.transform.SetParent(_parentTransform, false);
+        
+        // Set layer - use Default if VirtualObjects doesn't exist
+        int layer = LayerMask.NameToLayer("VirtualObjects");
+        if (layer < 0) layer = 0;
+        go.layer = layer;
 
-        _meshFilter = _screenObject.AddComponent<MeshFilter>();
-        _meshRenderer = _screenObject.AddComponent<MeshRenderer>();
+        // Add WorldPanelPlus
+        _worldPanel = go.AddComponent<WorldPanelPlus>();
+        
+        // Configure WorldPanelPlus defaults
+        _worldPanel.useBoardEdgeFeather = true;
+        _worldPanel.boardEdgeWidthUV = 0.02f;
+        _worldPanel.boardCornerRadius = 0.03f;
+        _worldPanel.boardEdgeColor = Color.black; // Dark border looks good for video
+        _worldPanel.panelTint = Color.white;
+        _worldPanel.enableSharpening = true; // Enable sharpening for video
+        _worldPanel.sharpnessStrength = 0.5f;
+        _worldPanel.anisoLevel = 16;
+        _worldPanel.mipMapBias = -0.5f;
+        _worldPanel.cursorEnable = false; // No cursor for video projection
+        
+        // Initialize
+        _worldPanel.Rebuild();
 
-        // Create material
-        Shader shader = Shader.Find(SHADER_NAME);
-        if (shader == null)
+        // Remove BoxCollider — video screen is a projection, not an interactable entity.
+        // This prevents the board from blocking raycasts to the controls panel behind it.
+        if (_worldPanel.board != null)
         {
-            Debug.LogWarning($"[FlatProjectionRenderer] Shader '{SHADER_NAME}' not found, using fallback");
-            shader = Shader.Find(FALLBACK_SHADER);
-        }
-
-        _material = new Material(shader);
-        _material.SetFloat("_Curvature", 0);
-        _material.SetFloat("_Brightness", 1);
-        _material.SetFloat("_Contrast", 1);
-        _material.SetFloat("_Saturation", 1);
-        _material.SetFloat("_StereoMode", 0);
-        _material.SetFloat("_UseNV12", 0);
-
-        _meshRenderer.material = _material;
-        _meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        _meshRenderer.receiveShadows = false;
-
-        // Generate initial flat mesh
-        GenerateFlatMesh();
-    }
-
-    private void GenerateFlatMesh()
-    {
-        Mesh mesh = new Mesh();
-        mesh.name = "FlatVideoMesh";
-
-        // Simple quad
-        mesh.vertices = new Vector3[]
-        {
-            new Vector3(-0.5f, -0.5f, 0),
-            new Vector3(0.5f, -0.5f, 0),
-            new Vector3(0.5f, 0.5f, 0),
-            new Vector3(-0.5f, 0.5f, 0)
-        };
-
-        mesh.uv = new Vector2[]
-        {
-            new Vector2(0, 0),
-            new Vector2(1, 0),
-            new Vector2(1, 1),
-            new Vector2(0, 1)
-        };
-
-        mesh.triangles = new int[] { 0, 2, 1, 0, 3, 2 };
-        mesh.RecalculateNormals();
-        mesh.RecalculateBounds();
-
-        _meshFilter.mesh = mesh;
-    }
-
-    private void GenerateCurvedMesh(float curvature)
-    {
-        if (curvature <= 0.01f)
-        {
-            GenerateFlatMesh();
-            return;
-        }
-
-        Mesh mesh = new Mesh();
-        mesh.name = "CurvedVideoMesh";
-
-        int segments = CURVED_SEGMENTS;
-        int vertexCount = (segments + 1) * 2;
-
-        Vector3[] vertices = new Vector3[vertexCount];
-        Vector2[] uvs = new Vector2[vertexCount];
-        int[] triangles = new int[segments * 6];
-
-        // Curve parameters
-        float curveAngle = Mathf.Lerp(0, 120f, curvature); // Max 120 degrees
-        float angleRad = curveAngle * Mathf.Deg2Rad;
-        float radius = 0.5f / Mathf.Sin(angleRad * 0.5f);
-        float centerZ = -radius * Mathf.Cos(angleRad * 0.5f);
-
-        for (int i = 0; i <= segments; i++)
-        {
-            float t = (float)i / segments;
-            float u = t;
-
-            // Calculate position on arc
-            float angle = Mathf.Lerp(-angleRad * 0.5f, angleRad * 0.5f, t);
-            float x = radius * Mathf.Sin(angle);
-            float z = radius * Mathf.Cos(angle) + centerZ;
-
-            // Bottom vertex
-            vertices[i * 2] = new Vector3(x, -0.5f, z);
-            uvs[i * 2] = new Vector2(u, 0);
-
-            // Top vertex
-            vertices[i * 2 + 1] = new Vector3(x, 0.5f, z);
-            uvs[i * 2 + 1] = new Vector2(u, 1);
-        }
-
-        // Generate triangles
-        for (int i = 0; i < segments; i++)
-        {
-            int baseIndex = i * 6;
-            int vertBase = i * 2;
-
-            triangles[baseIndex] = vertBase;
-            triangles[baseIndex + 1] = vertBase + 3;
-            triangles[baseIndex + 2] = vertBase + 1;
-
-            triangles[baseIndex + 3] = vertBase;
-            triangles[baseIndex + 4] = vertBase + 2;
-            triangles[baseIndex + 5] = vertBase + 3;
-        }
-
-        mesh.vertices = vertices;
-        mesh.uv = uvs;
-        mesh.triangles = triangles;
-        mesh.RecalculateNormals();
-        mesh.RecalculateBounds();
-
-        _meshFilter.mesh = mesh;
-    }
-
-    private void RegenerateMesh(float curvature)
-    {
-        if (curvature <= 0.01f)
-        {
-            GenerateFlatMesh();
-        }
-        else
-        {
-            GenerateCurvedMesh(curvature);
+            var col = _worldPanel.board.GetComponent<BoxCollider>();
+            if (col != null) Destroy(col);
         }
     }
 
     private void UpdateScreenAspect()
     {
-        if (_screenObject == null) return;
+        if (_worldPanel == null) return;
 
-        float aspect = _resolution.y > 0 ? (float)_resolution.x / _resolution.y : 16f / 9f;
+        float resX = _resolution.x;
+        float resY = _resolution.y;
+
+        // Adjust resolution for aspect ratio calculation based on stereo mode
+        if (_worldPanel.stereoMode == StereoMode.SideBySide)
+        {
+            resX /= 2f;
+        }
+        else if (_worldPanel.stereoMode == StereoMode.OverUnder)
+        {
+            resY /= 2f;
+        }
+
+        float aspect = resY > 0 ? resX / resY : 16f / 9f;
+
+        // Apply aspect ratio override if set
+        if (_aspectRatioOverride > 0f)
+            aspect = _aspectRatioOverride;
 
         // Base height of 1 meter, adjust width by aspect ratio
         float baseHeight = 1.0f * _currentSettings.Scale;
         float baseWidth = baseHeight * aspect;
 
-        _screenObject.transform.localScale = new Vector3(baseWidth, baseHeight, 1f);
+        bool changed = false;
+        if (Mathf.Abs(_worldPanel.width - baseWidth) > 0.001f)
+        {
+            _worldPanel.width = baseWidth;
+            changed = true;
+        }
+        if (Mathf.Abs(_worldPanel.height - baseHeight) > 0.001f)
+        {
+            _worldPanel.height = baseHeight;
+            changed = true;
+        }
+
+        if (changed)
+        {
+            // Apply scale changes (WorldPanelPlus Apply handles localScale based on width/height)
+            _worldPanel.Apply();
+
+            // Regenerate curved mesh if active (arc radius depends on width)
+            if (_currentCurvature > 0.001f)
+            {
+                ApplyCurvedMesh();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Rebuild mesh based on current curvature setting.
+    /// Curvature 0 = flat quad, curvature > 0 = curved cylindrical arc.
+    /// </summary>
+    private void RebuildMesh()
+    {
+        if (_worldPanel == null || _worldPanel.board == null) return;
+
+        if (_currentCurvature <= 0.001f)
+        {
+            // Flat mode: restore standard quad
+            ApplyFlatQuad();
+        }
+        else
+        {
+            // Curved mode: generate cylindrical arc mesh
+            ApplyCurvedMesh();
+        }
+
+        Debug.Log($"[FlatProjectionRenderer] RebuildMesh: curvature={_currentCurvature:F3}");
+    }
+
+    /// <summary>
+    /// Restore WorldPanelPlus board to standard flat quad.
+    /// </summary>
+    private void ApplyFlatQuad()
+    {
+        if (_curvedMesh != null)
+        {
+            Destroy(_curvedMesh);
+            _curvedMesh = null;
+        }
+
+        // Restore quad mesh on the board
+        MeshFilter mf = _worldPanel.board.GetComponent<MeshFilter>();
+        if (mf != null)
+        {
+            // Unity's built-in quad mesh
+            var quadGo = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            mf.sharedMesh = quadGo.GetComponent<MeshFilter>().sharedMesh;
+            Destroy(quadGo);
+        }
+    }
+
+    /// <summary>
+    /// Generate and apply a curved cylindrical arc mesh.
+    /// Uses the same algorithm as CurvedClusterMeshGenerator:
+    /// vertices at (sin(θ)*R, y, cos(θ)*R - R).
+    /// </summary>
+    private void ApplyCurvedMesh()
+    {
+        float width = _worldPanel.width;
+        float height = _worldPanel.height;
+
+        if (width <= 0 || height <= 0) return;
+
+        // Calculate arc radius
+        // R matches actual viewing distance, capped at 2.0m
+        // If _currentCurvature > 0, we use this dynamic radius logic.
+        float arcRadius = 2.0f; // Default cap
+
+        // Prefer tracked world distance for dynamic curvature updates
+        float effectiveDistance = (_lastTrackedWorldDistance > 0) ? _lastTrackedWorldDistance : _currentSettings.Distance;
+
+        if (effectiveDistance > 0)
+        {
+            arcRadius = Mathf.Min(effectiveDistance, 2.0f);
+        }
+        
+        // Ensure radius is not smaller than half-width to avoid invalid Atan
+        arcRadius = Mathf.Max(arcRadius, width * 0.51f); 
+        
+        Debug.Log($"[FlatProjectionRenderer] RebuildMesh: width={width:F2}, effectiveDist={effectiveDistance:F2}, R={arcRadius:F2}");
+
+        // Arc angle: 2 * atan(width / 2 / radius) - matches CurvedClusterMeshGenerator
+        float totalArcAngleRad = 2f * Mathf.Atan(width / 2f / arcRadius);
+
+        int segX = CURVED_SEGMENTS;
+        int segY = 2; // Vertical segments (minimal needed)
+        int vertexCountX = segX + 1;
+        int vertexCountY = segY + 1;
+        int vertexCount = vertexCountX * vertexCountY;
+
+        Vector3[] vertices = new Vector3[vertexCount];
+        Vector3[] normals = new Vector3[vertexCount];
+        Vector2[] uvs = new Vector2[vertexCount];
+
+        for (int y = 0; y <= segY; y++)
+        {
+            float vt = (float)y / segY;
+            float yPos = (vt - 0.5f); // -0.5 to 0.5 (unit mesh, scaled by board localScale)
+
+            for (int x = 0; x <= segX; x++)
+            {
+                float ut = (float)x / segX;
+
+                // Arc angle centered: ut=0 -> left edge, ut=1 -> right edge
+                float angle = (ut - 0.5f) * totalArcAngleRad;
+
+                // Cylindrical coordinates (same as CurvedClusterMeshGenerator)
+                // But normalized to unit mesh (-0.5 to 0.5 range) since WorldPanelPlus
+                // applies width/height via board localScale
+                float xPos = Mathf.Sin(angle) * arcRadius / width;
+                float zPos = (Mathf.Cos(angle) * arcRadius - arcRadius) / width;
+
+                int idx = y * vertexCountX + x;
+                vertices[idx] = new Vector3(xPos, yPos, zPos);
+
+                // Normal points toward arc center (viewer)
+                normals[idx] = new Vector3(-Mathf.Sin(angle), 0f, -Mathf.Cos(angle));
+
+                // Standard UV mapping 0-1
+                uvs[idx] = new Vector2(ut, vt);
+            }
+        }
+
+        // Generate triangles
+        int quadCount = segX * segY;
+        int[] triangles = new int[quadCount * 6];
+        int triIdx = 0;
+
+        for (int y = 0; y < segY; y++)
+        {
+            for (int x = 0; x < segX; x++)
+            {
+                int bl = y * vertexCountX + x;
+                int br = bl + 1;
+                int tl = bl + vertexCountX;
+                int tr = tl + 1;
+
+                // First triangle
+                triangles[triIdx++] = bl;
+                triangles[triIdx++] = tl;
+                triangles[triIdx++] = tr;
+
+                // Second triangle
+                triangles[triIdx++] = bl;
+                triangles[triIdx++] = tr;
+                triangles[triIdx++] = br;
+            }
+        }
+
+        // Create or update mesh
+        if (_curvedMesh == null)
+        {
+            _curvedMesh = new Mesh();
+            _curvedMesh.name = "CurvedVideoScreen";
+        }
+        else
+        {
+            _curvedMesh.Clear();
+        }
+
+        _curvedMesh.vertices = vertices;
+        _curvedMesh.normals = normals;
+        _curvedMesh.uv = uvs;
+        _curvedMesh.triangles = triangles;
+        _curvedMesh.RecalculateBounds();
+        _curvedMesh.RecalculateTangents();
+
+        // Apply to board MeshFilter
+        MeshFilter mf = _worldPanel.board.GetComponent<MeshFilter>();
+        if (mf != null)
+        {
+            mf.sharedMesh = _curvedMesh;
+        }
     }
     #endregion
-
     #region Unity Lifecycle
     private void OnDestroy()
     {

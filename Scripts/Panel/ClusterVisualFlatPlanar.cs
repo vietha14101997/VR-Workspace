@@ -342,10 +342,12 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
     /// </summary>
     private float GetArcRadius()
     {
+        if (_clusterRig != null) return _clusterRig.ArcRadius;
+
         var zoomController = VirtualObjectsZoomController.Instance;
         if (zoomController != null && zoomController.IsInitialized)
         {
-            return zoomController.CurrentDistance;
+            return Mathf.Min(zoomController.CurrentDistance, 1.8f);
         }
         return 1.8f; // Default fallback
     }
@@ -481,7 +483,11 @@ public class ClusterVisualFlatPlanar : MonoBehaviour
         _borderRenderer = _borderObject.GetComponent<MeshRenderer>();
         _borderMeshFilter.sharedMesh = _expandedMesh;
 
-        Debug.Log($"[ClusterVisualFlatPlanar] Created visual layers: background, content, border");
+        // Hide background and border - only show remote screen content
+        _backgroundObject.SetActive(false);
+        _borderObject.SetActive(false);
+
+        Debug.Log($"[ClusterVisualFlatPlanar] Created visual layers: background and border hidden, content only");
     }
 
     /// <summary>

@@ -18,7 +18,6 @@ public class RTTMediaActionBar : MonoBehaviour
     #region Events
     public event Action OnPlayClicked;
     public event Action OnFavouriteClicked;
-    public event Action OnPlaylistClicked;
     #endregion
 
     #region Private Fields
@@ -35,7 +34,6 @@ public class RTTMediaActionBar : MonoBehaviour
     private GameObject _container;
     private Button _playButton;
     private Button _favouriteButton;
-    private Button _playlistButton;
     private Image _favouriteIcon;
     private TextMeshProUGUI _favouriteText;
     private TMP_FontAsset _font;
@@ -510,9 +508,8 @@ public class RTTMediaActionBar : MonoBehaviour
             glowIntensity = 3f,
             popAmount = 0.03f
         };
-        GameObject playlistBtn = VRButtonFactory.CreateButton(canvasRT, playlistConfig, () => OnPlaylistClicked?.Invoke());
+        GameObject playlistBtn = VRButtonFactory.CreateButton(canvasRT, playlistConfig, null); // No action
         PositionButton(playlistBtn, playlistX);
-        _playlistButton = playlistBtn.GetComponent<Button>();
 
         // Container starts INACTIVE - only becomes active when explicitly shown via ShowWithFade() or ShowImmediate()
         // This prevents ActionBar from appearing during dwell pre-loading when frame is temporarily activated

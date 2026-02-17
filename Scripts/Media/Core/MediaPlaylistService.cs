@@ -439,6 +439,39 @@ public class MediaPlaylistService : MonoBehaviour
             _playbackQueue[n] = temp;
         }
     }
+
+    /// <summary>
+    /// Get the current playback queue.
+    /// </summary>
+    public List<string> GetPlaybackQueue()
+    {
+        return new List<string>(_playbackQueue);
+    }
+
+    /// <summary>Current queue index</summary>
+    public int CurrentQueueIndex => _currentQueueIndex;
+
+    /// <summary>
+    /// Set playback queue directly from a list of video paths.
+    /// Used when playing from library (not from a saved playlist).
+    /// </summary>
+    public void SetPlaybackQueueDirect(List<string> paths, int startIndex = 0)
+    {
+        _playbackQueue = new List<string>(paths);
+        _currentQueueIndex = startIndex;
+        _shuffleEnabled = false;
+        _repeatMode = RepeatMode.None;
+    }
+
+    /// <summary>
+    /// Jump to specific index in queue. Returns path or null.
+    /// </summary>
+    public string JumpToIndex(int index)
+    {
+        if (index < 0 || index >= _playbackQueue.Count) return null;
+        _currentQueueIndex = index;
+        return _playbackQueue[index];
+    }
     #endregion
 
     #region Persistence
