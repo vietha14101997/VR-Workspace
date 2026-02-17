@@ -115,6 +115,7 @@ public class VRVideoPlayerController : MonoBehaviour
             _playbackEngine.OnError += HandlePlaybackError;
             _playbackEngine.OnStateChanged += HandleStateChanged;
             _playbackEngine.OnTimeUpdate += HandleTimeUpdate;
+            _playbackEngine.OnSeekCompleted += HandleSeekCompleted;
         }
 
         // Controls panel events
@@ -307,6 +308,24 @@ public class VRVideoPlayerController : MonoBehaviour
 
         // Setup/teardown immersive zoom override
         SetupZoomOverride(isImmersive);
+
+        // Re-apply video texture to the new active renderer.
+        // SetProjection() switches to a renderer with no texture assigned.
+        // Without this, paused videos show black since Update() only pushes
+        // texture when IsPlaying is true.
+        if (_playbackEngine != null && _playbackEngine.IsPrepared && _projectionSystem != null)
+        {
+            if (_playbackEngine.UseNV12Output)
+            {
+                _projectionSystem.SetTextureNV12(
+                    _playbackEngine.YPlaneTexture,
+                    _playbackEngine.UVPlaneTexture);
+            }
+            else
+            {
+                _projectionSystem.SetTexture(_playbackEngine.OutputTexture);
+            }
+        }
     }
 
     /// <summary>
@@ -1132,6 +1151,11 @@ public class VRVideoPlayerController : MonoBehaviour
         _controlsPanel?.SetCurrentTime((float)currentTime);
     }
 
+    private void HandleSeekCompleted()
+    {
+        _controlsPanel?.OnSeekCompleted();
+    }
+
     private void HandleBackClicked()
     {
         Stop();
@@ -1325,6 +1349,7 @@ public class VRVideoPlayerController : MonoBehaviour
             _playbackEngine.OnError -= HandlePlaybackError;
             _playbackEngine.OnStateChanged -= HandleStateChanged;
             _playbackEngine.OnTimeUpdate -= HandleTimeUpdate;
+            _playbackEngine.OnSeekCompleted -= HandleSeekCompleted;
         }
 
         if (_controlsPanel != null)

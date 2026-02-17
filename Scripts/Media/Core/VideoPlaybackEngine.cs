@@ -44,6 +44,9 @@ public class VideoPlaybackEngine : MonoBehaviour
 
     /// <summary>Fired when time updates (approximately 4 times per second)</summary>
     public event Action<double> OnTimeUpdate;
+
+    /// <summary>Fired when a seek operation completes</summary>
+    public event Action OnSeekCompleted;
     #endregion
 
     #region Properties
@@ -141,6 +144,8 @@ public class VideoPlaybackEngine : MonoBehaviour
     private float _playbackSpeed = 1.0f;
     private double _lastReportedTime = -1;
     private Coroutine _timeUpdateCoroutine;
+    private PlaybackState _preSeekState = PlaybackState.Idle;
+    private Coroutine _seekCoroutine;
     #endregion
 
     #region Unity Lifecycle
@@ -175,6 +180,7 @@ public class VideoPlaybackEngine : MonoBehaviour
         _videoPlayer.prepareCompleted += OnVideoPrepared;
         _videoPlayer.loopPointReached += OnVideoEnded;
         _videoPlayer.errorReceived += OnVideoError;
+        _videoPlayer.seekCompleted += OnVideoSeekCompleted;
     }
     #endregion
 
@@ -271,13 +277,26 @@ public class VideoPlaybackEngine : MonoBehaviour
     {
         if (!IsPrepared) return;
 
-        var previousState = State;
-        SetState(PlaybackState.Seeking);
+        // Cancel any pending seek timeout
+        if (_seekCoroutine != null)
+        {
+            StopCoroutine(_seekCoroutine);
+            _seekCoroutine = null;
+        }
 
+        // Only capture pre-seek state if not already mid-seek
+        // (preserves original state during rapid seek chains)
+        if (State != PlaybackState.Seeking)
+        {
+            _preSeekState = State;
+        }
+
+        SetState(PlaybackState.Seeking);
         _videoPlayer.time = Mathf.Clamp((float)timeSeconds, 0, (float)Duration);
 
-        // Restore previous state after seek
-        StartCoroutine(RestoreStateAfterSeek(previousState));
+        // seekCompleted callback will handle state restoration.
+        // Fallback timeout ensures recovery if seekCompleted never fires.
+        _seekCoroutine = StartCoroutine(SeekTimeoutFallback());
     }
 
     /// <summary>
@@ -300,6 +319,7 @@ public class VideoPlaybackEngine : MonoBehaviour
             _videoPlayer.prepareCompleted -= OnVideoPrepared;
             _videoPlayer.loopPointReached -= OnVideoEnded;
             _videoPlayer.errorReceived -= OnVideoError;
+            _videoPlayer.seekCompleted -= OnVideoSeekCompleted;
             _videoPlayer.Stop();
         }
 
@@ -398,12 +418,34 @@ public class VideoPlaybackEngine : MonoBehaviour
         }
     }
 
-    private IEnumerator RestoreStateAfterSeek(PlaybackState previousState)
+    private void OnVideoSeekCompleted(VideoPlayer source)
     {
-        // Wait a frame for seek to complete
-        yield return null;
+        // Cancel timeout fallback
+        if (_seekCoroutine != null)
+        {
+            StopCoroutine(_seekCoroutine);
+            _seekCoroutine = null;
+        }
 
-        if (previousState == PlaybackState.Playing)
+        RestorePreSeekState();
+    }
+
+    private IEnumerator SeekTimeoutFallback()
+    {
+        // Safety timeout: if seekCompleted hasn't fired after 3 seconds,
+        // restore state anyway (handles edge cases like seek to same position).
+        yield return new WaitForSeconds(3.0f);
+
+        Debug.LogWarning("[VideoPlaybackEngine] Seek timeout - restoring state via fallback");
+        _seekCoroutine = null;
+        RestorePreSeekState();
+    }
+
+    private void RestorePreSeekState()
+    {
+        if (State != PlaybackState.Seeking) return; // Already restored
+
+        if (_preSeekState == PlaybackState.Playing)
         {
             SetState(PlaybackState.Playing);
         }
@@ -411,6 +453,8 @@ public class VideoPlaybackEngine : MonoBehaviour
         {
             SetState(PlaybackState.Paused);
         }
+
+        OnSeekCompleted?.Invoke();
     }
     #endregion
 

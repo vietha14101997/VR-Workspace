@@ -1154,7 +1154,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         else
         {
             // Immediate seek on click (not dragging)
-            _nextAllowedUpdateTime = Time.time + 1.0f; // Block updates for 1s
+            _nextAllowedUpdateTime = Time.time + 3.0f; // Fallback timeout - cleared early by OnSeekCompleted
             OnSeek?.Invoke(normalizedValue * _duration);
         }
     }
@@ -1167,9 +1167,18 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     private void OnSeekEnd()
     {
         _isSeeking = false;
-        _nextAllowedUpdateTime = Time.time + 1.0f; // Block updates for 1s after drag release
+        _nextAllowedUpdateTime = Time.time + 3.0f; // Fallback timeout - cleared early by OnSeekCompleted
         // Invoke seek event with actual time
         OnSeek?.Invoke(_seekSlider.NormalizedValue * _duration);
+    }
+
+    /// <summary>
+    /// Called by the controller when a seek operation completes.
+    /// Unblocks time updates that were blocked during the seek.
+    /// </summary>
+    public void OnSeekCompleted()
+    {
+        _nextAllowedUpdateTime = 0f;
     }
 
     private void CycleSpeed()
