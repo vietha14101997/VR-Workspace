@@ -105,8 +105,6 @@ public class RTTManager : MonoBehaviour
     [Header("Auto Recenter")]
     [Tooltip("Automatically recenter objects in front of user when app starts")]
     [SerializeField] private bool autoRecenterOnStart = true;
-    [Tooltip("Duration to continuously follow camera at startup (seconds)")]
-    [SerializeField] private float startupFollowDuration = 3.0f;
     #endregion
 
     #region Panel Management Fields
@@ -135,6 +133,11 @@ public class RTTManager : MonoBehaviour
     private bool _startupCameraFollowActive = false;
     private float _startupFollowStartTime = 0f;
     private GameObject _cachedVirtualObjects;
+    private Quaternion _initialCameraRotation;
+    private bool _cameraTrackingDetected = false;
+    private const float kCameraTrackingAngleThreshold = 1.0f; // Degrees of rotation change to confirm tracking
+    private const float kCameraTrackingFallbackTime = 2.0f;   // Assume tracking active after this time
+    private const float kMaxStartupFollowTime = 5.0f;         // Safety timeout
     #endregion
 
     #region Events
@@ -448,6 +451,13 @@ public class RTTManager : MonoBehaviour
 
     private IEnumerator WaitAndShowMainMenu()
     {
+        // Start camera-follow immediately (before waiting for MainMenu)
+        // LateUpdate will unlock once camera tracking is detected AND MainMenu is initialized
+        if (autoRecenterOnStart && !_hasAutoRecentered)
+        {
+            StartStartupCameraFollow();
+        }
+
         while (mainMenuFrame.ContentContainer == null)
             yield return null;
         yield return null;
@@ -462,17 +472,12 @@ public class RTTManager : MonoBehaviour
             _appManager.PrepareAllApps();
             Debug.Log("[RTTManager] Background app pre-initialization triggered");
         }
-
-        // Start continuous camera-follow instead of one-shot recenter
-        if (autoRecenterOnStart && !_hasAutoRecentered)
-        {
-            StartStartupCameraFollow();
-        }
     }
 
     /// <summary>
     /// Start continuous camera-follow at startup.
-    /// VirtualObjects will track camera's horizontal axis until startupFollowDuration expires.
+    /// VirtualObjects track camera's horizontal axis until camera tracking is detected
+    /// AND MainMenu initialization is complete.
     /// </summary>
     private void StartStartupCameraFollow()
     {
@@ -488,22 +493,51 @@ public class RTTManager : MonoBehaviour
         }
 #endif
 
+        Camera cam = Camera.main;
+        _initialCameraRotation = cam != null ? cam.transform.rotation : Quaternion.identity;
+        _cameraTrackingDetected = false;
         _startupCameraFollowActive = true;
         _startupFollowStartTime = Time.time;
-        Debug.Log($"[RTTManager] Startup camera-follow started (duration: {startupFollowDuration}s)");
+        Debug.Log("[RTTManager] Startup camera-follow started");
     }
 
     private void LateUpdate()
     {
         if (!_startupCameraFollowActive) return;
 
+        Camera cam = Camera.main;
+        if (cam == null) return;
+
         float elapsed = Time.time - _startupFollowStartTime;
-        if (elapsed >= startupFollowDuration)
+
+        // Detect camera tracking activation
+        if (!_cameraTrackingDetected)
+        {
+            float angleDiff = Quaternion.Angle(_initialCameraRotation, cam.transform.rotation);
+            if (angleDiff > kCameraTrackingAngleThreshold)
+            {
+                _cameraTrackingDetected = true;
+                Debug.Log($"[RTTManager] Camera tracking detected (delta: {angleDiff:F1}°)");
+            }
+            else if (elapsed >= kCameraTrackingFallbackTime)
+            {
+                _cameraTrackingDetected = true;
+                Debug.Log("[RTTManager] Camera tracking assumed active (fallback timeout)");
+            }
+        }
+
+        // Unlock when: camera tracking active AND MainMenu initialized
+        // Safety timeout: unlock regardless after kMaxStartupFollowTime
+        bool shouldUnlock = (_cameraTrackingDetected && _mainMenuInitialized)
+                         || elapsed >= kMaxStartupFollowTime;
+
+        if (shouldUnlock)
         {
             _startupCameraFollowActive = false;
             _hasAutoRecentered = true;
+            RepositionToFaceCamera(); // Final reposition with correct camera direction
             VirtualObjectsZoomController.Instance?.OnRecenter();
-            Debug.Log("[RTTManager] Startup camera-follow ended - VirtualObjects released");
+            Debug.Log($"[RTTManager] Startup camera-follow ended after {elapsed:F1}s (tracking={_cameraTrackingDetected}, menu={_mainMenuInitialized})");
             return;
         }
 
