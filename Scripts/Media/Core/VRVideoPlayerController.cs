@@ -365,8 +365,8 @@ public class VRVideoPlayerController : MonoBehaviour
                         contentDir = toContent.normalized;
                 }
 
-                // Distance 2.5m matches menu button — reduces vergence-accommodation conflict
-                newPos = camPos + contentDir * 2.5f;
+                // Distance 2.0m — same as flat mode; 3D effect is disabled when controls are visible
+                newPos = camPos + contentDir * 2.0f;
                 newPos.y = camPos.y - 0.625f;
                 facingDir = contentDir;
             }
@@ -392,19 +392,8 @@ public class VRVideoPlayerController : MonoBehaviour
         container.position = newPos;
         container.rotation = Quaternion.LookRotation(facingDir);
 
-        // Scale: kept position = 1.0 (same as flat), force repositioned = distance-based
-        float scaleFactor;
-        if (isImmersive && !keptPosition)
-        {
-            Vector3 toContainer = newPos - camPos;
-            toContainer.y = 0;
-            float actualDist = Mathf.Max(toContainer.magnitude, 0.5f);
-            scaleFactor = actualDist / 2.0f;
-        }
-        else
-        {
-            scaleFactor = 1.0f;
-        }
+        // Scale: always 1.0 — immersive now at same 2.0m distance as flat
+        float scaleFactor = 1.0f;
 
         Transform frame = container.Find("VideoControlsFrame");
         if (frame != null)

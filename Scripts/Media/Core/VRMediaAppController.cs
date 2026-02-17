@@ -110,8 +110,6 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
     private float _sidePhysicalH;      // side controls frame physical height (meters)
     private float _paginationWorldH;   // pagination quad world height (meters)
     private float _paginationGap = 0.015f; // gap between side controls bottom and pagination top
-    private Vector3 _paginationOrigQuadScale; // original pagination DisplayQuad scale (for scaling)
-    private float _sideControlsOrigQuadScaleX; // original side controls DisplayQuad scale X
 
     // Cached rounded rect sprite for menu button
     private static Sprite _cachedRoundedRectSprite;
@@ -863,8 +861,6 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         var sideQuad = sideFrame.GetDisplayQuad();
         if (sideQuad?.material != null)
             sideQuad.material.renderQueue = 3100;
-        if (sideQuad != null)
-            _sideControlsOrigQuadScaleX = sideQuad.transform.localScale.x;
 
         // Queue panel provides its own gradient background
         var sideContainer = sideFrame.ContentContainer;
@@ -927,10 +923,6 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             var paginationQuad = _queuePagination.GetDisplayQuad();
             if (paginationQuad?.material != null)
                 paginationQuad.material.renderQueue = 3100;
-
-            // Cache original quad scale for immersive scaling
-            if (paginationQuad != null)
-                _paginationOrigQuadScale = paginationQuad.transform.localScale;
 
             // Position below SideControlsFrame
             _paginationWorldH = 115f * paginationPixelToMeter; // RTTFilePagination default height
@@ -1226,8 +1218,8 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
         // Left = rotate forward -60° around Y axis (not full 90° — visible in peripheral vision)
         Vector3 leftDir = Quaternion.AngleAxis(-60f, Vector3.up) * camForward;
-        float distance = 2.5f;
-        float scaleFactor = distance / 2.0f; // 1.25x to maintain angular size
+        float distance = 2.0f;
+        float scaleFactor = 1.0f; // same distance as flat — no scaling needed
 
         Vector3 menuBtnPos = cam.transform.position + leftDir * distance;
         menuBtnPos.y = cam.transform.position.y; // eye height
@@ -1306,53 +1298,22 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
     }
 
     /// <summary>
-    /// Adjust side controls and pagination position based on current quad scaling.
-    /// X offset and pagination scale are derived from the ACTUAL DisplayQuad scale
-    /// (set by VRVideoPlayerController.RepositionControlsForProjection), so manual
-    /// popup projection changes that don't rescale quads won't cause jumps.
-    /// Y is always _sideControlsBaseY (no boost) for consistent positioning
-    /// across flat/immersive modes and popup/direct play transitions.
+    /// Reposition side controls and pagination to their base positions.
+    /// Since immersive and flat modes now use the same 2.0m distance with no
+    /// quad scaling, positions are constant (baseX, baseY) regardless of mode.
     /// </summary>
     private void PositionSideControlsForProjection(bool isImmersive)
     {
-        // Read actual quad scale factor from side controls DisplayQuad.
-        // RepositionControlsForProjection scales quads based on distance (1.25x at 2.5m).
-        // Manual popup changes do NOT rescale → factor stays at previous value → no jump.
-        float scale = 1f;
-        if (_sideControlsFrameObject != null && _sideControlsOrigQuadScaleX > 0)
-        {
-            var sideMenuFrame = _sideControlsFrameObject.GetComponent<RTTMenuFrame>();
-            if (sideMenuFrame != null)
-            {
-                var quad = sideMenuFrame.GetDisplayQuad();
-                if (quad != null)
-                    scale = quad.transform.localScale.x / _sideControlsOrigQuadScaleX;
-            }
-        }
-
-        float scaledX = _sideControlsBaseX * scale;
-
         if (_sideControlsFrameObject != null)
         {
-            _sideControlsFrameObject.transform.localPosition = new Vector3(scaledX, _sideControlsBaseY, 0);
+            _sideControlsFrameObject.transform.localPosition = new Vector3(
+                _sideControlsBaseX, _sideControlsBaseY, 0);
 
             if (_queuePagination != null)
             {
-                // Use scaled dimensions: queue quad visual extends further when scaled
-                float scaledSideH = _sidePhysicalH * scale;
-                float scaledPagH = _paginationWorldH * scale;
-                float pagY = _sideControlsBaseY - (scaledSideH / 2f) - _paginationGap - (scaledPagH / 2f);
-                _queuePagination.transform.localPosition = new Vector3(scaledX, pagY, 0);
-
-                // Scale pagination quad to match side controls quad scaling
-                var pagQuad = _queuePagination.GetDisplayQuad();
-                if (pagQuad != null && _paginationOrigQuadScale.sqrMagnitude > 0)
-                {
-                    pagQuad.transform.localScale = new Vector3(
-                        _paginationOrigQuadScale.x * scale,
-                        _paginationOrigQuadScale.y * scale,
-                        _paginationOrigQuadScale.z);
-                }
+                float pagY = _sideControlsBaseY - (_sidePhysicalH / 2f) - _paginationGap - (_paginationWorldH / 2f);
+                _queuePagination.transform.localPosition = new Vector3(
+                    _sideControlsBaseX, pagY, 0);
             }
         }
     }
