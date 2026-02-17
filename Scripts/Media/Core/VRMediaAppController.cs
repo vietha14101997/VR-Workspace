@@ -507,35 +507,18 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             ProjectionSystem.SetTargetPosition(_menuFramePosition, _menuFrameRotation);
         }
         
-        // Position controls below the video screen
-        // Container stays at local (0,0,0); children handle world positioning
+        // Position controls below the video screen (EXACT same as original)
         if (_controlsContainer != null && _menuFramePosition != Vector3.zero)
         {
-            // PlayerControlsGroup positioned in world space (below video screen)
             Vector3 controlsPos = _menuFramePosition + _menuFrameRotation * new Vector3(0, -0.625f, 0);
+            _controlsContainer.transform.position = controlsPos;
+            _controlsContainer.transform.rotation = Quaternion.identity;
+
+            // _playerControlsGroup stays at local zero; UI Settings offsets applied on top
             if (_playerControlsGroup != null)
             {
-                _playerControlsGroup.transform.position = controlsPos;
-                _playerControlsGroup.transform.rotation = Quaternion.identity;
-                _playerControlsBaseLocalPos = _playerControlsGroup.transform.localPosition;
-                // Reapply UI settings offsets on top of new base position
-                // (LoadSavedSettings may have run before base was set)
+                _playerControlsBaseLocalPos = Vector3.zero;
                 ApplyUISettingsToControlsGroup();
-            }
-
-            // UISettingsPopup: sibling of _playerControlsGroup in _controlsContainer
-            // Position at base controls pos + sideControlsBaseY offset (unaffected by UI depth/height/scale)
-            if (_uiSettingsPopupFrame != null && _uiSettingsPopupFrame.activeSelf)
-            {
-                _uiSettingsPopupFrame.transform.position = controlsPos + new Vector3(0, _sideControlsBaseY, 0);
-                Camera popupCam = Camera.main;
-                if (popupCam != null)
-                {
-                    Vector3 toCamera = popupCam.transform.position - _uiSettingsPopupFrame.transform.position;
-                    toCamera.y = 0;
-                    if (toCamera.sqrMagnitude > 0.001f)
-                        _uiSettingsPopupFrame.transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
-                }
             }
 
             // VideoControlsFrame faces the camera
@@ -2443,12 +2426,9 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             }
         }
 
-        // UISettingsPopup: sibling of _playerControlsGroup, positioned at base controls + sideY
-        // Unaffected by UI depth/height/scale adjustments
+        // UISettingsPopup: face-to-camera rotation only (position from localPosition in _controlsContainer)
         if (_uiSettingsPopupFrame != null && _uiSettingsPopupFrame.activeInHierarchy)
         {
-            Vector3 basePos = _menuFramePosition + _menuFrameRotation * new Vector3(0, -0.625f, 0);
-            _uiSettingsPopupFrame.transform.position = basePos + new Vector3(0, _sideControlsBaseY, 0);
             Vector3 toCamera = cam.transform.position - _uiSettingsPopupFrame.transform.position;
             toCamera.y = 0;
             if (toCamera.sqrMagnitude > 0.001f)
