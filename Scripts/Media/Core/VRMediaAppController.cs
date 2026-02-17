@@ -102,11 +102,13 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
     // Side controls panel (generic container beside controls)
     private GameObject _sideControlsFrameObject;
+    private GameObject _settingsFrameObject;
     private int _sideControlsSide = 1; // 1=right, -1=left
     private RTTMediaQueuePanel _queuePanel;
     private RTTMediaSettingsPanel _settingsPanel;
     private RTTMediaUISettingsPopup _uiSettingsPopup;
     private GameObject _uiSettingsPopupFrame;
+    private GameObject _uiSettingsBlocker;
     private GameObject _playerControlsGroup; // Sub-container for controls/side/overlay (UI Settings adjusts this, not _controlsContainer)
     private Vector3 _playerControlsBaseLocalPos; // Base local position after world positioning (before UI settings)
     private float _uiDepthOffset = 0f;  // Current UI depth slider value
@@ -119,6 +121,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
     private float _sideControlsBaseY;  // base Y from BuildPlayerUI (flat mode)
     private float _sidePhysicalW;      // side controls frame physical width (meters)
     private float _sidePhysicalH;      // side controls frame physical height (meters)
+    private float _settingsPhysicalW;  // settings frame physical width (meters)
     private float _paginationWorldH;   // pagination quad world height (meters)
     private float _paginationGap = 0.015f; // gap between side controls bottom and pagination top
 
@@ -903,21 +906,6 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             _queuePanel.Initialize(sideLogicalWidth, sideLogicalHeight, _font);
             _queuePanel.OnItemClicked += HandleQueueItemClicked;
             _queuePanel.OnShuffleClicked += HandleQueueShuffleClicked;
-
-            // Create settings panel inside side controls frame (sibling of QueuePanel)
-            GameObject settingsObj = new GameObject("SettingsPanel");
-            settingsObj.transform.SetParent(sideContainer, false);
-            var settingsRT = settingsObj.AddComponent<RectTransform>();
-            settingsRT.anchorMin = Vector2.zero;
-            settingsRT.anchorMax = Vector2.one;
-            settingsRT.offsetMin = Vector2.zero;
-            settingsRT.offsetMax = Vector2.zero;
-
-            _settingsPanel = settingsObj.AddComponent<RTTMediaSettingsPanel>();
-            _settingsPanel.Initialize(sideLogicalWidth, sideLogicalHeight, _font);
-            settingsObj.SetActive(false); // Start hidden (Queue visible by default)
-
-            WireSettingsPanelEvents();
         }
 
         // Position beside controls frame
@@ -932,6 +920,58 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
         _sideControlsFrameObject.SetActive(false);
 
+        // Pre-calculate pagination world height (needed for Settings frame sizing below)
+        float paginationPixelToMeter = 1.6f / 1920f;
+        _paginationWorldH = 115f * paginationPixelToMeter; // RTTFilePagination default height
+
+        // === 3b2. Settings Frame (own RTTMenuFrame, 1:1.5 ratio, spans Queue top to Pagination bottom) ===
+        {
+            float settingsTotalH = sidePhysicalH + _paginationGap + _paginationWorldH;
+            float settingsLogicalH = settingsTotalH * density;
+            float settingsLogicalW = settingsLogicalH / 1.5f;
+            float settingsPhysicalW = settingsLogicalW / density;
+            float settingsPhysicalH = settingsTotalH;
+            _settingsPhysicalW = settingsPhysicalW;
+
+            _settingsFrameObject = new GameObject("SettingsFrame");
+            _settingsFrameObject.transform.SetParent(_playerControlsGroup.transform, false);
+            _settingsFrameObject.layer = vLayer;
+
+            var settingsMenuFrame = _settingsFrameObject.AddComponent<RTTMenuFrame>();
+            settingsMenuFrame.Configure(settingsPhysicalW, settingsPhysicalH, settingsLogicalW);
+            settingsMenuFrame.SetGlassBackgroundEnabled(false);
+            settingsMenuFrame.SetFloatingDataEnabled(false);
+            settingsMenuFrame.SetContentMargins(0, 0, 0, 0);
+            settingsMenuFrame.ForceInitialize();
+
+            var settingsFrameQuad = settingsMenuFrame.GetDisplayQuad();
+            if (settingsFrameQuad?.material != null)
+                settingsFrameQuad.material.renderQueue = 3100;
+
+            var settingsContainer = settingsMenuFrame.ContentContainer;
+            if (settingsContainer != null)
+            {
+                GameObject settingsObj = new GameObject("SettingsPanel");
+                settingsObj.transform.SetParent(settingsContainer, false);
+                var settingsRT = settingsObj.AddComponent<RectTransform>();
+                settingsRT.anchorMin = Vector2.zero;
+                settingsRT.anchorMax = Vector2.one;
+                settingsRT.offsetMin = Vector2.zero;
+                settingsRT.offsetMax = Vector2.zero;
+
+                _settingsPanel = settingsObj.AddComponent<RTTMediaSettingsPanel>();
+                _settingsPanel.Initialize(settingsLogicalW, settingsLogicalH, _font);
+
+                WireSettingsPanelEvents();
+            }
+
+            float settingsX = (controlsPhysicalW / 2f + gapMeters + settingsPhysicalW / 2f) * _sideControlsSide;
+            float settingsY = _sideControlsBaseY - (_paginationGap + _paginationWorldH) / 2f;
+            _settingsFrameObject.transform.localPosition = new Vector3(settingsX, settingsY, 0);
+
+            _settingsFrameObject.SetActive(false);
+        }
+
         // === 3c. Queue Pagination (floating glass panel below SideControlsFrame) ===
         if (_queuePanel != null)
         {
@@ -942,7 +982,6 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             _queuePagination = paginationObj.AddComponent<RTTFilePagination>();
 
             // Pagination width = Queue width + 2 arrow buttons
-            float paginationPixelToMeter = 1.6f / 1920f;
             float queuePixelW = sidePhysicalW / paginationPixelToMeter; // Queue width in RTT pixels
             float btnSize = Mathf.Round(Mathf.Clamp(queuePixelW * 0.16f, 50f, 90f));
             float paginationFrameW = queuePixelW + 2f * btnSize;
@@ -963,7 +1002,6 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
                 paginationQuad.material.renderQueue = 3100;
 
             // Position below SideControlsFrame
-            _paginationWorldH = 115f * paginationPixelToMeter; // RTTFilePagination default height
             float paginationY = yOffset - (sidePhysicalH / 2f) - _paginationGap - (_paginationWorldH / 2f);
             paginationObj.transform.localPosition = new Vector3(xOffset, paginationY, 0);
 
@@ -1068,14 +1106,18 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         _controlsPanel.SetQueuePagination(_queuePagination);
         // Pass settings panel + queue panel references for toggle logic
         if (_settingsPanel != null && _queuePanel != null)
-            _controlsPanel.SetSettingsPanel(_settingsPanel, _queuePanel.gameObject);
+            _controlsPanel.SetSettingsPanel(_settingsPanel, _queuePanel.gameObject, _settingsFrameObject, _sideControlsFrameObject);
 
-        // Hide UI Settings popup when controls panel hides
+        // Hide UI Settings popup and blocker when controls panel hides
         _controlsPanel.OnVisibilityChanged += (visible) =>
         {
-            if (!visible && _uiSettingsPopup != null && _uiSettingsPopup.IsVisible)
+            if (!visible)
             {
-                _uiSettingsPopup.Hide();
+                if (_uiSettingsPopup != null && _uiSettingsPopup.IsVisible)
+                    _uiSettingsPopup.Hide();
+                _uiSettingsPopupFrame?.SetActive(false);
+                _uiSettingsBlocker?.SetActive(false);
+                _settingsPanel?.SetUISettingsRowForceHover(false);
             }
         };
 
@@ -1147,9 +1189,58 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         environmentPopup.Initialize(_font, _primaryColor, _accentColor, padding, bottomOffset, RTTMediaProjectionPopup.PopupMode.Environment);
         _playerController.SetEnvironmentPopup(environmentPopup);
 
-        // === 7. UI Settings Popup (beside SideControlsFrame, same Y level) ===
-        float uiPopupLogicalW = 1100f;
-        float uiPopupLogicalH = 990f; // 1:0.9 ratio
+        // === 7a. UI Settings Blocker (invisible overlay to block interaction with other UI) ===
+        _uiSettingsBlocker = new GameObject("UISettingsBlocker");
+        _uiSettingsBlocker.transform.SetParent(_controlsContainer.transform, false);
+        _uiSettingsBlocker.transform.localPosition = new Vector3(0, 0, 0.01f); // Slightly behind popup
+        _uiSettingsBlocker.layer = vLayer;
+
+        float blockerSize = 5f;
+        float blockerPixels = 64f;
+        var blockerFrame = _uiSettingsBlocker.AddComponent<RTTMenuFrame>();
+        blockerFrame.Configure(blockerSize, blockerSize, blockerPixels);
+        blockerFrame.SetGlassBackgroundEnabled(false);
+        blockerFrame.SetFloatingDataEnabled(false);
+        blockerFrame.SetContentMargins(0, 0, 0, 0);
+        blockerFrame.ForceInitialize();
+
+        var blockerQuad = blockerFrame.GetDisplayQuad();
+        if (blockerQuad?.material != null)
+            blockerQuad.material.renderQueue = 3150; // Between controls (3100) and popup (3200)
+
+        var blockerContainer = blockerFrame.ContentContainer;
+        if (blockerContainer != null)
+        {
+            GameObject blockerBtn = new GameObject("BlockerButton");
+            blockerBtn.transform.SetParent(blockerContainer, false);
+            var blockerBtnRT = blockerBtn.AddComponent<RectTransform>();
+            blockerBtnRT.anchorMin = Vector2.zero;
+            blockerBtnRT.anchorMax = Vector2.one;
+            blockerBtnRT.offsetMin = Vector2.zero;
+            blockerBtnRT.offsetMax = Vector2.zero;
+
+            var blockerImg = blockerBtn.AddComponent<Image>();
+            blockerImg.color = Color.clear;
+            blockerImg.raycastTarget = true;
+
+            var blockerButton = blockerBtn.AddComponent<Button>();
+            blockerButton.transition = Selectable.Transition.None;
+            blockerButton.onClick.AddListener(() =>
+            {
+                _uiSettingsPopupFrame?.SetActive(false);
+                _uiSettingsBlocker?.SetActive(false);
+                _settingsPanel?.SetUISettingsRowForceHover(false);
+            });
+
+            var blockerCol = blockerBtn.AddComponent<BoxCollider>();
+            blockerCol.size = new Vector3(blockerPixels, blockerPixels, 10);
+            blockerCol.center = new Vector3(0, 0, 5);
+        }
+        _uiSettingsBlocker.SetActive(false);
+
+        // === 7b. UI Settings Popup (beside SideControlsFrame, same Y level) ===
+        float uiPopupLogicalW = Mathf.Round(expandedWidth * 0.42f);
+        float uiPopupLogicalH = Mathf.Round(uiPopupLogicalW / 1.065f); // w:h = 1.065:1
         float uiPopupPhysW = uiPopupLogicalW / density;
         float uiPopupPhysH = uiPopupLogicalH / density;
 
@@ -1207,6 +1298,10 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
     private void HidePlayerUI()
     {
+        // Hide UI settings popup and blocker if open
+        _uiSettingsPopupFrame?.SetActive(false);
+        _uiSettingsBlocker?.SetActive(false);
+
         if (_controlsPanel != null)
         {
             _controlsPanel.gameObject.SetActive(false);
@@ -1487,7 +1582,10 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         if (_uiSettingsPopupFrame == null) return;
 
         bool isActive = _uiSettingsPopupFrame.activeSelf;
-        _uiSettingsPopupFrame.SetActive(!isActive);
+        bool showPopup = !isActive;
+        _uiSettingsPopupFrame.SetActive(showPopup);
+        _uiSettingsBlocker?.SetActive(showPopup);
+        _settingsPanel?.SetUISettingsRowForceHover(showPopup);
         Debug.Log("[VRMediaAppController] UI Settings popup toggled");
     }
 
@@ -1495,8 +1593,13 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
     {
         if (_uiSettingsPopup == null) return;
 
-        // Close button → hide the popup frame
-        _uiSettingsPopup.OnCloseRequested += () => _uiSettingsPopupFrame?.SetActive(false);
+        // Close button → hide the popup frame and blocker
+        _uiSettingsPopup.OnCloseRequested += () =>
+        {
+            _uiSettingsPopupFrame?.SetActive(false);
+            _uiSettingsBlocker?.SetActive(false);
+            _settingsPanel?.SetUISettingsRowForceHover(false);
+        };
 
         // Depth: slider 0-1, push player controls group back by Z
         _uiSettingsPopup.OnUIDepthChanged += (v) =>
@@ -1658,6 +1761,14 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
                 _sideControlsFrameObject.transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
         }
 
+        if (_settingsFrameObject != null)
+        {
+            Vector3 toCamera = cam.transform.position - _settingsFrameObject.transform.position;
+            toCamera.y = 0;
+            if (toCamera.sqrMagnitude > 0.001f)
+                _settingsFrameObject.transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
+        }
+
         if (_queuePagination != null)
         {
             Vector3 toCamera = cam.transform.position - _queuePagination.transform.position;
@@ -1685,6 +1796,15 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
                 _queuePagination.transform.localPosition = new Vector3(
                     _sideControlsBaseX, pagY, 0);
             }
+        }
+
+        if (_settingsFrameObject != null)
+        {
+            float controlsPhysicalW = (_containerWidth * 1.1f) / 1200f; // expandedWidth / density
+            float gapMeters = 0.02f;
+            float settingsX = (controlsPhysicalW / 2f + gapMeters + _settingsPhysicalW / 2f) * _sideControlsSide;
+            float settingsY = _sideControlsBaseY - (_paginationGap + _paginationWorldH) / 2f;
+            _settingsFrameObject.transform.localPosition = new Vector3(settingsX, settingsY, 0);
         }
     }
 
@@ -2415,6 +2535,17 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             }
         }
 
+        // Face-to-camera for SettingsFrame (separate RTTMenuFrame for settings panel)
+        if (_settingsFrameObject != null && _settingsFrameObject.activeInHierarchy)
+        {
+            Vector3 toCamera = cam.transform.position - _settingsFrameObject.transform.position;
+            toCamera.y = 0;
+            if (toCamera.sqrMagnitude > 0.001f)
+            {
+                _settingsFrameObject.transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
+            }
+        }
+
         // Face-to-camera for QueuePagination (uses own position for accurate facing)
         if (_queuePagination != null && _queuePagination.gameObject.activeInHierarchy)
         {
@@ -2433,6 +2564,15 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             toCamera.y = 0;
             if (toCamera.sqrMagnitude > 0.001f)
                 _uiSettingsPopupFrame.transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
+        }
+
+        // UISettingsBlocker: face-to-camera (same as popup)
+        if (_uiSettingsBlocker != null && _uiSettingsBlocker.activeInHierarchy)
+        {
+            Vector3 toCamera = cam.transform.position - _uiSettingsBlocker.transform.position;
+            toCamera.y = 0;
+            if (toCamera.sqrMagnitude > 0.001f)
+                _uiSettingsBlocker.transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
         }
 
         // Reset auto-hide when reticle is hovering the controls frame

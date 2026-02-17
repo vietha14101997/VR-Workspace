@@ -112,8 +112,10 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     // Settings panel toggle
     private RTTMediaSettingsPanel _settingsPanel;
     private GameObject _queuePanelObject;
+    private GameObject _settingsFrameObject;
     private bool _settingsActive = false;
     private Image _settingsButtonIconImage;
+    private Image _settingsButtonBgImage;
 
     // Volume persistence
     private const string PREF_VOLUME = "MediaPlayer_Volume";
@@ -324,6 +326,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         _settingsButton = CreateRoundIconButton(zoneA.transform, ICON_SETTINGS, HEADER_BUTTON_SIZE);
         var settingsIconObj = _settingsButton.transform.Find("IconImage");
         if (settingsIconObj != null) _settingsButtonIconImage = settingsIconObj.GetComponent<Image>();
+        _settingsButtonBgImage = _settingsButton.GetComponent<Image>();
         _settingsButton.onClick.AddListener(ToggleSettingsPanel);
     }
 
@@ -949,19 +952,37 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     /// <summary>
     /// Set references for settings panel toggle.
     /// </summary>
-    public void SetSettingsPanel(RTTMediaSettingsPanel settingsPanel, GameObject queuePanelObject)
+    public void SetSettingsPanel(RTTMediaSettingsPanel settingsPanel, GameObject queuePanelObject,
+        GameObject settingsFrameObject, GameObject sideControlsFrameObject)
     {
         _settingsPanel = settingsPanel;
         _queuePanelObject = queuePanelObject;
+        _settingsFrameObject = settingsFrameObject;
+        _sideControlsFrameObject = sideControlsFrameObject;
     }
 
     /// <summary>
-    /// Set settings button selected state (background color).
+    /// Set settings button selected state (icon color).
+    /// Updates ColorHoverEffect's original color so it doesn't reset on pointer exit.
     /// </summary>
     public void SetSettingsButtonSelected(bool selected)
     {
+        // Selected = same as hover color (THEME_COLOR blended with 15% white)
+        Color iconColor = selected ? new Color(
+            Mathf.Lerp(THEME_COLOR.r, 1f, 0.15f),
+            Mathf.Lerp(THEME_COLOR.g, 1f, 0.15f),
+            Mathf.Lerp(THEME_COLOR.b, 1f, 0.15f),
+            1f) : Color.white;
         if (_settingsButtonIconImage != null)
-            _settingsButtonIconImage.color = selected ? THEME_COLOR : Color.white;
+            _settingsButtonIconImage.color = iconColor;
+
+        // Update ColorHoverEffect's original color so pointer exit restores to correct color
+        var hoverCtrl = _settingsButton?.GetComponent<HoverEffectController>();
+        if (hoverCtrl != null)
+        {
+            var colorEffect = hoverCtrl.GetEffect("color") as ColorHoverEffect;
+            colorEffect?.SetOriginalColor(iconColor);
+        }
     }
 
     /// <summary>
@@ -974,20 +995,17 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
 
         if (_settingsActive)
         {
-            // Hide Queue, show Settings
-            if (_queuePanelObject != null) _queuePanelObject.SetActive(false);
-            if (_settingsPanel != null)
-            {
-                _settingsPanel.gameObject.SetActive(true);
-                _settingsPanel.NavigateToMainMenu();
-            }
+            // Hide Queue frame, show Settings frame
+            if (_sideControlsFrameObject != null) _sideControlsFrameObject.SetActive(false);
+            if (_settingsFrameObject != null) _settingsFrameObject.SetActive(true);
+            if (_settingsPanel != null) _settingsPanel.NavigateToMainMenu();
             if (_queuePagination != null) _queuePagination.HideImmediate();
         }
         else
         {
-            // Show Queue, hide Settings
-            if (_settingsPanel != null) _settingsPanel.gameObject.SetActive(false);
-            if (_queuePanelObject != null) _queuePanelObject.SetActive(true);
+            // Show Queue frame, hide Settings frame
+            if (_settingsFrameObject != null) _settingsFrameObject.SetActive(false);
+            if (_sideControlsFrameObject != null) _sideControlsFrameObject.SetActive(true);
             if (_queuePagination != null) _queuePagination.ShowImmediate();
         }
 
@@ -1105,14 +1123,14 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         // Restore correct side panel state (Queue or Settings)
         if (_settingsActive)
         {
-            if (_queuePanelObject != null) _queuePanelObject.SetActive(false);
-            if (_settingsPanel != null) _settingsPanel.gameObject.SetActive(true);
+            if (_sideControlsFrameObject != null) _sideControlsFrameObject.SetActive(false);
+            _settingsFrameObject?.SetActive(true);
             // Hide pagination when settings is active
         }
         else
         {
-            if (_queuePanelObject != null) _queuePanelObject.SetActive(true);
-            if (_settingsPanel != null) _settingsPanel.gameObject.SetActive(false);
+            _settingsFrameObject?.SetActive(false);
+            if (_sideControlsFrameObject != null) _sideControlsFrameObject.SetActive(true);
             if (_queuePagination != null) _queuePagination.ShowImmediate();
         }
 
@@ -1136,8 +1154,8 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         if (_menuButtonFrameObject != null) _menuButtonFrameObject.SetActive(true);
         if (_sideControlsFrameObject != null) _sideControlsFrameObject.SetActive(false);
         if (_queuePagination != null) _queuePagination.HideImmediate();
-        // Also hide settings panel when controls hide
-        if (_settingsPanel != null) _settingsPanel.gameObject.SetActive(false);
+        // Also hide settings frame when controls hide
+        _settingsFrameObject?.SetActive(false);
 
         OnVisibilityChanged?.Invoke(false);
     }

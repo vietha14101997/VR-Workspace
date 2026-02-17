@@ -171,6 +171,17 @@ namespace VRWorkspace.UI.HoverEffects
             return this;
         }
 
+        /// <summary>
+        /// Update the original (non-hovered) color at runtime.
+        /// If not currently hovered, also applies the color immediately.
+        /// </summary>
+        public void SetOriginalColor(Color color)
+        {
+            _originalColor = color;
+            if (_targetGraphic != null && _controller != null && !_controller.EffectiveHover)
+                _targetGraphic.color = color;
+        }
+
         #endregion
     }
 }

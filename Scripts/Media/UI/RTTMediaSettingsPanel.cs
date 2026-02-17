@@ -17,7 +17,8 @@ public class RTTMediaSettingsPanel : MonoBehaviour
     // Layout
     private const float HEADER_RATIO = 0.10f;
     private const float SIDE_MARGIN_RATIO = 0.055f;
-    private const float MENU_ITEM_HEIGHT_RATIO = 0.09f; // Each item = 9% of body height (7 items fit compactly)
+    private const float MENU_ITEM_HEIGHT_RATIO = 0.125f; // Each item = 12.5% of total height
+    private const float MENU_SPACING_RATIO = 0.025f; // Spacing = 2.5% of total height
 
     // Colors (matching RTTMediaQueuePanel)
     private static readonly Color ITEM_BG = new Color(0.14f, 0.14f, 0.16f, 0.6f);
@@ -54,6 +55,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
     private const string ICON_REFRESH = "icon_refresh";
     private const string ICON_3D = "icon_cube";
     private const string ICON_SWAP = "icon_shuffle";
+    private const string ICON_ARROW = "icon_arrow_right";
     #endregion
 
     #region Events - Picture Adjustments
@@ -140,6 +142,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
 
     // Menu items (for mode switching)
     private GameObject _screenSettingsMenuItem;
+    private GameObject _uiSettingsMenuItem;
 
     // Navigation
     private Stack<Page> _navStack = new Stack<Page>();
@@ -147,7 +150,9 @@ public class RTTMediaSettingsPanel : MonoBehaviour
 
     // Cached sprites
     private static Sprite _roundedRectSprite;
+    private static Sprite _topRoundedRectSprite;
     private static Sprite _circleSprite;
+    private float _menuSpacing;
 
     // Sub-page UI references - Video Adjustments
     private GameObject _videoAdjFlatContent;
@@ -208,7 +213,8 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         _headerHeight = Mathf.Round(_height * HEADER_RATIO);
         _bodyHeight = _height - _headerHeight;
         _sideMargin = Mathf.Round(_width * SIDE_MARGIN_RATIO);
-        _menuItemHeight = Mathf.Round(_bodyHeight * MENU_ITEM_HEIGHT_RATIO);
+        _menuItemHeight = Mathf.Round(_height * MENU_ITEM_HEIGHT_RATIO);
+        _menuSpacing = Mathf.Round(_height * MENU_SPACING_RATIO);
 
         BuildUI();
         NavigateToPage(Page.MainMenu);
@@ -233,6 +239,16 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         // If currently viewing screen settings in immersive mode, go back
         if (isImmersive && _currentPage == Page.ScreenSettings)
             NavigateBack();
+    }
+
+    /// <summary>
+    /// Set the "Open UI settings" row to forced hover state (when UI Settings popup is open).
+    /// </summary>
+    public void SetUISettingsRowForceHover(bool force)
+    {
+        if (_uiSettingsMenuItem == null) return;
+        var hoverCtrl = _uiSettingsMenuItem.GetComponent<HoverEffectController>();
+        hoverCtrl?.SetForceHover(force);
     }
 
     /// <summary>
@@ -383,8 +399,14 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         headerRT.anchorMin = new Vector2(0, 1);
         headerRT.anchorMax = new Vector2(1, 1);
         headerRT.pivot = new Vector2(0.5f, 1);
-        headerRT.offsetMin = new Vector2(_sideMargin, -_headerHeight);
-        headerRT.offsetMax = new Vector2(-_sideMargin, 0);
+        headerRT.offsetMin = new Vector2(0, -_headerHeight);
+        headerRT.offsetMax = new Vector2(0, 0);
+
+        var headerBg = headerObj.AddComponent<Image>();
+        headerBg.sprite = GetTopRoundedRectSprite();
+        headerBg.type = Image.Type.Sliced;
+        headerBg.color = new Color(0.12f, 0.12f, 0.14f, 0.90f);
+        headerBg.raycastTarget = false;
 
         var headerLayout = headerObj.AddComponent<HorizontalLayoutGroup>();
         headerLayout.childControlWidth = true;
@@ -406,7 +428,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         _titleText = titleObj.AddComponent<TextMeshProUGUI>();
         _titleText.font = _font;
         _titleText.text = "Settings";
-        _titleText.fontSize = 35;
+        _titleText.fontSize = 40;
         _titleText.color = TEXT_COLOR;
         _titleText.alignment = TextAlignmentOptions.Center;
         _titleText.fontStyle = FontStyles.Bold;
@@ -493,12 +515,12 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         // Use scrollable content for 7 items
         var scrollContent = CreateScrollableContent(_mainMenuContainer.transform);
 
-        // Override padding for menu items (tighter than sub-pages)
+        // Override padding for menu items
         var contentLayout = scrollContent.GetComponent<VerticalLayoutGroup>();
         if (contentLayout != null)
         {
-            contentLayout.spacing = 0;
-            contentLayout.padding = new RectOffset((int)_sideMargin, (int)_sideMargin, 5, 5);
+            contentLayout.spacing = (int)_menuSpacing;
+            contentLayout.padding = new RectOffset((int)_sideMargin, (int)_sideMargin, (int)_menuSpacing, 15);
         }
 
         // Menu items (order matches reference: Picture, Video, Passthrough, Screen, UI, Hotkeys, Player)
@@ -514,7 +536,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         _screenSettingsMenuItem = CreateMenuItem(scrollContent, ICON_SCREEN, "Screen settings",
             () => NavigateToPage(Page.ScreenSettings));
 
-        CreateMenuItem(scrollContent, ICON_UI, "Open UI settings",
+        _uiSettingsMenuItem = CreateMenuItem(scrollContent, ICON_UI, "Open UI settings",
             () => OnUISettingsRequested?.Invoke());
 
         CreateMenuItem(scrollContent, ICON_HOTKEYS, "Hotkeys settings",
@@ -533,9 +555,11 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         itemLE.minHeight = _menuItemHeight;
         itemLE.preferredHeight = _menuItemHeight;
 
-        // Background (transparent, for hover)
+        // Background (opaque gray, for hover)
         var bgImage = itemObj.AddComponent<Image>();
-        bgImage.color = Color.clear;
+        bgImage.color = new Color(0.18f, 0.18f, 0.20f, 0.85f);
+        bgImage.sprite = GetRoundedRectSprite();
+        bgImage.type = Image.Type.Sliced;
         bgImage.raycastTarget = true;
 
         var button = itemObj.AddComponent<Button>();
@@ -545,7 +569,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
 
         var itemLayout = itemObj.AddComponent<HorizontalLayoutGroup>();
         itemLayout.spacing = 15f;
-        itemLayout.padding = new RectOffset(10, 10, 0, 0);
+        itemLayout.padding = new RectOffset(25, 20, 0, 0);
         itemLayout.childAlignment = TextAnchor.MiddleLeft;
         itemLayout.childControlWidth = true;
         itemLayout.childControlHeight = false;
@@ -585,21 +609,22 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         labelText.alignment = TextAlignmentOptions.MidlineLeft;
         labelText.raycastTarget = false;
 
-        // Chevron ">"
-        GameObject chevronObj = new GameObject("Chevron");
-        chevronObj.transform.SetParent(itemObj.transform, false);
+        // Arrow icon
+        float arrowSize = Mathf.Round(_menuItemHeight * 0.20f);
+        GameObject arrowObj = new GameObject("Arrow");
+        arrowObj.transform.SetParent(itemObj.transform, false);
 
-        var chevronLE = chevronObj.AddComponent<LayoutElement>();
-        chevronLE.minWidth = 30;
-        chevronLE.minHeight = _menuItemHeight;
+        var arrowLE = arrowObj.AddComponent<LayoutElement>();
+        arrowLE.minWidth = arrowSize;
+        arrowLE.minHeight = arrowSize;
+        arrowLE.preferredWidth = arrowSize;
+        arrowLE.preferredHeight = arrowSize;
 
-        var chevronText = chevronObj.AddComponent<TextMeshProUGUI>();
-        chevronText.font = _font;
-        chevronText.text = ">";
-        chevronText.fontSize = 30;
-        chevronText.color = CHEVRON_COLOR;
-        chevronText.alignment = TextAlignmentOptions.MidlineRight;
-        chevronText.raycastTarget = false;
+        var arrowImage = arrowObj.AddComponent<Image>();
+        arrowImage.sprite = Resources.Load<Sprite>(ICON_ARROW);
+        arrowImage.color = Color.white;
+        arrowImage.preserveAspect = true;
+        arrowImage.raycastTarget = false;
 
         // Hover effects
         var hoverController = itemObj.AddComponent<HoverEffectController>();
@@ -1607,7 +1632,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         if (_roundedRectSprite != null) return _roundedRectSprite;
 
         int texW = 64, texH = 64;
-        int radius = 12;
+        int radius = 16;
         var tex = new Texture2D(texW, texH, TextureFormat.RGBA32, false);
 
         for (int y = 0; y < texH; y++)
@@ -1645,6 +1670,52 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         _roundedRectSprite = Sprite.Create(tex, new Rect(0, 0, texW, texH),
             Vector2.one * 0.5f, 100f, 0, SpriteMeshType.FullRect, border);
         return _roundedRectSprite;
+    }
+
+    /// <summary>
+    /// Rounded rect with only top-left and top-right corners rounded (bottom corners sharp).
+    /// </summary>
+    private static Sprite GetTopRoundedRectSprite()
+    {
+        if (_topRoundedRectSprite != null) return _topRoundedRectSprite;
+
+        int texW = 64, texH = 64;
+        int radius = 12;
+        var tex = new Texture2D(texW, texH, TextureFormat.RGBA32, false);
+
+        for (int y = 0; y < texH; y++)
+        {
+            for (int x = 0; x < texW; x++)
+            {
+                float alpha = 1f;
+                Vector2 corner = Vector2.zero;
+                bool isCorner = false;
+
+                // Only top corners are rounded (top = high y in texture)
+                if (x < radius && y >= texH - radius)
+                { corner = new Vector2(radius, texH - radius - 1); isCorner = true; }
+                else if (x >= texW - radius && y >= texH - radius)
+                { corner = new Vector2(texW - radius - 1, texH - radius - 1); isCorner = true; }
+
+                if (isCorner)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), corner);
+                    alpha = Mathf.Clamp01(radius - dist + 0.5f);
+                }
+
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+            }
+        }
+
+        tex.Apply();
+        tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
+
+        // Border: top corners have radius, bottom corners have 1 (sharp)
+        Vector4 border = new Vector4(radius + 1, 1, radius + 1, radius + 1);
+        _topRoundedRectSprite = Sprite.Create(tex, new Rect(0, 0, texW, texH),
+            Vector2.one * 0.5f, 100f, 0, SpriteMeshType.FullRect, border);
+        return _topRoundedRectSprite;
     }
     #endregion
 }

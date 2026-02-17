@@ -26,7 +26,7 @@ public class RTTMediaUISettingsPopup : MonoBehaviour
 
     private const float SLIDER_ROW_HEIGHT = 75f;
     private const float VALUES_TEXT_HEIGHT = 40f;
-    private const float RESET_BTN_HEIGHT = 55f;
+    private const float RESET_BTN_HEIGHT = 83f; // 55 * 1.25 * 1.2
     #endregion
 
     #region Events
@@ -52,6 +52,9 @@ public class RTTMediaUISettingsPopup : MonoBehaviour
     private float _currentScale = DEFAULT_SCALE;
 
     private static Sprite _roundedRectSprite;
+    private static Sprite _topRoundedRectSprite;
+    private static Sprite _pillSprite;
+    private static Sprite _bottomRoundedRectSprite;
     #endregion
 
     #region Public API
@@ -116,10 +119,10 @@ public class RTTMediaUISettingsPopup : MonoBehaviour
         headerLE.preferredHeight = height;
 
         var bg = headerObj.AddComponent<Image>();
+        bg.sprite = GetTopRoundedRectSprite();
+        bg.type = Image.Type.Sliced;
         bg.color = HEADER_BG;
 
-        // Use RectTransform-based children (not HLG) for header content
-        // so we have full control over positioning
         // Title centered
         GameObject titleObj = new GameObject("Title");
         titleObj.transform.SetParent(headerObj.transform, false);
@@ -132,14 +135,14 @@ public class RTTMediaUISettingsPopup : MonoBehaviour
         var titleText = titleObj.AddComponent<TextMeshProUGUI>();
         titleText.font = _font;
         titleText.text = "UI settings";
-        titleText.fontSize = 32;
+        titleText.fontSize = 40;
         titleText.fontStyle = FontStyles.Bold;
         titleText.color = TEXT_COLOR;
         titleText.alignment = TextAlignmentOptions.Center;
         titleText.raycastTarget = false;
 
-        // Close button (top-right)
-        float closeBtnSize = height * 0.55f;
+        // Close button (top-right, 25% smaller)
+        float closeBtnSize = height * 0.4125f;
         GameObject closeObj = new GameObject("CloseBtn");
         closeObj.transform.SetParent(headerObj.transform, false);
         var closeRT = closeObj.AddComponent<RectTransform>();
@@ -147,7 +150,7 @@ public class RTTMediaUISettingsPopup : MonoBehaviour
         closeRT.anchorMax = new Vector2(1, 0.5f);
         closeRT.pivot = new Vector2(1, 0.5f);
         closeRT.sizeDelta = new Vector2(closeBtnSize, closeBtnSize);
-        closeRT.anchoredPosition = new Vector2(-20, 0);
+        closeRT.anchoredPosition = new Vector2(-25, 0);
 
         var closeBg = closeObj.AddComponent<Image>();
         closeBg.color = Color.clear;
@@ -194,12 +197,14 @@ public class RTTMediaUISettingsPopup : MonoBehaviour
         bodyLE.flexibleHeight = 1f;
 
         var bg = bodyObj.AddComponent<Image>();
+        bg.sprite = GetBottomRoundedRectSprite();
+        bg.type = Image.Type.Sliced;
         bg.color = BODY_BG;
 
         // Flat layout: sliders → flexible spacer → details
         // childControlHeight=true so VLG actually sizes children
         var layout = bodyObj.AddComponent<VerticalLayoutGroup>();
-        layout.padding = new RectOffset(25, 25, 30, 20);
+        layout.padding = new RectOffset(25, 25, 30, 40);
         layout.spacing = 20;
         layout.childControlHeight = true;
         layout.childForceExpandHeight = false;
@@ -216,8 +221,8 @@ public class RTTMediaUISettingsPopup : MonoBehaviour
         _heightSlider = CreateSliderRow(bodyObj.transform, "Height", sliderAreaW, 0f, 1.0f, DEFAULT_HEIGHT,
             (v) => { _currentHeight = v; OnUIHeightChanged?.Invoke(v); UpdateValuesText(); });
 
-        // Scale slider (0.2 - 1.0, default 0.5)
-        _scaleSlider = CreateSliderRow(bodyObj.transform, "Scale", sliderAreaW, 0.2f, 1.0f, DEFAULT_SCALE,
+        // Scale slider (0 - 1.0, default 0.5)
+        _scaleSlider = CreateSliderRow(bodyObj.transform, "Scale", sliderAreaW, 0f, 1.0f, DEFAULT_SCALE,
             (v) => { _currentScale = v; OnUIScaleChanged?.Invoke(v); UpdateValuesText(); });
 
         // Flexible spacer pushes details to bottom
@@ -234,11 +239,18 @@ public class RTTMediaUISettingsPopup : MonoBehaviour
 
         _valuesText = valuesObj.AddComponent<TextMeshProUGUI>();
         _valuesText.font = _font;
-        _valuesText.fontSize = 24;
-        _valuesText.color = DETAIL_COLOR;
+        _valuesText.fontSize = 32;
+        _valuesText.color = Color.white;
+        _valuesText.fontStyle = FontStyles.Bold;
         _valuesText.alignment = TextAlignmentOptions.Center;
         _valuesText.raycastTarget = false;
         UpdateValuesText();
+
+        // Spacer between values text and reset button
+        GameObject btnSpacer = new GameObject("BtnSpacer");
+        btnSpacer.transform.SetParent(bodyObj.transform, false);
+        var btnSpacerLE = btnSpacer.AddComponent<LayoutElement>();
+        btnSpacerLE.preferredHeight = 0f;
 
         // Reset to defaults button
         CreateResetToDefaultsButton(bodyObj.transform);
@@ -349,14 +361,23 @@ public class RTTMediaUISettingsPopup : MonoBehaviour
 
     private void CreateResetToDefaultsButton(Transform parent)
     {
-        GameObject btnObj = new GameObject("ResetDefaultsBtn");
-        btnObj.transform.SetParent(parent, false);
+        // Wrapper takes full VLG width; button inside is 90% width centered
+        GameObject wrapperObj = new GameObject("ResetBtnWrapper");
+        wrapperObj.transform.SetParent(parent, false);
+        var wrapperLE = wrapperObj.AddComponent<LayoutElement>();
+        wrapperLE.preferredHeight = RESET_BTN_HEIGHT;
 
-        var btnLE = btnObj.AddComponent<LayoutElement>();
-        btnLE.preferredHeight = RESET_BTN_HEIGHT;
+        float btnWidth = _width * 0.9f;
+        GameObject btnObj = new GameObject("ResetDefaultsBtn");
+        btnObj.transform.SetParent(wrapperObj.transform, false);
+        var btnRT = btnObj.AddComponent<RectTransform>();
+        btnRT.anchorMin = new Vector2(0.5f, 0f);
+        btnRT.anchorMax = new Vector2(0.5f, 1f);
+        btnRT.pivot = new Vector2(0.5f, 0.5f);
+        btnRT.sizeDelta = new Vector2(btnWidth, 0f);
 
         var bgImage = btnObj.AddComponent<Image>();
-        bgImage.sprite = GetRoundedRectSprite();
+        bgImage.sprite = GetPillSprite();
         bgImage.type = Image.Type.Sliced;
         bgImage.color = RESET_BTN_BG;
 
@@ -386,7 +407,8 @@ public class RTTMediaUISettingsPopup : MonoBehaviour
         var tmp = textObj.AddComponent<TextMeshProUGUI>();
         tmp.font = _font;
         tmp.text = "Reset to defaults";
-        tmp.fontSize = 24;
+        tmp.fontSize = 30;
+        tmp.fontStyle = FontStyles.Bold;
         tmp.color = TEXT_COLOR;
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.raycastTarget = false;
@@ -398,7 +420,7 @@ public class RTTMediaUISettingsPopup : MonoBehaviour
             .WithHoverColor(RESET_BTN_HOVER));
 
         var col = btnObj.AddComponent<BoxCollider>();
-        col.size = new Vector3(_width - 60f, RESET_BTN_HEIGHT, 10);
+        col.size = new Vector3(btnWidth, RESET_BTN_HEIGHT, 10);
         col.center = new Vector3(0, 0, -5);
     }
     #endregion
@@ -453,6 +475,141 @@ public class RTTMediaUISettingsPopup : MonoBehaviour
         _roundedRectSprite = Sprite.Create(tex, new Rect(0, 0, size, size),
             Vector2.one * 0.5f, 100f, 0, SpriteMeshType.FullRect, border);
         return _roundedRectSprite;
+    }
+
+    private static Sprite GetTopRoundedRectSprite()
+    {
+        if (_topRoundedRectSprite != null) return _topRoundedRectSprite;
+
+        int texW = 64, texH = 64;
+        int radius = 12;
+        var tex = new Texture2D(texW, texH, TextureFormat.RGBA32, false);
+
+        for (int y = 0; y < texH; y++)
+        {
+            for (int x = 0; x < texW; x++)
+            {
+                float alpha = 1f;
+                Vector2 corner = Vector2.zero;
+                bool isCorner = false;
+
+                if (x < radius && y >= texH - radius)
+                { corner = new Vector2(radius, texH - radius - 1); isCorner = true; }
+                else if (x >= texW - radius && y >= texH - radius)
+                { corner = new Vector2(texW - radius - 1, texH - radius - 1); isCorner = true; }
+
+                if (isCorner)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), corner);
+                    alpha = Mathf.Clamp01(radius - dist + 0.5f);
+                }
+
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+            }
+        }
+
+        tex.Apply();
+        tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
+
+        Vector4 border = new Vector4(radius + 1, 1, radius + 1, radius + 1);
+        _topRoundedRectSprite = Sprite.Create(tex, new Rect(0, 0, texW, texH),
+            Vector2.one * 0.5f, 100f, 0, SpriteMeshType.FullRect, border);
+        return _topRoundedRectSprite;
+    }
+
+    /// <summary>
+    /// Rounded rect with only bottom-left and bottom-right corners rounded.
+    /// </summary>
+    private static Sprite GetBottomRoundedRectSprite()
+    {
+        if (_bottomRoundedRectSprite != null) return _bottomRoundedRectSprite;
+
+        int texW = 64, texH = 64;
+        int radius = 12;
+        var tex = new Texture2D(texW, texH, TextureFormat.RGBA32, false);
+
+        for (int y = 0; y < texH; y++)
+        {
+            for (int x = 0; x < texW; x++)
+            {
+                float alpha = 1f;
+                Vector2 corner = Vector2.zero;
+                bool isCorner = false;
+
+                // Only bottom corners are rounded (bottom = low y in texture)
+                if (x < radius && y < radius)
+                { corner = new Vector2(radius, radius); isCorner = true; }
+                else if (x >= texW - radius && y < radius)
+                { corner = new Vector2(texW - radius - 1, radius); isCorner = true; }
+
+                if (isCorner)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), corner);
+                    alpha = Mathf.Clamp01(radius - dist + 0.5f);
+                }
+
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+            }
+        }
+
+        tex.Apply();
+        tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
+
+        // Border: bottom corners have radius, top corners have 1 (sharp)
+        Vector4 border = new Vector4(radius + 1, radius + 1, radius + 1, 1);
+        _bottomRoundedRectSprite = Sprite.Create(tex, new Rect(0, 0, texW, texH),
+            Vector2.one * 0.5f, 100f, 0, SpriteMeshType.FullRect, border);
+        return _bottomRoundedRectSprite;
+    }
+
+    /// <summary>
+    /// Pill-shaped sprite (very large radius so short sides become semicircles).
+    /// </summary>
+    private static Sprite GetPillSprite()
+    {
+        if (_pillSprite != null) return _pillSprite;
+
+        int texW = 64, texH = 64;
+        int radius = 31; // Almost half = pill shape
+        var tex = new Texture2D(texW, texH, TextureFormat.RGBA32, false);
+
+        for (int y = 0; y < texH; y++)
+        {
+            for (int x = 0; x < texW; x++)
+            {
+                float alpha = 1f;
+                Vector2 corner = Vector2.zero;
+                bool isCorner = false;
+
+                if (x < radius && y < radius)
+                { corner = new Vector2(radius, radius); isCorner = true; }
+                else if (x >= texW - radius && y < radius)
+                { corner = new Vector2(texW - radius - 1, radius); isCorner = true; }
+                else if (x < radius && y >= texH - radius)
+                { corner = new Vector2(radius, texH - radius - 1); isCorner = true; }
+                else if (x >= texW - radius && y >= texH - radius)
+                { corner = new Vector2(texW - radius - 1, texH - radius - 1); isCorner = true; }
+
+                if (isCorner)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), corner);
+                    alpha = Mathf.Clamp01(radius - dist + 0.5f);
+                }
+
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+            }
+        }
+
+        tex.Apply();
+        tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
+
+        Vector4 border = new Vector4(radius + 1, radius + 1, radius + 1, radius + 1);
+        _pillSprite = Sprite.Create(tex, new Rect(0, 0, texW, texH),
+            Vector2.one * 0.5f, 100f, 0, SpriteMeshType.FullRect, border);
+        return _pillSprite;
     }
     #endregion
 }
