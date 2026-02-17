@@ -18,6 +18,13 @@ Shader "VRWorkspace/Media/VideoImmersive"
         _StereoMode ("Stereo Mode", Float) = 0  // 0=Mono, 1=SBS, 2=OU
         _EyeIndex ("Eye Index", Float) = 0      // 0=Left, 1=Right (editor fallback)
         _StereoStrength ("Stereo Strength", Range(0, 1)) = 1  // 1=full 3D, 0=mono (both eyes see left)
+        _LRInverse ("LR Inverse", Float) = 0  // 1=swap left/right eye
+
+        [Header(Adjustments)]
+        _Tint ("Tint", Range(-1, 1)) = 0
+        _Temperature ("Temperature", Range(-1, 1)) = 0
+        _VerticalShift ("Vertical Shift", Range(-1, 1)) = 0
+        _HorizontalShift ("Horizontal Shift", Range(-1, 1)) = 0
 
         [Header(NV12 Support)]
         _UseNV12 ("Use NV12", Float) = 0
@@ -63,6 +70,12 @@ Shader "VRWorkspace/Media/VideoImmersive"
             float _StereoMode;
             float _EyeIndex;
             float _StereoStrength;
+            float _LRInverse;
+
+            float _Tint;
+            float _Temperature;
+            float _VerticalShift;
+            float _HorizontalShift;
 
             float4 _CameraForward;  // Set from C# each frame (camera look direction)
 
@@ -122,6 +135,17 @@ Shader "VRWorkspace/Media/VideoImmersive"
                 color = (color - 0.5) * contrast + 0.5;
                 float luma = dot(color, float3(0.299, 0.587, 0.114));
                 color = lerp(float3(luma, luma, luma), color, saturation);
+                return saturate(color);
+            }
+
+            // ===== Helper: Tint & Temperature =====
+            float3 ApplyTintTemperature(float3 color, float tint, float temperature)
+            {
+                // Temperature: warm (positive) = +red -blue, cool (negative) = -red +blue
+                color.r += temperature * 0.1;
+                color.b -= temperature * 0.1;
+                // Tint: positive = +green, negative = +magenta
+                color.g += tint * 0.1;
                 return saturate(color);
             }
 
@@ -270,9 +294,15 @@ Shader "VRWorkspace/Media/VideoImmersive"
                     equirectUV.y = theta / 3.14159265 + 0.5;
                 }
 
+                // Apply vertical and horizontal shifts to UV
+                equirectUV.x += _HorizontalShift * 0.25;
+                equirectUV.y += _VerticalShift * 0.25;
+
                 // Apply stereo eye offset with strength control
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
                 float eye = unity_StereoEyeIndex * _StereoStrength;
+                // LR Inverse: swap left/right eye
+                if (_LRInverse > 0.5) eye = 1.0 - eye;
                 float2 stereoUV = GetStereoUV(equirectUV, _StereoMode, eye);
 
                 // Sample video texture
@@ -290,6 +320,9 @@ Shader "VRWorkspace/Media/VideoImmersive"
 
                 // Apply color correction
                 color = ColorCorrect(color, _Brightness, _Contrast, _Saturation);
+
+                // Apply tint and temperature
+                color = ApplyTintTemperature(color, _Tint, _Temperature);
 
                 // Apply 180 back-hemisphere fade
                 color *= alpha;

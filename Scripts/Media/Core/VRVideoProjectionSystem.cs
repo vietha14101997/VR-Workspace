@@ -293,6 +293,47 @@ public class VRVideoProjectionSystem : MonoBehaviour
     }
 
     /// <summary>
+    /// Get the immersive sphere renderer (if active or available).
+    /// </summary>
+    public ImmersiveSphereRenderer GetImmersiveRenderer()
+    {
+        if (ActiveRenderer is ImmersiveSphereRenderer immersive)
+            return immersive;
+
+        // Try to find from renderers dictionary
+        if (_renderers != null)
+        {
+            foreach (var r in _renderers.Values)
+            {
+                if (r is ImmersiveSphereRenderer imm)
+                    return imm;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Set vertical offset for flat screen position.
+    /// </summary>
+    public void SetVerticalOffset(float meters)
+    {
+        _currentSettings.PositionOffset = new Vector3(
+            _currentSettings.PositionOffset.x,
+            meters,
+            _currentSettings.PositionOffset.z);
+        ActiveRenderer?.UpdateDisplay(_currentSettings);
+    }
+
+    /// <summary>
+    /// Set aspect ratio override for flat projection.
+    /// </summary>
+    public void SetAspectRatioOverride(string ratio)
+    {
+        if (ActiveRenderer is FlatProjectionRenderer flat)
+            flat.SetAspectRatioOverride(ratio);
+    }
+
+    /// <summary>
     /// Recenter the view.
     /// </summary>
     public void RecenterView()
@@ -409,20 +450,24 @@ public class VRVideoProjectionSystem : MonoBehaviour
     #region Unity Lifecycle
     private void LateUpdate()
     {
-        if (_projectionRoot == null || _cameraRig == null) return;
+        if (_projectionRoot == null) return;
+
+        // Use Camera.main for consistent face-to-camera with controls UI
+        Camera cam = Camera.main;
+        if (cam == null) return;
 
         if (IsImmersiveProjection())
         {
             // Immersive projections (360/dome) surround the viewer — follow camera position
             // Rotation must stay identity: shader uses object-space directions for UV mapping,
             // so any parent rotation would misalign the projection center.
-            _projectionRoot.position = _cameraRig.position;
+            _projectionRoot.position = cam.transform.position;
             _projectionRoot.rotation = Quaternion.identity;
         }
         else if (IsVisible)
         {
             // Flat projection: face-to-camera rotation (same as MenuFrame/ClusterRig panels)
-            Vector3 toCamera = _cameraRig.position - _projectionRoot.position;
+            Vector3 toCamera = cam.transform.position - _projectionRoot.position;
             if (toCamera.sqrMagnitude > 0.001f)
             {
                 _projectionRoot.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);

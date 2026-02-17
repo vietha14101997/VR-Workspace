@@ -24,6 +24,15 @@ Shader "Unlit/WorldPanelBoard"
         // Edge mask for cluster panels (Left, Right, Top, Bottom): 1=show corner, 0=no corner
         _EdgeMask ("Edge Mask (L,R,T,B)", Vector) = (1,1,1,1)
 
+        // Video picture adjustments (for Media Player)
+        [Header(Picture Adjustments)]
+        _Brightness ("Brightness", Range(0, 2)) = 1
+        _Contrast ("Contrast", Range(0, 2)) = 1
+        _Saturation ("Saturation", Range(0, 2)) = 1
+        _Tint ("Tint", Range(-1, 1)) = 0
+        _Temperature ("Temperature", Range(-1, 1)) = 0
+        _LRInverse ("LR Inverse", Float) = 0
+
         // Video streaming quality enhancement
         // NOTE: Sharpening disabled by default - can cause artifacts on some devices
         [Header(Streaming Quality)]
@@ -61,6 +70,14 @@ Shader "Unlit/WorldPanelBoard"
             float4    _MainTex_ST;
             float4    _MainTex_TexelSize; // (1/width, 1/height, width, height)
             float4    _Color;
+
+            // Picture adjustments
+            float _Brightness;
+            float _Contrast;
+            float _Saturation;
+            float _Tint;
+            float _Temperature;
+            float _LRInverse;
 
             // Sharpening parameters
             float _Sharpness;
@@ -226,6 +243,25 @@ Shader "Unlit/WorldPanelBoard"
                 return saturate(sharpened);
             }
 
+            // Color correction for video playback
+            float3 VideoColorCorrect(float3 color, float brightness, float contrast, float saturation)
+            {
+                color *= brightness;
+                color = (color - 0.5) * contrast + 0.5;
+                float luma = dot(color, float3(0.299, 0.587, 0.114));
+                color = lerp(float3(luma, luma, luma), color, saturation);
+                return saturate(color);
+            }
+
+            // Tint and temperature adjustment
+            float3 ApplyTintTemperature(float3 color, float tint, float temperature)
+            {
+                color.r += temperature * 0.1;
+                color.b -= temperature * 0.1;
+                color.g += tint * 0.1;
+                return saturate(color);
+            }
+
             // Chroma correction to reduce YUV 4:2:0 color bleeding on text edges
             float4 ChromaCorrect(float4 color, float chromaSharpness)
             {
@@ -285,6 +321,8 @@ Shader "Unlit/WorldPanelBoard"
                 // Apply Stereo UV before sampling
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
                 float eye = unity_StereoEyeIndex * _StereoStrength;
+                // LR Inverse: swap left/right eye
+                if (_LRInverse > 0.5) eye = 1.0 - eye;
                 float2 stereoUV = GetStereoUV(i.uv, _StereoMode, eye);
 
                 // Uses tex2Dbias with _MipMapBias for sharper VR viewing at distance
@@ -301,6 +339,10 @@ Shader "Unlit/WorldPanelBoard"
                 {
                     col = tex2Dbias(_MainTex, float4(stereoUV, 0, _MipMapBias));
                 }
+                // Apply video picture adjustments (only effective when values differ from defaults)
+                col.rgb = VideoColorCorrect(col.rgb, _Brightness, _Contrast, _Saturation);
+                col.rgb = ApplyTintTemperature(col.rgb, _Tint, _Temperature);
+
                 col *= _Color;
 
                 // ---- Edge fade cũ (mờ dần về mép) ----

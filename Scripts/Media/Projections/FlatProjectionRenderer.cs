@@ -269,6 +269,35 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
         _worldPanel.Apply();
     }
 
+    /// <summary>
+    /// Set a shader float property on the board material (WorldPanelBoard shader).
+    /// </summary>
+    public void SetBoardShaderFloat(string property, float value)
+    {
+        if (_worldPanel == null || _worldPanel.board == null) return;
+        var rend = _worldPanel.board.GetComponent<Renderer>();
+        if (rend != null && rend.material.HasProperty(property))
+            rend.material.SetFloat(property, value);
+    }
+
+    /// <summary>
+    /// Set aspect ratio override. Pass "default" to use video native aspect.
+    /// </summary>
+    private float _aspectRatioOverride = 0f;
+
+    public void SetAspectRatioOverride(string ratio)
+    {
+        switch (ratio)
+        {
+            case "4:3": _aspectRatioOverride = 4f / 3f; break;
+            case "3:2": _aspectRatioOverride = 3f / 2f; break;
+            case "16:9": _aspectRatioOverride = 16f / 9f; break;
+            case "2:1": _aspectRatioOverride = 2f / 1f; break;
+            default: _aspectRatioOverride = 0f; break; // "default" = use native
+        }
+        UpdateScreenAspect();
+    }
+
     public void RecenterView()
     {
         if (Camera.main != null)
@@ -364,6 +393,10 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
         }
 
         float aspect = resY > 0 ? resX / resY : 16f / 9f;
+
+        // Apply aspect ratio override if set
+        if (_aspectRatioOverride > 0f)
+            aspect = _aspectRatioOverride;
 
         // Base height of 1 meter, adjust width by aspect ratio
         float baseHeight = 1.0f * _currentSettings.Scale;

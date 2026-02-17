@@ -66,6 +66,8 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     public event Action OnEnvironmentClicked;
     /// <summary>Fired when controls panel visibility changes. Parameter: true=visible, false=hidden.</summary>
     public event Action<bool> OnVisibilityChanged;
+    /// <summary>Fired when settings button is clicked.</summary>
+    public event Action OnSettingsClicked;
     #endregion
 
     #region Properties
@@ -106,6 +108,12 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     private GameObject _sideControlsFrameObject;
     private RTTFilePagination _queuePagination;
     private BoxCollider _parentFrameCollider; // Cached collider of parent RTT frame's display quad
+
+    // Settings panel toggle
+    private RTTMediaSettingsPanel _settingsPanel;
+    private GameObject _queuePanelObject;
+    private bool _settingsActive = false;
+    private Image _settingsButtonIconImage;
 
     // Volume persistence
     private const string PREF_VOLUME = "MediaPlayer_Volume";
@@ -314,7 +322,9 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
 
         // Button 5: Settings (Right)
         _settingsButton = CreateRoundIconButton(zoneA.transform, ICON_SETTINGS, HEADER_BUTTON_SIZE);
-        // User requested button to be present but no function on click
+        var settingsIconObj = _settingsButton.transform.Find("IconImage");
+        if (settingsIconObj != null) _settingsButtonIconImage = settingsIconObj.GetComponent<Image>();
+        _settingsButton.onClick.AddListener(ToggleSettingsPanel);
     }
 
     /// <summary>
@@ -936,6 +946,54 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         ResetAutoHideTimer();
     }
 
+    /// <summary>
+    /// Set references for settings panel toggle.
+    /// </summary>
+    public void SetSettingsPanel(RTTMediaSettingsPanel settingsPanel, GameObject queuePanelObject)
+    {
+        _settingsPanel = settingsPanel;
+        _queuePanelObject = queuePanelObject;
+    }
+
+    /// <summary>
+    /// Set settings button selected state (background color).
+    /// </summary>
+    public void SetSettingsButtonSelected(bool selected)
+    {
+        if (_settingsButtonIconImage != null)
+            _settingsButtonIconImage.color = selected ? THEME_COLOR : Color.white;
+    }
+
+    /// <summary>
+    /// Toggle settings panel visibility. Hides queue when showing settings and vice versa.
+    /// </summary>
+    private void ToggleSettingsPanel()
+    {
+        _settingsActive = !_settingsActive;
+        SetSettingsButtonSelected(_settingsActive);
+
+        if (_settingsActive)
+        {
+            // Hide Queue, show Settings
+            if (_queuePanelObject != null) _queuePanelObject.SetActive(false);
+            if (_settingsPanel != null)
+            {
+                _settingsPanel.gameObject.SetActive(true);
+                _settingsPanel.NavigateToMainMenu();
+            }
+            if (_queuePagination != null) _queuePagination.HideImmediate();
+        }
+        else
+        {
+            // Show Queue, hide Settings
+            if (_settingsPanel != null) _settingsPanel.gameObject.SetActive(false);
+            if (_queuePanelObject != null) _queuePanelObject.SetActive(true);
+            if (_queuePagination != null) _queuePagination.ShowImmediate();
+        }
+
+        OnSettingsClicked?.Invoke();
+    }
+
     private float _nextAllowedUpdateTime = 0f; // Prevent older time updates from overriding user seek
     
     /// <summary>
@@ -1044,7 +1102,19 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         if (_overlayFrameObject != null) _overlayFrameObject.SetActive(true);
         if (_menuButtonFrameObject != null) _menuButtonFrameObject.SetActive(false);
         if (_sideControlsFrameObject != null) _sideControlsFrameObject.SetActive(true);
-        if (_queuePagination != null) _queuePagination.ShowImmediate();
+        // Restore correct side panel state (Queue or Settings)
+        if (_settingsActive)
+        {
+            if (_queuePanelObject != null) _queuePanelObject.SetActive(false);
+            if (_settingsPanel != null) _settingsPanel.gameObject.SetActive(true);
+            // Hide pagination when settings is active
+        }
+        else
+        {
+            if (_queuePanelObject != null) _queuePanelObject.SetActive(true);
+            if (_settingsPanel != null) _settingsPanel.gameObject.SetActive(false);
+            if (_queuePagination != null) _queuePagination.ShowImmediate();
+        }
 
         OnVisibilityChanged?.Invoke(true);
     }
@@ -1066,6 +1136,8 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         if (_menuButtonFrameObject != null) _menuButtonFrameObject.SetActive(true);
         if (_sideControlsFrameObject != null) _sideControlsFrameObject.SetActive(false);
         if (_queuePagination != null) _queuePagination.HideImmediate();
+        // Also hide settings panel when controls hide
+        if (_settingsPanel != null) _settingsPanel.gameObject.SetActive(false);
 
         OnVisibilityChanged?.Invoke(false);
     }

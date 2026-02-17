@@ -104,9 +104,20 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
     private GameObject _sideControlsFrameObject;
     private int _sideControlsSide = 1; // 1=right, -1=left
     private RTTMediaQueuePanel _queuePanel;
+    private RTTMediaSettingsPanel _settingsPanel;
+    private RTTMediaUISettingsPopup _uiSettingsPopup;
+    private GameObject _uiSettingsPopupFrame;
+    private GameObject _playerControlsGroup; // Sub-container for controls/side/overlay (UI Settings adjusts this, not _controlsContainer)
+    private Vector3 _playerControlsBaseLocalPos; // Base local position after world positioning (before UI settings)
+    private float _uiDepthOffset = 0f;  // Current UI depth slider value
+    private float _uiHeightOffset = 0f; // Current UI height offset (slider - 0.5)
     private RTTFilePagination _queuePagination;
+
+    // Tracked picture adjustment values (for Save as defaults)
+    private SettingsSnapshot _currentPicture = new SettingsSnapshot();
     private float _sideControlsBaseX;  // base X offset from BuildPlayerUI (unscaled)
     private float _sideControlsBaseY;  // base Y from BuildPlayerUI (flat mode)
+    private float _sidePhysicalW;      // side controls frame physical width (meters)
     private float _sidePhysicalH;      // side controls frame physical height (meters)
     private float _paginationWorldH;   // pagination quad world height (meters)
     private float _paginationGap = 0.015f; // gap between side controls bottom and pagination top
@@ -496,15 +507,37 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             ProjectionSystem.SetTargetPosition(_menuFramePosition, _menuFrameRotation);
         }
         
-        // Position controls container below the video screen
+        // Position controls below the video screen
+        // Container stays at local (0,0,0); children handle world positioning
         if (_controlsContainer != null && _menuFramePosition != Vector3.zero)
         {
-            Vector3 controlsPos = _menuFramePosition + _menuFrameRotation * new Vector3(0, -0.625f, 0);
-            _controlsContainer.transform.position = controlsPos;
-            
-            // VideoControlsContainer is always (0,0,0) like VirtualObjects
-            _controlsContainer.transform.rotation = Quaternion.identity;
-            
+            // PlayerControlsGroup positioned in world space (below video screen)
+            Vector3 controlsPos = _menuFramePosition + new Vector3(0, -0.625f, 0);
+            if (_playerControlsGroup != null)
+            {
+                _playerControlsGroup.transform.position = controlsPos;
+                _playerControlsGroup.transform.rotation = Quaternion.identity;
+                _playerControlsBaseLocalPos = _playerControlsGroup.transform.localPosition;
+                // Reapply UI settings offsets on top of new base position
+                // (LoadSavedSettings may have run before base was set)
+                ApplyUISettingsToControlsGroup();
+            }
+
+            // UISettingsPopup: sibling of _playerControlsGroup in _controlsContainer
+            // Position at base controls pos + sideControlsBaseY offset (unaffected by UI depth/height/scale)
+            if (_uiSettingsPopupFrame != null && _uiSettingsPopupFrame.activeSelf)
+            {
+                _uiSettingsPopupFrame.transform.position = controlsPos + new Vector3(0, _sideControlsBaseY, 0);
+                Camera popupCam = Camera.main;
+                if (popupCam != null)
+                {
+                    Vector3 toCamera = popupCam.transform.position - _uiSettingsPopupFrame.transform.position;
+                    toCamera.y = 0;
+                    if (toCamera.sqrMagnitude > 0.001f)
+                        _uiSettingsPopupFrame.transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
+                }
+            }
+
             // VideoControlsFrame faces the camera
             if (_controlsFrameObject != null)
             {
@@ -585,7 +618,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         }
         
         GameObject projectionObj = new GameObject("VRVideoProjectionSystem");
-        projectionObj.transform.SetParent(projectionParent);
+        projectionObj.transform.SetParent(projectionParent, false);
         ProjectionSystem = projectionObj.AddComponent<VRVideoProjectionSystem>();
 
         // Initialize with camera rig (or main camera if no rig)
@@ -738,9 +771,15 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         _controlsContainer.transform.SetParent(transform, false);
 
 
+        // === 1b. Player Controls Group (sub-container for controls/side/overlay) ===
+        // UI Settings adjusts this group's position/scale, keeping _controlsContainer at origin
+        // so UISettingsPopup (sibling) stays centered
+        _playerControlsGroup = new GameObject("PlayerControlsGroup");
+        _playerControlsGroup.transform.SetParent(_controlsContainer.transform, false);
+
         // === 2. Dismiss overlay frame (large transparent click-to-dismiss) ===
         _overlayFrameObject = new GameObject("DismissOverlayFrame");
-        _overlayFrameObject.transform.SetParent(_controlsContainer.transform);
+        _overlayFrameObject.transform.SetParent(_playerControlsGroup.transform);
         // Offset overlay behind controls frame so raycast hits controls first
         _overlayFrameObject.transform.localPosition = new Vector3(0, 0, 0.5f);
         _overlayFrameObject.layer = vLayer;
@@ -789,7 +828,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
         // === 3. Controls frame (RTTMenuFrame with higher render priority) ===
         GameObject controlsFrameObj = new GameObject("VideoControlsFrame");
-        controlsFrameObj.transform.SetParent(_controlsContainer.transform, false); // Use false to keep local transform
+        controlsFrameObj.transform.SetParent(_playerControlsGroup.transform, false); // Use false to keep local transform
         controlsFrameObj.transform.localPosition = Vector3.zero; // Explicitly reset to zero
         controlsFrameObj.transform.localRotation = Quaternion.identity;
         controlsFrameObj.layer = vLayer;
@@ -842,7 +881,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
         // === 3b. Side Controls Frame (generic container beside controls) ===
         _sideControlsFrameObject = new GameObject("SideControlsFrame");
-        _sideControlsFrameObject.transform.SetParent(_controlsContainer.transform, false);
+        _sideControlsFrameObject.transform.SetParent(_playerControlsGroup.transform, false);
         _sideControlsFrameObject.layer = vLayer;
 
         var sideFrame = _sideControlsFrameObject.AddComponent<RTTMenuFrame>();
@@ -850,6 +889,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         float sideLogicalHeight = 1351f;
         float sidePhysicalW = sideLogicalWidth / density;
         float sidePhysicalH = sideLogicalHeight / density;
+        _sidePhysicalW = sidePhysicalW;
         _sidePhysicalH = sidePhysicalH;
 
         sideFrame.Configure(sidePhysicalW, sidePhysicalH, sideLogicalWidth);
@@ -880,6 +920,21 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             _queuePanel.Initialize(sideLogicalWidth, sideLogicalHeight, _font);
             _queuePanel.OnItemClicked += HandleQueueItemClicked;
             _queuePanel.OnShuffleClicked += HandleQueueShuffleClicked;
+
+            // Create settings panel inside side controls frame (sibling of QueuePanel)
+            GameObject settingsObj = new GameObject("SettingsPanel");
+            settingsObj.transform.SetParent(sideContainer, false);
+            var settingsRT = settingsObj.AddComponent<RectTransform>();
+            settingsRT.anchorMin = Vector2.zero;
+            settingsRT.anchorMax = Vector2.one;
+            settingsRT.offsetMin = Vector2.zero;
+            settingsRT.offsetMax = Vector2.zero;
+
+            _settingsPanel = settingsObj.AddComponent<RTTMediaSettingsPanel>();
+            _settingsPanel.Initialize(sideLogicalWidth, sideLogicalHeight, _font);
+            settingsObj.SetActive(false); // Start hidden (Queue visible by default)
+
+            WireSettingsPanelEvents();
         }
 
         // Position beside controls frame
@@ -898,7 +953,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         if (_queuePanel != null)
         {
             GameObject paginationObj = new GameObject("QueuePagination");
-            paginationObj.transform.SetParent(_controlsContainer.transform, false);
+            paginationObj.transform.SetParent(_playerControlsGroup.transform, false);
             paginationObj.layer = vLayer;
 
             _queuePagination = paginationObj.AddComponent<RTTFilePagination>();
@@ -1028,6 +1083,18 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         _controlsPanel.SetExternalFrames(_overlayFrameObject, _menuButtonFrameObject);
         _controlsPanel.SetSideControlsFrame(_sideControlsFrameObject);
         _controlsPanel.SetQueuePagination(_queuePagination);
+        // Pass settings panel + queue panel references for toggle logic
+        if (_settingsPanel != null && _queuePanel != null)
+            _controlsPanel.SetSettingsPanel(_settingsPanel, _queuePanel.gameObject);
+
+        // Hide UI Settings popup when controls panel hides
+        _controlsPanel.OnVisibilityChanged += (visible) =>
+        {
+            if (!visible && _uiSettingsPopup != null && _uiSettingsPopup.IsVisible)
+            {
+                _uiSettingsPopup.Hide();
+            }
+        };
 
         // === 5. Player Controller ===
         GameObject playerObj = new GameObject("PlayerController");
@@ -1097,6 +1164,41 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         environmentPopup.Initialize(_font, _primaryColor, _accentColor, padding, bottomOffset, RTTMediaProjectionPopup.PopupMode.Environment);
         _playerController.SetEnvironmentPopup(environmentPopup);
 
+        // === 7. UI Settings Popup (beside SideControlsFrame, same Y level) ===
+        float uiPopupLogicalW = 1100f;
+        float uiPopupLogicalH = 990f; // 1:0.9 ratio
+        float uiPopupPhysW = uiPopupLogicalW / density;
+        float uiPopupPhysH = uiPopupLogicalH / density;
+
+        _uiSettingsPopupFrame = new GameObject("UISettingsPopupFrame");
+        // Parent to _controlsContainer (sibling of _playerControlsGroup) so UI Settings
+        // sliders (depth/height/scale) don't affect the popup itself
+        _uiSettingsPopupFrame.transform.SetParent(_controlsContainer.transform, false);
+        // Position set in LateUpdate relative to _playerControlsGroup base position
+        _uiSettingsPopupFrame.transform.localPosition = new Vector3(0, _sideControlsBaseY, 0);
+        _uiSettingsPopupFrame.transform.localRotation = Quaternion.identity;
+        _uiSettingsPopupFrame.layer = vLayer;
+
+        var uiPopupFrame = _uiSettingsPopupFrame.AddComponent<RTTMenuFrame>();
+        uiPopupFrame.Configure(uiPopupPhysW, uiPopupPhysH, uiPopupLogicalW);
+        uiPopupFrame.SetGlassBackgroundEnabled(false);
+        uiPopupFrame.SetFloatingDataEnabled(false);
+        uiPopupFrame.SetContentMargins(0, 0, 0, 0);
+        uiPopupFrame.ForceInitialize();
+
+        var uiPopupQuad = uiPopupFrame.GetDisplayQuad();
+        if (uiPopupQuad?.material != null)
+            uiPopupQuad.material.renderQueue = 3200;
+
+        var uiPopupContainer = uiPopupFrame.ContentContainer;
+        if (uiPopupContainer != null)
+        {
+            _uiSettingsPopup = _uiSettingsPopupFrame.AddComponent<RTTMediaUISettingsPopup>();
+            _uiSettingsPopup.Initialize(uiPopupContainer, uiPopupLogicalW, uiPopupLogicalH, _font, _primaryColor);
+            WireUISettingsPopupEvents();
+        }
+        _uiSettingsPopupFrame.SetActive(false);
+
         Debug.Log("[VRMediaAppController] Player UI built with controls container");
     }
 
@@ -1105,6 +1207,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         if (_controlsPanel == null)
         {
             BuildPlayerUI();
+            LoadSavedSettings();
         }
 
         if (_controlsContainer != null)
@@ -1181,6 +1284,290 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
     }
 
     /// <summary>
+    /// Wire all settings panel events to player controller and projection system.
+    /// </summary>
+    private void WireSettingsPanelEvents()
+    {
+        if (_settingsPanel == null) return;
+
+        // Picture adjustments → shader params + track values
+        _settingsPanel.OnSharpnessChanged += (v) => { _currentPicture.Sharpness = v; _playerController?.SetPictureAdjustment("_Sharpness", "_Sharpen", v); };
+        _settingsPanel.OnBrightnessChanged += (v) => { _currentPicture.Brightness = v; _playerController?.SetPictureAdjustment("_Brightness", "_Brightness", v); };
+        _settingsPanel.OnSaturationChanged += (v) => { _currentPicture.Saturation = v; _playerController?.SetPictureAdjustment("_Saturation", "_Saturation", v); };
+        _settingsPanel.OnContrastChanged += (v) => { _currentPicture.Contrast = v; _playerController?.SetPictureAdjustment("_Contrast", "_Contrast", v); };
+        _settingsPanel.OnTintChanged += (v) => { _currentPicture.Tint = v; _playerController?.SetPictureAdjustment("_Tint", "_Tint", v); };
+        _settingsPanel.OnTemperatureChanged += (v) => { _currentPicture.Temperature = v; _playerController?.SetPictureAdjustment("_Temperature", "_Temperature", v); };
+
+        _settingsPanel.OnPictureSaveDefaults += HandlePictureSaveDefaults;
+        _settingsPanel.OnPictureResetDefaults += HandlePictureResetDefaults;
+
+        // Video adjustments
+        _settingsPanel.On3DChanged += (v) => _playerController?.SetStereoEnabled(v);
+        _settingsPanel.OnLRInverseChanged += (v) => _playerController?.SetLRInverse(v);
+        _settingsPanel.OnSpeedChanged += (v) =>
+        {
+            if (_playerController?.PlaybackEngine != null)
+                _playerController.PlaybackEngine.PlaybackSpeed = v;
+            _controlsPanel?.SetSpeed(v);
+            PlayerPrefs.SetFloat("MediaPlayer_Speed", v);
+        };
+
+        // Immersive adjustments
+        _settingsPanel.OnTiltChanged += (v) => _playerController?.ProjectionSystem?.GetImmersiveRenderer()?.SetTilt(v);
+        _settingsPanel.OnYawChanged += (v) => _playerController?.ProjectionSystem?.GetImmersiveRenderer()?.SetYawOffset(v);
+        _settingsPanel.OnZoomChanged += (v) => _playerController?.ProjectionSystem?.GetImmersiveRenderer()?.SetFieldOfView(v);
+        _settingsPanel.OnHeightChanged += (v) => _playerController?.ProjectionSystem?.GetImmersiveRenderer()?.SetVerticalShift(v);
+        _settingsPanel.OnHorizontalBalanceChanged += (v) => _playerController?.ProjectionSystem?.GetImmersiveRenderer()?.SetHorizontalShift(v);
+
+        // Screen settings (Flat)
+        _settingsPanel.OnAspectRatioChanged += (v) => _playerController?.ProjectionSystem?.SetAspectRatioOverride(v);
+        _settingsPanel.OnScreenDepthChanged += (v) => _playerController?.ProjectionSystem?.SetScreenDistance(v);
+        _settingsPanel.OnScreenScaleChanged += (v) => _playerController?.ProjectionSystem?.SetScreenScale(v);
+        _settingsPanel.OnVerticalMoveChanged += (v) => _playerController?.ProjectionSystem?.SetVerticalOffset(v);
+        _settingsPanel.OnScreenSettingsReset += HandleScreenSettingsReset;
+
+        // UI settings popup
+        _settingsPanel.OnUISettingsRequested += HandleUISettingsRequested;
+
+        // Additional menu items (placeholder handlers - log for now)
+        _settingsPanel.OnPassthroughClicked += () => Debug.Log("[VRMediaAppController] Passthrough settings clicked (not yet implemented)");
+        _settingsPanel.OnHotkeysSettingsClicked += () => Debug.Log("[VRMediaAppController] Hotkeys settings clicked (not yet implemented)");
+        _settingsPanel.OnPlayerSettingsClicked += () => Debug.Log("[VRMediaAppController] Player settings clicked (not yet implemented)");
+    }
+
+    private void HandlePictureSaveDefaults()
+    {
+        // Get current slider values from the settings panel snapshot
+        var snapshot = GetCurrentPictureSnapshot();
+        PlayerPrefs.SetFloat("MediaPlayer_PictureSharpen", snapshot.Sharpness);
+        PlayerPrefs.SetFloat("MediaPlayer_PictureBrightness", snapshot.Brightness);
+        PlayerPrefs.SetFloat("MediaPlayer_PictureSaturation", snapshot.Saturation);
+        PlayerPrefs.SetFloat("MediaPlayer_PictureContrast", snapshot.Contrast);
+        PlayerPrefs.SetFloat("MediaPlayer_PictureTint", snapshot.Tint);
+        PlayerPrefs.SetFloat("MediaPlayer_PictureTemperature", snapshot.Temperature);
+        PlayerPrefs.Save();
+        Debug.Log("[VRMediaAppController] Picture defaults saved to PlayerPrefs");
+    }
+
+    private void HandlePictureResetDefaults()
+    {
+        // Load saved defaults from PlayerPrefs (or factory defaults if none saved)
+        float sharpen = PlayerPrefs.GetFloat("MediaPlayer_PictureSharpen", 0.5f);
+        float brightness = PlayerPrefs.GetFloat("MediaPlayer_PictureBrightness", 1.0f);
+        float saturation = PlayerPrefs.GetFloat("MediaPlayer_PictureSaturation", 1.0f);
+        float contrast = PlayerPrefs.GetFloat("MediaPlayer_PictureContrast", 1.0f);
+        float tint = PlayerPrefs.GetFloat("MediaPlayer_PictureTint", 0f);
+        float temperature = PlayerPrefs.GetFloat("MediaPlayer_PictureTemperature", 0f);
+
+        // Apply to renderer
+        _playerController?.SetPictureAdjustment("_Sharpness", "_Sharpen", sharpen);
+        _playerController?.SetPictureAdjustment("_Brightness", "_Brightness", brightness);
+        _playerController?.SetPictureAdjustment("_Saturation", "_Saturation", saturation);
+        _playerController?.SetPictureAdjustment("_Contrast", "_Contrast", contrast);
+        _playerController?.SetPictureAdjustment("_Tint", "_Tint", tint);
+        _playerController?.SetPictureAdjustment("_Temperature", "_Temperature", temperature);
+
+        // Update UI sliders
+        var snapshot = new SettingsSnapshot
+        {
+            Sharpness = sharpen,
+            Brightness = brightness,
+            Saturation = saturation,
+            Contrast = contrast,
+            Tint = tint,
+            Temperature = temperature
+        };
+        _settingsPanel?.SetCurrentValues(snapshot);
+        Debug.Log("[VRMediaAppController] Picture adjustments reset to saved defaults");
+    }
+
+    private void HandleScreenSettingsReset()
+    {
+        float depth = 2.0f;
+        float scale = 1.0f;
+        float verticalMove = 0f;
+        string aspect = "default";
+
+        _playerController?.ProjectionSystem?.SetScreenDistance(depth);
+        _playerController?.ProjectionSystem?.SetScreenScale(scale);
+        _playerController?.ProjectionSystem?.SetVerticalOffset(verticalMove);
+        _playerController?.ProjectionSystem?.SetAspectRatioOverride(aspect);
+
+        // Update UI sliders
+        var snapshot = new SettingsSnapshot
+        {
+            ScreenDepth = depth,
+            ScreenScale = scale,
+            VerticalMove = verticalMove,
+            AspectRatio = aspect
+        };
+        _settingsPanel?.SetCurrentValues(snapshot);
+        Debug.Log("[VRMediaAppController] Screen settings reset to defaults");
+    }
+
+    /// <summary>
+    /// Get current picture adjustment values (tracked from last slider changes).
+    /// </summary>
+    private SettingsSnapshot GetCurrentPictureSnapshot()
+    {
+        return new SettingsSnapshot
+        {
+            Sharpness = _currentPicture.Sharpness,
+            Brightness = _currentPicture.Brightness,
+            Saturation = _currentPicture.Saturation,
+            Contrast = _currentPicture.Contrast,
+            Tint = _currentPicture.Tint,
+            Temperature = _currentPicture.Temperature
+        };
+    }
+
+    /// <summary>
+    /// Load saved picture defaults from PlayerPrefs and apply to renderer + UI.
+    /// Called after BuildPlayerUI when starting playback.
+    /// </summary>
+    private void LoadSavedSettings()
+    {
+        // Picture adjustments (saved defaults)
+        float sharpen = PlayerPrefs.GetFloat("MediaPlayer_PictureSharpen", 0.5f);
+        float brightness = PlayerPrefs.GetFloat("MediaPlayer_PictureBrightness", 1.0f);
+        float saturation = PlayerPrefs.GetFloat("MediaPlayer_PictureSaturation", 1.0f);
+        float contrast = PlayerPrefs.GetFloat("MediaPlayer_PictureContrast", 1.0f);
+        float tint = PlayerPrefs.GetFloat("MediaPlayer_PictureTint", 0f);
+        float temperature = PlayerPrefs.GetFloat("MediaPlayer_PictureTemperature", 0f);
+
+        _currentPicture.Sharpness = sharpen;
+        _currentPicture.Brightness = brightness;
+        _currentPicture.Saturation = saturation;
+        _currentPicture.Contrast = contrast;
+        _currentPicture.Tint = tint;
+        _currentPicture.Temperature = temperature;
+
+        // Apply to renderer
+        _playerController?.SetPictureAdjustment("_Sharpness", "_Sharpen", sharpen);
+        _playerController?.SetPictureAdjustment("_Brightness", "_Brightness", brightness);
+        _playerController?.SetPictureAdjustment("_Saturation", "_Saturation", saturation);
+        _playerController?.SetPictureAdjustment("_Contrast", "_Contrast", contrast);
+        _playerController?.SetPictureAdjustment("_Tint", "_Tint", tint);
+        _playerController?.SetPictureAdjustment("_Temperature", "_Temperature", temperature);
+
+        // UI settings (global) - midpoint defaults: depth=0, height=0.5, scale=0.5
+        // Version migration: clear stale values from old slider ranges
+        const int UI_SETTINGS_VER = 2;
+        if (PlayerPrefs.GetInt("MediaPlayer_UISettingsVer", 0) < UI_SETTINGS_VER)
+        {
+            PlayerPrefs.DeleteKey("MediaPlayer_UIDepth");
+            PlayerPrefs.DeleteKey("MediaPlayer_UIHeight");
+            PlayerPrefs.DeleteKey("MediaPlayer_UIScale");
+            PlayerPrefs.SetInt("MediaPlayer_UISettingsVer", UI_SETTINGS_VER);
+            PlayerPrefs.Save();
+            Debug.Log("[VRMediaAppController] UI settings migrated to v" + UI_SETTINGS_VER + ", reset to defaults");
+        }
+
+        float uiDepth = Mathf.Clamp(PlayerPrefs.GetFloat("MediaPlayer_UIDepth", 0f), 0f, 1.0f);
+        float uiHeight = Mathf.Clamp(PlayerPrefs.GetFloat("MediaPlayer_UIHeight", 0.5f), 0f, 1.0f);
+        float uiScale = Mathf.Clamp(PlayerPrefs.GetFloat("MediaPlayer_UIScale", 0.5f), 0.2f, 1.0f);
+
+        _uiSettingsPopup?.SetValues(uiDepth, uiHeight, uiScale);
+
+        // Apply UI settings to player controls group (combined with base position)
+        // Height: offset = (slider - 0.5), Scale: multiplier = slider * 2 (0.5 → 1.0x)
+        _uiDepthOffset = uiDepth;
+        _uiHeightOffset = uiHeight - 0.5f;
+        ApplyUISettingsToControlsGroup();
+        if (_playerControlsGroup != null)
+        {
+            float scaleMul = Mathf.Max(0.1f, uiScale * 2f);
+            _playerControlsGroup.transform.localScale = Vector3.one * scaleMul;
+        }
+
+        // Speed (persist across sessions)
+        float speed = PlayerPrefs.GetFloat("MediaPlayer_Speed", 1.0f);
+
+        // Build and apply snapshot to settings panel
+        var snapshot = new SettingsSnapshot
+        {
+            Sharpness = sharpen,
+            Brightness = brightness,
+            Saturation = saturation,
+            Contrast = contrast,
+            Tint = tint,
+            Temperature = temperature,
+            Speed = speed
+        };
+        _settingsPanel?.SetCurrentValues(snapshot);
+
+        Debug.Log("[VRMediaAppController] Loaded saved settings from PlayerPrefs");
+    }
+
+    private void HandleUISettingsRequested()
+    {
+        if (_uiSettingsPopupFrame == null) return;
+
+        bool isActive = _uiSettingsPopupFrame.activeSelf;
+        _uiSettingsPopupFrame.SetActive(!isActive);
+        Debug.Log("[VRMediaAppController] UI Settings popup toggled");
+    }
+
+    private void WireUISettingsPopupEvents()
+    {
+        if (_uiSettingsPopup == null) return;
+
+        // Close button → hide the popup frame
+        _uiSettingsPopup.OnCloseRequested += () => _uiSettingsPopupFrame?.SetActive(false);
+
+        // Depth: slider 0-1, push player controls group back by Z
+        _uiSettingsPopup.OnUIDepthChanged += (v) =>
+        {
+            _uiDepthOffset = v;
+            ApplyUISettingsToControlsGroup();
+            PlayerPrefs.SetFloat("MediaPlayer_UIDepth", v);
+        };
+
+        // Height: slider 0-1, midpoint 0.5 = current (no change)
+        _uiSettingsPopup.OnUIHeightChanged += (v) =>
+        {
+            _uiHeightOffset = v - 0.5f;
+            ApplyUISettingsToControlsGroup();
+            PlayerPrefs.SetFloat("MediaPlayer_UIHeight", v);
+        };
+
+        // Scale: slider 0.2-1.0, midpoint 0.5 = current size (1.0x)
+        // scale = value * 2 → 0.2=0.4x, 0.5=1.0x, 1.0=2.0x
+        _uiSettingsPopup.OnUIScaleChanged += (v) =>
+        {
+            float scale = Mathf.Max(0.1f, v * 2f);
+            if (_playerControlsGroup != null)
+            {
+                _playerControlsGroup.transform.localScale = Vector3.one * scale;
+            }
+            PlayerPrefs.SetFloat("MediaPlayer_UIScale", v);
+        };
+
+        _uiSettingsPopup.OnUISettingsReset += () =>
+        {
+            _uiDepthOffset = 0f;
+            _uiHeightOffset = 0f;
+            ApplyUISettingsToControlsGroup();
+            if (_playerControlsGroup != null)
+            {
+                _playerControlsGroup.transform.localScale = Vector3.one;
+            }
+            _uiSettingsPopup.SetValues(0f, 0.5f, 0.5f);
+            PlayerPrefs.SetFloat("MediaPlayer_UIDepth", 0f);
+            PlayerPrefs.SetFloat("MediaPlayer_UIHeight", 0.5f);
+            PlayerPrefs.SetFloat("MediaPlayer_UIScale", 0.5f);
+            PlayerPrefs.Save();
+            Debug.Log("[VRMediaAppController] UI settings reset to defaults");
+        };
+    }
+
+    private void ApplyUISettingsToControlsGroup()
+    {
+        if (_playerControlsGroup == null) return;
+        _playerControlsGroup.transform.localPosition = _playerControlsBaseLocalPos + new Vector3(0, _uiHeightOffset, -_uiDepthOffset);
+    }
+
+    /// <summary>
     /// Scale the menu button's display quad without affecting the RTT canvas/camera.
     /// Scaling the frame object breaks RTT rendering (pixelation, lost corners).
     /// Scaling only the display quad preserves rendering quality while changing world size.
@@ -1251,7 +1638,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         if (_menuButtonFrameObject == null) return;
 
         float menuBtnPhysical = 90f / 1200f;
-        Vector3 menuBtnPos = _menuFramePosition + _menuFrameRotation * new Vector3(0, -0.5f - menuBtnPhysical * 1.5f, 0);
+        Vector3 menuBtnPos = _menuFramePosition + new Vector3(0, -0.5f - menuBtnPhysical * 1.5f, 0);
         _menuButtonFrameObject.transform.position = menuBtnPos;
         _menuButtonFrameObject.transform.rotation = _menuFrameRotation;
         ScaleMenuButtonQuad(1.0f);
@@ -1336,6 +1723,9 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
         // Reposition side controls for the new projection type
         PositionSideControlsForProjection(isImmersive);
+
+        // Update settings panel mode (shows/hides Screen settings, toggles Video adj content)
+        _settingsPanel?.SetMode(isImmersive);
     }
 
     private void HandlePlaybackFailed(string error, bool isCodecError, string codecName, string containerFormat)

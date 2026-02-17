@@ -161,10 +161,8 @@ public class ImmersiveSphereRenderer : MonoBehaviour, IProjectionRenderer
             _shaderRotationOffset = 0f;
         }
 
-        if (_material != null)
-        {
-            _material.SetFloat("_Rotation", _shaderRotationOffset);
-        }
+        // Use combined rotation to preserve yaw offset
+        UpdateCombinedRotation();
     }
 
     public void Dispose()
@@ -302,6 +300,51 @@ public class ImmersiveSphereRenderer : MonoBehaviour, IProjectionRenderer
         {
             _material.SetFloat("_Tilt", tilt);
         }
+    }
+
+    /// <summary>
+    /// Set yaw offset separate from recenter rotation.
+    /// Combined with _shaderRotationOffset for final _Rotation value.
+    /// </summary>
+    private float _yawOffset = 0f;
+
+    public void SetYawOffset(float degrees)
+    {
+        _yawOffset = degrees;
+        UpdateCombinedRotation();
+    }
+
+    private void UpdateCombinedRotation()
+    {
+        if (_material != null)
+            _material.SetFloat("_Rotation", _shaderRotationOffset + _yawOffset);
+    }
+
+    /// <summary>
+    /// Set vertical shift for immersive projection.
+    /// </summary>
+    public void SetVerticalShift(float shift)
+    {
+        if (_material != null)
+            _material.SetFloat("_VerticalShift", shift);
+    }
+
+    /// <summary>
+    /// Set horizontal shift for immersive projection.
+    /// </summary>
+    public void SetHorizontalShift(float shift)
+    {
+        if (_material != null)
+            _material.SetFloat("_HorizontalShift", shift);
+    }
+
+    /// <summary>
+    /// Set a generic shader float property.
+    /// </summary>
+    public void SetShaderFloat(string property, float value)
+    {
+        if (_material != null && _material.HasProperty(property))
+            _material.SetFloat(property, value);
     }
     #endregion
 

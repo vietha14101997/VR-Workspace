@@ -35,6 +35,8 @@ public class VRVideoPlayerController : MonoBehaviour
     public double CurrentTime => _playbackEngine?.CurrentTime ?? 0;
     public double Duration => _playbackEngine?.Duration ?? 0;
     public MediaVideoInfo? CurrentVideo { get; private set; }
+    public VideoPlaybackEngine PlaybackEngine => _playbackEngine;
+    public VRVideoProjectionSystem ProjectionSystem => _projectionSystem;
     #endregion
 
     #region Private Fields
@@ -769,6 +771,51 @@ public class VRVideoPlayerController : MonoBehaviour
     {
         _displaySettings.Curvature = Mathf.Clamp01(curvature);
         _projectionSystem?.UpdateDisplay(_displaySettings);
+    }
+
+    /// <summary>
+    /// Set a picture adjustment shader parameter on the active renderer.
+    /// flatParam = shader param name for WorldPanelBoard (flat), immParam = for VideoImmersive (immersive).
+    /// </summary>
+    public void SetPictureAdjustment(string flatParam, string immParam, float value)
+    {
+        if (_projectionSystem?.ActiveRenderer is ImmersiveSphereRenderer immersive)
+        {
+            immersive.SetShaderFloat(immParam, value);
+        }
+        else if (_projectionSystem?.ActiveRenderer is FlatProjectionRenderer flat)
+        {
+            flat.SetBoardShaderFloat(flatParam, value);
+        }
+    }
+
+    /// <summary>
+    /// Enable/disable stereo 3D mode.
+    /// </summary>
+    public void SetStereoEnabled(bool enabled)
+    {
+        if (_projectionPopup != null)
+        {
+            // Update via projection popup which handles the full projection change
+            var currentStereo = enabled ? StereoMode.SideBySide : StereoMode.Mono;
+            // Directly set on renderer for immediate feedback
+            _projectionSystem?.ActiveRenderer?.SetStereoMode(currentStereo);
+        }
+    }
+
+    /// <summary>
+    /// Set LR Inverse (swap left/right eye for SBS stereo).
+    /// </summary>
+    public void SetLRInverse(bool inverse)
+    {
+        if (_projectionSystem?.ActiveRenderer is ImmersiveSphereRenderer immersive)
+        {
+            immersive.SetShaderFloat("_LRInverse", inverse ? 1f : 0f);
+        }
+        else if (_projectionSystem?.ActiveRenderer is FlatProjectionRenderer flat)
+        {
+            flat.SetBoardShaderFloat("_LRInverse", inverse ? 1f : 0f);
+        }
     }
 
     /// <summary>
