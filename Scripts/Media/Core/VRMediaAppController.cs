@@ -105,6 +105,13 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
     private int _sideControlsSide = 1; // 1=right, -1=left
     private RTTMediaQueuePanel _queuePanel;
     private RTTFilePagination _queuePagination;
+    private float _sideControlsBaseX;  // base X offset from BuildPlayerUI (unscaled)
+    private float _sideControlsBaseY;  // base Y from BuildPlayerUI (flat mode)
+    private float _sidePhysicalH;      // side controls frame physical height (meters)
+    private float _paginationWorldH;   // pagination quad world height (meters)
+    private float _paginationGap = 0.015f; // gap between side controls bottom and pagination top
+    private Vector3 _paginationOrigQuadScale; // original pagination DisplayQuad scale (for scaling)
+    private float _sideControlsOrigQuadScaleX; // original side controls DisplayQuad scale X
 
     // Cached rounded rect sprite for menu button
     private static Sprite _cachedRoundedRectSprite;
@@ -512,15 +519,15 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             _controlsContainer.SetActive(true);
         }
 
+        // Detect projection type for positioning
+        ProjectionDetector.DetectProjectionAndStereo(
+            video.Path, video.Width, video.Height,
+            out var projType, out _);
+        bool willBeImmersive = !ProjectionDetector.SupportsScreenSettings(projType);
+
         // Position menu button below the video screen (in VirtualObjects, follows zoom)
         if (_menuButtonFrameObject != null && _menuFramePosition != Vector3.zero)
         {
-            // Detect projection to position menu button appropriately
-            ProjectionDetector.DetectProjectionAndStereo(
-                video.Path, video.Width, video.Height,
-                out var projType, out _);
-            bool willBeImmersive = !ProjectionDetector.SupportsScreenSettings(projType);
-
             if (willBeImmersive && Camera.main != null)
             {
                 PositionMenuButtonImmersive(Camera.main);
@@ -530,6 +537,10 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
                 PositionMenuButtonFlat();
             }
         }
+
+        // Adjust side controls + pagination Y for immersive mode (raise to eye level)
+        // This must run regardless of _menuButtonFrameObject state
+        PositionSideControlsForProjection(willBeImmersive);
 
         // Use player controller to handle playback
         if (_playerController != null)
@@ -841,6 +852,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         float sideLogicalHeight = 1351f;
         float sidePhysicalW = sideLogicalWidth / density;
         float sidePhysicalH = sideLogicalHeight / density;
+        _sidePhysicalH = sidePhysicalH;
 
         sideFrame.Configure(sidePhysicalW, sidePhysicalH, sideLogicalWidth);
         sideFrame.SetGlassBackgroundEnabled(false);
@@ -851,6 +863,8 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         var sideQuad = sideFrame.GetDisplayQuad();
         if (sideQuad?.material != null)
             sideQuad.material.renderQueue = 3100;
+        if (sideQuad != null)
+            _sideControlsOrigQuadScaleX = sideQuad.transform.localScale.x;
 
         // Queue panel provides its own gradient background
         var sideContainer = sideFrame.ContentContainer;
@@ -878,6 +892,8 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         float xOffset = (controlsPhysicalW / 2f + gapMeters + sidePhysicalW / 2f) * _sideControlsSide;
         float oneItemHeight = sidePhysicalH * 0.9f * 0.4f; // body(90%) × itemRatio(40%)
         float yOffset = 0.625f + oneItemHeight * 0.5f;
+        _sideControlsBaseX = xOffset;
+        _sideControlsBaseY = yOffset;
         _sideControlsFrameObject.transform.localPosition = new Vector3(xOffset, yOffset, 0);
 
         _sideControlsFrameObject.SetActive(false);
@@ -912,10 +928,13 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             if (paginationQuad?.material != null)
                 paginationQuad.material.renderQueue = 3100;
 
+            // Cache original quad scale for immersive scaling
+            if (paginationQuad != null)
+                _paginationOrigQuadScale = paginationQuad.transform.localScale;
+
             // Position below SideControlsFrame
-            float paginationWorldH = 115f * paginationPixelToMeter; // RTTFilePagination default height
-            float paginationGap = 0.015f;
-            float paginationY = yOffset - (sidePhysicalH / 2f) - paginationGap - (paginationWorldH / 2f);
+            _paginationWorldH = 115f * paginationPixelToMeter; // RTTFilePagination default height
+            float paginationY = yOffset - (sidePhysicalH / 2f) - _paginationGap - (_paginationWorldH / 2f);
             paginationObj.transform.localPosition = new Vector3(xOffset, paginationY, 0);
 
             // Wire up page change notifications
@@ -1266,38 +1285,99 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
     /// </summary>
     private void UpdateSideControlsFacing()
     {
-        if (_sideControlsFrameObject == null) return;
         Camera cam = Camera.main;
         if (cam == null) return;
 
-        Vector3 toCamera = cam.transform.position - _sideControlsFrameObject.transform.position;
-        toCamera.y = 0;
-        if (toCamera.sqrMagnitude > 0.001f)
+        if (_sideControlsFrameObject != null)
         {
-            // Z+ away from camera (same convention as VideoControlsFrame)
-            Quaternion rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
-            _sideControlsFrameObject.transform.rotation = rotation;
+            Vector3 toCamera = cam.transform.position - _sideControlsFrameObject.transform.position;
+            toCamera.y = 0;
+            if (toCamera.sqrMagnitude > 0.001f)
+                _sideControlsFrameObject.transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
+        }
 
-            // Queue pagination follows same facing
+        if (_queuePagination != null)
+        {
+            Vector3 toCamera = cam.transform.position - _queuePagination.transform.position;
+            toCamera.y = 0;
+            if (toCamera.sqrMagnitude > 0.001f)
+                _queuePagination.transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
+        }
+    }
+
+    /// <summary>
+    /// Adjust side controls and pagination position based on projection type.
+    /// Y boost raises them for immersive eye level. X offset and pagination
+    /// scale are derived from the ACTUAL current DisplayQuad scale (set by
+    /// VRVideoPlayerController.RepositionControlsForProjection) rather than
+    /// hard-coded, so manual popup projection changes that don't rescale quads
+    /// won't cause the queue to jump horizontally.
+    /// </summary>
+    private void PositionSideControlsForProjection(bool isImmersive)
+    {
+        float yBoost = isImmersive ? 0.3f : 0f;
+
+        // Read actual quad scale factor from side controls DisplayQuad.
+        // RepositionControlsForProjection scales quads based on distance (1.25x at 2.5m).
+        // Manual popup changes do NOT rescale → factor stays at previous value → no X jump.
+        float scale = 1f;
+        if (_sideControlsFrameObject != null && _sideControlsOrigQuadScaleX > 0)
+        {
+            var sideMenuFrame = _sideControlsFrameObject.GetComponent<RTTMenuFrame>();
+            if (sideMenuFrame != null)
+            {
+                var quad = sideMenuFrame.GetDisplayQuad();
+                if (quad != null)
+                    scale = quad.transform.localScale.x / _sideControlsOrigQuadScaleX;
+            }
+        }
+
+        float scaledX = _sideControlsBaseX * scale;
+
+        if (_sideControlsFrameObject != null)
+        {
+            float newSideY = _sideControlsBaseY + yBoost;
+            _sideControlsFrameObject.transform.localPosition = new Vector3(scaledX, newSideY, 0);
+
             if (_queuePagination != null)
-                _queuePagination.transform.rotation = rotation;
+            {
+                // Use scaled dimensions: queue quad visual extends further when scaled
+                float scaledSideH = _sidePhysicalH * scale;
+                float scaledPagH = _paginationWorldH * scale;
+                float pagY = newSideY - (scaledSideH / 2f) - _paginationGap - (scaledPagH / 2f);
+                _queuePagination.transform.localPosition = new Vector3(scaledX, pagY, 0);
+
+                // Scale pagination quad to match side controls quad scaling
+                var pagQuad = _queuePagination.GetDisplayQuad();
+                if (pagQuad != null && _paginationOrigQuadScale.sqrMagnitude > 0)
+                {
+                    pagQuad.transform.localScale = new Vector3(
+                        _paginationOrigQuadScale.x * scale,
+                        _paginationOrigQuadScale.y * scale,
+                        _paginationOrigQuadScale.z);
+                }
+            }
         }
     }
 
     private void HandleProjectionSettingsUpdated(VideoProjectionType projection, StereoMode stereo)
     {
-        if (_menuButtonFrameObject == null) return;
-
         bool isImmersive = !ProjectionDetector.SupportsScreenSettings(projection);
 
-        if (isImmersive && Camera.main != null)
+        if (_menuButtonFrameObject != null)
         {
-            PositionMenuButtonImmersive(Camera.main);
+            if (isImmersive && Camera.main != null)
+            {
+                PositionMenuButtonImmersive(Camera.main);
+            }
+            else
+            {
+                PositionMenuButtonFlat();
+            }
         }
-        else
-        {
-            PositionMenuButtonFlat();
-        }
+
+        // Reposition side controls for the new projection type
+        PositionSideControlsForProjection(isImmersive);
     }
 
     private void HandlePlaybackFailed(string error, bool isCodecError, string codecName, string containerFormat)
@@ -1991,6 +2071,28 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             Vector3 toCamera = cam.transform.position - _menuButtonFrameObject.transform.position;
             if (toCamera.sqrMagnitude > 0.001f)
                 _menuButtonFrameObject.transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
+        }
+
+        // Face-to-camera for SideControlsFrame (fixes rotation on Android/Quest)
+        if (_sideControlsFrameObject != null && _sideControlsFrameObject.activeInHierarchy)
+        {
+            Vector3 toCamera = cam.transform.position - _sideControlsFrameObject.transform.position;
+            toCamera.y = 0;
+            if (toCamera.sqrMagnitude > 0.001f)
+            {
+                _sideControlsFrameObject.transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
+            }
+        }
+
+        // Face-to-camera for QueuePagination (uses own position for accurate facing)
+        if (_queuePagination != null && _queuePagination.gameObject.activeInHierarchy)
+        {
+            Vector3 toCamera = cam.transform.position - _queuePagination.transform.position;
+            toCamera.y = 0;
+            if (toCamera.sqrMagnitude > 0.001f)
+            {
+                _queuePagination.transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
+            }
         }
 
         // Reset auto-hide when reticle is hovering the controls frame

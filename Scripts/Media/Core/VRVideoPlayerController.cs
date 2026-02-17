@@ -236,6 +236,9 @@ public class VRVideoPlayerController : MonoBehaviour
         bool isImmersive = !ProjectionDetector.SupportsScreenSettings(projectionType);
         RepositionControlsForProjection(isImmersive, forceReposition: true);
 
+        // Notify VRMediaAppController to reposition side controls + menu button for new projection
+        OnProjectionSettingsUpdated?.Invoke(projectionType, stereoMode);
+
         // Load video
         if (_playbackEngine != null)
         {
