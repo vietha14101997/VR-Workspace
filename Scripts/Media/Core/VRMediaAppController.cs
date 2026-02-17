@@ -512,7 +512,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         if (_controlsContainer != null && _menuFramePosition != Vector3.zero)
         {
             // PlayerControlsGroup positioned in world space (below video screen)
-            Vector3 controlsPos = _menuFramePosition + new Vector3(0, -0.625f, 0);
+            Vector3 controlsPos = _menuFramePosition + _menuFrameRotation * new Vector3(0, -0.625f, 0);
             if (_playerControlsGroup != null)
             {
                 _playerControlsGroup.transform.position = controlsPos;
@@ -1452,7 +1452,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
         // UI settings (global) - midpoint defaults: depth=0, height=0.5, scale=0.5
         // Version migration: clear stale values from old slider ranges
-        const int UI_SETTINGS_VER = 2;
+        const int UI_SETTINGS_VER = 3;
         if (PlayerPrefs.GetInt("MediaPlayer_UISettingsVer", 0) < UI_SETTINGS_VER)
         {
             PlayerPrefs.DeleteKey("MediaPlayer_UIDepth");
@@ -2441,6 +2441,18 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             {
                 _queuePagination.transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
             }
+        }
+
+        // UISettingsPopup: sibling of _playerControlsGroup, positioned at base controls + sideY
+        // Unaffected by UI depth/height/scale adjustments
+        if (_uiSettingsPopupFrame != null && _uiSettingsPopupFrame.activeInHierarchy)
+        {
+            Vector3 basePos = _menuFramePosition + _menuFrameRotation * new Vector3(0, -0.625f, 0);
+            _uiSettingsPopupFrame.transform.position = basePos + new Vector3(0, _sideControlsBaseY, 0);
+            Vector3 toCamera = cam.transform.position - _uiSettingsPopupFrame.transform.position;
+            toCamera.y = 0;
+            if (toCamera.sqrMagnitude > 0.001f)
+                _uiSettingsPopupFrame.transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
         }
 
         // Reset auto-hide when reticle is hovering the controls frame
