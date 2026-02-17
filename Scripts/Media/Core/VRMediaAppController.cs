@@ -1306,20 +1306,18 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
     }
 
     /// <summary>
-    /// Adjust side controls and pagination position based on projection type.
-    /// Y boost raises them for immersive eye level. X offset and pagination
-    /// scale are derived from the ACTUAL current DisplayQuad scale (set by
-    /// VRVideoPlayerController.RepositionControlsForProjection) rather than
-    /// hard-coded, so manual popup projection changes that don't rescale quads
-    /// won't cause the queue to jump horizontally.
+    /// Adjust side controls and pagination position based on current quad scaling.
+    /// X offset and pagination scale are derived from the ACTUAL DisplayQuad scale
+    /// (set by VRVideoPlayerController.RepositionControlsForProjection), so manual
+    /// popup projection changes that don't rescale quads won't cause jumps.
+    /// Y is always _sideControlsBaseY (no boost) for consistent positioning
+    /// across flat/immersive modes and popup/direct play transitions.
     /// </summary>
     private void PositionSideControlsForProjection(bool isImmersive)
     {
-        float yBoost = isImmersive ? 0.3f : 0f;
-
         // Read actual quad scale factor from side controls DisplayQuad.
         // RepositionControlsForProjection scales quads based on distance (1.25x at 2.5m).
-        // Manual popup changes do NOT rescale → factor stays at previous value → no X jump.
+        // Manual popup changes do NOT rescale → factor stays at previous value → no jump.
         float scale = 1f;
         if (_sideControlsFrameObject != null && _sideControlsOrigQuadScaleX > 0)
         {
@@ -1336,15 +1334,14 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
         if (_sideControlsFrameObject != null)
         {
-            float newSideY = _sideControlsBaseY + yBoost;
-            _sideControlsFrameObject.transform.localPosition = new Vector3(scaledX, newSideY, 0);
+            _sideControlsFrameObject.transform.localPosition = new Vector3(scaledX, _sideControlsBaseY, 0);
 
             if (_queuePagination != null)
             {
                 // Use scaled dimensions: queue quad visual extends further when scaled
                 float scaledSideH = _sidePhysicalH * scale;
                 float scaledPagH = _paginationWorldH * scale;
-                float pagY = newSideY - (scaledSideH / 2f) - _paginationGap - (scaledPagH / 2f);
+                float pagY = _sideControlsBaseY - (scaledSideH / 2f) - _paginationGap - (scaledPagH / 2f);
                 _queuePagination.transform.localPosition = new Vector3(scaledX, pagY, 0);
 
                 // Scale pagination quad to match side controls quad scaling
