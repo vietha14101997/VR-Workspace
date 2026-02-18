@@ -332,6 +332,15 @@ public class VRVideoPlayerController : MonoBehaviour
         // Capture previous state BEFORE changing projection
         bool wasImmersive = _projectionSystem.IsImmersiveProjection();
 
+        // Capture picture settings from the CURRENT renderer before switching.
+        // The new renderer may be reused from a previous video with stale shader values.
+        float prevBrightness = GetCurrentShaderFloat("_Brightness", 1f);
+        float prevContrast = GetCurrentShaderFloat("_Contrast", 1f);
+        float prevSaturation = GetCurrentShaderFloat("_Saturation", 1f);
+        float prevTint = GetCurrentShaderFloat("_Tint", 0f);
+        float prevTemperature = GetCurrentShaderFloat("_Temperature", 0f);
+        float prevSharpness = GetCurrentShaderFloat("_Sharpness", 0.5f);
+
         // Choose appropriate display settings
         _displaySettings = isImmersive ? DisplaySettings.Immersive : DisplaySettings.Default;
 
@@ -349,6 +358,37 @@ public class VRVideoPlayerController : MonoBehaviour
         _projectionSystem.UpdateDisplay(_displaySettings);
         // NOTE: No RecenterView() here — sphere center syncs to flat screen direction
         // automatically in SetProjection(). Explicit recenter only via RecenterRoutine().
+
+        // Transfer picture settings to the NEW renderer.
+        // This prevents stale values from a previous video bleeding through.
+        ApplyShaderFloat("_Brightness", prevBrightness);
+        ApplyShaderFloat("_Contrast", prevContrast);
+        ApplyShaderFloat("_Saturation", prevSaturation);
+        ApplyShaderFloat("_Tint", prevTint);
+        ApplyShaderFloat("_Temperature", prevTemperature);
+        ApplyShaderFloat("_Sharpness", prevSharpness);
+
+        // Reset immersive-specific adjustments to defaults when switching TO immersive.
+        // These are per-video settings that should not carry over from a previous immersive video.
+        if (isImmersive && _projectionSystem.ActiveRenderer is ImmersiveSphereRenderer imm)
+        {
+            imm.SetShaderFloat("_Tilt", 0f);
+            imm.SetShaderFloat("_VerticalShift", 0f);
+            imm.SetShaderFloat("_HorizontalShift", 0f);
+            imm.SetShaderFloat("_LRInverse", 0f);
+            imm.ResetFOVZoom();
+        }
+
+        // Reset flat renderer board alpha when switching TO flat.
+        // During SwitchToPlayer, SetAllPlayerFramesAlpha(0f) may have set boardAlpha=0
+        // on the flat renderer before the system switched to immersive. The fade-in
+        // animation only restores brightness on the immersive renderer (the active one),
+        // leaving flat's boardAlpha stuck at 0. This makes the flat screen invisible
+        // when the user later switches back to Flat via the projection popup.
+        if (!isImmersive && _projectionSystem.ActiveRenderer is FlatProjectionRenderer flat)
+        {
+            flat.SetBoardAlpha(1f);
+        }
 
         // Update environment based on projection type
         if (_environmentController != null)
