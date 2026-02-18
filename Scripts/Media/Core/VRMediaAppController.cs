@@ -97,6 +97,12 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
     private float _menuButtonOffsetDist;   // distance from camera
     private float _menuButtonOffsetY;      // Y offset from camera eye height
 
+    // Immersive mode: controls container follows camera to stay fixed in video space
+    private bool _controlsFollowCamera;
+    private Vector3 _controlsOffsetDir;   // unit direction from camera to controls
+    private float _controlsOffsetDist;    // distance from camera
+    private float _controlsOffsetY;       // Y offset from camera eye height
+
     // Controls frame reference for hover detection
     private RTTCanvasBase _controlsCanvasBase;
 
@@ -553,6 +559,16 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             {
                 PositionMenuButtonFlat();
             }
+        }
+
+        // Immersive mode: controls container follows camera position each frame
+        if (willBeImmersive && Camera.main != null && _controlsContainer != null)
+        {
+            SetupControlsFollowCamera(Camera.main);
+        }
+        else
+        {
+            _controlsFollowCamera = false;
         }
 
         // Adjust side controls + pagination Y for immersive mode (raise to eye level)
@@ -1315,6 +1331,8 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         _uiSettingsPopupFrame?.SetActive(false);
         _uiSettingsBlocker?.SetActive(false);
 
+        _controlsFollowCamera = false;
+
         if (_controlsPanel != null)
         {
             _controlsPanel.gameObject.SetActive(false);
@@ -1770,6 +1788,29 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
     }
 
     /// <summary>
+    /// Set up controls container to follow camera position in immersive mode.
+    /// Calculates offset from camera to current controls position so LateUpdate
+    /// can maintain it each frame — keeps controls fixed in video space.
+    /// </summary>
+    private void SetupControlsFollowCamera(Camera cam)
+    {
+        Vector3 controlsPos = _controlsContainer.transform.position;
+        Vector3 camPos = cam.transform.position;
+
+        // Horizontal offset direction (Y=0 plane)
+        Vector3 horizontal = controlsPos - camPos;
+        float yOffset = horizontal.y;
+        horizontal.y = 0;
+        float dist = horizontal.magnitude;
+        Vector3 dir = dist > 0.001f ? horizontal / dist : cam.transform.forward;
+
+        _controlsFollowCamera = true;
+        _controlsOffsetDir = dir;
+        _controlsOffsetDist = dist;
+        _controlsOffsetY = yOffset;
+    }
+
+    /// <summary>
     /// Update SideControlsFrame rotation to face camera horizontally.
     /// Called after container positioning to ensure correct facing direction.
     /// </summary>
@@ -1847,6 +1888,16 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             {
                 PositionMenuButtonFlat();
             }
+        }
+
+        // Controls container: follow camera in immersive, stop following in flat
+        if (isImmersive && Camera.main != null && _controlsContainer != null)
+        {
+            SetupControlsFollowCamera(Camera.main);
+        }
+        else
+        {
+            _controlsFollowCamera = false;
         }
 
         // Reposition side controls for the new projection type
@@ -2522,6 +2573,14 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
     {
         Camera cam = Camera.main;
         if (cam == null) return;
+
+        // Controls container: follow camera position in immersive mode (stays fixed in video space)
+        if (_controlsFollowCamera && _controlsContainer != null && _controlsContainer.activeInHierarchy)
+        {
+            Vector3 pos = cam.transform.position + _controlsOffsetDir * _controlsOffsetDist;
+            pos.y = cam.transform.position.y + _controlsOffsetY;
+            _controlsContainer.transform.position = pos;
+        }
 
         // Face-to-camera for VideoControlsFrame (child of the identity-rotated container)
         if (_controlsFrameObject != null && _controlsFrameObject.activeInHierarchy)

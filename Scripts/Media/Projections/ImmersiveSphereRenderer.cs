@@ -145,6 +145,14 @@ public class ImmersiveSphereRenderer : MonoBehaviour, IProjectionRenderer
             _sphereObject.SetActive(true);
         }
         _isActive = true;
+
+        // For 360 mode: snapshot _CameraForward so zoom center is fixed
+        if (_projectionMode == ProjectionMode.Equirect360 && _material != null)
+        {
+            Camera cam = Camera.main;
+            if (cam != null)
+                _material.SetVector("_CameraForward", cam.transform.forward);
+        }
     }
 
     public void Hide()
@@ -162,6 +170,14 @@ public class ImmersiveSphereRenderer : MonoBehaviour, IProjectionRenderer
         if (Camera.main != null)
         {
             _shaderRotationOffset = Camera.main.transform.eulerAngles.y;
+
+            // For 360 mode: fix _CameraForward to current camera direction.
+            // This keeps the zoom center fixed in video space so content doesn't
+            // shift when rotating the camera (prevents UI drift).
+            if (_projectionMode == ProjectionMode.Equirect360 && _material != null)
+            {
+                _material.SetVector("_CameraForward", Camera.main.transform.forward);
+            }
         }
         else
         {
@@ -211,6 +227,14 @@ public class ImmersiveSphereRenderer : MonoBehaviour, IProjectionRenderer
         {
             _material.SetFloat("_ProjectionMode", (float)mode);
             _material.SetFloat("_FOV", _currentFOV);
+
+            // Switching to 360: snapshot _CameraForward for fixed zoom center
+            if (mode == ProjectionMode.Equirect360)
+            {
+                Camera cam = Camera.main;
+                if (cam != null)
+                    _material.SetVector("_CameraForward", cam.transform.forward);
+            }
         }
 
         Debug.Log($"[ImmersiveSphereRenderer] Projection mode: {mode}, FOV: {_currentFOV}");
@@ -497,7 +521,13 @@ public class ImmersiveSphereRenderer : MonoBehaviour, IProjectionRenderer
         Camera cam = Camera.main;
         if (cam != null)
         {
-            _material.SetVector("_CameraForward", cam.transform.forward);
+            // 180 mode: update _CameraForward each frame (zoom-in follows gaze)
+            // 360 mode: _CameraForward is set once at RecenterView/Show (fixed zoom center
+            //   keeps video content stable at each direction → UI doesn't drift)
+            if (_projectionMode == ProjectionMode.Equirect180)
+            {
+                _material.SetVector("_CameraForward", cam.transform.forward);
+            }
         }
     }
 
