@@ -405,7 +405,10 @@ public class VideoPlaybackEngine : MonoBehaviour
         CleanupRenderTexture();
 
         OutputTexture = new RenderTexture(width, height, 0, RenderTextureFormat.ARGB32);
+        OutputTexture.useMipMap = true;
+        OutputTexture.autoGenerateMips = true;
         OutputTexture.filterMode = FilterMode.Trilinear;
+        OutputTexture.anisoLevel = 16;
         OutputTexture.wrapMode = TextureWrapMode.Clamp;
         OutputTexture.Create();
 

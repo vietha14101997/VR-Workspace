@@ -372,7 +372,7 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
         _worldPanel.enableSharpening = true; // Enable sharpening for video
         _worldPanel.sharpnessStrength = 0.5f;
         _worldPanel.anisoLevel = 16;
-        _worldPanel.mipMapBias = -0.5f;
+        _worldPanel.mipMapBias = -0.25f;
         _worldPanel.cursorEnable = false; // No cursor for video projection
         
         // Initialize

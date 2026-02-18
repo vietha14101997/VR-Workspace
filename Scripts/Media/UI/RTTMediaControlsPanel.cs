@@ -49,8 +49,6 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
 
     #region Events
     public event Action OnPlayPause;
-    public event Action OnBackward;
-    public event Action OnForward;
     public event Action<float> OnSeek;
     public event Action<float> OnVolumeChanged;
     public event Action<float> OnSpeedChanged;
@@ -125,7 +123,6 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     private float _previousVolume = 1f;
     private float _speed = 1f;
     private bool _isSeeking = false;
-    private bool _isHovering = false;
     private Coroutine _fadeCoroutine;
 
     // Sprites
@@ -1229,12 +1226,10 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     #region Pointer Interfaces
     public void OnPointerEnter(PointerEventData eventData)
     {
-        _isHovering = true;
     }
 
     public void OnPointerExit(PointerEventData eventData)
     {
-        _isHovering = false;
     }
     #endregion
     #endregion

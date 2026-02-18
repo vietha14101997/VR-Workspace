@@ -86,6 +86,13 @@ public class ImmersiveSphereRenderer : MonoBehaviour, IProjectionRenderer
     {
         if (_material == null) return;
 
+        // Apply VR texture quality (mipmaps configured on source RenderTexture)
+        if (texture != null)
+        {
+            texture.filterMode = FilterMode.Trilinear;
+            texture.anisoLevel = 16;
+        }
+
         _material.SetTexture("_MainTex", texture);
         _material.SetFloat("_UseNV12", 0);
     }
