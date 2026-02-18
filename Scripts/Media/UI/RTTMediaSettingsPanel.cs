@@ -151,6 +151,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
     private static Sprite _topRoundedRectSprite;
     private static Sprite _circleSprite;
     private static Sprite _pillSprite;
+    private static Dictionary<int, Sprite> _sizedPillCache = new Dictionary<int, Sprite>();
     private float _menuSpacing;
 
     // Sub-page UI references - Video Adjustments
@@ -853,15 +854,13 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         segLE.preferredHeight = segHeight;
 
         var segBg = segContainer.AddComponent<Image>();
-        segBg.sprite = GetPillSprite();
+        segBg.sprite = GetSizedPillSprite(segHeight);
         segBg.type = Image.Type.Sliced;
-        segBg.pixelsPerUnitMultiplier = 64f / segHeight;
         segBg.color = new Color(0.20f, 0.20f, 0.22f, 1.0f);
 
-        int pillPad = Mathf.RoundToInt(segHeight * 0.25f);
         var segLayout = segContainer.AddComponent<HorizontalLayoutGroup>();
         segLayout.spacing = 0;
-        segLayout.padding = new RectOffset(pillPad, pillPad, 0, 0);
+        segLayout.padding = new RectOffset(0, 0, 0, 0);
         segLayout.childAlignment = TextAnchor.MiddleCenter;
         segLayout.childControlWidth = true;
         segLayout.childControlHeight = true;
@@ -892,12 +891,11 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         GameObject btnObj = new GameObject($"Speed_{label}");
         btnObj.transform.SetParent(parent, false);
 
-        // Background (circle sprite, preserveAspect keeps it circular)
+        // Background (pill sprite, Sliced mode fills cell width with rounded ends)
         var bgImage = btnObj.AddComponent<Image>();
-        bgImage.sprite = GetCircleSprite();
+        bgImage.sprite = GetSizedPillSprite(btnHeight);
+        bgImage.type = Image.Type.Sliced;
         bgImage.color = Color.clear;
-        bgImage.type = Image.Type.Simple;
-        bgImage.preserveAspect = true;
 
         var button = btnObj.AddComponent<Button>();
         button.targetGraphic = bgImage;
@@ -1636,12 +1634,15 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         toggleLE.preferredWidth = trackW;
         toggleLE.preferredHeight = trackH;
 
-        // Track background (pill sprite with proper semicircle ends)
+        // Track background (sized pill sprite — texture height matches trackH for perfect semicircles)
         var trackImage = toggleObj.AddComponent<Image>();
-        trackImage.sprite = GetPillSprite();
+        trackImage.sprite = GetSizedPillSprite(trackH);
         trackImage.type = Image.Type.Sliced;
-        trackImage.pixelsPerUnitMultiplier = 64f / trackH;
         trackImage.color = Color.white;
+
+        // Explicit RectTransform size (must be after AddComponent<Image> which creates the RectTransform)
+        var toggleRT = toggleObj.GetComponent<RectTransform>();
+        toggleRT.sizeDelta = new Vector2(trackW, trackH);
 
         // Thumb (black circular knob)
         GameObject thumbObj = new GameObject("Thumb");
@@ -1668,15 +1669,20 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         toggle.graphic = null;
         toggle.transition = Selectable.Transition.None;
 
+        Color toggleOnColor = new Color(
+            Mathf.Lerp(THEME_COLOR.r, 1f, 0.35f),
+            Mathf.Lerp(THEME_COLOR.g, 1f, 0.35f),
+            Mathf.Lerp(THEME_COLOR.b, 1f, 0.35f), 1f);
+
         toggle.onValueChanged.AddListener((val) =>
         {
-            trackImage.color = val ? THEME_COLOR : Color.white;
+            trackImage.color = val ? toggleOnColor : Color.white;
             thumbRT.anchoredPosition = new Vector2(val ? (trackW - offX) : offX, 0);
             onChanged?.Invoke(val);
         });
 
         if (defaultValue)
-            trackImage.color = THEME_COLOR;
+            trackImage.color = toggleOnColor;
 
         // Row-level button so clicking anywhere on the row toggles the switch
         var rowButton = rowObj.AddComponent<Button>();
@@ -2017,6 +2023,57 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         _pillSprite = Sprite.Create(tex, new Rect(0, 0, texW, texH),
             Vector2.one * 0.5f, 100f, 0, SpriteMeshType.FullRect, border);
         return _pillSprite;
+    }
+
+    /// <summary>
+    /// Pill sprite sized for a specific element height. Texture height = target height,
+    /// so 9-slice borders naturally match without pixelsPerUnitMultiplier scaling.
+    /// </summary>
+    private static Sprite GetSizedPillSprite(float targetHeight)
+    {
+        int h = Mathf.Max(4, Mathf.RoundToInt(targetHeight));
+        if (_sizedPillCache.TryGetValue(h, out var cached) && cached != null) return cached;
+
+        int texH = h;
+        int texW = Mathf.Max(h * 2, 16);
+        int radius = texH / 2;
+
+        var tex = new Texture2D(texW, texH, TextureFormat.RGBA32, false);
+        for (int y = 0; y < texH; y++)
+        {
+            for (int x = 0; x < texW; x++)
+            {
+                float alpha = 1f;
+                Vector2 corner = Vector2.zero;
+                bool isCorner = false;
+
+                if (x < radius && y < radius)
+                { corner = new Vector2(radius, radius); isCorner = true; }
+                else if (x >= texW - radius && y < radius)
+                { corner = new Vector2(texW - radius - 1, radius); isCorner = true; }
+                else if (x < radius && y >= texH - radius)
+                { corner = new Vector2(radius, texH - radius - 1); isCorner = true; }
+                else if (x >= texW - radius && y >= texH - radius)
+                { corner = new Vector2(texW - radius - 1, texH - radius - 1); isCorner = true; }
+
+                if (isCorner)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), corner);
+                    alpha = Mathf.Clamp01(radius - dist + 0.5f);
+                }
+
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+            }
+        }
+        tex.Apply();
+        tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
+
+        Vector4 border = new Vector4(radius + 1, radius, radius + 1, radius);
+        var sprite = Sprite.Create(tex, new Rect(0, 0, texW, texH),
+            Vector2.one * 0.5f, 100f, 0, SpriteMeshType.FullRect, border);
+        _sizedPillCache[h] = sprite;
+        return sprite;
     }
     #endregion
 }
