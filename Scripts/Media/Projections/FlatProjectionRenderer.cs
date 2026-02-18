@@ -280,13 +280,25 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
             rend.material.SetFloat(property, value);
     }
 
+    public float GetBoardShaderFloat(string property, float defaultVal = 0f)
+    {
+        if (_worldPanel == null || _worldPanel.board == null) return defaultVal;
+        var rend = _worldPanel.board.GetComponent<Renderer>();
+        if (rend != null && rend.material.HasProperty(property))
+            return rend.material.GetFloat(property);
+        return defaultVal;
+    }
+
     /// <summary>
     /// Set aspect ratio override. Pass "default" to use video native aspect.
     /// </summary>
     private float _aspectRatioOverride = 0f;
+    private string _aspectRatioString = "default";
+    public string AspectRatioOverrideString => _aspectRatioString;
 
     public void SetAspectRatioOverride(string ratio)
     {
+        _aspectRatioString = ratio ?? "default";
         switch (ratio)
         {
             case "4:3": _aspectRatioOverride = 4f / 3f; break;

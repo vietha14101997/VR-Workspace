@@ -346,6 +346,16 @@ public class ImmersiveSphereRenderer : MonoBehaviour, IProjectionRenderer
         if (_material != null && _material.HasProperty(property))
             _material.SetFloat(property, value);
     }
+
+    /// <summary>
+    /// Get a generic shader float property value.
+    /// </summary>
+    public float GetShaderFloat(string property, float defaultVal = 0f)
+    {
+        if (_material != null && _material.HasProperty(property))
+            return _material.GetFloat(property);
+        return defaultVal;
+    }
     #endregion
 
     #region Private Methods

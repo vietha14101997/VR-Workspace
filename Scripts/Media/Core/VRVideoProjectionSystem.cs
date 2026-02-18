@@ -333,6 +333,13 @@ public class VRVideoProjectionSystem : MonoBehaviour
             flat.SetAspectRatioOverride(ratio);
     }
 
+    public string GetAspectRatioOverride()
+    {
+        if (ActiveRenderer is FlatProjectionRenderer flat)
+            return flat.AspectRatioOverrideString;
+        return "default";
+    }
+
     /// <summary>
     /// Recenter the view.
     /// </summary>

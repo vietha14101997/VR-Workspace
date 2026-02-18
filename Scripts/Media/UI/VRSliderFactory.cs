@@ -440,6 +440,14 @@ public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler,
     /// </summary>
     public event Action<float> OnHoverPositionChanged; // Normalized position (0-1)
     public Func<float, string> OnFormatPreview; // Custom formatter for preview text
+    /// <summary>
+    /// Fired when pointer enters the slider area.
+    /// </summary>
+    public event Action OnHoverEnter;
+    /// <summary>
+    /// Fired when pointer exits the slider area.
+    /// </summary>
+    public event Action OnHoverExit;
     #endregion
 
     #region Properties
@@ -451,6 +459,7 @@ public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler,
 
     public float NormalizedValue => (_value - _minValue) / (_maxValue - _minValue);
     public bool IsDragging { get; private set; }
+    public RectTransform HandleTransform => _handleRT;
     #endregion
 
     #region Private Fields
@@ -625,6 +634,7 @@ public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler,
         Debug.Log($"[VRSliderControl] OnPointerEnter called on {gameObject.name}");
         _isHovering = true;
         ShowPreview();
+        OnHoverEnter?.Invoke();
     }
 
     public void OnPointerExit(PointerEventData eventData)
@@ -632,6 +642,7 @@ public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler,
         Debug.Log($"[VRSliderControl] OnPointerExit called on {gameObject.name}");
         _isHovering = false;
         HidePreview();
+        OnHoverExit?.Invoke();
     }
 
     private void Update()

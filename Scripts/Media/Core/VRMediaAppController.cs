@@ -746,6 +746,9 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
     private void BuildPlayerUI()
     {
+        // Initialize per-video settings cache (no-op if already loaded)
+        VideoSettingsCache.LoadFromDisk();
+
         int vLayer = LayerMask.NameToLayer("VirtualObjects");
         if (vLayer < 0) vLayer = 0;
 

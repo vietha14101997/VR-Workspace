@@ -1,5 +1,6 @@
 using UnityEngine;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 
@@ -56,6 +57,12 @@ public class VRVideoPlayerController : MonoBehaviour
 
     // Stereo UI shader for controls panel (supports per-eye offset, used even with offset=0)
     private const string STEREO_UI_SHADER = "VRWorkspace/UI/StereoUIPanel";
+
+    // Per-video settings cache: auto-save every 10s, restore on re-open
+    private Coroutine _autoSaveCoroutine;
+    private VideoSettingsEntry _cachedEntry;  // pending restore (consumed after HandleVideoPrepared)
+    private double _resumePosition = 0;
+    private bool _isStopped = true; // Guard against double-Stop() corrupting saved settings
 
     #endregion
 
@@ -222,25 +229,61 @@ public class VRVideoPlayerController : MonoBehaviour
             return;
         }
 
+        // Save current video settings before switching
+        SaveCurrentVideoSettings();
+        StopAutoSaveTimer();
+
         _currentVideo = video;
         CurrentVideo = video;
+        _isStopped = false; // Mark as active (allows Stop() to save settings once)
         OnVideoChanged?.Invoke(video.Path);
 
-        // Detect projection and stereo mode automatically (metadata -> filename -> resolution)
-        ProjectionDetector.DetectProjectionAndStereo(
-            video.Path, video.Width, video.Height,
-            out var projectionType, out var stereoMode);
+        // Hide projection during loading (will Show after all settings applied)
+        _projectionSystem?.Hide();
 
-        Debug.Log($"[VRVideoPlayerController] Playing: {video.Title}, Detected Projection: {projectionType}, Stereo: {stereoMode}");
+        VideoProjectionType projectionType;
+        StereoMode stereoMode;
 
-        // Configure projection system
+        // Priority 1: Per-video cache (user's previous settings for this video)
+        var cached = VideoSettingsCache.Get(video.Path);
+        if (cached != null)
+        {
+            projectionType = (VideoProjectionType)cached.Projection;
+            stereoMode = (StereoMode)cached.Stereo;
+            _currentMonitor = (RTTMediaProjectionPopup.MonitorType)cached.Monitor;
+            _currentEnv = (RTTMediaProjectionPopup.EnvironmentType)cached.Environment;
+            _resumePosition = cached.PlaybackPosition;
+            _cachedEntry = cached; // will restore picture/immersive settings after prepare
+            Debug.Log($"[VRVideoPlayerController] Playing: {video.Title}, Cache → {projectionType}, {stereoMode}, Monitor={_currentMonitor}, Resume={_resumePosition:F1}s");
+        }
+        else
+        {
+            // Priority 2: Try metadata detection (fast, synchronous)
+            var metadata = VideoSphericalMetadataReader.ReadMetadata(video.Path);
+            if (metadata.HasMetadata)
+            {
+                projectionType = ProjectionDetector.InterpretProjection(metadata, video.Width, video.Height);
+                stereoMode = ProjectionDetector.InterpretStereo(metadata);
+                Debug.Log($"[VRVideoPlayerController] Playing: {video.Title}, Metadata → {projectionType}, {stereoMode}");
+            }
+            else
+            {
+                // Priority 3: Default Flat + Mono
+                projectionType = VideoProjectionType.Flat;
+                stereoMode = StereoMode.Mono;
+                Debug.Log($"[VRVideoPlayerController] Playing: {video.Title}, No metadata → Flat/Mono");
+            }
+            _resumePosition = 0;
+            _cachedEntry = null;
+
+            // Reset per-video settings to defaults (prevent leaking from previous video)
+            _currentMonitor = RTTMediaProjectionPopup.MonitorType.Flat;
+            _currentEnv = RTTMediaProjectionPopup.EnvironmentType.Room;
+        }
+
         ApplyProjectionSettings(projectionType, stereoMode);
-
-        // Reposition controls on initial playback (both flat and immersive)
         bool isImmersive = !ProjectionDetector.SupportsScreenSettings(projectionType);
         RepositionControlsForProjection(isImmersive, forceReposition: true);
-
-        // Notify VRMediaAppController to reposition side controls + menu button for new projection
         OnProjectionSettingsUpdated?.Invoke(projectionType, stereoMode);
 
         // Load video
@@ -248,6 +291,8 @@ public class VRVideoPlayerController : MonoBehaviour
         {
             _playbackEngine.PrepareLocal(video.Path);
         }
+
+        StartAutoSaveTimer();
 
         // Update controls
         if (_controlsPanel != null)
@@ -280,6 +325,10 @@ public class VRVideoPlayerController : MonoBehaviour
         if (!isImmersive)
         {
             _displaySettings.Distance = 0f;
+
+            // Preserve current monitor type curvature (user may have selected Curved)
+            if (_currentMonitor == RTTMediaProjectionPopup.MonitorType.Curved)
+                _displaySettings.Curvature = 0.25f;
         }
 
         _projectionSystem.SetProjection(projectionType, stereoMode);
@@ -628,6 +677,14 @@ public class VRVideoPlayerController : MonoBehaviour
     /// </summary>
     public void Stop()
     {
+        // Only save settings once (prevents second Stop() from overwriting good data with stale engine state)
+        if (!_isStopped)
+        {
+            SaveCurrentVideoSettings();
+            _isStopped = true;
+        }
+        StopAutoSaveTimer();
+
         _playbackEngine?.Stop();
         _projectionSystem?.Hide();
 
@@ -1004,12 +1061,15 @@ public class VRVideoPlayerController : MonoBehaviour
     {
         Debug.Log("[VRVideoPlayerController] Video prepared");
 
-        // Set video texture to projection
+        // Reset renderer aspect ratio before setting new texture (renderer is reused, not recreated)
+        _projectionSystem?.SetAspectRatioOverride("default");
+
+        // Step 1: Set video texture (renderer is hidden via Hide() in PlayVideo)
         if (_playbackEngine != null && _projectionSystem != null)
         {
             var outputTexture = _playbackEngine.OutputTexture;
             Debug.Log($"[VRVideoPlayerController] OutputTexture: {(outputTexture != null ? $"{outputTexture.width}x{outputTexture.height}" : "null")}");
-            
+
             if (_playbackEngine.UseNV12Output)
             {
                 Debug.Log("[VRVideoPlayerController] Using NV12 output");
@@ -1023,22 +1083,28 @@ public class VRVideoPlayerController : MonoBehaviour
                 Debug.Log("[VRVideoPlayerController] Using standard texture output");
                 _projectionSystem.SetTexture(_playbackEngine.OutputTexture);
             }
-
-            Debug.Log("[VRVideoPlayerController] Calling ProjectionSystem.Show()");
-            _projectionSystem.Show();
-            
-            Debug.Log($"[VRVideoPlayerController] Projection visible: {_projectionSystem.IsVisible}, ActiveRenderer: {_projectionSystem.ActiveRenderer?.GetType().Name ?? "null"}");
         }
         else
         {
             Debug.LogError($"[VRVideoPlayerController] Cannot set texture - PlaybackEngine: {_playbackEngine != null}, ProjectionSystem: {_projectionSystem != null}");
         }
 
-        // Update controls with duration and aspect ratio
+        // Step 2: Apply ALL settings BEFORE showing projection
+        // Reset environment for videos without cache
+        if (_cachedEntry == null && _environmentController != null)
+        {
+            _environmentController.ShowEnvironment();
+            _environmentController.SetLightsEnabled(true);
+        }
+
+        // Restore cached picture/immersive/display/aspect settings
+        RestoreCachedSettings();
+
+        // Step 3: Update controls
         if (_controlsPanel != null && _playbackEngine != null)
         {
             _controlsPanel.SetDuration((float)_playbackEngine.Duration);
-            
+
             // Set aspect ratio for preview frame
             float ratio = 16f / 9f; // Default
             if (_playbackEngine.UseNV12Output && _playbackEngine.YPlaneTexture != null)
@@ -1049,33 +1115,63 @@ public class VRVideoPlayerController : MonoBehaviour
             {
                 ratio = (float)_playbackEngine.OutputTexture.width / _playbackEngine.OutputTexture.height;
             }
-            
+
             if (ratio > 0)
             {
                 _controlsPanel.SetPreviewAspectRatio(ratio);
             }
-            
+
             // Set the main video texture as the preview (mirrors playback)
-            // Note: NV12 textures might need shader conversion for RawImage, 
-            // but OutputTexture (RGB) usually works for preview if available.
             if (_playbackEngine.OutputTexture != null)
             {
                 _controlsPanel.SetPreviewTexture(_playbackEngine.OutputTexture);
             }
         }
 
-        // Auto-play moved to HandleBufferingCompleted() - first frame will be primed before playback starts
+        // Step 4: Show projection AFTER all settings applied
+        if (_projectionSystem != null)
+        {
+            _projectionSystem.Show();
+            Debug.Log($"[VRVideoPlayerController] Projection visible: {_projectionSystem.IsVisible}, ActiveRenderer: {_projectionSystem.ActiveRenderer?.GetType().Name ?? "null"}");
+        }
+
         Debug.Log("[VRVideoPlayerController] Buffering first frame...");
     }
 
     private void HandleBufferingCompleted()
     {
+        // Resume from cached position if available
+        if (_resumePosition > 1.0 && _playbackEngine != null)
+        {
+            // Don't resume if position is near or past the end
+            double duration = _playbackEngine.Duration;
+            if (_resumePosition < duration - 2.0)
+            {
+                Debug.Log($"[VRVideoPlayerController] Resuming from cached position: {_resumePosition:F1}s");
+                _playbackEngine.Seek(_resumePosition);
+            }
+            _resumePosition = 0;
+        }
+
         Debug.Log("[VRVideoPlayerController] Buffering complete - starting playback");
         _playbackEngine?.Play();
     }
 
     private void HandlePlaybackEnded()
     {
+        // Save settings first, then reset position to 0 (video completed, don't resume at end)
+        SaveCurrentVideoSettings();
+        if (_currentVideo.HasValue)
+        {
+            var entry = VideoSettingsCache.Get(_currentVideo.Value.Path);
+            if (entry != null)
+            {
+                entry.PlaybackPosition = 0;
+                VideoSettingsCache.FlushToDisk();
+            }
+        }
+        _isStopped = true; // Prevent Stop() from overwriting position=0 with end-of-video time
+        StopAutoSaveTimer();
         Debug.Log("[VRVideoPlayerController] Playback ended");
 
         if (_controlsPanel != null)
@@ -1406,6 +1502,16 @@ public class VRVideoPlayerController : MonoBehaviour
         }
     }
 
+    private void OnApplicationQuit()
+    {
+        // Save settings on app quit (safety net for Android where OnDestroy may not fire)
+        if (!_isStopped)
+        {
+            SaveCurrentVideoSettings();
+            _isStopped = true;
+        }
+    }
+
     private void OnDestroy()
     {
         // Unwire events
@@ -1489,4 +1595,157 @@ public class VRVideoPlayerController : MonoBehaviour
         objective.rotation = Quaternion.LookRotation(camForward);
     }
 }
+
+    #region Per-Video Settings Cache
+
+    private void StartAutoSaveTimer()
+    {
+        StopAutoSaveTimer();
+        _autoSaveCoroutine = StartCoroutine(AutoSaveLoop());
+    }
+
+    private void StopAutoSaveTimer()
+    {
+        if (_autoSaveCoroutine != null)
+        {
+            StopCoroutine(_autoSaveCoroutine);
+            _autoSaveCoroutine = null;
+        }
+    }
+
+    private IEnumerator AutoSaveLoop()
+    {
+        var wait = new WaitForSeconds(10f);
+        while (true)
+        {
+            yield return wait;
+            SaveCurrentVideoSettings();
+        }
+    }
+
+    private void SaveCurrentVideoSettings()
+    {
+        if (_isStopped) return; // Already saved during Stop(), engine state is stale
+        if (_currentVideo == null || string.IsNullOrEmpty(_currentVideo.Value.Path)) return;
+
+        var entry = new VideoSettingsEntry
+        {
+            FilePath = _currentVideo.Value.Path,
+            Projection = (int)(_projectionSystem?.CurrentProjection ?? VideoProjectionType.Flat),
+            Stereo = (int)(_projectionSystem?.CurrentStereoMode ?? StereoMode.Mono),
+            Monitor = (int)_currentMonitor,
+            Environment = (int)_currentEnv,
+            PlaybackPosition = _playbackEngine?.CurrentTime ?? 0,
+            PlaybackSpeed = _playbackEngine?.PlaybackSpeed ?? 1f,
+            Brightness = GetCurrentShaderFloat("_Brightness", 1f),
+            Contrast = GetCurrentShaderFloat("_Contrast", 1f),
+            Saturation = GetCurrentShaderFloat("_Saturation", 1f),
+            Sharpness = GetCurrentShaderFloat("_Sharpness", 0.5f),
+            Tint = GetCurrentShaderFloat("_Tint", 0f),
+            Temperature = GetCurrentShaderFloat("_Temperature", 0f),
+            ScreenDistance = _displaySettings.Distance,
+            ScreenScale = _displaySettings.Scale,
+            ScreenCurvature = _displaySettings.Curvature,
+            AspectRatio = _projectionSystem?.GetAspectRatioOverride() ?? "default",
+            FOVZoom = GetImmersiveFOV(),
+            ImmTilt = GetCurrentShaderFloat("_Tilt", 0f),
+            ImmYaw = GetCurrentShaderFloat("_YawOffset", 0f),
+            VerticalShift = GetCurrentShaderFloat("_VerticalShift", 0f),
+            HorizontalShift = GetCurrentShaderFloat("_HorizontalShift", 0f),
+            LRInverse = GetCurrentShaderFloat("_LRInverse", 0f) > 0.5f,
+            LastAccessedTicks = System.DateTime.UtcNow.Ticks
+        };
+
+        VideoSettingsCache.Set(entry.FilePath, entry);
+        VideoSettingsCache.FlushToDisk();
+        Debug.Log($"[VRVideoPlayerController] Saved settings: Position={entry.PlaybackPosition:F1}s, Brightness={entry.Brightness:F2}, AR={entry.AspectRatio}");
+    }
+
+    private void RestoreCachedSettings()
+    {
+        if (_cachedEntry == null) return;
+
+        // Restore picture adjustments
+        ApplyShaderFloat("_Brightness", _cachedEntry.Brightness);
+        ApplyShaderFloat("_Contrast", _cachedEntry.Contrast);
+        ApplyShaderFloat("_Saturation", _cachedEntry.Saturation);
+        ApplyShaderFloat("_Sharpness", _cachedEntry.Sharpness);
+        ApplyShaderFloat("_Tint", _cachedEntry.Tint);
+        ApplyShaderFloat("_Temperature", _cachedEntry.Temperature);
+
+        // Restore display settings (flat mode only)
+        if (ProjectionDetector.SupportsScreenSettings((VideoProjectionType)_cachedEntry.Projection))
+        {
+            _displaySettings.Distance = _cachedEntry.ScreenDistance;
+            _displaySettings.Scale = _cachedEntry.ScreenScale;
+            _projectionSystem?.UpdateDisplay(_displaySettings);
+
+            // Restore aspect ratio
+            _projectionSystem?.SetAspectRatioOverride(_cachedEntry.AspectRatio ?? "default");
+        }
+
+        // Restore immersive settings
+        if (_projectionSystem?.ActiveRenderer is ImmersiveSphereRenderer imm)
+        {
+            if (_cachedEntry.FOVZoom > 0f) imm.SetFieldOfView(_cachedEntry.FOVZoom);
+            imm.SetShaderFloat("_Tilt", _cachedEntry.ImmTilt);
+            imm.SetShaderFloat("_VerticalShift", _cachedEntry.VerticalShift);
+            imm.SetShaderFloat("_HorizontalShift", _cachedEntry.HorizontalShift);
+            if (_cachedEntry.LRInverse) imm.SetShaderFloat("_LRInverse", 1f);
+        }
+
+        // Restore playback speed
+        if (_playbackEngine != null && _cachedEntry.PlaybackSpeed > 0f)
+            _playbackEngine.PlaybackSpeed = _cachedEntry.PlaybackSpeed;
+
+        // Restore environment: set lights based on cached env type
+        if (_environmentController != null)
+        {
+            switch ((RTTMediaProjectionPopup.EnvironmentType)_cachedEntry.Environment)
+            {
+                case RTTMediaProjectionPopup.EnvironmentType.Cinema:
+                    _environmentController.SetLightsEnabled(false);
+                    break;
+                case RTTMediaProjectionPopup.EnvironmentType.LightOff:
+                    _environmentController.SetLightsEnabled(false);
+                    _environmentController.HideEnvironment();
+                    break;
+                case RTTMediaProjectionPopup.EnvironmentType.Room:
+                    _environmentController.SetLightsEnabled(true);
+                    _environmentController.ShowEnvironment();
+                    break;
+            }
+        }
+
+        Debug.Log($"[VRVideoPlayerController] Restored cached settings: Brightness={_cachedEntry.Brightness:F2}, " +
+            $"Speed={_cachedEntry.PlaybackSpeed:F2}, FOV={_cachedEntry.FOVZoom:F0}");
+
+        _cachedEntry = null; // consumed
+    }
+
+    private void ApplyShaderFloat(string param, float value)
+    {
+        if (_projectionSystem?.ActiveRenderer is ImmersiveSphereRenderer imm)
+            imm.SetShaderFloat(param, value);
+        else if (_projectionSystem?.ActiveRenderer is FlatProjectionRenderer flat)
+            flat.SetBoardShaderFloat(param, value);
+    }
+
+    private float GetCurrentShaderFloat(string param, float defaultVal)
+    {
+        if (_projectionSystem?.ActiveRenderer is ImmersiveSphereRenderer imm)
+            return imm.GetShaderFloat(param, defaultVal);
+        if (_projectionSystem?.ActiveRenderer is FlatProjectionRenderer flat)
+            return flat.GetBoardShaderFloat(param, defaultVal);
+        return defaultVal;
+    }
+
+    private float GetImmersiveFOV()
+    {
+        if (_projectionSystem?.ActiveRenderer is ImmersiveSphereRenderer imm)
+            return imm.CurrentFOV;
+        return 0f;
+    }
+
+    #endregion
 }

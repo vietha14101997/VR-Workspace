@@ -530,7 +530,11 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         _volumeIcon = _volumeButton.transform.Find("IconImage")?.GetComponent<Image>();
 
         _volumeSlider = VRSliderFactory.CreateVolumeSlider(leftGroup.transform, 150, _font, THEME_COLOR);
-        _volumeSlider.OnValueChanged += (v) => OnVolumeChanged?.Invoke(v);
+        _volumeSlider.OnValueChanged += (v) =>
+        {
+            SetVolume(v); // Update _volume + icon + persist to PlayerPrefs
+            OnVolumeChanged?.Invoke(v);
+        };
         AttachHoverEvents(_volumeSlider.gameObject);
 
         // Flexible spacer to push center group

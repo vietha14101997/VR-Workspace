@@ -70,7 +70,7 @@ public static class ProjectionDetector
 
     #region Metadata Interpretation
 
-    private static VideoProjectionType InterpretProjection(SphericalVideoMetadata meta, int width, int height)
+    public static VideoProjectionType InterpretProjection(SphericalVideoMetadata meta, int width, int height)
     {
         if (!meta.HasMetadata) return VideoProjectionType.Flat;
 
@@ -114,7 +114,7 @@ public static class ProjectionDetector
         return VideoProjectionType.Flat;
     }
 
-    private static StereoMode InterpretStereo(SphericalVideoMetadata meta)
+    public static StereoMode InterpretStereo(SphericalVideoMetadata meta)
     {
         if (!meta.HasMetadata || meta.StereoMode < 0) return StereoMode.Mono;
 

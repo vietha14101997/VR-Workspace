@@ -138,6 +138,7 @@ public class VideoPlaybackEngine : MonoBehaviour
 
     /// <summary>Current file path</summary>
     public string CurrentPath { get; private set; }
+
     #endregion
 
     #region Private Fields
@@ -168,21 +169,26 @@ public class VideoPlaybackEngine : MonoBehaviour
 
     private void SetupComponents()
     {
-        // Setup AudioSource
-        _audioSource = gameObject.AddComponent<AudioSource>();
-        _audioSource.playOnAwake = false;
-        _audioSource.spatialBlend = 0; // 2D audio
-
         // Setup VideoPlayer
         _videoPlayer = gameObject.AddComponent<VideoPlayer>();
         _videoPlayer.playOnAwake = false;
         _videoPlayer.renderMode = VideoRenderMode.RenderTexture;
-        _videoPlayer.audioOutputMode = VideoAudioOutputMode.AudioSource;
-        _videoPlayer.SetTargetAudioSource(0, _audioSource);
         _videoPlayer.skipOnDrop = true;
         _videoPlayer.isLooping = false;
         _videoPlayer.aspectRatio = VideoAspectRatio.NoScaling;
         _videoPlayer.waitForFirstFrame = true;
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+        // Android: Direct audio mode (AudioSource mode unreliable on many Android devices)
+        _videoPlayer.audioOutputMode = VideoAudioOutputMode.Direct;
+#else
+        // Desktop: AudioSource mode for spatial audio support
+        _audioSource = gameObject.AddComponent<AudioSource>();
+        _audioSource.playOnAwake = false;
+        _audioSource.spatialBlend = 0; // 2D audio
+        _videoPlayer.audioOutputMode = VideoAudioOutputMode.AudioSource;
+        _videoPlayer.SetTargetAudioSource(0, _audioSource);
+#endif
 
         // Event handlers
         _videoPlayer.prepareCompleted += OnVideoPrepared;
@@ -366,10 +372,21 @@ public class VideoPlaybackEngine : MonoBehaviour
 
     private void ApplyVolume()
     {
+        float vol = _isMuted ? 0 : _volume;
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+        // Android: Direct audio volume via VideoPlayer API
+        if (_videoPlayer != null)
+        {
+            _videoPlayer.SetDirectAudioVolume(0, vol);
+        }
+#else
+        // Desktop: AudioSource volume
         if (_audioSource != null)
         {
-            _audioSource.volume = _isMuted ? 0 : _volume;
+            _audioSource.volume = vol;
         }
+#endif
     }
 
     private void CleanupRenderTexture()

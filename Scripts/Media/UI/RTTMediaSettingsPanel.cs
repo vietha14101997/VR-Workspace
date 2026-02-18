@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using System;
 using System.Collections.Generic;
 using TMPro;
@@ -32,13 +33,18 @@ public class RTTMediaSettingsPanel : MonoBehaviour
     private static readonly Color HEADER_BTN_BG = new Color(0f, 0f, 0f, 0.75f);
 
     // Sub-page content
-    private const float SLIDER_ROW_HEIGHT = 70f;
+    private const float SLIDER_ROW_HEIGHT = 55f;
     private const float TOGGLE_ROW_HEIGHT = 65f;
     private const float SECTION_HEADER_HEIGHT = 45f;
     private const float BUTTON_ROW_HEIGHT = 55f;
     private const float SEGMENT_ROW_HEIGHT = 80f;
     private const float SUB_PAGE_PADDING_TOP = 15f;
     private const float SUB_PAGE_SPACING = 8f;
+
+    // Slider row layout
+    private const float SLIDER_LABEL_MIN_WIDTH = 195f;
+    private const float PLUS_MINUS_BTN_SIZE = 38f;
+    private static readonly Color PILL_BG_COLOR = new Color(0.1f, 0.1f, 0.12f, 0.85f);
 
     // Hover
     private const float HOVER_SCALE = 1.03f;
@@ -152,6 +158,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
     private static Sprite _roundedRectSprite;
     private static Sprite _topRoundedRectSprite;
     private static Sprite _circleSprite;
+    private static Sprite _pillSprite;
     private float _menuSpacing;
 
     // Sub-page UI references - Video Adjustments
@@ -670,36 +677,34 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         // Scrollable content
         var scrollContent = CreateScrollableContent(_pictureAdjContainer.transform);
 
-        float sliderWidth = _width - _sideMargin * 2 - 60f; // Leave room for reset button
-
         // Sharpen slider (0 - 2, default 0.5)
         (_sharpnessSlider, _sharpnessValueLabel) = CreateSliderRow(
-            scrollContent, "Sharpen", sliderWidth, 0f, 2f, 0.5f,
+            scrollContent, "Sharpen", 0f, 2f, 0.5f,
             (v) => { OnSharpnessChanged?.Invoke(v); UpdateValueLabel(_sharpnessValueLabel, v); });
 
         // Brightness slider (0 - 2, default 1.0)
         (_brightnessSlider, _brightnessValueLabel) = CreateSliderRow(
-            scrollContent, "Brightness", sliderWidth, 0f, 2f, 1.0f,
+            scrollContent, "Brightness", 0f, 2f, 1.0f,
             (v) => { OnBrightnessChanged?.Invoke(v); UpdateValueLabel(_brightnessValueLabel, v); });
 
         // Saturation slider (0 - 2, default 1.0)
         (_saturationSlider, _saturationValueLabel) = CreateSliderRow(
-            scrollContent, "Saturation", sliderWidth, 0f, 2f, 1.0f,
+            scrollContent, "Saturation", 0f, 2f, 1.0f,
             (v) => { OnSaturationChanged?.Invoke(v); UpdateValueLabel(_saturationValueLabel, v); });
 
         // Contrast slider (0 - 2, default 1.0)
         (_contrastSlider, _contrastValueLabel) = CreateSliderRow(
-            scrollContent, "Contrast", sliderWidth, 0f, 2f, 1.0f,
+            scrollContent, "Contrast", 0f, 2f, 1.0f,
             (v) => { OnContrastChanged?.Invoke(v); UpdateValueLabel(_contrastValueLabel, v); });
 
         // Tint slider (-1 - 1, default 0)
         (_tintSlider, _tintValueLabel) = CreateSliderRow(
-            scrollContent, "Tint", sliderWidth, -1f, 1f, 0f,
+            scrollContent, "Tint", -1f, 1f, 0f,
             (v) => { OnTintChanged?.Invoke(v); UpdateValueLabel(_tintValueLabel, v); });
 
         // Temperature slider (-1 - 1, default 0)
         (_temperatureSlider, _temperatureValueLabel) = CreateSliderRow(
-            scrollContent, "Temperature", sliderWidth, -1f, 1f, 0f,
+            scrollContent, "Temperature", -1f, 1f, 0f,
             (v) => { OnTemperatureChanged?.Invoke(v); UpdateValueLabel(_temperatureValueLabel, v); });
 
         // Spacer
@@ -781,31 +786,29 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         var immCSF = _videoAdjImmersiveContent.AddComponent<ContentSizeFitter>();
         immCSF.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-        float sliderWidth = _width - _sideMargin * 2 - 60f;
-
         // Tilt slider (-90 to 90, default 0)
         (_tiltSlider, _tiltValueLabel) = CreateSliderRow(
-            _videoAdjImmersiveContent.transform, "Tilt", sliderWidth, -90f, 90f, 0f,
-            (v) => { OnTiltChanged?.Invoke(v); UpdateValueLabel(_tiltValueLabel, v, "°"); });
+            _videoAdjImmersiveContent.transform, "Tilt", -90f, 90f, 0f,
+            (v) => { OnTiltChanged?.Invoke(v); UpdateValueLabel(_tiltValueLabel, v, "°"); }, "°");
 
         // Yaw slider (-180 to 180, default 0)
         (_yawSlider, _yawValueLabel) = CreateSliderRow(
-            _videoAdjImmersiveContent.transform, "Yaw", sliderWidth, -180f, 180f, 0f,
-            (v) => { OnYawChanged?.Invoke(v); UpdateValueLabel(_yawValueLabel, v, "°"); });
+            _videoAdjImmersiveContent.transform, "Yaw", -180f, 180f, 0f,
+            (v) => { OnYawChanged?.Invoke(v); UpdateValueLabel(_yawValueLabel, v, "°"); }, "°");
 
         // Zoom slider (180 to 420, default 300)
         (_zoomSlider, _zoomValueLabel) = CreateSliderRow(
-            _videoAdjImmersiveContent.transform, "Zoom", sliderWidth, 180f, 420f, 300f,
-            (v) => { OnZoomChanged?.Invoke(v); UpdateValueLabel(_zoomValueLabel, v, "°"); });
+            _videoAdjImmersiveContent.transform, "Zoom", 180f, 420f, 300f,
+            (v) => { OnZoomChanged?.Invoke(v); UpdateValueLabel(_zoomValueLabel, v, "°"); }, "°");
 
         // Height slider (-1 to 1, default 0)
         (_immHeightSlider, _immHeightValueLabel) = CreateSliderRow(
-            _videoAdjImmersiveContent.transform, "Height", sliderWidth, -1f, 1f, 0f,
+            _videoAdjImmersiveContent.transform, "Height", -1f, 1f, 0f,
             (v) => { OnHeightChanged?.Invoke(v); UpdateValueLabel(_immHeightValueLabel, v); });
 
         // Horizontal balance slider (-1 to 1, default 0)
         (_hBalanceSlider, _hBalanceValueLabel) = CreateSliderRow(
-            _videoAdjImmersiveContent.transform, "H. Balance", sliderWidth, -1f, 1f, 0f,
+            _videoAdjImmersiveContent.transform, "H. Balance", -1f, 1f, 0f,
             (v) => { OnHorizontalBalanceChanged?.Invoke(v); UpdateValueLabel(_hBalanceValueLabel, v); });
 
         // Set initial mode
@@ -952,22 +955,20 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         // Aspect ratio segment buttons
         CreateAspectRatioRow(scrollContent);
 
-        float sliderWidth = _width - _sideMargin * 2 - 60f;
-
         // Depth slider (1.0 - 5.0, default 2.0)
         (_depthSlider, _depthValueLabel) = CreateSliderRow(
-            scrollContent, "Depth", sliderWidth, 1.0f, 5.0f, 2.0f,
-            (v) => { OnScreenDepthChanged?.Invoke(v); UpdateValueLabel(_depthValueLabel, v, "m"); });
+            scrollContent, "Depth", 1.0f, 5.0f, 2.0f,
+            (v) => { OnScreenDepthChanged?.Invoke(v); UpdateValueLabel(_depthValueLabel, v, "m"); }, "m");
 
         // Scale slider (0.5 - 3.0, default 1.0)
         (_scaleSlider, _scaleValueLabel) = CreateSliderRow(
-            scrollContent, "Scale", sliderWidth, 0.5f, 3.0f, 1.0f,
-            (v) => { OnScreenScaleChanged?.Invoke(v); UpdateValueLabel(_scaleValueLabel, v, "x"); });
+            scrollContent, "Scale", 0.5f, 3.0f, 1.0f,
+            (v) => { OnScreenScaleChanged?.Invoke(v); UpdateValueLabel(_scaleValueLabel, v, "x"); }, "x");
 
         // Vertical move slider (-1.0 - 1.0, default 0)
         (_verticalMoveSlider, _verticalMoveValueLabel) = CreateSliderRow(
-            scrollContent, "Vertical", sliderWidth, -1.0f, 1.0f, 0f,
-            (v) => { OnVerticalMoveChanged?.Invoke(v); UpdateValueLabel(_verticalMoveValueLabel, v, "m"); });
+            scrollContent, "Vertical", -1.0f, 1.0f, 0f,
+            (v) => { OnVerticalMoveChanged?.Invoke(v); UpdateValueLabel(_verticalMoveValueLabel, v, "m"); }, "m");
 
         // Spacer
         CreateFixedSpacer(scrollContent, 20f);
@@ -1182,13 +1183,17 @@ public class RTTMediaSettingsPanel : MonoBehaviour
     }
 
     /// <summary>
-    /// Create a slider row with label, slider, value text, and reset button.
+    /// Create a slider row: [Label] [SliderWrapper with hover +/- buttons] [ResetBtn]
     /// Returns (slider, valueLabel).
     /// </summary>
     private (VRSliderControl, TextMeshProUGUI) CreateSliderRow(
-        Transform parent, string label, float sliderWidth,
-        float min, float max, float defaultValue, Action<float> onChanged)
+        Transform parent, string label,
+        float min, float max, float defaultValue,
+        Action<float> onChanged, string suffix = "")
     {
+        float sliderWidthEstimate = _width - _sideMargin * 2 - SLIDER_LABEL_MIN_WIDTH - 35f - 24f;
+
+        // === Row container (single horizontal line) ===
         GameObject rowObj = new GameObject($"SliderRow_{label}");
         rowObj.transform.SetParent(parent, false);
 
@@ -1196,78 +1201,74 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         rowLE.minHeight = SLIDER_ROW_HEIGHT;
         rowLE.preferredHeight = SLIDER_ROW_HEIGHT;
 
-        // Top part: Label + Value
-        // Bottom part: Slider + Reset button
-        var rowLayout = rowObj.AddComponent<VerticalLayoutGroup>();
-        rowLayout.spacing = 2f;
+        var rowLayout = rowObj.AddComponent<HorizontalLayoutGroup>();
+        rowLayout.spacing = 8f;
+        rowLayout.childAlignment = TextAnchor.MiddleCenter;
         rowLayout.childControlWidth = true;
-        rowLayout.childControlHeight = true;
-        rowLayout.childForceExpandWidth = true;
+        rowLayout.childControlHeight = false;
+        rowLayout.childForceExpandWidth = false;
         rowLayout.childForceExpandHeight = false;
 
-        // --- Label row ---
-        GameObject labelRow = new GameObject("LabelRow");
-        labelRow.transform.SetParent(rowObj.transform, false);
-
-        var labelRowLE = labelRow.AddComponent<LayoutElement>();
-        labelRowLE.minHeight = 26;
-        labelRowLE.preferredHeight = 26;
-
-        var labelRowLayout = labelRow.AddComponent<HorizontalLayoutGroup>();
-        labelRowLayout.childControlWidth = true;
-        labelRowLayout.childControlHeight = true;
-        labelRowLayout.childForceExpandWidth = false;
-        labelRowLayout.childForceExpandHeight = true;
-
-        // Label text
+        // === Label ===
         GameObject labelObj = new GameObject("Label");
-        labelObj.transform.SetParent(labelRow.transform, false);
+        labelObj.transform.SetParent(rowObj.transform, false);
 
         var labelLE2 = labelObj.AddComponent<LayoutElement>();
-        labelLE2.flexibleWidth = 1f;
+        labelLE2.minWidth = SLIDER_LABEL_MIN_WIDTH;
+        labelLE2.preferredWidth = SLIDER_LABEL_MIN_WIDTH;
 
         var labelText = labelObj.AddComponent<TextMeshProUGUI>();
         labelText.font = _font;
         labelText.text = label;
-        labelText.fontSize = 22;
+        labelText.fontSize = 28;
+        labelText.fontStyle = FontStyles.Bold;
         labelText.color = TEXT_COLOR;
         labelText.alignment = TextAlignmentOptions.MidlineLeft;
         labelText.raycastTarget = false;
 
-        // Value label
-        GameObject valueObj = new GameObject("Value");
-        valueObj.transform.SetParent(labelRow.transform, false);
+        // === Slider wrapper (contains pill bg, -/+ buttons, slider) ===
+        GameObject wrapperObj = new GameObject("SliderWrapper");
+        wrapperObj.transform.SetParent(rowObj.transform, false);
 
-        var valueLE = valueObj.AddComponent<LayoutElement>();
-        valueLE.minWidth = 80;
+        var wrapperLE = wrapperObj.AddComponent<LayoutElement>();
+        wrapperLE.flexibleWidth = 1f;
+        wrapperLE.minHeight = SLIDER_ROW_HEIGHT;
 
-        var valueText = valueObj.AddComponent<TextMeshProUGUI>();
-        valueText.font = _font;
-        valueText.text = FormatValue(defaultValue);
-        valueText.fontSize = 20;
-        valueText.color = new Color(0.6f, 0.6f, 0.6f, 1f);
-        valueText.alignment = TextAlignmentOptions.MidlineRight;
-        valueText.raycastTarget = false;
+        var wrapperLayout = wrapperObj.AddComponent<HorizontalLayoutGroup>();
+        wrapperLayout.spacing = 0f;
+        wrapperLayout.childAlignment = TextAnchor.MiddleCenter;
+        wrapperLayout.childControlWidth = true;
+        wrapperLayout.childControlHeight = false;
+        wrapperLayout.childForceExpandWidth = false;
+        wrapperLayout.childForceExpandHeight = false;
 
-        // --- Slider row ---
-        GameObject sliderRow = new GameObject("SliderRow");
-        sliderRow.transform.SetParent(rowObj.transform, false);
+        // --- Pill background (ignores layout, stretches to fill wrapper) ---
+        GameObject pillObj = new GameObject("PillBg");
+        pillObj.transform.SetParent(wrapperObj.transform, false);
+        var pillRT = pillObj.AddComponent<RectTransform>();
+        pillRT.anchorMin = new Vector2(0f, 0.1f);
+        pillRT.anchorMax = new Vector2(1f, 0.9f);
+        pillRT.offsetMin = Vector2.zero;
+        pillRT.offsetMax = Vector2.zero;
+        var pillLE = pillObj.AddComponent<LayoutElement>();
+        pillLE.ignoreLayout = true;
+        var pillImage = pillObj.AddComponent<Image>();
+        pillImage.sprite = GetPillSprite();
+        pillImage.type = Image.Type.Sliced;
+        pillImage.color = PILL_BG_COLOR;
+        pillImage.raycastTarget = false;
+        pillObj.SetActive(false);
 
-        var sliderRowLE = sliderRow.AddComponent<LayoutElement>();
-        sliderRowLE.flexibleHeight = 1f;
+        // --- Minus button (hidden by default) ---
+        float stepSize = (max - min) / 20f;
 
-        var sliderRowLayout = sliderRow.AddComponent<HorizontalLayoutGroup>();
-        sliderRowLayout.spacing = 8f;
-        sliderRowLayout.childControlWidth = true;
-        sliderRowLayout.childControlHeight = false;
-        sliderRowLayout.childForceExpandWidth = false;
-        sliderRowLayout.childForceExpandHeight = false;
-        sliderRowLayout.childAlignment = TextAnchor.MiddleCenter;
+        GameObject minusBtnObj = CreatePlusMinusButton(wrapperObj.transform, "\u2212");
+        minusBtnObj.SetActive(false);
 
-        // Slider
+        // --- Slider ---
         var slider = VRSliderFactory.CreateSlider(
-            sliderRow.transform,
-            sliderWidth, 40f,
+            wrapperObj.transform,
+            sliderWidthEstimate, 40f,
             _font, THEME_COLOR,
             VRSliderFactory.SliderStyle.Setting,
             min, max);
@@ -1277,12 +1278,74 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         if (sliderLE == null) sliderLE = slider.gameObject.AddComponent<LayoutElement>();
         sliderLE.flexibleWidth = 1f;
 
-        slider.OnValueChanged += (v) => onChanged?.Invoke(v);
+        // --- Plus button (hidden by default) ---
+        GameObject plusBtnObj = CreatePlusMinusButton(wrapperObj.transform, "+");
+        plusBtnObj.SetActive(false);
 
-        // Reset button
+        // Wire up +/- click handlers now that slider exists
+        float capturedStep = stepSize;
+        VRSliderControl sliderRef = slider;
+        minusBtnObj.GetComponent<Button>().onClick.AddListener(() =>
+        {
+            if (sliderRef != null) sliderRef.SetValue(sliderRef.Value - capturedStep);
+        });
+        plusBtnObj.GetComponent<Button>().onClick.AddListener(() =>
+        {
+            if (sliderRef != null) sliderRef.SetValue(sliderRef.Value + capturedStep);
+        });
+
+        // --- Value text (child of handle, shown on hover) ---
+        var handleRT = slider.HandleTransform;
+        GameObject valueObj = new GameObject("HoverValue");
+        valueObj.transform.SetParent(handleRT, false);
+        var valueRT = valueObj.AddComponent<RectTransform>();
+        valueRT.anchoredPosition = new Vector2(0, -25f);
+        valueRT.sizeDelta = new Vector2(100, 25);
+
+        var valueText = valueObj.AddComponent<TextMeshProUGUI>();
+        valueText.font = _font;
+        valueText.text = FormatValue(defaultValue, suffix);
+        valueText.fontSize = 18;
+        valueText.color = Color.white;
+        valueText.alignment = TextAlignmentOptions.Center;
+        valueText.overflowMode = TextOverflowModes.Overflow;
+        valueText.raycastTarget = false;
+        valueObj.SetActive(false);
+
+        // === Hover group management ===
+        var hoverGroup = wrapperObj.AddComponent<SettingsSliderHoverGroup>();
+        hoverGroup.Setup(pillObj, minusBtnObj, plusBtnObj, valueObj);
+
+        // Connect slider hover events
+        slider.OnHoverEnter += hoverGroup.OnChildHoverEnter;
+        slider.OnHoverExit += hoverGroup.OnChildHoverExit;
+
+        // Connect +/- button hover events
+        var minusNotifier = minusBtnObj.GetComponent<HoverNotifier>();
+        if (minusNotifier != null)
+        {
+            minusNotifier.onEnter += hoverGroup.OnChildHoverEnter;
+            minusNotifier.onExit += hoverGroup.OnChildHoverExit;
+        }
+        var plusNotifier = plusBtnObj.GetComponent<HoverNotifier>();
+        if (plusNotifier != null)
+        {
+            plusNotifier.onEnter += hoverGroup.OnChildHoverEnter;
+            plusNotifier.onExit += hoverGroup.OnChildHoverExit;
+        }
+
+        // === Value change callback ===
+        string capturedSuffix = suffix;
+        slider.OnValueChanged += (v) =>
+        {
+            onChanged?.Invoke(v);
+            UpdateValueLabel(valueText, v, capturedSuffix);
+        };
+
+        // === Reset button ===
         float resetBtnSize = 35f;
         GameObject resetBtnObj = new GameObject("ResetBtn");
-        resetBtnObj.transform.SetParent(sliderRow.transform, false);
+        resetBtnObj.transform.SetParent(rowObj.transform, false);
 
         var resetLE = resetBtnObj.AddComponent<LayoutElement>();
         resetLE.minWidth = resetBtnSize;
@@ -1304,7 +1367,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         resetBtn.onClick.AddListener(() =>
         {
             capturedSlider.SetValue(capturedDefault);
-            UpdateValueLabel(capturedValueText, capturedDefault);
+            UpdateValueLabel(capturedValueText, capturedDefault, capturedSuffix);
         });
 
         // Reset icon
@@ -1331,6 +1394,68 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         resetCol.center = new Vector3(0, 0, -5);
 
         return (slider, valueText);
+    }
+
+    /// <summary>
+    /// Create a +/- button for the slider hover wrapper.
+    /// Click handler should be wired up separately after the slider is created.
+    /// </summary>
+    private GameObject CreatePlusMinusButton(Transform parent, string text)
+    {
+        bool isPlus = text == "+";
+        string name = isPlus ? "PlusBtn" : "MinusBtn";
+        GameObject btnObj = new GameObject(name);
+        btnObj.transform.SetParent(parent, false);
+
+        var btnLE = btnObj.AddComponent<LayoutElement>();
+        btnLE.minWidth = PLUS_MINUS_BTN_SIZE;
+        btnLE.minHeight = PLUS_MINUS_BTN_SIZE;
+        btnLE.preferredWidth = PLUS_MINUS_BTN_SIZE;
+        btnLE.preferredHeight = PLUS_MINUS_BTN_SIZE;
+
+        // Background (circular)
+        var bgImage = btnObj.AddComponent<Image>();
+        bgImage.sprite = GetCircleSprite();
+        bgImage.color = new Color(0.25f, 0.25f, 0.28f, 0.9f);
+        bgImage.type = Image.Type.Simple;
+        bgImage.raycastTarget = true;
+
+        // Text
+        GameObject textObj = new GameObject("Text");
+        textObj.transform.SetParent(btnObj.transform, false);
+        var textRT = textObj.AddComponent<RectTransform>();
+        textRT.anchorMin = Vector2.zero;
+        textRT.anchorMax = Vector2.one;
+        textRT.offsetMin = Vector2.zero;
+        textRT.offsetMax = Vector2.zero;
+
+        var tmp = textObj.AddComponent<TextMeshProUGUI>();
+        tmp.font = _font;
+        tmp.text = text;
+        tmp.fontSize = 24;
+        tmp.fontStyle = FontStyles.Bold;
+        tmp.color = Color.white;
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.raycastTarget = false;
+
+        // Button component (click handler wired up by caller)
+        var button = btnObj.AddComponent<Button>();
+        button.targetGraphic = bgImage;
+        button.transition = Selectable.Transition.None;
+
+        // Hover notifier for delayed-hide group
+        btnObj.AddComponent<HoverNotifier>();
+
+        // Hover scale effect
+        var hoverCtrl = btnObj.AddComponent<HoverEffectController>();
+        hoverCtrl.AddEffect(new ScaleHoverEffect().WithHoverScale(1.15f).WithTransitionDuration(0.06f));
+
+        // Collider for VR interaction
+        var col = btnObj.AddComponent<BoxCollider>();
+        col.size = new Vector3(PLUS_MINUS_BTN_SIZE * 1.3f, PLUS_MINUS_BTN_SIZE * 1.3f, 10);
+        col.center = new Vector3(0, 0, -5);
+
+        return btnObj;
     }
 
     /// <summary>
@@ -1717,6 +1842,58 @@ public class RTTMediaSettingsPanel : MonoBehaviour
             Vector2.one * 0.5f, 100f, 0, SpriteMeshType.FullRect, border);
         return _topRoundedRectSprite;
     }
+
+    /// <summary>
+    /// Pill-shaped sprite with fully rounded left/right ends (radius = height/2).
+    /// </summary>
+    private static Sprite GetPillSprite()
+    {
+        if (_pillSprite != null) return _pillSprite;
+
+        int texW = 64, texH = 32;
+        int radius = texH / 2; // Full semicircle ends
+        var tex = new Texture2D(texW, texH, TextureFormat.RGBA32, false);
+
+        for (int y = 0; y < texH; y++)
+        {
+            for (int x = 0; x < texW; x++)
+            {
+                float alpha = 1f;
+                Vector2 corner = Vector2.zero;
+                bool isCorner = false;
+
+                // Bottom-left
+                if (x < radius && y < radius)
+                { corner = new Vector2(radius, radius); isCorner = true; }
+                // Bottom-right
+                else if (x >= texW - radius && y < radius)
+                { corner = new Vector2(texW - radius - 1, radius); isCorner = true; }
+                // Top-left
+                else if (x < radius && y >= texH - radius)
+                { corner = new Vector2(radius, texH - radius - 1); isCorner = true; }
+                // Top-right
+                else if (x >= texW - radius && y >= texH - radius)
+                { corner = new Vector2(texW - radius - 1, texH - radius - 1); isCorner = true; }
+
+                if (isCorner)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), corner);
+                    alpha = Mathf.Clamp01(radius - dist + 0.5f);
+                }
+
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+            }
+        }
+
+        tex.Apply();
+        tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
+
+        Vector4 border = new Vector4(radius + 1, radius + 1, radius + 1, radius + 1);
+        _pillSprite = Sprite.Create(tex, new Rect(0, 0, texW, texH),
+            Vector2.one * 0.5f, 100f, 0, SpriteMeshType.FullRect, border);
+        return _pillSprite;
+    }
     #endregion
 }
 
@@ -1750,4 +1927,75 @@ public class SettingsSnapshot
     public float ScreenDepth = 2.0f;
     public float ScreenScale = 1.0f;
     public float VerticalMove = 0f;
+}
+
+/// <summary>
+/// Simple hover event forwarder for UI elements (e.g. +/- buttons).
+/// Attach to any GameObject with a collider to detect hover enter/exit.
+/// </summary>
+public class HoverNotifier : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
+{
+    public event Action onEnter;
+    public event Action onExit;
+
+    public void OnPointerEnter(PointerEventData eventData) => onEnter?.Invoke();
+    public void OnPointerExit(PointerEventData eventData) => onExit?.Invoke();
+}
+
+/// <summary>
+/// Manages hover state for a settings slider row.
+/// Shows/hides pill background, +/- buttons, and value text with delayed hide
+/// to prevent flicker when reticle transitions between slider and buttons.
+/// </summary>
+public class SettingsSliderHoverGroup : MonoBehaviour
+{
+    private const float HIDE_DELAY = 0.15f;
+
+    private float _hideTimer = -1f;
+    private bool _isVisible = false;
+    private GameObject _pillBg;
+    private GameObject _minusBtn;
+    private GameObject _plusBtn;
+    private GameObject _valueText;
+
+    public void Setup(GameObject pillBg, GameObject minusBtn, GameObject plusBtn, GameObject valueText)
+    {
+        _pillBg = pillBg;
+        _minusBtn = minusBtn;
+        _plusBtn = plusBtn;
+        _valueText = valueText;
+    }
+
+    public void OnChildHoverEnter()
+    {
+        _hideTimer = -1f;
+        if (!_isVisible) SetVisible(true);
+    }
+
+    public void OnChildHoverExit()
+    {
+        _hideTimer = HIDE_DELAY;
+    }
+
+    private void Update()
+    {
+        if (_hideTimer > 0f)
+        {
+            _hideTimer -= Time.unscaledDeltaTime;
+            if (_hideTimer <= 0f)
+            {
+                _hideTimer = -1f;
+                SetVisible(false);
+            }
+        }
+    }
+
+    private void SetVisible(bool visible)
+    {
+        _isVisible = visible;
+        if (_pillBg != null) _pillBg.SetActive(visible);
+        if (_minusBtn != null) _minusBtn.SetActive(visible);
+        if (_plusBtn != null) _plusBtn.SetActive(visible);
+        if (_valueText != null) _valueText.SetActive(visible);
+    }
 }
