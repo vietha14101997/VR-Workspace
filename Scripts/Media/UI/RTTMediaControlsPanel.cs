@@ -31,8 +31,8 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     private const float TIMELINE_SLIDER_RATIO = 0.65f; // 65% of available width
 
     // Zone C - Controls (sizes calculated dynamically based on Zone C height)
-    private const float PLAY_BUTTON_HEIGHT_RATIO = 1.0f;   // 100% of Zone C height
-    private const float OTHER_BUTTON_HEIGHT_RATIO = 0.5f;  // 50% of Zone C height for all other buttons
+    private const float PLAY_BUTTON_HEIGHT_RATIO = 1.125f;  // 112.5% of Zone C height (increased from 1.0)
+    private const float OTHER_BUTTON_HEIGHT_RATIO = 0.625f; // 62.5% of Zone C height for all other buttons (increased from 0.5)
 
     // Styling
     private static readonly Color BG_COLOR = new Color(0.173f, 0.173f, 0.173f, 0.75f);
@@ -611,7 +611,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
 
         var rightLayout = rightGroup.AddComponent<HorizontalLayoutGroup>();
         rightLayout.spacing = horizontalSpacing;  // 3% spacing between environment and 3D
-        rightLayout.childAlignment = TextAnchor.MiddleCenter;  // Align content to center within group (changed from MiddleRight)
+        rightLayout.childAlignment = TextAnchor.MiddleRight;  // Align content to right within group (changed from MiddleCenter)
         rightLayout.childControlWidth = false;
         rightLayout.childForceExpandWidth = false;
 

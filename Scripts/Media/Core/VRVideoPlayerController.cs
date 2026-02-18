@@ -142,6 +142,12 @@ public class VRVideoPlayerController : MonoBehaviour
             _controlsPanel.OnRecenterClicked += HandleRecenter;
             _controlsPanel.OnEnvironmentClicked += ShowEnvironmentPopup;
             _controlsPanel.OnVisibilityChanged += HandleControlsVisibilityChanged;
+
+            // Close popups when interacting with main controls
+            _controlsPanel.OnPlayPause += HideAllPopups;
+            _controlsPanel.OnSeek += (_) => HideAllPopups();
+            _controlsPanel.OnVolumeChanged += (_) => HideAllPopups();
+            _controlsPanel.OnSettingsClicked += HideAllPopups;
         }
     }
 
@@ -211,6 +217,15 @@ public class VRVideoPlayerController : MonoBehaviour
         _environmentPopup.OnMonitorTypeChanged -= HandleMonitorTypeChanged;
         _environmentPopup.OnEnvironmentChanged -= HandleEnvironmentSettingsChanged;
         _environmentPopup.OnCloseRequested -= HideEnvironmentPopup;
+    }
+
+    /// <summary>
+    /// Hide all transient popups (Projection, Environment).
+    /// </summary>
+    public void HideAllPopups()
+    {
+        HideProjectionPopup();
+        HideEnvironmentPopup();
     }
 
 
@@ -907,6 +922,13 @@ public class VRVideoPlayerController : MonoBehaviour
     {
         if (_projectionPopup == null || _projectionSystem == null) return;
 
+        if (_projectionPopup.IsVisible)
+        {
+            _projectionPopup.Hide();
+            return;
+        }
+
+        HideEnvironmentPopup();
         _projectionPopup.SetState(_projectionSystem.CurrentProjection, ConvertToUIStereo(_projectionSystem.CurrentStereoMode));
         _projectionPopup.Show();
     }
@@ -975,6 +997,13 @@ public class VRVideoPlayerController : MonoBehaviour
     {
         if (_environmentPopup == null) return;
 
+        if (_environmentPopup.IsVisible)
+        {
+            _environmentPopup.Hide();
+            return;
+        }
+
+        HideProjectionPopup();
         // Update with current state from controller
         SyncEnvironmentStateFromController();
         _environmentPopup.SetEnvironmentState(_currentMonitor, _currentEnv);

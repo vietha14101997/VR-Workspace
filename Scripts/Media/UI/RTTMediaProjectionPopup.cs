@@ -111,6 +111,8 @@ public class RTTMediaProjectionPopup : MonoBehaviour
     private Coroutine _envAnimCoroutine;
 
     private HashSet<Button> _hoveredButtons = new HashSet<Button>();
+    
+    public bool IsVisible => _popup != null && _popup.activeSelf;
 
     #endregion
 

@@ -1133,6 +1133,16 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         _playerController.OnPlaybackFailed += HandlePlaybackFailed;
         _playerController.OnProjectionSettingsUpdated += HandleProjectionSettingsUpdated;
         _playerController.OnVideoChanged += HandleVideoChanged;
+        
+        // Hide UI Settings popup when interacting with playback controls
+        _controlsPanel.OnPlayPause += HideUISettingsPopup;
+        _controlsPanel.OnSeek += (_) => HideUISettingsPopup();
+        _controlsPanel.OnVolumeChanged += (_) => HideUISettingsPopup();
+        _controlsPanel.OnEnvironmentClicked += HideUISettingsPopup;
+        _controlsPanel.OnVRModeClicked += HideUISettingsPopup;
+        _controlsPanel.OnHeadsetModeClicked += HideUISettingsPopup;
+        _controlsPanel.OnRecenterClicked += HideUISettingsPopup;
+        _controlsPanel.OnSettingsClicked += HideUISettingsPopup;
 
         // === 5b. Error Dialog ===
         GameObject errorDialogObj = new GameObject("MediaErrorDialog");
@@ -1582,10 +1592,26 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
 
         bool isActive = _uiSettingsPopupFrame.activeSelf;
         bool showPopup = !isActive;
+
+        if (showPopup)
+        {
+            _playerController?.HideAllPopups();
+        }
+
         _uiSettingsPopupFrame.SetActive(showPopup);
         _uiSettingsBlocker?.SetActive(showPopup);
         _settingsPanel?.SetUISettingsRowForceHover(showPopup);
         Debug.Log("[VRMediaAppController] UI Settings popup toggled");
+    }
+
+    private void HideUISettingsPopup()
+    {
+        if (_uiSettingsPopup != null && _uiSettingsPopup.IsVisible)
+        {
+            _uiSettingsPopupFrame?.SetActive(false);
+            _uiSettingsBlocker?.SetActive(false);
+            _settingsPanel?.SetUISettingsRowForceHover(false);
+        }
     }
 
     private void WireUISettingsPopupEvents()
