@@ -409,7 +409,7 @@ public class RTTMediaUISettingsPopup : MonoBehaviour
         GameObject valueObj = new GameObject("HoverValue");
         valueObj.transform.SetParent(handleRT, false);
         var valueRT = valueObj.AddComponent<RectTransform>();
-        valueRT.anchoredPosition = new Vector2(0, -60f);
+        valueRT.anchoredPosition = new Vector2(0, -72f);
         valueRT.sizeDelta = new Vector2(160, 45);
 
         var valueText = valueObj.AddComponent<TextMeshProUGUI>();
