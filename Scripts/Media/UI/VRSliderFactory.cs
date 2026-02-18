@@ -459,6 +459,7 @@ public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler,
 
     public float NormalizedValue => (_value - _minValue) / (_maxValue - _minValue);
     public bool IsDragging { get; private set; }
+    public bool PreviewEnabled { get; set; } = true;
     public RectTransform HandleTransform => _handleRT;
     #endregion
 
@@ -776,6 +777,7 @@ public class VRSliderControl : MonoBehaviour, IPointerDownHandler, IDragHandler,
     #region Preview Methods
     private void ShowPreview()
     {
+        if (!PreviewEnabled) return;
         if (_previewContainer == null)
         {
             CreatePreviewUI();

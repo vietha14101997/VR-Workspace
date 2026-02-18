@@ -217,10 +217,14 @@ public class RTTRaycastManager : MonoBehaviour
         // Nested Canvases with overrideSorting=true need their own GraphicRaycaster
         RaycastNestedCanvases(panelData.graphicRaycaster.transform, screenPos);
 
-        // Sort results by depth (higher sorting order = closer to camera)
+        // Sort results by depth (higher sorting order = closer to camera, then higher depth = children first)
         if (_raycastResults.Count > 1)
         {
-            _raycastResults.Sort((a, b) => b.sortingOrder.CompareTo(a.sortingOrder));
+            _raycastResults.Sort((a, b) =>
+            {
+                int cmp = b.sortingOrder.CompareTo(a.sortingOrder);
+                return cmp != 0 ? cmp : b.depth.CompareTo(a.depth);
+            });
         }
 
         // Step 6: Build hit result

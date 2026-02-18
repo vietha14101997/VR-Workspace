@@ -45,7 +45,7 @@ namespace VRWorkspace.UI.HoverEffects
         // Public properties
         public Transform TargetVisuals
         {
-            get => _targetVisuals;
+            get => _targetVisuals != null ? _targetVisuals : transform;
             set => _targetVisuals = value;
         }
         public bool IsHovered => _isHovered;
