@@ -28,7 +28,7 @@ public class RTTMediaUISettingsPopup : MonoBehaviour
     private const float SLIDER_ROW_HEIGHT = 90f;
     private const float VALUES_TEXT_HEIGHT = 40f;
     private const float RESET_BTN_HEIGHT = 83f; // 55 * 1.25 * 1.2
-    private const float PLUS_MINUS_BTN_SIZE = 38f;
+    private const float PLUS_MINUS_BTN_SIZE = 46f;
     private static readonly Color PILL_BG_COLOR = new Color(0.1f, 0.1f, 0.12f, 0.85f);
     #endregion
 

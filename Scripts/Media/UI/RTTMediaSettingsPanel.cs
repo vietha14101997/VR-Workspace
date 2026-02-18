@@ -38,7 +38,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
 
     // Slider row layout
     private const float SLIDER_LABEL_MIN_WIDTH = 195f;
-    private const float PLUS_MINUS_BTN_SIZE = 38f;
+    private const float PLUS_MINUS_BTN_SIZE = 46f;
     private static readonly Color PILL_BG_COLOR = new Color(0.1f, 0.1f, 0.12f, 0.85f);
 
     // Hover

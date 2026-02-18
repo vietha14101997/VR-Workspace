@@ -2574,6 +2574,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
                 _uiSettingsBlocker.transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
         }
 
+
     }
 
     private void OnDestroy()

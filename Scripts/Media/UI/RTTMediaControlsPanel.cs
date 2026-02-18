@@ -522,9 +522,9 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         layout.padding = new RectOffset(0, 0, 0, (int)verticalPadding); // Add bottom padding
 
         // Calculate group width for symmetric layout (ensures CenterGroup is centered)
-        // LeftGroup: button + spacing + slider = otherButtonSize + spacing + 150
+        // LeftGroup: button + spacing + slider = otherButtonSize + spacing + 300
         // RightGroup: button + spacing + button = otherButtonSize + spacing + otherButtonSize
-        float leftGroupWidth = otherButtonSize + horizontalSpacing + 150f;
+        float leftGroupWidth = otherButtonSize + horizontalSpacing + 300f;
         float rightGroupWidth = otherButtonSize + horizontalSpacing + otherButtonSize;
         float symmetricWidth = Mathf.Max(leftGroupWidth, rightGroupWidth);
 
@@ -545,7 +545,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         _volumeButton.onClick.AddListener(ToggleMute);
         _volumeIcon = _volumeButton.transform.Find("IconImage")?.GetComponent<Image>();
 
-        _volumeSlider = VRSliderFactory.CreateVolumeSlider(leftGroup.transform, 150, _font, THEME_COLOR);
+        _volumeSlider = VRSliderFactory.CreateVolumeSlider(leftGroup.transform, 300, _font, THEME_COLOR);
         _volumeSlider.OnValueChanged += (v) =>
         {
             SetVolume(v); // Update _volume + icon + persist to PlayerPrefs
@@ -587,7 +587,8 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         centerLayout.childControlWidth = false;
         centerLayout.childForceExpandWidth = false;
 
-        _prevButton = CreateIconOnlyButton(centerGroup.transform, ICON_BACKWARD, otherButtonSize);
+        float seekButtonSize = otherButtonSize * 1.3f; // 30% larger for Backward/Forward
+        _prevButton = CreateIconOnlyButton(centerGroup.transform, ICON_BACKWARD, seekButtonSize);
         _prevButton.onClick.AddListener(() => SeekRelative(-10f));
 
         // Play/Pause button: full Zone C height, icon includes circle built-in
@@ -595,7 +596,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         _playPauseButton.onClick.AddListener(() => OnPlayPause?.Invoke());
         _playPauseIcon = _playPauseButton.transform.Find("IconImage")?.GetComponent<Image>();
 
-        _nextButton = CreateIconOnlyButton(centerGroup.transform, ICON_FORWARD, otherButtonSize);
+        _nextButton = CreateIconOnlyButton(centerGroup.transform, ICON_FORWARD, seekButtonSize);
         _nextButton.onClick.AddListener(() => SeekRelative(10f));
 
         // Flexible spacer to push right group

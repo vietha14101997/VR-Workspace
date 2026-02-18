@@ -84,7 +84,6 @@ public class RTTMediaProjectionPopup : MonoBehaviour
     private float _bottomMargin;
 
     private GameObject _popup;
-    private GameObject _blocker;
     private CanvasGroup _canvasGroup;
 
     // Current state (Projection mode)
@@ -126,7 +125,6 @@ public class RTTMediaProjectionPopup : MonoBehaviour
         _mode = mode;
 
         BuildUI();
-        _blocker.SetActive(false);
         Hide();
     }
     
@@ -150,30 +148,6 @@ public class RTTMediaProjectionPopup : MonoBehaviour
         // Apply margin
         popupRT.anchoredPosition = new Vector2(-_rightMargin, _bottomMargin); 
         
-        // Invisible Blocker (at the back)
-        _blocker = new GameObject("Blocker");
-        _blocker.transform.SetParent(transform, false);
-        _blocker.transform.SetAsFirstSibling(); // Ensure it's behind the popup
-
-        var blockerRT = _blocker.AddComponent<RectTransform>();
-        blockerRT.anchorMin = Vector2.zero;
-        blockerRT.anchorMax = Vector2.one;
-        blockerRT.offsetMin = new Vector2(-5000, -5000); // 5m coverage in each direction
-        blockerRT.offsetMax = new Vector2(5000, 5000);
-
-        var blockerImg = _blocker.AddComponent<Image>();
-        blockerImg.color = new Color(0, 0, 0, 0); // Invisible
-        blockerImg.raycastTarget = true;
-
-        var blockerBtn = _blocker.AddComponent<Button>();
-        blockerBtn.transition = Selectable.Transition.None;
-        blockerBtn.onClick.AddListener(Hide);
-
-        // BoxCollider for VR Raycast
-        var blockerCol = _blocker.AddComponent<BoxCollider>();
-        blockerCol.size = new Vector3(10000, 10000, 1);
-        blockerCol.center = Vector3.zero;
-
         // Background (Rounded Panel)
         var bg = _popup.AddComponent<Image>();
         bg.color = POPUP_BG_COLOR;
@@ -382,7 +356,6 @@ public class RTTMediaProjectionPopup : MonoBehaviour
 
     public void Hide()
     {
-        if (_blocker != null) _blocker.SetActive(false);
         _popup.SetActive(false);
         gameObject.SetActive(false);
     }
@@ -562,7 +535,6 @@ public class RTTMediaProjectionPopup : MonoBehaviour
     public void Show()
     {
         gameObject.SetActive(true);
-        if (_blocker != null) _blocker.SetActive(true);
         _popup.SetActive(true);
         
         // Force layout rebuild to ensure button positions are calculated before we snap selector

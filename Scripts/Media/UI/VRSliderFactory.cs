@@ -109,6 +109,8 @@ public static class VRSliderFactory
 
         var trackBgImage = trackBgObj.AddComponent<Image>();
         trackBgImage.color = new Color(1, 1, 1, 0.2f);
+        trackBgImage.sprite = CreatePillSprite();
+        trackBgImage.type = Image.Type.Sliced;
 
         // Buffer/loaded progress (for streaming - optional)
         GameObject bufferObj = new GameObject("BufferProgress");
@@ -123,6 +125,8 @@ public static class VRSliderFactory
 
         var bufferImage = bufferObj.AddComponent<Image>();
         bufferImage.color = new Color(1, 1, 1, 0.3f);
+        bufferImage.sprite = CreatePillSprite();
+        bufferImage.type = Image.Type.Sliced;
 
         // Progress fill
         GameObject fillObj = new GameObject("Fill");
@@ -137,6 +141,8 @@ public static class VRSliderFactory
 
         var fillImage = fillObj.AddComponent<Image>();
         fillImage.color = primaryColor;
+        fillImage.sprite = CreatePillSprite();
+        fillImage.type = Image.Type.Sliced;
 
         // Handle
         GameObject handleObj = new GameObject("Handle");
@@ -215,6 +221,8 @@ public static class VRSliderFactory
 
         var trackBgImage = trackBgObj.AddComponent<Image>();
         trackBgImage.color = new Color(1, 1, 1, 0.2f);
+        trackBgImage.sprite = CreatePillSprite();
+        trackBgImage.type = Image.Type.Sliced;
 
         // Fill
         GameObject fillObj = new GameObject("Fill");
@@ -229,6 +237,8 @@ public static class VRSliderFactory
 
         var fillImage = fillObj.AddComponent<Image>();
         fillImage.color = primaryColor;
+        fillImage.sprite = CreatePillSprite();
+        fillImage.type = Image.Type.Sliced;
 
         // Handle
         GameObject handleObj = new GameObject("Handle");
@@ -333,6 +343,8 @@ public static class VRSliderFactory
 
         var trackBgImage = trackBgObj.AddComponent<Image>();
         trackBgImage.color = new Color(1, 1, 1, 0.2f);
+        trackBgImage.sprite = CreatePillSprite();
+        trackBgImage.type = Image.Type.Sliced;
 
         // Fill
         GameObject fillObj = new GameObject("Fill");
@@ -347,6 +359,8 @@ public static class VRSliderFactory
 
         var fillImage = fillObj.AddComponent<Image>();
         fillImage.color = primaryColor;
+        fillImage.sprite = CreatePillSprite();
+        fillImage.type = Image.Type.Sliced;
 
         // Handle
         GameObject handleObj = new GameObject("Handle");
@@ -389,6 +403,49 @@ public static class VRSliderFactory
     #endregion
 
     #region Helpers
+    private static Sprite _cachedPillSprite;
+
+    /// <summary>
+    /// Create a pill-shaped (semicircle-ended) sprite for slider tracks/fills.
+    /// Uses 9-slice so it stretches correctly at any width.
+    /// </summary>
+    private static Sprite CreatePillSprite()
+    {
+        if (_cachedPillSprite != null) return _cachedPillSprite;
+
+        int h = 32;
+        int w = h * 2;
+        int radius = h / 2;
+        Texture2D tex = new Texture2D(w, h, TextureFormat.ARGB32, false);
+
+        for (int y = 0; y < h; y++)
+        {
+            for (int x = 0; x < w; x++)
+            {
+                float dist;
+                if (x < radius)
+                    dist = Vector2.Distance(new Vector2(x, y), new Vector2(radius, radius));
+                else if (x >= w - radius)
+                    dist = Vector2.Distance(new Vector2(x, y), new Vector2(w - radius - 1, radius));
+                else
+                    dist = Mathf.Abs(y - radius + 0.5f);
+
+                if (dist < radius - 1)
+                    tex.SetPixel(x, y, Color.white);
+                else if (dist < radius)
+                    tex.SetPixel(x, y, new Color(1, 1, 1, 1f - (dist - (radius - 1))));
+                else
+                    tex.SetPixel(x, y, Color.clear);
+            }
+        }
+
+        tex.Apply();
+        Vector4 border = new Vector4(radius + 1, 0, radius + 1, 0);
+        _cachedPillSprite = Sprite.Create(tex, new Rect(0, 0, w, h),
+            Vector2.one * 0.5f, 100f, 0, SpriteMeshType.FullRect, border);
+        return _cachedPillSprite;
+    }
+
     private static Sprite CreateCircleSprite()
     {
         // Create a simple circle texture for handle
