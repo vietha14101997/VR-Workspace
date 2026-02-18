@@ -1,5 +1,8 @@
 *.meta
+*.unity
 *.prefab
+Scenes/MainScene.unity
+/Scenes
 /.claude
 Materials/UIComponents/
 *.asset
