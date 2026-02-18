@@ -44,15 +44,13 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     // Menu Button
     private const string ICON_MENU = "icon_menu";
 
-    // Auto-hide
-    private const float AUTO_HIDE_DELAY = 10f;
     private const float FADE_DURATION = 0.2f;
     #endregion
 
     #region Events
     public event Action OnPlayPause;
-    public event Action OnPrevious;
-    public event Action OnNext;
+    public event Action OnBackward;
+    public event Action OnForward;
     public event Action<float> OnSeek;
     public event Action<float> OnVolumeChanged;
     public event Action<float> OnSpeedChanged;
@@ -128,7 +126,6 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     private float _speed = 1f;
     private bool _isSeeking = false;
     private bool _isHovering = false;
-    private float _autoHideTimer = 0f;
     private Coroutine _fadeCoroutine;
 
     // Sprites
@@ -143,10 +140,10 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     private const string ICON_SETTINGS = "icon_settings";
     private const string ICON_VOLUME = "icon_volume";
     private const string ICON_VOLUME_MUTE = "icon_volume_mute";
-    private const string ICON_PREV = "icon_previous";
+    private const string ICON_BACKWARD = "icon_backward";
     private const string ICON_PLAY = "icon_play";
     private const string ICON_PAUSE = "icon_pause";
-    private const string ICON_NEXT = "icon_next";
+    private const string ICON_FORWARD = "icon_forward";
     private const string ICON_ENVIRONMENT = "icon_enviroment";
     private const string ICON_3D = "icon_cube";
     #endregion
@@ -456,6 +453,28 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         };
         AttachHoverEvents(_seekSlider.gameObject);
 
+        // Double track and fill thickness + set fill color to hover button color
+        var seekTrackBg = _seekSlider.transform.Find("TrackBackground");
+        if (seekTrackBg != null)
+        {
+            var trt = seekTrackBg.GetComponent<RectTransform>();
+            trt.sizeDelta = new Vector2(trt.sizeDelta.x, trt.sizeDelta.y * 2f);
+        }
+        var seekFill = _seekSlider.transform.Find("Fill");
+        if (seekFill != null)
+        {
+            var frt = seekFill.GetComponent<RectTransform>();
+            frt.sizeDelta = new Vector2(frt.sizeDelta.x, frt.sizeDelta.y * 2f);
+            var fillImage = seekFill.GetComponent<Image>();
+            if (fillImage != null)
+            {
+                fillImage.color = new Color(
+                    Mathf.Lerp(THEME_COLOR.r, 1f, 0.15f),
+                    Mathf.Lerp(THEME_COLOR.g, 1f, 0.15f),
+                    Mathf.Lerp(THEME_COLOR.b, 1f, 0.15f), 1f);
+            }
+        }
+
         // Total time (at right edge)
         _totalTimeText = CreateText(timelineRow.transform, "00:00:00", 36, TextAlignmentOptions.MidlineLeft);
         _totalTimeText.enableAutoSizing = true;
@@ -537,6 +556,28 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         };
         AttachHoverEvents(_volumeSlider.gameObject);
 
+        // Double track and fill thickness + set fill color to hover button color
+        var volTrackBg = _volumeSlider.transform.Find("TrackBackground");
+        if (volTrackBg != null)
+        {
+            var trt = volTrackBg.GetComponent<RectTransform>();
+            trt.sizeDelta = new Vector2(trt.sizeDelta.x, trt.sizeDelta.y * 2f);
+        }
+        var volFill = _volumeSlider.transform.Find("Fill");
+        if (volFill != null)
+        {
+            var frt = volFill.GetComponent<RectTransform>();
+            frt.sizeDelta = new Vector2(frt.sizeDelta.x, frt.sizeDelta.y * 2f);
+            var fillImage = volFill.GetComponent<Image>();
+            if (fillImage != null)
+            {
+                fillImage.color = new Color(
+                    Mathf.Lerp(THEME_COLOR.r, 1f, 0.15f),
+                    Mathf.Lerp(THEME_COLOR.g, 1f, 0.15f),
+                    Mathf.Lerp(THEME_COLOR.b, 1f, 0.15f), 1f);
+            }
+        }
+
         // Flexible spacer to push center group
         CreateFlexibleSpacer(zoneC.transform);
 
@@ -549,16 +590,16 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         centerLayout.childControlWidth = false;
         centerLayout.childForceExpandWidth = false;
 
-        _prevButton = CreateIconOnlyButton(centerGroup.transform, ICON_PREV, otherButtonSize);
-        _prevButton.onClick.AddListener(() => OnPrevious?.Invoke());
+        _prevButton = CreateIconOnlyButton(centerGroup.transform, ICON_BACKWARD, otherButtonSize);
+        _prevButton.onClick.AddListener(() => SeekRelative(-10f));
 
         // Play/Pause button: full Zone C height, icon includes circle built-in
         _playPauseButton = CreateIconOnlyButton(centerGroup.transform, ICON_PLAY, playButtonSize, true);
         _playPauseButton.onClick.AddListener(() => OnPlayPause?.Invoke());
         _playPauseIcon = _playPauseButton.transform.Find("IconImage")?.GetComponent<Image>();
 
-        _nextButton = CreateIconOnlyButton(centerGroup.transform, ICON_NEXT, otherButtonSize);
-        _nextButton.onClick.AddListener(() => OnNext?.Invoke());
+        _nextButton = CreateIconOnlyButton(centerGroup.transform, ICON_FORWARD, otherButtonSize);
+        _nextButton.onClick.AddListener(() => SeekRelative(10f));
 
         // Flexible spacer to push right group
         CreateFlexibleSpacer(zoneC.transform);
@@ -949,8 +990,6 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
             _playPauseIcon.sprite = Resources.Load<Sprite>(iconName);
         }
 
-        // Reset auto-hide timer when state changes
-        ResetAutoHideTimer();
     }
 
     /// <summary>
@@ -987,6 +1026,18 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
             var colorEffect = hoverCtrl.GetEffect("color") as ColorHoverEffect;
             colorEffect?.SetOriginalColor(iconColor);
         }
+    }
+
+    /// <summary>
+    /// Reset side panel to Queue view (hide Settings). Called when opening a new video.
+    /// </summary>
+    public void ResetToQueueView()
+    {
+        _settingsActive = false;
+        SetSettingsButtonSelected(false);
+        if (_settingsFrameObject != null) _settingsFrameObject.SetActive(false);
+        if (_sideControlsFrameObject != null) _sideControlsFrameObject.SetActive(true);
+        if (_queuePagination != null) _queuePagination.ShowImmediate();
     }
 
     /// <summary>
@@ -1115,7 +1166,6 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         }
         _fadeCoroutine = StartCoroutine(FadeIn());
         IsVisible = true;
-        ResetAutoHideTimer();
 
         // Re-enable parent frame's display quad collider (was disabled on hide)
         SetParentFrameColliderEnabled(true);
@@ -1164,21 +1214,12 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         OnVisibilityChanged?.Invoke(false);
     }
 
-    /// <summary>
-    /// Reset auto-hide timer.
-    /// </summary>
-    public void ResetAutoHideTimer()
-    {
-        _autoHideTimer = AUTO_HIDE_DELAY;
-    }
 
     /// <summary>
     /// Notify that user interacted with controls.
     /// </summary>
     public void OnUserInteraction()
     {
-        ResetAutoHideTimer();
-
         if (!IsVisible)
         {
             Show();
@@ -1189,15 +1230,11 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     public void OnPointerEnter(PointerEventData eventData)
     {
         _isHovering = true;
-        ResetAutoHideTimer();
-        // Debug.Log("[RTTMediaControlsPanel] Pointer Enter - Hover Start");
     }
 
     public void OnPointerExit(PointerEventData eventData)
     {
         _isHovering = false;
-        ResetAutoHideTimer(); // Reset timer when leaving so it counts down from full duration
-        // Debug.Log("[RTTMediaControlsPanel] Pointer Exit - Hover End");
     }
     #endregion
     #endregion
@@ -1205,15 +1242,6 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
     #region Unity Lifecycle
     private void Update()
     {
-        // Auto-hide during playback
-        if (IsPlaying && IsVisible && !_isSeeking && !_isHovering)
-        {
-            _autoHideTimer -= Time.deltaTime;
-            if (_autoHideTimer <= 0)
-            {
-                Hide();
-            }
-        }
     }
 
     private void OnDestroy()
@@ -1233,6 +1261,20 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         if (go == null) return;
         var relay = go.AddComponent<HoverEventRelay>();
         relay.Initialize(this);
+    }
+
+    /// <summary>
+    /// Seek forward or backward by a relative number of seconds.
+    /// </summary>
+    private void SeekRelative(float seconds)
+    {
+        if (_duration <= 0) return;
+        float newTime = Mathf.Clamp(_currentTime + seconds, 0f, _duration);
+        float normalized = newTime / _duration;
+        _seekSlider.SetValueWithoutNotify(normalized);
+        _currentTimeText.text = FormatTime(newTime);
+        _nextAllowedUpdateTime = Time.time + 3.0f;
+        OnSeek?.Invoke(newTime);
     }
 
     private void OnSeekValueChanged(float normalizedValue)

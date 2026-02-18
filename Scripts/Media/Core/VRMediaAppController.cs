@@ -1081,7 +1081,6 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
             btn.onClick.AddListener(() =>
             {
                 _controlsPanel?.Show();
-                _controlsPanel?.ResetAutoHideTimer();
             });
 
             // Hover effects - scale + subtle color tint on icon (white → light pastel accent)
@@ -1295,6 +1294,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         if (_controlsPanel != null)
         {
             _controlsPanel.gameObject.SetActive(true);
+            _controlsPanel.ResetToQueueView();
             _controlsPanel.Show();
         }
     }
@@ -1410,10 +1410,6 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         // UI settings popup
         _settingsPanel.OnUISettingsRequested += HandleUISettingsRequested;
 
-        // Additional menu items (placeholder handlers - log for now)
-        _settingsPanel.OnPassthroughClicked += () => Debug.Log("[VRMediaAppController] Passthrough settings clicked (not yet implemented)");
-        _settingsPanel.OnHotkeysSettingsClicked += () => Debug.Log("[VRMediaAppController] Hotkeys settings clicked (not yet implemented)");
-        _settingsPanel.OnPlayerSettingsClicked += () => Debug.Log("[VRMediaAppController] Player settings clicked (not yet implemented)");
     }
 
     private void HandlePictureSaveDefaults()
@@ -2578,15 +2574,6 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
                 _uiSettingsBlocker.transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
         }
 
-        // Reset auto-hide when reticle is hovering the controls frame
-        if (_controlsPanel != null && _controlsPanel.IsVisible && _controlsCanvasBase != null)
-        {
-            var raycastMgr = RTTRaycastManager.Instance;
-            if (raycastMgr != null && raycastMgr.CurrentHit.isValid && raycastMgr.CurrentHit.panel == _controlsCanvasBase)
-            {
-                _controlsPanel.ResetAutoHideTimer();
-            }
-        }
     }
 
     private void OnDestroy()

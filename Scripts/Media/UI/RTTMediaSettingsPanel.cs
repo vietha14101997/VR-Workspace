@@ -18,7 +18,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
     // Layout
     private const float HEADER_RATIO = 0.10f;
     private const float SIDE_MARGIN_RATIO = 0.055f;
-    private const float MENU_ITEM_HEIGHT_RATIO = 0.125f; // Each item = 12.5% of total height
+    private const float MENU_ITEM_HEIGHT_RATIO = 0.15625f; // Each item = 15.625% of total height (125% of original)
     private const float MENU_SPACING_RATIO = 0.025f; // Spacing = 2.5% of total height
 
     // Colors (matching RTTMediaQueuePanel)
@@ -34,7 +34,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
     private static readonly Color HEADER_BG = new Color(0.12f, 0.12f, 0.14f, 0.90f);
 
     // Sub-page content (row heights and spacing computed dynamically in Initialize)
-    private const float SUB_PAGE_PADDING_TOP = 15f;
+    private const float SUB_PAGE_PADDING_TOP = 60f;
 
     // Slider row layout
     private const float SLIDER_LABEL_MIN_WIDTH = 195f;
@@ -46,19 +46,16 @@ public class RTTMediaSettingsPanel : MonoBehaviour
 
     // Icons
     private const string ICON_BACK = "icon_arrow_left";
-    private const string ICON_PICTURE = "icon_settings_2";
-    private const string ICON_VIDEO = "icon_media";
-    private const string ICON_PASSTHROUGH = "icon_passthrough";
-    private const string ICON_SCREEN = "icon_monitor";
-    private const string ICON_UI = "icon_move";
-    private const string ICON_HOTKEYS = "icon_remote";
-    private const string ICON_PLAYER = "icon_settings";
+    private const string ICON_PICTURE = "icon_picture";
+    private const string ICON_VIDEO = "icon_video";
+    private const string ICON_SCREEN = "icon_move";
+    private const string ICON_UI = "icon_ui_settings";
     private const string ICON_REFRESH = "icon_refresh";
     private const string ICON_RESET = "icon_reset";
     private const string ICON_MINUS = "icon_minus";
     private const string ICON_PLUS = "icon_plus";
     private const string ICON_3D = "icon_cube";
-    private const string ICON_SWAP = "icon_shuffle";
+    private const string ICON_REVERSE = "icon_reverse";
     private const string ICON_ARROW = "icon_arrow_right";
     #endregion
 
@@ -99,11 +96,6 @@ public class RTTMediaSettingsPanel : MonoBehaviour
     public event Action OnUISettingsRequested;
     #endregion
 
-    #region Events - Additional Menu Items
-    public event Action OnPassthroughClicked;
-    public event Action OnHotkeysSettingsClicked;
-    public event Action OnPlayerSettingsClicked;
-    #endregion
 
     #region Navigation
     private enum Page
@@ -222,7 +214,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         _sideMargin = Mathf.Round(_width * SIDE_MARGIN_RATIO);
         _menuItemHeight = Mathf.Round(_height * MENU_ITEM_HEIGHT_RATIO);
         _menuSpacing = Mathf.Round(_height * MENU_SPACING_RATIO);
-        _rowHeight = Mathf.Round(_height * 0.125f);
+        _rowHeight = Mathf.Round(_height * 0.15625f);
         _rowSpacing = Mathf.Round(_height * 0.025f);
 
         BuildUI();
@@ -423,7 +415,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         headerLayout.childForceExpandWidth = false;
         headerLayout.childForceExpandHeight = true;
         headerLayout.spacing = 8f;
-        headerLayout.padding = new RectOffset((int)(_sideMargin * 1.5f), (int)_sideMargin, 0, 0);
+        headerLayout.padding = new RectOffset((int)(_sideMargin * 0.85f), (int)_sideMargin, 0, 0);
 
         // Back button
         CreateBackButton(headerObj.transform);
@@ -539,27 +531,18 @@ public class RTTMediaSettingsPanel : MonoBehaviour
             contentLayout.padding = new RectOffset((int)_sideMargin, (int)_sideMargin, (int)_menuSpacing, 15);
         }
 
-        // Menu items (order matches reference: Picture, Video, Passthrough, Screen, UI, Hotkeys, Player)
+        // Menu items: Picture, Video, Screen, UI
         CreateMenuItem(scrollContent, ICON_PICTURE, "Picture adjustments",
             () => NavigateToPage(Page.PictureAdjustments));
 
         CreateMenuItem(scrollContent, ICON_VIDEO, "Video adjustments",
             () => NavigateToPage(Page.VideoAdjustments));
 
-        CreateMenuItem(scrollContent, ICON_PASSTHROUGH, "Passthrough",
-            () => OnPassthroughClicked?.Invoke());
-
         _screenSettingsMenuItem = CreateMenuItem(scrollContent, ICON_SCREEN, "Screen settings",
             () => NavigateToPage(Page.ScreenSettings));
 
         _uiSettingsMenuItem = CreateMenuItem(scrollContent, ICON_UI, "Open UI settings",
             () => OnUISettingsRequested?.Invoke());
-
-        CreateMenuItem(scrollContent, ICON_HOTKEYS, "Hotkeys settings",
-            () => OnHotkeysSettingsClicked?.Invoke());
-
-        CreateMenuItem(scrollContent, ICON_PLAYER, "Player settings",
-            () => OnPlayerSettingsClicked?.Invoke());
     }
 
     private GameObject CreateMenuItem(Transform parent, string iconName, string label, Action onClick)
@@ -584,7 +567,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         button.onClick.AddListener(() => onClick?.Invoke());
 
         var itemLayout = itemObj.AddComponent<HorizontalLayoutGroup>();
-        itemLayout.spacing = 15f;
+        itemLayout.spacing = 25f;
         itemLayout.padding = new RectOffset(25, 20, 0, 0);
         itemLayout.childAlignment = TextAnchor.MiddleLeft;
         itemLayout.childControlWidth = true;
@@ -592,8 +575,8 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         itemLayout.childForceExpandWidth = false;
         itemLayout.childForceExpandHeight = false;
 
-        // Icon
-        float iconSize = Mathf.Round(_menuItemHeight * 0.35f);
+        // Icon (75% of original 0.35 ratio = 25% reduction)
+        float iconSize = Mathf.Round(_menuItemHeight * 0.2625f);
         GameObject iconObj = new GameObject("Icon");
         iconObj.transform.SetParent(itemObj.transform, false);
 
@@ -620,7 +603,8 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         var labelText = labelObj.AddComponent<TextMeshProUGUI>();
         labelText.font = _font;
         labelText.text = label;
-        labelText.fontSize = 28;
+        labelText.fontSize = 35;
+        labelText.fontStyle = FontStyles.Bold;
         labelText.color = TEXT_COLOR;
         labelText.alignment = TextAlignmentOptions.MidlineLeft;
         labelText.raycastTarget = false;
@@ -767,7 +751,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
 
         // LR Inverse Toggle (with icon)
         _lrInverseToggle = CreateToggleRow(scrollContent, "LR Inverse", false,
-            (v) => OnLRInverseChanged?.Invoke(v), ICON_SWAP);
+            (v) => OnLRInverseChanged?.Invoke(v), ICON_REVERSE);
 
         // Speed segment buttons
         CreateSpeedRow(scrollContent);
@@ -827,45 +811,57 @@ public class RTTMediaSettingsPanel : MonoBehaviour
 
     private void CreateSpeedRow(Transform parent)
     {
+        // Outer container with VLG and ContentSizeFitter for auto height
         GameObject rowObj = new GameObject("SpeedRow");
         rowObj.transform.SetParent(parent, false);
 
-        var rowLE = rowObj.AddComponent<LayoutElement>();
-        rowLE.minHeight = _rowHeight;
-        rowLE.preferredHeight = _rowHeight;
-
         var rowLayout = rowObj.AddComponent<VerticalLayoutGroup>();
-        rowLayout.spacing = 8f;
-        rowLayout.padding = new RectOffset((int)_sideMargin, (int)_sideMargin, 5, 5);
+        rowLayout.spacing = 12f;
+        rowLayout.padding = new RectOffset(0, 0, 10, 0);
         rowLayout.childControlWidth = true;
         rowLayout.childControlHeight = true;
         rowLayout.childForceExpandWidth = true;
         rowLayout.childForceExpandHeight = false;
+
+        var rowCSF = rowObj.AddComponent<ContentSizeFitter>();
+        rowCSF.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
         // Label
         GameObject labelObj = new GameObject("SpeedLabel");
         labelObj.transform.SetParent(rowObj.transform, false);
 
         var labelLE = labelObj.AddComponent<LayoutElement>();
-        labelLE.minHeight = 28;
+        labelLE.minHeight = 45f;
+        labelLE.preferredHeight = 45f;
 
         var labelText = labelObj.AddComponent<TextMeshProUGUI>();
         labelText.font = _font;
         labelText.text = "Speed";
-        labelText.fontSize = 24;
+        labelText.fontSize = 35;
+        labelText.fontStyle = FontStyles.Bold;
         labelText.color = TEXT_COLOR;
         labelText.alignment = TextAlignmentOptions.MidlineLeft;
         labelText.raycastTarget = false;
 
-        // Segment container
+        // Segment container with background
+        float segHeight = _menuItemHeight * 0.49f;
         GameObject segContainer = new GameObject("SpeedSegments");
         segContainer.transform.SetParent(rowObj.transform, false);
 
         var segLE = segContainer.AddComponent<LayoutElement>();
-        segLE.flexibleHeight = 1f;
+        segLE.minHeight = segHeight;
+        segLE.preferredHeight = segHeight;
 
+        var segBg = segContainer.AddComponent<Image>();
+        segBg.sprite = GetPillSprite();
+        segBg.type = Image.Type.Sliced;
+        segBg.pixelsPerUnitMultiplier = 64f / segHeight;
+        segBg.color = new Color(0.20f, 0.20f, 0.22f, 1.0f);
+
+        int pillPad = Mathf.RoundToInt(segHeight * 0.25f);
         var segLayout = segContainer.AddComponent<HorizontalLayoutGroup>();
-        segLayout.spacing = 4f;
+        segLayout.spacing = 0;
+        segLayout.padding = new RectOffset(pillPad, pillPad, 0, 0);
         segLayout.childAlignment = TextAnchor.MiddleCenter;
         segLayout.childControlWidth = true;
         segLayout.childControlHeight = true;
@@ -878,13 +874,16 @@ public class RTTMediaSettingsPanel : MonoBehaviour
 
         foreach (float speed in speeds)
         {
-            CreateSpeedButton(segContainer.transform, speed);
+            CreateSpeedButton(segContainer.transform, speed, segHeight);
         }
 
         UpdateSpeedButtonSelection();
     }
 
-    private void CreateSpeedButton(Transform parent, float speed)
+    private static readonly Color SPEED_SELECTED_BG = new Color(0.15f, 0.15f, 0.17f, 0.7f);
+    private static readonly Color SPEED_HOVER_BG = new Color(0.28f, 0.28f, 0.30f, 0.6f);
+
+    private void CreateSpeedButton(Transform parent, float speed, float btnHeight)
     {
         string label = speed == 1f ? "1" :
                        speed < 1f ? speed.ToString("0.##") :
@@ -893,11 +892,12 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         GameObject btnObj = new GameObject($"Speed_{label}");
         btnObj.transform.SetParent(parent, false);
 
-        // Background
+        // Background (circle sprite, preserveAspect keeps it circular)
         var bgImage = btnObj.AddComponent<Image>();
         bgImage.sprite = GetCircleSprite();
         bgImage.color = Color.clear;
         bgImage.type = Image.Type.Simple;
+        bgImage.preserveAspect = true;
 
         var button = btnObj.AddComponent<Button>();
         button.targetGraphic = bgImage;
@@ -923,14 +923,21 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         var tmp = textObj.AddComponent<TextMeshProUGUI>();
         tmp.font = _font;
         tmp.text = label;
-        tmp.fontSize = 18;
+        tmp.fontSize = 35;
+        tmp.fontStyle = FontStyles.Bold;
         tmp.color = TEXT_COLOR;
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.raycastTarget = false;
 
+        // Hover effect (background only, not text)
+        var hoverController = btnObj.AddComponent<HoverEffectController>();
+        hoverController.AddEffect(new ColorHoverEffect()
+            .WithTargetChild("")
+            .WithHoverColor(SPEED_HOVER_BG));
+
         // Collider
         var col = btnObj.AddComponent<BoxCollider>();
-        col.size = new Vector3(50, 40, 10);
+        col.size = new Vector3(btnHeight, btnHeight, 10);
         col.center = new Vector3(0, 0, -5);
 
         _speedButtons.Add(button);
@@ -938,6 +945,11 @@ public class RTTMediaSettingsPanel : MonoBehaviour
 
     private void UpdateSpeedButtonSelection()
     {
+        Color selectedTextColor = new Color(
+            Mathf.Lerp(THEME_COLOR.r, 1f, 0.15f),
+            Mathf.Lerp(THEME_COLOR.g, 1f, 0.15f),
+            Mathf.Lerp(THEME_COLOR.b, 1f, 0.15f), 1f);
+
         float[] speeds = { 0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f };
         for (int i = 0; i < _speedButtons.Count && i < speeds.Length; i++)
         {
@@ -945,8 +957,18 @@ public class RTTMediaSettingsPanel : MonoBehaviour
             var bg = _speedButtons[i].GetComponent<Image>();
             var text = _speedButtons[i].GetComponentInChildren<TextMeshProUGUI>();
 
-            if (bg != null) bg.color = isSelected ? THEME_COLOR : Color.clear;
-            if (text != null) text.color = isSelected ? Color.white : TEXT_COLOR;
+            // Selected: dark transparent bg + colored text; Unselected: clear bg + white text
+            Color bgColor = isSelected ? SPEED_SELECTED_BG : Color.clear;
+            if (bg != null) bg.color = bgColor;
+            if (text != null) text.color = isSelected ? selectedTextColor : TEXT_COLOR;
+
+            // Update hover effect original color so pointer exit restores correct state
+            var hoverCtrl = _speedButtons[i].GetComponent<HoverEffectController>();
+            if (hoverCtrl != null)
+            {
+                var colorEffect = hoverCtrl.GetEffect("color") as ColorHoverEffect;
+                colorEffect?.SetOriginalColor(bgColor);
+            }
         }
     }
     #endregion
@@ -976,7 +998,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
 
         // Vertical move slider (-1.0 - 1.0, default 0)
         (_verticalMoveSlider, _verticalMoveValueLabel) = CreateSliderRow(
-            scrollContent, "Vertical", -1.0f, 1.0f, 0f,
+            scrollContent, "Vertical move", -1.0f, 1.0f, 0f,
             (v) => { OnVerticalMoveChanged?.Invoke(v); UpdateValueLabel(_verticalMoveValueLabel, v, "m"); }, "m");
 
         // Spacer
@@ -1006,71 +1028,76 @@ public class RTTMediaSettingsPanel : MonoBehaviour
 
     private void CreateAspectRatioRow(Transform parent)
     {
+        float gridSpacing = Mathf.Round(_width / 24f);
+        float contentWidth = _width - 2f * _sideMargin;
+        float btnWidth = Mathf.Round((contentWidth - 2f * gridSpacing) / 3f);
+        float btnHeight = Mathf.Round(btnWidth / 3f);
+        float labelHeight = 45f;
+        float gridHeight = btnHeight * 2f + gridSpacing;
+        float totalHeight = labelHeight + gridSpacing + gridHeight;
+
         GameObject rowObj = new GameObject("AspectRatioRow");
         rowObj.transform.SetParent(parent, false);
 
         var rowLE = rowObj.AddComponent<LayoutElement>();
-        rowLE.minHeight = _rowHeight * 2; // Two rows
-        rowLE.preferredHeight = _rowHeight * 2;
+        rowLE.minHeight = totalHeight;
+        rowLE.preferredHeight = totalHeight;
 
         var rowLayout = rowObj.AddComponent<VerticalLayoutGroup>();
-        rowLayout.spacing = 6f;
-        rowLayout.padding = new RectOffset((int)_sideMargin, (int)_sideMargin, 5, 5);
+        rowLayout.spacing = gridSpacing;
+        rowLayout.padding = new RectOffset(0, 0, 0, 0);
         rowLayout.childControlWidth = true;
         rowLayout.childControlHeight = true;
         rowLayout.childForceExpandWidth = true;
         rowLayout.childForceExpandHeight = false;
+
+        // Force self-sizing so parent VLG (childControlHeight=false) gets correct height
+        var rowCSF = rowObj.AddComponent<ContentSizeFitter>();
+        rowCSF.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
         // Label
         GameObject labelObj = new GameObject("AspectLabel");
         labelObj.transform.SetParent(rowObj.transform, false);
 
         var labelLE = labelObj.AddComponent<LayoutElement>();
-        labelLE.minHeight = 28;
+        labelLE.minHeight = labelHeight;
+        labelLE.preferredHeight = labelHeight;
 
         var labelText = labelObj.AddComponent<TextMeshProUGUI>();
         labelText.font = _font;
-        labelText.text = "Aspect ratio";
-        labelText.fontSize = 24;
+        labelText.text = "Screen by aspect ratio";
+        labelText.fontSize = 35;
+        labelText.fontStyle = FontStyles.Bold;
         labelText.color = TEXT_COLOR;
         labelText.alignment = TextAlignmentOptions.MidlineLeft;
         labelText.raycastTarget = false;
 
-        // Row 1: Default, 4:3, 3:2
-        var row1 = CreateAspectButtonRow(rowObj.transform);
-        CreateAspectButton(row1.transform, "Default", "default");
-        CreateAspectButton(row1.transform, "4:3", "4:3");
-        CreateAspectButton(row1.transform, "3:2", "3:2");
+        // Grid container (3 columns, auto rows)
+        GameObject gridObj = new GameObject("AspectGrid");
+        gridObj.transform.SetParent(rowObj.transform, false);
 
-        // Row 2: 16:9, 2:1
-        var row2 = CreateAspectButtonRow(rowObj.transform);
-        CreateAspectButton(row2.transform, "16:9", "16:9");
-        CreateAspectButton(row2.transform, "2:1", "2:1");
+        var gridLE = gridObj.AddComponent<LayoutElement>();
+        gridLE.minHeight = gridHeight;
+        gridLE.preferredHeight = gridHeight;
+
+        var grid = gridObj.AddComponent<GridLayoutGroup>();
+        grid.cellSize = new Vector2(btnWidth, btnHeight);
+        grid.spacing = new Vector2(gridSpacing, gridSpacing);
+        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        grid.constraintCount = 3;
+        grid.childAlignment = TextAnchor.UpperLeft;
+
+        // Create buttons inside grid
+        CreateAspectButton(gridObj.transform, "Default", "default", btnWidth, btnHeight);
+        CreateAspectButton(gridObj.transform, "4:3", "4:3", btnWidth, btnHeight);
+        CreateAspectButton(gridObj.transform, "3:2", "3:2", btnWidth, btnHeight);
+        CreateAspectButton(gridObj.transform, "16:9", "16:9", btnWidth, btnHeight);
+        CreateAspectButton(gridObj.transform, "2:1", "2:1", btnWidth, btnHeight);
 
         UpdateAspectButtonSelection();
     }
 
-    private GameObject CreateAspectButtonRow(Transform parent)
-    {
-        GameObject rowObj = new GameObject("AspectBtnRow");
-        rowObj.transform.SetParent(parent, false);
-
-        var rowLE = rowObj.AddComponent<LayoutElement>();
-        rowLE.minHeight = 40;
-        rowLE.preferredHeight = 40;
-
-        var rowLayout = rowObj.AddComponent<HorizontalLayoutGroup>();
-        rowLayout.spacing = 8f;
-        rowLayout.childAlignment = TextAnchor.MiddleLeft;
-        rowLayout.childControlWidth = true;
-        rowLayout.childControlHeight = true;
-        rowLayout.childForceExpandWidth = true;
-        rowLayout.childForceExpandHeight = true;
-
-        return rowObj;
-    }
-
-    private void CreateAspectButton(Transform parent, string label, string aspectValue)
+    private void CreateAspectButton(Transform parent, string label, string aspectValue, float btnWidth, float btnHeight)
     {
         GameObject btnObj = new GameObject($"Aspect_{aspectValue}");
         btnObj.transform.SetParent(parent, false);
@@ -1105,14 +1132,22 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         var tmp = textObj.AddComponent<TextMeshProUGUI>();
         tmp.font = _font;
         tmp.text = label;
-        tmp.fontSize = 22;
+        tmp.fontSize = 35;
+        tmp.fontStyle = FontStyles.Bold;
         tmp.color = TEXT_COLOR;
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.raycastTarget = false;
 
+        // Hover effects
+        var hoverController = btnObj.AddComponent<HoverEffectController>();
+        hoverController.AddEffect(new ScaleHoverEffect().WithHoverScale(1.05f).WithTransitionDuration(0.06f));
+        hoverController.AddEffect(new ColorHoverEffect()
+            .WithTargetChild("")
+            .WithHoverColor(ITEM_HOVER_BG));
+
         // Collider
         var col = btnObj.AddComponent<BoxCollider>();
-        col.size = new Vector3(100, 40, 10);
+        col.size = new Vector3(btnWidth, btnHeight, 10);
         col.center = new Vector3(0, 0, -5);
 
         _aspectButtons.Add(button);
@@ -1120,6 +1155,12 @@ public class RTTMediaSettingsPanel : MonoBehaviour
 
     private void UpdateAspectButtonSelection()
     {
+        Color selectedTextColor = new Color(
+            Mathf.Lerp(THEME_COLOR.r, 1f, 0.15f),
+            Mathf.Lerp(THEME_COLOR.g, 1f, 0.15f),
+            Mathf.Lerp(THEME_COLOR.b, 1f, 0.15f),
+            1f);
+
         string[] values = { "default", "4:3", "3:2", "16:9", "2:1" };
         for (int i = 0; i < _aspectButtons.Count && i < values.Length; i++)
         {
@@ -1127,8 +1168,13 @@ public class RTTMediaSettingsPanel : MonoBehaviour
             var bg = _aspectButtons[i].GetComponent<Image>();
             var text = _aspectButtons[i].GetComponentInChildren<TextMeshProUGUI>();
 
-            if (bg != null) bg.color = isSelected ? THEME_COLOR : ITEM_BG;
-            if (text != null) text.color = isSelected ? Color.white : TEXT_COLOR;
+            // Selected: text color changes, bg stays same; not clickable, no hover
+            if (bg != null) bg.color = ITEM_BG;
+            if (text != null) text.color = isSelected ? selectedTextColor : TEXT_COLOR;
+            _aspectButtons[i].interactable = !isSelected;
+
+            var hoverCtrl = _aspectButtons[i].GetComponent<HoverEffectController>();
+            if (hoverCtrl != null) hoverCtrl.enabled = !isSelected;
         }
     }
     #endregion
@@ -1207,7 +1253,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         float sliderWidth = _width * 0.35f;
         float btnAreaWidth = (pillWidth - sliderWidth) / 2f;
         float resetBtnSize = 56f;
-        float labelWidth = pillLeft - 4f;
+        float labelWidth = _width * 0.25f;
 
         // === Row container (LayoutElement for parent VLG, no inner layout) ===
         GameObject rowObj = new GameObject($"SliderRow_{label}");
@@ -1237,6 +1283,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         labelText.fontStyle = FontStyles.Bold;
         labelText.color = TEXT_COLOR;
         labelText.alignment = TextAlignmentOptions.MidlineLeft;
+        labelText.enableWordWrapping = true;
         labelText.raycastTarget = false;
 
         // === Pill area (absolute positioned, contains bg + buttons + slider) ===
@@ -1518,12 +1565,19 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         rowObj.transform.SetParent(parent, false);
 
         var rowLE = rowObj.AddComponent<LayoutElement>();
-        rowLE.minHeight = _rowHeight;
-        rowLE.preferredHeight = _rowHeight;
+        rowLE.minHeight = _menuItemHeight;
+        rowLE.preferredHeight = _menuItemHeight;
+
+        // Background (synced with menu items)
+        var bgImage = rowObj.AddComponent<Image>();
+        bgImage.sprite = GetRoundedRectSprite();
+        bgImage.type = Image.Type.Sliced;
+        bgImage.color = new Color(0.18f, 0.18f, 0.20f, 0.85f);
+        bgImage.raycastTarget = true;
 
         var rowLayout = rowObj.AddComponent<HorizontalLayoutGroup>();
-        rowLayout.spacing = 10f;
-        rowLayout.padding = new RectOffset((int)_sideMargin, (int)_sideMargin, 5, 5);
+        rowLayout.spacing = 25f;
+        rowLayout.padding = new RectOffset(25, 20, 0, 0);
         rowLayout.childAlignment = TextAnchor.MiddleLeft;
         rowLayout.childControlWidth = true;
         rowLayout.childControlHeight = false;
@@ -1533,7 +1587,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         // Icon (optional, displayed before label)
         if (!string.IsNullOrEmpty(iconName))
         {
-            float iconSize = 32f;
+            float iconSize = Mathf.Round(_menuItemHeight * 0.196875f);
             GameObject iconObj = new GameObject("Icon");
             iconObj.transform.SetParent(rowObj.transform, false);
 
@@ -1556,19 +1610,22 @@ public class RTTMediaSettingsPanel : MonoBehaviour
 
         var labelLE2 = labelObj.AddComponent<LayoutElement>();
         labelLE2.flexibleWidth = 1f;
-        labelLE2.minHeight = _rowHeight - 10;
+        labelLE2.minHeight = _menuItemHeight;
 
         var labelText = labelObj.AddComponent<TextMeshProUGUI>();
         labelText.font = _font;
         labelText.text = label;
         labelText.fontSize = 35;
+        labelText.fontStyle = FontStyles.Bold;
         labelText.color = TEXT_COLOR;
         labelText.alignment = TextAlignmentOptions.MidlineLeft;
         labelText.raycastTarget = false;
 
-        // Toggle switch
-        float trackW = 55f, trackH = 30f;
-        float thumbSize = trackH - 4f;
+        // Toggle switch (iOS-style: white pill track, black circular knob)
+        float trackH = Mathf.Round(_menuItemHeight * 0.2f);
+        float trackW = Mathf.Round(trackH * 1.75f);
+        float thumbPad = Mathf.Max(2f, Mathf.Round(trackH * 0.1f));
+        float thumbSize = trackH - thumbPad * 2f;
 
         GameObject toggleObj = new GameObject("Toggle");
         toggleObj.transform.SetParent(rowObj.transform, false);
@@ -1579,13 +1636,14 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         toggleLE.preferredWidth = trackW;
         toggleLE.preferredHeight = trackH;
 
-        // Track background
+        // Track background (pill sprite with proper semicircle ends)
         var trackImage = toggleObj.AddComponent<Image>();
-        trackImage.sprite = GetRoundedRectSprite();
+        trackImage.sprite = GetPillSprite();
         trackImage.type = Image.Type.Sliced;
-        trackImage.color = new Color(0.3f, 0.3f, 0.3f, 1f);
+        trackImage.pixelsPerUnitMultiplier = 64f / trackH;
+        trackImage.color = Color.white;
 
-        // Thumb
+        // Thumb (black circular knob)
         GameObject thumbObj = new GameObject("Thumb");
         thumbObj.transform.SetParent(toggleObj.transform, false);
 
@@ -1594,38 +1652,50 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         thumbRT.anchorMin = new Vector2(0, 0.5f);
         thumbRT.anchorMax = new Vector2(0, 0.5f);
         thumbRT.pivot = new Vector2(0.5f, 0.5f);
-        // Position: off = left (thumbSize/2 + 2), on = right (trackW - thumbSize/2 - 2)
-        float offX = thumbSize / 2f + 2f;
+        float offX = thumbPad + thumbSize / 2f;
         thumbRT.anchoredPosition = new Vector2(defaultValue ? (trackW - offX) : offX, 0);
 
         var thumbImage = thumbObj.AddComponent<Image>();
         thumbImage.sprite = GetCircleSprite();
-        thumbImage.color = Color.white;
+        thumbImage.preserveAspect = true;
+        thumbImage.color = Color.black;
         thumbImage.raycastTarget = false;
 
         // Unity Toggle component
         var toggle = toggleObj.AddComponent<Toggle>();
         toggle.isOn = defaultValue;
         toggle.targetGraphic = trackImage;
-        toggle.graphic = null; // We handle visuals manually
+        toggle.graphic = null;
         toggle.transition = Selectable.Transition.None;
 
-        // Update visuals on toggle
         toggle.onValueChanged.AddListener((val) =>
         {
-            trackImage.color = val ? THEME_COLOR : new Color(0.3f, 0.3f, 0.3f, 1f);
+            trackImage.color = val ? THEME_COLOR : Color.white;
             thumbRT.anchoredPosition = new Vector2(val ? (trackW - offX) : offX, 0);
             onChanged?.Invoke(val);
         });
 
-        // Initial visual state
         if (defaultValue)
             trackImage.color = THEME_COLOR;
 
-        // Collider
-        var col = toggleObj.AddComponent<BoxCollider>();
-        col.size = new Vector3(trackW * 1.3f, trackH * 1.5f, 10);
-        col.center = new Vector3(trackW / 2f, 0, -5);
+        // Row-level button so clicking anywhere on the row toggles the switch
+        var rowButton = rowObj.AddComponent<Button>();
+        rowButton.targetGraphic = bgImage;
+        rowButton.transition = Selectable.Transition.None;
+        Toggle capturedToggle = toggle;
+        rowButton.onClick.AddListener(() => capturedToggle.isOn = !capturedToggle.isOn);
+
+        // Collider covers entire row
+        float contentWidth = _width - _sideMargin * 2;
+        var col = rowObj.AddComponent<BoxCollider>();
+        col.size = new Vector3(contentWidth, _menuItemHeight, 10);
+        col.center = new Vector3(0, 0, -5);
+
+        // Hover effect on row background (no scale hover for Video adjustments rows)
+        var hoverController = rowObj.AddComponent<HoverEffectController>();
+        hoverController.AddEffect(new ColorHoverEffect()
+            .WithTargetChild("")
+            .WithHoverColor(ITEM_HOVER_BG));
 
         return toggle;
     }
@@ -1666,7 +1736,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         var tmp = textObj.AddComponent<TextMeshProUGUI>();
         tmp.font = _font;
         tmp.text = label;
-        tmp.fontSize = 32;
+        tmp.fontSize = 35;
         tmp.fontStyle = FontStyles.Bold;
         tmp.color = TEXT_COLOR;
         tmp.alignment = TextAlignmentOptions.Center;
@@ -1943,7 +2013,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         tex.wrapMode = TextureWrapMode.Clamp;
         tex.filterMode = FilterMode.Bilinear;
 
-        Vector4 border = new Vector4(radius + 1, radius + 1, radius + 1, radius + 1);
+        Vector4 border = new Vector4(radius + 1, radius, radius + 1, radius);
         _pillSprite = Sprite.Create(tex, new Rect(0, 0, texW, texH),
             Vector2.one * 0.5f, 100f, 0, SpriteMeshType.FullRect, border);
         return _pillSprite;

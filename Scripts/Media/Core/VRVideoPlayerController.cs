@@ -136,8 +136,7 @@ public class VRVideoPlayerController : MonoBehaviour
             _controlsPanel.OnVolumeChanged += SetVolume;
             _controlsPanel.OnSpeedChanged += SetPlaybackSpeed;
             _controlsPanel.OnBackClicked += HandleBackClicked;
-            _controlsPanel.OnPrevious += PlayPreviousVideo;
-            _controlsPanel.OnNext += PlayNextVideo;
+            // Forward/Backward buttons now seek ±10s directly via OnSeek
             _controlsPanel.OnVRModeClicked += HandleVRModeClicked;
             _controlsPanel.OnHeadsetModeClicked += HandleHeadsetModeClicked;
             _controlsPanel.OnRecenterClicked += HandleRecenter;
@@ -1533,8 +1532,7 @@ public class VRVideoPlayerController : MonoBehaviour
             _controlsPanel.OnVolumeChanged -= SetVolume;
             _controlsPanel.OnSpeedChanged -= SetPlaybackSpeed;
             _controlsPanel.OnBackClicked -= HandleBackClicked;
-            _controlsPanel.OnPrevious -= PlayPreviousVideo;
-            _controlsPanel.OnNext -= PlayNextVideo;
+            // Forward/Backward buttons now seek ±10s directly via OnSeek
             _controlsPanel.OnVRModeClicked -= HandleVRModeClicked;
             _controlsPanel.OnHeadsetModeClicked -= HandleHeadsetModeClicked;
             _controlsPanel.OnRecenterClicked -= HandleRecenter;
