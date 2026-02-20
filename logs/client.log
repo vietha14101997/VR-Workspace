@@ -1,12 +1,588 @@
-Assets\VR-Workspace\Scripts\Media\Core\MediaEnvironmentController.cs(137,29): warning CS0618: 'Object.FindObjectsOfType<T>()' is obsolete: 'Object.FindObjectsOfType has been deprecated. Use Object.FindObjectsByType instead which lets you decide whether you need the results sorted or not.  FindObjectsOfType sorts the results by InstanceID but if you do not need this using FindObjectSortMode.None is considerably faster.'
+[MainThreadDispatcher] Initialized on thread 1
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTPopupMenu.cs(268,31): warning CS0618: 'Object.FindObjectsOfType<T>()' is obsolete: 'Object.FindObjectsOfType has been deprecated. Use Object.FindObjectsByType instead which lets you decide whether you need the results sorted or not.  FindObjectsOfType sorts the results by InstanceID but if you do not need this using FindObjectSortMode.None is considerably faster.'
+[APBootstrap] AndroidStreamingHelper initialized
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTPopupInputable.cs(242,31): warning CS0618: 'Object.FindObjectsOfType<T>()' is obsolete: 'Object.FindObjectsOfType has been deprecated. Use Object.FindObjectsByType instead which lets you decide whether you need the results sorted or not.  FindObjectsOfType sorts the results by InstanceID but if you do not need this using FindObjectSortMode.None is considerably faster.'
+[APBootstrap] AppPermissionManager initialized
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTProgressPopup.cs(168,31): warning CS0618: 'Object.FindObjectsOfType<T>()' is obsolete: 'Object.FindObjectsOfType has been deprecated. Use Object.FindObjectsByType instead which lets you decide whether you need the results sorted or not.  FindObjectsOfType sorts the results by InstanceID but if you do not need this using FindObjectSortMode.None is considerably faster.'
+Starting camera passthrough
 
-Assets\VR-Workspace\Scripts\UI\RTT\Components\RTTPopupInputable.cs(541,35): warning CS0618: 'Object.FindObjectsOfType<T>()' is obsolete: 'Object.FindObjectsOfType has been deprecated. Use Object.FindObjectsByType instead which lets you decide whether you need the results sorted or not.  FindObjectsOfType sorts the results by InstanceID but if you do not need this using FindObjectSortMode.None is considerably faster.'
+No camera devices found
+UnityEngine.Debug:LogWarning (object)
+CameraPassthrough:StartCam () (at Assets/VR-Workspace/Scripts/Camera/CameraPassthrough.cs:61)
+CameraPassthrough:OnEnable () (at Assets/VR-Workspace/Scripts/Camera/CameraPassthrough.cs:17)
 
-Assets\VR-Workspace\Editor\VRUIComponentsPrefabBuilder.cs(838,9): warning CS0618: 'TMP_Text.enableWordWrapping' is obsolete: 'The enabledWordWrapping property is now obsolete. Please use the textWrappingMode property instead.'
+[AndroidHelper] App resumed
+
+[RTTMenu] Created main frame
+
+[RTTBootstrapper] Created RTTMenu with RTTMenuFrame_main
+
+[RTTBootstrapper] RTTMenu oriented towards camera
+
+[RTTToolbar] Created
+
+[RTTTaskbar] Icons loaded - Quit:True, Settings:True, Eye:True, EyeClose:True, Recenter:True, Home:True
+
+[RTTToolbar] Initialized with taskbar. Size: 0.913x0.331m, followTarget: RTTMenu
+
+[RTTBootstrapper] Created RTTTaskbar in RTTToolbar, following RTTMenu
+
+[RTTBootstrapper] RTTManager found, registering new frame and taskbar
+
+[RTTManager] Startup camera-follow started
+
+[RTTTaskbar] SelectSlot(0) called, current active: 0
+
+[VirtualObjectsZoomController] Configured: min=1m, max=2.5m, default=2m, step=0.1m
+
+[VirtualObjectsZoomController] Moving VirtualObjects from 0.00m to default 2.00m
+
+[VirtualObjectsZoomController] Zoom set to 2.00m (delta: 2.000m)
+
+[RTTBootstrapper] Created VirtualObjectsZoomController (range: 1m - 2.5m, default: 2m)
+
+[RTTBootstrapper] Initialization complete
+
+[MediaEnvironmentController] Found environment root: VirtualEnvironment
+
+[MediaEnvironmentController] Cached 1 room lights
+
+[MediaEnvironmentController] Initialized
+
+Stopping camera passthrough
+
+[EditorCameraController] Disabled TrackedPoseDriver on camera.
+
+[EditorCameraController] Ready. Press Alt to toggle mouse look.
+
+[RTTRaycastManager] Auto-initialized layer mask to VirtualObjects (layer 3)
+
+[RTTMenuFrame] UI built: 1920x1080 logical pixels
+
+[RTTMiniFrame] UI built: 1095.5x128 pixels
+
+[RTTMainMenuController] Icons loaded - Remote:True, Browser:True, Media:True, Files:False
+
+[HoverEffectController] AddEffect 'glow_border' to HitArea, TargetVisuals=Visuals
+
+[GlowBorderHoverEffect] Initialized successfully on HitArea, material=Custom/GlowingElementBorder
+
+[HoverEffectController] AddEffect 'background' to HitArea, TargetVisuals=Visuals
+
+[HoverEffectController] AddEffect 'scale' to HitArea, TargetVisuals=Visuals
+
+[HoverEffectController] AddEffect 'z_pop' to HitArea, TargetVisuals=Visuals
+
+[RTTMainMenu] Built 6 items in 3x2 grid
+
+[RTTMainMenuController] Main Menu created (useRegistry=True, itemCount=6)
+
+[RTTManager] Main Menu initialized (persistent, cannot be closed)
+
+[RTTAppManager] Background pre-init started
+
+[RTTMenu] Created app frame: remote
+
+[RTTManager] Background app pre-initialization triggered
+
+[RTTManager] Main Menu already initialized - cannot create another
+UnityEngine.Debug:LogWarning (object)
+RTTManager:CreatePersistentMainMenu () (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:688)
+RTTManager/<WaitAndShowMainMenu>d__125:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:509)
+UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
+
+[RTTManager] Creating RemoteMenu content...
+
+[RTTRemoteMenu] OnEnable called
+
+[HoverEffectController] AddEffect 'cursor_change' to HitArea, TargetVisuals=Visuals
+
+[HoverEffectController] AddEffect 'color' to Option_0, TargetVisuals=Option_0
+
+[HoverEffectController] AddEffect 'color' to Option_1, TargetVisuals=Option_1
+
+[HoverEffectController] AddEffect 'color' to Option_2, TargetVisuals=Option_2
+
+[HoverEffectController] AddEffect 'color' to Option_3, TargetVisuals=Option_3
+
+[HoverEffectController] AddEffect 'color' to Option_4, TargetVisuals=Option_4
+
+[RTTRemoteMenu] UI built
+
+[RTTRemoteMenu] Monitor selection changed: index=0, value=----
+
+[RTTRemoteMenu] No cached info, skipping recalculation
+
+[RTTRemoteMenu] Style changed: index=0, value=Flat Planar
+
+[RTTRemoteMenu] WorldPanelClusterRig not found - style will apply on next stream start
+
+[RTTRemoteMenu] Bitrate changed: index=0, value=----
+
+[RTTRemoteMenu] FPS changed: index=0, value=----
+
+[RTTRemoteMenu] CreateSidePanels called, _menuFrame null: False
+
+[RTTRemoteMenu] Creating Hardware Info Panel (left) with sphere positioning...
+
+[VirtualObjectsZoomController] Registered side panel: HardwareInfoPanel (side=-1, mainW=1.6, sideW=0.5333334, gap=0.05)
+
+[RTTRemoteMenu] Registered HardwareInfoPanel with VirtualObjectsZoomController
+
+[RTTRemoteMenu] PlaceSidePanel: mainPos=(0.00, 0.00, 2.00), panelPos=(-1.08, 0.00, 1.87)
+
+[RTTRemoteMenu] CreateSidePanelContent started for HardwareInfo
+
+[RTTRemoteMenu] Hardware frame created: True
+
+[RTTRemoteMenu] Creating Network Info Panel (right) with sphere positioning...
+
+[VirtualObjectsZoomController] Registered side panel: NetworkInfoPanel (side=1, mainW=1.6, sideW=0.5333334, gap=0.05)
+
+[RTTRemoteMenu] Registered NetworkInfoPanel with VirtualObjectsZoomController
+
+[RTTRemoteMenu] PlaceSidePanel: mainPos=(0.00, 0.00, 2.00), panelPos=(1.08, 0.00, 1.87)
+
+[RTTRemoteMenu] CreateSidePanelContent started for NetworkInfo
+
+[RTTRemoteMenu] Network frame created: True
+
+[RTTRemoteMenu] Side panels created (0.53m x 0.90m) gap=0.05m with sphere positioning (hidden)
+
+[RemotePreferences] Loaded: monitors=1, res=Flat Planar, bitrate=20 Mbps, fps=60 FPS
+
+[ServiceLocator] Registered: ConnectionViewModel
+
+[RTTRemoteMenu] HandlePhaseChanged: Disconnected -> Disconnected
+
+[RTTRemoteMenu] Hardware frame hidden
+
+[RTTRemoteMenu] Network frame hidden
+
+[RTTRemoteMenu] HideSidePanels completed
+
+[RTTRemoteMenu] Bound to ConnectionViewModel
+
+[RTTRemoteMenu] Frame not initialized for HardwareInfo, calling EnsureInitialized()
+
+[RTTMenuFrame] UI built: 640x1080 logical pixels
+
+[RTTRemoteMenu] Frame initialized for HardwareInfo after 0 frames, ContentContainer valid
+
+[RTTRemoteMenu] Frame not initialized for NetworkInfo, calling EnsureInitialized()
+
+[RTTRemoteMenu] Frame initialized for NetworkInfo after 0 frames, ContentContainer valid
+
+[RTTRemoteMenu] Created InfoPanel_HardwareInfo, parent set to ContentContainer
+
+[RTTInfoSidePanel] BuildUI started for HardwareInfo, container=ContentContainer
+
+[RTTInfoSidePanel] Already parented to ContentContainer
+
+[RTTInfoSidePanel] Calculated max label width for HardwareInfo: 155 (Base: 130 + 25)
+
+[RTTInfoSidePanel] Built for type: HardwareInfo, _isBuilt=True, parent=ContentContainer
+
+[RTTRemoteMenu] InfoPanel_HardwareInfo BuildUI completed, parent=ContentContainer
+
+[RTTInfoSidePanel] ShowLoadingState called for HardwareInfo, _isBuilt=True
+
+[RTTRemoteMenu] Created InfoPanel_NetworkInfo, parent set to ContentContainer
+
+[RTTInfoSidePanel] BuildUI started for NetworkInfo, container=ContentContainer
+
+[RTTInfoSidePanel] Calculated max label width for NetworkInfo: 225 (Base: 200 + 25)
+
+[RTTInfoSidePanel] Built for type: NetworkInfo, _isBuilt=True, parent=ContentContainer
+
+[RTTRemoteMenu] InfoPanel_NetworkInfo BuildUI completed, parent=ContentContainer
+
+[RTTInfoSidePanel] ShowSpeedTestLoadingState called for NetworkInfo, _isBuilt=True
+
+[RTTRemoteMenu] Side panel content created for HardwareInfo, frame hidden (not connecting)
+
+[RTTRemoteMenu] Side panel content created for HardwareInfo. ContentContainer children count: 1
+
+[RTTRemoteMenu] Side panel content created for NetworkInfo, frame hidden (not connecting)
+
+[RTTRemoteMenu] Side panel content created for NetworkInfo. ContentContainer children count: 1
+
+[RTTAppManager] Pre-initialized app: remote in 220.3ms
+
+[RTTMenu] Created app frame: media
+
+[RTTManager] Creating Media content...
+
+[VRMediaAppController] Projection will be parented to VirtualObjects for zoom support
+
+[VRMediaAppController] Found camera rig: Player
+
+[VRVideoProjectionSystem] Created FlatProjectionRenderer
+
+[VRVideoProjectionSystem] Initialized
+
+[MediaLibraryService] Cache loading disabled - will scan on demand
+
+[VirtualObjectsZoomController] Registered side panel: MediaNavigationPanel (side=-1, mainW=1.6, sideW=0.5333334, gap=0.05)
+
+[RTTMediaLibrary] CreateLeftPanelContent started at 3.226s
+
+[HoverEffectController] AddEffect 'scale' to Item_all, TargetVisuals=Item_all
+
+[HoverEffectController] AddEffect 'color' to Item_all, TargetVisuals=Item_all
+
+[HoverEffectController] AddEffect 'scale' to Item_videos, TargetVisuals=Item_videos
+
+[HoverEffectController] AddEffect 'color' to Item_videos, TargetVisuals=Item_videos
+
+[HoverEffectController] AddEffect 'scale' to Item_images, TargetVisuals=Item_images
+
+[HoverEffectController] AddEffect 'color' to Item_images, TargetVisuals=Item_images
+
+[HoverEffectController] AddEffect 'scale' to Item_audio, TargetVisuals=Item_audio
+
+[HoverEffectController] AddEffect 'color' to Item_audio, TargetVisuals=Item_audio
+
+[HoverEffectController] AddEffect 'scale' to Item_recent, TargetVisuals=Item_recent
+
+[HoverEffectController] AddEffect 'color' to Item_recent, TargetVisuals=Item_recent
+
+[HoverEffectController] AddEffect 'scale' to Item_favorites, TargetVisuals=Item_favorites
+
+[HoverEffectController] AddEffect 'color' to Item_favorites, TargetVisuals=Item_favorites
+
+[HoverEffectController] AddEffect 'scale' to Item_playlists, TargetVisuals=Item_playlists
+
+[HoverEffectController] AddEffect 'color' to Item_playlists, TargetVisuals=Item_playlists
+
+[RTTMediaLibrary] Left panel content created at 3.233s
+
+[VirtualObjectsZoomController] Registered side panel: MediaDetailPanel (side=1, mainW=1.6, sideW=0.5333334, gap=0.05)
+
+[RTTMediaLibrary] CreateRightPanelContent started at 3.234s
+
+[RTTMediaLibrary] Right panel content created at 3.246s
+
+[RTTPopupMenu] CreateWorldSpace: layer 'VirtualObjects' = 3, mainCam: VRCamera
+
+[RTTPopupMenu] Created world-space popup
+
+[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-681464
+
+[HoverEffectController] AddEffect 'scale' to Checkbox, TargetVisuals=Checkbox
+
+[HoverEffectController] AddEffect 'scale' to Btn_Rename, TargetVisuals=Btn_Rename
+
+[HoverEffectController] AddEffect 'scale' to Btn_Delete, TargetVisuals=Btn_Delete
+
+[RTTMediaLibrary] After CreateHeaderRows: _headerRT=True, _breadcrumbContainer=True
+
+[HoverEffectController] AddEffect 'scale' to PooledItem, TargetVisuals=PooledItem
+
+[RTTMediaLibrary] Creating 2 breadcrumb segments for: All Media > Videos
+
+[RTTMediaLibrary] Created 2 breadcrumb pills for path: All Media > Videos
+
+[RTTMediaLibraryController] No cached data, will scan immediately
+
+[RTTMediaLibraryController] No data available, starting scan...
+
+[MediaLibraryService] Starting directory scan in 3 locations: C:\Users\super\Videos, C:\Users\super\Music, C:\Users\super\Downloads
+
+[MediaLibraryService] Scanning: C:\Users\super\Videos
+
+[RTTMediaLibraryController] Starting fresh scan (no cache)
+
+[MediaLibraryService] Already scanning
+UnityEngine.Debug:LogWarning (object)
+MediaLibraryService:ScanMediaLibrary (System.Action`1<System.Collections.Generic.List`1<MediaVideoInfo>>) (at Assets/VR-Workspace/Scripts/Media/Core/MediaLibraryService.cs:112)
+RTTMediaLibraryController:RefreshLibraryInternal () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:702)
+RTTMediaLibraryController:OnViewReady () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibraryController.cs:667)
+RTTMediaLibrary/<CreateCenterGrid>d__91:MoveNext () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:740)
+UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
+RTTMediaLibrary:CreatePanels () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:286)
+RTTMediaLibrary:BuildUI () (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:153)
+RTTMediaLibrary:Initialize (RTTMediaLibraryController,RTTMenuFrame,single,single,TMPro.TMP_FontAsset,UnityEngine.Color,UnityEngine.Color) (at Assets/VR-Workspace/Scripts/Media/UI/RTTMediaLibrary.cs:141)
+VRMediaAppController:BuildLibraryUI () (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:672)
+VRMediaAppController:CreateMenu (UnityEngine.RectTransform,single,single,TMPro.TMP_FontAsset,UnityEngine.Color,UnityEngine.Color) (at Assets/VR-Workspace/Scripts/Media/Core/VRMediaAppController.cs:178)
+RTTManager:CreateMediaContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:1196)
+RTTManager:CreateAppContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:1104)
+VRWorkspace.UI.RTT.RTTAppManager/<PreInitAppAsync>d__79:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTAppManager.cs:1240)
+UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
+
+[RTTMediaLibrary] Center grid created
+
+[VRMediaAppController] Library UI built
+
+[VRMediaAppController] Media app created
+
+[MediaLibraryService] Scanning: C:\Users\super\Music
+
+[RTTMediaLibrary] InitializePageSizeDeferred: itemsPerPage=8
+
+[MediaLibraryService] Scanning: C:\Users\super\Downloads
+
+[MediaLibraryService] Found 1847 media files
+
+[RTTAppManager] Pre-initialized app: media in 237.5ms
+
+[RTTMenu] Created app frame: folder
+
+[RTTManager] Creating FileManager content...
+
+[RTTFileManager] PlaceSidePanel: innerEdge=(-0.85, 0.00, 2.00), panelPos=(-1.08, 0.00, 1.87)
+
+[VirtualObjectsZoomController] Registered side panel: FileNavigationPanel (side=-1, mainW=1.6, sideW=0.5333334, gap=0.05)
+
+[RTTFileManager] Registered FileNavigationPanel with VirtualObjectsZoomController
+
+[RTTFileManager] Placed FileNavigationPanel: pos=(-1.08, 0.00, 1.87)
+
+[HoverEffectController] AddEffect 'scale' to Item_internal, TargetVisuals=Item_internal
+
+[HoverEffectController] AddEffect 'color' to Item_internal, TargetVisuals=Item_internal
+
+[FileSystemService] Root path set to: C:\Users\super
+
+[HoverEffectController] AddEffect 'scale' to Item_downloads, TargetVisuals=Item_downloads
+
+[HoverEffectController] AddEffect 'color' to Item_downloads, TargetVisuals=Item_downloads
+
+[HoverEffectController] AddEffect 'scale' to Item_music, TargetVisuals=Item_music
+
+[HoverEffectController] AddEffect 'color' to Item_music, TargetVisuals=Item_music
+
+[RTTFileManager] PlaceSidePanel: innerEdge=(0.85, 0.00, 2.00), panelPos=(1.08, 0.00, 1.87)
+
+[VirtualObjectsZoomController] Registered side panel: FileDetailPanel (side=1, mainW=1.6, sideW=0.5333334, gap=0.05)
+
+[RTTFileManager] Registered FileDetailPanel with VirtualObjectsZoomController
+
+[RTTFileManager] Placed FileDetailPanel: pos=(1.08, 0.00, 1.87)
+
+[RTTFileActionBar] Buttons created
+
+[RTTFileActionBar] Initialized, following: FileDetailPanel
+
+[RTTFileManager] File action bar created (hidden initially)
+
+[Controller] CanCreateFolderHere called, _currentPath: 'root'
+
+[FileSystemService] CanCreateFolderInPath called with path: 'root'
+
+[FileSystemService] Path is 'root' or empty, returning false
+
+[Controller] CanCreateFolderHere result: False
+
+[RTTFileManager] UpdateNewFolderButtonState: canCreate=False
+
+[RTTFileManager] BoxCollider.enabled set to False
+
+[RTTFileManager] New Folder button DISABLED - alpha=0.4
+
+[RTTFileManager] Text Area found and offsetMin set to: (30.00, 0.00)
+
+[HoverEffectController] AddEffect 'scale' to Btn_Copy, TargetVisuals=Btn_Copy
+
+[HoverEffectController] AddEffect 'scale' to Btn_Move, TargetVisuals=Btn_Move
+
+[RTTFileGrid] CalculateGridMetrics: width=1770, availableWidth=1730, columnsPerRow=4, cellWidth=395, spacingX=30
+
+[Controller] SetSortOptionsNoRefresh: sortBy=Name, ascending=True
+
+[Controller] View is ready. Checking storage permissions...
+
+[Controller] NavigateToInternalAsync: path='root', restorePage=False, clickedFolder=''
+
+[RTTFileManager] UpdateBreadcrumbs called with path: root, container null: True, instance: -689676
+
+[RTTFileManager] Breadcrumb container reference lost, searching in hierarchy...
+UnityEngine.Debug:LogWarning (object)
+RTTFileManager:UpdateBreadcrumbs (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:2652)
+RTTFileManagerController/<NavigateToInternalAsync>d__43:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:304)
+UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
+RTTFileManagerController:NavigateToInternal (string,bool,string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:249)
+RTTFileManagerController:NavigateTo (string) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:209)
+RTTFileManagerController:OnViewReady () (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:175)
+RTTFileManager/<CreateCenterGrid>d__86:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:560)
+UnityEngine.MonoBehaviour:StartCoroutine (System.Collections.IEnumerator)
+RTTFileManager:CreatePanels () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:418)
+RTTFileManager:BuildUI () (at Assets/VR-Workspace/Scripts/UI/RTT/Components/RTTFileManager.cs:291)
+RTTFileManagerController:CreateMenu (UnityEngine.RectTransform,single,single,TMPro.TMP_FontAsset,UnityEngine.Color,UnityEngine.Color) (at Assets/VR-Workspace/Scripts/UI/RTT/Controllers/RTTFileManagerController.cs:97)
+RTTManager:CreateFilesMenuContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:1169)
+RTTManager:CreateAppContent (RTTAppInstance) (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTManager.cs:1101)
+VRWorkspace.UI.RTT.RTTAppManager/<PreInitAppAsync>d__79:MoveNext () (at Assets/VR-Workspace/Scripts/UI/RTT/Core/RTTAppManager.cs:1240)
+UnityEngine.SetupCoroutine:InvokeMoveNext (System.Collections.IEnumerator,intptr)
+
+[RTTFileManager] Found breadcrumb container from hierarchy: True
+
+[RTTFileManager] Created 1 breadcrumbs for path: C:\Users\super
+
+[FileSystemService] Reading directory async: C:\Users\super
+
+[FileSystemService] Quick count: 57 items (dirs=41, files=16)
+
+[Controller] Quick count received: 57 items
+
+[FileSystemService] Found 39 items async (30 folders, 9 files)
+
+[Controller] Using full data (load completed quickly): 39 items
+
+[Controller] CalculateTotalPages: totalFiles=39, pageSize=8, totalPages=5
+
+[RTTFileGrid] Progressive binding started: 24 items queued
+
+[RTTFileGrid] Progressive bind frame: 12 items, 12 remaining
+
+[RTTFileGrid] GetVisibleRowsForPagination: height=748.1688, availableHeight=728.1688, rowHeight=350, rowsFloat=2.080482, visibleRows=2
+
+[Detail] UpdateInfo: super name=0ms preview=0ms metadata=3ms total=3ms
+
+[RTTFileManagerController] Menu created
+
+[RTTFileGrid] Progressive bind frame: 8 items, 4 remaining
+
+[RTTFileGrid] Progressive bind frame: 4 items, 0 remaining
+
+[RTTFileGrid] Progressive binding complete: 24 items bound total
+
+[RTTAppManager] Pre-initialized app: folder in 236.7ms
+
+[RTTAppManager] Background pre-init complete: 3 apps in 990.2ms
+
+[EditorCameraController] Ignored toggle key during grace period (elapsed=1.6s)
+
+[RTTManager] Camera tracking assumed active (fallback timeout)
+
+[VirtualObjectsZoomController] Recenter: distance recalculated to 2.00m
+
+[RTTManager] Startup camera-follow ended after 2.0s (tracking=True, menu=True)
+
+[EditorCameraController] Ignored toggle key during grace period (elapsed=2.5s)
+
+[EditorCameraController] Ignored toggle key during grace period (elapsed=3.6s)
+
+[MediaLibraryService] Saved 1847 items to cache (with metadata & dimensions)
+
+[VideoHeaderParser] Duration from mvhd: 24.9s
+
+[VideoHeaderParser] Dimensions from tkhd: 1920x1080
+
+[VideoHeaderParser] Codec: avc1
+
+[RTTMediaGridItem] Duration badge for 'Genshin Impact 2026-02-20 13-49-17': show=True, duration=0s, text='0:24', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (208KB)
+
+[Cache] DISK DECODE: 2ms (512x288)
+
+[RTTMediaGridItem] Duration badge for 'Genshin Impact 2026-02-20 13-49-59': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (202KB)
+
+[RTTMediaGridItem] Duration badge for 'Genshin Impact 2026-02-19 18-46-14': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (135KB)
+
+[RTTMediaGridItem] Duration badge for 'Genshin Impact_2026.02.19-19.11': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (285KB)
+
+[Cache] DISK DECODE: 2ms (512x290)
+
+[RTTMediaGridItem] Duration badge for 'JAVxx - Xem JAV 3DSVR-1830 (Rò rỉ không kiểm duyệt) trực tuyến chất lượng HD - JAV Nhật Bản miễn phí MissAV': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (104KB)
+
+[Cache] DISK DECODE: 1ms (512x256)
+
+[RTTMediaGridItem] Duration badge for 'JAVxx - Xem JAV URVRSP-472 trực tuyến chất lượng HD - JAV Nhật Bản miễn phí MissAV': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (180KB)
+
+[Cache] DISK DECODE: 2ms (512x256)
+
+[RTTMediaGridItem] Duration badge for 'Rhythm of Shibuya': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (265KB)
+
+[Cache] DISK DECODE: 5ms (512x256)
+
+[RTTMediaGridItem] Duration badge for 'Đấu Phá Thương Khung Phần 5 Tập 185 Việt Sub - HH3D': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (89KB)
+
+[Cache] DISK DECODE: 1ms (512x218)
+
+[RTTMediaGridItem] Duration badge for 'veo_generated_1763658722': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 0ms (258KB)
+
+[RTTMediaGridItem] Duration badge for 'veo_generated_1763659088': show=True, duration=0s, text='--:--', font=NotoSansKR-Regular_TMP_Primary
+
+[Cache] DISK READ: 1ms (234KB)
+
+[RTTMediaGrid] Auto-selecting first item: Genshin Impact 2026-02-20 13-49-17
+
+[Detail] REQUEST: Genshin Impact 2026-02-20 13-49-17.mp4
+
+[Cache] DISK READ: 0ms (204KB)
+
+[Detail] RECEIVED: Genshin Impact 2026-02-20 13-49-17.mp4 wait=13ms assign=0ms
+
+[Detail] UpdateInfo: Genshin Impact 2026-02-20 13-49-17.mp4 name=0ms preview=13ms metadata=2ms total=15ms
+
+[Detail] RECEIVED: Genshin Impact 2026-02-20 13-49-17.mp4 wait=0ms assign=0ms
+
+[Detail] UpdateInfo: Genshin Impact 2026-02-20 13-49-17.mp4 name=0ms preview=0ms metadata=1ms total=1ms
+
+[AppStateCache] Saved state for media with 10 items
+
+[RTTMediaLibraryController] CacheCurrentState: Cached 10 items
+
+[MediaLibraryService] Scan complete: 1847 media files (cached)
+
+[MediaLibraryService] Triggering metadata preload for 1847 files
+
+[FileMetadataService] Starting background preload for 1847 files
+
+[VideoHeaderParser] Duration from mvhd: 25.9s
+
+[VideoHeaderParser] Duration from mvhd: 19.4s
+
+[VideoHeaderParser] Duration from mvhd: 24.0s
+
+[VideoHeaderParser] Dimensions from tkhd: 1920x1088
+
+[VideoHeaderParser] Codec: av01
+
+[VideoHeaderParser] Duration from mvhd: 1761.7s
+
+[VideoHeaderParser] Dimensions from tkhd: 1920x960
+
+[VideoHeaderParser] Duration from mvhd: 1621.6s
+
+[VideoHeaderParser] Dimensions from tkhd: 1280x640
+
+[VideoHeaderParser] Duration from mvhd: 29.9s
+
+[VideoHeaderParser] Dimensions from tkhd: 5760x2880
+
+[VideoHeaderParser] Codec: hvc1
+
+[VideoHeaderParser] Duration from mvhd: 1433.8s
+
+[VideoHeaderParser] Dimensions from tkhd: 1920x816
+
+[VideoHeaderParser] Duration from mvhd: 8.0s
+
+[VideoHeaderParser] Dimensions from tkhd: 1280x720
+
+[EditorCameraController] Ignored toggle key during grace period (elapsed=4.3s)
+
+[FileMetadataService] Preload complete: 1 loaded, 10 cached, 1836 failed (1502ms)
+
+[EditorCameraController] Mouse look ON (cursor locked)
+
+[EditorCameraController] Mouse look OFF (cursor free)
 

@@ -573,6 +573,26 @@ public class VRGazeReticle : MonoBehaviour
     }
 
     /// <summary>
+    /// Perform instant click on whatever the reticle is currently pointing at.
+    /// Used by non-VR mode virtual A button to bypass dwell timer.
+    /// </summary>
+    public void PerformInstantClick()
+    {
+        // RTT panel hit takes priority
+        if (useRTTRaycast && _lastRTTHit.isValid && _lastRTTHit.hitUIElement != null)
+        {
+            SendRTTClickAndLock(_lastRTTHit.hitUIElement);
+            return;
+        }
+
+        // World object hit
+        if (_currentHitObj != null)
+        {
+            HandlePointerClick(_currentHitObj);
+        }
+    }
+
+    /// <summary>
     /// Send RTT click and remember the button to prevent continuous clicking
     /// </summary>
     void SendRTTClickAndLock(GameObject target)

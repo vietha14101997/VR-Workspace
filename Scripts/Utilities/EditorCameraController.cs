@@ -129,18 +129,25 @@ public class EditorCameraController : MonoBehaviour
     private void SetMouseLookActive(bool active)
     {
         isMouseLookActive = active;
-        
+
         if (active)
         {
-            // Hide and lock cursor
+            // Re-enable mouse device so we can read delta for camera rotation
+            if (mouse != null && !mouse.enabled)
+                InputSystem.EnableDevice(mouse);
+
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
         }
         else
         {
-            // Show and unlock cursor
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
+
+            // Disable mouse device so InputSystemUIInputModule ignores
+            // mouse hover/click on UI elements while cursor is free
+            if (mouse != null && mouse.enabled)
+                InputSystem.DisableDevice(mouse);
         }
     }
     

@@ -308,6 +308,13 @@ public class RTTManager : MonoBehaviour
             Api.ScanDeviceParams();
         }
 #endif
+
+        // Initialize NonVRModeController if not present
+        if (NonVRModeController.Instance == null)
+        {
+            var controllerGO = new GameObject("NonVRModeController");
+            controllerGO.AddComponent<NonVRModeController>();
+        }
     }
 
     private void Update()
@@ -316,27 +323,31 @@ public class RTTManager : MonoBehaviour
         _qualityManager?.PeriodicUpdate();
 
 #if UNITY_ANDROID && !UNITY_EDITOR
-        if (Api.IsGearButtonPressed)
+        // Skip Cardboard API calls when in non-VR mode (XR is deinitialized)
+        if (NonVRModeController.Instance == null || !NonVRModeController.Instance.IsNonVRMode)
         {
-            Api.ScanDeviceParams();
-        }
+            if (Api.IsGearButtonPressed)
+            {
+                Api.ScanDeviceParams();
+            }
 
-        if (Api.IsCloseButtonPressed)
-        {
-            Application.Quit();
-        }
+            if (Api.IsCloseButtonPressed)
+            {
+                Application.Quit();
+            }
 
-        if (Api.IsTriggerHeldPressed)
-        {
-            PerformInstantRecenter();
-        }
+            if (Api.IsTriggerHeldPressed)
+            {
+                PerformInstantRecenter();
+            }
 
-        if (Api.HasNewDeviceParams())
-        {
-            Api.ReloadDeviceParams();
-        }
+            if (Api.HasNewDeviceParams())
+            {
+                Api.ReloadDeviceParams();
+            }
 
-        Api.UpdateScreenParams();
+            Api.UpdateScreenParams();
+        }
 #endif
     }
 
