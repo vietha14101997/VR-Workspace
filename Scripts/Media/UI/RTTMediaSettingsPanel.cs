@@ -280,12 +280,12 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         _tintSlider?.SetValueWithoutNotify(snapshot.Tint);
         _temperatureSlider?.SetValueWithoutNotify(snapshot.Temperature);
 
-        UpdateValueLabel(_sharpnessValueLabel, snapshot.Sharpness);
-        UpdateValueLabel(_brightnessValueLabel, snapshot.Brightness);
-        UpdateValueLabel(_saturationValueLabel, snapshot.Saturation);
-        UpdateValueLabel(_contrastValueLabel, snapshot.Contrast);
-        UpdateValueLabel(_tintValueLabel, snapshot.Tint);
-        UpdateValueLabel(_temperatureValueLabel, snapshot.Temperature);
+        FormatValueLabel(_sharpnessValueLabel, _sharpnessSlider, snapshot.Sharpness);
+        FormatValueLabel(_brightnessValueLabel, _brightnessSlider, snapshot.Brightness);
+        FormatValueLabel(_saturationValueLabel, _saturationSlider, snapshot.Saturation);
+        FormatValueLabel(_contrastValueLabel, _contrastSlider, snapshot.Contrast);
+        FormatValueLabel(_tintValueLabel, _tintSlider, snapshot.Tint);
+        FormatValueLabel(_temperatureValueLabel, _temperatureSlider, snapshot.Temperature);
 
         // Video adjustments
         if (_3dToggle != null) _3dToggle.isOn = snapshot.Is3D;
@@ -301,21 +301,21 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         _immHeightSlider?.SetValueWithoutNotify(snapshot.ImmHeight);
         _hBalanceSlider?.SetValueWithoutNotify(snapshot.HorizontalBalance);
 
-        UpdateValueLabel(_tiltValueLabel, snapshot.Tilt, "°");
-        UpdateValueLabel(_yawValueLabel, snapshot.Yaw, "°");
-        UpdateValueLabel(_rollValueLabel, snapshot.Roll, "°");
-        UpdateValueLabel(_zoomValueLabel, snapshot.Zoom, "°");
-        UpdateValueLabel(_immHeightValueLabel, snapshot.ImmHeight);
-        UpdateValueLabel(_hBalanceValueLabel, snapshot.HorizontalBalance);
+        FormatValueLabel(_tiltValueLabel, _tiltSlider, snapshot.Tilt);
+        FormatValueLabel(_yawValueLabel, _yawSlider, snapshot.Yaw);
+        FormatValueLabel(_rollValueLabel, _rollSlider, snapshot.Roll);
+        FormatValueLabel(_zoomValueLabel, _zoomSlider, snapshot.Zoom);
+        FormatValueLabel(_immHeightValueLabel, _immHeightSlider, snapshot.ImmHeight);
+        FormatValueLabel(_hBalanceValueLabel, _hBalanceSlider, snapshot.HorizontalBalance);
 
         // Screen settings
         _depthSlider?.SetValueWithoutNotify(snapshot.ScreenDepth);
         _scaleSlider?.SetValueWithoutNotify(snapshot.ScreenScale);
         _verticalMoveSlider?.SetValueWithoutNotify(snapshot.VerticalMove);
 
-        UpdateValueLabel(_depthValueLabel, snapshot.ScreenDepth, "m");
-        UpdateValueLabel(_scaleValueLabel, snapshot.ScreenScale, "x");
-        UpdateValueLabel(_verticalMoveValueLabel, snapshot.VerticalMove, "m");
+        FormatValueLabel(_depthValueLabel, _depthSlider, snapshot.ScreenDepth);
+        FormatValueLabel(_scaleValueLabel, _scaleSlider, snapshot.ScreenScale);
+        FormatValueLabel(_verticalMoveValueLabel, _verticalMoveSlider, snapshot.VerticalMove);
 
         _currentAspect = snapshot.AspectRatio ?? "default";
         UpdateAspectButtonSelection();
@@ -676,35 +676,41 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         // Scrollable content
         var scrollContent = CreateScrollableContent(_pictureAdjContainer.transform);
 
-        // Sharpen slider (0 - 2, default 0.0)
+        // Sharpen slider (0 - 2, default 0.0) → display as integer 0-20
         (_sharpnessSlider, _sharpnessValueLabel) = CreateSliderRow(
             scrollContent, "Sharpen", 0f, 2f, 0.0f,
-            (v) => { OnSharpnessChanged?.Invoke(v); UpdateValueLabel(_sharpnessValueLabel, v); });
+            (v) => OnSharpnessChanged?.Invoke(v),
+            (v) => Mathf.RoundToInt(v * 10f).ToString());
 
-        // Brightness slider (0 - 2, default 1.0)
+        // Brightness slider (0 - 2, default 1.0) → display centered at 0, range -1.1 to 1.1
         (_brightnessSlider, _brightnessValueLabel) = CreateSliderRow(
             scrollContent, "Brightness", 0f, 2f, 1.0f,
-            (v) => { OnBrightnessChanged?.Invoke(v); UpdateValueLabel(_brightnessValueLabel, v); });
+            (v) => OnBrightnessChanged?.Invoke(v),
+            (v) => ((v - 1f) * 1.1f).ToString("0.#"));
 
-        // Saturation slider (0 - 2, default 1.0)
+        // Saturation slider (0 - 2, default 1.0) → display centered at 0, range -1.1 to 1.1
         (_saturationSlider, _saturationValueLabel) = CreateSliderRow(
             scrollContent, "Saturation", 0f, 2f, 1.0f,
-            (v) => { OnSaturationChanged?.Invoke(v); UpdateValueLabel(_saturationValueLabel, v); });
+            (v) => OnSaturationChanged?.Invoke(v),
+            (v) => ((v - 1f) * 1.1f).ToString("0.#"));
 
-        // Contrast slider (0 - 2, default 1.0)
+        // Contrast slider (0 - 2, default 1.0) → display centered at 0, range -1.1 to 1.1
         (_contrastSlider, _contrastValueLabel) = CreateSliderRow(
             scrollContent, "Contrast", 0f, 2f, 1.0f,
-            (v) => { OnContrastChanged?.Invoke(v); UpdateValueLabel(_contrastValueLabel, v); });
+            (v) => OnContrastChanged?.Invoke(v),
+            (v) => ((v - 1f) * 1.1f).ToString("0.#"));
 
-        // Tint slider (-1 - 1, default 0)
+        // Tint slider (-1 - 1, default 0) → display range -1.1 to 1.1
         (_tintSlider, _tintValueLabel) = CreateSliderRow(
             scrollContent, "Tint", -1f, 1f, 0f,
-            (v) => { OnTintChanged?.Invoke(v); UpdateValueLabel(_tintValueLabel, v); });
+            (v) => OnTintChanged?.Invoke(v),
+            (v) => (v * 1.1f).ToString("0.#"));
 
-        // Temperature slider (-1 - 1, default 0)
+        // Temperature slider (-1 - 1, default 0) → display range -1.1 to 1.1
         (_temperatureSlider, _temperatureValueLabel) = CreateSliderRow(
             scrollContent, "Temperature", -1f, 1f, 0f,
-            (v) => { OnTemperatureChanged?.Invoke(v); UpdateValueLabel(_temperatureValueLabel, v); });
+            (v) => OnTemperatureChanged?.Invoke(v),
+            (v) => (v * 1.1f).ToString("0.#"));
 
         // Spacer
         CreateFixedSpacer(scrollContent, 20f);
@@ -730,12 +736,12 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         _tintSlider?.SetValueWithoutNotify(0f);
         _temperatureSlider?.SetValueWithoutNotify(0f);
 
-        UpdateValueLabel(_sharpnessValueLabel, 0.0f);
-        UpdateValueLabel(_brightnessValueLabel, 1.0f);
-        UpdateValueLabel(_saturationValueLabel, 1.0f);
-        UpdateValueLabel(_contrastValueLabel, 1.0f);
-        UpdateValueLabel(_tintValueLabel, 0f);
-        UpdateValueLabel(_temperatureValueLabel, 0f);
+        FormatValueLabel(_sharpnessValueLabel, _sharpnessSlider, 0.0f);
+        FormatValueLabel(_brightnessValueLabel, _brightnessSlider, 1.0f);
+        FormatValueLabel(_saturationValueLabel, _saturationSlider, 1.0f);
+        FormatValueLabel(_contrastValueLabel, _contrastSlider, 1.0f);
+        FormatValueLabel(_tintValueLabel, _tintSlider, 0f);
+        FormatValueLabel(_temperatureValueLabel, _temperatureSlider, 0f);
     }
     #endregion
 
@@ -785,35 +791,42 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         var immCSF = _videoAdjImmersiveContent.AddComponent<ContentSizeFitter>();
         immCSF.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-        // Tilt slider (-90 to 90, default 0)
+        // Tilt slider (-90 to 90, default 0) → display normalized -1.1 to 1.1
         (_tiltSlider, _tiltValueLabel) = CreateSliderRow(
             _videoAdjImmersiveContent.transform, "Tilt", -90f, 90f, 0f,
-            (v) => { OnTiltChanged?.Invoke(v); UpdateValueLabel(_tiltValueLabel, v, "°"); }, "°");
+            (v) => OnTiltChanged?.Invoke(v),
+            (v) => (v / 90f * 1.1f).ToString("0.#"));
 
-        // Yaw slider (-180 to 180, default 0)
+        // Yaw slider (-180 to 180, default 0) → display normalized -1.1 to 1.1
         (_yawSlider, _yawValueLabel) = CreateSliderRow(
             _videoAdjImmersiveContent.transform, "Yaw", -180f, 180f, 0f,
-            (v) => { OnYawChanged?.Invoke(v); UpdateValueLabel(_yawValueLabel, v, "°"); }, "°");
-            
-        // Roll slider (-180 to 180, default 0)
+            (v) => OnYawChanged?.Invoke(v),
+            (v) => (v / 180f * 1.1f).ToString("0.#"));
+
+        // Roll slider (-180 to 180, default 0) → display normalized -1.1 to 1.1
         (_rollSlider, _rollValueLabel) = CreateSliderRow(
             _videoAdjImmersiveContent.transform, "Roll", -180f, 180f, 0f,
-            (v) => { OnRollChanged?.Invoke(v); UpdateValueLabel(_rollValueLabel, v, "°"); }, "°");
+            (v) => OnRollChanged?.Invoke(v),
+            (v) => (v / 180f * 1.1f).ToString("0.#"));
 
-        // Zoom slider (180 to 420, default 300)
+        // Zoom slider (180 to 420, default 300) → display normalized -1.1 to 1.1
         (_zoomSlider, _zoomValueLabel) = CreateSliderRow(
             _videoAdjImmersiveContent.transform, "Zoom", 180f, 420f, 300f,
-            (v) => { OnZoomChanged?.Invoke(v); UpdateValueLabel(_zoomValueLabel, v, "°"); }, "°");
+            (v) => OnZoomChanged?.Invoke(v),
+            (v) => ((v - 300f) / 120f * 1.1f).ToString("0.#"));
 
-        // Height slider (-1 to 1, default 0)
+        // Height slider (-1 to 1, default 0) → display normalized -1.1 to 1.1
         (_immHeightSlider, _immHeightValueLabel) = CreateSliderRow(
             _videoAdjImmersiveContent.transform, "Height", -1f, 1f, 0f,
-            (v) => { OnHeightChanged?.Invoke(v); UpdateValueLabel(_immHeightValueLabel, v); });
+            (v) => OnHeightChanged?.Invoke(v),
+            (v) => (v * 1.1f).ToString("0.#"));
 
-        // Horizontal balance slider (-1 to 1, default 0)
+        // Horizontal balance slider (-1 to 1, default 0) → display 3 decimal places
         (_hBalanceSlider, _hBalanceValueLabel) = CreateSliderRow(
             _videoAdjImmersiveContent.transform, "H. Balance", -1f, 1f, 0f,
-            (v) => { OnHorizontalBalanceChanged?.Invoke(v); UpdateValueLabel(_hBalanceValueLabel, v); });
+            (v) => OnHorizontalBalanceChanged?.Invoke(v),
+            (v) => v.ToString("0.###"),
+            0.001f);
 
         // Set initial mode
         _videoAdjFlatContent.SetActive(!_isImmersive);
@@ -895,8 +908,8 @@ public class RTTMediaSettingsPanel : MonoBehaviour
     private void CreateSpeedButton(Transform parent, float speed, float btnHeight)
     {
         string label = speed == 1f ? "1" :
-                       speed < 1f ? speed.ToString("0.##") :
-                       speed.ToString("0.##");
+                       speed < 1f ? speed.ToString("0.##").Replace('.', ',') :
+                       speed.ToString("0.##").Replace('.', ',');
 
         GameObject btnObj = new GameObject($"Speed_{label}");
         btnObj.transform.SetParent(parent, false);
@@ -994,20 +1007,25 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         // Aspect ratio segment buttons
         CreateAspectRatioRow(scrollContent);
 
-        // Depth slider (1.0 - 5.0, default 2.0)
+        // Depth slider (1.0 - 5.0, default 2.0) → display 1-2 decimal, no unit
         (_depthSlider, _depthValueLabel) = CreateSliderRow(
             scrollContent, "Depth", 1.0f, 5.0f, 2.0f,
-            (v) => { OnScreenDepthChanged?.Invoke(v); UpdateValueLabel(_depthValueLabel, v, "m"); }, "m");
+            (v) => OnScreenDepthChanged?.Invoke(v),
+            (v) => v.ToString("0.##"),
+            0.05f);
 
-        // Scale slider (0.5 - 3.0, default 1.0)
+        // Scale slider (0.5 - 3.0, default 1.0) → display 1 decimal, no unit
         (_scaleSlider, _scaleValueLabel) = CreateSliderRow(
             scrollContent, "Scale", 0.5f, 3.0f, 1.0f,
-            (v) => { OnScreenScaleChanged?.Invoke(v); UpdateValueLabel(_scaleValueLabel, v, "x"); }, "x");
+            (v) => OnScreenScaleChanged?.Invoke(v),
+            (v) => v.ToString("0.#"));
 
-        // Vertical move slider (-1.0 - 1.0, default 0)
+        // Vertical move slider (-1.0 - 1.0, default 0) → display 3 decimal, no unit
         (_verticalMoveSlider, _verticalMoveValueLabel) = CreateSliderRow(
             scrollContent, "Vertical move", -1.0f, 1.0f, 0f,
-            (v) => { OnVerticalMoveChanged?.Invoke(v); UpdateValueLabel(_verticalMoveValueLabel, v, "m"); }, "m");
+            (v) => OnVerticalMoveChanged?.Invoke(v),
+            (v) => v.ToString("0.###"),
+            0.025f);
 
         // Spacer
         CreateFixedSpacer(scrollContent, 20f);
@@ -1026,9 +1044,9 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         _scaleSlider?.SetValueWithoutNotify(1.0f);
         _verticalMoveSlider?.SetValueWithoutNotify(0f);
 
-        UpdateValueLabel(_depthValueLabel, 2.0f, "m");
-        UpdateValueLabel(_scaleValueLabel, 1.0f, "x");
-        UpdateValueLabel(_verticalMoveValueLabel, 0f, "m");
+        FormatValueLabel(_depthValueLabel, _depthSlider, 2.0f);
+        FormatValueLabel(_scaleValueLabel, _scaleSlider, 1.0f);
+        FormatValueLabel(_verticalMoveValueLabel, _verticalMoveSlider, 0f);
 
         _currentAspect = "default";
         UpdateAspectButtonSelection();
@@ -1097,10 +1115,11 @@ public class RTTMediaSettingsPanel : MonoBehaviour
 
         // Create buttons inside grid
         CreateAspectButton(gridObj.transform, "Default", "default", btnWidth, btnHeight);
-        CreateAspectButton(gridObj.transform, "4:3", "4:3", btnWidth, btnHeight);
-        CreateAspectButton(gridObj.transform, "3:2", "3:2", btnWidth, btnHeight);
-        CreateAspectButton(gridObj.transform, "16:9", "16:9", btnWidth, btnHeight);
-        CreateAspectButton(gridObj.transform, "2:1", "2:1", btnWidth, btnHeight);
+        CreateAspectButton(gridObj.transform, "3 : 2", "3:2", btnWidth, btnHeight);
+        CreateAspectButton(gridObj.transform, "4 : 3", "4:3", btnWidth, btnHeight);
+        CreateAspectButton(gridObj.transform, "9 : 16", "9:16", btnWidth, btnHeight);
+        CreateAspectButton(gridObj.transform, "16 : 9", "16:9", btnWidth, btnHeight);
+        CreateAspectButton(gridObj.transform, "21 : 9", "21:9", btnWidth, btnHeight);
 
         UpdateAspectButtonSelection();
     }
@@ -1169,7 +1188,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
             Mathf.Lerp(THEME_COLOR.b, 1f, 0.15f),
             1f);
 
-        string[] values = { "default", "4:3", "3:2", "16:9", "2:1" };
+        string[] values = { "default", "3:2", "4:3", "9:16", "16:9", "21:9" };
         for (int i = 0; i < _aspectButtons.Count && i < values.Length; i++)
         {
             bool isSelected = values[i] == _currentAspect;
@@ -1253,7 +1272,8 @@ public class RTTMediaSettingsPanel : MonoBehaviour
     private (VRSliderControl, TextMeshProUGUI) CreateSliderRow(
         Transform parent, string label,
         float min, float max, float defaultValue,
-        Action<float> onChanged, string suffix = "")
+        Action<float> onChanged, Func<float, string> formatFunc = null,
+        float customStep = 0f)
     {
         // === Layout dimensions (proportional to panel width) ===
         float pillWidth = _width * 0.532f;
@@ -1320,7 +1340,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         pillObj.SetActive(false);
 
         // --- Minus button (centered in left btnArea, hidden by default) ---
-        float stepSize = (max - min) / 20f;
+        float stepSize = customStep > 0f ? customStep : (max - min) / 20f;
         GameObject minusBtnObj = CreatePlusMinusButton(pillAreaObj.transform, false);
         var minusBtnRT = minusBtnObj.GetComponent<RectTransform>();
         minusBtnRT.anchorMin = new Vector2(0f, 0.5f);
@@ -1411,7 +1431,8 @@ public class RTTMediaSettingsPanel : MonoBehaviour
 
         var valueText = valueObj.AddComponent<TextMeshProUGUI>();
         valueText.font = _font;
-        valueText.text = FormatValue(defaultValue, suffix);
+        formatFunc ??= (v) => v.ToString("F2");
+        valueText.text = formatFunc(defaultValue);
         valueText.fontSize = 35;
         valueText.fontStyle = FontStyles.Bold;
         valueText.color = Color.white;
@@ -1442,12 +1463,15 @@ public class RTTMediaSettingsPanel : MonoBehaviour
             plusNotifier.onExit += hoverGroup.OnChildHoverExit;
         }
 
+        // Store format function on slider for reuse in reset methods
+        slider.OnFormatPreview = formatFunc;
+
         // === Value change callback ===
-        string capturedSuffix = suffix;
+        Func<float, string> capturedFormat = formatFunc;
         slider.OnValueChanged += (v) =>
         {
             onChanged?.Invoke(v);
-            UpdateValueLabel(valueText, v, capturedSuffix);
+            if (valueText != null) valueText.text = capturedFormat(v);
         };
 
         // === Reset button (right-aligned in row) ===
@@ -1474,7 +1498,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         resetBtn.onClick.AddListener(() =>
         {
             capturedSlider.SetValue(capturedDefault);
-            UpdateValueLabel(capturedValueText, capturedDefault, capturedSuffix);
+            if (capturedValueText != null) capturedValueText.text = capturedFormat(capturedDefault);
         });
 
         // Reset icon
@@ -1853,14 +1877,10 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         rt.offsetMax = Vector2.zero;
     }
 
-    private static string FormatValue(float value, string suffix = "")
+    private static void FormatValueLabel(TextMeshProUGUI label, VRSliderControl slider, float value)
     {
-        return $"{value:F2}{suffix}";
-    }
-
-    private static void UpdateValueLabel(TextMeshProUGUI label, float value, string suffix = "")
-    {
-        if (label != null) label.text = FormatValue(value, suffix);
+        if (label == null) return;
+        label.text = slider?.OnFormatPreview != null ? slider.OnFormatPreview(value) : value.ToString("F2");
     }
 
     private static Sprite GetCircleSprite()

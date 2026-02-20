@@ -301,10 +301,11 @@ public class FlatProjectionRenderer : MonoBehaviour, IProjectionRenderer
         _aspectRatioString = ratio ?? "default";
         switch (ratio)
         {
-            case "4:3": _aspectRatioOverride = 4f / 3f; break;
             case "3:2": _aspectRatioOverride = 3f / 2f; break;
+            case "4:3": _aspectRatioOverride = 4f / 3f; break;
+            case "9:16": _aspectRatioOverride = 9f / 16f; break;
             case "16:9": _aspectRatioOverride = 16f / 9f; break;
-            case "2:1": _aspectRatioOverride = 2f / 1f; break;
+            case "21:9": _aspectRatioOverride = 21f / 9f; break;
             default: _aspectRatioOverride = 0f; break; // "default" = use native
         }
         UpdateScreenAspect();

@@ -623,7 +623,7 @@ public class RTTMediaUISettingsPopup : MonoBehaviour
     private void UpdateValuesText()
     {
         if (_valuesText == null) return;
-        _valuesText.text = $"Depth: {_currentDepth:F2}  |  Height: {_currentHeight:F2}  |  Scale: {_currentScale:F2}";
+        _valuesText.text = $"Depth: {_currentDepth.ToString("F2").Replace('.', ',')}  |  Height: {_currentHeight.ToString("F2").Replace('.', ',')}  |  Scale: {_currentScale.ToString("F2").Replace('.', ',')}";
     }
 
     private static Sprite GetRoundedRectSprite()
