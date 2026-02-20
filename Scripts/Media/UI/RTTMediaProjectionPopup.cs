@@ -143,7 +143,7 @@ public class RTTMediaProjectionPopup : MonoBehaviour
         popupRT.sizeDelta = new Vector2(POPUP_WIDTH, POPUP_HEIGHT);
         
         // Align to bottom-right (relative to controls panel area)
-        popupRT.anchorMin = new Vector2(1, 0); // Bottom Right
+        popupRT.anchorMin = new Vector2(1, 0);
         popupRT.anchorMax = new Vector2(1, 0);
         popupRT.pivot = new Vector2(1, 0); 
         

@@ -300,12 +300,44 @@ public class RTTManager : MonoBehaviour
         {
             StartCoroutine(WaitAndShowMainMenu());
         }
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+        Screen.sleepTimeout = SleepTimeout.NeverSleep;
+        if (!Api.HasDeviceParams())
+        {
+            Api.ScanDeviceParams();
+        }
+#endif
     }
 
     private void Update()
     {
         // Delegate periodic memory check to quality manager
         _qualityManager?.PeriodicUpdate();
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+        if (Api.IsGearButtonPressed)
+        {
+            Api.ScanDeviceParams();
+        }
+
+        if (Api.IsCloseButtonPressed)
+        {
+            Application.Quit();
+        }
+
+        if (Api.IsTriggerHeldPressed)
+        {
+            PerformInstantRecenter();
+        }
+
+        if (Api.HasNewDeviceParams())
+        {
+            Api.ReloadDeviceParams();
+        }
+
+        Api.UpdateScreenParams();
+#endif
     }
 
     private void OnDestroy()
