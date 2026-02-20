@@ -835,7 +835,7 @@ public static class VRUIComponentsPrefabBuilder
         tmp.alignment = align;
         tmp.fontStyle = bold ? FontStyles.Bold : FontStyles.Normal;
         tmp.raycastTarget = false;
-        tmp.enableWordWrapping = false;
+        tmp.textWrappingMode = TextWrappingModes.NoWrap;
         tmp.overflowMode = TextOverflowModes.Ellipsis;
 
         return go;

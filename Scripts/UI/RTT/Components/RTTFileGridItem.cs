@@ -305,7 +305,7 @@ public class RTTFileGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         _nameText.fontStyle = FontStyles.Bold;
         _nameText.color = Color.white;
         _nameText.overflowMode = TextOverflowModes.Ellipsis;
-        _nameText.enableWordWrapping = false;  // Single line for marquee
+        _nameText.textWrappingMode = TextWrappingModes.NoWrap;  // Single line for marquee
         _nameText.maxVisibleLines = 1;
 
         // Add LayoutElement BEFORE MarqueeText.Setup - it will be copied to mask container

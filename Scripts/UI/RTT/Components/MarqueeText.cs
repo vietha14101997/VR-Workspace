@@ -110,7 +110,7 @@ public class MarqueeText : MonoBehaviour
         textRT.sizeDelta = new Vector2(2000f, 0); // Large width, height from anchors
 
         // Disable built-in overflow handling
-        textComponent.enableWordWrapping = false;
+        textComponent.textWrappingMode = TextWrappingModes.NoWrap;
         textComponent.overflowMode = TextOverflowModes.Overflow;
 
         // Add marquee component

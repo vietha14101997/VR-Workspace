@@ -143,7 +143,7 @@ namespace VRWorkspace.Media.Subtitles
             _subtitleText.fontSize = FontSize;
             _subtitleText.color = TextColor;
             _subtitleText.alignment = TextAlignmentOptions.Center;
-            _subtitleText.enableWordWrapping = true;
+            _subtitleText.textWrappingMode = TextWrappingModes.Normal;
             _subtitleText.overflowMode = TextOverflowModes.Truncate;
             _subtitleText.text = "";
 

@@ -134,7 +134,7 @@ public class MediaEnvironmentController : MonoBehaviour
     private void CacheLights()
     {
         // Find all lights in the scene (excluding directional sun light for VR)
-        Light[] allLights = FindObjectsOfType<Light>();
+        Light[] allLights = FindObjectsByType<Light>(FindObjectsSortMode.None);
 
         // Filter to room/environment lights (point and spot)
         var roomLights = new System.Collections.Generic.List<Light>();

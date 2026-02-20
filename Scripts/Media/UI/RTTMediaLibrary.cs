@@ -1782,7 +1782,7 @@ public class RTTMediaLibrary : MonoBehaviour
         txt.verticalAlignment = VerticalAlignmentOptions.Middle;
         txt.fontStyle = FontStyles.Bold;
         txt.raycastTarget = false;
-        txt.enableWordWrapping = false;
+        txt.textWrappingMode = TextWrappingModes.NoWrap;
         txt.overflowMode = TextOverflowModes.Ellipsis;
 
         return btnObj;

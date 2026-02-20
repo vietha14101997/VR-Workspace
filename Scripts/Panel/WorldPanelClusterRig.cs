@@ -86,7 +86,7 @@ public class WorldPanelClusterRig : MonoBehaviour
     // Event fired when panel enabled state changes
     public event System.Action<int, bool> OnPanelEnabledChanged;
 
-    Camera Cam => Application.isPlaying ? Camera.main : FindObjectOfType<Camera>();
+    Camera Cam => Application.isPlaying ? Camera.main : FindFirstObjectByType<Camera>();
 
     /// <summary>
     /// Get arc radius for panel positioning.

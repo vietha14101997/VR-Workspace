@@ -78,7 +78,7 @@ public class RTTFileDetail : MonoBehaviour
         _nameText.fontStyle = FontStyles.Bold;
         _nameText.alignment = TextAlignmentOptions.MidlineLeft;
         _nameText.color = Color.white;
-        _nameText.enableWordWrapping = false;
+        _nameText.textWrappingMode = TextWrappingModes.NoWrap;
         _nameText.overflowMode = TextOverflowModes.Overflow;
 
         // Setup marquee for auto-scrolling long file names (centered when fits)
@@ -539,7 +539,7 @@ public class RTTFileDetail : MonoBehaviour
         labelText.alignment = TextAlignmentOptions.MidlineLeft;
         labelText.color = new Color(1f, 1f, 1f, 0.85f); // Semi-transparent white
         labelText.text = label;
-        labelText.enableWordWrapping = false;
+        labelText.textWrappingMode = TextWrappingModes.NoWrap;
         labelText.overflowMode = TextOverflowModes.Ellipsis;
 
         // Value (starts after label with spacing, stretches to right)
@@ -558,7 +558,7 @@ public class RTTFileDetail : MonoBehaviour
         valueText.fontStyle = FontStyles.Bold;
         valueText.alignment = TextAlignmentOptions.MidlineLeft;
         valueText.color = Color.white; // Full white
-        valueText.enableWordWrapping = false;
+        valueText.textWrappingMode = TextWrappingModes.NoWrap;
         valueText.overflowMode = TextOverflowModes.Overflow;
 
         // Setup marquee for auto-scrolling long values

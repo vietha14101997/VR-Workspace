@@ -265,7 +265,7 @@ public class RTTPopupMenu : MonoBehaviour
 
         if (Camera.main != null) return Camera.main;
 
-        Camera[] allCameras = GameObject.FindObjectsOfType<Camera>();
+        Camera[] allCameras = FindObjectsByType<Camera>(FindObjectsSortMode.None);
         foreach (var cam in allCameras)
         {
             if (!cam.name.Contains("UI") && cam.gameObject.activeInHierarchy)
@@ -1171,7 +1171,7 @@ public class RTTPopupMenu : MonoBehaviour
         float topMargin = 0f;  // Controlled by VLG padding
         float bottomMargin = _config.rowSpacing * 2.0f;  // Space between label and buttons below
         label.margin = new Vector4(leftMargin, topMargin, rightMargin, bottomMargin);
-        label.enableWordWrapping = true;
+        label.textWrappingMode = TextWrappingModes.Normal;
         label.raycastTarget = false;
 
         LayoutElement le = labelObj.AddComponent<LayoutElement>();

@@ -165,7 +165,7 @@ public class RTTProgressPopup : MonoBehaviour
 
         if (Camera.main != null) return Camera.main;
 
-        Camera[] allCameras = GameObject.FindObjectsOfType<Camera>();
+        Camera[] allCameras = FindObjectsByType<Camera>(FindObjectsSortMode.None);
         foreach (var cam in allCameras)
         {
             if (!cam.name.Contains("UI") && cam.gameObject.activeInHierarchy)
@@ -490,7 +490,7 @@ public class RTTProgressPopup : MonoBehaviour
         _statusText.color = new Color(0.8f, 0.8f, 0.85f);
         _statusText.alignment = TextAlignmentOptions.Center;
         _statusText.raycastTarget = false;
-        _statusText.enableWordWrapping = false;
+        _statusText.textWrappingMode = TextWrappingModes.NoWrap;
         _statusText.overflowMode = TextOverflowModes.Ellipsis;
 
         return yOffset + _config.statusHeight;

@@ -29,7 +29,7 @@ public class RTTRaycastManager : MonoBehaviour
 
             if (_instance == null)
             {
-                _instance = FindObjectOfType<RTTRaycastManager>();
+                _instance = FindFirstObjectByType<RTTRaycastManager>();
 
                 if (_instance == null)
                 {

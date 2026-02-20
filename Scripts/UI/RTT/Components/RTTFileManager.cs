@@ -2941,7 +2941,7 @@ public class RTTFileManager : MonoBehaviour
         txt.verticalAlignment = VerticalAlignmentOptions.Middle;
         txt.fontStyle = FontStyles.Bold;
         txt.raycastTarget = false;
-        txt.enableWordWrapping = false; // Single line
+        txt.textWrappingMode = TextWrappingModes.NoWrap; // Single line
         txt.overflowMode = TextOverflowModes.Ellipsis; // Show ... if too long
 
         // Button component
@@ -3181,7 +3181,7 @@ public class RTTFileManager : MonoBehaviour
         txt.color = Color.white;
         txt.alignment = TextAlignmentOptions.MidlineLeft;
         txt.raycastTarget = false;
-        txt.enableWordWrapping = false; // Single line - prevent wrap causing vertical expansion
+        txt.textWrappingMode = TextWrappingModes.NoWrap; // Single line - prevent wrap causing vertical expansion
         txt.overflowMode = TextOverflowModes.Ellipsis; // Truncate with ... if too long
         txt.maxVisibleLines = 1;
 

@@ -194,7 +194,7 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         _nameText.fontStyle = FontStyles.Bold;
         _nameText.color = Color.white;
         _nameText.alignment = TextAlignmentOptions.MidlineLeft;
-        _nameText.enableWordWrapping = false;
+        _nameText.textWrappingMode = TextWrappingModes.NoWrap;
         _nameText.overflowMode = TextOverflowModes.Ellipsis;
         _nameText.raycastTarget = false;
 
@@ -275,7 +275,7 @@ public class RTTFileListItem : MonoBehaviour, IPointerEnterHandler, IPointerExit
         text.color = Color.white;
         text.fontStyle = FontStyles.Bold;
         text.alignment = TextAlignmentOptions.Center;
-        text.enableWordWrapping = false;
+        text.textWrappingMode = TextWrappingModes.NoWrap;
         text.overflowMode = TextOverflowModes.Ellipsis;
         text.richText = true;
         text.raycastTarget = false;

@@ -38,7 +38,7 @@ public class RTTManager : MonoBehaviour
 
             if (_instance == null)
             {
-                _instance = FindObjectOfType<RTTManager>();
+                _instance = FindFirstObjectByType<RTTManager>();
 
                 if (_instance == null)
                 {
@@ -425,7 +425,7 @@ public class RTTManager : MonoBehaviour
     {
         // Find RTTMenu container first
         if (menu == null)
-            menu = RTTMenu.Instance ?? FindObjectOfType<RTTMenu>();
+            menu = RTTMenu.Instance ?? FindFirstObjectByType<RTTMenu>();
 
         if (mainMenuFrame == null)
         {
@@ -434,11 +434,11 @@ public class RTTManager : MonoBehaviour
                 mainMenuFrame = menu.MainFrame;
             // Fallback to static instance or FindObjectOfType
             if (mainMenuFrame == null)
-                mainMenuFrame = RTTMenuFrame.PrimaryInstance ?? FindObjectOfType<RTTMenuFrame>();
+                mainMenuFrame = RTTMenuFrame.PrimaryInstance ?? FindFirstObjectByType<RTTMenuFrame>();
         }
 
         if (taskbar == null)
-            taskbar = RTTTaskbar.Instance ?? FindObjectOfType<RTTTaskbar>();
+            taskbar = RTTTaskbar.Instance ?? FindFirstObjectByType<RTTTaskbar>();
 
         if (mainMenuController == null)
         {

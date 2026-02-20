@@ -222,7 +222,7 @@ public class RTTBootstrapper : MonoBehaviour
         RTTManager manager = RTTManager.Instance;
         if (manager == null)
         {
-            manager = FindObjectOfType<RTTManager>();
+            manager = FindFirstObjectByType<RTTManager>();
         }
 
         if (manager != null)

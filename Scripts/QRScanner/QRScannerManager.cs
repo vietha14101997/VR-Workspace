@@ -92,7 +92,7 @@ public class QRScannerManager : MonoBehaviour
     {
         // Find RTTTaskbar if not set
         if (_rttTaskbar == null)
-            _rttTaskbar = FindObjectOfType<RTTTaskbar>();
+            _rttTaskbar = FindFirstObjectByType<RTTTaskbar>();
 
         // Calculate cancel button position
         _cancelButtonDistance = frameDistance;

@@ -405,7 +405,7 @@ public static class VRInputFieldFactory
         placeholderTxt.verticalAlignment = VerticalAlignmentOptions.Middle;
         placeholderTxt.raycastTarget = false;
         placeholderTxt.overflowMode = TextOverflowModes.Ellipsis;
-        placeholderTxt.enableWordWrapping = false;
+        placeholderTxt.textWrappingMode = TextWrappingModes.NoWrap;
         if (config.font != null) placeholderTxt.font = config.font;
 
         // Input Text
@@ -420,7 +420,7 @@ public static class VRInputFieldFactory
         inputTxt.verticalAlignment = VerticalAlignmentOptions.Middle;
         inputTxt.raycastTarget = false;
         inputTxt.overflowMode = TextOverflowModes.Overflow;
-        inputTxt.enableWordWrapping = false;
+        inputTxt.textWrappingMode = TextWrappingModes.NoWrap;
         if (config.font != null) inputTxt.font = config.font;
 
         // TMP_InputField component

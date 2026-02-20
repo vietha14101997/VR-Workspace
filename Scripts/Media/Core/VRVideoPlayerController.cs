@@ -1417,7 +1417,7 @@ public class VRVideoPlayerController : MonoBehaviour
     private System.Collections.IEnumerator RecenterRoutine()
     {
         VRGazeReticle reticle = VRGazeReticle.Instance;
-        if (reticle == null) reticle = FindObjectOfType<VRGazeReticle>();
+        if (reticle == null) reticle = FindFirstObjectByType<VRGazeReticle>();
 
         // Load recenter icon from Resources (icon files are directly in Resources folder)
         Sprite recenterIcon = Resources.Load<Sprite>("icon_recenter");

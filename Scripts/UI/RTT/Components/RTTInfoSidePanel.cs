@@ -545,7 +545,7 @@ public class RTTInfoSidePanel : MonoBehaviour
         // HardwareInfo values (CPU, GPU names) should wrap.
         if (panelType == PanelType.NetworkInfo)
         {
-            valueTxt.enableWordWrapping = false;
+            valueTxt.textWrappingMode = TextWrappingModes.NoWrap;
             valueTxt.overflowMode = TextOverflowModes.Ellipsis;
             
             // Enable auto-sizing to shrink text instead of cutting it off
@@ -555,7 +555,7 @@ public class RTTInfoSidePanel : MonoBehaviour
         }
         else
         {
-            valueTxt.enableWordWrapping = true;
+            valueTxt.textWrappingMode = TextWrappingModes.Normal;
             valueTxt.overflowMode = TextOverflowModes.Overflow;
             valueTxt.enableAutoSizing = false;
         }

@@ -79,6 +79,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
     #region Events - Immersive Adjustments
     public event Action<float> OnTiltChanged;
     public event Action<float> OnYawChanged;
+    public event Action<float> OnRollChanged;
     public event Action<float> OnZoomChanged;
     public event Action<float> OnHeightChanged;
     public event Action<float> OnHorizontalBalanceChanged;
@@ -164,6 +165,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
     // Immersive sliders
     private VRSliderControl _tiltSlider;
     private VRSliderControl _yawSlider;
+    private VRSliderControl _rollSlider;
     private VRSliderControl _zoomSlider;
     private VRSliderControl _immHeightSlider;
     private VRSliderControl _hBalanceSlider;
@@ -192,6 +194,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
     private TextMeshProUGUI _temperatureValueLabel;
     private TextMeshProUGUI _tiltValueLabel;
     private TextMeshProUGUI _yawValueLabel;
+    private TextMeshProUGUI _rollValueLabel;
     private TextMeshProUGUI _zoomValueLabel;
     private TextMeshProUGUI _immHeightValueLabel;
     private TextMeshProUGUI _hBalanceValueLabel;
@@ -293,12 +296,14 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         // Immersive sliders
         _tiltSlider?.SetValueWithoutNotify(snapshot.Tilt);
         _yawSlider?.SetValueWithoutNotify(snapshot.Yaw);
+        _rollSlider?.SetValueWithoutNotify(snapshot.Roll);
         _zoomSlider?.SetValueWithoutNotify(snapshot.Zoom);
         _immHeightSlider?.SetValueWithoutNotify(snapshot.ImmHeight);
         _hBalanceSlider?.SetValueWithoutNotify(snapshot.HorizontalBalance);
 
         UpdateValueLabel(_tiltValueLabel, snapshot.Tilt, "°");
         UpdateValueLabel(_yawValueLabel, snapshot.Yaw, "°");
+        UpdateValueLabel(_rollValueLabel, snapshot.Roll, "°");
         UpdateValueLabel(_zoomValueLabel, snapshot.Zoom, "°");
         UpdateValueLabel(_immHeightValueLabel, snapshot.ImmHeight);
         UpdateValueLabel(_hBalanceValueLabel, snapshot.HorizontalBalance);
@@ -671,9 +676,9 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         // Scrollable content
         var scrollContent = CreateScrollableContent(_pictureAdjContainer.transform);
 
-        // Sharpen slider (0 - 2, default 0.5)
+        // Sharpen slider (0 - 2, default 0.0)
         (_sharpnessSlider, _sharpnessValueLabel) = CreateSliderRow(
-            scrollContent, "Sharpen", 0f, 2f, 0.5f,
+            scrollContent, "Sharpen", 0f, 2f, 0.0f,
             (v) => { OnSharpnessChanged?.Invoke(v); UpdateValueLabel(_sharpnessValueLabel, v); });
 
         // Brightness slider (0 - 2, default 1.0)
@@ -718,14 +723,14 @@ public class RTTMediaSettingsPanel : MonoBehaviour
 
     private void ResetPictureSliders()
     {
-        _sharpnessSlider?.SetValueWithoutNotify(0.5f);
+        _sharpnessSlider?.SetValueWithoutNotify(0.0f);
         _brightnessSlider?.SetValueWithoutNotify(1.0f);
         _saturationSlider?.SetValueWithoutNotify(1.0f);
         _contrastSlider?.SetValueWithoutNotify(1.0f);
         _tintSlider?.SetValueWithoutNotify(0f);
         _temperatureSlider?.SetValueWithoutNotify(0f);
 
-        UpdateValueLabel(_sharpnessValueLabel, 0.5f);
+        UpdateValueLabel(_sharpnessValueLabel, 0.0f);
         UpdateValueLabel(_brightnessValueLabel, 1.0f);
         UpdateValueLabel(_saturationValueLabel, 1.0f);
         UpdateValueLabel(_contrastValueLabel, 1.0f);
@@ -747,7 +752,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         // === Common controls (both Flat and Immersive) ===
 
         // 3D Toggle (with icon)
-        _3dToggle = CreateToggleRow(scrollContent, "3D", false,
+        _3dToggle = CreateToggleRow(scrollContent, "3D", true,
             (v) => On3DChanged?.Invoke(v), ICON_3D);
 
         // LR Inverse Toggle (with icon)
@@ -789,6 +794,11 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         (_yawSlider, _yawValueLabel) = CreateSliderRow(
             _videoAdjImmersiveContent.transform, "Yaw", -180f, 180f, 0f,
             (v) => { OnYawChanged?.Invoke(v); UpdateValueLabel(_yawValueLabel, v, "°"); }, "°");
+            
+        // Roll slider (-180 to 180, default 0)
+        (_rollSlider, _rollValueLabel) = CreateSliderRow(
+            _videoAdjImmersiveContent.transform, "Roll", -180f, 180f, 0f,
+            (v) => { OnRollChanged?.Invoke(v); UpdateValueLabel(_rollValueLabel, v, "°"); }, "°");
 
         // Zoom slider (180 to 420, default 300)
         (_zoomSlider, _zoomValueLabel) = CreateSliderRow(
@@ -1281,7 +1291,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
         labelText.fontStyle = FontStyles.Bold;
         labelText.color = TEXT_COLOR;
         labelText.alignment = TextAlignmentOptions.MidlineLeft;
-        labelText.enableWordWrapping = true;
+        labelText.textWrappingMode = TextWrappingModes.Normal;
         labelText.raycastTarget = false;
 
         // === Pill area (absolute positioned, contains bg + buttons + slider) ===
@@ -2084,7 +2094,7 @@ public class RTTMediaSettingsPanel : MonoBehaviour
 public class SettingsSnapshot
 {
     // Picture adjustments
-    public float Sharpness = 0.5f;
+    public float Sharpness = 0.0f;
     public float Brightness = 1.0f;
     public float Saturation = 1.0f;
     public float Contrast = 1.0f;
@@ -2092,13 +2102,14 @@ public class SettingsSnapshot
     public float Temperature = 0f;
 
     // Video adjustments
-    public bool Is3D = false;
+    public bool Is3D = true;
     public bool IsLRInverse = false;
     public float Speed = 1.0f;
 
     // Immersive adjustments
     public float Tilt = 0f;
     public float Yaw = 0f;
+    public float Roll = 0f;
     public float Zoom = 300f;
     public float ImmHeight = 0f;
     public float HorizontalBalance = 0f;

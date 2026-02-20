@@ -678,7 +678,7 @@ public class RTTMediaQueuePanel : MonoBehaviour, IPaginationController
         item.TitleText.alignment = TextAlignmentOptions.MidlineLeft;
         item.TitleText.overflowMode = TextOverflowModes.Ellipsis;
         item.TitleText.maxVisibleLines = 1;
-        item.TitleText.enableWordWrapping = false;
+        item.TitleText.textWrappingMode = TextWrappingModes.NoWrap;
         item.TitleText.raycastTarget = false;
 
         if (!isPeek)

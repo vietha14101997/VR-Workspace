@@ -126,7 +126,7 @@ public class RTTRemoteMenuController : MonoBehaviour
         if (connectionPipeline != null) return;
 
         // Try to find existing
-        connectionPipeline = FindObjectOfType<RemoteConnectionPipeline>();
+        connectionPipeline = FindFirstObjectByType<RemoteConnectionPipeline>();
 
         // Create if not found
         if (connectionPipeline == null)

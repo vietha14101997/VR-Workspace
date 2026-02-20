@@ -476,7 +476,7 @@ public static class VRDropdownFactory
             labelTxt.verticalAlignment = VerticalAlignmentOptions.Bottom;
             labelTxt.fontStyle = FontStyles.Bold;
             labelTxt.raycastTarget = false;
-            labelTxt.enableWordWrapping = false;
+            labelTxt.textWrappingMode = TextWrappingModes.NoWrap;
             labelTxt.overflowMode = TextOverflowModes.Ellipsis;
             if (config.font != null) labelTxt.font = config.font;
         }
@@ -524,7 +524,7 @@ public static class VRDropdownFactory
             valueTxt.verticalAlignment = VerticalAlignmentOptions.Middle;
         }
         valueTxt.raycastTarget = false;
-        valueTxt.enableWordWrapping = false;
+        valueTxt.textWrappingMode = TextWrappingModes.NoWrap;
         valueTxt.overflowMode = TextOverflowModes.Ellipsis;
         if (config.font != null) valueTxt.font = config.font;
 

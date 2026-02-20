@@ -384,7 +384,7 @@ public class RTTMediaGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExi
         _titleText.color = Color.white;
         _titleText.alignment = TextAlignmentOptions.MidlineLeft;  // Changed from Center to MidlineLeft for correct Marquee positioning
         _titleText.overflowMode = TextOverflowModes.Ellipsis;
-        _titleText.enableWordWrapping = false;
+        _titleText.textWrappingMode = TextWrappingModes.NoWrap;
         _titleText.maxVisibleLines = 1;
         _titleText.raycastTarget = false;
 
@@ -1037,7 +1037,7 @@ public class RTTMediaGridItem : MonoBehaviour, IPointerEnterHandler, IPointerExi
         }
 
         // Option 3: Find any TMP font in scene
-        var existingTMP = FindObjectOfType<TextMeshProUGUI>();
+        var existingTMP = FindFirstObjectByType<TextMeshProUGUI>();
         if (existingTMP != null && existingTMP.font != null)
         {
             _cachedFallbackFont = existingTMP.font;

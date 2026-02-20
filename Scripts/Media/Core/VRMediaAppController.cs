@@ -1424,6 +1424,7 @@ public class VRMediaAppController : MonoBehaviour, IDataBindable
         // Immersive adjustments
         _settingsPanel.OnTiltChanged += (v) => _playerController?.ProjectionSystem?.GetImmersiveRenderer()?.SetTilt(v);
         _settingsPanel.OnYawChanged += (v) => _playerController?.ProjectionSystem?.GetImmersiveRenderer()?.SetYawOffset(v);
+        _settingsPanel.OnRollChanged += (v) => _playerController?.ProjectionSystem?.GetImmersiveRenderer()?.SetRollOffset(v);
         _settingsPanel.OnZoomChanged += (v) => _playerController?.ProjectionSystem?.GetImmersiveRenderer()?.SetFieldOfView(v);
         _settingsPanel.OnHeightChanged += (v) => _playerController?.ProjectionSystem?.GetImmersiveRenderer()?.SetVerticalShift(v);
         _settingsPanel.OnHorizontalBalanceChanged += (v) => _playerController?.ProjectionSystem?.GetImmersiveRenderer()?.SetHorizontalShift(v);

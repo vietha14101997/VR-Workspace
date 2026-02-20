@@ -186,7 +186,7 @@ public class MediaErrorDialog : MonoBehaviour
         tmp.fontStyle = style;
         tmp.color = color ?? Color.white;
         tmp.alignment = TextAlignmentOptions.Center;
-        tmp.enableWordWrapping = true;
+        tmp.textWrappingMode = TextWrappingModes.Normal;
 
         return tmp;
     }

@@ -1388,7 +1388,7 @@ public class RTTRemoteMenu : MonoBehaviour
         bool isCurvedSurround = index == 1;  // 0=Flat Planar, 1=Curved Surround
 
         // Find WorldPanelClusterRig and apply style change
-        var clusterRig = FindObjectOfType<WorldPanelClusterRig>();
+        var clusterRig = FindFirstObjectByType<WorldPanelClusterRig>();
         if (clusterRig != null)
         {
             clusterRig.SetStyle(isCurvedSurround);
@@ -2312,7 +2312,7 @@ public class RTTRemoteMenu : MonoBehaviour
         txt.alignment = align;
         txt.fontStyle = bold ? FontStyles.Bold : FontStyles.Normal;
         txt.raycastTarget = false;
-        txt.enableWordWrapping = false;
+        txt.textWrappingMode = TextWrappingModes.NoWrap;
         txt.overflowMode = TextOverflowModes.Ellipsis;
         if (customFont) txt.font = customFont;
 
@@ -2374,7 +2374,7 @@ public class RTTRemoteMenu : MonoBehaviour
         }
 
         // Find RTTTaskbar
-        RTTTaskbar taskbar = FindObjectOfType<RTTTaskbar>();
+        RTTTaskbar taskbar = FindFirstObjectByType<RTTTaskbar>();
 
         // Create QRScannerManager
         GameObject managerObj = new GameObject("QRScannerManager");

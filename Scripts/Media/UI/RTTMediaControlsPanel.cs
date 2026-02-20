@@ -384,7 +384,7 @@ public class RTTMediaControlsPanel : MonoBehaviour, IPointerEnterHandler, IPoint
         _titleText.fontStyle = FontStyles.Bold;
         _titleText.color = Color.white;
         _titleText.alignment = TextAlignmentOptions.MidlineLeft;  // MidlineLeft for correct MarqueeText positioning
-        _titleText.enableWordWrapping = false;
+        _titleText.textWrappingMode = TextWrappingModes.NoWrap;
         _titleText.overflowMode = TextOverflowModes.Ellipsis;
 
         // Add MarqueeText behavior with centerWhenFits for proper centering

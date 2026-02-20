@@ -239,7 +239,7 @@ public class RTTPopupInputable : MonoBehaviour
         if (Camera.main != null) return Camera.main;
 
         // Last resort: find any camera that's not UICamera
-        Camera[] allCameras = GameObject.FindObjectsOfType<Camera>();
+        Camera[] allCameras = FindObjectsByType<Camera>(FindObjectsSortMode.None);
         foreach (var cam in allCameras)
         {
             if (!cam.name.Contains("UI") && cam.gameObject.activeInHierarchy)
@@ -538,7 +538,7 @@ public class RTTPopupInputable : MonoBehaviour
         // Last resort: find any camera that's not UICamera
         if (mainCam == null)
         {
-            Camera[] allCameras = GameObject.FindObjectsOfType<Camera>();
+            Camera[] allCameras = FindObjectsByType<Camera>(FindObjectsSortMode.None);
             foreach (var cam in allCameras)
             {
                 if (!cam.name.Contains("UI") && cam.gameObject.activeInHierarchy)

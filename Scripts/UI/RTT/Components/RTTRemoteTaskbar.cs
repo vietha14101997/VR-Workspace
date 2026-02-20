@@ -669,7 +669,7 @@ public class RTTRemoteTaskbar : MonoBehaviour
         {
             _latencyText.text = "-- ms";
             _latencyText.fontSize = 24f;
-            _latencyText.enableWordWrapping = false;  // Single line
+            _latencyText.textWrappingMode = TextWrappingModes.NoWrap;  // Single line
             _latencyText.overflowMode = TMPro.TextOverflowModes.Overflow;
         }
     }
@@ -812,7 +812,7 @@ public class RTTRemoteTaskbar : MonoBehaviour
 
     private void SyncPassthroughWithModeController()
     {
-        var modeController = FindObjectOfType<ModeController>();
+        var modeController = FindFirstObjectByType<ModeController>();
         if (modeController != null)
         {
             _isPassthroughOn = modeController.mode == ViewMode.RealWorld;
@@ -841,7 +841,7 @@ public class RTTRemoteTaskbar : MonoBehaviour
 
         UpdateEyeButtonColor();
 
-        var modeController = FindObjectOfType<ModeController>();
+        var modeController = FindFirstObjectByType<ModeController>();
         if (modeController != null)
         {
             modeController.SetMode(_isPassthroughOn ? ViewMode.RealWorld : ViewMode.VirtualSpace);
@@ -878,7 +878,7 @@ public class RTTRemoteTaskbar : MonoBehaviour
             envController.SetLightsEnabled(isOn);
         }
 
-        var modeController = FindObjectOfType<ModeController>();
+        var modeController = FindFirstObjectByType<ModeController>();
 
         if (!_isLightOn)
         {
@@ -1033,7 +1033,7 @@ public class RTTRemoteTaskbar : MonoBehaviour
             _isPassthroughOn = isOn;
             UpdateEyeButtonColor();
 
-            var modeController = FindObjectOfType<ModeController>();
+            var modeController = FindFirstObjectByType<ModeController>();
             if (modeController != null)
             {
                 modeController.SetMode(_isPassthroughOn ? ViewMode.RealWorld : ViewMode.VirtualSpace);
@@ -1062,7 +1062,7 @@ public class RTTRemoteTaskbar : MonoBehaviour
     private IEnumerator RecenterRoutine()
     {
         VRGazeReticle reticle = VRGazeReticle.Instance;
-        if (reticle == null) reticle = FindObjectOfType<VRGazeReticle>();
+        if (reticle == null) reticle = FindFirstObjectByType<VRGazeReticle>();
 
         if (reticle != null)
         {

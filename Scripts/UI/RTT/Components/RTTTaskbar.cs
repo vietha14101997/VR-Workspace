@@ -100,7 +100,7 @@ public class RTTTaskbar : MonoBehaviour
 
     private void SyncPassthroughWithModeController()
     {
-        var modeController = FindObjectOfType<ModeController>();
+        var modeController = FindFirstObjectByType<ModeController>();
         if (modeController != null)
         {
             _isPassthroughOn = modeController.mode == ViewMode.RealWorld;
@@ -240,7 +240,7 @@ public class RTTTaskbar : MonoBehaviour
 
         UpdateEyeButtonColor();
 
-        var modeController = FindObjectOfType<ModeController>();
+        var modeController = FindFirstObjectByType<ModeController>();
         if (modeController != null)
         {
             modeController.SetMode(_isPassthroughOn ? ViewMode.RealWorld : ViewMode.VirtualSpace);
@@ -277,7 +277,7 @@ public class RTTTaskbar : MonoBehaviour
             envController.SetLightsEnabled(isOn);
         }
 
-        var modeController = FindObjectOfType<ModeController>();
+        var modeController = FindFirstObjectByType<ModeController>();
 
         if (!_isLightOn)
         {
@@ -607,7 +607,7 @@ public class RTTTaskbar : MonoBehaviour
             _isPassthroughOn = isOn;
             UpdateEyeButtonColor();
 
-            var modeController = FindObjectOfType<ModeController>();
+            var modeController = FindFirstObjectByType<ModeController>();
             if (modeController != null)
             {
                 modeController.SetMode(_isPassthroughOn ? ViewMode.RealWorld : ViewMode.VirtualSpace);
@@ -646,7 +646,7 @@ public class RTTTaskbar : MonoBehaviour
     private System.Collections.IEnumerator RecenterRoutine()
     {
         VRGazeReticle reticle = VRGazeReticle.Instance;
-        if (reticle == null) reticle = FindObjectOfType<VRGazeReticle>();
+        if (reticle == null) reticle = FindFirstObjectByType<VRGazeReticle>();
 
         if (reticle != null)
         {

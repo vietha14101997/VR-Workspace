@@ -288,7 +288,7 @@ public class RTTMediaSidePanel : MonoBehaviour
         txt.fontStyle = FontStyles.Bold;
         txt.color = new Color(1f, 1f, 1f, 0.85f);
         txt.alignment = TextAlignmentOptions.MidlineLeft;
-        txt.enableWordWrapping = false;
+        txt.textWrappingMode = TextWrappingModes.NoWrap;
         txt.overflowMode = TextOverflowModes.Ellipsis;
 
         // Store reference

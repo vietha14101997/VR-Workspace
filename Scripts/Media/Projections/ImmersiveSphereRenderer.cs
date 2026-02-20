@@ -344,6 +344,19 @@ public class ImmersiveSphereRenderer : MonoBehaviour, IProjectionRenderer
         _yawOffset = degrees;
         UpdateCombinedRotation();
     }
+    
+    /// <summary>
+    /// Set roll offset for immersive projection.
+    /// Maps to a _Roll shader property.
+    /// </summary>
+    private float _rollOffset = 0f;
+    
+    public void SetRollOffset(float degrees)
+    {
+        _rollOffset = degrees;
+        if (_material != null)
+            _material.SetFloat("_Roll", _rollOffset);
+    }
 
     private void UpdateCombinedRotation()
     {
@@ -418,6 +431,7 @@ public class ImmersiveSphereRenderer : MonoBehaviour, IProjectionRenderer
         _material.SetFloat("_ProjectionMode", (float)_projectionMode);
         _material.SetFloat("_FOV", 300);
         _material.SetFloat("_Rotation", 0);
+        _material.SetFloat("_Roll", 0);
         _material.SetFloat("_Tilt", 0);
         _material.SetFloat("_StereoStrength", 1);
         _material.SetFloat("_FadeSharpness", 8);
