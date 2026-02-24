@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using VRWorkspace.UI.Config;
 using VRWorkspace.UI.Components;
+using VRWorkspace.UI.Utilities;
 using VRWorkspace.UI.RTT;
 
 namespace VRWorkspace.UI.RTT.Components
@@ -121,6 +122,7 @@ namespace VRWorkspace.UI.RTT.Components
         private bool _isBuilt = false;
         private PopupSectionType _lastSectionType = PopupSectionType.SectionBlock;
         private GameObject _contentContainer;
+        private Material _bgMaterial;
         private Material _borderMaterial;
 
         // World-space mode fields
@@ -923,29 +925,15 @@ namespace VRWorkspace.UI.RTT.Components
             Image bgImg = _popupObject.AddComponent<Image>();
             bgImg.sprite = GetPixelSprite();
 
-            Shader glassShader = Shader.Find("Custom/GlassGradientBackgroundWide");
-            if (glassShader != null)
+            _bgMaterial = MaterialFactory.CreatePopupBackground(_config.width / 100f, _config.glassAlpha);
+            if (_bgMaterial != null)
             {
-                Material mat = new Material(glassShader);
-                mat.SetFloat("_CornerRadius", UIConstants.PopupCornerRadius + 0.01f); // Slightly larger than border
-                mat.SetFloat("_EdgePadding", UIConstants.PopupEdgePadding);
-                mat.SetFloat("_Aspect", _config.width / 100f);
-
-                mat.SetColor("_ColorA", UIConstants.PopupGlassColorA);
-                mat.SetColor("_ColorB", UIConstants.PopupGlassColorB);
-                mat.SetFloat("_GlassAlpha", _config.glassAlpha);
-                mat.SetFloat("_GradientOffset", 0f);
-                mat.SetFloat("_GradientAngle", -10f);
-                mat.SetFloat("_CyanRatio", 0.7f);
-                mat.SetFloat("_FresnelPower", 2.2f);
-                mat.SetFloat("_FresnelStrength", 0.12f);
-
-                bgImg.material = mat;
+                bgImg.material = _bgMaterial;
                 bgImg.color = Color.white;
             }
             else
             {
-                bgImg.color = _config.backgroundColor;
+                bgImg.color = UIConstants.PopupFallbackBgColor;
             }
         }
 
@@ -964,54 +952,16 @@ namespace VRWorkspace.UI.RTT.Components
             borderImg.sprite = GetPixelSprite();
             borderImg.raycastTarget = false;
 
-            Shader glowShader = Shader.Find("Custom/GlowingGlassBorder");
-            if (glowShader != null)
+            _borderMaterial = MaterialFactory.CreatePopupGlowBorder(_config.width / 100f);
+            if (_borderMaterial != null)
             {
-                Material mat = new Material(glowShader);
-                mat.SetFloat("_StrokeEnabled", 0);
-                mat.SetFloat("_BorderWidth", UIConstants.PopupBorderWidth);
-                mat.SetFloat("_CornerRadius", UIConstants.PopupCornerRadius);
-                mat.SetFloat("_EdgePadding", UIConstants.PopupEdgePadding);
-                mat.SetFloat("_Aspect", _config.width / 100f);
-
-                // Glow border layer widths from UIConstants
-                mat.SetFloat("_Layer1Width", UIConstants.PopupGlowLayer1Width);
-                mat.SetFloat("_Layer1Alpha", UIConstants.PopupGlowLayer1Alpha);
-                mat.SetFloat("_Layer2Width", UIConstants.PopupGlowLayer2Width);
-                mat.SetFloat("_Layer2Alpha", UIConstants.PopupGlowLayer2Alpha);
-                mat.SetFloat("_Layer3Width", UIConstants.PopupGlowLayer3Width);
-                mat.SetFloat("_Layer3Alpha", UIConstants.PopupGlowLayer3Alpha);
-                mat.SetFloat("_Layer4Width", UIConstants.PopupGlowLayer4Width);
-                mat.SetFloat("_Layer4Alpha", UIConstants.PopupGlowLayer4Alpha);
-
-                mat.SetColor("_ColorA", UIConstants.PopupGlowColorA);
-                mat.SetColor("_ColorB", UIConstants.PopupGlowColorB);
-                mat.SetFloat("_GradientMode", 2f);
-                mat.SetFloat("_GradientAngle", -10f);
-                mat.SetFloat("_GlassAlpha", 0.02f);
-                mat.SetColor("_GlassTint", new Color(0.9f, 0.95f, 1f, 1f));
-                mat.SetFloat("_ShimmerSpeed", 0.4f);
-                mat.SetFloat("_ShimmerIntensity", 0.2f);
-                mat.SetFloat("_LightSize", 0.008f);
-                mat.SetFloat("_LightGlow", 0.008f);
-
-                borderImg.material = mat;
-                _borderMaterial = mat;
+                borderImg.material = _borderMaterial;
             }
         }
 
         private void UpdateBackgroundAspect(float height)
         {
-            Image bgImg = _popupObject.GetComponent<Image>();
-            if (bgImg != null && bgImg.material != null)
-            {
-                bgImg.material.SetFloat("_Aspect", _config.width / height);
-            }
-
-            if (_borderMaterial != null)
-            {
-                _borderMaterial.SetFloat("_Aspect", _config.width / height);
-            }
+            MaterialFactory.UpdatePopupAspect(_bgMaterial, _borderMaterial, _config.width, height);
 
             // Update BoxCollider size for world-space mode
             if (_isWorldSpaceMode)
@@ -1331,18 +1281,16 @@ namespace VRWorkspace.UI.RTT.Components
 
             DestroyExternalOverlays();
 
-            if (_popupObject != null)
+            if (_bgMaterial != null)
             {
-                Image bgImg = _popupObject.GetComponent<Image>();
-                if (bgImg != null && bgImg.material != null)
-                {
-                    Destroy(bgImg.material);
-                }
+                Destroy(_bgMaterial);
+                _bgMaterial = null;
             }
 
             if (_borderMaterial != null)
             {
                 Destroy(_borderMaterial);
+                _borderMaterial = null;
             }
         }
 
