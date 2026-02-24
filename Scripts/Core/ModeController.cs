@@ -1,5 +1,5 @@
 using UnityEngine;
-using VRWorkspace.Camera;
+using VRWorkspace.CameraUtils;
 using VRWorkspace.Media.Core;
 
 namespace VRWorkspace.Core

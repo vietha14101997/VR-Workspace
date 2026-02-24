@@ -3,7 +3,7 @@ using UnityEngine.Android;
 using System.Collections;
 using System.Collections.Generic;
 
-namespace VRWorkspace.Camera
+namespace VRWorkspace.CameraUtils
 {
     [RequireComponent(typeof(MeshRenderer))]
     public class CameraPassthrough : MonoBehaviour

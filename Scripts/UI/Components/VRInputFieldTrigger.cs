@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using TMPro;
-using VRWorkspace.Keyboard;
+using VRWorkspace.VRKeyboard;
 using VRWorkspace.UI.RTT.Components;
 using VRWorkspace.UI.RTT.Input;
 

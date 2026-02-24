@@ -4,7 +4,7 @@ using TMPro;
 using System.Collections.Generic;
 using VRWorkspace.UI.RTT.Components;
 
-namespace VRWorkspace.Keyboard
+namespace VRWorkspace.VRKeyboard
 {
     /// <summary>
     /// Manages RTT Mobile Keyboard visibility and handles input field focus in VR environment.

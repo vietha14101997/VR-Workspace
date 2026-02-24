@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using VRWorkspace.Utilities;
+using VRWorkspace.UI.RTT.Services;
 
 namespace VRWorkspace.UI.RTT
 {
