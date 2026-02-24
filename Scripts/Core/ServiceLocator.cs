@@ -5,17 +5,11 @@ using UnityEngine;
 namespace VRWorkspace.Core
 {
     /// <summary>
-    /// Simple service locator for dependency injection.
-    /// Use this to register and retrieve services (ViewModels, Services, etc.)
-    ///
-    /// Usage:
-    /// // Register
-    /// ServiceLocator.Register&lt;IConnectionService&gt;(new ConnectionService());
-    /// ServiceLocator.Register(connectionViewModel);
-    ///
-    /// // Retrieve
-    /// var vm = ServiceLocator.Get&lt;ConnectionViewModel&gt;();
+    /// [DEPRECATED] Use VContainer dependency injection instead.
+    /// This class is kept for backward compatibility during migration.
+    /// Inject dependencies via LifetimeScope registrations and [Inject] attributes.
     /// </summary>
+    [System.Obsolete("Use VContainer dependency injection instead. See Core/DI/ for LifetimeScopes.")]
     public static class ServiceLocator
     {
         private static readonly Dictionary<Type, object> _services = new Dictionary<Type, object>();
@@ -223,9 +217,9 @@ namespace VRWorkspace.Core
     }
 
     /// <summary>
-    /// MonoBehaviour that initializes core services on startup.
-    /// Add this to your startup scene.
+    /// [DEPRECATED] Use VContainer RootLifetimeScope instead.
     /// </summary>
+    [System.Obsolete("Use VContainer RootLifetimeScope instead. See Core/DI/RootLifetimeScope.cs.")]
     public class ServiceBootstrap : MonoBehaviour
     {
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
