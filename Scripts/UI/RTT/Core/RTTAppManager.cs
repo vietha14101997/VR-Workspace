@@ -2,6 +2,7 @@ using UnityEngine;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using VRWorkspace.UI.RTT.Components;
 
 namespace VRWorkspace.UI.RTT
 {

@@ -9,1205 +9,1215 @@ using VRWorkspace.Streaming;
 using VRWorkspace.Core;
 using VRWorkspace.ViewModels;
 using VRWorkspace.UI.RTT;
-#if UNITY_ANDROID && !UNITY_EDITOR
-using Google.XR.Cardboard;
-#endif
+using VRWorkspace.Input;
+using VRWorkspace.Media.Core;
+using VRWorkspace.Panel;
+using VRWorkspace.UI.RTT.Components;
+using VRWorkspace.UI.RTT.Controllers;
 
-/// <summary>
-/// Unified RTT Manager - consolidates RTTManager, RTTMenuManager, and RTTAppManager.
-/// Handles:
-/// - Panel registration and tracking
-/// - Camera depth assignment for render ordering
-/// - Quality level management and memory monitoring
-/// - Menu state and navigation
-/// - Multi-app lifecycle management
-/// - Theme management (centralized colors)
-/// - Font management (centralized typography)
-/// </summary>
-public class RTTManager : MonoBehaviour
+namespace VRWorkspace.UI.RTT
 {
-    #region Singleton
-    private static RTTManager _instance;
-    private static bool _applicationQuitting = false;
+    #if UNITY_ANDROID && !UNITY_EDITOR
+    using Google.XR.Cardboard;
+    #endif
 
-    public static RTTManager Instance
+    /// <summary>
+    /// Unified RTT Manager - consolidates RTTManager, RTTMenuManager, and RTTAppManager.
+    /// Handles:
+    /// - Panel registration and tracking
+    /// - Camera depth assignment for render ordering
+    /// - Quality level management and memory monitoring
+    /// - Menu state and navigation
+    /// - Multi-app lifecycle management
+    /// - Theme management (centralized colors)
+    /// - Font management (centralized typography)
+    /// </summary>
+    public class RTTManager : MonoBehaviour
     {
-        get
-        {
-            if (_applicationQuitting) return null;
+        #region Singleton
+        private static RTTManager _instance;
+        private static bool _applicationQuitting = false;
 
-            if (_instance == null)
+        public static RTTManager Instance
+        {
+            get
             {
-                _instance = FindFirstObjectByType<RTTManager>();
+                if (_applicationQuitting) return null;
 
                 if (_instance == null)
                 {
-                    var go = new GameObject("RTTManager");
-                    _instance = go.AddComponent<RTTManager>();
-                    DontDestroyOnLoad(go);
+                    _instance = FindFirstObjectByType<RTTManager>();
+
+                    if (_instance == null)
+                    {
+                        var go = new GameObject("RTTManager");
+                        _instance = go.AddComponent<RTTManager>();
+                        DontDestroyOnLoad(go);
+                    }
                 }
+                return _instance;
             }
-            return _instance;
         }
-    }
-    #endregion
+        #endregion
 
-    #region Configuration Assets
-    [Header("Configuration Assets")]
-    [SerializeField] private RTTConfig rttConfig;
-    [SerializeField] private RTTThemeConfig themeConfig;
-    [SerializeField] private RTTAppRegistry appRegistry;
+        #region Configuration Assets
+        [Header("Configuration Assets")]
+        [SerializeField] private RTTConfig rttConfig;
+        [SerializeField] private RTTThemeConfig themeConfig;
+        [SerializeField] private RTTAppRegistry appRegistry;
 
-    [Header("Typography")]
-    [SerializeField] private TMP_FontAsset primaryFont;
-    #endregion
+        [Header("Typography")]
+        [SerializeField] private TMP_FontAsset primaryFont;
+        #endregion
 
-    #region Panel Management Config
-    [Header("Panel Management")]
-    [Tooltip("Maximum number of panels that can render in a single frame")]
-#pragma warning disable CS0414 // Field is assigned but never used - exposed for Inspector configuration
-    [SerializeField] private int maxConcurrentRenders = 3;
-#pragma warning restore CS0414
+        #region Panel Management Config
+        [Header("Panel Management")]
+        [Tooltip("Maximum number of panels that can render in a single frame")]
+    #pragma warning disable CS0414 // Field is assigned but never used - exposed for Inspector configuration
+        [SerializeField] private int maxConcurrentRenders = 3;
+    #pragma warning restore CS0414
 
-    [Tooltip("Enable performance logging to console")]
-    [SerializeField] private bool enablePerformanceLogging = false;
+        [Tooltip("Enable performance logging to console")]
+        [SerializeField] private bool enablePerformanceLogging = false;
 
-    [Tooltip("Starting camera depth for RTT cameras")]
-    [SerializeField] private int startingCameraDepth = -100;
-    #endregion
+        [Tooltip("Starting camera depth for RTT cameras")]
+        [SerializeField] private int startingCameraDepth = -100;
+        #endregion
 
-    #region Menu/App References
-    [Header("Menu References")]
-    [SerializeField] private RTTMenu menu;
-    [SerializeField] private RTTMenuFrame mainMenuFrame;
-    [SerializeField] private RTTTaskbar taskbar;
+        #region Menu/App References
+        [Header("Menu References")]
+        [SerializeField] private RTTMenu menu;
+        [SerializeField] private RTTMenuFrame mainMenuFrame;
+        [SerializeField] private RTTTaskbar taskbar;
 
-    [Header("Controllers")]
-    [SerializeField] private RTTMainMenuController mainMenuController;
-    [SerializeField] private RTTRemoteMenuController remoteMenuController;
+        [Header("Controllers")]
+        [SerializeField] private RTTMainMenuController mainMenuController;
+        [SerializeField] private RTTRemoteMenuController remoteMenuController;
 
-    [Header("Frame Spawning")]
-    [SerializeField] private Transform frameParent;
-    [SerializeField] private WorldPanelPlus panelPrefab;
+        [Header("Frame Spawning")]
+        [SerializeField] private Transform frameParent;
+        [SerializeField] private WorldPanelPlus panelPrefab;
 
-    [Header("Transition Animation")]
-    [SerializeField] private float transitionOutDuration = 0.15f;  // Increased for smoother transition
-    [SerializeField] private float transitionInDuration = 0.15f;
-    [SerializeField] private bool useFadeTransition = true;
-    [SerializeField] private bool useScaleTransition = false;
+        [Header("Transition Animation")]
+        [SerializeField] private float transitionOutDuration = 0.15f;  // Increased for smoother transition
+        [SerializeField] private float transitionInDuration = 0.15f;
+        [SerializeField] private bool useFadeTransition = true;
+        [SerializeField] private bool useScaleTransition = false;
 
-    [Header("Auto Init")]
-    [SerializeField] private bool autoShowMainMenu = true;
+        [Header("Auto Init")]
+        [SerializeField] private bool autoShowMainMenu = true;
 
-    [Tooltip("Pre-initialize all app menus in background after main menu stabilizes")]
-    [SerializeField] private bool enableBackgroundPreInit = true;
+        [Tooltip("Pre-initialize all app menus in background after main menu stabilizes")]
+        [SerializeField] private bool enableBackgroundPreInit = true;
 
-    [Header("Auto Recenter")]
-    [Tooltip("Automatically recenter objects in front of user when app starts")]
-    [SerializeField] private bool autoRecenterOnStart = true;
-    #endregion
+        [Header("Auto Recenter")]
+        [Tooltip("Automatically recenter objects in front of user when app starts")]
+        [SerializeField] private bool autoRecenterOnStart = true;
+        #endregion
 
-    #region Panel Management Fields
-    // Legacy fields removed - now managed by extracted managers
-    private Queue<RTTCanvasBase> _renderQueue = new Queue<RTTCanvasBase>();
-    private float _lastFrameRenderTime;
-    private int _rendersThisFrame;
+        #region Panel Management Fields
+        // Legacy fields removed - now managed by extracted managers
+        private Queue<RTTCanvasBase> _renderQueue = new Queue<RTTCanvasBase>();
+        private float _lastFrameRenderTime;
+        private int _rendersThisFrame;
 
-    // Extracted Managers
-    private RTTPanelManager _panelManager;
-    private RTTQualityManager _qualityManager;
-    private RTTAppManager _appManager;
-    #endregion
+        // Extracted Managers
+        private RTTPanelManager _panelManager;
+        private RTTQualityManager _qualityManager;
+        private RTTAppManager _appManager;
+        #endregion
 
-    #region Menu State Fields
-    public enum MenuState { MainMenu, RemoteMenu }
-    private MenuState _currentMenuState = MenuState.MainMenu;
-    private GameObject _currentMenuContent;
+        #region Menu State Fields
+        public enum MenuState { MainMenu, RemoteMenu }
+        private MenuState _currentMenuState = MenuState.MainMenu;
+        private GameObject _currentMenuContent;
 
-    // Persistent Main Menu - created once, never destroyed
-    private GameObject _mainMenuContent;
-    private bool _mainMenuInitialized = false;
-    private bool _hasAutoRecentered = false;
+        // Persistent Main Menu - created once, never destroyed
+        private GameObject _mainMenuContent;
+        private bool _mainMenuInitialized = false;
+        private bool _hasAutoRecentered = false;
 
-    // Startup camera-follow state
-    private bool _startupCameraFollowActive = false;
-    private float _startupFollowStartTime = 0f;
-    private GameObject _cachedVirtualObjects;
-    private Quaternion _initialCameraRotation;
-    private bool _cameraTrackingDetected = false;
-    private const float kCameraTrackingAngleThreshold = 1.0f; // Degrees of rotation change to confirm tracking
-    private const float kCameraTrackingFallbackTime = 2.0f;   // Assume tracking active after this time
-    private const float kMaxStartupFollowTime = 5.0f;         // Safety timeout
-    #endregion
+        // Startup camera-follow state
+        private bool _startupCameraFollowActive = false;
+        private float _startupFollowStartTime = 0f;
+        private GameObject _cachedVirtualObjects;
+        private Quaternion _initialCameraRotation;
+        private bool _cameraTrackingDetected = false;
+        private const float kCameraTrackingAngleThreshold = 1.0f; // Degrees of rotation change to confirm tracking
+        private const float kCameraTrackingFallbackTime = 2.0f;   // Assume tracking active after this time
+        private const float kMaxStartupFollowTime = 5.0f;         // Safety timeout
+        #endregion
 
-    #region Events
-    /// <summary>Fired when theme configuration changes</summary>
-    public event Action OnThemeChanged;
+        #region Events
+        /// <summary>Fired when theme configuration changes</summary>
+        public event Action OnThemeChanged;
 
-    /// <summary>Fired when font changes</summary>
-    public event Action OnFontChanged;
+        /// <summary>Fired when font changes</summary>
+        public event Action OnFontChanged;
 
-    /// <summary>Fired when menu state changes</summary>
-    public event Action<MenuState> OnMenuStateChanged;
-    #endregion
+        /// <summary>Fired when menu state changes</summary>
+        public event Action<MenuState> OnMenuStateChanged;
+        #endregion
 
-    #region Properties - Configuration
-    public RTTConfig DefaultConfig => rttConfig;
-    public RTTThemeConfig Theme => themeConfig;
-    public RTTAppRegistry AppRegistry => appRegistry;
+        #region Properties - Configuration
+        public RTTConfig DefaultConfig => rttConfig;
+        public RTTThemeConfig Theme => themeConfig;
+        public RTTAppRegistry AppRegistry => appRegistry;
 
-    /// <summary>
-    /// Get the configured font. Priority: Theme font > Primary font fallback.
-    /// </summary>
-    public TMP_FontAsset Font => themeConfig?.font != null ? themeConfig.font : primaryFont;
+        /// <summary>
+        /// Get the configured font. Priority: Theme font > Primary font fallback.
+        /// </summary>
+        public TMP_FontAsset Font => themeConfig?.font != null ? themeConfig.font : primaryFont;
 
-    // Theme color shortcuts
-    public Color PrimaryColor => themeConfig?.primaryColor ?? new Color(0f, 0.9f, 1f);
-    public Color AccentColor => themeConfig?.accentColor ?? new Color(0.76f, 0.36f, 1f);
-    #endregion
+        // Theme color shortcuts
+        public Color PrimaryColor => themeConfig?.primaryColor ?? new Color(0f, 0.9f, 1f);
+        public Color AccentColor => themeConfig?.accentColor ?? new Color(0.76f, 0.36f, 1f);
+        #endregion
 
-    #region Properties - Panel Management
-    public RTTQualityLevel CurrentQualityLevel => _qualityManager?.CurrentQualityLevel ?? RTTQualityLevel.High;
-    public int RegisteredPanelCount => _panelManager?.RegisteredPanelCount ?? 0;
-    public int VisiblePanelCount => _panelManager?.VisiblePanelCount ?? 0;
-    #endregion
+        #region Properties - Panel Management
+        public RTTQualityLevel CurrentQualityLevel => _qualityManager?.CurrentQualityLevel ?? RTTQualityLevel.High;
+        public int RegisteredPanelCount => _panelManager?.RegisteredPanelCount ?? 0;
+        public int VisiblePanelCount => _panelManager?.VisiblePanelCount ?? 0;
+        #endregion
 
-    #region Properties - Menu State
-    public MenuState CurrentMenuState => _currentMenuState;
-    public bool IsMainMenuActive => _currentMenuState == MenuState.MainMenu;
-    public bool IsRemoteMenuActive => _currentMenuState == MenuState.RemoteMenu;
-    public RTTMenu Menu => menu;
-    public RTTMenuFrame MenuFrame => mainMenuFrame;
-    public RTTMainMenuController MainMenuController => mainMenuController;
-    public RTTRemoteMenuController RemoteMenuController => remoteMenuController;
-    #endregion
+        #region Properties - Menu State
+        public MenuState CurrentMenuState => _currentMenuState;
+        public bool IsMainMenuActive => _currentMenuState == MenuState.MainMenu;
+        public bool IsRemoteMenuActive => _currentMenuState == MenuState.RemoteMenu;
+        public RTTMenu Menu => menu;
+        public RTTMenuFrame MenuFrame => mainMenuFrame;
+        public RTTMainMenuController MainMenuController => mainMenuController;
+        public RTTRemoteMenuController RemoteMenuController => remoteMenuController;
+        #endregion
 
-    #region Properties - App Lifecycle
-    public RTTMenuFrame MainMenuFrame => mainMenuFrame;
-    public bool IsMainMenuVisible => _appManager?.IsMainMenuVisible ?? true;
-    public string CurrentVisibleAppId => _appManager?.CurrentVisibleAppId;
-    public int MaxOpenApps => appRegistry?.maxOpenApps ?? 3;
-    public bool IsTransitioning => _appManager?.IsTransitioning ?? false;
-    public int OpenAppCount => _appManager?.OpenAppCount ?? 0;
-    public RTTAppInstance CurrentApp => _appManager?.CurrentApp;
-    #endregion
+        #region Properties - App Lifecycle
+        public RTTMenuFrame MainMenuFrame => mainMenuFrame;
+        public bool IsMainMenuVisible => _appManager?.IsMainMenuVisible ?? true;
+        public string CurrentVisibleAppId => _appManager?.CurrentVisibleAppId;
+        public int MaxOpenApps => appRegistry?.maxOpenApps ?? 3;
+        public bool IsTransitioning => _appManager?.IsTransitioning ?? false;
+        public int OpenAppCount => _appManager?.OpenAppCount ?? 0;
+        public RTTAppInstance CurrentApp => _appManager?.CurrentApp;
+        #endregion
 
-    #region Properties - Zoom
-    /// <summary>Get current zoom distance from camera</summary>
-    public float ZoomDistance => VirtualObjectsZoomController.Instance?.CurrentDistance ?? 2.0f;
+        #region Properties - Zoom
+        /// <summary>Get current zoom distance from camera</summary>
+        public float ZoomDistance => VirtualObjectsZoomController.Instance?.CurrentDistance ?? 2.0f;
 
-    /// <summary>Get minimum zoom distance</summary>
-    public float ZoomMinDistance => VirtualObjectsZoomController.Instance?.MinDistance ?? 1.0f;
+        /// <summary>Get minimum zoom distance</summary>
+        public float ZoomMinDistance => VirtualObjectsZoomController.Instance?.MinDistance ?? 1.0f;
 
-    /// <summary>Get maximum zoom distance</summary>
-    public float ZoomMaxDistance => VirtualObjectsZoomController.Instance?.MaxDistance ?? 2.0f;
+        /// <summary>Get maximum zoom distance</summary>
+        public float ZoomMaxDistance => VirtualObjectsZoomController.Instance?.MaxDistance ?? 2.0f;
 
-    /// <summary>Whether zoom controller is available</summary>
-    public bool IsZoomAvailable => VirtualObjectsZoomController.Instance != null;
-    #endregion
+        /// <summary>Whether zoom controller is available</summary>
+        public bool IsZoomAvailable => VirtualObjectsZoomController.Instance != null;
+        #endregion
 
-    #region Zoom API
-    /// <summary>
-    /// Set zoom distance (move VirtualObjects closer/farther from camera).
-    /// </summary>
-    /// <param name="distance">Distance in meters (clamped to min/max)</param>
-    public void SetZoom(float distance)
-    {
-        VirtualObjectsZoomController.Instance?.SetZoomDistance(distance);
-    }
-
-    /// <summary>
-    /// Set zoom using normalized value (0 = closest, 1 = farthest).
-    /// </summary>
-    public void SetNormalizedZoom(float normalized01)
-    {
-        VirtualObjectsZoomController.Instance?.SetNormalizedZoom(normalized01);
-    }
-
-    /// <summary>
-    /// Get normalized zoom value (0 = closest, 1 = farthest).
-    /// </summary>
-    public float GetNormalizedZoom()
-    {
-        return VirtualObjectsZoomController.Instance?.GetNormalizedZoom() ?? 0.5f;
-    }
-
-    /// <summary>
-    /// Zoom in by one step (move closer to camera).
-    /// </summary>
-    public void ZoomIn()
-    {
-        VirtualObjectsZoomController.Instance?.ZoomIn();
-    }
-
-    /// <summary>
-    /// Zoom out by one step (move farther from camera).
-    /// </summary>
-    public void ZoomOut()
-    {
-        VirtualObjectsZoomController.Instance?.ZoomOut();
-    }
-
-    /// <summary>
-    /// Reset zoom to default distance.
-    /// </summary>
-    public void ResetZoom()
-    {
-        VirtualObjectsZoomController.Instance?.ResetZoom();
-    }
-    #endregion
-
-    #region Lifecycle
-    private void Awake()
-    {
-        if (_instance != null && _instance != this)
+        #region Zoom API
+        /// <summary>
+        /// Set zoom distance (move VirtualObjects closer/farther from camera).
+        /// </summary>
+        /// <param name="distance">Distance in meters (clamped to min/max)</param>
+        public void SetZoom(float distance)
         {
-            Destroy(gameObject);
-            return;
+            VirtualObjectsZoomController.Instance?.SetZoomDistance(distance);
         }
 
-        _instance = this;
-
-        // Move to root if not already (DontDestroyOnLoad only works for root GameObjects)
-        if (transform.parent != null)
-            transform.SetParent(null);
-
-        DontDestroyOnLoad(gameObject);
-
-        // Load configs from Resources if not assigned
-        LoadConfigsFromResources();
-
-        // Initialize extracted managers
-        InitializeManagers();
-
-        // Subscribe to theme property changes for runtime updates
-        RTTThemeConfig.OnAnyThemePropertyChanged += HandleThemePropertyChanged;
-    }
-
-    private void Start()
-    {
-        // Auto-find references
-        AutoFindReferences();
-
-        // Initialize app manager with references
-        InitializeAppManager();
-
-        // Subscribe to controller events
-        SubscribeToControllerEvents();
-
-        // Auto show main menu
-        if (autoShowMainMenu && mainMenuFrame != null)
+        /// <summary>
+        /// Set zoom using normalized value (0 = closest, 1 = farthest).
+        /// </summary>
+        public void SetNormalizedZoom(float normalized01)
         {
-            StartCoroutine(WaitAndShowMainMenu());
+            VirtualObjectsZoomController.Instance?.SetNormalizedZoom(normalized01);
         }
 
-#if UNITY_ANDROID && !UNITY_EDITOR
-        Screen.sleepTimeout = SleepTimeout.NeverSleep;
-        if (!Api.HasDeviceParams())
+        /// <summary>
+        /// Get normalized zoom value (0 = closest, 1 = farthest).
+        /// </summary>
+        public float GetNormalizedZoom()
         {
-            Api.ScanDeviceParams();
+            return VirtualObjectsZoomController.Instance?.GetNormalizedZoom() ?? 0.5f;
         }
-#endif
 
-        // Initialize NonVRModeController if not present
-        if (NonVRModeController.Instance == null)
+        /// <summary>
+        /// Zoom in by one step (move closer to camera).
+        /// </summary>
+        public void ZoomIn()
         {
-            var controllerGO = new GameObject("NonVRModeController");
-            controllerGO.AddComponent<NonVRModeController>();
+            VirtualObjectsZoomController.Instance?.ZoomIn();
         }
-    }
 
-    private void Update()
-    {
-        // Delegate periodic memory check to quality manager
-        _qualityManager?.PeriodicUpdate();
-
-#if UNITY_ANDROID && !UNITY_EDITOR
-        // Skip Cardboard API calls when in non-VR mode (XR is deinitialized)
-        if (NonVRModeController.Instance == null || !NonVRModeController.Instance.IsNonVRMode)
+        /// <summary>
+        /// Zoom out by one step (move farther from camera).
+        /// </summary>
+        public void ZoomOut()
         {
-            if (Api.IsGearButtonPressed)
+            VirtualObjectsZoomController.Instance?.ZoomOut();
+        }
+
+        /// <summary>
+        /// Reset zoom to default distance.
+        /// </summary>
+        public void ResetZoom()
+        {
+            VirtualObjectsZoomController.Instance?.ResetZoom();
+        }
+        #endregion
+
+        #region Lifecycle
+        private void Awake()
+        {
+            if (_instance != null && _instance != this)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            _instance = this;
+
+            // Move to root if not already (DontDestroyOnLoad only works for root GameObjects)
+            if (transform.parent != null)
+                transform.SetParent(null);
+
+            DontDestroyOnLoad(gameObject);
+
+            // Load configs from Resources if not assigned
+            LoadConfigsFromResources();
+
+            // Initialize extracted managers
+            InitializeManagers();
+
+            // Subscribe to theme property changes for runtime updates
+            RTTThemeConfig.OnAnyThemePropertyChanged += HandleThemePropertyChanged;
+        }
+
+        private void Start()
+        {
+            // Auto-find references
+            AutoFindReferences();
+
+            // Initialize app manager with references
+            InitializeAppManager();
+
+            // Subscribe to controller events
+            SubscribeToControllerEvents();
+
+            // Auto show main menu
+            if (autoShowMainMenu && mainMenuFrame != null)
+            {
+                StartCoroutine(WaitAndShowMainMenu());
+            }
+
+    #if UNITY_ANDROID && !UNITY_EDITOR
+            Screen.sleepTimeout = SleepTimeout.NeverSleep;
+            if (!Api.HasDeviceParams())
             {
                 Api.ScanDeviceParams();
             }
+    #endif
 
-            if (Api.IsCloseButtonPressed)
+            // Initialize NonVRModeController if not present
+            if (NonVRModeController.Instance == null)
             {
-                Application.Quit();
+                var controllerGO = new GameObject("NonVRModeController");
+                controllerGO.AddComponent<NonVRModeController>();
             }
-
-            if (Api.IsTriggerHeldPressed)
-            {
-                PerformInstantRecenter();
-            }
-
-            if (Api.HasNewDeviceParams())
-            {
-                Api.ReloadDeviceParams();
-            }
-
-            Api.UpdateScreenParams();
         }
-#endif
-    }
 
-    private void OnDestroy()
-    {
-        // Unsubscribe from theme property changes
-        RTTThemeConfig.OnAnyThemePropertyChanged -= HandleThemePropertyChanged;
-
-        UnsubscribeFromControllerEvents();
-
-        // Cleanup active apps (handled by RTTAppManager.OnDestroy)
-
-        if (_instance == this) _instance = null;
-    }
-
-    private void OnApplicationQuit()
-    {
-        _applicationQuitting = true;
-    }
-    #endregion
-
-    #region Initialization Helpers
-    private void LoadConfigsFromResources()
-    {
-        if (rttConfig == null)
-            rttConfig = Resources.Load<RTTConfig>("RTTConfig");
-        if (themeConfig == null)
-            themeConfig = Resources.Load<RTTThemeConfig>("RTTTheme");
-        if (appRegistry == null)
-            appRegistry = Resources.Load<RTTAppRegistry>("RTTAppRegistry");
-    }
-
-    /// <summary>
-    /// Initialize extracted manager classes for cleaner architecture.
-    /// These managers handle specific responsibilities while RTTManager coordinates them.
-    /// </summary>
-    private void InitializeManagers()
-    {
-        // Panel Manager - handles panel registration and camera depth
-        _panelManager = new RTTPanelManager(startingCameraDepth, enablePerformanceLogging);
-
-        // Quality Manager - handles quality levels and memory monitoring
-        _qualityManager = new RTTQualityManager(rttConfig, _panelManager, enablePerformanceLogging);
-
-        // App Manager - handles app lifecycle (MonoBehaviour)
-        _appManager = gameObject.AddComponent<RTTAppManager>();
-    }
-
-    /// <summary>
-    /// Initialize RTTAppManager with references after AutoFindReferences.
-    /// </summary>
-    private void InitializeAppManager()
-    {
-        if (_appManager == null) return;
-
-        _appManager.Initialize(
-            menu,
-            mainMenuFrame,
-            taskbar,
-            appRegistry,
-            frameParent,
-            transitionOutDuration,
-            transitionInDuration,
-            useFadeTransition,
-            useScaleTransition
-        );
-
-        _appManager.SetCreateContentCallback(CreateAppContent);
-        _appManager.SetMenuStateCallback(state => {
-            _currentMenuState = state;
-            OnMenuStateChanged?.Invoke(state);
-        });
-
-        // Subscribe to app manager events
-        _appManager.OnAppOpened += (appId, instance) => {
-            if (enablePerformanceLogging)
-                Debug.Log($"[RTTManager] App opened: {appId}");
-        };
-        _appManager.OnAppClosed += appId => {
-            if (enablePerformanceLogging)
-                Debug.Log($"[RTTManager] App closed: {appId}");
-        };
-    }
-
-    private void AutoFindReferences()
-    {
-        // Find RTTMenu container first
-        if (menu == null)
-            menu = RTTMenu.Instance ?? FindFirstObjectByType<RTTMenu>();
-
-        if (mainMenuFrame == null)
+        private void Update()
         {
-            // Try to get from RTTMenu first
-            if (menu != null)
-                mainMenuFrame = menu.MainFrame;
-            // Fallback to static instance or FindObjectOfType
+            // Delegate periodic memory check to quality manager
+            _qualityManager?.PeriodicUpdate();
+
+    #if UNITY_ANDROID && !UNITY_EDITOR
+            // Skip Cardboard API calls when in non-VR mode (XR is deinitialized)
+            if (NonVRModeController.Instance == null || !NonVRModeController.Instance.IsNonVRMode)
+            {
+                if (Api.IsGearButtonPressed)
+                {
+                    Api.ScanDeviceParams();
+                }
+
+                if (Api.IsCloseButtonPressed)
+                {
+                    Application.Quit();
+                }
+
+                if (Api.IsTriggerHeldPressed)
+                {
+                    PerformInstantRecenter();
+                }
+
+                if (Api.HasNewDeviceParams())
+                {
+                    Api.ReloadDeviceParams();
+                }
+
+                Api.UpdateScreenParams();
+            }
+    #endif
+        }
+
+        private void OnDestroy()
+        {
+            // Unsubscribe from theme property changes
+            RTTThemeConfig.OnAnyThemePropertyChanged -= HandleThemePropertyChanged;
+
+            UnsubscribeFromControllerEvents();
+
+            // Cleanup active apps (handled by RTTAppManager.OnDestroy)
+
+            if (_instance == this) _instance = null;
+        }
+
+        private void OnApplicationQuit()
+        {
+            _applicationQuitting = true;
+        }
+        #endregion
+
+        #region Initialization Helpers
+        private void LoadConfigsFromResources()
+        {
+            if (rttConfig == null)
+                rttConfig = Resources.Load<RTTConfig>("RTTConfig");
+            if (themeConfig == null)
+                themeConfig = Resources.Load<RTTThemeConfig>("RTTTheme");
+            if (appRegistry == null)
+                appRegistry = Resources.Load<RTTAppRegistry>("RTTAppRegistry");
+        }
+
+        /// <summary>
+        /// Initialize extracted manager classes for cleaner architecture.
+        /// These managers handle specific responsibilities while RTTManager coordinates them.
+        /// </summary>
+        private void InitializeManagers()
+        {
+            // Panel Manager - handles panel registration and camera depth
+            _panelManager = new RTTPanelManager(startingCameraDepth, enablePerformanceLogging);
+
+            // Quality Manager - handles quality levels and memory monitoring
+            _qualityManager = new RTTQualityManager(rttConfig, _panelManager, enablePerformanceLogging);
+
+            // App Manager - handles app lifecycle (MonoBehaviour)
+            _appManager = gameObject.AddComponent<RTTAppManager>();
+        }
+
+        /// <summary>
+        /// Initialize RTTAppManager with references after AutoFindReferences.
+        /// </summary>
+        private void InitializeAppManager()
+        {
+            if (_appManager == null) return;
+
+            _appManager.Initialize(
+                menu,
+                mainMenuFrame,
+                taskbar,
+                appRegistry,
+                frameParent,
+                transitionOutDuration,
+                transitionInDuration,
+                useFadeTransition,
+                useScaleTransition
+            );
+
+            _appManager.SetCreateContentCallback(CreateAppContent);
+            _appManager.SetMenuStateCallback(state => {
+                _currentMenuState = state;
+                OnMenuStateChanged?.Invoke(state);
+            });
+
+            // Subscribe to app manager events
+            _appManager.OnAppOpened += (appId, instance) => {
+                if (enablePerformanceLogging)
+                    Debug.Log($"[RTTManager] App opened: {appId}");
+            };
+            _appManager.OnAppClosed += appId => {
+                if (enablePerformanceLogging)
+                    Debug.Log($"[RTTManager] App closed: {appId}");
+            };
+        }
+
+        private void AutoFindReferences()
+        {
+            // Find RTTMenu container first
+            if (menu == null)
+                menu = RTTMenu.Instance ?? FindFirstObjectByType<RTTMenu>();
+
             if (mainMenuFrame == null)
-                mainMenuFrame = RTTMenuFrame.PrimaryInstance ?? FindFirstObjectByType<RTTMenuFrame>();
-        }
+            {
+                // Try to get from RTTMenu first
+                if (menu != null)
+                    mainMenuFrame = menu.MainFrame;
+                // Fallback to static instance or FindObjectOfType
+                if (mainMenuFrame == null)
+                    mainMenuFrame = RTTMenuFrame.PrimaryInstance ?? FindFirstObjectByType<RTTMenuFrame>();
+            }
 
-        if (taskbar == null)
-            taskbar = RTTTaskbar.Instance ?? FindFirstObjectByType<RTTTaskbar>();
+            if (taskbar == null)
+                taskbar = RTTTaskbar.Instance ?? FindFirstObjectByType<RTTTaskbar>();
 
-        if (mainMenuController == null)
-        {
-            mainMenuController = GetComponentInChildren<RTTMainMenuController>();
             if (mainMenuController == null)
-                mainMenuController = gameObject.AddComponent<RTTMainMenuController>();
+            {
+                mainMenuController = GetComponentInChildren<RTTMainMenuController>();
+                if (mainMenuController == null)
+                    mainMenuController = gameObject.AddComponent<RTTMainMenuController>();
+            }
+
+            // Note: Don't auto-create RTTRemoteMenuController here
+            // It will be created per-app in CreateRemoteMenuContent() when needed
+            // This prevents having an uninitialized controller running Update()
+            if (remoteMenuController == null)
+            {
+                remoteMenuController = GetComponentInChildren<RTTRemoteMenuController>();
+                // Don't AddComponent here - let CreateRemoteMenuContent handle it
+            }
+
+            // Set frameParent to RTTMenu if available, otherwise fallback to mainMenuFrame's parent
+            if (frameParent == null)
+            {
+                if (menu != null)
+                    frameParent = menu.transform;
+                else if (mainMenuFrame != null)
+                    frameParent = mainMenuFrame.transform.parent;
+            }
         }
 
-        // Note: Don't auto-create RTTRemoteMenuController here
-        // It will be created per-app in CreateRemoteMenuContent() when needed
-        // This prevents having an uninitialized controller running Update()
-        if (remoteMenuController == null)
+        private void SubscribeToControllerEvents()
         {
-            remoteMenuController = GetComponentInChildren<RTTRemoteMenuController>();
-            // Don't AddComponent here - let CreateRemoteMenuContent handle it
+            if (mainMenuController != null)
+                mainMenuController.OnMenuItemClicked += HandleMainMenuItemClicked;
+
+            // Note: Per-app controllers are created dynamically in CreateRemoteMenuContent
+            // and handle their own events via RTTRemoteMenuController
         }
 
-        // Set frameParent to RTTMenu if available, otherwise fallback to mainMenuFrame's parent
-        if (frameParent == null)
+        private void UnsubscribeFromControllerEvents()
         {
-            if (menu != null)
-                frameParent = menu.transform;
-            else if (mainMenuFrame != null)
-                frameParent = mainMenuFrame.transform.parent;
+            if (mainMenuController != null)
+                mainMenuController.OnMenuItemClicked -= HandleMainMenuItemClicked;
         }
-    }
 
-    private void SubscribeToControllerEvents()
-    {
-        if (mainMenuController != null)
-            mainMenuController.OnMenuItemClicked += HandleMainMenuItemClicked;
-
-        // Note: Per-app controllers are created dynamically in CreateRemoteMenuContent
-        // and handle their own events via RTTRemoteMenuController
-    }
-
-    private void UnsubscribeFromControllerEvents()
-    {
-        if (mainMenuController != null)
-            mainMenuController.OnMenuItemClicked -= HandleMainMenuItemClicked;
-    }
-
-    private IEnumerator WaitAndShowMainMenu()
-    {
-        // Start camera-follow immediately (before waiting for MainMenu)
-        // LateUpdate will unlock once camera tracking is detected AND MainMenu is initialized
-        if (autoRecenterOnStart && !_hasAutoRecentered)
+        private IEnumerator WaitAndShowMainMenu()
         {
-            StartStartupCameraFollow();
-        }
+            // Start camera-follow immediately (before waiting for MainMenu)
+            // LateUpdate will unlock once camera tracking is detected AND MainMenu is initialized
+            if (autoRecenterOnStart && !_hasAutoRecentered)
+            {
+                StartStartupCameraFollow();
+            }
 
-        while (mainMenuFrame.ContentContainer == null)
+            while (mainMenuFrame.ContentContainer == null)
+                yield return null;
             yield return null;
-        yield return null;
 
-        // Create the Main Menu once - it will never be destroyed
-        CreatePersistentMainMenu();
-        Debug.Log("[RTTManager] Main Menu initialized (persistent, cannot be closed)");
+            // Create the Main Menu once - it will never be destroyed
+            CreatePersistentMainMenu();
+            Debug.Log("[RTTManager] Main Menu initialized (persistent, cannot be closed)");
 
-        // Background pre-init all apps after main menu is ready
-        if (enableBackgroundPreInit && _appManager != null)
-        {
-            _appManager.PrepareAllApps();
-            Debug.Log("[RTTManager] Background app pre-initialization triggered");
-        }
-    }
-
-    /// <summary>
-    /// Start continuous camera-follow at startup.
-    /// VirtualObjects track camera's horizontal axis until camera tracking is detected
-    /// AND MainMenu initialization is complete.
-    /// </summary>
-    private void StartStartupCameraFollow()
-    {
-#if UNITY_ANDROID && !UNITY_EDITOR
-        try
-        {
-            Api.Recenter();
-            Debug.Log("[RTTManager] Cardboard API Recenter called");
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogWarning($"[RTTManager] Cardboard Recenter failed: {e.Message}");
-        }
-#endif
-
-        Camera cam = Camera.main;
-        _initialCameraRotation = cam != null ? cam.transform.rotation : Quaternion.identity;
-        _cameraTrackingDetected = false;
-        _startupCameraFollowActive = true;
-        _startupFollowStartTime = Time.time;
-        Debug.Log("[RTTManager] Startup camera-follow started");
-    }
-
-    private void LateUpdate()
-    {
-        if (!_startupCameraFollowActive) return;
-
-        Camera cam = Camera.main;
-        if (cam == null) return;
-
-        float elapsed = Time.time - _startupFollowStartTime;
-
-        // Detect camera tracking activation
-        if (!_cameraTrackingDetected)
-        {
-            float angleDiff = Quaternion.Angle(_initialCameraRotation, cam.transform.rotation);
-            if (angleDiff > kCameraTrackingAngleThreshold)
+            // Background pre-init all apps after main menu is ready
+            if (enableBackgroundPreInit && _appManager != null)
             {
-                _cameraTrackingDetected = true;
-                Debug.Log($"[RTTManager] Camera tracking detected (delta: {angleDiff:F1}°)");
-            }
-            else if (elapsed >= kCameraTrackingFallbackTime)
-            {
-                _cameraTrackingDetected = true;
-                Debug.Log("[RTTManager] Camera tracking assumed active (fallback timeout)");
+                _appManager.PrepareAllApps();
+                Debug.Log("[RTTManager] Background app pre-initialization triggered");
             }
         }
 
-        // Unlock when: camera tracking active AND MainMenu initialized
-        // Safety timeout: unlock regardless after kMaxStartupFollowTime
-        bool shouldUnlock = (_cameraTrackingDetected && _mainMenuInitialized)
-                         || elapsed >= kMaxStartupFollowTime;
-
-        if (shouldUnlock)
+        /// <summary>
+        /// Start continuous camera-follow at startup.
+        /// VirtualObjects track camera's horizontal axis until camera tracking is detected
+        /// AND MainMenu initialization is complete.
+        /// </summary>
+        private void StartStartupCameraFollow()
         {
-            _startupCameraFollowActive = false;
-            _hasAutoRecentered = true;
-            RepositionToFaceCamera(); // Final reposition with correct camera direction
-            VirtualObjectsZoomController.Instance?.OnRecenter();
-            Debug.Log($"[RTTManager] Startup camera-follow ended after {elapsed:F1}s (tracking={_cameraTrackingDetected}, menu={_mainMenuInitialized})");
-            return;
-        }
-
-        RepositionToFaceCamera();
-    }
-
-    /// <summary>
-    /// Reposition VirtualObjects children to face camera (horizontal lock).
-    /// Lightweight method for per-frame updates during startup camera-follow.
-    /// </summary>
-    private void RepositionToFaceCamera()
-    {
-        Camera cam = Camera.main;
-        if (cam == null) return;
-
-        if (_cachedVirtualObjects == null)
-            _cachedVirtualObjects = GameObject.Find("VirtualObjects");
-        if (_cachedVirtualObjects == null) return;
-
-        RTTMenuFrame primary = RTTMenuFrame.PrimaryInstance;
-        if (primary == null) return;
-
-        // Store pivot (primary frame position/rotation)
-        Vector3 pivotPos = primary.transform.position;
-        Quaternion pivotRot = primary.transform.rotation;
-
-        // Collect children and relative transforms
-        var virtualObjectsTransform = _cachedVirtualObjects.transform;
-        int childCount = virtualObjectsTransform.childCount;
-        var children = new Transform[childCount];
-        var relPositions = new Vector3[childCount];
-        var relRotations = new Quaternion[childCount];
-
-        Quaternion invPivotRot = Quaternion.Inverse(pivotRot);
-        for (int i = 0; i < childCount; i++)
-        {
-            Transform child = virtualObjectsTransform.GetChild(i);
-            children[i] = child;
-            relPositions[i] = invPivotRot * (child.position - pivotPos);
-            relRotations[i] = invPivotRot * child.rotation;
-        }
-
-        // Calculate new pivot facing camera (horizontal only)
-        Vector3 camForward = cam.transform.forward;
-        camForward.y = 0;
-        if (camForward.sqrMagnitude < 0.001f) camForward = Vector3.forward;
-        camForward.Normalize();
-
-        Vector3 camPos = cam.transform.position;
-        float hDist = Vector2.Distance(
-            new Vector2(pivotPos.x, pivotPos.z),
-            new Vector2(camPos.x, camPos.z));
-
-        Vector3 newPivotPos = camPos + camForward * hDist;
-        newPivotPos.y = pivotPos.y;
-        Quaternion newPivotRot = Quaternion.LookRotation(camForward);
-
-        for (int i = 0; i < childCount; i++)
-        {
-            children[i].position = newPivotPos + newPivotRot * relPositions[i];
-            children[i].rotation = newPivotRot * relRotations[i];
-        }
-    }
-
-    /// <summary>
-    /// Perform instant recenter without animation.
-    /// Moves all VirtualObjects to face the camera.
-    /// Also calls Cardboard API Recenter on Android to reset headset tracking.
-    /// </summary>
-    public void PerformInstantRecenter()
-    {
-#if UNITY_ANDROID && !UNITY_EDITOR
-        try
-        {
-            Api.Recenter();
-            Debug.Log("[RTTManager] Cardboard API Recenter called");
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogWarning($"[RTTManager] Cardboard Recenter failed: {e.Message}");
-        }
-#endif
-
-        RepositionToFaceCamera();
-
-        Debug.Log("[RTTManager] Instant recenter completed");
-        VirtualObjectsZoomController.Instance?.OnRecenter();
-    }
-
-    /// <summary>
-    /// Create the persistent Main Menu. Called once during initialization.
-    /// The Main Menu will never be destroyed during the application lifecycle.
-    /// </summary>
-    private void CreatePersistentMainMenu()
-    {
-        if (_mainMenuInitialized)
-        {
-            // Check if content was destroyed externally (e.g. scene change)
-            if (_mainMenuContent == null)
+    #if UNITY_ANDROID && !UNITY_EDITOR
+            try
             {
-                _mainMenuInitialized = false; // Reset status to allow recreation
+                Api.Recenter();
+                Debug.Log("[RTTManager] Cardboard API Recenter called");
             }
-            else
+            catch (System.Exception e)
             {
-                Debug.LogWarning("[RTTManager] Main Menu already initialized - cannot create another");
+                Debug.LogWarning($"[RTTManager] Cardboard Recenter failed: {e.Message}");
+            }
+    #endif
+
+            Camera cam = Camera.main;
+            _initialCameraRotation = cam != null ? cam.transform.rotation : Quaternion.identity;
+            _cameraTrackingDetected = false;
+            _startupCameraFollowActive = true;
+            _startupFollowStartTime = Time.time;
+            Debug.Log("[RTTManager] Startup camera-follow started");
+        }
+
+        private void LateUpdate()
+        {
+            if (!_startupCameraFollowActive) return;
+
+            Camera cam = Camera.main;
+            if (cam == null) return;
+
+            float elapsed = Time.time - _startupFollowStartTime;
+
+            // Detect camera tracking activation
+            if (!_cameraTrackingDetected)
+            {
+                float angleDiff = Quaternion.Angle(_initialCameraRotation, cam.transform.rotation);
+                if (angleDiff > kCameraTrackingAngleThreshold)
+                {
+                    _cameraTrackingDetected = true;
+                    Debug.Log($"[RTTManager] Camera tracking detected (delta: {angleDiff:F1}°)");
+                }
+                else if (elapsed >= kCameraTrackingFallbackTime)
+                {
+                    _cameraTrackingDetected = true;
+                    Debug.Log("[RTTManager] Camera tracking assumed active (fallback timeout)");
+                }
+            }
+
+            // Unlock when: camera tracking active AND MainMenu initialized
+            // Safety timeout: unlock regardless after kMaxStartupFollowTime
+            bool shouldUnlock = (_cameraTrackingDetected && _mainMenuInitialized)
+                             || elapsed >= kMaxStartupFollowTime;
+
+            if (shouldUnlock)
+            {
+                _startupCameraFollowActive = false;
+                _hasAutoRecentered = true;
+                RepositionToFaceCamera(); // Final reposition with correct camera direction
+                VirtualObjectsZoomController.Instance?.OnRecenter();
+                Debug.Log($"[RTTManager] Startup camera-follow ended after {elapsed:F1}s (tracking={_cameraTrackingDetected}, menu={_mainMenuInitialized})");
                 return;
             }
+
+            RepositionToFaceCamera();
         }
 
-        // Re-validate frame reference if needed
-        if (mainMenuFrame == null || mainMenuFrame.ContentContainer == null)
+        /// <summary>
+        /// Reposition VirtualObjects children to face camera (horizontal lock).
+        /// Lightweight method for per-frame updates during startup camera-follow.
+        /// </summary>
+        private void RepositionToFaceCamera()
         {
-             mainMenuFrame = RTTMenuFrame.PrimaryInstance;
-             if (mainMenuFrame == null || mainMenuFrame.ContentContainer == null)
-             {
-                 Debug.LogWarning("[RTTManager] MenuFrame or ContentContainer not initialized");
-                 return;
-             }
+            Camera cam = Camera.main;
+            if (cam == null) return;
+
+            if (_cachedVirtualObjects == null)
+                _cachedVirtualObjects = GameObject.Find("VirtualObjects");
+            if (_cachedVirtualObjects == null) return;
+
+            RTTMenuFrame primary = RTTMenuFrame.PrimaryInstance;
+            if (primary == null) return;
+
+            // Store pivot (primary frame position/rotation)
+            Vector3 pivotPos = primary.transform.position;
+            Quaternion pivotRot = primary.transform.rotation;
+
+            // Collect children and relative transforms
+            var virtualObjectsTransform = _cachedVirtualObjects.transform;
+            int childCount = virtualObjectsTransform.childCount;
+            var children = new Transform[childCount];
+            var relPositions = new Vector3[childCount];
+            var relRotations = new Quaternion[childCount];
+
+            Quaternion invPivotRot = Quaternion.Inverse(pivotRot);
+            for (int i = 0; i < childCount; i++)
+            {
+                Transform child = virtualObjectsTransform.GetChild(i);
+                children[i] = child;
+                relPositions[i] = invPivotRot * (child.position - pivotPos);
+                relRotations[i] = invPivotRot * child.rotation;
+            }
+
+            // Calculate new pivot facing camera (horizontal only)
+            Vector3 camForward = cam.transform.forward;
+            camForward.y = 0;
+            if (camForward.sqrMagnitude < 0.001f) camForward = Vector3.forward;
+            camForward.Normalize();
+
+            Vector3 camPos = cam.transform.position;
+            float hDist = Vector2.Distance(
+                new Vector2(pivotPos.x, pivotPos.z),
+                new Vector2(camPos.x, camPos.z));
+
+            Vector3 newPivotPos = camPos + camForward * hDist;
+            newPivotPos.y = pivotPos.y;
+            Quaternion newPivotRot = Quaternion.LookRotation(camForward);
+
+            for (int i = 0; i < childCount; i++)
+            {
+                children[i].position = newPivotPos + newPivotRot * relPositions[i];
+                children[i].rotation = newPivotRot * relRotations[i];
+            }
         }
 
-        if (mainMenuController != null)
+        /// <summary>
+        /// Perform instant recenter without animation.
+        /// Moves all VirtualObjects to face the camera.
+        /// Also calls Cardboard API Recenter on Android to reset headset tracking.
+        /// </summary>
+        public void PerformInstantRecenter()
         {
-            var containerSize = GetContainerSize();
-            _mainMenuContent = mainMenuController.CreateMenu(
-                mainMenuFrame.ContentContainer,
-                containerSize.x,
-                containerSize.y
+    #if UNITY_ANDROID && !UNITY_EDITOR
+            try
+            {
+                Api.Recenter();
+                Debug.Log("[RTTManager] Cardboard API Recenter called");
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[RTTManager] Cardboard Recenter failed: {e.Message}");
+            }
+    #endif
+
+            RepositionToFaceCamera();
+
+            Debug.Log("[RTTManager] Instant recenter completed");
+            VirtualObjectsZoomController.Instance?.OnRecenter();
+        }
+
+        /// <summary>
+        /// Create the persistent Main Menu. Called once during initialization.
+        /// The Main Menu will never be destroyed during the application lifecycle.
+        /// </summary>
+        private void CreatePersistentMainMenu()
+        {
+            if (_mainMenuInitialized)
+            {
+                // Check if content was destroyed externally (e.g. scene change)
+                if (_mainMenuContent == null)
+                {
+                    _mainMenuInitialized = false; // Reset status to allow recreation
+                }
+                else
+                {
+                    Debug.LogWarning("[RTTManager] Main Menu already initialized - cannot create another");
+                    return;
+                }
+            }
+
+            // Re-validate frame reference if needed
+            if (mainMenuFrame == null || mainMenuFrame.ContentContainer == null)
+            {
+                 mainMenuFrame = RTTMenuFrame.PrimaryInstance;
+                 if (mainMenuFrame == null || mainMenuFrame.ContentContainer == null)
+                 {
+                     Debug.LogWarning("[RTTManager] MenuFrame or ContentContainer not initialized");
+                     return;
+                 }
+            }
+
+            if (mainMenuController != null)
+            {
+                var containerSize = GetContainerSize();
+                _mainMenuContent = mainMenuController.CreateMenu(
+                    mainMenuFrame.ContentContainer,
+                    containerSize.x,
+                    containerSize.y
+                );
+            }
+
+            _mainMenuInitialized = true;
+            _currentMenuState = MenuState.MainMenu;
+            OnMenuStateChanged?.Invoke(_currentMenuState);
+            mainMenuFrame.MarkDirty();
+        }
+        #endregion
+
+        #region Panel Registration
+        public void RegisterPanel(RTTCanvasBase panel)
+        {
+            if (panel == null) return;
+            _panelManager?.RegisterPanel(panel);
+        }
+
+        public void UnregisterPanel(RTTCanvasBase panel)
+        {
+            if (panel == null) return;
+            _panelManager?.UnregisterPanel(panel);
+        }
+
+        public int AssignCameraDepth() => _panelManager?.AssignCameraDepth() ?? -100;
+
+        public IReadOnlyList<RTTCanvasBase> GetRegisteredPanels() => _panelManager?.RegisteredPanels ?? new List<RTTCanvasBase>().AsReadOnly();
+
+        public T FindPanel<T>() where T : RTTCanvasBase => _panelManager?.FindPanel<T>();
+        #endregion
+
+        #region Quality Management
+        public void SetQualityLevel(RTTQualityLevel level) => _qualityManager?.SetQualityLevel(level);
+        public RTTQualityPreset GetQualityPreset(RTTQualityLevel level) => _qualityManager?.GetQualityPreset(level) ?? rttConfig?.GetPreset(level);
+        public void TryScaleUp() => _qualityManager?.TryScaleUp();
+        public void TryScaleDown() => _qualityManager?.TryScaleDown();
+        #endregion
+
+        #region Memory Management
+        public float TotalMemoryMB => _qualityManager?.TotalMemoryMB ?? 0f;
+        public float MaxTextureMemoryMB => _qualityManager?.MaxTextureMemoryMB ?? 150f;
+        #endregion
+
+        #region Performance Statistics
+        public RTTPerformanceStats GetPerformanceStats() => _qualityManager?.GetPerformanceStats() ?? new RTTPerformanceStats();
+        public void LogPerformanceStats() => _qualityManager?.LogPerformanceStats();
+        #endregion
+
+        #region Panel Utility
+        public void MarkAllDirty() => _panelManager?.MarkAllDirty();
+        public void HideAll() => _panelManager?.HideAll();
+        public void ShowAll() => _panelManager?.ShowAll();
+        public void CleanupDestroyedPanels() => _panelManager?.CleanupDestroyedPanels();
+        #endregion
+
+        #region Theme Management
+        public void SetTheme(RTTThemeConfig newTheme)
+        {
+            if (newTheme == null) return;
+            themeConfig = newTheme;
+            OnThemeChanged?.Invoke();
+            Debug.Log("[RTTManager] Theme changed, notifying components");
+        }
+
+        public void RefreshAllThemes()
+        {
+            OnThemeChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// Handle runtime theme property changes from RTTThemeConfig.
+        /// Called when individual properties change via SetPrimaryColor(), SetAccentColor(), etc.
+        /// </summary>
+        private void HandleThemePropertyChanged()
+        {
+            // Propagate to all subscribed components
+            OnThemeChanged?.Invoke();
+
+            if (enablePerformanceLogging)
+                Debug.Log("[RTTManager] Theme property changed at runtime, notifying components");
+        }
+
+        /// <summary>
+        /// Get alternating color for menu items (primary/accent pattern)
+        /// </summary>
+        public Color GetAlternatingColor(int index)
+        {
+            return themeConfig?.GetAlternatingColor(index) ?? (index % 2 == 0 ? PrimaryColor : AccentColor);
+        }
+        #endregion
+
+        #region Font Management
+        public void SetFont(TMP_FontAsset font)
+        {
+            if (font == null) return;
+            primaryFont = font;
+            OnFontChanged?.Invoke();
+            Debug.Log("[RTTManager] Font changed, notifying components");
+        }
+
+        public void RefreshAllFonts()
+        {
+            OnFontChanged?.Invoke();
+        }
+        #endregion
+
+        #region Immersive Mode
+        private bool _wasTaskbarVisible;
+        private bool _wasMenuVisible;
+        private bool _isImmersiveMode;
+
+        /// <summary>
+        /// Enter immersive mode: Hide global system UI (Taskbar, Main Menu).
+        /// Used by Video Player or other full-screen apps.
+        /// </summary>
+        public void EnterImmersiveMode()
+        {
+            if (_isImmersiveMode) return;
+            _isImmersiveMode = true;
+
+            // Save state
+            _wasTaskbarVisible = taskbar != null && taskbar.gameObject.activeSelf;
+            _wasMenuVisible = mainMenuFrame != null && mainMenuFrame.gameObject.activeSelf;
+
+            // Hide UI
+            if (taskbar != null) taskbar.gameObject.SetActive(false);
+
+            // Hide menu frame (this hides the container for both Main Menu and App content)
+            // Note: We might need a more granular approach if we want to keep App content visible but hide the "Menu" styling?
+            // But for Video Player, the Video Projection is separate from the MenuFrame (it uses WorldPanelPlus in world space),
+            // so hiding the MenuFrame is correct to clear the view.
+            if (mainMenuFrame != null) mainMenuFrame.gameObject.SetActive(false);
+
+            Debug.Log("[RTTManager] Entered Immersive Mode");
+        }
+
+        /// <summary>
+        /// Exit immersive mode: Restore global system UI state.
+        /// </summary>
+        public void ExitImmersiveMode()
+        {
+            if (!_isImmersiveMode) return;
+            _isImmersiveMode = false;
+
+            // Restore state
+            if (taskbar != null && _wasTaskbarVisible) taskbar.gameObject.SetActive(true);
+            if (mainMenuFrame != null && _wasMenuVisible) mainMenuFrame.gameObject.SetActive(true);
+
+            Debug.Log("[RTTManager] Exited Immersive Mode");
+        }
+        #endregion
+
+        #region Menu Navigation
+        /// <summary>
+        /// Show the persistent Main Menu. Does not recreate - only shows existing menu.
+        /// The Main Menu is created once and never destroyed.
+        /// </summary>
+        public void ShowMainMenu()
+        {
+            // Cancel Immersive Mode if active, as showing menu implies leaving immersion
+            if (_isImmersiveMode) ExitImmersiveMode();
+
+            // Re-validate frame if lost (e.g. scene change)
+            if (mainMenuFrame == null)
+            {
+                mainMenuFrame = RTTMenuFrame.PrimaryInstance;
+            }
+
+            if (mainMenuFrame == null || mainMenuFrame.ContentContainer == null)
+            {
+                Debug.LogWarning("[RTTManager] MenuFrame or ContentContainer not initialized");
+                return;
+            }
+
+            // Initialize Main Menu if not done yet
+            if (!_mainMenuInitialized)
+            {
+                CreatePersistentMainMenu();
+            }
+
+            // Destroy any non-MainMenu content (e.g., Remote Menu content in the same frame)
+            DestroyCurrentMenuContent();
+
+            // Show the persistent Main Menu content
+            if (_mainMenuContent != null)
+            {
+                _mainMenuContent.SetActive(true);
+            }
+
+            // Ensure mainMenuFrame is active and visible
+            if (mainMenuFrame != null)
+            {
+                mainMenuFrame.gameObject.SetActive(true);
+                mainMenuFrame.SetAsPrimaryFrame();
+            }
+
+            _currentMenuState = MenuState.MainMenu;
+            OnMenuStateChanged?.Invoke(_currentMenuState);
+            mainMenuFrame.MarkDirty();
+            Debug.Log("[RTTManager] Showing Main Menu (persistent)");
+        }
+
+        public void SwitchToRemoteMenu()
+        {
+            if (_currentMenuState == MenuState.RemoteMenu) return;
+            if (mainMenuFrame == null || mainMenuFrame.ContentContainer == null) return;
+
+            // Hide the persistent Main Menu content (don't destroy)
+            HideMainMenuContent();
+
+            // Destroy any other non-MainMenu content
+            DestroyCurrentMenuContent();
+
+            if (remoteMenuController != null)
+            {
+                var containerSize = GetContainerSize();
+                _currentMenuContent = remoteMenuController.CreateMenu(
+                    mainMenuFrame.ContentContainer,
+                    containerSize.x,
+                    containerSize.y,
+                    Font,  // Uses theme font with fallback
+                    PrimaryColor,
+                    AccentColor
+                );
+            }
+
+            _currentMenuState = MenuState.RemoteMenu;
+            OnMenuStateChanged?.Invoke(_currentMenuState);
+            mainMenuFrame.MarkDirty();
+            Debug.Log("[RTTManager] Switched to Remote Menu");
+        }
+
+        /// <summary>
+        /// Register a new Main Menu Frame (e.g. from Bootstrapper when scene changes).
+        /// </summary>
+        public void RegisterNewMenuFrame(RTTMenuFrame frame)
+        {
+            if (frame == null) return;
+
+            mainMenuFrame = frame;
+
+            // Update references
+            if (menu == null && frame.transform.parent != null)
+            {
+                menu = frame.transform.parent.GetComponent<RTTMenu>();
+            }
+
+            // Re-initialize app manager if needed to update its references
+            InitializeAppManager();
+
+            if (autoShowMainMenu)
+            {
+                // If the content container is not yet ready (common during Awake/Start), wait for it
+                if (mainMenuFrame.ContentContainer == null)
+                {
+                    StartCoroutine(WaitAndShowMainMenu());
+                }
+                else
+                {
+                    ShowMainMenu();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Register a new Taskbar (e.g. from Bootstrapper when scene changes).
+        /// </summary>
+        public void RegisterNewTaskbar(RTTTaskbar newTaskbar)
+        {
+            if (newTaskbar == null) return;
+
+            taskbar = newTaskbar;
+
+            // Update AppManager reference
+            if (_appManager != null)
+            {
+                _appManager.UpdateTaskbarReference(newTaskbar);
+            }
+        }
+
+        /// <summary>
+        /// Hide the persistent Main Menu content without destroying it.
+        /// </summary>
+        private void HideMainMenuContent()
+        {
+            if (_mainMenuContent != null)
+            {
+                _mainMenuContent.SetActive(false);
+            }
+        }
+
+        public void ReturnToMainMenu()
+        {
+            if (_currentMenuState == MenuState.MainMenu) return;
+            ShowMainMenu();
+            Debug.Log("[RTTManager] Returned to Main Menu");
+        }
+
+        /// <summary>
+        /// Destroy non-MainMenu content. Main Menu is never destroyed.
+        /// </summary>
+        private void DestroyCurrentMenuContent()
+        {
+            // Never destroy the persistent Main Menu content
+            if (_currentMenuContent != null && _currentMenuContent != _mainMenuContent)
+            {
+                // Only cleanup non-MainMenu content
+                if (_currentMenuState == MenuState.RemoteMenu)
+                    remoteMenuController?.Cleanup();
+
+                Destroy(_currentMenuContent);
+                _currentMenuContent = null;
+            }
+        }
+
+        private Vector2 GetContainerSize()
+        {
+            if (mainMenuFrame == null || mainMenuFrame.ContentContainer == null)
+                return new Vector2(1770f, 800f);
+
+            var rect = mainMenuFrame.ContentContainer.rect;
+            if (rect.width > 0 && rect.height > 0)
+                return new Vector2(rect.width, rect.height);
+
+            return new Vector2(
+                mainMenuFrame.LogicalWidthValue - 150f,
+                mainMenuFrame.LogicalWidthValue / mainMenuFrame.PanelWidth * mainMenuFrame.PanelHeight - 100f
             );
         }
+        #endregion
 
-        _mainMenuInitialized = true;
-        _currentMenuState = MenuState.MainMenu;
-        OnMenuStateChanged?.Invoke(_currentMenuState);
-        mainMenuFrame.MarkDirty();
-    }
-    #endregion
-
-    #region Panel Registration
-    public void RegisterPanel(RTTCanvasBase panel)
-    {
-        if (panel == null) return;
-        _panelManager?.RegisterPanel(panel);
-    }
-
-    public void UnregisterPanel(RTTCanvasBase panel)
-    {
-        if (panel == null) return;
-        _panelManager?.UnregisterPanel(panel);
-    }
-
-    public int AssignCameraDepth() => _panelManager?.AssignCameraDepth() ?? -100;
-
-    public IReadOnlyList<RTTCanvasBase> GetRegisteredPanels() => _panelManager?.RegisteredPanels ?? new List<RTTCanvasBase>().AsReadOnly();
-
-    public T FindPanel<T>() where T : RTTCanvasBase => _panelManager?.FindPanel<T>();
-    #endregion
-
-    #region Quality Management
-    public void SetQualityLevel(RTTQualityLevel level) => _qualityManager?.SetQualityLevel(level);
-    public RTTQualityPreset GetQualityPreset(RTTQualityLevel level) => _qualityManager?.GetQualityPreset(level) ?? rttConfig?.GetPreset(level);
-    public void TryScaleUp() => _qualityManager?.TryScaleUp();
-    public void TryScaleDown() => _qualityManager?.TryScaleDown();
-    #endregion
-
-    #region Memory Management
-    public float TotalMemoryMB => _qualityManager?.TotalMemoryMB ?? 0f;
-    public float MaxTextureMemoryMB => _qualityManager?.MaxTextureMemoryMB ?? 150f;
-    #endregion
-
-    #region Performance Statistics
-    public RTTPerformanceStats GetPerformanceStats() => _qualityManager?.GetPerformanceStats() ?? new RTTPerformanceStats();
-    public void LogPerformanceStats() => _qualityManager?.LogPerformanceStats();
-    #endregion
-
-    #region Panel Utility
-    public void MarkAllDirty() => _panelManager?.MarkAllDirty();
-    public void HideAll() => _panelManager?.HideAll();
-    public void ShowAll() => _panelManager?.ShowAll();
-    public void CleanupDestroyedPanels() => _panelManager?.CleanupDestroyedPanels();
-    #endregion
-
-    #region Theme Management
-    public void SetTheme(RTTThemeConfig newTheme)
-    {
-        if (newTheme == null) return;
-        themeConfig = newTheme;
-        OnThemeChanged?.Invoke();
-        Debug.Log("[RTTManager] Theme changed, notifying components");
-    }
-
-    public void RefreshAllThemes()
-    {
-        OnThemeChanged?.Invoke();
-    }
-
-    /// <summary>
-    /// Handle runtime theme property changes from RTTThemeConfig.
-    /// Called when individual properties change via SetPrimaryColor(), SetAccentColor(), etc.
-    /// </summary>
-    private void HandleThemePropertyChanged()
-    {
-        // Propagate to all subscribed components
-        OnThemeChanged?.Invoke();
-
-        if (enablePerformanceLogging)
-            Debug.Log("[RTTManager] Theme property changed at runtime, notifying components");
-    }
-
-    /// <summary>
-    /// Get alternating color for menu items (primary/accent pattern)
-    /// </summary>
-    public Color GetAlternatingColor(int index)
-    {
-        return themeConfig?.GetAlternatingColor(index) ?? (index % 2 == 0 ? PrimaryColor : AccentColor);
-    }
-    #endregion
-
-    #region Font Management
-    public void SetFont(TMP_FontAsset font)
-    {
-        if (font == null) return;
-        primaryFont = font;
-        OnFontChanged?.Invoke();
-        Debug.Log("[RTTManager] Font changed, notifying components");
-    }
-
-    public void RefreshAllFonts()
-    {
-        OnFontChanged?.Invoke();
-    }
-    #endregion
-
-    #region Immersive Mode
-    private bool _wasTaskbarVisible;
-    private bool _wasMenuVisible;
-    private bool _isImmersiveMode;
-
-    /// <summary>
-    /// Enter immersive mode: Hide global system UI (Taskbar, Main Menu).
-    /// Used by Video Player or other full-screen apps.
-    /// </summary>
-    public void EnterImmersiveMode()
-    {
-        if (_isImmersiveMode) return;
-        _isImmersiveMode = true;
-
-        // Save state
-        _wasTaskbarVisible = taskbar != null && taskbar.gameObject.activeSelf;
-        _wasMenuVisible = mainMenuFrame != null && mainMenuFrame.gameObject.activeSelf;
-
-        // Hide UI
-        if (taskbar != null) taskbar.gameObject.SetActive(false);
-        
-        // Hide menu frame (this hides the container for both Main Menu and App content)
-        // Note: We might need a more granular approach if we want to keep App content visible but hide the "Menu" styling?
-        // But for Video Player, the Video Projection is separate from the MenuFrame (it uses WorldPanelPlus in world space),
-        // so hiding the MenuFrame is correct to clear the view.
-        if (mainMenuFrame != null) mainMenuFrame.gameObject.SetActive(false);
-
-        Debug.Log("[RTTManager] Entered Immersive Mode");
-    }
-
-    /// <summary>
-    /// Exit immersive mode: Restore global system UI state.
-    /// </summary>
-    public void ExitImmersiveMode()
-    {
-        if (!_isImmersiveMode) return;
-        _isImmersiveMode = false;
-
-        // Restore state
-        if (taskbar != null && _wasTaskbarVisible) taskbar.gameObject.SetActive(true);
-        if (mainMenuFrame != null && _wasMenuVisible) mainMenuFrame.gameObject.SetActive(true);
-
-        Debug.Log("[RTTManager] Exited Immersive Mode");
-    }
-    #endregion
-
-    #region Menu Navigation
-    /// <summary>
-    /// Show the persistent Main Menu. Does not recreate - only shows existing menu.
-    /// The Main Menu is created once and never destroyed.
-    /// </summary>
-    public void ShowMainMenu()
-    {
-        // Cancel Immersive Mode if active, as showing menu implies leaving immersion
-        if (_isImmersiveMode) ExitImmersiveMode();
-
-        // Re-validate frame if lost (e.g. scene change)
-        if (mainMenuFrame == null)
+        #region Menu Event Handlers
+        private void HandleMainMenuItemClicked(string itemId)
         {
-            mainMenuFrame = RTTMenuFrame.PrimaryInstance;
+            // Check app registry for app type
+            if (appRegistry != null)
+            {
+                var appType = appRegistry.GetAppType(itemId);
+                if (appType == RTTAppRegistry.AppType.Quit)
+                {
+                    HandleQuit();
+                    return;
+                }
+            }
+            else if (itemId == "quit")
+            {
+                HandleQuit();
+                return;
+            }
+
+            // Open app
+            OpenApp(itemId);
         }
 
-        if (mainMenuFrame == null || mainMenuFrame.ContentContainer == null)
+        private void HandleQuit()
         {
-            Debug.LogWarning("[RTTManager] MenuFrame or ContentContainer not initialized");
-            return;
+            Debug.Log("[RTTManager] Quit clicked");
+    #if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+    #else
+            Application.Quit();
+    #endif
+        }
+        #endregion
+
+        #region App Lifecycle - Public API (Delegated to RTTAppManager)
+        public RTTAppInstance OpenApp(string appId) => _appManager?.OpenApp(appId);
+        public void PrepareApp(string appId) => _appManager?.PrepareApp(appId);
+        public bool IsAppPrepared(string appId) => _appManager?.IsAppPrepared(appId) ?? false;
+        public void OpenPreparedApp(string appId) => _appManager?.OpenPreparedApp(appId);
+        public void SwitchToApp(string appId) => _appManager?.SwitchToApp(appId);
+        public void SwitchToHome() => _appManager?.SwitchToHome();
+        public void CloseApp(string appId) => _appManager?.CloseApp(appId);
+        public bool IsAppOpen(string appId) => _appManager?.IsAppOpen(appId) ?? false;
+        public RTTAppInstance GetApp(string appId) => _appManager?.GetApp(appId);
+        public IReadOnlyCollection<string> GetOpenAppIds() => _appManager?.GetOpenAppIds() ?? new List<string>();
+        #endregion
+
+        // App Lifecycle code (Internal + Coroutines) moved to RTTAppManager
+
+        #region App Content Creation
+        private void CreateAppContent(RTTAppInstance instance)
+        {
+            var appType = appRegistry?.GetAppType(instance.AppId) ?? GetFallbackAppType(instance.AppId);
+
+            switch (appType)
+            {
+                case RTTAppRegistry.AppType.Remote:
+                    CreateRemoteMenuContent(instance);
+                    break;
+                case RTTAppRegistry.AppType.Files:
+                    CreateFilesMenuContent(instance);
+                    break;
+                case RTTAppRegistry.AppType.Media:
+                    CreateMediaContent(instance);
+                    break;
+                case RTTAppRegistry.AppType.Browser:
+                case RTTAppRegistry.AppType.Settings:
+                    Debug.Log($"[RTTManager] {appType} app not yet implemented");
+                    break;
+                default:
+                    Debug.LogWarning($"[RTTManager] Unknown app: {instance.AppId}");
+                    break;
+            }
         }
 
-        // Initialize Main Menu if not done yet
-        if (!_mainMenuInitialized)
+        private RTTAppRegistry.AppType GetFallbackAppType(string appId)
         {
-            CreatePersistentMainMenu();
+            switch (appId)
+            {
+                case "remote": return RTTAppRegistry.AppType.Remote;
+                case "browser": return RTTAppRegistry.AppType.Browser;
+                case "media": return RTTAppRegistry.AppType.Media;
+                case "files": return RTTAppRegistry.AppType.Files;
+                case "settings": return RTTAppRegistry.AppType.Settings;
+                case "quit": return RTTAppRegistry.AppType.Quit;
+                default: return RTTAppRegistry.AppType.NotImplemented;
+            }
         }
 
-        // Destroy any non-MainMenu content (e.g., Remote Menu content in the same frame)
-        DestroyCurrentMenuContent();
-
-        // Show the persistent Main Menu content
-        if (_mainMenuContent != null)
+        private void CreateRemoteMenuContent(RTTAppInstance instance)
         {
-            _mainMenuContent.SetActive(true);
-        }
+            Debug.Log($"[RTTManager] Creating RemoteMenu content...");
 
-        // Ensure mainMenuFrame is active and visible
-        if (mainMenuFrame != null)
-        {
-            mainMenuFrame.gameObject.SetActive(true);
-            mainMenuFrame.SetAsPrimaryFrame();
-        }
+            // Create controller as sibling to frame, NOT child
+            // This ensures controller stays active when frame is hidden during streaming
+            GameObject controllerObj = new GameObject($"RemoteMenuController_{instance.AppId}");
+            controllerObj.transform.SetParent(this.transform); // Parent to RTTManager, not frame
+            var controller = controllerObj.AddComponent<RTTRemoteMenuController>();
 
-        _currentMenuState = MenuState.MainMenu;
-        OnMenuStateChanged?.Invoke(_currentMenuState);
-        mainMenuFrame.MarkDirty();
-        Debug.Log("[RTTManager] Showing Main Menu (persistent)");
-    }
+            var containerSize = instance.Frame.GetContentSize();
 
-    public void SwitchToRemoteMenu()
-    {
-        if (_currentMenuState == MenuState.RemoteMenu) return;
-        if (mainMenuFrame == null || mainMenuFrame.ContentContainer == null) return;
-
-        // Hide the persistent Main Menu content (don't destroy)
-        HideMainMenuContent();
-
-        // Destroy any other non-MainMenu content
-        DestroyCurrentMenuContent();
-
-        if (remoteMenuController != null)
-        {
-            var containerSize = GetContainerSize();
-            _currentMenuContent = remoteMenuController.CreateMenu(
-                mainMenuFrame.ContentContainer,
+            instance.MenuContent = controller.CreateMenu(
+                instance.Frame.ContentContainer,
                 containerSize.x,
                 containerSize.y,
                 Font,  // Uses theme font with fallback
                 PrimaryColor,
                 AccentColor
             );
+
+            instance.Controller = controller;
+            controller.OnBackClicked += () => CloseApp(instance.AppId);
+
+            instance.Frame.MarkDirty();
         }
 
-        _currentMenuState = MenuState.RemoteMenu;
-        OnMenuStateChanged?.Invoke(_currentMenuState);
-        mainMenuFrame.MarkDirty();
-        Debug.Log("[RTTManager] Switched to Remote Menu");
-    }
-
-    /// <summary>
-    /// Register a new Main Menu Frame (e.g. from Bootstrapper when scene changes).
-    /// </summary>
-    public void RegisterNewMenuFrame(RTTMenuFrame frame)
-    {
-        if (frame == null) return;
-        
-        mainMenuFrame = frame;
-        
-        // Update references
-        if (menu == null && frame.transform.parent != null)
+        private void CreateFilesMenuContent(RTTAppInstance instance)
         {
-            menu = frame.transform.parent.GetComponent<RTTMenu>();
+            Debug.Log($"[RTTManager] Creating FileManager content...");
+
+            // Create controller
+            GameObject controllerObj = new GameObject($"FileManagerController_{instance.AppId}");
+            controllerObj.transform.SetParent(this.transform);
+            var controller = controllerObj.AddComponent<RTTFileManagerController>();
+
+            var containerSize = instance.Frame.GetContentSize();
+
+            // Create View via Controller
+            instance.MenuContent = controller.CreateMenu(
+                instance.Frame.ContentContainer,
+                containerSize.x,
+                containerSize.y,
+                Font,  // Uses theme font with fallback
+                PrimaryColor,
+                AccentColor
+            );
+
+            instance.Controller = controller;
+            controller.OnBackClicked += () => CloseApp(instance.AppId);
+
+            instance.Frame.MarkDirty();
         }
 
-        // Re-initialize app manager if needed to update its references
-        InitializeAppManager();
-
-        if (autoShowMainMenu)
+        private void CreateMediaContent(RTTAppInstance instance)
         {
-            // If the content container is not yet ready (common during Awake/Start), wait for it
-            if (mainMenuFrame.ContentContainer == null)
-            {
-                StartCoroutine(WaitAndShowMainMenu());
-            }
-            else
-            {
-                ShowMainMenu();
-            }
+            Debug.Log($"[RTTManager] Creating Media content...");
+
+            // Create controller
+            GameObject controllerObj = new GameObject($"MediaController_{instance.AppId}");
+            controllerObj.transform.SetParent(this.transform);
+            var controller = controllerObj.AddComponent<VRMediaAppController>();
+
+            var containerSize = instance.Frame.GetContentSize();
+
+            // Create View via Controller
+            instance.MenuContent = controller.CreateMenu(
+                instance.Frame.ContentContainer,
+                containerSize.x,
+                containerSize.y,
+                Font,  // Uses theme font with fallback
+                PrimaryColor,
+                AccentColor
+            );
+
+            instance.Controller = controller;
+            controller.OnBackClicked += () => CloseApp(instance.AppId);
+
+            instance.Frame.MarkDirty();
         }
+        #endregion
+
+        // Animation Helpers moved to RTTAppManager
     }
 
-    /// <summary>
-    /// Register a new Taskbar (e.g. from Bootstrapper when scene changes).
-    /// </summary>
-    public void RegisterNewTaskbar(RTTTaskbar newTaskbar)
-    {
-        if (newTaskbar == null) return;
-
-        taskbar = newTaskbar;
-        
-        // Update AppManager reference
-        if (_appManager != null)
-        {
-            _appManager.UpdateTaskbarReference(newTaskbar);
-        }
-    }
-
-    /// <summary>
-    /// Hide the persistent Main Menu content without destroying it.
-    /// </summary>
-    private void HideMainMenuContent()
-    {
-        if (_mainMenuContent != null)
-        {
-            _mainMenuContent.SetActive(false);
-        }
-    }
-
-    public void ReturnToMainMenu()
-    {
-        if (_currentMenuState == MenuState.MainMenu) return;
-        ShowMainMenu();
-        Debug.Log("[RTTManager] Returned to Main Menu");
-    }
-
-    /// <summary>
-    /// Destroy non-MainMenu content. Main Menu is never destroyed.
-    /// </summary>
-    private void DestroyCurrentMenuContent()
-    {
-        // Never destroy the persistent Main Menu content
-        if (_currentMenuContent != null && _currentMenuContent != _mainMenuContent)
-        {
-            // Only cleanup non-MainMenu content
-            if (_currentMenuState == MenuState.RemoteMenu)
-                remoteMenuController?.Cleanup();
-
-            Destroy(_currentMenuContent);
-            _currentMenuContent = null;
-        }
-    }
-
-    private Vector2 GetContainerSize()
-    {
-        if (mainMenuFrame == null || mainMenuFrame.ContentContainer == null)
-            return new Vector2(1770f, 800f);
-
-        var rect = mainMenuFrame.ContentContainer.rect;
-        if (rect.width > 0 && rect.height > 0)
-            return new Vector2(rect.width, rect.height);
-
-        return new Vector2(
-            mainMenuFrame.LogicalWidthValue - 150f,
-            mainMenuFrame.LogicalWidthValue / mainMenuFrame.PanelWidth * mainMenuFrame.PanelHeight - 100f
-        );
-    }
-    #endregion
-
-    #region Menu Event Handlers
-    private void HandleMainMenuItemClicked(string itemId)
-    {
-        // Check app registry for app type
-        if (appRegistry != null)
-        {
-            var appType = appRegistry.GetAppType(itemId);
-            if (appType == RTTAppRegistry.AppType.Quit)
-            {
-                HandleQuit();
-                return;
-            }
-        }
-        else if (itemId == "quit")
-        {
-            HandleQuit();
-            return;
-        }
-
-        // Open app
-        OpenApp(itemId);
-    }
-
-    private void HandleQuit()
-    {
-        Debug.Log("[RTTManager] Quit clicked");
-#if UNITY_EDITOR
-        UnityEditor.EditorApplication.isPlaying = false;
-#else
-        Application.Quit();
-#endif
-    }
-    #endregion
-
-    #region App Lifecycle - Public API (Delegated to RTTAppManager)
-    public RTTAppInstance OpenApp(string appId) => _appManager?.OpenApp(appId);
-    public void PrepareApp(string appId) => _appManager?.PrepareApp(appId);
-    public bool IsAppPrepared(string appId) => _appManager?.IsAppPrepared(appId) ?? false;
-    public void OpenPreparedApp(string appId) => _appManager?.OpenPreparedApp(appId);
-    public void SwitchToApp(string appId) => _appManager?.SwitchToApp(appId);
-    public void SwitchToHome() => _appManager?.SwitchToHome();
-    public void CloseApp(string appId) => _appManager?.CloseApp(appId);
-    public bool IsAppOpen(string appId) => _appManager?.IsAppOpen(appId) ?? false;
-    public RTTAppInstance GetApp(string appId) => _appManager?.GetApp(appId);
-    public IReadOnlyCollection<string> GetOpenAppIds() => _appManager?.GetOpenAppIds() ?? new List<string>();
-    #endregion
-
-    // App Lifecycle code (Internal + Coroutines) moved to RTTAppManager
-
-    #region App Content Creation
-    private void CreateAppContent(RTTAppInstance instance)
-    {
-        var appType = appRegistry?.GetAppType(instance.AppId) ?? GetFallbackAppType(instance.AppId);
-
-        switch (appType)
-        {
-            case RTTAppRegistry.AppType.Remote:
-                CreateRemoteMenuContent(instance);
-                break;
-            case RTTAppRegistry.AppType.Files:
-                CreateFilesMenuContent(instance);
-                break;
-            case RTTAppRegistry.AppType.Media:
-                CreateMediaContent(instance);
-                break;
-            case RTTAppRegistry.AppType.Browser:
-            case RTTAppRegistry.AppType.Settings:
-                Debug.Log($"[RTTManager] {appType} app not yet implemented");
-                break;
-            default:
-                Debug.LogWarning($"[RTTManager] Unknown app: {instance.AppId}");
-                break;
-        }
-    }
-
-    private RTTAppRegistry.AppType GetFallbackAppType(string appId)
-    {
-        switch (appId)
-        {
-            case "remote": return RTTAppRegistry.AppType.Remote;
-            case "browser": return RTTAppRegistry.AppType.Browser;
-            case "media": return RTTAppRegistry.AppType.Media;
-            case "files": return RTTAppRegistry.AppType.Files;
-            case "settings": return RTTAppRegistry.AppType.Settings;
-            case "quit": return RTTAppRegistry.AppType.Quit;
-            default: return RTTAppRegistry.AppType.NotImplemented;
-        }
-    }
-
-    private void CreateRemoteMenuContent(RTTAppInstance instance)
-    {
-        Debug.Log($"[RTTManager] Creating RemoteMenu content...");
-
-        // Create controller as sibling to frame, NOT child
-        // This ensures controller stays active when frame is hidden during streaming
-        GameObject controllerObj = new GameObject($"RemoteMenuController_{instance.AppId}");
-        controllerObj.transform.SetParent(this.transform); // Parent to RTTManager, not frame
-        var controller = controllerObj.AddComponent<RTTRemoteMenuController>();
-
-        var containerSize = instance.Frame.GetContentSize();
-
-        instance.MenuContent = controller.CreateMenu(
-            instance.Frame.ContentContainer,
-            containerSize.x,
-            containerSize.y,
-            Font,  // Uses theme font with fallback
-            PrimaryColor,
-            AccentColor
-        );
-
-        instance.Controller = controller;
-        controller.OnBackClicked += () => CloseApp(instance.AppId);
-
-        instance.Frame.MarkDirty();
-    }
-
-    private void CreateFilesMenuContent(RTTAppInstance instance)
-    {
-        Debug.Log($"[RTTManager] Creating FileManager content...");
-
-        // Create controller
-        GameObject controllerObj = new GameObject($"FileManagerController_{instance.AppId}");
-        controllerObj.transform.SetParent(this.transform);
-        var controller = controllerObj.AddComponent<RTTFileManagerController>();
-
-        var containerSize = instance.Frame.GetContentSize();
-
-        // Create View via Controller
-        instance.MenuContent = controller.CreateMenu(
-            instance.Frame.ContentContainer,
-            containerSize.x,
-            containerSize.y,
-            Font,  // Uses theme font with fallback
-            PrimaryColor,
-            AccentColor
-        );
-
-        instance.Controller = controller;
-        controller.OnBackClicked += () => CloseApp(instance.AppId);
-
-        instance.Frame.MarkDirty();
-    }
-
-    private void CreateMediaContent(RTTAppInstance instance)
-    {
-        Debug.Log($"[RTTManager] Creating Media content...");
-
-        // Create controller
-        GameObject controllerObj = new GameObject($"MediaController_{instance.AppId}");
-        controllerObj.transform.SetParent(this.transform);
-        var controller = controllerObj.AddComponent<VRMediaAppController>();
-
-        var containerSize = instance.Frame.GetContentSize();
-
-        // Create View via Controller
-        instance.MenuContent = controller.CreateMenu(
-            instance.Frame.ContentContainer,
-            containerSize.x,
-            containerSize.y,
-            Font,  // Uses theme font with fallback
-            PrimaryColor,
-            AccentColor
-        );
-
-        instance.Controller = controller;
-        controller.OnBackClicked += () => CloseApp(instance.AppId);
-
-        instance.Frame.MarkDirty();
-    }
-    #endregion
-
-    // Animation Helpers moved to RTTAppManager
 }

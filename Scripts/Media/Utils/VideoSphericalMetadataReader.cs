@@ -3,454 +3,422 @@ using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
 using UnityEngine;
+using VRWorkspace.Media.UI;
 
-/// <summary>
-/// Result of reading spherical video metadata from file.
-/// </summary>
-public struct SphericalVideoMetadata
+namespace VRWorkspace.Media.Utils
 {
-    /// <summary>True if any spherical metadata was found</summary>
-    public bool HasMetadata;
-
-    /// <summary>Projection type: "equirectangular", "cubemap", or null</summary>
-    public string ProjectionType;
-
-    /// <summary>Stereo mode: 0=mono, 1=top-bottom, 2=left-right, -1=not found</summary>
-    public int StereoMode;
-
-    /// <summary>Whether this is a full sphere (360) or half sphere (180)</summary>
-    public bool IsFullSphere;
-
-    /// <summary>Source of metadata: "sv3d", "xmp", "none"</summary>
-    public string Source;
-
-    /// <summary>Full panorama width pixels from XMP (for 180 vs 360 disambiguation)</summary>
-    public int FullPanoWidthPixels;
-
-    /// <summary>Cropped area image width pixels from XMP</summary>
-    public int CroppedAreaImageWidthPixels;
-
-    public static SphericalVideoMetadata Empty => new SphericalVideoMetadata
+    /// <summary>
+    /// Result of reading spherical video metadata from file.
+    /// </summary>
+    public struct SphericalVideoMetadata
     {
-        HasMetadata = false,
-        ProjectionType = null,
-        StereoMode = -1,
-        IsFullSphere = false,
-        Source = "none",
-        FullPanoWidthPixels = 0,
-        CroppedAreaImageWidthPixels = 0
-    };
-}
+        /// <summary>True if any spherical metadata was found</summary>
+        public bool HasMetadata;
 
-/// <summary>
-/// Reads spherical video metadata from MP4/MOV files.
-/// Supports Google Spatial Media V2 (sv3d/st3d ISO BMFF boxes)
-/// and V1 (XMP GSpherical).
-/// </summary>
-public static class VideoSphericalMetadataReader
-{
-    #region Cache
-    private static string _cachedFilePath;
-    private static SphericalVideoMetadata _cachedResult;
-    #endregion
+        /// <summary>Projection type: "equirectangular", "cubemap", or null</summary>
+        public string ProjectionType;
 
-    #region Supported Extensions
-    private static readonly string[] SupportedExtensions = { ".mp4", ".m4v", ".mov", ".m4a" };
-    #endregion
+        /// <summary>Stereo mode: 0=mono, 1=top-bottom, 2=left-right, -1=not found</summary>
+        public int StereoMode;
+
+        /// <summary>Whether this is a full sphere (360) or half sphere (180)</summary>
+        public bool IsFullSphere;
+
+        /// <summary>Source of metadata: "sv3d", "xmp", "none"</summary>
+        public string Source;
+
+        /// <summary>Full panorama width pixels from XMP (for 180 vs 360 disambiguation)</summary>
+        public int FullPanoWidthPixels;
+
+        /// <summary>Cropped area image width pixels from XMP</summary>
+        public int CroppedAreaImageWidthPixels;
+
+        public static SphericalVideoMetadata Empty => new SphericalVideoMetadata
+        {
+            HasMetadata = false,
+            ProjectionType = null,
+            StereoMode = -1,
+            IsFullSphere = false,
+            Source = "none",
+            FullPanoWidthPixels = 0,
+            CroppedAreaImageWidthPixels = 0
+        };
+    }
 
     /// <summary>
-    /// Read spherical video metadata from file. Results are cached per file path.
+    /// Reads spherical video metadata from MP4/MOV files.
+    /// Supports Google Spatial Media V2 (sv3d/st3d ISO BMFF boxes)
+    /// and V1 (XMP GSpherical).
     /// </summary>
-    public static SphericalVideoMetadata ReadMetadata(string filePath)
+    public static class VideoSphericalMetadataReader
     {
-        if (string.IsNullOrEmpty(filePath))
-            return SphericalVideoMetadata.Empty;
+        #region Cache
+        private static string _cachedFilePath;
+        private static SphericalVideoMetadata _cachedResult;
+        #endregion
 
-        // Cache check
-        if (filePath == _cachedFilePath)
+        #region Supported Extensions
+        private static readonly string[] SupportedExtensions = { ".mp4", ".m4v", ".mov", ".m4a" };
+        #endregion
+
+        /// <summary>
+        /// Read spherical video metadata from file. Results are cached per file path.
+        /// </summary>
+        public static SphericalVideoMetadata ReadMetadata(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath))
+                return SphericalVideoMetadata.Empty;
+
+            // Cache check
+            if (filePath == _cachedFilePath)
+                return _cachedResult;
+
+            _cachedFilePath = filePath;
+            _cachedResult = ReadMetadataInternal(filePath);
             return _cachedResult;
-
-        _cachedFilePath = filePath;
-        _cachedResult = ReadMetadataInternal(filePath);
-        return _cachedResult;
-    }
-
-    /// <summary>
-    /// Clear the metadata cache.
-    /// </summary>
-    public static void ClearCache()
-    {
-        _cachedFilePath = null;
-        _cachedResult = SphericalVideoMetadata.Empty;
-    }
-
-    private static SphericalVideoMetadata ReadMetadataInternal(string filePath)
-    {
-        if (!File.Exists(filePath))
-            return SphericalVideoMetadata.Empty;
-
-        // Check supported extension
-        string ext = Path.GetExtension(filePath)?.ToLowerInvariant();
-        bool supported = false;
-        for (int i = 0; i < SupportedExtensions.Length; i++)
-        {
-            if (ext == SupportedExtensions[i]) { supported = true; break; }
         }
-        if (!supported)
-            return SphericalVideoMetadata.Empty;
 
-        try
+        /// <summary>
+        /// Clear the metadata cache.
+        /// </summary>
+        public static void ClearCache()
         {
-            using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
-            using (var reader = new BinaryReader(fs))
+            _cachedFilePath = null;
+            _cachedResult = SphericalVideoMetadata.Empty;
+        }
+
+        private static SphericalVideoMetadata ReadMetadataInternal(string filePath)
+        {
+            if (!File.Exists(filePath))
+                return SphericalVideoMetadata.Empty;
+
+            // Check supported extension
+            string ext = Path.GetExtension(filePath)?.ToLowerInvariant();
+            bool supported = false;
+            for (int i = 0; i < SupportedExtensions.Length; i++)
             {
-                var result = SphericalVideoMetadata.Empty;
+                if (ext == SupportedExtensions[i]) { supported = true; break; }
+            }
+            if (!supported)
+                return SphericalVideoMetadata.Empty;
 
-                // Try V2 (sv3d/st3d) first - more precise
-                if (TryReadV2Metadata(reader, fs.Length, ref result))
+            try
+            {
+                using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                using (var reader = new BinaryReader(fs))
                 {
-                    result.Source = "sv3d";
-                    result.HasMetadata = true;
-                    return result;
-                }
+                    var result = SphericalVideoMetadata.Empty;
 
-                // Try V1 (XMP GSpherical)
-                fs.Position = 0;
-                if (TryReadV1XmpMetadata(reader, fs.Length, ref result))
-                {
-                    result.Source = "xmp";
-                    result.HasMetadata = true;
-                    return result;
-                }
+                    // Try V2 (sv3d/st3d) first - more precise
+                    if (TryReadV2Metadata(reader, fs.Length, ref result))
+                    {
+                        result.Source = "sv3d";
+                        result.HasMetadata = true;
+                        return result;
+                    }
 
+                    // Try V1 (XMP GSpherical)
+                    fs.Position = 0;
+                    if (TryReadV1XmpMetadata(reader, fs.Length, ref result))
+                    {
+                        result.Source = "xmp";
+                        result.HasMetadata = true;
+                        return result;
+                    }
+
+                    return SphericalVideoMetadata.Empty;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[VideoSphericalMetadataReader] Failed to read metadata from {Path.GetFileName(filePath)}: {ex.Message}");
                 return SphericalVideoMetadata.Empty;
             }
         }
-        catch (Exception ex)
+
+        #region V2: sv3d/st3d (ISO BMFF)
+
+        private static bool TryReadV2Metadata(BinaryReader reader, long fileLength, ref SphericalVideoMetadata result)
         {
-            Debug.LogWarning($"[VideoSphericalMetadataReader] Failed to read metadata from {Path.GetFileName(filePath)}: {ex.Message}");
-            return SphericalVideoMetadata.Empty;
-        }
-    }
+            var fs = reader.BaseStream;
+            fs.Position = 0;
 
-    #region V2: sv3d/st3d (ISO BMFF)
+            // Find moov atom
+            long moovPos = FindAtom(reader, fileLength, "moov");
+            if (moovPos < 0) return false;
 
-    private static bool TryReadV2Metadata(BinaryReader reader, long fileLength, ref SphericalVideoMetadata result)
-    {
-        var fs = reader.BaseStream;
-        fs.Position = 0;
+            fs.Position = moovPos;
+            long moovSize = ReadAtomSize(reader, out _);
+            long moovEnd = moovPos + moovSize;
+            fs.Position = moovPos + 8;
 
-        // Find moov atom
-        long moovPos = FindAtom(reader, fileLength, "moov");
-        if (moovPos < 0) return false;
+            // Find video track
+            if (!TryFindVideoTrackSampleEntry(reader, moovEnd, out long sampleEntryPos, out long sampleEntryEnd))
+                return false;
 
-        fs.Position = moovPos;
-        long moovSize = ReadAtomSize(reader, out _);
-        long moovEnd = moovPos + moovSize;
-        fs.Position = moovPos + 8;
+            // Navigate past sample entry fixed fields (78 bytes from start of sample entry)
+            // Sample entry: 8 (header) + 70 (fixed fields) = 78
+            long childBoxesStart = sampleEntryPos + 78;
+            if (childBoxesStart >= sampleEntryEnd)
+                return false;
 
-        // Find video track
-        if (!TryFindVideoTrackSampleEntry(reader, moovEnd, out long sampleEntryPos, out long sampleEntryEnd))
-            return false;
+            bool foundSomething = false;
 
-        // Navigate past sample entry fixed fields (78 bytes from start of sample entry)
-        // Sample entry: 8 (header) + 70 (fixed fields) = 78
-        long childBoxesStart = sampleEntryPos + 78;
-        if (childBoxesStart >= sampleEntryEnd)
-            return false;
-
-        bool foundSomething = false;
-
-        // Search for sv3d
-        fs.Position = childBoxesStart;
-        long sv3dPos = FindAtomWithin(reader, sampleEntryEnd, "sv3d");
-        if (sv3dPos >= 0)
-        {
-            fs.Position = sv3dPos;
-            long sv3dSize = ReadAtomSize(reader, out _);
-            long sv3dEnd = sv3dPos + sv3dSize;
-            fs.Position = sv3dPos + 8;
-
-            TryParseSv3d(reader, sv3dEnd, ref result);
-            foundSomething = true;
-        }
-
-        // Search for st3d
-        fs.Position = childBoxesStart;
-        long st3dPos = FindAtomWithin(reader, sampleEntryEnd, "st3d");
-        if (st3dPos >= 0)
-        {
-            fs.Position = st3dPos;
-            long st3dSize = ReadAtomSize(reader, out _);
-            fs.Position = st3dPos + 8;
-
-            TryParseSt3d(reader, ref result);
-            foundSomething = true;
-        }
-
-        return foundSomething;
-    }
-
-    /// <summary>
-    /// Find the video track and navigate to the first sample entry inside stsd.
-    /// Returns the position and end of the first sample entry.
-    /// </summary>
-    private static bool TryFindVideoTrackSampleEntry(BinaryReader reader, long moovEnd, out long sampleEntryPos, out long sampleEntryEnd)
-    {
-        sampleEntryPos = -1;
-        sampleEntryEnd = -1;
-
-        var fs = reader.BaseStream;
-
-        // Iterate trak atoms within moov
-        while (fs.Position < moovEnd - 8)
-        {
-            long trakPos = fs.Position;
-            long trakAtomPos = FindAtomWithin(reader, moovEnd, "trak");
-            if (trakAtomPos < 0) break;
-
-            fs.Position = trakAtomPos;
-            long trakSize = ReadAtomSize(reader, out _);
-            long trakEnd = trakAtomPos + trakSize;
-            fs.Position = trakAtomPos + 8;
-
-            // Check if this is a video track by finding mdia/hdlr
-            if (IsVideoTrack(reader, trakEnd))
+            // Search for sv3d
+            fs.Position = childBoxesStart;
+            long sv3dPos = FindAtomWithin(reader, sampleEntryEnd, "sv3d");
+            if (sv3dPos >= 0)
             {
-                // Navigate to stsd: trak -> mdia -> minf -> stbl -> stsd
+                fs.Position = sv3dPos;
+                long sv3dSize = ReadAtomSize(reader, out _);
+                long sv3dEnd = sv3dPos + sv3dSize;
+                fs.Position = sv3dPos + 8;
+
+                TryParseSv3d(reader, sv3dEnd, ref result);
+                foundSomething = true;
+            }
+
+            // Search for st3d
+            fs.Position = childBoxesStart;
+            long st3dPos = FindAtomWithin(reader, sampleEntryEnd, "st3d");
+            if (st3dPos >= 0)
+            {
+                fs.Position = st3dPos;
+                long st3dSize = ReadAtomSize(reader, out _);
+                fs.Position = st3dPos + 8;
+
+                TryParseSt3d(reader, ref result);
+                foundSomething = true;
+            }
+
+            return foundSomething;
+        }
+
+        /// <summary>
+        /// Find the video track and navigate to the first sample entry inside stsd.
+        /// Returns the position and end of the first sample entry.
+        /// </summary>
+        private static bool TryFindVideoTrackSampleEntry(BinaryReader reader, long moovEnd, out long sampleEntryPos, out long sampleEntryEnd)
+        {
+            sampleEntryPos = -1;
+            sampleEntryEnd = -1;
+
+            var fs = reader.BaseStream;
+
+            // Iterate trak atoms within moov
+            while (fs.Position < moovEnd - 8)
+            {
+                long trakPos = fs.Position;
+                long trakAtomPos = FindAtomWithin(reader, moovEnd, "trak");
+                if (trakAtomPos < 0) break;
+
+                fs.Position = trakAtomPos;
+                long trakSize = ReadAtomSize(reader, out _);
+                long trakEnd = trakAtomPos + trakSize;
                 fs.Position = trakAtomPos + 8;
+
+                // Check if this is a video track by finding mdia/hdlr
+                if (IsVideoTrack(reader, trakEnd))
+                {
+                    // Navigate to stsd: trak -> mdia -> minf -> stbl -> stsd
+                    fs.Position = trakAtomPos + 8;
+                    long mdiaPos = FindAtomWithin(reader, trakEnd, "mdia");
+                    if (mdiaPos < 0) { fs.Position = trakEnd; continue; }
+
+                    fs.Position = mdiaPos;
+                    long mdiaSize = ReadAtomSize(reader, out _);
+                    long mdiaEnd = mdiaPos + mdiaSize;
+                    fs.Position = mdiaPos + 8;
+
+                    long minfPos = FindAtomWithin(reader, mdiaEnd, "minf");
+                    if (minfPos < 0) { fs.Position = trakEnd; continue; }
+
+                    fs.Position = minfPos;
+                    long minfSize = ReadAtomSize(reader, out _);
+                    long minfEnd = minfPos + minfSize;
+                    fs.Position = minfPos + 8;
+
+                    long stblPos = FindAtomWithin(reader, minfEnd, "stbl");
+                    if (stblPos < 0) { fs.Position = trakEnd; continue; }
+
+                    fs.Position = stblPos;
+                    long stblSize = ReadAtomSize(reader, out _);
+                    long stblEnd = stblPos + stblSize;
+                    fs.Position = stblPos + 8;
+
+                    long stsdPos = FindAtomWithin(reader, stblEnd, "stsd");
+                    if (stsdPos < 0) { fs.Position = trakEnd; continue; }
+
+                    fs.Position = stsdPos;
+                    long stsdSize = ReadAtomSize(reader, out _);
+                    long stsdEnd = stsdPos + stsdSize;
+
+                    // stsd is a FullBox: 8 (header) + 4 (version/flags) + 4 (entry_count)
+                    fs.Position = stsdPos + 16;
+
+                    if (fs.Position >= stsdEnd) { fs.Position = trakEnd; continue; }
+
+                    // Read first sample entry
+                    sampleEntryPos = fs.Position;
+                    long entrySize = ReadAtomSize(reader, out _);
+                    sampleEntryEnd = sampleEntryPos + entrySize;
+
+                    return true;
+                }
+
+                fs.Position = trakEnd;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Check if a trak atom is a video track by reading its mdia/hdlr handler_type.
+        /// </summary>
+        private static bool IsVideoTrack(BinaryReader reader, long trakEnd)
+        {
+            var fs = reader.BaseStream;
+            long savedPos = fs.Position;
+
+            try
+            {
+                // Find mdia within trak
                 long mdiaPos = FindAtomWithin(reader, trakEnd, "mdia");
-                if (mdiaPos < 0) { fs.Position = trakEnd; continue; }
+                if (mdiaPos < 0) return false;
 
                 fs.Position = mdiaPos;
                 long mdiaSize = ReadAtomSize(reader, out _);
                 long mdiaEnd = mdiaPos + mdiaSize;
                 fs.Position = mdiaPos + 8;
 
-                long minfPos = FindAtomWithin(reader, mdiaEnd, "minf");
-                if (minfPos < 0) { fs.Position = trakEnd; continue; }
+                // Find hdlr within mdia
+                long hdlrPos = FindAtomWithin(reader, mdiaEnd, "hdlr");
+                if (hdlrPos < 0) return false;
 
-                fs.Position = minfPos;
-                long minfSize = ReadAtomSize(reader, out _);
-                long minfEnd = minfPos + minfSize;
-                fs.Position = minfPos + 8;
+                // hdlr structure: 8 (header) + 4 (version/flags) + 4 (pre_defined) + 4 (handler_type)
+                fs.Position = hdlrPos + 16;
 
-                long stblPos = FindAtomWithin(reader, minfEnd, "stbl");
-                if (stblPos < 0) { fs.Position = trakEnd; continue; }
+                if (fs.Position + 4 > trakEnd) return false;
 
-                fs.Position = stblPos;
-                long stblSize = ReadAtomSize(reader, out _);
-                long stblEnd = stblPos + stblSize;
-                fs.Position = stblPos + 8;
+                byte[] handlerType = reader.ReadBytes(4);
+                string handler = Encoding.ASCII.GetString(handlerType);
 
-                long stsdPos = FindAtomWithin(reader, stblEnd, "stsd");
-                if (stsdPos < 0) { fs.Position = trakEnd; continue; }
-
-                fs.Position = stsdPos;
-                long stsdSize = ReadAtomSize(reader, out _);
-                long stsdEnd = stsdPos + stsdSize;
-
-                // stsd is a FullBox: 8 (header) + 4 (version/flags) + 4 (entry_count)
-                fs.Position = stsdPos + 16;
-
-                if (fs.Position >= stsdEnd) { fs.Position = trakEnd; continue; }
-
-                // Read first sample entry
-                sampleEntryPos = fs.Position;
-                long entrySize = ReadAtomSize(reader, out _);
-                sampleEntryEnd = sampleEntryPos + entrySize;
-
-                return true;
+                return handler == "vide";
             }
-
-            fs.Position = trakEnd;
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// Check if a trak atom is a video track by reading its mdia/hdlr handler_type.
-    /// </summary>
-    private static bool IsVideoTrack(BinaryReader reader, long trakEnd)
-    {
-        var fs = reader.BaseStream;
-        long savedPos = fs.Position;
-
-        try
-        {
-            // Find mdia within trak
-            long mdiaPos = FindAtomWithin(reader, trakEnd, "mdia");
-            if (mdiaPos < 0) return false;
-
-            fs.Position = mdiaPos;
-            long mdiaSize = ReadAtomSize(reader, out _);
-            long mdiaEnd = mdiaPos + mdiaSize;
-            fs.Position = mdiaPos + 8;
-
-            // Find hdlr within mdia
-            long hdlrPos = FindAtomWithin(reader, mdiaEnd, "hdlr");
-            if (hdlrPos < 0) return false;
-
-            // hdlr structure: 8 (header) + 4 (version/flags) + 4 (pre_defined) + 4 (handler_type)
-            fs.Position = hdlrPos + 16;
-
-            if (fs.Position + 4 > trakEnd) return false;
-
-            byte[] handlerType = reader.ReadBytes(4);
-            string handler = Encoding.ASCII.GetString(handlerType);
-
-            return handler == "vide";
-        }
-        catch
-        {
-            return false;
-        }
-        finally
-        {
-            fs.Position = savedPos;
-        }
-    }
-
-    private static void TryParseSv3d(BinaryReader reader, long sv3dEnd, ref SphericalVideoMetadata result)
-    {
-        var fs = reader.BaseStream;
-
-        // Find proj box within sv3d
-        long projPos = FindAtomWithin(reader, sv3dEnd, "proj");
-        if (projPos < 0) return;
-
-        fs.Position = projPos;
-        long projSize = ReadAtomSize(reader, out _);
-        long projEnd = projPos + projSize;
-        fs.Position = projPos + 8;
-
-        // Look for equi (equirectangular) or cbmp (cubemap) within proj
-        long searchStart = fs.Position;
-
-        // Check for equi
-        fs.Position = searchStart;
-        long equiPos = FindAtomWithin(reader, projEnd, "equi");
-        if (equiPos >= 0)
-        {
-            result.ProjectionType = "equirectangular";
-
-            // equi is a FullBox: 8 (header) + 4 (version/flags) + 4*4 (bounds)
-            fs.Position = equiPos + 12; // skip header + version/flags
-
-            if (fs.Position + 16 <= projEnd)
+            catch
             {
-                uint boundsTop = ReadUInt32BE(reader);
-                uint boundsBottom = ReadUInt32BE(reader);
-                uint boundsLeft = ReadUInt32BE(reader);
-                uint boundsRight = ReadUInt32BE(reader);
-
-                // If all bounds are 0, it's a full sphere (360)
-                // Non-zero bounds indicate partial sphere (could be 180)
-                result.IsFullSphere = (boundsTop == 0 && boundsBottom == 0 && boundsLeft == 0 && boundsRight == 0);
+                return false;
             }
-            else
+            finally
             {
-                result.IsFullSphere = true; // Default to full sphere if can't read bounds
+                fs.Position = savedPos;
             }
-            return;
         }
 
-        // Check for cbmp
-        fs.Position = searchStart;
-        long cbmpPos = FindAtomWithin(reader, projEnd, "cbmp");
-        if (cbmpPos >= 0)
+        private static void TryParseSv3d(BinaryReader reader, long sv3dEnd, ref SphericalVideoMetadata result)
         {
-            result.ProjectionType = "cubemap";
-            result.IsFullSphere = true;
-        }
-    }
+            var fs = reader.BaseStream;
 
-    private static void TryParseSt3d(BinaryReader reader, ref SphericalVideoMetadata result)
-    {
-        var fs = reader.BaseStream;
+            // Find proj box within sv3d
+            long projPos = FindAtomWithin(reader, sv3dEnd, "proj");
+            if (projPos < 0) return;
 
-        // st3d is a FullBox: after header comes 4 bytes version/flags
-        if (fs.Position + 4 > fs.Length) return;
-        reader.ReadBytes(4); // version + flags
+            fs.Position = projPos;
+            long projSize = ReadAtomSize(reader, out _);
+            long projEnd = projPos + projSize;
+            fs.Position = projPos + 8;
 
-        if (fs.Position + 1 > fs.Length) return;
-        byte stereoMode = reader.ReadByte();
+            // Look for equi (equirectangular) or cbmp (cubemap) within proj
+            long searchStart = fs.Position;
 
-        // 0 = mono, 1 = top-bottom, 2 = left-right
-        result.StereoMode = stereoMode;
-    }
-
-    #endregion
-
-    #region V1: XMP GSpherical
-
-    private static bool TryReadV1XmpMetadata(BinaryReader reader, long fileLength, ref SphericalVideoMetadata result)
-    {
-        var fs = reader.BaseStream;
-        fs.Position = 0;
-
-        // Try 1: Find moov/udta/XMP_ atom
-        long moovPos = FindAtom(reader, fileLength, "moov");
-        if (moovPos >= 0)
-        {
-            fs.Position = moovPos;
-            long moovSize = ReadAtomSize(reader, out _);
-            long moovEnd = moovPos + moovSize;
-            fs.Position = moovPos + 8;
-
-            long udtaPos = FindAtomWithin(reader, moovEnd, "udta");
-            if (udtaPos >= 0)
+            // Check for equi
+            fs.Position = searchStart;
+            long equiPos = FindAtomWithin(reader, projEnd, "equi");
+            if (equiPos >= 0)
             {
-                fs.Position = udtaPos;
-                long udtaSize = ReadAtomSize(reader, out _);
-                long udtaEnd = udtaPos + udtaSize;
-                fs.Position = udtaPos + 8;
+                result.ProjectionType = "equirectangular";
 
-                long xmpPos = FindAtomWithin(reader, udtaEnd, "XMP_");
-                if (xmpPos >= 0)
+                // equi is a FullBox: 8 (header) + 4 (version/flags) + 4*4 (bounds)
+                fs.Position = equiPos + 12; // skip header + version/flags
+
+                if (fs.Position + 16 <= projEnd)
                 {
-                    fs.Position = xmpPos;
-                    long xmpSize = ReadAtomSize(reader, out _);
-                    fs.Position = xmpPos + 8;
+                    uint boundsTop = ReadUInt32BE(reader);
+                    uint boundsBottom = ReadUInt32BE(reader);
+                    uint boundsLeft = ReadUInt32BE(reader);
+                    uint boundsRight = ReadUInt32BE(reader);
 
-                    int dataSize = (int)(xmpSize - 8);
-                    if (dataSize > 0 && dataSize < 1024 * 1024) // Max 1MB XMP
-                    {
-                        byte[] xmpData = reader.ReadBytes(dataSize);
-                        string xmpText = Encoding.UTF8.GetString(xmpData);
-                        if (ParseGSphericalXmp(xmpText, ref result))
-                            return true;
-                    }
+                    // If all bounds are 0, it's a full sphere (360)
+                    // Non-zero bounds indicate partial sphere (could be 180)
+                    result.IsFullSphere = (boundsTop == 0 && boundsBottom == 0 && boundsLeft == 0 && boundsRight == 0);
                 }
+                else
+                {
+                    result.IsFullSphere = true; // Default to full sphere if can't read bounds
+                }
+                return;
+            }
+
+            // Check for cbmp
+            fs.Position = searchStart;
+            long cbmpPos = FindAtomWithin(reader, projEnd, "cbmp");
+            if (cbmpPos >= 0)
+            {
+                result.ProjectionType = "cubemap";
+                result.IsFullSphere = true;
             }
         }
 
-        // Try 2: Find uuid atom with XMP UUID at top level
-        fs.Position = 0;
-        byte[] xmpUuid = {
-            0xBE, 0x7A, 0xCF, 0xCB, 0x97, 0xA9, 0x42, 0xE8,
-            0x9C, 0x71, 0x99, 0x94, 0x91, 0xE3, 0xAF, 0xAC
-        };
-
-        while (fs.Position < fileLength - 8)
+        private static void TryParseSt3d(BinaryReader reader, ref SphericalVideoMetadata result)
         {
-            long atomPos = fs.Position;
-            long atomSize = ReadAtomSize(reader, out _);
+            var fs = reader.BaseStream;
 
-            if (atomSize < 8) break;
+            // st3d is a FullBox: after header comes 4 bytes version/flags
+            if (fs.Position + 4 > fs.Length) return;
+            reader.ReadBytes(4); // version + flags
 
-            // Read atom type
-            byte[] atomType = reader.ReadBytes(4);
-            if (Encoding.ASCII.GetString(atomType) == "uuid")
+            if (fs.Position + 1 > fs.Length) return;
+            byte stereoMode = reader.ReadByte();
+
+            // 0 = mono, 1 = top-bottom, 2 = left-right
+            result.StereoMode = stereoMode;
+        }
+
+        #endregion
+
+        #region V1: XMP GSpherical
+
+        private static bool TryReadV1XmpMetadata(BinaryReader reader, long fileLength, ref SphericalVideoMetadata result)
+        {
+            var fs = reader.BaseStream;
+            fs.Position = 0;
+
+            // Try 1: Find moov/udta/XMP_ atom
+            long moovPos = FindAtom(reader, fileLength, "moov");
+            if (moovPos >= 0)
             {
-                if (fs.Position + 16 <= atomPos + atomSize)
+                fs.Position = moovPos;
+                long moovSize = ReadAtomSize(reader, out _);
+                long moovEnd = moovPos + moovSize;
+                fs.Position = moovPos + 8;
+
+                long udtaPos = FindAtomWithin(reader, moovEnd, "udta");
+                if (udtaPos >= 0)
                 {
-                    byte[] uuid = reader.ReadBytes(16);
-                    if (MatchesUuid(uuid, xmpUuid))
+                    fs.Position = udtaPos;
+                    long udtaSize = ReadAtomSize(reader, out _);
+                    long udtaEnd = udtaPos + udtaSize;
+                    fs.Position = udtaPos + 8;
+
+                    long xmpPos = FindAtomWithin(reader, udtaEnd, "XMP_");
+                    if (xmpPos >= 0)
                     {
-                        int dataSize = (int)(atomSize - 28); // 8 header + 4 type + 16 uuid
-                        if (dataSize > 0 && dataSize < 1024 * 1024)
+                        fs.Position = xmpPos;
+                        long xmpSize = ReadAtomSize(reader, out _);
+                        fs.Position = xmpPos + 8;
+
+                        int dataSize = (int)(xmpSize - 8);
+                        if (dataSize > 0 && dataSize < 1024 * 1024) // Max 1MB XMP
                         {
                             byte[] xmpData = reader.ReadBytes(dataSize);
                             string xmpText = Encoding.UTF8.GetString(xmpData);
@@ -461,208 +429,245 @@ public static class VideoSphericalMetadataReader
                 }
             }
 
-            fs.Position = atomPos + atomSize;
-        }
+            // Try 2: Find uuid atom with XMP UUID at top level
+            fs.Position = 0;
+            byte[] xmpUuid = {
+                0xBE, 0x7A, 0xCF, 0xCB, 0x97, 0xA9, 0x42, 0xE8,
+                0x9C, 0x71, 0x99, 0x94, 0x91, 0xE3, 0xAF, 0xAC
+            };
 
-        return false;
-    }
-
-    private static bool MatchesUuid(byte[] a, byte[] b)
-    {
-        if (a.Length != b.Length) return false;
-        for (int i = 0; i < a.Length; i++)
-        {
-            if (a[i] != b[i]) return false;
-        }
-        return true;
-    }
-
-    // Regex patterns for XMP GSpherical parsing
-    private static readonly Regex SphericalRegex = new Regex(
-        @"GSpherical:Spherical[>""=\s]+(true|false)", RegexOptions.IgnoreCase);
-    private static readonly Regex ProjectionTypeRegex = new Regex(
-        @"GSpherical:ProjectionType[>""=\s]+(\w+)", RegexOptions.IgnoreCase);
-    private static readonly Regex StereoModeRegex = new Regex(
-        @"GSpherical:StereoMode[>""=\s]+([\w-]+)", RegexOptions.IgnoreCase);
-    private static readonly Regex FullPanoWidthRegex = new Regex(
-        @"GSpherical:FullPanoWidthPixels[>""=\s]+(\d+)", RegexOptions.IgnoreCase);
-    private static readonly Regex CroppedWidthRegex = new Regex(
-        @"GSpherical:CroppedAreaImageWidthPixels[>""=\s]+(\d+)", RegexOptions.IgnoreCase);
-
-    private static bool ParseGSphericalXmp(string xmpText, ref SphericalVideoMetadata result)
-    {
-        // Check if spherical metadata is present
-        var sphericalMatch = SphericalRegex.Match(xmpText);
-        if (!sphericalMatch.Success || sphericalMatch.Groups[1].Value.ToLowerInvariant() != "true")
-            return false;
-
-        // Projection type
-        var projMatch = ProjectionTypeRegex.Match(xmpText);
-        if (projMatch.Success)
-        {
-            result.ProjectionType = projMatch.Groups[1].Value.ToLowerInvariant();
-        }
-        else
-        {
-            result.ProjectionType = "equirectangular"; // Default for V1
-        }
-
-        // Stereo mode
-        var stereoMatch = StereoModeRegex.Match(xmpText);
-        if (stereoMatch.Success)
-        {
-            string stereoValue = stereoMatch.Groups[1].Value.ToLowerInvariant();
-            switch (stereoValue)
+            while (fs.Position < fileLength - 8)
             {
-                case "mono":
-                    result.StereoMode = 0;
-                    break;
-                case "top-bottom":
-                    result.StereoMode = 1;
-                    break;
-                case "left-right":
-                    result.StereoMode = 2;
-                    break;
-                default:
-                    result.StereoMode = 0;
-                    break;
+                long atomPos = fs.Position;
+                long atomSize = ReadAtomSize(reader, out _);
+
+                if (atomSize < 8) break;
+
+                // Read atom type
+                byte[] atomType = reader.ReadBytes(4);
+                if (Encoding.ASCII.GetString(atomType) == "uuid")
+                {
+                    if (fs.Position + 16 <= atomPos + atomSize)
+                    {
+                        byte[] uuid = reader.ReadBytes(16);
+                        if (MatchesUuid(uuid, xmpUuid))
+                        {
+                            int dataSize = (int)(atomSize - 28); // 8 header + 4 type + 16 uuid
+                            if (dataSize > 0 && dataSize < 1024 * 1024)
+                            {
+                                byte[] xmpData = reader.ReadBytes(dataSize);
+                                string xmpText = Encoding.UTF8.GetString(xmpData);
+                                if (ParseGSphericalXmp(xmpText, ref result))
+                                    return true;
+                            }
+                        }
+                    }
+                }
+
+                fs.Position = atomPos + atomSize;
             }
+
+            return false;
         }
 
-        // Full pano width (for 180 vs 360 disambiguation)
-        var fullPanoMatch = FullPanoWidthRegex.Match(xmpText);
-        if (fullPanoMatch.Success && int.TryParse(fullPanoMatch.Groups[1].Value, out int fullPanoWidth))
+        private static bool MatchesUuid(byte[] a, byte[] b)
         {
-            result.FullPanoWidthPixels = fullPanoWidth;
-        }
-
-        var croppedMatch = CroppedWidthRegex.Match(xmpText);
-        if (croppedMatch.Success && int.TryParse(croppedMatch.Groups[1].Value, out int croppedWidth))
-        {
-            result.CroppedAreaImageWidthPixels = croppedWidth;
-        }
-
-        // Determine if full sphere
-        // If cropped area is roughly half of full pano, it's 180
-        if (result.FullPanoWidthPixels > 0 && result.CroppedAreaImageWidthPixels > 0)
-        {
-            float ratio = (float)result.CroppedAreaImageWidthPixels / result.FullPanoWidthPixels;
-            result.IsFullSphere = ratio > 0.75f; // If cropped is > 75% of full, treat as 360
-        }
-        else
-        {
-            result.IsFullSphere = true; // Default to 360 for V1 without crop info
-        }
-
-        return true;
-    }
-
-    #endregion
-
-    #region MP4 Atom Helpers
-
-    /// <summary>
-    /// Read atom size, handling extended size (64-bit) when size field == 1.
-    /// Returns total atom size including header.
-    /// </summary>
-    private static long ReadAtomSize(BinaryReader reader, out bool isExtended)
-    {
-        isExtended = false;
-        uint size32 = ReadUInt32BE(reader);
-
-        if (size32 == 1)
-        {
-            // Extended size: next 8 bytes are the real size
-            isExtended = true;
-            return ReadInt64BE(reader);
-        }
-
-        return size32;
-    }
-
-    private static long FindAtom(BinaryReader reader, long endPos, string atomType)
-    {
-        reader.BaseStream.Position = 0;
-        return FindAtomWithin(reader, endPos, atomType);
-    }
-
-    private static long FindAtomWithin(BinaryReader reader, long endPos, string atomType, long startPos = -1)
-    {
-        var fs = reader.BaseStream;
-        if (startPos >= 0) fs.Position = startPos;
-
-        byte[] targetType = Encoding.ASCII.GetBytes(atomType);
-
-        while (fs.Position < endPos - 8)
-        {
-            long atomPos = fs.Position;
-
-            // Read atom size
-            uint size32 = ReadUInt32BE(reader);
-            if (size32 < 8 && size32 != 1) break; // Invalid atom (size 0 means "rest of file" but we skip that)
-
-            // Read atom type
-            byte[] type = reader.ReadBytes(4);
-
-            long atomSize;
-            if (size32 == 1)
+            if (a.Length != b.Length) return false;
+            for (int i = 0; i < a.Length; i++)
             {
-                // Extended size
-                if (fs.Position + 8 > endPos) break;
-                atomSize = ReadInt64BE(reader);
+                if (a[i] != b[i]) return false;
+            }
+            return true;
+        }
+
+        // Regex patterns for XMP GSpherical parsing
+        private static readonly Regex SphericalRegex = new Regex(
+            @"GSpherical:Spherical[>""=\s]+(true|false)", RegexOptions.IgnoreCase);
+        private static readonly Regex ProjectionTypeRegex = new Regex(
+            @"GSpherical:ProjectionType[>""=\s]+(\w+)", RegexOptions.IgnoreCase);
+        private static readonly Regex StereoModeRegex = new Regex(
+            @"GSpherical:StereoMode[>""=\s]+([\w-]+)", RegexOptions.IgnoreCase);
+        private static readonly Regex FullPanoWidthRegex = new Regex(
+            @"GSpherical:FullPanoWidthPixels[>""=\s]+(\d+)", RegexOptions.IgnoreCase);
+        private static readonly Regex CroppedWidthRegex = new Regex(
+            @"GSpherical:CroppedAreaImageWidthPixels[>""=\s]+(\d+)", RegexOptions.IgnoreCase);
+
+        private static bool ParseGSphericalXmp(string xmpText, ref SphericalVideoMetadata result)
+        {
+            // Check if spherical metadata is present
+            var sphericalMatch = SphericalRegex.Match(xmpText);
+            if (!sphericalMatch.Success || sphericalMatch.Groups[1].Value.ToLowerInvariant() != "true")
+                return false;
+
+            // Projection type
+            var projMatch = ProjectionTypeRegex.Match(xmpText);
+            if (projMatch.Success)
+            {
+                result.ProjectionType = projMatch.Groups[1].Value.ToLowerInvariant();
             }
             else
             {
-                atomSize = size32;
+                result.ProjectionType = "equirectangular"; // Default for V1
             }
 
-            if (atomSize < 8) break;
-
-            // Check if this is the atom we're looking for
-            if (type[0] == targetType[0] && type[1] == targetType[1] &&
-                type[2] == targetType[2] && type[3] == targetType[3])
+            // Stereo mode
+            var stereoMatch = StereoModeRegex.Match(xmpText);
+            if (stereoMatch.Success)
             {
-                return atomPos;
+                string stereoValue = stereoMatch.Groups[1].Value.ToLowerInvariant();
+                switch (stereoValue)
+                {
+                    case "mono":
+                        result.StereoMode = 0;
+                        break;
+                    case "top-bottom":
+                        result.StereoMode = 1;
+                        break;
+                    case "left-right":
+                        result.StereoMode = 2;
+                        break;
+                    default:
+                        result.StereoMode = 0;
+                        break;
+                }
             }
 
-            // Skip to next atom
-            long nextPos = atomPos + atomSize;
-            if (nextPos <= atomPos) break; // Overflow protection
-            fs.Position = nextPos;
+            // Full pano width (for 180 vs 360 disambiguation)
+            var fullPanoMatch = FullPanoWidthRegex.Match(xmpText);
+            if (fullPanoMatch.Success && int.TryParse(fullPanoMatch.Groups[1].Value, out int fullPanoWidth))
+            {
+                result.FullPanoWidthPixels = fullPanoWidth;
+            }
+
+            var croppedMatch = CroppedWidthRegex.Match(xmpText);
+            if (croppedMatch.Success && int.TryParse(croppedMatch.Groups[1].Value, out int croppedWidth))
+            {
+                result.CroppedAreaImageWidthPixels = croppedWidth;
+            }
+
+            // Determine if full sphere
+            // If cropped area is roughly half of full pano, it's 180
+            if (result.FullPanoWidthPixels > 0 && result.CroppedAreaImageWidthPixels > 0)
+            {
+                float ratio = (float)result.CroppedAreaImageWidthPixels / result.FullPanoWidthPixels;
+                result.IsFullSphere = ratio > 0.75f; // If cropped is > 75% of full, treat as 360
+            }
+            else
+            {
+                result.IsFullSphere = true; // Default to 360 for V1 without crop info
+            }
+
+            return true;
         }
 
-        return -1;
-    }
+        #endregion
 
-    private static uint ReadUInt32BE(BinaryReader reader)
-    {
-        byte[] bytes = reader.ReadBytes(4);
-        if (BitConverter.IsLittleEndian)
+        #region MP4 Atom Helpers
+
+        /// <summary>
+        /// Read atom size, handling extended size (64-bit) when size field == 1.
+        /// Returns total atom size including header.
+        /// </summary>
+        private static long ReadAtomSize(BinaryReader reader, out bool isExtended)
         {
-            Array.Reverse(bytes);
-        }
-        return BitConverter.ToUInt32(bytes, 0);
-    }
+            isExtended = false;
+            uint size32 = ReadUInt32BE(reader);
 
-    private static ushort ReadUInt16BE(BinaryReader reader)
-    {
-        byte[] bytes = reader.ReadBytes(2);
-        if (BitConverter.IsLittleEndian)
+            if (size32 == 1)
+            {
+                // Extended size: next 8 bytes are the real size
+                isExtended = true;
+                return ReadInt64BE(reader);
+            }
+
+            return size32;
+        }
+
+        private static long FindAtom(BinaryReader reader, long endPos, string atomType)
         {
-            Array.Reverse(bytes);
+            reader.BaseStream.Position = 0;
+            return FindAtomWithin(reader, endPos, atomType);
         }
-        return BitConverter.ToUInt16(bytes, 0);
-    }
 
-    private static long ReadInt64BE(BinaryReader reader)
-    {
-        byte[] bytes = reader.ReadBytes(8);
-        if (BitConverter.IsLittleEndian)
+        private static long FindAtomWithin(BinaryReader reader, long endPos, string atomType, long startPos = -1)
         {
-            Array.Reverse(bytes);
+            var fs = reader.BaseStream;
+            if (startPos >= 0) fs.Position = startPos;
+
+            byte[] targetType = Encoding.ASCII.GetBytes(atomType);
+
+            while (fs.Position < endPos - 8)
+            {
+                long atomPos = fs.Position;
+
+                // Read atom size
+                uint size32 = ReadUInt32BE(reader);
+                if (size32 < 8 && size32 != 1) break; // Invalid atom (size 0 means "rest of file" but we skip that)
+
+                // Read atom type
+                byte[] type = reader.ReadBytes(4);
+
+                long atomSize;
+                if (size32 == 1)
+                {
+                    // Extended size
+                    if (fs.Position + 8 > endPos) break;
+                    atomSize = ReadInt64BE(reader);
+                }
+                else
+                {
+                    atomSize = size32;
+                }
+
+                if (atomSize < 8) break;
+
+                // Check if this is the atom we're looking for
+                if (type[0] == targetType[0] && type[1] == targetType[1] &&
+                    type[2] == targetType[2] && type[3] == targetType[3])
+                {
+                    return atomPos;
+                }
+
+                // Skip to next atom
+                long nextPos = atomPos + atomSize;
+                if (nextPos <= atomPos) break; // Overflow protection
+                fs.Position = nextPos;
+            }
+
+            return -1;
         }
-        return BitConverter.ToInt64(bytes, 0);
+
+        private static uint ReadUInt32BE(BinaryReader reader)
+        {
+            byte[] bytes = reader.ReadBytes(4);
+            if (BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(bytes);
+            }
+            return BitConverter.ToUInt32(bytes, 0);
+        }
+
+        private static ushort ReadUInt16BE(BinaryReader reader)
+        {
+            byte[] bytes = reader.ReadBytes(2);
+            if (BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(bytes);
+            }
+            return BitConverter.ToUInt16(bytes, 0);
+        }
+
+        private static long ReadInt64BE(BinaryReader reader)
+        {
+            byte[] bytes = reader.ReadBytes(8);
+            if (BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(bytes);
+            }
+            return BitConverter.ToInt64(bytes, 0);
+        }
+
+        #endregion
     }
 
-    #endregion
 }
