@@ -6,6 +6,7 @@ using System;
 using VRWorkspace.UI.HoverEffects;
 using VRWorkspace.Media.Data;
 using VRWorkspace.UI.Components;
+using VRWorkspace.UI.RTT;
 using VRWorkspace.UI.RTT.Components;
 using VRWorkspace.UI.RTT.Controllers;
 using VRWorkspace.UI.RTT.Services;

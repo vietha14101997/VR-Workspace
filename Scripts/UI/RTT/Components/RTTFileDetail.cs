@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using TMPro;
 using System;
 using VRWorkspace.UI.Components;
+using VRWorkspace.UI.RTT;
 using VRWorkspace.UI.RTT.Controllers;
 using VRWorkspace.UI.RTT.Services;
 

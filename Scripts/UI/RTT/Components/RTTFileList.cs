@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using TMPro;
 using System;
 using VRWorkspace.UI.Utilities;
+using VRWorkspace.UI.RTT;
 using VRWorkspace.UI.RTT.Controllers;
 using VRWorkspace.UI.RTT.Services;
 

@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using TMPro;
 using VRWorkspace.UI.HoverEffects;
+using VRWorkspace.UI.RTT;
 using VRWorkspace.UI.RTT.Controllers;
 
 namespace VRWorkspace.UI.RTT.Components

@@ -4,6 +4,7 @@ using UnityEngine.EventSystems;
 using TMPro;
 using System;
 using VRWorkspace.UI.HoverEffects;
+using VRWorkspace.UI.RTT;
 using VRWorkspace.UI.RTT.Controllers;
 using VRWorkspace.UI.RTT.Services;
 

@@ -4,6 +4,7 @@ using TMPro;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using VRWorkspace.UI.RTT;
 using VRWorkspace.UI.RTT.Controllers;
 using VRWorkspace.UI.RTT.Services;
 
