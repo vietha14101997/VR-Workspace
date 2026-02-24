@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using UnityEngine;
 using VRWorkspace.Media.UI;
+using VRWorkspace.UI.RTT.Services;
 
 namespace VRWorkspace.Media.Utils
 {
@@ -144,11 +145,11 @@ namespace VRWorkspace.Media.Utils
             fs.Position = 0;
 
             // Find moov atom
-            long moovPos = FindAtom(reader, fileLength, "moov");
+            long moovPos = Mp4AtomParser.FindAtom(reader, fileLength, "moov");
             if (moovPos < 0) return false;
 
             fs.Position = moovPos;
-            long moovSize = ReadAtomSize(reader, out _);
+            long moovSize = Mp4AtomParser.ReadAtomSize(reader, out _);
             long moovEnd = moovPos + moovSize;
             fs.Position = moovPos + 8;
 
@@ -166,11 +167,11 @@ namespace VRWorkspace.Media.Utils
 
             // Search for sv3d
             fs.Position = childBoxesStart;
-            long sv3dPos = FindAtomWithin(reader, sampleEntryEnd, "sv3d");
+            long sv3dPos = Mp4AtomParser.FindAtomWithin(reader, sampleEntryEnd, "sv3d");
             if (sv3dPos >= 0)
             {
                 fs.Position = sv3dPos;
-                long sv3dSize = ReadAtomSize(reader, out _);
+                long sv3dSize = Mp4AtomParser.ReadAtomSize(reader, out _);
                 long sv3dEnd = sv3dPos + sv3dSize;
                 fs.Position = sv3dPos + 8;
 
@@ -180,11 +181,11 @@ namespace VRWorkspace.Media.Utils
 
             // Search for st3d
             fs.Position = childBoxesStart;
-            long st3dPos = FindAtomWithin(reader, sampleEntryEnd, "st3d");
+            long st3dPos = Mp4AtomParser.FindAtomWithin(reader, sampleEntryEnd, "st3d");
             if (st3dPos >= 0)
             {
                 fs.Position = st3dPos;
-                long st3dSize = ReadAtomSize(reader, out _);
+                long st3dSize = Mp4AtomParser.ReadAtomSize(reader, out _);
                 fs.Position = st3dPos + 8;
 
                 TryParseSt3d(reader, ref result);
@@ -209,11 +210,11 @@ namespace VRWorkspace.Media.Utils
             while (fs.Position < moovEnd - 8)
             {
                 long trakPos = fs.Position;
-                long trakAtomPos = FindAtomWithin(reader, moovEnd, "trak");
+                long trakAtomPos = Mp4AtomParser.FindAtomWithin(reader, moovEnd, "trak");
                 if (trakAtomPos < 0) break;
 
                 fs.Position = trakAtomPos;
-                long trakSize = ReadAtomSize(reader, out _);
+                long trakSize = Mp4AtomParser.ReadAtomSize(reader, out _);
                 long trakEnd = trakAtomPos + trakSize;
                 fs.Position = trakAtomPos + 8;
 
@@ -222,35 +223,35 @@ namespace VRWorkspace.Media.Utils
                 {
                     // Navigate to stsd: trak -> mdia -> minf -> stbl -> stsd
                     fs.Position = trakAtomPos + 8;
-                    long mdiaPos = FindAtomWithin(reader, trakEnd, "mdia");
+                    long mdiaPos = Mp4AtomParser.FindAtomWithin(reader, trakEnd, "mdia");
                     if (mdiaPos < 0) { fs.Position = trakEnd; continue; }
 
                     fs.Position = mdiaPos;
-                    long mdiaSize = ReadAtomSize(reader, out _);
+                    long mdiaSize = Mp4AtomParser.ReadAtomSize(reader, out _);
                     long mdiaEnd = mdiaPos + mdiaSize;
                     fs.Position = mdiaPos + 8;
 
-                    long minfPos = FindAtomWithin(reader, mdiaEnd, "minf");
+                    long minfPos = Mp4AtomParser.FindAtomWithin(reader, mdiaEnd, "minf");
                     if (minfPos < 0) { fs.Position = trakEnd; continue; }
 
                     fs.Position = minfPos;
-                    long minfSize = ReadAtomSize(reader, out _);
+                    long minfSize = Mp4AtomParser.ReadAtomSize(reader, out _);
                     long minfEnd = minfPos + minfSize;
                     fs.Position = minfPos + 8;
 
-                    long stblPos = FindAtomWithin(reader, minfEnd, "stbl");
+                    long stblPos = Mp4AtomParser.FindAtomWithin(reader, minfEnd, "stbl");
                     if (stblPos < 0) { fs.Position = trakEnd; continue; }
 
                     fs.Position = stblPos;
-                    long stblSize = ReadAtomSize(reader, out _);
+                    long stblSize = Mp4AtomParser.ReadAtomSize(reader, out _);
                     long stblEnd = stblPos + stblSize;
                     fs.Position = stblPos + 8;
 
-                    long stsdPos = FindAtomWithin(reader, stblEnd, "stsd");
+                    long stsdPos = Mp4AtomParser.FindAtomWithin(reader, stblEnd, "stsd");
                     if (stsdPos < 0) { fs.Position = trakEnd; continue; }
 
                     fs.Position = stsdPos;
-                    long stsdSize = ReadAtomSize(reader, out _);
+                    long stsdSize = Mp4AtomParser.ReadAtomSize(reader, out _);
                     long stsdEnd = stsdPos + stsdSize;
 
                     // stsd is a FullBox: 8 (header) + 4 (version/flags) + 4 (entry_count)
@@ -260,7 +261,7 @@ namespace VRWorkspace.Media.Utils
 
                     // Read first sample entry
                     sampleEntryPos = fs.Position;
-                    long entrySize = ReadAtomSize(reader, out _);
+                    long entrySize = Mp4AtomParser.ReadAtomSize(reader, out _);
                     sampleEntryEnd = sampleEntryPos + entrySize;
 
                     return true;
@@ -283,16 +284,16 @@ namespace VRWorkspace.Media.Utils
             try
             {
                 // Find mdia within trak
-                long mdiaPos = FindAtomWithin(reader, trakEnd, "mdia");
+                long mdiaPos = Mp4AtomParser.FindAtomWithin(reader, trakEnd, "mdia");
                 if (mdiaPos < 0) return false;
 
                 fs.Position = mdiaPos;
-                long mdiaSize = ReadAtomSize(reader, out _);
+                long mdiaSize = Mp4AtomParser.ReadAtomSize(reader, out _);
                 long mdiaEnd = mdiaPos + mdiaSize;
                 fs.Position = mdiaPos + 8;
 
                 // Find hdlr within mdia
-                long hdlrPos = FindAtomWithin(reader, mdiaEnd, "hdlr");
+                long hdlrPos = Mp4AtomParser.FindAtomWithin(reader, mdiaEnd, "hdlr");
                 if (hdlrPos < 0) return false;
 
                 // hdlr structure: 8 (header) + 4 (version/flags) + 4 (pre_defined) + 4 (handler_type)
@@ -320,11 +321,11 @@ namespace VRWorkspace.Media.Utils
             var fs = reader.BaseStream;
 
             // Find proj box within sv3d
-            long projPos = FindAtomWithin(reader, sv3dEnd, "proj");
+            long projPos = Mp4AtomParser.FindAtomWithin(reader, sv3dEnd, "proj");
             if (projPos < 0) return;
 
             fs.Position = projPos;
-            long projSize = ReadAtomSize(reader, out _);
+            long projSize = Mp4AtomParser.ReadAtomSize(reader, out _);
             long projEnd = projPos + projSize;
             fs.Position = projPos + 8;
 
@@ -333,7 +334,7 @@ namespace VRWorkspace.Media.Utils
 
             // Check for equi
             fs.Position = searchStart;
-            long equiPos = FindAtomWithin(reader, projEnd, "equi");
+            long equiPos = Mp4AtomParser.FindAtomWithin(reader, projEnd, "equi");
             if (equiPos >= 0)
             {
                 result.ProjectionType = "equirectangular";
@@ -343,10 +344,10 @@ namespace VRWorkspace.Media.Utils
 
                 if (fs.Position + 16 <= projEnd)
                 {
-                    uint boundsTop = ReadUInt32BE(reader);
-                    uint boundsBottom = ReadUInt32BE(reader);
-                    uint boundsLeft = ReadUInt32BE(reader);
-                    uint boundsRight = ReadUInt32BE(reader);
+                    uint boundsTop = Mp4AtomParser.ReadUInt32BE(reader);
+                    uint boundsBottom = Mp4AtomParser.ReadUInt32BE(reader);
+                    uint boundsLeft = Mp4AtomParser.ReadUInt32BE(reader);
+                    uint boundsRight = Mp4AtomParser.ReadUInt32BE(reader);
 
                     // If all bounds are 0, it's a full sphere (360)
                     // Non-zero bounds indicate partial sphere (could be 180)
@@ -361,7 +362,7 @@ namespace VRWorkspace.Media.Utils
 
             // Check for cbmp
             fs.Position = searchStart;
-            long cbmpPos = FindAtomWithin(reader, projEnd, "cbmp");
+            long cbmpPos = Mp4AtomParser.FindAtomWithin(reader, projEnd, "cbmp");
             if (cbmpPos >= 0)
             {
                 result.ProjectionType = "cubemap";
@@ -394,27 +395,27 @@ namespace VRWorkspace.Media.Utils
             fs.Position = 0;
 
             // Try 1: Find moov/udta/XMP_ atom
-            long moovPos = FindAtom(reader, fileLength, "moov");
+            long moovPos = Mp4AtomParser.FindAtom(reader, fileLength, "moov");
             if (moovPos >= 0)
             {
                 fs.Position = moovPos;
-                long moovSize = ReadAtomSize(reader, out _);
+                long moovSize = Mp4AtomParser.ReadAtomSize(reader, out _);
                 long moovEnd = moovPos + moovSize;
                 fs.Position = moovPos + 8;
 
-                long udtaPos = FindAtomWithin(reader, moovEnd, "udta");
+                long udtaPos = Mp4AtomParser.FindAtomWithin(reader, moovEnd, "udta");
                 if (udtaPos >= 0)
                 {
                     fs.Position = udtaPos;
-                    long udtaSize = ReadAtomSize(reader, out _);
+                    long udtaSize = Mp4AtomParser.ReadAtomSize(reader, out _);
                     long udtaEnd = udtaPos + udtaSize;
                     fs.Position = udtaPos + 8;
 
-                    long xmpPos = FindAtomWithin(reader, udtaEnd, "XMP_");
+                    long xmpPos = Mp4AtomParser.FindAtomWithin(reader, udtaEnd, "XMP_");
                     if (xmpPos >= 0)
                     {
                         fs.Position = xmpPos;
-                        long xmpSize = ReadAtomSize(reader, out _);
+                        long xmpSize = Mp4AtomParser.ReadAtomSize(reader, out _);
                         fs.Position = xmpPos + 8;
 
                         int dataSize = (int)(xmpSize - 8);
@@ -439,7 +440,7 @@ namespace VRWorkspace.Media.Utils
             while (fs.Position < fileLength - 8)
             {
                 long atomPos = fs.Position;
-                long atomSize = ReadAtomSize(reader, out _);
+                long atomSize = Mp4AtomParser.ReadAtomSize(reader, out _);
 
                 if (atomSize < 8) break;
 
@@ -562,112 +563,6 @@ namespace VRWorkspace.Media.Utils
 
         #endregion
 
-        #region MP4 Atom Helpers
-
-        /// <summary>
-        /// Read atom size, handling extended size (64-bit) when size field == 1.
-        /// Returns total atom size including header.
-        /// </summary>
-        private static long ReadAtomSize(BinaryReader reader, out bool isExtended)
-        {
-            isExtended = false;
-            uint size32 = ReadUInt32BE(reader);
-
-            if (size32 == 1)
-            {
-                // Extended size: next 8 bytes are the real size
-                isExtended = true;
-                return ReadInt64BE(reader);
-            }
-
-            return size32;
-        }
-
-        private static long FindAtom(BinaryReader reader, long endPos, string atomType)
-        {
-            reader.BaseStream.Position = 0;
-            return FindAtomWithin(reader, endPos, atomType);
-        }
-
-        private static long FindAtomWithin(BinaryReader reader, long endPos, string atomType, long startPos = -1)
-        {
-            var fs = reader.BaseStream;
-            if (startPos >= 0) fs.Position = startPos;
-
-            byte[] targetType = Encoding.ASCII.GetBytes(atomType);
-
-            while (fs.Position < endPos - 8)
-            {
-                long atomPos = fs.Position;
-
-                // Read atom size
-                uint size32 = ReadUInt32BE(reader);
-                if (size32 < 8 && size32 != 1) break; // Invalid atom (size 0 means "rest of file" but we skip that)
-
-                // Read atom type
-                byte[] type = reader.ReadBytes(4);
-
-                long atomSize;
-                if (size32 == 1)
-                {
-                    // Extended size
-                    if (fs.Position + 8 > endPos) break;
-                    atomSize = ReadInt64BE(reader);
-                }
-                else
-                {
-                    atomSize = size32;
-                }
-
-                if (atomSize < 8) break;
-
-                // Check if this is the atom we're looking for
-                if (type[0] == targetType[0] && type[1] == targetType[1] &&
-                    type[2] == targetType[2] && type[3] == targetType[3])
-                {
-                    return atomPos;
-                }
-
-                // Skip to next atom
-                long nextPos = atomPos + atomSize;
-                if (nextPos <= atomPos) break; // Overflow protection
-                fs.Position = nextPos;
-            }
-
-            return -1;
-        }
-
-        private static uint ReadUInt32BE(BinaryReader reader)
-        {
-            byte[] bytes = reader.ReadBytes(4);
-            if (BitConverter.IsLittleEndian)
-            {
-                Array.Reverse(bytes);
-            }
-            return BitConverter.ToUInt32(bytes, 0);
-        }
-
-        private static ushort ReadUInt16BE(BinaryReader reader)
-        {
-            byte[] bytes = reader.ReadBytes(2);
-            if (BitConverter.IsLittleEndian)
-            {
-                Array.Reverse(bytes);
-            }
-            return BitConverter.ToUInt16(bytes, 0);
-        }
-
-        private static long ReadInt64BE(BinaryReader reader)
-        {
-            byte[] bytes = reader.ReadBytes(8);
-            if (BitConverter.IsLittleEndian)
-            {
-                Array.Reverse(bytes);
-            }
-            return BitConverter.ToInt64(bytes, 0);
-        }
-
-        #endregion
     }
 
 }

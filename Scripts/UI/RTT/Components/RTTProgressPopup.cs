@@ -24,9 +24,13 @@ namespace VRWorkspace.UI.RTT.Components
         #region Nested Classes
 
         [System.Serializable]
-        public class PopupConfig
+        public class PopupConfig : PopupConfigBase
         {
-            public float width = 500f;
+            // width, primaryColor, accentColor, overlayColor, font, layerName
+            // are inherited from PopupConfigBase.
+            // PopupConfig uses PopupConfigBase defaults (width=500f, overlayColor alpha=0.5f,
+            // layerName="VirtualObjects") which already match, so no constructor override needed.
+
             public float padding = 24f;
             public float titleFontSize = 28f;
             public float statusFontSize = 22f;
@@ -37,12 +41,7 @@ namespace VRWorkspace.UI.RTT.Components
             public float progressBarHeight = 24f;
             public float buttonHeight = 50f;
             public float spacing = 16f;
-            public Color primaryColor = new Color(0f, 0.9f, 1f);
-            public Color accentColor = new Color(0.76f, 0.36f, 1f);
             public Color progressBarBgColor = new Color(0.2f, 0.2f, 0.25f, 0.8f);
-            public Color overlayColor = new Color(0f, 0f, 0f, 0.5f);
-            public TMP_FontAsset font;
-            public string layerName = "VirtualObjects";
 
             // Border settings (synchronized with other popups)
             public float borderWidth = 0.05f;
@@ -155,30 +154,7 @@ namespace VRWorkspace.UI.RTT.Components
                 + config.buttonHeight;
         }
 
-        private static Camera FindMainCamera()
-        {
-            string[] cameraNames = { "CenterEyeAnchor", "Main Camera", "PlayerCamera", "Camera" };
-            foreach (var name in cameraNames)
-            {
-                GameObject camObj = GameObject.Find(name);
-                if (camObj != null)
-                {
-                    Camera cam = camObj.GetComponent<Camera>();
-                    if (cam != null && cam.gameObject.activeInHierarchy) return cam;
-                }
-            }
-
-            if (Camera.main != null) return Camera.main;
-
-            Camera[] allCameras = FindObjectsByType<Camera>(FindObjectsSortMode.None);
-            foreach (var cam in allCameras)
-            {
-                if (!cam.name.Contains("UI") && cam.gameObject.activeInHierarchy)
-                    return cam;
-            }
-
-            return null;
-        }
+        private static Camera FindMainCamera() => CameraFinder.FindMainCamera();
 
         #endregion
 

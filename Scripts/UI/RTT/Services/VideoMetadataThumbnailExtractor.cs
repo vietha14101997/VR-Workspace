@@ -1,7 +1,6 @@
 using UnityEngine;
 using System;
 using System.IO;
-using System.Text;
 
 namespace VRWorkspace.UI.RTT.Services
 {
@@ -67,60 +66,60 @@ namespace VRWorkspace.UI.RTT.Services
             using (BinaryReader reader = new BinaryReader(fs))
             {
                 // Find moov atom
-                long moovPos = FindAtom(reader, fs.Length, "moov");
+                long moovPos = Mp4AtomParser.FindAtom(reader, fs.Length, "moov");
                 if (moovPos < 0) return false;
 
                 // Read moov atom size
                 fs.Position = moovPos;
-                uint moovSize = ReadUInt32BE(reader);
+                uint moovSize = Mp4AtomParser.ReadUInt32BE(reader);
                 long moovEnd = moovPos + moovSize;
 
                 // Skip moov header (size + type)
                 fs.Position = moovPos + 8;
 
                 // Find udta atom within moov
-                long udtaPos = FindAtomWithin(reader, moovEnd, "udta");
+                long udtaPos = Mp4AtomParser.FindAtomWithin(reader, moovEnd, "udta");
                 if (udtaPos < 0) return false;
 
                 fs.Position = udtaPos;
-                uint udtaSize = ReadUInt32BE(reader);
+                uint udtaSize = Mp4AtomParser.ReadUInt32BE(reader);
                 long udtaEnd = udtaPos + udtaSize;
                 fs.Position = udtaPos + 8;
 
                 // Find meta atom within udta
-                long metaPos = FindAtomWithin(reader, udtaEnd, "meta");
+                long metaPos = Mp4AtomParser.FindAtomWithin(reader, udtaEnd, "meta");
                 if (metaPos < 0) return false;
 
                 fs.Position = metaPos;
-                uint metaSize = ReadUInt32BE(reader);
+                uint metaSize = Mp4AtomParser.ReadUInt32BE(reader);
                 long metaEnd = metaPos + metaSize;
                 // meta atom has 4 extra bytes (version/flags) after header
                 fs.Position = metaPos + 12;
 
                 // Find ilst atom within meta
-                long ilstPos = FindAtomWithin(reader, metaEnd, "ilst");
+                long ilstPos = Mp4AtomParser.FindAtomWithin(reader, metaEnd, "ilst");
                 if (ilstPos < 0) return false;
 
                 fs.Position = ilstPos;
-                uint ilstSize = ReadUInt32BE(reader);
+                uint ilstSize = Mp4AtomParser.ReadUInt32BE(reader);
                 long ilstEnd = ilstPos + ilstSize;
                 fs.Position = ilstPos + 8;
 
                 // Find covr atom within ilst
-                long covrPos = FindAtomWithin(reader, ilstEnd, "covr");
+                long covrPos = Mp4AtomParser.FindAtomWithin(reader, ilstEnd, "covr");
                 if (covrPos < 0) return false;
 
                 fs.Position = covrPos;
-                uint covrSize = ReadUInt32BE(reader);
+                uint covrSize = Mp4AtomParser.ReadUInt32BE(reader);
                 long covrEnd = covrPos + covrSize;
                 fs.Position = covrPos + 8;
 
                 // Find data atom within covr
-                long dataPos = FindAtomWithin(reader, covrEnd, "data");
+                long dataPos = Mp4AtomParser.FindAtomWithin(reader, covrEnd, "data");
                 if (dataPos < 0) return false;
 
                 fs.Position = dataPos;
-                uint dataSize = ReadUInt32BE(reader);
+                uint dataSize = Mp4AtomParser.ReadUInt32BE(reader);
 
                 // Skip data atom header (8 bytes) + type indicator (4 bytes) + null bytes (4 bytes)
                 fs.Position = dataPos + 16;
@@ -153,53 +152,6 @@ namespace VRWorkspace.UI.RTT.Services
             }
         }
 
-        private static long FindAtom(BinaryReader reader, long endPos, string atomType)
-        {
-            long startPos = reader.BaseStream.Position;
-            return FindAtomWithin(reader, endPos, atomType, startPos);
-        }
-
-        private static long FindAtomWithin(BinaryReader reader, long endPos, string atomType, long startPos = -1)
-        {
-            FileStream fs = (FileStream)reader.BaseStream;
-            if (startPos >= 0) fs.Position = startPos;
-
-            byte[] targetType = Encoding.ASCII.GetBytes(atomType);
-
-            while (fs.Position < endPos - 8)
-            {
-                long atomPos = fs.Position;
-
-                // Read atom size (4 bytes, big-endian)
-                uint size = ReadUInt32BE(reader);
-                if (size < 8) break; // Invalid atom
-
-                // Read atom type (4 bytes)
-                byte[] type = reader.ReadBytes(4);
-
-                // Check if this is the atom we're looking for
-                if (type[0] == targetType[0] && type[1] == targetType[1] &&
-                    type[2] == targetType[2] && type[3] == targetType[3])
-                {
-                    return atomPos;
-                }
-
-                // Skip to next atom
-                fs.Position = atomPos + size;
-            }
-
-            return -1;
-        }
-
-        private static uint ReadUInt32BE(BinaryReader reader)
-        {
-            byte[] bytes = reader.ReadBytes(4);
-            if (BitConverter.IsLittleEndian)
-            {
-                Array.Reverse(bytes);
-            }
-            return BitConverter.ToUInt32(bytes, 0);
-        }
         #endregion
 
         #region MKV Extraction

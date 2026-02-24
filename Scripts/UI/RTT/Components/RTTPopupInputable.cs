@@ -27,13 +27,22 @@ namespace VRWorkspace.UI.RTT.Components
         /// Configuration for the popup
         /// </summary>
         [System.Serializable]
-        public class PopupConfig
+        public class PopupConfig : PopupConfigBase
         {
+            // width, primaryColor, accentColor, overlayColor, font, layerName
+            // are inherited from PopupConfigBase.
+            // PopupInputable overrides the base defaults via constructor.
+            public PopupConfig()
+            {
+                width = 500f;
+                overlayColor = new Color(0f, 0f, 0f, 0.7f);
+                layerName = "UI";
+            }
+
             public string title = "CREATE FOLDER";
             public string inputLabel = "Name";
             public string inputPlaceholder = "Enter folder name";
             public string buttonText = "Create";
-            public float width = 500f;
             public float padding = 20f;
             public float titleFontSize = 32;
             public float labelFontSize = 36;
@@ -44,11 +53,6 @@ namespace VRWorkspace.UI.RTT.Components
             public float titleHeight = 50f;
             public float closeButtonSize = 75f;
             public float spacing = 10f;
-            public Color primaryColor = new Color(0f, 0.9f, 1f);
-            public Color accentColor = new Color(0.76f, 0.36f, 1f);
-            public Color overlayColor = new Color(0f, 0f, 0f, 0.7f);
-            public TMP_FontAsset font;
-            public string layerName = "UI";
         }
 
         #endregion
@@ -225,35 +229,7 @@ namespace VRWorkspace.UI.RTT.Components
         /// <summary>
         /// Find the main camera (VR center eye or main camera)
         /// </summary>
-        private static Camera FindMainCamera()
-        {
-            // Try to find camera by specific names used in VR apps
-            string[] cameraNames = { "CenterEyeAnchor", "Main Camera", "PlayerCamera", "Camera" };
-            foreach (var name in cameraNames)
-            {
-                GameObject camObj = GameObject.Find(name);
-                if (camObj != null)
-                {
-                    Camera cam = camObj.GetComponent<Camera>();
-                    if (cam != null && cam.gameObject.activeInHierarchy) return cam;
-                }
-            }
-
-            // Fallback to Camera.main
-            if (Camera.main != null) return Camera.main;
-
-            // Last resort: find any camera that's not UICamera
-            Camera[] allCameras = FindObjectsByType<Camera>(FindObjectsSortMode.None);
-            foreach (var cam in allCameras)
-            {
-                if (!cam.name.Contains("UI") && cam.gameObject.activeInHierarchy)
-                {
-                    return cam;
-                }
-            }
-
-            return null;
-        }
+        private static Camera FindMainCamera() => CameraFinder.FindMainCamera();
 
         #endregion
 
@@ -518,40 +494,7 @@ namespace VRWorkspace.UI.RTT.Components
 
         private void CreateWorldSpaceVisualOverlay()
         {
-            // Find the correct main camera (not UICamera used for RTT)
-            Camera mainCam = null;
-
-            // Try to find camera by specific names used in VR apps
-            string[] cameraNames = { "CenterEyeAnchor", "Main Camera", "PlayerCamera", "Camera" };
-            foreach (var name in cameraNames)
-            {
-                GameObject camObj = GameObject.Find(name);
-                if (camObj != null)
-                {
-                    mainCam = camObj.GetComponent<Camera>();
-                    if (mainCam != null && mainCam.gameObject.activeInHierarchy) break;
-                }
-            }
-
-            // Fallback to Camera.main
-            if (mainCam == null)
-            {
-                mainCam = Camera.main;
-            }
-
-            // Last resort: find any camera that's not UICamera
-            if (mainCam == null)
-            {
-                Camera[] allCameras = FindObjectsByType<Camera>(FindObjectsSortMode.None);
-                foreach (var cam in allCameras)
-                {
-                    if (!cam.name.Contains("UI") && cam.gameObject.activeInHierarchy)
-                    {
-                        mainCam = cam;
-                        break;
-                    }
-                }
-            }
+            Camera mainCam = CameraFinder.FindMainCamera();
 
             if (mainCam == null)
             {

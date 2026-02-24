@@ -1172,7 +1172,7 @@ namespace VRWorkspace.UI.RTT.Services
                         }
 
                         fs.Position = moovPos;
-                        uint moovSize = ReadUInt32BE(reader);
+                        uint moovSize = Mp4AtomParser.ReadUInt32BE(reader);
                         long moovDataStart = moovPos + 8;  // Skip size + type
                         long moovDataEnd = moovPos + moovSize;
 
@@ -1193,7 +1193,7 @@ namespace VRWorkspace.UI.RTT.Services
                             if (trakPos < 0) break;
 
                             fs.Position = trakPos;
-                            uint trakSize = ReadUInt32BE(reader);
+                            uint trakSize = Mp4AtomParser.ReadUInt32BE(reader);
                             long trakDataStart = trakPos + 8;
                             long trakDataEnd = trakPos + trakSize;
 
@@ -1247,54 +1247,7 @@ namespace VRWorkspace.UI.RTT.Services
             /// </summary>
             private static long FindAtomAt(System.IO.BinaryReader reader, long startPos, long endPos, string atomType)
             {
-                var fs = reader.BaseStream;
-                fs.Position = startPos;
-
-                byte[] target = System.Text.Encoding.ASCII.GetBytes(atomType);
-
-                while (fs.Position < endPos - 8)
-                {
-                    long atomPos = fs.Position;
-
-                    uint size = ReadUInt32BE(reader);
-
-                    // Handle extended size (size == 1 means 64-bit size follows)
-                    long atomSize;
-                    if (size == 1)
-                    {
-                        atomSize = (long)ReadUInt64BE(reader);
-                        if (atomSize < 16) break;
-                    }
-                    else if (size == 0)
-                    {
-                        // size 0 means atom extends to end of file
-                        atomSize = endPos - atomPos;
-                    }
-                    else if (size < 8)
-                    {
-                        break; // Invalid atom
-                    }
-                    else
-                    {
-                        atomSize = size;
-                    }
-
-                    byte[] type = reader.ReadBytes(4);
-                    if (type.Length < 4) break;
-
-                    if (type[0] == target[0] && type[1] == target[1] &&
-                        type[2] == target[2] && type[3] == target[3])
-                    {
-                        return atomPos;
-                    }
-
-                    // Move to next sibling atom
-                    long nextPos = atomPos + atomSize;
-                    if (nextPos <= atomPos) break; // Prevent infinite loop
-                    fs.Position = nextPos;
-                }
-
-                return -1;
+                return Mp4AtomParser.FindAtomWithin(reader, endPos, atomType, startPos);
             }
 
             /// <summary>
@@ -1312,8 +1265,8 @@ namespace VRWorkspace.UI.RTT.Services
                 else
                     reader.ReadBytes(8);  // 32-bit timestamps
 
-                uint timeScale = ReadUInt32BE(reader);
-                ulong duration = (version == 1) ? ReadUInt64BE(reader) : ReadUInt32BE(reader);
+                uint timeScale = Mp4AtomParser.ReadUInt32BE(reader);
+                ulong duration = (version == 1) ? Mp4AtomParser.ReadUInt64BE(reader) : Mp4AtomParser.ReadUInt32BE(reader);
 
                 if (timeScale > 0)
                     return (double)duration / timeScale;
@@ -1357,8 +1310,8 @@ namespace VRWorkspace.UI.RTT.Services
                 reader.ReadBytes(36); // matrix (9x int32)
 
                 // Width and height are fixed-point 16.16
-                uint rawWidth = ReadUInt32BE(reader);
-                uint rawHeight = ReadUInt32BE(reader);
+                uint rawWidth = Mp4AtomParser.ReadUInt32BE(reader);
+                uint rawHeight = Mp4AtomParser.ReadUInt32BE(reader);
                 width = (int)(rawWidth >> 16);
                 height = (int)(rawHeight >> 16);
             }
@@ -1372,7 +1325,7 @@ namespace VRWorkspace.UI.RTT.Services
                 if (mdiaPos < 0) return false;
 
                 reader.BaseStream.Position = mdiaPos;
-                uint mdiaSize = ReadUInt32BE(reader);
+                uint mdiaSize = Mp4AtomParser.ReadUInt32BE(reader);
                 long mdiaDataStart = mdiaPos + 8;
                 long mdiaDataEnd = mdiaPos + mdiaSize;
 
@@ -1401,21 +1354,21 @@ namespace VRWorkspace.UI.RTT.Services
                     if (mdiaPos < 0) return null;
 
                     reader.BaseStream.Position = mdiaPos;
-                    uint mdiaSize = ReadUInt32BE(reader);
+                    uint mdiaSize = Mp4AtomParser.ReadUInt32BE(reader);
                     long mdiaEnd = mdiaPos + mdiaSize;
 
                     long minfPos = FindAtomAt(reader, mdiaPos + 8, mdiaEnd, "minf");
                     if (minfPos < 0) return null;
 
                     reader.BaseStream.Position = minfPos;
-                    uint minfSize = ReadUInt32BE(reader);
+                    uint minfSize = Mp4AtomParser.ReadUInt32BE(reader);
                     long minfEnd = minfPos + minfSize;
 
                     long stblPos = FindAtomAt(reader, minfPos + 8, minfEnd, "stbl");
                     if (stblPos < 0) return null;
 
                     reader.BaseStream.Position = stblPos;
-                    uint stblSize = ReadUInt32BE(reader);
+                    uint stblSize = Mp4AtomParser.ReadUInt32BE(reader);
                     long stblEnd = stblPos + stblSize;
 
                     long stsdPos = FindAtomAt(reader, stblPos + 8, stblEnd, "stsd");
@@ -1436,23 +1389,6 @@ namespace VRWorkspace.UI.RTT.Services
                 return null;
             }
 
-            private static uint ReadUInt32BE(System.IO.BinaryReader reader)
-            {
-                byte[] bytes = reader.ReadBytes(4);
-                if (bytes.Length < 4) return 0;
-                if (System.BitConverter.IsLittleEndian)
-                    System.Array.Reverse(bytes);
-                return System.BitConverter.ToUInt32(bytes, 0);
-            }
-
-            private static ulong ReadUInt64BE(System.IO.BinaryReader reader)
-            {
-                byte[] bytes = reader.ReadBytes(8);
-                if (bytes.Length < 8) return 0;
-                if (System.BitConverter.IsLittleEndian)
-                    System.Array.Reverse(bytes);
-                return System.BitConverter.ToUInt64(bytes, 0);
-            }
         }
         #endregion
     }
