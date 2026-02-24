@@ -18,7 +18,7 @@ namespace VRWorkspace.Media.Core
     /// Controller for VR video playback.
     /// Connects VideoPlaybackEngine, VRVideoProjectionSystem, and RTTMediaControlsPanel.
     /// </summary>
-    public class VRVideoPlayerController : MonoBehaviour
+    public partial class VRVideoPlayerController : MonoBehaviour
     {
         #region Events
         public event Action OnBackToLibrary;
@@ -1179,32 +1179,7 @@ namespace VRWorkspace.Media.Core
             RestoreCachedSettings();
 
             // Step 3: Update controls
-            if (_controlsPanel != null && _playbackEngine != null)
-            {
-                _controlsPanel.SetDuration((float)_playbackEngine.Duration);
-
-                // Set aspect ratio for preview frame
-                float ratio = 16f / 9f; // Default
-                if (_playbackEngine.UseNV12Output && _playbackEngine.YPlaneTexture != null)
-                {
-                    ratio = (float)_playbackEngine.YPlaneTexture.width / _playbackEngine.YPlaneTexture.height;
-                }
-                else if (_playbackEngine.OutputTexture != null)
-                {
-                    ratio = (float)_playbackEngine.OutputTexture.width / _playbackEngine.OutputTexture.height;
-                }
-
-                if (ratio > 0)
-                {
-                    _controlsPanel.SetPreviewAspectRatio(ratio);
-                }
-
-                // Set the main video texture as the preview (mirrors playback)
-                if (_playbackEngine.OutputTexture != null)
-                {
-                    _controlsPanel.SetPreviewTexture(_playbackEngine.OutputTexture);
-                }
-            }
+            RefreshPreviewTexture();
 
             // Step 4: Show projection AFTER all settings applied
             if (_projectionSystem != null)
@@ -1252,12 +1227,7 @@ namespace VRWorkspace.Media.Core
             StopAutoSaveTimer();
             Debug.Log("[VRVideoPlayerController] Playback ended");
 
-            if (_controlsPanel != null)
-            {
-                _controlsPanel.SetCurrentTime((float)(_playbackEngine?.Duration ?? 0));
-                _controlsPanel.SetPlayState(false);
-                _controlsPanel.Show();
-            }
+            RefreshUIOnPlaybackEnded();
 
             if (_currentVideo.HasValue)
             {
@@ -1365,36 +1335,6 @@ namespace VRWorkspace.Media.Core
                 Debug.LogWarning($"[VRVideoPlayerController] Failed to detect container format: {ex.Message}");
                 return null;
             }
-        }
-
-        private void HandleStateChanged(VideoPlaybackEngine.PlaybackState state)
-        {
-            bool isPlaying = state == VideoPlaybackEngine.PlaybackState.Playing;
-            _controlsPanel?.SetPlayState(isPlaying);
-
-            // Show loading status during preparation/buffering
-            if (state == VideoPlaybackEngine.PlaybackState.Loading)
-            {
-                _controlsPanel?.SetTitle("Preparing...");
-            }
-            else if (state == VideoPlaybackEngine.PlaybackState.Buffering)
-            {
-                _controlsPanel?.SetTitle("Buffering...");
-            }
-            else if (state == VideoPlaybackEngine.PlaybackState.Playing && _currentVideo.HasValue)
-            {
-                _controlsPanel?.SetTitle(_currentVideo.Value.Title);
-            }
-        }
-
-        private void HandleTimeUpdate(double currentTime)
-        {
-            _controlsPanel?.SetCurrentTime((float)currentTime);
-        }
-
-        private void HandleSeekCompleted()
-        {
-            _controlsPanel?.OnSeekCompleted();
         }
 
         private void HandleBackClicked()
