@@ -4,6 +4,8 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.IO;
+using VRWorkspace.UI.Components;
+using VRWorkspace.UI.Effects;
 
 /// <summary>
 /// Editor tool to create VR UI Component prefabs.

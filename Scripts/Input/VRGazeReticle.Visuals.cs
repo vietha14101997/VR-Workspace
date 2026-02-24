@@ -1,7 +1,8 @@
 using UnityEngine;
 using UnityEngine.UI;
+using VRWorkspace.UI.Components;
 
-namespace VRWorkspace.Input
+namespace VRWorkspace.VRInput
 {
     /// <summary>
     /// Reticle rendering, animation, visual feedback, dot/ring creation, color changes.

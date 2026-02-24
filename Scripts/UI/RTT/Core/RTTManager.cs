@@ -9,7 +9,7 @@ using VRWorkspace.Streaming;
 using VRWorkspace.Core;
 using VRWorkspace.ViewModels;
 using VRWorkspace.UI.RTT;
-using VRWorkspace.Input;
+using VRWorkspace.VRInput;
 using VRWorkspace.Media.Core;
 using VRWorkspace.Panel;
 using VRWorkspace.UI.RTT.Components;

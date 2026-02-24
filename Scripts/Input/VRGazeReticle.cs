@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 
-namespace VRWorkspace.Input
+namespace VRWorkspace.VRInput
 {
     using VRWorkspace.Media.UI;
     using VRWorkspace.UI.Components;

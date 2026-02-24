@@ -2,7 +2,7 @@ using UnityEngine;
 using System.Collections.Generic;
 using VRWorkspace.UI.RTT;
 
-namespace VRWorkspace.UI.RTT.Debug
+namespace VRWorkspace.UI.RTT.Diagnostics
 {
     /// <summary>
     /// Debug gizmo drawer for RTT panels.

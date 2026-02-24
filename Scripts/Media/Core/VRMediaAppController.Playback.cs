@@ -11,6 +11,7 @@ using VRWorkspace.Media.Data;
 using VRWorkspace.Media.Projections;
 using VRWorkspace.Media.UI;
 using VRWorkspace.Media.Utils;
+using VRWorkspace.UI.RTT;
 
 namespace VRWorkspace.Media.Core
 {

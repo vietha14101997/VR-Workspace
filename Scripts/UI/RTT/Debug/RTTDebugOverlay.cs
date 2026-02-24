@@ -4,7 +4,7 @@ using TMPro;
 using VRWorkspace.UI.RTT;
 using VRWorkspace.UI.RTT.Input;
 
-namespace VRWorkspace.UI.RTT.Debug
+namespace VRWorkspace.UI.RTT.Diagnostics
 {
     /// <summary>
     /// Debug overlay for RTT system.
@@ -38,7 +38,7 @@ namespace VRWorkspace.UI.RTT.Debug
         void Update()
         {
             // Toggle with key
-            if (Input.GetKeyDown(toggleKey))
+            if (UnityEngine.Input.GetKeyDown(toggleKey))
             {
                 SetVisible(!_isVisible);
             }

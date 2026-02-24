@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using VRWorkspace.UI.HoverEffects;
 using VRWorkspace.Core;
-using VRWorkspace.Input;
+using VRWorkspace.VRInput;
 using VRWorkspace.Media.Core;
 using VRWorkspace.UI.Components;
 using VRWorkspace.UI.RTT;

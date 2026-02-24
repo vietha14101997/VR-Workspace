@@ -1,5 +1,5 @@
 using UnityEngine;
-using VRWorkspace.Input;
+using VRWorkspace.VRInput;
 
 namespace VRWorkspace.UI.HoverEffects
 {

@@ -8,7 +8,7 @@ using TMPro;
 
 using TouchPhase = UnityEngine.TouchPhase;
 
-namespace VRWorkspace.Input
+namespace VRWorkspace.VRInput
 {
     /// <summary>
     /// Controls Non-VR mode: mono rendering, virtual joystick camera control,

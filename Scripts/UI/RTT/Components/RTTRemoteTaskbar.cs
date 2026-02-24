@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using VRWorkspace.Core;
 using VRWorkspace.ViewModels;
 using VRWorkspace.Streaming;
-using VRWorkspace.Input;
+using VRWorkspace.VRInput;
 using VRWorkspace.Media.Core;
 using VRWorkspace.Media.UI;
 using VRWorkspace.Panel;

@@ -1037,7 +1037,7 @@ namespace VRWorkspace.UI.RTT.Components
         private void OnInputEndEdit(string value)
         {
             // Submit on Enter key
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+            if (UnityEngine.Input.GetKeyDown(KeyCode.Return) || UnityEngine.Input.GetKeyDown(KeyCode.KeypadEnter))
             {
                 OnConfirmClicked();
             }

@@ -2,6 +2,7 @@
 using UnityEditor;
 using UnityEngine;
 using System.IO;
+using VRWorkspace.Panel;
 
 public static class WorldPanelPlusPrefabBuilder
 {

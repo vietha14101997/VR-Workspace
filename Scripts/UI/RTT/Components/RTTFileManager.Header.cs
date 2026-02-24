@@ -7,6 +7,7 @@ using VRWorkspace.UI.Config;
 using VRWorkspace.UI.Utilities;
 using VRWorkspace.UI.Components;
 using VRWorkspace.UI.RTT.Services;
+using VRWorkspace.Utilities;
 
 namespace VRWorkspace.UI.RTT.Components
 {
@@ -1303,11 +1304,11 @@ namespace VRWorkspace.UI.RTT.Components
         {
             if (_isGridView && _fileGrid != null)
             {
-                _fileGrid.Populate(new List<VRWorkspace.Media.Core.MockFile>(), "");
+                _fileGrid.Populate(new List<MockFile>(), "");
             }
             else if (_fileList != null)
             {
-                _fileList.Populate(new List<VRWorkspace.Media.Core.MockFile>(), "");
+                _fileList.Populate(new List<MockFile>(), "");
             }
         }
 

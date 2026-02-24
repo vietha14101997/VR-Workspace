@@ -3,7 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using VRWorkspace.Input;
+using VRWorkspace.VRInput;
 using VRWorkspace.Media.Data;
 using VRWorkspace.Media.Projections;
 using VRWorkspace.Media.UI;
