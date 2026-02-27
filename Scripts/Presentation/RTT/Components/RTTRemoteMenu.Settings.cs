@@ -25,17 +25,26 @@ namespace VRWorkspace.UI.RTT.Components
             // Enable all dropdowns first
             EnableDropdowns();
 
+            // Load saved preferences — user's previous selections take priority
+            var prefs = RemotePreferences.Load();
+
             // === Monitors ===
-            // Server suggests based on bandwidth calculation
             int suggestedMonitorIndex = Mathf.Clamp(config.monitors - 1, 0, 2);
             var monitorOptions = BuildOptionsWithRecommended(MONITOR_OPTIONS, suggestedMonitorIndex);
-            VRDropdownFactory.SetOptions(_monitorsDropdown, monitorOptions, suggestedMonitorIndex);
+            int selectedMonitorIndex = prefs.HasMonitorPreference
+                ? Mathf.Clamp(prefs.monitors, 0, 2)
+                : suggestedMonitorIndex;
+            VRDropdownFactory.SetOptions(_monitorsDropdown, monitorOptions, selectedMonitorIndex);
 
             // === Style ===
-            // Style dropdown uses simple 2 options, no "Recommended" logic needed
-            // Just ensure it's enabled with the options already set in CreateGrid
             var styleOptions = new List<string>(STYLE_OPTIONS);
-            VRDropdownFactory.SetOptions(_styleDropdown, styleOptions, 0);  // Default: Flat Planar
+            int selectedStyleIndex = 0;
+            if (prefs.HasResolutionPreference)
+            {
+                int savedIdx = FindOptionIndex(STYLE_OPTIONS, prefs.resolution);
+                if (savedIdx >= 0) selectedStyleIndex = savedIdx;
+            }
+            VRDropdownFactory.SetOptions(_styleDropdown, styleOptions, selectedStyleIndex);
 
             // === Bitrate ===
             int bitrateMbps = config.bitrateKbps / 1000;
@@ -43,30 +52,38 @@ namespace VRWorkspace.UI.RTT.Components
             int suggestedBitrateIndex = FindOptionIndex(BITRATE_OPTIONS, suggestedBitrate);
             if (suggestedBitrateIndex < 0)
             {
-                // Find nearest option: 5, 10, 15, 20, 30 Mbps
-                if (bitrateMbps >= 25) suggestedBitrateIndex = 4;      // 30 Mbps
-                else if (bitrateMbps >= 17) suggestedBitrateIndex = 3; // 20 Mbps
-                else if (bitrateMbps >= 12) suggestedBitrateIndex = 2; // 15 Mbps
-                else if (bitrateMbps >= 7) suggestedBitrateIndex = 1;  // 10 Mbps
-                else suggestedBitrateIndex = 0;                        // 5 Mbps
-                Debug.LogWarning($"[RTTRemoteMenu] Bitrate '{suggestedBitrate}' not found, using nearest: {BITRATE_OPTIONS[suggestedBitrateIndex]}");
+                if (bitrateMbps >= 25) suggestedBitrateIndex = 4;
+                else if (bitrateMbps >= 17) suggestedBitrateIndex = 3;
+                else if (bitrateMbps >= 12) suggestedBitrateIndex = 2;
+                else if (bitrateMbps >= 7) suggestedBitrateIndex = 1;
+                else suggestedBitrateIndex = 0;
             }
             var bitrateOptions = BuildOptionsWithRecommended(BITRATE_OPTIONS, suggestedBitrateIndex);
-            VRDropdownFactory.SetOptions(_bitrateDropdown, bitrateOptions, suggestedBitrateIndex);
+            int selectedBitrateIndex = suggestedBitrateIndex;
+            if (prefs.HasBitratePreference)
+            {
+                int savedIdx = FindOptionIndexClean(BITRATE_OPTIONS, prefs.bitrate);
+                if (savedIdx >= 0) selectedBitrateIndex = savedIdx;
+            }
+            VRDropdownFactory.SetOptions(_bitrateDropdown, bitrateOptions, selectedBitrateIndex);
 
             // === FPS ===
             string suggestedFps = $"{config.fps} FPS";
             int suggestedFpsIndex = FindOptionIndex(FPS_OPTIONS, suggestedFps);
-            if (suggestedFpsIndex < 0)
-            {
-                Debug.LogWarning($"[RTTRemoteMenu] FPS '{suggestedFps}' not found, defaulting to 60 FPS");
-                suggestedFpsIndex = 2; // Default to 60 FPS
-            }
+            if (suggestedFpsIndex < 0) suggestedFpsIndex = 2; // Default to 60 FPS
             var fpsOptions = BuildOptionsWithRecommended(FPS_OPTIONS, suggestedFpsIndex);
-            VRDropdownFactory.SetOptions(_fpsDropdown, fpsOptions, suggestedFpsIndex);
+            int selectedFpsIndex = suggestedFpsIndex;
+            if (prefs.HasFpsPreference)
+            {
+                int savedIdx = FindOptionIndexClean(FPS_OPTIONS, prefs.fps);
+                if (savedIdx >= 0) selectedFpsIndex = savedIdx;
+            }
+            VRDropdownFactory.SetOptions(_fpsDropdown, fpsOptions, selectedFpsIndex);
 
-            Debug.Log($"[RTTRemoteMenu] Applied suggested config: {config.monitors}mon @ {config.resolutionWidth}x{config.resolutionHeight}, {config.fps}fps, {config.bitrateKbps}kbps");
-            Debug.Log($"[RTTRemoteMenu] Selected indices: Mon={suggestedMonitorIndex}, Bitrate={suggestedBitrateIndex}, FPS={suggestedFpsIndex}");
+            bool usingSaved = prefs.HasMonitorPreference || prefs.HasBitratePreference || prefs.HasFpsPreference;
+            Debug.Log($"[RTTRemoteMenu] Applied config: {(usingSaved ? "SAVED prefs" : "suggested")} — Mon={selectedMonitorIndex + 1}, Bitrate={BITRATE_OPTIONS[selectedBitrateIndex]}, FPS={FPS_OPTIONS[selectedFpsIndex]}");
+            if (usingSaved)
+                Debug.Log($"[RTTRemoteMenu] Server suggested: {config.monitors}mon, {config.bitrateKbps}kbps, {config.fps}fps (shown as Recommended)");
         }
 
         /// <summary>
@@ -206,66 +223,59 @@ namespace VRWorkspace.UI.RTT.Components
         {
             if (_cachedNetworkInfo == null || _cachedHardwareInfo == null) return;
 
-            // Get current selections before updating options (only bitrate and FPS need recalculation)
+            // Get current selections before updating options
             int currentBitrateIndex = VRDropdownFactory.GetSelectedIndex(_bitrateDropdown);
             int currentFpsIndex = VRDropdownFactory.GetSelectedIndex(_fpsDropdown);
 
             // === Calculate recommended Bitrate based on resolution and network ===
             double availableBandwidth = _cachedNetworkInfo.bandwidthMbps > 0 ? _cachedNetworkInfo.bandwidthMbps : 100;
 
-            // Base bitrate recommendation based on resolution (same logic as server)
             int baseBitrateKbps;
-            if (_cachedHardwareInfo.gpuVramGB >= 8) // 1080p
-                baseBitrateKbps = 15000;
-            else if (_cachedHardwareInfo.gpuVramGB >= 4) // 900p
-                baseBitrateKbps = 12000;
-            else // 768p
-                baseBitrateKbps = 10000;
+            if (_cachedHardwareInfo.gpuVramGB >= 8) baseBitrateKbps = 15000;
+            else if (_cachedHardwareInfo.gpuVramGB >= 4) baseBitrateKbps = 12000;
+            else baseBitrateKbps = 10000;
 
-            // Scale up for excellent network (low ping, high bandwidth)
             if (_cachedNetworkInfo.pingMs < 10 && availableBandwidth > 500)
                 baseBitrateKbps = (int)(baseBitrateKbps * 1.3f);
             else if (_cachedNetworkInfo.pingMs < 20 && availableBandwidth > 200)
                 baseBitrateKbps = (int)(baseBitrateKbps * 1.15f);
 
-            // Max bitrate per monitor based on bandwidth
             double maxBitratePerMonitor = availableBandwidth * 0.6 / monitorCount * 1000;
             int suggestedBitrateKbps = (int)Math.Clamp(Math.Min(baseBitrateKbps, maxBitratePerMonitor), 5000, 30000);
 
-            // Map to bitrate option index: 5, 10, 15, 20, 30 Mbps
             int suggestedBitrateIndex;
-            if (suggestedBitrateKbps >= 25000) suggestedBitrateIndex = 4; // 30 Mbps
-            else if (suggestedBitrateKbps >= 17500) suggestedBitrateIndex = 3; // 20 Mbps
-            else if (suggestedBitrateKbps >= 12500) suggestedBitrateIndex = 2; // 15 Mbps
-            else if (suggestedBitrateKbps >= 7500) suggestedBitrateIndex = 1; // 10 Mbps
-            else suggestedBitrateIndex = 0; // 5 Mbps
+            if (suggestedBitrateKbps >= 25000) suggestedBitrateIndex = 4;
+            else if (suggestedBitrateKbps >= 17500) suggestedBitrateIndex = 3;
+            else if (suggestedBitrateKbps >= 12500) suggestedBitrateIndex = 2;
+            else if (suggestedBitrateKbps >= 7500) suggestedBitrateIndex = 1;
+            else suggestedBitrateIndex = 0;
 
-            // === Calculate recommended FPS based on ping and VRAM ===
-            // More monitors = potentially lower FPS to reduce encoder load
-            // Lower VRAM = lower FPS
             int suggestedFpsIndex;
             if (_cachedHardwareInfo.hwAccelEnabled && _cachedNetworkInfo.pingMs < 20)
-            {
-                suggestedFpsIndex = 2; // 60 FPS
-            }
+                suggestedFpsIndex = 2;
             else if (_cachedHardwareInfo.hwAccelEnabled && _cachedNetworkInfo.pingMs < 50)
-            {
-                suggestedFpsIndex = 1; // 45 FPS
-            }
+                suggestedFpsIndex = 1;
             else
-            {
-                suggestedFpsIndex = 0; // 30 FPS
-            }
+                suggestedFpsIndex = 0;
 
-            // Bitrate - auto-select recommended
+            // Check if user has saved preferences — keep their choice, only update "(Recommended)" labels
+            var prefs = RemotePreferences.Load();
+
+            // Bitrate: update options with new Recommended label, but keep user's selection if saved
             var bitrateOptions = BuildOptionsWithRecommended(BITRATE_OPTIONS, suggestedBitrateIndex);
-            VRDropdownFactory.SetOptions(_bitrateDropdown, bitrateOptions, suggestedBitrateIndex);
+            int selectedBitrateIndex = (prefs.HasBitratePreference && currentBitrateIndex >= 0)
+                ? currentBitrateIndex  // Keep user's current selection
+                : suggestedBitrateIndex;
+            VRDropdownFactory.SetOptions(_bitrateDropdown, bitrateOptions, Mathf.Clamp(selectedBitrateIndex, 0, BITRATE_OPTIONS.Length - 1));
 
-            // FPS - auto-select recommended
+            // FPS: same logic
             var fpsOptions = BuildOptionsWithRecommended(FPS_OPTIONS, suggestedFpsIndex);
-            VRDropdownFactory.SetOptions(_fpsDropdown, fpsOptions, suggestedFpsIndex);
+            int selectedFpsIndex = (prefs.HasFpsPreference && currentFpsIndex >= 0)
+                ? currentFpsIndex
+                : suggestedFpsIndex;
+            VRDropdownFactory.SetOptions(_fpsDropdown, fpsOptions, Mathf.Clamp(selectedFpsIndex, 0, FPS_OPTIONS.Length - 1));
 
-            Debug.Log($"[RTTRemoteMenu] Auto-selected for {monitorCount} monitors: Bitrate={BITRATE_OPTIONS[suggestedBitrateIndex]}, FPS={FPS_OPTIONS[suggestedFpsIndex]}");
+            Debug.Log($"[RTTRemoteMenu] Recalculated for {monitorCount} monitors: Recommended={BITRATE_OPTIONS[suggestedBitrateIndex]}/{FPS_OPTIONS[suggestedFpsIndex]}, Selected={BITRATE_OPTIONS[Mathf.Clamp(selectedBitrateIndex, 0, BITRATE_OPTIONS.Length - 1)]}/{FPS_OPTIONS[Mathf.Clamp(selectedFpsIndex, 0, FPS_OPTIONS.Length - 1)]}");
         }
         #endregion
 

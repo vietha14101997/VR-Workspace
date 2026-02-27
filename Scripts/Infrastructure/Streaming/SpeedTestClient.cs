@@ -41,7 +41,9 @@ namespace VRWorkspace.Streaming
         // Constants - matching web client for consistency
         private const int SPEED_TEST_DURATION_MS = 2000;  // 2 seconds (same as web client)
         private const int WARMUP_PERIOD_MS = 0;           // No warmup (same as web client)
-        private const int PING_SAMPLES = 3;
+        private const int PING_WARMUP = 2;          // Discard first 2 pings (WiFi radio wake-up)
+        private const int PING_MEASURED = 8;          // Collect 8 real samples after warmup
+        private const int PING_SAMPLES = 10;          // Total = warmup + measured
         private const int PING_TIMEOUT_MS = 2000;
 
         // Results
@@ -122,6 +124,7 @@ namespace VRWorkspace.Streaming
 
         /// <summary>
         /// Measure ping with high-resolution Stopwatch timing.
+        /// Uses warmup pings to wake WiFi radio, then collects samples with outlier discard.
         /// </summary>
         private async Task MeasurePingAsync()
         {
@@ -134,19 +137,19 @@ namespace VRWorkspace.Streaming
                     _pongReceived = new TaskCompletionSource<bool>();
                     _pingStartTicks = _masterTimer.ElapsedTicks;
 
-                    // Fire-and-forget send (like browser)
                     _ = SendTextAsync("ping");
 
-                    // Wait for pong with timeout
                     using var cts = new CancellationTokenSource(PING_TIMEOUT_MS);
                     cts.Token.Register(() => _pongReceived?.TrySetResult(false));
 
                     var success = await _pongReceived.Task;
 
-                    if (success)
+                    // Discard warmup pings (WiFi power save wake-up causes high RTT)
+                    if (success && i < PING_WARMUP && _pingTimes.Count > 0)
                     {
-                        // Already calculated in HandlePong() with high-res timing
-                        // _pingTimes was already updated
+                        var discarded = _pingTimes[_pingTimes.Count - 1];
+                        _pingTimes.RemoveAt(_pingTimes.Count - 1);
+                        Debug.Log($"[SpeedTest] Warmup ping {i + 1}: {discarded:F1}ms (discarded)");
                     }
                 }
                 catch (Exception ex)
@@ -154,27 +157,32 @@ namespace VRWorkspace.Streaming
                     Debug.LogWarning($"[SpeedTest] Ping sample {i + 1} failed: {ex.Message}");
                 }
 
-                // Small delay between samples (reduced from 50ms for faster test)
                 await Task.Delay(20, _ct);
             }
 
             if (_pingTimes.Count > 0)
             {
-                // Calculate average
-                double sum = 0;
-                foreach (var t in _pingTimes) sum += t;
-                PingMs = sum / _pingTimes.Count;
+                // Sort and discard highest outlier for robustness
+                _pingTimes.Sort();
+                if (_pingTimes.Count > 3)
+                    _pingTimes.RemoveAt(_pingTimes.Count - 1);
 
-                // Calculate jitter (average of consecutive differences)
+                // Use median instead of mean (more robust against outliers)
+                int mid = _pingTimes.Count / 2;
+                PingMs = (_pingTimes.Count % 2 == 0)
+                    ? (_pingTimes[mid - 1] + _pingTimes[mid]) / 2.0
+                    : _pingTimes[mid];
+
+                // Jitter: average of consecutive differences on sorted data
                 if (_pingTimes.Count > 1)
                 {
                     double jitterSum = 0;
                     for (int i = 1; i < _pingTimes.Count; i++)
-                    {
                         jitterSum += Math.Abs(_pingTimes[i] - _pingTimes[i - 1]);
-                    }
                     JitterMs = jitterSum / (_pingTimes.Count - 1);
                 }
+
+                Debug.Log($"[SpeedTest] Ping stats: {_pingTimes.Count} samples, median={PingMs:F1}ms, jitter={JitterMs:F1}ms, range=[{_pingTimes[0]:F1}-{_pingTimes[_pingTimes.Count - 1]:F1}]ms");
             }
         }
 

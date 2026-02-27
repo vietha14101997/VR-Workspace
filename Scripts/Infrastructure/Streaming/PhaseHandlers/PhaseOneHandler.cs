@@ -287,6 +287,10 @@ namespace VRWorkspace.Streaming
                 var result      = await _speedTest.RunSpeedTestAsync();
                 var networkType = DetectNetworkAdapterType();
 
+                // Fallback: classify by measured metrics when adapter detection fails
+                if (networkType == "Unknown")
+                    networkType = ClassifyByMetrics(result.PingMs, result.BandwidthMbps);
+
                 NetworkInfo = new NetworkTestResult
                 {
                     pingMs          = result.PingMs,
@@ -355,6 +359,17 @@ namespace VRWorkspace.Streaming
                 Debug.LogWarning($"[Phase1] Network adapter detection failed: {ex.Message}");
             }
             return "Unknown";
+        }
+
+        /// <summary>
+        /// Fallback classification when adapter detection fails (Android/VR headsets).
+        /// Uses measured ping and bandwidth to infer connection type.
+        /// </summary>
+        private static string ClassifyByMetrics(double pingMs, double bandwidthMbps)
+        {
+            if (pingMs < 3 && bandwidthMbps > 500) return "Ethernet";
+            if (pingMs < 30 && bandwidthMbps > 30) return "Wi-Fi";
+            return "Internet";
         }
 
         /// <summary>
