@@ -254,6 +254,66 @@ namespace VRWorkspace.Streaming
         }
 
         /// <summary>
+        /// Graduated recovery for WiFi stalls. Escalates through 3 steps:
+        /// 1. Keyframe burst (3 consecutive I-frames) — resolves most WiFi stalls
+        /// 2. Skip-to-live + keyframe burst — handles accumulated decoder delay
+        /// 3. Full PeerConnection reconnect — last resort
+        /// </summary>
+        private async Task GraduatedRecoveryAsync(int monitorIndex)
+        {
+            PCWrapper wrapper;
+            lock (_lock)
+            {
+                if (monitorIndex < 0 || monitorIndex >= _peerConnections.Count) return;
+                wrapper = _peerConnections[monitorIndex];
+                if (wrapper.IsInGraduatedRecovery || wrapper.IsReconnecting) return;
+                wrapper.IsInGraduatedRecovery = true;
+            }
+
+            try
+            {
+                // STEP 1: Keyframe burst (3 consecutive I-frames)
+                wrapper.GraduatedRecoveryStep = 1;
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} graduated step 1: keyframe burst");
+                await SendTextAsync($"{{\"type\":\"request_keyframe_burst\",\"monitorIndex\":{monitorIndex},\"count\":3}}");
+                await Task.Delay(1000, _cts.Token);
+
+                if ((DateTime.UtcNow - wrapper.LastFrameTime).TotalMilliseconds < 500)
+                {
+                    Debug.Log($"[PhaseProtocol] PC{monitorIndex} recovered at step 1!");
+                    return;
+                }
+
+                // STEP 2: Skip-to-live + keyframe burst
+                wrapper.GraduatedRecoveryStep = 2;
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} graduated step 2: skip + keyframe burst");
+                SkipToLiveImmediate(monitorIndex);
+                await Task.Delay(100);
+                await SendTextAsync($"{{\"type\":\"request_keyframe_burst\",\"monitorIndex\":{monitorIndex},\"count\":3}}");
+                await Task.Delay(1000, _cts.Token);
+
+                if ((DateTime.UtcNow - wrapper.LastFrameTime).TotalMilliseconds < 500)
+                {
+                    Debug.Log($"[PhaseProtocol] PC{monitorIndex} recovered at step 2!");
+                    return;
+                }
+
+                // STEP 3: Full reconnect (last resort)
+                wrapper.GraduatedRecoveryStep = 3;
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} graduated step 3: full reconnect");
+                wrapper.IsInGraduatedRecovery = false;
+                wrapper.IsReconnecting = true;
+                await AutoHealMonitorAsync(monitorIndex);
+            }
+            catch (OperationCanceledException) { }
+            finally
+            {
+                wrapper.IsInGraduatedRecovery = false;
+                wrapper.GraduatedRecoveryStep = 0;
+            }
+        }
+
+        /// <summary>
         /// Client-side auto-heal: Detect disconnection and automatically attempt reconnect.
         /// This runs independently of server's reconnect request for faster recovery.
         /// Uses exponential backoff: 2s, 4s, 8s, 16s, 32s between attempts.

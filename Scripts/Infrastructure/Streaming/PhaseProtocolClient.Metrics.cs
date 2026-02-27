@@ -35,13 +35,17 @@ namespace VRWorkspace.Streaming
         private const float BASE_DECODER_FREEZE_CHECK_INTERVAL_MS = 3000f;
         private const float BASE_PREVENTIVE_KEYFRAME_INTERVAL_SECONDS = 15f;
 
+        // Proactive keyframe on packet loss spike (WiFi resilience)
+        private float _prevPacketLoss = 0f;
+        private DateTime _lastProactiveKeyframeTime = DateTime.MinValue;
+
         // WiFi thresholds (more tolerant - allow for jitter and burst loss)
         private const float WIFI_FRAME_GAP_THRESHOLD_MS = 1500f;           // 1.5s for WiFi (was 500ms)
         private const float WIFI_MONITOR_DRIFT_THRESHOLD_MS = 1000f;       // 1s drift allowed (was 500ms)
         private const int WIFI_DECODER_FREEZE_THRESHOLD_FRAMES = 120;      // ~4s at 30fps (was 90)
         private const float WIFI_DECODER_FREEZE_CHECK_INTERVAL_MS = 5000f; // Check every 5s (was 3s)
-        private const float WIFI_PREVENTIVE_KEYFRAME_MIN_INTERVAL = 10f;   // Minimum 10s
-        private const float WIFI_PREVENTIVE_KEYFRAME_MAX_INTERVAL = 30f;   // Maximum 30s on stable
+        private const float WIFI_PREVENTIVE_KEYFRAME_MIN_INTERVAL = 3f;    // Minimum 3s (aggressive for WiFi)
+        private const float WIFI_PREVENTIVE_KEYFRAME_MAX_INTERVAL = 8f;   // Maximum 8s on stable WiFi
 
         // Active thresholds - computed properties based on connection type
         private float FrameGapThresholdMs => _isWiFiConnection ? WIFI_FRAME_GAP_THRESHOLD_MS : BASE_FRAME_GAP_THRESHOLD_MS;
@@ -588,11 +592,31 @@ namespace VRWorkspace.Streaming
             // Check for latency issues and request skip_to_live if needed
             CheckLatencyAndSkip();
 
+            // Proactive keyframe burst on packet loss spike (WiFi only)
+            if (_isWiFiConnection) CheckPacketLossAndRequestKeyframe();
+
             // Send FPS feedback to server for adaptive encoding
             SendFpsFeedbackIfNeeded();
 
             // Send comprehensive quality feedback for adaptive bitrate
             SendQualityFeedbackIfNeeded();
+        }
+
+        /// <summary>
+        /// Detect sudden packet loss spikes and proactively request keyframe burst
+        /// before the decoder stalls. This prevents stalls on WiFi.
+        /// </summary>
+        private void CheckPacketLossAndRequestKeyframe()
+        {
+            float loss = _metrics.PacketLossRate;
+            if (loss > 0.03f && _prevPacketLoss < 0.01f &&
+                (DateTime.UtcNow - _lastProactiveKeyframeTime).TotalSeconds >= 2.0)
+            {
+                Debug.Log($"[PhaseProtocol] Loss spike {_prevPacketLoss:P1}\u2192{loss:P1}, proactive keyframe burst");
+                _ = SendTextAsync("{\"type\":\"request_keyframe_burst\",\"count\":3}");
+                _lastProactiveKeyframeTime = DateTime.UtcNow;
+            }
+            _prevPacketLoss = loss;
         }
 
         /// <summary>
@@ -602,13 +626,13 @@ namespace VRWorkspace.Streaming
         /// </summary>
         private async Task FrameStallMonitorAsync(CancellationToken ct)
         {
-            const int CHECK_INTERVAL_MS = 1000; // Check every 1 second (was 2s)
-            const int STALL_THRESHOLD_MS = 3000; // Consider stalled if no frames for 3 seconds (was 5s)
-            const int INITIAL_GRACE_PERIOD_MS = 5000; // Wait 5 seconds before monitoring (was 10s)
+            const int CHECK_INTERVAL_MS = 500;  // Check every 0.5s for fast WiFi detection
+            const int STALL_THRESHOLD_MS = 3000; // 3s for wired connections
+            const int WIFI_STALL_THRESHOLD_MS = 800; // 0.8s for WiFi — fast detection
+            const int INITIAL_GRACE_PERIOD_MS = 5000;
 
             Debug.Log("[PhaseProtocol] Frame stall monitor started");
 
-            // Initial grace period to let streams stabilize
             await Task.Delay(INITIAL_GRACE_PERIOD_MS, ct);
 
             while (!ct.IsCancellationRequested && _stateMachine.IsStreaming)
@@ -621,24 +645,30 @@ namespace VRWorkspace.Streaming
                         wrappers = _peerConnections.ToList();
                     }
 
+                    int effectiveThreshold = _isWiFiConnection ? WIFI_STALL_THRESHOLD_MS : STALL_THRESHOLD_MS;
+
                     foreach (var wrapper in wrappers)
                     {
                         if (wrapper.PC == null) continue;
-                        if (wrapper.IsReconnecting) continue; // Already reconnecting
+                        if (wrapper.IsReconnecting || wrapper.IsInGraduatedRecovery) continue;
 
                         var timeSinceFrame = DateTime.UtcNow - wrapper.LastFrameTime;
                         var pcState = wrapper.PC.ConnectionState;
 
-                        // Only check for stalls if PC appears connected
                         if (pcState == RTCPeerConnectionState.Connected &&
                             wrapper.LastFrameTime != default &&
-                            timeSinceFrame.TotalMilliseconds > STALL_THRESHOLD_MS)
+                            timeSinceFrame.TotalMilliseconds > effectiveThreshold)
                         {
-                            Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} FRAME STALL detected! No frames for {timeSinceFrame.TotalSeconds:F1}s (frames received: {wrapper.FrameCount})");
+                            Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} FRAME STALL detected! No frames for {timeSinceFrame.TotalSeconds:F1}s (threshold={effectiveThreshold}ms, wifi={_isWiFiConnection})");
 
-                            // Trigger reconnect
-                            if (!wrapper.IsReconnecting)
+                            if (_isWiFiConnection)
                             {
+                                // WiFi: use graduated recovery (keyframe burst first, then escalate)
+                                _ = GraduatedRecoveryAsync(wrapper.Index);
+                            }
+                            else
+                            {
+                                // Wired: direct reconnect (stalls are rare and serious)
                                 wrapper.IsReconnecting = true;
                                 Debug.Log($"[PhaseProtocol] PC{wrapper.Index} triggering reconnect due to frame stall");
                                 _ = AutoHealMonitorAsync(wrapper.Index);

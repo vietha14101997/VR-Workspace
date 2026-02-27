@@ -167,6 +167,10 @@ namespace VRWorkspace.Streaming
             // Cumulative counters
             public long     TotalFramesReceived;
             public DateTime StreamStartTime;
+
+            // Graduated recovery state (WiFi resilience)
+            public bool IsInGraduatedRecovery;
+            public int  GraduatedRecoveryStep;
         }
 
         // ── Public properties ─────────────────────────────────────────────────
