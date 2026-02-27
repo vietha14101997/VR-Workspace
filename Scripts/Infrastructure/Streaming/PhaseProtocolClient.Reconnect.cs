@@ -272,13 +272,16 @@ namespace VRWorkspace.Streaming
 
             try
             {
-                // STEP 1: Keyframe burst (3 consecutive I-frames)
-                wrapper.GraduatedRecoveryStep = 1;
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} graduated step 1: keyframe burst");
-                await SendTextAsync($"{{\"type\":\"request_keyframe_burst\",\"monitorIndex\":{monitorIndex},\"count\":3}}");
-                await Task.Delay(1000, _cts.Token);
+                // WiFi: more aggressive burst (5 I-frames for redundancy against packet loss)
+                int burstCount = _isWiFiConnection ? 5 : 3;
 
-                if ((DateTime.UtcNow - wrapper.LastFrameTime).TotalMilliseconds < 500)
+                // STEP 1: Keyframe burst
+                wrapper.GraduatedRecoveryStep = 1;
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} graduated step 1: keyframe burst (count={burstCount})");
+                await SendTextAsync($"{{\"type\":\"request_keyframe_burst\",\"monitorIndex\":{monitorIndex},\"count\":{burstCount}}}");
+                await Task.Delay(500, _cts.Token);
+
+                if ((DateTime.UtcNow - wrapper.LastFrameTime).TotalMilliseconds < 300)
                 {
                     Debug.Log($"[PhaseProtocol] PC{monitorIndex} recovered at step 1!");
                     return;
@@ -286,13 +289,13 @@ namespace VRWorkspace.Streaming
 
                 // STEP 2: Skip-to-live + keyframe burst
                 wrapper.GraduatedRecoveryStep = 2;
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} graduated step 2: skip + keyframe burst");
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} graduated step 2: skip + keyframe burst (count={burstCount})");
                 SkipToLiveImmediate(monitorIndex);
                 await Task.Delay(100);
-                await SendTextAsync($"{{\"type\":\"request_keyframe_burst\",\"monitorIndex\":{monitorIndex},\"count\":3}}");
-                await Task.Delay(1000, _cts.Token);
+                await SendTextAsync($"{{\"type\":\"request_keyframe_burst\",\"monitorIndex\":{monitorIndex},\"count\":{burstCount}}}");
+                await Task.Delay(500, _cts.Token);
 
-                if ((DateTime.UtcNow - wrapper.LastFrameTime).TotalMilliseconds < 500)
+                if ((DateTime.UtcNow - wrapper.LastFrameTime).TotalMilliseconds < 300)
                 {
                     Debug.Log($"[PhaseProtocol] PC{monitorIndex} recovered at step 2!");
                     return;

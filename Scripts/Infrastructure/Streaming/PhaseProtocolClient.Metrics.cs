@@ -40,12 +40,12 @@ namespace VRWorkspace.Streaming
         private DateTime _lastProactiveKeyframeTime = DateTime.MinValue;
 
         // WiFi thresholds (more tolerant - allow for jitter and burst loss)
-        private const float WIFI_FRAME_GAP_THRESHOLD_MS = 1500f;           // 1.5s for WiFi (was 500ms)
-        private const float WIFI_MONITOR_DRIFT_THRESHOLD_MS = 1000f;       // 1s drift allowed (was 500ms)
-        private const int WIFI_DECODER_FREEZE_THRESHOLD_FRAMES = 120;      // ~4s at 30fps (was 90)
-        private const float WIFI_DECODER_FREEZE_CHECK_INTERVAL_MS = 5000f; // Check every 5s (was 3s)
-        private const float WIFI_PREVENTIVE_KEYFRAME_MIN_INTERVAL = 3f;    // Minimum 3s (aggressive for WiFi)
-        private const float WIFI_PREVENTIVE_KEYFRAME_MAX_INTERVAL = 8f;   // Maximum 8s on stable WiFi
+        private const float WIFI_FRAME_GAP_THRESHOLD_MS = 800f;             // 0.8s for WiFi (was 1.5s — faster gap detection)
+        private const float WIFI_MONITOR_DRIFT_THRESHOLD_MS = 600f;        // 0.6s drift allowed (was 1s)
+        private const int WIFI_DECODER_FREEZE_THRESHOLD_FRAMES = 60;       // ~2s at 30fps (was 120/~4s — faster freeze detection)
+        private const float WIFI_DECODER_FREEZE_CHECK_INTERVAL_MS = 3000f; // Check every 3s (was 5s)
+        private const float WIFI_PREVENTIVE_KEYFRAME_MIN_INTERVAL = 1.5f;  // Minimum 1.5s (was 3s — faster natural recovery)
+        private const float WIFI_PREVENTIVE_KEYFRAME_MAX_INTERVAL = 5f;   // Maximum 5s on stable WiFi (was 8s)
 
         // Active thresholds - computed properties based on connection type
         private float FrameGapThresholdMs => _isWiFiConnection ? WIFI_FRAME_GAP_THRESHOLD_MS : BASE_FRAME_GAP_THRESHOLD_MS;
@@ -626,9 +626,10 @@ namespace VRWorkspace.Streaming
         /// </summary>
         private async Task FrameStallMonitorAsync(CancellationToken ct)
         {
-            const int CHECK_INTERVAL_MS = 500;  // Check every 0.5s for fast WiFi detection
-            const int STALL_THRESHOLD_MS = 3000; // 3s for wired connections
-            const int WIFI_STALL_THRESHOLD_MS = 800; // 0.8s for WiFi — fast detection
+            const int CHECK_INTERVAL_MS = 500;          // Wired: check every 0.5s
+            const int WIFI_CHECK_INTERVAL_MS = 300;    // WiFi: check every 0.3s for faster detection
+            const int STALL_THRESHOLD_MS = 3000;       // 3s for wired connections
+            const int WIFI_STALL_THRESHOLD_MS = 500;   // 0.5s for WiFi (was 0.8s — faster recovery)
             const int INITIAL_GRACE_PERIOD_MS = 5000;
 
             Debug.Log("[PhaseProtocol] Frame stall monitor started");
@@ -676,7 +677,8 @@ namespace VRWorkspace.Streaming
                         }
                     }
 
-                    await Task.Delay(CHECK_INTERVAL_MS, ct);
+                    int checkInterval = _isWiFiConnection ? WIFI_CHECK_INTERVAL_MS : CHECK_INTERVAL_MS;
+                    await Task.Delay(checkInterval, ct);
                 }
                 catch (OperationCanceledException)
                 {
@@ -685,7 +687,8 @@ namespace VRWorkspace.Streaming
                 catch (Exception ex)
                 {
                     Debug.LogWarning($"[PhaseProtocol] Frame stall monitor error: {ex.Message}");
-                    await Task.Delay(CHECK_INTERVAL_MS, ct);
+                    int checkInterval = _isWiFiConnection ? WIFI_CHECK_INTERVAL_MS : CHECK_INTERVAL_MS;
+                    await Task.Delay(checkInterval, ct);
                 }
             }
 
@@ -1011,22 +1014,23 @@ namespace VRWorkspace.Streaming
             float interval = WIFI_PREVENTIVE_KEYFRAME_MAX_INTERVAL;
 
             // Reduce interval if packet loss is high
+            // (values must be < MAX_INTERVAL to have effect)
             if (_metrics.PacketLossRate > 0.05f)
-                interval = Math.Min(interval, 15f);
+                interval = Math.Min(interval, 3f);
             if (_metrics.PacketLossRate > 0.1f)
-                interval = Math.Min(interval, 10f);
+                interval = Math.Min(interval, 2f);
 
             // Reduce interval if jitter is high
             if (_metrics.JitterMs > 30)
-                interval = Math.Min(interval, 15f);
+                interval = Math.Min(interval, 3f);
             if (_metrics.JitterMs > 50)
-                interval = Math.Min(interval, 10f);
+                interval = Math.Min(interval, 2f);
 
             // Reduce interval if health is low
             if (_metrics.HealthScore < 50)
-                interval = Math.Min(interval, 12f);
+                interval = Math.Min(interval, 3f);
             if (_metrics.HealthScore < 30)
-                interval = Math.Min(interval, 8f);
+                interval = Math.Min(interval, 2f);
 
             // Use base interval for LAN connections
             if (!_isWiFiConnection)
