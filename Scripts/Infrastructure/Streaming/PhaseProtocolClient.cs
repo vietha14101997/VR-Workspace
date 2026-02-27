@@ -115,6 +115,7 @@ namespace VRWorkspace.Streaming
         public event Action<List<MonitorInfo>>                 OnConfigComplete;
         public event Action                                    OnReadyToStream;
         public event Action<int, Texture>                      OnVideoTextureReceived; // monitorIndex, texture
+        public event Action<AudioStreamTrack>                  OnAudioTrackReceived;   // remote audio track
         public event Action                                    OnStreamingStarted;
         public event Action<string>                            OnError;
         public event Action                                    OnDisconnected;

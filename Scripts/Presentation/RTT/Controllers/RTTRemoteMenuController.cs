@@ -39,6 +39,9 @@ namespace VRWorkspace.UI.RTT.Controllers
         // Remote taskbar (follows ClusterRig during streaming)
         private RTTRemoteTaskbar _remoteTaskbar;
 
+        // Remote audio playback (auto-created when streaming starts)
+        private RemoteAudioPlayer _audioPlayer;
+
         // Cursor tracking
         private int _activeCursorPanelIndex = -1;
 
@@ -191,6 +194,9 @@ namespace VRWorkspace.UI.RTT.Controllers
             CleanupProgressOverlays();
             _isStreamingActive = false;
             _pendingConfig = null;
+
+            // Cleanup remote audio player
+            CleanupRemoteAudioPlayer();
 
             // Cleanup remote taskbar
             CleanupRemoteTaskbar();
@@ -418,6 +424,9 @@ namespace VRWorkspace.UI.RTT.Controllers
                 Destroy(_clusterRig.gameObject);
                 _clusterRig = null;
             }
+
+            // Cleanup remote audio player
+            CleanupRemoteAudioPlayer();
 
             // Cleanup remote taskbar
             CleanupRemoteTaskbar();
@@ -679,6 +688,45 @@ namespace VRWorkspace.UI.RTT.Controllers
         }
 
         /// <summary>
+        /// Create RemoteAudioPlayer dynamically for desktop audio playback.
+        /// Auto-subscribes to OnRemoteAudioTrackReceived from ViewModel.
+        /// </summary>
+        private void CreateRemoteAudioPlayer()
+        {
+            CleanupRemoteAudioPlayer();
+
+            var audioObj = new GameObject("RemoteAudioPlayer");
+            audioObj.transform.SetParent(transform, false);
+            audioObj.AddComponent<AudioSource>();
+            _audioPlayer = audioObj.AddComponent<RemoteAudioPlayer>();
+
+            if (_viewModel != null)
+            {
+                _viewModel.OnRemoteAudioTrackReceived += _audioPlayer.SetTrack;
+            }
+
+            Debug.Log("[RTTRemoteMenuController] Created RemoteAudioPlayer");
+        }
+
+        /// <summary>
+        /// Cleanup remote audio player.
+        /// </summary>
+        private void CleanupRemoteAudioPlayer()
+        {
+            if (_audioPlayer != null)
+            {
+                if (_viewModel != null)
+                {
+                    _viewModel.OnRemoteAudioTrackReceived -= _audioPlayer.SetTrack;
+                }
+
+                _audioPlayer.StopAudio();
+                Destroy(_audioPlayer.gameObject);
+                _audioPlayer = null;
+            }
+        }
+
+        /// <summary>
         /// Cleanup remote taskbar.
         /// </summary>
         private void CleanupRemoteTaskbar()
@@ -783,6 +831,9 @@ namespace VRWorkspace.UI.RTT.Controllers
                 _clusterRig.SetStyle(isCurvedSurround);
                 Debug.Log($"[RTTRemoteMenuController] Applied style: {(isCurvedSurround ? "Curved Surround" : "Flat Planar")}");
             }
+
+            // Create remote audio player for desktop audio streaming
+            CreateRemoteAudioPlayer();
 
             // Create Remote Taskbar that follows ClusterRig
             CreateRemoteTaskbar();

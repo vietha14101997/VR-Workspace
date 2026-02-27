@@ -81,6 +81,11 @@ namespace VRWorkspace.Streaming
                 Debug.Log($"[PhaseProtocol] Added transceiver {i} for monitor {i}");
             }
 
+            // Add audio transceiver (RecvOnly) - MUST be after video to match server track order
+            var audioTrans = pc.AddTransceiver(TrackKind.Audio,
+                new RTCRtpTransceiverInit { direction = RTCRtpTransceiverDirection.RecvOnly });
+            Debug.Log("[PhaseProtocol] Added audio transceiver (after video transceivers)");
+
             // Setup event handlers for single PC
             SetupSinglePCEventHandlers(pc, trackWrappers, transceivers);
 
@@ -282,6 +287,11 @@ namespace VRWorkspace.Streaming
                     };
 
                     Debug.Log($"[PhaseProtocol] Track {trackIndex} received video, mid={e.Transceiver?.Mid}");
+                }
+                else if (e.Track is AudioStreamTrack audioTrack)
+                {
+                    Debug.Log($"[PhaseProtocol] Received audio track, mid={e.Transceiver?.Mid}");
+                    OnAudioTrackReceived?.Invoke(audioTrack);
                 }
             };
         }
@@ -628,6 +638,11 @@ namespace VRWorkspace.Streaming
                         OnVideoTextureReceived?.Invoke(idx, tex);
                     };
                     Debug.Log($"[PhaseProtocol] PC{idx} received video track, mid={mid}");
+                }
+                else if (e.Track is AudioStreamTrack audioTrack)
+                {
+                    Debug.Log($"[PhaseProtocol] PC{idx} received audio track, mid={e.Transceiver?.Mid}");
+                    OnAudioTrackReceived?.Invoke(audioTrack);
                 }
             };
         }

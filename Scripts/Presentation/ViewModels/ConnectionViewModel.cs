@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Unity.WebRTC;
 using UnityEngine;
 using VRWorkspace.Core;
 using VRWorkspace.Streaming;
@@ -116,6 +117,12 @@ namespace VRWorkspace.ViewModels
         /// UI should show "Connecting..." and wait for auto-start.
         /// </summary>
         public event Action OnAllMonitorsReady;
+
+        /// <summary>
+        /// Fired when a remote audio track is received from the server.
+        /// Subscribe to this to set up audio playback (e.g., via RemoteAudioPlayer).
+        /// </summary>
+        public event Action<AudioStreamTrack> OnRemoteAudioTrackReceived;
 
         #endregion
 
@@ -678,6 +685,13 @@ namespace VRWorkspace.ViewModels
                 if (_clientGeneration != subscribedGeneration) return;
                 _textures[idx] = tex;
                 VideoTextures.SetAndNotify(new Dictionary<int, Texture>(_textures));
+            };
+
+            _client.OnAudioTrackReceived += (audioTrack) =>
+            {
+                if (_clientGeneration != subscribedGeneration) return;
+                Debug.Log("[ConnectionViewModel] Audio track received from server");
+                OnRemoteAudioTrackReceived?.Invoke(audioTrack);
             };
 
             _client.OnStreamingStarted += () =>
