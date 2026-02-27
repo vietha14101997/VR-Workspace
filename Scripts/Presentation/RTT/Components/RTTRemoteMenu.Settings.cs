@@ -22,6 +22,9 @@ namespace VRWorkspace.UI.RTT.Components
 
             _cachedSuggestedConfig = config;
 
+            // Disable preference saving during programmatic dropdown setup
+            _preferenceSaveEnabled = false;
+
             // Enable all dropdowns first
             EnableDropdowns();
 
@@ -80,6 +83,9 @@ namespace VRWorkspace.UI.RTT.Components
             }
             VRDropdownFactory.SetOptions(_fpsDropdown, fpsOptions, selectedFpsIndex);
 
+            // Enable preference saving now that dropdowns have valid values
+            _preferenceSaveEnabled = true;
+
             bool usingSaved = prefs.HasMonitorPreference || prefs.HasBitratePreference || prefs.HasFpsPreference;
             Debug.Log($"[RTTRemoteMenu] Applied config: {(usingSaved ? "SAVED prefs" : "suggested")} — Mon={selectedMonitorIndex + 1}, Bitrate={BITRATE_OPTIONS[selectedBitrateIndex]}, FPS={FPS_OPTIONS[selectedFpsIndex]}");
             if (usingSaved)
@@ -136,6 +142,7 @@ namespace VRWorkspace.UI.RTT.Components
 
             int selectedMonitors = index + 1; // 1, 2, or 3 monitors
             RecalculateSuggestionsForMonitorCount(selectedMonitors);
+            if (_preferenceSaveEnabled) SaveCurrentSelections();
         }
 
         /// <summary>
@@ -159,6 +166,7 @@ namespace VRWorkspace.UI.RTT.Components
             {
                 Debug.Log("[RTTRemoteMenu] WorldPanelClusterRig not found - style will apply on next stream start");
             }
+            if (_preferenceSaveEnabled) SaveCurrentSelections();
         }
 
         /// <summary>
@@ -186,6 +194,7 @@ namespace VRWorkspace.UI.RTT.Components
                 _ = _viewModel.UpdateConfigAsync(fpsVal, null);
                 Debug.Log($"[RTTRemoteMenu] Sent update_config: fps={fpsVal}");
             }
+            if (_preferenceSaveEnabled) SaveCurrentSelections();
         }
 
         /// <summary>
@@ -213,6 +222,7 @@ namespace VRWorkspace.UI.RTT.Components
                 _ = _viewModel.UpdateConfigAsync(null, bitrateKbps);
                 Debug.Log($"[RTTRemoteMenu] Sent update_config: bitrateKbps={bitrateKbps} (total)");
             }
+            if (_preferenceSaveEnabled) SaveCurrentSelections();
         }
 
         /// <summary>
@@ -286,6 +296,7 @@ namespace VRWorkspace.UI.RTT.Components
         /// </summary>
         private void InitializeDropdownsDisabled()
         {
+            _preferenceSaveEnabled = false;  // Prevent handlers from saving placeholder values
             var placeholder = new List<string> { "----" };
 
             VRDropdownFactory.SetOptions(_monitorsDropdown, placeholder, 0);
@@ -383,6 +394,20 @@ namespace VRWorkspace.UI.RTT.Components
 
             // USB mode requires QR scan - disable manual host input
             VRInputFieldFactory.SetInteractable(_hostInput, !_isUsbMode);
+        }
+
+        /// <summary>
+        /// Save only host/port/USB mode to preferences.
+        /// Called immediately after successful connection (AwaitingHardwareInfo phase).
+        /// </summary>
+        private void SaveHostPreference()
+        {
+            var prefs = RemotePreferences.Load();
+            prefs.lastHost = VRInputFieldFactory.GetValue(_hostInput);
+            prefs.lastPort = Port;
+            prefs.usbMode = _isUsbMode;
+            prefs.Save();
+            Debug.Log($"[RTTRemoteMenu] Saved host preference: host={prefs.lastHost}, port={prefs.lastPort}, USB={prefs.usbMode}");
         }
 
         /// <summary>

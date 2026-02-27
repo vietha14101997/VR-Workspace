@@ -81,10 +81,16 @@ namespace VRWorkspace.Streaming
                 Debug.Log($"[PhaseProtocol] Added transceiver {i} for monitor {i}");
             }
 
-            // Add audio transceiver (RecvOnly) - MUST be after video to match server track order
-            var audioTrans = pc.AddTransceiver(TrackKind.Audio,
-                new RTCRtpTransceiverInit { direction = RTCRtpTransceiverDirection.RecvOnly });
-            Debug.Log("[PhaseProtocol] Added audio transceiver (after video transceivers)");
+            // Add audio transceiver on device builds only.
+            // Unity Editor has a SIPSorcery signalingState bug that breaks DTLS,
+            // and adding audio causes m-line reordering that makes it worse.
+            // On Android, signalingState works correctly, so audio + reorder is fine.
+#if UNITY_EDITOR
+            Debug.Log("[PhaseProtocol] Audio transceiver skipped (Editor: SIPSorcery DTLS workaround)");
+#else
+            pc.AddTransceiver(TrackKind.Audio, new RTCRtpTransceiverInit { direction = RTCRtpTransceiverDirection.RecvOnly });
+            Debug.Log("[PhaseProtocol] Added audio transceiver (RecvOnly)");
+#endif
 
             // Setup event handlers for single PC
             SetupSinglePCEventHandlers(pc, trackWrappers, transceivers);

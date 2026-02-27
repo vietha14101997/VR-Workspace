@@ -17,9 +17,16 @@ namespace VRWorkspace.Streaming
         void Awake()
         {
             _audioSource = GetComponent<AudioSource>();
-            _audioSource.loop = true;
+            _audioSource.loop = false;
             _audioSource.playOnAwake = false;
             _audioSource.spatialBlend = 0f; // 2D audio (non-spatial, full volume both ears)
+
+            // Reduce Unity audio DSP buffer for lower latency.
+            // Default is 1024 samples (~21ms per buffer). With 4 buffers = ~85ms total.
+            // 256 samples (~5ms per buffer) × 2 buffers = ~10ms total pipeline latency.
+            // Trade-off: lower latency but higher CPU usage.
+            AudioSettings.SetDSPBufferSize(256, 2);
+            Debug.Log($"[RemoteAudioPlayer] DSP buffer set to 256x2 for low latency");
         }
 
         /// <summary>
@@ -39,7 +46,7 @@ namespace VRWorkspace.Streaming
             // Unity.WebRTC 3.x: AudioStreamTrack received via OnTrack
             // is automatically decoded. We need to set it as output to our AudioSource.
             _audioSource.SetTrack(track);
-            _audioSource.loop = true;
+            _audioSource.loop = false;
             _audioSource.Play();
 
             Debug.Log("[RemoteAudioPlayer] Audio track set and playing");

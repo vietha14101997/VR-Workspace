@@ -124,6 +124,11 @@ namespace VRWorkspace.ViewModels
         /// </summary>
         public event Action<AudioStreamTrack> OnRemoteAudioTrackReceived;
 
+        /// <summary>
+        /// Cached audio track for late subscribers (OnTrack fires before RemoteAudioPlayer exists).
+        /// </summary>
+        public AudioStreamTrack CachedAudioTrack => _cachedAudioTrack;
+
         #endregion
 
         #region Commands
@@ -143,6 +148,14 @@ namespace VRWorkspace.ViewModels
         private TransportMode _transportMode = TransportMode.WiFi;
         private readonly Dictionary<int, Texture> _textures = new Dictionary<int, Texture>();
         private bool _disposed;
+
+        /// <summary>
+        /// Cached audio track received from server.
+        /// OnAudioTrackReceived fires during WebRTC negotiation (Phase 2),
+        /// but RemoteAudioPlayer subscribes later (Phase 3). Cache ensures
+        /// late subscribers still get the track.
+        /// </summary>
+        private AudioStreamTrack _cachedAudioTrack;
 
         /// <summary>
         /// Generation counter to invalidate stale event handlers from old clients.
@@ -367,6 +380,7 @@ namespace VRWorkspace.ViewModels
             IsConnected.Value = false;
             IsStreaming.Value = false;
             ErrorMessage.Value = string.Empty;
+            _cachedAudioTrack = null;
 
             // Phase 1 data
             HardwareInfo.Value = null;
@@ -690,7 +704,8 @@ namespace VRWorkspace.ViewModels
             _client.OnAudioTrackReceived += (audioTrack) =>
             {
                 if (_clientGeneration != subscribedGeneration) return;
-                Debug.Log("[ConnectionViewModel] Audio track received from server");
+                _cachedAudioTrack = audioTrack; // Cache for late subscribers (RemoteAudioPlayer created in Phase 3)
+                Debug.Log("[ConnectionViewModel] Audio track received and cached");
                 OnRemoteAudioTrackReceived?.Invoke(audioTrack);
             };
 

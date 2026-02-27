@@ -500,6 +500,11 @@ namespace VRWorkspace.UI.RTT.Components
                     break;
 
                 case ConnectionPhase.AwaitingHardwareInfo:
+                    UpdateButtonText("CONNECTING...");
+                    // Connect succeeded — save host/port/usbMode immediately
+                    SaveHostPreference();
+                    break;
+
                 case ConnectionPhase.SpeedTesting:
                 case ConnectionPhase.AwaitingNetworkInfo:
                 case ConnectionPhase.AwaitingSuggestedConfig:

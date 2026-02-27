@@ -1,5 +1,6 @@
 using UnityEngine;
 using TMPro;
+using Cysharp.Threading.Tasks;
 using VRWorkspace.UI.RTT;
 using VRWorkspace.UI.RTT.Components;
 
@@ -229,6 +230,69 @@ namespace VRWorkspace.UI.RTT.Controllers
         }
         #endregion
 
+        /// <summary>
+        /// Async version: Create the main menu spread across frames.
+        /// Uses Resources.LoadAsync for icons, yields between heavy operations.
+        /// </summary>
+        public async UniTask<GameObject> CreateMenuAsync(RectTransform container, float containerW, float containerH)
+        {
+            if (container == null)
+            {
+                Debug.LogWarning("[RTTMainMenuController] Container is null");
+                return null;
+            }
+
+            // Load icons async (spread across frames)
+            await LoadMenuIconsAsync();
+            await UniTask.Yield();
+
+            // Create menu container
+            _menuObject = new GameObject("MainMenu");
+            _menuObject.transform.SetParent(container, false);
+
+            RectTransform menuRT = _menuObject.AddComponent<RectTransform>();
+            menuRT.anchorMin = Vector2.zero;
+            menuRT.anchorMax = Vector2.one;
+            menuRT.offsetMin = Vector2.zero;
+            menuRT.offsetMax = Vector2.zero;
+
+            // Get font from RTTManager if available
+            var manager = RTTManager.Instance;
+            var font = manager?.Font ?? menuFont;
+
+            // Get layout from AppRegistry if available
+            var registry = manager?.AppRegistry;
+            int cols = registry?.menuColumns ?? menuColumns;
+            float spacing = registry?.menuSpacing ?? menuSpacing.x;
+            float aspect = registry?.buttonAspectRatio ?? menuButtonAspect;
+
+            // Create RTTMainMenu component
+            _mainMenuInstance = _menuObject.AddComponent<RTTMainMenu>();
+            _mainMenuInstance.CustomFont = font;
+            _mainMenuInstance.FontSize = menuFontSize;
+            _mainMenuInstance.Columns = cols;
+            _mainMenuInstance.Spacing = new Vector2(spacing, spacing * 1.5f);
+            _mainMenuInstance.ButtonAspect = aspect;
+
+            // Add menu items
+            bool hasRegistryApps = useAppRegistry && registry != null && registry.EnabledAppCount > 0;
+            if (hasRegistryApps)
+                AddItemsFromRegistry(registry, manager?.Theme);
+            else
+            {
+                AddHardcodedItems();
+                Debug.Log("[RTTMainMenuController] Using hardcoded items (registry empty or disabled)");
+            }
+
+            _mainMenuInstance.OnMenuItemClicked += HandleMenuItemClicked;
+
+            await UniTask.Yield(); // breathe before heavy BuildUI (TMP mesh gen)
+            _mainMenuInstance.BuildUI(container, containerW, containerH);
+
+            Debug.Log($"[RTTMainMenuController] Main Menu created async (useRegistry={hasRegistryApps}, itemCount={_mainMenuInstance.MenuItems.Count})");
+            return _menuObject;
+        }
+
         #region Private Methods
         private void LoadMenuIcons()
         {
@@ -240,6 +304,18 @@ namespace VRWorkspace.UI.RTT.Controllers
             if (iconQuit == null) iconQuit = Resources.Load<Sprite>("icon_quit");
 
             Debug.Log($"[RTTMainMenuController] Icons loaded - Remote:{iconRemote != null}, Browser:{iconBrowser != null}, Media:{iconMedia != null}, Files:{iconFiles != null}");
+        }
+
+        private async UniTask LoadMenuIconsAsync()
+        {
+            if (iconRemote == null) { iconRemote = await Resources.LoadAsync<Sprite>("icon_remote") as Sprite; await UniTask.Yield(); }
+            if (iconBrowser == null) { iconBrowser = await Resources.LoadAsync<Sprite>("icon_browser") as Sprite; await UniTask.Yield(); }
+            if (iconMedia == null) { iconMedia = await Resources.LoadAsync<Sprite>("icon_media") as Sprite; await UniTask.Yield(); }
+            if (iconFiles == null) { iconFiles = await Resources.LoadAsync<Sprite>("icon_files") as Sprite; await UniTask.Yield(); }
+            if (iconSettings == null) { iconSettings = await Resources.LoadAsync<Sprite>("icon_settings") as Sprite; await UniTask.Yield(); }
+            if (iconQuit == null) { iconQuit = await Resources.LoadAsync<Sprite>("icon_quit") as Sprite; }
+
+            Debug.Log($"[RTTMainMenuController] Icons loaded async - Remote:{iconRemote != null}, Browser:{iconBrowser != null}, Media:{iconMedia != null}, Files:{iconFiles != null}");
         }
 
         private Color GetMenuButtonColor(int index)

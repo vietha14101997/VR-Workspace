@@ -2,6 +2,7 @@ using UnityEngine;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using VRWorkspace.UI.RTT.Components;
 
 namespace VRWorkspace.UI.RTT
@@ -1265,6 +1266,150 @@ namespace VRWorkspace.UI.RTT
         }
 
         /// <summary>
+        /// UniTask version: Pre-initialize all apps with better frame spacing.
+        /// Called from RTTManager's async startup path.
+        /// </summary>
+        public async UniTaskVoid PrepareAllAppsUniTask()
+        {
+            if (_appRegistry == null || _backgroundPreInitRunning || _backgroundPreInitComplete)
+                return;
+
+            _backgroundPreInitRunning = true;
+            Debug.Log("[RTTAppManager] Background pre-init started (UniTask)");
+            float startTime = Time.realtimeSinceStartup;
+            int preInitCount = 0;
+
+            try
+            {
+                var apps = _appRegistry.GetSortedEnabledApps();
+
+                foreach (var appDef in apps)
+                {
+                    if (appDef.appType == RTTAppRegistry.AppType.NotImplemented ||
+                        appDef.appType == RTTAppRegistry.AppType.Quit ||
+                        appDef.appType == RTTAppRegistry.AppType.Browser ||
+                        appDef.appType == RTTAppRegistry.AppType.Settings ||
+                        _activeApps.ContainsKey(appDef.id) ||
+                        _preparingApps.ContainsKey(appDef.id) ||
+                        _preInitApps.ContainsKey(appDef.id))
+                        continue;
+
+                    await PreInitAppUniTask(appDef.id);
+                    preInitCount++;
+
+                    // 3 frames spacing instead of 0.1s fixed — lets GPU process RenderTexture alloc
+                    await UniTask.DelayFrame(3);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected on MonoBehaviour destroy — do not log
+            }
+            finally
+            {
+                _backgroundPreInitRunning = false;
+                _backgroundPreInitComplete = preInitCount > 0;
+            }
+
+            float elapsed = (Time.realtimeSinceStartup - startTime) * 1000f;
+            Debug.Log($"[RTTAppManager] Background pre-init complete: {preInitCount} apps in {elapsed:F1}ms");
+        }
+
+        /// <summary>
+        /// UniTask version: Pre-initialize a single app with proper frame yielding.
+        /// </summary>
+        private async UniTask PreInitAppUniTask(string appId)
+        {
+            if (_mainMenuFrame == null)
+            {
+                Debug.LogError($"[RTTAppManager] MainMenuFrame is null, cannot pre-init {appId}");
+                return;
+            }
+
+            float appStart = Time.realtimeSinceStartup;
+
+            Sprite icon = GetAppIcon(appId);
+            var instance = new RTTAppInstance(appId)
+            {
+                TaskbarSlotIndex = -1,
+                Icon = icon,
+                IsPreInitialized = true
+            };
+
+            if (_activeApps.ContainsKey(appId) || _preparingApps.ContainsKey(appId))
+            {
+                Debug.Log($"[RTTAppManager] PreInit: {appId} already active/preparing. Aborting.");
+                return;
+            }
+
+            // Frame 1: Create frame (RenderTexture alloc — GPU spike)
+            if (_menu != null)
+            {
+                instance.Frame = _menu.CreateAppFrame(
+                    instance.AppId,
+                    _mainMenuFrame.PanelWidth,
+                    _mainMenuFrame.PanelHeight,
+                    _mainMenuFrame.LogicalWidthValue
+                );
+            }
+            else
+            {
+                instance.Frame = RTTMenuFrame.Create(
+                    _frameParent,
+                    _mainMenuFrame.PanelWidth,
+                    _mainMenuFrame.PanelHeight,
+                    _mainMenuFrame.LogicalWidthValue,
+                    name: $"RTTMenuFrame_{instance.AppId}"
+                );
+            }
+
+            instance.Frame.transform.position = _mainMenuFrame.transform.position;
+            instance.Frame.transform.rotation = _mainMenuFrame.transform.rotation;
+            instance.Frame.transform.localScale = Vector3.one;
+            instance.Frame.SetVisible(false);
+            instance.Frame.gameObject.SetActive(true);
+
+            await UniTask.Yield(); // let GPU process RenderTexture
+
+            // Wait for ContentContainer (cancelled when MonoBehaviour destroyed)
+            var ct = this.GetCancellationTokenOnDestroy();
+            bool cancelled = await UniTask.WaitUntil(
+                () => instance.Frame.ContentContainer != null,
+                cancellationToken: ct
+            ).SuppressCancellationThrow();
+
+            if (cancelled || instance.Frame.ContentContainer == null)
+            {
+                Debug.LogError($"[RTTAppManager] ContentContainer not ready for pre-init: {appId}");
+                return;
+            }
+            await UniTask.Yield();
+
+            // Create content via callback
+            _createAppContentCallback?.Invoke(instance);
+
+            // Let content settle (layout, TMP mesh gen, etc.)
+            await UniTask.DelayFrame(5);
+
+            // Hide frame completely
+            instance.Frame.gameObject.SetActive(false);
+            instance.IsPrepared = true;
+
+            // Final check: did user open it in the meantime?
+            if (_activeApps.ContainsKey(appId) || _preparingApps.ContainsKey(appId))
+            {
+                Debug.Log($"[RTTAppManager] PreInit: {appId} became active during pre-init. Destroying.");
+                if (instance.Frame != null) Destroy(instance.Frame.gameObject);
+                return;
+            }
+
+            _preInitApps[appId] = instance;
+
+            float elapsed = (Time.realtimeSinceStartup - appStart) * 1000f;
+            Debug.Log($"[RTTAppManager] Pre-initialized app: {appId} in {elapsed:F1}ms");
+        }
+
+        /// <summary>
         /// Show a pre-initialized app with transition animation.
         /// </summary>
         private IEnumerator ShowPreInitApp(RTTAppInstance instance)
@@ -1379,23 +1524,34 @@ namespace VRWorkspace.UI.RTT
             string appId = app.AppId;
             Debug.Log($"[RTTAppManager] Resetting app: {appId}");
 
+            // Call Cleanup() on controller BEFORE destroying
+            // This resets ViewModel state, stops streaming, hides side panels, etc.
             if (app.Controller != null)
             {
+                var cleanupMethod = app.Controller.GetType().GetMethod("Cleanup");
+                if (cleanupMethod != null)
+                {
+                    try { cleanupMethod.Invoke(app.Controller, null); }
+                    catch (Exception e) { Debug.LogWarning($"[RTTAppManager] Reset cleanup failed for {appId}: {e.Message}"); }
+                }
                 if (app.Controller.gameObject != null)
-                    DestroyImmediate(app.Controller.gameObject);
+                    Destroy(app.Controller.gameObject);
                 app.Controller = null;
             }
 
-            // Clear old content from frame's content container IMMEDIATELY
-            // Use DestroyImmediate to ensure container is empty before new content is built
+            yield return null; // let deferred Destroy() process
+
+            // Clear old content from frame's content container
             if (app.Frame != null && app.Frame.ContentContainer != null)
             {
                 int childCount = app.Frame.ContentContainer.childCount;
                 for (int i = childCount - 1; i >= 0; i--)
                 {
-                    DestroyImmediate(app.Frame.ContentContainer.GetChild(i).gameObject);
+                    Destroy(app.Frame.ContentContainer.GetChild(i).gameObject);
                 }
             }
+
+            yield return null; // let deferred Destroy() process
 
             if (app.MenuContent != null)
             {

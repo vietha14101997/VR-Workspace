@@ -5,9 +5,11 @@ using System.Collections.Generic;
 using System.Linq;
 using TMPro;
 using Unity.WebRTC;
+using Cysharp.Threading.Tasks;
 using VRWorkspace.Utils;
 using VRWorkspace.Streaming;
 using VRWorkspace.Core;
+using VRWorkspace.Core.Coroutines;
 using VRWorkspace.ViewModels;
 using VRWorkspace.UI.RTT;
 using VRWorkspace.VRInput;
@@ -146,6 +148,7 @@ namespace VRWorkspace.UI.RTT
         // Persistent Main Menu - created once, never destroyed
         private GameObject _mainMenuContent;
         private bool _mainMenuInitialized = false;
+        private bool _mainMenuCreating = false;
         private bool _hasAutoRecentered = false;
 
         // Stored delegate for theme property change subscription (allows clean unsubscribe)
@@ -308,10 +311,10 @@ namespace VRWorkspace.UI.RTT
             // Subscribe to controller events
             SubscribeToControllerEvents();
 
-            // Auto show main menu
+            // Auto show main menu (async - spread work across frames to avoid jank)
             if (autoShowMainMenu && mainMenuFrame != null)
             {
-                StartCoroutine(WaitAndShowMainMenu());
+                WaitAndShowMainMenuAsync().Forget();
             }
 
     #if UNITY_ANDROID && !UNITY_EDITOR
@@ -524,28 +527,40 @@ namespace VRWorkspace.UI.RTT
                 mainMenuController.OnMenuItemClicked -= HandleMainMenuItemClicked;
         }
 
-        private IEnumerator WaitAndShowMainMenu()
+        private async UniTaskVoid WaitAndShowMainMenuAsync()
         {
-            // Start camera-follow immediately (before waiting for MainMenu)
-            // LateUpdate will unlock once camera tracking is detected AND MainMenu is initialized
-            if (autoRecenterOnStart && !_hasAutoRecentered)
+            // Re-entrancy guard: prevent concurrent async startup from rapid RegisterNewMenuFrame calls
+            if (_mainMenuCreating || _mainMenuInitialized) return;
+            _mainMenuCreating = true;
+
+            try
             {
-                StartStartupCameraFollow();
+                // Start camera-follow immediately (before waiting for MainMenu)
+                if (autoRecenterOnStart && !_hasAutoRecentered)
+                {
+                    StartStartupCameraFollow();
+                }
+
+                // Wait for ContentContainer to be ready (spread across frames)
+                await UniTask.WaitUntil(() => mainMenuFrame.ContentContainer != null,
+                    cancellationToken: this.GetCancellationTokenOnDestroy());
+                await UniTask.Yield(); // breathe frame
+
+                // Create the Main Menu once - it will never be destroyed
+                await CreatePersistentMainMenuAsync();
+                Debug.Log("[RTTManager] Main Menu initialized (persistent, cannot be closed)");
+
+                // Background pre-init all apps after main menu is ready
+                if (enableBackgroundPreInit && _appManager != null)
+                {
+                    _appManager.PrepareAllAppsUniTask().Forget();
+                    Debug.Log("[RTTManager] Background app pre-initialization triggered");
+                }
             }
-
-            while (mainMenuFrame.ContentContainer == null)
-                yield return null;
-            yield return null;
-
-            // Create the Main Menu once - it will never be destroyed
-            CreatePersistentMainMenu();
-            Debug.Log("[RTTManager] Main Menu initialized (persistent, cannot be closed)");
-
-            // Background pre-init all apps after main menu is ready
-            if (enableBackgroundPreInit && _appManager != null)
+            catch (OperationCanceledException) { }
+            finally
             {
-                _appManager.PrepareAllApps();
-                Debug.Log("[RTTManager] Background app pre-initialization triggered");
+                _mainMenuCreating = false;
             }
         }
 
@@ -588,11 +603,8 @@ namespace VRWorkspace.UI.RTT
         {
             if (_mainMenuInitialized)
             {
-                // Check if content was destroyed externally (e.g. scene change)
                 if (_mainMenuContent == null)
-                {
-                    _mainMenuInitialized = false; // Reset status to allow recreation
-                }
+                    _mainMenuInitialized = false;
                 else
                 {
                     Debug.LogWarning("[RTTManager] Main Menu already initialized - cannot create another");
@@ -600,7 +612,6 @@ namespace VRWorkspace.UI.RTT
                 }
             }
 
-            // Re-validate frame reference if needed
             if (mainMenuFrame == null || mainMenuFrame.ContentContainer == null)
             {
                  mainMenuFrame = RTTMenuFrame.PrimaryInstance;
@@ -615,6 +626,49 @@ namespace VRWorkspace.UI.RTT
             {
                 var containerSize = GetContainerSize();
                 _mainMenuContent = mainMenuController.CreateMenu(
+                    mainMenuFrame.ContentContainer,
+                    containerSize.x,
+                    containerSize.y
+                );
+            }
+
+            _mainMenuInitialized = true;
+            _currentMenuState = MenuState.MainMenu;
+            OnMenuStateChanged?.Invoke(_currentMenuState);
+            mainMenuFrame.MarkDirty();
+        }
+
+        /// <summary>
+        /// Async version: Create the persistent Main Menu spread across frames.
+        /// Uses async icon loading and yields between heavy operations.
+        /// </summary>
+        private async UniTask CreatePersistentMainMenuAsync()
+        {
+            if (_mainMenuInitialized)
+            {
+                if (_mainMenuContent == null)
+                    _mainMenuInitialized = false;
+                else
+                {
+                    Debug.LogWarning("[RTTManager] Main Menu already initialized - cannot create another");
+                    return;
+                }
+            }
+
+            if (mainMenuFrame == null || mainMenuFrame.ContentContainer == null)
+            {
+                 mainMenuFrame = RTTMenuFrame.PrimaryInstance;
+                 if (mainMenuFrame == null || mainMenuFrame.ContentContainer == null)
+                 {
+                     Debug.LogWarning("[RTTManager] MenuFrame or ContentContainer not initialized");
+                     return;
+                 }
+            }
+
+            if (mainMenuController != null)
+            {
+                var containerSize = GetContainerSize();
+                _mainMenuContent = await mainMenuController.CreateMenuAsync(
                     mainMenuFrame.ContentContainer,
                     containerSize.x,
                     containerSize.y
@@ -804,7 +858,7 @@ namespace VRWorkspace.UI.RTT
                 // If the content container is not yet ready (common during Awake/Start), wait for it
                 if (mainMenuFrame.ContentContainer == null)
                 {
-                    StartCoroutine(WaitAndShowMainMenu());
+                    WaitAndShowMainMenuAsync().Forget();
                 }
                 else
                 {

@@ -222,12 +222,8 @@ namespace VRWorkspace.UI.RTT
 
         private void RegisterWithManager()
         {
-            RTTManager manager = RTTManager.Instance;
-            if (manager == null)
-            {
-                manager = FindFirstObjectByType<RTTManager>();
-            }
-
+            // RTTManager.Instance already handles creation — no FindFirstObjectByType fallback needed
+            var manager = RTTManager.Instance;
             if (manager != null)
             {
                 // Explicitly register the new frame with the persistent manager

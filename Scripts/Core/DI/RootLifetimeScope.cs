@@ -1,6 +1,7 @@
 using VContainer;
 using VContainer.Unity;
 using VRWorkspace.Core;
+using VRWorkspace.Core.Coroutines;
 
 namespace VRWorkspace.DI
 {
@@ -15,6 +16,10 @@ namespace VRWorkspace.DI
             // Core services
             builder.Register<IMainThreadDispatcher>(resolver =>
                 MainThreadDispatcher.Instance, Lifetime.Singleton);
+
+            // Application-wide CoroutineScope (Kotlin-style structured concurrency)
+            builder.Register<CoroutineScope>(resolver =>
+                new CoroutineScope(Dispatchers.Main), Lifetime.Singleton);
         }
     }
 }

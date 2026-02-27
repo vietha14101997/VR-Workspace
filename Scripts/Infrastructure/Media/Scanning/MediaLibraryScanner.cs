@@ -4,6 +4,9 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using Cysharp.Threading.Tasks;
+using VRWorkspace.Core.Coroutines;
 using VRWorkspace.Media.Core;
 using VRWorkspace.Media.Data;
 using VRWorkspace.Media.Utils;
@@ -49,6 +52,7 @@ namespace VRWorkspace.Infrastructure.Media.Scanning
         private readonly Func<HashSet<string>> _getFavorites;
         private Coroutine _scanCoroutine;
         private Coroutine _backgroundScanCoroutine;
+        private CancellationTokenSource _scanCts;
         #endregion
 
         /// <summary>
@@ -79,13 +83,19 @@ namespace VRWorkspace.Infrastructure.Media.Scanning
             _scanCoroutine = _host.StartCoroutine(ScanCoroutine(onComplete));
         }
 
-        /// <summary>Stop any running full scan.</summary>
+        /// <summary>Stop any running full scan (coroutine or async).</summary>
         public void StopScan()
         {
             if (_scanCoroutine != null)
             {
                 _host.StopCoroutine(_scanCoroutine);
                 _scanCoroutine = null;
+            }
+            if (_scanCts != null)
+            {
+                _scanCts.Cancel();
+                _scanCts.Dispose();
+                _scanCts = null;
             }
             IsScanning = false;
         }
@@ -109,6 +119,66 @@ namespace VRWorkspace.Infrastructure.Media.Scanning
             }
 
             _backgroundScanCoroutine = _host.StartCoroutine(BackgroundScanCoroutine(existingVideos));
+        }
+
+        /// <summary>
+        /// Async version: Full library scan using Dispatchers.IO for file discovery.
+        /// File system operations run on IO thread pool — main thread stays responsive.
+        /// </summary>
+        public async UniTask<ScanResult> ScanAsync(CancellationToken ct = default)
+        {
+            if (IsScanning)
+            {
+                Debug.LogWarning("[MediaLibraryScanner] Already scanning");
+                return new ScanResult();
+            }
+
+            IsScanning = true;
+            OnScanStarted?.Invoke();
+            OnScanProgress?.Invoke(0f);
+
+            var result = new ScanResult();
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+            await ScanUsingMediaStoreAsync(result, ct);
+#else
+            await ScanUsingDirectoriesAsync(result, ct);
+#endif
+
+            // Deduplicate + sort on Default dispatcher (CPU work, off main thread)
+            result.Videos = await Dispatchers.Default.RunAsync(() =>
+            {
+                var seen = new HashSet<string>();
+                return result.Videos
+                    .Where(v => seen.Add(v.Path))
+                    .OrderBy(v => v.Title)
+                    .ToList();
+            }, ct);
+
+            await UniTask.SwitchToMainThread(ct);
+            IsScanning = false;
+            OnScanProgress?.Invoke(1f);
+            OnScanCompleted?.Invoke(result);
+
+            Debug.Log($"[MediaLibraryScanner] Async scan complete: {result.Videos.Count} media files");
+            return result;
+        }
+
+        /// <summary>
+        /// Start an async scan with callback API (drop-in replacement for StartScan).
+        /// </summary>
+        public void StartScanAsync(Action<ScanResult> onComplete = null)
+        {
+            if (IsScanning) return;
+            StopScan();
+            _scanCts = new CancellationTokenSource();
+            var cts = _scanCts;
+            ScanAsync(cts.Token).ContinueWith(result =>
+            {
+                cts.Dispose();
+                if (_scanCts == cts) _scanCts = null;
+                onComplete?.Invoke(result);
+            }).Forget();
         }
         #endregion
 
@@ -273,6 +343,101 @@ namespace VRWorkspace.Infrastructure.Media.Scanning
                 }
             }
         }
+        /// <summary>
+        /// Async version: File discovery runs on IO thread pool via Dispatchers.IO.
+        /// Eliminates the 50-500ms main thread freeze from Directory.GetFiles.
+        /// </summary>
+        private async UniTask ScanUsingDirectoriesAsync(ScanResult result, CancellationToken ct)
+        {
+            var scanRoots = GetScanRoots();
+            var allExtensions = VIDEO_EXTENSIONS.Concat(IMAGE_EXTENSIONS).Concat(AUDIO_EXTENSIONS).ToHashSet();
+            var foundFiles = new List<string>();
+
+            Debug.Log($"[MediaLibraryScanner] Starting async directory scan in {scanRoots.Count} locations");
+
+            // File discovery on IO thread — does NOT block main thread
+            foreach (var root in scanRoots)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                string scanError = null;
+                var files = await Dispatchers.IO.RunAsync(() =>
+                {
+                    if (!Directory.Exists(root)) return new List<string>();
+                    try
+                    {
+                        return Directory.GetFiles(root, "*.*", SearchOption.AllDirectories)
+                            .Where(f => allExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
+                            .ToList();
+                    }
+                    catch (Exception ex)
+                    {
+                        scanError = $"[MediaLibraryScanner] Error scanning {root}: {ex.Message}";
+                        return new List<string>();
+                    }
+                }, ct);
+                if (scanError != null) Debug.LogWarning(scanError);
+
+                foundFiles.AddRange(files);
+            }
+
+            Debug.Log($"[MediaLibraryScanner] Found {foundFiles.Count} media files");
+
+            // Process files back on main thread, yield every 10 items
+            var favorites = _getFavorites();
+            int processed = 0;
+
+            foreach (var filePath in foundFiles)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                try
+                {
+                    var videoInfo = CreateVideoInfo(filePath, favorites);
+                    result.Videos.Add(videoInfo);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[MediaLibraryScanner] Error processing {filePath}: {ex.Message}");
+                }
+
+                processed++;
+                if (processed % 10 == 0)
+                {
+                    OnScanProgress?.Invoke((float)processed / foundFiles.Count);
+                    await UniTask.Yield(ct);
+                }
+            }
+        }
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+        private async UniTask ScanUsingMediaStoreAsync(ScanResult result, CancellationToken ct)
+        {
+            Debug.Log("[MediaLibraryScanner] Using Android MediaStore (async)...");
+
+            var mediaItems = AndroidMediaStoreHelper.QueryAllMedia();
+            int processed = 0;
+            var favorites = _getFavorites();
+
+            foreach (var item in mediaItems)
+            {
+                ct.ThrowIfCancellationRequested();
+                try { result.Videos.Add(CreateVideoInfoFromMediaStore(item, favorites)); } catch { }
+
+                processed++;
+                if (processed % 50 == 0)
+                {
+                    OnScanProgress?.Invoke((float)processed / mediaItems.Count);
+                    await UniTask.Yield(ct);
+                }
+            }
+        }
+#else
+        private async UniTask ScanUsingMediaStoreAsync(ScanResult result, CancellationToken ct)
+        {
+            await ScanUsingDirectoriesAsync(result, ct);
+        }
+#endif
         #endregion
 
         #region Background Incremental Scan

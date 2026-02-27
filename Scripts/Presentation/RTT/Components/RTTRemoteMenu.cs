@@ -50,6 +50,7 @@ namespace VRWorkspace.UI.RTT.Components
         private GameObject _hostInput;
         private GameObject _usbModeToggle;  // USB mode checkbox (replaces port input)
         private bool _isUsbMode = false;    // Current USB mode state
+        private bool _preferenceSaveEnabled = false;  // Guard: only save when dropdowns are properly configured
         private string _usbTetheringIP = null;  // USB Tethering IP from QR scan (for full USB streaming)
         private const int DEFAULT_PORT = 8288;
         private GameObject _monitorsDropdown;

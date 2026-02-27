@@ -703,6 +703,14 @@ namespace VRWorkspace.UI.RTT.Controllers
             if (_viewModel != null)
             {
                 _viewModel.OnRemoteAudioTrackReceived += _audioPlayer.SetTrack;
+
+                // OnTrack fires during Phase 2, but this player is created in Phase 3.
+                // Apply cached track if it arrived before we subscribed.
+                if (_viewModel.CachedAudioTrack != null)
+                {
+                    _audioPlayer.SetTrack(_viewModel.CachedAudioTrack);
+                    Debug.Log("[RTTRemoteMenuController] Applied cached audio track to player");
+                }
             }
 
             Debug.Log("[RTTRemoteMenuController] Created RemoteAudioPlayer");
