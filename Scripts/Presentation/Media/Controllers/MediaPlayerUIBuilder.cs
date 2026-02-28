@@ -657,7 +657,16 @@ namespace VRWorkspace.Presentation.Media.Controllers
             out float uiDepthOffset,
             out float uiHeightOffset)
         {
-            float sharpen = PlayerPrefs.GetFloat("MediaPlayer_PictureSharpen", 0.5f);
+            // Migrate old sharpen default (was 0.5, now 0.0)
+            const int PICTURE_SETTINGS_VER = 1;
+            if (PlayerPrefs.GetInt("MediaPlayer_PictureSettingsVer", 0) < PICTURE_SETTINGS_VER)
+            {
+                PlayerPrefs.DeleteKey("MediaPlayer_PictureSharpen");
+                PlayerPrefs.SetInt("MediaPlayer_PictureSettingsVer", PICTURE_SETTINGS_VER);
+                PlayerPrefs.Save();
+            }
+
+            float sharpen = PlayerPrefs.GetFloat("MediaPlayer_PictureSharpen", 0.0f);
             float brightness = PlayerPrefs.GetFloat("MediaPlayer_PictureBrightness", 1.0f);
             float saturation = PlayerPrefs.GetFloat("MediaPlayer_PictureSaturation", 1.0f);
             float contrast = PlayerPrefs.GetFloat("MediaPlayer_PictureContrast", 1.0f);
@@ -730,7 +739,7 @@ namespace VRWorkspace.Presentation.Media.Controllers
             VRWorkspace.Media.Core.VRVideoPlayerController playerController,
             RTTMediaSettingsPanel settingsPanel)
         {
-            float sharpen = PlayerPrefs.GetFloat("MediaPlayer_PictureSharpen", 0.5f);
+            float sharpen = PlayerPrefs.GetFloat("MediaPlayer_PictureSharpen", 0.0f);
             float brightness = PlayerPrefs.GetFloat("MediaPlayer_PictureBrightness", 1.0f);
             float saturation = PlayerPrefs.GetFloat("MediaPlayer_PictureSaturation", 1.0f);
             float contrast = PlayerPrefs.GetFloat("MediaPlayer_PictureContrast", 1.0f);

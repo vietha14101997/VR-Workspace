@@ -56,7 +56,7 @@ namespace VRWorkspace.Media.Core
                     Brightness = GetCurrentShaderFloat("_Brightness", 1f),
                     Contrast = GetCurrentShaderFloat("_Contrast", 1f),
                     Saturation = GetCurrentShaderFloat("_Saturation", 1f),
-                    Sharpness = GetCurrentShaderFloat("_Sharpness", 0.5f),
+                    Sharpness = GetCurrentShaderFloat("_Sharpness", 0.0f),
                     Tint = GetCurrentShaderFloat("_Tint", 0f),
                     Temperature = GetCurrentShaderFloat("_Temperature", 0f),
                     ScreenDistance = _displaySettings.Distance,

@@ -20,9 +20,10 @@ namespace VRWorkspace.Media.UI
             // Scrollable content
             var scrollContent = CreateScrollableContent(_pictureAdjContainer.transform);
 
-            // Sharpen slider (0 - 2, default 0.0) → display as integer 0-20
+            // Sharpen slider (-0.1 - 2.1, default 0.0) → display as integer -1 to 21
+            // Negative = slight blur, 0 = no change, positive = sharpen
             (_sharpnessSlider, _sharpnessValueLabel) = CreateSliderRow(
-                scrollContent, "Sharpen", 0f, 2f, 0.0f,
+                scrollContent, "Sharpen", -0.1f, 2.1f, 0.0f,
                 (v) => OnSharpnessChanged?.Invoke(v),
                 (v) => Mathf.RoundToInt(v * 10f).ToString());
 

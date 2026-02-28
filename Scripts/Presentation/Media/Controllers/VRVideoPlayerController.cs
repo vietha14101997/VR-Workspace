@@ -352,7 +352,7 @@ namespace VRWorkspace.Media.Core
             float prevSaturation = GetCurrentShaderFloat("_Saturation", 1f);
             float prevTint = GetCurrentShaderFloat("_Tint", 0f);
             float prevTemperature = GetCurrentShaderFloat("_Temperature", 0f);
-            float prevSharpness = GetCurrentShaderFloat("_Sharpness", 0.5f);
+            float prevSharpness = GetCurrentShaderFloat("_Sharpness", 0.0f);
 
             // Choose appropriate display settings
             _displaySettings = isImmersive ? DisplaySettings.Immersive : DisplaySettings.Default;

@@ -276,21 +276,32 @@ namespace VRWorkspace.Media.Projections
 
         /// <summary>
         /// Set a shader float property on the board material (WorldPanelBoard shader).
+        /// Uses sharedMaterial because _panelMat is already a unique instance.
+        /// Also syncs WorldPanelPlus fields for properties managed by UpdateBoardShaderProperties,
+        /// so Apply() doesn't revert the value to the old field value.
         /// </summary>
         public void SetBoardShaderFloat(string property, float value)
         {
             if (_worldPanel == null || _worldPanel.board == null) return;
+
+            // Sync WorldPanelPlus fields so Apply() won't overwrite
+            switch (property)
+            {
+                case "_Sharpness": _worldPanel.sharpnessStrength = value; break;
+                case "_ChromaSharpness": _worldPanel.chromaSharpness = value; break;
+            }
+
             var rend = _worldPanel.board.GetComponent<Renderer>();
-            if (rend != null && rend.material.HasProperty(property))
-                rend.material.SetFloat(property, value);
+            if (rend != null && rend.sharedMaterial != null && rend.sharedMaterial.HasProperty(property))
+                rend.sharedMaterial.SetFloat(property, value);
         }
 
         public float GetBoardShaderFloat(string property, float defaultVal = 0f)
         {
             if (_worldPanel == null || _worldPanel.board == null) return defaultVal;
             var rend = _worldPanel.board.GetComponent<Renderer>();
-            if (rend != null && rend.material.HasProperty(property))
-                return rend.material.GetFloat(property);
+            if (rend != null && rend.sharedMaterial != null && rend.sharedMaterial.HasProperty(property))
+                return rend.sharedMaterial.GetFloat(property);
             return defaultVal;
         }
 
@@ -376,7 +387,7 @@ namespace VRWorkspace.Media.Projections
             _worldPanel.boardEdgeColor = Color.black; // Dark border looks good for video
             _worldPanel.panelTint = Color.white;
             _worldPanel.enableSharpening = true; // Enable sharpening for video
-            _worldPanel.sharpnessStrength = 0.5f;
+            _worldPanel.sharpnessStrength = 0.0f; // Default off — user adds via slider
             _worldPanel.anisoLevel = 16;
             _worldPanel.mipMapBias = -0.25f;
             _worldPanel.cursorEnable = false; // No cursor for video projection

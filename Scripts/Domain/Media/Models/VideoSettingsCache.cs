@@ -30,7 +30,7 @@ namespace VRWorkspace.Media.Data
         public float Brightness = 1f;
         public float Contrast = 1f;
         public float Saturation = 1f;
-        public float Sharpness = 0.5f;
+        public float Sharpness = 0.0f;
         public float Tint = 0f;
         public float Temperature = 0f;
 
