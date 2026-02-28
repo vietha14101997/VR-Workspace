@@ -240,6 +240,7 @@ namespace VRWorkspace.Media.UI
                 _font, THEME_COLOR,
                 VRSliderFactory.SliderStyle.Setting,
                 min, max);
+            slider.SetStep(stepSize);
             slider.SetValueWithoutNotify(defaultValue);
             slider.PreviewEnabled = false;
 
