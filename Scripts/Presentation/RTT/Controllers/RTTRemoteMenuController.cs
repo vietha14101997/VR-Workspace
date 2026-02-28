@@ -367,18 +367,19 @@ namespace VRWorkspace.UI.RTT.Controllers
         /// <summary>
         /// Get connection settings from the remote menu.
         /// </summary>
-        public (string host, string port, int monitors, string style, string bitrate, string fps) GetConnectionSettings()
+        public (string host, string port, int monitors, string mode, string bitrate, string fps, string monitorType) GetConnectionSettings()
         {
             if (_remoteMenuInstance == null)
-                return ("localhost", "8080", 1, "Flat Planar", "20 Mbps", "60 FPS");
+                return ("localhost", "8080", 1, "Classic", "20 Mbps", "60 FPS", "standard");
 
             return (
                 _remoteMenuInstance.Host,
                 _remoteMenuInstance.Port,
-                _remoteMenuInstance.MonitorIndex + 1,
-                _remoteMenuInstance.Style,
+                _remoteMenuInstance.IsUltrawide ? 1 : _remoteMenuInstance.MonitorIndex + 1,
+                _remoteMenuInstance.Mode,
                 _remoteMenuInstance.Bitrate,
-                _remoteMenuInstance.FPS
+                _remoteMenuInstance.FPS,
+                _remoteMenuInstance.MonitorType
             );
         }
 
@@ -850,13 +851,19 @@ namespace VRWorkspace.UI.RTT.Controllers
             // Build cluster with the specified monitor count (skip sample textures)
             _clusterRig.BuildWithPanelCount(config.monitors, skipSampleTextures: true);
 
-            // Apply style from RTTRemoteMenu (Flat Planar or Curved Surround)
+            // Auto-apply style based on monitor selection:
+            // Ultrawide/Super Ultrawide → Curved Surround, Standard (1/2/3) → Flat Planar
             if (_remoteMenuInstance != null)
             {
-                int styleIndex = _remoteMenuInstance.StyleIndex; // 0=Flat Planar, 1=Curved Surround
-                bool isCurvedSurround = (styleIndex == 1);
+                bool isCurvedSurround = _remoteMenuInstance.IsUltrawide;
                 _clusterRig.SetStyle(isCurvedSurround);
-                Debug.Log($"[RTTRemoteMenuController] Applied style: {(isCurvedSurround ? "Curved Surround" : "Flat Planar")}");
+                Debug.Log($"[RTTRemoteMenuController] Applied style: {(isCurvedSurround ? "Curved Surround (Ultrawide)" : "Flat Planar (Standard)")}");
+
+                // Set ultrawide panel aspect ratio if needed
+                if (isCurvedSurround)
+                {
+                    _clusterRig.SetUltrawideAspect(config.monitorType);
+                }
             }
 
             // Create remote audio player for desktop audio streaming

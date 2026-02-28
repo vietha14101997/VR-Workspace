@@ -93,6 +93,14 @@ namespace VRWorkspace.Streaming
             _sctpInitChannel.OnClose = () => Debug.Log("[PhaseProtocol] Audio DataChannel closed");
             Debug.Log("[PhaseProtocol] Audio via DataChannel (client-created, no RTP audio transceiver)");
 
+            // Client creates "cursor" DataChannel for low-latency cursor position updates.
+            // Server sends binary cursor position (19 bytes) through this channel (UDP-like latency).
+            _cursorChannel = pc.CreateDataChannel("cursor");
+            _cursorChannel.OnMessage = bytes => HandleCursorFromDataChannel(bytes);
+            _cursorChannel.OnOpen = () => Debug.Log("[PhaseProtocol] Cursor DataChannel opened");
+            _cursorChannel.OnClose = () => Debug.Log("[PhaseProtocol] Cursor DataChannel closed");
+            Debug.Log("[PhaseProtocol] Cursor via DataChannel (low-latency binary)");
+
             // Setup event handlers for single PC
             SetupSinglePCEventHandlers(pc, trackWrappers, transceivers);
 

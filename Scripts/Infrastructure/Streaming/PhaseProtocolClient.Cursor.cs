@@ -7,7 +7,32 @@ namespace VRWorkspace.Streaming
     public partial class PhaseProtocolClient
     {
         /// <summary>
-        /// Handle cursor position update from server.
+        /// Handle cursor position from DataChannel (binary format, low-latency).
+        /// Binary: [type(1)][monitorIndex(1)][u(4)][v(4)][flags(1)][cursorId(8)] = 19 bytes
+        /// </summary>
+        private void HandleCursorFromDataChannel(byte[] data)
+        {
+            if (data == null || data.Length < 19) return;
+            if (data[0] != 1) return; // type 1 = cursor_position
+
+            int monitorIndex = data[1];
+            float u = BitConverter.ToSingle(data, 2);
+            float v = BitConverter.ToSingle(data, 6);
+            byte flags = data[10];
+            bool visible = (flags & 1) != 0;
+            int cursorTypeInt = (flags >> 1) & 0x0F;
+            long cursorId = BitConverter.ToInt64(data, 11);
+            CursorType cursorType = (CursorType)cursorTypeInt;
+
+            // Dispatch to main thread (DataChannel callback is on WebRTC thread)
+            VRWorkspace.Core.MainThreadDispatcher.Enqueue(() =>
+            {
+                OnCursorPosition?.Invoke(monitorIndex, u, v, visible, cursorType, cursorId);
+            });
+        }
+
+        /// <summary>
+        /// Handle cursor position update from server (WebSocket fallback).
         /// </summary>
         private void HandleCursorPosition(SimpleJson json)
         {

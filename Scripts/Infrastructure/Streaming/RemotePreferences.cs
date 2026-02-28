@@ -11,8 +11,9 @@ namespace VRWorkspace.Streaming
     [Serializable]
     public class RemotePreferences
     {
-        public int monitors = -1;           // -1 = use suggested
-        public string resolution = "";      // empty = use suggested
+        public int monitors = -1;           // -1 = use suggested (0-4: index into MONITOR_OPTIONS)
+        public string mode = "";            // "Classic" or "Spatial"
+        public string resolution = "";      // [DEPRECATED] kept for backward compat migration
         public string bitrate = "";
         public string fps = "";
         public string lastHost = "";
@@ -36,7 +37,16 @@ namespace VRWorkspace.Streaming
                     var prefs = JsonUtility.FromJson<RemotePreferences>(json);
                     if (prefs != null)
                     {
-                        Debug.Log($"[RemotePreferences] Loaded: monitors={prefs.monitors}, res={prefs.resolution}, bitrate={prefs.bitrate}, fps={prefs.fps}");
+                        // Backward compat: migrate old "resolution" field to "mode"
+                        if (string.IsNullOrEmpty(prefs.mode) && !string.IsNullOrEmpty(prefs.resolution))
+                        {
+                            // Old resolution values were "Flat Planar" or "Curved Surround"
+                            // These don't map to mode, so just default to Classic
+                            prefs.mode = "Classic";
+                            prefs.resolution = "";
+                        }
+
+                        Debug.Log($"[RemotePreferences] Loaded: monitors={prefs.monitors}, mode={prefs.mode}, bitrate={prefs.bitrate}, fps={prefs.fps}");
                         return prefs;
                     }
                 }
@@ -66,33 +76,28 @@ namespace VRWorkspace.Streaming
             }
         }
 
-        /// <summary>
-        /// Check if user has saved monitor preference.
-        /// </summary>
+        /// <summary>Check if user has saved monitor preference.</summary>
         public bool HasMonitorPreference => monitors >= 0;
 
-        /// <summary>
-        /// Check if user has saved resolution preference.
-        /// </summary>
-        public bool HasResolutionPreference => !string.IsNullOrEmpty(resolution);
+        /// <summary>Check if user has saved mode preference.</summary>
+        public bool HasModePreference => !string.IsNullOrEmpty(mode);
 
-        /// <summary>
-        /// Check if user has saved bitrate preference.
-        /// </summary>
+        /// <summary>Check if user has saved bitrate preference.</summary>
         public bool HasBitratePreference => !string.IsNullOrEmpty(bitrate);
 
-        /// <summary>
-        /// Check if user has saved fps preference.
-        /// </summary>
+        /// <summary>Check if user has saved fps preference.</summary>
         public bool HasFpsPreference => !string.IsNullOrEmpty(fps);
 
         /// <summary>
-        /// Remove " (Recommended)" suffix from a value.
+        /// Remove " (Recommended)" and " (Locked)" suffixes from a value.
         /// </summary>
         public static string CleanValue(string value)
         {
             if (string.IsNullOrEmpty(value)) return value;
-            return value.Replace(" (Recommended)", "").Trim();
+            return value
+                .Replace(" (Recommended)", "")
+                .Replace(" (Locked)", "")
+                .Trim();
         }
     }
 }

@@ -311,6 +311,15 @@ namespace VRWorkspace.UI.Components
         }
 
         /// <summary>
+        /// Lock/unlock a specific option in a dropdown to prevent/allow selection.
+        /// </summary>
+        public static void SetOptionLocked(GameObject wrapper, int index, bool locked)
+        {
+            var dropdown = GetDropdown(wrapper);
+            dropdown?.SetOptionLocked(index, locked);
+        }
+
+        /// <summary>
         /// Enable/disable dropdown interaction với visual feedback
         /// </summary>
         public static void SetInteractable(GameObject wrapper, bool interactable)
@@ -346,6 +355,7 @@ namespace VRWorkspace.UI.Components
         private GameObject _dropdownPanel;
         private System.Action<int, string> _onValueChanged;
         private HoverEffectController _hoverController;  // Reference to hover controller for dropdown button
+        private HashSet<int> _lockedOptions = new HashSet<int>();  // Per-option lock state
 
         // For RTT mode: create a world-space floating panel to avoid RenderTexture clipping
         private RTTCanvasBase _rttCanvasBase;
@@ -454,13 +464,19 @@ namespace VRWorkspace.UI.Components
             }
         }
 
-        public void SetSelectedIndex(int index)
+        public void SetSelectedIndex(int index, bool bypassLock = false)
         {
             if (_options == null || index < 0 || index >= _options.Count) return;
 
+            // Prevent selecting locked options (unless bypassed for programmatic use)
+            if (!bypassLock && _lockedOptions.Contains(index)) return;
+
             UpdateSelection(index);
-            // Strip "(Recommended)" suffix from displayed value
-            string displayValue = _options[index].Replace(" (Recommended)", "").Trim();
+            // Strip "(Recommended)" and "(Locked)" suffixes from displayed value
+            string displayValue = _options[index]
+                .Replace(" (Recommended)", "")
+                .Replace(" (Locked)", "")
+                .Trim();
             if (_valueTxt != null)
             {
                 _valueTxt.text = displayValue;
@@ -476,6 +492,72 @@ namespace VRWorkspace.UI.Components
             UpdateOptionLabels();
 
             SetSelectedIndex(selectedIndex);
+        }
+
+        /// <summary>
+        /// Lock/unlock a specific option to prevent/allow selection.
+        /// Locked options are visually dimmed and cannot be clicked.
+        /// </summary>
+        public void SetOptionLocked(int index, bool locked)
+        {
+            if (locked)
+                _lockedOptions.Add(index);
+            else
+                _lockedOptions.Remove(index);
+
+            UpdateLockedOptionVisuals();
+        }
+
+        /// <summary>Check if a specific option is locked.</summary>
+        public bool IsOptionLocked(int index) => _lockedOptions.Contains(index);
+
+        /// <summary>
+        /// Update visual state for locked options (dimmed alpha, non-interactable).
+        /// </summary>
+        private void UpdateLockedOptionVisuals()
+        {
+            if (_dropdownPanel == null) return;
+
+            foreach (int lockedIdx in _lockedOptions)
+            {
+                Transform optionTransform = FindChildRecursive(_dropdownPanel.transform, "Option_" + lockedIdx);
+                if (optionTransform == null) continue;
+
+                // Dim the entire option
+                var canvasGroup = optionTransform.GetComponent<CanvasGroup>();
+                if (canvasGroup == null)
+                    canvasGroup = optionTransform.gameObject.AddComponent<CanvasGroup>();
+                canvasGroup.alpha = 0.35f;
+                canvasGroup.interactable = false;
+
+                // Add "(Locked)" suffix to text if not already present
+                Transform textTransform = optionTransform.Find("Text");
+                if (textTransform != null)
+                {
+                    var txt = textTransform.GetComponent<TextMeshProUGUI>();
+                    if (txt != null && !txt.text.Contains("(Locked)"))
+                    {
+                        txt.text = txt.text + " (Locked)";
+                    }
+                }
+            }
+
+            // Ensure unlocked options are restored
+            if (_options == null) return;
+            for (int i = 0; i < _options.Count; i++)
+            {
+                if (_lockedOptions.Contains(i)) continue;
+
+                Transform optionTransform = FindChildRecursive(_dropdownPanel.transform, "Option_" + i);
+                if (optionTransform == null) continue;
+
+                var canvasGroup = optionTransform.GetComponent<CanvasGroup>();
+                if (canvasGroup != null)
+                {
+                    canvasGroup.alpha = 1f;
+                    canvasGroup.interactable = true;
+                }
+            }
         }
 
         /// <summary>

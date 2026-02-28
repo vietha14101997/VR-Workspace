@@ -85,6 +85,7 @@ namespace VRWorkspace.Streaming
         private TaskCompletionSource<bool> _allAnswersReceivedTcs;
         private bool   _streamingStartedFired;
         private RTCDataChannel _sctpInitChannel; // Kept alive to maintain SCTP transport for audio DataChannel
+        private RTCDataChannel _cursorChannel;   // Low-latency cursor position updates (binary, UDP-like)
         private int _pcGeneration; // Incremented on cleanup to guard stale PC callbacks
 
         // ── Frame timing / FPS ────────────────────────────────────────────────
@@ -274,7 +275,9 @@ namespace VRWorkspace.Streaming
             {
                 _ws = new ClientWebSocket();
                 _ws.Options.KeepAliveInterval = TimeSpan.FromSeconds(30);
-                await _ws.ConnectAsync(new Uri(serverUrl), ct);
+                using var connectTimeout = new CancellationTokenSource(5000); // 5s timeout for unreachable hosts
+                using var connectLinked = CancellationTokenSource.CreateLinkedTokenSource(ct, connectTimeout.Token);
+                await _ws.ConnectAsync(new Uri(serverUrl), connectLinked.Token);
 
                 Debug.Log("[PhaseProtocol] WebSocket connected, waiting for hardware_info");
                 _stateMachine.TryTransition(ConnectionPhase.AwaitingHardwareInfo);
@@ -314,6 +317,14 @@ namespace VRWorkspace.Streaming
                 // ── Start loops ───────────────────────────────────────────────
                 _ = ReceiveLoopAsync(ct);
                 _ = KeepaliveLoopAsync(ct);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                // Connect timeout (host unreachable)
+                string msg = "Connection timed out — check server IP";
+                Debug.LogError($"[PhaseProtocol] {msg}");
+                _stateMachine.ForceTransition(ConnectionPhase.Error, msg);
+                OnError?.Invoke(msg);
             }
             catch (Exception ex)
             {
@@ -921,6 +932,7 @@ namespace VRWorkspace.Streaming
             }
 
             _sctpInitChannel = null;
+            _cursorChannel = null;
             _streamingStartedFired = false;
             _streamingStartTime    = DateTime.MinValue;
             _isStreamingPaused     = false;

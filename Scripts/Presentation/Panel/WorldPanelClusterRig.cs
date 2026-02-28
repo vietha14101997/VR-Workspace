@@ -586,6 +586,37 @@ namespace VRWorkspace.Panel
         }
 
         /// <summary>
+        /// Set panel dimensions for ultrawide aspect ratio.
+        /// Call AFTER BuildWithPanelCount for ultrawide/super_ultrawide modes.
+        /// </summary>
+        /// <param name="monitorType">"ultrawide" or "super_ultrawide"</param>
+        public void SetUltrawideAspect(string monitorType)
+        {
+            if (_panels == null || _panels.Count == 0) return;
+            if (monitorType != "ultrawide" && monitorType != "super_ultrawide") return;
+
+            // Aspect ratio from resized stream: ultrawide 1920x810, super 2880x810
+            float aspectRatio = monitorType == "ultrawide"
+                ? 1920f / 810f    // ~2.37:1
+                : 2880f / 810f;   // ~3.56:1
+
+            // Keep height, adjust width to match stream aspect ratio
+            float height = _panels[0].height;
+            float newWidth = height * aspectRatio;
+
+            foreach (var panel in _panels)
+            {
+                panel.width = newWidth;
+                panel.Apply();
+            }
+
+            Debug.Log($"[WorldPanelClusterRig] Ultrawide aspect: {monitorType} → {newWidth:F3}m x {height:F3}m (aspect {aspectRatio:F2}:1)");
+
+            // Refresh layout with new dimensions
+            RefreshLayoutAndVisuals();
+        }
+
+        /// <summary>
         /// Set panel cluster style dynamically (can be called during streaming).
         /// Does NOT recreate panels - only updates layout mode and visual settings.
         /// </summary>

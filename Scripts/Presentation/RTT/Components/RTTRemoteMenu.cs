@@ -54,7 +54,7 @@ namespace VRWorkspace.UI.RTT.Components
         private string _usbTetheringIP = null;  // USB Tethering IP from QR scan (for full USB streaming)
         private const int DEFAULT_PORT = 8288;
         private GameObject _monitorsDropdown;
-        private GameObject _styleDropdown;
+        private GameObject _modeDropdown;
         private GameObject _bitrateDropdown;
         private GameObject _fpsDropdown;
         private GameObject _bodyContainer;
@@ -108,8 +108,8 @@ namespace VRWorkspace.UI.RTT.Components
         private const int DROPDOWN_VALUE_FONT_SIZE = 42;
 
         // Default dropdown options (without Recommended suffix)
-        private static readonly string[] MONITOR_OPTIONS = { "1 Monitor", "2 Monitors", "3 Monitors" };
-        private static readonly string[] STYLE_OPTIONS = { "Flat Planar", "Curved Surround" };
+        private static readonly string[] MONITOR_OPTIONS = { "1 Monitor", "2 Monitors", "3 Monitors", "Ultrawide", "Super Ultrawide" };
+        private static readonly string[] MODE_OPTIONS = { "Classic", "Spatial" };
         private static readonly string[] BITRATE_OPTIONS = { "10 Mbps", "15 Mbps", "20 Mbps", "25 Mbps", "30 Mbps" };
         private static readonly string[] FPS_OPTIONS = { "30 FPS", "45 FPS", "60 FPS" };
 
@@ -137,10 +137,23 @@ namespace VRWorkspace.UI.RTT.Components
         public string UsbTetheringIP => _usbTetheringIP;
         public bool HasUsbTetheringIP => !string.IsNullOrEmpty(_usbTetheringIP);
         public int MonitorIndex => VRDropdownFactory.GetSelectedIndex(_monitorsDropdown);
-        public string Style => VRDropdownFactory.GetSelectedValue(_styleDropdown);
-        public int StyleIndex => VRDropdownFactory.GetSelectedIndex(_styleDropdown);
+        public string Mode => VRDropdownFactory.GetSelectedValue(_modeDropdown);
+        public int ModeIndex => VRDropdownFactory.GetSelectedIndex(_modeDropdown);
         public string Bitrate => VRDropdownFactory.GetSelectedValue(_bitrateDropdown);
         public string FPS => VRDropdownFactory.GetSelectedValue(_fpsDropdown);
+
+        /// <summary>
+        /// Monitor type based on selected monitor option.
+        /// "standard" for 1/2/3 Monitors, "ultrawide" for Ultrawide, "super_ultrawide" for Super Ultrawide.
+        /// </summary>
+        public string MonitorType => MonitorIndex switch {
+            3 => "ultrawide",
+            4 => "super_ultrawide",
+            _ => "standard"
+        };
+
+        /// <summary>True if Ultrawide or Super Ultrawide is selected.</summary>
+        public bool IsUltrawide => MonitorIndex >= 3;
         #endregion
 
         #region Build UI
@@ -495,8 +508,8 @@ namespace VRWorkspace.UI.RTT.Components
             float cellW = (w - gapX) / 2f;
 
             // Dropdown options
-            var monitorOptions = new List<string> { "1 Monitor", "2 Monitors", "3 Monitors" };
-            var styleOptions = new List<string> { "Flat Planar", "Curved Surround" };
+            var monitorOptions = new List<string> { "1 Monitor", "2 Monitors", "3 Monitors", "Ultrawide", "Super Ultrawide" };
+            var modeOptions = new List<string> { "Classic", "Spatial" };
             var bitrateOptions = new List<string> { "10 Mbps", "15 Mbps", "20 Mbps", "25 Mbps", "30 Mbps" };
             var fpsOptions = new List<string> { "30 FPS", "45 FPS", "60 FPS" };
 
@@ -511,14 +524,14 @@ namespace VRWorkspace.UI.RTT.Components
                 labelFontSize: DROPDOWN_LABEL_FONT_SIZE, valueFontSize: DROPDOWN_VALUE_FONT_SIZE, font: customFont);
             PositionElement(_monitorsDropdown, 0, row1Y);
 
-            // Style dropdown (replaces Resolution): Flat Planar = FixedThreeSlot + flat, Curved Surround = Dynamic + curved
-            _styleDropdown = VRDropdownFactory.CreateIconDropdown(
+            // Mode dropdown: Classic (active) / Spatial (locked for future)
+            _modeDropdown = VRDropdownFactory.CreateIconDropdown(
                 grid.transform, cellW,
-                "Style", LoadIcon("resolution"), accentColor,  // Reusing resolution icon for now
-                styleOptions, 0,  // Default: Flat Planar
-                onValueChanged: HandleStyleChanged,
+                "Mode", LoadIcon("resolution"), accentColor,
+                modeOptions, 0,  // Default: Classic
+                onValueChanged: HandleModeChanged,
                 labelFontSize: DROPDOWN_LABEL_FONT_SIZE, valueFontSize: DROPDOWN_VALUE_FONT_SIZE, font: customFont);
-            PositionElement(_styleDropdown, cellW + gapX, row1Y);
+            PositionElement(_modeDropdown, cellW + gapX, row1Y);
 
             // Row 2 (bottom) - Total Bitrate (distributed across all monitors)
             _bitrateDropdown = VRDropdownFactory.CreateIconDropdown(

@@ -65,6 +65,10 @@ namespace VRWorkspace.Streaming
                                     ? "null"
                                     : $"\"{EscapeJson(config.preferGpu)}\"";
 
+            var monitorTypeStr = string.IsNullOrEmpty(config.monitorType)
+                                    ? "standard"
+                                    : config.monitorType;
+
             var displayConfigJson =
                 $"{{\"type\":\"display_config\"," +
                 $"\"monitors\":{config.monitors}," +
@@ -72,6 +76,7 @@ namespace VRWorkspace.Streaming
                 $"\"refreshRate\":{config.refreshRate}," +
                 $"\"bitrateKbps\":{config.bitrateKbps}," +
                 $"\"fps\":{config.fps}," +
+                $"\"monitorType\":\"{EscapeJson(monitorTypeStr)}\"," +
                 $"\"preferGpu\":{preferGpuStr}}}";
 
             await _send(displayConfigJson);

@@ -31,23 +31,28 @@ namespace VRWorkspace.UI.RTT.Components
             // Load saved preferences — user's previous selections take priority
             var prefs = RemotePreferences.Load();
 
-            // === Monitors ===
-            int suggestedMonitorIndex = Mathf.Clamp(config.monitors - 1, 0, 2);
+            // === Monitors (5 options: 1 Mon, 2 Mon, 3 Mon, Ultrawide, Super Ultrawide) ===
+            int suggestedMonitorIndex = Mathf.Clamp(config.monitors - 1, 0, MONITOR_OPTIONS.Length - 1);
             var monitorOptions = BuildOptionsWithRecommended(MONITOR_OPTIONS, suggestedMonitorIndex);
             int selectedMonitorIndex = prefs.HasMonitorPreference
-                ? Mathf.Clamp(prefs.monitors, 0, 2)
+                ? Mathf.Clamp(prefs.monitors, 0, MONITOR_OPTIONS.Length - 1)
                 : suggestedMonitorIndex;
             VRDropdownFactory.SetOptions(_monitorsDropdown, monitorOptions, selectedMonitorIndex);
 
-            // === Style ===
-            var styleOptions = new List<string>(STYLE_OPTIONS);
-            int selectedStyleIndex = 0;
-            if (prefs.HasResolutionPreference)
+            // === Mode (Classic / Spatial) — Spatial is locked ===
+            var modeOptions = new List<string>(MODE_OPTIONS);
+            int selectedModeIndex = 0; // Default: Classic
+            if (prefs.HasModePreference)
             {
-                int savedIdx = FindOptionIndex(STYLE_OPTIONS, prefs.resolution);
-                if (savedIdx >= 0) selectedStyleIndex = savedIdx;
+                int savedIdx = FindOptionIndex(MODE_OPTIONS, prefs.mode);
+                if (savedIdx >= 0) selectedModeIndex = savedIdx;
             }
-            VRDropdownFactory.SetOptions(_styleDropdown, styleOptions, selectedStyleIndex);
+            VRDropdownFactory.SetOptions(_modeDropdown, modeOptions, selectedModeIndex);
+            // Lock "Spatial" option (index 1) — future feature
+            VRDropdownFactory.SetOptionLocked(_modeDropdown, 1, true);
+
+            // === Auto-apply style based on monitor selection ===
+            ApplyAutoStyleForMonitor(selectedMonitorIndex);
 
             // === Bitrate ===
             int bitrateMbps = config.bitrateKbps / 1000;
@@ -127,45 +132,56 @@ namespace VRWorkspace.UI.RTT.Components
         #region Dropdown Change Handlers
         /// <summary>
         /// Handle Monitors dropdown selection changed.
-        /// Recalculates suggested config for Bitrate, FPS based on new monitor count.
+        /// Auto-applies Flat Planar / Curved Surround based on monitor type.
+        /// For Ultrawide/Super Ultrawide: treats as 1 monitor for bitrate/FPS calculation.
         /// </summary>
         private void HandleMonitorSelectionChanged(int index, string value)
         {
             Debug.Log($"[RTTRemoteMenu] Monitor selection changed: index={index}, value={value}");
 
+            // Auto-apply style based on monitor type
+            ApplyAutoStyleForMonitor(index);
+
             // Only recalculate if we have cached info
             if (_cachedNetworkInfo == null || _cachedHardwareInfo == null)
             {
                 Debug.Log("[RTTRemoteMenu] No cached info, skipping recalculation");
+                if (_preferenceSaveEnabled) SaveCurrentSelections();
                 return;
             }
 
-            int selectedMonitors = index + 1; // 1, 2, or 3 monitors
+            // Ultrawide/Super Ultrawide = 1 virtual monitor, Standard = 1/2/3 physical
+            int selectedMonitors = index >= 3 ? 1 : index + 1;
             RecalculateSuggestionsForMonitorCount(selectedMonitors);
             if (_preferenceSaveEnabled) SaveCurrentSelections();
         }
 
         /// <summary>
-        /// Handle Style dropdown selection changed.
-        /// Applies Flat Planar or Curved Surround style to WorldPanelClusterRig immediately.
+        /// Auto-apply Flat Planar or Curved Surround based on monitor selection.
+        /// Standard (1/2/3 Monitors) → Flat Planar, Ultrawide/Super Ultrawide → Curved Surround.
         /// </summary>
-        private void HandleStyleChanged(int index, string value)
+        private void ApplyAutoStyleForMonitor(int monitorIndex)
         {
-            Debug.Log($"[RTTRemoteMenu] Style changed: index={index}, value={value}");
+            bool isCurvedSurround = monitorIndex >= 3; // Ultrawide or Super Ultrawide
 
-            bool isCurvedSurround = index == 1;  // 0=Flat Planar, 1=Curved Surround
-
-            // Find WorldPanelClusterRig and apply style change
             var clusterRig = FindFirstObjectByType<WorldPanelClusterRig>();
             if (clusterRig != null)
             {
                 clusterRig.SetStyle(isCurvedSurround);
-                Debug.Log($"[RTTRemoteMenu] Applied style: {(isCurvedSurround ? "Curved Surround" : "Flat Planar")}");
+                Debug.Log($"[RTTRemoteMenu] Auto-style: {(isCurvedSurround ? "Curved Surround (Ultrawide)" : "Flat Planar (Standard)")}");
             }
-            else
-            {
-                Debug.Log("[RTTRemoteMenu] WorldPanelClusterRig not found - style will apply on next stream start");
-            }
+        }
+
+        /// <summary>
+        /// Handle Mode dropdown selection changed.
+        /// Currently only "Classic" is selectable (Spatial is locked for future use).
+        /// </summary>
+        private void HandleModeChanged(int index, string value)
+        {
+            Debug.Log($"[RTTRemoteMenu] Mode changed: index={index}, value={value}");
+
+            // Spatial mode is locked — only Classic mode is functional
+            // Future: Spatial mode will trigger different VR rendering path
             if (_preferenceSaveEnabled) SaveCurrentSelections();
         }
 
@@ -300,25 +316,29 @@ namespace VRWorkspace.UI.RTT.Components
             var placeholder = new List<string> { "----" };
 
             VRDropdownFactory.SetOptions(_monitorsDropdown, placeholder, 0);
-            VRDropdownFactory.SetOptions(_styleDropdown, new List<string> { "Flat Planar", "Curved Surround" }, 0);
+            VRDropdownFactory.SetOptions(_modeDropdown, new List<string> { "Classic", "Spatial" }, 0);
             VRDropdownFactory.SetOptions(_bitrateDropdown, placeholder, 0);
             VRDropdownFactory.SetOptions(_fpsDropdown, placeholder, 0);
 
             VRDropdownFactory.SetInteractable(_monitorsDropdown, false);
-            VRDropdownFactory.SetInteractable(_styleDropdown, false);  // Style follows same lock logic
+            VRDropdownFactory.SetInteractable(_modeDropdown, false);
             VRDropdownFactory.SetInteractable(_bitrateDropdown, false);
             VRDropdownFactory.SetInteractable(_fpsDropdown, false);
         }
 
         /// <summary>
         /// Enable all dropdowns for interaction.
+        /// Lock "Spatial" option in Mode dropdown after enabling.
         /// </summary>
         private void EnableDropdowns()
         {
             VRDropdownFactory.SetInteractable(_monitorsDropdown, true);
-            VRDropdownFactory.SetInteractable(_styleDropdown, true);
+            VRDropdownFactory.SetInteractable(_modeDropdown, true);
             VRDropdownFactory.SetInteractable(_bitrateDropdown, true);
             VRDropdownFactory.SetInteractable(_fpsDropdown, true);
+
+            // Always lock "Spatial" option (index 1) in Mode dropdown
+            VRDropdownFactory.SetOptionLocked(_modeDropdown, 1, true);
         }
 
         /// <summary>
@@ -327,17 +347,13 @@ namespace VRWorkspace.UI.RTT.Components
         /// </summary>
         private void LockAllInputs()
         {
-            // Khóa 4 dropdowns
             VRDropdownFactory.SetInteractable(_monitorsDropdown, false);
-            VRDropdownFactory.SetInteractable(_styleDropdown, false);
+            VRDropdownFactory.SetInteractable(_modeDropdown, false);
             VRDropdownFactory.SetInteractable(_bitrateDropdown, false);
             VRDropdownFactory.SetInteractable(_fpsDropdown, false);
 
-            // Khóa host input và USB toggle
             VRInputFieldFactory.SetInteractable(_hostInput, false);
             SetUsbToggleInteractable(false);
-
-            // Khóa QR button
             VRButtonFactory.SetInteractable(_qrButton, false);
 
             Debug.Log("[RTTRemoteMenu] All inputs locked (Ready state)");
@@ -348,17 +364,16 @@ namespace VRWorkspace.UI.RTT.Components
         /// </summary>
         private void UnlockAllInputs()
         {
-            // Mở khóa 4 dropdowns
             VRDropdownFactory.SetInteractable(_monitorsDropdown, true);
-            VRDropdownFactory.SetInteractable(_styleDropdown, true);
+            VRDropdownFactory.SetInteractable(_modeDropdown, true);
             VRDropdownFactory.SetInteractable(_bitrateDropdown, true);
             VRDropdownFactory.SetInteractable(_fpsDropdown, true);
 
-            // Mở khóa host input (only if not USB mode) và USB toggle
+            // Re-lock Spatial after enabling Mode dropdown
+            VRDropdownFactory.SetOptionLocked(_modeDropdown, 1, true);
+
             VRInputFieldFactory.SetInteractable(_hostInput, !_isUsbMode);
             SetUsbToggleInteractable(true);
-
-            // Mở khóa QR button
             VRButtonFactory.SetInteractable(_qrButton, true);
 
             Debug.Log("[RTTRemoteMenu] All inputs unlocked");
@@ -419,15 +434,15 @@ namespace VRWorkspace.UI.RTT.Components
             var prefs = new RemotePreferences
             {
                 monitors = MonitorIndex,
-                resolution = Style,  // Now stores style ("Flat Planar" or "Curved Surround")
+                mode = RemotePreferences.CleanValue(Mode),
                 bitrate = RemotePreferences.CleanValue(Bitrate),
                 fps = RemotePreferences.CleanValue(FPS),
-                lastHost = VRInputFieldFactory.GetValue(_hostInput),  // Save actual host input value
+                lastHost = VRInputFieldFactory.GetValue(_hostInput),
                 lastPort = Port,
                 usbMode = _isUsbMode
             };
             prefs.Save();
-            Debug.Log($"[RTTRemoteMenu] Saved preferences: {prefs.monitors}mon, style={prefs.resolution}, {prefs.bitrate}, {prefs.fps}, USB={prefs.usbMode}");
+            Debug.Log($"[RTTRemoteMenu] Saved preferences: {prefs.monitors}mon, mode={prefs.mode}, {prefs.bitrate}, {prefs.fps}, USB={prefs.usbMode}");
         }
         #endregion
 

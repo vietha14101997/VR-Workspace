@@ -122,6 +122,7 @@ namespace VRWorkspace.Streaming
         public int fps = 60;
         public string preferGpu;
         public string selectedCodec = "H264";  // Negotiated codec for streaming
+        public string monitorType = "standard"; // "standard", "ultrawide", "super_ultrawide"
 
         /// <summary>
         /// Create config from suggested config.

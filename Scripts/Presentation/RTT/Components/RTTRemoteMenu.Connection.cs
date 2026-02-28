@@ -404,20 +404,32 @@ namespace VRWorkspace.UI.RTT.Components
                 }
             }
 
+            // For ultrawide modes: 1 virtual monitor, override resolution
+            bool isUltrawide = IsUltrawide;
+            int monitors = isUltrawide ? 1 : MonitorIndex + 1;
+
+            if (isUltrawide)
+            {
+                // Ultrawide: 2560x1080, Super Ultrawide: 3840x1080
+                resW = MonitorIndex == 3 ? 2560 : 3840;
+                resH = 1080;
+            }
+
             // Create config from user selections
             // bitrateKbps is TOTAL for all monitors - server will divide by monitor count
             var config = new StreamingConfig
             {
-                monitors = MonitorIndex + 1,
+                monitors = monitors,
                 resolutionWidth = resW,
                 resolutionHeight = resH,
                 bitrateKbps = bitrateKbps,  // TOTAL bitrate for all monitors
                 fps = fpsVal,
                 refreshRate = suggested.refreshRate,
-                selectedCodec = suggested.selectedCodec
+                selectedCodec = suggested.selectedCodec,
+                monitorType = MonitorType
             };
 
-            Debug.Log($"[RTTRemoteMenu] BuildConfigFromForm: {config.monitors}mon @ {config.resolutionWidth}x{config.resolutionHeight}, {config.fps}fps, {config.bitrateKbps}kbps (total)");
+            Debug.Log($"[RTTRemoteMenu] BuildConfigFromForm: {config.monitors}mon ({config.monitorType}) @ {config.resolutionWidth}x{config.resolutionHeight}, {config.fps}fps, {config.bitrateKbps}kbps (total)");
             return config;
         }
 
