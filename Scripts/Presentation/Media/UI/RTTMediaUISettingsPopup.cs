@@ -23,10 +23,6 @@ namespace VRWorkspace.Media.UI
         private static readonly Color RESET_BTN_BG = new Color(0.14f, 0.14f, 0.16f, 0.8f);
         private static readonly Color RESET_BTN_HOVER = new Color(0.22f, 0.22f, 0.24f, 0.9f);
 
-        private const float DEFAULT_DEPTH = 0f;
-        private const float DEFAULT_HEIGHT = 0.5f;
-        private const float DEFAULT_SCALE = 0.5f;
-
         private const float SLIDER_ROW_HEIGHT = 90f;
         private const float VALUES_TEXT_HEIGHT = 40f;
         private const float RESET_BTN_HEIGHT = 83f; // 55 * 1.25 * 1.2
@@ -52,9 +48,18 @@ namespace VRWorkspace.Media.UI
         private VRSliderControl _scaleSlider;
         private TextMeshProUGUI _valuesText;
 
-        private float _currentDepth = DEFAULT_DEPTH;
-        private float _currentHeight = DEFAULT_HEIGHT;
-        private float _currentScale = DEFAULT_SCALE;
+        private float _defaultDepth = 0f;
+        private float _defaultHeight = 0.5f;
+        private float _defaultScale = 0.5f;
+        private float _sliderStep = 0.05f;
+
+        private float _currentDepth;
+        private float _currentHeight;
+        private float _currentScale;
+
+        private Action<float> _depthBtnUpdater;
+        private Action<float> _heightBtnUpdater;
+        private Action<float> _scaleBtnUpdater;
 
         private static Sprite _roundedRectSprite;
         private static Sprite _topRoundedRectSprite;
@@ -63,12 +68,20 @@ namespace VRWorkspace.Media.UI
         #endregion
 
         #region Public API
-        public void Initialize(Transform contentContainer, float width, float height, TMP_FontAsset font, Color primaryColor)
+        public void Initialize(Transform contentContainer, float width, float height, TMP_FontAsset font, Color primaryColor,
+            float defaultDepth = 0f, float defaultHeight = 0.5f, float defaultScale = 0.5f, float sliderStep = 0.05f)
         {
             _font = font;
             _primaryColor = primaryColor;
             _width = width;
             _height = height;
+            _defaultDepth = defaultDepth;
+            _defaultHeight = defaultHeight;
+            _defaultScale = defaultScale;
+            _sliderStep = sliderStep;
+            _currentDepth = defaultDepth;
+            _currentHeight = defaultHeight;
+            _currentScale = defaultScale;
             BuildUI(contentContainer);
         }
 
@@ -84,6 +97,9 @@ namespace VRWorkspace.Media.UI
             _depthSlider?.SetValueWithoutNotify(depth);
             _heightSlider?.SetValueWithoutNotify(height);
             _scaleSlider?.SetValueWithoutNotify(scale);
+            _depthBtnUpdater?.Invoke(depth);
+            _heightBtnUpdater?.Invoke(height);
+            _scaleBtnUpdater?.Invoke(scale);
             UpdateValuesText();
         }
         #endregion
@@ -218,17 +234,17 @@ namespace VRWorkspace.Media.UI
 
             float sliderAreaW = _width - 60f; // padding 30 each side
 
-            // Depth slider (0 - 1.0, default 0)
-            _depthSlider = CreateSliderRow(bodyObj.transform, "Depth", sliderAreaW, 0f, 1.0f, DEFAULT_DEPTH,
-                (v) => { _currentDepth = v; OnUIDepthChanged?.Invoke(v); UpdateValuesText(); });
+            // Depth slider (0 - 1.0)
+            _depthSlider = CreateSliderRow(bodyObj.transform, "Depth", sliderAreaW, 0f, 1.0f, _defaultDepth,
+                (v) => { _currentDepth = v; OnUIDepthChanged?.Invoke(v); UpdateValuesText(); }, out _depthBtnUpdater);
 
-            // Height slider (0 - 1.0, default 0.5)
-            _heightSlider = CreateSliderRow(bodyObj.transform, "Height", sliderAreaW, 0f, 1.0f, DEFAULT_HEIGHT,
-                (v) => { _currentHeight = v; OnUIHeightChanged?.Invoke(v); UpdateValuesText(); });
+            // Height slider (0 - 1.0)
+            _heightSlider = CreateSliderRow(bodyObj.transform, "Height", sliderAreaW, 0f, 1.0f, _defaultHeight,
+                (v) => { _currentHeight = v; OnUIHeightChanged?.Invoke(v); UpdateValuesText(); }, out _heightBtnUpdater);
 
-            // Scale slider (0 - 1.0, default 0.5)
-            _scaleSlider = CreateSliderRow(bodyObj.transform, "Scale", sliderAreaW, 0f, 1.0f, DEFAULT_SCALE,
-                (v) => { _currentScale = v; OnUIScaleChanged?.Invoke(v); UpdateValuesText(); });
+            // Scale slider (0 - 1.0)
+            _scaleSlider = CreateSliderRow(bodyObj.transform, "Scale", sliderAreaW, 0f, 1.0f, _defaultScale,
+                (v) => { _currentScale = v; OnUIScaleChanged?.Invoke(v); UpdateValuesText(); }, out _scaleBtnUpdater);
 
             // Flexible spacer pushes details to bottom
             GameObject spacer = new GameObject("Spacer");
@@ -262,7 +278,7 @@ namespace VRWorkspace.Media.UI
         }
 
         private VRSliderControl CreateSliderRow(Transform parent, string label, float totalWidth,
-            float min, float max, float defaultValue, Action<float> onChanged)
+            float min, float max, float defaultValue, Action<float> onChanged, out Action<float> btnStateUpdater)
         {
             float labelW = 130f;
             float resetBtnW = 56f;
@@ -271,7 +287,7 @@ namespace VRWorkspace.Media.UI
             float sliderWidth = pillWidth * 0.66f;
             float btnAreaWidth = (pillWidth - sliderWidth) / 2f;
             float pillLeft = labelW + 10f;
-            float stepSize = (max - min) / 20f;
+            float stepSize = _sliderStep;
 
             // === Row container (no inner layout, absolute positioning) ===
             GameObject rowObj = new GameObject($"Row_{label}");
@@ -508,6 +524,7 @@ namespace VRWorkspace.Media.UI
             rowNotifier.onEnter += hoverGroup.OnChildHoverEnter;
             rowNotifier.onExit += hoverGroup.OnChildHoverExit;
 
+            btnStateUpdater = updateBtnStates;
             return slider;
         }
 
@@ -582,12 +599,12 @@ namespace VRWorkspace.Media.UI
             button.transition = Selectable.Transition.None;
             button.onClick.AddListener(() =>
             {
-                _depthSlider?.SetValue(DEFAULT_DEPTH);
-                _heightSlider?.SetValue(DEFAULT_HEIGHT);
-                _scaleSlider?.SetValue(DEFAULT_SCALE);
-                _currentDepth = DEFAULT_DEPTH;
-                _currentHeight = DEFAULT_HEIGHT;
-                _currentScale = DEFAULT_SCALE;
+                _depthSlider?.SetValue(_defaultDepth);
+                _heightSlider?.SetValue(_defaultHeight);
+                _scaleSlider?.SetValue(_defaultScale);
+                _currentDepth = _defaultDepth;
+                _currentHeight = _defaultHeight;
+                _currentScale = _defaultScale;
                 UpdateValuesText();
                 OnUISettingsReset?.Invoke();
             });

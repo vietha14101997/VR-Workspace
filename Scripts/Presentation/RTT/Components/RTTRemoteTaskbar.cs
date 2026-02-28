@@ -13,6 +13,7 @@ using VRWorkspace.Media.UI;
 using VRWorkspace.Panel;
 using VRWorkspace.UI.Components;
 using VRWorkspace.UI.HoverEffects;
+using VRWorkspace.UI.RTT;
 
 namespace VRWorkspace.UI.RTT.Components
 {
@@ -72,8 +73,12 @@ namespace VRWorkspace.UI.RTT.Components
         private int _currentFps = 60;
 
         // Section 2 references
-        private GameObject _monitorTypeButton;
+        private GameObject _screenSettingsButton;
         private List<GameObject> _monitorSlots = new List<GameObject>();
+
+        // Screen settings popup (like Video Player UI Settings)
+        private GameObject _screenSettingsFrame;
+        private RTTMediaUISettingsPopup _screenSettingsPopup;
 
         // Section 3 reference
         private TextMeshProUGUI _latencyText;
@@ -131,6 +136,9 @@ namespace VRWorkspace.UI.RTT.Components
             // Create expansion panel
             CreateExpansionPanel();
 
+            // Create screen settings popup
+            CreateScreenSettingsPopup();
+
             // Bind to ViewModel
             BindToViewModel();
 
@@ -150,6 +158,7 @@ namespace VRWorkspace.UI.RTT.Components
             if (_instance == this) _instance = null;
             UnbindFromViewModel();
             CleanupExpansionPanel();
+            CleanupScreenSettingsPopup();
         }
 
         private void LateUpdate()
@@ -252,8 +261,8 @@ namespace VRWorkspace.UI.RTT.Components
             var defaultFpsIcon = GetFpsIcon(_currentFps);
             _fpsButton = CreateIconButton(section1, defaultFpsIcon, "FPS", _cyanColor, buttonSize, OnFpsClicked);
 
-            // 4. Monitor Type button (clickable to show expansion panel)
-            _monitorTypeButton = CreateIconButton(section1, iconEnviroment, "MonitorType", _cyanColor, buttonSize, OnMonitorTypeClicked);
+            // 4. Screen Settings button (opens screen settings popup)
+            _screenSettingsButton = CreateIconButton(section1, iconEnviroment, "ScreenSettings", _cyanColor, buttonSize, OnScreenSettingsClicked);
 
             // 5. Eye button (opens expansion with Passthrough + Light)
             _eyeButton = CreateIconButton(section1, iconEye, "Eye", _cyanColor, buttonSize, OnEyeClicked);
@@ -266,6 +275,7 @@ namespace VRWorkspace.UI.RTT.Components
         {
             Debug.Log("[RTTRemoteTaskbar] Back pressed - showing menu");
             HideExpansionPanel();
+            HideScreenSettingsPopup();
             OnMenuRequested?.Invoke();
             _miniFrame.MarkDirty();
         }
@@ -273,6 +283,8 @@ namespace VRWorkspace.UI.RTT.Components
         private void OnBitrateClicked()
         {
             if (_expansionPanel == null) return;
+
+            HideScreenSettingsPopup();
 
             // Toggle behavior: if already showing Bitrate options, hide it
             if (_expansionPanel.IsVisible && _expansionPanel.CurrentType == RTTTaskbarExpansion.ExpansionType.Bitrate)
@@ -294,6 +306,8 @@ namespace VRWorkspace.UI.RTT.Components
         {
             if (_expansionPanel == null) return;
 
+            HideScreenSettingsPopup();
+
             // Toggle behavior: if already showing FPS options, hide it
             if (_expansionPanel.IsVisible && _expansionPanel.CurrentType == RTTTaskbarExpansion.ExpansionType.Fps)
             {
@@ -310,27 +324,42 @@ namespace VRWorkspace.UI.RTT.Components
             _miniFrame.MarkDirty();
         }
 
-        private void OnMonitorTypeClicked()
+        private void OnScreenSettingsClicked()
         {
-            if (_expansionPanel == null || _clusterRig == null) return;
+            if (_screenSettingsFrame == null) return;
 
-            // Toggle behavior: if already showing MonitorType options, hide it
-            if (_expansionPanel.IsVisible && _expansionPanel.CurrentType == RTTTaskbarExpansion.ExpansionType.MonitorType)
-            {
-                Debug.Log("[RTTRemoteTaskbar] MonitorType clicked - hiding expansion panel (toggle)");
-                _expansionPanel.Hide();
-            }
-            else
-            {
-                // Show MonitorType options
-                Debug.Log("[RTTRemoteTaskbar] MonitorType clicked - showing expansion panel");
-                Vector3? buttonWorldPos = GetButtonWorldPosition(_monitorTypeButton);
+            // Hide expansion panel if visible
+            HideExpansionPanel();
 
-                // Sync current state from ClusterRig
-                bool isCurved = _clusterRig.useCurvedVisual;
-                _expansionPanel.ShowMonitorTypeOptions(isCurved, buttonWorldPos);
+            // Toggle popup visibility
+            bool isVisible = _screenSettingsFrame.activeSelf;
+            if (!isVisible)
+            {
+                PositionPopupAtPrimaryFrame();
             }
+            _screenSettingsFrame.SetActive(!isVisible);
+            UpdateScreenSettingsButtonAppearance(!isVisible);
+
+            Debug.Log($"[RTTRemoteTaskbar] Screen Settings {(!isVisible ? "opened" : "closed")}");
             _miniFrame.MarkDirty();
+        }
+
+        /// <summary>
+        /// Position popup at the center of the primary RTTMenuFrame.
+        /// Converts primary frame's world position to local space of the toolbar parent.
+        /// </summary>
+        private void PositionPopupAtPrimaryFrame()
+        {
+            RTTMenuFrame primary = RTTMenuFrame.PrimaryInstance;
+            if (primary == null || _screenSettingsFrame == null) return;
+
+            Transform toolbarParent = _screenSettingsFrame.transform.parent;
+            if (toolbarParent == null) return;
+
+            // Convert primary frame center to toolbar's local space
+            Vector3 localPos = toolbarParent.InverseTransformPoint(primary.transform.position);
+            _screenSettingsFrame.transform.localPosition = localPos;
+            _screenSettingsFrame.transform.localRotation = Quaternion.identity;
         }
 
         /// <summary>
@@ -407,7 +436,6 @@ namespace VRWorkspace.UI.RTT.Components
             _expansionPanel.OnFpsSelected += OnExpansionFpsSelected;
             _expansionPanel.OnPassthroughToggled += OnPassthroughToggled;
             _expansionPanel.OnLightToggled += OnLightToggled;
-            _expansionPanel.OnMonitorTypeSelected += OnExpansionMonitorTypeSelected;
 
             Debug.Log("[RTTRemoteTaskbar] Expansion panel created in RTTToolbar");
         }
@@ -420,7 +448,6 @@ namespace VRWorkspace.UI.RTT.Components
                 _expansionPanel.OnFpsSelected -= OnExpansionFpsSelected;
                 _expansionPanel.OnPassthroughToggled -= OnPassthroughToggled;
                 _expansionPanel.OnLightToggled -= OnLightToggled;
-                _expansionPanel.OnMonitorTypeSelected -= OnExpansionMonitorTypeSelected;
 
                 if (Application.isPlaying)
                     Destroy(_expansionPanel.gameObject);
@@ -460,18 +487,6 @@ namespace VRWorkspace.UI.RTT.Components
             _miniFrame.MarkDirty();
         }
 
-        private void OnExpansionMonitorTypeSelected(bool isCurved)
-        {
-            Debug.Log($"[RTTRemoteTaskbar] Monitor Type selected from expansion: {(isCurved ? "Curved" : "Flat")}");
-
-            if (_clusterRig != null)
-            {
-                _clusterRig.SetStyle(isCurved);
-            }
-
-            _miniFrame.MarkDirty();
-        }
-
         /// <summary>
         /// Get the expansion panel reference.
         /// </summary>
@@ -486,6 +501,193 @@ namespace VRWorkspace.UI.RTT.Components
             {
                 _expansionPanel.Hide();
             }
+        }
+        #endregion
+
+        #region Screen Settings Popup
+        // Match Video Player sizing: density=1200, aspect=1.065
+        private const float POPUP_DENSITY = 1200f;
+        private const float POPUP_ASPECT = 1.065f;
+        private const float POPUP_PHYS_W = 0.7f; // 0.7m physical width (matches Video Player scale)
+
+        private const float DEFAULT_SCREEN_DEPTH = 0.5f;
+        private const float DEFAULT_SCREEN_HEIGHT = 0.5f;
+        private const float DEFAULT_SCREEN_SCALE = 0.5f;
+
+        private void CreateScreenSettingsPopup()
+        {
+            RTTToolbar toolbar = RTTToolbar.Instance;
+            if (toolbar == null) return;
+
+            float physW = POPUP_PHYS_W;
+            float physH = physW / POPUP_ASPECT;
+            float logicalW = Mathf.Round(physW * POPUP_DENSITY);
+            float logicalH = Mathf.Round(logicalW / POPUP_ASPECT);
+
+            _screenSettingsFrame = new GameObject("ScreenSettingsPopupFrame");
+            _screenSettingsFrame.transform.SetParent(toolbar.transform, false);
+            _screenSettingsFrame.transform.localRotation = Quaternion.identity;
+            _screenSettingsFrame.layer = LayerMask.NameToLayer("UI");
+
+            var menuFrame = _screenSettingsFrame.AddComponent<RTTMenuFrame>();
+            menuFrame.Configure(physW, physH, logicalW);
+            menuFrame.SetGlassBackgroundEnabled(false);
+            menuFrame.SetFloatingDataEnabled(false);
+            menuFrame.SetContentMargins(0, 0, 0, 0);
+            menuFrame.ForceInitialize();
+
+            // Set render queue above other panels
+            var quad = menuFrame.GetDisplayQuad();
+            if (quad?.material != null)
+                quad.material.renderQueue = 3200;
+
+            var container = menuFrame.ContentContainer;
+            if (container != null)
+            {
+                // Get font from RTTManager
+                var font = RTTManager.Instance?.Font;
+                Color primaryColor = new Color(0f, 0.9f, 1f, 1f); // Cyan theme for remote desktop
+
+                _screenSettingsPopup = _screenSettingsFrame.AddComponent<RTTMediaUISettingsPopup>();
+                _screenSettingsPopup.Initialize(container, logicalW, logicalH, font, primaryColor,
+                    DEFAULT_SCREEN_DEPTH, DEFAULT_SCREEN_HEIGHT, DEFAULT_SCREEN_SCALE, 0.1f);
+
+                WireScreenSettingsEvents();
+                LoadScreenSettings();
+            }
+
+            _screenSettingsFrame.SetActive(false);
+            Debug.Log("[RTTRemoteTaskbar] Screen Settings popup created");
+        }
+
+        private void WireScreenSettingsEvents()
+        {
+            if (_screenSettingsPopup == null) return;
+
+            _screenSettingsPopup.OnCloseRequested += () =>
+            {
+                _screenSettingsFrame?.SetActive(false);
+                UpdateScreenSettingsButtonAppearance(false);
+            };
+
+            _screenSettingsPopup.OnUIDepthChanged += (v) =>
+            {
+                ApplyScreenDepth(v);
+                PlayerPrefs.SetFloat("RemoteDesktop_ScreenDepth", v);
+                PlayerPrefs.Save();
+            };
+
+            _screenSettingsPopup.OnUIHeightChanged += (v) =>
+            {
+                ApplyScreenHeight(v);
+                PlayerPrefs.SetFloat("RemoteDesktop_ScreenHeight", v);
+                PlayerPrefs.Save();
+            };
+
+            _screenSettingsPopup.OnUIScaleChanged += (v) =>
+            {
+                ApplyScreenScale(v);
+                PlayerPrefs.SetFloat("RemoteDesktop_ScreenScale", v);
+                PlayerPrefs.Save();
+            };
+
+            _screenSettingsPopup.OnUISettingsReset += () =>
+            {
+                ApplyScreenDepth(DEFAULT_SCREEN_DEPTH);
+                ApplyScreenHeight(DEFAULT_SCREEN_HEIGHT);
+                ApplyScreenScale(DEFAULT_SCREEN_SCALE);
+                _screenSettingsPopup.SetValues(DEFAULT_SCREEN_DEPTH, DEFAULT_SCREEN_HEIGHT, DEFAULT_SCREEN_SCALE);
+
+                PlayerPrefs.SetFloat("RemoteDesktop_ScreenDepth", DEFAULT_SCREEN_DEPTH);
+                PlayerPrefs.SetFloat("RemoteDesktop_ScreenHeight", DEFAULT_SCREEN_HEIGHT);
+                PlayerPrefs.SetFloat("RemoteDesktop_ScreenScale", DEFAULT_SCREEN_SCALE);
+                PlayerPrefs.Save();
+
+                Debug.Log("[RTTRemoteTaskbar] Screen settings reset to defaults");
+            };
+        }
+
+        private void ApplyScreenDepth(float v)
+        {
+            var zoom = VirtualObjectsZoomController.Instance;
+            if (zoom != null)
+            {
+                float distance = Mathf.Lerp(zoom.MinDistance, zoom.MaxDistance, v);
+                zoom.SetZoomDistance(distance);
+            }
+        }
+
+        private void ApplyScreenHeight(float v)
+        {
+            if (_clusterRig != null)
+            {
+                _clusterRig.verticalOffset = (v - 0.5f) * 1.0f;
+            }
+        }
+
+        private void ApplyScreenScale(float v)
+        {
+            if (_clusterRig != null)
+            {
+                float scale = Mathf.Max(0.1f, 0.5f + v);
+                _clusterRig.transform.localScale = Vector3.one * scale;
+            }
+        }
+
+        private void LoadScreenSettings()
+        {
+            float depth = PlayerPrefs.GetFloat("RemoteDesktop_ScreenDepth", DEFAULT_SCREEN_DEPTH);
+            float height = PlayerPrefs.GetFloat("RemoteDesktop_ScreenHeight", DEFAULT_SCREEN_HEIGHT);
+            float scale = PlayerPrefs.GetFloat("RemoteDesktop_ScreenScale", DEFAULT_SCREEN_SCALE);
+
+            _screenSettingsPopup?.SetValues(depth, height, scale);
+
+            // Apply loaded values (deferred to allow ClusterRig to initialize)
+            StartCoroutine(ApplyScreenSettingsDeferred(depth, height, scale));
+        }
+
+        private IEnumerator ApplyScreenSettingsDeferred(float depth, float height, float scale)
+        {
+            // Wait for ClusterRig and ZoomController to be ready
+            yield return null;
+            yield return null;
+
+            ApplyScreenDepth(depth);
+            ApplyScreenHeight(height);
+            ApplyScreenScale(scale);
+        }
+
+        private void CleanupScreenSettingsPopup()
+        {
+            if (_screenSettingsFrame != null)
+            {
+                if (Application.isPlaying)
+                    Destroy(_screenSettingsFrame);
+                else
+                    DestroyImmediate(_screenSettingsFrame);
+
+                _screenSettingsFrame = null;
+                _screenSettingsPopup = null;
+            }
+        }
+
+        /// <summary>
+        /// Hide the screen settings popup if visible.
+        /// </summary>
+        public void HideScreenSettingsPopup()
+        {
+            if (_screenSettingsFrame != null && _screenSettingsFrame.activeSelf)
+            {
+                _screenSettingsFrame.SetActive(false);
+                UpdateScreenSettingsButtonAppearance(false);
+            }
+        }
+
+        private void UpdateScreenSettingsButtonAppearance(bool isActive)
+        {
+            if (_screenSettingsButton == null) return;
+            Color targetColor = isActive ? _purpleColor : _cyanColor;
+            VRButtonFactory.SetBareIconButtonGlowColor(_screenSettingsButton, targetColor);
         }
         #endregion
 
@@ -801,6 +1003,8 @@ namespace VRWorkspace.UI.RTT.Components
         private void OnEyeClicked()
         {
             if (_expansionPanel == null) return;
+
+            HideScreenSettingsPopup();
 
             // Toggle behavior: if already showing Eye options, hide it
             if (_expansionPanel.IsVisible && _expansionPanel.CurrentType == RTTTaskbarExpansion.ExpansionType.Eye)

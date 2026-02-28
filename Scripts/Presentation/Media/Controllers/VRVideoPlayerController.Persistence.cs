@@ -42,37 +42,44 @@ namespace VRWorkspace.Media.Core
             if (_isStopped) return; // Already saved during Stop(), engine state is stale
             if (_currentVideo == null || string.IsNullOrEmpty(_currentVideo.Value.Path)) return;
 
-            var entry = new VideoSettingsEntry
+            try
             {
-                FilePath = _currentVideo.Value.Path,
-                Projection = (int)(_projectionSystem?.CurrentProjection ?? VideoProjectionType.Flat),
-                Stereo = (int)(_projectionSystem?.CurrentStereoMode ?? StereoMode.Mono),
-                Monitor = (int)_currentMonitor,
-                Environment = (int)_currentEnv,
-                PlaybackPosition = _playbackEngine?.CurrentTime ?? 0,
-                PlaybackSpeed = _playbackEngine?.PlaybackSpeed ?? 1f,
-                Brightness = GetCurrentShaderFloat("_Brightness", 1f),
-                Contrast = GetCurrentShaderFloat("_Contrast", 1f),
-                Saturation = GetCurrentShaderFloat("_Saturation", 1f),
-                Sharpness = GetCurrentShaderFloat("_Sharpness", 0.5f),
-                Tint = GetCurrentShaderFloat("_Tint", 0f),
-                Temperature = GetCurrentShaderFloat("_Temperature", 0f),
-                ScreenDistance = _displaySettings.Distance,
-                ScreenScale = _displaySettings.Scale,
-                ScreenCurvature = _displaySettings.Curvature,
-                AspectRatio = _projectionSystem?.GetAspectRatioOverride() ?? "default",
-                FOVZoom = GetImmersiveFOV(),
-                ImmTilt = GetCurrentShaderFloat("_Tilt", 0f),
-                ImmYaw = GetCurrentShaderFloat("_YawOffset", 0f),
-                VerticalShift = GetCurrentShaderFloat("_VerticalShift", 0f),
-                HorizontalShift = GetCurrentShaderFloat("_HorizontalShift", 0f),
-                LRInverse = GetCurrentShaderFloat("_LRInverse", 0f) > 0.5f,
-                LastAccessedTicks = System.DateTime.UtcNow.Ticks
-            };
+                var entry = new VideoSettingsEntry
+                {
+                    FilePath = _currentVideo.Value.Path,
+                    Projection = (int)(_projectionSystem?.CurrentProjection ?? VideoProjectionType.Flat),
+                    Stereo = (int)(_projectionSystem?.CurrentStereoMode ?? StereoMode.Mono),
+                    Monitor = (int)_currentMonitor,
+                    Environment = (int)_currentEnv,
+                    PlaybackPosition = _playbackEngine?.CurrentTime ?? 0,
+                    PlaybackSpeed = _playbackEngine?.PlaybackSpeed ?? 1f,
+                    Brightness = GetCurrentShaderFloat("_Brightness", 1f),
+                    Contrast = GetCurrentShaderFloat("_Contrast", 1f),
+                    Saturation = GetCurrentShaderFloat("_Saturation", 1f),
+                    Sharpness = GetCurrentShaderFloat("_Sharpness", 0.5f),
+                    Tint = GetCurrentShaderFloat("_Tint", 0f),
+                    Temperature = GetCurrentShaderFloat("_Temperature", 0f),
+                    ScreenDistance = _displaySettings.Distance,
+                    ScreenScale = _displaySettings.Scale,
+                    ScreenCurvature = _displaySettings.Curvature,
+                    AspectRatio = _projectionSystem?.GetAspectRatioOverride() ?? "default",
+                    FOVZoom = GetImmersiveFOV(),
+                    ImmTilt = GetCurrentShaderFloat("_Tilt", 0f),
+                    ImmYaw = GetCurrentShaderFloat("_YawOffset", 0f),
+                    VerticalShift = GetCurrentShaderFloat("_VerticalShift", 0f),
+                    HorizontalShift = GetCurrentShaderFloat("_HorizontalShift", 0f),
+                    LRInverse = GetCurrentShaderFloat("_LRInverse", 0f) > 0.5f,
+                    LastAccessedTicks = System.DateTime.UtcNow.Ticks
+                };
 
-            VideoSettingsCache.Set(entry.FilePath, entry);
-            VideoSettingsCache.FlushToDisk();
-            Debug.Log($"[VRVideoPlayerController] Saved settings: Position={entry.PlaybackPosition:F1}s, Brightness={entry.Brightness:F2}, AR={entry.AspectRatio}");
+                VideoSettingsCache.Set(entry.FilePath, entry);
+                VideoSettingsCache.FlushToDisk();
+                Debug.Log($"[VRVideoPlayerController] Saved settings: Position={entry.PlaybackPosition:F1}s, Brightness={entry.Brightness:F2}, AR={entry.AspectRatio}");
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"[VRVideoPlayerController] Failed to save video settings: {ex.Message}");
+            }
         }
 
         private void RestoreCachedSettings()
