@@ -125,6 +125,12 @@ namespace VRWorkspace.ViewModels
         public event Action<AudioStreamTrack> OnRemoteAudioTrackReceived;
 
         /// <summary>
+        /// Fired when DataChannel audio data is received (low-latency path, bypasses NetEQ).
+        /// Binary format: [type(1)][timestamp(8)][opus_data]
+        /// </summary>
+        public event Action<byte[]> OnDCAudioData;
+
+        /// <summary>
         /// Cached audio track for late subscribers (OnTrack fires before RemoteAudioPlayer exists).
         /// </summary>
         public AudioStreamTrack CachedAudioTrack => _cachedAudioTrack;
@@ -704,9 +710,16 @@ namespace VRWorkspace.ViewModels
             _client.OnAudioTrackReceived += (audioTrack) =>
             {
                 if (_clientGeneration != subscribedGeneration) return;
-                _cachedAudioTrack = audioTrack; // Cache for late subscribers (RemoteAudioPlayer created in Phase 3)
+                _cachedAudioTrack = audioTrack;
                 Debug.Log("[ConnectionViewModel] Audio track received and cached");
                 OnRemoteAudioTrackReceived?.Invoke(audioTrack);
+            };
+
+            // DataChannel audio: forward raw Opus frames for low-latency playback
+            _client.OnAudioDataReceived += (data) =>
+            {
+                if (_clientGeneration != subscribedGeneration) return;
+                OnDCAudioData?.Invoke(data);
             };
 
             _client.OnStreamingStarted += () =>

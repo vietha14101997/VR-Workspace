@@ -81,16 +81,17 @@ namespace VRWorkspace.Streaming
                 Debug.Log($"[PhaseProtocol] Added transceiver {i} for monitor {i}");
             }
 
-            // Add audio transceiver on device builds only.
-            // Unity Editor has a SIPSorcery signalingState bug that breaks DTLS,
-            // and adding audio causes m-line reordering that makes it worse.
-            // On Android, signalingState works correctly, so audio + reorder is fine.
-#if UNITY_EDITOR
-            Debug.Log("[PhaseProtocol] Audio transceiver skipped (Editor: SIPSorcery DTLS workaround)");
-#else
-            pc.AddTransceiver(TrackKind.Audio, new RTCRtpTransceiverInit { direction = RTCRtpTransceiverDirection.RecvOnly });
-            Debug.Log("[PhaseProtocol] Added audio transceiver (RecvOnly)");
-#endif
+            // Client creates "audio" DataChannel (SCTP) to bypass NetEQ jitter buffer.
+            // Client-created DC ensures proper SCTP negotiation (libwebrtc manages SCTP natively).
+            // Server receives this DC via ondatachannel and sends Opus frames through it.
+            _sctpInitChannel = pc.CreateDataChannel("audio");
+            _sctpInitChannel.OnMessage = bytes =>
+            {
+                OnAudioDataReceived?.Invoke(bytes);
+            };
+            _sctpInitChannel.OnOpen = () => Debug.Log("[PhaseProtocol] Audio DataChannel opened");
+            _sctpInitChannel.OnClose = () => Debug.Log("[PhaseProtocol] Audio DataChannel closed");
+            Debug.Log("[PhaseProtocol] Audio via DataChannel (client-created, no RTP audio transceiver)");
 
             // Setup event handlers for single PC
             SetupSinglePCEventHandlers(pc, trackWrappers, transceivers);
@@ -161,9 +162,11 @@ namespace VRWorkspace.Streaming
         private void SetupSinglePCEventHandlers(RTCPeerConnection pc, List<PCWrapper> trackWrappers, List<RTCRtpTransceiver> transceivers)
         {
             Debug.Log($"[PhaseProtocol] Setting up Single-PC event handlers for {trackWrappers.Count} tracks");
+            int gen = _pcGeneration; // Capture generation to guard against stale callbacks
 
             pc.OnIceConnectionChange = s =>
             {
+                if (_pcGeneration != gen) return; // Stale PC callback after cleanup
                 Debug.Log($"[PhaseProtocol] Single-PC ICE: {s}");
 
                 // Fire progress for all monitors
@@ -188,6 +191,7 @@ namespace VRWorkspace.Streaming
 
             pc.OnConnectionStateChange = s =>
             {
+                if (_pcGeneration != gen) return; // Stale PC callback after cleanup
                 Debug.Log($"[PhaseProtocol] Single-PC State: {s}");
                 if (s == RTCPeerConnectionState.Connected)
                 {
@@ -299,6 +303,12 @@ namespace VRWorkspace.Streaming
                     Debug.Log($"[PhaseProtocol] Received audio track, mid={e.Transceiver?.Mid}");
                     OnAudioTrackReceived?.Invoke(audioTrack);
                 }
+            };
+
+            // Fallback: handle server-created DataChannels (if any)
+            pc.OnDataChannel = channel =>
+            {
+                Debug.Log($"[PhaseProtocol] Server DataChannel received: label={channel.Label}");
             };
         }
 
@@ -519,8 +529,11 @@ namespace VRWorkspace.Streaming
         /// </summary>
         private void SetupPCEventHandlers(RTCPeerConnection pc, PCWrapper wrapper, int idx)
         {
+            int gen = _pcGeneration; // Capture generation to guard against stale callbacks
+
             pc.OnIceConnectionChange = s =>
             {
+                if (_pcGeneration != gen) return; // Stale PC callback after cleanup
                 Debug.Log($"[PhaseProtocol] PC{idx} ICE: {s}");
 
                 // Fire ICE progress events for UI
@@ -544,6 +557,7 @@ namespace VRWorkspace.Streaming
 
             pc.OnConnectionStateChange = s =>
             {
+                if (_pcGeneration != gen) return; // Stale PC callback after cleanup
                 Debug.Log($"[PhaseProtocol] PC{idx} State: {s}");
                 if (s == RTCPeerConnectionState.Connected)
                 {

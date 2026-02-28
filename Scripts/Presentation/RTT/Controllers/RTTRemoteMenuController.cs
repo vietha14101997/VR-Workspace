@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using TMPro;
 using System.Collections.Generic;
@@ -41,6 +42,8 @@ namespace VRWorkspace.UI.RTT.Controllers
 
         // Remote audio playback (auto-created when streaming starts)
         private RemoteAudioPlayer _audioPlayer;
+        private DataChannelAudioPlayer _dcAudioPlayer;
+        private Action<byte[]> _dcAudioHandler;
 
         // Cursor tracking
         private int _activeCursorPanelIndex = -1;
@@ -695,25 +698,26 @@ namespace VRWorkspace.UI.RTT.Controllers
         {
             CleanupRemoteAudioPlayer();
 
-            var audioObj = new GameObject("RemoteAudioPlayer");
-            audioObj.transform.SetParent(transform, false);
-            audioObj.AddComponent<AudioSource>();
-            _audioPlayer = audioObj.AddComponent<RemoteAudioPlayer>();
+            // DataChannel audio player (low-latency: ~20ms, bypasses NetEQ)
+            var dcAudioObj = new GameObject("DataChannelAudioPlayer");
+            dcAudioObj.transform.SetParent(transform, false);
+            dcAudioObj.AddComponent<AudioSource>();
+            _dcAudioPlayer = dcAudioObj.AddComponent<DataChannelAudioPlayer>();
+            _dcAudioPlayer.StartPlayback();
 
             if (_viewModel != null)
             {
-                _viewModel.OnRemoteAudioTrackReceived += _audioPlayer.SetTrack;
-
-                // OnTrack fires during Phase 2, but this player is created in Phase 3.
-                // Apply cached track if it arrived before we subscribed.
-                if (_viewModel.CachedAudioTrack != null)
+                // Wire DC audio: parse binary message and feed Opus frames
+                _dcAudioHandler = (data) =>
                 {
-                    _audioPlayer.SetTrack(_viewModel.CachedAudioTrack);
-                    Debug.Log("[RTTRemoteMenuController] Applied cached audio track to player");
-                }
+                    // Format: [type(1)][timestamp(8)][opus_data]
+                    if (data != null && data.Length > 9 && data[0] == 0x01)
+                        _dcAudioPlayer?.OnOpusFrame(data, 9, data.Length - 9);
+                };
+                _viewModel.OnDCAudioData += _dcAudioHandler;
             }
 
-            Debug.Log("[RTTRemoteMenuController] Created RemoteAudioPlayer");
+            Debug.Log("[RTTRemoteMenuController] Created DataChannelAudioPlayer (low-latency)");
         }
 
         /// <summary>
@@ -721,6 +725,21 @@ namespace VRWorkspace.UI.RTT.Controllers
         /// </summary>
         private void CleanupRemoteAudioPlayer()
         {
+            // Cleanup DataChannel audio player
+            if (_dcAudioPlayer != null)
+            {
+                if (_viewModel != null && _dcAudioHandler != null)
+                {
+                    _viewModel.OnDCAudioData -= _dcAudioHandler;
+                }
+                _dcAudioHandler = null;
+
+                _dcAudioPlayer.StopAudio();
+                Destroy(_dcAudioPlayer.gameObject);
+                _dcAudioPlayer = null;
+            }
+
+            // Cleanup legacy RTP audio player (fallback)
             if (_audioPlayer != null)
             {
                 if (_viewModel != null)

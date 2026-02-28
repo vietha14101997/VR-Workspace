@@ -84,6 +84,8 @@ namespace VRWorkspace.Streaming
         private int    _expectedMonitorCount;
         private TaskCompletionSource<bool> _allAnswersReceivedTcs;
         private bool   _streamingStartedFired;
+        private RTCDataChannel _sctpInitChannel; // Kept alive to maintain SCTP transport for audio DataChannel
+        private int _pcGeneration; // Incremented on cleanup to guard stale PC callbacks
 
         // ── Frame timing / FPS ────────────────────────────────────────────────
         private long  _serverClockOffset;
@@ -115,7 +117,8 @@ namespace VRWorkspace.Streaming
         public event Action<List<MonitorInfo>>                 OnConfigComplete;
         public event Action                                    OnReadyToStream;
         public event Action<int, Texture>                      OnVideoTextureReceived; // monitorIndex, texture
-        public event Action<AudioStreamTrack>                  OnAudioTrackReceived;   // remote audio track
+        public event Action<AudioStreamTrack>                  OnAudioTrackReceived;   // remote audio track (RTP, legacy)
+        public event Action<byte[]>                            OnAudioDataReceived;    // DataChannel audio (low-latency)
         public event Action                                    OnStreamingStarted;
         public event Action<string>                            OnError;
         public event Action                                    OnDisconnected;
@@ -908,6 +911,7 @@ namespace VRWorkspace.Streaming
 
             lock (_lock)
             {
+                _pcGeneration++; // Invalidate stale PC callbacks before disposing
                 foreach (var w in _peerConnections)
                 {
                     try { w.PC?.Close(); w.PC?.Dispose(); } catch { }
@@ -916,6 +920,7 @@ namespace VRWorkspace.Streaming
                 _expectedMonitorCount = 0;
             }
 
+            _sctpInitChannel = null;
             _streamingStartedFired = false;
             _streamingStartTime    = DateTime.MinValue;
             _isStreamingPaused     = false;
