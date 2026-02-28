@@ -16,7 +16,7 @@ namespace VRWorkspace.VRInput
     {
         [Header("Configuration")]
         [Tooltip("Kích thước visual (ảo) của chấm tại khoảng cách 1m.")]
-        public float reticleSize = 0.01f;
+        public float reticleSize = 0.005f;
 
         public Color colorInteract = new Color(1f, 0f, 0f, 1f);
 
