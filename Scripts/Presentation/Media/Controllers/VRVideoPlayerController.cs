@@ -74,6 +74,12 @@ namespace VRWorkspace.Media.Core
         private double _resumePosition = 0;
         private bool _isStopped = true; // Guard against double-Stop() corrupting saved settings
 
+        // Monitory Type Logic
+        private RTTMediaProjectionPopup.MonitorType _currentMonitor = RTTMediaProjectionPopup.MonitorType.Flat;
+
+        // Environment Settings Logic
+        private RTTMediaProjectionPopup.EnvironmentType _currentEnv = RTTMediaProjectionPopup.EnvironmentType.Room;
+
         #endregion
 
         #region Initialization
@@ -161,8 +167,6 @@ namespace VRWorkspace.Media.Core
             }
         }
 
-
-
         /// <summary>
         /// Set the projection popup reference.
         /// </summary>
@@ -237,7 +241,6 @@ namespace VRWorkspace.Media.Core
             HideProjectionPopup();
             HideEnvironmentPopup();
         }
-
 
         #endregion
 
@@ -441,265 +444,6 @@ namespace VRWorkspace.Media.Core
                 {
                     _projectionSystem.SetTexture(_playbackEngine.OutputTexture);
                 }
-            }
-        }
-
-        /// <summary>
-        /// Reposition the controls container to be centered in front of the video.
-        /// For immersive (180/360): centers in front of camera at 2m distance.
-        /// For flat: centers below the flat screen position.
-        /// </summary>
-        private void RepositionControlsForProjection(bool isImmersive, bool forceReposition = true)
-        {
-            Camera cam = Camera.main;
-            if (cam == null || _controlsPanel == null) return;
-
-            // Find VideoControlsContainer by traversing up from controls panel
-            Transform container = FindControlsContainer();
-            if (container == null) return;
-
-            Vector3 camPos = cam.transform.position;
-            Vector3 camForward = cam.transform.forward;
-            camForward.y = 0;
-            if (camForward.sqrMagnitude < 0.001f) camForward = Vector3.forward;
-            camForward.Normalize();
-
-            Vector3 newPos = container.position;
-            Vector3 facingDir = camForward;
-
-            bool keptPosition = false;
-
-            if (isImmersive)
-            {
-                if (!forceReposition)
-                {
-                    // Flat→immersive transition: keep current world position (no visible jump)
-                    Vector3 currentPos = container.position;
-                    Vector3 toControls = currentPos - camPos;
-                    toControls.y = 0;
-                    float dist = toControls.magnitude;
-
-                    if (dist > 0.5f)
-                    {
-                        newPos = currentPos;
-                        facingDir = toControls.normalized;
-                        keptPosition = true;
-                    }
-                }
-
-                if (!keptPosition)
-                {
-                    // Force reposition or no valid current position:
-                    // use saved flat position direction so controls align with video content center
-                    Vector3 contentDir = camForward;
-                    if (_projectionSystem != null && _projectionSystem.HasSavedFlatTransform)
-                    {
-                        Vector3 toContent = _projectionSystem.SavedFlatPosition - camPos;
-                        toContent.y = 0;
-                        if (toContent.sqrMagnitude > 0.001f)
-                            contentDir = toContent.normalized;
-                    }
-
-                    // Distance 2.0m — same as flat mode; 3D effect is disabled when controls are visible
-                    newPos = camPos + contentDir * 2.0f;
-                    newPos.y = camPos.y - 0.625f;
-                    facingDir = contentDir;
-                }
-            }
-            else
-            {
-                // Flat: position controls below the screen, facing same direction as screen
-                Vector3 screenPos = _projectionSystem != null
-                    ? _projectionSystem.ProjectionPosition
-                    : container.position;
-
-                newPos = screenPos;
-                newPos.y = camPos.y - 0.625f;
-
-                // Face direction = from camera toward screen (horizontal)
-                Vector3 toScreen = screenPos - camPos;
-                toScreen.y = 0;
-                if (toScreen.sqrMagnitude < 0.001f) toScreen = camForward;
-                toScreen.Normalize();
-                facingDir = toScreen;
-            }
-
-            container.position = newPos;
-            container.rotation = Quaternion.LookRotation(facingDir);
-
-            // Scale: always 1.0 — immersive now at same 2.0m distance as flat
-            float scaleFactor = 1.0f;
-
-            Transform frame = container.Find("VideoControlsFrame");
-            if (frame != null)
-            {
-                frame.localRotation = Quaternion.identity;
-                ScaleFrameQuad(frame, scaleFactor);
-            }
-
-            Transform overlay = container.Find("DismissOverlayFrame");
-            if (overlay != null)
-            {
-                overlay.localRotation = Quaternion.identity;
-                ScaleFrameQuad(overlay, scaleFactor);
-            }
-
-            Transform sideFrame = container.Find("SideControlsFrame");
-            if (sideFrame != null)
-            {
-                ScaleFrameQuad(sideFrame, scaleFactor);
-            }
-
-            Debug.Log($"[VRVideoPlayerController] Controls repositioned (immersive={isImmersive}, force={forceReposition}, scale={scaleFactor:F2}) at {newPos}");
-        }
-
-        /// <summary>
-        /// Find the VideoControlsContainer transform by traversing up from controls panel.
-        /// </summary>
-        private Transform FindControlsContainer()
-        {
-            if (_controlsPanel == null) return null;
-
-            Transform current = _controlsPanel.transform;
-            while (current.parent != null && current.name != "VideoControlsContainer")
-            {
-                current = current.parent;
-            }
-            return current.name == "VideoControlsContainer" ? current : null;
-        }
-
-        /// <summary>
-        /// Scale an RTTMenuFrame's DisplayQuad to maintain angular size at different distances.
-        /// scaleFactor=1.0 for standard 2m distance, 1.25 for 2.5m immersive distance.
-        /// </summary>
-        private void ScaleFrameQuad(Transform frameTransform, float scaleFactor)
-        {
-            var menuFrame = frameTransform.GetComponent<RTTMenuFrame>();
-            if (menuFrame == null) return;
-
-            var quad = menuFrame.GetDisplayQuad();
-            if (quad == null) return;
-
-            // Store original scale on first access
-            if (!_controlsQuadOriginalScales.ContainsKey(frameTransform))
-            {
-                _controlsQuadOriginalScales[frameTransform] = quad.transform.localScale;
-            }
-
-            Vector3 orig = _controlsQuadOriginalScales[frameTransform];
-            quad.transform.localScale = new Vector3(
-                orig.x * scaleFactor,
-                orig.y * scaleFactor,
-                orig.z
-            );
-        }
-
-        /// <summary>
-        /// Handle controls panel visibility changes.
-        /// When controls are visible in stereo mode: instantly set mono rendering
-        /// to eliminate vergence-accommodation conflict. Works for both immersive and flat modes.
-        /// Note: Animation was tested but causes worse dizziness (sustained rotation from UV shift).
-        /// Instant switch produces only a brief "pop" which the brain dismisses easily.
-        /// </summary>
-        private void HandleControlsVisibilityChanged(bool visible)
-        {
-            if (_projectionSystem?.ActiveRenderer == null) return;
-
-            bool isStereo = _projectionSystem.CurrentStereoMode != StereoMode.Mono;
-            if (!isStereo) return;
-
-            _projectionSystem.ActiveRenderer.SetStereoStrength(visible ? 0f : 1f);
-        }
-
-        /// <summary>
-        /// Ensure controls panel uses StereoUIPanel shader with given stereo offset.
-        /// Currently always called with offset=0 (vergence handled by force-mono on video).
-        /// </summary>
-        private void SetControlsStereoDepthOffset(float offset)
-        {
-            Transform container = FindControlsContainer();
-            if (container == null) return;
-
-            // Always use StereoUIPanel shader — avoid shader swapping artifacts.
-            // With offset=0, StereoUIPanel renders identically to Sprites/Default.
-            Shader stereoShader = Shader.Find(STEREO_UI_SHADER);
-
-            Transform frame = container.Find("VideoControlsFrame");
-            if (frame != null) ApplyStereoShader(frame, stereoShader, offset);
-
-            Transform overlay = container.Find("DismissOverlayFrame");
-            if (overlay != null) ApplyStereoShader(overlay, stereoShader, offset);
-
-            Transform sideFrame = container.Find("SideControlsFrame");
-            if (sideFrame != null) ApplyStereoShader(sideFrame, stereoShader, offset);
-        }
-
-        private void ApplyStereoShader(Transform frameTransform, Shader stereoShader, float offset)
-        {
-            var menuFrame = frameTransform.GetComponent<RTTMenuFrame>();
-            if (menuFrame == null) return;
-            var quad = menuFrame.GetDisplayQuad();
-            if (quad?.material == null) return;
-
-            // Swap to StereoUIPanel shader once (subsequent calls skip if already applied)
-            if (stereoShader != null && quad.material.shader != stereoShader)
-            {
-                Texture tex = quad.material.mainTexture;
-                Color color = quad.material.color;
-                int queue = quad.material.renderQueue;
-                quad.material.shader = stereoShader;
-                quad.material.mainTexture = tex;
-                quad.material.color = color;
-                quad.material.renderQueue = queue;
-            }
-
-            if (quad.material.HasProperty("_StereoOffset"))
-                quad.material.SetFloat("_StereoOffset", offset);
-        }
-
-        /// <summary>
-        /// Setup zoom override so zoom inside video player never affects VirtualObjects.
-        /// Flat: zoom adjusts screen scale. Immersive: zoom adjusts FOV.
-        /// </summary>
-        private void SetupZoomOverride(bool isImmersive)
-        {
-            var zoomController = VirtualObjectsZoomController.Instance;
-            if (zoomController == null) return;
-
-            if (isImmersive && _projectionSystem != null)
-            {
-                zoomController.SetZoomOverride(
-                    () => _projectionSystem.ZoomImmersive(-10f),  // zoom in = decrease FOV
-                    () => _projectionSystem.ZoomImmersive(10f)    // zoom out = increase FOV
-                );
-            }
-            else
-            {
-                // Flat mode: zoom adjusts screen scale (isolated from VirtualObjects)
-                zoomController.SetZoomOverride(
-                    () => SetScreenScale(_displaySettings.Scale + 0.1f),  // zoom in = bigger
-                    () => SetScreenScale(_displaySettings.Scale - 0.1f)   // zoom out = smaller
-                );
-            }
-        }
-
-        private RTTMediaProjectionPopup.StereoMode ConvertToUIStereo(StereoMode mode)
-        {
-            switch (mode)
-            {
-                case StereoMode.SideBySide: return RTTMediaProjectionPopup.StereoMode.SideBySide;
-                case StereoMode.OverUnder: return RTTMediaProjectionPopup.StereoMode.OverUnder;
-                default: return RTTMediaProjectionPopup.StereoMode.Mono;
-            }
-        }
-
-        private StereoMode ConvertFromUIStereo(RTTMediaProjectionPopup.StereoMode mode)
-        {
-            switch (mode)
-            {
-                case RTTMediaProjectionPopup.StereoMode.SideBySide: return StereoMode.SideBySide;
-                case RTTMediaProjectionPopup.StereoMode.OverUnder: return StereoMode.OverUnder;
-                default: return StereoMode.Mono;
             }
         }
 
@@ -963,8 +707,6 @@ namespace VRWorkspace.Media.Core
             _controlsPanel?.Hide();
         }
 
-
-
         /// <summary>
         /// Show projection settings popup.
         /// </summary>
@@ -1068,12 +810,9 @@ namespace VRWorkspace.Media.Core
             _environmentPopup?.Hide();
         }
 
+        #endregion
 
-    #endregion
-
-    #region Event Handlers
-        // Monitory Type Logic
-        private RTTMediaProjectionPopup.MonitorType _currentMonitor = RTTMediaProjectionPopup.MonitorType.Flat;
+        #region Event Handlers
         private void HandleMonitorTypeChanged(RTTMediaProjectionPopup.MonitorType type)
         {
             _currentMonitor = type;
@@ -1082,8 +821,6 @@ namespace VRWorkspace.Media.Core
             Debug.Log($"[VRVideoPlayerController] Monitor type changed to {type}, curvature set to {curvature}");
         }
 
-        // Environment Settings Logic
-        private RTTMediaProjectionPopup.EnvironmentType _currentEnv = RTTMediaProjectionPopup.EnvironmentType.Room;
         private void HandleEnvironmentSettingsChanged(RTTMediaProjectionPopup.EnvironmentType type)
         {
             _currentEnv = type;
@@ -1135,6 +872,7 @@ namespace VRWorkspace.Media.Core
 
             Debug.Log($"[VRVideoPlayerController] Synced UI state to {_currentEnv} (Lights: {lightsOn}, Blocked: {manualBlocked || lightsBlocked})");
         }
+
         private void HandleVideoPrepared()
         {
             Debug.Log("[VRVideoPlayerController] Video prepared");
@@ -1343,9 +1081,6 @@ namespace VRWorkspace.Media.Core
             OnBackToLibrary?.Invoke();
         }
 
-
-
-
         private void HandleVRModeClicked()
         {
             Debug.Log("[VRVideoPlayerController] VR Mode clicked - Showing Projection Popup");
@@ -1356,7 +1091,6 @@ namespace VRWorkspace.Media.Core
         {
             Debug.Log("[VRVideoPlayerController] Headset Mode clicked (Not implemented)");
         }
-
 
         private void HandleRecenter()
         {
@@ -1498,6 +1232,54 @@ namespace VRWorkspace.Media.Core
                 child.rotation = newPivotRot * relativeRotations[i];
             }
         }
+
+        private void RecenterObject(Transform objective, Camera cam)
+        {
+            if (objective == null || cam == null) return;
+
+            Vector3 camForward = cam.transform.forward;
+            camForward.y = 0;
+            if (camForward.sqrMagnitude < 0.001f) camForward = Vector3.forward;
+            camForward.Normalize();
+
+            Vector3 camPos = cam.transform.position;
+
+            // Calculate new position based on current distance
+            // Maintain height (y) and distance from camera
+            Vector3 currentPos = objective.position;
+            float dist = Vector2.Distance(new Vector2(currentPos.x, currentPos.z), new Vector2(camPos.x, camPos.z));
+
+            Vector3 newPos = camPos + camForward * dist;
+            newPos.y = currentPos.y; // Keep height
+
+            objective.position = newPos;
+
+            // Custom logic for VideoControlsContainer
+            if (objective.name == "VideoControlsContainer")
+            {
+                // Rotate container to face the camera so children keep their relative positions
+                objective.rotation = Quaternion.LookRotation(camForward);
+
+                // Reset child frames to local identity
+                Transform frame = objective.Find("VideoControlsFrame");
+                if (frame != null)
+                {
+                    frame.localRotation = Quaternion.identity;
+                }
+
+                Transform overlay = objective.Find("DismissOverlayFrame");
+                if (overlay != null)
+                {
+                    overlay.localRotation = Quaternion.identity;
+                }
+            }
+            else
+            {
+                // Standard behavior for other objects
+                objective.rotation = Quaternion.LookRotation(camForward);
+            }
+        }
+
         #endregion
 
         #region Unity Lifecycle
@@ -1565,206 +1347,5 @@ namespace VRWorkspace.Media.Core
             VirtualObjectsZoomController.Instance?.ClearZoomOverride();
         }
         #endregion
-
-        private void RecenterObject(Transform objective, Camera cam)
-        {
-            if (objective == null || cam == null) return;
-
-            Vector3 camForward = cam.transform.forward;
-            camForward.y = 0;
-            if (camForward.sqrMagnitude < 0.001f) camForward = Vector3.forward;
-            camForward.Normalize();
-
-            Vector3 camPos = cam.transform.position;
-
-            // Calculate new position based on current distance
-            // Maintain height (y) and distance from camera
-            Vector3 currentPos = objective.position;
-            float dist = Vector2.Distance(new Vector2(currentPos.x, currentPos.z), new Vector2(camPos.x, camPos.z));
-
-            Vector3 newPos = camPos + camForward * dist;
-            newPos.y = currentPos.y; // Keep height
-
-            objective.position = newPos;
-
-        // Custom logic for VideoControlsContainer
-        if (objective.name == "VideoControlsContainer")
-        {
-            // Rotate container to face the camera so children keep their relative positions
-            objective.rotation = Quaternion.LookRotation(camForward);
-
-            // Reset child frames to local identity
-            Transform frame = objective.Find("VideoControlsFrame");
-            if (frame != null)
-            {
-                frame.localRotation = Quaternion.identity;
-            }
-
-            Transform overlay = objective.Find("DismissOverlayFrame");
-            if (overlay != null)
-            {
-                overlay.localRotation = Quaternion.identity;
-            }
-        }
-        else
-        {
-            // Standard behavior for other objects
-            objective.rotation = Quaternion.LookRotation(camForward);
-        }
     }
-
-        #region Per-Video Settings Cache
-
-        private void StartAutoSaveTimer()
-        {
-            StopAutoSaveTimer();
-            _autoSaveCoroutine = StartCoroutine(AutoSaveLoop());
-        }
-
-        private void StopAutoSaveTimer()
-        {
-            if (_autoSaveCoroutine != null)
-            {
-                StopCoroutine(_autoSaveCoroutine);
-                _autoSaveCoroutine = null;
-            }
-        }
-
-        private IEnumerator AutoSaveLoop()
-        {
-            var wait = new WaitForSeconds(10f);
-            while (true)
-            {
-                yield return wait;
-                SaveCurrentVideoSettings();
-            }
-        }
-
-        private void SaveCurrentVideoSettings()
-        {
-            if (_isStopped) return; // Already saved during Stop(), engine state is stale
-            if (_currentVideo == null || string.IsNullOrEmpty(_currentVideo.Value.Path)) return;
-
-            var entry = new VideoSettingsEntry
-            {
-                FilePath = _currentVideo.Value.Path,
-                Projection = (int)(_projectionSystem?.CurrentProjection ?? VideoProjectionType.Flat),
-                Stereo = (int)(_projectionSystem?.CurrentStereoMode ?? StereoMode.Mono),
-                Monitor = (int)_currentMonitor,
-                Environment = (int)_currentEnv,
-                PlaybackPosition = _playbackEngine?.CurrentTime ?? 0,
-                PlaybackSpeed = _playbackEngine?.PlaybackSpeed ?? 1f,
-                Brightness = GetCurrentShaderFloat("_Brightness", 1f),
-                Contrast = GetCurrentShaderFloat("_Contrast", 1f),
-                Saturation = GetCurrentShaderFloat("_Saturation", 1f),
-                Sharpness = GetCurrentShaderFloat("_Sharpness", 0.5f),
-                Tint = GetCurrentShaderFloat("_Tint", 0f),
-                Temperature = GetCurrentShaderFloat("_Temperature", 0f),
-                ScreenDistance = _displaySettings.Distance,
-                ScreenScale = _displaySettings.Scale,
-                ScreenCurvature = _displaySettings.Curvature,
-                AspectRatio = _projectionSystem?.GetAspectRatioOverride() ?? "default",
-                FOVZoom = GetImmersiveFOV(),
-                ImmTilt = GetCurrentShaderFloat("_Tilt", 0f),
-                ImmYaw = GetCurrentShaderFloat("_YawOffset", 0f),
-                VerticalShift = GetCurrentShaderFloat("_VerticalShift", 0f),
-                HorizontalShift = GetCurrentShaderFloat("_HorizontalShift", 0f),
-                LRInverse = GetCurrentShaderFloat("_LRInverse", 0f) > 0.5f,
-                LastAccessedTicks = System.DateTime.UtcNow.Ticks
-            };
-
-            VideoSettingsCache.Set(entry.FilePath, entry);
-            VideoSettingsCache.FlushToDisk();
-            Debug.Log($"[VRVideoPlayerController] Saved settings: Position={entry.PlaybackPosition:F1}s, Brightness={entry.Brightness:F2}, AR={entry.AspectRatio}");
-        }
-
-        private void RestoreCachedSettings()
-        {
-            if (_cachedEntry == null) return;
-
-            // Restore picture adjustments
-            ApplyShaderFloat("_Brightness", _cachedEntry.Brightness);
-            ApplyShaderFloat("_Contrast", _cachedEntry.Contrast);
-            ApplyShaderFloat("_Saturation", _cachedEntry.Saturation);
-            ApplyShaderFloat("_Sharpness", _cachedEntry.Sharpness);
-            ApplyShaderFloat("_Tint", _cachedEntry.Tint);
-            ApplyShaderFloat("_Temperature", _cachedEntry.Temperature);
-
-            // Restore display settings (flat mode only)
-            if (ProjectionDetector.SupportsScreenSettings((VideoProjectionType)_cachedEntry.Projection))
-            {
-                _displaySettings.Distance = _cachedEntry.ScreenDistance;
-                _displaySettings.Scale = _cachedEntry.ScreenScale;
-                _projectionSystem?.UpdateDisplay(_displaySettings);
-
-                // Restore aspect ratio
-                _projectionSystem?.SetAspectRatioOverride(_cachedEntry.AspectRatio ?? "default");
-            }
-
-            // Restore immersive settings
-            if (_projectionSystem?.ActiveRenderer is ImmersiveSphereRenderer imm)
-            {
-                if (_cachedEntry.FOVZoom > 0f) imm.SetFieldOfView(_cachedEntry.FOVZoom);
-                imm.SetShaderFloat("_Tilt", _cachedEntry.ImmTilt);
-                imm.SetShaderFloat("_VerticalShift", _cachedEntry.VerticalShift);
-                imm.SetShaderFloat("_HorizontalShift", _cachedEntry.HorizontalShift);
-                if (_cachedEntry.LRInverse) imm.SetShaderFloat("_LRInverse", 1f);
-            }
-
-            // Restore playback speed
-            if (_playbackEngine != null && _cachedEntry.PlaybackSpeed > 0f)
-                _playbackEngine.PlaybackSpeed = _cachedEntry.PlaybackSpeed;
-
-            // Restore environment: set lights based on cached env type
-            if (_environmentController != null)
-            {
-                switch ((RTTMediaProjectionPopup.EnvironmentType)_cachedEntry.Environment)
-                {
-                    case RTTMediaProjectionPopup.EnvironmentType.Cinema:
-                        _environmentController.SetLightsEnabled(false);
-                        break;
-                    case RTTMediaProjectionPopup.EnvironmentType.LightOff:
-                        _environmentController.SetLightsEnabled(false);
-                        _environmentController.HideEnvironment();
-                        break;
-                    case RTTMediaProjectionPopup.EnvironmentType.Room:
-                        _environmentController.SetLightsEnabled(true);
-                        _environmentController.ShowEnvironment();
-                        break;
-                }
-            }
-
-            Debug.Log($"[VRVideoPlayerController] Restored cached settings: Brightness={_cachedEntry.Brightness:F2}, " +
-                $"Speed={_cachedEntry.PlaybackSpeed:F2}, FOV={_cachedEntry.FOVZoom:F0}");
-
-            _cachedEntry = null; // consumed
-        }
-
-        private void ApplyShaderFloat(string param, float value)
-        {
-            if (_projectionSystem?.ActiveRenderer is ImmersiveSphereRenderer imm)
-                imm.SetShaderFloat(param, value);
-            else if (_projectionSystem?.ActiveRenderer is FlatProjectionRenderer flat)
-                flat.SetBoardShaderFloat(param, value);
-        }
-
-        private float GetCurrentShaderFloat(string param, float defaultVal)
-        {
-            if (_projectionSystem?.ActiveRenderer is ImmersiveSphereRenderer imm)
-                return imm.GetShaderFloat(param, defaultVal);
-            if (_projectionSystem?.ActiveRenderer is FlatProjectionRenderer flat)
-                return flat.GetBoardShaderFloat(param, defaultVal);
-            return defaultVal;
-        }
-
-        private float GetImmersiveFOV()
-        {
-            if (_projectionSystem?.ActiveRenderer is ImmersiveSphereRenderer imm)
-                return imm.CurrentFOV;
-            return 0f;
-        }
-
-        #endregion
-    }
-
 }
