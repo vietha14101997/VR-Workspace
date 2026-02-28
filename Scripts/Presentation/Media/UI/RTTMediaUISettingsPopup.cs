@@ -226,7 +226,7 @@ namespace VRWorkspace.Media.UI
             // childControlHeight=true so VLG actually sizes children
             var layout = bodyObj.AddComponent<VerticalLayoutGroup>();
             layout.padding = new RectOffset(25, 25, 30, 40);
-            layout.spacing = 25;
+            layout.spacing = 30;
             layout.childControlHeight = true;
             layout.childForceExpandHeight = false;
             layout.childControlWidth = true;

@@ -183,12 +183,12 @@ namespace VRWorkspace.Media.Projections
 
             if (_worldPanel == null) return;
 
-            // Position screen at local origin - parent transform handles world positioning
-            // Apply small Z offset based on distance setting for fine-tuning
+            // Position screen at local origin — parent transform (projection root)
+            // is already placed at Distance from camera by VRVideoProjectionSystem.
             Vector3 localPos = new Vector3(
                 settings.PositionOffset.x,
                 settings.PositionOffset.y,
-                settings.Distance // Use distance as Z offset from parent
+                0f
             );
             _worldPanel.transform.localPosition = localPos;
 

@@ -525,6 +525,7 @@ namespace VRWorkspace.Media.UI
 
         #region Private Fields
         private float _value = 0f;
+        private bool _visualsInitialized = false;
         private float _minValue = 0f;
         private float _maxValue = 1f;
         private float _step = 0f; // 0 = continuous (no snapping)
@@ -604,9 +605,10 @@ namespace VRWorkspace.Media.UI
                 newValue = Mathf.Clamp(newValue, _minValue, _maxValue);
             }
 
-            if (Mathf.Approximately(newValue, _value)) return;
+            if (_visualsInitialized && Mathf.Approximately(newValue, _value)) return;
 
             _value = newValue;
+            _visualsInitialized = true;
             UpdateVisuals();
 
             if (notify)
@@ -658,19 +660,60 @@ namespace VRWorkspace.Media.UI
 
         private void UpdateValueFromPointer(PointerEventData eventData)
         {
+            // Try RTT gaze-based position first (render texture panels use different coordinates)
+            if (TryGetNormalizedFromGaze(out float gazeNormalized))
+            {
+                float newValue = Mathf.Lerp(_minValue, _maxValue, gazeNormalized);
+                SetValue(newValue);
+                _hoverNormalizedPosition = gazeNormalized;
+                return;
+            }
+
+            // Fallback to screen coordinates for non-RTT contexts
             RectTransform rt = GetComponent<RectTransform>();
             Vector2 localPoint;
 
             if (RectTransformUtility.ScreenPointToLocalPointInRectangle(rt, eventData.position, eventData.pressEventCamera, out localPoint))
             {
-                // Calculate normalized position
                 float normalized = (localPoint.x + rt.rect.width / 2) / rt.rect.width;
                 normalized = Mathf.Clamp01(normalized);
 
-                // Convert to value
                 float newValue = Mathf.Lerp(_minValue, _maxValue, normalized);
                 SetValue(newValue);
             }
+        }
+
+        /// <summary>
+        /// Try to get normalized slider position from RTT gaze raycast.
+        /// Returns true if RTT hit was found on this slider.
+        /// </summary>
+        private bool TryGetNormalizedFromGaze(out float normalized)
+        {
+            normalized = 0f;
+            if (RTTRaycastManager.Instance == null) return false;
+
+            var hit = RTTRaycastManager.Instance.CurrentHit;
+            if (!hit.isValid || hit.hitUIElement == null || hit.panel == null) return false;
+
+            Transform hitTransform = hit.hitUIElement.transform;
+            bool isOurSlider = hitTransform == transform || hitTransform.IsChildOf(transform);
+            if (!isOurSlider) return false;
+
+            RectTransform rt = GetComponent<RectTransform>();
+            if (rt == null) return false;
+
+            Canvas canvas = GetComponentInParent<Canvas>();
+            if (canvas == null) return false;
+
+            Vector2 localPoint;
+            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                rt, hit.screenPosition, canvas.worldCamera, out localPoint))
+            {
+                normalized = (localPoint.x + rt.rect.width * rt.pivot.x) / rt.rect.width;
+                normalized = Mathf.Clamp01(normalized);
+                return true;
+            }
+            return false;
         }
 
         public void OnPointerClick(PointerEventData eventData)
@@ -708,9 +751,19 @@ namespace VRWorkspace.Media.UI
 
         private void Update()
         {
-            if (_isHovering && _previewContainer != null && _previewContainer.activeSelf)
+            if (_isHovering)
             {
-                UpdatePreviewFromGaze();
+                // Always update hover position from gaze when hovering (needed for OnPointerDown/OnDrag)
+                if (TryGetNormalizedFromGaze(out float normalized))
+                {
+                    _hoverNormalizedPosition = normalized;
+                }
+
+                // Update preview visuals only when preview is active
+                if (_previewContainer != null && _previewContainer.activeSelf)
+                {
+                    UpdatePreviewFromGaze();
+                }
             }
         }
 

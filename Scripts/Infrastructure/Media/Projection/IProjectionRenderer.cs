@@ -109,7 +109,7 @@ namespace VRWorkspace.Media.Projections
         /// </summary>
         public static DisplaySettings Default => new DisplaySettings
         {
-            Distance = 2.0f,
+            Distance = 1.8f,
             Scale = 1.0f,
             Curvature = 0.0f,
             HeadLocked = false,

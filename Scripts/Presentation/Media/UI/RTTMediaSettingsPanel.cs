@@ -998,7 +998,7 @@ namespace VRWorkspace.Media.UI
 
         // Screen settings
         public string AspectRatio = "default";
-        public float ScreenDepth = 2.0f;
+        public float ScreenDepth = 1.8f;
         public float ScreenScale = 1.0f;
         public float VerticalMove = 0f;
     }

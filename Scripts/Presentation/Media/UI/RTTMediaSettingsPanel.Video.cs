@@ -271,9 +271,9 @@ namespace VRWorkspace.Media.UI
             // Aspect ratio segment buttons
             CreateAspectRatioRow(scrollContent);
 
-            // Depth slider (1.0 - 5.0, default 2.0) → display 1-2 decimal, no unit
+            // Depth slider (1.0 - 3.0, default 1.8) → display 1-2 decimal, no unit
             (_depthSlider, _depthValueLabel) = CreateSliderRow(
-                scrollContent, "Depth", 1.0f, 5.0f, 2.0f,
+                scrollContent, "Depth", 1.0f, 3.0f, 1.8f,
                 (v) => OnScreenDepthChanged?.Invoke(v),
                 (v) => v.ToString("0.##"),
                 0.05f);
@@ -304,11 +304,11 @@ namespace VRWorkspace.Media.UI
 
         private void ResetScreenSliders()
         {
-            _depthSlider?.SetValueWithoutNotify(2.0f);
+            _depthSlider?.SetValueWithoutNotify(1.8f);
             _scaleSlider?.SetValueWithoutNotify(1.0f);
             _verticalMoveSlider?.SetValueWithoutNotify(0f);
 
-            FormatValueLabel(_depthValueLabel, _depthSlider, 2.0f);
+            FormatValueLabel(_depthValueLabel, _depthSlider, 1.8f);
             FormatValueLabel(_scaleValueLabel, _scaleSlider, 1.0f);
             FormatValueLabel(_verticalMoveValueLabel, _verticalMoveSlider, 0f);
 

@@ -359,7 +359,10 @@ namespace VRWorkspace.UI.RTT.Components
             // Convert primary frame center to toolbar's local space
             Vector3 localPos = toolbarParent.InverseTransformPoint(primary.transform.position);
             _screenSettingsFrame.transform.localPosition = localPos;
-            _screenSettingsFrame.transform.localRotation = Quaternion.identity;
+
+            // Match primary frame's rotation so popup stands upright like the screen
+            _screenSettingsFrame.transform.localRotation =
+                Quaternion.Inverse(toolbarParent.rotation) * primary.transform.rotation;
         }
 
         /// <summary>
@@ -622,6 +625,7 @@ namespace VRWorkspace.UI.RTT.Components
             if (_clusterRig != null)
             {
                 _clusterRig.verticalOffset = (v - 0.5f) * 1.0f;
+                _clusterRig.RequestLayout();
             }
         }
 

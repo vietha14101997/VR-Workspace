@@ -65,6 +65,10 @@ namespace VRWorkspace.Media.Core
             _menuButtonFrameObject?.SetActive(false);
             ProjectionSystem?.Hide();
 
+            // Ensure error dialog is hidden when returning to library
+            if (_errorDialog != null)
+                _errorDialog.gameObject.SetActive(false);
+
             _libraryView?.gameObject.SetActive(true);
 
             _allMenuFrames = GetAllFrames();
@@ -220,7 +224,12 @@ namespace VRWorkspace.Media.Core
                 _uiSettingsBlocker,
                 _settingsPanel,
                 _playerControlsGroup,
-                setDepthOffset: (v) => _uiDepthOffset = v,
+                setDepthOffset: (v) =>
+                {
+                    // Map 0-1 slider to 1-3m screen distance (v=0→1m, v=0.4→1.8m, v=1→3m)
+                    float distance = 1.0f + v * 2.0f;
+                    _playerController?.ProjectionSystem?.SetScreenDistance(distance);
+                },
                 setHeightOffset: (v) => _uiHeightOffset = v,
                 ApplyUISettingsToControlsGroup);
         }
@@ -234,6 +243,11 @@ namespace VRWorkspace.Media.Core
                     _playerController, _settingsPanel, _uiSettingsPopup, _playerControlsGroup,
                     out _uiDepthOffset, out _uiHeightOffset);
                 _currentPicture = snapshot;
+
+                // Apply loaded depth as screen distance (1-3m mapping)
+                float screenDistance = 1.0f + _uiDepthOffset * 2.0f;
+                _playerController?.ProjectionSystem?.SetScreenDistance(screenDistance);
+
                 ApplyUISettingsToControlsGroup();
             }
 

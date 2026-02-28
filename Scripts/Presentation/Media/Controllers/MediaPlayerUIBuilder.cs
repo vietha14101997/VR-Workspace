@@ -421,6 +421,7 @@ namespace VRWorkspace.Presentation.Media.Controllers
 
             result.ErrorDialog = errorDialogObj.AddComponent<MediaErrorDialog>();
             result.ErrorDialog.Initialize(_font, _primaryColor, _accentColor);
+            errorDialogObj.SetActive(false); // Start hidden; Show() will activate it
 
             // ====================================================== //
             // 6. Projection & Environment popups                      //
@@ -524,7 +525,9 @@ namespace VRWorkspace.Presentation.Media.Controllers
             if (uiPopupContainer != null)
             {
                 result.UISettingsPopup = result.UISettingsPopupFrame.AddComponent<RTTMediaUISettingsPopup>();
-                result.UISettingsPopup.Initialize(uiPopupContainer, uiPopupLogicalW, uiPopupLogicalH, _font, _primaryColor);
+                // Depth default 0.4 → maps to 1.8m screen distance (1.0 + 0.4 * 2.0)
+                result.UISettingsPopup.Initialize(uiPopupContainer, uiPopupLogicalW, uiPopupLogicalH, _font, _primaryColor,
+                    defaultDepth: 0.4f);
             }
             result.UISettingsPopupFrame.SetActive(false);
 
@@ -635,15 +638,8 @@ namespace VRWorkspace.Presentation.Media.Controllers
 
             uiSettingsPopup.OnUISettingsReset += () =>
             {
-                setDepthOffset?.Invoke(0f);
-                setHeightOffset?.Invoke(0f);
-                applyUISettings?.Invoke();
-                if (playerControlsGroup != null)
-                    playerControlsGroup.transform.localScale = Vector3.one;
-                uiSettingsPopup.SetValues(0f, 0.5f, 0.5f);
-                PlayerPrefs.SetFloat("MediaPlayer_UIDepth", 0f);
-                PlayerPrefs.SetFloat("MediaPlayer_UIHeight", 0.5f);
-                PlayerPrefs.SetFloat("MediaPlayer_UIScale", 0.5f);
+                // Individual slider handlers already fire via SetValue in the popup's reset logic.
+                // Just flush PlayerPrefs after all handlers have saved their values.
                 PlayerPrefs.Save();
                 Debug.Log("[MediaPlayerUIBuilder] UI settings reset to defaults");
             };
@@ -675,7 +671,7 @@ namespace VRWorkspace.Presentation.Media.Controllers
             playerController?.SetPictureAdjustment("_Tint", "_Tint", tint);
             playerController?.SetPictureAdjustment("_Temperature", "_Temperature", temperature);
 
-            const int UI_SETTINGS_VER = 3;
+            const int UI_SETTINGS_VER = 4;
             if (PlayerPrefs.GetInt("MediaPlayer_UISettingsVer", 0) < UI_SETTINGS_VER)
             {
                 PlayerPrefs.DeleteKey("MediaPlayer_UIDepth");
@@ -686,7 +682,7 @@ namespace VRWorkspace.Presentation.Media.Controllers
                 Debug.Log("[MediaPlayerUIBuilder] UI settings migrated to v" + UI_SETTINGS_VER);
             }
 
-            uiDepthOffset = Mathf.Clamp(PlayerPrefs.GetFloat("MediaPlayer_UIDepth", 0f), 0f, 1.0f);
+            uiDepthOffset = Mathf.Clamp(PlayerPrefs.GetFloat("MediaPlayer_UIDepth", 0.4f), 0f, 1.0f);
             float uiHeightRaw = Mathf.Clamp(PlayerPrefs.GetFloat("MediaPlayer_UIHeight", 0.5f), 0f, 1.0f);
             uiHeightOffset = uiHeightRaw - 0.5f;
             float uiScale = Mathf.Clamp(PlayerPrefs.GetFloat("MediaPlayer_UIScale", 0.5f), 0.2f, 1.0f);
@@ -764,7 +760,7 @@ namespace VRWorkspace.Presentation.Media.Controllers
             VRWorkspace.Media.Core.VRVideoPlayerController playerController,
             RTTMediaSettingsPanel settingsPanel)
         {
-            float depth = 2.0f;
+            float depth = 1.8f;
             float scale = 1.0f;
             float verticalMove = 0f;
             const string aspect = "default";

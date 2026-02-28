@@ -44,6 +44,11 @@ namespace VRWorkspace.Media.Core
         private Quaternion _savedFlatRotation;
         private bool _hasSavedFlatTransform = false;
 
+        // Cached flat screen placement (computed once, applied every frame by LateUpdate)
+        private Vector3 _flatDirection = Vector3.forward;
+        private Vector3 _flatWorldPosition;
+        private bool _hasFlatWorldPosition = false;
+
         /// <summary>Saved flat screen position (for controls alignment in immersive mode)</summary>
         public Vector3 SavedFlatPosition => _savedFlatPosition;
         public bool HasSavedFlatTransform => _hasSavedFlatTransform;
@@ -114,14 +119,29 @@ namespace VRWorkspace.Media.Core
         {
             if (_projectionRoot != null)
             {
-                _projectionRoot.position = position;
-                _projectionRoot.rotation = rotation;
-                // Always save as flat reference — used for controls alignment in immersive mode
-                // and for restoring flat screen position when switching back from immersive
+                // Save as flat reference — used for direction computation,
+                // controls alignment in immersive mode, and restoring when switching back
                 _savedFlatPosition = position;
                 _savedFlatRotation = rotation;
                 _hasSavedFlatTransform = true;
-                Debug.Log($"[VRVideoProjectionSystem] Set target position: {position}, rotation: {rotation.eulerAngles}");
+
+                // Compute screen direction and target world position
+                ComputeFlatWorldPosition();
+
+                // If flat projection is already visible, apply immediately
+                if (IsVisible && !IsImmersiveProjection() && _hasFlatWorldPosition)
+                {
+                    _projectionRoot.position = _flatWorldPosition;
+                    _projectionRoot.rotation = Quaternion.LookRotation(_flatDirection, Vector3.up);
+                }
+                else if (!IsVisible)
+                {
+                    // Not visible yet — set raw position as placeholder
+                    _projectionRoot.position = position;
+                    _projectionRoot.rotation = rotation;
+                }
+
+                Debug.Log($"[VRVideoProjectionSystem] Set target position: {position}, rotation: {rotation.eulerAngles}, flatWorldPos: {_flatWorldPosition}");
             }
         }
 
@@ -221,6 +241,11 @@ namespace VRWorkspace.Media.Core
 
             if (IsVisible)
             {
+                // Recompute flat position for the new projection
+                if (!willBeImmersive)
+                {
+                    ComputeFlatWorldPosition();
+                }
                 ActiveRenderer.Show();
             }
 
@@ -266,8 +291,14 @@ namespace VRWorkspace.Media.Core
         /// </summary>
         public void SetScreenDistance(float meters)
         {
-            _currentSettings.Distance = Mathf.Clamp(meters, 1.0f, 5.0f);
+            _currentSettings.Distance = Mathf.Clamp(meters, 1.0f, 3.0f);
             ActiveRenderer?.UpdateDisplay(_currentSettings);
+
+            // Recompute world position with new distance (direction stays the same)
+            if (IsVisible && !IsImmersiveProjection())
+            {
+                RecomputeFlatWorldPositionForDistance();
+            }
         }
 
         /// <summary>
@@ -359,6 +390,21 @@ namespace VRWorkspace.Media.Core
         public void Show()
         {
             IsVisible = true;
+
+            // Ensure we have a computed flat position for LateUpdate to apply
+            if (!IsImmersiveProjection())
+            {
+                if (!_hasFlatWorldPosition)
+                    ComputeFlatWorldPosition();
+
+                // Apply immediately so the screen is visible on the very first frame
+                if (_hasFlatWorldPosition)
+                {
+                    _projectionRoot.position = _flatWorldPosition;
+                    _projectionRoot.rotation = Quaternion.LookRotation(_flatDirection, Vector3.up);
+                }
+            }
+
             ActiveRenderer?.Show();
         }
 
@@ -399,11 +445,78 @@ namespace VRWorkspace.Media.Core
             }
 
             _isInitialized = false;
+            _hasFlatWorldPosition = false;
             Debug.Log("[VRVideoProjectionSystem] Disposed");
         }
         #endregion
 
         #region Private Methods
+        /// <summary>
+        /// Compute the screen direction from camera and cache the target world position.
+        /// Direction is determined from camera toward savedFlatPosition; if they overlap
+        /// (e.g., VirtualObjects Z offset makes menu frame world pos ≈ camera pos),
+        /// falls back to camera forward.
+        /// </summary>
+        private void ComputeFlatWorldPosition()
+        {
+            Camera cam = Camera.main;
+            if (cam == null) return;
+
+            // Determine horizontal direction from camera to the saved flat position
+            if (_hasSavedFlatTransform)
+            {
+                Vector3 toSaved = _savedFlatPosition - cam.transform.position;
+                Vector3 horizontal = new Vector3(toSaved.x, 0f, toSaved.z);
+
+                if (horizontal.sqrMagnitude > 0.01f)
+                {
+                    // Menu frame is far enough from camera to determine direction
+                    _flatDirection = horizontal.normalized;
+                }
+                else
+                {
+                    // Menu frame world position ≈ camera position
+                    // (common when VirtualObjects Z offset cancels menu frame local position)
+                    // Use camera's current horizontal forward as direction
+                    Vector3 fwd = cam.transform.forward;
+                    fwd.y = 0f;
+                    _flatDirection = fwd.sqrMagnitude > 0.001f ? fwd.normalized : Vector3.forward;
+                }
+            }
+            else
+            {
+                // No saved position — use camera forward
+                Vector3 fwd = cam.transform.forward;
+                fwd.y = 0f;
+                _flatDirection = fwd.sqrMagnitude > 0.001f ? fwd.normalized : Vector3.forward;
+            }
+
+            // Compute world position: Distance from camera in the flat direction
+            _flatWorldPosition = cam.transform.position + _flatDirection * _currentSettings.Distance;
+            _flatWorldPosition.y = _hasSavedFlatTransform ? _savedFlatPosition.y : cam.transform.position.y;
+            _hasFlatWorldPosition = true;
+
+            Debug.Log($"[VRVideoProjectionSystem] ComputeFlatWorldPosition: cam={cam.transform.position}, dir={_flatDirection}, dist={_currentSettings.Distance}, result={_flatWorldPosition}");
+        }
+
+        /// <summary>
+        /// Recompute flat world position using the already-cached direction but new Distance.
+        /// Called when Distance changes via SetScreenDistance.
+        /// </summary>
+        private void RecomputeFlatWorldPositionForDistance()
+        {
+            if (!_hasFlatWorldPosition) return;
+
+            Camera cam = Camera.main;
+            if (cam == null) return;
+
+            // Keep the same direction, just change distance
+            _flatWorldPosition = cam.transform.position + _flatDirection * _currentSettings.Distance;
+            _flatWorldPosition.y = _hasSavedFlatTransform ? _savedFlatPosition.y : cam.transform.position.y;
+
+            Debug.Log($"[VRVideoProjectionSystem] RecomputeForDistance: dist={_currentSettings.Distance}, result={_flatWorldPosition}");
+        }
+
         private void CreateRenderer(VideoProjectionType type)
         {
             switch (type)
@@ -476,10 +589,13 @@ namespace VRWorkspace.Media.Core
                 _projectionRoot.position = cam.transform.position;
                 _projectionRoot.rotation = Quaternion.identity;
             }
-            else if (IsVisible)
+            else if (IsVisible && _hasFlatWorldPosition)
             {
-                // Flat projection: face-to-camera rotation (same as MenuFrame/ClusterRig panels)
-                Vector3 toCamera = cam.transform.position - _projectionRoot.position;
+                // Flat projection: apply cached world position (fixed in world space)
+                // and face-to-camera rotation.
+                _projectionRoot.position = _flatWorldPosition;
+
+                Vector3 toCamera = cam.transform.position - _flatWorldPosition;
                 if (toCamera.sqrMagnitude > 0.001f)
                 {
                     _projectionRoot.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);

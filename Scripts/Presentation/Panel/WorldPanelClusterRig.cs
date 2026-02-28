@@ -665,6 +665,7 @@ namespace VRWorkspace.Panel
         }
 
         private float _lastUpdateArcRadius = -1f;
+        private float _lastVerticalOffset = 0f;
 
         void Update()
         {
@@ -674,14 +675,25 @@ namespace VRWorkspace.Panel
             }
             else if (Application.isPlaying && _panels.Count > 0)
             {
-                // Detect arc radius changes (e.g. from zoom controller) and trigger layout refresh
+                // Detect arc radius or vertical offset changes and trigger layout refresh
                 float currentR = ArcRadius;
-                if (Mathf.Abs(currentR - _lastUpdateArcRadius) > 0.001f)
+                bool changed = Mathf.Abs(currentR - _lastUpdateArcRadius) > 0.001f
+                            || Mathf.Abs(verticalOffset - _lastVerticalOffset) > 0.001f;
+                if (changed)
                 {
                     _lastUpdateArcRadius = currentR;
+                    _lastVerticalOffset = verticalOffset;
                     LayoutFromCamera();
                 }
             }
+        }
+
+        /// <summary>
+        /// Force an immediate layout refresh. Call after changing verticalOffset or other layout properties.
+        /// </summary>
+        public void RequestLayout()
+        {
+            if (_panels.Count > 0) LayoutFromCamera();
         }
 
         void LayoutFromCamera()
