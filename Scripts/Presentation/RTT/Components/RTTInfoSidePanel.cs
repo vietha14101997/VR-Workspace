@@ -1,0 +1,617 @@
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+using VRWorkspace.Streaming;
+using System.Collections.Generic;
+
+namespace VRWorkspace.UI.RTT.Components
+{
+    /// <summary>
+    /// Content component for displaying hardware or network info.
+    /// Only creates child UI elements (titles, rows, separators).
+    /// Must be placed inside a container (like RTTMenuFrame.ContentContainer).
+    /// Similar pattern to RTTMainMenu - content-only, no frame creation.
+    /// </summary>
+    public class RTTInfoSidePanel : MonoBehaviour
+    {
+        public enum PanelType
+        {
+            HardwareInfo,
+            NetworkInfo
+        }
+
+        #region Configuration
+        [Header("Panel Type")]
+        [SerializeField] private PanelType panelType = PanelType.HardwareInfo;
+
+        [Header("Visual Settings")]
+        [SerializeField] private Color themeColor = new Color(0f, 0.9f, 1f);
+        [SerializeField] private TMP_FontAsset customFont;
+
+        [Header("Typography")]
+        [SerializeField] private int titleFontSize = 48;
+        [SerializeField] private int labelFontSize = 36;
+        [SerializeField] private int valueFontSize = 40;
+
+        #endregion
+
+        #region Private Fields
+        private RectTransform _container;
+        private Dictionary<string, TextMeshProUGUI> _valueTexts = new Dictionary<string, TextMeshProUGUI>();
+        private bool _isBuilt = false;
+
+        // UI Pooling - reuse objects instead of destroy/recreate to reduce GC
+        private List<GameObject> _rowPool = new List<GameObject>();
+        private int _activeRowCount = 0;
+        private GameObject _titleObj;
+        private TextMeshProUGUI _titleText;
+        private GameObject _separatorObj;
+        private float _calculatedLabelWidth = 200f; // Default value, will be recalculated
+        #endregion
+
+        #region Properties
+        public PanelType Type => panelType;
+        public TMP_FontAsset CustomFont { get => customFont; set => customFont = value; }
+        public Color ThemeColor { get => themeColor; set => themeColor = value; }
+        #endregion
+
+        #region Events
+        /// <summary>
+        /// Called when content needs re-rendering (for RTT frames).
+        /// </summary>
+        public event System.Action OnContentChanged;
+        #endregion
+
+        #region Public API
+        /// <summary>
+        /// Build the info panel UI inside the given container.
+        /// </summary>
+        public void BuildUI(RectTransform container, PanelType type, Color theme, TMP_FontAsset font = null)
+        {
+            panelType = type;
+            themeColor = theme;
+            if (font != null) customFont = font;
+
+            BuildUI(container);
+        }
+
+        /// <summary>
+        /// Build the info panel UI inside the given container.
+        /// </summary>
+        public void BuildUI(RectTransform container)
+        {
+            Debug.Log($"[RTTInfoSidePanel] BuildUI started for {panelType}, container={container?.name ?? "NULL"}");
+
+            if (container == null)
+            {
+                Debug.LogError($"[RTTInfoSidePanel] BuildUI failed: container is NULL for {panelType}!");
+                return;
+            }
+
+            _container = container;
+
+            // Setup RectTransform
+            RectTransform rt = GetComponent<RectTransform>();
+            if (rt == null) rt = gameObject.AddComponent<RectTransform>();
+
+            // Check if already parented correctly (parent might be set before BuildUI)
+            if (transform.parent != container)
+            {
+                Debug.Log($"[RTTInfoSidePanel] Setting parent from {transform.parent?.name ?? "NULL"} to {container.name}");
+                rt.SetParent(container, false);
+            }
+            else
+            {
+                Debug.Log($"[RTTInfoSidePanel] Already parented to {container.name}");
+            }
+
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+            rt.localScale = Vector3.one;
+
+            // Add vertical layout
+            var layout = gameObject.GetComponent<VerticalLayoutGroup>();
+            if (layout == null) layout = gameObject.AddComponent<VerticalLayoutGroup>();
+
+            layout.spacing = 30f; // Reduced from 80f to allow space for multiline text
+            layout.childAlignment = TextAnchor.UpperCenter;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true; // Enable height control so rows expand with content
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
+            layout.padding = new RectOffset(40, 40, 40, 40);
+
+            // Pre-calculate label width based on content
+            CalculateMaxLabelWidth();
+
+            _isBuilt = true;
+            Debug.Log($"[RTTInfoSidePanel] Built for type: {panelType}, _isBuilt={_isBuilt}, parent={transform.parent?.name}");
+        }
+
+        /// <summary>
+        /// Show loading state before data arrives.
+        /// </summary>
+        public void ShowLoadingState()
+        {
+            Debug.Log($"[RTTInfoSidePanel] ShowLoadingState called for {panelType}, _isBuilt={_isBuilt}");
+
+            if (!_isBuilt)
+            {
+                Debug.LogWarning($"[RTTInfoSidePanel] ShowLoadingState skipped - not built yet for {panelType}");
+                return;
+            }
+
+            ClearContent();
+
+            if (panelType == PanelType.HardwareInfo)
+            {
+                AddTitle("SERVER INFO");
+                AddInfoRow("Device", "Loading...");
+                AddInfoRow("CPU", "...");
+                AddInfoRow("VGA", "...");
+                AddInfoRow("RAM", "...");
+                AddInfoRow("OS", "...");
+            }
+            else
+            {
+                AddTitle("NETWORK INFO");
+                AddInfoRow("Ping", "...");
+                AddInfoRow("Jitter", "...");
+                AddInfoRow("Bandwidth", "...");
+                AddInfoRow("Type", "...");
+                AddInfoRow("Quality", "...");
+            }
+
+            OnContentChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// Set hardware info data.
+        /// </summary>
+        public void SetHardwareInfo(ServerHardwareInfo info)
+        {
+            if (info == null || panelType != PanelType.HardwareInfo) return;
+
+            ClearContent();
+
+            AddTitle("SERVER INFO");
+            AddInfoRow("Device", info.deviceName ?? "Unknown");
+            AddInfoRow("CPU", info.processor ?? "Unknown");
+            AddInfoRow("VGA", $"{info.gpu ?? "Unknown"} - {info.gpuVramGB}GB");
+            AddInfoRow("RAM", $"{info.ramGB} GB");
+            AddInfoRow("OS", info.os ?? "Unknown");
+
+            OnContentChanged?.Invoke();
+            Debug.Log($"[RTTInfoSidePanel] SetHardwareInfo: {info.deviceName}");
+        }
+
+        /// <summary>
+        /// Set network info data.
+        /// </summary>
+        public void SetNetworkInfo(NetworkTestResult info)
+        {
+            if (info == null || panelType != PanelType.NetworkInfo) return;
+
+            ClearContent();
+
+            // USB Mode: Display USB-specific metrics instead of WebSocket speedtest
+            if (info.isUsbMode)
+            {
+                Debug.Log("[RTTInfoSidePanel] *** USB Mode UI BUILD v4 ***");
+                AddTitle("USB NETWORKING");
+
+                // Helper to check if value is valid (not -1 placeholder)
+                bool hasServerData = info.usbLatencyMs > 0 || info.usbEstimatedBandwidthMbps > 0;
+
+                // Ping: Use USB ICMP latency if available, otherwise show "--"
+                if (info.usbLatencyMs > 0)
+                {
+                    AddInfoRow("Ping", $"{info.usbLatencyMs:F2} ms");
+                }
+                else if (info.pingMs >= 0)
+                {
+                    AddInfoRow("Ping", $"{info.pingMs:F2} ms");
+                }
+                else
+                {
+                    AddInfoRow("Ping", "--");
+                }
+
+                // Jitter: Show if valid, otherwise "--"
+                if (info.jitterMs >= 0)
+                {
+                    AddInfoRow("Jitter", $"{info.jitterMs:F2} ms");
+                }
+                else
+                {
+                    AddInfoRow("Jitter", "--");
+                }
+
+                // Bandwidth: Use USB estimated if available, otherwise "--"
+                if (info.usbEstimatedBandwidthMbps > 0)
+                {
+                    AddInfoRow("Bandwidth", $"{info.usbEstimatedBandwidthMbps:F0} Mbps");
+                }
+                else if (info.bandwidthMbps > 0)
+                {
+                    AddInfoRow("Bandwidth", $"{info.bandwidthMbps:F0} Mbps");
+                }
+                else
+                {
+                    AddInfoRow("Bandwidth", "--");
+                }
+
+                // USB Type: Show version if available
+                if (!string.IsNullOrEmpty(info.usbVersion))
+                {
+                    AddInfoRow("Type", $"USB ({info.usbVersion})");
+                }
+                else
+                {
+                    AddInfoRow("Type", "USB");
+                }
+
+                // Quality: Excellent when we have server data, otherwise Measuring...
+                if (hasServerData)
+                {
+                    AddInfoRow("Quality", "Excellent", GetQualityColor("Excellent"));
+                }
+                else
+                {
+                    AddInfoRow("Quality", "Measuring...");
+                }
+
+                Debug.Log($"[RTTInfoSidePanel] SetNetworkInfo USB Mode: hasServerData={hasServerData}");
+                Debug.Log($"[RTTInfoSidePanel]   usbLatencyMs={info.usbLatencyMs}, jitterMs={info.jitterMs}, usbEstimatedBandwidthMbps={info.usbEstimatedBandwidthMbps}, usbVersion={info.usbVersion}");
+            }
+            else
+            {
+                // Standard WiFi/LAN display
+                AddTitle("NETWORK INFO");
+                AddInfoRow("Ping", $"{info.pingMs:F1} ms");
+                AddInfoRow("Jitter", $"{info.jitterMs:F1} ms");
+                AddInfoRow("Type", info.connectionType ?? "Unknown");
+
+                // Handle partial results (e.g. Ping done, Bandwidth pending)
+                if (info.bandwidthMbps > 0)
+                {
+                    AddInfoRow("Bandwidth", $"{info.bandwidthMbps:F0} Mbps");
+                    string quality = GetNetworkQuality(info);
+                    AddInfoRow("Quality", quality, GetQualityColor(quality));
+                }
+                else
+                {
+                    AddInfoRow("Bandwidth", "Waiting...");
+                    AddInfoRow("Quality", "Waiting...");
+                }
+
+                Debug.Log($"[RTTInfoSidePanel] SetNetworkInfo: {info.pingMs:F1}ms");
+            }
+
+            OnContentChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// Show speed test loading state.
+        /// </summary>
+        public void ShowSpeedTestLoadingState()
+        {
+            Debug.Log($"[RTTInfoSidePanel] ShowSpeedTestLoadingState called for {panelType}, _isBuilt={_isBuilt}");
+
+            if (panelType != PanelType.NetworkInfo)
+            {
+                Debug.LogWarning($"[RTTInfoSidePanel] ShowSpeedTestLoadingState called on wrong panel type: {panelType}");
+                return;
+            }
+
+            if (!_isBuilt)
+            {
+                Debug.LogWarning($"[RTTInfoSidePanel] ShowSpeedTestLoadingState skipped - not built yet");
+                return;
+            }
+
+            ClearContent();
+            _valueTexts.Clear();
+
+            AddTitle("NETWORK INFO");
+            AddInfoRow("Ping", "Measuring...");
+            AddInfoRow("Jitter", "Waiting...");
+            AddInfoRow("Bandwidth", "Waiting...");
+            AddInfoRow("Quality", "Testing...");
+
+            OnContentChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// Update ping values during speed test.
+        /// </summary>
+        public void UpdatePingValues(double pingMs, double jitterMs)
+        {
+            if (panelType != PanelType.NetworkInfo) return;
+
+            if (_valueTexts.TryGetValue("Ping", out var pingTxt))
+                pingTxt.text = $"{pingMs:F1} ms";
+
+            if (_valueTexts.TryGetValue("Jitter", out var jitterTxt))
+                jitterTxt.text = $"{jitterMs:F1} ms";
+
+            OnContentChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// Update bandwidth progress during speed test.
+        /// </summary>
+        public void UpdateSpeedTestProgress(string direction, double currentMbps, int progress)
+        {
+            if (panelType != PanelType.NetworkInfo) return;
+            if (direction != "bandwidth") return;
+
+            string value = progress < 100
+                ? $"{currentMbps:F1} Mbps ({progress}%)"
+                : $"{currentMbps:F1} Mbps";
+
+            if (_valueTexts.TryGetValue("Bandwidth", out var txt))
+            {
+                txt.text = value;
+                OnContentChanged?.Invoke();
+            }
+        }
+        #endregion
+
+        #region Content Building
+        /// <summary>
+        /// Reset content for reuse - disables pooled objects instead of destroying.
+        /// This reduces GC allocation and improves performance.
+        /// </summary>
+        private void ClearContent()
+        {
+            _valueTexts.Clear();
+            _activeRowCount = 0;
+
+            // Disable pooled rows instead of destroying
+            foreach (var row in _rowPool)
+            {
+                if (row != null) row.SetActive(false);
+            }
+
+            // Hide title and separator (will be reactivated when needed)
+            if (_titleObj != null) _titleObj.SetActive(false);
+            if (_separatorObj != null) _separatorObj.SetActive(false);
+        }
+
+        private void AddTitle(string title)
+        {
+            // Reuse existing title object if available
+            if (_titleObj != null)
+            {
+                _titleObj.SetActive(true);
+                _titleObj.transform.SetAsLastSibling(); // Ensure correct order
+                _titleText.text = title;
+                _titleText.color = themeColor;
+            }
+            else
+            {
+                // Create new title object (first time only)
+                _titleObj = new GameObject("Title");
+                _titleObj.transform.SetParent(transform, false);
+
+                RectTransform rt = _titleObj.AddComponent<RectTransform>();
+                rt.sizeDelta = new Vector2(0, titleFontSize + 20);
+
+                var le = _titleObj.AddComponent<LayoutElement>();
+                le.minHeight = titleFontSize + 20;
+                le.flexibleHeight = 0; // Don't expand vertically
+
+                _titleText = _titleObj.AddComponent<TextMeshProUGUI>();
+                _titleText.text = title;
+                _titleText.fontSize = titleFontSize;
+                _titleText.color = themeColor;
+                _titleText.alignment = TextAlignmentOptions.Center;
+                _titleText.fontStyle = FontStyles.Bold;
+                _titleText.raycastTarget = false;
+                if (customFont != null) _titleText.font = customFont;
+            }
+
+            AddSeparator();
+        }
+
+        private void AddSeparator()
+        {
+            // Reuse existing separator if available
+            if (_separatorObj != null)
+            {
+                _separatorObj.SetActive(true);
+                _separatorObj.transform.SetAsLastSibling(); // Ensure correct order
+                var img = _separatorObj.GetComponent<Image>();
+                if (img != null) img.color = new Color(themeColor.r, themeColor.g, themeColor.b, 0.5f);
+            }
+            else
+            {
+                // Create new separator (first time only)
+                _separatorObj = new GameObject("Separator");
+                _separatorObj.transform.SetParent(transform, false);
+
+                RectTransform rt = _separatorObj.AddComponent<RectTransform>();
+                rt.sizeDelta = new Vector2(0, 4);
+
+                Image img = _separatorObj.AddComponent<Image>();
+                img.color = new Color(themeColor.r, themeColor.g, themeColor.b, 0.5f);
+                img.raycastTarget = false;
+
+                var layoutElem = _separatorObj.AddComponent<LayoutElement>();
+                layoutElem.preferredHeight = 4;
+                layoutElem.flexibleWidth = 1;
+            }
+        }
+
+        private void AddInfoRow(string label, string value, Color? valueColor = null)
+        {
+            GameObject rowObj;
+            TextMeshProUGUI labelTxt;
+            TextMeshProUGUI valueTxt;
+
+            // Try to reuse pooled row
+            if (_activeRowCount < _rowPool.Count)
+            {
+                rowObj = _rowPool[_activeRowCount];
+                rowObj.SetActive(true);
+                rowObj.transform.SetAsLastSibling(); // Ensure correct order
+
+                // Get cached text components
+                labelTxt = rowObj.transform.Find("Label")?.GetComponent<TextMeshProUGUI>();
+                valueTxt = rowObj.transform.Find("Value")?.GetComponent<TextMeshProUGUI>();
+
+                if (labelTxt != null && valueTxt != null)
+                {
+                    labelTxt.text = label;
+                    valueTxt.text = value;
+                    valueTxt.color = valueColor ?? Color.white;
+                    _valueTexts[label] = valueTxt;
+                    _activeRowCount++;
+                    return;
+                }
+            }
+
+            // Create new row (pool miss or first time)
+            rowObj = CreateInfoRowObject(label, value, valueColor, out valueTxt);
+            _rowPool.Add(rowObj);
+            _valueTexts[label] = valueTxt;
+            _activeRowCount++;
+        }
+
+        /// <summary>
+        /// Create a new info row object. Called when pool is empty.
+        /// </summary>
+        private GameObject CreateInfoRowObject(string label, string value, Color? valueColor, out TextMeshProUGUI valueTxt)
+        {
+            GameObject rowObj = new GameObject($"Row_{label}");
+            rowObj.transform.SetParent(transform, false);
+
+            RectTransform rt = rowObj.AddComponent<RectTransform>();
+            // Height is controlled by parent layout
+            // rt.sizeDelta = new Vector2(0, valueFontSize + 16);
+
+            HorizontalLayoutGroup hlg = rowObj.AddComponent<HorizontalLayoutGroup>();
+            hlg.spacing = 10;
+            hlg.childAlignment = TextAnchor.MiddleLeft;
+            hlg.childControlWidth = true; // Allow layout to resize children (Label/Value) to fit row width
+            hlg.childControlHeight = true;
+            hlg.childForceExpandWidth = false;
+            hlg.childForceExpandHeight = false;
+
+            // Add LayoutElement to allow row to expand vertically and fill extra space
+            var rowLE = rowObj.AddComponent<LayoutElement>();
+            rowLE.flexibleHeight = 1f;
+
+            // Label
+            GameObject labelObj = new GameObject("Label");
+            labelObj.transform.SetParent(rowObj.transform, false);
+
+            RectTransform labelRT = labelObj.AddComponent<RectTransform>();
+            labelRT.sizeDelta = new Vector2(_calculatedLabelWidth, 0);
+
+            TextMeshProUGUI labelTxt = labelObj.AddComponent<TextMeshProUGUI>();
+            labelTxt.text = label;
+            labelTxt.fontSize = labelFontSize;
+            labelTxt.color = Color.white;
+            labelTxt.alignment = TextAlignmentOptions.Left;
+            labelTxt.fontStyle = FontStyles.Bold;
+            labelTxt.raycastTarget = false;
+            if (customFont != null) labelTxt.font = customFont;
+
+            var labelLayout = labelObj.AddComponent<LayoutElement>();
+            labelLayout.minWidth = _calculatedLabelWidth;
+            labelLayout.preferredWidth = _calculatedLabelWidth;
+
+            // Value
+            GameObject valueObj = new GameObject("Value");
+            valueObj.transform.SetParent(rowObj.transform, false);
+
+            RectTransform valueRT = valueObj.AddComponent<RectTransform>();
+            valueRT.sizeDelta = new Vector2(350, 0);
+
+            valueTxt = valueObj.AddComponent<TextMeshProUGUI>();
+            valueTxt.text = value;
+            valueTxt.fontSize = valueFontSize;
+            valueTxt.color = valueColor ?? Color.white;
+            valueTxt.alignment = TextAlignmentOptions.Left;
+            valueTxt.fontStyle = FontStyles.Bold;
+            valueTxt.raycastTarget = false;
+            valueTxt.fontStyle = FontStyles.Bold;
+            if (customFont != null) valueTxt.font = customFont;
+
+            // Wrap settings based on panel type: 
+            // NetworkInfo values (Ping, Mbps) should be single line.
+            // HardwareInfo values (CPU, GPU names) should wrap.
+            if (panelType == PanelType.NetworkInfo)
+            {
+                valueTxt.textWrappingMode = TextWrappingModes.NoWrap;
+                valueTxt.overflowMode = TextOverflowModes.Ellipsis;
+
+                // Enable auto-sizing to shrink text instead of cutting it off
+                valueTxt.enableAutoSizing = true;
+                valueTxt.fontSizeMin = 20;
+                valueTxt.fontSizeMax = valueFontSize;
+            }
+            else
+            {
+                valueTxt.textWrappingMode = TextWrappingModes.Normal;
+                valueTxt.overflowMode = TextOverflowModes.Overflow;
+                valueTxt.enableAutoSizing = false;
+            }
+
+            var valueLayout = valueObj.AddComponent<LayoutElement>();
+            valueLayout.flexibleWidth = 1;
+            valueLayout.minHeight = valueFontSize;
+
+            return rowObj;
+        }
+        #endregion
+
+        #region Helpers
+        private string GetNetworkQuality(NetworkTestResult info)
+        {
+            // USB connection is always excellent quality (stable, high bandwidth potential)
+            // TCP speedtest can't measure true USB 3.0 bandwidth, but UDP streaming can use it
+            if (info.connectionType == "USB")
+                return "Excellent";
+
+            // LAN connections with very low ping
+            if (info.pingMs < 5 && info.bandwidthMbps > 500)
+                return "Excellent";
+
+            if (info.pingMs < 20 && info.bandwidthMbps > 100) return "Excellent";
+            if (info.pingMs < 50 && info.bandwidthMbps > 50) return "Good";
+            if (info.pingMs < 100 && info.bandwidthMbps > 20) return "Fair";
+            return "Poor";
+        }
+
+        private Color GetQualityColor(string quality)
+        {
+            return quality switch
+            {
+                "Excellent" => new Color(0.2f, 1f, 0.4f),
+                "Good" => new Color(0.5f, 1f, 0.3f),
+                "Fair" => new Color(1f, 0.8f, 0.2f),
+                _ => new Color(1f, 0.4f, 0.3f)
+            };
+        }
+        #endregion
+
+        private void CalculateMaxLabelWidth()
+        {
+            // Approximation to avoid runtime layout/instantiation issues inside BuildUI
+            // Hardware Max: "Device" -> ~130px
+            // Network Max: "Bandwidth" -> ~200px
+
+            float baseWidth = (panelType == PanelType.HardwareInfo) ? 130f : 200f;
+
+            _calculatedLabelWidth = baseWidth + 25f; // Add user requested padding
+
+            Debug.Log($"[RTTInfoSidePanel] Calculated max label width for {panelType}: {_calculatedLabelWidth} (Base: {baseWidth} + 25)");
+        }
+    }
+
+}
