@@ -289,6 +289,8 @@ namespace VRWorkspace.Media.Projections
             {
                 case "_Sharpness": _worldPanel.sharpnessStrength = value; break;
                 case "_ChromaSharpness": _worldPanel.chromaSharpness = value; break;
+                case "_MipMapBias": _worldPanel.mipMapBias = value; break;
+                case "_MaxMipLevel": _worldPanel.maxMipLevel = value; break;
             }
 
             var rend = _worldPanel.board.GetComponent<Renderer>();
@@ -386,10 +388,10 @@ namespace VRWorkspace.Media.Projections
             _worldPanel.boardCornerRadius = 0.03f;
             _worldPanel.boardEdgeColor = Color.black; // Dark border looks good for video
             _worldPanel.panelTint = Color.white;
-            _worldPanel.enableSharpening = true; // Enable sharpening for video
-            _worldPanel.sharpnessStrength = 0.0f; // Default off — user adds via slider
+            _worldPanel.enableSharpening = true;
+            _worldPanel.sharpnessStrength = 0.5f;
             _worldPanel.anisoLevel = 16;
-            _worldPanel.mipMapBias = -0.25f;
+            _worldPanel.mipMapBias = -0.3f;
             _worldPanel.cursorEnable = false; // No cursor for video projection
 
             // Initialize

@@ -272,7 +272,7 @@ namespace VRWorkspace.UI.RTT.Controllers
                 if (tex == null) continue;
 
                 // Generate mipmap texture for anti-aliasing at distance
-                var mipmapTex = GetMipmapTexture(i, tex);
+                var mipmapTex = GetMipmapTexture(i, tex, panel.mipSharpness);
                 var finalTex = mipmapTex != null ? (Texture)mipmapTex : tex;
 
                 if (shouldLog)
@@ -298,7 +298,7 @@ namespace VRWorkspace.UI.RTT.Controllers
         /// Get or create a RenderTexture with mipmaps for anti-aliasing.
         /// This eliminates moire/aliasing artifacts when viewing panels at distance.
         /// </summary>
-        private RenderTexture GetMipmapTexture(int index, Texture source)
+        private RenderTexture GetMipmapTexture(int index, Texture source, float mipSharpness = 0.1f)
         {
             if (source == null || source.width <= 0 || source.height <= 0)
             {
@@ -330,13 +330,13 @@ namespace VRWorkspace.UI.RTT.Controllers
                 rt.filterMode = FilterMode.Trilinear;
                 rt.anisoLevel = 16; // Maximum anisotropic filtering for VR
                 rt.Create();
-                rt.mipMapBias = -0.25f; // No bias - rely on aniso filtering only to avoid color aliasing
+                rt.mipMapBias = 0f; // Bias handled by shader _MipMapBias property to avoid double-bias
 
                 _mipmapTextures[index] = rt;
                 Debug.Log($"[RTTRemote-MIPMAP] Created mipmap RT for panel {index}: {source.width}x{source.height}, sourceType={source.GetType().Name}");
             }
 
-            // Copy source to mipmap texture
+            // Copy source to mipmap texture and generate sharp mipmaps
             try
             {
                 var prevRT = RenderTexture.active;
@@ -344,8 +344,9 @@ namespace VRWorkspace.UI.RTT.Controllers
                 Graphics.Blit(source, rt);
                 RenderTexture.active = prevRT;
 
-                // Generate mipmaps
-                rt.GenerateMips();
+                // Generate sharp mipmaps using Lanczos-2 kernel instead of blurry box filter.
+                // This preserves edge detail (text sharpness) while still anti-aliasing (no shimmer).
+                SharpMipGenerator.Generate(rt, sharpness: mipSharpness, maxMipLevels: 4);
             }
             catch (System.Exception ex)
             {

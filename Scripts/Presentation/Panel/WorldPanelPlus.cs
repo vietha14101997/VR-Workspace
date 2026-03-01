@@ -33,13 +33,19 @@ namespace VRWorkspace.Panel
         public FilterMode textureFilterMode = FilterMode.Trilinear;
         [Tooltip("Anisotropic filtering level (1-16). Higher = sharper at angles.")]
         [Range(1, 16)] public int anisoLevel = 16; // Maximum for VR sharpness
-        [Tooltip("Mipmap bias for VR sharpness. Negative = sharper but may cause color aliasing. Keep at 0 for best quality.")]
-        [Range(-2f, 0f)] public float mipMapBias = -0.25f;
+        [Tooltip("Mipmap bias for VR sharpness. Negative = sharper. -0.3 for Cardboard, -0.5 for Quest.")]
+        [Range(-2f, 0f)] public float mipMapBias = -0.3f;
+        [Tooltip("Maximum mip level. Higher = less shimmer but more blur. 2.5 for Cardboard, 1.5 for Quest.")]
+        [Range(0f, 4f)] public float maxMipLevel = 2.5f;
+        [Tooltip("Mipmap generation sharpness (Lanczos kernel). 0=box filter, 0.1=recommended, 0.15=aggressive for text.")]
+        [Range(0f, 0.25f)] public float mipSharpness = 0.1f;
+        [Tooltip("Stable AA: eliminates VR shimmer by using fixed mip + 4-sample AA instead of trilinear blending.")]
+        public bool stableAA = true;
 
         [Header("Video Sharpening (disable if image has artifacts)")]
-        [Tooltip("Enable shader-based sharpening. Disable if you see color artifacts or noise.")]
-        public bool enableSharpening = false;  // Default OFF - thử nghiệm cho chất lượng tốt hơn
-        [Tooltip("Sharpening strength (0-2). Higher = sharper but may cause artifacts.")]
+        [Tooltip("Enable shader-based luminance sharpening to restore edge detail.")]
+        public bool enableSharpening = true;
+        [Tooltip("Sharpening strength (0-2). 0.5 recommended for balanced sharpness.")]
         [Range(0, 2)] public float sharpnessStrength = 0.5f;
         [Tooltip("Chroma boost to reduce YUV 4:2:0 color bleeding (0-1).")]
         [Range(0, 1)] public float chromaSharpness = 0.3f;
@@ -429,9 +435,13 @@ namespace VRWorkspace.Panel
                 if (_panelMat.HasProperty("_ChromaSharpness"))
                     _panelMat.SetFloat("_ChromaSharpness", chromaSharpness);
 
-                // VR quality - mipmap bias for sharper textures at distance
+                // VR quality - mipmap LOD control for sharper textures at distance
                 if (_panelMat.HasProperty("_MipMapBias"))
                     _panelMat.SetFloat("_MipMapBias", mipMapBias);
+                if (_panelMat.HasProperty("_MaxMipLevel"))
+                    _panelMat.SetFloat("_MaxMipLevel", maxMipLevel);
+                if (_panelMat.HasProperty("_StableAA"))
+                    _panelMat.SetFloat("_StableAA", stableAA ? 1f : 0f);
 
                 // Stereo support
                 if (_panelMat.HasProperty("_StereoMode"))

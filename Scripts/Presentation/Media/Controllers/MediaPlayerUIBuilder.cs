@@ -429,7 +429,7 @@ namespace VRWorkspace.Presentation.Media.Controllers
             float bottomOffset = RTTMediaControlsPanel.GetZoneBBottomOffset();
 
             var projectionObj = new GameObject("ProjectionPopup_Root");
-            projectionObj.transform.SetParent(_libraryContainer, false);
+            projectionObj.transform.SetParent(controlsContent, false);
             var projectionRT = projectionObj.AddComponent<RectTransform>();
             projectionRT.anchorMin = Vector2.zero;
             projectionRT.anchorMax = Vector2.one;
@@ -440,7 +440,7 @@ namespace VRWorkspace.Presentation.Media.Controllers
             result.ProjectionPopup.Initialize(_font, _primaryColor, _accentColor, padding, bottomOffset, RTTMediaProjectionPopup.PopupMode.Projection);
 
             var envPopupObj = new GameObject("EnvironmentPopup_Root");
-            envPopupObj.transform.SetParent(_libraryContainer, false);
+            envPopupObj.transform.SetParent(controlsContent, false);
             var envPopupRT = envPopupObj.AddComponent<RectTransform>();
             envPopupRT.anchorMin = Vector2.zero;
             envPopupRT.anchorMax = Vector2.one;

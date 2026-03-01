@@ -32,6 +32,7 @@ Shader "Custom/ClusterContentFlatPlanar"
         // VR quality - negative bias for sharper textures at distance
         [Header(VR Quality)]
         _MipMapBias ("Mipmap Bias", Range(-2, 0)) = 0
+        _MaxMipLevel ("Max Mip Level", Range(0, 4)) = 1.5
     }
 
     SubShader
@@ -105,6 +106,7 @@ Shader "Custom/ClusterContentFlatPlanar"
 
             // VR quality - mipmap bias for sharper textures at distance
             float _MipMapBias;
+            float _MaxMipLevel;
 
             // SDF for rounded box
             float sdRoundedBox(float2 pos, float2 halfSize, float radius)
@@ -113,19 +115,40 @@ Shader "Custom/ClusterContentFlatPlanar"
                 return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
             }
 
-            // Unsharp Mask sharpening with tex2Dbias for VR sharpness at distance
-            float4 UnsharpMask(sampler2D tex, float2 uv, float2 texelSize, float sharpness, float radius, float mipBias)
+            // Sample texture with LOD clamping using tex2Dgrad.
+            // Preserves anisotropic filtering and works reliably on Android.
+            float4 SampleClampedLOD(sampler2D tex, float2 uv, float2 uvDx, float2 uvDy, float2 texSize, float maxLod, float bias)
             {
-                float4 center = tex2Dbias(tex, float4(uv, 0, mipBias));
+                float2 dx = uvDx * texSize;
+                float2 dy = uvDy * texSize;
+                float rho = max(length(dx), length(dy));
+                // max(rho, 1.0): when rho < 1 (magnification/close-up), keeps scale=1
+                float lod = log2(max(rho, 1.0));
+                float targetLod = clamp(lod + bias, 0.0, maxLod);
+                float scale = exp2(targetLod - lod);
+                return tex2Dgrad(tex, uv, uvDx * scale, uvDy * scale);
+            }
+
+            // Unsharp Mask with LOD-clamped sampling and luminance-only sharpening
+            float4 UnsharpMask(sampler2D tex, float2 uv, float2 uvDx, float2 uvDy,
+                               float2 texelSize, float2 texSize,
+                               float sharpness, float radius, float maxLod, float mipBias)
+            {
+                float4 center = SampleClampedLOD(tex, uv, uvDx, uvDy, texSize, maxLod, mipBias);
 
                 float4 blur = (
-                    tex2Dbias(tex, float4(uv + float2(-texelSize.x, 0) * radius, 0, mipBias)) +
-                    tex2Dbias(tex, float4(uv + float2(texelSize.x, 0) * radius, 0, mipBias)) +
-                    tex2Dbias(tex, float4(uv + float2(0, -texelSize.y) * radius, 0, mipBias)) +
-                    tex2Dbias(tex, float4(uv + float2(0, texelSize.y) * radius, 0, mipBias))
+                    SampleClampedLOD(tex, uv + float2(-texelSize.x, 0) * radius, uvDx, uvDy, texSize, maxLod, mipBias) +
+                    SampleClampedLOD(tex, uv + float2( texelSize.x, 0) * radius, uvDx, uvDy, texSize, maxLod, mipBias) +
+                    SampleClampedLOD(tex, uv + float2(0, -texelSize.y) * radius, uvDx, uvDy, texSize, maxLod, mipBias) +
+                    SampleClampedLOD(tex, uv + float2(0,  texelSize.y) * radius, uvDx, uvDy, texSize, maxLod, mipBias)
                 ) * 0.25;
 
-                float4 sharpened = center + (center - blur) * sharpness;
+                float centerLuma = dot(center.rgb, float3(0.299, 0.587, 0.114));
+                float blurLuma = dot(blur.rgb, float3(0.299, 0.587, 0.114));
+                float lumaDetail = (centerLuma - blurLuma) * sharpness;
+
+                float4 sharpened = center;
+                sharpened.rgb += lumaDetail;
                 return saturate(sharpened);
             }
 
@@ -138,61 +161,68 @@ Shader "Custom/ClusterContentFlatPlanar"
                 return saturate(color);
             }
 
-            // Sample from specific panel texture with optional sharpening
-            // Uses tex2Dbias with _MipMapBias for sharper VR viewing at distance
-            float4 SamplePanel(int panelIndex, float2 panelUV)
+            // Sample from specific panel texture with LOD-clamped sampling
+            // uvDx/uvDy: pre-computed UV derivatives for smooth LOD calculation
+            float4 SamplePanel(int panelIndex, float2 panelUV, float2 uvDx, float2 uvDy)
             {
                 float4 color = float4(0, 0, 0, 1);
                 float2 texelSize = float2(0.001, 0.001);
+                float2 texSize = float2(1920, 1080);
 
-                // Sample based on panel index
+                // Sample based on panel index with LOD-clamped sampling
                 if (panelIndex == 0)
                 {
                     texelSize = _Content0_TexelSize.xy;
+                    texSize = _Content0_TexelSize.zw;
                     if (_EnableSharpening > 0.5)
-                        color = UnsharpMask(_Content0, panelUV, texelSize, _Sharpness, _SharpnessRadius, _MipMapBias);
+                        color = UnsharpMask(_Content0, panelUV, uvDx, uvDy, texelSize, texSize, _Sharpness, _SharpnessRadius, _MaxMipLevel, _MipMapBias);
                     else
-                        color = tex2Dbias(_Content0, float4(panelUV, 0, _MipMapBias));
+                        color = SampleClampedLOD(_Content0, panelUV, uvDx, uvDy, texSize, _MaxMipLevel, _MipMapBias);
                 }
                 else if (panelIndex == 1)
                 {
                     texelSize = _Content1_TexelSize.xy;
+                    texSize = _Content1_TexelSize.zw;
                     if (_EnableSharpening > 0.5)
-                        color = UnsharpMask(_Content1, panelUV, texelSize, _Sharpness, _SharpnessRadius, _MipMapBias);
+                        color = UnsharpMask(_Content1, panelUV, uvDx, uvDy, texelSize, texSize, _Sharpness, _SharpnessRadius, _MaxMipLevel, _MipMapBias);
                     else
-                        color = tex2Dbias(_Content1, float4(panelUV, 0, _MipMapBias));
+                        color = SampleClampedLOD(_Content1, panelUV, uvDx, uvDy, texSize, _MaxMipLevel, _MipMapBias);
                 }
                 else if (panelIndex == 2)
                 {
                     texelSize = _Content2_TexelSize.xy;
+                    texSize = _Content2_TexelSize.zw;
                     if (_EnableSharpening > 0.5)
-                        color = UnsharpMask(_Content2, panelUV, texelSize, _Sharpness, _SharpnessRadius, _MipMapBias);
+                        color = UnsharpMask(_Content2, panelUV, uvDx, uvDy, texelSize, texSize, _Sharpness, _SharpnessRadius, _MaxMipLevel, _MipMapBias);
                     else
-                        color = tex2Dbias(_Content2, float4(panelUV, 0, _MipMapBias));
+                        color = SampleClampedLOD(_Content2, panelUV, uvDx, uvDy, texSize, _MaxMipLevel, _MipMapBias);
                 }
                 else if (panelIndex == 3)
                 {
                     texelSize = _Content3_TexelSize.xy;
+                    texSize = _Content3_TexelSize.zw;
                     if (_EnableSharpening > 0.5)
-                        color = UnsharpMask(_Content3, panelUV, texelSize, _Sharpness, _SharpnessRadius, _MipMapBias);
+                        color = UnsharpMask(_Content3, panelUV, uvDx, uvDy, texelSize, texSize, _Sharpness, _SharpnessRadius, _MaxMipLevel, _MipMapBias);
                     else
-                        color = tex2Dbias(_Content3, float4(panelUV, 0, _MipMapBias));
+                        color = SampleClampedLOD(_Content3, panelUV, uvDx, uvDy, texSize, _MaxMipLevel, _MipMapBias);
                 }
                 else if (panelIndex == 4)
                 {
                     texelSize = _Content4_TexelSize.xy;
+                    texSize = _Content4_TexelSize.zw;
                     if (_EnableSharpening > 0.5)
-                        color = UnsharpMask(_Content4, panelUV, texelSize, _Sharpness, _SharpnessRadius, _MipMapBias);
+                        color = UnsharpMask(_Content4, panelUV, uvDx, uvDy, texelSize, texSize, _Sharpness, _SharpnessRadius, _MaxMipLevel, _MipMapBias);
                     else
-                        color = tex2Dbias(_Content4, float4(panelUV, 0, _MipMapBias));
+                        color = SampleClampedLOD(_Content4, panelUV, uvDx, uvDy, texSize, _MaxMipLevel, _MipMapBias);
                 }
                 else if (panelIndex == 5)
                 {
                     texelSize = _Content5_TexelSize.xy;
+                    texSize = _Content5_TexelSize.zw;
                     if (_EnableSharpening > 0.5)
-                        color = UnsharpMask(_Content5, panelUV, texelSize, _Sharpness, _SharpnessRadius, _MipMapBias);
+                        color = UnsharpMask(_Content5, panelUV, uvDx, uvDy, texelSize, texSize, _Sharpness, _SharpnessRadius, _MaxMipLevel, _MipMapBias);
                     else
-                        color = tex2Dbias(_Content5, float4(panelUV, 0, _MipMapBias));
+                        color = SampleClampedLOD(_Content5, panelUV, uvDx, uvDy, texSize, _MaxMipLevel, _MipMapBias);
                 }
 
                 // Apply chroma correction
@@ -258,8 +288,12 @@ Shader "Custom/ClusterContentFlatPlanar"
                 // Use per-panel UV directly from mesh (panelUV = uv2)
                 float2 panelUV = i.panelUV;
 
-                // Sample content from the correct panel
-                float4 finalColor = SamplePanel(panelIndex, panelUV);
+                // Compute UV derivatives from interpolated panelUV for smooth LOD
+                float2 uvDx = ddx(panelUV);
+                float2 uvDy = ddy(panelUV);
+
+                // Sample content from the correct panel with LOD-clamped sampling
+                float4 finalColor = SamplePanel(panelIndex, panelUV, uvDx, uvDy);
                 finalColor.a *= alphaMask;
 
                 return finalColor;

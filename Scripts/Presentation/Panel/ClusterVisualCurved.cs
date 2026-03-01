@@ -642,8 +642,6 @@ namespace VRWorkspace.Panel
             _contentMaterial.SetFloat("_ClusterHeight", clusterHeight);
             _contentMaterial.SetFloat("_BlendZone", blendZoneWidth);
 
-            _contentMaterial.SetFloat("_BlendZone", blendZoneWidth);
-
             // Use minimal corner radius for content - background/border already provide visual corners
             // This prevents content from being clipped too aggressively (e.g. taskbar date/time)
             _contentMaterial.SetFloat("_CornerRadius", 0.01f);
@@ -653,6 +651,8 @@ namespace VRWorkspace.Panel
             _contentMaterial.SetFloat("_SharpnessRadius", 1.0f);
             _contentMaterial.SetFloat("_ChromaSharpness", 0.3f);
             _contentMaterial.SetFloat("_EnableSharpening", 1f);
+            _contentMaterial.SetFloat("_MipMapBias", -0.3f);
+            _contentMaterial.SetFloat("_MaxMipLevel", 2.5f);
 
             _contentMaterial.renderQueue = 3000;
             _contentRenderer.sharedMaterial = _contentMaterial;

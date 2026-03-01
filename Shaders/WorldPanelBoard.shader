@@ -44,6 +44,9 @@ Shader "Unlit/WorldPanelBoard"
         // VR quality - negative bias for sharper textures at distance
         [Header(VR Quality)]
         _MipMapBias ("Mipmap Bias", Range(-2, 0)) = 0
+        _MaxMipLevel ("Max Mip Level", Range(0, 4)) = 1.5
+        // Stable AA: 0=legacy tex2Dgrad (trilinear, may shimmer), 1=stable 4-sample (VR recommended)
+        _StableAA ("Stable AA (VR anti-shimmer)", Float) = 1
 
         [Header(Stereo)]
         _StereoMode ("Stereo Mode", Float) = 0  // 0=Mono, 1=SBS, 2=OU
@@ -87,6 +90,8 @@ Shader "Unlit/WorldPanelBoard"
 
             // VR quality - mipmap bias for sharper textures at distance
             float _MipMapBias;
+            float _MaxMipLevel;
+            float _StableAA;
 
             float4 _PanelSize;   // (W,H,0,0)
             float   _EdgeFadeX;
@@ -222,24 +227,144 @@ Shader "Unlit/WorldPanelBoard"
                 return length(max(q, 0.0)) - cornerRadius;
             }
 
-            // Unsharp Mask sharpening - enhances edges after H.264 decode blur
-            // Uses tex2Dbias for VR sharpness at distance
-            float4 UnsharpMask(sampler2D tex, float2 uv, float2 texelSize, float sharpness, float radius, float mipBias)
+            // ==========================================
+            // LEGACY: tex2Dgrad sampling (trilinear + aniso)
+            // May shimmer in VR due to LOD blend ratio fluctuation.
+            // Kept as fallback when _StableAA = 0.
+            // ==========================================
+            float4 SampleClampedLOD(sampler2D tex, float2 uv, float2 uvDx, float2 uvDy, float2 texSize, float maxLod, float bias)
             {
-                float4 center = tex2Dbias(tex, float4(uv, 0, mipBias));
+                float2 dx = uvDx * texSize;
+                float2 dy = uvDy * texSize;
+                float rho = max(length(dx), length(dy));
+                float lod = log2(max(rho, 1.0));
+                float targetLod = clamp(lod + bias, 0.0, maxLod);
+                float scale = exp2(targetLod - lod);
+                return tex2Dgrad(tex, uv, uvDx * scale, uvDy * scale);
+            }
 
-                // 4-tap box blur for performance (sufficient for streaming artifacts)
-                float4 blur = (
-                    tex2Dbias(tex, float4(uv + float2(-texelSize.x, 0) * radius, 0, mipBias)) +
-                    tex2Dbias(tex, float4(uv + float2(texelSize.x, 0) * radius, 0, mipBias)) +
-                    tex2Dbias(tex, float4(uv + float2(0, -texelSize.y) * radius, 0, mipBias)) +
-                    tex2Dbias(tex, float4(uv + float2(0, texelSize.y) * radius, 0, mipBias))
-                ) * 0.25;
+            // ==========================================
+            // STABLE AA: VR anti-shimmer sampling
+            //
+            // Fixes two problems with the legacy approach:
+            //
+            // 1. SHIMMER: Trilinear blending between mip levels means the blend
+            //    ratio (e.g., 70% mip0 + 30% mip1) changes every micro-frame as
+            //    the head moves in VR. This causes visible temporal flickering.
+            //    FIX: Floor LOD to integer → always sample from ONE mip level.
+            //
+            // 2. EDGE BLUR: Using max(|dx|, |dy|) for LOD selects based on the
+            //    most stretched axis, over-blurring the minor axis.
+            //    FIX: Use min(|dx|, |dy|) for LOD, let the 4-sample pattern
+            //    cover the pixel footprint along both axes.
+            //
+            // Cost: 4 tex2Dlod per sample (vs 1 tex2Dgrad), but tex2Dlod is
+            // cheaper per-call on mobile (no derivative calculation needed).
+            // ==========================================
 
-                // Unsharp mask: center + (center - blur) * strength
-                float4 sharpened = center + (center - blur) * sharpness;
+            // Compute stable mip level: min-axis LOD, floor'd to integer
+            float ComputeStableMip(float2 uvDx, float2 uvDy, float2 texSize, float maxLod, float bias)
+            {
+                float2 dx = uvDx * texSize;
+                float2 dy = uvDy * texSize;
 
-                // Clamp to valid range
+                // Use MINOR axis for LOD (aniso-friendly)
+                // This prevents over-blurring when the Quad is viewed at an angle.
+                // The 4-sample pattern handles the major axis coverage.
+                float minAxis = min(length(dx), length(dy));
+
+                float lod = log2(max(minAxis, 1.0));
+                float targetLod = clamp(lod + bias, 0.0, maxLod);
+
+                // Floor to integer mip level.
+                // This eliminates trilinear blend ratio fluctuation (the root cause of shimmer).
+                // The 4-sample rotated grid provides anti-aliasing instead of trilinear blending.
+                return floor(targetLod);
+            }
+
+            // Single sample at stable mip level (for blur taps in unsharp mask)
+            float4 SampleStableLOD(sampler2D tex, float2 uv, float mipLevel)
+            {
+                return tex2Dlod(tex, float4(uv, 0, mipLevel));
+            }
+
+            // 4-sample anti-aliased read at stable mip level.
+            // The sample pattern is aligned to the UV derivatives (screen-space pixel footprint),
+            // providing proper anti-aliasing even at oblique viewing angles.
+            float4 SampleStableAA(sampler2D tex, float2 uv, float2 uvDx, float2 uvDy, float mipLevel)
+            {
+                // Quarter-pixel offsets along both derivative directions
+                // This covers the pixel's footprint on the texture surface,
+                // replacing trilinear blending with explicit multi-sampling.
+                float2 sDx = uvDx * 0.25;
+                float2 sDy = uvDy * 0.25;
+
+                float4 s1 = tex2Dlod(tex, float4(uv + sDx + sDy, 0, mipLevel));
+                float4 s2 = tex2Dlod(tex, float4(uv - sDx + sDy, 0, mipLevel));
+                float4 s3 = tex2Dlod(tex, float4(uv + sDx - sDy, 0, mipLevel));
+                float4 s4 = tex2Dlod(tex, float4(uv - sDx - sDy, 0, mipLevel));
+
+                return (s1 + s2 + s3 + s4) * 0.25;
+            }
+
+            // Unified sampling: choose legacy or stable AA based on toggle
+            float4 SampleTexture(sampler2D tex, float2 uv, float2 uvDx, float2 uvDy,
+                                 float2 texSize, float maxLod, float bias, float stableAA)
+            {
+                if (stableAA > 0.5)
+                {
+                    float mip = ComputeStableMip(uvDx, uvDy, texSize, maxLod, bias);
+                    return SampleStableAA(tex, uv, uvDx, uvDy, mip);
+                }
+                else
+                {
+                    return SampleClampedLOD(tex, uv, uvDx, uvDy, texSize, maxLod, bias);
+                }
+            }
+
+            // Unsharp Mask sharpening.
+            // Uses luminance-only sharpening to prevent color fringing.
+            // Supports both legacy (tex2Dgrad) and stable AA (tex2Dlod) modes.
+            float4 UnsharpMask(sampler2D tex, float2 uv, float2 uvDx, float2 uvDy,
+                               float2 texelSize, float2 texSize,
+                               float sharpness, float radius, float maxLod, float mipBias,
+                               float stableAA)
+            {
+                float4 center;
+                float4 blur;
+
+                if (stableAA > 0.5)
+                {
+                    // Stable AA path: 4-sample center + 4 single-sample blur taps = 8 reads
+                    float mip = ComputeStableMip(uvDx, uvDy, texSize, maxLod, mipBias);
+                    center = SampleStableAA(tex, uv, uvDx, uvDy, mip);
+                    blur = (
+                        SampleStableLOD(tex, uv + float2(-texelSize.x, 0) * radius, mip) +
+                        SampleStableLOD(tex, uv + float2( texelSize.x, 0) * radius, mip) +
+                        SampleStableLOD(tex, uv + float2(0, -texelSize.y) * radius, mip) +
+                        SampleStableLOD(tex, uv + float2(0,  texelSize.y) * radius, mip)
+                    ) * 0.25;
+                }
+                else
+                {
+                    // Legacy path: 5 tex2Dgrad reads
+                    center = SampleClampedLOD(tex, uv, uvDx, uvDy, texSize, maxLod, mipBias);
+                    blur = (
+                        SampleClampedLOD(tex, uv + float2(-texelSize.x, 0) * radius, uvDx, uvDy, texSize, maxLod, mipBias) +
+                        SampleClampedLOD(tex, uv + float2( texelSize.x, 0) * radius, uvDx, uvDy, texSize, maxLod, mipBias) +
+                        SampleClampedLOD(tex, uv + float2(0, -texelSize.y) * radius, uvDx, uvDy, texSize, maxLod, mipBias) +
+                        SampleClampedLOD(tex, uv + float2(0,  texelSize.y) * radius, uvDx, uvDy, texSize, maxLod, mipBias)
+                    ) * 0.25;
+                }
+
+                // Luminance-only sharpening: prevents color fringing artifacts
+                float centerLuma = dot(center.rgb, float3(0.299, 0.587, 0.114));
+                float blurLuma = dot(blur.rgb, float3(0.299, 0.587, 0.114));
+                float lumaDetail = (centerLuma - blurLuma) * sharpness;
+
+                float4 sharpened = center;
+                sharpened.rgb += lumaDetail;
+
                 return saturate(sharpened);
             }
 
@@ -325,19 +450,27 @@ Shader "Unlit/WorldPanelBoard"
                 if (_LRInverse > 0.5) eye = 1.0 - eye;
                 float2 stereoUV = GetStereoUV(i.uv, _StereoMode, eye);
 
-                // Uses tex2Dbias with _MipMapBias for sharper VR viewing at distance
+                // Compute UV derivatives once for LOD-clamped sampling
+                float2 uvDx = ddx(stereoUV);
+                float2 uvDy = ddy(stereoUV);
+
                 fixed4 col;
                 if (_EnableSharpening > 0.5)
                 {
-                    // Apply Unsharp Mask to combat H.264 decode blur
-                    col = UnsharpMask(_MainTex, stereoUV, _MainTex_TexelSize.xy, _Sharpness, _SharpnessRadius, _MipMapBias);
+                    // Apply luminance-only Unsharp Mask with stable or legacy sampling
+                    col = UnsharpMask(_MainTex, stereoUV, uvDx, uvDy,
+                                     _MainTex_TexelSize.xy, _MainTex_TexelSize.zw,
+                                     _Sharpness, _SharpnessRadius, _MaxMipLevel, _MipMapBias,
+                                     _StableAA);
 
                     // Apply chroma correction to reduce YUV 4:2:0 color bleeding
                     col = ChromaCorrect(col, _ChromaSharpness);
                 }
                 else
                 {
-                    col = tex2Dbias(_MainTex, float4(stereoUV, 0, _MipMapBias));
+                    col = SampleTexture(_MainTex, stereoUV, uvDx, uvDy,
+                                        _MainTex_TexelSize.zw, _MaxMipLevel, _MipMapBias,
+                                        _StableAA);
                 }
                 // Apply video picture adjustments (only effective when values differ from defaults)
                 col.rgb = VideoColorCorrect(col.rgb, _Brightness, _Contrast, _Saturation);

@@ -462,6 +462,8 @@ namespace VRWorkspace.Media.Core
             Camera cam = Camera.main;
             if (cam == null) return;
 
+            float distance;
+
             // Determine horizontal direction from camera to the saved flat position
             if (_hasSavedFlatTransform)
             {
@@ -472,6 +474,10 @@ namespace VRWorkspace.Media.Core
                 {
                     // Menu frame is far enough from camera to determine direction
                     _flatDirection = horizontal.normalized;
+                    // Use actual horizontal distance to saved position.
+                    // _currentSettings.Distance may be 0 (flat mode) which would place
+                    // the screen at camera position, causing it to follow the camera.
+                    distance = horizontal.magnitude;
                 }
                 else
                 {
@@ -481,22 +487,24 @@ namespace VRWorkspace.Media.Core
                     Vector3 fwd = cam.transform.forward;
                     fwd.y = 0f;
                     _flatDirection = fwd.sqrMagnitude > 0.001f ? fwd.normalized : Vector3.forward;
+                    distance = 2.0f; // Fallback: place 2m in front
                 }
             }
             else
             {
-                // No saved position — use camera forward
+                // No saved position — use camera forward and _currentSettings.Distance
                 Vector3 fwd = cam.transform.forward;
                 fwd.y = 0f;
                 _flatDirection = fwd.sqrMagnitude > 0.001f ? fwd.normalized : Vector3.forward;
+                distance = Mathf.Max(_currentSettings.Distance, 1.5f);
             }
 
-            // Compute world position: Distance from camera in the flat direction
-            _flatWorldPosition = cam.transform.position + _flatDirection * _currentSettings.Distance;
+            // Compute world position: distance from camera in the flat direction
+            _flatWorldPosition = cam.transform.position + _flatDirection * distance;
             _flatWorldPosition.y = _hasSavedFlatTransform ? _savedFlatPosition.y : cam.transform.position.y;
             _hasFlatWorldPosition = true;
 
-            Debug.Log($"[VRVideoProjectionSystem] ComputeFlatWorldPosition: cam={cam.transform.position}, dir={_flatDirection}, dist={_currentSettings.Distance}, result={_flatWorldPosition}");
+            Debug.Log($"[VRVideoProjectionSystem] ComputeFlatWorldPosition: cam={cam.transform.position}, dir={_flatDirection}, dist={distance}, result={_flatWorldPosition}");
         }
 
         /// <summary>
