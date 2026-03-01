@@ -115,14 +115,14 @@ namespace VRWorkspace.Streaming
         private DateTime _lastPreventiveKeyframeTime = DateTime.MinValue;
         private int _freezeCount = 0; // Track consecutive freeze detections for graduated response
 
-        // FPS Feedback constants (for adaptive encoding)
-        private const float FPS_FEEDBACK_INTERVAL_SECONDS = 1.0f;  // Send feedback every 1s
-        private const float FPS_CHANGE_THRESHOLD = 5.0f;           // Report if FPS differs by 5+
-        private const int FPS_WINDOW_FRAMES = 30;                  // Minimum frames before calculating
+        // FPS Feedback constants (for adaptive encoding + server-side stall detection)
+        private const float FPS_FEEDBACK_INTERVAL_SECONDS = 0.5f;  // Send feedback every 500ms for ≤1s stall detection
+        private const float FPS_CHANGE_THRESHOLD = 5.0f;           // Report if FPS differs by 5+ (logging only)
+        private const int FPS_WINDOW_FRAMES = 0;                   // Always send, even with 0 frames (critical for stall detection)
 
         // Quality feedback timing (for adaptive bitrate decisions)
         private DateTime _lastQualityFeedbackTime = DateTime.MinValue;
-        private const float QUALITY_FEEDBACK_INTERVAL_SECONDS = 3.0f; // Send comprehensive feedback every 3 seconds
+        private const float QUALITY_FEEDBACK_INTERVAL_SECONDS = 2.0f; // Send comprehensive feedback every 2 seconds
         private int _pollCount = 0; // For occasional logging
 
         #endregion
@@ -360,34 +360,18 @@ namespace VRWorkspace.Streaming
                     if ((DateTime.UtcNow - wrapper.LastFpsFeedbackSent).TotalSeconds < FPS_FEEDBACK_INTERVAL_SECONDS)
                         continue;
 
-                    // Skip if not enough frames to calculate
-                    if (wrapper.RenderedFrameCount < FPS_WINDOW_FRAMES)
-                        continue;
-
-                    // Calculate effective FPS
+                    // Calculate effective FPS (always send, even with 0 frames for stall detection)
                     double windowSeconds = (DateTime.UtcNow - wrapper.FpsWindowStart).TotalSeconds;
                     if (windowSeconds <= 0) continue;
 
                     float effectiveFps = (float)(wrapper.RenderedFrameCount / windowSeconds);
 
-                    // Only send if FPS changed significantly (avoid spam)
-                    if (Math.Abs(effectiveFps - wrapper.LastReportedEffectiveFps) < FPS_CHANGE_THRESHOLD
-                        && wrapper.LastReportedEffectiveFps > 0)
-                    {
-                        // Reset window but don't send
-                        ResetFpsWindow(wrapper);
-                        continue;
-                    }
-
                     // Send feedback
                     wrapper.LastFpsFeedbackSent = DateTime.UtcNow;
                     wrapper.LastReportedEffectiveFps = effectiveFps;
 
-                    // Update global metrics with effective FPS (use max across all monitors for buffer status)
-                    if (effectiveFps > _metrics.EffectiveFps || _metrics.EffectiveFps == 0)
-                    {
-                        _metrics.RecordEffectiveFps(effectiveFps);
-                    }
+                    // Update global metrics with latest effective FPS
+                    _metrics.RecordEffectiveFps(effectiveFps);
 
                     // Use InvariantCulture to ensure decimal separator is always '.' (not ',' on some devices)
                     string fpsStr = effectiveFps.ToString("F1", System.Globalization.CultureInfo.InvariantCulture);
@@ -407,8 +391,8 @@ namespace VRWorkspace.Streaming
                         : 0;
                     float avgFps = totalSeconds > 0 ? (float)(wrapper.TotalFramesReceived / totalSeconds) : 0;
 
-                    if (VerboseLogging)
-                        Debug.Log($"[Decode FPS] Mon{wrapper.Index}: {effectiveFps:F1} fps (window), total={wrapper.TotalFramesReceived} frames in {totalSeconds:F1}s = {avgFps:F1} avg fps");
+                    // TODO: Remove DIAG log after debugging stall recovery
+                    Debug.Log($"[DIAG:FPS] Mon{wrapper.Index}: {effectiveFps:F1}fps, rendered={wrapper.RenderedFrameCount}, dropped={wrapper.DroppedFrameCount}, total={wrapper.TotalFramesReceived}, window={windowSeconds:F2}s, avg={avgFps:F1}fps");
 
                     // Reset window
                     ResetFpsWindow(wrapper);
@@ -488,14 +472,8 @@ namespace VRWorkspace.Streaming
 
             _ = SendTextAsync(feedbackJson);
 
-            // Log occasionally for debugging (every ~20 polls = ~60 seconds)
-            if (_pollCount % 20 == 0)
-            {
-                Debug.Log($"[PhaseProtocol] Quality feedback: RTT={_metrics.CurrentPingMs:F0}ms, " +
-                    $"jitter={_metrics.JitterMs:F1}ms, loss={_metrics.PacketLossRate:P1}, " +
-                    $"fps={_metrics.EffectiveFps:F0}/{_lastServerTargetFps:F0}, health={_metrics.HealthScore}, " +
-                    $"buffer={bufferStatus}");
-            }
+            // TODO: Remove DIAG log after debugging stall recovery
+            Debug.Log($"[DIAG:QF] RTT={_metrics.CurrentPingMs:F0}ms, jitter={_metrics.JitterMs:F1}ms, loss={_metrics.PacketLossRate:P2}, fps={_metrics.EffectiveFps:F1}/{_lastServerTargetFps:F0}, health={_metrics.HealthScore}, buf={bufferStatus}, rendered={totalRendered}, dropped={totalDropped}");
         }
 
         /// <summary>
@@ -543,6 +521,7 @@ namespace VRWorkspace.Streaming
                                     wrapper.FrameCount++;
                                     wrapper.RenderedFrameCount++;
                                     wrapper.RealFrameCount++; // Real frame for freeze detection
+                                    wrapper.TotalFramesReceived++; // Cumulative counter for pipeline loss calculation
                                     wrapper.TexturePtrDetectionWorking = true; // Detection method confirmed working
 
                                     // Debug log first 10 frames and every 300 frames after - disabled by default
@@ -571,11 +550,44 @@ namespace VRWorkspace.Streaming
                                 {
                                     // 2 seconds passed but never detected a ptr change
                                     // Fallback: Unity WebRTC reuses texture pointer, assume frames are coming
-                                    wrapper.LastFrameTime = DateTime.UtcNow;
-                                    if (_pollCount % 6 == 0)
+                                    //
+                                    // IMPORTANT: Only update LastFrameTime if the WebRTC decoder is
+                                    // actually producing frames (framesDecoded advancing). Otherwise
+                                    // this unconditional update masks real stalls from the stall monitor.
+                                    bool decoderActive;
+                                    if (wrapper.LastWebRTCFramesDecoded >= 0)
                                     {
-                                        wrapper.FrameCount++;
-                                        wrapper.RenderedFrameCount++;
+                                        // WebRTC stats available: trust decoder advance time
+                                        var timeSinceDecoderActive = (DateTime.UtcNow - wrapper.LastDecoderAdvanceTime).TotalMilliseconds;
+                                        decoderActive = timeSinceDecoderActive < 3000;
+                                    }
+                                    else
+                                    {
+                                        // Stats not yet available (grace period): assume active
+                                        decoderActive = true;
+                                    }
+
+                                    if (decoderActive)
+                                    {
+                                        wrapper.LastFrameTime = DateTime.UtcNow;
+                                    }
+
+                                    // Frame counting in fallback mode: consume WebRTC framesDecoded delta
+                                    // as ground truth instead of _pollCount % 6 (which capped at ~10fps).
+                                    // Done here under _lock to avoid race with ResetFpsWindow/SendFpsFeedback.
+                                    if (wrapper.LastWebRTCFramesDecoded >= 0)
+                                    {
+                                        long baseline = wrapper.LastFallbackFramesAccounted < 0
+                                            ? wrapper.LastWebRTCFramesDecoded
+                                            : wrapper.LastFallbackFramesAccounted;
+                                        long delta = wrapper.LastWebRTCFramesDecoded - baseline;
+                                        if (delta > 0 && delta < 1000) // sanity: skip impossible jumps
+                                        {
+                                            wrapper.RenderedFrameCount += (int)delta;
+                                            wrapper.FrameCount += (int)delta;
+                                            wrapper.TotalFramesReceived += delta;
+                                        }
+                                        wrapper.LastFallbackFramesAccounted = wrapper.LastWebRTCFramesDecoded;
                                     }
                                 }
                                 // else: TexturePtrDetectionWorking=true means we expect ptr changes
@@ -595,6 +607,31 @@ namespace VRWorkspace.Streaming
             // Proactive keyframe burst on packet loss spike (WiFi only)
             if (_isWiFiConnection) CheckPacketLossAndRequestKeyframe();
 
+            // TODO: Remove DIAG summary after debugging stall recovery
+            // Periodic state summary every ~5s (300 polls at 60fps)
+            if (_pollCount % 300 == 0 && _stateMachine.IsStreaming)
+            {
+                long totalFrames = 0;
+                int totalDropped = 0;
+                long totalDecoded = 0;
+                bool anyFallback = false;
+                lock (_lock)
+                {
+                    foreach (var w in _peerConnections)
+                    {
+                        totalFrames += w.TotalFramesReceived;
+                        totalDropped += w.DroppedFrameCount;
+                        totalDecoded += Math.Max(0, w.LastWebRTCFramesDecoded);
+                        if (!w.TexturePtrDetectionWorking && w.Texture != null)
+                            anyFallback = true;
+                    }
+                }
+                Debug.Log($"[DIAG:STATE] polls={_pollCount}, totalFrames={totalFrames}, dropped={totalDropped}, " +
+                    $"fps={_metrics.EffectiveFps:F1}/{_lastServerTargetFps:F0}, RTT={_metrics.CurrentPingMs:F0}ms, " +
+                    $"loss={_metrics.PacketLossRate:P2}, health={_metrics.HealthScore}, wifi={_isWiFiConnection}, " +
+                    $"decoderFrames={totalDecoded}, fallback={anyFallback}");
+            }
+
             // Send FPS feedback to server for adaptive encoding
             SendFpsFeedbackIfNeeded();
 
@@ -612,7 +649,7 @@ namespace VRWorkspace.Streaming
             if (loss > 0.03f && _prevPacketLoss < 0.01f &&
                 (DateTime.UtcNow - _lastProactiveKeyframeTime).TotalSeconds >= 2.0)
             {
-                Debug.Log($"[PhaseProtocol] Loss spike {_prevPacketLoss:P1}\u2192{loss:P1}, proactive keyframe burst");
+                Debug.LogWarning($"[DIAG:LOSS] Loss spike {_prevPacketLoss:P1}\u2192{loss:P1}, proactive keyframe burst");
                 _ = SendTextAsync("{\"type\":\"request_keyframe_burst\",\"count\":3}");
                 _lastProactiveKeyframeTime = DateTime.UtcNow;
             }
@@ -653,11 +690,18 @@ namespace VRWorkspace.Streaming
                         if (wrapper.PC == null) continue;
                         if (wrapper.IsReconnecting || wrapper.IsInGraduatedRecovery) continue;
 
+                        // Suppress frame stall detection during decoder stall recovery grace period.
+                        // SkipToLiveImmediate causes a brief frame gap that would falsely trigger
+                        // FRAME STALL → GraduatedRecovery → burst(5) → cascade → full reconnect.
+                        var timeSinceDecoderRecovery = (DateTime.UtcNow - wrapper.LastDecoderStallRecoveryTime).TotalMilliseconds;
+                        bool inDecoderRecoveryGrace = timeSinceDecoderRecovery < 5000; // 5s grace after decoder stall recovery
+
                         var timeSinceFrame = DateTime.UtcNow - wrapper.LastFrameTime;
                         var pcState = wrapper.PC.ConnectionState;
 
                         if (pcState == RTCPeerConnectionState.Connected &&
                             wrapper.LastFrameTime != default &&
+                            !inDecoderRecoveryGrace &&
                             timeSinceFrame.TotalMilliseconds > effectiveThreshold)
                         {
                             Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} FRAME STALL detected! No frames for {timeSinceFrame.TotalSeconds:F1}s (threshold={effectiveThreshold}ms, wifi={_isWiFiConnection})");
@@ -674,6 +718,16 @@ namespace VRWorkspace.Streaming
                                 Debug.Log($"[PhaseProtocol] PC{wrapper.Index} triggering reconnect due to frame stall");
                                 _ = AutoHealMonitorAsync(wrapper.Index);
                             }
+                        }
+
+                        // WebRTC stats-based decoder stall detection
+                        // This catches stalls that LastFrameTime misses, e.g. when:
+                        // - Fallback mode blindly updates LastFrameTime (TexturePtrDetection not working)
+                        // - Texture pointer changes but decoder outputs duplicate/frozen frames
+                        if (pcState == RTCPeerConnectionState.Connected &&
+                            wrapper.LastFrameTime != default)
+                        {
+                            await UpdateDecoderStallCheck(wrapper);
                         }
                     }
 
@@ -693,6 +747,106 @@ namespace VRWorkspace.Streaming
             }
 
             Debug.Log("[PhaseProtocol] Frame stall monitor stopped");
+        }
+
+        /// <summary>
+        /// Poll WebRTC stats to detect decoder stalls via framesDecoded counter.
+        /// This is the ground truth for whether the decoder is producing frames,
+        /// independent of texture pointer behavior or fallback mode.
+        /// </summary>
+        private async Task UpdateDecoderStallCheck(PCWrapper wrapper)
+        {
+            int decoderStallThresholdMs = _isWiFiConnection ? 1000 : 2000;
+            int recoveryCooldownMs = _isWiFiConnection ? 3000 : 5000;
+            const int ESCALATE_TO_RECONNECT_MS = 10000;
+
+            try
+            {
+                var op = wrapper.PC.GetStats();
+                while (!op.IsDone) await Task.Yield();
+                if (op.IsError) return;
+
+                var report = op.Value;
+                try
+                {
+                    foreach (var pair in report.Stats)
+                    {
+                        if (pair.Value is RTCInboundRTPStreamStats inbound && inbound.kind == "video")
+                        {
+                            long decoded = (long)inbound.framesDecoded;
+                            long received = (long)inbound.framesReceived;
+
+                            if (wrapper.LastWebRTCFramesDecoded < 0)
+                            {
+                                // First stats check — initialize
+                                wrapper.LastWebRTCFramesDecoded = decoded;
+                                wrapper.LastDecoderAdvanceTime = DateTime.UtcNow;
+                                Debug.Log($"[PhaseProtocol] PC{wrapper.Index} decoder stats init: decoded={decoded}, received={received}");
+                            }
+                            else if (decoded > wrapper.LastWebRTCFramesDecoded)
+                            {
+                                // Decoder is producing frames — update tracking
+                                long delta = decoded - wrapper.LastWebRTCFramesDecoded;
+                                wrapper.LastDecoderAdvanceTime = DateTime.UtcNow;
+                                wrapper.LastWebRTCFramesDecoded = decoded;
+
+                                // In fallback mode, frame accounting is done in PollTextures
+                                // (under _lock) to avoid race conditions with RenderedFrameCount/FrameCount.
+                                // TotalFramesReceived is also moved there for consistency.
+                            }
+                            else
+                            {
+                                // Decoder has NOT advanced since last check
+                                var timeSinceAdvance = (DateTime.UtcNow - wrapper.LastDecoderAdvanceTime).TotalMilliseconds;
+                                var timeSinceRecovery = (DateTime.UtcNow - wrapper.LastDecoderStallRecoveryTime).TotalMilliseconds;
+
+                                if (timeSinceAdvance > decoderStallThresholdMs &&
+                                    timeSinceRecovery > recoveryCooldownMs)
+                                {
+                                    long gap = received - decoded;
+                                    Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} DECODER STALL (WebRTC stats)! " +
+                                        $"framesDecoded={decoded} unchanged for {timeSinceAdvance / 1000:F1}s, received={received}, gap={gap}");
+
+                                    // Flush jitter buffer backlog first, then send single keyframe.
+                                    // Burst (3 I-frames) makes decoder stalls WORSE by adding more data
+                                    // to an already-full buffer (I-frames are 5-10x larger than P-frames).
+                                    SkipToLiveImmediate(wrapper.Index);
+                                    wrapper.LastDecoderStallRecoveryTime = DateTime.UtcNow;
+                                }
+
+                                // Escalation: if decoder stalled too long despite keyframes, reconnect.
+                                // Fast-path: if ICE is already disconnected/failed, recovery messages
+                                // can't reach the server, so escalate after 3s instead of 10s.
+                                bool iceDown = wrapper.PC.IceConnectionState == RTCIceConnectionState.Disconnected
+                                    || wrapper.PC.IceConnectionState == RTCIceConnectionState.Failed
+                                    || wrapper.PC.IceConnectionState == RTCIceConnectionState.Closed;
+                                int escalateMs = iceDown ? 3000 : ESCALATE_TO_RECONNECT_MS;
+
+                                if (timeSinceAdvance > escalateMs && !wrapper.IsReconnecting
+                                    && !_isIntentionalDisconnect)
+                                {
+                                    Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} persistent decoder stall " +
+                                        $"({timeSinceAdvance / 1000:F0}s), escalating to reconnect" +
+                                        (iceDown ? " (ICE down, fast-path)" : ""));
+                                    wrapper.IsReconnecting = true;
+                                    _ = AutoHealMonitorAsync(wrapper.Index);
+                                }
+                            }
+                            break; // Only process first video inbound stats
+                        }
+                    }
+                }
+                finally
+                {
+                    report.Dispose();
+                }
+            }
+            catch (Exception ex)
+            {
+                // Suppress frequent stats errors (can happen during shutdown)
+                if (VerboseLogging)
+                    Debug.LogWarning($"[PhaseProtocol] Stats check error PC{wrapper.Index}: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -964,7 +1118,8 @@ namespace VRWorkspace.Streaming
             int bitrateKbps = json.GetInt("bitrateKbps");
             string reason = json.GetString("reason") ?? "adaptive";
 
-            Debug.Log($"[PhaseProtocol] Server adjusted bitrate: monitor {monitorIndex} → {bitrateKbps} kbps ({reason})");
+            // TODO: Remove DIAG log after debugging stall recovery
+            Debug.LogWarning($"[DIAG:BITRATE] Server adjusted: mon{monitorIndex} → {bitrateKbps}kbps ({reason})");
 
             // Fire event for UI update if needed
             OnBitrateAdjusted?.Invoke(monitorIndex, bitrateKbps, reason);
@@ -993,8 +1148,10 @@ namespace VRWorkspace.Streaming
         {
             // Detect WiFi based on connection type string OR high jitter
             // High jitter (>10ms) typically indicates WiFi even if type is unknown
-            _isWiFiConnection = connectionType?.ToLower().Contains("wifi") == true ||
-                                connectionType?.ToLower().Contains("wireless") == true ||
+            // Note: Android returns "Wi-Fi" (with hyphen), so strip non-alpha before matching
+            var normalizedType = connectionType?.ToLower().Replace("-", "").Replace("_", "").Replace(" ", "") ?? "";
+            _isWiFiConnection = normalizedType.Contains("wifi") ||
+                                normalizedType.Contains("wireless") ||
                                 jitterMs > 10.0;
 
             // Update metrics with connection info

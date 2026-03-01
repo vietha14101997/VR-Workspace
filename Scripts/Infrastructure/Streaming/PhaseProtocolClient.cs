@@ -56,6 +56,7 @@ namespace VRWorkspace.Streaming
         // ── WebSocket / cancellation ──────────────────────────────────────────
         private ClientWebSocket         _ws;
         private CancellationTokenSource _cts;
+        private volatile bool           _isIntentionalDisconnect;
         private readonly object         _lock = new object();
 
         // ── State machine ─────────────────────────────────────────────────────
@@ -176,6 +177,17 @@ namespace VRWorkspace.Streaming
             // Graduated recovery state (WiFi resilience)
             public bool IsInGraduatedRecovery;
             public int  GraduatedRecoveryStep;
+
+            // WebRTC stats-based decoder stall detection
+            // framesDecoded from RTCInboundRTPStreamStats is the ground truth for whether
+            // the decoder is actually producing frames, independent of texture pointer behavior.
+            public long LastWebRTCFramesDecoded = -1;    // -1 = not yet initialized
+            public DateTime LastDecoderAdvanceTime = DateTime.UtcNow;
+            public DateTime LastDecoderStallRecoveryTime;
+
+            // Fallback mode frame accounting (consumed by PollTextures under _lock)
+            // Tracks how many framesDecoded have been accounted for in RenderedFrameCount
+            public long LastFallbackFramesAccounted = -1;
         }
 
         // ── Public properties ─────────────────────────────────────────────────
@@ -263,6 +275,7 @@ namespace VRWorkspace.Streaming
             }
 
             _cts = new CancellationTokenSource();
+            _isIntentionalDisconnect = false;
             var ct = _cts.Token;
 
             if (!serverUrl.Contains("protocol="))
@@ -404,6 +417,7 @@ namespace VRWorkspace.Streaming
         public async Task StopAsync()
         {
             Debug.Log("[PhaseProtocol] Stopping...");
+            _isIntentionalDisconnect = true;
 
             try
             {

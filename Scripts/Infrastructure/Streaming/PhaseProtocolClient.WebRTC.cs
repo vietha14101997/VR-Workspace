@@ -195,6 +195,29 @@ namespace VRWorkspace.Streaming
                         OnMonitorIceComplete?.Invoke(i);
                     CheckAllMonitorsConnected();
                 }
+                else if (s == RTCIceConnectionState.Disconnected || s == RTCIceConnectionState.Failed)
+                {
+                    if (_isIntentionalDisconnect) return; // User pressed Disconnect — don't auto-reconnect
+
+                    // ICE dropped — OnConnectionStateChange may fire late or not at all.
+                    // Give ICE 3s to recover, then trigger reconnect directly.
+                    int capturedGen = _pcGeneration;
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(3000);
+                        if (_isIntentionalDisconnect) return; // User disconnected during grace period
+                        if (_pcGeneration != capturedGen) return; // PC was already replaced
+                        if (!_stateMachine.IsStreaming) return;
+                        var currentIce = pc.IceConnectionState;
+                        if (currentIce == RTCIceConnectionState.Connected || currentIce == RTCIceConnectionState.Completed)
+                            return; // ICE recovered on its own
+                        if (trackWrappers[0].IsReconnecting) return; // Already reconnecting
+
+                        Debug.LogWarning($"[PhaseProtocol] Single-PC ICE still {currentIce} after 3s grace, triggering reconnect");
+                        trackWrappers[0].IsReconnecting = true;
+                        _ = ReconnectSinglePCAsync();
+                    });
+                }
             };
 
             pc.OnConnectionStateChange = s =>

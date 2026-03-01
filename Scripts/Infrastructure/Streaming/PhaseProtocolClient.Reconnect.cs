@@ -53,6 +53,19 @@ namespace VRWorkspace.Streaming
             // Use the shared codec preferences method
             SetCodecPreferences(trans, idx);
 
+            // Re-create DataChannels (must match initial connection in PhaseProtocolClient.WebRTC.cs)
+            // Without these, server has no audio/cursor channels after reconnect
+            _sctpInitChannel = pc.CreateDataChannel("audio");
+            _sctpInitChannel.OnMessage = bytes => { OnAudioDataReceived?.Invoke(bytes); };
+            _sctpInitChannel.OnOpen = () => Debug.Log("[PhaseProtocol] Audio DataChannel opened (reconnect)");
+            _sctpInitChannel.OnClose = () => Debug.Log("[PhaseProtocol] Audio DataChannel closed (reconnect)");
+
+            _cursorChannel = pc.CreateDataChannel("cursor");
+            _cursorChannel.OnMessage = bytes => HandleCursorFromDataChannel(bytes);
+            _cursorChannel.OnOpen = () => Debug.Log("[PhaseProtocol] Cursor DataChannel opened (reconnect)");
+            _cursorChannel.OnClose = () => Debug.Log("[PhaseProtocol] Cursor DataChannel closed (reconnect)");
+            Debug.Log($"[PhaseProtocol] PC{idx} DataChannels created (audio+cursor) on reconnect");
+
             // Connection state handlers
             pc.OnIceConnectionChange = s =>
             {
