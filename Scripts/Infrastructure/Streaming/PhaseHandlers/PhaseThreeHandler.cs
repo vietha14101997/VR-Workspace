@@ -57,7 +57,7 @@ namespace VRWorkspace.Streaming
             double targetFpsD  = json.GetDouble("targetFps");
             float  targetFps   = targetFpsD > 0 ? (float)targetFpsD : 60f;
 
-            Debug.Log($"[Phase3] fps_adjusted: monitor {monitorIndex} → {targetFps:F1} fps");
+            // fps_adjusted fires every ~250ms — too noisy for default logging
             OnFpsAdjusted?.Invoke(monitorIndex, targetFps);
         }
 
@@ -67,7 +67,7 @@ namespace VRWorkspace.Streaming
             int    bitrateKbps  = json.GetInt("bitrateKbps");
             string reason       = json.GetString("reason") ?? "adaptive";
 
-            Debug.Log($"[Phase3] bitrate_adjusted: monitor {monitorIndex} → {bitrateKbps} kbps ({reason})");
+            // bitrate_adjusted can fire frequently — keep quiet
             OnBitrateAdjusted?.Invoke(monitorIndex, bitrateKbps, reason);
         }
 
@@ -82,7 +82,7 @@ namespace VRWorkspace.Streaming
 
         public void HandleSkipToLiveAck()
         {
-            Debug.Log("[Phase3] skip_to_live acknowledged by server");
+            // skip_to_live ack fires frequently during recovery — keep quiet
             OnSkipToLiveAck?.Invoke();
         }
 
@@ -123,7 +123,7 @@ namespace VRWorkspace.Streaming
                 ? $"{{\"type\":\"request_keyframe\",\"monitorIndex\":{monitorIndex}}}"
                 : "{\"type\":\"request_keyframe\"}";
             await _send(json);
-            Debug.Log($"[Phase3] request_keyframe sent (monitor={monitorIndex})");
+            // request_keyframe fires frequently via preventive + stall recovery — keep quiet
         }
 
         public async Task SkipToLiveAsync(int monitorIndex = -1)

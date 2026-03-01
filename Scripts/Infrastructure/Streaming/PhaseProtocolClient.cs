@@ -584,13 +584,13 @@ namespace VRWorkspace.Streaming
 
         private async Task HandleTextMessageAsync(string text)
         {
-            if (!text.Contains("cursor_position"))
+            if (VerboseLogging && !text.Contains("cursor_position"))
                 Debug.Log($"[PhaseProtocol] Received: {text.Substring(0, Math.Min(100, text.Length))}...");
 
             // cursor_image has a raw-parse fast path (avoid base64 corruption via SimpleJson)
             if (text.Contains("\"type\":\"cursor_image\"") || text.Contains("\"Type\":\"cursor_image\""))
             {
-                Debug.Log($"[PhaseProtocol] cursor_image RAW message length: {text.Length}");
+                if (VerboseLogging) Debug.Log($"[PhaseProtocol] cursor_image RAW message length: {text.Length}");
                 HandleCursorImageRaw(text);
                 return;
             }

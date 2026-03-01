@@ -327,7 +327,7 @@ namespace VRWorkspace.Streaming
                 string msg = monitorIndex >= 0
                     ? $"{{\"type\":\"skip_to_live\",\"monitor\":{monitorIndex},\"urgent\":true}}"
                     : "{\"type\":\"skip_to_live\",\"urgent\":true}";
-                Debug.Log($"[PhaseProtocol] URGENT skip_to_live (bypassing cooldown)");
+                Debug.LogWarning($"[PhaseProtocol] URGENT skip_to_live (bypassing cooldown)");
                 await SendTextAsync(msg);
 
                 // Also request keyframe to ensure clean recovery
@@ -336,7 +336,7 @@ namespace VRWorkspace.Streaming
                     ? $"{{\"type\":\"request_keyframe\",\"monitorIndex\":{monitorIndex}}}"
                     : "{\"type\":\"request_keyframe\"}";
                 await SendTextAsync(keyframeMsg);
-                Debug.Log($"[PhaseProtocol] Follow-up keyframe request sent");
+                if (VerboseLogging) Debug.Log($"[PhaseProtocol] Follow-up keyframe request sent");
             }
             catch (Exception ex)
             {
@@ -392,7 +392,7 @@ namespace VRWorkspace.Streaming
                     float avgFps = totalSeconds > 0 ? (float)(wrapper.TotalFramesReceived / totalSeconds) : 0;
 
                     // TODO: Remove DIAG log after debugging stall recovery
-                    Debug.Log($"[DIAG:FPS] Mon{wrapper.Index}: {effectiveFps:F1}fps, rendered={wrapper.RenderedFrameCount}, dropped={wrapper.DroppedFrameCount}, total={wrapper.TotalFramesReceived}, window={windowSeconds:F2}s, avg={avgFps:F1}fps");
+                    if (VerboseLogging) Debug.Log($"[DIAG:FPS] Mon{wrapper.Index}: {effectiveFps:F1}fps, rendered={wrapper.RenderedFrameCount}, dropped={wrapper.DroppedFrameCount}, total={wrapper.TotalFramesReceived}, window={windowSeconds:F2}s, avg={avgFps:F1}fps");
 
                     // Reset window
                     ResetFpsWindow(wrapper);
@@ -473,7 +473,7 @@ namespace VRWorkspace.Streaming
             _ = SendTextAsync(feedbackJson);
 
             // TODO: Remove DIAG log after debugging stall recovery
-            Debug.Log($"[DIAG:QF] RTT={_metrics.CurrentPingMs:F0}ms, jitter={_metrics.JitterMs:F1}ms, loss={_metrics.PacketLossRate:P2}, fps={_metrics.EffectiveFps:F1}/{_lastServerTargetFps:F0}, health={_metrics.HealthScore}, buf={bufferStatus}, rendered={totalRendered}, dropped={totalDropped}");
+            if (VerboseLogging) Debug.Log($"[DIAG:QF] RTT={_metrics.CurrentPingMs:F0}ms, jitter={_metrics.JitterMs:F1}ms, loss={_metrics.PacketLossRate:P2}, fps={_metrics.EffectiveFps:F1}/{_lastServerTargetFps:F0}, health={_metrics.HealthScore}, buf={bufferStatus}, rendered={totalRendered}, dropped={totalDropped}");
         }
 
         /// <summary>
@@ -715,7 +715,7 @@ namespace VRWorkspace.Streaming
                             {
                                 // Wired: direct reconnect (stalls are rare and serious)
                                 wrapper.IsReconnecting = true;
-                                Debug.Log($"[PhaseProtocol] PC{wrapper.Index} triggering reconnect due to frame stall");
+                                Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} triggering reconnect due to frame stall");
                                 _ = AutoHealMonitorAsync(wrapper.Index);
                             }
                         }
@@ -1103,7 +1103,7 @@ namespace VRWorkspace.Streaming
             float targetFps = targetFpsD > 0 ? (float)targetFpsD : 60f;
 
             _lastServerTargetFps = targetFps;
-            Debug.Log($"[PhaseProtocol] Server adjusted FPS: monitor {monitorIndex} → {targetFps:F1} fps");
+            if (VerboseLogging) Debug.Log($"[PhaseProtocol] Server adjusted FPS: monitor {monitorIndex} → {targetFps:F1} fps");
 
             OnFpsAdjusted?.Invoke(monitorIndex, targetFps);
         }
@@ -1118,8 +1118,7 @@ namespace VRWorkspace.Streaming
             int bitrateKbps = json.GetInt("bitrateKbps");
             string reason = json.GetString("reason") ?? "adaptive";
 
-            // TODO: Remove DIAG log after debugging stall recovery
-            Debug.LogWarning($"[DIAG:BITRATE] Server adjusted: mon{monitorIndex} → {bitrateKbps}kbps ({reason})");
+            Debug.Log($"[DIAG:BITRATE] Server adjusted: mon{monitorIndex} → {bitrateKbps}kbps ({reason})");
 
             // Fire event for UI update if needed
             OnBitrateAdjusted?.Invoke(monitorIndex, bitrateKbps, reason);

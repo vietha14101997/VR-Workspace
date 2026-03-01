@@ -46,8 +46,7 @@ namespace VRWorkspace.Core
             #if UNITY_EDITOR
             Debug.unityLogger.filterLogType = LogType.Warning;
             #else
-            // TODO: Revert to LogType.Error after debugging stall recovery
-            Debug.unityLogger.filterLogType = LogType.Log;
+            Debug.unityLogger.filterLogType = LogType.Error;
             #endif
         }
 
