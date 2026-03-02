@@ -797,8 +797,8 @@ namespace VRWorkspace.Panel
         {
             if (_panels.Count == 0) return;
 
-            // Keep cluster at local origin
-            transform.localPosition = Vector3.zero;
+            // Apply vertical offset to the cluster rig itself so the entire rig moves
+            transform.localPosition = new Vector3(0, verticalOffset, 0);
             transform.localRotation = Quaternion.identity;
 
             var refPanel = _panels[_panels.Count / 2];
@@ -844,7 +844,7 @@ namespace VRWorkspace.Panel
 
                     // Calculate horizontal offset from center
                     float xOffset = slotOffsets[i] * (spacingWidth + edgeGapMeters - panelOverlap);
-                    Vector3 localPos = new Vector3(xOffset, verticalOffset, 0);
+                    Vector3 localPos = new Vector3(xOffset, 0, 0);
                     Quaternion localRot = Quaternion.identity; // Face forward (Z+)
 
                     panel.transform.localPosition = localPos;
@@ -877,7 +877,7 @@ namespace VRWorkspace.Panel
                     float x = Mathf.Sin(yawRad) * currentArcRadius;
                     float z = Mathf.Cos(yawRad) * currentArcRadius - currentArcRadius;
 
-                    Vector3 localPos = new Vector3(x, verticalOffset, z);
+                    Vector3 localPos = new Vector3(x, 0, z);
 
                     // Rotation: face outward from arc center (toward camera position)
                     // Panel forward points toward camera (which is at -Z direction from arc)

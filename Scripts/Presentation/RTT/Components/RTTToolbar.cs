@@ -45,6 +45,7 @@ namespace VRWorkspace.UI.RTT.Components
 
         private RTTMiniFrame _activeTaskbarFrame;
         private WorldPanelClusterRig _activeClusterRig;
+        private float _heightOffset = 0f;
         private bool _initialized = false;
         #endregion
 
@@ -99,6 +100,7 @@ namespace VRWorkspace.UI.RTT.Components
             _activeTaskbarFrame = miniFrame;
             _followTarget = miniFrame.GetFollowTarget();
             _activeClusterRig = null; // Clear cluster rig when switching taskbar
+            _heightOffset = 0f;
 
             // Calculate toolbar dimensions based on taskbar
             Vector2 taskbarSize = miniFrame.GetWorldSize();
@@ -204,6 +206,15 @@ namespace VRWorkspace.UI.RTT.Components
         }
 
         /// <summary>
+        /// Set a vertical offset applied to the toolbar position.
+        /// Used to move the toolbar up/down with the screen when height changes.
+        /// </summary>
+        public void SetHeightOffset(float offset)
+        {
+            _heightOffset = offset;
+        }
+
+        /// <summary>
         /// Check if the active taskbar is RTTTaskbar (not RTTRemoteTaskbar).
         /// </summary>
         public bool IsRTTTaskbarActive()
@@ -262,7 +273,7 @@ namespace VRWorkspace.UI.RTT.Components
             if (cam == null || _followTarget == null) return;
 
             Vector3 cameraPos = cam.transform.position;
-            Vector3 targetCenter = _followTarget.position;
+            Vector3 targetCenter = _followTarget.position + Vector3.up * _heightOffset;
             Vector3 targetUp = _followTarget.up;
 
             // Use base _targetHeight (from follow target / RTTMenu) plus scale adjustment.

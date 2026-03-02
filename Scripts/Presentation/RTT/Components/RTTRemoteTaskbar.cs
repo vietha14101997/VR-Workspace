@@ -633,11 +633,12 @@ namespace VRWorkspace.UI.RTT.Components
         {
             if (_clusterRig != null)
             {
-                _clusterRig.verticalOffset = (v - 0.5f) * 1.0f;
+                float heightOffset = (v - 0.5f) * 1.0f; // 0.1 slider = 0.1m
+                _clusterRig.verticalOffset = heightOffset;
                 _clusterRig.RequestLayout();
 
-                // Notify toolbar about height change so it can reposition
-                RTTToolbar.Instance?.SetActiveClusterRig(_clusterRig);
+                // Move toolbar up/down together with the screen
+                RTTToolbar.Instance?.SetHeightOffset(heightOffset);
             }
         }
 
@@ -1634,6 +1635,10 @@ namespace VRWorkspace.UI.RTT.Components
                 {
                     RTTToolbar.Instance.SetActiveTaskbar(_miniFrame);
                     RTTToolbar.Instance.SetActiveClusterRig(_clusterRig);
+
+                    // Restore height offset from saved settings
+                    float height = PlayerPrefs.GetFloat("RemoteDesktop_ScreenHeight", DEFAULT_SCREEN_HEIGHT);
+                    RTTToolbar.Instance.SetHeightOffset((height - 0.5f) * 1.0f);
                 }
             }
         }
