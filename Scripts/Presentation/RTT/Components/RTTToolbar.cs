@@ -44,6 +44,7 @@ namespace VRWorkspace.UI.RTT.Components
         private float _targetHeight;
 
         private RTTMiniFrame _activeTaskbarFrame;
+        private WorldPanelClusterRig _activeClusterRig;
         private bool _initialized = false;
         #endregion
 
@@ -97,6 +98,7 @@ namespace VRWorkspace.UI.RTT.Components
 
             _activeTaskbarFrame = miniFrame;
             _followTarget = miniFrame.GetFollowTarget();
+            _activeClusterRig = null; // Clear cluster rig when switching taskbar
 
             // Calculate toolbar dimensions based on taskbar
             Vector2 taskbarSize = miniFrame.GetWorldSize();
@@ -192,6 +194,16 @@ namespace VRWorkspace.UI.RTT.Components
         }
 
         /// <summary>
+        /// Set the active cluster rig for dynamic target height calculation.
+        /// When set, the toolbar uses the cluster rig's scaled bounds instead of follow target bounds.
+        /// </summary>
+        public void SetActiveClusterRig(WorldPanelClusterRig rig)
+        {
+            _activeClusterRig = rig;
+            UpdateTargetHeight();
+        }
+
+        /// <summary>
         /// Check if the active taskbar is RTTTaskbar (not RTTRemoteTaskbar).
         /// </summary>
         public bool IsRTTTaskbarActive()
@@ -210,7 +222,8 @@ namespace VRWorkspace.UI.RTT.Components
                 return;
             }
 
-            // Try to get target height from various components
+            // Always use follow target height as base (NOT cluster rig).
+            // Scale adjustment is handled separately in UpdateSpherePosition via delta.
             var targetCanvas = _followTarget.GetComponent<RTTCanvasBase>();
             if (targetCanvas != null)
             {
@@ -252,7 +265,19 @@ namespace VRWorkspace.UI.RTT.Components
             Vector3 targetCenter = _followTarget.position;
             Vector3 targetUp = _followTarget.up;
 
-            float targetHalfHeight = _targetHeight / 2f;
+            // Use base _targetHeight (from follow target / RTTMenu) plus scale adjustment.
+            // At default scale (slider 0.5 → localScale 1.0): no adjustment → matches normal taskbar.
+            // When scale changes: bottom edge moves → add delta so toolbar tracks it.
+            float effectiveHeight = _targetHeight;
+            if (_activeClusterRig != null)
+            {
+                float unscaledHeight = _activeClusterRig.GetFollowBounds().size.y;
+                float currentScale = _activeClusterRig.transform.lossyScale.y;
+                // Delta = how much the bottom edge moved from default scale position
+                effectiveHeight += unscaledHeight * (currentScale - 1.0f);
+            }
+
+            float targetHalfHeight = effectiveHeight / 2f;
             float toolbarHalfHeight = _toolbarHeight / 2f;
             float gap = _taskbarHeight * spacingMultiplier;
 

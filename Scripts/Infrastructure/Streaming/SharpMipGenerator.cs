@@ -76,6 +76,12 @@ namespace VRWorkspace.Streaming
                 ? Mathf.Min(maxMipLevels, GetMipCount(rt.width, rt.height))
                 : GetMipCount(rt.width, rt.height);
 
+            // Temporarily force Bilinear on the source RT to prevent trilinear
+            // from blending mip 0 (initialized) with mip 1+ (uninitialized) during
+            // the first iteration. This is the root cause of alpha < 1 at higher mips.
+            var prevFilter = rt.filterMode;
+            rt.filterMode = FilterMode.Bilinear;
+
             RenderTexture prev = null;
 
             for (int mip = 1; mip <= totalMips; mip++)
@@ -103,6 +109,9 @@ namespace VRWorkspace.Streaming
             // Release the last temp
             if (prev != null)
                 RenderTexture.ReleaseTemporary(prev);
+
+            // Restore original filter mode
+            rt.filterMode = prevFilter;
         }
 
         /// <summary>

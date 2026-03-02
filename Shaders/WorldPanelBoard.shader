@@ -258,6 +258,9 @@ Shader "Unlit/WorldPanelBoard"
             //    FIX: Use min(|dx|, |dy|) for LOD, let the 4-sample pattern
             //    cover the pixel footprint along both axes.
             //
+            // Additionally, offset multiplier reduced from 0.25 to 0.125 to
+            // dampen derivative jitter from VR head tracking (less shimmer).
+            //
             // Cost: 4 tex2Dlod per sample (vs 1 tex2Dgrad), but tex2Dlod is
             // cheaper per-call on mobile (no derivative calculation needed).
             // ==========================================
@@ -291,13 +294,13 @@ Shader "Unlit/WorldPanelBoard"
             // 4-sample anti-aliased read at stable mip level.
             // The sample pattern is aligned to the UV derivatives (screen-space pixel footprint),
             // providing proper anti-aliasing even at oblique viewing angles.
+            // Offset multiplier reduced from 0.25 to 0.125 to dampen VR head tracking jitter.
             float4 SampleStableAA(sampler2D tex, float2 uv, float2 uvDx, float2 uvDy, float mipLevel)
             {
-                // Quarter-pixel offsets along both derivative directions
-                // This covers the pixel's footprint on the texture surface,
-                // replacing trilinear blending with explicit multi-sampling.
-                float2 sDx = uvDx * 0.25;
-                float2 sDy = uvDy * 0.25;
+                // Quarter-pixel offsets dampened by 50% to reduce VR shimmer from
+                // frame-to-frame derivative fluctuations caused by head tracking.
+                float2 sDx = uvDx * 0.125;
+                float2 sDy = uvDy * 0.125;
 
                 float4 s1 = tex2Dlod(tex, float4(uv + sDx + sDy, 0, mipLevel));
                 float4 s2 = tex2Dlod(tex, float4(uv - sDx + sDy, 0, mipLevel));
@@ -469,8 +472,8 @@ Shader "Unlit/WorldPanelBoard"
                 else
                 {
                     col = SampleTexture(_MainTex, stereoUV, uvDx, uvDy,
-                                        _MainTex_TexelSize.zw, _MaxMipLevel, _MipMapBias,
-                                        _StableAA);
+                                        _MainTex_TexelSize.zw,
+                                        _MaxMipLevel, _MipMapBias, _StableAA);
                 }
                 // Apply video picture adjustments (only effective when values differ from defaults)
                 col.rgb = VideoColorCorrect(col.rgb, _Brightness, _Contrast, _Saturation);

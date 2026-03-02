@@ -52,6 +52,9 @@ namespace VRWorkspace.UI.RTT.Controllers
         private RenderTexture[] _mipmapTextures;
         private float _lastMipmapDebugTime;
         private const float MIPMAP_DEBUG_INTERVAL = 2f;
+
+        // Saved zoom distance before remote mode depth changes (restored when exiting remote)
+        private float _savedZoomDistance = -1f;
         #endregion
 
         #region Events
@@ -227,6 +230,9 @@ namespace VRWorkspace.UI.RTT.Controllers
                 Destroy(_clusterRig.gameObject);
                 _clusterRig = null;
             }
+
+            // Restore zoom distance to pre-remote value so main menu panels are unaffected
+            RestoreZoomDistance();
 
             // Show main menu and taskbar after cleanup
             ShowMainMenuAndTaskbar();
@@ -450,6 +456,9 @@ namespace VRWorkspace.UI.RTT.Controllers
                 _webrtcUpdateCoroutine = null;
             }
 
+            // Restore zoom distance to pre-remote value so main menu panels are unaffected
+            RestoreZoomDistance();
+
             // Show main menu and taskbar again
             ShowMainMenuAndTaskbar();
 
@@ -473,6 +482,9 @@ namespace VRWorkspace.UI.RTT.Controllers
 
             // Hide menu and taskbar
             HideMainMenuAndTaskbar();
+
+            // Re-apply remote depth setting (zoom was restored for menu display)
+            ReapplyRemoteDepth();
 
             // ClusterRig should already be visible
             if (_clusterRig != null)
@@ -537,6 +549,38 @@ namespace VRWorkspace.UI.RTT.Controllers
                 taskbar.Hide();
                 Debug.Log("[RTTRemoteMenuController] Hidden RTTTaskbar");
             }
+        }
+
+        /// <summary>
+        /// Restore zoom distance to what it was before remote mode changed it.
+        /// </summary>
+        private void RestoreZoomDistance()
+        {
+            if (_savedZoomDistance < 0f) return;
+
+            var zoom = VirtualObjectsZoomController.Instance;
+            if (zoom != null)
+            {
+                Debug.Log($"[RTTRemoteMenuController] Restoring zoom distance: {_savedZoomDistance:F2}m");
+                zoom.SetZoomDistance(_savedZoomDistance);
+            }
+            _savedZoomDistance = -1f;
+        }
+
+        /// <summary>
+        /// Re-apply remote depth setting (after restoring zoom for menu display).
+        /// </summary>
+        private void ReapplyRemoteDepth()
+        {
+            var zoom = VirtualObjectsZoomController.Instance;
+            if (zoom == null) return;
+
+            // Save current zoom as base again
+            _savedZoomDistance = zoom.CurrentDistance;
+
+            float depth = PlayerPrefs.GetFloat("RemoteDesktop_ScreenDepth", 0.5f);
+            float distance = Mathf.Lerp(zoom.MinDistance, zoom.MaxDistance, depth);
+            zoom.SetZoomDistance(distance);
         }
 
         /// <summary>
@@ -647,6 +691,9 @@ namespace VRWorkspace.UI.RTT.Controllers
                 _clusterRig.gameObject.SetActive(false);
             }
 
+            // Restore zoom distance to pre-remote value so main menu panels are unaffected
+            RestoreZoomDistance();
+
             // Show RTTMenuFrame and RTTTaskbar
             ShowMainMenuAndTaskbar();
 
@@ -677,6 +724,9 @@ namespace VRWorkspace.UI.RTT.Controllers
             {
                 taskbar.Hide();
             }
+
+            // Re-apply remote depth setting (zoom was restored for menu display)
+            ReapplyRemoteDepth();
 
             // Show ClusterRig
             if (_clusterRig != null)
@@ -869,6 +919,14 @@ namespace VRWorkspace.UI.RTT.Controllers
 
             // Create remote audio player for desktop audio streaming
             CreateRemoteAudioPlayer();
+
+            // Save current zoom distance before remote mode changes it
+            var zoom = VirtualObjectsZoomController.Instance;
+            if (zoom != null && _savedZoomDistance < 0f)
+            {
+                _savedZoomDistance = zoom.CurrentDistance;
+                Debug.Log($"[RTTRemoteMenuController] Saved zoom distance: {_savedZoomDistance:F2}m");
+            }
 
             // Create Remote Taskbar that follows ClusterRig
             CreateRemoteTaskbar();

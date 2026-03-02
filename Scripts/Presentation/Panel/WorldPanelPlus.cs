@@ -438,8 +438,20 @@ namespace VRWorkspace.Panel
                 // VR quality - mipmap LOD control for sharper textures at distance
                 if (_panelMat.HasProperty("_MipMapBias"))
                     _panelMat.SetFloat("_MipMapBias", mipMapBias);
+
+                // Clamp max mip level to 0 for textures without mipmaps.
+                // tex2Dlod at mip > 0 returns transparent on some mobile GPUs
+                // when the texture has no mipmap chain.
+                float effectiveMaxMip = maxMipLevel;
+                if (contentTexture is RenderTexture rt)
+                    effectiveMaxMip = rt.useMipMap ? maxMipLevel : 0f;
+                else if (contentTexture is Texture2D t2d)
+                    effectiveMaxMip = t2d.mipmapCount > 1 ? maxMipLevel : 0f;
+                else if (contentTexture != null)
+                    effectiveMaxMip = 0f; // Unknown texture type — safe fallback
+
                 if (_panelMat.HasProperty("_MaxMipLevel"))
-                    _panelMat.SetFloat("_MaxMipLevel", maxMipLevel);
+                    _panelMat.SetFloat("_MaxMipLevel", effectiveMaxMip);
                 if (_panelMat.HasProperty("_StableAA"))
                     _panelMat.SetFloat("_StableAA", stableAA ? 1f : 0f);
 

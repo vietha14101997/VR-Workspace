@@ -345,24 +345,37 @@ namespace VRWorkspace.UI.RTT.Components
         }
 
         /// <summary>
-        /// Position popup at the center of the primary RTTMenuFrame.
-        /// Converts primary frame's world position to local space of the toolbar parent.
+        /// Position popup centered on and parallel to the primary frame, at default zoom distance.
+        /// Uses direction from camera to primary frame (not camera forward) so the popup
+        /// stays aligned with the primary frame regardless of where the camera is looking.
         /// </summary>
         private void PositionPopupAtPrimaryFrame()
         {
+            if (_screenSettingsFrame == null) return;
+
+            Camera cam = Camera.main;
+            if (cam == null) return;
+
             RTTMenuFrame primary = RTTMenuFrame.PrimaryInstance;
-            if (primary == null || _screenSettingsFrame == null) return;
+            if (primary == null) return;
 
-            Transform toolbarParent = _screenSettingsFrame.transform.parent;
-            if (toolbarParent == null) return;
+            // Use default zoom distance for stable positioning regardless of current depth
+            var zoom = VirtualObjectsZoomController.Instance;
+            float distance = zoom != null ? zoom.DefaultDistance : 2.0f;
 
-            // Convert primary frame center to toolbar's local space
-            Vector3 localPos = toolbarParent.InverseTransformPoint(primary.transform.position);
-            _screenSettingsFrame.transform.localPosition = localPos;
+            Vector3 camPos = cam.transform.position;
+            // Use direction from camera to primary frame (not camera forward)
+            // This ensures popup is centered on and parallel to the primary frame
+            Vector3 toPrimary = primary.transform.position - camPos;
+            toPrimary.y = 0;
+            if (toPrimary.sqrMagnitude < 0.001f) toPrimary = cam.transform.forward;
+            toPrimary.Normalize();
 
-            // Match primary frame's rotation so popup stands upright like the screen
-            _screenSettingsFrame.transform.localRotation =
-                Quaternion.Inverse(toolbarParent.rotation) * primary.transform.rotation;
+            Vector3 position = camPos + toPrimary * distance;
+            position.y = primary.transform.position.y; // Match primary frame height
+
+            _screenSettingsFrame.transform.position = position;
+            _screenSettingsFrame.transform.rotation = Quaternion.LookRotation(toPrimary, Vector3.up);
         }
 
         /// <summary>
@@ -519,17 +532,14 @@ namespace VRWorkspace.UI.RTT.Components
 
         private void CreateScreenSettingsPopup()
         {
-            RTTToolbar toolbar = RTTToolbar.Instance;
-            if (toolbar == null) return;
-
             float physW = POPUP_PHYS_W;
             float physH = physW / POPUP_ASPECT;
             float logicalW = Mathf.Round(physW * POPUP_DENSITY);
             float logicalH = Mathf.Round(logicalW / POPUP_ASPECT);
 
             _screenSettingsFrame = new GameObject("ScreenSettingsPopupFrame");
-            _screenSettingsFrame.transform.SetParent(toolbar.transform, false);
-            _screenSettingsFrame.transform.localRotation = Quaternion.identity;
+            // Parent at scene root - immune to VirtualObjects zoom and Toolbar rotation
+            _screenSettingsFrame.transform.SetParent(null, false);
             _screenSettingsFrame.layer = LayerMask.NameToLayer("UI");
 
             var menuFrame = _screenSettingsFrame.AddComponent<RTTMenuFrame>();
@@ -613,11 +623,10 @@ namespace VRWorkspace.UI.RTT.Components
         private void ApplyScreenDepth(float v)
         {
             var zoom = VirtualObjectsZoomController.Instance;
-            if (zoom != null)
-            {
-                float distance = Mathf.Lerp(zoom.MinDistance, zoom.MaxDistance, v);
-                zoom.SetZoomDistance(distance);
-            }
+            if (zoom == null) return;
+
+            float distance = Mathf.Lerp(zoom.MinDistance, zoom.MaxDistance, v);
+            zoom.SetZoomDistance(distance);
         }
 
         private void ApplyScreenHeight(float v)
@@ -626,6 +635,9 @@ namespace VRWorkspace.UI.RTT.Components
             {
                 _clusterRig.verticalOffset = (v - 0.5f) * 1.0f;
                 _clusterRig.RequestLayout();
+
+                // Notify toolbar about height change so it can reposition
+                RTTToolbar.Instance?.SetActiveClusterRig(_clusterRig);
             }
         }
 
@@ -635,6 +647,10 @@ namespace VRWorkspace.UI.RTT.Components
             {
                 float scale = Mathf.Max(0.1f, 0.5f + v);
                 _clusterRig.transform.localScale = Vector3.one * scale;
+
+                // Notify toolbar about scale change so it can reposition
+                // using the cluster rig's scaled bounds
+                RTTToolbar.Instance?.SetActiveClusterRig(_clusterRig);
             }
         }
 
@@ -1587,10 +1603,12 @@ namespace VRWorkspace.UI.RTT.Components
         /// <summary>
         /// Set the ClusterRig reference for panel enable/disable functionality,
         /// without changing the follow target.
+        /// Also notifies RTTToolbar for dynamic scaled target height calculation.
         /// </summary>
         public void SetClusterRig(WorldPanelClusterRig clusterRig)
         {
             _clusterRig = clusterRig;
+            RTTToolbar.Instance?.SetActiveClusterRig(clusterRig);
         }
 
         /// <summary>
@@ -1615,6 +1633,7 @@ namespace VRWorkspace.UI.RTT.Components
                 if (RTTToolbar.Instance != null)
                 {
                     RTTToolbar.Instance.SetActiveTaskbar(_miniFrame);
+                    RTTToolbar.Instance.SetActiveClusterRig(_clusterRig);
                 }
             }
         }

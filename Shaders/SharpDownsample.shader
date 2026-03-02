@@ -53,36 +53,45 @@ Shader "Hidden/SharpDownsample"
                 // 4x4 sample grid centered on the 2x2 source block
                 // Offsets: -1.5, -0.5, +0.5, +1.5 texels from center
 
+                // Use tex2Dlod at mip 0 explicitly to prevent trilinear from
+                // blending with uninitialized higher mip levels of the source RT.
+                #define SAMPLE(offset) tex2Dlod(_MainTex, float4(uv + (offset) * ts, 0, 0))
+
                 // Center 2x2 (weight = wCenter each)
-                float4 c00 = tex2D(_MainTex, uv + float2(-0.5, -0.5) * ts);
-                float4 c10 = tex2D(_MainTex, uv + float2( 0.5, -0.5) * ts);
-                float4 c01 = tex2D(_MainTex, uv + float2(-0.5,  0.5) * ts);
-                float4 c11 = tex2D(_MainTex, uv + float2( 0.5,  0.5) * ts);
+                float4 c00 = SAMPLE(float2(-0.5, -0.5));
+                float4 c10 = SAMPLE(float2( 0.5, -0.5));
+                float4 c01 = SAMPLE(float2(-0.5,  0.5));
+                float4 c11 = SAMPLE(float2( 0.5,  0.5));
 
                 // Edge samples - top/bottom (weight = wEdge each)
-                float4 eT0 = tex2D(_MainTex, uv + float2(-0.5, -1.5) * ts);
-                float4 eT1 = tex2D(_MainTex, uv + float2( 0.5, -1.5) * ts);
-                float4 eB0 = tex2D(_MainTex, uv + float2(-0.5,  1.5) * ts);
-                float4 eB1 = tex2D(_MainTex, uv + float2( 0.5,  1.5) * ts);
+                float4 eT0 = SAMPLE(float2(-0.5, -1.5));
+                float4 eT1 = SAMPLE(float2( 0.5, -1.5));
+                float4 eB0 = SAMPLE(float2(-0.5,  1.5));
+                float4 eB1 = SAMPLE(float2( 0.5,  1.5));
 
                 // Edge samples - left/right (weight = wEdge each)
-                float4 eL0 = tex2D(_MainTex, uv + float2(-1.5, -0.5) * ts);
-                float4 eL1 = tex2D(_MainTex, uv + float2(-1.5,  0.5) * ts);
-                float4 eR0 = tex2D(_MainTex, uv + float2( 1.5, -0.5) * ts);
-                float4 eR1 = tex2D(_MainTex, uv + float2( 1.5,  0.5) * ts);
+                float4 eL0 = SAMPLE(float2(-1.5, -0.5));
+                float4 eL1 = SAMPLE(float2(-1.5,  0.5));
+                float4 eR0 = SAMPLE(float2( 1.5, -0.5));
+                float4 eR1 = SAMPLE(float2( 1.5,  0.5));
 
                 // Corner samples (weight = wCorner each)
-                float4 cTL = tex2D(_MainTex, uv + float2(-1.5, -1.5) * ts);
-                float4 cTR = tex2D(_MainTex, uv + float2( 1.5, -1.5) * ts);
-                float4 cBL = tex2D(_MainTex, uv + float2(-1.5,  1.5) * ts);
-                float4 cBR = tex2D(_MainTex, uv + float2( 1.5,  1.5) * ts);
+                float4 cTL = SAMPLE(float2(-1.5, -1.5));
+                float4 cTR = SAMPLE(float2( 1.5, -1.5));
+                float4 cBL = SAMPLE(float2(-1.5,  1.5));
+                float4 cBR = SAMPLE(float2( 1.5,  1.5));
+
+                #undef SAMPLE
 
                 // Weighted sum (always sums to 1.0 for any s value)
                 float4 result = (c00 + c10 + c01 + c11) * wCenter
                               + (eT0 + eT1 + eB0 + eB1 + eL0 + eL1 + eR0 + eR1) * wEdge
                               + (cTL + cTR + cBL + cBR) * wCorner;
 
-                return saturate(result);
+                // Force alpha=1: desktop/video content is always opaque.
+                // Some mobile GPUs corrupt alpha during CopyTexture to mip levels,
+                // causing transparent panels at distance when tex2Dlod samples mip > 0.
+                return float4(saturate(result.rgb), 1.0);
             }
             ENDCG
         }
