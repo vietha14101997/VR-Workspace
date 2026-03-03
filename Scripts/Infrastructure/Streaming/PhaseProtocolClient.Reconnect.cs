@@ -316,10 +316,23 @@ namespace VRWorkspace.Streaming
 
                 // STEP 3: Full reconnect (last resort)
                 wrapper.GraduatedRecoveryStep = 3;
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} graduated step 3: full reconnect");
-                wrapper.IsInGraduatedRecovery = false;
-                wrapper.IsReconnecting = true;
-                await AutoHealMonitorAsync(monitorIndex);
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} graduated step 2 failed, triggering reconnection...");
+                
+                bool isSinglePC = false;
+                lock (_lock) { isSinglePC = _peerConnections.Count > 1 && _peerConnections.All(w => w.PC == wrapper.PC); }
+
+                if (isSinglePC)
+                {
+                    Debug.Log($"[PhaseProtocol] PC{monitorIndex} graduated step 3: full Single-PC reconnect");
+                    wrapper.IsReconnecting = true;
+                    _ = ReconnectSinglePCAsync();
+                }
+                else
+                {
+                    Debug.Log($"[PhaseProtocol] PC{monitorIndex} graduated step 3: monitor reconnect");
+                    wrapper.IsReconnecting = true;
+                    await AutoHealMonitorAsync(monitorIndex);
+                }
             }
             catch (OperationCanceledException) { }
             finally
@@ -393,9 +406,25 @@ namespace VRWorkspace.Streaming
                 Debug.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal: PC state={state}, initiating reconnect...");
             }
 
+            // If multiple monitors share same PC (Single-PC mode), we MUST reconnect the whole PC
+            // because server ignores per-monitor offers (index > 0) in Phase 3.
+            bool isSinglePC = false;
+            lock (_lock)
+            {
+                isSinglePC = _peerConnections.Count > 1 && _peerConnections.All(w => w.PC == wrapper.PC);
+            }
+
             try
             {
-                await ReconnectMonitorAsync(monitorIndex);
+                if (isSinglePC)
+                {
+                    Debug.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal: Triggering full Single-PC multi-track reconnect");
+                    await ReconnectSinglePCAsync();
+                }
+                else
+                {
+                    await ReconnectMonitorAsync(monitorIndex);
+                }
             }
             catch (Exception ex)
             {
