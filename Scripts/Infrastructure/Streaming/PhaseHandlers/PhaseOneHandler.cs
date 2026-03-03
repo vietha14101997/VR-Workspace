@@ -408,7 +408,7 @@ namespace VRWorkspace.Streaming
             var cap = new ClientCodecCapability
             {
                 supportedCodecs = codecs,
-                preferredCodec  = "H264",
+                preferredCodec  = hevcAvailable ? "H265" : "H264",
                 supportsHevc    = hevcAvailable,
                 supportsVP9     = true,
                 supportsVP8     = true,
