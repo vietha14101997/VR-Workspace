@@ -41,6 +41,10 @@ namespace VRWorkspace.Panel
         [Range(0f, 0.25f)] public float mipSharpness = 0.1f;
         [Tooltip("Stable AA: eliminates VR shimmer by using fixed mip + 4-sample AA instead of trilinear blending.")]
         public bool stableAA = true;
+        [Tooltip("Shimmer Blend: controlled partial trilinear between adjacent mips. 0=sharp but shimmer, 0.2=recommended, 0.5=no shimmer but softer.")]
+        [Range(0f, 0.5f)] public float shimmerBlend = 0.2f;
+        [Tooltip("Temporal Smooth: suppress video encoder micro-noise on static content. 0=off, 0.5=recommended, 1=max smoothing.")]
+        [Range(0f, 1f)] public float temporalSmooth = 0.5f;
 
         [Header("Video Sharpening (disable if image has artifacts)")]
         [Tooltip("Enable shader-based luminance sharpening to restore edge detail.")]
@@ -454,6 +458,10 @@ namespace VRWorkspace.Panel
                     _panelMat.SetFloat("_MaxMipLevel", effectiveMaxMip);
                 if (_panelMat.HasProperty("_StableAA"))
                     _panelMat.SetFloat("_StableAA", stableAA ? 1f : 0f);
+                if (_panelMat.HasProperty("_ShimmerBlend"))
+                    _panelMat.SetFloat("_ShimmerBlend", shimmerBlend);
+                if (_panelMat.HasProperty("_TemporalSmooth"))
+                    _panelMat.SetFloat("_TemporalSmooth", temporalSmooth);
 
                 // Stereo support
                 if (_panelMat.HasProperty("_StereoMode"))

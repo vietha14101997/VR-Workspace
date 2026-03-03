@@ -44,7 +44,7 @@ namespace VRWorkspace.Streaming
     [Serializable]
     public class ClientCodecCapability
     {
-        public string[] supportedCodecs;    // Codecs client can decode (H264, VP9, VP8)
+        public string[] supportedCodecs;    // Codecs client can decode (H264, H265, VP9, VP8)
         public string preferredCodec;       // Client's preferred codec
         public bool supportsHevc;           // HEVC hardware decoder available
         public bool supportsVP9;            // VP9 decoding support (Unity WebRTC native)

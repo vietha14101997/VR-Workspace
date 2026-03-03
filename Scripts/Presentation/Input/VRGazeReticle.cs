@@ -41,28 +41,42 @@ namespace VRWorkspace.VRInput
         [Tooltip("Bật/tắt tính năng ổn định đầu (giảm rung lắc)")]
         public bool headStabilizationEnabled = true;
 
-        [Tooltip("Hệ số smoothing khi đứng yên (thấp = mượt hơn)")]
-        [Range(0.7f, 0.95f)]
-        public float stillSmoothingFactor = 0.80f;
+        [Tooltip("Hệ số smoothing khi đứng yên (thấp = ít noise hơn, camera ổn định hơn)")]
+        [Range(0.01f, 0.15f)]
+        public float stillSmoothingFactor = 0.05f;
 
         [Tooltip("Hệ số smoothing khi quay đầu (cao = responsive hơn)")]
-        [Range(0.9f, 0.99f)]
-        public float movingSmoothingFactor = 0.97f;
+        [Range(0.5f, 0.99f)]
+        public float movingSmoothingFactor = 0.90f;
 
         [Tooltip("Ngưỡng vận tốc góc (độ/giây) coi là 'đứng yên'")]
-        [Range(1f, 10f)]
-        public float stillThreshold = 5f;
+        [Range(0.5f, 10f)]
+        public float stillThreshold = 1.5f;
 
         [Tooltip("Ngưỡng vận tốc góc (độ/giây) coi là 'quay nhanh'")]
-        [Range(15f, 60f)]
-        public float fastThreshold = 35f;
+        [Range(10f, 60f)]
+        public float fastThreshold = 25f;
 
-        [Tooltip("Cường độ chỉnh drift (cao = nhanh hơn nhưng có thể gây khó chịu)")]
-        [Range(0.01f, 0.1f)]
-        public float driftCorrectionStrength = 0.03f;
+        [Header("Dead Zone")]
+        [Tooltip("Ngưỡng dead zone (độ/giây) - chuyển động dưới mức này bị bỏ qua hoàn toàn")]
+        [Range(0.1f, 3f)]
+        public float deadZoneThreshold = 0.8f;
+
+        [Header("Drift Correction")]
+        [Tooltip("Cường độ chỉnh drift pitch/roll bằng accelerometer")]
+        [Range(0.01f, 0.5f)]
+        public float driftCorrectionStrength = 0.15f;
 
         [Tooltip("Bật/tắt chỉnh drift bằng accelerometer")]
         public bool driftCorrectionEnabled = true;
+
+        [Tooltip("Hệ số lọc low-pass cho accelerometer (thấp = lọc mạnh hơn, ít noise)")]
+        [Range(0.01f, 0.3f)]
+        public float accelFilterAlpha = 0.05f;
+
+        [Tooltip("Cường độ bù yaw drift khi đứng yên")]
+        [Range(0.01f, 0.5f)]
+        public float yawDriftDamping = 0.1f;
 
         private Image _reticleImage;
         private Camera _cam;
@@ -113,6 +127,15 @@ namespace VRWorkspace.VRInput
         private Vector3 _previousEuler;
         private float _currentSmoothingFactor;
         private bool _stabilizationInitialized = false;
+
+        // Accelerometer low-pass filter state
+        private Vector3 _filteredAccel = Vector3.zero;
+        private bool _accelInitialized = false;
+
+        // Yaw drift compensation state
+        private float _stationaryYaw;
+        private float _stationaryTimer = 0f;
+        private const float kStationaryLockDelay = 0.3f; // seconds before locking yaw
 
         // Singleton access helper (optional, or use FindObjectOfType)
         public static VRGazeReticle Instance { get; private set; }
@@ -1227,6 +1250,9 @@ namespace VRWorkspace.VRInput
                 _stabilizedRotation = _cam.transform.rotation;
                 _previousEuler = _cam.transform.eulerAngles;
                 _currentSmoothingFactor = stillSmoothingFactor;
+                _stationaryYaw = _cam.transform.eulerAngles.y;
+                _stationaryTimer = 0f;
+                _accelInitialized = false;
                 _stabilizationInitialized = true;
             }
         }
@@ -1243,24 +1269,48 @@ namespace VRWorkspace.VRInput
         {
             if (_cam == null) return;
 
+            float dt = Time.deltaTime;
+            if (dt <= 0f) return;
+
             // Get raw rotation from TrackedPoseDriver
             Quaternion rawRotation = _cam.transform.rotation;
 
             // Calculate angular velocity for adaptive smoothing
             Vector3 currentEuler = rawRotation.eulerAngles;
             Vector3 deltaEuler = DeltaAngles(_previousEuler, currentEuler);
-            float angularSpeed = deltaEuler.magnitude / Time.deltaTime;
+            float angularSpeed = deltaEuler.magnitude / dt;
 
-            // Adaptive smoothing factor based on movement speed
-            _currentSmoothingFactor = CalculateAdaptiveSmoothingFactor(angularSpeed);
+            // === DEAD ZONE: Ignore micro-movements (gyroscope noise) ===
+            bool isStationary = angularSpeed < deadZoneThreshold;
+            if (isStationary)
+            {
+                // Below dead zone threshold - keep previous stabilized rotation (ignore noise completely)
+                _stationaryTimer += dt;
+            }
+            else
+            {
+                // Above dead zone - apply adaptive smoothing
+                _stationaryTimer = 0f;
+                _currentSmoothingFactor = CalculateAdaptiveSmoothingFactor(angularSpeed);
+                _stabilizedRotation = Quaternion.Slerp(_stabilizedRotation, rawRotation, _currentSmoothingFactor);
+            }
 
-            // Apply complementary filter (Slerp between previous stabilized and new raw)
-            _stabilizedRotation = Quaternion.Slerp(_stabilizedRotation, rawRotation, _currentSmoothingFactor);
-
-            // Apply drift correction if enabled
+            // === DRIFT CORRECTION (Pitch/Roll via accelerometer) ===
             if (driftCorrectionEnabled)
             {
-                ApplyDriftCorrection(ref _stabilizedRotation);
+                ApplyDriftCorrection(ref _stabilizedRotation, isStationary);
+            }
+
+            // === YAW DRIFT COMPENSATION ===
+            if (isStationary && _stationaryTimer > kStationaryLockDelay)
+            {
+                // When stationary for a while, gently pull yaw back to locked position
+                ApplyYawDriftCompensation(ref _stabilizedRotation, dt);
+            }
+            else if (!isStationary)
+            {
+                // Update the "intended" yaw while user is actively moving
+                _stationaryYaw = _stabilizedRotation.eulerAngles.y;
             }
 
             // Apply stabilized rotation to camera
@@ -1277,34 +1327,66 @@ namespace VRWorkspace.VRInput
             if (angularSpeed <= stillThreshold)
                 return stillSmoothingFactor;
 
-            // Linear interpolation between still and fast thresholds
+            // Smooth interpolation between still and fast thresholds
             float t = (angularSpeed - stillThreshold) / (fastThreshold - stillThreshold);
+            t = t * t * (3f - 2f * t); // SmoothStep for gradual transition
             return Mathf.Lerp(stillSmoothingFactor, movingSmoothingFactor, t);
         }
 
-        void ApplyDriftCorrection(ref Quaternion rotation)
+        void ApplyDriftCorrection(ref Quaternion rotation, bool isStationary)
         {
-            // Get accelerometer data (gravity direction when still)
-            Vector3 accel = Input.acceleration;
-            float accelMagnitude = accel.magnitude;
+            // Get and filter accelerometer data
+            Vector3 rawAccel = Input.acceleration;
+            float accelMagnitude = rawAccel.magnitude;
 
-            // Only apply correction when accelerometer reading is valid (near 1g)
+            // Only process valid accelerometer readings (near 1g = device not in freefall/fast motion)
             if (accelMagnitude < 0.8f || accelMagnitude > 1.2f)
                 return;
 
-            // Accelerometer gives "down" direction in device space
-            // Convert to "up" and normalize
-            Vector3 accelUp = -accel.normalized;
+            // Low-pass filter accelerometer to remove noise
+            if (!_accelInitialized)
+            {
+                _filteredAccel = rawAccel;
+                _accelInitialized = true;
+            }
+            else
+            {
+                _filteredAccel = Vector3.Lerp(_filteredAccel, rawAccel, accelFilterAlpha);
+            }
+
+            // Normalized filtered gravity-up vector
+            Vector3 accelUp = -_filteredAccel.normalized;
 
             // Get current up from stabilized rotation
             Vector3 currentUp = rotation * Vector3.up;
 
-            // Calculate correction rotation
+            // Calculate pitch/roll correction only (preserve yaw)
             Quaternion correction = Quaternion.FromToRotation(currentUp, accelUp);
 
-            // Apply gradual correction
-            float correctionStep = driftCorrectionStrength * Time.deltaTime;
+            // Stronger correction when stationary, gentler when moving
+            float strength = isStationary
+                ? driftCorrectionStrength * 2f
+                : driftCorrectionStrength;
+            float correctionStep = strength * Time.deltaTime;
             rotation = Quaternion.Slerp(Quaternion.identity, correction, correctionStep) * rotation;
+        }
+
+        void ApplyYawDriftCompensation(ref Quaternion rotation, float dt)
+        {
+            // Extract current euler from stabilized rotation
+            Vector3 euler = rotation.eulerAngles;
+            float currentYaw = euler.y;
+
+            // Calculate yaw difference
+            float yawDelta = Mathf.DeltaAngle(currentYaw, _stationaryYaw);
+
+            // Only correct if drift is small enough to be noise (not intentional movement we missed)
+            if (Mathf.Abs(yawDelta) > 5f) return;
+
+            // Gently pull yaw back toward the locked position
+            float correction = yawDelta * yawDriftDamping * dt;
+            euler.y = currentYaw + correction;
+            rotation = Quaternion.Euler(euler.x, euler.y, euler.z);
         }
 
         Vector3 DeltaAngles(Vector3 from, Vector3 to)
@@ -1325,6 +1407,9 @@ namespace VRWorkspace.VRInput
             {
                 _stabilizedRotation = _cam.transform.rotation;
                 _previousEuler = _cam.transform.eulerAngles;
+                _stationaryYaw = _cam.transform.eulerAngles.y;
+                _stationaryTimer = 0f;
+                _accelInitialized = false;
             }
         }
 

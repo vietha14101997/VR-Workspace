@@ -155,15 +155,16 @@ namespace VRWorkspace.Streaming
         }
 
         /// <summary>
-        /// Update dynamic encoding settings (FPS and/or bitrate).
+        /// Update dynamic encoding settings (FPS, bitrate, and/or resolution).
         /// </summary>
-        public async Task UpdateConfigAsync(int? fps, int? bitrateKbps)
+        public async Task UpdateConfigAsync(int? fps, int? bitrateKbps, int? resolutionHeight = null)
         {
             if (!EnsureStreaming("UpdateConfig")) return;
 
             var parts = new System.Collections.Generic.List<string> { "\"type\":\"update_config\"" };
-            if (fps.HasValue)         parts.Add($"\"fps\":{fps.Value}");
-            if (bitrateKbps.HasValue) parts.Add($"\"bitrateKbps\":{bitrateKbps.Value}");
+            if (fps.HasValue)              parts.Add($"\"fps\":{fps.Value}");
+            if (bitrateKbps.HasValue)      parts.Add($"\"bitrateKbps\":{bitrateKbps.Value}");
+            if (resolutionHeight.HasValue) parts.Add($"\"resolutionHeight\":{resolutionHeight.Value}");
 
             string json = "{" + string.Join(",", parts) + "}";
             Debug.Log($"[Phase3] update_config: {json}");

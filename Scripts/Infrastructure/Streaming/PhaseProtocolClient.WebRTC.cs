@@ -535,19 +535,19 @@ namespace VRWorkspace.Streaming
                     break;
 
                 case VideoCodec.VP9:
-                    // VP9 → H264 → VP8 → others (skip H265 as not supported)
-                    preferredCodecs = vp9.Concat(h264).Concat(vp8).Concat(others).ToArray();
+                    // VP9 → H264 → H265 → VP8 → others
+                    preferredCodecs = vp9.Concat(h264).Concat(h265).Concat(vp8).Concat(others).ToArray();
                     break;
 
                 case VideoCodec.VP8:
-                    // VP8 → H264 → VP9 → others
-                    preferredCodecs = vp8.Concat(h264).Concat(vp9).Concat(others).ToArray();
+                    // VP8 → H264 → VP9 → H265 → others
+                    preferredCodecs = vp8.Concat(h264).Concat(vp9).Concat(h265).Concat(others).ToArray();
                     break;
 
                 case VideoCodec.H264:
                 default:
-                    // H264 → VP9 → VP8 → others
-                    preferredCodecs = h264.Concat(vp9).Concat(vp8).Concat(others).ToArray();
+                    // H264 → H265 → VP9 → VP8 → others
+                    preferredCodecs = h264.Concat(h265).Concat(vp9).Concat(vp8).Concat(others).ToArray();
                     break;
             }
 

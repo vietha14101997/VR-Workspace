@@ -106,13 +106,22 @@ namespace VRWorkspace.Streaming
 
             var codecsArray   = string.Join(",", clientCap.supportedCodecs.Select(c => $"\"{c}\""));
             var supportsHevc  = clientCap.supportsHevc.ToString().ToLower();
+
+            // Get client screen resolution for server-side resize decision
+            // For VR headsets: Screen.currentResolution gives the device display resolution
+            int screenWidth = Screen.currentResolution.width;
+            int screenHeight = Screen.currentResolution.height;
+            Debug.Log($"[Phase1] Client screen resolution: {screenWidth}x{screenHeight}");
+
             var ackJson       =
                 $"{{\"type\":\"hardware_info_ack\",\"clientCodecs\":{{" +
                 $"\"supportedCodecs\":[{codecsArray}]," +
                 $"\"preferredCodec\":\"{clientCap.preferredCodec}\"," +
                 $"\"supportsHevc\":{supportsHevc}," +
                 $"\"deviceModel\":\"{EscapeJson(clientCap.deviceModel)}\"," +
-                $"\"apiLevel\":{clientCap.apiLevel}" +
+                $"\"apiLevel\":{clientCap.apiLevel}," +
+                $"\"screenWidth\":{screenWidth}," +
+                $"\"screenHeight\":{screenHeight}" +
                 $"}}}}";
             await _send(ackJson);
             Debug.Log("[Phase1] hardware_info_ack sent");
@@ -373,15 +382,34 @@ namespace VRWorkspace.Streaming
         }
 
         /// <summary>
-        /// Discover client codec capabilities (H264, VP9, VP8 via Unity WebRTC; no H265).
+        /// Discover client codec capabilities.
+        /// Checks HevcDecoderPlugin.IsAvailable() to detect H265 hardware decoder.
         /// </summary>
         private static ClientCodecCapability GetClientCodecCapability()
         {
+            // Check if HEVC hardware decoder is available via HevcDecoder.aar
+            bool hevcAvailable = false;
+#if UNITY_ANDROID && !UNITY_EDITOR
+            try
+            {
+                hevcAvailable = Native.HevcDecoderPlugin.IsAvailable();
+                Debug.Log($"[Phase1] HEVC hardware decoder available: {hevcAvailable}");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[Phase1] HEVC availability check failed: {ex.Message}");
+            }
+#endif
+
+            var codecs = hevcAvailable
+                ? new[] { "H264", "H265", "VP9", "VP8" }
+                : new[] { "H264", "VP9", "VP8" };
+
             var cap = new ClientCodecCapability
             {
-                supportedCodecs = new[] { "H264", "VP9", "VP8" },
+                supportedCodecs = codecs,
                 preferredCodec  = "H264",
-                supportsHevc    = false,
+                supportsHevc    = hevcAvailable,
                 supportsVP9     = true,
                 supportsVP8     = true,
                 deviceModel     = UnityEngine.SystemInfo.deviceModel,

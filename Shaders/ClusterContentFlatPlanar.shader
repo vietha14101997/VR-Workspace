@@ -33,6 +33,8 @@ Shader "Custom/ClusterContentFlatPlanar"
         [Header(VR Quality)]
         _MipMapBias ("Mipmap Bias", Range(-2, 0)) = 0
         _MaxMipLevel ("Max Mip Level", Range(0, 4)) = 1.5
+        // Stable AA: 0=legacy tex2Dgrad (trilinear, may shimmer), 1=stable 4-sample (VR recommended)
+        _StableAA ("Stable AA (VR anti-shimmer)", Float) = 1
     }
 
     SubShader
@@ -107,6 +109,7 @@ Shader "Custom/ClusterContentFlatPlanar"
             // VR quality - mipmap bias for sharper textures at distance
             float _MipMapBias;
             float _MaxMipLevel;
+            float _StableAA;
 
             // SDF for rounded box
             float sdRoundedBox(float2 pos, float2 halfSize, float radius)
@@ -129,19 +132,81 @@ Shader "Custom/ClusterContentFlatPlanar"
                 return tex2Dgrad(tex, uv, uvDx * scale, uvDy * scale);
             }
 
+            // ==========================================
+            // STABLE AA: VR anti-shimmer sampling
+            // Floor LOD to integer + 4-sample rotated grid
+            // ==========================================
+
+            float ComputeStableMip(float2 uvDx, float2 uvDy, float2 texSize, float maxLod, float bias)
+            {
+                float2 dx = uvDx * texSize;
+                float2 dy = uvDy * texSize;
+                float minAxis = min(length(dx), length(dy));
+                float lod = log2(max(minAxis, 1.0));
+                float targetLod = clamp(lod + bias, 0.0, maxLod);
+                return floor(targetLod);
+            }
+
+            float4 SampleStableLOD(sampler2D tex, float2 uv, float mipLevel)
+            {
+                return tex2Dlod(tex, float4(uv, 0, mipLevel));
+            }
+
+            float4 SampleStableAA(sampler2D tex, float2 uv, float2 uvDx, float2 uvDy, float mipLevel)
+            {
+                float2 sDx = uvDx * 0.125;
+                float2 sDy = uvDy * 0.125;
+                float4 s1 = tex2Dlod(tex, float4(uv + sDx + sDy, 0, mipLevel));
+                float4 s2 = tex2Dlod(tex, float4(uv - sDx + sDy, 0, mipLevel));
+                float4 s3 = tex2Dlod(tex, float4(uv + sDx - sDy, 0, mipLevel));
+                float4 s4 = tex2Dlod(tex, float4(uv - sDx - sDy, 0, mipLevel));
+                return (s1 + s2 + s3 + s4) * 0.25;
+            }
+
+            float4 SampleTexture(sampler2D tex, float2 uv, float2 uvDx, float2 uvDy,
+                                 float2 texSize, float maxLod, float bias, float stableAA)
+            {
+                if (stableAA > 0.5)
+                {
+                    float mip = ComputeStableMip(uvDx, uvDy, texSize, maxLod, bias);
+                    return SampleStableAA(tex, uv, uvDx, uvDy, mip);
+                }
+                else
+                {
+                    return SampleClampedLOD(tex, uv, uvDx, uvDy, texSize, maxLod, bias);
+                }
+            }
+
             // Unsharp Mask with LOD-clamped sampling and luminance-only sharpening
+            // Supports both legacy (tex2Dgrad) and stable AA (tex2Dlod) modes
             float4 UnsharpMask(sampler2D tex, float2 uv, float2 uvDx, float2 uvDy,
                                float2 texelSize, float2 texSize,
                                float sharpness, float radius, float maxLod, float mipBias)
             {
-                float4 center = SampleClampedLOD(tex, uv, uvDx, uvDy, texSize, maxLod, mipBias);
+                float4 center;
+                float4 blur;
 
-                float4 blur = (
-                    SampleClampedLOD(tex, uv + float2(-texelSize.x, 0) * radius, uvDx, uvDy, texSize, maxLod, mipBias) +
-                    SampleClampedLOD(tex, uv + float2( texelSize.x, 0) * radius, uvDx, uvDy, texSize, maxLod, mipBias) +
-                    SampleClampedLOD(tex, uv + float2(0, -texelSize.y) * radius, uvDx, uvDy, texSize, maxLod, mipBias) +
-                    SampleClampedLOD(tex, uv + float2(0,  texelSize.y) * radius, uvDx, uvDy, texSize, maxLod, mipBias)
-                ) * 0.25;
+                if (_StableAA > 0.5)
+                {
+                    float mip = ComputeStableMip(uvDx, uvDy, texSize, maxLod, mipBias);
+                    center = SampleStableAA(tex, uv, uvDx, uvDy, mip);
+                    blur = (
+                        SampleStableLOD(tex, uv + float2(-texelSize.x, 0) * radius, mip) +
+                        SampleStableLOD(tex, uv + float2( texelSize.x, 0) * radius, mip) +
+                        SampleStableLOD(tex, uv + float2(0, -texelSize.y) * radius, mip) +
+                        SampleStableLOD(tex, uv + float2(0,  texelSize.y) * radius, mip)
+                    ) * 0.25;
+                }
+                else
+                {
+                    center = SampleClampedLOD(tex, uv, uvDx, uvDy, texSize, maxLod, mipBias);
+                    blur = (
+                        SampleClampedLOD(tex, uv + float2(-texelSize.x, 0) * radius, uvDx, uvDy, texSize, maxLod, mipBias) +
+                        SampleClampedLOD(tex, uv + float2( texelSize.x, 0) * radius, uvDx, uvDy, texSize, maxLod, mipBias) +
+                        SampleClampedLOD(tex, uv + float2(0, -texelSize.y) * radius, uvDx, uvDy, texSize, maxLod, mipBias) +
+                        SampleClampedLOD(tex, uv + float2(0,  texelSize.y) * radius, uvDx, uvDy, texSize, maxLod, mipBias)
+                    ) * 0.25;
+                }
 
                 float centerLuma = dot(center.rgb, float3(0.299, 0.587, 0.114));
                 float blurLuma = dot(blur.rgb, float3(0.299, 0.587, 0.114));
@@ -161,7 +226,7 @@ Shader "Custom/ClusterContentFlatPlanar"
                 return saturate(color);
             }
 
-            // Sample from specific panel texture with LOD-clamped sampling
+            // Sample from specific panel texture with stable or legacy sampling
             // uvDx/uvDy: pre-computed UV derivatives for smooth LOD calculation
             float4 SamplePanel(int panelIndex, float2 panelUV, float2 uvDx, float2 uvDy)
             {
@@ -169,7 +234,7 @@ Shader "Custom/ClusterContentFlatPlanar"
                 float2 texelSize = float2(0.001, 0.001);
                 float2 texSize = float2(1920, 1080);
 
-                // Sample based on panel index with LOD-clamped sampling
+                // Sample based on panel index with stable or legacy sampling
                 if (panelIndex == 0)
                 {
                     texelSize = _Content0_TexelSize.xy;
@@ -177,7 +242,7 @@ Shader "Custom/ClusterContentFlatPlanar"
                     if (_EnableSharpening > 0.5)
                         color = UnsharpMask(_Content0, panelUV, uvDx, uvDy, texelSize, texSize, _Sharpness, _SharpnessRadius, _MaxMipLevel, _MipMapBias);
                     else
-                        color = SampleClampedLOD(_Content0, panelUV, uvDx, uvDy, texSize, _MaxMipLevel, _MipMapBias);
+                        color = SampleTexture(_Content0, panelUV, uvDx, uvDy, texSize, _MaxMipLevel, _MipMapBias, _StableAA);
                 }
                 else if (panelIndex == 1)
                 {
@@ -186,7 +251,7 @@ Shader "Custom/ClusterContentFlatPlanar"
                     if (_EnableSharpening > 0.5)
                         color = UnsharpMask(_Content1, panelUV, uvDx, uvDy, texelSize, texSize, _Sharpness, _SharpnessRadius, _MaxMipLevel, _MipMapBias);
                     else
-                        color = SampleClampedLOD(_Content1, panelUV, uvDx, uvDy, texSize, _MaxMipLevel, _MipMapBias);
+                        color = SampleTexture(_Content1, panelUV, uvDx, uvDy, texSize, _MaxMipLevel, _MipMapBias, _StableAA);
                 }
                 else if (panelIndex == 2)
                 {
@@ -195,7 +260,7 @@ Shader "Custom/ClusterContentFlatPlanar"
                     if (_EnableSharpening > 0.5)
                         color = UnsharpMask(_Content2, panelUV, uvDx, uvDy, texelSize, texSize, _Sharpness, _SharpnessRadius, _MaxMipLevel, _MipMapBias);
                     else
-                        color = SampleClampedLOD(_Content2, panelUV, uvDx, uvDy, texSize, _MaxMipLevel, _MipMapBias);
+                        color = SampleTexture(_Content2, panelUV, uvDx, uvDy, texSize, _MaxMipLevel, _MipMapBias, _StableAA);
                 }
                 else if (panelIndex == 3)
                 {
@@ -204,7 +269,7 @@ Shader "Custom/ClusterContentFlatPlanar"
                     if (_EnableSharpening > 0.5)
                         color = UnsharpMask(_Content3, panelUV, uvDx, uvDy, texelSize, texSize, _Sharpness, _SharpnessRadius, _MaxMipLevel, _MipMapBias);
                     else
-                        color = SampleClampedLOD(_Content3, panelUV, uvDx, uvDy, texSize, _MaxMipLevel, _MipMapBias);
+                        color = SampleTexture(_Content3, panelUV, uvDx, uvDy, texSize, _MaxMipLevel, _MipMapBias, _StableAA);
                 }
                 else if (panelIndex == 4)
                 {
@@ -213,7 +278,7 @@ Shader "Custom/ClusterContentFlatPlanar"
                     if (_EnableSharpening > 0.5)
                         color = UnsharpMask(_Content4, panelUV, uvDx, uvDy, texelSize, texSize, _Sharpness, _SharpnessRadius, _MaxMipLevel, _MipMapBias);
                     else
-                        color = SampleClampedLOD(_Content4, panelUV, uvDx, uvDy, texSize, _MaxMipLevel, _MipMapBias);
+                        color = SampleTexture(_Content4, panelUV, uvDx, uvDy, texSize, _MaxMipLevel, _MipMapBias, _StableAA);
                 }
                 else if (panelIndex == 5)
                 {
@@ -222,7 +287,7 @@ Shader "Custom/ClusterContentFlatPlanar"
                     if (_EnableSharpening > 0.5)
                         color = UnsharpMask(_Content5, panelUV, uvDx, uvDy, texelSize, texSize, _Sharpness, _SharpnessRadius, _MaxMipLevel, _MipMapBias);
                     else
-                        color = SampleClampedLOD(_Content5, panelUV, uvDx, uvDy, texSize, _MaxMipLevel, _MipMapBias);
+                        color = SampleTexture(_Content5, panelUV, uvDx, uvDy, texSize, _MaxMipLevel, _MipMapBias, _StableAA);
                 }
 
                 // Apply chroma correction

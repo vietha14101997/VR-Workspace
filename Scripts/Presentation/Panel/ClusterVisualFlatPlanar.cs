@@ -696,6 +696,7 @@ namespace VRWorkspace.Panel
             _contentMaterial.SetFloat("_EnableSharpening", 1f);
             _contentMaterial.SetFloat("_MipMapBias", -0.3f);
             _contentMaterial.SetFloat("_MaxMipLevel", 2.5f);
+            _contentMaterial.SetFloat("_StableAA", 1f); // VR anti-shimmer: floor mip + 4-sample grid
 
             _contentMaterial.renderQueue = 3000;
             _contentRenderer.sharedMaterial = _contentMaterial;

@@ -1337,36 +1337,36 @@ namespace VRWorkspace.Panel
             // Cleanup curved visual
             if (_curvedVisual != null)
             {
-    #if UNITY_EDITOR
+#if UNITY_EDITOR
                 DestroyImmediate(_curvedVisual);
-    #else
+#else
                 Destroy(_curvedVisual);
-    #endif
+#endif
                 _curvedVisual = null;
             }
 
             // Cleanup flat planar visual
             if (_flatPlanarVisual != null)
             {
-    #if UNITY_EDITOR
+#if UNITY_EDITOR
                 DestroyImmediate(_flatPlanarVisual);
-    #else
+#else
                 Destroy(_flatPlanarVisual);
-    #endif
+#endif
                 _flatPlanarVisual = null;
             }
 
-    #if UNITY_EDITOR
+#if UNITY_EDITOR
             for (int i = transform.childCount - 1; i >= 0; i--)
                 DestroyImmediate(transform.GetChild(i).gameObject);
-    #else
+#else
             for (int i = transform.childCount - 1; i >= 0; i--)
                 Destroy(transform.GetChild(i).gameObject);
-    #endif
+#endif
             _panels.Clear();
         }
 
-    #if UNITY_EDITOR
+#if UNITY_EDITOR
         void OnValidate()
         {
             if (_panels.Count > 0)
@@ -1380,6 +1380,6 @@ namespace VRWorkspace.Panel
                 RefreshClusterVisuals();
             }
         }
-    #endif
+#endif
     }
 }

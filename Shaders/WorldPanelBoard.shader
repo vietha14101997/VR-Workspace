@@ -36,17 +36,24 @@ Shader "Unlit/WorldPanelBoard"
         // Video streaming quality enhancement
         // NOTE: Sharpening disabled by default - can cause artifacts on some devices
         [Header(Streaming Quality)]
-        _Sharpness ("Sharpness", Range(0, 2)) = 0.5
+        _Sharpness ("Sharpness", Range(0, 2)) = 1.0
         _SharpnessRadius ("Sharpness Radius", Range(0.5, 3)) = 1.0
         _ChromaSharpness ("Chroma Sharpness", Range(0, 1)) = 0.3
-        _EnableSharpening ("Enable Sharpening", Float) = 0
+        _EnableSharpening ("Enable Sharpening", Float) = 1
 
         // VR quality - negative bias for sharper textures at distance
         [Header(VR Quality)]
-        _MipMapBias ("Mipmap Bias", Range(-2, 0)) = 0
+        _MipMapBias ("Mipmap Bias", Range(-2, 0)) = -0.7
         _MaxMipLevel ("Max Mip Level", Range(0, 4)) = 1.5
         // Stable AA: 0=legacy tex2Dgrad (trilinear, may shimmer), 1=stable 4-sample (VR recommended)
         _StableAA ("Stable AA (VR anti-shimmer)", Float) = 1
+        // Shimmer Blend: controlled partial trilinear between adjacent mip levels.
+        // 0 = pure integer mip (sharp but may shimmer), 0.5 = full trilinear (no shimmer but blurry)
+        // 0.2 = recommended: eliminates shimmer while keeping ~80% of mip-0 sharpness
+        _ShimmerBlend ("Shimmer Blend (anti-noise)", Range(0, 0.5)) = 0.2
+        // Temporal Smooth: suppress video encoder micro-noise on static content.
+        // 0 = off, 0.5 = recommended (kills banding without losing detail), 1 = max
+        _TemporalSmooth ("Temporal Smooth (anti-banding)", Range(0, 1)) = 0.5
 
         [Header(Stereo)]
         _StereoMode ("Stereo Mode", Float) = 0  // 0=Mono, 1=SBS, 2=OU
@@ -92,6 +99,8 @@ Shader "Unlit/WorldPanelBoard"
             float _MipMapBias;
             float _MaxMipLevel;
             float _StableAA;
+            float _ShimmerBlend;
+            float _TemporalSmooth;
 
             float4 _PanelSize;   // (W,H,0,0)
             float   _EdgeFadeX;
@@ -265,8 +274,13 @@ Shader "Unlit/WorldPanelBoard"
             // cheaper per-call on mobile (no derivative calculation needed).
             // ==========================================
 
-            // Compute stable mip level: min-axis LOD, floor'd to integer
-            float ComputeStableMip(float2 uvDx, float2 uvDy, float2 texSize, float maxLod, float bias)
+            // Compute stable mip level: min-axis LOD, rounded to nearest integer.
+            // Returns TWO values via out parameter:
+            //   baseMip  = primary mip level (integer, for sharp 4-sample reads)
+            //   blendMip = adjacent mip level for controlled anti-shimmer blending
+            // The caller uses _ShimmerBlend to lerp between them.
+            float ComputeStableMip(float2 uvDx, float2 uvDy, float2 texSize, float maxLod, float bias,
+                                   out float blendMip)
             {
                 float2 dx = uvDx * texSize;
                 float2 dy = uvDy * texSize;
@@ -279,10 +293,19 @@ Shader "Unlit/WorldPanelBoard"
                 float lod = log2(max(minAxis, 1.0));
                 float targetLod = clamp(lod + bias, 0.0, maxLod);
 
-                // Floor to integer mip level.
-                // This eliminates trilinear blend ratio fluctuation (the root cause of shimmer).
-                // The 4-sample rotated grid provides anti-aliasing instead of trilinear blending.
-                return floor(targetLod);
+                // Round to nearest integer mip (instead of floor).
+                // This snaps to the CLOSEST mip level, reducing over-sharpness
+                // at the transition boundary compared to always flooring down.
+                float baseMip = floor(targetLod + 0.5); // round()
+                baseMip = clamp(baseMip, 0.0, maxLod);
+
+                // Blend target: the adjacent mip in the direction of the fractional LOD.
+                // If targetLod > baseMip → blend with baseMip+1 (blur direction)
+                // If targetLod < baseMip → blend with baseMip-1 (sharp direction)
+                float frac_lod = targetLod - baseMip;
+                blendMip = clamp(baseMip + sign(frac_lod + 0.001), 0.0, maxLod);
+
+                return baseMip;
             }
 
             // Single sample at stable mip level (for blur taps in unsharp mask)
@@ -291,23 +314,37 @@ Shader "Unlit/WorldPanelBoard"
                 return tex2Dlod(tex, float4(uv, 0, mipLevel));
             }
 
-            // 4-sample anti-aliased read at stable mip level.
-            // The sample pattern is aligned to the UV derivatives (screen-space pixel footprint),
-            // providing proper anti-aliasing even at oblique viewing angles.
-            // Offset multiplier reduced from 0.25 to 0.125 to dampen VR head tracking jitter.
-            float4 SampleStableAA(sampler2D tex, float2 uv, float2 uvDx, float2 uvDy, float mipLevel)
+            // 4-sample anti-aliased read with controlled shimmer blend.
+            //
+            // The base mip is sampled with a tight 4-sample rotated grid for spatial AA.
+            // Then a single sample from the adjacent mip is blended in at _ShimmerBlend
+            // ratio to smooth temporal aliasing (shimmer) without destroying sharpness.
+            //
+            // shimmerBlend=0.0 → pure integer mip (sharp, may shimmer)
+            // shimmerBlend=0.2 → 80% base + 20% adjacent (recommended: sharp + stable)
+            // shimmerBlend=0.5 → 50/50 blend (very stable but softer)
+            float4 SampleStableAA(sampler2D tex, float2 uv, float2 uvDx, float2 uvDy,
+                                  float baseMip, float blendMip, float shimmerBlend)
             {
-                // Quarter-pixel offsets dampened by 50% to reduce VR shimmer from
-                // frame-to-frame derivative fluctuations caused by head tracking.
+                // Sub-pixel offsets (0.125 = 1/8 pixel) sized to average out
+                // DCT block-boundary artifacts from video compression while
+                // still providing spatial anti-aliasing.
                 float2 sDx = uvDx * 0.125;
                 float2 sDy = uvDy * 0.125;
 
-                float4 s1 = tex2Dlod(tex, float4(uv + sDx + sDy, 0, mipLevel));
-                float4 s2 = tex2Dlod(tex, float4(uv - sDx + sDy, 0, mipLevel));
-                float4 s3 = tex2Dlod(tex, float4(uv + sDx - sDy, 0, mipLevel));
-                float4 s4 = tex2Dlod(tex, float4(uv - sDx - sDy, 0, mipLevel));
+                // 4-sample rotated grid at base mip level (primary sharp read)
+                float4 s1 = tex2Dlod(tex, float4(uv + sDx + sDy, 0, baseMip));
+                float4 s2 = tex2Dlod(tex, float4(uv - sDx + sDy, 0, baseMip));
+                float4 s3 = tex2Dlod(tex, float4(uv + sDx - sDy, 0, baseMip));
+                float4 s4 = tex2Dlod(tex, float4(uv - sDx - sDy, 0, baseMip));
+                float4 baseColor = (s1 + s2 + s3 + s4) * 0.25;
 
-                return (s1 + s2 + s3 + s4) * 0.25;
+                // Single sample from adjacent mip for temporal smoothing
+                // (cheaper than 4-sample: the blend mip is inherently smoother)
+                float4 blendColor = tex2Dlod(tex, float4(uv, 0, blendMip));
+
+                // Controlled blend: just enough to kill shimmer, preserve sharpness
+                return lerp(baseColor, blendColor, shimmerBlend);
             }
 
             // Unified sampling: choose legacy or stable AA based on toggle
@@ -316,13 +353,60 @@ Shader "Unlit/WorldPanelBoard"
             {
                 if (stableAA > 0.5)
                 {
-                    float mip = ComputeStableMip(uvDx, uvDy, texSize, maxLod, bias);
-                    return SampleStableAA(tex, uv, uvDx, uvDy, mip);
+                    float blendMip;
+                    float baseMip = ComputeStableMip(uvDx, uvDy, texSize, maxLod, bias, blendMip);
+                    return SampleStableAA(tex, uv, uvDx, uvDy, baseMip, blendMip, _ShimmerBlend);
                 }
                 else
                 {
                     return SampleClampedLOD(tex, uv, uvDx, uvDy, texSize, maxLod, bias);
                 }
+            }
+
+            // ==========================================
+            // TEMPORAL SMOOTH: suppress encoder micro-noise
+            //
+            // Video encoders (H264/H265) produce slightly different quantization
+            // noise each frame even when the source desktop is static. This
+            // causes visible flicker/banding on dark regions in VR.
+            //
+            // Two techniques:
+            // 1. Color quantization: round colors to coarser steps (e.g., 64 levels
+            //    instead of 256) to collapse micro-variations into stable values.
+            // 2. Ordered dithering: add a screen-space Bayer pattern offset before
+            //    quantization so that banding breaks up into imperceptible noise.
+            // ==========================================
+
+            // 4x4 Bayer dither matrix (normalized to 0..1)
+            static const float BayerMatrix[16] = {
+                 0.0/16.0,  8.0/16.0,  2.0/16.0, 10.0/16.0,
+                12.0/16.0,  4.0/16.0, 14.0/16.0,  6.0/16.0,
+                 3.0/16.0, 11.0/16.0,  1.0/16.0,  9.0/16.0,
+                15.0/16.0,  7.0/16.0, 13.0/16.0,  5.0/16.0
+            };
+
+            // Apply temporal smoothing + ordered dithering to suppress encoder noise.
+            // strength: 0 = off, 0.5 = recommended, 1 = maximum smoothing
+            float4 TemporalSmooth(float4 color, float2 screenPos, float strength)
+            {
+                if (strength < 0.001) return color;
+
+                // Number of quantization levels: fewer = more stable but coarser.
+                // At strength=0.5: ~128 levels (noise < 0.4% invisible in VR)
+                // At strength=1.0: ~64 levels  (noise < 0.8% still imperceptible)
+                float levels = lerp(256.0, 64.0, strength);
+                float invLevels = 1.0 / levels;
+
+                // Screen-space Bayer dither offset
+                int2 sp = int2(fmod(abs(screenPos), 4.0));
+                float dither = BayerMatrix[sp.y * 4 + sp.x] - 0.5; // center around 0
+                float ditherScale = invLevels * strength; // scale dither by step size
+
+                // Quantize with dither: add dither before rounding, then round
+                float3 c = color.rgb + dither * ditherScale;
+                c = floor(c * levels + 0.5) * invLevels;
+
+                return float4(saturate(c), color.a);
             }
 
             // Unsharp Mask sharpening.
@@ -338,14 +422,15 @@ Shader "Unlit/WorldPanelBoard"
 
                 if (stableAA > 0.5)
                 {
-                    // Stable AA path: 4-sample center + 4 single-sample blur taps = 8 reads
-                    float mip = ComputeStableMip(uvDx, uvDy, texSize, maxLod, mipBias);
-                    center = SampleStableAA(tex, uv, uvDx, uvDy, mip);
+                    // Stable AA path: 4-sample center + shimmer blend + 4 single-sample blur taps
+                    float blendMip;
+                    float baseMip = ComputeStableMip(uvDx, uvDy, texSize, maxLod, mipBias, blendMip);
+                    center = SampleStableAA(tex, uv, uvDx, uvDy, baseMip, blendMip, _ShimmerBlend);
                     blur = (
-                        SampleStableLOD(tex, uv + float2(-texelSize.x, 0) * radius, mip) +
-                        SampleStableLOD(tex, uv + float2( texelSize.x, 0) * radius, mip) +
-                        SampleStableLOD(tex, uv + float2(0, -texelSize.y) * radius, mip) +
-                        SampleStableLOD(tex, uv + float2(0,  texelSize.y) * radius, mip)
+                        SampleStableLOD(tex, uv + float2(-texelSize.x, 0) * radius, baseMip) +
+                        SampleStableLOD(tex, uv + float2( texelSize.x, 0) * radius, baseMip) +
+                        SampleStableLOD(tex, uv + float2(0, -texelSize.y) * radius, baseMip) +
+                        SampleStableLOD(tex, uv + float2(0,  texelSize.y) * radius, baseMip)
                     ) * 0.25;
                 }
                 else
@@ -478,6 +563,9 @@ Shader "Unlit/WorldPanelBoard"
                 // Apply video picture adjustments (only effective when values differ from defaults)
                 col.rgb = VideoColorCorrect(col.rgb, _Brightness, _Contrast, _Saturation);
                 col.rgb = ApplyTintTemperature(col.rgb, _Tint, _Temperature);
+
+                // Anti-banding: suppress encoder micro-noise on static content
+                col = TemporalSmooth(col, i.pos.xy, _TemporalSmooth);
 
                 col *= _Color;
 
