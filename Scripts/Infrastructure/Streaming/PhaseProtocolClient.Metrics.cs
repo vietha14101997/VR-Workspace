@@ -485,6 +485,12 @@ namespace VRWorkspace.Streaming
         {
             _pollCount++;
 
+            // Tick H265 Custom Decoders (uploaded textures to GPU)
+            foreach (var receiver in _h265Receivers.Values)
+            {
+                receiver.Tick();
+            }
+
             lock (_lock)
             {
                 foreach (var wrapper in _peerConnections)
@@ -594,7 +600,49 @@ namespace VRWorkspace.Streaming
                                 // Don't update LastFrameTime - let stall detection work
                             }
 
-                            wrapper.Texture = tex;
+                            // H265: Do NOT overwrite wrapper.Texture here — it was already set
+                            // correctly by the OnTextureReady callback (from H265StreamReceiver).
+                            // The WebRTC track texture (tex) is empty/black in H265 mode because
+                            // Encoded Transform intercepts frames before they reach the WebRTC decoder.
+                            // Overwriting wrapper.Texture with tex would cause a black screen.
+                            bool isH265WithCustomDecoder = _selectedCodec == VideoCodec.H265
+                                && _h265Receivers.ContainsKey(wrapper.Index);
+                            if (!isH265WithCustomDecoder)
+                            {
+                                wrapper.Texture = tex;
+                            }
+                            else if (wrapper.Texture != null && _pollCount <= 5)
+                            {
+                                string webRtcTexInfo = tex != null ? tex.width + "x" + tex.height : "null";
+                                Debug.Log($"[PhaseProtocol] PC{wrapper.Index} H265: preserving custom decoder texture {wrapper.Texture.width}x{wrapper.Texture.height}, WebRTC tex={webRtcTexInfo}");
+                            }
+
+                            // H265 Override: Update frame counts based on custom decoder metrics
+                            if (_selectedCodec == VideoCodec.H265 && _h265Receivers.TryGetValue(wrapper.Index, out var receiver))
+                            {
+                                // Current decoder total decoded frames since start
+                                long currentDecoded = receiver.DecodedFrameCount;
+                                
+                                // Calculate delta since last poll
+                                // Note: wrapper.RealFrameCount is an int, so we cast delta
+                                if (wrapper.LastWebRTCFramesDecoded >= 0)
+                                {
+                                    int delta = (int)(currentDecoded - wrapper.LastWebRTCFramesDecoded);
+                                    if (delta > 0)
+                                    {
+                                        wrapper.FrameCount += delta;
+                                        wrapper.RenderedFrameCount += delta;
+                                        wrapper.RealFrameCount += delta;
+                                        wrapper.TotalFramesReceived += delta;
+                                        wrapper.LastFrameTime = DateTime.UtcNow;
+                                        wrapper.TexturePtrDetectionWorking = true; // Use common path for stall detection
+                                    }
+                                }
+                                
+                                // Cache current decoded count for next delta calculation
+                                // We reuse LastWebRTCFramesDecoded field as a generic "last decoded" baseline
+                                wrapper.LastWebRTCFramesDecoded = currentDecoded;
+                            }
                         }
                     }
                     catch { }
@@ -775,6 +823,13 @@ namespace VRWorkspace.Streaming
                         {
                             long decoded = (long)inbound.framesDecoded;
                             long received = (long)inbound.framesReceived;
+
+                            // H265 Override: If custom decoder is active, use its decoded count
+                            if (_selectedCodec == VideoCodec.H265 && _h265Receivers.TryGetValue(wrapper.Index, out var receiver))
+                            {
+                                decoded = receiver.DecodedFrameCount;
+                                // received count from WebRTC is still valid for total pipeline packets
+                            }
 
                             if (wrapper.LastWebRTCFramesDecoded < 0)
                             {

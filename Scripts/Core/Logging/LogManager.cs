@@ -46,7 +46,7 @@ namespace VRWorkspace.Core
             #if UNITY_EDITOR
             Debug.unityLogger.filterLogType = LogType.Warning;
             #else
-            Debug.unityLogger.filterLogType = LogType.Error;
+            Debug.unityLogger.filterLogType = LogType.Log;
             #endif
         }
 

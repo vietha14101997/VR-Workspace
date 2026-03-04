@@ -73,11 +73,9 @@ namespace VRWorkspace.Core
             int sdkVersion = GetAndroidSDKVersion();
             Debug.Log($"[PermissionManager] Starting permission requests for Android SDK {sdkVersion}");
 
-            bool allGranted = true;
-
             // Step 1: Request Camera permission (for QR Scanner)
             yield return StartCoroutine(RequestCameraPermission((granted) => {
-                if (!granted) allGranted = false;
+                // Camera is optional
             }));
 
             // Step 2: Request Storage permissions based on SDK version
@@ -129,7 +127,7 @@ namespace VRWorkspace.Core
                     if (!HasManageExternalStoragePermission() && sdkVersion >= 33)
                     {
                         yield return StartCoroutine(RequestMediaPermissions((granted) => {
-                            if (!granted) allGranted = false;
+                            // Media access fallback
                         }));
                     }
                 }
@@ -138,7 +136,7 @@ namespace VRWorkspace.Core
             {
                 // Android 10 and below: Request legacy storage permissions
                 yield return StartCoroutine(RequestLegacyStoragePermissions((granted) => {
-                    if (!granted) allGranted = false;
+                    // Legacy storage access
                 }));
             }
 
@@ -168,7 +166,9 @@ namespace VRWorkspace.Core
             var callbacks = new PermissionCallbacks();
             callbacks.PermissionGranted += (perm) => { result = true; };
             callbacks.PermissionDenied += (perm) => { result = false; };
+#pragma warning disable 0618
             callbacks.PermissionDeniedAndDontAskAgain += (perm) => { result = false; };
+#pragma warning restore 0618
 
             Permission.RequestUserPermission(CAMERA, callbacks);
 

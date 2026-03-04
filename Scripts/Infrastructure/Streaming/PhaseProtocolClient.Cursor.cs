@@ -12,8 +12,25 @@ namespace VRWorkspace.Streaming
         /// </summary>
         private void HandleCursorFromDataChannel(byte[] data)
         {
-            if (data == null || data.Length < 19) return;
-            if (data[0] != 1) return; // type 1 = cursor_position
+            if (data == null || data.Length < 2) return;
+
+            byte msgType = data[0];
+
+            if (msgType == 0x02)
+            {
+                // H265 codec config: [type=0x02][trackIndex(1)][Annex-B VPS+SPS+PPS...]
+                HandleH265CodecConfig(data);
+                return;
+            }
+
+            if (msgType == 0x03)
+            {
+                // H265 IDR keyframe data: [type=0x03][trackIndex(1)][chunkIndex(1)][totalChunks(1)][IDR data...]
+                HandleH265IdrData(data);
+                return;
+            }
+
+            if (msgType != 1 || data.Length < 19) return; // type 1 = cursor_position
 
             int monitorIndex = data[1];
             float u = BitConverter.ToSingle(data, 2);
@@ -29,6 +46,118 @@ namespace VRWorkspace.Streaming
             {
                 OnCursorPosition?.Invoke(monitorIndex, u, v, visible, cursorType, cursorId);
             });
+        }
+
+        /// <summary>
+        /// Handle H265 codec config (VPS/SPS/PPS) received via DataChannel side-channel.
+        /// Format: [type=0x02][trackIndex(1)][Annex-B VPS+SPS+PPS bytes...]
+        /// These are sent reliably because keyframe NALs are lost during RTP FU reassembly.
+        /// </summary>
+        private void HandleH265CodecConfig(byte[] data)
+        {
+            if (data.Length < 10) return; // At minimum: type + trackIndex + some NAL data
+
+            int trackIndex = data[1];
+            int paramLen = data.Length - 2;
+            byte[] paramSets = new byte[paramLen];
+            Buffer.BlockCopy(data, 2, paramSets, 0, paramLen);
+
+            Debug.Log($"[PhaseProtocol] Received H265 codec config via DataChannel: track={trackIndex}, paramSets={paramLen} bytes");
+
+            // Forward to the H265 handler for this track
+            if (_h265Handlers.TryGetValue(trackIndex, out var handler))
+            {
+                handler.SetCodecConfig(paramSets);
+                Debug.Log($"[PhaseProtocol] H265 codec config applied to handler PC{trackIndex}");
+            }
+            else
+            {
+                Debug.LogWarning($"[PhaseProtocol] No H265 handler found for track {trackIndex}, config will be lost");
+            }
+        }
+
+        // ── IDR chunk reassembly state ──
+        private readonly System.Collections.Generic.Dictionary<int, byte[][]> _idrChunks 
+            = new System.Collections.Generic.Dictionary<int, byte[][]>();
+
+        /// <summary>
+        /// Handle H265 IDR keyframe data received via DataChannel side-channel.
+        /// Format: [type=0x03][trackIndex(1)][chunkIndex(1)][totalChunks(1)][IDR Annex-B data...]
+        /// Large IDR frames are split into chunks by the server. Client reassembles and feeds
+        /// the complete IDR directly to the decoder, bypassing the Encoded Transform API.
+        /// </summary>
+        private void HandleH265IdrData(byte[] data)
+        {
+            if (data.Length < 5) return; // type + trackIndex + chunkIndex + totalChunks + at least 1 byte data
+
+            int trackIndex = data[1];
+            int chunkIndex = data[2];
+            int totalChunks = data[3];
+            int dataLen = data.Length - 4;
+
+            Debug.Log($"[PhaseProtocol] Received H265 IDR chunk via DataChannel: track={trackIndex}, chunk={chunkIndex + 1}/{totalChunks}, {dataLen} bytes");
+
+            if (totalChunks == 1)
+            {
+                // Single chunk — no reassembly needed
+                byte[] idrData = new byte[dataLen];
+                Buffer.BlockCopy(data, 4, idrData, 0, dataLen);
+
+                if (_h265Handlers.TryGetValue(trackIndex, out var handler))
+                {
+                    handler.FeedIdrFromDataChannel(idrData);
+                    Debug.Log($"[PhaseProtocol] H265 IDR (single chunk) fed to handler PC{trackIndex}: {idrData.Length} bytes");
+                }
+                else
+                {
+                    Debug.LogWarning($"[PhaseProtocol] No H265 handler for track {trackIndex}, IDR data lost");
+                }
+                return;
+            }
+
+            // Multi-chunk reassembly
+            if (!_idrChunks.TryGetValue(trackIndex, out var chunks) || chunks.Length != totalChunks)
+            {
+                chunks = new byte[totalChunks][];
+                _idrChunks[trackIndex] = chunks;
+            }
+
+            // Store this chunk
+            byte[] chunkData = new byte[dataLen];
+            Buffer.BlockCopy(data, 4, chunkData, 0, dataLen);
+            chunks[chunkIndex] = chunkData;
+
+            // Check if all chunks received
+            bool complete = true;
+            int totalSize = 0;
+            for (int i = 0; i < totalChunks; i++)
+            {
+                if (chunks[i] == null) { complete = false; break; }
+                totalSize += chunks[i].Length;
+            }
+
+            if (complete)
+            {
+                // Reassemble
+                byte[] idrData = new byte[totalSize];
+                int pos = 0;
+                for (int i = 0; i < totalChunks; i++)
+                {
+                    Buffer.BlockCopy(chunks[i], 0, idrData, pos, chunks[i].Length);
+                    pos += chunks[i].Length;
+                }
+                _idrChunks.Remove(trackIndex);
+
+                if (_h265Handlers.TryGetValue(trackIndex, out var handler))
+                {
+                    handler.FeedIdrFromDataChannel(idrData);
+                    Debug.Log($"[PhaseProtocol] H265 IDR ({totalChunks} chunks reassembled) fed to handler PC{trackIndex}: {idrData.Length} bytes");
+                }
+                else
+                {
+                    Debug.LogWarning($"[PhaseProtocol] No H265 handler for track {trackIndex}, reassembled IDR lost");
+                }
+            }
         }
 
         /// <summary>

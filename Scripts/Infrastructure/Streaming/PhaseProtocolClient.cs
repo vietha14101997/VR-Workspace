@@ -107,6 +107,10 @@ namespace VRWorkspace.Streaming
         private VideoCodec _selectedCodec = VideoCodec.H264;
         public  VideoCodec SelectedCodec  => _selectedCodec;
 
+        // ── H265 Custom Decoder ───────────────────────────────────────────────
+        private readonly Dictionary<int, H265StreamReceiver> _h265Receivers = new Dictionary<int, H265StreamReceiver>();
+        private readonly Dictionary<int, H265EncodedFrameHandler> _h265Handlers = new Dictionary<int, H265EncodedFrameHandler>();
+
         // ── Receive loop internals ─────────────────────────────────────────────
         private int   _msgCounter            = 0;
         private const int RECEIVE_TIMEOUT_MS = 30000;
@@ -947,6 +951,20 @@ namespace VRWorkspace.Streaming
 
             _sctpInitChannel = null;
             _cursorChannel = null;
+
+            // Cleanup H265 Custom Decoders
+            foreach (var receiver in _h265Receivers.Values)
+            {
+                try { receiver.Dispose(); } catch { }
+            }
+            _h265Receivers.Clear();
+
+            foreach (var handler in _h265Handlers.Values)
+            {
+                try { handler.Dispose(); } catch { }
+            }
+            _h265Handlers.Clear();
+
             _streamingStartedFired = false;
             _streamingStartTime    = DateTime.MinValue;
             _isStreamingPaused     = false;

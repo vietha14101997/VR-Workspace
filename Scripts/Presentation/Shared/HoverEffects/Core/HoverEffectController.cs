@@ -33,7 +33,9 @@ namespace VRWorkspace.UI.HoverEffects
         private bool _isHovered = false;
         private List<IHoverEffect> _activeEffects = new List<IHoverEffect>();
         private bool _isInitialized = false;
+#if UNITY_EDITOR
         private bool _warnedNoEffects = false; // Only warn once per instance
+#endif
 
         // Events
         /// <summary>

@@ -7,7 +7,6 @@ namespace VRWorkspace.Native
     /// <summary>
     /// Unity C# wrapper for native HEVC/H.265 hardware decoder.
     /// Uses Android MediaCodec through JNI for hardware-accelerated decoding.
-    ///
     /// Usage:
     /// 1. Check HevcDecoderPlugin.IsAvailable() before creating instance
     /// 2. Create instance and call Initialize(width, height)
@@ -18,10 +17,16 @@ namespace VRWorkspace.Native
     public class HevcDecoderPlugin : IDisposable
     {
         private const string TAG = "[HevcDecoder]";
+        private static readonly System.Diagnostics.Stopwatch _stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
 #if UNITY_ANDROID && !UNITY_EDITOR
         private AndroidJavaObject _decoderBridge;
         private static AndroidJavaClass _bridgeClass;
+        
+        // Cached JNI method IDs to avoid AndroidJNIHelper.GetSignature warnings
+        private IntPtr _decodeMethodId = IntPtr.Zero;
+        private IntPtr _pushFrameMethodId = IntPtr.Zero;
+        private IntPtr _bridgeRawObject = IntPtr.Zero;
 #endif
 
         private bool _initialized;
@@ -80,7 +85,7 @@ namespace VRWorkspace.Native
             if (_initialized)
             {
                 Debug.LogWarning($"{TAG} Already initialized, releasing first");
-                ReleaseDecoder();
+                ReleaseDecoder(true);
             }
 
 #if UNITY_ANDROID && !UNITY_EDITOR
@@ -150,14 +155,33 @@ namespace VRWorkspace.Native
             }
 
 #if UNITY_ANDROID && !UNITY_EDITOR
-            try
+            lock (_lock)
             {
-                return _decoderBridge.Call<bool>("decode", nalData, presentationTimeUs);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"{TAG} DecodeNal exception: {ex.Message}");
-                return false;
+                if (!_initialized || _disposed || _decoderBridge == null) return false;
+                try
+                {
+                    EnsureJniMethodIds();
+                    
+                    // Use raw JNI to avoid AndroidJNIHelper.GetSignature byte/sbyte warnings
+                    sbyte[] signedNalData = (sbyte[])(Array)nalData;
+                    IntPtr jByteArray = AndroidJNI.ToSByteArray(signedNalData);
+                    try
+                    {
+                        jvalue[] args = new jvalue[2];
+                        args[0].l = jByteArray;
+                        args[1].j = presentationTimeUs;
+                        return AndroidJNI.CallBooleanMethod(_bridgeRawObject, _decodeMethodId, args);
+                    }
+                    finally
+                    {
+                        AndroidJNI.DeleteLocalRef(jByteArray);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"{TAG} DecodeNal exception: {ex.Message}");
+                    return false;
+                }
             }
 #else
             return false;
@@ -165,10 +189,74 @@ namespace VRWorkspace.Native
         }
 
         /// <summary>
+        /// Push an encoded H.265 frame to the decoder bridge.
+        /// This is used by the H265StreamReceiver pipeline.
+        /// </summary>
+        public void PushEncodedFrame(byte[] nalData, long timestamp, bool isKeyFrame)
+        {
+            if (!_initialized || _disposed || nalData == null) return;
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+            lock (_lock)
+            {
+                if (!_initialized || _disposed || _decoderBridge == null) return;
+                try
+                {
+                    EnsureJniMethodIds();
+                    
+                    // Use raw JNI to avoid AndroidJNIHelper.GetSignature byte/sbyte warnings
+                    sbyte[] signedNalData = (sbyte[])(Array)nalData;
+                    IntPtr jByteArray = AndroidJNI.ToSByteArray(signedNalData);
+                    try
+                    {
+                        jvalue[] args = new jvalue[3];
+                        args[0].l = jByteArray;
+                        args[1].j = timestamp;
+                        args[2].z = isKeyFrame;
+                        AndroidJNI.CallVoidMethod(_bridgeRawObject, _pushFrameMethodId, args);
+                    }
+                    finally
+                    {
+                        AndroidJNI.DeleteLocalRef(jByteArray);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"{TAG} PushEncodedFrame exception: {ex.Message}");
+                }
+            }
+#endif
+        }
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+        /// <summary>
+        /// Cache JNI method IDs on first use. This avoids AndroidJNIHelper reflection
+        /// which triggers byte/sbyte deprecation warnings on every call.
+        /// </summary>
+        private void EnsureJniMethodIds()
+        {
+            if (_bridgeRawObject != IntPtr.Zero) return;
+            
+            _bridgeRawObject = _decoderBridge.GetRawObject();
+            IntPtr classRef = AndroidJNI.GetObjectClass(_bridgeRawObject);
+            try
+            {
+                _decodeMethodId = AndroidJNI.GetMethodID(classRef, "decode", "([BJ)Z");
+                _pushFrameMethodId = AndroidJNI.GetMethodID(classRef, "pushEncodedFrame", "([BJZ)V");
+                Debug.Log($"{TAG} JNI method IDs cached successfully");
+            }
+            finally
+            {
+                AndroidJNI.DeleteLocalRef(classRef);
+            }
+        }
+#endif
+
+        /// <summary>
         /// Try to get a decoded frame and copy to managed buffers.
         /// </summary>
         /// <returns>True if a frame is available</returns>
-        public bool TryGetFrame()
+        public unsafe bool TryGetFrame()
         {
             if (!_initialized || _disposed)
             {
@@ -177,63 +265,78 @@ namespace VRWorkspace.Native
             }
 
 #if UNITY_ANDROID && !UNITY_EDITOR
-            try
+            lock (_lock)
             {
-                if (!_decoderBridge.Call<bool>("getFrame"))
+                if (!_initialized || _disposed || _decoderBridge == null)
                 {
                     _hasFrame = false;
                     return false;
                 }
 
-                // Get frame info
-                _frameWidth = _decoderBridge.Call<int>("getFrameWidth");
-                _frameHeight = _decoderBridge.Call<int>("getFrameHeight");
-                _yStride = _decoderBridge.Call<int>("getYStride");
-                _uvStride = _decoderBridge.Call<int>("getUVStride");
-
-                // Get Y plane buffer
-                AndroidJavaObject yBuffer = _decoderBridge.Call<AndroidJavaObject>("getYPlane");
-                if (yBuffer != null)
+                try
                 {
-                    // Get direct ByteBuffer data
-                    IntPtr yPtr = yBuffer.Call<IntPtr>("getDirect");
-                    int ySize = _frameHeight * _yStride;
-
-                    // Resize buffer if needed
-                    if (_yPlaneBuffer == null || _yPlaneBuffer.Length < ySize)
+                    if (!_decoderBridge.Call<bool>("getFrame"))
                     {
-                        _yPlaneBuffer = new byte[ySize];
+                        _hasFrame = false;
+                        return false;
                     }
 
-                    Marshal.Copy(yPtr, _yPlaneBuffer, 0, Math.Min(ySize, _yPlaneBuffer.Length));
-                    yBuffer.Dispose();
-                }
-
-                // Get UV plane buffer
-                AndroidJavaObject uvBuffer = _decoderBridge.Call<AndroidJavaObject>("getUVPlane");
-                if (uvBuffer != null)
-                {
-                    IntPtr uvPtr = uvBuffer.Call<IntPtr>("getDirect");
-                    int uvSize = (_frameHeight / 2) * _uvStride;
-
-                    // Resize buffer if needed
-                    if (_uvPlaneBuffer == null || _uvPlaneBuffer.Length < uvSize)
+                    // Get frame info
+                    _frameWidth = _decoderBridge.Call<int>("getFrameWidth");
+                    _frameHeight = _decoderBridge.Call<int>("getFrameHeight");
+                    _yStride = _decoderBridge.Call<int>("getYStride");
+                    _uvStride = _decoderBridge.Call<int>("getUVStride");
+                    
+                    if (_stopwatch.ElapsedMilliseconds % 2000 < 20) // Throttle log
                     {
-                        _uvPlaneBuffer = new byte[uvSize];
+                        Debug.Log($"{TAG} Frame decoded: {_frameWidth}x{_frameHeight}, stride={_yStride}");
                     }
 
-                    Marshal.Copy(uvPtr, _uvPlaneBuffer, 0, Math.Min(uvSize, _uvPlaneBuffer.Length));
-                    uvBuffer.Dispose();
-                }
+                    // Get Y plane buffer
+                    using (AndroidJavaObject yBuffer = _decoderBridge.Call<AndroidJavaObject>("getYPlane"))
+                    {
+                        if (yBuffer != null)
+                        {
+                            IntPtr yPtr = (IntPtr)AndroidJNI.GetDirectBufferAddress(yBuffer.GetRawObject());
+                            if (yPtr != IntPtr.Zero)
+                            {
+                                int ySize = _frameHeight * _yStride;
+                                if (_yPlaneBuffer == null || _yPlaneBuffer.Length < ySize)
+                                {
+                                    _yPlaneBuffer = new byte[ySize];
+                                }
+                                Marshal.Copy(yPtr, _yPlaneBuffer, 0, Math.Min(ySize, _yPlaneBuffer.Length));
+                            }
+                        }
+                    }
 
-                _hasFrame = true;
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"{TAG} TryGetFrame exception: {ex.Message}");
-                _hasFrame = false;
-                return false;
+                    // Get UV plane buffer
+                    using (AndroidJavaObject uvBuffer = _decoderBridge.Call<AndroidJavaObject>("getUVPlane"))
+                    {
+                        if (uvBuffer != null)
+                        {
+                            IntPtr uvPtr = (IntPtr)AndroidJNI.GetDirectBufferAddress(uvBuffer.GetRawObject());
+                            if (uvPtr != IntPtr.Zero)
+                            {
+                                int uvSize = (_frameHeight / 2) * _uvStride;
+                                if (_uvPlaneBuffer == null || _uvPlaneBuffer.Length < uvSize)
+                                {
+                                    _uvPlaneBuffer = new byte[uvSize];
+                                }
+                                Marshal.Copy(uvPtr, _uvPlaneBuffer, 0, Math.Min(uvSize, _uvPlaneBuffer.Length));
+                            }
+                        }
+                    }
+
+                    _hasFrame = true;
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"{TAG} TryGetFrame exception: {ex.Message}");
+                    _hasFrame = false;
+                    return false;
+                }
             }
 #else
             _hasFrame = false;
@@ -362,37 +465,56 @@ namespace VRWorkspace.Native
             }
 
 #if UNITY_ANDROID && !UNITY_EDITOR
-            try
+            lock (_lock)
             {
-                _decoderBridge?.Call("flush");
-                _hasFrame = false;
-                Debug.Log($"{TAG} Flushed");
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"{TAG} Flush exception: {ex.Message}");
+                if (!_initialized || _disposed || _decoderBridge == null) return;
+                try
+                {
+                    _decoderBridge.Call("flush");
+                    _hasFrame = false;
+                    Debug.Log($"{TAG} Flushed");
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"{TAG} Flush exception: {ex.Message}");
+                }
             }
 #endif
         }
 
-        private void ReleaseDecoder()
+        private readonly object _lock = new object();
+
+        private void ReleaseDecoder(bool disposing)
         {
+            lock (_lock)
+            {
+                if (!_initialized) return;
+
 #if UNITY_ANDROID && !UNITY_EDITOR
-            try
-            {
-                _decoderBridge?.Call("release");
-                _decoderBridge?.Dispose();
-                _decoderBridge = null;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"{TAG} ReleaseDecoder exception: {ex.Message}");
-            }
+                // CRITICAL: AndroidJNI/AndroidJavaObject CANNOT be used on the Finalizer thread (GC thread).
+                // Only release native resources if we are disposing explicitly from the main thread.
+                if (disposing && _decoderBridge != null)
+                {
+                    try
+                    {
+                        _decoderBridge.Call("release");
+                        _decoderBridge.Dispose();
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogError($"{TAG} ReleaseDecoder JNI exception: {ex.Message}");
+                    }
+                    finally
+                    {
+                        _decoderBridge = null;
+                    }
+                }
 #endif
-            _initialized = false;
-            _hasFrame = false;
-            _yPlaneBuffer = null;
-            _uvPlaneBuffer = null;
+                _initialized = false;
+                _hasFrame = false;
+                _yPlaneBuffer = null;
+                _uvPlaneBuffer = null;
+            }
         }
 
         /// <summary>
@@ -400,24 +522,35 @@ namespace VRWorkspace.Native
         /// </summary>
         public void Dispose()
         {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
             if (_disposed) return;
             _disposed = true;
 
-            ReleaseDecoder();
-            Debug.Log($"{TAG} Disposed");
+            ReleaseDecoder(disposing);
+            
+            if (disposing)
+            {
+                Debug.Log($"{TAG} Disposed explicitly");
+            }
         }
 
         private static long GetTimestampUs()
         {
-            return (long)(Time.realtimeSinceStartup * 1000000);
+            return _stopwatch.ElapsedTicks * 1_000_000 / System.Diagnostics.Stopwatch.Frequency;
         }
 
         ~HevcDecoderPlugin()
         {
             if (!_disposed)
             {
-                Debug.LogWarning($"{TAG} Decoder not disposed properly!");
-                Dispose();
+                // NEVER call Dispose() or anything touching JNI here.
+                // Just set flags and cleanup managed resources.
+                Dispose(false);
             }
         }
     }

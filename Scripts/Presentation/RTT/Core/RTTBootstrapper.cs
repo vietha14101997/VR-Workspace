@@ -19,7 +19,9 @@ namespace VRWorkspace.UI.RTT
         [Header("Taskbar Settings")]
         [SerializeField] private int section1Capacity = 4;
         [SerializeField] private int section2Capacity = 4;
+#pragma warning disable 0414
         [SerializeField] private float taskbarSpacingMultiplier = 1.1f;
+#pragma warning restore 0414
 
         [Header("Visual")]
         [ColorUsage(true, true)]

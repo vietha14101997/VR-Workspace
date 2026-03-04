@@ -9,6 +9,7 @@ namespace VRWorkspace.Streaming
 {
     public partial class PhaseProtocolClient
     {
+        private bool _allMonitorsReadyFired;
         /// <summary>
         /// Create PeerConnections in background so receive loop can process incoming messages.
         /// </summary>
@@ -278,7 +279,8 @@ namespace VRWorkspace.Streaming
             // Track received - map to monitor via transceiver
             pc.OnTrack = e =>
             {
-                Debug.Log($"[PhaseProtocol] Single-PC OnTrack: kind={e.Track?.Kind}, enabled={e.Track?.Enabled}");
+                var mid = e.Transceiver?.Mid ?? "null";
+                Debug.Log($"[PhaseProtocol] Single-PC OnTrack: kind={e.Track?.Kind}, enabled={e.Track?.Enabled}, mid={mid}");
 
                 if (e.Track is VideoStreamTrack v)
                 {
@@ -295,7 +297,7 @@ namespace VRWorkspace.Streaming
 
                     if (trackIndex < 0 || trackIndex >= trackWrappers.Count)
                     {
-                        Debug.LogWarning($"[PhaseProtocol] Received track for unknown transceiver, mid={e.Transceiver?.Mid}");
+                        Debug.LogWarning($"[PhaseProtocol] Received track for unknown transceiver, mid={mid}");
                         return;
                     }
 
@@ -304,34 +306,95 @@ namespace VRWorkspace.Streaming
                     wrapper.LastFrameTime = DateTime.UtcNow;
 
                     int idx = trackIndex; // Capture for closure
-                    v.OnVideoReceived += tex =>
+
+                    if (_selectedCodec == VideoCodec.H265)
                     {
-                        wrapper.Texture = tex;
-                        wrapper.LastFrameTime = DateTime.UtcNow;
-                        wrapper.FrameCount++;
-                        wrapper.RenderedFrameCount++;
-                        wrapper.TotalFramesReceived++; // Cumulative counter (never reset)
-
-                        // Track stream start time
-                        if (wrapper.StreamStartTime == DateTime.MinValue)
-                            wrapper.StreamStartTime = DateTime.UtcNow;
-
-                        if (!_streamingStartedFired)
+                        Debug.Log($"[PhaseProtocol] PC{idx} using H265 custom decoder pipeline (Single-PC mode)");
+                        
+                        // Initialize receiver with current config dimensions
+                        int w = _userConfig?.resolutionWidth ?? 1920;
+                        int h = _userConfig?.resolutionHeight ?? 1080;
+                        
+                        // Cleanup old receiver/handler if they exist for this index
+                        if (_h265Receivers.TryGetValue(idx, out var oldReceiver))
                         {
-                            _streamingStartedFired = true;
-                            Debug.Log($"[PhaseProtocol] Track {idx} received first frame, firing OnStreamingStarted");
-                            _stateMachine.TryTransition(ConnectionPhase.Streaming);
-                            OnStreamingStarted?.Invoke();
+                            Debug.Log($"[PhaseProtocol] Cleaning up old H265 receiver for PC{idx}");
+                            oldReceiver.Dispose();
+                            _h265Receivers.Remove(idx);
+                        }
+                        if (_h265Handlers.TryGetValue(idx, out var oldHandler))
+                        {
+                            oldHandler.Dispose();
+                            _h265Handlers.Remove(idx);
                         }
 
-                        OnVideoTextureReceived?.Invoke(idx, tex);
-                    };
+                        var receiver = new H265StreamReceiver(idx, w, h);
+                        if (receiver.Start())
+                        {
+                            _h265Receivers[idx] = receiver;
+                            receiver.OnTextureReady += (monIdx, tex) => {
+                                wrapper.Texture = tex;
+                                wrapper.LastFrameTime = DateTime.UtcNow;
+                                wrapper.FrameCount++;
+                                wrapper.RenderedFrameCount++;
+                                wrapper.TotalFramesReceived++;
+                                
+                                if (wrapper.StreamStartTime == DateTime.MinValue)
+                                    wrapper.StreamStartTime = DateTime.UtcNow;
 
-                    Debug.Log($"[PhaseProtocol] Track {trackIndex} received video, mid={e.Transceiver?.Mid}");
+                                if (!_streamingStartedFired)
+                                {
+                                    _streamingStartedFired = true;
+                                    Debug.Log($"[PhaseProtocol] PC{idx} received first frame (H265), firing OnStreamingStarted");
+                                    _stateMachine.TryTransition(ConnectionPhase.Streaming);
+                                    OnStreamingStarted?.Invoke();
+                                }
+                                    
+                                OnVideoTextureReceived?.Invoke(monIdx, tex);
+                            };
+
+                            // Hook into Encoded Transform (Insertable Streams)
+                            try {
+                                var handler = new H265EncodedFrameHandler(receiver);
+                                _h265Handlers[idx] = handler;
+                                e.Transceiver.Receiver.Transform = handler.Transform;
+                                
+                                Debug.Log($"[PhaseProtocol] PC{idx} hooked H265 custom decoder via Encoded Transform (Transform set: {e.Transceiver.Receiver.Transform != null})");
+                            } catch (Exception ex) {
+                                Debug.LogError($"[PhaseProtocol] PC{idx} failed to hook H265 Transform: {ex.Message}");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Standard WebRTC pipeline
+                        v.OnVideoReceived += tex =>
+                        {
+                            wrapper.Texture = tex;
+                            wrapper.LastFrameTime = DateTime.UtcNow;
+                            wrapper.FrameCount++;
+                            wrapper.RenderedFrameCount++;
+                            wrapper.TotalFramesReceived++;
+
+                            if (wrapper.StreamStartTime == DateTime.MinValue)
+                                wrapper.StreamStartTime = DateTime.UtcNow;
+
+                            if (!_streamingStartedFired)
+                            {
+                                _streamingStartedFired = true;
+                                Debug.Log($"[PhaseProtocol] Track {idx} received first frame, firing OnStreamingStarted");
+                                _stateMachine.TryTransition(ConnectionPhase.Streaming);
+                                OnStreamingStarted?.Invoke();
+                            }
+
+                            OnVideoTextureReceived?.Invoke(idx, tex);
+                        };
+                        Debug.Log($"[PhaseProtocol] Track {trackIndex} attached to standard OnVideoReceived callback");
+                    }
                 }
                 else if (e.Track is AudioStreamTrack audioTrack)
                 {
-                    Debug.Log($"[PhaseProtocol] Received audio track, mid={e.Transceiver?.Mid}");
+                    Debug.Log($"[PhaseProtocol] Received audio track, mid={mid}");
                     OnAudioTrackReceived?.Invoke(audioTrack);
                 }
             };
@@ -658,36 +721,86 @@ namespace VRWorkspace.Streaming
 
                     // Capture mid for callback logging
                     var capturedMid = mid;
-                    v.OnVideoReceived += tex =>
+
+                    if (_selectedCodec == VideoCodec.H265)
                     {
-                        wrapper.Texture = tex;
-                        wrapper.LastFrameTime = DateTime.UtcNow;
-                        wrapper.FrameCount++;
-                        wrapper.RenderedFrameCount++; // For adaptive FPS feedback
-                        wrapper.TotalFramesReceived++; // Cumulative counter (never reset)
-
-                        // Track stream start time
-                        if (wrapper.StreamStartTime == DateTime.MinValue)
-                            wrapper.StreamStartTime = DateTime.UtcNow;
-
-                        // Debug: Log callback trigger (first few frames only)
-                        if (wrapper.FrameCount <= 3)
+                        // H265 custom decode pipeline
+                        Debug.Log($"[PhaseProtocol] PC{idx} using H265 custom decoder pipeline");
+                        
+                        // Initialize receiver with current config dimensions
+                        int w = _userConfig?.resolutionWidth ?? 1920;
+                        int h = _userConfig?.resolutionHeight ?? 1080;
+                        var receiver = new H265StreamReceiver(idx, w, h);
+                        if (receiver.Start())
                         {
-                            Debug.Log($"[PhaseProtocol] PC{idx} OnVideoReceived mid={capturedMid}, frame={wrapper.FrameCount}, tex={tex?.width}x{tex?.height}");
-                        }
+                            _h265Receivers[idx] = receiver;
+                            receiver.OnTextureReady += (monIdx, tex) => {
+                                wrapper.Texture = tex;
+                                wrapper.LastFrameTime = DateTime.UtcNow;
+                                wrapper.FrameCount++;
+                                wrapper.RenderedFrameCount++;
+                                wrapper.TotalFramesReceived++;
+                                
+                                if (wrapper.StreamStartTime == DateTime.MinValue)
+                                    wrapper.StreamStartTime = DateTime.UtcNow;
 
-                        // Fire OnStreamingStarted on first frame if not already fired
-                        // This is a backup mechanism in case streaming_started message is delayed/lost
-                        if (!_streamingStartedFired)
+                                // Fire OnStreamingStarted on first frame if not already fired
+                                if (!_streamingStartedFired)
+                                {
+                                    _streamingStartedFired = true;
+                                    Debug.Log($"[PhaseProtocol] PC{idx} received first frame (H265), firing OnStreamingStarted as backup");
+                                    _stateMachine.TryTransition(ConnectionPhase.Streaming);
+                                    OnStreamingStarted?.Invoke();
+                                }
+                                    
+                                OnVideoTextureReceived?.Invoke(monIdx, tex);
+                            };
+
+                            // Hook into Encoded Transform (Insertable Streams)
+                            try {
+                                var handler = new H265EncodedFrameHandler(receiver);
+                                _h265Handlers[idx] = handler;
+                                e.Transceiver.Receiver.Transform = handler.Transform;
+                                
+                                Debug.Log($"[PhaseProtocol] PC{idx} hooked H265 custom decoder via Encoded Transform");
+                            } catch (Exception ex) {
+                                Debug.LogError($"[PhaseProtocol] PC{idx} failed to hook H265 Transform: {ex.Message}");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Standard WebRTC pipeline
+                        v.OnVideoReceived += tex =>
                         {
-                            _streamingStartedFired = true;
-                            Debug.Log($"[PhaseProtocol] PC{idx} received first frame, firing OnStreamingStarted as backup");
-                            _stateMachine.TryTransition(ConnectionPhase.Streaming);
-                            OnStreamingStarted?.Invoke();
-                        }
+                            wrapper.Texture = tex;
+                            wrapper.LastFrameTime = DateTime.UtcNow;
+                            wrapper.FrameCount++;
+                            wrapper.RenderedFrameCount++; // For adaptive FPS feedback
+                            wrapper.TotalFramesReceived++; // Cumulative counter (never reset)
 
-                        OnVideoTextureReceived?.Invoke(idx, tex);
-                    };
+                            // Track stream start time
+                            if (wrapper.StreamStartTime == DateTime.MinValue)
+                                wrapper.StreamStartTime = DateTime.UtcNow;
+
+                            // Debug: Log callback trigger (first few frames only)
+                            if (wrapper.FrameCount <= 3)
+                            {
+                                Debug.Log($"[PhaseProtocol] PC{idx} OnVideoReceived mid={capturedMid}, frame={wrapper.FrameCount}, tex={tex?.width}x{tex?.height}");
+                            }
+
+                            // Fire OnStreamingStarted on first frame if not already fired
+                            if (!_streamingStartedFired)
+                            {
+                                _streamingStartedFired = true;
+                                Debug.Log($"[PhaseProtocol] PC{idx} received first frame, firing OnStreamingStarted as backup");
+                                _stateMachine.TryTransition(ConnectionPhase.Streaming);
+                                OnStreamingStarted?.Invoke();
+                            }
+
+                            OnVideoTextureReceived?.Invoke(idx, tex);
+                        };
+                    }
                     Debug.Log($"[PhaseProtocol] PC{idx} received video track, mid={mid}");
                 }
                 else if (e.Track is AudioStreamTrack audioTrack)
@@ -958,7 +1071,7 @@ namespace VRWorkspace.Streaming
         {
             lock (_lock)
             {
-                if (_expectedMonitorCount <= 0) return;
+                if (_expectedMonitorCount <= 0 || _allMonitorsReadyFired) return;
 
                 int connected = _peerConnections.Count(p =>
                     p.PC != null &&
@@ -969,6 +1082,7 @@ namespace VRWorkspace.Streaming
 
                 if (connected >= _expectedMonitorCount)
                 {
+                    _allMonitorsReadyFired = true;
                     Debug.Log("[PhaseProtocol] All monitors connected, firing OnAllMonitorsReady");
                     OnAllMonitorsReady?.Invoke();
                 }
