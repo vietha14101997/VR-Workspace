@@ -114,6 +114,7 @@ namespace VRWorkspace.Streaming
         // ── H265→H264 Codec Fallback ──────────────────────────────────────────
         private volatile bool _h265FallbackTriggered = false;
         private volatile bool _h265FallbackInProgress = false;
+        private int           _h265StallStrikes = 0; // Cumulative strikes for persistent H265 stalls
 
         // ── Receive loop internals ─────────────────────────────────────────────
         private int   _msgCounter            = 0;
@@ -350,6 +351,8 @@ namespace VRWorkspace.Streaming
             finally
             {
                 _h265FallbackInProgress = false;
+                _h265StallStrikes = 0;
+                _freezeCount = 0;
             }
         }
 
@@ -821,8 +824,13 @@ namespace VRWorkspace.Streaming
                             break;
 
                         case "reconnect_required":
-                            Debug.LogWarning("[PhaseProtocol] Server requested reconnect");
-                            _ = ReconnectSessionAsync();
+                        case "reconnect_request":
+                            {
+                                string? codec = json.GetString("suggestedCodec");
+                                string? reason = json.GetString("reason");
+                                Debug.LogWarning($"[PhaseProtocol] Server requested reconnect (type={type}, reason={reason}, suggested={codec})");
+                                _ = ReconnectSessionAsync(codec);
+                            }
                             break;
 
                         case null:

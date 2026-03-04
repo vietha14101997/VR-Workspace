@@ -754,7 +754,14 @@ namespace VRWorkspace.Streaming
                         {
                             Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} FRAME STALL detected! No frames for {timeSinceFrame.TotalSeconds:F1}s (threshold={effectiveThreshold}ms, wifi={_isWiFiConnection})");
 
-                            if (_isWiFiConnection)
+                            if (_selectedCodec == VideoCodec.H265)
+                            {
+                                // H265 stall: Use graduated recovery with freeze counting.
+                                // If it happens repeatedly, it will trigger codec fallback.
+                                wrapper.LastDecoderStallRecoveryTime = DateTime.UtcNow; // Set cooldown
+                                HandleDecoderStallOrFreeze(wrapper.Index, $"Frame stall ({timeSinceFrame.TotalSeconds:F1}s)");
+                            }
+                            else if (_isWiFiConnection)
                             {
                                 // WiFi: use graduated recovery (keyframe burst first, then escalate)
                                 _ = GraduatedRecoveryAsync(wrapper.Index);
@@ -877,15 +884,16 @@ namespace VRWorkspace.Streaming
                                     || wrapper.PC.IceConnectionState == RTCIceConnectionState.Closed;
                                 int escalateMs = iceDown ? 3000 : ESCALATE_TO_RECONNECT_MS;
 
-                                if (timeSinceAdvance > escalateMs && !wrapper.IsReconnecting
-                                    && !_isIntentionalDisconnect)
-                                {
-                                    Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} persistent decoder stall " +
-                                        $"({timeSinceAdvance / 1000:F0}s), escalating to reconnect" +
-                                        (iceDown ? " (ICE down, fast-path)" : ""));
-                                    wrapper.IsReconnecting = true;
-                                    _ = AutoHealMonitorAsync(wrapper.Index);
-                                }
+                        if (timeSinceAdvance > escalateMs && !wrapper.IsReconnecting
+                            && !_isIntentionalDisconnect)
+                        {
+                            Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} persistent decoder stall " +
+                                $"({timeSinceAdvance / 1000:F0}s), escalating to codec fallback check" +
+                                (iceDown ? " (ICE down, fast-path)" : ""));
+                            
+                            // Major persistent stall: escalate to global decoder freeze handler
+                            HandleDecoderStallOrFreeze(wrapper.Index, $"Persistent decoder stall ({timeSinceAdvance / 1000:F0}s)");
+                        }
                             }
                             break; // Only process first video inbound stats
                         }
@@ -944,6 +952,71 @@ namespace VRWorkspace.Streaming
         /// Handle frame timing message from server for clock synchronization.
         /// Used to calculate latency and sync client/server clocks.
         /// </summary>
+        /// <summary>
+        /// Global handler for decoder freezes and stalls.
+        /// Escalates through graduated recovery steps and eventually triggers H.264 fallback if needed.
+        /// </summary>
+        private void HandleDecoderStallOrFreeze(int monitorIndex, string reason)
+        {
+            _freezeCount++;
+            _h265StallStrikes++; // Persistent cumulative count across recoveries
+            
+            Debug.LogWarning($"[PhaseProtocol] {reason} (strike #{_freezeCount}, total strikes={_h265StallStrikes})!");
+
+            // Update stats
+            _metrics?.RecordStall();
+
+            // Graduated response:
+            // Strike 1 -> SkipToLive (light)
+            // Strike 2 -> RequestKeyframe (heavy)
+            // Strike 3 (H265) -> Fallback to H.264
+            if (_freezeCount < 3 && _h265StallStrikes < 10)
+            {
+                if (_freezeCount == 1)
+                {
+                    if (VerboseLogging) Debug.Log($"[PhaseProtocol] Response 1: SkipToLive");
+                    SkipToLive(monitorIndex);
+                }
+                else
+                {
+                    if (VerboseLogging) Debug.Log($"[PhaseProtocol] Response 2: RequestKeyframe (burst)");
+                    RequestKeyframe(monitorIndex);
+                }
+            }
+            else if (_selectedCodec == VideoCodec.H265)
+            {
+                string triggerReason = _freezeCount >= 3 ? $"sustained stall (strike {_freezeCount})" : $"flakey instability ({_h265StallStrikes} total strikes)";
+                Debug.LogError($"[PhaseProtocol] H265 fallback threshold reached: {triggerReason} — triggering H264 fallback");
+                
+                OnH265DecoderFailed(monitorIndex);
+                
+                _freezeCount = 0; // Reset after triggering fallback
+                // _h265StallStrikes is reset in TriggerCodecFallbackAsync
+            }
+            else
+            {
+                // Already in H264, just keep requesting keyframes or try one reconnect
+                if (_freezeCount >= 3)
+                {
+                    Debug.LogWarning($"[PhaseProtocol] Strike {_freezeCount} in H264 — trying one auto-heal reconnect");
+                    if (monitorIndex >= 0 && monitorIndex < _peerConnections.Count)
+                    {
+                        var wrapper = _peerConnections[monitorIndex];
+                        if (!wrapper.IsReconnecting)
+                        {
+                            wrapper.IsReconnecting = true;
+                            _ = AutoHealMonitorAsync(monitorIndex);
+                        }
+                    }
+                    _freezeCount = 0; // Prevent infinite reconnect loop per-check
+                }
+                else
+                {
+                    RequestKeyframe(monitorIndex);
+                }
+            }
+        }
+
         private void HandleFrameTiming(SimpleJson json)
         {
             long serverTime = json.GetLong("serverTime");
@@ -1034,38 +1107,7 @@ namespace VRWorkspace.Streaming
                             }
                             else
                             {
-                                _freezeCount++;
-                                Debug.LogWarning($"[PhaseProtocol] DECODER FREEZE #{_freezeCount}! Server sent {serverFrameAdvance} frames but client decoded only {realFrameAdvance}");
-
-                                // Graduated response:
-                                // First 2 freezes -> Request recovery
-                                // 3rd freeze -> Trigger H264 fallback
-                                if (_freezeCount < 3)
-                                {
-                                    if (_freezeCount == 1)
-                                    {
-                                        if (VerboseLogging) Debug.Log($"[PhaseProtocol] Response: SkipToLive (light recovery)");
-                                        SkipToLive(-1);
-                                    }
-                                    else
-                                    {
-                                        if (VerboseLogging) Debug.Log($"[PhaseProtocol] Response: RequestKeyframe (heavy recovery, freeze #{_freezeCount})");
-                                        RequestKeyframe(-1);
-                                    }
-                                }
-                                else if (_selectedCodec == VideoCodec.H265)
-                                {
-                                    Debug.LogError($"[PhaseProtocol] DECODER FREEZE threshold reached ({_freezeCount}) — triggering H264 fallback");
-                                    OnH265DecoderFailed(-1);
-                                    _freezeCount = 0; // Reset after triggering fallback
-                                }
-                                else
-                                {
-                                    // Already in H264, just keep requesting keyframes
-                                    RequestKeyframe(-1);
-                                    if (_freezeCount >= 5) _freezeCount = 0;
-                                }
-                                _metrics.RecordStall();
+                                HandleDecoderStallOrFreeze(-1, $"Decoder freeze (server +{serverFrameAdvance}, client +{realFrameAdvance})");
                             }
                         }
                         else if (realFrameAdvance >= 10)

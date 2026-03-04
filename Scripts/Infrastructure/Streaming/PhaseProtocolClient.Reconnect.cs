@@ -502,11 +502,26 @@ namespace VRWorkspace.Streaming
 
         /// <summary>
         /// Reconnect entire session - preserves user config but re-runs Phase 2 (ICE negotiation).
-        /// Called when individual track reconnects have failed and user chooses "Restart Session".
+        /// Called when individual track reconnects have failed and user chooses "Restart Session",
+        /// or when server requests a reconnect with a specific codec (e.g. H265 -> H264 fallback).
         /// </summary>
-        public async Task ReconnectSessionAsync()
+        public async Task ReconnectSessionAsync(string? suggestedCodec = null)
         {
-            Debug.Log("[PhaseProtocol] Starting full session reconnect...");
+            Debug.Log($"[PhaseProtocol] Starting full session reconnect (suggestedCodec={suggestedCodec ?? "none"})...");
+
+            // 0. Handle codec suggestion if provided
+            if (!string.IsNullOrEmpty(suggestedCodec))
+            {
+                if (suggestedCodec.Equals("H264", StringComparison.OrdinalIgnoreCase))
+                {
+                    Debug.Log("[PhaseProtocol] Reconnecting with fallback codec: H264");
+                    _selectedCodec = VideoCodec.H264;
+                    if (_userConfig != null) _userConfig.selectedCodec = "H264";
+                    
+                    // Fire event for UI
+                    OnCodecFallback?.Invoke("H264");
+                }
+            }
 
             // 1. Close all PeerConnections
             lock (_lock)
@@ -525,6 +540,7 @@ namespace VRWorkspace.Streaming
 
             // 2. Reset metrics
             _metrics.ResetAll();
+            _h265StallStrikes = 0; // Reset stall strikes on reconnect
             _streamingStartedFired = false;
 
             // 3. Transition to reconnecting state
