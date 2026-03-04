@@ -143,29 +143,96 @@ namespace VRWorkspace.Streaming
                 {
                     wrapper.VideoTrack = v;
                     wrapper.LastFrameTime = DateTime.UtcNow; // Initialize
-                    v.OnVideoReceived += tex =>
+
+                    if (_selectedCodec == VideoCodec.H265)
                     {
-                        wrapper.Texture = tex;
-                        wrapper.LastFrameTime = DateTime.UtcNow;
-                        wrapper.FrameCount++;
-                        wrapper.RenderedFrameCount++; // For adaptive FPS feedback
-                        wrapper.TotalFramesReceived++; // Cumulative counter (never reset)
+                        // H265 custom decode pipeline (same as initial connection)
+                        Debug.Log($"[PhaseProtocol] PC{idx} using H265 custom decoder pipeline (reconnect)");
 
-                        // Track stream start time
-                        if (wrapper.StreamStartTime == DateTime.MinValue)
-                            wrapper.StreamStartTime = DateTime.UtcNow;
+                        int w = _userConfig?.resolutionWidth  ?? 1920;
+                        int h = _userConfig?.resolutionHeight ?? 1080;
 
-                        // Fire OnStreamingStarted on first frame if not already fired
-                        if (!_streamingStartedFired)
+                        // Cleanup old receiver/handler if they exist for this index
+                        if (_h265Receivers.TryGetValue(idx, out var oldReceiver))
                         {
-                            _streamingStartedFired = true;
-                            Debug.Log($"[PhaseProtocol] PC{idx} received first frame (reconnected), firing OnStreamingStarted");
-                            _stateMachine.TryTransition(ConnectionPhase.Streaming);
-                            OnStreamingStarted?.Invoke();
+                            oldReceiver.Dispose();
+                            _h265Receivers.Remove(idx);
+                        }
+                        if (_h265Handlers.TryGetValue(idx, out var oldHandler))
+                        {
+                            oldHandler.Dispose();
+                            _h265Handlers.Remove(idx);
                         }
 
-                        OnVideoTextureReceived?.Invoke(idx, tex);
-                    };
+                        var receiver = new H265StreamReceiver(idx, w, h);
+                        if (receiver.Start())
+                        {
+                            _h265Receivers[idx] = receiver;
+                            receiver.OnTextureReady += (monIdx, tex) =>
+                            {
+                                wrapper.Texture = tex;
+                                wrapper.LastFrameTime = DateTime.UtcNow;
+                                wrapper.FrameCount++;
+                                wrapper.RenderedFrameCount++;
+                                wrapper.TotalFramesReceived++;
+
+                                if (wrapper.StreamStartTime == DateTime.MinValue)
+                                    wrapper.StreamStartTime = DateTime.UtcNow;
+
+                                if (!_streamingStartedFired)
+                                {
+                                    _streamingStartedFired = true;
+                                    Debug.Log($"[PhaseProtocol] PC{idx} received first frame (H265 reconnect), firing OnStreamingStarted");
+                                    _stateMachine.TryTransition(ConnectionPhase.Streaming);
+                                    OnStreamingStarted?.Invoke();
+                                }
+
+                                OnVideoTextureReceived?.Invoke(monIdx, tex);
+                            };
+                            // Hook fallback: if decoder still fails after reconnect, switch to H264
+                            receiver.OnDecoderFailed += monIdx => OnH265DecoderFailed(monIdx);
+
+                            // Hook Encoded Transform
+                            try
+                            {
+                                var handler = new H265EncodedFrameHandler(receiver);
+                                _h265Handlers[idx] = handler;
+                                e.Transceiver.Receiver.Transform = handler.Transform;
+                                Debug.Log($"[PhaseProtocol] PC{idx} hooked H265 custom decoder via Encoded Transform (reconnect)");
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.LogError($"[PhaseProtocol] PC{idx} failed to hook H265 Transform (reconnect): {ex.Message}");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Standard WebRTC pipeline
+                        v.OnVideoReceived += tex =>
+                        {
+                            wrapper.Texture = tex;
+                            wrapper.LastFrameTime = DateTime.UtcNow;
+                            wrapper.FrameCount++;
+                            wrapper.RenderedFrameCount++; // For adaptive FPS feedback
+                            wrapper.TotalFramesReceived++; // Cumulative counter (never reset)
+
+                            // Track stream start time
+                            if (wrapper.StreamStartTime == DateTime.MinValue)
+                                wrapper.StreamStartTime = DateTime.UtcNow;
+
+                            // Fire OnStreamingStarted on first frame if not already fired
+                            if (!_streamingStartedFired)
+                            {
+                                _streamingStartedFired = true;
+                                Debug.Log($"[PhaseProtocol] PC{idx} received first frame (reconnected), firing OnStreamingStarted");
+                                _stateMachine.TryTransition(ConnectionPhase.Streaming);
+                                OnStreamingStarted?.Invoke();
+                            }
+
+                            OnVideoTextureReceived?.Invoke(idx, tex);
+                        };
+                    }
                     Debug.Log($"[PhaseProtocol] PC{idx} received video track (reconnected)");
                 }
             };

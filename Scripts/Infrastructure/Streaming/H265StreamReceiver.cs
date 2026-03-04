@@ -57,6 +57,21 @@ namespace VRWorkspace.Streaming
         public long DecodedFrameCount     => _decodedCount;
         private long _decodedCount;
 
+        // ──────────── Fallback Detection ────────────
+        // If we receive encoded frames but decode nothing for FALLBACK_TRIGGER_SECONDS,
+        // fire OnDecoderFailed so the client can request H265→H264 codec downgrade.
+        private const float FALLBACK_TRIGGER_SECONDS = 8f;       // 8s without decoded frame → declare failure
+        private const int   FALLBACK_MIN_ENCODED_FRAMES = 30;    // Require at least 30 encoded frames received first
+        private DateTime    _firstEncodedFrameTime = DateTime.MinValue;
+        private bool        _fallbackFired;
+
+        /// <summary>
+        /// Fires when the H265 decoder consistently fails to produce frames.
+        /// Signals that the client should request H265→H264 fallback from the server.
+        /// Parameters: monitorIndex
+        /// </summary>
+        public event Action<int> OnDecoderFailed;
+
         // Y/UV byte buffers — reused to avoid GC pressure
         private byte[] _yBuf;
         private byte[] _uvBuf;
@@ -153,6 +168,10 @@ namespace VRWorkspace.Streaming
 
             EncodedFramesReceived++;
 
+            // Start fallback timer on first encoded frame received
+            if (_firstEncodedFrameTime == DateTime.MinValue)
+                _firstEncodedFrameTime = DateTime.UtcNow;
+
             // Use PushEncodedFrame to pass the explicit isKeyFrame flag (detected by NAL parsing)
             _decoder.PushEncodedFrame(encodedData, presentationTimeUs > 0 ? presentationTimeUs : GetTimestampUs(), isKeyFrame);
             
@@ -163,6 +182,8 @@ namespace VRWorkspace.Streaming
         }
 
         // ──────────── Update (call from Unity main thread) ────────────
+
+        private int _noFrameTicks;  // Consecutive ticks with no decoded frame (for stall diagnostics)
 
         /// <summary>
         /// Poll decoded frames and upload texture. Call this from MonoBehaviour.Update().
@@ -187,7 +208,38 @@ namespace VRWorkspace.Streaming
                 }
             }
 
-            if (!gotFrame) return;
+            if (!gotFrame)
+            {
+                _noFrameTicks++;
+                // Log warning every ~3s (180 ticks at 60fps) if decoder has never stalled before
+                if (_noFrameTicks == 180 || _noFrameTicks == 600)
+                {
+                    Debug.LogWarning($"{TAG} PC{MonitorIndex} No frame from decoder for {_noFrameTicks} ticks " +
+                        $"(decoded={_decodedCount}, encoded={EncodedFramesReceived}). " +
+                        $"Y/UV strides: {_decoder.YStride}/{_decoder.UVStride}, frame size: {_decoder.FrameWidth}x{_decoder.FrameHeight}");
+                }
+
+                // ── Fallback detection ──────────────────────────────────────────
+                // If we received enough encoded frames but NEVER decoded any after the timeout,
+                // the hardware H265 decoder is not functional on this device → trigger fallback.
+                if (!_fallbackFired
+                    && _decodedCount == 0
+                    && EncodedFramesReceived >= FALLBACK_MIN_ENCODED_FRAMES
+                    && _firstEncodedFrameTime != DateTime.MinValue
+                    && (DateTime.UtcNow - _firstEncodedFrameTime).TotalSeconds >= FALLBACK_TRIGGER_SECONDS)
+                {
+                    _fallbackFired = true;
+                    Debug.LogError($"{TAG} PC{MonitorIndex} DECODER FAILURE: received {EncodedFramesReceived} encoded frames " +
+                        $"but decoded 0 in {FALLBACK_TRIGGER_SECONDS}s. Triggering H265→H264 fallback!");
+                    OnDecoderFailed?.Invoke(MonitorIndex);
+                }
+
+                return;
+            }
+
+            _noFrameTicks = 0; // Reset on successful frame
+            // Also reset fallback timer window so intermittent failures don't re-trigger
+            _firstEncodedFrameTime = DateTime.UtcNow; // Sliding window from last success
 
             // Get Y plane data
             byte[] yData  = _decoder.GetYPlaneData();
@@ -200,42 +252,54 @@ namespace VRWorkspace.Streaming
             int fWidth   = _decoder.FrameWidth;
             int fHeight  = _decoder.FrameHeight;
 
-            // Upload Y plane (strip stride padding if needed)
-            if (yStride == fWidth)
+            // Upload Y plane: always use stride-copy to produce exactly fWidth*fHeight bytes.
+            // Passing the raw buffer (which may be larger due to MediaCodec stride alignment)
+            // to LoadRawTextureData would throw an exception or produce a black texture.
             {
-                _yTex.LoadRawTextureData(yData);
-            }
-            else
-            {
-                // Has stride padding — copy row by row into packed buffer
-                if (_yBuf == null || _yBuf.Length < fWidth * fHeight)
-                    _yBuf = new byte[fWidth * fHeight];
+                int yNeeded = fWidth * fHeight;
+                if (_yBuf == null || _yBuf.Length < yNeeded)
+                    _yBuf = new byte[yNeeded];
 
-                for (int row = 0; row < fHeight; row++)
-                    Buffer.BlockCopy(yData, row * yStride, _yBuf, row * fWidth, fWidth);
+                if (yStride == fWidth)
+                {
+                    // No padding: fast copy entire buffer (only the exact needed bytes)
+                    Buffer.BlockCopy(yData, 0, _yBuf, 0, yNeeded);
+                }
+                else
+                {
+                    // Stride padding present: copy row by row
+                    for (int row = 0; row < fHeight; row++)
+                        Buffer.BlockCopy(yData, row * yStride, _yBuf, row * fWidth, fWidth);
+                }
                 _yTex.LoadRawTextureData(_yBuf);
+                _yTex.Apply(false, false);
             }
-            _yTex.Apply(false, false);
 
-            // Upload UV plane (RG16: 2 bytes per pixel, width/2, height/2)
-            int uvWidth  = fWidth  / 2;
-            int uvHeight = fHeight / 2;
-            int uvRowBytes = uvWidth * 2; // RG16
-
-            if (uvStride == uvWidth * 2)
+            // Upload UV plane: always use stride-copy to produce exactly uvWidth*uvHeight*2 bytes.
+            // Android NV12 UV plane is interleaved (CbCr), RG16 format = 2 bytes per pixel.
             {
-                _uvTex.LoadRawTextureData(uvData);
-            }
-            else
-            {
-                if (_uvBuf == null || _uvBuf.Length < uvRowBytes * uvHeight)
-                    _uvBuf = new byte[uvRowBytes * uvHeight];
+                int uvWidth    = fWidth  / 2;
+                int uvHeight   = fHeight / 2;
+                int uvRowBytes = uvWidth * 2; // RG16: 2 bytes per UV pixel
+                int uvNeeded   = uvRowBytes * uvHeight;
 
-                for (int row = 0; row < uvHeight; row++)
-                    Buffer.BlockCopy(uvData, row * uvStride, _uvBuf, row * uvRowBytes, uvRowBytes);
+                if (_uvBuf == null || _uvBuf.Length < uvNeeded)
+                    _uvBuf = new byte[uvNeeded];
+
+                if (uvStride == uvRowBytes)
+                {
+                    // No padding: fast copy exact needed bytes
+                    Buffer.BlockCopy(uvData, 0, _uvBuf, 0, uvNeeded);
+                }
+                else
+                {
+                    // Stride padding present: copy row by row
+                    for (int row = 0; row < uvHeight; row++)
+                        Buffer.BlockCopy(uvData, row * uvStride, _uvBuf, row * uvRowBytes, uvRowBytes);
+                }
                 _uvTex.LoadRawTextureData(_uvBuf);
+                _uvTex.Apply(false, false);
             }
-            _uvTex.Apply(false, false);
 
             // Blit NV12 → RGBA output RenderTexture
             Graphics.Blit(null, _outputRt, _nv12Material);

@@ -106,9 +106,17 @@ namespace VRWorkspace.Native
                 _height = height;
                 _initialized = true;
 
-                // Pre-allocate buffers for Y and UV planes (NV12 format)
+                // Pre-allocate buffers for Y and UV planes (NV12 format).
+                // IMPORTANT: Use 1.5x multiplier for UV to handle stride-aligned buffers.
+                // Android MediaCodec aligns stride to 128 bytes, so for 1920-wide video:
+                //   yStride = 1920, uvStride = 1920 (but sometimes 2048 on some GPUs)
+                // We over-allocate to prevent overflow and resize dynamically in TryGetFrame.
                 int ySize = width * height;
-                int uvSize = width * height / 2;
+                // UV: allocate with extra padding for potential stride alignment
+                // uvStride can be up to alignUp(width, 128). For 1920: max is 1920 itself.
+                // For safety allocate using stride=alignUp(width, 128)
+                int strideAlign = ((width + 127) / 128) * 128;
+                int uvSize = (height / 2) * strideAlign;
                 _yPlaneBuffer = new byte[ySize];
                 _uvPlaneBuffer = new byte[uvSize];
 
@@ -318,12 +326,17 @@ namespace VRWorkspace.Native
                             IntPtr uvPtr = (IntPtr)AndroidJNI.GetDirectBufferAddress(uvBuffer.GetRawObject());
                             if (uvPtr != IntPtr.Zero)
                             {
+                                // IMPORTANT: Use actual uvStride for size, not width-based calculation.
+                                // Android MediaCodec may use aligned stride (e.g., 2048 for 1920-wide).
+                                // Under-allocating here causes buffer overflow and memory corruption.
                                 int uvSize = (_frameHeight / 2) * _uvStride;
                                 if (_uvPlaneBuffer == null || _uvPlaneBuffer.Length < uvSize)
                                 {
+                                    Debug.LogWarning($"{TAG} UV buffer resize: {_uvPlaneBuffer?.Length ?? 0} -> {uvSize} (stride={_uvStride}, w={_frameWidth}, h={_frameHeight})");
                                     _uvPlaneBuffer = new byte[uvSize];
                                 }
-                                Marshal.Copy(uvPtr, _uvPlaneBuffer, 0, Math.Min(uvSize, _uvPlaneBuffer.Length));
+                                // Safe copy: copy exactly uvSize bytes (no overflow)
+                                Marshal.Copy(uvPtr, _uvPlaneBuffer, 0, uvSize);
                             }
                         }
                     }

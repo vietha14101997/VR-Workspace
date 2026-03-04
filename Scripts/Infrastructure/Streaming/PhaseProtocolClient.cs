@@ -111,6 +111,10 @@ namespace VRWorkspace.Streaming
         private readonly Dictionary<int, H265StreamReceiver> _h265Receivers = new Dictionary<int, H265StreamReceiver>();
         private readonly Dictionary<int, H265EncodedFrameHandler> _h265Handlers = new Dictionary<int, H265EncodedFrameHandler>();
 
+        // ── H265→H264 Codec Fallback ──────────────────────────────────────────
+        private volatile bool _h265FallbackTriggered = false;
+        private volatile bool _h265FallbackInProgress = false;
+
         // ── Receive loop internals ─────────────────────────────────────────────
         private int   _msgCounter            = 0;
         private const int RECEIVE_TIMEOUT_MS = 30000;
@@ -140,6 +144,11 @@ namespace VRWorkspace.Streaming
         public event Action<string[]>                          OnReconnectFailed;
         public event Action                                    OnSessionReconnectRequested;
         public event Action<string, double, int>               OnSpeedTestProgress;
+        /// <summary>
+        /// Fires when H265 decoder fails and codec is being switched to H264.
+        /// Parameter: fallbackCodec (always "H264" currently).
+        /// </summary>
+        public event Action<string>                            OnCodecFallback;
 
         // NOTE: OnSkipToLiveAck, OnBitrateAdjusted, OnQualityRecommendation are declared
         // in PhaseProtocolClient.Metrics.cs (that partial also owns SkipToLiveImmediate).
@@ -262,6 +271,107 @@ namespace VRWorkspace.Streaming
                 if (index >= 0 && index < _peerConnections.Count)
                     return _peerConnections[index].Texture;
                 return null;
+            }
+        }
+
+        // ── H265 → H264 Codec Fallback ────────────────────────────────────────
+
+        /// <summary>
+        /// Called when H265StreamReceiver.OnDecoderFailed fires (any monitor).
+        /// Tears down H265 pipeline, notifies server, then reconnects using H264.
+        /// Safe to call from any thread; idempotent due to _h265FallbackTriggered flag.
+        /// </summary>
+        internal void OnH265DecoderFailed(int monitorIndex)
+        {
+            if (_h265FallbackTriggered || _h265FallbackInProgress) return;
+            _h265FallbackTriggered = true;
+            _ = TriggerCodecFallbackAsync();
+        }
+
+        private async Task TriggerCodecFallbackAsync()
+        {
+            if (_h265FallbackInProgress) return;
+            _h265FallbackInProgress = true;
+
+            Debug.LogError("[PhaseProtocol] H265 DECODER FAILURE — switching to H264 fallback");
+
+            try
+            {
+                // 1. Dispose all H265 receivers and handlers
+                lock (_lock)
+                {
+                    foreach (var r in _h265Receivers.Values)
+                        try { r.Dispose(); } catch { }
+                    _h265Receivers.Clear();
+
+                    foreach (var h in _h265Handlers.Values)
+                        try { h.Dispose(); } catch { }
+                    _h265Handlers.Clear();
+
+                    // Clear cached textures so UI shows loading instead of stale H265 frame
+                    foreach (var w in _peerConnections)
+                        w.Texture = null;
+                }
+
+                // 2. Switch codec locally BEFORE reconnect so SetCodecPreferences picks up H264
+                _selectedCodec = VideoCodec.H264;
+                if (_userConfig != null)
+                    _userConfig.selectedCodec = "H264";
+
+                Debug.Log("[PhaseProtocol] Codec switched to H264, notifying server...");
+
+                // 3. Notify server so it can switch encoder from H265→H264
+                if (_ws?.State == System.Net.WebSockets.WebSocketState.Open)
+                {
+                    try
+                    {
+                        await SendTextAsync("{\"type\":\"codec_fallback\",\"from\":\"H265\",\"to\":\"H264\",\"reason\":\"decoder_failure\"}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogWarning($"[PhaseProtocol] codec_fallback send failed: {ex.Message}");
+                    }
+                }
+
+                // 4. Notify UI (e.g. show toast "Switched to H264 for compatibility")
+                OnCodecFallback?.Invoke("H264");
+
+                // 5. Reconnect entire PeerConnection with H264 codec preferences.
+                //    ReconnectSinglePCAsync() uses _selectedCodec (now H264) in SetCodecPreferences().
+                await Task.Delay(200); // Brief pause for server to process the notification
+                Debug.Log("[PhaseProtocol] Initiating Single-PC reconnect with H264...");
+                _streamingStartedFired = false;
+                _ = ReconnectSinglePCAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[PhaseProtocol] TriggerCodecFallbackAsync failed: {ex.Message}");
+            }
+            finally
+            {
+                _h265FallbackInProgress = false;
+            }
+        }
+
+        /// <summary>
+        /// Handle codec_switch ACK from server (optional — server may send this after processing codec_fallback).
+        /// </summary>
+        private void HandleCodecSwitch(SimpleJson json)
+        {
+            var codec = json.GetString("codec") ?? "H264";
+            var reason = json.GetString("reason") ?? "";
+            Debug.Log($"[PhaseProtocol] Server acknowledged codec switch → {codec} (reason: {reason})");
+
+            // If server sends codec_switch proactively (e.g. H265 not supported on server hardware),
+            // also update our local codec preference.
+            if (codec.Equals("H264", StringComparison.OrdinalIgnoreCase) && _selectedCodec == VideoCodec.H265)
+            {
+                Debug.Log("[PhaseProtocol] Server-initiated codec downgrade: H265 → H264");
+                if (!_h265FallbackTriggered)
+                {
+                    _h265FallbackTriggered = true;
+                    _ = TriggerCodecFallbackAsync();
+                }
             }
         }
 
@@ -674,6 +784,11 @@ namespace VRWorkspace.Streaming
 
                         case "skip_to_live_ack":
                             _phase3.HandleSkipToLiveAck();
+                            break;
+
+                        // ── Codec fallback (server ACK or server-initiated downgrade) ──
+                        case "codec_switch":
+                            HandleCodecSwitch(json);
                             break;
 
                         // ── Cursor (partial file) ─────────────────────────────

@@ -1038,20 +1038,32 @@ namespace VRWorkspace.Streaming
                                 Debug.LogWarning($"[PhaseProtocol] DECODER FREEZE #{_freezeCount}! Server sent {serverFrameAdvance} frames but client decoded only {realFrameAdvance}");
 
                                 // Graduated response:
-                                // First freeze -> SkipToLive (lighter, just sync to latest)
-                                // Repeated freeze within short time -> RequestKeyframe (force fresh IDR)
-                                if (_freezeCount <= 1)
+                                // First 2 freezes -> Request recovery
+                                // 3rd freeze -> Trigger H264 fallback
+                                if (_freezeCount < 3)
                                 {
-                                    if (VerboseLogging) Debug.Log($"[PhaseProtocol] Response: SkipToLive (light recovery)");
-                                    SkipToLive(-1);
+                                    if (_freezeCount == 1)
+                                    {
+                                        if (VerboseLogging) Debug.Log($"[PhaseProtocol] Response: SkipToLive (light recovery)");
+                                        SkipToLive(-1);
+                                    }
+                                    else
+                                    {
+                                        if (VerboseLogging) Debug.Log($"[PhaseProtocol] Response: RequestKeyframe (heavy recovery, freeze #{_freezeCount})");
+                                        RequestKeyframe(-1);
+                                    }
+                                }
+                                else if (_selectedCodec == VideoCodec.H265)
+                                {
+                                    Debug.LogError($"[PhaseProtocol] DECODER FREEZE threshold reached ({_freezeCount}) — triggering H264 fallback");
+                                    OnH265DecoderFailed(-1);
+                                    _freezeCount = 0; // Reset after triggering fallback
                                 }
                                 else
                                 {
-                                    if (VerboseLogging) Debug.Log($"[PhaseProtocol] Response: RequestKeyframe (heavy recovery, freeze #{_freezeCount})");
+                                    // Already in H264, just keep requesting keyframes
                                     RequestKeyframe(-1);
-                                    // Reset freeze count after heavy recovery
-                                    if (_freezeCount >= 3)
-                                        _freezeCount = 0;
+                                    if (_freezeCount >= 5) _freezeCount = 0;
                                 }
                                 _metrics.RecordStall();
                             }

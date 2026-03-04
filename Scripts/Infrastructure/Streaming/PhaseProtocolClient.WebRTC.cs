@@ -352,6 +352,12 @@ namespace VRWorkspace.Streaming
                                     
                                 OnVideoTextureReceived?.Invoke(monIdx, tex);
                             };
+                            // Hook fallback: if decoder never produces frames, switch to H264
+                            receiver.OnDecoderFailed += monIdx =>
+                            {
+                                Debug.LogError($"[PhaseProtocol] PC{monIdx} H265 decoder failed, triggering fallback");
+                                OnH265DecoderFailed(monIdx);
+                            };
 
                             // Hook into Encoded Transform (Insertable Streams)
                             try {
