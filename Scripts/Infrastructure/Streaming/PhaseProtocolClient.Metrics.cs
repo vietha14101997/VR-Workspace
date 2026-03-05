@@ -625,9 +625,9 @@ namespace VRWorkspace.Streaming
                                 
                                 // Calculate delta since last poll
                                 // Note: wrapper.RealFrameCount is an int, so we cast delta
-                                if (wrapper.LastWebRTCFramesDecoded >= 0)
+                                if (wrapper.LastH265DecodedCount >= 0)
                                 {
-                                    int delta = (int)(currentDecoded - wrapper.LastWebRTCFramesDecoded);
+                                    int delta = (int)(currentDecoded - wrapper.LastH265DecodedCount);
                                     if (delta > 0)
                                     {
                                         wrapper.FrameCount += delta;
@@ -640,8 +640,7 @@ namespace VRWorkspace.Streaming
                                 }
                                 
                                 // Cache current decoded count for next delta calculation
-                                // We reuse LastWebRTCFramesDecoded field as a generic "last decoded" baseline
-                                wrapper.LastWebRTCFramesDecoded = currentDecoded;
+                                wrapper.LastH265DecodedCount = currentDecoded;
                             }
                         }
                     }
@@ -796,13 +795,13 @@ namespace VRWorkspace.Streaming
         /// This is the ground truth for whether the decoder is producing frames,
         /// independent of texture pointer behavior or fallback mode.
         /// </summary>
-        private async Task UpdateDecoderStallCheck(PCWrapper wrapper)
-        {
-            // Path B: Aggressive Decoder Stall Detection
-            // (Only triggers if bytes are arriving but frames are NOT decoded)
-            const int DECODER_STALL_THRESHOLD_MS = 300; 
-            const int RECOVERY_COOLDOWN_MS = 2500;
-            const int ESCALATE_TO_RECONNECT_MS = 8000;
+    private async Task UpdateDecoderStallCheck(PCWrapper wrapper)
+    {
+        // Path B: Aggressive Decoder Stall Detection
+        // WiFi: Relax thresholds slightly to avoid "spamming" stalls on jittery connections
+        int decoderThreshold = _isWiFiConnection ? 500 : 300; 
+        const int RECOVERY_COOLDOWN_MS = 2500;
+        const int ESCALATE_TO_RECONNECT_MS = 8000;
 
             try
             {
@@ -817,6 +816,22 @@ namespace VRWorkspace.Streaming
                     {
                         if (pair.Value is RTCInboundRTPStreamStats inbound && inbound.kind == "video")
                         {
+                            // Single-PC Multi-Track mode: Multiple video stats exist in one report.
+                            // We MUST match the stat to the correct wrapper via Mid (Media ID).
+                            bool isCorrectTrack = true;
+                            if (!string.IsNullOrEmpty(wrapper.Mid))
+                            {
+                                // Unity WebRTC RTCInboundRTPStreamStats has 'mid' property
+                                isCorrectTrack = (inbound.mid == wrapper.Mid);
+                            }
+                            else if (wrapper.VideoTrack != null)
+                            {
+                                // Fallback: Match track identifier if Mid is not set or not available in stats
+                                isCorrectTrack = (inbound.trackIdentifier == wrapper.VideoTrack.Id);
+                            }
+
+                            if (!isCorrectTrack) continue;
+
                             long decoded = (long)inbound.framesDecoded;
                             long received = (long)inbound.framesReceived;
                             long bytes = (long)inbound.bytesReceived;
@@ -864,17 +879,17 @@ namespace VRWorkspace.Streaming
                                 var timeSinceNetwork = (DateTime.UtcNow - wrapper.LastNetworkActivityTime).TotalMilliseconds;
                                 var timeSinceRecovery = (DateTime.UtcNow - wrapper.LastDecoderStallRecoveryTime).TotalMilliseconds;
 
-                                // CONDITION: Decoder stopped (>300ms) but Network still active (<500ms jitter window)
-                                if (timeSinceAdvance > DECODER_STALL_THRESHOLD_MS && 
+                                // CONDITION: Decoder stopped but Network still active
+                                if (timeSinceAdvance > decoderThreshold && 
                                     timeSinceNetwork < 500 && 
                                     timeSinceRecovery > RECOVERY_COOLDOWN_MS)
                                 {
                                     Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} DECODER STALL (Path B)! " +
-                                        $"framesDecoded={decoded} frozen for {timeSinceAdvance:F0}ms while bytes are flowing.");
+                                        $"framesDecoded={decoded} (last={wrapper.LastWebRTCFramesDecoded}) frozen for {timeSinceAdvance:F0}ms while bytes are flowing ({timeSinceNetwork:F0}ms).");
                                     
                                     // High-confidence decoder/sync issue: Request keyframe immediately
                                     wrapper.LastDecoderStallRecoveryTime = DateTime.UtcNow;
-                                    HandleDecoderStallOrFreeze(wrapper.Index, "Aggressive decoder stall");
+                                    HandleDecoderStallOrFreeze(wrapper.Index, $"Aggressive decoder stall (dec={decoded}, net={timeSinceNetwork:F0}ms)");
                                 }
 
                                 // 5. Escalation

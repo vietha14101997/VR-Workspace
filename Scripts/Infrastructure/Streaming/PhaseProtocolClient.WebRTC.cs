@@ -79,7 +79,8 @@ namespace VRWorkspace.Streaming
                 var trans = pc.AddTransceiver(TrackKind.Video, new RTCRtpTransceiverInit { direction = RTCRtpTransceiverDirection.RecvOnly });
                 SetCodecPreferences(trans, i);
                 transceivers.Add(trans);
-                Debug.Log($"[PhaseProtocol] Added transceiver {i} for monitor {i}");
+                trackWrappers[i].Mid = trans.Mid; // Store MID for stats matching
+                Debug.Log($"[PhaseProtocol] Added transceiver {i} for monitor {i}, mid={trans.Mid}");
             }
 
             // Client creates "audio" DataChannel (SCTP) to bypass NetEQ jitter buffer.
@@ -233,6 +234,8 @@ namespace VRWorkspace.Streaming
                         w.IsReconnecting = false;
                         w.ReconnectAttempts = 0;
                     }
+                    _metrics.ResetStallCount();
+                    ResetStallStrikes();
                 }
                 else if (s == RTCPeerConnectionState.Failed || s == RTCPeerConnectionState.Disconnected)
                 {
@@ -291,6 +294,7 @@ namespace VRWorkspace.Streaming
                         if (transceivers[i] == e.Transceiver)
                         {
                             trackIndex = i;
+                            trackWrappers[i].Mid = mid; // Store MID for stats matching
                             break;
                         }
                     }
@@ -335,19 +339,15 @@ namespace VRWorkspace.Streaming
                             receiver.OnTextureReady += (monIdx, tex) => {
                                 wrapper.Texture = tex;
                                 wrapper.LastFrameTime = DateTime.UtcNow;
-                                wrapper.FrameCount++;
-                                wrapper.RenderedFrameCount++;
-                                wrapper.TotalFramesReceived++;
                                 
                                 if (wrapper.StreamStartTime == DateTime.MinValue)
                                     wrapper.StreamStartTime = DateTime.UtcNow;
 
                                 if (!_streamingStartedFired)
                                 {
-                                    _streamingStartedFired = true;
                                     Debug.Log($"[PhaseProtocol] PC{idx} received first frame (H265), firing OnStreamingStarted");
                                     _stateMachine.TryTransition(ConnectionPhase.Streaming);
-                                    OnStreamingStarted?.Invoke();
+                                    HandleStreamingStartedInternal();
                                 }
                                     
                                 OnVideoTextureReceived?.Invoke(monIdx, tex);
@@ -743,9 +743,6 @@ namespace VRWorkspace.Streaming
                             receiver.OnTextureReady += (monIdx, tex) => {
                                 wrapper.Texture = tex;
                                 wrapper.LastFrameTime = DateTime.UtcNow;
-                                wrapper.FrameCount++;
-                                wrapper.RenderedFrameCount++;
-                                wrapper.TotalFramesReceived++;
                                 
                                 if (wrapper.StreamStartTime == DateTime.MinValue)
                                     wrapper.StreamStartTime = DateTime.UtcNow;

@@ -42,8 +42,8 @@ namespace VRWorkspace.Streaming
         private HevcDecoderPlugin _decoder;
         private bool _initialized;
         private bool _disposed;
-        private bool _flipY = true;      // Default true to fix reported upside-down issue
-        private bool _fullRange = true;   // Default true to fix reported faded colors (AMF)
+        private bool _flipY = true;      // true fixes upside-down reports
+        private bool _fullRange = true;   // true fixes silver/faded colors reports
 
         // Thread-safe timing
         private static readonly System.Diagnostics.Stopwatch _stopwatch = System.Diagnostics.Stopwatch.StartNew();

@@ -53,6 +53,7 @@ namespace VRWorkspace.Streaming
 
             // Use the shared codec preferences method
             SetCodecPreferences(trans, idx);
+            wrapper.Mid = trans.Mid; // Store MID for stats matching
 
             // Re-create DataChannels (must match initial connection in PhaseProtocolClient.WebRTC.cs)
             // Without these, server has no audio/cursor channels after reconnect
@@ -83,6 +84,7 @@ namespace VRWorkspace.Streaming
                     wrapper.ReconnectAttempts = 0; // Reset on successful reconnection
                     _metrics.ResetStallCount();
                     _metrics.ResetIceDisconnectCount();
+                    ResetStallStrikes();
 
                     // Send reconnect acknowledgment to server
                     _ = SendTextAsync($"{{\"type\":\"reconnect_ack\",\"monitorIndex\":{idx}}}");
@@ -173,19 +175,15 @@ namespace VRWorkspace.Streaming
                             {
                                 wrapper.Texture = tex;
                                 wrapper.LastFrameTime = DateTime.UtcNow;
-                                wrapper.FrameCount++;
-                                wrapper.RenderedFrameCount++;
-                                wrapper.TotalFramesReceived++;
 
                                 if (wrapper.StreamStartTime == DateTime.MinValue)
                                     wrapper.StreamStartTime = DateTime.UtcNow;
 
                                 if (!_streamingStartedFired)
                                 {
-                                    _streamingStartedFired = true;
                                     Debug.Log($"[PhaseProtocol] PC{idx} received first frame (H265 reconnect), firing OnStreamingStarted");
                                     _stateMachine.TryTransition(ConnectionPhase.Streaming);
-                                    OnStreamingStarted?.Invoke();
+                                    HandleStreamingStartedInternal();
                                 }
 
                                 OnVideoTextureReceived?.Invoke(monIdx, tex);
@@ -361,8 +359,9 @@ namespace VRWorkspace.Streaming
                 Debug.Log($"[PhaseProtocol] PC{monitorIndex} graduated step 1: keyframe burst (count={burstCount})");
                 await SendTextAsync($"{{\"type\":\"request_keyframe_burst\",\"monitorIndex\":{monitorIndex},\"count\":{burstCount}}}");
                 
-                // Wait for frames to resume (shorter delay for faster recovery)
-                await Task.Delay(300, _cts.Token);
+                // Wait for frames to resume
+                int step1Delay = _isWiFiConnection ? 600 : 300;
+                await Task.Delay(step1Delay, _cts.Token);
 
                 // Verify recovery using GROUND TRUTH (Decoder advance time)
                 var timeSinceDecoderAdvance = (DateTime.UtcNow - wrapper.LastDecoderAdvanceTime).TotalMilliseconds;
@@ -378,7 +377,8 @@ namespace VRWorkspace.Streaming
                 SkipToLiveImmediate(monitorIndex);
                 await Task.Delay(50);
                 await SendTextAsync($"{{\"type\":\"request_keyframe_burst\",\"monitorIndex\":{monitorIndex},\"count\":{burstCount}}}");
-                await Task.Delay(400, _cts.Token);
+                int step2Delay = _isWiFiConnection ? 800 : 400;
+                await Task.Delay(step2Delay, _cts.Token);
 
                 timeSinceDecoderAdvance = (DateTime.UtcNow - wrapper.LastDecoderAdvanceTime).TotalMilliseconds;
                 if (timeSinceDecoderAdvance < 200)

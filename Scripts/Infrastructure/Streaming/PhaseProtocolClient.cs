@@ -161,6 +161,7 @@ namespace VRWorkspace.Streaming
             public int   Index;
             public RTCPeerConnection PC;
             public VideoStreamTrack  VideoTrack;
+            public string            Mid;         // For Single-PC stats matching
             public Texture           Texture;
             public bool  AnswerSet;
             public bool  OfferSent;
@@ -202,6 +203,9 @@ namespace VRWorkspace.Streaming
             public DateTime LastNetworkActivityTime = DateTime.UtcNow;
             public DateTime LastDecoderStallRecoveryTime;
             public bool WaitingForFirstFrame = true;     // Suppression window for bootstrap (grace period)
+
+            // Split H265 tracking for PollTextures to avoid race with UpdateDecoderStallCheck
+            public long LastH265DecodedCount = -1;
 
             // Fallback mode frame accounting (consumed by PollTextures under _lock)
             // Tracks how many framesDecoded have been accounted for in RenderedFrameCount
@@ -480,12 +484,11 @@ namespace VRWorkspace.Streaming
             }
             catch { }
 
-            // Start frame stall monitor
-            _ = FrameStallMonitorAsync(_cts.Token);
-
             if (!_streamingStartedFired)
             {
                 _streamingStartedFired = true;
+                // Start frame stall monitor
+                _ = FrameStallMonitorAsync(_cts.Token);
                 OnStreamingStarted?.Invoke();
             }
         }
@@ -1097,9 +1100,19 @@ namespace VRWorkspace.Streaming
             _isStreamingPaused     = false;
 
             _metrics.ResetAll();
+            _freezeCount = 0;
+            _h265StallStrikes = 0;
+            _h265FallbackTriggered = false;
+            _h265FallbackInProgress = false;
 
             try { _ws?.Abort(); _ws?.Dispose(); } catch { }
             _ws = null;
+        }
+
+        public void ResetStallStrikes()
+        {
+            _freezeCount = 0;
+            // Note: _h265StallStrikes is preserved for long-term health monitoring
         }
 
         public void Dispose() => Cleanup();
