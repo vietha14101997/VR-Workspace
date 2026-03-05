@@ -369,27 +369,32 @@ namespace VRWorkspace.UI.RTT.Components
             int resW = suggested.resolutionWidth;
             int resH = suggested.resolutionHeight;
 
-            // Parse Total Bitrate from dropdown (this is total for all monitors)
-            int bitrateKbps = suggested.bitrateKbps;
-            var bitrateRaw = Bitrate;
-            var bitrate = RemotePreferences.CleanValue(bitrateRaw);
-            Debug.Log($"[RTTRemoteMenu] BuildConfigFromForm: Bitrate raw='{bitrateRaw}', cleaned='{bitrate}', suggested={suggested.bitrateKbps}");
-            if (!string.IsNullOrEmpty(bitrate))
+            // Parse Resolution Length from dropdown (this is for specific monitors)
+            int resolutionHeight = suggested.resolutionHeight;
+            var resolutionRaw = Resolution;
+            var resolutionStr = RemotePreferences.CleanValue(resolutionRaw);
+            Debug.Log($"[RTTRemoteMenu] BuildConfigFromForm: Resolution raw='{resolutionRaw}', cleaned='{resolutionStr}', suggested={suggested.resolutionHeight}");
+            if (!string.IsNullOrEmpty(resolutionStr))
             {
-                var numStr = bitrate.Replace(" ", "").Replace("Mbps", "").Replace("mbps", "");
-                if (int.TryParse(numStr, out int mbps))
+                var numStr = resolutionStr.Replace(" ", "").Replace("p", "");
+                if (int.TryParse(numStr, out int res))
                 {
-                    bitrateKbps = mbps * 1000;
-                    Debug.Log($"[RTTRemoteMenu] BuildConfigFromForm: Parsed bitrate={mbps} Mbps -> {bitrateKbps} kbps");
+                    resolutionHeight = res;
+                    resH = res;
+                    // Automatically map 16:9 resolutions
+                    if (res == 720) resW = 1280;
+                    else if (res == 1080) resW = 1920;
+                    else if (res == 1440) resW = 2560;
+                    Debug.Log($"[RTTRemoteMenu] BuildConfigFromForm: Parsed resolution={res}p -> {resW}x{resH}");
                 }
                 else
                 {
-                    Debug.LogWarning($"[RTTRemoteMenu] BuildConfigFromForm: Failed to parse bitrate from '{numStr}', using suggested={suggested.bitrateKbps}");
+                    Debug.LogWarning($"[RTTRemoteMenu] BuildConfigFromForm: Failed to parse resolution from '{numStr}', using suggested={suggested.resolutionHeight}");
                 }
             }
             else
             {
-                Debug.LogWarning($"[RTTRemoteMenu] BuildConfigFromForm: Bitrate empty, using suggested={suggested.bitrateKbps}");
+                Debug.LogWarning($"[RTTRemoteMenu] BuildConfigFromForm: Resolution empty, using suggested={suggested.resolutionHeight}");
             }
 
             // Parse FPS
@@ -416,20 +421,18 @@ namespace VRWorkspace.UI.RTT.Components
             }
 
             // Create config from user selections
-            // bitrateKbps is TOTAL for all monitors - server will divide by monitor count
             var config = new StreamingConfig
             {
                 monitors = monitors,
                 resolutionWidth = resW,
                 resolutionHeight = resH,
-                bitrateKbps = bitrateKbps,  // TOTAL bitrate for all monitors
                 fps = fpsVal,
                 refreshRate = suggested.refreshRate,
                 selectedCodec = suggested.selectedCodec,
                 monitorType = MonitorType
             };
 
-            Debug.Log($"[RTTRemoteMenu] BuildConfigFromForm: {config.monitors}mon ({config.monitorType}) @ {config.resolutionWidth}x{config.resolutionHeight}, {config.fps}fps, {config.bitrateKbps}kbps (total)");
+            Debug.Log($"[RTTRemoteMenu] BuildConfigFromForm: {config.monitors}mon ({config.monitorType}) @ {config.resolutionWidth}x{config.resolutionHeight}, {config.fps}fps");
             return config;
         }
 

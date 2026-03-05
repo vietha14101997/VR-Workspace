@@ -173,11 +173,11 @@ namespace VRWorkspace.Streaming
                 _firstEncodedFrameTime = DateTime.UtcNow;
 
             // Use PushEncodedFrame to pass the explicit isKeyFrame flag (detected by NAL parsing)
-            _decoder.PushEncodedFrame(encodedData, presentationTimeUs > 0 ? presentationTimeUs : GetTimestampUs(), isKeyFrame);
+            bool pushed = _decoder.PushEncodedFrame(encodedData, presentationTimeUs > 0 ? presentationTimeUs : GetTimestampUs(), isKeyFrame);
             
             if (isKeyFrame && EncodedFramesReceived < 20)
             {
-                Debug.Log($"{TAG} PC{MonitorIndex} Keyframe pushed to decoder: {encodedData.Length} bytes");
+                Debug.Log($"{TAG} PC{MonitorIndex} Keyframe pushed to decoder {(pushed ? "successfully" : "FAILED")}: {encodedData.Length} bytes");
             }
         }
 
@@ -212,11 +212,12 @@ namespace VRWorkspace.Streaming
             {
                 _noFrameTicks++;
                 // Log warning every ~3s (180 ticks at 60fps) if decoder has never stalled before
-                if (_noFrameTicks == 180 || _noFrameTicks == 600)
+                if (_noFrameTicks == 180 || _noFrameTicks == 600 || _noFrameTicks == 1200)
                 {
-                    Debug.LogWarning($"{TAG} PC{MonitorIndex} No frame from decoder for {_noFrameTicks} ticks " +
-                        $"(decoded={_decodedCount}, encoded={EncodedFramesReceived}). " +
-                        $"Y/UV strides: {_decoder.YStride}/{_decoder.UVStride}, frame size: {_decoder.FrameWidth}x{_decoder.FrameHeight}");
+                    float elapsedSinceStart = (float)(DateTime.UtcNow - _firstEncodedFrameTime).TotalSeconds;
+                    Debug.LogWarning($"{TAG} PC{MonitorIndex} SUSTAINED STALL: No frame from decoder for {_noFrameTicks} ticks ({elapsedSinceStart:F1}s). " +
+                        $"Stats: decoded={_decodedCount}, encoded={EncodedFramesReceived} (gap={EncodedFramesReceived - _decodedCount}). " +
+                        $"Plugin: initialized={_decoder.IsInitialized}, strides={_decoder.YStride}/{_decoder.UVStride}, size={_decoder.FrameWidth}x{_decoder.FrameHeight}");
                 }
 
                 // ── Fallback detection ──────────────────────────────────────────

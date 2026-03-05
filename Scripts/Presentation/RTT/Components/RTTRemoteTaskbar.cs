@@ -43,8 +43,8 @@ namespace VRWorkspace.UI.RTT.Components
         [SerializeField] private Sprite iconMonitor;
         [SerializeField] private Sprite iconEnviroment;
 
-        // Dynamic icons for bitrate (10, 15, 20, 25, 30 Mbps)
-        private Dictionary<int, Sprite> _bitrateIcons = new Dictionary<int, Sprite>();
+        // Dynamic icons for resolution (720, 1080, 1440 p)
+        private Dictionary<int, Sprite> _resolutionIcons = new Dictionary<int, Sprite>();
 
         // Screen icons (screen_1, screen_2, screen_3)
         private Dictionary<int, Sprite> _screenIcons = new Dictionary<int, Sprite>();
@@ -66,10 +66,10 @@ namespace VRWorkspace.UI.RTT.Components
 
         // Section 1 references
         private GameObject _backButton;
-        private GameObject _bitrateButton;
+        private GameObject _resolutionButton;
         private GameObject _fpsButton;
         private GameObject _eyeButton;
-        private int _currentBitrateMbps = 20;
+        private int _currentResolutionHeight = 1080;
         private int _currentFps = 60;
 
         // Section 2 references
@@ -180,15 +180,15 @@ namespace VRWorkspace.UI.RTT.Components
                 return;
             }
 
-            // Subscribe to current bitrate/fps changes (these update when user changes settings)
-            _viewModel.CurrentBitrateKbps.OnChanged += OnBitrateChanged;
+            // Subscribe to current resolution/fps changes (these update when user changes settings)
+            _viewModel.CurrentResolutionHeight.OnChanged += OnResolutionChanged;
             _viewModel.CurrentFps.OnChanged += OnFpsChanged;
 
             // Subscribe to config changes for monitor count
             _viewModel.AppliedConfig.OnChanged += OnConfigChanged;
 
             // Initial update
-            UpdateBitrateIcon(_viewModel.CurrentBitrateKbps.Value);
+            UpdateResolutionIcon(_viewModel.CurrentResolutionHeight.Value);
             UpdateFpsIcon(_viewModel.CurrentFps.Value);
             if (_viewModel.AppliedConfig.Value != null)
             {
@@ -200,20 +200,20 @@ namespace VRWorkspace.UI.RTT.Components
         {
             if (_viewModel != null)
             {
-                _viewModel.CurrentBitrateKbps.OnChanged -= OnBitrateChanged;
+                _viewModel.CurrentResolutionHeight.OnChanged -= OnResolutionChanged;
                 _viewModel.CurrentFps.OnChanged -= OnFpsChanged;
                 _viewModel.AppliedConfig.OnChanged -= OnConfigChanged;
             }
         }
 
-        private void OnBitrateChanged(int bitrateKbps)
+        private void OnResolutionChanged(int resolutionHeight)
         {
-            UpdateBitrateIcon(bitrateKbps);
+            UpdateResolutionIcon(resolutionHeight);
 
             // Sync expansion panel
             if (_expansionPanel != null)
             {
-                _expansionPanel.SetCurrentBitrate(bitrateKbps / 1000);
+                _expansionPanel.SetCurrentResolution(resolutionHeight);
             }
 
             _miniFrame?.MarkDirty();
@@ -253,9 +253,9 @@ namespace VRWorkspace.UI.RTT.Components
             // 1. Back button
             _backButton = CreateIconButton(section1, iconBack, "Back", _cyanColor, buttonSize, OnBackClicked);
 
-            // 2. Bitrate button (clickable to show expansion panel)
-            var defaultBitrateIcon = GetBitrateIcon(_currentBitrateMbps);
-            _bitrateButton = CreateIconButton(section1, defaultBitrateIcon, "Bitrate", _cyanColor, buttonSize, OnBitrateClicked);
+            // 2. Resolution button (clickable to show expansion panel)
+            var defaultResolutionIcon = GetResolutionIcon(_currentResolutionHeight);
+            _resolutionButton = CreateIconButton(section1, defaultResolutionIcon, "Resolution", _cyanColor, buttonSize, OnResolutionClicked);
 
             // 3. FPS button (clickable to show expansion panel)
             var defaultFpsIcon = GetFpsIcon(_currentFps);
@@ -280,24 +280,24 @@ namespace VRWorkspace.UI.RTT.Components
             _miniFrame.MarkDirty();
         }
 
-        private void OnBitrateClicked()
+        private void OnResolutionClicked()
         {
             if (_expansionPanel == null) return;
 
             HideScreenSettingsPopup();
 
-            // Toggle behavior: if already showing Bitrate options, hide it
-            if (_expansionPanel.IsVisible && _expansionPanel.CurrentType == RTTTaskbarExpansion.ExpansionType.Bitrate)
+            // Toggle behavior: if already showing Resolution options, hide it
+            if (_expansionPanel.IsVisible && _expansionPanel.CurrentType == RTTTaskbarExpansion.ExpansionType.Resolution)
             {
-                Debug.Log("[RTTRemoteTaskbar] Bitrate clicked - hiding expansion panel (toggle)");
+                Debug.Log("[RTTRemoteTaskbar] Resolution clicked - hiding expansion panel (toggle)");
                 _expansionPanel.Hide();
             }
             else
             {
-                // Show bitrate options (will auto-close if showing FPS options)
-                Debug.Log("[RTTRemoteTaskbar] Bitrate clicked - showing expansion panel");
-                Vector3? buttonWorldPos = GetButtonWorldPosition(_bitrateButton);
-                _expansionPanel.ShowBitrateOptions(_currentBitrateMbps, buttonWorldPos);
+                // Show resolution options (will auto-close if showing FPS options)
+                Debug.Log("[RTTRemoteTaskbar] Resolution clicked - showing expansion panel");
+                Vector3? buttonWorldPos = GetButtonWorldPosition(_resolutionButton);
+                _expansionPanel.ShowResolutionOptions(_currentResolutionHeight, buttonWorldPos);
             }
             _miniFrame.MarkDirty();
         }
@@ -316,7 +316,7 @@ namespace VRWorkspace.UI.RTT.Components
             }
             else
             {
-                // Show FPS options (will auto-close if showing Bitrate options)
+                // Show FPS options (will auto-close if showing Resolution options)
                 Debug.Log("[RTTRemoteTaskbar] FPS clicked - showing expansion panel");
                 Vector3? buttonWorldPos = GetButtonWorldPosition(_fpsButton);
                 _expansionPanel.ShowFpsOptions(_currentFps, buttonWorldPos);
@@ -448,7 +448,7 @@ namespace VRWorkspace.UI.RTT.Components
             _expansionPanel = expansionObj.AddComponent<RTTTaskbarExpansion>();
 
             // Subscribe to events
-            _expansionPanel.OnBitrateSelected += OnExpansionBitrateSelected;
+            _expansionPanel.OnResolutionSelected += OnExpansionResolutionSelected;
             _expansionPanel.OnFpsSelected += OnExpansionFpsSelected;
             _expansionPanel.OnPassthroughToggled += OnPassthroughToggled;
             _expansionPanel.OnLightToggled += OnLightToggled;
@@ -460,7 +460,7 @@ namespace VRWorkspace.UI.RTT.Components
         {
             if (_expansionPanel != null)
             {
-                _expansionPanel.OnBitrateSelected -= OnExpansionBitrateSelected;
+                _expansionPanel.OnResolutionSelected -= OnExpansionResolutionSelected;
                 _expansionPanel.OnFpsSelected -= OnExpansionFpsSelected;
                 _expansionPanel.OnPassthroughToggled -= OnPassthroughToggled;
                 _expansionPanel.OnLightToggled -= OnLightToggled;
@@ -474,16 +474,15 @@ namespace VRWorkspace.UI.RTT.Components
             }
         }
 
-        private void OnExpansionBitrateSelected(int mbps)
+        private void OnExpansionResolutionSelected(int resH)
         {
-            Debug.Log($"[RTTRemoteTaskbar] Bitrate selected from expansion: {mbps} Mbps");
+            Debug.Log($"[RTTRemoteTaskbar] Resolution selected from expansion: {resH}p");
 
             // Update ViewModel via UpdateConfigAsync
             if (_viewModel != null)
             {
-                int bitrateKbps = mbps * 1000;
-                // Fire and forget - the async update will trigger OnBitrateChanged
-                _ = _viewModel.UpdateConfigAsync(null, bitrateKbps);
+                // Fire and forget - the async update will trigger OnResolutionChanged
+                _ = _viewModel.UpdateConfigAsync(null, resH);
             }
 
             _miniFrame.MarkDirty();
@@ -946,18 +945,20 @@ namespace VRWorkspace.UI.RTT.Components
             }
         }
 
-        private void UpdateBitrateIcon(int bitrateKbps)
+        private void UpdateResolutionIcon(int resH)
         {
-            int mbps = bitrateKbps / 1000;
-            if (mbps == _currentBitrateMbps) return;
+            if (_resolutionButton == null) return;
 
-            _currentBitrateMbps = mbps;
-            var icon = GetBitrateIcon(mbps);
-            if (icon != null)
-            {
-                SetBareIconButtonIcon(_bitrateButton, icon);
-            }
+            Sprite icon = GetResolutionIcon(resH);
+            SetBareIconButtonIcon(_resolutionButton, icon);
+
+            // Turn off glow since it's just a display (turns purple only when expansion is open)
+            VRButtonFactory.SetBareIconButtonGlowColor(_resolutionButton, _cyanColor);
+
+            _currentResolutionHeight = resH;
         }
+
+
 
         private void UpdateFpsIcon(int fps)
         {
@@ -971,28 +972,18 @@ namespace VRWorkspace.UI.RTT.Components
             }
         }
 
-        private Sprite GetBitrateIcon(int mbps)
+
+
+        private Sprite GetResolutionIcon(int resH)
         {
-            // Snap to nearest valid option: 10, 15, 20, 25, 30
-            int[] validOptions = { 10, 15, 20, 25, 30 };
-            int nearest = validOptions[0];
-            int minDiff = Mathf.Abs(mbps - nearest);
-
-            foreach (int opt in validOptions)
-            {
-                int diff = Mathf.Abs(mbps - opt);
-                if (diff < minDiff)
-                {
-                    minDiff = diff;
-                    nearest = opt;
-                }
-            }
-
-            if (_bitrateIcons.TryGetValue(nearest, out Sprite icon))
+            // Try specific icon
+            if (_resolutionIcons.TryGetValue(resH, out var icon))
             {
                 return icon;
             }
-            return _bitrateIcons.ContainsKey(20) ? _bitrateIcons[20] : null;
+
+            // Fallback strategy: return closest available icon, or default if none
+            return iconMonitor;
         }
 
         private Sprite GetFpsIcon(int fps)
@@ -1656,17 +1647,18 @@ namespace VRWorkspace.UI.RTT.Components
             if (iconMonitor == null) iconMonitor = LoadIcon("monitor");
             if (iconEnviroment == null) iconEnviroment = LoadIcon("enviroment");
 
-            // Dynamic bitrate icons (10, 15, 20, 25, 30 Mbps)
-            // Naming: icon_{bitrate}_mbps (e.g., icon_10_mbps, icon_20_mbps)
-            int[] bitrateOptions = { 10, 15, 20, 25, 30 };
-            foreach (int mbps in bitrateOptions)
+            // Dynamic resolution icons (720, 1080, 1440 p)
+            int[] resOptions = { 720, 1080, 1440 };
+            foreach (int res in resOptions)
             {
-                var icon = LoadIcon($"{mbps}_mbps");
+                var icon = Resources.Load<Sprite>($"icon_{res}p");
                 if (icon != null)
                 {
-                    _bitrateIcons[mbps] = icon;
+                    _resolutionIcons[res] = icon;
                 }
             }
+
+
 
             // Dynamic FPS icons (30, 45, 60)
             // Naming: icon_{fps}_fps (e.g., icon_30_fps, icon_60_fps)
@@ -1680,11 +1672,10 @@ namespace VRWorkspace.UI.RTT.Components
                 }
             }
 
-            // Screen icons (1, 2, 3)
-            // Naming: icon_screen_{number} (e.g., icon_screen_1, icon_screen_2)
+            // Screen icons (screen_1, screen_2, screen_3)
             for (int i = 1; i <= 3; i++)
             {
-                var icon = LoadIcon($"screen_{i}");
+                var icon = Resources.Load<Sprite>($"icon_screen_{i}");
                 if (icon != null)
                 {
                     _screenIcons[i] = icon;
@@ -1692,7 +1683,7 @@ namespace VRWorkspace.UI.RTT.Components
             }
 
             Debug.Log($"[RTTRemoteTaskbar] Icons loaded - Back:{iconBack != null}, Eye:{iconEye != null}, EyeClose:{iconEyeClose != null}, Recenter:{iconRecenter != null}, Zoom:{iconZoom != null}, Monitor:{iconMonitor != null}");
-            Debug.Log($"[RTTRemoteTaskbar] Bitrate icons: {_bitrateIcons.Count}/5, FPS icons: {_fpsIcons.Count}/3, Screen icons: {_screenIcons.Count}/3");
+            Debug.Log($"[RTTRemoteTaskbar] Loaded icons - Resolution: {_resolutionIcons.Count}, FPS: {_fpsIcons.Count}/3, Screens: {_screenIcons.Count}/3");
         }
 
         private static Sprite LoadIcon(string name)

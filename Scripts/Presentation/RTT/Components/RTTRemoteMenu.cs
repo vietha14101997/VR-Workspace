@@ -55,7 +55,7 @@ namespace VRWorkspace.UI.RTT.Components
         private const int DEFAULT_PORT = 8288;
         private GameObject _monitorsDropdown;
         private GameObject _modeDropdown;
-        private GameObject _bitrateDropdown;
+        private GameObject _resolutionDropdown;
         private GameObject _fpsDropdown;
         private GameObject _bodyContainer;
 
@@ -110,8 +110,8 @@ namespace VRWorkspace.UI.RTT.Components
         // Default dropdown options (without Recommended suffix)
         private static readonly string[] MONITOR_OPTIONS = { "1 Monitor", "2 Monitors", "3 Monitors", "Ultrawide", "Super Ultrawide" };
         private static readonly string[] MODE_OPTIONS = { "Classic", "Spatial" };
-        private static readonly string[] BITRATE_OPTIONS = { "10 Mbps", "15 Mbps", "20 Mbps", "25 Mbps", "30 Mbps" };
-        private static readonly string[] FPS_OPTIONS = { "30 FPS", "45 FPS", "60 FPS" };
+        private static readonly string[] RESOLUTION_OPTIONS = { "720p", "1080p", "1440p" };
+        private static readonly string[] FPS_OPTIONS = { "30 FPS", "60 FPS", "120 FPS" };
 
         // Button progress tracking (used in Button Progress Handlers region in Connection.cs)
         private int _buttonServerProgress = 0;
@@ -139,7 +139,7 @@ namespace VRWorkspace.UI.RTT.Components
         public int MonitorIndex => VRDropdownFactory.GetSelectedIndex(_monitorsDropdown);
         public string Mode => VRDropdownFactory.GetSelectedValue(_modeDropdown);
         public int ModeIndex => VRDropdownFactory.GetSelectedIndex(_modeDropdown);
-        public string Bitrate => VRDropdownFactory.GetSelectedValue(_bitrateDropdown);
+        public string Resolution => VRDropdownFactory.GetSelectedValue(_resolutionDropdown);
         public string FPS => VRDropdownFactory.GetSelectedValue(_fpsDropdown);
 
         /// <summary>
@@ -215,7 +215,7 @@ namespace VRWorkspace.UI.RTT.Components
             // Separator 2 position
             float sep2Y = y + bodyY - gap * 1.5f;
 
-            // Grid 2x2 (Monitors, Resolution, Bitrate, FPS)
+            // Grid 2x2 (Monitors, Resolution, Resolution, FPS)
             bodyY -= gap * 2.5f + gridH;
             CreateGrid(_bodyContainer.transform, 0, bodyY, contentW, 0.04f * contentW, dropdownH, gap * 1.5f, gap);
 
@@ -510,8 +510,8 @@ namespace VRWorkspace.UI.RTT.Components
             // Dropdown options
             var monitorOptions = new List<string> { "1 Monitor", "2 Monitors", "3 Monitors", "Ultrawide", "Super Ultrawide" };
             var modeOptions = new List<string> { "Classic", "Spatial" };
-            var bitrateOptions = new List<string> { "10 Mbps", "15 Mbps", "20 Mbps", "25 Mbps", "30 Mbps" };
-            var fpsOptions = new List<string> { "30 FPS", "45 FPS", "60 FPS" };
+            var resolutionOptions = new List<string> { "720p", "1080p", "1440p" };
+            var fpsOptions = new List<string> { "30 FPS", "60 FPS", "120 FPS" };
 
             // Row 1 (top)
             float row1Y = dropdownH + gapY;
@@ -533,19 +533,19 @@ namespace VRWorkspace.UI.RTT.Components
                 labelFontSize: DROPDOWN_LABEL_FONT_SIZE, valueFontSize: DROPDOWN_VALUE_FONT_SIZE, font: customFont);
             PositionElement(_modeDropdown, cellW + gapX, row1Y);
 
-            // Row 2 (bottom) - Total Bitrate (distributed across all monitors)
-            _bitrateDropdown = VRDropdownFactory.CreateIconDropdown(
+            // Row 2 (bottom) - Resolution
+            _resolutionDropdown = VRDropdownFactory.CreateIconDropdown(
                 grid.transform, cellW,
-                "Total Bitrate", LoadIcon("bitrate"), accentColor,
-                bitrateOptions, 2,
-                onValueChanged: HandleBitrateChanged,
+                "Resolution", LoadIcon("resolution"), accentColor,
+                resolutionOptions, 1, // Default 1080p
+                onValueChanged: HandleResolutionChanged,
                 labelFontSize: DROPDOWN_LABEL_FONT_SIZE, valueFontSize: DROPDOWN_VALUE_FONT_SIZE, font: customFont);
-            PositionElement(_bitrateDropdown, 0, 0);
+            PositionElement(_resolutionDropdown, 0, 0);
 
             _fpsDropdown = VRDropdownFactory.CreateIconDropdown(
                 grid.transform, cellW,
                 "FPS", LoadIcon("fps"), themeColor,
-                fpsOptions, 2,
+                fpsOptions, 1, // Default 60 FPS
                 onValueChanged: HandleFpsChanged,
                 labelFontSize: DROPDOWN_LABEL_FONT_SIZE, valueFontSize: DROPDOWN_VALUE_FONT_SIZE, font: customFont);
             PositionElement(_fpsDropdown, cellW + gapX, 0);

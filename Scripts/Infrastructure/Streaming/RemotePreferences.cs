@@ -13,8 +13,7 @@ namespace VRWorkspace.Streaming
     {
         public int monitors = -1;           // -1 = use suggested (0-4: index into MONITOR_OPTIONS)
         public string mode = "";            // "Classic" or "Spatial"
-        public string resolution = "";      // [DEPRECATED] kept for backward compat migration
-        public string bitrate = "";
+        public string resolution = "";      // "720p", "1080p", "1440p"
         public string fps = "";
         public string lastHost = "";
         public string lastPort = "8288";    // default port
@@ -42,11 +41,10 @@ namespace VRWorkspace.Streaming
                         {
                             // Old resolution values were "Flat Planar" or "Curved Surround"
                             // These don't map to mode, so just default to Classic
-                            prefs.mode = "Classic";
-                            prefs.resolution = "";
+                            prefs.resolution = "1080p"; // Default resolution if migrating
                         }
 
-                        Debug.Log($"[RemotePreferences] Loaded: monitors={prefs.monitors}, mode={prefs.mode}, bitrate={prefs.bitrate}, fps={prefs.fps}");
+                        Debug.Log($"[RemotePreferences] Loaded: monitors={prefs.monitors}, mode={prefs.mode}, resolution={prefs.resolution}, fps={prefs.fps}");
                         return prefs;
                     }
                 }
@@ -82,8 +80,8 @@ namespace VRWorkspace.Streaming
         /// <summary>Check if user has saved mode preference.</summary>
         public bool HasModePreference => !string.IsNullOrEmpty(mode);
 
-        /// <summary>Check if user has saved bitrate preference.</summary>
-        public bool HasBitratePreference => !string.IsNullOrEmpty(bitrate);
+        /// <summary>Check if user has saved resolution preference.</summary>
+        public bool HasResolutionPreference => !string.IsNullOrEmpty(resolution);
 
         /// <summary>Check if user has saved fps preference.</summary>
         public bool HasFpsPreference => !string.IsNullOrEmpty(fps);

@@ -84,8 +84,8 @@ namespace VRWorkspace.ViewModels
         /// <summary>Total number of monitors expected</summary>
         public ObservableProperty<int> TotalMonitorCount { get; } = new(0);
 
-        /// <summary>Current bitrate in kbps (updated when config changes)</summary>
-        public ObservableProperty<int> CurrentBitrateKbps { get; } = new(20000);
+        /// <summary>Current resolution height (updated when config changes)</summary>
+        public ObservableProperty<int> CurrentResolutionHeight { get; } = new(1080);
 
         /// <summary>Current FPS (updated when config changes)</summary>
         public ObservableProperty<int> CurrentFps { get; } = new(60);
@@ -410,7 +410,7 @@ namespace VRWorkspace.ViewModels
             TotalMonitorCount.Value = 0;
 
             // Current streaming config
-            CurrentBitrateKbps.Value = 20000;
+            CurrentResolutionHeight.Value = 1080;
             CurrentFps.Value = 60;
 
             Debug.Log("[ConnectionViewModel] All state reset to initial values");
@@ -484,8 +484,8 @@ namespace VRWorkspace.ViewModels
             AppliedConfig.Value = config;
             TotalMonitorCount.Value = config.monitors;
 
-            // Set current bitrate/fps from config
-            CurrentBitrateKbps.Value = config.bitrateKbps;
+            // Set current resolution/fps from config
+            CurrentResolutionHeight.Value = config.resolutionHeight;
             CurrentFps.Value = config.fps;
 
             // Reset progress
@@ -564,25 +564,24 @@ namespace VRWorkspace.ViewModels
 
         /// <summary>
         /// Update streaming configuration during Phase 3 (Streaming).
-        /// Sends update_config message to server for dynamic FPS/Bitrate changes.
+        /// Sends update_config message to server for dynamic FPS/Resolution changes.
         /// </summary>
         /// <param name="fps">New target FPS (null = no change)</param>
-        /// <param name="bitrateKbps">New TOTAL bitrate in kbps for all monitors (null = no change)</param>
-        public async Task UpdateConfigAsync(int? fps, int? bitrateKbps)
+        /// <param name="resolutionHeight">New target resolution height (null = no change)</param>
+        public async Task UpdateConfigAsync(int? fps, int? resolutionHeight)
         {
             if (_client == null || Phase.Value != ConnectionPhase.Streaming)
             {
                 Debug.LogWarning($"[ConnectionViewModel] UpdateConfigAsync: Not streaming (phase={Phase.Value})");
                 return;
             }
-
-            await _client.UpdateConfigAsync(fps, bitrateKbps);
+            await _client.UpdateConfigAsync(fps, resolutionHeight);
 
             // Update current values after sending to server
-            if (bitrateKbps.HasValue)
+            if (resolutionHeight.HasValue)
             {
-                CurrentBitrateKbps.Value = bitrateKbps.Value;
-                Debug.Log($"[ConnectionViewModel] Updated CurrentBitrateKbps: {bitrateKbps.Value}");
+                CurrentResolutionHeight.Value = resolutionHeight.Value;
+                Debug.Log($"[ConnectionViewModel] Updated CurrentResolutionHeight: {resolutionHeight.Value}");
             }
             if (fps.HasValue)
             {

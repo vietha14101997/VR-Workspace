@@ -48,7 +48,7 @@ namespace VRWorkspace.UI.RTT.Components
         public enum ExpansionType
         {
             None,
-            Bitrate,
+            Resolution,
             Fps,
             Eye,
             Apps,
@@ -57,7 +57,7 @@ namespace VRWorkspace.UI.RTT.Components
         #endregion
 
         #region Events
-        public event Action<int> OnBitrateSelected;
+        public event Action<int> OnResolutionSelected;
         public event Action<int> OnFpsSelected;
         public event Action<bool> OnPassthroughToggled;
         public event Action<bool> OnLightToggled;
@@ -80,15 +80,15 @@ namespace VRWorkspace.UI.RTT.Components
         private List<GameObject> _optionButtons = new List<GameObject>();
 
         // Current selection state
-        private int _selectedBitrateMbps = 20;
+        private int _selectedResolutionHeight = 1080;
         private int _selectedFps = 60;
 
         // Available options
-        private readonly int[] _bitrateOptions = { 10, 15, 20, 25, 30 };
-        private readonly int[] _fpsOptions = { 30, 45, 60 };
+        private readonly int[] _resolutionOptions = { 720, 1080, 1440 };
+        private readonly int[] _fpsOptions = { 30, 60, 120 };
 
         // Icons
-        private Dictionary<int, Sprite> _bitrateIcons = new Dictionary<int, Sprite>();
+        private Dictionary<int, Sprite> _resolutionIcons = new Dictionary<int, Sprite>();
         private Dictionary<int, Sprite> _fpsIcons = new Dictionary<int, Sprite>();
         private Sprite _iconPassthrough;
         private Sprite _iconLightOn;
@@ -134,7 +134,7 @@ namespace VRWorkspace.UI.RTT.Components
         protected override void Awake()
         {
             LoadIcons();
-            RecalculateSize(ExpansionType.Bitrate); // Default to bitrate for initial size
+            RecalculateSize(ExpansionType.Resolution); // Default to resolution for initial size
 
             worldWidth = _totalWidth * PixelToMeter;
             worldHeight = frameHeight * PixelToMeter;
@@ -199,15 +199,15 @@ namespace VRWorkspace.UI.RTT.Components
 
         #region Public API
         /// <summary>
-        /// Show expansion panel with bitrate options.
+        /// Show expansion panel with resolution options.
         /// </summary>
-        /// <param name="currentBitrateMbps">Current selected bitrate</param>
+        /// <param name="currentResolutionHeight">Current selected resolution</param>
         /// <param name="triggerButtonWorldPos">World position of the trigger button (for X-axis alignment)</param>
-        public void ShowBitrateOptions(int currentBitrateMbps, Vector3? triggerButtonWorldPos = null)
+        public void ShowResolutionOptions(int currentResolutionHeight, Vector3? triggerButtonWorldPos = null)
         {
-            _selectedBitrateMbps = currentBitrateMbps;
+            _selectedResolutionHeight = currentResolutionHeight;
             CalculateLocalXOffset(triggerButtonWorldPos);
-            ShowExpansion(ExpansionType.Bitrate);
+            ShowExpansion(ExpansionType.Resolution);
         }
 
         /// <summary>
@@ -300,12 +300,12 @@ namespace VRWorkspace.UI.RTT.Components
         }
 
         /// <summary>
-        /// Set current bitrate selection (for visual update without triggering event).
+        /// Set current resolution selection (for visual update without triggering event).
         /// </summary>
-        public void SetCurrentBitrate(int mbps)
+        public void SetCurrentResolution(int height)
         {
-            _selectedBitrateMbps = mbps;
-            if (_currentType == ExpansionType.Bitrate)
+            _selectedResolutionHeight = height;
+            if (_currentType == ExpansionType.Resolution)
             {
                 UpdateButtonStates();
             }
@@ -625,7 +625,7 @@ namespace VRWorkspace.UI.RTT.Components
         {
             int buttonCount = type switch
             {
-                ExpansionType.Bitrate => _bitrateOptions.Length,
+                ExpansionType.Resolution => _resolutionOptions.Length,
                 ExpansionType.Fps => _fpsOptions.Length,
                 ExpansionType.Eye => 2, // Passthrough + Light
                 ExpansionType.Apps => appExpansionCapacity, // Fixed 4 slots
@@ -703,9 +703,9 @@ namespace VRWorkspace.UI.RTT.Components
             _optionButtons.Clear();
 
             // Create new buttons based on type
-            if (_currentType == ExpansionType.Bitrate)
+            if (_currentType == ExpansionType.Resolution)
             {
-                CreateBitrateButtons();
+                CreateResolutionButtons();
             }
             else if (_currentType == ExpansionType.Fps)
             {
@@ -725,22 +725,22 @@ namespace VRWorkspace.UI.RTT.Components
             }
         }
 
-        private void CreateBitrateButtons()
+        private void CreateResolutionButtons()
         {
-            foreach (int mbps in _bitrateOptions)
+            foreach (int resH in _resolutionOptions)
             {
-                bool isSelected = (mbps == _selectedBitrateMbps);
+                bool isSelected = (resH == _selectedResolutionHeight);
                 Color color = isSelected ? _purpleColor : _cyanColor;
-                Sprite icon = _bitrateIcons.TryGetValue(mbps, out var s) ? s : null;
+                Sprite icon = _resolutionIcons.TryGetValue(resH, out var s) ? s : null;
 
-                int capturedMbps = mbps;
+                int capturedResH = resH;
                 var btn = VRButtonFactory.CreateBareIconButton(
                     _contentContainer, buttonSize, icon, color,
-                    () => OnBitrateButtonClicked(capturedMbps),
+                    () => OnResolutionButtonClicked(capturedResH),
                     0.05f, 0.6f
                 );
 
-                btn.name = $"Btn_Bitrate_{mbps}";
+                btn.name = $"Btn_Resolution_{resH}";
                 SetLayerRecursively(btn, LayerMask.NameToLayer("UI"));
                 _optionButtons.Add(btn);
             }
@@ -946,11 +946,11 @@ namespace VRWorkspace.UI.RTT.Components
             VRButtonFactory.SetBareIconButtonSprite(_optionButtons[1], lightIcon);
         }
 
-        private void OnBitrateButtonClicked(int mbps)
+        private void OnResolutionButtonClicked(int resH)
         {
-            _selectedBitrateMbps = mbps;
+            _selectedResolutionHeight = resH;
             UpdateButtonStates();
-            OnBitrateSelected?.Invoke(mbps);
+            OnResolutionSelected?.Invoke(resH);
             MarkDirty();
 
             // Hide after selection
@@ -1021,11 +1021,11 @@ namespace VRWorkspace.UI.RTT.Components
 
         private void UpdateButtonStates()
         {
-            if (_currentType == ExpansionType.Bitrate)
+            if (_currentType == ExpansionType.Resolution)
             {
-                for (int i = 0; i < _bitrateOptions.Length && i < _optionButtons.Count; i++)
+                for (int i = 0; i < _resolutionOptions.Length && i < _optionButtons.Count; i++)
                 {
-                    bool isSelected = (_bitrateOptions[i] == _selectedBitrateMbps);
+                    bool isSelected = (_resolutionOptions[i] == _selectedResolutionHeight);
                     Color color = isSelected ? _purpleColor : _cyanColor;
                     VRButtonFactory.SetBareIconButtonGlowColor(_optionButtons[i], color);
                 }
@@ -1218,13 +1218,13 @@ namespace VRWorkspace.UI.RTT.Components
         #region Icons
         private void LoadIcons()
         {
-            // Dynamic bitrate icons (10, 15, 20, 25, 30 Mbps)
-            foreach (int mbps in _bitrateOptions)
+            // Dynamic resolution icons (720, 1080, 1440 p)
+            foreach (int res in _resolutionOptions)
             {
-                var icon = Resources.Load<Sprite>($"icon_{mbps}_mbps");
+                var icon = Resources.Load<Sprite>($"icon_{res}p");
                 if (icon != null)
                 {
-                    _bitrateIcons[mbps] = icon;
+                    _resolutionIcons[res] = icon;
                 }
             }
 
@@ -1247,7 +1247,7 @@ namespace VRWorkspace.UI.RTT.Components
             _iconFlatMonitor = Resources.Load<Sprite>("icon_flat_monitor");
             _iconCurvedMonitor = Resources.Load<Sprite>("icon_curved_monitor");
 
-            Debug.Log($"[RTTTaskbarExpansion] Icons loaded - Bitrate: {_bitrateIcons.Count}/{_bitrateOptions.Length}, " +
+            Debug.Log($"[RTTTaskbarExpansion] Icons loaded - Resolution: {_resolutionIcons.Count}/{_resolutionOptions.Length}, " +
                 $"FPS: {_fpsIcons.Count}/{_fpsOptions.Length}, " +
                 $"Passthrough: {_iconPassthrough != null}, LightOn: {_iconLightOn != null}, LightOff: {_iconLightOff != null}, " +
                 $"FlatMonitor: {_iconFlatMonitor != null}, CurvedMonitor: {_iconCurvedMonitor != null}");

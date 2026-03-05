@@ -374,17 +374,17 @@ namespace VRWorkspace.UI.RTT.Controllers
         /// <summary>
         /// Get connection settings from the remote menu.
         /// </summary>
-        public (string host, string port, int monitors, string mode, string bitrate, string fps, string monitorType) GetConnectionSettings()
+        public (string host, string port, int monitors, string mode, string resolution, string fps, string monitorType) GetConnectionSettings()
         {
             if (_remoteMenuInstance == null)
-                return ("localhost", "8080", 1, "Classic", "20 Mbps", "60 FPS", "standard");
+                return ("localhost", "8080", 1, "Classic", "1080p", "60 FPS", "standard");
 
             return (
                 _remoteMenuInstance.Host,
                 _remoteMenuInstance.Port,
                 _remoteMenuInstance.IsUltrawide ? 1 : _remoteMenuInstance.MonitorIndex + 1,
                 _remoteMenuInstance.Mode,
-                _remoteMenuInstance.Bitrate,
+                _remoteMenuInstance.Resolution,
                 _remoteMenuInstance.FPS,
                 _remoteMenuInstance.MonitorType
             );

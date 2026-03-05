@@ -200,14 +200,15 @@ namespace VRWorkspace.Native
         /// Push an encoded H.265 frame to the decoder bridge.
         /// This is used by the H265StreamReceiver pipeline.
         /// </summary>
-        public void PushEncodedFrame(byte[] nalData, long timestamp, bool isKeyFrame)
+        /// <returns>True if frame was queued successfully</returns>
+        public bool PushEncodedFrame(byte[] nalData, long timestamp, bool isKeyFrame)
         {
-            if (!_initialized || _disposed || nalData == null) return;
+            if (!_initialized || _disposed || nalData == null) return false;
 
 #if UNITY_ANDROID && !UNITY_EDITOR
             lock (_lock)
             {
-                if (!_initialized || _disposed || _decoderBridge == null) return;
+                if (!_initialized || _disposed || _decoderBridge == null) return false;
                 try
                 {
                     EnsureJniMethodIds();
@@ -221,7 +222,12 @@ namespace VRWorkspace.Native
                         args[0].l = jByteArray;
                         args[1].j = timestamp;
                         args[2].z = isKeyFrame;
-                        AndroidJNI.CallVoidMethod(_bridgeRawObject, _pushFrameMethodId, args);
+                        bool result = AndroidJNI.CallBooleanMethod(_bridgeRawObject, _pushFrameMethodId, args);
+                        if (!result)
+                        {
+                            Debug.LogWarning($"{TAG} Failed to push {(isKeyFrame ? "IDR" : "P")} frame to decoder (buffer full or hardware busy)");
+                        }
+                        return result;
                     }
                     finally
                     {
@@ -231,8 +237,11 @@ namespace VRWorkspace.Native
                 catch (Exception ex)
                 {
                     Debug.LogError($"{TAG} PushEncodedFrame exception: {ex.Message}");
+                    return false;
                 }
             }
+#else
+            return false;
 #endif
         }
 
@@ -250,7 +259,7 @@ namespace VRWorkspace.Native
             try
             {
                 _decodeMethodId = AndroidJNI.GetMethodID(classRef, "decode", "([BJ)Z");
-                _pushFrameMethodId = AndroidJNI.GetMethodID(classRef, "pushEncodedFrame", "([BJZ)V");
+                _pushFrameMethodId = AndroidJNI.GetMethodID(classRef, "pushEncodedFrame", "([BJZ)Z");
                 Debug.Log($"{TAG} JNI method IDs cached successfully");
             }
             finally

@@ -54,26 +54,17 @@ namespace VRWorkspace.UI.RTT.Components
             // === Auto-apply style based on monitor selection ===
             ApplyAutoStyleForMonitor(selectedMonitorIndex);
 
-            // === Bitrate ===
-            int bitrateMbps = config.bitrateKbps / 1000;
-            string suggestedBitrate = $"{bitrateMbps} Mbps";
-            int suggestedBitrateIndex = FindOptionIndex(BITRATE_OPTIONS, suggestedBitrate);
-            if (suggestedBitrateIndex < 0)
+            // === Resolution ===
+            // Calculate a suggested resolution based on previous default bitrate logic, or default to 1080p.
+            int suggestedResolutionIndex = 1; // Default to 1080p
+            var resolutionOptions = BuildOptionsWithRecommended(RESOLUTION_OPTIONS, suggestedResolutionIndex);
+            int selectedResolutionIndex = suggestedResolutionIndex;
+            if (prefs.HasResolutionPreference)
             {
-                if (bitrateMbps >= 25) suggestedBitrateIndex = 4;
-                else if (bitrateMbps >= 17) suggestedBitrateIndex = 3;
-                else if (bitrateMbps >= 12) suggestedBitrateIndex = 2;
-                else if (bitrateMbps >= 7) suggestedBitrateIndex = 1;
-                else suggestedBitrateIndex = 0;
+                int savedIdx = FindOptionIndexClean(RESOLUTION_OPTIONS, prefs.resolution);
+                if (savedIdx >= 0) selectedResolutionIndex = savedIdx;
             }
-            var bitrateOptions = BuildOptionsWithRecommended(BITRATE_OPTIONS, suggestedBitrateIndex);
-            int selectedBitrateIndex = suggestedBitrateIndex;
-            if (prefs.HasBitratePreference)
-            {
-                int savedIdx = FindOptionIndexClean(BITRATE_OPTIONS, prefs.bitrate);
-                if (savedIdx >= 0) selectedBitrateIndex = savedIdx;
-            }
-            VRDropdownFactory.SetOptions(_bitrateDropdown, bitrateOptions, selectedBitrateIndex);
+            VRDropdownFactory.SetOptions(_resolutionDropdown, resolutionOptions, selectedResolutionIndex);
 
             // === FPS ===
             string suggestedFps = $"{config.fps} FPS";
@@ -91,10 +82,10 @@ namespace VRWorkspace.UI.RTT.Components
             // Enable preference saving now that dropdowns have valid values
             _preferenceSaveEnabled = true;
 
-            bool usingSaved = prefs.HasMonitorPreference || prefs.HasBitratePreference || prefs.HasFpsPreference;
-            Debug.Log($"[RTTRemoteMenu] Applied config: {(usingSaved ? "SAVED prefs" : "suggested")} — Mon={selectedMonitorIndex + 1}, Bitrate={BITRATE_OPTIONS[selectedBitrateIndex]}, FPS={FPS_OPTIONS[selectedFpsIndex]}");
+            bool usingSaved = prefs.HasMonitorPreference || prefs.HasResolutionPreference || prefs.HasFpsPreference;
+            Debug.Log($"[RTTRemoteMenu] Applied config: {(usingSaved ? "SAVED prefs" : "suggested")} — Mon={selectedMonitorIndex + 1}, Resolution={RESOLUTION_OPTIONS[selectedResolutionIndex]}, FPS={FPS_OPTIONS[selectedFpsIndex]}");
             if (usingSaved)
-                Debug.Log($"[RTTRemoteMenu] Server suggested: {config.monitors}mon, {config.bitrateKbps}kbps, {config.fps}fps (shown as Recommended)");
+                Debug.Log($"[RTTRemoteMenu] Server suggested: {config.monitors}mon, {config.resolutionHeight}p, {config.fps}fps (shown as Recommended)");
         }
 
         /// <summary>
@@ -150,9 +141,6 @@ namespace VRWorkspace.UI.RTT.Components
                 return;
             }
 
-            // Ultrawide/Super Ultrawide = 1 virtual monitor, Standard = 1/2/3 physical
-            int selectedMonitors = index >= 3 ? 1 : index + 1;
-            RecalculateSuggestionsForMonitorCount(selectedMonitors);
             if (_preferenceSaveEnabled) SaveCurrentSelections();
         }
 
@@ -214,29 +202,29 @@ namespace VRWorkspace.UI.RTT.Components
         }
 
         /// <summary>
-        /// Handle Bitrate dropdown selection changed.
+        /// Handle Resolution dropdown selection changed.
         /// Sends update_config to server if currently streaming.
         /// </summary>
-        private void HandleBitrateChanged(int index, string value)
+        private void HandleResolutionChanged(int index, string value)
         {
-            Debug.Log($"[RTTRemoteMenu] Bitrate changed: index={index}, value={value}");
+            Debug.Log($"[RTTRemoteMenu] Resolution changed: index={index}, value={value}");
 
-            // Parse Bitrate value (total for all monitors)
-            int bitrateKbps = 20000; // default
+            // Parse Resolution value
+            int resolutionHeight = 1080; // default
             if (!string.IsNullOrEmpty(value))
             {
-                var numStr = value.Replace(" ", "").Replace("Mbps", "").Replace("mbps", "");
-                if (int.TryParse(numStr, out int mbps))
+                var numStr = value.Replace(" ", "").Replace("p", "");
+                if (int.TryParse(numStr, out int height))
                 {
-                    bitrateKbps = mbps * 1000;
+                    resolutionHeight = height;
                 }
             }
 
             // If streaming, send update_config
             if (_currentPhase == ConnectionPhase.Streaming && _viewModel != null)
             {
-                _ = _viewModel.UpdateConfigAsync(null, bitrateKbps);
-                Debug.Log($"[RTTRemoteMenu] Sent update_config: bitrateKbps={bitrateKbps} (total)");
+                _ = _viewModel.UpdateConfigAsync(null, resolutionHeight);
+                Debug.Log($"[RTTRemoteMenu] Sent update_config: resolutionHeight={resolutionHeight}");
             }
             if (_preferenceSaveEnabled) SaveCurrentSelections();
         }
@@ -250,31 +238,19 @@ namespace VRWorkspace.UI.RTT.Components
             if (_cachedNetworkInfo == null || _cachedHardwareInfo == null) return;
 
             // Get current selections before updating options
-            int currentBitrateIndex = VRDropdownFactory.GetSelectedIndex(_bitrateDropdown);
+            int currentResolutionIndex = VRDropdownFactory.GetSelectedIndex(_resolutionDropdown);
             int currentFpsIndex = VRDropdownFactory.GetSelectedIndex(_fpsDropdown);
 
-            // === Calculate recommended Bitrate based on resolution and network ===
+            // === Calculate recommended Resolution based on hardware and network ===
             double availableBandwidth = _cachedNetworkInfo.bandwidthMbps > 0 ? _cachedNetworkInfo.bandwidthMbps : 100;
 
-            int baseBitrateKbps;
-            if (_cachedHardwareInfo.gpuVramGB >= 8) baseBitrateKbps = 15000;
-            else if (_cachedHardwareInfo.gpuVramGB >= 4) baseBitrateKbps = 12000;
-            else baseBitrateKbps = 10000;
-
-            if (_cachedNetworkInfo.pingMs < 10 && availableBandwidth > 500)
-                baseBitrateKbps = (int)(baseBitrateKbps * 1.3f);
-            else if (_cachedNetworkInfo.pingMs < 20 && availableBandwidth > 200)
-                baseBitrateKbps = (int)(baseBitrateKbps * 1.15f);
-
-            double maxBitratePerMonitor = availableBandwidth * 0.6 / monitorCount * 1000;
-            int suggestedBitrateKbps = (int)Math.Clamp(Math.Min(baseBitrateKbps, maxBitratePerMonitor), 5000, 30000);
-
-            int suggestedBitrateIndex;
-            if (suggestedBitrateKbps >= 25000) suggestedBitrateIndex = 4;
-            else if (suggestedBitrateKbps >= 17500) suggestedBitrateIndex = 3;
-            else if (suggestedBitrateKbps >= 12500) suggestedBitrateIndex = 2;
-            else if (suggestedBitrateKbps >= 7500) suggestedBitrateIndex = 1;
-            else suggestedBitrateIndex = 0;
+            int suggestedResolutionIndex;
+            if (_cachedHardwareInfo.gpuVramGB >= 8 && availableBandwidth > 100)
+                suggestedResolutionIndex = 2; // 1440p
+            else if (_cachedHardwareInfo.gpuVramGB >= 4 && availableBandwidth > 50)
+                suggestedResolutionIndex = 1; // 1080p
+            else
+                suggestedResolutionIndex = 0; // 720p
 
             int suggestedFpsIndex;
             if (_cachedHardwareInfo.hwAccelEnabled && _cachedNetworkInfo.pingMs < 20)
@@ -287,12 +263,12 @@ namespace VRWorkspace.UI.RTT.Components
             // Check if user has saved preferences — keep their choice, only update "(Recommended)" labels
             var prefs = RemotePreferences.Load();
 
-            // Bitrate: update options with new Recommended label, but keep user's selection if saved
-            var bitrateOptions = BuildOptionsWithRecommended(BITRATE_OPTIONS, suggestedBitrateIndex);
-            int selectedBitrateIndex = (prefs.HasBitratePreference && currentBitrateIndex >= 0)
-                ? currentBitrateIndex  // Keep user's current selection
-                : suggestedBitrateIndex;
-            VRDropdownFactory.SetOptions(_bitrateDropdown, bitrateOptions, Mathf.Clamp(selectedBitrateIndex, 0, BITRATE_OPTIONS.Length - 1));
+            // Resolution: update options with new Recommended label, but keep user's selection if saved
+            var resolutionOptions = BuildOptionsWithRecommended(RESOLUTION_OPTIONS, suggestedResolutionIndex);
+            int selectedResolutionIndex = (prefs.HasResolutionPreference && currentResolutionIndex >= 0)
+                ? currentResolutionIndex  // Keep user's current selection
+                : suggestedResolutionIndex;
+            VRDropdownFactory.SetOptions(_resolutionDropdown, resolutionOptions, Mathf.Clamp(selectedResolutionIndex, 0, RESOLUTION_OPTIONS.Length - 1));
 
             // FPS: same logic
             var fpsOptions = BuildOptionsWithRecommended(FPS_OPTIONS, suggestedFpsIndex);
@@ -301,7 +277,7 @@ namespace VRWorkspace.UI.RTT.Components
                 : suggestedFpsIndex;
             VRDropdownFactory.SetOptions(_fpsDropdown, fpsOptions, Mathf.Clamp(selectedFpsIndex, 0, FPS_OPTIONS.Length - 1));
 
-            Debug.Log($"[RTTRemoteMenu] Recalculated for {monitorCount} monitors: Recommended={BITRATE_OPTIONS[suggestedBitrateIndex]}/{FPS_OPTIONS[suggestedFpsIndex]}, Selected={BITRATE_OPTIONS[Mathf.Clamp(selectedBitrateIndex, 0, BITRATE_OPTIONS.Length - 1)]}/{FPS_OPTIONS[Mathf.Clamp(selectedFpsIndex, 0, FPS_OPTIONS.Length - 1)]}");
+            Debug.Log($"[RTTRemoteMenu] Recalculated for {monitorCount} monitors: Recommended={RESOLUTION_OPTIONS[suggestedResolutionIndex]}/{FPS_OPTIONS[suggestedFpsIndex]}, Selected={RESOLUTION_OPTIONS[Mathf.Clamp(selectedResolutionIndex, 0, RESOLUTION_OPTIONS.Length - 1)]}/{FPS_OPTIONS[Mathf.Clamp(selectedFpsIndex, 0, FPS_OPTIONS.Length - 1)]}");
         }
         #endregion
 
@@ -317,12 +293,12 @@ namespace VRWorkspace.UI.RTT.Components
 
             VRDropdownFactory.SetOptions(_monitorsDropdown, placeholder, 0);
             VRDropdownFactory.SetOptions(_modeDropdown, new List<string> { "Classic", "Spatial" }, 0);
-            VRDropdownFactory.SetOptions(_bitrateDropdown, placeholder, 0);
+            VRDropdownFactory.SetOptions(_resolutionDropdown, placeholder, 0);
             VRDropdownFactory.SetOptions(_fpsDropdown, placeholder, 0);
 
             VRDropdownFactory.SetInteractable(_monitorsDropdown, false);
             VRDropdownFactory.SetInteractable(_modeDropdown, false);
-            VRDropdownFactory.SetInteractable(_bitrateDropdown, false);
+            VRDropdownFactory.SetInteractable(_resolutionDropdown, false);
             VRDropdownFactory.SetInteractable(_fpsDropdown, false);
         }
 
@@ -334,7 +310,7 @@ namespace VRWorkspace.UI.RTT.Components
         {
             VRDropdownFactory.SetInteractable(_monitorsDropdown, true);
             VRDropdownFactory.SetInteractable(_modeDropdown, true);
-            VRDropdownFactory.SetInteractable(_bitrateDropdown, true);
+            VRDropdownFactory.SetInteractable(_resolutionDropdown, true);
             VRDropdownFactory.SetInteractable(_fpsDropdown, true);
 
             // Always lock "Spatial" option (index 1) in Mode dropdown
@@ -349,7 +325,7 @@ namespace VRWorkspace.UI.RTT.Components
         {
             VRDropdownFactory.SetInteractable(_monitorsDropdown, false);
             VRDropdownFactory.SetInteractable(_modeDropdown, false);
-            VRDropdownFactory.SetInteractable(_bitrateDropdown, false);
+            VRDropdownFactory.SetInteractable(_resolutionDropdown, false);
             VRDropdownFactory.SetInteractable(_fpsDropdown, false);
 
             VRInputFieldFactory.SetInteractable(_hostInput, false);
@@ -366,7 +342,7 @@ namespace VRWorkspace.UI.RTT.Components
         {
             VRDropdownFactory.SetInteractable(_monitorsDropdown, true);
             VRDropdownFactory.SetInteractable(_modeDropdown, true);
-            VRDropdownFactory.SetInteractable(_bitrateDropdown, true);
+            VRDropdownFactory.SetInteractable(_resolutionDropdown, true);
             VRDropdownFactory.SetInteractable(_fpsDropdown, true);
 
             // Re-lock Spatial after enabling Mode dropdown
@@ -435,14 +411,14 @@ namespace VRWorkspace.UI.RTT.Components
             {
                 monitors = MonitorIndex,
                 mode = RemotePreferences.CleanValue(Mode),
-                bitrate = RemotePreferences.CleanValue(Bitrate),
+                resolution = RemotePreferences.CleanValue(Resolution),
                 fps = RemotePreferences.CleanValue(FPS),
                 lastHost = VRInputFieldFactory.GetValue(_hostInput),
                 lastPort = Port,
                 usbMode = _isUsbMode
             };
             prefs.Save();
-            Debug.Log($"[RTTRemoteMenu] Saved preferences: {prefs.monitors}mon, mode={prefs.mode}, {prefs.bitrate}, {prefs.fps}, USB={prefs.usbMode}");
+            Debug.Log($"[RTTRemoteMenu] Saved preferences: {prefs.monitors}mon, mode={prefs.mode}, {prefs.resolution}, {prefs.fps}, USB={prefs.usbMode}");
         }
         #endregion
 

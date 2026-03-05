@@ -1,3 +1,4 @@
+#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
 using System;
 using System.Collections.Generic;
 using System.Net.WebSockets;
@@ -612,10 +613,10 @@ namespace VRWorkspace.Streaming
 
         // SkipToLiveImmediate is defined in PhaseProtocolClient.Metrics.cs partial.
 
-        public async Task UpdateConfigAsync(int? fps, int? bitrateKbps)
+        public async Task UpdateConfigAsync(int? fps, int? resolutionHeight)
         {
             if (_ws?.State != WebSocketState.Open) { Debug.LogWarning($"[PhaseProtocol] UpdateConfigAsync skipped: ws={_ws?.State}"); return; }
-            await _phase3.UpdateConfigAsync(fps, bitrateKbps);
+            await _phase3.UpdateConfigAsync(fps, resolutionHeight);
         }
 
         // ── Receive loop ──────────────────────────────────────────────────────
