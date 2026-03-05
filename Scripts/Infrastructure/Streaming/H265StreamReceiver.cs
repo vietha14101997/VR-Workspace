@@ -35,8 +35,8 @@ namespace VRWorkspace.Streaming
 
         // ──────────── Configuration ────────────
         public readonly int MonitorIndex;
-        public readonly int Width;
-        public readonly int Height;
+        public int Width { get; private set; }
+        public int Height { get; private set; }
 
         // ──────────── State ────────────
         private HevcDecoderPlugin _decoder;
@@ -252,6 +252,48 @@ namespace VRWorkspace.Streaming
             int uvStride = _decoder.UVStride;
             int fWidth   = _decoder.FrameWidth;
             int fHeight  = _decoder.FrameHeight;
+
+            // Handle resolution changes by reallocating textures and buffers.
+            // If the decoder starts outputting a lower/higher resolution than configured
+            // (e.g. Adaptive Bitrate downscaling), we must recreate textures to prevent
+            // UnityException (LoadRawTextureData: not enough data provided).
+            if (fWidth != Width || fHeight != Height)
+            {
+                Debug.LogWarning($"{TAG} PC{MonitorIndex} Resolution changed dynamically: {Width}x{Height} -> {fWidth}x{fHeight}. Reallocating textures.");
+                
+                Width = fWidth;
+                Height = fHeight;
+                
+                if (_yTex != null) { UnityEngine.Object.Destroy(_yTex); }
+                if (_uvTex != null) { UnityEngine.Object.Destroy(_uvTex); }
+                if (_outputRt != null) { _outputRt.Release(); UnityEngine.Object.Destroy(_outputRt); }
+                
+                // Recreate textures with the new dimensions
+                _yTex = new Texture2D(Width, Height, TextureFormat.R8, false, true);
+                _yTex.filterMode = FilterMode.Bilinear;
+                _yTex.name = $"H265_Y_Mon{MonitorIndex}";
+
+                _uvTex = new Texture2D(Width / 2, Height / 2, TextureFormat.RG16, false, true);
+                _uvTex.filterMode = FilterMode.Bilinear;
+                _uvTex.name = $"H265_UV_Mon{MonitorIndex}";
+
+                _outputRt = new RenderTexture(Width, Height, 0, RenderTextureFormat.ARGB32);
+                _outputRt.filterMode = FilterMode.Trilinear;
+                _outputRt.anisoLevel = 8;
+                _outputRt.name = $"H265_Output_Mon{MonitorIndex}";
+                _outputRt.Create();
+                
+                // Re-bind to the material
+                if (_nv12Material != null)
+                {
+                    _nv12Material.SetTexture("_YTex", _yTex);
+                    _nv12Material.SetTexture("_UVTex", _uvTex);
+                }
+                
+                // Re-allocate the byte buffers
+                _yBuf = new byte[Width * Height];
+                _uvBuf = new byte[(Width / 2) * (Height / 2) * 2];
+            }
 
             // Upload Y plane: always use stride-copy to produce exactly fWidth*fHeight bytes.
             // Passing the raw buffer (which may be larger due to MediaCodec stride alignment)

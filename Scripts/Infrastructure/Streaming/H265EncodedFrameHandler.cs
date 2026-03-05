@@ -32,6 +32,7 @@ namespace VRWorkspace.Streaming
         private int _packetCount = 0;
         private int _frameCount = 0;
         private int _droppedBeforeConfig = 0;
+        private int _headerRepairCount = 0;
         private static readonly byte[] AnnexBPrefix = { 0x00, 0x00, 0x00, 0x01 };
 
         // ── Gating strategy ──
@@ -224,6 +225,19 @@ namespace VRWorkspace.Streaming
             }
 
             // ── MODE B: Raw NAL or RTP payload (no Annex-B start codes) ──
+            // Some Unity WebRTC receiver builds deliver H265 payload with the first NAL header
+            // byte stripped (observed as packets starting with 0x01 + random payload byte).
+            // Reconstruct a valid 2-byte HEVC NAL header prefix so MediaCodec can decode deltas.
+            if (LooksLikeMissingHevcHeaderByte(data))
+            {
+                data = RepairMissingHevcHeaderByte(data);
+                _headerRepairCount++;
+                if (_headerRepairCount <= 5 || _headerRepairCount % 200 == 0)
+                {
+                    Debug.LogWarning($"{TAG} PC{_receiver?.MonitorIndex} Repaired missing HEVC header byte on pkt#{_packetCount} (len={data.Length})");
+                }
+            }
+
             int nalType = (data[0] >> 1) & 0x3F;
 
             if (_packetCount <= 5 || _packetCount % 500 == 0)
@@ -258,9 +272,6 @@ namespace VRWorkspace.Streaming
 
                 if (nalType == 19 || nalType == 20 || nalType == 32 || nalType == 33 || nalType == 34)
                     _currentFrameHasKeyNal = true;
-
-                if (nalType <= 31) // Slice NAL types
-                    FlushCurrentFrame();
             }
         }
 
@@ -402,6 +413,28 @@ namespace VRWorkspace.Streaming
                    (data[0] == 0 && data[1] == 0 && data[2] == 1);
         }
 
+        private static bool LooksLikeMissingHevcHeaderByte(byte[] data)
+        {
+            if (data == null || data.Length < 2) return false;
+            if (HasAnnexBStartCode(data)) return false;
+
+            // Pattern seen in failing sessions:
+            // data[0] is usually 0x01 (nuh_temporal_id_plus1 from header byte #2),
+            // while header byte #1 is missing.
+            if (data[0] != 0x01) return false;
+
+            int interpretedLayerId = ((data[0] & 0x01) << 5) | ((data[1] >> 3) & 0x1F);
+            return interpretedLayerId != 0;
+        }
+
+        private static byte[] RepairMissingHevcHeaderByte(byte[] data)
+        {
+            byte[] fixedData = new byte[data.Length + 1];
+            fixedData[0] = 0x00;
+            Buffer.BlockCopy(data, 0, fixedData, 1, data.Length);
+            return fixedData;
+        }
+
         /// <summary>
         /// Check if an Annex-B stream contains a real IDR NAL unit (type 19 or 20).
         /// </summary>
@@ -511,6 +544,7 @@ namespace VRWorkspace.Streaming
             _decoderBootstrapped = false;
             _codecConfigApplied = false;
             _droppedBeforeConfig = 0;
+            _headerRepairCount = 0;
             _isFirstFrame = true;
             _frameCount = 0;
             _packetCount = 0;
