@@ -197,8 +197,11 @@ namespace VRWorkspace.Streaming
             // framesDecoded from RTCInboundRTPStreamStats is the ground truth for whether
             // the decoder is actually producing frames, independent of texture pointer behavior.
             public long LastWebRTCFramesDecoded = -1;    // -1 = not yet initialized
+            public long LastWebRTCBytesReceived = -1;     // Track network throughput vs decoder output
             public DateTime LastDecoderAdvanceTime = DateTime.UtcNow;
+            public DateTime LastNetworkActivityTime = DateTime.UtcNow;
             public DateTime LastDecoderStallRecoveryTime;
+            public bool WaitingForFirstFrame = true;     // Suppression window for bootstrap (grace period)
 
             // Fallback mode frame accounting (consumed by PollTextures under _lock)
             // Tracks how many framesDecoded have been accounted for in RenderedFrameCount

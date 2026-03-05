@@ -14,6 +14,8 @@ Shader "VRWorkspace/NV12ToRGBA"
     {
         _YTex  ("Y Plane",  2D) = "white" {}
         _UVTex ("UV Plane", 2D) = "gray"  {}
+        [Toggle] _FlipY ("Flip Y", Float) = 0
+        [Toggle] _FullRange ("Full Range", Float) = 0
     }
 
     SubShader
@@ -32,6 +34,8 @@ Shader "VRWorkspace/NV12ToRGBA"
 
             sampler2D _YTex;
             sampler2D _UVTex;
+            float _FlipY;
+            float _FullRange;
 
             struct appdata
             {
@@ -50,6 +54,11 @@ Shader "VRWorkspace/NV12ToRGBA"
                 v2f o;
                 o.pos = UnityObjectToClipPos(v.vertex);
                 o.uv  = v.uv;
+
+                if (_FlipY > 0.5) {
+                    o.uv.y = 1.0 - v.uv.y;
+                }
+
                 return o;
             }
 
@@ -65,12 +74,21 @@ Shader "VRWorkspace/NV12ToRGBA"
                 float v = uv_sample.g;
 
                 // BT.709 YUV → RGB conversion
-                // Y  range: [16/255, 235/255] (limited range from hardware decoder)
-                // UV range: [16/255, 240/255]
-                // Shift to full range first
-                float yp = (y  - 16.0 / 255.0) * (255.0 / 219.0);
-                float up = (u  - 128.0 / 255.0) * (255.0 / 224.0);
-                float vp = (v  - 128.0 / 255.0) * (255.0 / 224.0);
+                float yp, up, vp;
+
+                if (_FullRange > 0.5) {
+                    // Full Range [0, 1]
+                    yp = y;
+                    up = u - 0.5;
+                    vp = v - 0.5;
+                } else {
+                    // BT.709 Limited Range (default)
+                    // Y  range: [16/255, 235/255]
+                    // UV range: [16/255, 240/255]
+                    yp = (y - 16.0 / 255.0) * (255.0 / 219.0);
+                    up = (u - 128.0 / 255.0) * (255.0 / 224.0);
+                    vp = (v - 128.0 / 255.0) * (255.0 / 224.0);
+                }
 
                 // BT.709 matrix
                 float r = yp + 1.5748 * vp;

@@ -1013,6 +1013,15 @@ namespace VRWorkspace.Streaming
                 _ = SendTextAsync("{\"type\":\"proceed\",\"phase\":3}");
                 OnReadyToStream?.Invoke();
             }
+            else if (_stateMachine.CurrentPhase == ConnectionPhase.Streaming)
+            {
+                Debug.Log("[PhaseProtocol] ice_ready received during Streaming phase (reconnect).");
+                // The server is already in Phase 3 or expects a signal if it reset its state.
+                // We should make sure we're synchronized. We could send a proceed phase 3 just in case,
+                // but we might not need to if the server is already streaming.
+                // However, sending start_streaming might be necessary if the server went back to waiting.
+                _ = SendTextAsync("{\"type\":\"reconnect_ack\"}"); 
+            }
             else
             {
                 Debug.Log($"[PhaseProtocol] ice_ready received but phase is {_stateMachine.CurrentPhase}, ignoring");

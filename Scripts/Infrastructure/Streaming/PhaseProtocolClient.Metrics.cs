@@ -713,8 +713,6 @@ namespace VRWorkspace.Streaming
         {
             const int CHECK_INTERVAL_MS = 500;          // Wired: check every 0.5s
             const int WIFI_CHECK_INTERVAL_MS = 300;    // WiFi: check every 0.3s for faster detection
-            const int STALL_THRESHOLD_MS = 3000;       // 3s for wired connections
-            const int WIFI_STALL_THRESHOLD_MS = 500;   // 0.5s for WiFi (was 0.8s — faster recovery)
             const int INITIAL_GRACE_PERIOD_MS = 5000;
 
             Debug.Log("[PhaseProtocol] Frame stall monitor started");
@@ -731,58 +729,47 @@ namespace VRWorkspace.Streaming
                         wrappers = _peerConnections.ToList();
                     }
 
-                    int effectiveThreshold = _isWiFiConnection ? WIFI_STALL_THRESHOLD_MS : STALL_THRESHOLD_MS;
+                    // Network stall threshold (WiFi resilient)
+                    const int NETWORK_STALL_THRESHOLD_MS = 1500;
+                    const int BOOTSTRAP_TIMEOUT_MS = 5000;
 
                     foreach (var wrapper in wrappers)
                     {
                         if (wrapper.PC == null) continue;
-                        if (wrapper.IsReconnecting || wrapper.IsInGraduatedRecovery) continue;
+                        if (wrapper.IsReconnecting) continue; // Skip if already recovering
 
-                        // Suppress frame stall detection during decoder stall recovery grace period.
-                        // SkipToLiveImmediate causes a brief frame gap that would falsely trigger
-                        // FRAME STALL → GraduatedRecovery → burst(5) → cascade → full reconnect.
-                        var timeSinceDecoderRecovery = (DateTime.UtcNow - wrapper.LastDecoderStallRecoveryTime).TotalMilliseconds;
-                        bool inDecoderRecoveryGrace = timeSinceDecoderRecovery < 5000; // 5s grace after decoder stall recovery
-
-                        var timeSinceFrame = DateTime.UtcNow - wrapper.LastFrameTime;
-                        var pcState = wrapper.PC.ConnectionState;
-
-                        if (pcState == RTCPeerConnectionState.Connected &&
-                            wrapper.LastFrameTime != default &&
-                            !inDecoderRecoveryGrace &&
-                            timeSinceFrame.TotalMilliseconds > effectiveThreshold)
+                        // 1. Check Network Stall (Path A)
+                        var timeSinceNetwork = (DateTime.UtcNow - wrapper.LastNetworkActivityTime).TotalMilliseconds;
+                        bool isNetworkStalled = timeSinceNetwork > NETWORK_STALL_THRESHOLD_MS;
+                        
+                        // 2. Check Bootstrap (Initial connection)
+                        if (wrapper.WaitingForFirstFrame)
                         {
-                            Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} FRAME STALL detected! No frames for {timeSinceFrame.TotalSeconds:F1}s (threshold={effectiveThreshold}ms, wifi={_isWiFiConnection})");
-
-                            if (_selectedCodec == VideoCodec.H265)
+                            if (timeSinceNetwork > BOOTSTRAP_TIMEOUT_MS)
                             {
-                                // H265 stall: Use graduated recovery with freeze counting.
-                                // If it happens repeatedly, it will trigger codec fallback.
-                                wrapper.LastDecoderStallRecoveryTime = DateTime.UtcNow; // Set cooldown
-                                HandleDecoderStallOrFreeze(wrapper.Index, $"Frame stall ({timeSinceFrame.TotalSeconds:F1}s)");
-                            }
-                            else if (_isWiFiConnection)
-                            {
-                                // WiFi: use graduated recovery (keyframe burst first, then escalate)
-                                _ = GraduatedRecoveryAsync(wrapper.Index);
-                            }
-                            else
-                            {
-                                // Wired: direct reconnect (stalls are rare and serious)
+                                Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} BOOTSTRAP TIMEOUT ({timeSinceNetwork:F0}ms) - triggering reconnect");
                                 wrapper.IsReconnecting = true;
-                                Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} triggering reconnect due to frame stall");
                                 _ = AutoHealMonitorAsync(wrapper.Index);
                             }
+                            // Always update decoder stats to see if we've started receiving frames
+                            await UpdateDecoderStallCheck(wrapper);
+                            continue;
                         }
 
-                        // WebRTC stats-based decoder stall detection
-                        // This catches stalls that LastFrameTime misses, e.g. when:
-                        // - Fallback mode blindly updates LastFrameTime (TexturePtrDetection not working)
-                        // - Texture pointer changes but decoder outputs duplicate/frozen frames
-                        if (pcState == RTCPeerConnectionState.Connected &&
-                            wrapper.LastFrameTime != default)
+                        // 3. Update Decoder Stats and Check Decoder Stall (Path B)
+                        // UpdateDecoderStallCheck will trigger recovery if it detects a stall
+                        await UpdateDecoderStallCheck(wrapper);
+                        
+                        // 4. Handle Network Stall (Path A recovery)
+                        if (isNetworkStalled && !wrapper.IsInGraduatedRecovery)
                         {
-                            await UpdateDecoderStallCheck(wrapper);
+                             var timeSinceDecoderRecovery = (DateTime.UtcNow - wrapper.LastDecoderStallRecoveryTime).TotalMilliseconds;
+                             if (timeSinceDecoderRecovery > 3000) // 3s grace after decoder recovery
+                             {
+                                  Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} NETWORK STALL ({timeSinceNetwork:F0}ms silence) - triggering repair");
+                                  // GraduatedRecovery handles WiFi silence better than direct reconnect
+                                  _ = GraduatedRecoveryAsync(wrapper.Index);
+                             }
                         }
                     }
 
@@ -811,9 +798,11 @@ namespace VRWorkspace.Streaming
         /// </summary>
         private async Task UpdateDecoderStallCheck(PCWrapper wrapper)
         {
-            int decoderStallThresholdMs = _isWiFiConnection ? 1000 : 2000;
-            int recoveryCooldownMs = _isWiFiConnection ? 3000 : 5000;
-            const int ESCALATE_TO_RECONNECT_MS = 10000;
+            // Path B: Aggressive Decoder Stall Detection
+            // (Only triggers if bytes are arriving but frames are NOT decoded)
+            const int DECODER_STALL_THRESHOLD_MS = 300; 
+            const int RECOVERY_COOLDOWN_MS = 2500;
+            const int ESCALATE_TO_RECONNECT_MS = 8000;
 
             try
             {
@@ -830,72 +819,72 @@ namespace VRWorkspace.Streaming
                         {
                             long decoded = (long)inbound.framesDecoded;
                             long received = (long)inbound.framesReceived;
+                            long bytes = (long)inbound.bytesReceived;
 
                             // H265 Override: If custom decoder is active, use its decoded count
                             if (_selectedCodec == VideoCodec.H265 && _h265Receivers.TryGetValue(wrapper.Index, out var receiver))
                             {
                                 decoded = receiver.DecodedFrameCount;
-                                // received count from WebRTC is still valid for total pipeline packets
                             }
 
-                            if (wrapper.LastWebRTCFramesDecoded < 0)
+                            // 1. Initial/Bootstrap Logic
+                            if (wrapper.LastWebRTCBytesReceived < 0)
                             {
-                                // First stats check — initialize
+                                wrapper.LastWebRTCBytesReceived = bytes;
                                 wrapper.LastWebRTCFramesDecoded = decoded;
+                                wrapper.LastNetworkActivityTime = DateTime.UtcNow;
                                 wrapper.LastDecoderAdvanceTime = DateTime.UtcNow;
-                                Debug.Log($"[PhaseProtocol] PC{wrapper.Index} decoder stats init: decoded={decoded}, received={received}");
+                                return;
                             }
-                            else if (decoded > wrapper.LastWebRTCFramesDecoded)
-                            {
-                                // Decoder is producing frames — update tracking
-                                long delta = decoded - wrapper.LastWebRTCFramesDecoded;
-                                wrapper.LastDecoderAdvanceTime = DateTime.UtcNow;
-                                wrapper.LastWebRTCFramesDecoded = decoded;
 
-                                // In fallback mode, frame accounting is done in PollTextures
-                                // (under _lock) to avoid race conditions with RenderedFrameCount/FrameCount.
-                                // TotalFramesReceived is also moved there for consistency.
-                            }
-                            else
+                            // 2. Track Network Activity (Path A)
+                            if (bytes > wrapper.LastWebRTCBytesReceived)
                             {
-                                // Decoder has NOT advanced since last check
+                                wrapper.LastWebRTCBytesReceived = bytes;
+                                wrapper.LastNetworkActivityTime = DateTime.UtcNow;
+                            }
+
+                            // 3. Track Decoder Progress
+                            if (decoded > wrapper.LastWebRTCFramesDecoded)
+                            {
+                                wrapper.LastWebRTCFramesDecoded = decoded;
+                                wrapper.LastDecoderAdvanceTime = DateTime.UtcNow;
+                                
+                                // First frame decoded - exit bootstrap window
+                                if (wrapper.WaitingForFirstFrame)
+                                {
+                                    Debug.Log($"[PhaseProtocol] PC{wrapper.Index} bootstrap complete (first frame decoded)");
+                                    wrapper.WaitingForFirstFrame = false;
+                                }
+                            }
+                            else if (!wrapper.WaitingForFirstFrame)
+                            {
+                                // 4. Check for Decoder Stall (Path B)
                                 var timeSinceAdvance = (DateTime.UtcNow - wrapper.LastDecoderAdvanceTime).TotalMilliseconds;
+                                var timeSinceNetwork = (DateTime.UtcNow - wrapper.LastNetworkActivityTime).TotalMilliseconds;
                                 var timeSinceRecovery = (DateTime.UtcNow - wrapper.LastDecoderStallRecoveryTime).TotalMilliseconds;
 
-                                if (timeSinceAdvance > decoderStallThresholdMs &&
-                                    timeSinceRecovery > recoveryCooldownMs)
+                                // CONDITION: Decoder stopped (>300ms) but Network still active (<500ms jitter window)
+                                if (timeSinceAdvance > DECODER_STALL_THRESHOLD_MS && 
+                                    timeSinceNetwork < 500 && 
+                                    timeSinceRecovery > RECOVERY_COOLDOWN_MS)
                                 {
-                                    long gap = received - decoded;
-                                    Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} DECODER STALL (WebRTC stats)! " +
-                                        $"framesDecoded={decoded} unchanged for {timeSinceAdvance / 1000:F1}s, received={received}, gap={gap}");
-
-                                    // Flush jitter buffer backlog first, then send single keyframe.
-                                    // Burst (3 I-frames) makes decoder stalls WORSE by adding more data
-                                    // to an already-full buffer (I-frames are 5-10x larger than P-frames).
-                                    SkipToLiveImmediate(wrapper.Index);
+                                    Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} DECODER STALL (Path B)! " +
+                                        $"framesDecoded={decoded} frozen for {timeSinceAdvance:F0}ms while bytes are flowing.");
+                                    
+                                    // High-confidence decoder/sync issue: Request keyframe immediately
                                     wrapper.LastDecoderStallRecoveryTime = DateTime.UtcNow;
+                                    HandleDecoderStallOrFreeze(wrapper.Index, "Aggressive decoder stall");
                                 }
 
-                                // Escalation: if decoder stalled too long despite keyframes, reconnect.
-                                // Fast-path: if ICE is already disconnected/failed, recovery messages
-                                // can't reach the server, so escalate after 3s instead of 10s.
-                                bool iceDown = wrapper.PC.IceConnectionState == RTCIceConnectionState.Disconnected
-                                    || wrapper.PC.IceConnectionState == RTCIceConnectionState.Failed
-                                    || wrapper.PC.IceConnectionState == RTCIceConnectionState.Closed;
-                                int escalateMs = iceDown ? 3000 : ESCALATE_TO_RECONNECT_MS;
-
-                        if (timeSinceAdvance > escalateMs && !wrapper.IsReconnecting
-                            && !_isIntentionalDisconnect)
-                        {
-                            Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} persistent decoder stall " +
-                                $"({timeSinceAdvance / 1000:F0}s), escalating to codec fallback check" +
-                                (iceDown ? " (ICE down, fast-path)" : ""));
-                            
-                            // Major persistent stall: escalate to global decoder freeze handler
-                            HandleDecoderStallOrFreeze(wrapper.Index, $"Persistent decoder stall ({timeSinceAdvance / 1000:F0}s)");
-                        }
+                                // 5. Escalation
+                                if (timeSinceAdvance > ESCALATE_TO_RECONNECT_MS && !wrapper.IsReconnecting)
+                                {
+                                     Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} persistent stall ({timeSinceAdvance/1000:F1}s), triggering auto-heal");
+                                     HandleDecoderStallOrFreeze(wrapper.Index, "Persistent stall escalation");
+                                }
                             }
-                            break; // Only process first video inbound stats
+                            break; 
                         }
                     }
                 }
@@ -906,9 +895,8 @@ namespace VRWorkspace.Streaming
             }
             catch (Exception ex)
             {
-                // Suppress frequent stats errors (can happen during shutdown)
                 if (VerboseLogging)
-                    Debug.LogWarning($"[PhaseProtocol] Stats check error PC{wrapper.Index}: {ex.Message}");
+                    Debug.LogWarning($"[PhaseProtocol] Stall check error PC{wrapper.Index}: {ex.Message}");
             }
         }
 
@@ -966,54 +954,27 @@ namespace VRWorkspace.Streaming
             // Update stats
             _metrics?.RecordStall();
 
-            // Graduated response:
-            // Strike 1 -> SkipToLive (light)
-            // Strike 2 -> RequestKeyframe (heavy)
-            // Strike 3 (H265) -> Fallback to H.264
-            if (_freezeCount < 3 && _h265StallStrikes < 10)
-            {
-                if (_freezeCount == 1)
-                {
-                    if (VerboseLogging) Debug.Log($"[PhaseProtocol] Response 1: SkipToLive");
-                    SkipToLive(monitorIndex);
-                }
-                else
-                {
-                    if (VerboseLogging) Debug.Log($"[PhaseProtocol] Response 2: RequestKeyframe (burst)");
-                    RequestKeyframe(monitorIndex);
-                }
-            }
-            else if (_selectedCodec == VideoCodec.H265)
+            // Fallback check for H265
+            if (_selectedCodec == VideoCodec.H265 && (_freezeCount >= 3 || _h265StallStrikes >= 10))
             {
                 string triggerReason = _freezeCount >= 3 ? $"sustained stall (strike {_freezeCount})" : $"flakey instability ({_h265StallStrikes} total strikes)";
                 Debug.LogError($"[PhaseProtocol] H265 fallback threshold reached: {triggerReason} — triggering H264 fallback");
                 
                 OnH265DecoderFailed(monitorIndex);
-                
-                _freezeCount = 0; // Reset after triggering fallback
-                // _h265StallStrikes is reset in TriggerCodecFallbackAsync
+                _freezeCount = 0; 
+                return;
             }
-            else
+
+            // Standard recovery: trigger GraduatedRecoveryAsync
+            // This will handle Step 1 (Keyframe), Step 2 (Skip+Keyframe), Step 3 (Reconnect)
+            // It manages its own state via wrapper.IsInGraduatedRecovery.
+            _ = GraduatedRecoveryAsync(monitorIndex);
+
+            // If we've hit many strikes even in H264, reset count but GraduatedRecovery 
+            // will eventually trigger a reconnect in Step 3 if it keeps stalling.
+            if (_freezeCount >= 5) 
             {
-                // Already in H264, just keep requesting keyframes or try one reconnect
-                if (_freezeCount >= 3)
-                {
-                    Debug.LogWarning($"[PhaseProtocol] Strike {_freezeCount} in H264 — trying one auto-heal reconnect");
-                    if (monitorIndex >= 0 && monitorIndex < _peerConnections.Count)
-                    {
-                        var wrapper = _peerConnections[monitorIndex];
-                        if (!wrapper.IsReconnecting)
-                        {
-                            wrapper.IsReconnecting = true;
-                            _ = AutoHealMonitorAsync(monitorIndex);
-                        }
-                    }
-                    _freezeCount = 0; // Prevent infinite reconnect loop per-check
-                }
-                else
-                {
-                    RequestKeyframe(monitorIndex);
-                }
+                _freezeCount = 0;
             }
         }
 

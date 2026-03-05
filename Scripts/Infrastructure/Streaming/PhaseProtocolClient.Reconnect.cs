@@ -360,23 +360,28 @@ namespace VRWorkspace.Streaming
                 wrapper.GraduatedRecoveryStep = 1;
                 Debug.Log($"[PhaseProtocol] PC{monitorIndex} graduated step 1: keyframe burst (count={burstCount})");
                 await SendTextAsync($"{{\"type\":\"request_keyframe_burst\",\"monitorIndex\":{monitorIndex},\"count\":{burstCount}}}");
-                await Task.Delay(500, _cts.Token);
+                
+                // Wait for frames to resume (shorter delay for faster recovery)
+                await Task.Delay(300, _cts.Token);
 
-                if ((DateTime.UtcNow - wrapper.LastFrameTime).TotalMilliseconds < 300)
+                // Verify recovery using GROUND TRUTH (Decoder advance time)
+                var timeSinceDecoderAdvance = (DateTime.UtcNow - wrapper.LastDecoderAdvanceTime).TotalMilliseconds;
+                if (timeSinceDecoderAdvance < 200) 
                 {
-                    Debug.Log($"[PhaseProtocol] PC{monitorIndex} recovered at step 1!");
+                    Debug.Log($"[PhaseProtocol] PC{monitorIndex} recovered at step 1 (decoder advanced {timeSinceDecoderAdvance:F0}ms ago)");
                     return;
                 }
 
-                // STEP 2: Skip-to-live + keyframe burst
+                // STEP 2: Skip-to-live + keyframe burst (handles accumulated buffer delay)
                 wrapper.GraduatedRecoveryStep = 2;
                 Debug.Log($"[PhaseProtocol] PC{monitorIndex} graduated step 2: skip + keyframe burst (count={burstCount})");
                 SkipToLiveImmediate(monitorIndex);
-                await Task.Delay(100);
+                await Task.Delay(50);
                 await SendTextAsync($"{{\"type\":\"request_keyframe_burst\",\"monitorIndex\":{monitorIndex},\"count\":{burstCount}}}");
-                await Task.Delay(500, _cts.Token);
+                await Task.Delay(400, _cts.Token);
 
-                if ((DateTime.UtcNow - wrapper.LastFrameTime).TotalMilliseconds < 300)
+                timeSinceDecoderAdvance = (DateTime.UtcNow - wrapper.LastDecoderAdvanceTime).TotalMilliseconds;
+                if (timeSinceDecoderAdvance < 200)
                 {
                     Debug.Log($"[PhaseProtocol] PC{monitorIndex} recovered at step 2!");
                     return;

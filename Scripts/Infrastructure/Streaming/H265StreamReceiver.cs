@@ -42,6 +42,8 @@ namespace VRWorkspace.Streaming
         private HevcDecoderPlugin _decoder;
         private bool _initialized;
         private bool _disposed;
+        private bool _flipY = true;      // Default true to fix reported upside-down issue
+        private bool _fullRange = true;   // Default true to fix reported faded colors (AMF)
 
         // Thread-safe timing
         private static readonly System.Diagnostics.Stopwatch _stopwatch = System.Diagnostics.Stopwatch.StartNew();
@@ -145,6 +147,8 @@ namespace VRWorkspace.Streaming
             _nv12Material = new Material(shader) { name = "NV12ToRGBA_Mat" };
             _nv12Material.SetTexture("_YTex",  _yTex);
             _nv12Material.SetTexture("_UVTex", _uvTex);
+            _nv12Material.SetFloat("_FlipY", _flipY ? 1f : 0f);
+            _nv12Material.SetFloat("_FullRange", _fullRange ? 1f : 0f);
 
             // Pre-allocate CPU buffers
             _yBuf  = new byte[Width  * Height];
@@ -360,6 +364,20 @@ namespace VRWorkspace.Streaming
         {
             if (_initialized && !_disposed)
                 _decoder?.Flush();
+        }
+
+        public void SetFlipY(bool flip)
+        {
+            _flipY = flip;
+            if (_nv12Material != null)
+                _nv12Material.SetFloat("_FlipY", _flipY ? 1f : 0f);
+        }
+
+        public void SetFullRange(bool fullRange)
+        {
+            _fullRange = fullRange;
+            if (_nv12Material != null)
+                _nv12Material.SetFloat("_FullRange", _fullRange ? 1f : 0f);
         }
 
         // ──────────── IDisposable ────────────
