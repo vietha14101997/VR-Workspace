@@ -158,6 +158,10 @@ namespace VRWorkspace.Streaming
             await SendTextAsync($"{{\"type\":\"offer\",\"monitorIndex\":0,\"sdp\":\"{EscapeJsonString(offer.sdp)}\"}}");
             Debug.Log($"[PhaseProtocol] Single-PC offer sent with {count} m= sections ({sw.ElapsedMilliseconds}ms)");
 
+            // Create separate audio PeerConnection (isolated SCTP association).
+            // Prevents H.265 video DataChannel traffic from causing audio delay via shared SCTP congestion.
+            _ = CreateAudioPeerConnectionAsync();
+
             // Wait for answer with timeout
             const int ANSWER_TIMEOUT_MS = 10000;
             try
@@ -177,6 +181,169 @@ namespace VRWorkspace.Streaming
             catch (Exception ex)
             {
                 Debug.LogWarning($"[PhaseProtocol] Answer waiting exception: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Create a separate PeerConnection dedicated to audio DataChannel.
+        /// This gives audio its own SCTP association, completely isolated from
+        /// H.265 video DataChannel traffic on the main PC. Eliminates SCTP
+        /// congestion-induced audio delay (~1s → ~30ms).
+        /// </summary>
+        private async Task CreateAudioPeerConnectionAsync()
+        {
+            try
+            {
+                var cfg = new RTCConfiguration { iceServers = new RTCIceServer[0] };
+                _audioPc = new RTCPeerConnection(ref cfg);
+                Debug.Log("[PhaseProtocol] Audio PeerConnection created (separate SCTP association)");
+
+                // Add a dummy recvonly audio transceiver so the SDP includes m=audio.
+                // SIPSorcery's ICE agent requires at least one media section to work properly;
+                // data-channel-only (m=application) PCs fail ICE connectivity checks.
+                _audioPc.AddTransceiver(TrackKind.Audio);
+                Debug.Log("[PhaseProtocol] Audio PC: added dummy audio transceiver for ICE compatibility");
+
+                // Create audio DC on the dedicated PC
+                var audioDc = _audioPc.CreateDataChannel("audio");
+                audioDc.OnMessage = bytes => { OnAudioDataReceived?.Invoke(bytes); };
+                audioDc.OnOpen = () => Debug.Log("[PhaseProtocol] Audio DC (dedicated PC) opened — low-latency path active");
+                audioDc.OnClose = () => Debug.Log("[PhaseProtocol] Audio DC (dedicated PC) closed");
+
+                // ICE candidate handling
+                _audioPc.OnIceCandidate = cand =>
+                {
+                    if (cand == null || string.IsNullOrEmpty(cand.Candidate)) return;
+                    var raw = cand.Candidate;
+                    if (!raw.StartsWith("candidate:")) raw = "candidate:" + raw;
+                    _ = SendTextAsync($"{{\"type\":\"audio_candidate\",\"candidate\":\"{EscapeJsonString(raw)}\"}}");
+                };
+
+                _audioPc.OnIceConnectionChange = state =>
+                {
+                    Debug.Log($"[PhaseProtocol] Audio PC ICE state: {state}");
+                };
+
+                // Create and send offer
+                var offerOp = _audioPc.CreateOffer();
+                while (!offerOp.IsDone) await Task.Yield();
+                if (offerOp.IsError) { Debug.LogError("[PhaseProtocol] Audio PC CreateOffer failed"); return; }
+
+                var offer = offerOp.Desc;
+                var setLocalOp = _audioPc.SetLocalDescription(ref offer);
+                while (!setLocalOp.IsDone) await Task.Yield();
+                if (setLocalOp.IsError) { Debug.LogError("[PhaseProtocol] Audio PC SetLocal failed"); return; }
+
+                await SendTextAsync($"{{\"type\":\"audio_offer\",\"sdp\":\"{EscapeJsonString(offer.sdp)}\"}}");
+                Debug.Log("[PhaseProtocol] Audio PC offer sent (dedicated SCTP for audio)");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[PhaseProtocol] Audio PC creation failed (non-fatal, fallback to main PC audio): {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Handle answer for the dedicated audio PeerConnection.
+        /// </summary>
+        private async Task HandleAudioAnswerAsync(SimpleJson json)
+        {
+            if (_audioPc == null) return;
+            try
+            {
+                string sdp = json.GetString("sdp");
+                if (string.IsNullOrEmpty(sdp)) { Debug.LogError("[PhaseProtocol] Audio answer has empty SDP"); return; }
+
+                // Log raw SDP for debugging
+                Debug.Log($"[PhaseProtocol] Audio answer SDP ({sdp.Length} chars):\n{sdp}");
+
+                // Use the same FixSdp() as main PC to normalize line endings,
+                // remove empty lines, and ensure trailing \r\n — required by libwebrtc
+                sdp = FixSdp(sdp);
+
+                // Additional fixes for data-channel-only SDP:
+                // SIPSorcery may generate "DTLS/SCTP" but libwebrtc requires "UDP/DTLS/SCTP"
+                // Normalize first to avoid double-prefixing (UDP/UDP/DTLS/SCTP)
+                if (!sdp.Contains("UDP/DTLS/SCTP"))
+                    sdp = sdp.Replace("DTLS/SCTP", "UDP/DTLS/SCTP");
+
+                // Ensure setup:active (not actpass) for answerer per RFC 5763
+                sdp = sdp.Replace("a=setup:actpass", "a=setup:active");
+
+                Debug.Log($"[PhaseProtocol] Audio answer fixed SDP ({sdp.Length} chars):\n{sdp}");
+
+                var answer = new RTCSessionDescription { type = RTCSdpType.Answer, sdp = sdp };
+                var op = _audioPc.SetRemoteDescription(ref answer);
+                while (!op.IsDone) await Task.Yield();
+
+                if (op.IsError)
+                {
+                    Debug.LogError("[PhaseProtocol] Audio PC SetRemoteDescription failed");
+                }
+                else
+                {
+                    Debug.Log("[PhaseProtocol] Audio PC answer applied successfully");
+
+                    // Flush any audio ICE candidates that arrived before answer was applied
+                    _audioAnswerApplied = true;
+                    List<RTCIceCandidateInit> pending;
+                    lock (_pendingAudioRemoteCandidates)
+                    {
+                        pending = new List<RTCIceCandidateInit>(_pendingAudioRemoteCandidates);
+                        _pendingAudioRemoteCandidates.Clear();
+                    }
+                    if (pending.Count > 0)
+                    {
+                        Debug.Log($"[PhaseProtocol] Flushing {pending.Count} buffered audio ICE candidates");
+                        foreach (var init in pending)
+                        {
+                            _audioPc.AddIceCandidate(new RTCIceCandidate(init));
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[PhaseProtocol] Audio answer handling failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Handle ICE candidate for the dedicated audio PeerConnection.
+        /// </summary>
+        private void HandleAudioCandidate(SimpleJson json)
+        {
+            if (_audioPc == null) return;
+            try
+            {
+                string candStr = json.GetString("candidate");
+                if (string.IsNullOrEmpty(candStr)) return;
+                if (!candStr.StartsWith("candidate:")) candStr = "candidate:" + candStr;
+
+                var init = new RTCIceCandidateInit
+                {
+                    candidate = candStr,
+                    sdpMLineIndex = 0,
+                    sdpMid = "0"
+                };
+
+                if (!_audioAnswerApplied)
+                {
+                    // Buffer until SetRemoteDescription completes (fire-and-forget race)
+                    lock (_pendingAudioRemoteCandidates)
+                    {
+                        _pendingAudioRemoteCandidates.Add(init);
+                    }
+                    Debug.Log($"[PhaseProtocol] Audio ICE candidate buffered (answer pending, {_pendingAudioRemoteCandidates.Count} queued)");
+                    return;
+                }
+
+                _audioPc.AddIceCandidate(new RTCIceCandidate(init));
+                Debug.Log($"[PhaseProtocol] Audio ICE candidate added: {candStr.Substring(0, Math.Min(60, candStr.Length))}...");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[PhaseProtocol] Audio ICE candidate failed: {ex.Message}");
             }
         }
 

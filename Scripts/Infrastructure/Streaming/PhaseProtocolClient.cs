@@ -89,6 +89,9 @@ namespace VRWorkspace.Streaming
         private RTCDataChannel _sctpInitChannel; // Kept alive to maintain SCTP transport for audio DataChannel
         private RTCDataChannel _cursorChannel;   // Low-latency cursor position updates (binary, UDP-like)
         private RTCDataChannel _h265VideoChannel; // Unreliable unordered DC for H.265 video (avoids SCTP HOL blocking on audio)
+        private RTCPeerConnection _audioPc; // Dedicated PeerConnection for audio DC (isolated SCTP, no H.265 video congestion)
+        private volatile bool _audioAnswerApplied;
+        private readonly List<RTCIceCandidateInit> _pendingAudioRemoteCandidates = new();
         private int _pcGeneration; // Incremented on cleanup to guard stale PC callbacks
 
         // ── Frame timing / FPS ────────────────────────────────────────────────
@@ -779,6 +782,14 @@ namespace VRWorkspace.Streaming
                             HandleEndOfCandidates(json);
                             break;
 
+                        case "audio_answer":
+                            _ = HandleAudioAnswerAsync(json);
+                            break;
+
+                        case "audio_candidate":
+                            HandleAudioCandidate(json);
+                            break;
+
                         case "ice_ready":
                             HandleIceReady(json);
                             break;
@@ -1101,6 +1112,11 @@ namespace VRWorkspace.Streaming
             _sctpInitChannel = null;
             _cursorChannel = null;
             _h265VideoChannel = null;
+
+            try { _audioPc?.Close(); _audioPc?.Dispose(); } catch { }
+            _audioPc = null;
+            _audioAnswerApplied = false;
+            lock (_pendingAudioRemoteCandidates) { _pendingAudioRemoteCandidates.Clear(); }
 
             // Cleanup H265 Custom Decoders
             foreach (var receiver in _h265Receivers.Values)
