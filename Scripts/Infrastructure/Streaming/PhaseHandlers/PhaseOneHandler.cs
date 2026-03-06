@@ -249,6 +249,14 @@ namespace VRWorkspace.Streaming
                 _      => VideoCodec.H264
             };
 
+            // H265 capability gate: if server suggests H265 but device can't decode it, override to H264
+            if (SelectedCodec == VideoCodec.H265 && !H265CapabilityTest.IsDeviceCapable())
+            {
+                Debug.LogWarning("[Phase1] Server suggested H265 but device failed capability test — overriding to H264");
+                SelectedCodec = VideoCodec.H264;
+                SuggestedConfig.selectedCodec = "H264";
+            }
+
             Debug.Log($"[Phase1] Suggested: {SuggestedConfig.monitors}mon @ {SuggestedConfig.resolutionWidth}x{SuggestedConfig.resolutionHeight}, {SuggestedConfig.fps}fps, {SuggestedConfig.bitrateKbps}kbps, codec={SuggestedConfig.selectedCodec}, connType={connType}");
 
             // Handle race: suggested_config may arrive while still in SpeedTesting

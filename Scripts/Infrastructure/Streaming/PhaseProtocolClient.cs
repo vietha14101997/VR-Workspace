@@ -365,6 +365,7 @@ namespace VRWorkspace.Streaming
             finally
             {
                 _h265FallbackInProgress = false;
+                _h265FallbackTriggered = false; // Reset so auto-heal works for H264 after fallback
                 _h265StallStrikes = 0;
                 _freezeCount = 0;
             }

@@ -192,6 +192,7 @@ namespace VRWorkspace.Streaming
                             };
                             // Hook fallback: if decoder still fails after reconnect, switch to H264
                             receiver.OnDecoderFailed += monIdx => OnH265DecoderFailed(monIdx);
+                            receiver.OnKeyframeNeeded += monIdx => RequestKeyframe(monIdx);
 
                             // Hook Encoded Transform
                             try

@@ -486,7 +486,10 @@ namespace VRWorkspace.Streaming
             _pollCount++;
 
             // Tick H265 Custom Decoders (uploaded textures to GPU)
-            foreach (var receiver in _h265Receivers.Values)
+            // Snapshot to avoid ConcurrentModificationException during fallback disposal
+            H265StreamReceiver[] h265Snapshot;
+            lock (_lock) { h265Snapshot = _h265Receivers.Values.ToArray(); }
+            foreach (var receiver in h265Snapshot)
             {
                 receiver.Tick();
             }

@@ -360,6 +360,7 @@ namespace VRWorkspace.Streaming
                                 Debug.LogError($"[PhaseProtocol] PC{monIdx} H265 decoder failed, triggering fallback");
                                 OnH265DecoderFailed(monIdx);
                             };
+                            receiver.OnKeyframeNeeded += monIdx => RequestKeyframe(monIdx);
 
                             // Hook into Encoded Transform (Insertable Streams)
                             try {
@@ -760,6 +761,8 @@ namespace VRWorkspace.Streaming
                                     
                                 OnVideoTextureReceived?.Invoke(monIdx, tex);
                             };
+                            receiver.OnDecoderFailed += monIdx => OnH265DecoderFailed(monIdx);
+                            receiver.OnKeyframeNeeded += monIdx => RequestKeyframe(monIdx);
 
                             // Hook into Encoded Transform (Insertable Streams)
                             try {

@@ -62,8 +62,11 @@ namespace VRWorkspace.Streaming
         // ──────────── Fallback Detection ────────────
         // If we receive encoded frames but decode nothing for FALLBACK_TRIGGER_SECONDS,
         // fire OnDecoderFailed so the client can request H265→H264 codec downgrade.
-        private const float FALLBACK_TRIGGER_SECONDS = 8f;       // 8s without decoded frame → declare failure
-        private const int   FALLBACK_MIN_ENCODED_FRAMES = 30;    // Require at least 30 encoded frames received first
+        // Phase 1 (quick probe): Fast fallback if decoder never outputs a single frame
+        // Phase 2 (sustained): Slower fallback for mid-stream stalls (decoder worked then stopped)
+        private const float FALLBACK_PROBE_SECONDS = 3f;         // 3s quick probe — fast fail if decoder can't start
+        private const float FALLBACK_TRIGGER_SECONDS = 5f;       // 5s sustained stall after initial success
+        private const int   FALLBACK_MIN_ENCODED_FRAMES = 15;    // Require at least 15 encoded frames received first
         private DateTime    _firstEncodedFrameTime = DateTime.MinValue;
         private DateTime    _lastDecodedFrameTime = DateTime.MinValue;  // Track last successful decode
         private bool        _fallbackFired;
@@ -74,6 +77,13 @@ namespace VRWorkspace.Streaming
         /// Parameters: monitorIndex
         /// </summary>
         public event Action<int> OnDecoderFailed;
+
+        /// <summary>
+        /// Fires when a short stall is detected — request keyframe before full fallback.
+        /// Parameters: monitorIndex
+        /// </summary>
+        public event Action<int> OnKeyframeNeeded;
+        private bool _keyframeRequested; // Prevent spamming keyframe requests
 
         // Y/UV byte buffers — reused to avoid GC pressure
         private byte[] _yBuf;
@@ -216,6 +226,14 @@ namespace VRWorkspace.Streaming
             if (!gotFrame)
             {
                 _noFrameTicks++;
+                // Request keyframe after ~1.5s stall (90 ticks at 60fps) — gives decoder another chance before fallback
+                if (_noFrameTicks == 90 && !_keyframeRequested && _decodedCount > 0)
+                {
+                    _keyframeRequested = true;
+                    Debug.LogWarning($"{TAG} PC{MonitorIndex} Short stall detected ({_noFrameTicks} ticks), requesting keyframe");
+                    OnKeyframeNeeded?.Invoke(MonitorIndex);
+                }
+
                 // Log warning every ~3s (180 ticks at 60fps) if decoder has never stalled before
                 if (_noFrameTicks == 180 || _noFrameTicks == 600 || _noFrameTicks == 1200)
                 {
@@ -225,22 +243,26 @@ namespace VRWorkspace.Streaming
                         $"Plugin: initialized={_decoder.IsInitialized}, strides={_decoder.YStride}/{_decoder.UVStride}, size={_decoder.FrameWidth}x{_decoder.FrameHeight}");
                 }
 
-                // ── Fallback detection ──────────────────────────────────────────
-                // Trigger fallback if decoder stalls for too long, whether it never
-                // decoded any frames OR decoded a few then stopped (e.g. 2 frames then freeze).
+                // ── Fallback detection (2-phase) ─────────────────────────────────
+                // Phase 1 (quick probe): If decoder NEVER produced a frame, fail fast (3s)
+                // Phase 2 (sustained stall): If decoder worked then stopped, use longer timeout (5s)
                 if (!_fallbackFired
                     && EncodedFramesReceived >= FALLBACK_MIN_ENCODED_FRAMES
                     && _firstEncodedFrameTime != DateTime.MinValue)
                 {
+                    bool neverDecoded = _decodedCount == 0;
+                    float timeout = neverDecoded ? FALLBACK_PROBE_SECONDS : FALLBACK_TRIGGER_SECONDS;
+
                     var referenceTime = _lastDecodedFrameTime != DateTime.MinValue
                         ? _lastDecodedFrameTime
                         : _firstEncodedFrameTime;
 
-                    if ((DateTime.UtcNow - referenceTime).TotalSeconds >= FALLBACK_TRIGGER_SECONDS)
+                    if ((DateTime.UtcNow - referenceTime).TotalSeconds >= timeout)
                     {
                         _fallbackFired = true;
-                        Debug.LogError($"{TAG} PC{MonitorIndex} DECODER FAILURE: received {EncodedFramesReceived} encoded frames, " +
-                            $"decoded {_decodedCount}, stalled for {FALLBACK_TRIGGER_SECONDS}s. Triggering H265→H264 fallback!");
+                        string phase = neverDecoded ? "QUICK PROBE" : "SUSTAINED STALL";
+                        Debug.LogError($"{TAG} PC{MonitorIndex} DECODER FAILURE ({phase}): received {EncodedFramesReceived} encoded frames, " +
+                            $"decoded {_decodedCount}, stalled for {timeout}s. Triggering H265→H264 fallback!");
                         OnDecoderFailed?.Invoke(MonitorIndex);
                     }
                 }
@@ -249,6 +271,7 @@ namespace VRWorkspace.Streaming
             }
 
             _noFrameTicks = 0; // Reset on successful frame
+            _keyframeRequested = false; // Allow new keyframe request on next stall
             _lastDecodedFrameTime = DateTime.UtcNow; // Track last successful decode for stall detection
 
             // Get Y plane data
