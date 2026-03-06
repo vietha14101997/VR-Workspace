@@ -83,9 +83,14 @@ namespace VRWorkspace.Streaming
                 Debug.Log($"[PhaseProtocol] Added transceiver {i} for monitor {i}, mid={trans.Mid}");
             }
 
-            // Client creates "audio" DataChannel (SCTP) to bypass NetEQ jitter buffer.
-            // Client-created DC ensures proper SCTP negotiation (libwebrtc manages SCTP natively).
-            // Server receives this DC via ondatachannel and sends Opus frames through it.
+            // Add RecvOnly audio transceiver to receive Opus RTP from server.
+            // Audio goes through RTP/UDP on the same ICE connection as video — no SCTP involvement,
+            // no head-of-line blocking from H.265 video DataChannel traffic.
+            var audioTrans = pc.AddTransceiver(TrackKind.Audio);
+            audioTrans.Direction = RTCRtpTransceiverDirection.RecvOnly;
+            Debug.Log("[PhaseProtocol] Added RecvOnly audio transceiver to main PC (RTP Opus)");
+
+            // DataChannel for audio (fallback if RTP audio negotiation fails)
             _sctpInitChannel = pc.CreateDataChannel("audio");
             _sctpInitChannel.OnMessage = bytes =>
             {
@@ -93,7 +98,7 @@ namespace VRWorkspace.Streaming
             };
             _sctpInitChannel.OnOpen = () => Debug.Log("[PhaseProtocol] Audio DataChannel opened");
             _sctpInitChannel.OnClose = () => Debug.Log("[PhaseProtocol] Audio DataChannel closed");
-            Debug.Log("[PhaseProtocol] Audio via DataChannel (client-created, no RTP audio transceiver)");
+            Debug.Log("[PhaseProtocol] Audio DataChannel created (fallback)");
 
             // Client creates "cursor" DataChannel for low-latency cursor position updates.
             // Server sends binary cursor position (19 bytes) through this channel (UDP-like latency).
@@ -158,9 +163,9 @@ namespace VRWorkspace.Streaming
             await SendTextAsync($"{{\"type\":\"offer\",\"monitorIndex\":0,\"sdp\":\"{EscapeJsonString(offer.sdp)}\"}}");
             Debug.Log($"[PhaseProtocol] Single-PC offer sent with {count} m= sections ({sw.ElapsedMilliseconds}ms)");
 
-            // Create separate audio PeerConnection (isolated SCTP association).
-            // Prevents H.265 video DataChannel traffic from causing audio delay via shared SCTP congestion.
-            _ = CreateAudioPeerConnectionAsync();
+            // Audio now goes through main PC as RTP track (not separate Audio PC).
+            // RTP audio on the same ICE connection is NOT affected by SCTP congestion
+            // from H.265 video DataChannel — RTP and SCTP are independent transports.
 
             // Wait for answer with timeout
             const int ANSWER_TIMEOUT_MS = 10000;
@@ -196,19 +201,28 @@ namespace VRWorkspace.Streaming
             {
                 var cfg = new RTCConfiguration { iceServers = new RTCIceServer[0] };
                 _audioPc = new RTCPeerConnection(ref cfg);
-                Debug.Log("[PhaseProtocol] Audio PeerConnection created (separate SCTP association)");
+                Debug.Log("[PhaseProtocol] Audio PeerConnection created (RTP Opus transport)");
 
-                // Add a dummy recvonly audio transceiver so the SDP includes m=audio.
-                // SIPSorcery's ICE agent requires at least one media section to work properly;
-                // data-channel-only (m=application) PCs fail ICE connectivity checks.
-                _audioPc.AddTransceiver(TrackKind.Audio);
-                Debug.Log("[PhaseProtocol] Audio PC: added dummy audio transceiver for ICE compatibility");
+                // Add recvonly audio transceiver to receive Opus RTP from server.
+                // Server sends Opus via _audioPc.SendAudio() — goes through ICE/DTLS/UDP,
+                // completely bypassing SCTP (which is broken on Unity WebRTC for audio PC).
+                var transceiver = _audioPc.AddTransceiver(TrackKind.Audio);
+                transceiver.Direction = RTCRtpTransceiverDirection.RecvOnly;
+                Debug.Log("[PhaseProtocol] Audio PC: added recvonly audio transceiver for Opus RTP");
 
-                // Create audio DC on the dedicated PC
-                var audioDc = _audioPc.CreateDataChannel("audio");
-                audioDc.OnMessage = bytes => { OnAudioDataReceived?.Invoke(bytes); };
-                audioDc.OnOpen = () => Debug.Log("[PhaseProtocol] Audio DC (dedicated PC) opened — low-latency path active");
-                audioDc.OnClose = () => Debug.Log("[PhaseProtocol] Audio DC (dedicated PC) closed");
+                // OnTrack: receive audio MediaStreamTrack from server
+                _audioPc.OnTrack = e =>
+                {
+                    if (e.Track is AudioStreamTrack audioTrack)
+                    {
+                        Debug.Log($"[PhaseProtocol] Audio PC OnTrack: received audio track (RTP Opus, dedicated PC)");
+                        OnAudioTrackReceived?.Invoke(audioTrack);
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[PhaseProtocol] Audio PC OnTrack: unexpected track kind={e.Track?.Kind}");
+                    }
+                };
 
                 // ICE candidate handling
                 _audioPc.OnIceCandidate = cand =>
@@ -235,7 +249,7 @@ namespace VRWorkspace.Streaming
                 if (setLocalOp.IsError) { Debug.LogError("[PhaseProtocol] Audio PC SetLocal failed"); return; }
 
                 await SendTextAsync($"{{\"type\":\"audio_offer\",\"sdp\":\"{EscapeJsonString(offer.sdp)}\"}}");
-                Debug.Log("[PhaseProtocol] Audio PC offer sent (dedicated SCTP for audio)");
+                Debug.Log("[PhaseProtocol] Audio PC offer sent (RTP Opus transport)");
             }
             catch (Exception ex)
             {
@@ -260,12 +274,6 @@ namespace VRWorkspace.Streaming
                 // Use the same FixSdp() as main PC to normalize line endings,
                 // remove empty lines, and ensure trailing \r\n — required by libwebrtc
                 sdp = FixSdp(sdp);
-
-                // Additional fixes for data-channel-only SDP:
-                // SIPSorcery may generate "DTLS/SCTP" but libwebrtc requires "UDP/DTLS/SCTP"
-                // Normalize first to avoid double-prefixing (UDP/UDP/DTLS/SCTP)
-                if (!sdp.Contains("UDP/DTLS/SCTP"))
-                    sdp = sdp.Replace("DTLS/SCTP", "UDP/DTLS/SCTP");
 
                 // Ensure setup:active (not actpass) for answerer per RFC 5763
                 sdp = sdp.Replace("a=setup:actpass", "a=setup:active");

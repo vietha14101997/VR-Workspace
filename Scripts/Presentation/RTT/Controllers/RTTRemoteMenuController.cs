@@ -42,8 +42,7 @@ namespace VRWorkspace.UI.RTT.Controllers
 
         // Remote audio playback (auto-created when streaming starts)
         private RemoteAudioPlayer _audioPlayer;
-        private DataChannelAudioPlayer _dcAudioPlayer;
-        private Action<byte[]> _dcAudioHandler;
+        private DataChannelAudioPlayer _dcAudioPlayer; // Fallback: Opus via DataChannel when Audio PC ICE fails
 
         // Cursor tracking
         private int _activeCursorPanelIndex = -1;
@@ -750,26 +749,39 @@ namespace VRWorkspace.UI.RTT.Controllers
         {
             CleanupRemoteAudioPlayer();
 
-            // DataChannel audio player (low-latency: ~20ms, bypasses NetEQ)
+            // Create RTP player FIRST — its Awake() calls AudioSettings.Reset() which kills all audio.
+            // DataChannelAudioPlayer.StartPlayback() must happen AFTER to survive the reset.
+            var rtpAudioObj = new GameObject("RemoteAudioPlayer");
+            rtpAudioObj.transform.SetParent(transform, false);
+            rtpAudioObj.AddComponent<AudioSource>();
+            _audioPlayer = rtpAudioObj.AddComponent<RemoteAudioPlayer>();
+            _audioPlayer.SetMute(true); // Muted: DC audio is primary
+
+            // Primary: DataChannel audio player (Opus via SCTP — same transport as H.265 video)
+            // Both video and audio travel the same path → naturally synced latency (~40ms buffer)
             var dcAudioObj = new GameObject("DataChannelAudioPlayer");
             dcAudioObj.transform.SetParent(transform, false);
             dcAudioObj.AddComponent<AudioSource>();
             _dcAudioPlayer = dcAudioObj.AddComponent<DataChannelAudioPlayer>();
-            _dcAudioPlayer.StartPlayback();
+            _dcAudioPlayer.StartPlayback(); // Must be AFTER RemoteAudioPlayer's AudioSettings.Reset()
 
             if (_viewModel != null)
             {
-                // Wire DC audio: parse binary message and feed Opus frames
-                _dcAudioHandler = (data) =>
-                {
-                    // Format: [type(1)][timestamp(8)][opus_data]
-                    if (data != null && data.Length > 9 && data[0] == 0x01)
-                        _dcAudioPlayer?.OnOpusFrame(data, 9, data.Length - 9);
-                };
-                _viewModel.OnDCAudioData += _dcAudioHandler;
+                _viewModel.OnDCAudioData += HandleDCAudioData;
+                _viewModel.OnRemoteAudioTrackReceived += _audioPlayer.SetTrack;
             }
 
-            Debug.Log("[RTTRemoteMenuController] Created DataChannelAudioPlayer (low-latency)");
+            Debug.Log("[RTTRemoteMenuController] Created audio players (DC primary, RTP fallback muted)");
+        }
+
+        private void HandleDCAudioData(byte[] data)
+        {
+            // DataChannel audio is primary — same SCTP transport as video for synced latency.
+            // RTP audio goes through NetEQ jitter buffer (~500ms+) causing audio-video desync.
+            if (_dcAudioPlayer != null)
+            {
+                _dcAudioPlayer.OnOpusFrame(data, 0, data.Length);
+            }
         }
 
         /// <summary>
@@ -777,21 +789,7 @@ namespace VRWorkspace.UI.RTT.Controllers
         /// </summary>
         private void CleanupRemoteAudioPlayer()
         {
-            // Cleanup DataChannel audio player
-            if (_dcAudioPlayer != null)
-            {
-                if (_viewModel != null && _dcAudioHandler != null)
-                {
-                    _viewModel.OnDCAudioData -= _dcAudioHandler;
-                }
-                _dcAudioHandler = null;
-
-                _dcAudioPlayer.StopAudio();
-                Destroy(_dcAudioPlayer.gameObject);
-                _dcAudioPlayer = null;
-            }
-
-            // Cleanup legacy RTP audio player (fallback)
+            // Cleanup RTP audio player (via dedicated Audio PC)
             if (_audioPlayer != null)
             {
                 if (_viewModel != null)
@@ -802,6 +800,19 @@ namespace VRWorkspace.UI.RTT.Controllers
                 _audioPlayer.StopAudio();
                 Destroy(_audioPlayer.gameObject);
                 _audioPlayer = null;
+            }
+
+            // Cleanup DataChannel fallback audio player
+            if (_dcAudioPlayer != null)
+            {
+                if (_viewModel != null)
+                {
+                    _viewModel.OnDCAudioData -= HandleDCAudioData;
+                }
+
+                _dcAudioPlayer.StopAudio();
+                Destroy(_dcAudioPlayer.gameObject);
+                _dcAudioPlayer = null;
             }
         }
 

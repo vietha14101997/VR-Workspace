@@ -17,8 +17,17 @@ namespace VRWorkspace.Streaming
         private const int CHANNELS = 2;
         private const int FRAME_SAMPLES = 480; // 10ms at 48kHz
 
-        // Ring buffer: ~85ms capacity at 48kHz stereo (enough for 8 Opus frames + margin)
-        private const int RING_CAPACITY = 4096 * CHANNELS;
+        // Ring buffer: ~200ms capacity at 48kHz stereo
+        // Must absorb TCP batch bursts (20ms) + WiFi HOL delay without overflow
+        private const int RING_CAPACITY = 9600 * CHANNELS;
+
+        // Latency target for adaptive drift correction (~40ms)
+        // Smooth resampling keeps buffer near this level without audible artifacts.
+        // 40ms buffer + ~60ms Android audio + ~25ms network ≈ 125ms total.
+        private const int TARGET_LATENCY_SAMPLES = 1920 * CHANNELS; // 40ms at 48kHz stereo
+
+        // Emergency skip threshold: only hard-skip when buffer exceeds 3x target (120ms)
+        private const int EMERGENCY_SKIP_SAMPLES = TARGET_LATENCY_SAMPLES * 3;
         private float[] _ring;
         private volatile int _writePos;
         private volatile int _readPos;
@@ -93,6 +102,10 @@ namespace VRWorkspace.Streaming
 
                 int samplesToWrite = decoded * CHANNELS;
 
+                // No latency control here — only audio thread modifies _readPos.
+                // This prevents race condition between main thread and audio thread
+                // that caused crackling/distortion artifacts.
+
                 // Convert short → float and write to ring buffer
                 int wp = _writePos;
                 for (int i = 0; i < samplesToWrite; i++)
@@ -109,8 +122,11 @@ namespace VRWorkspace.Streaming
         }
 
         /// <summary>
-        /// Unity audio thread callback. Reads decoded samples from ring buffer.
-        /// Underrun → silence (zeros). Overrun handled by dropping oldest samples.
+        /// Unity audio thread callback. Uses adaptive resampling to keep buffer
+        /// near TARGET_LATENCY without audible artifacts.
+        /// When buffer grows: speed up playback slightly (consume faster).
+        /// When buffer shrinks: slow down slightly (conserve data).
+        /// Only hard-skips in emergency (>3x target).
         /// </summary>
         void OnAudioFilterRead(float[] data, int channels)
         {
@@ -121,30 +137,72 @@ namespace VRWorkspace.Streaming
             }
 
             int available = AvailableSamples();
-            int needed = data.Length;
 
             if (available <= 0)
             {
-                // Underrun: output silence
                 Array.Clear(data, 0, data.Length);
                 return;
             }
 
-            int toRead = Math.Min(available, needed);
             int rp = _readPos;
+            int ch = channels; // expected 2 (stereo)
 
-            for (int i = 0; i < toRead; i++)
+            // Emergency skip: only when way too far behind (>120ms)
+            if (available > EMERGENCY_SKIP_SAMPLES)
             {
-                data[i] = _ring[(rp + i) % RING_CAPACITY];
-            }
-            // Clear remainder if not enough samples
-            if (toRead < needed)
-            {
-                Array.Clear(data, toRead, needed - toRead);
+                int skip = available - TARGET_LATENCY_SAMPLES;
+                // Align skip to frame boundary (ch samples = 1 stereo frame)
+                skip = (skip / ch) * ch;
+                rp = (rp + skip) % RING_CAPACITY;
+                available -= skip;
             }
 
-            // Atomic update after all samples read (volatile write)
-            _readPos = (rp + toRead) % RING_CAPACITY;
+            // Adaptive playback rate based on buffer level
+            float bufferRatio = (float)available / TARGET_LATENCY_SAMPLES;
+            float playbackRate;
+
+            if (bufferRatio > 1.5f)
+                playbackRate = 1.08f;      // well above target: 8% faster
+            else if (bufferRatio > 1.15f)
+                playbackRate = 1.03f;      // slightly above: 3% faster
+            else if (bufferRatio < 0.4f)
+                playbackRate = 0.95f;      // running low: 5% slower
+            else if (bufferRatio < 0.7f)
+                playbackRate = 0.98f;      // slightly low: 2% slower
+            else
+                playbackRate = 1.0f;       // near target: normal speed
+
+            // Read with linear interpolation, advancing by stereo frames
+            int framesNeeded = data.Length / ch;
+            int framesAvailable = available / ch;
+            float readFrame = 0f;
+
+            for (int f = 0; f < framesNeeded; f++)
+            {
+                int idx = (int)readFrame;
+
+                if (idx + 1 >= framesAvailable)
+                {
+                    // Underrun: fill rest with silence
+                    for (int i = f * ch; i < data.Length; i++)
+                        data[i] = 0f;
+                    readFrame = idx;
+                    break;
+                }
+
+                float frac = readFrame - idx;
+                for (int c = 0; c < ch; c++)
+                {
+                    int pos0 = (rp + idx * ch + c) % RING_CAPACITY;
+                    int pos1 = (rp + (idx + 1) * ch + c) % RING_CAPACITY;
+                    data[f * ch + c] = _ring[pos0] + (_ring[pos1] - _ring[pos0]) * frac;
+                }
+
+                readFrame += playbackRate;
+            }
+
+            int framesConsumed = (int)readFrame;
+            _readPos = (rp + framesConsumed * ch) % RING_CAPACITY;
         }
 
         private int AvailableSamples()

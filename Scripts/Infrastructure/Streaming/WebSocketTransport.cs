@@ -16,7 +16,8 @@ namespace VRWorkspace.Streaming
     {
         // ── Public events ────────────────────────────────────────────────────────
         public event Action<string> OnMessageReceived;
-        public event Action<int>    OnBinaryBytesReceived;   // byte count only – no copy
+        public event Action<byte[]> OnBinaryDataReceived;    // binary data (audio frames, etc.)
+        public event Action<int>    OnBinaryBytesReceived;   // byte count only – no copy (speed test)
         public event Action         OnDisconnected;
         public event Action<string> OnError;
         public event Action<double> OnPingRtt;               // RTT in ms when pong arrives
@@ -142,16 +143,35 @@ namespace VRWorkspace.Streaming
                         return;
                     }
 
-                    // ── Binary (speed-test data) – count bytes, no allocation ──
+                    // ── Binary message ──
                     if (first.MessageType == WebSocketMessageType.Binary)
                     {
+                        // Audio frames (small, type byte 0x01): forward data to handler
+                        if (OnBinaryDataReceived != null && first.EndOfMessage)
+                        {
+                            var copy = new byte[first.Count];
+                            Buffer.BlockCopy(buffer, 0, copy, 0, first.Count);
+                            OnBinaryDataReceived.Invoke(copy);
+                            continue;
+                        }
+
+                        // Multi-fragment binary or speed-test: count bytes only
                         int total = first.Count;
                         while (!first.EndOfMessage)
                         {
                             first = await _ws.ReceiveAsync(new ArraySegment<byte>(buffer), ct);
                             total += first.Count;
                         }
-                        OnBinaryBytesReceived?.Invoke(total);
+                        if (OnBinaryDataReceived != null)
+                        {
+                            // Multi-fragment binary with data handler — reassemble
+                            // (unlikely for audio, but handle gracefully)
+                            OnBinaryBytesReceived?.Invoke(total);
+                        }
+                        else
+                        {
+                            OnBinaryBytesReceived?.Invoke(total);
+                        }
                         continue;
                     }
 

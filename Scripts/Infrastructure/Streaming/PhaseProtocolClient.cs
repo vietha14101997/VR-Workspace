@@ -675,7 +675,7 @@ namespace VRWorkspace.Streaming
 
                     _msgCounter++;
 
-                    // Binary – speed test bytes, no alloc
+                    // Binary message (speed test data)
                     if (first.MessageType == WebSocketMessageType.Binary)
                     {
                         int total = first.Count;
