@@ -1,0 +1,1214 @@
+2026/03/06 17:54:13.037 5552 5552 Info Unity applyWindowUIChanges fullScreen = true, renderOutsideSafeArea = true
+2026/03/06 17:54:13.064 5552 5552 Verbose Unity Context Type: ActivityOrService
+2026/03/06 17:54:13.064 5552 5552 Debug Unity CommandLine:  
+2026/03/06 17:54:13.072 5552 5552 Info Unity onResume
+2026/03/06 17:54:13.151 5552 5552 Info Unity windowFocusChanged: true
+2026/03/06 17:54:13.151 5552 5552 Info Unity resumeUnity
+2026/03/06 17:54:13.158 5552 5629 Info Unity MemoryManager: Using 'Dynamic Heap' Allocator.
+2026/03/06 17:54:13.158 5552 5629 Debug Unity [UnityMemory] Configuration Parameters - Can be set up in boot.config
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-allocator-temp-initial-block-size-main=262144"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-allocator-temp-initial-block-size-worker=262144"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-temp-allocator-size-background-worker=32768"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-temp-allocator-size-job-worker=262144"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-temp-allocator-size-preload-manager=262144"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-temp-allocator-size-nav-mesh-worker=65536"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-temp-allocator-size-audio-worker=65536"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-temp-allocator-size-cloud-worker=32768"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-bucket-allocator-granularity=16"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-bucket-allocator-bucket-count=8"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-bucket-allocator-block-size=4194304"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-bucket-allocator-block-count=1"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-main-allocator-block-size=16777216"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-thread-allocator-block-size=16777216"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-gfx-main-allocator-block-size=16777216"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-gfx-thread-allocator-block-size=16777216"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-cache-allocator-block-size=4194304"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-typetree-allocator-block-size=2097152"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-profiler-bucket-allocator-granularity=16"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-profiler-bucket-allocator-bucket-count=8"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-profiler-bucket-allocator-block-size=4194304"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-profiler-bucket-allocator-block-count=1"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-profiler-allocator-block-size=16777216"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-profiler-editor-allocator-block-size=1048576"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-temp-allocator-size-main=4194304"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-job-temp-allocator-block-size=2097152"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-job-temp-allocator-block-size-background=1048576"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-job-temp-allocator-reduction-small-platforms=262144"
+2026/03/06 17:54:13.158 5552 5629 Debug Unity     "memorysetup-temp-allocator-size-gfx=262144"
+2026/03/06 17:54:13.172 5552 5629 Debug Unity Enabling Unity systrace
+2026/03/06 17:54:13.177 5552 5629 Info Unity SetGameState: isLoading: true, mode: UNKNOWN, label: -2, quality: -1
+2026/03/06 17:54:13.180 5552 5629 Debug Unity [VFS] Mount /data/app/~~0u3ibMsV_T9Hr6ynPlpKGg==/com.Reka.VRWorkSpace-qUD0JqJEBwdSFAtL4Pt_bw==/base.apk
+2026/03/06 17:54:13.183 5552 5629 Debug Unity Loading player data from /data/data/com.Reka.VRWorkSpace/pram-shadow-files/assets/bin/Data/data.unity3d
+2026/03/06 17:54:13.248 5552 5552 Info Unity applyWindowUIChanges fullScreen = true, renderOutsideSafeArea = true
+2026/03/06 17:54:13.248 5552 5629 Info Unity SystemInfo CPU = ARM64 FP ASIMD AES, Cores = 8, Memory = 11284mb
+2026/03/06 17:54:13.248 5552 5629 Info Unity SystemInfo ARM big.LITTLE configuration: 5 big (mask: 0xf8), 3 little (mask: 0x7)
+2026/03/06 17:54:13.249 5552 5629 Info Unity ApplicationInfo 'com.Reka.VRWorkSpace', Version '0.1', Min API Level '26', Target API Level '36'
+2026/03/06 17:54:13.249 5552 5629 Info Unity Built from '6000.3/staging' branch, Version '6000.3.10f1 (e35f0c77bd8e)', Build type 'Development', Scripting Backend 'il2cpp', CPU 'arm64-v8a', Stripping 'Enabled'
+2026/03/06 17:54:13.249 5552 5629 Info Unity Device Model 'vivo V2352GA', OS 'Android OS 16 (API 36)'
+2026/03/06 17:54:13.249 5552 5629 Debug Unity Determine if il2cpp resources need to extracted:
+2026/03/06 17:54:13.250 5552 5629 Debug Unity     il2cpp resources are up to date, not extracting
+2026/03/06 17:54:13.281 5552 5629 Debug Unity [EGL] Attaching window :0xb400006eed81c520
+2026/03/06 17:54:13.281 5552 5629 Debug Unity InitializeScriptEngine OK (0x7077c7efc0)
+2026/03/06 17:54:13.281 5552 5629 Debug Unity Found 3 interfaces on host :
+2026/03/06 17:54:13.281 5552 5629 Debug Unity  0) 53.103.8.111
+2026/03/06 17:54:13.281 5552 5629 Debug Unity  1) 192.168.1.36
+2026/03/06 17:54:13.281 5552 5629 Debug Unity  2) 10.190.178.105
+2026/03/06 17:54:13.281 5552 5629 Debug Unity 
+2026/03/06 17:54:13.282 5552 5629 Debug Unity Player connection [471102108608]  Target information:
+2026/03/06 17:54:13.282 5552 5629 Debug Unity Player connection [471102108608]  * "[IP] 53.103.8.111 [Port] 55000 [Flags] 2 [Guid] 2699380765 [EditorId] 3665415251 [Version] 1048832 [Id] AndroidPlayer(11,vivo_V2352GA@192.168.1.36) [Debug] 0 [PackageName] AndroidPlayer [ProjectName] VRWorkSpace" 
+2026/03/06 17:54:13.282 5552 5629 Debug Unity Player connection [471102108608]  * "[IP] 192.168.1.36 [Port] 55000 [Flags] 2 [Guid] 2699380765 [EditorId] 3665415251 [Version] 1048832 [Id] AndroidPlayer(11,vivo_V2352GA@192.168.1.36) [Debug] 0 [PackageName] AndroidPlayer [ProjectName] VRWorkSpace" 
+2026/03/06 17:54:13.282 5552 5629 Debug Unity Player connection [471102108608]  * "[IP] 10.190.178.105 [Port] 55000 [Flags] 2 [Guid] 2699380765 [EditorId] 3665415251 [Version] 1048832 [Id] AndroidPlayer(11,vivo_V2352GA@192.168.1.36) [Debug] 0 [PackageName] AndroidPlayer [ProjectName] VRWorkSpace" 
+2026/03/06 17:54:13.282 5552 5629 Debug Unity Player connection [471102108608] Started UDP target info broadcast (1) on [225.0.0.222:54997].
+2026/03/06 17:54:13.291 5552 5629 Debug Unity Input System module state changed to: Initialized.
+2026/03/06 17:54:13.293 5552 5629 Debug Unity [Physics::Module] Initialized fallback backend.
+2026/03/06 17:54:13.293 5552 5629 Debug Unity [Physics::Module] Id: 0xdecafbad
+2026/03/06 17:54:13.325 5552 5629 Debug Unity PlayerInitEngineNoGraphics OK
+2026/03/06 17:54:13.325 5552 5629 Info Unity Company Name: Reka
+2026/03/06 17:54:13.325 5552 5629 Info Unity Product Name: VRWorkSpace
+2026/03/06 17:54:13.325 5552 5629 Debug Unity AndroidGraphics::Startup window =  0xb400006eed81c520
+2026/03/06 17:54:13.325 5552 5629 Debug Unity [EGL] Attaching window :0xb400006eed81c520
+2026/03/06 17:54:13.326 5552 5552 Info Unity applyWindowUIChanges fullScreen = true, renderOutsideSafeArea = true
+2026/03/06 17:54:13.328 5552 5629 Debug Unity [Subsystems] Discovering subsystems at path /data/data/com.Reka.VRWorkSpace/pram-shadow-files/assets/bin/Data/UnitySubsystems
+2026/03/06 17:54:13.328 5552 5629 Debug Unity [Subsystems] No descriptors matched for  examples in /data/data/com.Reka.VRWorkSpace/pram-shadow-files/assets/bin/Data/UnitySubsystems/GfxPluginCardboard/UnitySubsystemsManifest.json.
+2026/03/06 17:54:13.328 5552 5629 Debug Unity [Subsystems] 1 'inputs' descriptors matched in /data/data/com.Reka.VRWorkSpace/pram-shadow-files/assets/bin/Data/UnitySubsystems/GfxPluginCardboard/UnitySubsystemsManifest.json
+2026/03/06 17:54:13.328 5552 5629 Debug Unity [Subsystems] 1 'displays' descriptors matched in /data/data/com.Reka.VRWorkSpace/pram-shadow-files/assets/bin/Data/UnitySubsystems/GfxPluginCardboard/UnitySubsystemsManifest.json
+2026/03/06 17:54:13.328 5552 5629 Debug Unity [Subsystems] No descriptors matched for  meshings in /data/data/com.Reka.VRWorkSpace/pram-shadow-files/assets/bin/Data/UnitySubsystems/GfxPluginCardboard/UnitySubsystemsManifest.json.
+2026/03/06 17:54:13.337 5552 5629 Debug Unity [EGL] Request: ES 3.2 RGB 000 0/0
+2026/03/06 17:54:13.337 5552 5629 Debug Unity [EGL] Checking ES 3.2 support...
+2026/03/06 17:54:13.339 5552 5629 Debug Unity [EGL] ES 3.2 support detected
+2026/03/06 17:54:13.339 5552 5629 Debug Unity [EGL] Found: ID[1] ES 3.2 RGB 565 0/0
+2026/03/06 17:54:13.339 5552 5629 Debug Unity GfxDevice: creating device client; kGfxThreadingModeThreaded
+2026/03/06 17:54:13.339 5552 5629 Debug Unity [EGL] Request: ES 3.2 RGB 000 0/0
+2026/03/06 17:54:13.339 5552 5629 Debug Unity [EGL] Found: ID[1] ES 3.2 RGB 565 0/0
+2026/03/06 17:54:13.339 5552 5629 Debug Unity [EGL] Request: ES 3.0 RGBA 8888 0/0
+2026/03/06 17:54:13.340 5552 5629 Debug Unity [EGL] Found: ID[9] ES 3.0 RGBA 8888 0/0
+2026/03/06 17:54:13.341 5552 5629 Debug Unity ANativeWindow: (2800/1260) RequestedResolution: (0/0) RenderingResolution: (0/0) EGLSurface: (2800/1260)
+2026/03/06 17:54:13.344 5552 5629 Debug Unity Renderer: Adreno (TM) 735
+2026/03/06 17:54:13.344 5552 5629 Debug Unity Vendor:   Qualcomm
+2026/03/06 17:54:13.344 5552 5629 Debug Unity Version:  OpenGL ES 3.2 V@0762.41 (GIT@f6b5df5188, I29aebc4401, 1758283784) (Date:09/19/25)
+2026/03/06 17:54:13.344 5552 5629 Debug Unity GLES:     3
+2026/03/06 17:54:13.344 5552 5629 Debug Unity  GL_OES_EGL_image GL_OES_EGL_image_external GL_OES_EGL_sync GL_OES_vertex_half_float GL_OES_framebuffer_object GL_OES_rgb8_rgba8 GL_OES_compressed_ETC1_RGB8_texture GL_AMD_compressed_ATC_texture GL_KHR_texture_compression_astc_sliced_3d GL_KHR_texture_compression_astc_ldr GL_KHR_texture_compression_astc_hdr GL_OES_texture_compression_astc GL_EXT_texture_compression_s3tc GL_EXT_texture_compression_s3tc_srgb GL_EXT_texture_compression_rgtc GL_EXT_texture_compression_bptc GL_OES_texture_npot GL_EXT_texture_filter_anisotropic GL_EXT_texture_format_BGRA8888 GL_EXT_read_format_bgra GL_OES_texture_3D GL_EXT_color_buffer_float GL_EXT_color_buffer_half_float GL_EXT_float_blend GL_QCOM_alpha_test GL_OES_depth24 GL_OES_packed_depth_stencil GL_OES_depth_texture GL_OES_depth_texture_cube_map GL_EXT_sRGB GL_OES_texture_float GL_OES_texture_float_linear GL_OES_texture_half_float GL_OES_texture_half_float_linear GL_EXT_texture_type_2_10_10_10_REV GL_EXT_texture_sRGB_decode GL_EXT_texture_compression_astc_decode_mode GL_EXT_
+2026/03/06 17:54:13.344 5552 5629 Debug Unity texture_mirror_clamp_to_edge GL_EXT_texture_format_sRGB_override GL_OES_element_index_uint GL_EXT_copy_image GL_EXT_geometry_shader GL_EXT_tessellation_shader GL_OES_texture_stencil8 GL_EXT_shader_io_blocks GL_OES_shader_image_atomic GL_OES_sample_variables GL_EXT_texture_border_clamp GL_EXT_EGL_image_external_wrap_modes GL_EXT_multisampled_render_to_texture GL_EXT_multisampled_render_to_texture2 GL_OES_shader_multisample_interpolation GL_EXT_texture_cube_map_array GL_EXT_draw_buffers_indexed GL_EXT_gpu_shader5 GL_EXT_robustness GL_EXT_texture_buffer GL_EXT_shader_framebuffer_fetch GL_ARM_shader_framebuffer_fetch_depth_stencil GL_OES_texture_storage_multisample_2d_array GL_OES_sample_shading GL_OES_get_program_binary GL_EXT_debug_label GL_KHR_blend_equation_advanced GL_KHR_blend_equation_advanced_coherent GL_QCOM_tiled_rendering GL_ANDROID_extension_pack_es31a GL_EXT_primitive_bounding_box GL_OES_standard_derivatives GL_OES_vertex_array_object GL_EXT_disjoint_timer_query GL_KHR_debug GL_EXT_YUV_target GL_EXT
+2026/03/06 17:54:13.344 5552 5629 Debug Unity _sRGB_write_control GL_EXT_texture_norm16 GL_EXT_discard_framebuffer GL_OES_surfaceless_context GL_OVR_multiview GL_OVR_multiview2 GL_EXT_texture_sRGB_R8 GL_KHR_no_error GL_EXT_debug_marker GL_OES_EGL_image_external_essl3 GL_OVR_multiview_multisampled_render_to_texture GL_EXT_buffer_storage GL_EXT_external_buffer GL_EXT_blit_framebuffer_params GL_EXT_clip_cull_distance GL_EXT_protected_textures GL_EXT_shader_non_constant_global_initializers GL_QCOM_texture_foveated GL_QCOM_texture_foveated2 GL_QCOM_texture_foveated_subsampled_layout GL_QCOM_shader_framebuffer_fetch_noncoherent GL_QCOM_shader_framebuffer_fetch_rate GL_EXT_memory_object GL_EXT_memory_object_fd GL_EXT_EGL_image_array GL_NV_shader_noperspective_interpolation GL_KHR_robust_buffer_access_behavior GL_EXT_EGL_image_storage GL_EXT_blend_func_extended GL_EXT_clip_control GL_OES_texture_view GL_EXT_fragment_invocation_density GL_QCOM_motion_estimation GL_QCOM_validate_shader_binary GL_QCOM_YUV_texture_gather GL_QCOM_shading_rate GL_QCOM_frame_extrapola
+2026/03/06 17:54:13.344 5552 5629 Debug Unity tion GL_QCOM_texture_lod_bias GL_IMG_texture_filter_cubic GL_QCOM_render_shared_exponent GL_EXT_polygon_offset_clamp GL_EXT_texture_sRGB_RG8 GL_EXT_depth_clamp GL_EXT_fragment_shading_rate GL_EXT_fragment_shading_rate_primitive GL_EXT_fragment_shading_rate_attachment GL_EXT_shader_implicit_conversions GL_EXT_render_snorm GL_QCOM_render_sRGB_R8_RG8
+2026/03/06 17:54:13.345 5552 5629 Debug Unity OPENGL LOG: Creating OpenGL ES 3.2 graphics device ; Context level  <OpenGL ES 3.2> ; Context handle -41633024
+2026/03/06 17:54:13.346 5552 5629 Debug Unity [Subsystems] Cardboard successfully registered Provider for CardboardDisplay
+2026/03/06 17:54:13.346 5552 5629 Info Unity [XR] [CardboardXrMain]: Display subsystem successfully loaded.
+2026/03/06 17:54:13.346 5552 5629 Debug Unity [Subsystems] Cardboard successfully registered Provider for CardboardInput
+2026/03/06 17:54:13.346 5552 5629 Debug Unity [Subsystems] Cardboard successfully registered Provider for CardboardDisplay
+2026/03/06 17:54:13.346 5552 5629 Info Unity [XR] [CardboardXrMain]: Input subsystem successfully loaded.
+2026/03/06 17:54:13.346 5552 5629 Debug Unity [EGL] Attaching window :0xb400006eed81c520
+2026/03/06 17:54:13.347 5552 5629 Debug Unity Requested framebuffer: resolution[2800x1260], rgba[8/8/8/8], depth+stencil[on], samples[1]
+2026/03/06 17:54:13.347 5552 5629 Debug Unity Created framebuffer: resolution[2800x1260], rgba[8/8/8/8], depth+stencil[24/8], samples[0] 
+2026/03/06 17:54:13.350 5552 5629 Debug Unity SwappyWrapper: InitSwappyWrapper() succeeded.
+2026/03/06 17:54:13.358 5552 5629 Debug Unity [EGL] Attaching window :0xb400006eed81c520
+2026/03/06 17:54:13.358 5552 5629 Debug Unity Initialize engine version: 6000.3.10f1 (e35f0c77bd8e)
+2026/03/06 17:54:13.494 5552 5629 Debug Unity [Physics::Module] Selected backend.
+2026/03/06 17:54:13.494 5552 5629 Debug Unity [Physics::Module] Name: PhysX
+2026/03/06 17:54:13.494 5552 5629 Debug Unity [Physics::Module] Id: 0xf2b8ea05
+2026/03/06 17:54:13.494 5552 5629 Debug Unity [Physics::Module] SDK Version: 4.1.2
+2026/03/06 17:54:13.494 5552 5629 Debug Unity [Physics::Module] Integration Version: 1.0.0
+2026/03/06 17:54:13.494 5552 5629 Debug Unity [Physics::Module] Threading Mode: Multi-Threaded
+2026/03/06 17:54:13.570 5552 5629 Debug Unity ERROR: Shader 
+2026/03/06 17:54:13.570 5552 5629 Debug Unity Hidden/PostProcessing/MultiScaleVO shader is not supported on this GPU (none of subshaders/fallbacks are suitable)
+2026/03/06 17:54:13.612 5552 5629 Debug Unity ERROR: Shader 
+2026/03/06 17:54:13.612 5552 5629 Debug Unity Hidden/PostProcessing/Debug/Histogram shader is not supported on this GPU (none of subshaders/fallbacks are suitable)
+2026/03/06 17:54:13.612 5552 5629 Debug Unity ERROR: Shader 
+2026/03/06 17:54:13.612 5552 5629 Debug Unity Hidden/PostProcessing/Debug/LightMeter shader is not supported on this GPU (none of subshaders/fallbacks are suitable)
+2026/03/06 17:54:13.612 5552 5629 Debug Unity ERROR: Shader 
+2026/03/06 17:54:13.612 5552 5629 Debug Unity Hidden/PostProcessing/Debug/Vectorscope shader is not supported on this GPU (none of subshaders/fallbacks are suitable)
+2026/03/06 17:54:13.613 5552 5629 Debug Unity ERROR: Shader 
+2026/03/06 17:54:13.613 5552 5629 Debug Unity Hidden/PostProcessing/Debug/Waveform shader is not supported on this GPU (none of subshaders/fallbacks are suitable)
+2026/03/06 17:54:13.615 5552 5629 Info Unity XRGeneral Settings awakening...
+2026/03/06 17:54:13.615 5552 5629 Info Unity UnityEngine.DebugLogHandler:Internal_Log(LogType, LogOption, String, Object)
+2026/03/06 17:54:13.615 5552 5629 Info Unity UnityEngine.XR.Management.XRGeneralSettings:Awake()
+2026/03/06 17:54:13.722 5552 5629 Debug Unity [Subsystems] Loading plugin GfxPluginCardboard for subsystem CardboardDisplay...
+2026/03/06 17:54:13.723 5552 5629 Debug Unity [Subsystems] Loading plugin GfxPluginCardboard for subsystem CardboardInput...
+2026/03/06 17:54:13.723 5552 5629 Info Unity [XR] [CardboardXrInputProvider]: Lifecycle initialized
+2026/03/06 17:54:13.727 5552 5629 Debug Unity PlayerInitEngineGraphics OK
+2026/03/06 17:54:13.743 5552 5629 Info Unity SetGameState: isLoading: false, mode: UNKNOWN, label: -1, quality: 6
+2026/03/06 17:54:13.744 5552 5629 Debug Unity ANativeWindow: (2800/1260) RequestedResolution: (0/0) RenderingResolution: (0/0) EGLSurface: (2800/1260)
+2026/03/06 17:54:13.860 5552 5629 Info Unity [XR] [CardboardXrInputProvider]: Lifecycle started
+2026/03/06 17:54:13.862 5552 5629 Debug Unity Using Java Choreographer.
+2026/03/06 17:54:13.865 5552 5629 Info Unity SetGameState: isLoading: true, mode: UNKNOWN, label: 0, quality: 6
+2026/03/06 17:54:13.915 5552 5629 Info Unity [XR] [CardboardXrInputProvider]: No events to handle
+2026/03/06 17:54:13.916 5552 5680 Info Unity [XR] [CardboardXrDisplayProvider]: Initializes Cardboard API.
+2026/03/06 17:54:13.929 5552 5680 Debug Unity RequestCreateTexture
+2026/03/06 17:54:13.929 5552 5680 Debug Unity RequestCreateTexture
+2026/03/06 17:54:13.929 5552 5629 Debug Unity SetupRenderTextureFromXRRequest (id: 1 col: 0x1c d: 0x2 sr: 0x0)
+2026/03/06 17:54:13.929 5552 5629 Debug Unity RenderTexture::Create (id: 1)
+2026/03/06 17:54:13.929 5552 5680 Debug Unity IVRDeviceCallback_CreateEyeTextureResources 0x1c
+2026/03/06 17:54:13.930 5552 5629 Debug Unity SetupRenderTextureFromXRRequest (id: 2 col: 0x1d d: 0x3 sr: 0x0)
+2026/03/06 17:54:13.930 5552 5629 Debug Unity RenderTexture::Create (id: 2)
+2026/03/06 17:54:13.930 5552 5680 Debug Unity IVRDeviceCallback_CreateEyeTextureResources 0x1d
+2026/03/06 17:54:14.571 5552 5629 Debug Unity Changing screen orientation to LandscapeLeft.
+2026/03/06 17:54:18.430 5552 5629 Debug Unity UnloadTime: 1.732969 ms
+2026/03/06 17:54:18.432 5552 5629 Info Unity [MainThreadDispatcher] Initialized on thread 1
+2026/03/06 17:54:18.443 5552 5629 Info Unity [APBootstrap] AndroidStreamingHelper initialized
+2026/03/06 17:54:18.443 5552 5629 Info Unity [APBootstrap] AppPermissionManager initialized
+2026/03/06 17:54:18.444 5552 5629 Info Unity Starting camera passthrough
+2026/03/06 17:54:18.501 5552 5629 Info Unity Camera2 0 is a simple camera
+2026/03/06 17:54:18.505 5552 5629 Info Unity Camera2 1 is a simple camera
+2026/03/06 17:54:18.518 5552 5629 Info Unity Camera2: 0 focal length 4.84
+2026/03/06 17:54:18.518 5552 5629 Info Unity Camera2: sensor size 6.5536 x 4.9152
+2026/03/06 17:54:18.518 5552 5629 Info Unity Camera2: focal length equivalent 26
+2026/03/06 17:54:18.546 5552 5629 Info Unity Camera2: 1 focal length 3.74
+2026/03/06 17:54:18.547 5552 5629 Info Unity Camera2: sensor size 4.608 x 3.456
+2026/03/06 17:54:18.547 5552 5629 Info Unity Camera2: focal length equivalent 29
+2026/03/06 17:54:18.554 5552 5629 Info Unity Found 2 camera devices
+2026/03/06 17:54:18.554 5552 5629 Info Unity Camera 0: Camera 0 (front facing: False)
+2026/03/06 17:54:18.554 5552 5629 Info Unity Camera 1: Camera 1 (front facing: True)
+2026/03/06 17:54:18.554 5552 5629 Info Unity Selected back camera: Camera 0
+2026/03/06 17:54:18.554 5552 5629 Info Unity Starting webcam texture: Camera 0 at 1280x720
+2026/03/06 17:54:18.559 5552 5629 Info Unity Camera2: Hardware level: 3
+2026/03/06 17:54:18.560 5552 5629 Info Unity Camera2: FrameSize 4096 x 3072 [2.613983692063143]
+2026/03/06 17:54:18.560 5552 5629 Info Unity Camera2: FrameSize 4080 x 3072 [2.6100697927420065]
+2026/03/06 17:54:18.560 5552 5629 Info Unity Camera2: FrameSize 4096 x 2304 [2.3263016196113617]
+2026/03/06 17:54:18.560 5552 5629 Info Unity Camera2: FrameSize 4096 x 2304 [2.3263016196113617]
+2026/03/06 17:54:18.560 5552 5629 Info Unity Camera2: FrameSize 4080 x 2296 [2.318909455913901]
+2026/03/06 17:54:18.560 5552 5629 Info Unity Camera2: FrameSize 3840 x 2160 [2.1972245773362196]
+2026/03/06 17:54:18.560 5552 5629 Info Unity Camera2: FrameSize 3264 x 2448 [2.1598687907924505]
+2026/03/06 17:54:18.560 5552 5629 Info Unity Camera2: FrameSize 3200 x 2400 [2.120263536200091]
+2026/03/06 17:54:18.560 5552 5629 Info Unity Camera2: FrameSize 4096 x 1844 [2.1035920019121193]
+2026/03/06 17:54:18.560 5552 5629 Info Unity Camera2: FrameSize 4080 x 1836 [2.0953302696548795]
+2026/03/06 17:54:18.560 5552 5629 Info Unity Camera2: FrameSize 3200 x 2000 [1.9379419794061366]
+2026/03/06 17:54:18.560 5552 5629 Info Unity Camera2: FrameSize 3264 x 1836 [1.8721867183406695]
+2026/03/06 17:54:18.560 5552 5629 Info Unity Camera2: FrameSize 3200 x 1800 [1.83258146374831]
+2026/03/06 17:54:18.560 5552 5629 Info Unity Camera2: FrameSize 2560 x 1920 [1.6739764335716716]
+2026/03/06 17:54:18.560 5552 5629 Info Unity Camera2: FrameSize 3264 x 1472 [1.6512194464490553]
+2026/03/06 17:54:18.560 5552 5629 Info Unity Camera2: FrameSize 3200 x 1456 [1.6204877486206852]
+2026/03/06 17:54:18.560 5552 5629 Info Unity Camera2: FrameSize 2304 x 1728 [1.463255402256019]
+2026/03/06 17:54:18.560 5552 5629 Info Unity Camera2: FrameSize 2560 x 1440 [1.3862943611198906]
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: FrameSize 1920 x 1920 [1.3862943611198906]
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: FrameSize 2800 x 1260 [1.3423751271850553]
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: FrameSize 2048 x 1536 [1.2276893309432522]
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: FrameSize 2304 x 1296 [1.175573329804238]
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: FrameSize 1920 x 1440 [1.0986122886681098]
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: FrameSize 2304 x 1040 [0.9555114450274363]
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: FrameSize 1920 x 1080 [0.8109302162163289]
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: FrameSize 1632 x 1224 [0.7735744296725598]
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: FrameSize 1600 x 1200 [0.7339691750802004]
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: FrameSize 1920 x 864 [0.5877866649021191]
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: FrameSize 1440 x 1080 [0.523248143764548]
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: FrameSize 1920 x 800 [0.5108256237659907]
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: FrameSize 1280 x 960 [0.2876820724517809]
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: FrameSize 1080 x 1080 [0.5753641449035618]
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: FrameSize 1600 x 720 [0.2231435513142097]
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: FrameSize 1440 x 720 [0.11778303565638351]
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: FrameSize 1280 x 720 [0.0]
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: FrameSize 1024 x 768 [0.28768207245178096]
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: FrameSize 960 x 540 [0.5753641449035617]
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: FrameSize 800 x 600 [0.6523251860396903]
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: FrameSize 800 x 480 [0.8754687373539001]
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: FrameSize 720 x 480 [0.9808292530117262]
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: FrameSize 640 x 480 [1.0986122886681096]
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: FrameSize 352 x 288 [2.207274913189721]
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: FrameSize 320 x 240 [2.4849066497880004]
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: FrameSize 176 x 144 [3.593569274309611]
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: FPS requested: 60 set: 30
+2026/03/06 17:54:18.561 5552 5629 Info Unity Camera2: Open logical camera 0
+2026/03/06 17:54:18.596 5552 5736 Info Unity Camera2: CameraDevice opened.
+2026/03/06 17:54:18.612 5552 5629 Info Unity Camera2: Start preview.
+2026/03/06 17:54:18.701 5552 5736 Info Unity Camera2: CaptureSession is configured.
+2026/03/06 17:54:18.708 5552 5629 Info Unity SetGameState: isLoading: false, mode: UNKNOWN, label: 0, quality: 6
+2026/03/06 17:54:18.713 5552 5629 Info Unity [RTTMenu] Created main frame
+2026/03/06 17:54:18.713 5552 5629 Info Unity [RTTBootstrapper] Created RTTMenu with RTTMenuFrame_main
+2026/03/06 17:54:18.713 5552 5629 Info Unity [RTTBootstrapper] RTTMenu oriented towards camera
+2026/03/06 17:54:18.714 5552 5629 Info Unity [RTTToolbar] Created
+2026/03/06 17:54:18.718 5552 5629 Info Unity [RTTTaskbar] Icons loaded - Quit:True, Settings:True, Eye:True, EyeClose:True, Recenter:True, Home:True
+2026/03/06 17:54:18.719 5552 5629 Info Unity [RTTToolbar] Initialized with taskbar. Size: 0,913x0,331m, followTarget: RTTMenu
+2026/03/06 17:54:18.719 5552 5629 Info Unity [RTTBootstrapper] Created RTTTaskbar in RTTToolbar, following RTTMenu
+2026/03/06 17:54:18.719 5552 5629 Info Unity [RTTBootstrapper] RTTManager found, registering new frame and taskbar
+2026/03/06 17:54:18.720 5552 5629 Info Unity [RTTRecenterController] Cardboard API Recenter called
+2026/03/06 17:54:18.720 5552 5629 Info Unity [RTTRecenterController] Startup camera-follow started
+2026/03/06 17:54:18.721 5552 5629 Info Unity [RTTTaskbar] SelectSlot(0) called, current active: 0
+2026/03/06 17:54:18.723 5552 5629 Info Unity [VirtualObjectsZoomController] Configured: min=1m, max=2,5m, default=2m, step=0,1m
+2026/03/06 17:54:18.723 5552 5629 Info Unity [VirtualObjectsZoomController] Moving VirtualObjects from 0,00m to default 2,00m
+2026/03/06 17:54:18.723 5552 5629 Info Unity [VirtualObjectsZoomController] Zoom set to 2,00m (delta: 2,000m)
+2026/03/06 17:54:18.723 5552 5629 Info Unity [RTTBootstrapper] Created VirtualObjectsZoomController (range: 1m - 2,5m, default: 2m)
+2026/03/06 17:54:18.723 5552 5629 Info Unity [RTTBootstrapper] Initialization complete
+2026/03/06 17:54:18.723 5552 5629 Info Unity [PermissionManager] Starting permission requests for Android SDK 36
+2026/03/06 17:54:18.723 5552 5629 Info Unity [PermissionManager] Camera permission already granted
+2026/03/06 17:54:18.725 5552 5629 Info Unity [CardboardApi] Device params found.
+2026/03/06 17:54:18.727 5552 5629 Info Unity [NonVRMode] Mouse device disabled on Android.
+2026/03/06 17:54:18.753 5552 5629 Info Unity [MediaEnvironmentController] Found environment root: VirtualEnvironment
+2026/03/06 17:54:18.754 5552 5629 Info Unity [MediaEnvironmentController] Cached 0 room lights
+2026/03/06 17:54:18.754 5552 5629 Info Unity [MediaEnvironmentController] Initialized
+2026/03/06 17:54:18.754 5552 5629 Info Unity Stopping camera passthrough
+2026/03/06 17:54:18.754 5552 5629 Info Unity Stopping webcam texture
+2026/03/06 17:54:18.754 5552 5629 Info Unity Camera2: Close.
+2026/03/06 17:54:18.754 5552 5629 Info Unity Camera2: Stop preview.
+2026/03/06 17:54:19.051 5552 5736 Info Unity Camera2: CameraDevice closed.
+2026/03/06 17:54:19.051 5552 5629 Info Unity Destroying webcam texture
+2026/03/06 17:54:19.051 5552 5629 Info Unity [RTTRaycastManager] Auto-initialized layer mask to VirtualObjects (layer 3)
+2026/03/06 17:54:19.063 5552 5629 Info Unity [RTTMenuFrame] UI built: 1920x1080 logical pixels
+2026/03/06 17:54:19.258 5552 5629 Info Unity [RTTMiniFrame] UI built: 1095,5x128 pixels
+2026/03/06 17:54:19.261 5552 5629 Info Unity [CardboardApi] Reload device parameters.
+2026/03/06 17:54:19.271 5552 5680 Info Unity [XR] [CardboardXrDisplayProvider]: Initializes Cardboard API.
+2026/03/06 17:54:19.271 5552 5680 Debug Unity RequestDestroyTexture
+2026/03/06 17:54:19.271 5552 5680 Debug Unity RequestDestroyTexture
+2026/03/06 17:54:19.276 5552 5680 Debug Unity RequestCreateTexture
+2026/03/06 17:54:19.276 5552 5680 Debug Unity RequestCreateTexture
+2026/03/06 17:54:19.277 5552 5629 Debug Unity SetupRenderTextureFromXRRequest (id: 3 col: 0x45 d: 0x2 sr: 0x0)
+2026/03/06 17:54:19.277 5552 5629 Debug Unity RenderTexture::Create (id: 3)
+2026/03/06 17:54:19.277 5552 5680 Debug Unity IVRDeviceCallback_CreateEyeTextureResources 0x45
+2026/03/06 17:54:19.277 5552 5629 Debug Unity SetupRenderTextureFromXRRequest (id: 4 col: 0x46 d: 0x3 sr: 0x0)
+2026/03/06 17:54:19.277 5552 5629 Debug Unity RenderTexture::Create (id: 4)
+2026/03/06 17:54:19.277 5552 5680 Debug Unity IVRDeviceCallback_CreateEyeTextureResources 0x46
+2026/03/06 17:54:19.317 5552 5629 Info Unity [PermissionManager] Permission check: Storage=True, Camera=True
+2026/03/06 17:54:19.317 5552 5629 Info Unity [PermissionManager] Permission request complete. All granted: True
+2026/03/06 17:54:19.317 5552 5629 Info Unity [APBootstrap] Permissions complete. All granted: True
+2026/03/06 17:54:19.321 5552 5629 Info Unity [AndroidHelper] Battery optimization already disabled for this app
+2026/03/06 17:54:19.321 5552 5629 Info Unity [RTTRecenterController] Camera tracking detected (delta: 51,4┬░)
+2026/03/06 17:54:19.446 5552 5629 Info Unity [RTTMainMenuController] Icons loaded async - Remote:True, Browser:True, Media:True, Files:False
+2026/03/06 17:54:19.471 5552 5629 Info Unity [RTTMainMenu] Built 6 items in 3x2 grid
+2026/03/06 17:54:19.471 5552 5629 Info Unity [RTTMainMenuController] Main Menu created async (useRegistry=True, itemCount=6)
+2026/03/06 17:54:19.471 5552 5629 Info Unity [RTTManager] Main Menu initialized (persistent, cannot be closed)
+2026/03/06 17:54:19.471 5552 5629 Info Unity [RTTAppManager] Background pre-init started (UniTask)
+2026/03/06 17:54:19.472 5552 5629 Info Unity [RTTMenu] Created app frame: remote
+2026/03/06 17:54:19.472 5552 5629 Info Unity [RTTManager] Background app pre-initialization triggered
+2026/03/06 17:54:19.477 5552 5629 Info Unity [RTTMenuFrame] UI built: 1920x1080 logical pixels
+2026/03/06 17:54:19.477 5552 5629 Info Unity [VirtualObjectsZoomController] Recenter: distance recalculated to 1,98m
+2026/03/06 17:54:19.477 5552 5629 Info Unity [RTTRecenterController] Startup camera-follow ended after 0,2s
+2026/03/06 17:54:19.502 5552 5629 Info Unity [RemoteAppContentFactory] Creating RemoteMenu content...
+2026/03/06 17:54:19.504 5552 5629 Info Unity [RTTRemoteMenu] OnEnable called
+2026/03/06 17:54:19.545 5552 5629 Info Unity [RTTRemoteMenu] UI built
+2026/03/06 17:54:19.546 5552 5629 Info Unity [RTTRemoteMenu] Monitor selection changed: index=0, value=----
+2026/03/06 17:54:19.546 5552 5629 Info Unity [RTTRemoteMenu] No cached info, skipping recalculation
+2026/03/06 17:54:19.546 5552 5629 Info Unity [RTTRemoteMenu] Mode changed: index=0, value=Classic
+2026/03/06 17:54:19.546 5552 5629 Info Unity [RTTRemoteMenu] Resolution changed: index=0, value=----
+2026/03/06 17:54:19.547 5552 5629 Info Unity [RTTRemoteMenu] FPS changed: index=0, value=----
+2026/03/06 17:54:19.547 5552 5629 Info Unity [RTTRemoteMenu] CreateSidePanels called, _menuFrame null: False
+2026/03/06 17:54:19.547 5552 5629 Info Unity [RTTRemoteMenu] Creating Hardware Info Panel (left) with sphere positioning...
+2026/03/06 17:54:19.547 5552 5629 Info Unity [VirtualObjectsZoomController] Registered side panel: HardwareInfoPanel (side=-1, mainW=1,6, sideW=0,5333334, gap=0,05)
+2026/03/06 17:54:19.547 5552 5629 Info Unity [RTTRemoteMenu] Registered HardwareInfoPanel with VirtualObjectsZoomController
+2026/03/06 17:54:19.548 5552 5629 Info Unity [RTTRemoteMenu] PlaceSidePanel: mainPos=(-0.02, 0.00, 2.06), panelPos=(-1.09, 0.00, 1.92)
+2026/03/06 17:54:19.548 5552 5629 Info Unity [RTTRemoteMenu] CreateSidePanelContent started for HardwareInfo
+2026/03/06 17:54:19.548 5552 5629 Info Unity [RTTRemoteMenu] Hardware frame created: True
+2026/03/06 17:54:19.548 5552 5629 Info Unity [RTTRemoteMenu] Creating Network Info Panel (right) with sphere positioning...
+2026/03/06 17:54:19.548 5552 5629 Info Unity [VirtualObjectsZoomController] Registered side panel: NetworkInfoPanel (side=1, mainW=1,6, sideW=0,5333334, gap=0,05)
+2026/03/06 17:54:19.548 5552 5629 Info Unity [RTTRemoteMenu] Registered NetworkInfoPanel with VirtualObjectsZoomController
+2026/03/06 17:54:19.548 5552 5629 Info Unity [RTTRemoteMenu] PlaceSidePanel: mainPos=(-0.02, 0.00, 2.06), panelPos=(1.07, 0.00, 1.94)
+2026/03/06 17:54:19.548 5552 5629 Info Unity [RTTRemoteMenu] CreateSidePanelContent started for NetworkInfo
+2026/03/06 17:54:19.548 5552 5629 Info Unity [RTTRemoteMenu] Network frame created: True
+2026/03/06 17:54:19.548 5552 5629 Info Unity [RTTRemoteMenu] Side panels created (0,53m x 0,90m) gap=0,05m with sphere positioning (hidden)
+2026/03/06 17:54:19.549 5552 5629 Info Unity [RemotePreferences] Loaded: monitors=1, mode=Classic, resolution=720p, fps=60 FPS
+2026/03/06 17:54:19.553 5552 5629 Info Unity [ServiceLocator] Registered: ConnectionViewModel
+2026/03/06 17:54:19.553 5552 5629 Info Unity [RTTRemoteMenu] HandlePhaseChanged: Disconnected -> Disconnected
+2026/03/06 17:54:19.553 5552 5629 Info Unity [RTTRemoteMenu] Monitor selection changed: index=0, value=----
+2026/03/06 17:54:19.553 5552 5629 Info Unity [RTTRemoteMenu] No cached info, skipping recalculation
+2026/03/06 17:54:19.553 5552 5629 Info Unity [RTTRemoteMenu] Mode changed: index=0, value=Classic
+2026/03/06 17:54:19.553 5552 5629 Info Unity [RTTRemoteMenu] Resolution changed: index=0, value=----
+2026/03/06 17:54:19.554 5552 5629 Info Unity [RTTRemoteMenu] FPS changed: index=0, value=----
+2026/03/06 17:54:19.554 5552 5629 Info Unity [RTTRemoteMenu] Hardware frame hidden
+2026/03/06 17:54:19.554 5552 5629 Info Unity [RTTRemoteMenu] Network frame hidden
+2026/03/06 17:54:19.554 5552 5629 Info Unity [RTTRemoteMenu] HideSidePanels completed
+2026/03/06 17:54:19.554 5552 5629 Info Unity [RTTRemoteMenu] Bound to ConnectionViewModel
+2026/03/06 17:54:19.564 5552 5629 Info Unity [RTTRemoteMenu] Frame not initialized for HardwareInfo, calling EnsureInitialized()
+2026/03/06 17:54:19.566 5552 5629 Info Unity [RTTMenuFrame] UI built: 640x1080 logical pixels
+2026/03/06 17:54:19.566 5552 5629 Info Unity [RTTRemoteMenu] Frame initialized for HardwareInfo after 0 frames, ContentContainer valid
+2026/03/06 17:54:19.566 5552 5629 Info Unity [RTTRemoteMenu] Frame not initialized for NetworkInfo, calling EnsureInitialized()
+2026/03/06 17:54:19.568 5552 5629 Info Unity [RTTMenuFrame] UI built: 640x1080 logical pixels
+2026/03/06 17:54:19.568 5552 5629 Info Unity [RTTRemoteMenu] Frame initialized for NetworkInfo after 0 frames, ContentContainer valid
+2026/03/06 17:54:19.597 5552 5629 Info Unity [RTTRemoteMenu] Created InfoPanel_HardwareInfo, parent set to ContentContainer
+2026/03/06 17:54:19.598 5552 5629 Info Unity [RTTInfoSidePanel] BuildUI started for HardwareInfo, container=ContentContainer
+2026/03/06 17:54:19.599 5552 5629 Info Unity [RTTInfoSidePanel] Already parented to ContentContainer
+2026/03/06 17:54:19.599 5552 5629 Info Unity [RTTInfoSidePanel] Calculated max label width for HardwareInfo: 155 (Base: 130 + 25)
+2026/03/06 17:54:19.599 5552 5629 Info Unity [RTTInfoSidePanel] Built for type: HardwareInfo, _isBuilt=True, parent=ContentContainer
+2026/03/06 17:54:19.599 5552 5629 Info Unity [RTTRemoteMenu] InfoPanel_HardwareInfo BuildUI completed, parent=ContentContainer
+2026/03/06 17:54:19.599 5552 5629 Info Unity [RTTInfoSidePanel] ShowLoadingState called for HardwareInfo, _isBuilt=True
+2026/03/06 17:54:19.602 5552 5629 Info Unity [RTTRemoteMenu] Created InfoPanel_NetworkInfo, parent set to ContentContainer
+2026/03/06 17:54:19.602 5552 5629 Info Unity [RTTInfoSidePanel] BuildUI started for NetworkInfo, container=ContentContainer
+2026/03/06 17:54:19.602 5552 5629 Info Unity [RTTInfoSidePanel] Already parented to ContentContainer
+2026/03/06 17:54:19.602 5552 5629 Info Unity [RTTInfoSidePanel] Calculated max label width for NetworkInfo: 225 (Base: 200 + 25)
+2026/03/06 17:54:19.602 5552 5629 Info Unity [RTTInfoSidePanel] Built for type: NetworkInfo, _isBuilt=True, parent=ContentContainer
+2026/03/06 17:54:19.602 5552 5629 Info Unity [RTTRemoteMenu] InfoPanel_NetworkInfo BuildUI completed, parent=ContentContainer
+2026/03/06 17:54:19.602 5552 5629 Info Unity [RTTInfoSidePanel] ShowSpeedTestLoadingState called for NetworkInfo, _isBuilt=True
+2026/03/06 17:54:19.632 5552 5629 Info Unity [RTTAppManager] Pre-initialized app: remote in 160,4ms
+2026/03/06 17:54:19.680 5552 5629 Info Unity [RTTMenu] Created app frame: media
+2026/03/06 17:54:19.685 5552 5629 Info Unity [RTTMenuFrame] UI built: 1920x1080 logical pixels
+2026/03/06 17:54:19.714 5552 5629 Info Unity [MediaAppContentFactory] Creating Media content...
+2026/03/06 17:54:19.716 5552 5629 Info Unity [VRMediaAppController] Projection parented to VirtualObjects for zoom support
+2026/03/06 17:54:19.716 5552 5629 Info Unity [VRMediaAppController] Found camera rig: Player
+2026/03/06 17:54:19.719 5552 5629 Info Unity [VRVideoProjectionSystem] Created FlatProjectionRenderer
+2026/03/06 17:54:19.719 5552 5629 Info Unity [VRVideoProjectionSystem] Initialized
+2026/03/06 17:54:19.725 5552 5629 Info Unity [MediaLibraryService] Cache loading disabled - will scan on demand
+2026/03/06 17:54:19.733 5552 5629 Info Unity [VirtualObjectsZoomController] Registered side panel: MediaNavigationPanel (side=-1, mainW=1,6, sideW=0,5333334, gap=0,05)
+2026/03/06 17:54:19.735 5552 5629 Info Unity [RTTMenuFrame] UI built: 640x1080 logical pixels
+2026/03/06 17:54:19.735 5552 5629 Info Unity [RTTMediaLibrary] CreateLeftPanelContent started at 5,870s
+2026/03/06 17:54:19.745 5552 5629 Info Unity [RTTMediaLibrary] Left panel content created at 5,880s
+2026/03/06 17:54:19.745 5552 5629 Info Unity [VirtualObjectsZoomController] Registered side panel: MediaDetailPanel (side=1, mainW=1,6, sideW=0,5333334, gap=0,05)
+2026/03/06 17:54:19.749 5552 5629 Info Unity [RTTMenuFrame] UI built: 640x1080 logical pixels
+2026/03/06 17:54:19.749 5552 5629 Info Unity [RTTMediaLibrary] CreateRightPanelContent started at 5,884s
+2026/03/06 17:54:19.760 5552 5629 Info Unity [RTTMediaLibrary] Right panel content created at 5,894s
+2026/03/06 17:54:19.761 5552 5629 Info Unity [RTTPopupMenu] CreateWorldSpace: layer 'VirtualObjects' = 3, mainCam: VRCamera
+2026/03/06 17:54:19.763 5552 5629 Info Unity [RTTPopupMenu] Created world-space popup
+2026/03/06 17:54:19.770 5552 5629 Info Unity [RTTPopupMenu] CreateWorldSpace: layer 'VirtualObjects' = 3, mainCam: VRCamera
+2026/03/06 17:54:19.771 5552 5629 Info Unity [RTTPopupMenu] Created world-space popup
+2026/03/06 17:54:19.778 5552 5629 Info Unity [RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=-5724
+2026/03/06 17:54:19.781 5552 5629 Info Unity [RTTMediaLibrary] After CreateHeaderRows: _headerRT=True, _breadcrumbContainer=True
+2026/03/06 17:54:19.845 5552 5629 Info Unity [RTTMediaLibrary] Creating 2 breadcrumb segments for: All Media > Videos
+2026/03/06 17:54:19.845 5552 5629 Info Unity [RTTMediaLibrary] Created 2 breadcrumb pills for path: All Media > Videos
+2026/03/06 17:54:19.846 5552 5629 Info Unity [RTTMediaLibraryController] No cached data, will scan immediately
+2026/03/06 17:54:19.846 5552 5629 Info Unity [RTTMediaLibraryController] No data available, starting scan...
+2026/03/06 17:54:19.846 5552 5629 Info Unity [MediaLibraryScanner] Using Android MediaStore for fast media discovery...
+2026/03/06 17:54:19.859 5552 5629 Info Unity [AndroidMediaStoreHelper] Found 1 Video items
+2026/03/06 17:54:19.867 5552 5629 Info Unity [AndroidMediaStoreHelper] Found 592 Image items
+2026/03/06 17:54:20.024 5552 5629 Info Unity [AndroidMediaStoreHelper] Found 1 Audio items
+2026/03/06 17:54:20.025 5552 5629 Info Unity [MediaLibraryScanner] MediaStore query returned 594 items in 179ms
+2026/03/06 17:54:20.028 5552 5629 Info Unity [RTTMediaLibraryController] Starting fresh scan (no cache)
+2026/03/06 17:54:20.028 5552 5629 Warn Unity [MediaLibraryScanner] Already scanning
+2026/03/06 17:54:20.028 5552 5629 Info Unity [RTTMediaLibrary] Center grid created
+2026/03/06 17:54:20.029 5552 5629 Info Unity [VRMediaAppController] Library UI built
+2026/03/06 17:54:20.029 5552 5629 Info Unity [VRMediaAppController] Media app created
+2026/03/06 17:54:20.038 5552 5629 Info Unity [RTTMediaLibrary] InitializePageSizeDeferred: itemsPerPage=8
+2026/03/06 17:54:20.107 5552 5629 Info Unity [RTTAppManager] Pre-initialized app: media in 427,1ms
+2026/03/06 17:54:20.155 5552 5629 Info Unity [RTTMenu] Created app frame: folder
+2026/03/06 17:54:20.159 5552 5629 Info Unity [RTTMenuFrame] UI built: 1920x1080 logical pixels
+2026/03/06 17:54:20.188 5552 5629 Info Unity [FilesAppContentFactory] Creating FileManager content...
+2026/03/06 17:54:20.218 5552 5629 Info Unity [RTTFileManager] PlaceSidePanel: innerEdge=(-0.86, 0.00, 2.06), panelPos=(-1.09, 0.00, 1.92)
+2026/03/06 17:54:20.218 5552 5629 Info Unity [VirtualObjectsZoomController] Registered side panel: FileNavigationPanel (side=-1, mainW=1,6, sideW=0,5333334, gap=0,05)
+2026/03/06 17:54:20.218 5552 5629 Info Unity [RTTFileManager] Registered FileNavigationPanel with VirtualObjectsZoomController
+2026/03/06 17:54:20.218 5552 5629 Info Unity [RTTFileManager] Placed FileNavigationPanel: pos=(-1.09, 0.00, 1.92)
+2026/03/06 17:54:20.220 5552 5629 Info Unity [RTTMenuFrame] UI built: 640x1080 logical pixels
+2026/03/06 17:54:20.226 5552 5629 Info Unity [FileSystemService] Root path set to: /storage/emulated/0
+2026/03/06 17:54:20.229 5552 5629 Info Unity [RTTFileManager] PlaceSidePanel: innerEdge=(0.83, 0.00, 2.07), panelPos=(1.07, 0.00, 1.94)
+2026/03/06 17:54:20.229 5552 5629 Info Unity [VirtualObjectsZoomController] Registered side panel: FileDetailPanel (side=1, mainW=1,6, sideW=0,5333334, gap=0,05)
+2026/03/06 17:54:20.229 5552 5629 Info Unity [RTTFileManager] Registered FileDetailPanel with VirtualObjectsZoomController
+2026/03/06 17:54:20.229 5552 5629 Info Unity [RTTFileManager] Placed FileDetailPanel: pos=(1.07, 0.00, 1.94)
+2026/03/06 17:54:20.231 5552 5629 Info Unity [RTTMenuFrame] UI built: 640x1080 logical pixels
+2026/03/06 17:54:20.237 5552 5629 Info Unity [RTTFileActionBar] Buttons created
+2026/03/06 17:54:20.237 5552 5629 Info Unity [RTTFileActionBar] Initialized, following: FileDetailPanel
+2026/03/06 17:54:20.237 5552 5629 Info Unity [RTTFileManager] File action bar created (hidden initially)
+2026/03/06 17:54:20.238 5552 5629 Info Unity [RTTPopupMenu] CreateWorldSpace: layer 'VirtualObjects' = 3, mainCam: VRCamera
+2026/03/06 17:54:20.239 5552 5629 Info Unity [RTTPopupMenu] Created world-space popup
+2026/03/06 17:54:20.248 5552 5629 Info Unity [Controller] CanCreateFolderHere called, _currentPath: 'root'
+2026/03/06 17:54:20.248 5552 5629 Info Unity [FileSystemService] CanCreateFolderInPath called with path: 'root'
+2026/03/06 17:54:20.248 5552 5629 Info Unity [FileSystemService] Path is 'root' or empty, returning false
+2026/03/06 17:54:20.248 5552 5629 Info Unity [Controller] CanCreateFolderHere result: False
+2026/03/06 17:54:20.248 5552 5629 Info Unity [RTTFileManager] UpdateNewFolderButtonState: canCreate=False
+2026/03/06 17:54:20.248 5552 5629 Info Unity [RTTFileManager] BoxCollider.enabled set to False
+2026/03/06 17:54:20.248 5552 5629 Info Unity [RTTFileManager] New Folder button DISABLED - alpha=0,4
+2026/03/06 17:54:20.250 5552 5629 Info Unity [RTTFileManager] Text Area found and offsetMin set to: (30.00, 0.00)
+2026/03/06 17:54:20.256 5552 5629 Info Unity [RTTFileGrid] CalculateGridMetrics: width=1770, availableWidth=1730, columnsPerRow=4, cellWidth=395, spacingX=30
+2026/03/06 17:54:20.289 5552 5629 Info Unity [Controller] SetSortOptionsNoRefresh: sortBy=Name, ascending=True
+2026/03/06 17:54:20.289 5552 5629 Info Unity [Controller] View is ready. Checking storage permissions...
+2026/03/06 17:54:20.289 5552 5629 Info Unity [Controller] Permissions already granted via AppPermissionManager.
+2026/03/06 17:54:20.289 5552 5629 Info Unity [Controller] NavigateToInternalAsync: path='root', restorePage=False, clickedFolder=''
+2026/03/06 17:54:20.290 5552 5629 Info Unity [RTTFileManager] UpdateBreadcrumbs called with path: root, container null: True, instance: -13920
+2026/03/06 17:54:20.290 5552 5629 Info Unity [Controller] CanCreateFolderHere called, _currentPath: 'root'
+2026/03/06 17:54:20.290 5552 5629 Info Unity [FileSystemService] CanCreateFolderInPath called with path: 'root'
+2026/03/06 17:54:20.290 5552 5629 Info Unity [FileSystemService] Path is 'root' or empty, returning false
+2026/03/06 17:54:20.290 5552 5629 Info Unity [Controller] CanCreateFolderHere result: False
+2026/03/06 17:54:20.290 5552 5629 Info Unity [RTTFileManager] UpdateNewFolderButtonState: canCreate=False
+2026/03/06 17:54:20.290 5552 5629 Info Unity [RTTFileManager] BoxCollider.enabled set to False
+2026/03/06 17:54:20.290 5552 5629 Info Unity [RTTFileManager] New Folder button DISABLED - alpha=0,4
+2026/03/06 17:54:20.290 5552 5629 Warn Unity [RTTFileManager] Breadcrumb container reference lost, searching in hierarchy...
+2026/03/06 17:54:20.290 5552 5629 Info Unity [RTTFileManager] Found breadcrumb container from hierarchy: True
+2026/03/06 17:54:20.291 5552 5629 Info Unity [RTTFileManager] Created 1 breadcrumbs for path: /storage/emulated/0
+2026/03/06 17:54:20.291 5552 5629 Info Unity [FileSystemService] Reading directory async: /storage/emulated/0
+2026/03/06 17:54:20.300 5552 5629 Info Unity [FileSystemService] Quick count: 32 items (dirs=28, files=4)
+2026/03/06 17:54:20.300 5552 5629 Info Unity [Controller] Quick count received: 32 items
+2026/03/06 17:54:20.300 5552 5629 Info Unity [TextEncodingHelper] Normalized NFD->NFC: 'T├¬╠úp cu╠ëa t├┤i' (13 chars) -> 'Tß╗çp cß╗ºa t├┤i' (11 chars)
+2026/03/06 17:54:20.301 5552 5629 Info Unity [FileSystemService] Found 20 items async (19 folders, 1 files)
+2026/03/06 17:54:20.301 5552 5629 Info Unity [Controller] Using full data (load completed quickly): 20 items
+2026/03/06 17:54:20.301 5552 5629 Info Unity [Controller] CalculateTotalPages: totalFiles=20, pageSize=8, totalPages=3
+2026/03/06 17:54:20.318 5552 5629 Info Unity [RTTFileGrid] Progressive binding started: 8 items queued
+2026/03/06 17:54:20.341 5552 5629 Info Unity [RTTFileGrid] Progressive bind frame: 5 items, 3 remaining
+2026/03/06 17:54:20.342 5552 5629 Info Unity [RTTFileGrid] GetVisibleRowsForPagination: height=748,1688, availableHeight=728,1688, rowHeight=350, rowsFloat=2,080482, visibleRows=2
+2026/03/06 17:54:20.345 5552 5629 Info Unity [Detail] UpdateInfo: 0 name=0ms preview=0ms metadata=2ms total=2ms
+2026/03/06 17:54:20.346 5552 5629 Info Unity [RTTFileManagerController] Menu created
+2026/03/06 17:54:20.379 5552 5629 Info Unity [RTTFileGrid] Progressive bind frame: 1 items, 2 remaining
+2026/03/06 17:54:20.383 5552 5629 Info Unity [MediaLibraryScanner] MediaStore scan complete in 537ms
+2026/03/06 17:54:20.399 5552 5629 Info Unity [RTTMediaGridItem] Duration badge for 'Rhythm of Shibuya': show=True, duration=29,92s, text='0:29', font=NotoSansKR-Regular_TMP_Primary
+2026/03/06 17:54:20.401 5552 5629 Info Unity [Cache] DISK READ: 0ms (290KB)
+2026/03/06 17:54:20.406 5552 5629 Info Unity [Cache] DISK DECODE: 4ms (512x256)
+2026/03/06 17:54:20.427 5552 5629 Info Unity [RTTMediaGrid] Auto-selecting first item: Rhythm of Shibuya
+2026/03/06 17:54:20.428 5552 5629 Info Unity [Detail] REQUEST: Rhythm of Shibuya.mp4
+2026/03/06 17:54:20.433 5552 5629 Info Unity [Cache] DISK READ: 2ms (292KB)
+2026/03/06 17:54:20.437 5552 5629 Info Unity [Cache] DISK DECODE: 4ms (512x256)
+2026/03/06 17:54:20.456 5552 5629 Info Unity [Detail] RECEIVED: Rhythm of Shibuya.mp4 wait=27ms assign=0ms
+2026/03/06 17:54:20.461 5552 5629 Info Unity [VideoHeaderParser] Duration from mvhd: 29,9s
+2026/03/06 17:54:20.461 5552 5629 Info Unity [VideoHeaderParser] Dimensions from tkhd: 5760x2880
+2026/03/06 17:54:20.461 5552 5629 Info Unity [VideoHeaderParser] Codec: hvc1
+2026/03/06 17:54:20.463 5552 5629 Info Unity [Detail] UpdateInfo: Rhythm of Shibuya.mp4 name=0ms preview=28ms metadata=7ms total=35ms
+2026/03/06 17:54:20.463 5552 5629 Info Unity [Detail] REQUEST: Rhythm of Shibuya.mp4
+2026/03/06 17:54:20.463 5552 5629 Info Unity [Detail] RECEIVED: Rhythm of Shibuya.mp4 wait=0ms assign=0ms
+2026/03/06 17:54:20.467 5552 5629 Info Unity [Detail] UpdateInfo: Rhythm of Shibuya.mp4 name=0ms preview=0ms metadata=4ms total=4ms
+2026/03/06 17:54:20.470 5552 5629 Info Unity [AppStateCache] Saved state for media with 1 items
+2026/03/06 17:54:20.470 5552 5629 Info Unity [RTTMediaLibraryController] CacheCurrentState: Cached 1 items
+2026/03/06 17:54:20.481 5552 5629 Info Unity [MediaCacheService] Saved 594 items to cache (with metadata & dimensions)
+2026/03/06 17:54:20.481 5552 5629 Info Unity [MediaLibraryService] Triggering metadata preload for 594 files
+2026/03/06 17:54:20.481 5552 5629 Info Unity [FileMetadataService] Starting background preload for 594 files
+2026/03/06 17:54:20.481 5552 5629 Info Unity [MediaLibraryScanner] Scan complete: 594 media files
+2026/03/06 17:54:20.495 5552 5629 Info Unity [RTTFileGrid] Progressive bind frame: 2 items, 0 remaining
+2026/03/06 17:54:20.504 5552 5629 Info Unity [RTTFileGrid] Progressive binding complete: 8 items bound total
+2026/03/06 17:54:20.543 5552 5629 Info Unity [RTTAppManager] Pre-initialized app: folder in 388,2ms
+2026/03/06 17:54:20.588 5552 5629 Info Unity [RTTAppManager] Background pre-init complete: 3 apps in 1116,7ms
+2026/03/06 17:54:20.939 5552 5629 Info Unity [FileMetadataService] Preload complete: 1 loaded, 1 cached, 592 failed (457ms)
+2026/03/06 17:54:22.058 5552 5629 Info Unity [RTTMainMenu] Click started: remote at 8,192s
+2026/03/06 17:54:22.058 5552 5629 Info Unity [RTTMainMenu] PrepareApp called: remote at 8,193s (+0,3ms)
+2026/03/06 17:54:22.058 5552 5629 Info Unity [RTTAppManager] PrepareApp: remote already active, preparing, or pre-initialized. Skipping redundant creation.
+2026/03/06 17:54:22.058 5552 5629 Info Unity [RTTMainMenu] Button animation started: remote at 8,193s (+0,5ms)
+2026/03/06 17:54:22.141 5552 5629 Info Unity [RTTMainMenu] Button animation ended: remote at 8,276s (+83,4ms)
+2026/03/06 17:54:22.141 5552 5629 Info Unity [RTTMainMenu] OpenPreparedApp called: remote at 8,276s (+83,6ms)
+2026/03/06 17:54:22.142 5552 5629 Info Unity [RTTAppManager] OpenPreparedApp: Using pre-initialized instance for remote
+2026/03/06 17:54:22.142 5552 5629 Info Unity [RTTMainMenu] Click flow completed: remote at 8,276s (total: +84,0ms)
+2026/03/06 17:54:22.312 5552 5629 Info Unity [RTTRemoteMenu] OnEnable called
+2026/03/06 17:54:22.483 5552 5629 Info Unity [RTTTaskbar] RegisterApp called - slotIndex=1, icon=icon_remote
+2026/03/06 17:54:22.483 5552 5629 Info Unity [RTTTaskbar] SetSlotIcon - slot=AppBtn_AppSlot_1, icon=icon_remote, slotIndex=1
+2026/03/06 17:54:22.484 5552 5629 Info Unity [RTTTaskbar] SetSlotIcon - removed 0 old children
+2026/03/06 17:54:22.484 5552 5629 Info Unity [RTTTaskbar] SetSlotIcon - created iconBtn=Btn_icon_remote, slot.childCount now=1
+2026/03/06 17:54:22.484 5552 5629 Info Unity [RTTTaskbar] Registered app slot 1, total apps: 1
+2026/03/06 17:54:22.484 5552 5629 Info Unity [RTTTaskbar] SelectSlot(1) called, current active: 0
+2026/03/06 17:54:22.485 5552 5629 Info Unity [RTTTaskbar] Selected app with slot index 1
+2026/03/06 17:54:22.488 5552 5629 Info Unity [RTTRemoteMenu] OnEnable called
+2026/03/06 17:54:22.489 5552 5629 Info Unity [RTTTaskbar] SelectSlot(1) called, current active: 1
+2026/03/06 17:54:22.489 5552 5629 Info Unity [RTTAppManager] Pre-init app shown: remote in 347,4ms
+2026/03/06 17:54:25.023 5552 5629 Info Unity [RTTQRScanner] UI built: 1,6m x 0,9m
+2026/03/06 17:54:25.024 5552 5629 Info Unity [QRScannerManager] Created RTTQRScanner at distance 2,003518m
+2026/03/06 17:54:25.026 5552 5629 Info Unity [RTTQRScanner] Using camera: Camera 0
+2026/03/06 17:54:25.034 5552 5629 Info Unity Camera2: Hardware level: 3
+2026/03/06 17:54:25.035 5552 5629 Info Unity Camera2: FrameSize 4096 x 3072 [2.613983692063143]
+2026/03/06 17:54:25.035 5552 5629 Info Unity Camera2: FrameSize 4080 x 3072 [2.6100697927420065]
+2026/03/06 17:54:25.035 5552 5629 Info Unity Camera2: FrameSize 4096 x 2304 [2.3263016196113617]
+2026/03/06 17:54:25.035 5552 5629 Info Unity Camera2: FrameSize 4096 x 2304 [2.3263016196113617]
+2026/03/06 17:54:25.035 5552 5629 Info Unity Camera2: FrameSize 4080 x 2296 [2.318909455913901]
+2026/03/06 17:54:25.035 5552 5629 Info Unity Camera2: FrameSize 3840 x 2160 [2.1972245773362196]
+2026/03/06 17:54:25.035 5552 5629 Info Unity Camera2: FrameSize 3264 x 2448 [2.1598687907924505]
+2026/03/06 17:54:25.035 5552 5629 Info Unity Camera2: FrameSize 3200 x 2400 [2.120263536200091]
+2026/03/06 17:54:25.035 5552 5629 Info Unity Camera2: FrameSize 4096 x 1844 [2.1035920019121193]
+2026/03/06 17:54:25.036 5552 5629 Info Unity Camera2: FrameSize 4080 x 1836 [2.0953302696548795]
+2026/03/06 17:54:25.036 5552 5629 Info Unity Camera2: FrameSize 3200 x 2000 [1.9379419794061366]
+2026/03/06 17:54:25.036 5552 5629 Info Unity Camera2: FrameSize 3264 x 1836 [1.8721867183406695]
+2026/03/06 17:54:25.036 5552 5629 Info Unity Camera2: FrameSize 3200 x 1800 [1.83258146374831]
+2026/03/06 17:54:25.036 5552 5629 Info Unity Camera2: FrameSize 2560 x 1920 [1.6739764335716716]
+2026/03/06 17:54:25.036 5552 5629 Info Unity Camera2: FrameSize 3264 x 1472 [1.6512194464490553]
+2026/03/06 17:54:25.036 5552 5629 Info Unity Camera2: FrameSize 3200 x 1456 [1.6204877486206852]
+2026/03/06 17:54:25.036 5552 5629 Info Unity Camera2: FrameSize 2304 x 1728 [1.463255402256019]
+2026/03/06 17:54:25.036 5552 5629 Info Unity Camera2: FrameSize 2560 x 1440 [1.3862943611198906]
+2026/03/06 17:54:25.036 5552 5629 Info Unity Camera2: FrameSize 1920 x 1920 [1.3862943611198906]
+2026/03/06 17:54:25.036 5552 5629 Info Unity Camera2: FrameSize 2800 x 1260 [1.3423751271850553]
+2026/03/06 17:54:25.036 5552 5629 Info Unity Camera2: FrameSize 2048 x 1536 [1.2276893309432522]
+2026/03/06 17:54:25.036 5552 5629 Info Unity Camera2: FrameSize 2304 x 1296 [1.175573329804238]
+2026/03/06 17:54:25.036 5552 5629 Info Unity Camera2: FrameSize 1920 x 1440 [1.0986122886681098]
+2026/03/06 17:54:25.036 5552 5629 Info Unity Camera2: FrameSize 2304 x 1040 [0.9555114450274363]
+2026/03/06 17:54:25.036 5552 5629 Info Unity Camera2: FrameSize 1920 x 1080 [0.8109302162163289]
+2026/03/06 17:54:25.036 5552 5629 Info Unity Camera2: FrameSize 1632 x 1224 [0.7735744296725598]
+2026/03/06 17:54:25.036 5552 5629 Info Unity Camera2: FrameSize 1600 x 1200 [0.7339691750802004]
+2026/03/06 17:54:25.036 5552 5629 Info Unity Camera2: FrameSize 1920 x 864 [0.5877866649021191]
+2026/03/06 17:54:25.036 5552 5629 Info Unity Camera2: FrameSize 1440 x 1080 [0.523248143764548]
+2026/03/06 17:54:25.036 5552 5629 Info Unity Camera2: FrameSize 1920 x 800 [0.5108256237659907]
+2026/03/06 17:54:25.036 5552 5629 Info Unity Camera2: FrameSize 1280 x 960 [0.2876820724517809]
+2026/03/06 17:54:25.036 5552 5629 Info Unity Camera2: FrameSize 1080 x 1080 [0.5753641449035618]
+2026/03/06 17:54:25.036 5552 5629 Info Unity Camera2: FrameSize 1600 x 720 [0.2231435513142097]
+2026/03/06 17:54:25.036 5552 5629 Info Unity Camera2: FrameSize 1440 x 720 [0.11778303565638351]
+2026/03/06 17:54:25.037 5552 5629 Info Unity Camera2: FrameSize 1280 x 720 [0.0]
+2026/03/06 17:54:25.037 5552 5629 Info Unity Camera2: FrameSize 1024 x 768 [0.28768207245178096]
+2026/03/06 17:54:25.037 5552 5629 Info Unity Camera2: FrameSize 960 x 540 [0.5753641449035617]
+2026/03/06 17:54:25.037 5552 5629 Info Unity Camera2: FrameSize 800 x 600 [0.6523251860396903]
+2026/03/06 17:54:25.037 5552 5629 Info Unity Camera2: FrameSize 800 x 480 [0.8754687373539001]
+2026/03/06 17:54:25.037 5552 5629 Info Unity Camera2: FrameSize 720 x 480 [0.9808292530117262]
+2026/03/06 17:54:25.037 5552 5629 Info Unity Camera2: FrameSize 640 x 480 [1.0986122886681096]
+2026/03/06 17:54:25.037 5552 5629 Info Unity Camera2: FrameSize 352 x 288 [2.207274913189721]
+2026/03/06 17:54:25.037 5552 5629 Info Unity Camera2: FrameSize 320 x 240 [2.4849066497880004]
+2026/03/06 17:54:25.037 5552 5629 Info Unity Camera2: FrameSize 176 x 144 [3.593569274309611]
+2026/03/06 17:54:25.037 5552 5629 Info Unity Camera2: FPS requested: 30 set: 30
+2026/03/06 17:54:25.037 5552 5629 Info Unity Camera2: Open logical camera 0
+2026/03/06 17:54:25.084 5552 5938 Info Unity Camera2: CameraDevice opened.
+2026/03/06 17:54:25.090 5552 5629 Info Unity Camera2: Start preview.
+2026/03/06 17:54:25.175 5552 5938 Info Unity Camera2: CaptureSession is configured.
+2026/03/06 17:54:25.601 5552 5629 Info Unity [RTTQRScanner] Camera initialized: 1280x720
+2026/03/06 17:54:26.068 5552 5629 Info Unity [RTTQRScanner] QR Decoded: {"ip":"192.168.1.41","port":"8288","usbIP":"10.190.178.241"}
+2026/03/06 17:54:26.758 5552 5629 Info Unity Camera2: Close.
+2026/03/06 17:54:26.758 5552 5629 Info Unity Camera2: Stop preview.
+2026/03/06 17:54:26.914 5552 5938 Info Unity Camera2: CameraDevice closed.
+2026/03/06 17:54:26.915 5552 5629 Info Unity [RTTToolbar] Initialized with taskbar. Size: 0,913x0,331m, followTarget: RTTMenu
+2026/03/06 17:54:26.915 5552 5629 Info Unity [RTTRemoteMenu] QR Scanned: QRConfig[ip=192.168.1.41, port=8288, usbIP=10.190.178.241]
+2026/03/06 17:54:26.915 5552 5629 Info Unity [RTTRemoteMenu] QR Config received: QRConfig[ip=192.168.1.41, port=8288, usbIP=10.190.178.241]
+2026/03/06 17:54:26.915 5552 5629 Info Unity [RTTRemoteMenu] USB IP available: 10.190.178.241
+2026/03/06 17:54:26.915 5552 5629 Info Unity [RTTRemoteMenu] Host set to: 10.190.178.241 (USB Mode: True)
+2026/03/06 17:54:29.180 5552 5629 Info Unity [RTTRemoteMenu] Button clicked! viewModel=True, currentPhase=Disconnected
+2026/03/06 17:54:29.180 5552 5629 Info Unity [RTTRemoteMenu] Connecting via USB (10.190.178.241)...
+2026/03/06 17:54:29.182 5552 5629 Info Unity [ConnectionViewModel] Connecting via USB Tethering (10.190.178.241:8288)
+2026/03/06 17:54:29.189 5552 5629 Info Unity [PhaseProtocol] USB Mode: True, Server IP: 10.190.178.241
+2026/03/06 17:54:29.189 5552 5629 Info Unity [ConnectionViewModel] USB Mode: ICE filtering to subnet of 10.190.178.241
+2026/03/06 17:54:29.190 5552 5629 Info Unity [RTTRemoteMenu] HandlePhaseChanged: Disconnected -> Connecting
+2026/03/06 17:54:29.190 5552 5629 Info Unity [ConnectionViewModel] Connecting to ws://10.190.178.241:8288/signal?protocol=v2&transport=usb (transport=USB)
+2026/03/06 17:54:29.191 5552 5629 Info Unity [PhaseProtocol] Connecting to ws://10.190.178.241:8288/signal?protocol=v2&transport=usb
+2026/03/06 17:54:29.191 5552 5629 Info Unity [StateMachine] Disconnected -> Connecting
+2026/03/06 17:54:29.300 5552 5629 Info Unity [PhaseProtocol] WebSocket connected, waiting for hardware_info
+2026/03/06 17:54:29.300 5552 5629 Info Unity [StateMachine] Connecting -> AwaitingHardwareInfo
+2026/03/06 17:54:29.421 5552 5629 Info Unity [Phase1] Received hardware_info
+2026/03/06 17:54:29.425 5552 5629 Info Unity [Phase1] Server: ADMIN-PC, GPU: NVIDIA GeForce GTX 1660 Ti (6GB)
+2026/03/06 17:54:29.425 5552 5629 Info Unity [Phase1] Encoder: NVENC, HW: True
+2026/03/06 17:54:29.425 5552 5629 Info Unity [RTTRemoteMenu] HandleHardwareInfoReceived called, info null: False, panel null: False
+2026/03/06 17:54:29.425 5552 5629 Info Unity [RTTRemoteMenu] EnsureBothPanelsVisible: Showing hardware frame
+2026/03/06 17:54:29.430 5552 5629 Info Unity [RTTInfoSidePanel] SetHardwareInfo: ADMIN-PC
+2026/03/06 17:54:29.430 5552 5629 Info Unity [RTTRemoteMenu] EnsureBothPanelsVisible: Showing network frame
+2026/03/06 17:54:29.432 5552 5629 Info Unity [RTTInfoSidePanel] ShowSpeedTestLoadingState called for NetworkInfo, _isBuilt=True
+2026/03/06 17:54:29.435 5552 5629 Info Unity [RTTInfoSidePanel] SetHardwareInfo: ADMIN-PC
+2026/03/06 17:54:29.435 5552 5629 Info Unity [RTTRemoteMenu] Updated hardware info panel: ADMIN-PC
+2026/03/06 17:54:29.435 5552 5629 Info Unity [RTTRemoteMenu] HandlePhaseChanged: Connecting -> SpeedTesting
+2026/03/06 17:54:29.496 5552 5629 Info Unity [Phase1] HEVC hardware decoder available: True
+2026/03/06 17:54:29.497 5552 5629 Info Unity [Phase1] Android API 36, device: vivo V2352GA
+2026/03/06 17:54:29.497 5552 5629 Info Unity [Phase1] Client screen resolution: 2800x1260
+2026/03/06 17:54:29.518 5552 5629 Info Unity [Phase1] hardware_info_ack sent
+2026/03/06 17:54:29.518 5552 5629 Info Unity [StateMachine] AwaitingHardwareInfo -> SpeedTesting
+2026/03/06 17:54:29.518 5552 5629 Info Unity [Phase1] USB Mode: skipping WebSocket speedtest, using server values
+2026/03/06 17:54:29.535 5552 5629 Info Unity [Phase1] speedtest_result sent: 480,0Mbps, 0,5ms
+2026/03/06 17:54:29.535 5552 5629 Info Unity [PhaseProtocol] Connection type: USB, WiFi mode: False
+2026/03/06 17:54:29.535 5552 5629 Info Unity [PhaseProtocol] Active thresholds - FrameGap: 500ms, MonitorDrift: 500ms, FreezeThreshold: 90 frames
+2026/03/06 17:54:29.535 5552 5629 Info Unity [RTTRemoteMenu] HandleNetworkInfoReceived called, info null: False, panel null: False
+2026/03/06 17:54:29.535 5552 5629 Info Unity [RTTInfoSidePanel] *** USB Mode UI BUILD v4 ***
+2026/03/06 17:54:29.537 5552 5629 Info Unity [RTTInfoSidePanel] SetNetworkInfo USB Mode: hasServerData=False
+2026/03/06 17:54:29.537 5552 5629 Info Unity [RTTInfoSidePanel]   usbLatencyMs=-1, jitterMs=-1, usbEstimatedBandwidthMbps=-1, usbVersion=
+2026/03/06 17:54:29.537 5552 5629 Info Unity [RTTRemoteMenu] Updated network info panel: -1,0ms, -1Mbps
+2026/03/06 17:54:29.537 5552 5629 Warn Unity [StateMachine] Invalid transition: SpeedTesting -> AwaitingSuggestedConfig
+2026/03/06 17:54:30.003 5552 5629 Info Unity [Phase1] suggested_config received, phase=SpeedTesting
+2026/03/06 17:54:30.003 5552 5629 Info Unity [Phase1] USB mode activated: latency=1,86ms, ver=USB 3.0, bw=5000Mbps
+2026/03/06 17:54:30.004 5552 5629 Info Unity [PhaseProtocol] Connection type: USB, WiFi mode: False
+2026/03/06 17:54:30.004 5552 5629 Info Unity [PhaseProtocol] Active thresholds - FrameGap: 500ms, MonitorDrift: 500ms, FreezeThreshold: 90 frames
+2026/03/06 17:54:30.004 5552 5629 Info Unity [RTTRemoteMenu] HandleNetworkInfoReceived called, info null: False, panel null: False
+2026/03/06 17:54:30.004 5552 5629 Info Unity [RTTInfoSidePanel] *** USB Mode UI BUILD v4 ***
+2026/03/06 17:54:30.005 5552 5629 Info Unity [RTTInfoSidePanel] SetNetworkInfo USB Mode: hasServerData=True
+2026/03/06 17:54:30.005 5552 5629 Info Unity [RTTInfoSidePanel]   usbLatencyMs=1,85733333333333, jitterMs=0,127, usbEstimatedBandwidthMbps=5000, usbVersion=USB 3.0
+2026/03/06 17:54:30.005 5552 5629 Info Unity [RTTRemoteMenu] Updated network info panel: 0,5ms, 480Mbps
+2026/03/06 17:54:30.153 5552 5629 Info Unity [HevcDecoder] Initialized 320x240
+2026/03/06 17:54:30.175 5552 5629 Info Unity [HevcDecoder] Disposed explicitly
+2026/03/06 17:54:30.175 5552 5629 Info Unity [H265Test] HEVC decoder init OK ΓÇö device is H265 capable
+2026/03/06 17:54:30.175 5552 5629 Info Unity [Phase1] Suggested: 3mon @ 1920x1080, 60fps, 30000kbps, codec=H265, connType=USB
+2026/03/06 17:54:30.175 5552 5629 Info Unity [StateMachine] FORCE: SpeedTesting -> ConfiguringSettings: suggested_config received
+2026/03/06 17:54:30.178 5552 5629 Info Unity [RemotePreferences] Loaded: monitors=1, mode=Classic, resolution=720p, fps=60 FPS
+2026/03/06 17:54:30.178 5552 5629 Info Unity [RTTRemoteMenu] Monitor selection changed: index=1, value=2 Monitors
+2026/03/06 17:54:30.180 5552 5629 Info Unity [RTTRemoteMenu] Mode changed: index=0, value=Classic
+2026/03/06 17:54:30.182 5552 5629 Info Unity [RTTRemoteMenu] Resolution changed: index=0, value=720p
+2026/03/06 17:54:30.182 5552 5629 Info Unity [RTTRemoteMenu] FPS changed: index=1, value=60 FPS
+2026/03/06 17:54:30.182 5552 5629 Info Unity [RTTRemoteMenu] Applied config: SAVED prefs ΓÇö Mon=2, Resolution=720p, FPS=60 FPS
+2026/03/06 17:54:30.182 5552 5629 Info Unity [RTTRemoteMenu] Server suggested: 3mon, 1080p, 60fps (shown as Recommended)
+2026/03/06 17:54:30.182 5552 5629 Info Unity [RTTRemoteMenu] HandlePhaseChanged: SpeedTesting -> ConfiguringSettings
+2026/03/06 17:54:32.278 5552 5629 Info Unity [RTTRemoteMenu] Button clicked! viewModel=True, currentPhase=ConfiguringSettings
+2026/03/06 17:54:32.278 5552 5629 Info Unity [RTTRemoteMenu] Starting with button progress...
+2026/03/06 17:54:32.279 5552 5629 Info Unity [RTTRemoteMenu] BuildConfigFromForm: Resolution raw='720p', cleaned='720p', suggested=1080
+2026/03/06 17:54:32.279 5552 5629 Info Unity [RTTRemoteMenu] BuildConfigFromForm: Parsed resolution=720p -> 1280x720
+2026/03/06 17:54:32.279 5552 5629 Info Unity [RTTRemoteMenu] BuildConfigFromForm: 2mon (standard) @ 1280x720, 60fps
+2026/03/06 17:54:32.280 5552 5629 Info Unity [RemotePreferences] Saved to /storage/emulated/0/Android/data/com.Reka.VRWorkSpace/files/remote_preferences.json
+2026/03/06 17:54:32.280 5552 5629 Info Unity [RTTRemoteMenu] Saved preferences: 1mon, mode=Classic, 720p, 60 FPS, USB=True
+2026/03/06 17:54:32.281 5552 5629 Info Unity [RTTRemoteMenu] All inputs locked (Ready state)
+2026/03/06 17:54:32.282 5552 5629 Info Unity [ConnectionViewModel] StartWithProgressAsync: 2 monitors, 20000kbps, 60fps
+2026/03/06 17:54:32.283 5552 5629 Info Unity [RTTRemoteMenuController] HandleStartWithProgress: 2 monitors - waiting for streaming ready
+2026/03/06 17:54:32.284 5552 5629 Info Unity [WorldPanelCursor] Cursor cache cleared
+2026/03/06 17:54:32.285 5552 5629 Info Unity [PhaseProtocol] ProceedToPhase2Async, phase=ConfiguringSettings
+2026/03/06 17:54:32.286 5552 5629 Info Unity [Phase2] Sending config: 2 monitors @ 1280x720, 60fps, 20Mbps
+2026/03/06 17:54:32.286 5552 5629 Info Unity [StateMachine] ConfiguringSettings -> SendingDisplayConfig
+2026/03/06 17:54:32.303 5552 5629 Info Unity [Phase2] proceed(2) sent
+2026/03/06 17:54:32.320 5552 5629 Info Unity [Phase2] display_config sent
+2026/03/06 17:54:32.320 5552 5629 Info Unity [StateMachine] SendingDisplayConfig -> AwaitingSetupComplete
+2026/03/06 17:54:32.359 5552 5629 Info Unity [Phase2] Config progress: vdd_setup 0% ΓÇô Checking display configuration...
+2026/03/06 17:54:32.376 5552 5629 Info Unity [Phase2] Config progress: vdd_setup 30% ΓÇô Configuring virtual displays...
+2026/03/06 17:54:36.398 5552 5629 Warn Unity [PhaseProtocol] Pong timeout! 6065ms, missed=1
+2026/03/06 17:54:38.422 5552 5629 Warn Unity [PhaseProtocol] Pong timeout! 8089ms, missed=2
+2026/03/06 17:54:40.062 5552 5629 Info Unity [Phase2] Config progress: topology 60% ΓÇô Configuring display layout and scaling...
+2026/03/06 17:54:40.445 5552 5629 Warn Unity [PhaseProtocol] Pong timeout! 10112ms, missed=3
+2026/03/06 17:54:40.445 5552 5629 Warn Unity [PhaseProtocol] Pong timeout during Phase 2 (server busy with display setup) ΓÇô skipping reconnect
+2026/03/06 17:54:42.184 5552 5629 Info Unity [Phase2] Config progress: capture_init 90% ΓÇô Initializing capture...
+2026/03/06 17:54:42.468 5552 5629 Warn Unity [PhaseProtocol] Pong timeout! 12135ms, missed=4
+2026/03/06 17:54:42.468 5552 5629 Warn Unity [PhaseProtocol] Pong timeout during Phase 2 (server busy with display setup) ΓÇô skipping reconnect
+2026/03/06 17:54:42.869 5552 5629 Info Unity [Phase2] Config progress: capture_init 100% ΓÇô Ready
+2026/03/06 17:54:42.885 5552 5629 Info Unity [Phase2] config_complete received, starting ICE negotiation
+2026/03/06 17:54:42.886 5552 5629 Info Unity [RTTRemoteMenu] HandlePhaseChanged: ConfiguringSettings -> ICENegotiating
+2026/03/06 17:54:42.886 5552 5629 Info Unity [RTTRemoteMenu] All inputs locked (Ready state)
+2026/03/06 17:54:42.886 5552 5629 Info Unity [StateMachine] AwaitingSetupComplete -> ICENegotiating
+2026/03/06 17:54:42.886 5552 5629 Info Unity [Phase2] Launching CreatePeerConnections in background...
+2026/03/06 17:54:42.886 5552 5629 Info Unity [PhaseProtocol] Creating SINGLE PeerConnection with 2 video transceivers (Single-PC Multi-Track mode)
+2026/03/06 17:54:42.889 5552 5629 Info Unity [PhaseProtocol] CreateSinglePCMultiTrackAsync: Creating PeerConnection for 2 monitors...
+2026/03/06 17:54:42.910 5552 5629 Info Unity [PhaseProtocol] PeerConnection created: True, SignalingState=Stable
+2026/03/06 17:54:42.919 5552 5629 Info Unity [PhaseProtocol] PC0 codec preferences: H265 first, total 14 codecs
+2026/03/06 17:54:42.923 5552 5629 Info Unity [PhaseProtocol] Added transceiver 0 for monitor 0, mid=
+2026/03/06 17:54:42.926 5552 5629 Info Unity [PhaseProtocol] PC1 codec preferences: H265 first, total 14 codecs
+2026/03/06 17:54:42.927 5552 5629 Info Unity [PhaseProtocol] Added transceiver 1 for monitor 1, mid=
+2026/03/06 17:54:42.933 5552 5629 Info Unity [PhaseProtocol] Audio via DataChannel (client-created, no RTP audio transceiver)
+2026/03/06 17:54:42.933 5552 5629 Info Unity [PhaseProtocol] Cursor via DataChannel (low-latency binary)
+2026/03/06 17:54:42.934 5552 5629 Info Unity [PhaseProtocol] Setting up Single-PC event handlers for 2 tracks
+2026/03/06 17:54:42.984 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:1652866792 1 udp 2122260223 10.190.178.105 34678 t...
+2026/03/06 17:54:42.984 5552 5629 Info Unity [PhaseProtocol] USB Mode: Allowing USB candidate: 10.190.178.105
+2026/03/06 17:54:42.984 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:976452320 1 udp 2122129151 192.168.1.36 60408 typ ...
+2026/03/06 17:54:42.985 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 192.168.1.36 (server subnet: 10.190.178)
+2026/03/06 17:54:42.985 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:1371205628 1 udp 2122063615 53.103.8.111 42465 typ...
+2026/03/06 17:54:42.985 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 53.103.8.111 (server subnet: 10.190.178)
+2026/03/06 17:54:42.985 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2042811041 1 udp 2122197247 2402:800:6d62:3e6b:5c7...
+2026/03/06 17:54:42.985 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 2402:800:6d62:3e6b:5c7c:a2ff:fe21:6c12 (server subnet: 10.190.178)
+2026/03/06 17:54:42.985 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:1652866792 1 udp 2122260223 10.190.178.105 33477 t...
+2026/03/06 17:54:42.985 5552 5629 Info Unity [PhaseProtocol] USB Mode: Allowing USB candidate: 10.190.178.105
+2026/03/06 17:54:42.985 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:976452320 1 udp 2122129151 192.168.1.36 53838 typ ...
+2026/03/06 17:54:42.985 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 192.168.1.36 (server subnet: 10.190.178)
+2026/03/06 17:54:42.985 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:1371205628 1 udp 2122063615 53.103.8.111 37553 typ...
+2026/03/06 17:54:42.986 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 53.103.8.111 (server subnet: 10.190.178)
+2026/03/06 17:54:42.986 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2042811041 1 udp 2122197247 2402:800:6d62:3e6b:5c7...
+2026/03/06 17:54:42.986 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 2402:800:6d62:3e6b:5c7c:a2ff:fe21:6c12 (server subnet: 10.190.178)
+2026/03/06 17:54:42.986 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:1652866792 1 udp 2122260223 10.190.178.105 59267 t...
+2026/03/06 17:54:42.986 5552 5629 Info Unity [PhaseProtocol] USB Mode: Allowing USB candidate: 10.190.178.105
+2026/03/06 17:54:42.986 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:976452320 1 udp 2122129151 192.168.1.36 36689 typ ...
+2026/03/06 17:54:42.986 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 192.168.1.36 (server subnet: 10.190.178)
+2026/03/06 17:54:42.986 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:1371205628 1 udp 2122063615 53.103.8.111 58067 typ...
+2026/03/06 17:54:42.986 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 53.103.8.111 (server subnet: 10.190.178)
+2026/03/06 17:54:42.986 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2042811041 1 udp 2122197247 2402:800:6d62:3e6b:5c7...
+2026/03/06 17:54:42.986 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 2402:800:6d62:3e6b:5c7c:a2ff:fe21:6c12 (server subnet: 10.190.178)
+2026/03/06 17:54:42.998 5552 5629 Info Unity [PhaseProtocol] Single-PC offer sent with 2 m= sections (109ms)
+2026/03/06 17:54:43.080 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:474700912 1 tcp 1518280447 10.190.178.105 32787 ty...
+2026/03/06 17:54:43.080 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:54:43.080 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:1157404792 1 tcp 1518149375 192.168.1.36 50259 typ...
+2026/03/06 17:54:43.080 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:54:43.080 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:796200292 1 tcp 1518083839 53.103.8.111 54441 typ ...
+2026/03/06 17:54:43.080 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:54:43.081 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:118304825 1 tcp 1518217471 2402:800:6d62:3e6b:5c7c...
+2026/03/06 17:54:43.081 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:54:43.081 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:474700912 1 tcp 1518280447 10.190.178.105 36115 ty...
+2026/03/06 17:54:43.081 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:54:43.081 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:1157404792 1 tcp 1518149375 192.168.1.36 47377 typ...
+2026/03/06 17:54:43.081 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:54:43.081 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:796200292 1 tcp 1518083839 53.103.8.111 45297 typ ...
+2026/03/06 17:54:43.081 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:54:43.081 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:118304825 1 tcp 1518217471 2402:800:6d62:3e6b:5c7c...
+2026/03/06 17:54:43.081 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:54:43.081 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:474700912 1 tcp 1518280447 10.190.178.105 45169 ty...
+2026/03/06 17:54:43.081 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:54:43.081 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:1157404792 1 tcp 1518149375 192.168.1.36 41189 typ...
+2026/03/06 17:54:43.081 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:54:43.081 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:796200292 1 tcp 1518083839 53.103.8.111 47567 typ ...
+2026/03/06 17:54:43.081 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:54:43.082 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:118304825 1 tcp 1518217471 2402:800:6d62:3e6b:5c7c...
+2026/03/06 17:54:43.082 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:54:43.482 5552 5629 Info Unity [PhaseProtocol] PC0 received ICE candidate
+2026/03/06 17:54:43.483 5552 5629 Info Unity [PhaseProtocol] PC0 queuing remote ICE candidate (AnswerSet=false, pending=1)
+2026/03/06 17:54:43.516 5552 5629 Info Unity [PhaseProtocol] PC0 raw SDP preview: v=0\r\no=- 15593 0 IN IP4 127.0.0.1\r\ns=sipsorcery\r\nt=0 0\r\na=group:BUNDLE 0 1 2\r\nm=video 9 UDP/TLS/RTP/SAVPF 123\r\nc=IN IP4 0.0.0.0\r\na=ice-ufrag:OPGL\r\na=ice-pwd:BSLBPJVEHMMOAHFHZWPUBMKX\r\na=fingerprint:sha
+2026/03/06 17:54:43.516 5552 5629 Info Unity [PhaseProtocol] FixSdp: 45 lines, 1461 chars
+2026/03/06 17:54:43.516 5552 5629 Info Unity [PhaseProtocol] PC0 received answer (SDP: 1459 -> 1461 bytes)
+2026/03/06 17:54:43.518 5552 5629 Info Unity [PhaseProtocol] PC0 SignalingState=HaveLocalOffer, IceState=New
+2026/03/06 17:54:43.519 5552 5629 Info Unity [PhaseProtocol] PC0 calling SetRemoteDescription (SDP len=1461)...
+2026/03/06 17:54:43.526 5552 5629 Info Unity [PhaseProtocol] PC0 SetRemoteDescription called, waiting for completion...
+2026/03/06 17:54:43.542 5552 5629 Info Unity [PhaseProtocol] Single-PC ICE: Checking
+2026/03/06 17:54:43.551 5552 5629 Info Unity [PhaseProtocol] Single-PC OnTrack: kind=Video, enabled=True, mid=0
+2026/03/06 17:54:43.551 5552 5629 Info Unity [PhaseProtocol] PC0 using H265 custom decoder pipeline (Single-PC mode)
+2026/03/06 17:54:43.672 5552 5629 Info Unity [HevcDecoder] Initialized 1280x720
+2026/03/06 17:54:43.678 5552 5629 Info Unity [H265Receiver] PC0 Initialized 1280x720
+2026/03/06 17:54:43.681 5552 5629 Info Unity [H265EncodedHandler] PC0 handler created (gates on DataChannel codec config + IDR)
+2026/03/06 17:54:43.684 5552 5629 Info Unity [PhaseProtocol] PC0 hooked H265 custom decoder via Encoded Transform (Transform set: True)
+2026/03/06 17:54:43.685 5552 5629 Info Unity [PhaseProtocol] Single-PC OnTrack: kind=Video, enabled=True, mid=1
+2026/03/06 17:54:43.686 5552 5629 Info Unity [PhaseProtocol] PC1 using H265 custom decoder pipeline (Single-PC mode)
+2026/03/06 17:54:43.825 5552 5629 Info Unity [HevcDecoder] Initialized 1280x720
+2026/03/06 17:54:43.828 5552 5629 Info Unity [H265Receiver] PC1 Initialized 1280x720
+2026/03/06 17:54:43.831 5552 5629 Info Unity [H265EncodedHandler] PC1 handler created (gates on DataChannel codec config + IDR)
+2026/03/06 17:54:43.841 5552 5629 Info Unity [PhaseProtocol] PC1 hooked H265 custom decoder via Encoded Transform (Transform set: True)
+2026/03/06 17:54:43.842 5552 5629 Info Unity [PhaseProtocol] Single-PC State: Connecting
+2026/03/06 17:54:43.842 5552 5629 Info Unity [PhaseProtocol] PC0 received ICE candidate
+2026/03/06 17:54:43.842 5552 5629 Info Unity [PhaseProtocol] PC0 queuing remote ICE candidate (AnswerSet=false, pending=2)
+2026/03/06 17:54:43.843 5552 5629 Info Unity [PhaseProtocol] PC0 SetRemoteDescription wait done: IsDone=True, IsError=False, elapsed=315ms
+2026/03/06 17:54:43.843 5552 5629 Info Unity [PhaseProtocol] PC0 answer set OK (316ms)
+2026/03/06 17:54:43.843 5552 5629 Info Unity [PhaseProtocol] Single-PC mode: marking all wrappers as AnswerSet
+2026/03/06 17:54:43.843 5552 5629 Info Unity [PhaseProtocol] All 2 answers received, signaling TCS
+2026/03/06 17:54:43.845 5552 5629 Info Unity [PhaseProtocol] PC0 Added ICE candidate
+2026/03/06 17:54:43.845 5552 5629 Info Unity [PhaseProtocol] PC0 Added ICE candidate
+2026/03/06 17:54:43.845 5552 5629 Info Unity [PhaseProtocol] CheckIceComplete: 2/2 PCs have answers (expected 2 total), phase=ICENegotiating
+2026/03/06 17:54:43.845 5552 5629 Info Unity [PhaseProtocol] All 2 PeerConnections ready, transitioning to ReadyToStream
+2026/03/06 17:54:43.846 5552 5629 Info Unity [StateMachine] ICENegotiating -> ReadyToStream
+2026/03/06 17:54:43.846 5552 5629 Info Unity [PhaseProtocol] Sending proceed message for phase 3
+2026/03/06 17:54:43.846 5552 5629 Info Unity [RTTRemoteMenu] HandlePhaseChanged: ICENegotiating -> ReadyToStream
+2026/03/06 17:54:43.858 5552 5629 Info Unity [PhaseProtocol] Single-PC State: Connected
+2026/03/06 17:54:43.859 5552 5629 Info Unity [PhaseProtocol] Single-PC ICE: Connected
+2026/03/06 17:54:43.859 5552 5629 Info Unity [ConnectionViewModel] Monitor 0 ICE complete. Ready: 1/2
+2026/03/06 17:54:43.859 5552 5629 Info Unity [ConnectionViewModel] Monitor 1 ICE complete. Ready: 2/2
+2026/03/06 17:54:43.859 5552 5629 Info Unity [PhaseProtocol] CheckAllMonitorsConnected: 2/2
+2026/03/06 17:54:43.859 5552 5629 Info Unity [PhaseProtocol] All monitors connected, firing OnAllMonitorsReady
+2026/03/06 17:54:43.859 5552 5629 Info Unity [ConnectionViewModel] All monitors ready, firing OnAllMonitorsReady
+2026/03/06 17:54:43.859 5552 5629 Info Unity [RTTRemoteMenuController] All monitors ready - waiting for streaming to start
+2026/03/06 17:54:43.859 5552 5629 Info Unity [ConnectionViewModel] Delaying 1 second for stability...
+2026/03/06 17:54:43.860 5552 5629 Info Unity [PhaseProtocol] Single-PC ICE: Completed
+2026/03/06 17:54:43.860 5552 5629 Info Unity [ConnectionViewModel] Monitor 0 ICE complete. Ready: 3/2
+2026/03/06 17:54:43.860 5552 5629 Info Unity [ConnectionViewModel] Monitor 1 ICE complete. Ready: 4/2
+2026/03/06 17:54:43.860 5552 5629 Info Unity [PhaseProtocol] Audio DataChannel opened
+2026/03/06 17:54:43.860 5552 5629 Info Unity [PhaseProtocol] Cursor DataChannel opened
+2026/03/06 17:54:43.860 5552 5629 Info Unity [PhaseProtocol] Single-PC answer received in 971ms
+2026/03/06 17:54:43.860 5552 5629 Info Unity [PhaseProtocol] CreatePeerConnectionsAsync completed successfully
+2026/03/06 17:54:43.860 5552 5629 Info Unity [PhaseProtocol] PC0 received ICE candidate
+2026/03/06 17:54:43.860 5552 5629 Info Unity [PhaseProtocol] PC0 adding remote ICE candidate (AnswerSet=true)
+2026/03/06 17:54:43.861 5552 5629 Info Unity [PhaseProtocol] PC0 Added ICE candidate
+2026/03/06 17:54:43.874 5552 5629 Info Unity [PhaseProtocol] Single-PC ICE: Connected
+2026/03/06 17:54:43.874 5552 5629 Info Unity [ConnectionViewModel] Monitor 0 ICE complete. Ready: 5/2
+2026/03/06 17:54:43.874 5552 5629 Info Unity [ConnectionViewModel] Monitor 1 ICE complete. Ready: 6/2
+2026/03/06 17:54:43.874 5552 5629 Info Unity [PhaseProtocol] Server confirmed 2 ICE connections ready
+2026/03/06 17:54:43.874 5552 5629 Info Unity [PhaseProtocol] ice_ready received but phase is ReadyToStream, ignoring
+2026/03/06 17:54:44.860 5552 5629 Info Unity [ConnectionViewModel] Auto-starting streaming (force=False)...
+2026/03/06 17:54:44.860 5552 5629 Info Unity [PhaseProtocol] Starting streaming (Phase 3)
+2026/03/06 17:54:44.860 5552 5629 Info Unity [StateMachine] ReadyToStream -> StartingStream
+2026/03/06 17:54:44.892 5552 5629 Info Unity [Phase3] streaming_started received
+2026/03/06 17:54:44.893 5552 5629 Info Unity [StateMachine] StartingStream -> Streaming
+2026/03/06 17:54:44.914 5552 5629 Info Unity [AndroidHelper] Wi-Fi Lock acquired (HIGH_PERF mode)
+2026/03/06 17:54:44.918 5552 5629 Info Unity [AndroidHelper] Wake Lock acquired (PARTIAL mode)
+2026/03/06 17:54:44.918 5552 5629 Info Unity [AndroidHelper] All power locks acquired for stable streaming
+2026/03/06 17:54:44.918 5552 5629 Info Unity [AndroidHelper] Screen sleep: disabled
+2026/03/06 17:54:44.918 5552 5629 Info Unity [PhaseProtocol] Frame stall monitor started
+2026/03/06 17:54:44.918 5552 5629 Info Unity [RTTRemoteMenu] HandlePhaseChanged: ReadyToStream -> Streaming
+2026/03/06 17:54:44.920 5552 5629 Info Unity [RTTRemoteMenu] Hardware frame hidden
+2026/03/06 17:54:44.922 5552 5629 Info Unity [RTTRemoteMenu] Network frame hidden
+2026/03/06 17:54:44.922 5552 5629 Info Unity [RTTRemoteMenu] HideSidePanels completed
+2026/03/06 17:54:44.922 5552 5629 Info Unity [RTTRemoteMenuController] Creating ClusterRig for streaming: 2 monitors
+2026/03/06 17:54:44.924 5552 5629 Info Unity [RTTMenu] SetClusterRig: ClusterRig parented with useParentOrigin=true
+2026/03/06 17:54:44.928 5552 5629 Info Unity [WorldPanelClusterRig] LayoutFromParentOrigin: 2 panels, mode=FlatPlanar
+2026/03/06 17:54:44.929 5552 5629 Info Unity [ClusterVisualFlatPlanar] Initialize() called
+2026/03/06 17:54:44.929 5552 5629 Info Unity [ClusterVisualFlatPlanar] Initializing for 2 panels
+2026/03/06 17:54:44.929 5552 5629 Info Unity [ClusterVisualFlatPlanar] GenerateMeshes: totalPanels=2, enabledCount=2, enabledIndices=[0,1], panelWidth=1,600m
+2026/03/06 17:54:44.931 5552 5629 Info Unity [FlatPlanarMeshGenerator] Generated mesh: 2 panels, 33 vertices, bounds=(2.67, 0.90, 1.19), center=(0.54, 0.00, -0.59)
+2026/03/06 17:54:44.931 5552 5629 Info Unity [ClusterVisualFlatPlanar] Mesh Gen - panelWidth: 1,600m, panelHeight: 0,900m, panelCount: 2, arcRadius: 1,80m, meshMarginH: 0 (full width)
+2026/03/06 17:54:44.931 5552 5629 Info Unity [ClusterVisualFlatPlanar] Yaw angle per panel: 47,9┬░, foldSegments: 6, gap: 0,0000m, overlap: 0,0015m
+2026/03/06 17:54:44.931 5552 5629 Info Unity [ClusterVisualFlatPlanar] CreateVisualLayers: expandedMesh.bounds=Center: (0.52, 0.00, -0.63), Extents: (1.42, 0.55, 0.63)
+2026/03/06 17:54:44.932 5552 5629 Info Unity [ClusterVisualFlatPlanar] Created visual layers: background and border hidden, content only
+2026/03/06 17:54:44.932 5552 5629 Info Unity [ClusterVisualFlatPlanar] Background material applied: shader=Custom/ClusterBackgroundCurved, clusterWidth=3,62, clusterHeight=1,10
+2026/03/06 17:54:44.932 5552 5629 Info Unity [ClusterVisualFlatPlanar] Content material applied: shader=Custom/ClusterContentFlatPlanar
+2026/03/06 17:54:44.932 5552 5629 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
+2026/03/06 17:54:44.933 5552 5629 Info Unity [ClusterVisualFlatPlanar] Initialize() completed successfully
+2026/03/06 17:54:44.933 5552 5629 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
+2026/03/06 17:54:44.933 5552 5629 Info Unity [ClusterVisualFlatPlanar] Background material applied: shader=Custom/ClusterBackgroundCurved, clusterWidth=3,62, clusterHeight=1,10
+2026/03/06 17:54:44.933 5552 5629 Info Unity [ClusterVisualFlatPlanar] Background material applied: shader=Custom/ClusterBackgroundCurved, clusterWidth=3,62, clusterHeight=1,10
+2026/03/06 17:54:44.933 5552 5629 Info Unity [ClusterVisualFlatPlanar] Content material applied: shader=Custom/ClusterContentFlatPlanar
+2026/03/06 17:54:44.933 5552 5629 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
+2026/03/06 17:54:44.933 5552 5629 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
+2026/03/06 17:54:44.933 5552 5629 Info Unity [ClusterVisualFlatPlanar] GenerateMeshes: totalPanels=2, enabledCount=2, enabledIndices=[0,1], panelWidth=1,600m
+2026/03/06 17:54:44.933 5552 5629 Info Unity [FlatPlanarMeshGenerator] Generated mesh: 2 panels, 33 vertices, bounds=(2.67, 0.90, 1.19), center=(0.54, 0.00, -0.59)
+2026/03/06 17:54:44.934 5552 5629 Info Unity [ClusterVisualFlatPlanar] Mesh Gen - panelWidth: 1,600m, panelHeight: 0,900m, panelCount: 2, arcRadius: 1,80m, meshMarginH: 0 (full width)
+2026/03/06 17:54:44.934 5552 5629 Info Unity [ClusterVisualFlatPlanar] Yaw angle per panel: 47,9┬░, foldSegments: 6, gap: 0,0000m, overlap: 0,0015m
+2026/03/06 17:54:44.934 5552 5629 Info Unity [ClusterVisualFlatPlanar] Background material applied: shader=Custom/ClusterBackgroundCurved, clusterWidth=3,62, clusterHeight=1,10
+2026/03/06 17:54:44.934 5552 5629 Info Unity [ClusterVisualFlatPlanar] Content material applied: shader=Custom/ClusterContentFlatPlanar
+2026/03/06 17:54:44.934 5552 5629 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
+2026/03/06 17:54:44.934 5552 5629 Info Unity [ClusterVisualFlatPlanar] GenerateMeshes: totalPanels=2, enabledCount=2, enabledIndices=[0,1], panelWidth=1,600m
+2026/03/06 17:54:44.934 5552 5629 Info Unity [FlatPlanarMeshGenerator] Generated mesh: 2 panels, 33 vertices, bounds=(2.67, 0.90, 1.19), center=(0.54, 0.00, -0.59)
+2026/03/06 17:54:44.934 5552 5629 Info Unity [ClusterVisualFlatPlanar] Mesh Gen - panelWidth: 1,600m, panelHeight: 0,900m, panelCount: 2, arcRadius: 1,80m, meshMarginH: 0 (full width)
+2026/03/06 17:54:44.934 5552 5629 Info Unity [ClusterVisualFlatPlanar] Yaw angle per panel: 47,9┬░, foldSegments: 6, gap: 0,0000m, overlap: 0,0015m
+2026/03/06 17:54:44.934 5552 5629 Info Unity [ClusterVisualFlatPlanar] Background material applied: shader=Custom/ClusterBackgroundCurved, clusterWidth=3,62, clusterHeight=1,10
+2026/03/06 17:54:44.934 5552 5629 Info Unity [ClusterVisualFlatPlanar] Content material applied: shader=Custom/ClusterContentFlatPlanar
+2026/03/06 17:54:44.934 5552 5629 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
+2026/03/06 17:54:44.934 5552 5629 Info Unity [ClusterVisualFlatPlanar] GenerateMeshes: totalPanels=2, enabledCount=2, enabledIndices=[0,1], panelWidth=1,600m
+2026/03/06 17:54:44.935 5552 5629 Info Unity [FlatPlanarMeshGenerator] Generated mesh: 2 panels, 33 vertices, bounds=(2.67, 0.90, 1.19), center=(0.54, 0.00, -0.59)
+2026/03/06 17:54:44.935 5552 5629 Info Unity [ClusterVisualFlatPlanar] Mesh Gen - panelWidth: 1,600m, panelHeight: 0,900m, panelCount: 2, arcRadius: 1,80m, meshMarginH: 0 (full width)
+2026/03/06 17:54:44.935 5552 5629 Info Unity [ClusterVisualFlatPlanar] Yaw angle per panel: 47,9┬░, foldSegments: 6, gap: 0,0000m, overlap: 0,0015m
+2026/03/06 17:54:44.935 5552 5629 Info Unity [ClusterVisualFlatPlanar] Background material applied: shader=Custom/ClusterBackgroundCurved, clusterWidth=3,52, clusterHeight=1,05
+2026/03/06 17:54:44.935 5552 5629 Info Unity [ClusterVisualFlatPlanar] Content material applied: shader=Custom/ClusterContentFlatPlanar
+2026/03/06 17:54:44.935 5552 5629 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
+2026/03/06 17:54:44.935 5552 5629 Info Unity [WorldPanelClusterRig] Applied Flat Planar: unified content layer, boards hidden
+2026/03/06 17:54:44.935 5552 5629 Info Unity [WorldPanelClusterRig] Built 2 panels with cluster visuals (no sample textures)
+2026/03/06 17:54:44.935 5552 5629 Info Unity [RTTRemoteMenuController] Applied style: Flat Planar (Standard)
+2026/03/06 17:54:44.946 5552 5629 Debug Unity Failed to load native plugin: Unable to lookup library path for 'dl.so'.
+2026/03/06 17:54:44.957 5552 5629 Info Unity [DataChannelAudioPlayer] DSP before: rate=24000, buf=1024, speakers=Stereo
+2026/03/06 17:54:44.999 5552 5629 Info Unity [DataChannelAudioPlayer] DSP after: rate=48000, buf=256, speakers=Stereo
+2026/03/06 17:54:44.999 5552 5629 Info Unity [DataChannelAudioPlayer] Playback started
+2026/03/06 17:54:44.999 5552 5629 Info Unity [RTTRemoteMenuController] Created DataChannelAudioPlayer (low-latency)
+2026/03/06 17:54:45.000 5552 5629 Info Unity [RTTRemoteMenuController] Saved zoom distance: 1,98m
+2026/03/06 17:54:45.001 5552 6199 Info Unity [DataChannelAudioPlayer] OnAudioFilterRead: data.Length=512, channels=2, outputRate=48000
+2026/03/06 17:54:45.007 5552 5629 Info Unity [RTTRemoteTaskbar] Icons loaded - Back:True, Eye:True, EyeClose:True, Recenter:True, Zoom:True, Monitor:True
+2026/03/06 17:54:45.007 5552 5629 Info Unity [RTTRemoteTaskbar] Loaded icons - Resolution: 0, FPS: 3/3, Screens: 3/3
+2026/03/06 17:54:45.007 5552 5629 Info Unity [RTTToolbar] Initialized with taskbar. Size: 0,913x0,331m, followTarget: RTTMenu
+2026/03/06 17:54:45.007 5552 5629 Info Unity [RTTRemoteMenuController] Created RTTRemoteTaskbar in RTTToolbar, following RTTMenu
+2026/03/06 17:54:45.008 5552 5629 Info Unity [RTTRemoteMenuController] Hidden RTTMenuFrame
+2026/03/06 17:54:45.008 5552 5629 Info Unity [RTTRemoteMenuController] Hidden RTTTaskbar
+2026/03/06 17:54:45.008 5552 5629 Info Unity [RTTRemoteMenuController] ClusterRig created inside RTTMenu - streaming active
+2026/03/06 17:54:45.012 5552 5629 Info Unity [RTTMiniFrame] UI built: 1197,5x128 pixels
+2026/03/06 17:54:45.020 5552 5629 Info Unity [PhaseProtocol] Streaming started - latency checks will begin after warmup period
+2026/03/06 17:54:45.021 5552 5629 Info Unity [WorldPanelClusterRig] LayoutFromParentOrigin: 2 panels, mode=FlatPlanar
+2026/03/06 17:54:45.021 5552 5629 Info Unity [PhaseProtocol] HandleCursorImageRaw: rawJson.Length=5597
+2026/03/06 17:54:45.021 5552 5629 Info Unity [PhaseProtocol] RAW Parsed cursor_image: id=59542719736839610, type=IBeam, size=32x32, base64Len=5464
+2026/03/06 17:54:45.021 5552 5629 Info Unity [PhaseProtocol] Cursor 59542719736839610 base64 (RAW): len=5464, start=AAAM5wABBDcAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+2026/03/06 17:54:45.021 5552 5629 Info Unity [PhaseProtocol] Cursor 59542719736839610 decoded: 4096 bytes, expected 4096
+2026/03/06 17:54:45.021 5552 5629 Info Unity [PhaseProtocol] Cursor 59542719736839610 texture created (RAW parser): 32x32, hotspot=(0,0)
+2026/03/06 17:54:45.046 5552 5629 Info Unity [RTTTaskbarExpansion] Icons loaded - Resolution: 0/3, FPS: 2/3, Passthrough: True, LightOn: True, LightOff: True, FlatMonitor: True, CurvedMonitor: True
+2026/03/06 17:54:45.046 5552 5629 Info Unity [RTTRemoteTaskbar] Expansion panel created in RTTToolbar
+2026/03/06 17:54:45.047 5552 5629 Info Unity [RTTMenuFrame] UI built: 840x788,7323 logical pixels
+2026/03/06 17:54:45.064 5552 5629 Info Unity [RTTRemoteTaskbar] Screen Settings popup created
+2026/03/06 17:54:45.068 5552 5629 Info Unity [RTTTaskbarExpansion] UI built: 326x128 pixels
+2026/03/06 17:54:45.092 5552 5629 Info Unity [VirtualObjectsZoomController] Zoom set to 1,75m (delta: -0,228m)
+2026/03/06 17:54:45.092 5552 5629 Info Unity [WorldPanelClusterRig] LayoutFromParentOrigin: 2 panels, mode=FlatPlanar
+2026/03/06 17:54:45.109 5552 5629 Info Unity [WorldPanelClusterRig] LayoutFromParentOrigin: 2 panels, mode=FlatPlanar
+2026/03/06 17:54:45.109 5552 5629 Info Unity [ClusterVisualFlatPlanar] Arc radius changed: 1,800 -> 1,750, regenerating mesh
+2026/03/06 17:54:45.109 5552 5629 Info Unity [ClusterVisualFlatPlanar] Rebuild() called
+2026/03/06 17:54:45.109 5552 5629 Info Unity [ClusterVisualFlatPlanar] Initialize() called
+2026/03/06 17:54:45.109 5552 5629 Info Unity [ClusterVisualFlatPlanar] Initializing for 2 panels
+2026/03/06 17:54:45.109 5552 5629 Info Unity [ClusterVisualFlatPlanar] GenerateMeshes: totalPanels=2, enabledCount=2, enabledIndices=[0,1], panelWidth=1,600m
+2026/03/06 17:54:45.109 5552 5629 Info Unity [FlatPlanarMeshGenerator] Generated mesh: 2 panels, 33 vertices, bounds=(2.65, 0.90, 1.21), center=(0.52, 0.00, -0.60)
+2026/03/06 17:54:45.110 5552 5629 Info Unity [ClusterVisualFlatPlanar] Mesh Gen - panelWidth: 1,600m, panelHeight: 0,900m, panelCount: 2, arcRadius: 1,75m, meshMarginH: 0 (full width)
+2026/03/06 17:54:45.110 5552 5629 Info Unity [ClusterVisualFlatPlanar] Yaw angle per panel: 49,1┬░, foldSegments: 6, gap: 0,0000m, overlap: 0,0015m
+2026/03/06 17:54:45.110 5552 5629 Info Unity [ClusterVisualFlatPlanar] CreateVisualLayers: expandedMesh.bounds=Center: (0.51, 0.00, -0.63), Extents: (1.39, 0.53, 0.63)
+2026/03/06 17:54:45.110 5552 5629 Info Unity [ClusterVisualFlatPlanar] Created visual layers: background and border hidden, content only
+2026/03/06 17:54:45.110 5552 5629 Info Unity [ClusterVisualFlatPlanar] Background material applied: shader=Custom/ClusterBackgroundCurved, clusterWidth=3,52, clusterHeight=1,05
+2026/03/06 17:54:45.111 5552 5629 Info Unity [ClusterVisualFlatPlanar] Content material applied: shader=Custom/ClusterContentFlatPlanar
+2026/03/06 17:54:45.111 5552 5629 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
+2026/03/06 17:54:45.111 5552 5629 Info Unity [ClusterVisualFlatPlanar] Initialize() completed successfully
+2026/03/06 17:54:48.028 5552 5629 Warn Unity [H265Receiver] PC0 SUSTAINED STALL: No frame from decoder for 180 ticks (63908390000,0s). Stats: decoded=0, encoded=0 (gap=0). Plugin: initialized=True, strides=0/0, size=1280x720
+2026/03/06 17:54:48.028 5552 5629 Warn Unity [H265Receiver] PC1 SUSTAINED STALL: No frame from decoder for 180 ticks (63908390000,0s). Stats: decoded=0, encoded=0 (gap=0). Plugin: initialized=True, strides=0/0, size=1280x720
+2026/03/06 17:54:48.798 5552 5629 Info Unity [PhaseProtocol] HandleCursorImageRaw: rawJson.Length=5600
+2026/03/06 17:54:48.798 5552 5629 Info Unity [PhaseProtocol] RAW Parsed cursor_image: id=6116152097342303662, type=IBeam, size=32x32, base64Len=5464
+2026/03/06 17:54:48.798 5552 5629 Info Unity [PhaseProtocol] Cursor 6116152097342303662 base64 (RAW): len=5464, start=AAAAAAAAAAAAAAAAAAEENwABC70AAQQ3AAAAAAAA...end=AAAAAAAAAAAAAAAAAA==
+2026/03/06 17:54:48.798 5552 5629 Info Unity [PhaseProtocol] Cursor 6116152097342303662 decoded: 4096 bytes, expected 4096
+2026/03/06 17:54:48.798 5552 5629 Info Unity [PhaseProtocol] Cursor 6116152097342303662 texture created (RAW parser): 32x32, hotspot=(4,11)
+2026/03/06 17:54:48.916 5552 5629 Warn Unity [PhaseProtocol] Decoder freeze (server +249, client +0) (strike #1, total strikes=1)!
+2026/03/06 17:54:50.000 5552 5629 Info Unity [DIAG:STATE] polls=300, totalFrames=0, dropped=0, fps=0,0/60, RTT=17ms, loss=0,00 %, health=85, wifi=False, decoderFrames=0, fallback=False
+2026/03/06 17:54:52.420 5552 5629 Warn Unity [PhaseProtocol] Decoder freeze (server +218, client +0) (strike #2, total strikes=2)!
+2026/03/06 17:54:54.974 5552 5629 Info Unity [DIAG:STATE] polls=600, totalFrames=0, dropped=0, fps=0,0/60, RTT=17ms, loss=0,00 %, health=70, wifi=False, decoderFrames=0, fallback=False
+2026/03/06 17:54:55.057 5552 5629 Warn Unity [H265Receiver] PC0 SUSTAINED STALL: No frame from decoder for 600 ticks (63908390000,0s). Stats: decoded=0, encoded=0 (gap=0). Plugin: initialized=True, strides=0/0, size=1280x720
+2026/03/06 17:54:55.058 5552 5629 Warn Unity [H265Receiver] PC1 SUSTAINED STALL: No frame from decoder for 600 ticks (63908390000,0s). Stats: decoded=0, encoded=0 (gap=0). Plugin: initialized=True, strides=0/0, size=1280x720
+2026/03/06 17:54:55.426 5552 5629 Warn Unity [PhaseProtocol] Decoder freeze (server +187, client +0) (strike #3, total strikes=3)!
+2026/03/06 17:54:58.428 5552 5629 Warn Unity [PhaseProtocol] Decoder freeze (server +186, client +0) (strike #4, total strikes=4)!
+2026/03/06 17:54:59.180 5552 5629 Info Unity [PhaseProtocol] Single-PC ICE: Completed
+2026/03/06 17:54:59.180 5552 5629 Info Unity [ConnectionViewModel] Monitor 0 ICE complete. Ready: 7/2
+2026/03/06 17:54:59.180 5552 5629 Info Unity [ConnectionViewModel] Monitor 1 ICE complete. Ready: 8/2
+2026/03/06 17:54:59.929 5552 5629 Info Unity [DIAG:STATE] polls=900, totalFrames=0, dropped=0, fps=0,0/60, RTT=18ms, loss=0,00 %, health=40, wifi=False, decoderFrames=0, fallback=False
+2026/03/06 17:55:01.933 5552 5629 Warn Unity [PhaseProtocol] Decoder freeze (server +218, client +0) (strike #5, total strikes=5)!
+2026/03/06 17:55:01.933 5552 5629 Error Unity [PhaseProtocol] H265 fallback threshold reached: sustained stall (strike 5) ΓÇö triggering H264 fallback
+2026/03/06 17:55:01.934 5552 5629 Error Unity [PhaseProtocol] H265 DECODER FAILURE ΓÇö switching to H264 fallback
+2026/03/06 17:55:01.964 5552 5629 Info Unity [HevcDecoder] Disposed explicitly
+2026/03/06 17:55:01.965 5552 5629 Info Unity [H265Receiver] PC0 Disposed (decoded=0)
+2026/03/06 17:55:01.988 5552 5629 Info Unity [HevcDecoder] Disposed explicitly
+2026/03/06 17:55:01.989 5552 5629 Info Unity [H265Receiver] PC1 Disposed (decoded=0)
+2026/03/06 17:55:01.989 5552 5629 Info Unity [PhaseProtocol] Codec switched to H264, notifying server...
+2026/03/06 17:55:02.169 5552 5629 Warn Unity [PhaseProtocol] PC0 BOOTSTRAP TIMEOUT (12201ms) - triggering reconnect
+2026/03/06 17:55:02.169 5552 5629 Info Unity [PhaseProtocol] PC0 auto-heal: attempt 1/5, waiting 500ms...
+2026/03/06 17:55:02.169 5552 5629 Info Unity [PhaseProtocol] Waiting for server codec switch ACK before reconnecting...
+2026/03/06 17:55:02.169 5552 5629 Info Unity [PhaseProtocol] Server acknowledged codec switch ΓåÆ H264 (reason: client_fallback)
+2026/03/06 17:55:02.186 5552 5629 Warn Unity [PhaseProtocol] PC1 BOOTSTRAP TIMEOUT (12202ms) - triggering reconnect
+2026/03/06 17:55:02.186 5552 5629 Info Unity [PhaseProtocol] PC1 auto-heal: attempt 1/5, waiting 500ms...
+2026/03/06 17:55:02.678 5552 5629 Info Unity [PhaseProtocol] PC0 auto-heal: H265 fallback in progress, aborting auto-heal
+2026/03/06 17:55:02.678 5552 5629 Info Unity [PhaseProtocol] Initiating Single-PC reconnect with H264...
+2026/03/06 17:55:02.678 5552 5629 Info Unity [PhaseProtocol] ReconnectSinglePC: Reconnecting 2 monitors (gen=1)...
+2026/03/06 17:55:02.693 5552 5629 Info Unity [PhaseProtocol] CreateSinglePCMultiTrackAsync: Creating PeerConnection for 2 monitors...
+2026/03/06 17:55:02.695 5552 5629 Info Unity [PhaseProtocol] PeerConnection created: True, SignalingState=Stable
+2026/03/06 17:55:02.697 5552 5629 Info Unity [PhaseProtocol] PC0 codec preferences: H264 first, total 14 codecs
+2026/03/06 17:55:02.698 5552 5629 Info Unity [PhaseProtocol] Added transceiver 0 for monitor 0, mid=
+2026/03/06 17:55:02.699 5552 5629 Info Unity [PhaseProtocol] PC1 codec preferences: H264 first, total 14 codecs
+2026/03/06 17:55:02.700 5552 5629 Info Unity [PhaseProtocol] Added transceiver 1 for monitor 1, mid=
+2026/03/06 17:55:02.701 5552 5629 Info Unity [PhaseProtocol] Audio via DataChannel (client-created, no RTP audio transceiver)
+2026/03/06 17:55:02.701 5552 5629 Info Unity [PhaseProtocol] Cursor via DataChannel (low-latency binary)
+2026/03/06 17:55:02.701 5552 5629 Info Unity [PhaseProtocol] Setting up Single-PC event handlers for 2 tracks
+2026/03/06 17:55:02.708 5552 5629 Info Unity [PhaseProtocol] Single-PC State: Closed
+2026/03/06 17:55:02.708 5552 5629 Info Unity [PhaseProtocol] PC1 auto-heal: H265 fallback in progress, aborting auto-heal
+2026/03/06 17:55:02.724 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:1114823174 1 udp 2122260223 10.190.178.105 43693 t...
+2026/03/06 17:55:02.724 5552 5629 Info Unity [PhaseProtocol] USB Mode: Allowing USB candidate: 10.190.178.105
+2026/03/06 17:55:02.724 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:3326868112 1 udp 2122129151 192.168.1.44 41803 typ...
+2026/03/06 17:55:02.724 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 192.168.1.44 (server subnet: 10.190.178)
+2026/03/06 17:55:02.724 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:1900841746 1 udp 2122063615 53.103.8.111 57985 typ...
+2026/03/06 17:55:02.724 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 53.103.8.111 (server subnet: 10.190.178)
+2026/03/06 17:55:02.724 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:3132641870 1 udp 2122197247 2402:800:6d62:3e6b:446...
+2026/03/06 17:55:02.724 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 2402:800:6d62:3e6b:446d:c7ff:fe99:37ab (server subnet: 10.190.178)
+2026/03/06 17:55:02.724 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:1114823174 1 udp 2122260223 10.190.178.105 57709 t...
+2026/03/06 17:55:02.724 5552 5629 Info Unity [PhaseProtocol] USB Mode: Allowing USB candidate: 10.190.178.105
+2026/03/06 17:55:02.724 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:3326868112 1 udp 2122129151 192.168.1.44 50975 typ...
+2026/03/06 17:55:02.724 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 192.168.1.44 (server subnet: 10.190.178)
+2026/03/06 17:55:02.724 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:1900841746 1 udp 2122063615 53.103.8.111 49866 typ...
+2026/03/06 17:55:02.724 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 53.103.8.111 (server subnet: 10.190.178)
+2026/03/06 17:55:02.725 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:3132641870 1 udp 2122197247 2402:800:6d62:3e6b:446...
+2026/03/06 17:55:02.725 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 2402:800:6d62:3e6b:446d:c7ff:fe99:37ab (server subnet: 10.190.178)
+2026/03/06 17:55:02.725 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:1114823174 1 udp 2122260223 10.190.178.105 36384 t...
+2026/03/06 17:55:02.725 5552 5629 Info Unity [PhaseProtocol] USB Mode: Allowing USB candidate: 10.190.178.105
+2026/03/06 17:55:02.725 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:3326868112 1 udp 2122129151 192.168.1.44 51500 typ...
+2026/03/06 17:55:02.725 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 192.168.1.44 (server subnet: 10.190.178)
+2026/03/06 17:55:02.725 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:1900841746 1 udp 2122063615 53.103.8.111 42187 typ...
+2026/03/06 17:55:02.725 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 53.103.8.111 (server subnet: 10.190.178)
+2026/03/06 17:55:02.725 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:3132641870 1 udp 2122197247 2402:800:6d62:3e6b:446...
+2026/03/06 17:55:02.725 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 2402:800:6d62:3e6b:446d:c7ff:fe99:37ab (server subnet: 10.190.178)
+2026/03/06 17:55:02.743 5552 5629 Info Unity [PhaseProtocol] Single-PC offer sent with 2 m= sections (49ms)
+2026/03/06 17:55:02.826 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:1019033758 1 tcp 1518280447 10.190.178.105 55593 t...
+2026/03/06 17:55:02.826 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:02.827 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:3095664648 1 tcp 1518149375 192.168.1.44 45531 typ...
+2026/03/06 17:55:02.827 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:02.827 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:260270474 1 tcp 1518083839 53.103.8.111 38481 typ ...
+2026/03/06 17:55:02.827 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:02.827 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:3296178390 1 tcp 1518217471 2402:800:6d62:3e6b:446...
+2026/03/06 17:55:02.827 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:02.827 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:1019033758 1 tcp 1518280447 10.190.178.105 40631 t...
+2026/03/06 17:55:02.827 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:02.828 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:3095664648 1 tcp 1518149375 192.168.1.44 47831 typ...
+2026/03/06 17:55:02.828 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:02.828 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:260270474 1 tcp 1518083839 53.103.8.111 55891 typ ...
+2026/03/06 17:55:02.828 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:02.828 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:3296178390 1 tcp 1518217471 2402:800:6d62:3e6b:446...
+2026/03/06 17:55:02.828 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:02.828 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:1019033758 1 tcp 1518280447 10.190.178.105 36101 t...
+2026/03/06 17:55:02.828 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:02.828 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:3095664648 1 tcp 1518149375 192.168.1.44 47563 typ...
+2026/03/06 17:55:02.828 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:02.828 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:260270474 1 tcp 1518083839 53.103.8.111 60957 typ ...
+2026/03/06 17:55:02.828 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:02.828 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:3296178390 1 tcp 1518217471 2402:800:6d62:3e6b:446...
+2026/03/06 17:55:02.829 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:02.976 5552 5629 Info Unity [PhaseProtocol] PC0 received ICE candidate
+2026/03/06 17:55:02.976 5552 5629 Info Unity [PhaseProtocol] PC0 queuing remote ICE candidate (AnswerSet=false, pending=1)
+2026/03/06 17:55:02.993 5552 5629 Info Unity [PhaseProtocol] PC0 raw SDP preview: v=0\r\no=- 90652 0 IN IP4 127.0.0.1\r\ns=sipsorcery\r\nt=0 0\r\na=group:BUNDLE 0 1 2\r\nm=video 9 UDP/TLS/RTP/SAVPF 124\r\nc=IN IP4 0.0.0.0\r\na=ice-ufrag:JKZT\r\na=ice-pwd:CJXRYPGZJSPQWHQKDXNNTTJA\r\na=fingerprint:sha
+2026/03/06 17:55:02.993 5552 5629 Info Unity [PhaseProtocol] FixSdp: 45 lines, 1527 chars
+2026/03/06 17:55:02.993 5552 5629 Info Unity [PhaseProtocol] PC0 received answer (SDP: 1525 -> 1527 bytes)
+2026/03/06 17:55:02.993 5552 5629 Info Unity [PhaseProtocol] PC0 SignalingState=HaveLocalOffer, IceState=New
+2026/03/06 17:55:02.994 5552 5629 Info Unity [PhaseProtocol] PC0 calling SetRemoteDescription (SDP len=1527)...
+2026/03/06 17:55:02.998 5552 5629 Info Unity [PhaseProtocol] PC0 SetRemoteDescription called, waiting for completion...
+2026/03/06 17:55:03.010 5552 5629 Info Unity [PhaseProtocol] Single-PC ICE: Checking
+2026/03/06 17:55:03.010 5552 5629 Info Unity [PhaseProtocol] Single-PC OnTrack: kind=Video, enabled=True, mid=0
+2026/03/06 17:55:03.011 5552 5629 Info Unity [PhaseProtocol] Track 0 attached to standard OnVideoReceived callback
+2026/03/06 17:55:03.011 5552 5629 Info Unity [PhaseProtocol] Single-PC OnTrack: kind=Video, enabled=True, mid=1
+2026/03/06 17:55:03.011 5552 5629 Info Unity [PhaseProtocol] Track 1 attached to standard OnVideoReceived callback
+2026/03/06 17:55:03.011 5552 5629 Info Unity [PhaseProtocol] PC0 received ICE candidate
+2026/03/06 17:55:03.012 5552 5629 Info Unity [PhaseProtocol] PC0 queuing remote ICE candidate (AnswerSet=false, pending=2)
+2026/03/06 17:55:03.012 5552 5629 Info Unity [PhaseProtocol] PC0 SetRemoteDescription wait done: IsDone=True, IsError=False, elapsed=13ms
+2026/03/06 17:55:03.012 5552 5629 Info Unity [PhaseProtocol] PC0 answer set OK (13ms)
+2026/03/06 17:55:03.012 5552 5629 Info Unity [PhaseProtocol] Single-PC mode: marking all wrappers as AnswerSet
+2026/03/06 17:55:03.012 5552 5629 Info Unity [PhaseProtocol] All 2 answers received, signaling TCS
+2026/03/06 17:55:03.012 5552 5629 Info Unity [PhaseProtocol] PC0 Added ICE candidate
+2026/03/06 17:55:03.012 5552 5629 Info Unity [PhaseProtocol] PC0 Added ICE candidate
+2026/03/06 17:55:03.013 5552 5629 Info Unity [PhaseProtocol] CheckIceComplete: 2/2 PCs have answers (expected 2 total), phase=Streaming
+2026/03/06 17:55:03.013 5552 5629 Warn Unity [PhaseProtocol] All PCs ready but phase is Streaming, not ICENegotiating
+2026/03/06 17:55:03.025 5552 5629 Info Unity [PhaseProtocol] Single-PC State: Connecting
+2026/03/06 17:55:03.026 5552 5629 Info Unity [PhaseProtocol] Single-PC answer received in 332ms
+2026/03/06 17:55:03.026 5552 5629 Info Unity [PhaseProtocol] ReconnectSinglePC: Reconnection initiated, waiting for answer...
+2026/03/06 17:55:03.026 5552 5629 Info Unity [PhaseProtocol] PC0 received ICE candidate
+2026/03/06 17:55:03.026 5552 5629 Info Unity [PhaseProtocol] PC0 adding remote ICE candidate (AnswerSet=true)
+2026/03/06 17:55:03.026 5552 5629 Info Unity [PhaseProtocol] PC0 Added ICE candidate
+2026/03/06 17:55:04.595 5552 5629 Info Unity [PhaseProtocol] Single-PC State: Connected
+2026/03/06 17:55:04.595 5552 5629 Info Unity [PhaseProtocol] Single-PC ICE: Connected
+2026/03/06 17:55:04.595 5552 5629 Info Unity [ConnectionViewModel] Monitor 0 ICE complete. Ready: 9/2
+2026/03/06 17:55:04.595 5552 5629 Info Unity [ConnectionViewModel] Monitor 1 ICE complete. Ready: 10/2
+2026/03/06 17:55:04.611 5552 5629 Info Unity [PhaseProtocol] Audio DataChannel opened
+2026/03/06 17:55:04.611 5552 5629 Info Unity [PhaseProtocol] Cursor DataChannel opened
+2026/03/06 17:55:04.611 5552 5629 Info Unity [PhaseProtocol] Server confirmed 2 ICE connections ready
+2026/03/06 17:55:04.611 5552 5629 Info Unity [PhaseProtocol] ice_ready received during Streaming phase (reconnect).
+2026/03/06 17:55:04.749 5552 5629 Info Unity [PhaseProtocol] Track 1 received first frame, firing OnStreamingStarted
+2026/03/06 17:55:04.749 5552 5629 Warn Unity [StateMachine] Invalid transition: Streaming -> Streaming
+2026/03/06 17:55:04.761 5552 5629 Info Unity [RTTRemote-MIPMAP] Created mipmap RT for panel 1: 1280x720, sourceType=Texture2D
+2026/03/06 17:55:04.777 5552 5629 Info Unity [RTTRemote-MIPMAP] Created mipmap RT for panel 0: 1280x720, sourceType=Texture2D
+2026/03/06 17:55:04.930 5552 5629 Info Unity [PhaseProtocol] PC0 bootstrap complete (first frame decoded)
+2026/03/06 17:55:04.946 5552 5629 Info Unity [PhaseProtocol] PC1 bootstrap complete (first frame decoded)
+2026/03/06 17:55:05.129 5552 5629 Info Unity [DIAG:STATE] polls=1200, totalFrames=2, dropped=0, fps=0,0/60, RTT=17ms, loss=0,00 %, health=100, wifi=False, decoderFrames=16, fallback=True
+2026/03/06 17:55:05.933 5552 5629 Warn Unity [PhaseProtocol] Decoder freeze (server +245, client +0) (strike #1, total strikes=1)!
+2026/03/06 17:55:07.102 5552 5629 Warn Unity [PhaseProtocol] PC0 DECODER STALL (Path B)! framesDecoded=8 (last=8) frozen for 2172ms while bytes are flowing (0ms).
+2026/03/06 17:55:07.102 5552 5629 Warn Unity [PhaseProtocol] Aggressive decoder stall (dec=8, net=0ms) (strike #2, total strikes=2)!
+2026/03/06 17:55:07.102 5552 5629 Info Unity [PhaseProtocol] PC0 graduated step 1: keyframe burst (count=1)
+2026/03/06 17:55:07.118 5552 5629 Warn Unity [PhaseProtocol] PC1 DECODER STALL (Path B)! framesDecoded=8 (last=8) frozen for 2172ms while bytes are flowing (0ms).
+2026/03/06 17:55:07.119 5552 5629 Warn Unity [PhaseProtocol] Aggressive decoder stall (dec=8, net=0ms) (strike #3, total strikes=3)!
+2026/03/06 17:55:07.119 5552 5629 Info Unity [PhaseProtocol] PC1 graduated step 1: keyframe burst (count=1)
+2026/03/06 17:55:08.634 5552 5629 Info Unity [PhaseProtocol] PC0 graduated step 2: skip + keyframe burst (count=1)
+2026/03/06 17:55:08.635 5552 5629 Warn Unity [PhaseProtocol] URGENT skip_to_live (bypassing cooldown)
+2026/03/06 17:55:08.651 5552 5629 Info Unity [PhaseProtocol] PC1 graduated step 2: skip + keyframe burst (count=1)
+2026/03/06 17:55:08.651 5552 5629 Warn Unity [PhaseProtocol] URGENT skip_to_live (bypassing cooldown)
+2026/03/06 17:55:10.101 5552 5629 Info Unity [DIAG:STATE] polls=1500, totalFrames=145, dropped=0, fps=64,0/60, RTT=50ms, loss=0,00 %, health=55, wifi=False, decoderFrames=159, fallback=True
+2026/03/06 17:55:10.719 5552 5629 Info Unity [PhaseProtocol] PC0 graduated step 2 failed, triggering reconnection...
+2026/03/06 17:55:10.719 5552 5629 Info Unity [PhaseProtocol] PC0 graduated step 3: full Single-PC reconnect
+2026/03/06 17:55:10.719 5552 5629 Info Unity [PhaseProtocol] ReconnectSinglePC: Reconnecting 2 monitors (gen=2)...
+2026/03/06 17:55:10.916 5552 5629 Info Unity [PhaseProtocol] CreateSinglePCMultiTrackAsync: Creating PeerConnection for 2 monitors...
+2026/03/06 17:55:10.921 5552 5629 Info Unity [PhaseProtocol] PeerConnection created: True, SignalingState=Stable
+2026/03/06 17:55:10.923 5552 5629 Info Unity [PhaseProtocol] PC0 codec preferences: H264 first, total 14 codecs
+2026/03/06 17:55:10.926 5552 5629 Info Unity [PhaseProtocol] Added transceiver 0 for monitor 0, mid=
+2026/03/06 17:55:10.928 5552 5629 Info Unity [PhaseProtocol] PC1 codec preferences: H264 first, total 14 codecs
+2026/03/06 17:55:10.931 5552 5629 Info Unity [PhaseProtocol] Added transceiver 1 for monitor 1, mid=
+2026/03/06 17:55:10.931 5552 5629 Info Unity [PhaseProtocol] Audio via DataChannel (client-created, no RTP audio transceiver)
+2026/03/06 17:55:10.932 5552 5629 Info Unity [PhaseProtocol] Cursor via DataChannel (low-latency binary)
+2026/03/06 17:55:10.932 5552 5629 Info Unity [PhaseProtocol] Setting up Single-PC event handlers for 2 tracks
+2026/03/06 17:55:10.946 5552 5629 Info Unity [RTTRemoteTaskbar] Back pressed - showing menu
+2026/03/06 17:55:10.946 5552 5629 Info Unity [RTTRemoteMenuController] Taskbar menu requested - returning to RemoteMenu
+2026/03/06 17:55:10.947 5552 5629 Info Unity [PhaseProtocol] Single-PC State: Closed
+2026/03/06 17:55:10.948 5552 5629 Info Unity [PhaseProtocol] PC1 graduated step 2 failed, triggering reconnection...
+2026/03/06 17:55:10.948 5552 5629 Info Unity [PhaseProtocol] PC1 graduated step 3: monitor reconnect
+2026/03/06 17:55:10.948 5552 5629 Info Unity [PhaseProtocol] PC1 auto-heal: attempt 1/5, waiting 500ms...
+2026/03/06 17:55:10.960 5552 5629 Info Unity [Phase3] pause_streaming sent
+2026/03/06 17:55:10.961 5552 5629 Info Unity [RTTRemoteMenuController] Restoring zoom distance: 1,98m
+2026/03/06 17:55:10.961 5552 5629 Info Unity [VirtualObjectsZoomController] Zoom set to 1,98m (delta: 0,244m)
+2026/03/06 17:55:10.961 5552 5629 Info Unity [RTTRemoteMenuController] Shown RTTMenuFrame
+2026/03/06 17:55:10.961 5552 5629 Info Unity [RTTToolbar] Initialized with taskbar. Size: 0,913x0,331m, followTarget: RTTMenu
+2026/03/06 17:55:10.961 5552 5629 Info Unity [RTTRemoteMenuController] Shown RTTTaskbar
+2026/03/06 17:55:10.971 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2646628758 1 udp 2122260223 10.190.178.105 40937 t...
+2026/03/06 17:55:10.972 5552 5629 Info Unity [PhaseProtocol] USB Mode: Allowing USB candidate: 10.190.178.105
+2026/03/06 17:55:10.972 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2217236167 1 udp 2122129151 192.168.1.44 50392 typ...
+2026/03/06 17:55:10.972 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 192.168.1.44 (server subnet: 10.190.178)
+2026/03/06 17:55:10.972 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2267657146 1 udp 2122063615 53.103.8.111 56217 typ...
+2026/03/06 17:55:10.972 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 53.103.8.111 (server subnet: 10.190.178)
+2026/03/06 17:55:10.972 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:3846134460 1 udp 2122197247 2402:800:6d62:3e6b:446...
+2026/03/06 17:55:10.972 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 2402:800:6d62:3e6b:446d:c7ff:fe99:37ab (server subnet: 10.190.178)
+2026/03/06 17:55:10.972 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2646628758 1 udp 2122260223 10.190.178.105 60025 t...
+2026/03/06 17:55:10.972 5552 5629 Info Unity [PhaseProtocol] USB Mode: Allowing USB candidate: 10.190.178.105
+2026/03/06 17:55:10.972 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2217236167 1 udp 2122129151 192.168.1.44 48256 typ...
+2026/03/06 17:55:10.973 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 192.168.1.44 (server subnet: 10.190.178)
+2026/03/06 17:55:10.973 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2267657146 1 udp 2122063615 53.103.8.111 56670 typ...
+2026/03/06 17:55:10.973 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 53.103.8.111 (server subnet: 10.190.178)
+2026/03/06 17:55:10.973 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:3846134460 1 udp 2122197247 2402:800:6d62:3e6b:446...
+2026/03/06 17:55:10.973 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 2402:800:6d62:3e6b:446d:c7ff:fe99:37ab (server subnet: 10.190.178)
+2026/03/06 17:55:10.973 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2646628758 1 udp 2122260223 10.190.178.105 47253 t...
+2026/03/06 17:55:10.973 5552 5629 Info Unity [PhaseProtocol] USB Mode: Allowing USB candidate: 10.190.178.105
+2026/03/06 17:55:10.973 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2217236167 1 udp 2122129151 192.168.1.44 35932 typ...
+2026/03/06 17:55:10.973 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 192.168.1.44 (server subnet: 10.190.178)
+2026/03/06 17:55:10.973 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2267657146 1 udp 2122063615 53.103.8.111 39465 typ...
+2026/03/06 17:55:10.974 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 53.103.8.111 (server subnet: 10.190.178)
+2026/03/06 17:55:10.974 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:3846134460 1 udp 2122197247 2402:800:6d62:3e6b:446...
+2026/03/06 17:55:10.974 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 2402:800:6d62:3e6b:446d:c7ff:fe99:37ab (server subnet: 10.190.178)
+2026/03/06 17:55:10.988 5552 5629 Info Unity [PhaseProtocol] Single-PC offer sent with 2 m= sections (71ms)
+2026/03/06 17:55:11.072 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:1667927298 1 tcp 1518280447 10.190.178.105 39931 t...
+2026/03/06 17:55:11.072 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:11.072 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2055373395 1 tcp 1518149375 192.168.1.44 47155 typ...
+2026/03/06 17:55:11.072 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:11.072 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2038654766 1 tcp 1518083839 53.103.8.111 56695 typ...
+2026/03/06 17:55:11.072 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:11.073 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:462786088 1 tcp 1518217471 2402:800:6d62:3e6b:446d...
+2026/03/06 17:55:11.073 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:11.073 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:1667927298 1 tcp 1518280447 10.190.178.105 58483 t...
+2026/03/06 17:55:11.073 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:11.073 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2055373395 1 tcp 1518149375 192.168.1.44 47629 typ...
+2026/03/06 17:55:11.073 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:11.073 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2038654766 1 tcp 1518083839 53.103.8.111 44957 typ...
+2026/03/06 17:55:11.073 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:11.073 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:462786088 1 tcp 1518217471 2402:800:6d62:3e6b:446d...
+2026/03/06 17:55:11.073 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:11.073 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:1667927298 1 tcp 1518280447 10.190.178.105 53891 t...
+2026/03/06 17:55:11.073 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:11.074 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2055373395 1 tcp 1518149375 192.168.1.44 39157 typ...
+2026/03/06 17:55:11.074 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:11.074 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2038654766 1 tcp 1518083839 53.103.8.111 55683 typ...
+2026/03/06 17:55:11.074 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:11.074 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:462786088 1 tcp 1518217471 2402:800:6d62:3e6b:446d...
+2026/03/06 17:55:11.074 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:11.206 5552 5629 Info Unity [PhaseProtocol] PC0 received ICE candidate
+2026/03/06 17:55:11.206 5552 5629 Info Unity [PhaseProtocol] PC0 queuing remote ICE candidate (AnswerSet=false, pending=1)
+2026/03/06 17:55:11.222 5552 5629 Info Unity [PhaseProtocol] PC0 raw SDP preview: v=0\r\no=- 73429 0 IN IP4 127.0.0.1\r\ns=sipsorcery\r\nt=0 0\r\na=group:BUNDLE 0 1 2\r\nm=video 9 UDP/TLS/RTP/SAVPF 124\r\nc=IN IP4 0.0.0.0\r\na=ice-ufrag:COOQ\r\na=ice-pwd:PCYRSLWLZIZWERFTOWZOGVVA\r\na=fingerprint:sha
+2026/03/06 17:55:11.222 5552 5629 Info Unity [PhaseProtocol] FixSdp: 45 lines, 1526 chars
+2026/03/06 17:55:11.222 5552 5629 Info Unity [PhaseProtocol] PC0 received answer (SDP: 1524 -> 1526 bytes)
+2026/03/06 17:55:11.223 5552 5629 Info Unity [PhaseProtocol] PC0 SignalingState=HaveLocalOffer, IceState=New
+2026/03/06 17:55:11.223 5552 5629 Info Unity [PhaseProtocol] PC0 calling SetRemoteDescription (SDP len=1526)...
+2026/03/06 17:55:11.228 5552 5629 Info Unity [PhaseProtocol] PC0 SetRemoteDescription called, waiting for completion...
+2026/03/06 17:55:11.238 5552 5629 Info Unity [PhaseProtocol] Single-PC ICE: Checking
+2026/03/06 17:55:11.239 5552 5629 Info Unity [PhaseProtocol] Single-PC OnTrack: kind=Video, enabled=True, mid=0
+2026/03/06 17:55:11.239 5552 5629 Info Unity [PhaseProtocol] Track 0 attached to standard OnVideoReceived callback
+2026/03/06 17:55:11.240 5552 5629 Info Unity [PhaseProtocol] Single-PC OnTrack: kind=Video, enabled=True, mid=1
+2026/03/06 17:55:11.240 5552 5629 Info Unity [PhaseProtocol] Track 1 attached to standard OnVideoReceived callback
+2026/03/06 17:55:11.240 5552 5629 Info Unity [PhaseProtocol] PC0 received ICE candidate
+2026/03/06 17:55:11.240 5552 5629 Info Unity [PhaseProtocol] PC0 queuing remote ICE candidate (AnswerSet=false, pending=2)
+2026/03/06 17:55:11.255 5552 5629 Info Unity [PhaseProtocol] PC0 SetRemoteDescription wait done: IsDone=True, IsError=False, elapsed=26ms
+2026/03/06 17:55:11.255 5552 5629 Info Unity [PhaseProtocol] PC0 answer set OK (26ms)
+2026/03/06 17:55:11.255 5552 5629 Info Unity [PhaseProtocol] Single-PC mode: marking all wrappers as AnswerSet
+2026/03/06 17:55:11.255 5552 5629 Info Unity [PhaseProtocol] All 2 answers received, signaling TCS
+2026/03/06 17:55:11.255 5552 5629 Info Unity [PhaseProtocol] PC0 Added ICE candidate
+2026/03/06 17:55:11.255 5552 5629 Info Unity [PhaseProtocol] PC0 Added ICE candidate
+2026/03/06 17:55:11.255 5552 5629 Info Unity [PhaseProtocol] CheckIceComplete: 2/2 PCs have answers (expected 2 total), phase=Streaming
+2026/03/06 17:55:11.255 5552 5629 Warn Unity [PhaseProtocol] All PCs ready but phase is Streaming, not ICENegotiating
+2026/03/06 17:55:11.256 5552 5629 Info Unity [PhaseProtocol] Single-PC State: Connecting
+2026/03/06 17:55:11.271 5552 5629 Info Unity [PhaseProtocol] Single-PC answer received in 355ms
+2026/03/06 17:55:11.271 5552 5629 Info Unity [PhaseProtocol] ReconnectSinglePC: Reconnection initiated, waiting for answer...
+2026/03/06 17:55:11.272 5552 5629 Info Unity [PhaseProtocol] PC0 received ICE candidate
+2026/03/06 17:55:11.272 5552 5629 Info Unity [PhaseProtocol] PC0 adding remote ICE candidate (AnswerSet=true)
+2026/03/06 17:55:11.272 5552 5629 Info Unity [PhaseProtocol] PC0 Added ICE candidate
+2026/03/06 17:55:11.455 5552 5629 Info Unity [PhaseProtocol] PC1 auto-heal: frames recovered (215ms since last frame), skip reconnect
+2026/03/06 17:55:12.840 5552 5629 Info Unity [PhaseProtocol] Single-PC State: Connected
+2026/03/06 17:55:12.840 5552 5629 Info Unity [PhaseProtocol] Single-PC ICE: Connected
+2026/03/06 17:55:12.840 5552 5629 Info Unity [ConnectionViewModel] Monitor 0 ICE complete. Ready: 11/2
+2026/03/06 17:55:12.840 5552 5629 Info Unity [ConnectionViewModel] Monitor 1 ICE complete. Ready: 12/2
+2026/03/06 17:55:12.856 5552 5629 Info Unity [PhaseProtocol] Audio DataChannel opened
+2026/03/06 17:55:12.856 5552 5629 Info Unity [PhaseProtocol] Cursor DataChannel opened
+2026/03/06 17:55:12.856 5552 5629 Info Unity [PhaseProtocol] Server confirmed 2 ICE connections ready
+2026/03/06 17:55:12.856 5552 5629 Info Unity [PhaseProtocol] ice_ready received during Streaming phase (reconnect).
+2026/03/06 17:55:13.142 5552 5629 Info Unity [PhaseProtocol] PC0 bootstrap complete (first frame decoded)
+2026/03/06 17:55:13.160 5552 5629 Info Unity [PhaseProtocol] PC1 bootstrap complete (first frame decoded)
+2026/03/06 17:55:13.423 5552 5629 Info Unity [RTTRemoteMenu] DISCONNECT clicked
+2026/03/06 17:55:13.423 5552 5629 Info Unity [RTTRemoteMenuController] DISCONNECT clicked - cleaning up streaming resources
+2026/03/06 17:55:13.423 5552 5629 Info Unity [RTTMenu] ClearClusterRig: ClusterRig reference cleared
+2026/03/06 17:55:13.424 5552 5629 Info Unity [DataChannelAudioPlayer] Stopped
+2026/03/06 17:55:13.424 5552 5629 Info Unity [RTTRemoteMenuController] Shown RTTMenuFrame
+2026/03/06 17:55:13.424 5552 5629 Info Unity [RTTToolbar] Initialized with taskbar. Size: 0,913x0,331m, followTarget: RTTMenu
+2026/03/06 17:55:13.424 5552 5629 Info Unity [RTTRemoteMenuController] Shown RTTTaskbar
+2026/03/06 17:55:13.424 5552 5629 Info Unity [RTTRemoteMenuController] Streaming resources cleaned up, menu reset
+2026/03/06 17:55:13.424 5552 5629 Info Unity [PhaseProtocol] Stopping...
+2026/03/06 17:55:13.428 5552 5629 Info Unity [AndroidHelper] Wi-Fi Lock released
+2026/03/06 17:55:13.429 5552 5629 Info Unity [AndroidHelper] Wake Lock released
+2026/03/06 17:55:13.429 5552 5629 Info Unity [AndroidHelper] All power locks released
+2026/03/06 17:55:13.430 5552 5629 Info Unity [AndroidHelper] Screen sleep: system default
+2026/03/06 17:55:13.430 5552 5629 Info Unity [DataChannelAudioPlayer] Stopped
+2026/03/06 17:55:18.502 5552 5629 Info Unity [PhaseProtocol] Single-PC ICE: Disconnected
+2026/03/06 17:55:18.502 5552 5629 Info Unity [PhaseProtocol] Single-PC State: Disconnected
+2026/03/06 17:55:18.502 5552 5629 Info Unity [PhaseProtocol] Single-PC initiating full reconnect...
+2026/03/06 17:55:18.502 5552 5629 Info Unity [PhaseProtocol] ReconnectSinglePC: Reconnecting 2 monitors (gen=3)...
+2026/03/06 17:55:18.674 5552 5629 Info Unity [PhaseProtocol] CreateSinglePCMultiTrackAsync: Creating PeerConnection for 2 monitors...
+2026/03/06 17:55:18.679 5552 5629 Info Unity [PhaseProtocol] PeerConnection created: True, SignalingState=Stable
+2026/03/06 17:55:18.682 5552 5629 Info Unity [PhaseProtocol] PC0 codec preferences: H264 first, total 14 codecs
+2026/03/06 17:55:18.685 5552 5629 Info Unity [PhaseProtocol] Added transceiver 0 for monitor 0, mid=
+2026/03/06 17:55:18.687 5552 5629 Info Unity [PhaseProtocol] PC1 codec preferences: H264 first, total 14 codecs
+2026/03/06 17:55:18.689 5552 5629 Info Unity [PhaseProtocol] Added transceiver 1 for monitor 1, mid=
+2026/03/06 17:55:18.690 5552 5629 Info Unity [PhaseProtocol] Audio via DataChannel (client-created, no RTP audio transceiver)
+2026/03/06 17:55:18.691 5552 5629 Info Unity [PhaseProtocol] Cursor via DataChannel (low-latency binary)
+2026/03/06 17:55:18.691 5552 5629 Info Unity [PhaseProtocol] Setting up Single-PC event handlers for 2 tracks
+2026/03/06 17:55:18.707 5552 5629 Info Unity [PhaseProtocol] Single-PC State: Closed
+2026/03/06 17:55:18.743 5552 5629 Info Unity [PhaseProtocol] Single-PC offer sent with 2 m= sections (68ms)
+2026/03/06 17:55:18.743 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:1719905063 1 udp 2122260223 10.190.178.105 45732 t...
+2026/03/06 17:55:18.743 5552 5629 Info Unity [PhaseProtocol] USB Mode: Allowing USB candidate: 10.190.178.105
+2026/03/06 17:55:18.743 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2137760886 1 udp 2122129151 192.168.1.44 55235 typ...
+2026/03/06 17:55:18.743 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 192.168.1.44 (server subnet: 10.190.178)
+2026/03/06 17:55:18.743 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2087338251 1 udp 2122063615 53.103.8.111 48544 typ...
+2026/03/06 17:55:18.744 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 53.103.8.111 (server subnet: 10.190.178)
+2026/03/06 17:55:18.744 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:511485965 1 udp 2122197247 2402:800:6d62:3e6b:446d...
+2026/03/06 17:55:18.744 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 2402:800:6d62:3e6b:446d:c7ff:fe99:37ab (server subnet: 10.190.178)
+2026/03/06 17:55:18.744 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:1719905063 1 udp 2122260223 10.190.178.105 42893 t...
+2026/03/06 17:55:18.744 5552 5629 Info Unity [PhaseProtocol] USB Mode: Allowing USB candidate: 10.190.178.105
+2026/03/06 17:55:18.744 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2137760886 1 udp 2122129151 192.168.1.44 33392 typ...
+2026/03/06 17:55:18.744 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 192.168.1.44 (server subnet: 10.190.178)
+2026/03/06 17:55:18.744 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2087338251 1 udp 2122063615 53.103.8.111 48988 typ...
+2026/03/06 17:55:18.744 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 53.103.8.111 (server subnet: 10.190.178)
+2026/03/06 17:55:18.744 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:511485965 1 udp 2122197247 2402:800:6d62:3e6b:446d...
+2026/03/06 17:55:18.744 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 2402:800:6d62:3e6b:446d:c7ff:fe99:37ab (server subnet: 10.190.178)
+2026/03/06 17:55:18.744 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:1719905063 1 udp 2122260223 10.190.178.105 57587 t...
+2026/03/06 17:55:18.744 5552 5629 Info Unity [PhaseProtocol] USB Mode: Allowing USB candidate: 10.190.178.105
+2026/03/06 17:55:18.745 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2137760886 1 udp 2122129151 192.168.1.44 48727 typ...
+2026/03/06 17:55:18.745 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 192.168.1.44 (server subnet: 10.190.178)
+2026/03/06 17:55:18.745 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2087338251 1 udp 2122063615 53.103.8.111 40385 typ...
+2026/03/06 17:55:18.745 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 53.103.8.111 (server subnet: 10.190.178)
+2026/03/06 17:55:18.745 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:511485965 1 udp 2122197247 2402:800:6d62:3e6b:446d...
+2026/03/06 17:55:18.745 5552 5629 Info Unity [PhaseProtocol] USB Mode: Filtering non-USB candidate: 2402:800:6d62:3e6b:446d:c7ff:fe99:37ab (server subnet: 10.190.178)
+2026/03/06 17:55:18.852 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2552856499 1 tcp 1518280447 10.190.178.105 34245 t...
+2026/03/06 17:55:18.852 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:18.852 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2176938210 1 tcp 1518149375 192.168.1.44 51441 typ...
+2026/03/06 17:55:18.852 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:18.853 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2193659295 1 tcp 1518083839 53.103.8.111 56837 typ...
+2026/03/06 17:55:18.853 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:18.853 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:3772152985 1 tcp 1518217471 2402:800:6d62:3e6b:446...
+2026/03/06 17:55:18.853 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:18.853 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2552856499 1 tcp 1518280447 10.190.178.105 37935 t...
+2026/03/06 17:55:18.853 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:18.853 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2176938210 1 tcp 1518149375 192.168.1.44 56745 typ...
+2026/03/06 17:55:18.853 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:18.854 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2193659295 1 tcp 1518083839 53.103.8.111 55395 typ...
+2026/03/06 17:55:18.854 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:18.854 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:3772152985 1 tcp 1518217471 2402:800:6d62:3e6b:446...
+2026/03/06 17:55:18.854 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:18.854 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2552856499 1 tcp 1518280447 10.190.178.105 53627 t...
+2026/03/06 17:55:18.854 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:18.854 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2176938210 1 tcp 1518149375 192.168.1.44 60633 typ...
+2026/03/06 17:55:18.854 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:18.854 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:2193659295 1 tcp 1518083839 53.103.8.111 58679 typ...
+2026/03/06 17:55:18.855 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:18.855 5552 5629 Info Unity [PhaseProtocol] Single-PC local ICE candidate: candidate:3772152985 1 tcp 1518217471 2402:800:6d62:3e6b:446...
+2026/03/06 17:55:18.855 5552 5629 Info Unity [PhaseProtocol] Skipping TCP candidate
+2026/03/06 17:55:19.254 5552 5629 Info Unity [PhaseProtocol] Frame stall monitor stopped
+2026/03/06 17:55:19.264 5552 5629 Info Unity [StateMachine] FORCE: Streaming -> Disconnected: Reset
+2026/03/06 17:55:19.264 5552 5629 Info Unity [RTTRemoteMenu] HandlePhaseChanged: Streaming -> Disconnected
+2026/03/06 17:55:19.265 5552 5629 Info Unity [RTTRemoteMenu] Monitor selection changed: index=0, value=----
+2026/03/06 17:55:19.267 5552 5629 Info Unity [RTTRemoteMenu] Mode changed: index=0, value=Classic
+2026/03/06 17:55:19.267 5552 5629 Info Unity [RTTRemoteMenu] Resolution changed: index=0, value=----
+2026/03/06 17:55:19.267 5552 5629 Info Unity [RTTRemoteMenu] FPS changed: index=0, value=----
+2026/03/06 17:55:19.267 5552 5629 Info Unity [RTTRemoteMenu] Hardware frame hidden
+2026/03/06 17:55:19.267 5552 5629 Info Unity [RTTRemoteMenu] Network frame hidden
+2026/03/06 17:55:19.268 5552 5629 Info Unity [RTTRemoteMenu] HideSidePanels completed
+2026/03/06 17:55:19.268 5552 5629 Info Unity [RTTRemoteMenu] HandleHardwareInfoReceived called, info null: True, panel null: False
+2026/03/06 17:55:19.268 5552 5629 Warn Unity [RTTRemoteMenu] HandleHardwareInfoReceived skipped: panel=True, info=False
+2026/03/06 17:55:19.268 5552 5629 Info Unity [RTTRemoteMenu] HandleNetworkInfoReceived called, info null: True, panel null: False
+2026/03/06 17:55:19.268 5552 5629 Warn Unity [RTTRemoteMenu] HandleNetworkInfoReceived skipped: panel=True, info=False
+2026/03/06 17:55:19.269 5552 5629 Info Unity [ConnectionViewModel] All state reset to initial values
+2026/03/06 17:55:28.758 5552 5629 Warn Unity [PhaseProtocol] Single-PC answer timeout after 10083ms
+2026/03/06 17:55:28.758 5552 5629 Info Unity [PhaseProtocol] ReconnectSinglePC: Reconnection initiated, waiting for answer...
+2026/03/06 17:55:40.574 5552 5552 Info Unity onPause
+2026/03/06 17:55:40.580 5552 5552 Info Unity pauseUnity
+2026/03/06 17:55:40.585 5552 5629 Info Unity [XR] [CardboardXrInputProvider]: Lifecycle stopped
+2026/03/06 17:55:40.593 5552 5629 Info Unity [AndroidHelper] App paused - keeping locks active
+2026/03/06 17:55:40.597 5552 5629 Info Unity SetGameState: isLoading: false, mode: CONTENT, label: -6, quality: 6
+2026/03/06 17:55:41.108 5552 5552 Debug Unity PersistentUnitySurface.preserveContent: com.unity3d.player.a.g{be5e2cf VFE...... .F....I. 0,0-2800,1260 #7f0801be app:id/unitySurfaceView aid=1073741824}
+2026/03/06 17:55:41.108 5552 5552 Debug Unity PersistentUnitySurface.PlaceholderView.Copy: com.unity3d.player.a.g{be5e2cf VFE...... .F....I. 0,0-2800,1260 #7f0801be app:id/unitySurfaceView aid=1073741824} Width 2800  Height 1260
+2026/03/06 17:55:41.184 5552 6626 Debug Unity PixelCopy finished: 0
+2026/03/06 17:55:41.185 5552 5629 Debug Unity [EGL] Attaching window :0x0
+2026/03/06 17:55:41.201 5552 5552 Info Unity windowFocusChanged: false
+2026/03/06 17:55:41.207 5552 5552 Info Unity applyWindowUIChanges fullScreen = true, renderOutsideSafeArea = true
+2026/03/06 17:55:41.579 5552 5552 Info Unity onDestroy

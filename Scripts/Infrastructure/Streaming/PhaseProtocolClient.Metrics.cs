@@ -641,6 +641,7 @@ namespace VRWorkspace.Streaming
                                     wrapper.RealFrameCount += delta;
                                     wrapper.TotalFramesReceived += delta;
                                     wrapper.LastFrameTime = DateTime.UtcNow;
+                                    wrapper.LastNetworkActivityTime = DateTime.UtcNow; // H265 DC: DataChannel IS the network
                                     wrapper.TexturePtrDetectionWorking = true;
                                 }
                             }
@@ -757,7 +758,12 @@ namespace VRWorkspace.Streaming
                         // 2. Check Bootstrap (Initial connection)
                         if (wrapper.WaitingForFirstFrame)
                         {
-                            if (timeSinceNetwork > BOOTSTRAP_TIMEOUT_MS)
+                            // H265 DC mode: timeSinceNetwork is meaningless (RTP bytes don't flow).
+                            // Use LastFrameTime instead — if decoder already produced frames,
+                            // bootstrap is implicitly complete (UpdateDecoderStallCheck handles it).
+                            bool h265DcBootstrap = _selectedCodec == VideoCodec.H265
+                                && _h265Receivers.ContainsKey(wrapper.Index);
+                            if (!h265DcBootstrap && timeSinceNetwork > BOOTSTRAP_TIMEOUT_MS)
                             {
                                 Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} BOOTSTRAP TIMEOUT ({timeSinceNetwork:F0}ms) - triggering reconnect");
                                 wrapper.IsReconnecting = true;
@@ -773,7 +779,13 @@ namespace VRWorkspace.Streaming
                         await UpdateDecoderStallCheck(wrapper);
                         
                         // 4. Handle Network Stall (Path A recovery)
-                        if (isNetworkStalled && !wrapper.IsInGraduatedRecovery)
+                        // SKIP for H265 DataChannel mode: all video frames arrive via SCTP DataChannel,
+                        // NOT RTP. The RTP bytesReceived counter never increases → timeSinceNetwork is
+                        // always stale → false positive NETWORK STALL. The H265 decoder stall check
+                        // (UpdateDecoderStallCheck) already handles actual decoder stalls correctly.
+                        bool isH265DcMode = _selectedCodec == VideoCodec.H265
+                            && _h265Receivers.ContainsKey(wrapper.Index);
+                        if (isNetworkStalled && !wrapper.IsInGraduatedRecovery && !isH265DcMode)
                         {
                              var timeSinceDecoderRecovery = (DateTime.UtcNow - wrapper.LastDecoderStallRecoveryTime).TotalMilliseconds;
                              if (timeSinceDecoderRecovery > 3000) // 3s grace after decoder recovery

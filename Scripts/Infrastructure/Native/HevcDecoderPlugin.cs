@@ -294,7 +294,9 @@ namespace VRWorkspace.Native
                 {
                     if (!_decoderBridge.Call<bool>("getFrame"))
                     {
-                        _hasFrame = false;
+                        // DON'T clear _hasFrame here — previous frame data in
+                        // _yPlaneBuffer/_uvPlaneBuffer is still valid and may be
+                        // needed by the caller (e.g., Tick() drain loop).
                         return false;
                     }
 
