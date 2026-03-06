@@ -617,31 +617,32 @@ namespace VRWorkspace.Streaming
                                 Debug.Log($"[PhaseProtocol] PC{wrapper.Index} H265: preserving custom decoder texture {wrapper.Texture.width}x{wrapper.Texture.height}, WebRTC tex={webRtcTexInfo}");
                             }
 
-                            // H265 Override: Update frame counts based on custom decoder metrics
-                            if (_selectedCodec == VideoCodec.H265 && _h265Receivers.TryGetValue(wrapper.Index, out var receiver))
+                        }
+
+                        // H265 Override: Update frame counts based on custom decoder metrics.
+                        // IMPORTANT: This runs OUTSIDE the (tex != null) check because in DC-only
+                        // H265 mode, the WebRTC track texture is null (Encoded Transform drops all
+                        // data, so the native WebRTC decoder never produces a texture). Frame
+                        // counting and LastFrameTime must still update based on our custom decoder.
+                        if (_selectedCodec == VideoCodec.H265 && _h265Receivers.TryGetValue(wrapper.Index, out var receiver))
+                        {
+                            long currentDecoded = receiver.DecodedFrameCount;
+
+                            if (wrapper.LastH265DecodedCount >= 0)
                             {
-                                // Current decoder total decoded frames since start
-                                long currentDecoded = receiver.DecodedFrameCount;
-                                
-                                // Calculate delta since last poll
-                                // Note: wrapper.RealFrameCount is an int, so we cast delta
-                                if (wrapper.LastH265DecodedCount >= 0)
+                                int delta = (int)(currentDecoded - wrapper.LastH265DecodedCount);
+                                if (delta > 0)
                                 {
-                                    int delta = (int)(currentDecoded - wrapper.LastH265DecodedCount);
-                                    if (delta > 0)
-                                    {
-                                        wrapper.FrameCount += delta;
-                                        wrapper.RenderedFrameCount += delta;
-                                        wrapper.RealFrameCount += delta;
-                                        wrapper.TotalFramesReceived += delta;
-                                        wrapper.LastFrameTime = DateTime.UtcNow;
-                                        wrapper.TexturePtrDetectionWorking = true; // Use common path for stall detection
-                                    }
+                                    wrapper.FrameCount += delta;
+                                    wrapper.RenderedFrameCount += delta;
+                                    wrapper.RealFrameCount += delta;
+                                    wrapper.TotalFramesReceived += delta;
+                                    wrapper.LastFrameTime = DateTime.UtcNow;
+                                    wrapper.TexturePtrDetectionWorking = true;
                                 }
-                                
-                                // Cache current decoded count for next delta calculation
-                                wrapper.LastH265DecodedCount = currentDecoded;
                             }
+
+                            wrapper.LastH265DecodedCount = currentDecoded;
                         }
                     }
                     catch { }
@@ -668,7 +669,11 @@ namespace VRWorkspace.Streaming
                     {
                         totalFrames += w.TotalFramesReceived;
                         totalDropped += w.DroppedFrameCount;
-                        totalDecoded += Math.Max(0, w.LastWebRTCFramesDecoded);
+                        // For H265 DC mode, use custom decoder count; otherwise WebRTC stats
+                        if (_selectedCodec == VideoCodec.H265 && _h265Receivers.TryGetValue(w.Index, out var diagReceiver))
+                            totalDecoded += diagReceiver.DecodedFrameCount;
+                        else
+                            totalDecoded += Math.Max(0, w.LastWebRTCFramesDecoded);
                         if (!w.TexturePtrDetectionWorking && w.Texture != null)
                             anyFallback = true;
                     }
@@ -728,9 +733,14 @@ namespace VRWorkspace.Streaming
                         wrappers = _peerConnections.ToList();
                     }
 
-                    // Network stall threshold (WiFi resilient)
-                    const int NETWORK_STALL_THRESHOLD_MS = 1500;
-                    const int BOOTSTRAP_TIMEOUT_MS = 5000;
+                    // Network stall threshold:
+                    // - USB: SCTP slow-start causes periodic ~1.5-2s gaps after IDR bursts.
+                    //   USB is a direct cable — actual network failures are impossible.
+                    //   Use a generous threshold to avoid triggering destructive reconnect
+                    //   cycles that reset SCTP congestion window and make things worse.
+                    // - WiFi/Wired: 1.5s catches real network issues promptly.
+                    int NETWORK_STALL_THRESHOLD_MS = _isUsbMode ? 5000 : 1500;
+                    int BOOTSTRAP_TIMEOUT_MS = _isUsbMode ? 10000 : 5000;
 
                     foreach (var wrapper in wrappers)
                     {
@@ -797,11 +807,16 @@ namespace VRWorkspace.Streaming
         /// </summary>
     private async Task UpdateDecoderStallCheck(PCWrapper wrapper)
     {
-        // Path B: Aggressive Decoder Stall Detection
-        // WiFi: Relax thresholds slightly to avoid "spamming" stalls on jittery connections
-        int decoderThreshold = _isWiFiConnection ? 500 : 300; 
+        // Path B: Decoder Stall Detection
+        // H265 via DataChannel: SCTP slow-start causes initial congestion after IDR burst.
+        // The congestion window needs several seconds to open up, so use a generous threshold
+        // to avoid false stall detection during SCTP ramp-up.
+        // WiFi: Further relax to avoid false positives on jittery connections.
+        bool isH265DC = _selectedCodec == VideoCodec.H265;
+        // USB H264: 1500ms - jitter buffer + SCTP slow-start after reconnect causes 500-800ms gaps
+        int decoderThreshold = isH265DC ? 5000 : (_isWiFiConnection ? 500 : 1500);
         const int RECOVERY_COOLDOWN_MS = 2500;
-        const int ESCALATE_TO_RECONNECT_MS = 8000;
+        const int ESCALATE_TO_RECONNECT_MS = 15000;
 
             try
             {
@@ -862,9 +877,17 @@ namespace VRWorkspace.Streaming
                             // 3. Track Decoder Progress
                             if (decoded > wrapper.LastWebRTCFramesDecoded)
                             {
+                                long decodeBurst = decoded - wrapper.LastWebRTCFramesDecoded;
                                 wrapper.LastWebRTCFramesDecoded = decoded;
                                 wrapper.LastDecoderAdvanceTime = DateTime.UtcNow;
-                                
+
+                                // Reset freeze count on sustained decode progress (burst of 3+ frames)
+                                // Prevents false H265 fallback from transient stalls
+                                if (decodeBurst >= 3 && _freezeCount > 0)
+                                {
+                                    _freezeCount = 0;
+                                }
+
                                 // First frame decoded - exit bootstrap window
                                 if (wrapper.WaitingForFirstFrame)
                                 {
@@ -880,16 +903,22 @@ namespace VRWorkspace.Streaming
                                 var timeSinceRecovery = (DateTime.UtcNow - wrapper.LastDecoderStallRecoveryTime).TotalMilliseconds;
 
                                 // CONDITION: Decoder stopped but Network still active
-                                if (timeSinceAdvance > decoderThreshold && 
-                                    timeSinceNetwork < 500 && 
+                                // For H265 DC mode: RTP bytesReceived is irrelevant (all frames come via DataChannel).
+                                // Skip the "network active" check — SCTP congestion after IDR burst can stall DC
+                                // delivery for seconds while RTP bytes still flow normally.
+                                bool networkActive = isH265DC || timeSinceNetwork < 500;
+                                if (timeSinceAdvance > decoderThreshold &&
+                                    networkActive &&
                                     timeSinceRecovery > RECOVERY_COOLDOWN_MS)
                                 {
                                     Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} DECODER STALL (Path B)! " +
-                                        $"framesDecoded={decoded} (last={wrapper.LastWebRTCFramesDecoded}) frozen for {timeSinceAdvance:F0}ms while bytes are flowing ({timeSinceNetwork:F0}ms).");
-                                    
+                                        $"framesDecoded={decoded} (last={wrapper.LastWebRTCFramesDecoded}) frozen for {timeSinceAdvance:F0}ms" +
+                                        (isH265DC ? " (H265 DC mode)" : $" while bytes are flowing ({timeSinceNetwork:F0}ms)") + ".");
+
                                     // High-confidence decoder/sync issue: Request keyframe immediately
                                     wrapper.LastDecoderStallRecoveryTime = DateTime.UtcNow;
-                                    HandleDecoderStallOrFreeze(wrapper.Index, $"Aggressive decoder stall (dec={decoded}, net={timeSinceNetwork:F0}ms)");
+                                    HandleDecoderStallOrFreeze(wrapper.Index, $"Aggressive decoder stall (dec={decoded}" +
+                                        (isH265DC ? ", H265-DC" : $", net={timeSinceNetwork:F0}ms") + ")");
                                 }
 
                                 // 5. Escalation
@@ -969,8 +998,8 @@ namespace VRWorkspace.Streaming
             // Update stats
             _metrics?.RecordStall();
 
-            // Fallback check for H265
-            if (_selectedCodec == VideoCodec.H265 && (_freezeCount >= 3 || _h265StallStrikes >= 10))
+            // Fallback check for H265 (relaxed: 5 sustained stalls or 15 total strikes)
+            if (_selectedCodec == VideoCodec.H265 && (_freezeCount >= 5 || _h265StallStrikes >= 15))
             {
                 string triggerReason = _freezeCount >= 3 ? $"sustained stall (strike {_freezeCount})" : $"flakey instability ({_h265StallStrikes} total strikes)";
                 Debug.LogError($"[PhaseProtocol] H265 fallback threshold reached: {triggerReason} — triggering H264 fallback");

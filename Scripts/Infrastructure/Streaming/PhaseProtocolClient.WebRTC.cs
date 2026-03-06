@@ -233,6 +233,8 @@ namespace VRWorkspace.Streaming
                         w.LastConnectedTime = DateTime.UtcNow;
                         w.IsReconnecting = false;
                         w.ReconnectAttempts = 0;
+                        w.LastDecoderStallRecoveryTime = DateTime.UtcNow; // Grace period for stall detection
+                        w.WaitingForFirstFrame = true; // Suppress stall detection until first frame
                     }
                     _metrics.ResetStallCount();
                     ResetStallStrikes();

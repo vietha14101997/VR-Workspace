@@ -32,7 +32,6 @@ namespace VRWorkspace.Streaming
         private int _packetCount = 0;
         private int _frameCount = 0;
         private int _droppedBeforeConfig = 0;
-        private int _headerRepairCount = 0;
         private static readonly byte[] AnnexBPrefix = { 0x00, 0x00, 0x00, 0x01 };
 
         // ── Gating strategy ──
@@ -134,6 +133,23 @@ namespace VRWorkspace.Streaming
         }
 
         /// <summary>
+        /// Feed a P-frame received via DataChannel directly to the decoder.
+        /// DEPRECATED: In hybrid mode, P-frames arrive via RTP Encoded Transform.
+        /// Kept as fallback if server still sends type 0x04 messages.
+        /// </summary>
+        public void FeedPFrameFromDataChannel(byte[] pframeAnnexBData)
+        {
+            if (_receiver == null || pframeAnnexBData == null || pframeAnnexBData.Length == 0) return;
+
+            _frameCount++;
+            if (_frameCount <= 10 || _frameCount % 300 == 0)
+                Debug.Log($"{TAG} PC{_receiver?.MonitorIndex} P-frame from DataChannel: {pframeAnnexBData.Length} bytes (frame #{_frameCount})");
+
+            _decoderBootstrapped = true;
+            _receiver.OnEncodedFrameReceived(pframeAnnexBData, false, GetTimestampUs());
+        }
+
+        /// <summary>
         /// Callback for transformed video frames.
         /// </summary>
         private void OnTransformedFrame(RTCTransformEvent e)
@@ -183,19 +199,14 @@ namespace VRWorkspace.Streaming
                 Debug.Log($"{TAG} PC{_receiver?.MonitorIndex} RAW pkt#{_packetCount}: len={data.Length}, ts={rtpTimestamp}, WebRTC_Type={frame.Type}, hex=[{hex}]");
             }
 
-            // ── GATING: Drop frames until codec config arrives AND decoder is bootstrapped ──
-            if (_waitingForCodecConfig)
-            {
-                _droppedBeforeConfig++;
-                if (_droppedBeforeConfig <= 5 || _droppedBeforeConfig % 100 == 0)
-                    Debug.Log($"{TAG} PC{_receiver?.MonitorIndex} Dropped (no codec config yet): #{_droppedBeforeConfig}, len={data.Length}");
-                return;
-            }
+            // ── HYBRID MODE: IDR comes via DataChannel, P-frames come via RTP here. ──
+            // Gate: Wait for decoder bootstrap (IDR fed via DataChannel) before accepting
+            // RTP P-frames. Without IDR reference, P-frames are useless to the decoder.
             if (!_decoderBootstrapped)
             {
                 _droppedBeforeConfig++;
-                if (_droppedBeforeConfig <= 10 || _droppedBeforeConfig % 100 == 0)
-                    Debug.Log($"{TAG} PC{_receiver?.MonitorIndex} Dropped (no IDR from DataChannel yet): #{_droppedBeforeConfig}, len={data.Length}");
+                if (_droppedBeforeConfig <= 5 || _droppedBeforeConfig % 500 == 0)
+                    Debug.Log($"{TAG} PC{_receiver?.MonitorIndex} Dropped (waiting for IDR bootstrap): #{_droppedBeforeConfig}, len={data.Length}");
                 return;
             }
 
@@ -207,7 +218,6 @@ namespace VRWorkspace.Streaming
                 bool hasRealIdr = ContainsIdrNal(data);
                 bool isKeyFrame = hasRealIdr;
 
-                // For Mode A IDR frames (rare — usually too large to arrive), prepend config
                 byte[] outputData = PrependCodecConfigIfNeeded(data, hasRealIdr, ref isKeyFrame);
 
                 _frameCount++;
@@ -224,27 +234,17 @@ namespace VRWorkspace.Streaming
                 return;
             }
 
-            // ── MODE B: Raw NAL or RTP payload (no Annex-B start codes) ──
-            // Some Unity WebRTC receiver builds deliver H265 payload with the first NAL header
-            // byte stripped (observed as packets starting with 0x01 + random payload byte).
-            // Reconstruct a valid 2-byte HEVC NAL header prefix so MediaCodec can decode deltas.
-            if (LooksLikeMissingHevcHeaderByte(data))
-            {
-                data = RepairMissingHevcHeaderByte(data);
-                _headerRepairCount++;
-                if (_headerRepairCount <= 5 || _headerRepairCount % 200 == 0)
-                {
-                    Debug.LogWarning($"{TAG} PC{_receiver?.MonitorIndex} Repaired missing HEVC header byte on pkt#{_packetCount} (len={data.Length})");
-                }
-            }
-
+            // ── MODE B: Raw NAL unit (no Annex-B start codes) ──
+            // Server sends each H265 NAL as a single RTP packet with a dummy prefix byte
+            // that SIPSorcery strips. The Encoded Transform delivers the complete NAL with
+            // its 2-byte HEVC header intact: [nalType<<1|flags, layerId<<3|tid, payload...]
             int nalType = (data[0] >> 1) & 0x3F;
 
             if (_packetCount <= 5 || _packetCount % 500 == 0)
             {
                 string typeDesc = nalType == 49 ? "FU" : nalType == 48 ? "AP" :
                                   nalType == 32 ? "VPS" : nalType == 33 ? "SPS" : nalType == 34 ? "PPS" :
-                                  (nalType >= 19 && nalType <= 21) ? "IDR" : 
+                                  (nalType >= 19 && nalType <= 21) ? "IDR" :
                                   nalType <= 9 ? "TRAIL" : $"NAL({nalType})";
                 Debug.Log($"{TAG} PC{_receiver?.MonitorIndex} pkt#{_packetCount}: type={nalType}({typeDesc}), len={data.Length}, ts={rtpTimestamp}");
             }
@@ -413,28 +413,6 @@ namespace VRWorkspace.Streaming
                    (data[0] == 0 && data[1] == 0 && data[2] == 1);
         }
 
-        private static bool LooksLikeMissingHevcHeaderByte(byte[] data)
-        {
-            if (data == null || data.Length < 2) return false;
-            if (HasAnnexBStartCode(data)) return false;
-
-            // Pattern seen in failing sessions:
-            // data[0] is usually 0x01 (nuh_temporal_id_plus1 from header byte #2),
-            // while header byte #1 is missing.
-            if (data[0] != 0x01) return false;
-
-            int interpretedLayerId = ((data[0] & 0x01) << 5) | ((data[1] >> 3) & 0x1F);
-            return interpretedLayerId != 0;
-        }
-
-        private static byte[] RepairMissingHevcHeaderByte(byte[] data)
-        {
-            byte[] fixedData = new byte[data.Length + 1];
-            fixedData[0] = 0x00;
-            Buffer.BlockCopy(data, 0, fixedData, 1, data.Length);
-            return fixedData;
-        }
-
         /// <summary>
         /// Check if an Annex-B stream contains a real IDR NAL unit (type 19 or 20).
         /// </summary>
@@ -544,7 +522,6 @@ namespace VRWorkspace.Streaming
             _decoderBootstrapped = false;
             _codecConfigApplied = false;
             _droppedBeforeConfig = 0;
-            _headerRepairCount = 0;
             _isFirstFrame = true;
             _frameCount = 0;
             _packetCount = 0;

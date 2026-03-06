@@ -43,7 +43,7 @@ namespace VRWorkspace.Streaming
         private bool _initialized;
         private bool _disposed;
         private bool _flipY = true;      // true fixes upside-down reports
-        private bool _fullRange = true;   // true fixes silver/faded colors reports
+        private bool _fullRange = false;  // Hardware MediaCodec outputs limited-range YUV (Y:16-235)
 
         // Thread-safe timing
         private static readonly System.Diagnostics.Stopwatch _stopwatch = System.Diagnostics.Stopwatch.StartNew();
@@ -65,6 +65,7 @@ namespace VRWorkspace.Streaming
         private const float FALLBACK_TRIGGER_SECONDS = 8f;       // 8s without decoded frame → declare failure
         private const int   FALLBACK_MIN_ENCODED_FRAMES = 30;    // Require at least 30 encoded frames received first
         private DateTime    _firstEncodedFrameTime = DateTime.MinValue;
+        private DateTime    _lastDecodedFrameTime = DateTime.MinValue;  // Track last successful decode
         private bool        _fallbackFired;
 
         /// <summary>
@@ -225,26 +226,30 @@ namespace VRWorkspace.Streaming
                 }
 
                 // ── Fallback detection ──────────────────────────────────────────
-                // If we received enough encoded frames but NEVER decoded any after the timeout,
-                // the hardware H265 decoder is not functional on this device → trigger fallback.
+                // Trigger fallback if decoder stalls for too long, whether it never
+                // decoded any frames OR decoded a few then stopped (e.g. 2 frames then freeze).
                 if (!_fallbackFired
-                    && _decodedCount == 0
                     && EncodedFramesReceived >= FALLBACK_MIN_ENCODED_FRAMES
-                    && _firstEncodedFrameTime != DateTime.MinValue
-                    && (DateTime.UtcNow - _firstEncodedFrameTime).TotalSeconds >= FALLBACK_TRIGGER_SECONDS)
+                    && _firstEncodedFrameTime != DateTime.MinValue)
                 {
-                    _fallbackFired = true;
-                    Debug.LogError($"{TAG} PC{MonitorIndex} DECODER FAILURE: received {EncodedFramesReceived} encoded frames " +
-                        $"but decoded 0 in {FALLBACK_TRIGGER_SECONDS}s. Triggering H265→H264 fallback!");
-                    OnDecoderFailed?.Invoke(MonitorIndex);
+                    var referenceTime = _lastDecodedFrameTime != DateTime.MinValue
+                        ? _lastDecodedFrameTime
+                        : _firstEncodedFrameTime;
+
+                    if ((DateTime.UtcNow - referenceTime).TotalSeconds >= FALLBACK_TRIGGER_SECONDS)
+                    {
+                        _fallbackFired = true;
+                        Debug.LogError($"{TAG} PC{MonitorIndex} DECODER FAILURE: received {EncodedFramesReceived} encoded frames, " +
+                            $"decoded {_decodedCount}, stalled for {FALLBACK_TRIGGER_SECONDS}s. Triggering H265→H264 fallback!");
+                        OnDecoderFailed?.Invoke(MonitorIndex);
+                    }
                 }
 
                 return;
             }
 
             _noFrameTicks = 0; // Reset on successful frame
-            // Also reset fallback timer window so intermittent failures don't re-trigger
-            _firstEncodedFrameTime = DateTime.UtcNow; // Sliding window from last success
+            _lastDecodedFrameTime = DateTime.UtcNow; // Track last successful decode for stall detection
 
             // Get Y plane data
             byte[] yData  = _decoder.GetYPlaneData();

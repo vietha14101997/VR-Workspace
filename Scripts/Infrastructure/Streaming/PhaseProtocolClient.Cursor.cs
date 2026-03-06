@@ -30,6 +30,13 @@ namespace VRWorkspace.Streaming
                 return;
             }
 
+            if (msgType == 0x04)
+            {
+                // H265 P-frame data: [type=0x04][trackIndex(1)][chunkIndex(1)][totalChunks(1)][P-frame data...]
+                HandleH265PFrameData(data);
+                return;
+            }
+
             if (msgType != 1 || data.Length < 19) return; // type 1 = cursor_position
 
             int monitorIndex = data[1];
@@ -103,6 +110,9 @@ namespace VRWorkspace.Streaming
                 byte[] idrData = new byte[dataLen];
                 Buffer.BlockCopy(data, 4, idrData, 0, dataLen);
 
+                // Flush any stale P-frame chunk reassembly (new IDR = new GOP reference)
+                _pframeChunks.Remove(trackIndex);
+
                 if (_h265Handlers.TryGetValue(trackIndex, out var handler))
                 {
                     handler.FeedIdrFromDataChannel(idrData);
@@ -147,6 +157,7 @@ namespace VRWorkspace.Streaming
                     pos += chunks[i].Length;
                 }
                 _idrChunks.Remove(trackIndex);
+                _pframeChunks.Remove(trackIndex); // Flush stale P-frame chunks on new IDR
 
                 if (_h265Handlers.TryGetValue(trackIndex, out var handler))
                 {
@@ -157,6 +168,86 @@ namespace VRWorkspace.Streaming
                 {
                     Debug.LogWarning($"[PhaseProtocol] No H265 handler for track {trackIndex}, reassembled IDR lost");
                 }
+            }
+        }
+
+        // ── P-frame chunk reassembly state ──
+        private readonly System.Collections.Generic.Dictionary<int, byte[][]> _pframeChunks
+            = new System.Collections.Generic.Dictionary<int, byte[][]>();
+        private int _pframeCount = 0;
+
+        /// <summary>
+        /// Handle H265 P-frame data received via DataChannel side-channel.
+        /// Format: [type=0x04][trackIndex(1)][chunkIndex(1)][totalChunks(1)][P-frame Annex-B data...]
+        /// Since the Encoded Transform API delivers broken FU fragments for H265,
+        /// ALL H265 frames (IDR + P) are now sent via DataChannel.
+        /// </summary>
+        private void HandleH265PFrameData(byte[] data)
+        {
+            if (data.Length < 5) return;
+
+            int trackIndex = data[1];
+            int chunkIndex = data[2];
+            int totalChunks = data[3];
+            int dataLen = data.Length - 4;
+
+            if (totalChunks == 1)
+            {
+                // Single chunk — no reassembly needed (most P-frames fit in one chunk)
+                byte[] pframeData = new byte[dataLen];
+                Buffer.BlockCopy(data, 4, pframeData, 0, dataLen);
+                FeedPFrameToReceiver(trackIndex, pframeData);
+                return;
+            }
+
+            // Multi-chunk reassembly (rare for P-frames, but possible at high bitrate)
+            if (!_pframeChunks.TryGetValue(trackIndex, out var chunks) || chunks.Length != totalChunks)
+            {
+                chunks = new byte[totalChunks][];
+                _pframeChunks[trackIndex] = chunks;
+            }
+
+            byte[] chunkData = new byte[dataLen];
+            Buffer.BlockCopy(data, 4, chunkData, 0, dataLen);
+            chunks[chunkIndex] = chunkData;
+
+            bool complete = true;
+            int totalSize = 0;
+            for (int i = 0; i < totalChunks; i++)
+            {
+                if (chunks[i] == null) { complete = false; break; }
+                totalSize += chunks[i].Length;
+            }
+
+            if (complete)
+            {
+                byte[] pframeData = new byte[totalSize];
+                int pos = 0;
+                for (int i = 0; i < totalChunks; i++)
+                {
+                    Buffer.BlockCopy(chunks[i], 0, pframeData, pos, chunks[i].Length);
+                    pos += chunks[i].Length;
+                }
+                _pframeChunks.Remove(trackIndex);
+                FeedPFrameToReceiver(trackIndex, pframeData);
+            }
+        }
+
+        private void FeedPFrameToReceiver(int trackIndex, byte[] pframeData)
+        {
+            _pframeCount++;
+            if (_pframeCount <= 5 || _pframeCount % 300 == 0)
+                Debug.Log($"[PhaseProtocol] H265 P-frame via DataChannel: track={trackIndex}, {pframeData.Length} bytes (total #{_pframeCount})");
+
+            if (_h265Handlers.TryGetValue(trackIndex, out var handler))
+            {
+                handler.FeedPFrameFromDataChannel(pframeData);
+            }
+            else if (_h265Receivers.TryGetValue(trackIndex, out var receiver))
+            {
+                // Direct feed to receiver if handler not available
+                receiver.OnEncodedFrameReceived(pframeData, false,
+                    System.Diagnostics.Stopwatch.GetTimestamp() * 1_000_000 / System.Diagnostics.Stopwatch.Frequency);
             }
         }
 

@@ -90,12 +90,18 @@ Shader "VRWorkspace/NV12ToRGBA"
                     vp = (v - 128.0 / 255.0) * (255.0 / 224.0);
                 }
 
-                // BT.709 matrix
-                float r = yp + 1.5748 * vp;
-                float g = yp - 0.1873 * up - 0.4681 * vp;
-                float b = yp + 1.8556 * up;
+                // BT.709 matrix → produces sRGB (gamma-encoded) RGB values
+                float r = saturate(yp + 1.5748 * vp);
+                float g = saturate(yp - 0.1873 * up - 0.4681 * vp);
+                float b = saturate(yp + 1.8556 * up);
 
-                return fixed4(saturate(r), saturate(g), saturate(b), 1.0);
+                // Convert sRGB → linear for Unity's linear rendering pipeline.
+                // Without this, the GPU applies another gamma curve on RT write → double gamma → washed out.
+                r = GammaToLinearSpaceExact(r);
+                g = GammaToLinearSpaceExact(g);
+                b = GammaToLinearSpaceExact(b);
+
+                return fixed4(r, g, b, 1.0);
             }
             ENDCG
         }

@@ -116,6 +116,7 @@ namespace VRWorkspace.Streaming
         private volatile bool _h265FallbackTriggered = false;
         private volatile bool _h265FallbackInProgress = false;
         private int           _h265StallStrikes = 0; // Cumulative strikes for persistent H265 stalls
+        private volatile int  _reconnectGeneration = 0; // Guards against stale SDP answers from superseded reconnects
 
         // ── Receive loop internals ─────────────────────────────────────────────
         private int   _msgCounter            = 0;
@@ -345,12 +346,17 @@ namespace VRWorkspace.Streaming
                 // 4. Notify UI (e.g. show toast "Switched to H264 for compatibility")
                 OnCodecFallback?.Invoke("H264");
 
-                // 5. Reconnect entire PeerConnection with H264 codec preferences.
+                // 5. Wait for server to acknowledge codec switch before reconnecting.
+                //    This prevents the race where the server responds to a stale H265 auto-heal offer
+                //    with an H265 answer, which would then be incorrectly applied to the new H264 PC.
+                Debug.Log("[PhaseProtocol] Waiting for server codec switch ACK before reconnecting...");
+                await Task.Delay(500); // Allow server to process codec_fallback and switch encoder
+
+                // 6. Reconnect entire PeerConnection with H264 codec preferences.
                 //    ReconnectSinglePCAsync() uses _selectedCodec (now H264) in SetCodecPreferences().
-                await Task.Delay(200); // Brief pause for server to process the notification
                 Debug.Log("[PhaseProtocol] Initiating Single-PC reconnect with H264...");
                 _streamingStartedFired = false;
-                _ = ReconnectSinglePCAsync();
+                await ReconnectSinglePCAsync();
             }
             catch (Exception ex)
             {
@@ -956,17 +962,28 @@ namespace VRWorkspace.Streaming
 
                         if (_missedPongCount >= MAX_MISSED_PONGS)
                         {
-                            Debug.LogError("[PhaseProtocol] Server not responding – triggering reconnect");
-                            OnConnectionHealthCritical?.Invoke();
-
-                            List<PCWrapper> wrappers;
-                            lock (_lock) { wrappers = _peerConnections.ToList(); }
-                            foreach (var wrapper in wrappers)
+                            // During Phase 2 the server is busy setting up VDD/displays
+                            // (can take 10-15s). Don't trigger reconnect — no PeerConnections
+                            // exist yet, and the deferred reconnect would kill the first
+                            // working connection once Phase 3 starts.
+                            if (_stateMachine.IsInPhase2)
                             {
-                                if (!wrapper.IsReconnecting)
+                                Debug.LogWarning("[PhaseProtocol] Pong timeout during Phase 2 (server busy with display setup) – skipping reconnect");
+                            }
+                            else
+                            {
+                                Debug.LogError("[PhaseProtocol] Server not responding – triggering reconnect");
+                                OnConnectionHealthCritical?.Invoke();
+
+                                List<PCWrapper> wrappers;
+                                lock (_lock) { wrappers = _peerConnections.ToList(); }
+                                foreach (var wrapper in wrappers)
                                 {
-                                    wrapper.IsReconnecting = true;
-                                    _ = AutoHealMonitorAsync(wrapper.Index);
+                                    if (!wrapper.IsReconnecting)
+                                    {
+                                        wrapper.IsReconnecting = true;
+                                        _ = AutoHealMonitorAsync(wrapper.Index);
+                                    }
                                 }
                             }
                         }

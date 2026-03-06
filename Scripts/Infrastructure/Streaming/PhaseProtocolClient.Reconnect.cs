@@ -82,6 +82,8 @@ namespace VRWorkspace.Streaming
                     wrapper.LastConnectedTime = DateTime.UtcNow;
                     wrapper.IsReconnecting = false;
                     wrapper.ReconnectAttempts = 0; // Reset on successful reconnection
+                    wrapper.LastDecoderStallRecoveryTime = DateTime.UtcNow; // Grace period for stall detection
+                    wrapper.WaitingForFirstFrame = true; // Suppress stall detection until first frame
                     _metrics.ResetStallCount();
                     _metrics.ResetIceDisconnectCount();
                     ResetStallStrikes();
@@ -310,7 +312,9 @@ namespace VRWorkspace.Streaming
                 oldPc = _peerConnections[0].PC;
             }
 
-            Debug.Log($"[PhaseProtocol] ReconnectSinglePC: Reconnecting {count} monitors...");
+            // Increment reconnect generation to invalidate any in-flight answers from previous reconnects
+            int gen = ++_reconnectGeneration;
+            Debug.Log($"[PhaseProtocol] ReconnectSinglePC: Reconnecting {count} monitors (gen={gen})...");
 
             // Close old PeerConnection
             try
@@ -323,11 +327,25 @@ namespace VRWorkspace.Streaming
                 Debug.LogWarning($"[PhaseProtocol] Error closing old PC: {ex.Message}");
             }
 
+            // Check if a newer reconnect superseded us during disposal
+            if (_reconnectGeneration != gen)
+            {
+                Debug.LogWarning($"[PhaseProtocol] ReconnectSinglePC gen={gen} superseded by gen={_reconnectGeneration}, aborting");
+                return;
+            }
+
             // Reset answer TCS for new session
             _allAnswersReceivedTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             // Recreate everything using the same method as initial connection
             await CreateSinglePCMultiTrackAsync(count);
+
+            // Check again after async operation — a newer reconnect may have started
+            if (_reconnectGeneration != gen)
+            {
+                Debug.LogWarning($"[PhaseProtocol] ReconnectSinglePC gen={gen} superseded after PC creation, aborting");
+                return;
+            }
 
             Debug.Log("[PhaseProtocol] ReconnectSinglePC: Reconnection initiated, waiting for answer...");
         }
@@ -351,21 +369,25 @@ namespace VRWorkspace.Streaming
 
             try
             {
+                // USB: single keyframe only — SCTP congestion window is small after reconnect,
+                // flooding with IDR bursts (30-50KB each) makes congestion WORSE and causes
+                // a destructive stall→reconnect→stall cycle.
                 // WiFi: more aggressive burst (5 I-frames for redundancy against packet loss)
-                int burstCount = _isWiFiConnection ? 5 : 3;
+                int burstCount = _isUsbMode ? 1 : (_isWiFiConnection ? 5 : 3);
 
                 // STEP 1: Keyframe burst
                 wrapper.GraduatedRecoveryStep = 1;
                 Debug.Log($"[PhaseProtocol] PC{monitorIndex} graduated step 1: keyframe burst (count={burstCount})");
                 await SendTextAsync($"{{\"type\":\"request_keyframe_burst\",\"monitorIndex\":{monitorIndex},\"count\":{burstCount}}}");
-                
-                // Wait for frames to resume
-                int step1Delay = _isWiFiConnection ? 600 : 300;
+
+                // Wait for frames to resume (USB needs longer for SCTP to deliver)
+                int step1Delay = _isUsbMode ? 1500 : (_isWiFiConnection ? 600 : 300);
                 await Task.Delay(step1Delay, _cts.Token);
 
                 // Verify recovery using GROUND TRUTH (Decoder advance time)
                 var timeSinceDecoderAdvance = (DateTime.UtcNow - wrapper.LastDecoderAdvanceTime).TotalMilliseconds;
-                if (timeSinceDecoderAdvance < 200) 
+                // 500ms window: new SSRC after reconnect needs time for jitter buffer init
+                if (timeSinceDecoderAdvance < 500)
                 {
                     Debug.Log($"[PhaseProtocol] PC{monitorIndex} recovered at step 1 (decoder advanced {timeSinceDecoderAdvance:F0}ms ago)");
                     return;
@@ -377,11 +399,11 @@ namespace VRWorkspace.Streaming
                 SkipToLiveImmediate(monitorIndex);
                 await Task.Delay(50);
                 await SendTextAsync($"{{\"type\":\"request_keyframe_burst\",\"monitorIndex\":{monitorIndex},\"count\":{burstCount}}}");
-                int step2Delay = _isWiFiConnection ? 800 : 400;
+                int step2Delay = _isUsbMode ? 2000 : (_isWiFiConnection ? 800 : 400);
                 await Task.Delay(step2Delay, _cts.Token);
 
                 timeSinceDecoderAdvance = (DateTime.UtcNow - wrapper.LastDecoderAdvanceTime).TotalMilliseconds;
-                if (timeSinceDecoderAdvance < 200)
+                if (timeSinceDecoderAdvance < 500)
                 {
                     Debug.Log($"[PhaseProtocol] PC{monitorIndex} recovered at step 2!");
                     return;
@@ -451,6 +473,14 @@ namespace VRWorkspace.Streaming
             if (!_stateMachine.IsStreaming)
             {
                 Debug.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal: no longer streaming, skip reconnect");
+                wrapper.IsReconnecting = false;
+                return;
+            }
+
+            // Abort auto-heal if H265 fallback has been triggered — fallback handles its own reconnect
+            if (_h265FallbackTriggered || _h265FallbackInProgress)
+            {
+                Debug.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal: H265 fallback in progress, aborting auto-heal");
                 wrapper.IsReconnecting = false;
                 return;
             }
