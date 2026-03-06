@@ -91,8 +91,9 @@ namespace VRWorkspace.Streaming
 
                 if (decoded <= 0) return;
 
-                // Convert short → float and write to ring buffer
                 int samplesToWrite = decoded * CHANNELS;
+
+                // Convert short → float and write to ring buffer
                 int wp = _writePos;
                 for (int i = 0; i < samplesToWrite; i++)
                 {

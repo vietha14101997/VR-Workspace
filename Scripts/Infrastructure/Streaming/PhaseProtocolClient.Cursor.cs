@@ -7,10 +7,10 @@ namespace VRWorkspace.Streaming
     public partial class PhaseProtocolClient
     {
         /// <summary>
-        /// Handle cursor position from DataChannel (binary format, low-latency).
-        /// Binary: [type(1)][monitorIndex(1)][u(4)][v(4)][flags(1)][cursorId(8)] = 19 bytes
+        /// Handle H.265 video frames from dedicated unreliable DataChannel.
+        /// Separated from cursor DC to avoid SCTP head-of-line blocking on audio.
         /// </summary>
-        private void HandleCursorFromDataChannel(byte[] data)
+        private void HandleH265VideoFromDataChannel(byte[] data)
         {
             if (data == null || data.Length < 2) return;
 
@@ -18,22 +18,34 @@ namespace VRWorkspace.Streaming
 
             if (msgType == 0x02)
             {
-                // H265 codec config: [type=0x02][trackIndex(1)][Annex-B VPS+SPS+PPS...]
                 HandleH265CodecConfig(data);
-                return;
             }
-
-            if (msgType == 0x03)
+            else if (msgType == 0x03)
             {
-                // H265 IDR keyframe data: [type=0x03][trackIndex(1)][chunkIndex(1)][totalChunks(1)][IDR data...]
                 HandleH265IdrData(data);
-                return;
             }
-
-            if (msgType == 0x04)
+            else if (msgType == 0x04)
             {
-                // H265 P-frame data: [type=0x04][trackIndex(1)][chunkIndex(1)][totalChunks(1)][P-frame data...]
                 HandleH265PFrameData(data);
+            }
+        }
+
+        /// <summary>
+        /// Handle cursor position from DataChannel (binary format, low-latency).
+        /// Binary: [type(1)][monitorIndex(1)][u(4)][v(4)][flags(1)][cursorId(8)] = 19 bytes
+        /// H.265 video frames now go through dedicated h265video DC (unreliable, unordered).
+        /// This DC only handles cursor position (type=0x01) and legacy H.265 fallback.
+        /// </summary>
+        private void HandleCursorFromDataChannel(byte[] data)
+        {
+            if (data == null || data.Length < 2) return;
+
+            byte msgType = data[0];
+
+            // Legacy fallback: handle H.265 frames on cursor DC if h265video DC not available
+            if (msgType == 0x02 || msgType == 0x03 || msgType == 0x04)
+            {
+                HandleH265VideoFromDataChannel(data);
                 return;
             }
 

@@ -103,6 +103,21 @@ namespace VRWorkspace.Streaming
             _cursorChannel.OnClose = () => Debug.Log("[PhaseProtocol] Cursor DataChannel closed");
             Debug.Log("[PhaseProtocol] Cursor via DataChannel (low-latency binary)");
 
+            // Client creates "h265video" DataChannel for H.265 video frames.
+            // Unreliable + unordered: avoids SCTP head-of-line blocking that degrades audio quality.
+            // P-frames are fire-and-forget (lost P-frame → wait for next IDR to resync).
+            // IDR + codec config also go here (infrequent, server handles retry via keyframe interval).
+            var h265VideoInit = new RTCDataChannelInit
+            {
+                ordered = false,
+                maxRetransmits = 0
+            };
+            _h265VideoChannel = pc.CreateDataChannel("h265video", h265VideoInit);
+            _h265VideoChannel.OnMessage = bytes => HandleH265VideoFromDataChannel(bytes);
+            _h265VideoChannel.OnOpen = () => Debug.Log("[PhaseProtocol] H265 Video DataChannel opened (unreliable, unordered)");
+            _h265VideoChannel.OnClose = () => Debug.Log("[PhaseProtocol] H265 Video DataChannel closed");
+            Debug.Log("[PhaseProtocol] H265 Video via dedicated DataChannel (unreliable, unordered)");
+
             // Setup event handlers for single PC
             SetupSinglePCEventHandlers(pc, trackWrappers, transceivers);
 

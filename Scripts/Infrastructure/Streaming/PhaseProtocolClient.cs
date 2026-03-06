@@ -88,6 +88,7 @@ namespace VRWorkspace.Streaming
         private bool   _streamingStartedFired;
         private RTCDataChannel _sctpInitChannel; // Kept alive to maintain SCTP transport for audio DataChannel
         private RTCDataChannel _cursorChannel;   // Low-latency cursor position updates (binary, UDP-like)
+        private RTCDataChannel _h265VideoChannel; // Unreliable unordered DC for H.265 video (avoids SCTP HOL blocking on audio)
         private int _pcGeneration; // Incremented on cleanup to guard stale PC callbacks
 
         // ── Frame timing / FPS ────────────────────────────────────────────────
@@ -1099,6 +1100,7 @@ namespace VRWorkspace.Streaming
 
             _sctpInitChannel = null;
             _cursorChannel = null;
+            _h265VideoChannel = null;
 
             // Cleanup H265 Custom Decoders
             foreach (var receiver in _h265Receivers.Values)
