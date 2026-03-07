@@ -66,7 +66,21 @@ namespace VRWorkspace.Streaming
             _cursorChannel.OnMessage = bytes => HandleCursorFromDataChannel(bytes);
             _cursorChannel.OnOpen = () => Debug.Log("[PhaseProtocol] Cursor DataChannel opened (reconnect)");
             _cursorChannel.OnClose = () => Debug.Log("[PhaseProtocol] Cursor DataChannel closed (reconnect)");
-            Debug.Log($"[PhaseProtocol] PC{idx} DataChannels created (audio+cursor) on reconnect");
+
+            // Re-create per-track H265 video DataChannels
+            var h265VideoInit = new RTCDataChannelInit { ordered = false, maxRetransmits = 0 };
+            _h265VideoChannels.Clear();
+            for (int t = 0; t < _expectedMonitorCount; t++)
+            {
+                string label = $"h265video-{t}";
+                var ch = pc.CreateDataChannel(label, h265VideoInit);
+                int capturedTrack = t;
+                ch.OnMessage = bytes => HandleH265VideoFromDataChannel(bytes);
+                ch.OnOpen = () => Debug.Log($"[PhaseProtocol] H265 Video DC opened: {label} (reconnect)");
+                ch.OnClose = () => Debug.Log($"[PhaseProtocol] H265 Video DC closed: {label} (reconnect)");
+                _h265VideoChannels[t] = ch;
+            }
+            Debug.Log($"[PhaseProtocol] PC{idx} DataChannels created (audio+cursor+{_expectedMonitorCount}x h265video) on reconnect");
 
             // Connection state handlers
             pc.OnIceConnectionChange = s =>

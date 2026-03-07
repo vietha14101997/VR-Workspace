@@ -88,7 +88,10 @@ namespace VRWorkspace.Streaming
         private bool   _streamingStartedFired;
         private RTCDataChannel _sctpInitChannel; // Kept alive to maintain SCTP transport for audio DataChannel
         private RTCDataChannel _cursorChannel;   // Low-latency cursor position updates (binary, UDP-like)
-        private RTCDataChannel _h265VideoChannel; // Unreliable unordered DC for H.265 video (avoids SCTP HOL blocking on audio)
+        // Per-track DataChannels for H.265 video (unreliable, unordered).
+        // Each track has its own DC → own SCTP buffer → no cross-track congestion.
+        // Labels: "h265video-0", "h265video-1", etc.
+        private readonly Dictionary<int, RTCDataChannel> _h265VideoChannels = new Dictionary<int, RTCDataChannel>();
         private RTCPeerConnection _audioPc; // Dedicated PeerConnection for audio DC (isolated SCTP, no H.265 video congestion)
         private volatile bool _audioAnswerApplied;
         private readonly List<RTCIceCandidateInit> _pendingAudioRemoteCandidates = new();
@@ -1111,7 +1114,7 @@ namespace VRWorkspace.Streaming
 
             _sctpInitChannel = null;
             _cursorChannel = null;
-            _h265VideoChannel = null;
+            _h265VideoChannels.Clear();
 
             try { _audioPc?.Close(); _audioPc?.Dispose(); } catch { }
             _audioPc = null;
