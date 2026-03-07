@@ -551,6 +551,10 @@ namespace VRWorkspace.Streaming
                                 OnH265DecoderFailed(monIdx);
                             };
                             receiver.OnKeyframeNeeded += monIdx => RequestKeyframe(monIdx);
+                            receiver.OnCorruptionDetected += monIdx =>
+                            {
+                                TaintTrack(monIdx, "luminance corruption detected by decoder");
+                            };
 
                             // Hook into Encoded Transform (Insertable Streams)
                             try {
@@ -953,6 +957,10 @@ namespace VRWorkspace.Streaming
                             };
                             receiver.OnDecoderFailed += monIdx => OnH265DecoderFailed(monIdx);
                             receiver.OnKeyframeNeeded += monIdx => RequestKeyframe(monIdx);
+                            receiver.OnCorruptionDetected += monIdx =>
+                            {
+                                TaintTrack(monIdx, "luminance corruption detected by decoder");
+                            };
 
                             // Hook into Encoded Transform (Insertable Streams)
                             try {

@@ -89,6 +89,30 @@ namespace VRWorkspace.Streaming
         private byte[] _yBuf;
         private byte[] _uvBuf;
 
+        // ──────────── Corruption Detection ────────────
+        // Track Y-plane luminance to detect inter-frame prediction corruption.
+        // When P-frames are lost, decoder produces frames with wildly wrong colors.
+        // Detect by monitoring average luminance jumps between consecutive frames.
+        private float _prevAvgLuminance = -1f;
+        private int _luminanceJumpCount = 0;
+        private const float LUMINANCE_JUMP_THRESHOLD = 0.25f;  // 25% absolute jump in avg Y
+        private const int LUMINANCE_JUMP_TRIGGER = 3;           // 3 rapid jumps = likely corruption
+        private DateTime _lastLuminanceJumpTime = DateTime.MinValue;
+        private const float LUMINANCE_JUMP_WINDOW_SECONDS = 1.0f; // Reset jump count after 1s calm
+
+        // Corruption recovery state
+        private bool _corruptionSuspected;
+        private DateTime _lastCorruptionTime = DateTime.MinValue;
+
+        // ── IDR gate: after flush, only accept keyframes until reference chain is restored ──
+        private bool _waitingForCleanIdr;
+
+        /// <summary>
+        /// Fires when frame corruption is detected (e.g., from inter-frame prediction errors).
+        /// Parameters: monitorIndex. Receiver should request keyframe + decoder flush.
+        /// </summary>
+        public event Action<int> OnCorruptionDetected;
+
         // ──────────── Events ────────────
         /// <summary>
         /// Fires on Unity main thread each time a new decoded frame is ready.
@@ -187,6 +211,20 @@ namespace VRWorkspace.Streaming
             if (_firstEncodedFrameTime == DateTime.MinValue)
                 _firstEncodedFrameTime = DateTime.UtcNow;
 
+            // IDR gate: after flush, drop P-frames until a keyframe restores the reference chain
+            if (_waitingForCleanIdr)
+            {
+                if (isKeyFrame)
+                {
+                    _waitingForCleanIdr = false;
+                    Debug.Log($"{TAG} PC{MonitorIndex} Clean IDR received — reference chain restored, accepting P-frames again");
+                }
+                else
+                {
+                    return; // Drop P-frame — no valid reference after flush
+                }
+            }
+
             // Use PushEncodedFrame to pass the explicit isKeyFrame flag (detected by NAL parsing)
             bool pushed = _decoder.PushEncodedFrame(encodedData, presentationTimeUs > 0 ? presentationTimeUs : GetTimestampUs(), isKeyFrame);
             
@@ -226,11 +264,14 @@ namespace VRWorkspace.Streaming
             if (!gotFrame)
             {
                 _noFrameTicks++;
-                // Request keyframe after ~1.5s stall (90 ticks at 60fps) — gives decoder another chance before fallback
-                if (_noFrameTicks == 90 && !_keyframeRequested && _decodedCount > 0)
+                // Request keyframe after ~0.75s stall (45 ticks at 60fps) — fast recovery for corruption
+                if (_noFrameTicks == 45 && !_keyframeRequested && _decodedCount > 0)
                 {
                     _keyframeRequested = true;
-                    Debug.LogWarning($"{TAG} PC{MonitorIndex} Short stall detected ({_noFrameTicks} ticks), requesting keyframe");
+                    // Push stall reference forward: give server time to respond to keyframe request
+                    // before triggering DECODER FAILURE fallback. Server may be draining DC buffer.
+                    _lastDecodedFrameTime = DateTime.UtcNow;
+                    Debug.LogWarning($"{TAG} PC{MonitorIndex} Short stall detected ({_noFrameTicks} ticks, ~{_noFrameTicks / 60f:F1}s), requesting keyframe");
                     OnKeyframeNeeded?.Invoke(MonitorIndex);
                 }
 
@@ -246,7 +287,9 @@ namespace VRWorkspace.Streaming
                 // ── Fallback detection (2-phase) ─────────────────────────────────
                 // Phase 1 (quick probe): If decoder NEVER produced a frame, fail fast (3s)
                 // Phase 2 (sustained stall): If decoder worked then stopped, use longer timeout (5s)
+                // Skip when deliberately waiting for IDR (P-frames are being dropped intentionally)
                 if (!_fallbackFired
+                    && !_waitingForCleanIdr
                     && EncodedFramesReceived >= FALLBACK_MIN_ENCODED_FRAMES
                     && _firstEncodedFrameTime != DateTime.MinValue)
                 {
@@ -350,6 +393,27 @@ namespace VRWorkspace.Streaming
                 _yTex.Apply(false, false);
             }
 
+            // ── Corruption detection (cheap: 16 sample points from Y plane) ──
+            if (CheckFrameCorruption(yData, fWidth, fHeight, yStride))
+            {
+                if (!_corruptionSuspected || (DateTime.UtcNow - _lastCorruptionTime).TotalSeconds > 2.0)
+                {
+                    _corruptionSuspected = true;
+                    _lastCorruptionTime = DateTime.UtcNow;
+                    Debug.LogWarning($"{TAG} PC{MonitorIndex} CORRUPTION DETECTED: rapid luminance oscillation (decoded={_decodedCount}).");
+
+                    // Fire corruption event — TaintTrack handles flush + keyframe + P-frame gating
+                    OnCorruptionDetected?.Invoke(MonitorIndex);
+                    return; // Skip displaying this corrupted frame
+                }
+            }
+            else if (_corruptionSuspected && (DateTime.UtcNow - _lastCorruptionTime).TotalSeconds > 3.0)
+            {
+                // Corruption resolved (3s of clean frames)
+                _corruptionSuspected = false;
+                Debug.Log($"{TAG} PC{MonitorIndex} Corruption resolved (3s clean)");
+            }
+
             // Upload UV plane: always use stride-copy to produce exactly uvWidth*uvHeight*2 bytes.
             // Android NV12 UV plane is interleaved (CbCr), RG16 format = 2 bytes per pixel.
             {
@@ -387,11 +451,85 @@ namespace VRWorkspace.Streaming
 
         /// <summary>
         /// Flush decoder on stream discontinuity (e.g., server restart, seek).
+        /// After flush, only keyframes are accepted until the reference chain is restored.
         /// </summary>
         public void Flush()
         {
             if (_initialized && !_disposed)
+            {
                 _decoder?.Flush();
+                _waitingForCleanIdr = true;
+                Debug.Log($"{TAG} PC{MonitorIndex} Flushed — waiting for clean IDR before accepting P-frames");
+            }
+        }
+
+        /// <summary>
+        /// Sample average luminance from Y-plane data (cheap: 16 sample points in 4x4 grid).
+        /// Y plane in NV12 is raw luminance: 0=black, 255=white.
+        /// </summary>
+        private float SampleAverageLuminance(byte[] yData, int width, int height, int stride)
+        {
+            if (yData == null || width == 0 || height == 0) return 0.5f;
+
+            float sum = 0f;
+            int samples = 0;
+
+            // Sample 4x4 grid (16 points) — very fast, avoids reading entire plane
+            for (int row = 1; row <= 4; row++)
+            {
+                int y = height * row / 5;
+                for (int col = 1; col <= 4; col++)
+                {
+                    int x = width * col / 5;
+                    int idx = y * stride + x;
+                    if (idx < yData.Length)
+                    {
+                        sum += yData[idx];
+                        samples++;
+                    }
+                }
+            }
+
+            return samples > 0 ? (sum / samples) / 255f : 0.5f;
+        }
+
+        /// <summary>
+        /// Check for frame corruption by detecting rapid luminance jumps.
+        /// Returns true if corruption is suspected.
+        /// </summary>
+        private bool CheckFrameCorruption(byte[] yData, int width, int height, int stride)
+        {
+            float avgLum = SampleAverageLuminance(yData, width, height, stride);
+
+            if (_prevAvgLuminance < 0f)
+            {
+                _prevAvgLuminance = avgLum;
+                return false;
+            }
+
+            float delta = Mathf.Abs(avgLum - _prevAvgLuminance);
+            _prevAvgLuminance = avgLum;
+
+            if (delta > LUMINANCE_JUMP_THRESHOLD)
+            {
+                var now = DateTime.UtcNow;
+
+                // Reset jump count if too much time has passed (legitimate scene change)
+                if ((now - _lastLuminanceJumpTime).TotalSeconds > LUMINANCE_JUMP_WINDOW_SECONDS)
+                    _luminanceJumpCount = 0;
+
+                _luminanceJumpCount++;
+                _lastLuminanceJumpTime = now;
+
+                // Multiple rapid jumps = corruption (legitimate changes are usually sustained, not oscillating)
+                if (_luminanceJumpCount >= LUMINANCE_JUMP_TRIGGER)
+                {
+                    _luminanceJumpCount = 0;
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public void SetFlipY(bool flip)

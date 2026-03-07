@@ -193,6 +193,10 @@ namespace VRWorkspace.Streaming
                             // Hook fallback: if decoder still fails after reconnect, switch to H264
                             receiver.OnDecoderFailed += monIdx => OnH265DecoderFailed(monIdx);
                             receiver.OnKeyframeNeeded += monIdx => RequestKeyframe(monIdx);
+                            receiver.OnCorruptionDetected += monIdx =>
+                            {
+                                TaintTrack(monIdx, "luminance corruption detected by decoder");
+                            };
 
                             // Hook Encoded Transform
                             try

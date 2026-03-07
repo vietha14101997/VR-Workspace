@@ -514,6 +514,20 @@ namespace VRWorkspace.Streaming
             => _stopwatch.ElapsedTicks * 1_000_000 / System.Diagnostics.Stopwatch.Frequency;
 
         /// <summary>
+        /// Re-close the bootstrap gate so RTP P-frames are dropped until next IDR.
+        /// Called when corruption is detected (reference chain broken).
+        /// Unlike ResetState(), this preserves codec config and counters.
+        /// </summary>
+        public void ResetBootstrapGate()
+        {
+            if (_decoderBootstrapped)
+            {
+                _decoderBootstrapped = false;
+                Debug.Log($"{TAG} PC{_receiver?.MonitorIndex} Bootstrap gate RE-CLOSED (corruption recovery). RTP P-frames will be dropped until next IDR from DataChannel.");
+            }
+        }
+
+        /// <summary>
         /// Reset internal state for reconnection.
         /// </summary>
         public void ResetState()

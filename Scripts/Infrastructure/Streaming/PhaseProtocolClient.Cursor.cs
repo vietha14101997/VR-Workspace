@@ -96,8 +96,23 @@ namespace VRWorkspace.Streaming
         }
 
         // ── IDR chunk reassembly state ──
-        private readonly System.Collections.Generic.Dictionary<int, byte[][]> _idrChunks 
+        private readonly System.Collections.Generic.Dictionary<int, byte[][]> _idrChunks
             = new System.Collections.Generic.Dictionary<int, byte[][]>();
+
+        // Chunk timeout tracking for corruption detection
+        private readonly System.Collections.Generic.Dictionary<int, DateTime> _idrChunkStartTimes
+            = new System.Collections.Generic.Dictionary<int, DateTime>();
+        private readonly System.Collections.Generic.Dictionary<int, DateTime> _pframeChunkStartTimes
+            = new System.Collections.Generic.Dictionary<int, DateTime>();
+        private int _consecutiveDroppedPframes = 0;
+        private DateTime _lastCorruptionKeyframeRequest = DateTime.MinValue;
+
+        // ── P-frame gating: stop feeding P-frames when reference chain is broken ──
+        // When ANY chunk is lost, the decoder's reference chain is corrupted.
+        // ALL subsequent P-frames will produce garbage until a new IDR arrives.
+        // Tainted tracks drop P-frames at the source to prevent decoder corruption.
+        private readonly System.Collections.Generic.HashSet<int> _taintedTracks
+            = new System.Collections.Generic.HashSet<int>();
 
         /// <summary>
         /// Handle H265 IDR keyframe data received via DataChannel side-channel.
@@ -124,6 +139,9 @@ namespace VRWorkspace.Streaming
 
                 // Flush any stale P-frame chunk reassembly (new IDR = new GOP reference)
                 _pframeChunks.Remove(trackIndex);
+                _idrChunkStartTimes.Remove(trackIndex);
+                _consecutiveDroppedPframes = 0; // IDR received, reset corruption counter
+                UntaintTrack(trackIndex); // Clean IDR received — reference chain restored
 
                 if (_h265Handlers.TryGetValue(trackIndex, out var handler))
                 {
@@ -140,8 +158,33 @@ namespace VRWorkspace.Streaming
             // Multi-chunk reassembly
             if (!_idrChunks.TryGetValue(trackIndex, out var chunks) || chunks.Length != totalChunks)
             {
+                // Check if previous IDR assembly was incomplete (chunks were lost)
+                if (_idrChunks.ContainsKey(trackIndex) && chunkIndex == 0)
+                {
+                    var oldChunks = _idrChunks[trackIndex];
+                    int receivedCount = 0;
+                    for (int i = 0; i < oldChunks.Length; i++)
+                        if (oldChunks[i] != null) receivedCount++;
+                    Debug.LogWarning($"[PhaseProtocol] IDR chunk loss detected for track {trackIndex}: had {receivedCount}/{oldChunks.Length} chunks, discarding stale assembly");
+                    TaintTrack(trackIndex, "IDR chunk loss");
+                }
                 chunks = new byte[totalChunks][];
                 _idrChunks[trackIndex] = chunks;
+                _idrChunkStartTimes[trackIndex] = DateTime.UtcNow;
+            }
+            else if (chunkIndex == 0 && chunks[0] != null)
+            {
+                // New IDR started while previous was incomplete
+                int receivedCount = 0;
+                for (int i = 0; i < chunks.Length; i++)
+                    if (chunks[i] != null) receivedCount++;
+                if (receivedCount < chunks.Length)
+                {
+                    Debug.LogWarning($"[PhaseProtocol] New IDR started but previous incomplete for track {trackIndex}: {receivedCount}/{chunks.Length}");
+                }
+                chunks = new byte[totalChunks][];
+                _idrChunks[trackIndex] = chunks;
+                _idrChunkStartTimes[trackIndex] = DateTime.UtcNow;
             }
 
             // Store this chunk
@@ -169,7 +212,10 @@ namespace VRWorkspace.Streaming
                     pos += chunks[i].Length;
                 }
                 _idrChunks.Remove(trackIndex);
+                _idrChunkStartTimes.Remove(trackIndex);
+                _consecutiveDroppedPframes = 0; // IDR received, reset corruption counter
                 _pframeChunks.Remove(trackIndex); // Flush stale P-frame chunks on new IDR
+                UntaintTrack(trackIndex); // Complete IDR received — reference chain restored
 
                 if (_h265Handlers.TryGetValue(trackIndex, out var handler))
                 {
@@ -215,8 +261,20 @@ namespace VRWorkspace.Streaming
             // Multi-chunk reassembly (rare for P-frames, but possible at high bitrate)
             if (!_pframeChunks.TryGetValue(trackIndex, out var chunks) || chunks.Length != totalChunks)
             {
+                // Check if previous P-frame assembly was incomplete (chunk loss = corruption)
+                if (_pframeChunks.ContainsKey(trackIndex) && chunkIndex == 0)
+                {
+                    _consecutiveDroppedPframes++;
+                    if (_consecutiveDroppedPframes <= 5 || _consecutiveDroppedPframes % 50 == 0)
+                        Debug.LogWarning($"[PhaseProtocol] P-frame chunk loss for track {trackIndex} (consecutive: {_consecutiveDroppedPframes})");
+
+                    // ANY P-frame chunk loss breaks the reference chain — taint immediately
+                    TaintTrack(trackIndex, $"P-frame chunk loss (consecutive: {_consecutiveDroppedPframes})");
+                    _consecutiveDroppedPframes = 0;
+                }
                 chunks = new byte[totalChunks][];
                 _pframeChunks[trackIndex] = chunks;
+                _pframeChunkStartTimes[trackIndex] = DateTime.UtcNow;
             }
 
             byte[] chunkData = new byte[dataLen];
@@ -241,12 +299,18 @@ namespace VRWorkspace.Streaming
                     pos += chunks[i].Length;
                 }
                 _pframeChunks.Remove(trackIndex);
+                _pframeChunkStartTimes.Remove(trackIndex);
+                if (_consecutiveDroppedPframes > 0) _consecutiveDroppedPframes = 0;
                 FeedPFrameToReceiver(trackIndex, pframeData);
             }
         }
 
         private void FeedPFrameToReceiver(int trackIndex, byte[] pframeData)
         {
+            // Gate: drop P-frames for tainted tracks (reference chain broken)
+            if (_taintedTracks.Contains(trackIndex))
+                return;
+
             _pframeCount++;
             if (_pframeCount <= 5 || _pframeCount % 300 == 0)
                 Debug.Log($"[PhaseProtocol] H265 P-frame via DataChannel: track={trackIndex}, {pframeData.Length} bytes (total #{_pframeCount})");
@@ -476,6 +540,43 @@ namespace VRWorkspace.Streaming
             {
                 Debug.LogError($"[PhaseProtocol] Failed to parse cursor_image (RAW): {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Mark a track as tainted (reference chain broken). All P-frames for this
+        /// track are dropped until a clean IDR arrives. Also flushes decoder and
+        /// requests keyframe burst.
+        /// </summary>
+        private void TaintTrack(int trackIndex, string reason)
+        {
+            bool wasAlreadyTainted = _taintedTracks.Contains(trackIndex);
+            _taintedTracks.Add(trackIndex);
+
+            if (!wasAlreadyTainted)
+                Debug.LogWarning($"[PhaseProtocol] Track {trackIndex} TAINTED: {reason}. P-frames will be dropped until next IDR.");
+
+            // Flush the decoder to clear corrupted reference frames
+            if (_h265Receivers.TryGetValue(trackIndex, out var receiver))
+                receiver.Flush();
+
+            // Also reset the handler's bootstrap gate so RTP P-frames are dropped too
+            if (_h265Handlers.TryGetValue(trackIndex, out var handler))
+                handler.ResetBootstrapGate();
+
+            // Request keyframe with cooldown
+            if ((DateTime.UtcNow - _lastCorruptionKeyframeRequest).TotalSeconds < 0.5)
+                return;
+            _lastCorruptionKeyframeRequest = DateTime.UtcNow;
+            _ = SendTextAsync($"{{\"type\":\"request_keyframe_burst\",\"monitorIndex\":{trackIndex},\"count\":2,\"reason\":\"tainted_track\"}}");
+        }
+
+        /// <summary>
+        /// Clear tainted status after a complete IDR is received and fed to decoder.
+        /// </summary>
+        private void UntaintTrack(int trackIndex)
+        {
+            if (_taintedTracks.Remove(trackIndex))
+                Debug.Log($"[PhaseProtocol] Track {trackIndex} UNTAINTED: clean IDR received, P-frames resumed.");
         }
 
         /// <summary>

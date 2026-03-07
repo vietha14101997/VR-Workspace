@@ -755,29 +755,37 @@ namespace VRWorkspace.UI.RTT.Controllers
             rtpAudioObj.transform.SetParent(transform, false);
             rtpAudioObj.AddComponent<AudioSource>();
             _audioPlayer = rtpAudioObj.AddComponent<RemoteAudioPlayer>();
-            _audioPlayer.SetMute(true); // Muted: DC audio is primary
+            // Primary: RTP audio (independent UDP transport, not affected by H.265 SCTP congestion)
 
-            // Primary: DataChannel audio player (Opus via SCTP — same transport as H.265 video)
-            // Both video and audio travel the same path → naturally synced latency (~40ms buffer)
+            // Fallback: DataChannel audio (shares SCTP with H.265 video → congestion causes delay+distortion)
             var dcAudioObj = new GameObject("DataChannelAudioPlayer");
             dcAudioObj.transform.SetParent(transform, false);
             dcAudioObj.AddComponent<AudioSource>();
             _dcAudioPlayer = dcAudioObj.AddComponent<DataChannelAudioPlayer>();
             _dcAudioPlayer.StartPlayback(); // Must be AFTER RemoteAudioPlayer's AudioSettings.Reset()
+            _dcAudioPlayer.SetMute(true); // Muted: RTP audio is primary (DC shares SCTP with H.265 video)
 
             if (_viewModel != null)
             {
                 _viewModel.OnDCAudioData += HandleDCAudioData;
                 _viewModel.OnRemoteAudioTrackReceived += _audioPlayer.SetTrack;
+
+                // Audio track may already be cached (OnTrack fires in Phase 2, before player is created in Phase 3)
+                var cachedTrack = _viewModel.CachedAudioTrack;
+                if (cachedTrack != null)
+                {
+                    Debug.Log("[RTTRemoteMenuController] Using cached audio track for RTP player");
+                    _audioPlayer.SetTrack(cachedTrack);
+                }
             }
 
-            Debug.Log("[RTTRemoteMenuController] Created audio players (DC primary, RTP fallback muted)");
+            Debug.Log("[RTTRemoteMenuController] Created audio players (RTP primary, DC fallback muted)");
         }
 
         private void HandleDCAudioData(byte[] data)
         {
-            // DataChannel audio is primary — same SCTP transport as video for synced latency.
-            // RTP audio goes through NetEQ jitter buffer (~500ms+) causing audio-video desync.
+            // DataChannel audio fallback — feeds DC player (muted unless RTP fails).
+            // DC shares SCTP with H.265 video, causing congestion. RTP is primary.
             if (_dcAudioPlayer != null)
             {
                 _dcAudioPlayer.OnOpusFrame(data, 0, data.Length);
@@ -802,7 +810,7 @@ namespace VRWorkspace.UI.RTT.Controllers
                 _audioPlayer = null;
             }
 
-            // Cleanup DataChannel fallback audio player
+            // Cleanup DataChannel audio player (fallback, muted)
             if (_dcAudioPlayer != null)
             {
                 if (_viewModel != null)
