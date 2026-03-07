@@ -584,14 +584,18 @@ namespace VRWorkspace.Streaming
         public async Task PauseStreamingAsync()
         {
             if (_ws?.State != WebSocketState.Open) { Debug.LogWarning("[PhaseProtocol] PauseStreaming skipped: WebSocket not open"); return; }
-            await _phase3.PauseStreamingAsync();
             _isStreamingPaused = true;
+            // Propagate pause to H265 receivers to suppress stall detection
+            foreach (var r in _h265Receivers.Values) r.IsPaused = true;
+            await _phase3.PauseStreamingAsync();
         }
 
         public async Task ResumeStreamingAsync()
         {
             if (_ws?.State != WebSocketState.Open) { Debug.LogWarning("[PhaseProtocol] ResumeStreaming skipped: WebSocket not open"); return; }
             _isStreamingPaused = false;
+            // Propagate resume to H265 receivers
+            foreach (var r in _h265Receivers.Values) r.IsPaused = false;
             await _phase3.ResumeStreamingAsync();
         }
 

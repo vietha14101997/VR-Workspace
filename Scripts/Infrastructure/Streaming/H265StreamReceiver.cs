@@ -59,6 +59,13 @@ namespace VRWorkspace.Streaming
         public long DecodedFrameCount     => _decodedCount;
         private long _decodedCount;
 
+        /// <summary>
+        /// When true, stall detection is suppressed. Set by PhaseProtocolClient when
+        /// streaming is paused (user pressed Back). Without this, no-frame condition
+        /// during pause triggers false DECODER FAILURE → H265→H264 fallback.
+        /// </summary>
+        public volatile bool IsPaused;
+
         // ──────────── Fallback Detection ────────────
         // If we receive encoded frames but decode nothing for FALLBACK_TRIGGER_SECONDS,
         // fire OnDecoderFailed so the client can request H265→H264 codec downgrade.
@@ -263,6 +270,16 @@ namespace VRWorkspace.Streaming
 
             if (!gotFrame)
             {
+                // When streaming is paused (user pressed Back), no frames are expected.
+                // Reset stall counter to prevent false DECODER FAILURE on resume.
+                if (IsPaused)
+                {
+                    _noFrameTicks = 0;
+                    _keyframeRequested = false;
+                    _lastDecodedFrameTime = DateTime.UtcNow;
+                    return;
+                }
+
                 _noFrameTicks++;
                 // Request keyframe after ~0.75s stall (45 ticks at 60fps) — fast recovery for corruption
                 if (_noFrameTicks == 45 && !_keyframeRequested && _decodedCount > 0)

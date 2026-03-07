@@ -746,6 +746,22 @@ namespace VRWorkspace.Streaming
                     int NETWORK_STALL_THRESHOLD_MS = _isUsbMode ? 5000 : 1500;
                     int BOOTSTRAP_TIMEOUT_MS = _isUsbMode ? 10000 : 5000;
 
+                    // Skip all stall detection when streaming is paused.
+                    // Server stops sending frames during pause, so no-frame condition is expected.
+                    // Without this, pause triggers false DECODER STALL → H265→H264 fallback.
+                    if (_isStreamingPaused)
+                    {
+                        // Reset stall state so resume doesn't immediately trigger stall
+                        foreach (var w in wrappers)
+                        {
+                            w.LastNetworkActivityTime = DateTime.UtcNow;
+                            w.LastDecoderStallRecoveryTime = DateTime.UtcNow;
+                        }
+                        int pauseInterval = _isWiFiConnection ? WIFI_CHECK_INTERVAL_MS : CHECK_INTERVAL_MS;
+                        await Task.Delay(pauseInterval, ct);
+                        continue;
+                    }
+
                     foreach (var wrapper in wrappers)
                     {
                         if (wrapper.PC == null) continue;
