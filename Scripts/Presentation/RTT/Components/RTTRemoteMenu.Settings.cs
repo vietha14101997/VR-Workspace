@@ -64,7 +64,19 @@ namespace VRWorkspace.UI.RTT.Components
                 int savedIdx = FindOptionIndexClean(RESOLUTION_OPTIONS, prefs.resolution);
                 if (savedIdx >= 0) selectedResolutionIndex = savedIdx;
             }
+
+            // Lock 1440p option if server's physical monitors are below 1440p
+            bool lock1440p = config.maxNativeHeight > 0 && config.maxNativeHeight < 1440;
+            if (lock1440p && selectedResolutionIndex == 2)
+                selectedResolutionIndex = 1; // Fall back to 1080p if 1440p was selected but locked
+
             VRDropdownFactory.SetOptions(_resolutionDropdown, resolutionOptions, selectedResolutionIndex);
+
+            if (lock1440p)
+            {
+                VRDropdownFactory.SetOptionLocked(_resolutionDropdown, 2, true); // Lock 1440p (index 2)
+                Debug.Log($"[RTTRemoteMenu] 1440p locked: server max native height = {config.maxNativeHeight}p");
+            }
 
             // === FPS ===
             string suggestedFps = $"{config.fps} FPS";
@@ -268,7 +280,17 @@ namespace VRWorkspace.UI.RTT.Components
             int selectedResolutionIndex = (prefs.HasResolutionPreference && currentResolutionIndex >= 0)
                 ? currentResolutionIndex  // Keep user's current selection
                 : suggestedResolutionIndex;
+            // Lock 1440p if server's physical monitors are below 1440p
+            bool lock1440p = _cachedSuggestedConfig != null && _cachedSuggestedConfig.maxNativeHeight > 0 && _cachedSuggestedConfig.maxNativeHeight < 1440;
+            if (lock1440p && suggestedResolutionIndex == 2)
+                suggestedResolutionIndex = 1; // Clamp suggestion to 1080p
+            if (lock1440p && selectedResolutionIndex == 2)
+                selectedResolutionIndex = 1; // Clamp selection to 1080p
+
             VRDropdownFactory.SetOptions(_resolutionDropdown, resolutionOptions, Mathf.Clamp(selectedResolutionIndex, 0, RESOLUTION_OPTIONS.Length - 1));
+
+            if (lock1440p)
+                VRDropdownFactory.SetOptionLocked(_resolutionDropdown, 2, true);
 
             // FPS: same logic
             var fpsOptions = BuildOptionsWithRecommended(FPS_OPTIONS, suggestedFpsIndex);
@@ -315,6 +337,10 @@ namespace VRWorkspace.UI.RTT.Components
 
             // Always lock "Spatial" option (index 1) in Mode dropdown
             VRDropdownFactory.SetOptionLocked(_modeDropdown, 1, true);
+
+            // Re-lock 1440p if server's physical monitors are below 1440p
+            if (_cachedSuggestedConfig != null && _cachedSuggestedConfig.maxNativeHeight > 0 && _cachedSuggestedConfig.maxNativeHeight < 1440)
+                VRDropdownFactory.SetOptionLocked(_resolutionDropdown, 2, true);
         }
 
         /// <summary>
@@ -347,6 +373,10 @@ namespace VRWorkspace.UI.RTT.Components
 
             // Re-lock Spatial after enabling Mode dropdown
             VRDropdownFactory.SetOptionLocked(_modeDropdown, 1, true);
+
+            // Re-lock 1440p if server's physical monitors are below 1440p
+            if (_cachedSuggestedConfig != null && _cachedSuggestedConfig.maxNativeHeight > 0 && _cachedSuggestedConfig.maxNativeHeight < 1440)
+                VRDropdownFactory.SetOptionLocked(_resolutionDropdown, 2, true);
 
             VRInputFieldFactory.SetInteractable(_hostInput, !_isUsbMode);
             SetUsbToggleInteractable(true);

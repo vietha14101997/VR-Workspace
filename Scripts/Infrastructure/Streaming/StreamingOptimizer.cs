@@ -106,6 +106,7 @@ namespace VRWorkspace.Streaming
         public string reason;
         public string selectedCodec = "H264";  // Codec negotiated for streaming
         public string connectionType = "Unknown";  // USB, WiFi, LAN, Internet
+        public int maxNativeHeight = 0;  // Max native resolution height of server's physical monitors (0 = unknown)
     }
 
     /// <summary>

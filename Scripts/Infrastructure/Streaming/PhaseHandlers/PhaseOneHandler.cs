@@ -199,7 +199,8 @@ namespace VRWorkspace.Streaming
                 refreshRate     = json.GetInt("refreshRate"),
                 reason          = json.GetString("reason") ?? "",
                 selectedCodec   = json.GetString("selectedCodec") ?? "H264",
-                connectionType  = connType
+                connectionType  = connType,
+                maxNativeHeight = json.GetInt("maxNativeHeight")
             };
 
             // Merge server-provided network info into our NetworkInfo object
