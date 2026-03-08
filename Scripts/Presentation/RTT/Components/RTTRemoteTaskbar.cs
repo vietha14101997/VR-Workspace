@@ -291,6 +291,7 @@ namespace VRWorkspace.UI.RTT.Components
             {
                 Debug.Log("[RTTRemoteTaskbar] Resolution clicked - hiding expansion panel (toggle)");
                 _expansionPanel.Hide();
+                UpdateExpansionTriggerButtonColors(null);
             }
             else
             {
@@ -298,6 +299,7 @@ namespace VRWorkspace.UI.RTT.Components
                 Debug.Log("[RTTRemoteTaskbar] Resolution clicked - showing expansion panel");
                 Vector3? buttonWorldPos = GetButtonWorldPosition(_resolutionButton);
                 _expansionPanel.ShowResolutionOptions(_currentResolutionHeight, buttonWorldPos);
+                UpdateExpansionTriggerButtonColors(RTTTaskbarExpansion.ExpansionType.Resolution);
             }
             _miniFrame.MarkDirty();
         }
@@ -313,6 +315,7 @@ namespace VRWorkspace.UI.RTT.Components
             {
                 Debug.Log("[RTTRemoteTaskbar] FPS clicked - hiding expansion panel (toggle)");
                 _expansionPanel.Hide();
+                UpdateExpansionTriggerButtonColors(null);
             }
             else
             {
@@ -320,6 +323,7 @@ namespace VRWorkspace.UI.RTT.Components
                 Debug.Log("[RTTRemoteTaskbar] FPS clicked - showing expansion panel");
                 Vector3? buttonWorldPos = GetButtonWorldPosition(_fpsButton);
                 _expansionPanel.ShowFpsOptions(_currentFps, buttonWorldPos);
+                UpdateExpansionTriggerButtonColors(RTTTaskbarExpansion.ExpansionType.Fps);
             }
             _miniFrame.MarkDirty();
         }
@@ -485,6 +489,8 @@ namespace VRWorkspace.UI.RTT.Components
                 _ = _viewModel.UpdateConfigAsync(null, resH);
             }
 
+            // Reset trigger button colors (expansion auto-hides after selection)
+            UpdateExpansionTriggerButtonColors(null);
             _miniFrame.MarkDirty();
         }
 
@@ -499,6 +505,8 @@ namespace VRWorkspace.UI.RTT.Components
                 _ = _viewModel.UpdateConfigAsync(fps, null);
             }
 
+            // Reset trigger button colors (expansion auto-hides after selection)
+            UpdateExpansionTriggerButtonColors(null);
             _miniFrame.MarkDirty();
         }
 
@@ -515,6 +523,35 @@ namespace VRWorkspace.UI.RTT.Components
             if (_expansionPanel != null && _expansionPanel.IsVisible)
             {
                 _expansionPanel.Hide();
+                UpdateExpansionTriggerButtonColors(null);
+            }
+        }
+
+        /// <summary>
+        /// Update trigger button colors based on which expansion type is active.
+        /// Pass null to reset all buttons to default cyan color.
+        /// </summary>
+        private void UpdateExpansionTriggerButtonColors(RTTTaskbarExpansion.ExpansionType? activeType)
+        {
+            // Resolution button
+            if (_resolutionButton != null)
+            {
+                Color color = (activeType == RTTTaskbarExpansion.ExpansionType.Resolution) ? _purpleColor : _cyanColor;
+                VRButtonFactory.SetBareIconButtonGlowColor(_resolutionButton, color);
+            }
+
+            // FPS button
+            if (_fpsButton != null)
+            {
+                Color color = (activeType == RTTTaskbarExpansion.ExpansionType.Fps) ? _purpleColor : _cyanColor;
+                VRButtonFactory.SetBareIconButtonGlowColor(_fpsButton, color);
+            }
+
+            // Eye button
+            if (_eyeButton != null)
+            {
+                Color color = (activeType == RTTTaskbarExpansion.ExpansionType.Eye) ? _purpleColor : _cyanColor;
+                VRButtonFactory.SetBareIconButtonGlowColor(_eyeButton, color);
             }
         }
         #endregion
@@ -988,8 +1025,8 @@ namespace VRWorkspace.UI.RTT.Components
 
         private Sprite GetFpsIcon(int fps)
         {
-            // Snap to nearest valid option: 30, 45, 60
-            int[] validOptions = { 30, 45, 60 };
+            // Snap to nearest valid option: 30, 60, 120
+            int[] validOptions = { 30, 60, 120 };
             int nearest = validOptions[0];
             int minDiff = Mathf.Abs(fps - nearest);
 
@@ -1023,6 +1060,7 @@ namespace VRWorkspace.UI.RTT.Components
             {
                 Debug.Log("[RTTRemoteTaskbar] Eye clicked - hiding expansion panel (toggle)");
                 _expansionPanel.Hide();
+                UpdateExpansionTriggerButtonColors(null);
             }
             else
             {
@@ -1033,6 +1071,7 @@ namespace VRWorkspace.UI.RTT.Components
 
                 // Disable passthrough button if light is OFF
                 _expansionPanel.SetPassthroughInteractable(_isLightOn);
+                UpdateExpansionTriggerButtonColors(RTTTaskbarExpansion.ExpansionType.Eye);
             }
             _miniFrame.MarkDirty();
         }
@@ -1644,7 +1683,7 @@ namespace VRWorkspace.UI.RTT.Components
             if (iconEyeClose == null) iconEyeClose = LoadIcon("eye_close");
             if (iconRecenter == null) iconRecenter = LoadIcon("recenter");
             if (iconZoom == null) iconZoom = LoadIcon("zoom");
-            if (iconMonitor == null) iconMonitor = LoadIcon("monitor");
+            if (iconMonitor == null) iconMonitor = LoadIcon("resolution");
             if (iconEnviroment == null) iconEnviroment = LoadIcon("enviroment");
 
             // Dynamic resolution icons (720, 1080, 1440 p)
@@ -1660,9 +1699,9 @@ namespace VRWorkspace.UI.RTT.Components
 
 
 
-            // Dynamic FPS icons (30, 45, 60)
+            // Dynamic FPS icons (30, 45, 60, 120)
             // Naming: icon_{fps}_fps (e.g., icon_30_fps, icon_60_fps)
-            int[] fpsOptions = { 30, 45, 60 };
+            int[] fpsOptions = { 30, 60, 120 };
             foreach (int fps in fpsOptions)
             {
                 var icon = LoadIcon($"{fps}_fps");
