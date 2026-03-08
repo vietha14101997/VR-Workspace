@@ -76,7 +76,19 @@ namespace VRWorkspace.VRInput
 
         [Tooltip("Cường độ bù yaw drift khi đứng yên")]
         [Range(0.01f, 0.5f)]
-        public float yawDriftDamping = 0.1f;
+        public float yawDriftDamping = 0.3f;
+
+        [Header("Compass Yaw Correction")]
+        [Tooltip("Bật/tắt chỉnh yaw drift bằng magnetometer (compass)")]
+        public bool compassCorrectionEnabled = true;
+
+        [Tooltip("Cường độ chỉnh yaw theo compass (thấp = mượt hơn, ít giật)")]
+        [Range(0.01f, 0.3f)]
+        public float compassCorrectionStrength = 0.08f;
+
+        [Tooltip("Hệ số lọc low-pass cho compass heading (thấp = lọc mạnh hơn)")]
+        [Range(0.01f, 0.2f)]
+        public float compassFilterAlpha = 0.03f;
 
         private Image _reticleImage;
         private Camera _cam;
@@ -135,7 +147,17 @@ namespace VRWorkspace.VRInput
         // Yaw drift compensation state
         private float _stationaryYaw;
         private float _stationaryTimer = 0f;
-        private const float kStationaryLockDelay = 0.3f; // seconds before locking yaw
+        private const float kStationaryLockDelay = 0.15f; // seconds before locking yaw
+
+        // Compass (magnetometer) yaw correction state
+        private bool _compassInitialized = false;
+        private float _filteredCompassHeading = 0f;
+        private float _compassYawOffset = 0f;
+
+        // Gyro bias estimation state
+        private Vector3 _gyroBiasEstimate = Vector3.zero;
+        private const float kBiasEstimationAlpha = 0.005f;
+        private float _biasEstimationTimer = 0f;
 
         // Singleton access helper (optional, or use FindObjectOfType)
         public static VRGazeReticle Instance { get; private set; }
@@ -1253,7 +1275,16 @@ namespace VRWorkspace.VRInput
                 _stationaryYaw = _cam.transform.eulerAngles.y;
                 _stationaryTimer = 0f;
                 _accelInitialized = false;
+                _compassInitialized = false;
+                _gyroBiasEstimate = Vector3.zero;
+                _biasEstimationTimer = 0f;
                 _stabilizationInitialized = true;
+
+                // Enable compass for yaw drift correction
+                if (compassCorrectionEnabled)
+                {
+                    Input.compass.enabled = true;
+                }
             }
         }
 
@@ -1262,6 +1293,14 @@ namespace VRWorkspace.VRInput
             if (headStabilizationEnabled && _stabilizationInitialized && !_isRecentering)
             {
                 ApplyHeadStabilization();
+            }
+        }
+
+        void OnDisable()
+        {
+            if (compassCorrectionEnabled)
+            {
+                Input.compass.enabled = false;
             }
         }
 
@@ -1278,19 +1317,31 @@ namespace VRWorkspace.VRInput
             // Calculate angular velocity for adaptive smoothing
             Vector3 currentEuler = rawRotation.eulerAngles;
             Vector3 deltaEuler = DeltaAngles(_previousEuler, currentEuler);
-            float angularSpeed = deltaEuler.magnitude / dt;
+
+            // === GYRO BIAS ESTIMATION: compensate systematic drift ===
+            Vector3 rawAngularVelocity = deltaEuler / dt;
+            Vector3 biasCompensatedDelta = deltaEuler - _gyroBiasEstimate * dt;
+            float angularSpeed = biasCompensatedDelta.magnitude / dt;
 
             // === DEAD ZONE: Ignore micro-movements (gyroscope noise) ===
             bool isStationary = angularSpeed < deadZoneThreshold;
             if (isStationary)
             {
-                // Below dead zone threshold - keep previous stabilized rotation (ignore noise completely)
                 _stationaryTimer += dt;
+
+                // Update bias estimate when stationary for > 1s
+                _biasEstimationTimer += dt;
+                if (_biasEstimationTimer > 1f)
+                {
+                    _gyroBiasEstimate = Vector3.Lerp(
+                        _gyroBiasEstimate, rawAngularVelocity, kBiasEstimationAlpha);
+                }
             }
             else
             {
                 // Above dead zone - apply adaptive smoothing
                 _stationaryTimer = 0f;
+                _biasEstimationTimer = 0f;
                 _currentSmoothingFactor = CalculateAdaptiveSmoothingFactor(angularSpeed);
                 _stabilizedRotation = Quaternion.Slerp(_stabilizedRotation, rawRotation, _currentSmoothingFactor);
             }
@@ -1301,10 +1352,16 @@ namespace VRWorkspace.VRInput
                 ApplyDriftCorrection(ref _stabilizedRotation, isStationary);
             }
 
-            // === YAW DRIFT COMPENSATION ===
-            if (isStationary && _stationaryTimer > kStationaryLockDelay)
+            // === COMPASS YAW CORRECTION (absolute yaw reference) ===
+            bool compassActive = compassCorrectionEnabled && _compassInitialized;
+            if (compassCorrectionEnabled)
             {
-                // When stationary for a while, gently pull yaw back to locked position
+                ApplyCompassYawCorrection(ref _stabilizedRotation, isStationary, dt);
+            }
+
+            // === YAW DRIFT COMPENSATION (fallback when compass unavailable) ===
+            if (!compassActive && isStationary && _stationaryTimer > kStationaryLockDelay)
+            {
                 ApplyYawDriftCompensation(ref _stabilizedRotation, dt);
             }
             else if (!isStationary)
@@ -1371,6 +1428,58 @@ namespace VRWorkspace.VRInput
             rotation = Quaternion.Slerp(Quaternion.identity, correction, correctionStep) * rotation;
         }
 
+        void ApplyCompassYawCorrection(ref Quaternion rotation, bool isStationary, float dt)
+        {
+            // Skip if compass data unreliable (headingAccuracy < 0 means invalid)
+            // Android returns accuracy in degrees: 0/15/30/45 steps
+            if (Input.compass.headingAccuracy < 0f || Input.compass.headingAccuracy > 45f)
+                return;
+
+            float compassHeading = Input.compass.trueHeading;
+
+            // Low-pass filter compass heading (circular averaging to handle 0/360 wrap)
+            if (!_compassInitialized)
+            {
+                _filteredCompassHeading = compassHeading;
+                // Calculate offset: align compass coordinate system with gyro yaw (normalized to [-180, 180])
+                _compassYawOffset = Mathf.DeltaAngle(compassHeading, rotation.eulerAngles.y);
+                _compassInitialized = true;
+                return;
+            }
+
+            // Circular low-pass filter: use delta angle to avoid 359->1 jump issues
+            float headingDelta = Mathf.DeltaAngle(_filteredCompassHeading, compassHeading);
+            _filteredCompassHeading += headingDelta * compassFilterAlpha;
+            // Normalize to 0-360
+            _filteredCompassHeading = (_filteredCompassHeading % 360f + 360f) % 360f;
+
+            // Expected yaw based on compass + offset
+            float expectedYaw = _filteredCompassHeading + _compassYawOffset;
+            expectedYaw = (expectedYaw % 360f + 360f) % 360f;
+
+            // Calculate yaw error
+            Vector3 euler = rotation.eulerAngles;
+            float yawError = Mathf.DeltaAngle(euler.y, expectedYaw);
+
+            // Only correct reasonable drift (ignore if user physically rotated = large delta)
+            if (Mathf.Abs(yawError) > 20f)
+            {
+                // Large discrepancy: re-sync offset (user likely turned physically)
+                _compassYawOffset = Mathf.DeltaAngle(_filteredCompassHeading, euler.y);
+                return;
+            }
+
+            // Stronger correction when stationary, gentler when moving
+            float strength = isStationary
+                ? compassCorrectionStrength * 2f
+                : compassCorrectionStrength;
+
+            // Use AngleAxis to avoid gimbal lock at extreme pitch angles
+            float correctionAmount = yawError * strength * dt;
+            Quaternion yawCorrection = Quaternion.AngleAxis(correctionAmount, Vector3.up);
+            rotation = yawCorrection * rotation;
+        }
+
         void ApplyYawDriftCompensation(ref Quaternion rotation, float dt)
         {
             // Extract current euler from stabilized rotation
@@ -1381,12 +1490,16 @@ namespace VRWorkspace.VRInput
             float yawDelta = Mathf.DeltaAngle(currentYaw, _stationaryYaw);
 
             // Only correct if drift is small enough to be noise (not intentional movement we missed)
-            if (Mathf.Abs(yawDelta) > 5f) return;
+            float absYawDelta = Mathf.Abs(yawDelta);
+            if (absYawDelta > 15f) return;
 
-            // Gently pull yaw back toward the locked position
-            float correction = yawDelta * yawDriftDamping * dt;
-            euler.y = currentYaw + correction;
-            rotation = Quaternion.Euler(euler.x, euler.y, euler.z);
+            // Progressive damping: smaller drift → faster correction (avoid oscillation at large deltas)
+            float progressiveDamping = yawDriftDamping * (1f + 2f * (1f - absYawDelta / 15f));
+
+            // Use AngleAxis to avoid gimbal lock at extreme pitch angles
+            float correction = yawDelta * progressiveDamping * dt;
+            Quaternion yawCorrection = Quaternion.AngleAxis(correction, Vector3.up);
+            rotation = yawCorrection * rotation;
         }
 
         Vector3 DeltaAngles(Vector3 from, Vector3 to)
@@ -1410,6 +1523,9 @@ namespace VRWorkspace.VRInput
                 _stationaryYaw = _cam.transform.eulerAngles.y;
                 _stationaryTimer = 0f;
                 _accelInitialized = false;
+                _compassInitialized = false;
+                _gyroBiasEstimate = Vector3.zero;
+                _biasEstimationTimer = 0f;
             }
         }
 
