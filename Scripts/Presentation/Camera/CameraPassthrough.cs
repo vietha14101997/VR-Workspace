@@ -9,7 +9,8 @@ namespace VRWorkspace.CameraUtils
     public class CameraPassthrough : MonoBehaviour
     {
         public Camera cam;           // kéo Main Camera vào
-        public float distance = -1f; // -1 = tự đặt gần far clip
+        public float distance = 10f; // -1 = tự đặt gần far clip, 10f để tránh lỗi nhìn xa quá
+        public float physicalCameraFOV = 60f; // FOV thật của cụm camera lồi
         public int requestedFPS = 30;
 
         WebCamTexture _tex;
@@ -23,8 +24,6 @@ namespace VRWorkspace.CameraUtils
         {
             if (!cam) return;
             float d = (distance > 0f) ? distance : (cam.farClipPlane - 1f);
-            float h = 2f * d * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
-            float w = h * cam.aspect;
 
             // aspect “cover” để không méo + xử lý xoay/mirror
             float texAspect = 1f;
@@ -33,10 +32,10 @@ namespace VRWorkspace.CameraUtils
                 bool rot90 = (_tex.videoRotationAngle % 180) != 0;
                 texAspect = rot90 ? (float)_tex.height / _tex.width : (float)_tex.width / _tex.height;
             }
-            float frustumAspect = w / h;
-            float targetW, targetH;
-            if (texAspect > frustumAspect) { targetH = h; targetW = targetH * texAspect; }
-            else { targetW = w; targetH = targetW / texAspect; }
+            
+            // Tính toán khung hình thật (1:1) thay vì căng theo FOV ảo của camera VR
+            float targetH = 2f * d * Mathf.Tan(physicalCameraFOV * 0.5f * Mathf.Deg2Rad);
+            float targetW = targetH * texAspect;
 
             float xFlip = (_tex != null && _tex.videoVerticallyMirrored) ? -1f : 1f;
             float zRot = (_tex != null) ? -_tex.videoRotationAngle : 0f;
