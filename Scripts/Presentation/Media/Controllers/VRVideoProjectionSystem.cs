@@ -62,6 +62,13 @@ namespace VRWorkspace.Media.Core
             _savedFlatPosition = position;
             _savedFlatRotation = rotation;
             _hasSavedFlatTransform = true;
+
+            // Immediately recompute the flat world position so the projection screen 
+            // follows the new recentered direction in Flat mode.
+            if (IsVisible && !IsImmersiveProjection())
+            {
+                ComputeFlatWorldPosition();
+            }
         }
         #endregion
 
