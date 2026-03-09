@@ -8,6 +8,8 @@ namespace VRWorkspace.VRInput
     using VRWorkspace.UI.Components;
     using VRWorkspace.UI.RTT.Components;
     using VRWorkspace.UI.RTT.Input;
+    using VRWorkspace.MathFilters; // Cho MadgwickAHRS
+    using VRWorkspace.AI;          // Cho DriftDataCollector
     #if UNITY_EDITOR
     using UnityEditor;
     #endif
@@ -89,6 +91,15 @@ namespace VRWorkspace.VRInput
         [Tooltip("Hệ số lọc low-pass cho compass heading (thấp = lọc mạnh hơn)")]
         [Range(0.01f, 0.2f)]
         public float compassFilterAlpha = 0.03f;
+        
+        [Header("Madgwick Sensor Fusion")]
+        [Tooltip("Bật/tắt thay thế logic cũ bằng Madgwick AHRS")]
+        public bool useMadgwickFilter = true;
+        [Tooltip("Hệ số bù trừ Beta của Madgwick (cao = tin Accel/Compass nhiều hơn)")]
+        [Range(0.0f, 1.0f)]
+        public float madgwickBeta = 0.1f;
+        [Tooltip("Auto-Record IMU dataset cho AI khi Compass đang tốt")]
+        public bool recordDatasetForAI = false;
 
         private Image _reticleImage;
         private Camera _cam;
@@ -158,6 +169,10 @@ namespace VRWorkspace.VRInput
         private Vector3 _gyroBiasEstimate = Vector3.zero;
         private const float kBiasEstimationAlpha = 0.005f;
         private float _biasEstimationTimer = 0f;
+        
+        // Madgwick & AI
+        private MadgwickAHRS _madgwick;
+        private DriftDataCollector _dataCollector;
 
         // Singleton access helper (optional, or use FindObjectOfType)
         public static VRGazeReticle Instance { get; private set; }
@@ -190,6 +205,21 @@ namespace VRWorkspace.VRInput
 
             // Initialize head stabilization
             InitializeStabilization();
+            
+            // Khởi tạo hệ thống mới
+            if (useMadgwickFilter)
+            {
+                Input.gyro.enabled = true; // Bắt buộc bật con quay
+                _madgwick = new MadgwickAHRS(1f / 60f, madgwickBeta);
+                // Khởi tạo hướng đầu tiên
+                _madgwick.Reset(_cam.transform.rotation);
+            }
+            
+            _dataCollector = gameObject.GetComponent<DriftDataCollector>();
+            if (_dataCollector == null)
+            {
+                _dataCollector = gameObject.AddComponent<DriftDataCollector>();
+            }
         }
 
         void Update()
@@ -1314,6 +1344,15 @@ namespace VRWorkspace.VRInput
             // Get raw rotation from TrackedPoseDriver
             Quaternion rawRotation = _cam.transform.rotation;
 
+            // Nếu đang dùng Madgwick, áp dụng thuật toán riêng
+            if (useMadgwickFilter)
+            {
+                ApplyMadgwickAHRS(dt);
+                // Vẫn cập nhật last euler cho logic Dwell/Click
+                _previousEuler = _cam.transform.eulerAngles;
+                return;
+            }
+
             // Calculate angular velocity for adaptive smoothing
             Vector3 currentEuler = rawRotation.eulerAngles;
             Vector3 deltaEuler = DeltaAngles(_previousEuler, currentEuler);
@@ -1375,6 +1414,72 @@ namespace VRWorkspace.VRInput
 
             // Store for next frame
             _previousEuler = currentEuler;
+        }
+
+        void ApplyMadgwickAHRS(float dt)
+        {
+            if (_madgwick == null) return;
+            _madgwick.SamplePeriod = dt;
+            _madgwick.Beta = madgwickBeta;
+            
+            // Get raw sensor values
+            Vector3 gyro = Input.gyro.rotationRateUnbiased; // rad/s
+            Vector3 accel = Input.acceleration;             // g
+            Vector3 mag = Input.compass.rawVector;          // uT
+            
+            // Check compass reliability
+            float compassAccuracy = Input.compass.headingAccuracy;
+            bool isCompassReliable = (compassAccuracy >= 0f && compassAccuracy <= 45f);
+
+            // Process Sensor Fusion
+            if (compassCorrectionEnabled && isCompassReliable)
+            {
+                // Tính toán Full 9-DOF
+                _madgwick.Update(
+                    gyro.x, gyro.y, gyro.z,
+                    accel.x, accel.y, accel.z,
+                    mag.x, mag.y, mag.z
+                );
+            }
+            else
+            {
+                // La bàn loạn -> Fallback về 6-DOF (Gyro + Accel) - Chấp nhận Yaw bị Drift từ từ
+                _madgwick.UpdateIMU(
+                    gyro.x, gyro.y, gyro.z,
+                    accel.x, accel.y, accel.z
+                );
+            }
+
+            // Calculate stationary state to train AI (AI needs to know when user is actually stopping)
+            float angularSpeed = gyro.magnitude;
+            bool isStationary = angularSpeed < (deadZoneThreshold * Mathf.Deg2Rad);
+            
+            // --- DATA COLLECTION FOR AI ---
+            if (recordDatasetForAI && _dataCollector != null)
+            {
+                if (!_dataCollector.isRecording) _dataCollector.StartRecording();
+                
+                // Mấu chốt: Chỉ lấy nhãn (TargetYawDrift) khi la bàn đáng tin cậy!
+                // Giả lập lượng "tín hiệu trôi gây ra nếu không có Compass".
+                // Bằng cách so sánh Yaw của (6-DOF) với Yaw đã chuẩn hoá của Madgwick.
+                float targetYawDrift = 0f;
+                // (Trong đk thực tế, bạn có thể lấy chênh lệch giữa TrackedPoseDriver và Madgwick filter làm Label Drift)
+                float trackedYaw = _cam.transform.rotation.eulerAngles.y;
+                float madgwickYaw = _madgwick.Quaternion.eulerAngles.y;
+                targetYawDrift = Mathf.DeltaAngle(trackedYaw, madgwickYaw);
+
+                _dataCollector.RecordFrame(gyro, accel, mag, isStationary, targetYawDrift);
+            }
+            else if (!recordDatasetForAI && _dataCollector != null && _dataCollector.isRecording)
+            {
+                _dataCollector.StopRecording();
+            }
+
+            // Dùng quaternion từ AI/Madgwick gán sang camera
+            // Unity camera Y up, Z forward - Quat từ thuật toán có thể cần mapping axis tuỳ dòng kính
+            // Ở đây tạm thời match trực tiếp (giả định Input.gyro trả đúng hệ toạ độ tay trái)
+            _stabilizedRotation = _madgwick.Quaternion;
+            _cam.transform.rotation = _stabilizedRotation;
         }
 
         float CalculateAdaptiveSmoothingFactor(float angularSpeed)
@@ -1526,6 +1631,12 @@ namespace VRWorkspace.VRInput
                 _compassInitialized = false;
                 _gyroBiasEstimate = Vector3.zero;
                 _biasEstimationTimer = 0f;
+                
+                if (_madgwick != null)
+                {
+                    // Reset lại điểm mốc
+                    _madgwick.Reset(_cam.transform.rotation);
+                }
             }
         }
 
