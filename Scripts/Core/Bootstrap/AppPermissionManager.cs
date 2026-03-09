@@ -217,7 +217,9 @@ namespace VRWorkspace.Core
             var callbacks = new PermissionCallbacks();
             callbacks.PermissionGranted += (perm) => { grantedCount++; responseCount++; };
             callbacks.PermissionDenied += (perm) => { responseCount++; };
+#pragma warning disable 0618
             callbacks.PermissionDeniedAndDontAskAgain += (perm) => { responseCount++; };
+#pragma warning restore 0618
 
             Permission.RequestUserPermissions(permissions, callbacks);
 
@@ -269,7 +271,9 @@ namespace VRWorkspace.Core
             var callbacks = new PermissionCallbacks();
             callbacks.PermissionGranted += (perm) => { grantedCount++; responseCount++; };
             callbacks.PermissionDenied += (perm) => { responseCount++; };
+#pragma warning disable 0618
             callbacks.PermissionDeniedAndDontAskAgain += (perm) => { responseCount++; };
+#pragma warning restore 0618
 
             Permission.RequestUserPermissions(permissions, callbacks);
 

@@ -187,7 +187,9 @@ namespace VRWorkspace.UI.RTT.Services
                     Debug.Log($"[StoragePermission] Media denied: {perm}");
                     onComplete?.Invoke(false);
                 };
+#pragma warning disable 0618
                 callbacks.PermissionDeniedAndDontAskAgain += (perm) => {
+#pragma warning restore 0618
                     Debug.Log($"[StoragePermission] Media denied (Don't ask again): {perm}");
                     onComplete?.Invoke(false);
                 };

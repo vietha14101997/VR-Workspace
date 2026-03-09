@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text;
+using System.Globalization;
 using UnityEngine;
 
 namespace VRWorkspace.AI
@@ -18,9 +19,6 @@ namespace VRWorkspace.AI
         private string _filePath;
         private StreamWriter _writer;
         private StringBuilder _sb = new StringBuilder();
-
-        // Ensure Permission
-        private bool _permissionRequested = false;
 
         private void Start()
         {
@@ -54,8 +52,6 @@ namespace VRWorkspace.AI
         private void RequestStoragePermission()
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
-            if (_permissionRequested) return;
-
             try
             {
                 using (var versionClass = new AndroidJavaClass("android.os.Build$VERSION"))
@@ -98,7 +94,6 @@ namespace VRWorkspace.AI
             {
                 Debug.LogError("[DriftDataCollector] Lỗi khi xin quyền: " + ex.Message);
             }
-            _permissionRequested = true;
 #endif
         }
 
@@ -108,6 +103,10 @@ namespace VRWorkspace.AI
             
             RequestStoragePermission();
             
+            // Force Enable Sensors
+            Input.gyro.enabled = true;
+            Input.compass.enabled = true;
+
             isRecording = true;
 
             try
@@ -172,18 +171,18 @@ namespace VRWorkspace.AI
             if (!isRecording || _writer == null) return;
 
             _sb.Clear();
-            _sb.Append(Time.time).Append(",");
+            _sb.Append(Time.time.ToString(CultureInfo.InvariantCulture)).Append(",");
             
             // Raw Inputs (Gyro, Accel, Mag)
-            _sb.Append(gyro.x).Append(",").Append(gyro.y).Append(",").Append(gyro.z).Append(",");
-            _sb.Append(accel.x).Append(",").Append(accel.y).Append(",").Append(accel.z).Append(",");
-            _sb.Append(mag.x).Append(",").Append(mag.y).Append(",").Append(mag.z).Append(",");
+            _sb.Append(gyro.x.ToString(CultureInfo.InvariantCulture)).Append(",").Append(gyro.y.ToString(CultureInfo.InvariantCulture)).Append(",").Append(gyro.z.ToString(CultureInfo.InvariantCulture)).Append(",");
+            _sb.Append(accel.x.ToString(CultureInfo.InvariantCulture)).Append(",").Append(accel.y.ToString(CultureInfo.InvariantCulture)).Append(",").Append(accel.z.ToString(CultureInfo.InvariantCulture)).Append(",");
+            _sb.Append(mag.x.ToString(CultureInfo.InvariantCulture)).Append(",").Append(mag.y.ToString(CultureInfo.InvariantCulture)).Append(",").Append(mag.z.ToString(CultureInfo.InvariantCulture)).Append(",");
             
             // State (0 or 1)
             _sb.Append(isStationary ? 1 : 0).Append(",");
             
             // Lable: The ground-truth drift calculated by Madgwick Teacher
-            _sb.Append(targetYawDrift);
+            _sb.Append(targetYawDrift.ToString(CultureInfo.InvariantCulture));
 
             _writer.WriteLine(_sb.ToString());
         }

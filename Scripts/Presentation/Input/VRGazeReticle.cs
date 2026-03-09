@@ -14,6 +14,7 @@ namespace VRWorkspace.VRInput
     using UnityEditor;
     #endif
 
+    [RequireComponent(typeof(VRWorkspace.AI.DriftAIClassifier))]
     public partial class VRGazeReticle : MonoBehaviour
     {
         [Header("Configuration")]
@@ -173,6 +174,7 @@ namespace VRWorkspace.VRInput
         // Madgwick & AI
         private MadgwickAHRS _madgwick;
         private DriftDataCollector _dataCollector;
+        private DriftAIClassifier _aiClassifier;
 
         // Singleton access helper (optional, or use FindObjectOfType)
         public static VRGazeReticle Instance { get; private set; }
@@ -210,6 +212,8 @@ namespace VRWorkspace.VRInput
             if (useMadgwickFilter)
             {
                 Input.gyro.enabled = true; // Bắt buộc bật con quay
+                Input.compass.enabled = true; // Bật la bàn
+                Input.location.Start(); // Hardware Android yêu cầu LocationService Start mới cho đọc Magnetometer
                 _madgwick = new MadgwickAHRS(1f / 60f, madgwickBeta);
                 // Khởi tạo hướng đầu tiên
                 _madgwick.Reset(_cam.transform.rotation);
@@ -219,6 +223,12 @@ namespace VRWorkspace.VRInput
             if (_dataCollector == null)
             {
                 _dataCollector = gameObject.AddComponent<DriftDataCollector>();
+            }
+
+            _aiClassifier = gameObject.GetComponent<DriftAIClassifier>();
+            if (_aiClassifier == null)
+            {
+                _aiClassifier = gameObject.AddComponent<DriftAIClassifier>();
             }
         }
 
@@ -1423,9 +1433,33 @@ namespace VRWorkspace.VRInput
             _madgwick.Beta = madgwickBeta;
             
             // Get raw sensor values
-            Vector3 gyro = Input.gyro.rotationRateUnbiased; // rad/s
+            Vector3 gyro = Input.gyro.rotationRateUnbiased; // rad/s (Trừ Bias có sẵn của HW)
+            if (gyro == Vector3.zero) gyro = Input.gyro.rotationRate; // Fallback nếu chưa trừ bias
+
             Vector3 accel = Input.acceleration;             // g
             Vector3 mag = Input.compass.rawVector;          // uT
+
+            // Fallback 1: Lấy từ XR Subsystem nếu thiết bị VR chiếm quyền cảm biến
+            UnityEngine.XR.InputDevice xrDevice = UnityEngine.XR.InputDevices.GetDeviceAtXRNode(UnityEngine.XR.XRNode.CenterEye);
+            if (xrDevice.isValid)
+            {
+                if (gyro == Vector3.zero) xrDevice.TryGetFeatureValue(UnityEngine.XR.CommonUsages.deviceAngularVelocity, out gyro);
+                if (accel == Vector3.zero) xrDevice.TryGetFeatureValue(UnityEngine.XR.CommonUsages.deviceAcceleration, out accel);
+            }
+
+            // Fallback 2: Tự tính toán vận tốc xoay (Angular Velocity) dựa trên Tracking Camera (Cực kỳ chính xác vì kính VR lấy trực tiếp từ IMU)
+            if (gyro == Vector3.zero && dt > 0)
+            {
+                // Note: DeltaAngles trả về góc Degree, ta cần chuyển sang Radian/s để feed vào AI và Madgwick
+                Vector3 delta = DeltaAngles(_previousEuler, _cam.transform.eulerAngles);
+                gyro = (delta / dt) * Mathf.Deg2Rad;
+            }
+
+            // Fallback 3: Tự tính toán trọng lực dựa trên hướng Up của tracking Camera (1g hướng xuống)
+            if (accel == Vector3.zero)
+            {
+                accel = -_cam.transform.up; 
+            }
             
             // Check compass reliability
             float compassAccuracy = Input.compass.headingAccuracy;
@@ -1473,6 +1507,17 @@ namespace VRWorkspace.VRInput
             else if (!recordDatasetForAI && _dataCollector != null && _dataCollector.isRecording)
             {
                 _dataCollector.StopRecording();
+            }
+
+            // --- AI INFERENCE (HỖ TRỢ KHI LA BÀN NHIỄU/MẤT TÍN HIỆU) ---
+            if (!isCompassReliable && isStationary && _aiClassifier != null)
+            {
+                // Dự đoán lượng trôi dạt (Yaw Drift) do IMU nhiễu
+                float predictedDriftSpeed = _aiClassifier.PredictYawDrift(gyro, accel, mag);
+                
+                // Trừ bù lượng Drift cho Vector Quaternion của Madgwick (Chỉ bù quanh trục Y)
+                Quaternion compensation = Quaternion.Euler(0f, -predictedDriftSpeed * dt, 0f);
+                _madgwick.Reset(compensation * _madgwick.Quaternion);
             }
 
             // Dùng quaternion từ AI/Madgwick gán sang camera

@@ -1,52 +1,14 @@
-[RTTRemoteMenu] Button clicked! viewModel=True, currentPhase=Disconnected
+Assets\VR-Workspace\Scripts\Core\Bootstrap\AppPermissionManager.cs(220,13): warning CS0618: 'PermissionCallbacks.PermissionDeniedAndDontAskAgain' is obsolete: 'Unreliable. Query ShouldShowRequestPermissionRationale and use PermissionDenied event.'
 
-[RTTRemoteMenu] Showing token popup for 27.72.102.134:8288
+Assets\VR-Workspace\Scripts\Core\Bootstrap\AppPermissionManager.cs(272,13): warning CS0618: 'PermissionCallbacks.PermissionDeniedAndDontAskAgain' is obsolete: 'Unreliable. Query ShouldShowRequestPermissionRationale and use PermissionDenied event.'
 
-[RTTPopupInputable] Created world-space popup: 575x345
+Assets\VR-Workspace\Scripts\Infrastructure\AI\DriftDataCollector.cs(55,17): error CS0103: The name '_permissionRequested' does not exist in the current context
 
-[RTTPopupInputable] Positioned at (-0.67, 0.00, 1.83), offset 0.05m in front of RTTMenuFrame_remote
+Assets\VR-Workspace\Scripts\Presentation\RTT\Services\StoragePermissionHelper.cs(190,17): warning CS0618: 'PermissionCallbacks.PermissionDeniedAndDontAskAgain' is obsolete: 'Unreliable. Query ShouldShowRequestPermissionRationale and use PermissionDenied event.'
 
-[RTTPopupInputable] Creating world overlay using camera: VRCamera
+Error building Player because scripts had compiler errors
 
-[RTTPopupInputable] Flat world overlay created at distance 2.5
-
-[RTTPopupInputable] Shown in world-space mode, fixed position in front of reference frame
-
-[RTTRemoteMenu] Connecting via Internet...
-
-[PhaseProtocol] USB Mode: False, Server IP: null
-
-[RTTRemoteMenu] HandlePhaseChanged: Disconnected -> Connecting
-
-[ConnectionViewModel] Connecting to ws://27.72.102.134:8288/signal?protocol=v2&token=YX7F3V (transport=WiFi)
-
-[PhaseProtocol] Connecting to ws://27.72.102.134:8288/signal?protocol=v2&token=YX7F3V
-
-[StateMachine] Disconnected -> Connecting
-
-[PhaseProtocol] Connection failed: Unable to connect to the remote server
-UnityEngine.Debug:LogError (object)
-VRWorkspace.Streaming.PhaseProtocolClient/<ConnectAsync>d__153:MoveNext () (at Assets/VR-Workspace/Scripts/Infrastructure/Streaming/PhaseProtocolClient.cs:524)
-UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
-
-[StateMachine] FORCE: Connecting -> Error: Unable to connect to the remote server
-
-[RTTRemoteMenu] Error: Unable to connect to the remote server
-UnityEngine.Debug:LogError (object)
-VRWorkspace.UI.RTT.Components.RTTRemoteMenu:HandleErrorMessage (string) (at Assets/VR-Workspace/Scripts/Presentation/RTT/Components/RTTRemoteMenu.Connection.cs:619)
-VRWorkspace.Core.ObservableProperty`1/<>c__DisplayClass12_0<string>:<NotifyChanged>b__0 () (at Assets/VR-Workspace/Scripts/Core/Observable/ObservableProperty.cs:114)
-VRWorkspace.Core.MainThreadDispatcher:Enqueue (System.Action) (at Assets/VR-Workspace/Scripts/Core/Threading/MainThreadDispatcher.cs:122)
-VRWorkspace.Core.ObservableProperty`1<string>:NotifyChanged (string) (at Assets/VR-Workspace/Scripts/Core/Observable/ObservableProperty.cs:114)
-VRWorkspace.Core.ObservableProperty`1<string>:set_Value (string) (at Assets/VR-Workspace/Scripts/Core/Observable/ObservableProperty.cs:79)
-VRWorkspace.ViewModels.ConnectionViewModel/<>c__DisplayClass123_0:<SubscribeToEvents>b__10 (string) (at Assets/VR-Workspace/Scripts/Presentation/ViewModels/ConnectionViewModel.cs:737)
-VRWorkspace.Streaming.PhaseProtocolClient/<ConnectAsync>d__153:MoveNext () (at Assets/VR-Workspace/Scripts/Infrastructure/Streaming/PhaseProtocolClient.cs:526)
-UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
-
-[RTTRemoteMenu] HandlePhaseChanged: Connecting -> Error
-
-[ConnectionViewModel] Error: Unable to connect to the remote server
-UnityEngine.Debug:LogError (object)
-VRWorkspace.ViewModels.ConnectionViewModel/<>c__DisplayClass123_0:<SubscribeToEvents>b__10 (string) (at Assets/VR-Workspace/Scripts/Presentation/ViewModels/ConnectionViewModel.cs:739)
-VRWorkspace.Streaming.PhaseProtocolClient/<ConnectAsync>d__153:MoveNext () (at Assets/VR-Workspace/Scripts/Infrastructure/Streaming/PhaseProtocolClient.cs:526)
-UnityEngine.UnitySynchronizationContext:ExecuteTasks ()
+Build completed with a result of 'Failed' in 16 seconds (16275 ms) [3/10/2026 12:01:00 AM -> 3/10/2026 12:01:16 AM, 16s]
+2 errors
+UnityEngine.GUIUtility:ProcessEvent (int,intptr,bool&)
 
