@@ -355,6 +355,7 @@ namespace VRWorkspace.UI.RTT.Components
             VRDropdownFactory.SetInteractable(_fpsDropdown, false);
 
             VRInputFieldFactory.SetInteractable(_hostInput, false);
+            SetInternetToggleInteractable(false);
             SetUsbToggleInteractable(false);
             VRButtonFactory.SetInteractable(_qrButton, false);
 
@@ -379,6 +380,7 @@ namespace VRWorkspace.UI.RTT.Components
                 VRDropdownFactory.SetOptionLocked(_resolutionDropdown, 2, true);
 
             VRInputFieldFactory.SetInteractable(_hostInput, !_isUsbMode);
+            SetInternetToggleInteractable(true);
             SetUsbToggleInteractable(true);
             VRButtonFactory.SetInteractable(_qrButton, true);
 
@@ -394,6 +396,20 @@ namespace VRWorkspace.UI.RTT.Components
 
             // Find checkbox button inside toggle
             var checkboxBtn = _usbModeToggle.transform.Find("ToggleContainer/Btn_");
+            if (checkboxBtn != null)
+            {
+                VRButtonFactory.SetInteractable(checkboxBtn.gameObject, interactable);
+            }
+        }
+
+        /// <summary>
+        /// Set Internet toggle interactable state.
+        /// </summary>
+        private void SetInternetToggleInteractable(bool interactable)
+        {
+            if (_internetModeToggle == null) return;
+
+            var checkboxBtn = _internetModeToggle.transform.Find("ToggleContainer/Btn_");
             if (checkboxBtn != null)
             {
                 VRButtonFactory.SetInteractable(checkboxBtn.gameObject, interactable);

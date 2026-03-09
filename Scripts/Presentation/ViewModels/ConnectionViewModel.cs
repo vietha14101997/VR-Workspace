@@ -152,6 +152,8 @@ namespace VRWorkspace.ViewModels
         private string _currentHost;
         private int _currentPort;
         private TransportMode _transportMode = TransportMode.WiFi;
+        private string _authToken;
+        private string _tunnelUrl;
         private readonly Dictionary<int, Texture> _textures = new Dictionary<int, Texture>();
         private bool _disposed;
 
@@ -204,11 +206,13 @@ namespace VRWorkspace.ViewModels
         /// <summary>
         /// Connect to the streaming server.
         /// </summary>
-        public async Task ConnectAsync(string host, int port)
+        public async Task ConnectAsync(string host, int port, string token = null, string tunnelUrl = null)
         {
             _currentHost = host;
             _currentPort = port;
             _transportMode = TransportMode.WiFi;
+            _authToken = token;
+            _tunnelUrl = tunnelUrl;
             await ConnectCommand.ExecuteAsync();
         }
 
@@ -627,9 +631,20 @@ namespace VRWorkspace.ViewModels
 
             try
             {
-                // Build URL with transport parameter for USB mode
+                // Build URL with transport parameter for USB mode and optional auth token
                 var transportParam = _transportMode == TransportMode.USB ? "&transport=usb" : "";
-                var url = $"ws://{_currentHost}:{_currentPort}/signal?protocol=v2{transportParam}";
+                var tokenParam = !string.IsNullOrEmpty(_authToken) ? $"&token={_authToken}" : "";
+                string url;
+                if (!string.IsNullOrEmpty(_tunnelUrl))
+                {
+                    // Tunnel mode: use wss:// through Cloudflare Tunnel
+                    var baseUrl = _tunnelUrl.TrimEnd('/').Replace("https://", "wss://");
+                    url = $"{baseUrl}/signal?protocol=v2{transportParam}{tokenParam}";
+                }
+                else
+                {
+                    url = $"ws://{_currentHost}:{_currentPort}/signal?protocol=v2{transportParam}{tokenParam}";
+                }
                 Debug.Log($"[ConnectionViewModel] Connecting to {url} (transport={_transportMode})");
                 await _client.ConnectAsync(url);
                 IsConnected.Value = true;

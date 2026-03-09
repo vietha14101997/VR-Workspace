@@ -982,10 +982,17 @@ namespace VRWorkspace.UI.RTT.Components
 
         private void OnInputEndEdit(string value)
         {
-            // Submit on Enter key
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Return) || UnityEngine.Input.GetKeyDown(KeyCode.KeypadEnter))
+            // Submit on Enter key (compatible with both legacy Input and new Input System)
+            try
             {
-                OnConfirmClicked();
+                if (UnityEngine.Input.GetKeyDown(KeyCode.Return) || UnityEngine.Input.GetKeyDown(KeyCode.KeypadEnter))
+                {
+                    OnConfirmClicked();
+                }
+            }
+            catch (System.InvalidOperationException)
+            {
+                // New Input System active - EndEdit triggered by deselection, confirm via button only
             }
         }
 

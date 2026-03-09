@@ -12,11 +12,23 @@ namespace VRWorkspace.QRScanner
         public string ip;       // WiFi IP
         public string port;     // Port (string for JsonUtility compatibility)
         public string usbIP;    // USB Tethering IP (optional)
+        public string publicIP; // Public IP for internet mode (optional)
+        public string tunnelUrl; // Cloudflare Tunnel URL (optional)
 
         /// <summary>
         /// Check if USB Tethering IP is available.
         /// </summary>
         public bool HasUsbIP => !string.IsNullOrEmpty(usbIP);
+
+        /// <summary>
+        /// Check if public IP is available (internet mode).
+        /// </summary>
+        public bool HasPublicIP => !string.IsNullOrEmpty(publicIP);
+
+        /// <summary>
+        /// Check if tunnel URL is available (zero-config internet mode).
+        /// </summary>
+        public bool HasTunnelUrl => !string.IsNullOrEmpty(tunnelUrl);
 
         /// <summary>
         /// Parse JSON string thành QRScannerConfig
@@ -45,7 +57,9 @@ namespace VRWorkspace.QRScanner
         public override string ToString()
         {
             string usbInfo = HasUsbIP ? $", usbIP={usbIP}" : "";
-            return $"QRConfig[ip={ip}, port={port}{usbInfo}]";
+            string internetInfo = HasPublicIP ? $", publicIP={publicIP}" : "";
+            string tunnelInfo = HasTunnelUrl ? $", tunnel={tunnelUrl}" : "";
+            return $"QRConfig[ip={ip}, port={port}{usbInfo}{internetInfo}{tunnelInfo}]";
         }
     }
 

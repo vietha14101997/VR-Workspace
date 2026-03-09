@@ -49,9 +49,13 @@ namespace VRWorkspace.UI.RTT.Components
         // UI References
         private GameObject _hostInput;
         private GameObject _usbModeToggle;  // USB mode checkbox (replaces port input)
+        private GameObject _internetModeToggle; // Internet mode checkbox
         private bool _isUsbMode = false;    // Current USB mode state
+        private bool _isInternetMode = false; // Current internet mode state
+        private RTTPopupInputable _tokenPopup; // Token input popup for internet mode
         private bool _preferenceSaveEnabled = false;  // Guard: only save when dropdowns are properly configured
         private string _usbTetheringIP = null;  // USB Tethering IP from QR scan (for full USB streaming)
+        private string _tunnelUrl = null;  // Cloudflare Tunnel URL from QR scan (for zero-config internet)
         private const int DEFAULT_PORT = 8288;
         private GameObject _monitorsDropdown;
         private GameObject _modeDropdown;
@@ -134,6 +138,7 @@ namespace VRWorkspace.UI.RTT.Components
         }
         public string Port => DEFAULT_PORT.ToString();
         public bool IsUsbMode => _isUsbMode;
+        public bool IsInternetMode => _isInternetMode;
         public string UsbTetheringIP => _usbTetheringIP;
         public bool HasUsbTetheringIP => !string.IsNullOrEmpty(_usbTetheringIP);
         public int MonitorIndex => VRDropdownFactory.GetSelectedIndex(_monitorsDropdown);
@@ -308,8 +313,9 @@ namespace VRWorkspace.UI.RTT.Components
         {
             var row = CreateContainer(parent, "InputRow", x, y, w, h);
 
-            float hostW = (w - gapX) * 0.6f;  // Host takes more space now
-            float toggleW = (w - gapX) * 0.4f;
+            float hostW = (w - 2 * gapX) * 0.45f;
+            float usbToggleW = (w - 2 * gapX) * 0.275f;
+            float internetToggleW = (w - 2 * gapX) * 0.275f;
 
             // Host Input
             _hostInput = VRInputFieldFactory.CreateLabeledInputField(
@@ -319,9 +325,13 @@ namespace VRWorkspace.UI.RTT.Components
                 labelFontSize: LABEL_FONT_SIZE, inputFontSize: INPUT_FONT_SIZE, font: customFont);
             PositionElement(_hostInput, 0, 0);
 
-            // USB Mode Toggle (replaces Port input)
-            _usbModeToggle = CreateUsbModeToggle(row.transform, toggleW, h);
+            // USB Mode Toggle
+            _usbModeToggle = CreateUsbModeToggle(row.transform, usbToggleW, h);
             PositionElement(_usbModeToggle, hostW + gapX, 0);
+
+            // Internet Mode Toggle
+            _internetModeToggle = CreateInternetModeToggle(row.transform, internetToggleW, h);
+            PositionElement(_internetModeToggle, hostW + usbToggleW + 2 * gapX, 0);
         }
 
         /// <summary>
@@ -437,6 +447,13 @@ namespace VRWorkspace.UI.RTT.Components
             // USB mode requires QR scan - disable manual host input
             VRInputFieldFactory.SetInteractable(_hostInput, !_isUsbMode);
 
+            // Mutually exclusive with Internet mode
+            if (_isUsbMode && _isInternetMode)
+            {
+                _isInternetMode = false;
+                UpdateInternetModeToggleVisual();
+            }
+
             Debug.Log($"[RTTRemoteMenu] USB Mode: {_isUsbMode}");
         }
 
@@ -493,6 +510,141 @@ namespace VRWorkspace.UI.RTT.Components
                     statusTMP.text = "USB Tethering";
                     statusTMP.color = themeColor;  // Always bright
                 }
+            }
+        }
+        /// <summary>
+        /// Create Internet Mode toggle checkbox (same layout as USB toggle).
+        /// </summary>
+        private GameObject CreateInternetModeToggle(Transform parent, float width, float height)
+        {
+            Color internetColor = new Color(0.2f, 0.7f, 1f); // Cyan tint
+
+            var container = new GameObject("InternetModeToggle");
+            container.transform.SetParent(parent, false);
+            var rt = container.AddComponent<RectTransform>();
+            rt.sizeDelta = new Vector2(width, height);
+
+            // Layout: Label on top, toggle button below (same as USB toggle)
+            float labelH = height * 0.35f;
+            float toggleH = height * 0.65f;
+
+            // Label "Internet"
+            var labelObj = new GameObject("Label");
+            labelObj.transform.SetParent(container.transform, false);
+            var labelRT = labelObj.AddComponent<RectTransform>();
+            labelRT.anchorMin = new Vector2(0, 0.65f);
+            labelRT.anchorMax = new Vector2(1, 1);
+            labelRT.offsetMin = Vector2.zero;
+            labelRT.offsetMax = Vector2.zero;
+
+            var labelTMP = labelObj.AddComponent<TextMeshProUGUI>();
+            labelTMP.text = "Internet";
+            labelTMP.fontSize = LABEL_FONT_SIZE;
+            labelTMP.color = internetColor;
+            labelTMP.alignment = TextAlignmentOptions.Left;
+            labelTMP.fontStyle = FontStyles.Bold;
+            labelTMP.raycastTarget = false;
+            if (customFont) labelTMP.font = customFont;
+
+            // Toggle button container
+            var toggleContainer = new GameObject("ToggleContainer");
+            toggleContainer.transform.SetParent(container.transform, false);
+            var toggleContainerRT = toggleContainer.AddComponent<RectTransform>();
+            toggleContainerRT.anchorMin = new Vector2(0, 0);
+            toggleContainerRT.anchorMax = new Vector2(1, 0.6f);
+            toggleContainerRT.offsetMin = Vector2.zero;
+            toggleContainerRT.offsetMax = Vector2.zero;
+
+            // Checkbox button
+            float checkboxSize = toggleH * 0.7f;
+            var checkboxConfig = new VRButtonFactory.ButtonConfig
+            {
+                label = "",
+                themeColor = internetColor,
+                width = checkboxSize,
+                height = checkboxSize,
+                iconOnly = true,
+                iconSize = checkboxSize * 0.6f,
+                cornerRadius = 0.15f,
+                backgroundAlpha = 0.15f,
+                borderWidth = 0.04f,
+                popAmount = 0.02f
+            };
+
+            var checkboxBtn = VRButtonFactory.CreateButton(toggleContainer.transform, checkboxConfig, OnInternetModeToggleClicked);
+            var checkboxRT = checkboxBtn.GetComponent<RectTransform>();
+            checkboxRT.anchorMin = new Vector2(0, 0.5f);
+            checkboxRT.anchorMax = new Vector2(0, 0.5f);
+            checkboxRT.pivot = new Vector2(0, 0.5f);
+            checkboxRT.anchoredPosition = Vector2.zero;
+
+            // Checkmark indicator
+            var checkmark = new GameObject("Checkmark");
+            checkmark.transform.SetParent(checkboxBtn.transform, false);
+            var checkmarkRT = checkmark.AddComponent<RectTransform>();
+            checkmarkRT.anchorMin = new Vector2(0.15f, 0.15f);
+            checkmarkRT.anchorMax = new Vector2(0.85f, 0.85f);
+            checkmarkRT.offsetMin = Vector2.zero;
+            checkmarkRT.offsetMax = Vector2.zero;
+
+            var checkmarkImg = checkmark.AddComponent<Image>();
+            checkmarkImg.sprite = Resources.Load<Sprite>("icon_check_mark");
+            checkmarkImg.color = Color.white;
+            checkmarkImg.preserveAspect = true;
+            checkmarkImg.raycastTarget = false;
+            checkmark.SetActive(false);
+
+            // Status label next to checkbox
+            var statusObj = new GameObject("Status");
+            statusObj.transform.SetParent(toggleContainer.transform, false);
+            var statusRT = statusObj.AddComponent<RectTransform>();
+            statusRT.anchorMin = new Vector2(0, 0);
+            statusRT.anchorMax = new Vector2(1, 1);
+            statusRT.offsetMin = new Vector2(checkboxSize + 15f, 0);
+            statusRT.offsetMax = Vector2.zero;
+
+            var statusTMP = statusObj.AddComponent<TextMeshProUGUI>();
+            statusTMP.text = "Remote";
+            statusTMP.fontSize = INPUT_FONT_SIZE * 0.85f;
+            statusTMP.color = internetColor;
+            statusTMP.alignment = TextAlignmentOptions.Left;
+            statusTMP.verticalAlignment = VerticalAlignmentOptions.Middle;
+            statusTMP.raycastTarget = false;
+            if (customFont) statusTMP.font = customFont;
+
+            return container;
+        }
+
+        private void OnInternetModeToggleClicked()
+        {
+            _isInternetMode = !_isInternetMode;
+            UpdateInternetModeToggleVisual();
+
+            // Internet mode: USB mode is mutually exclusive
+            if (_isInternetMode && _isUsbMode)
+            {
+                _isUsbMode = false;
+                UpdateUsbModeToggleVisual();
+                VRInputFieldFactory.SetInteractable(_hostInput, true);
+            }
+
+            Debug.Log($"[RTTRemoteMenu] Internet Mode: {_isInternetMode}");
+        }
+
+        private void UpdateInternetModeToggleVisual()
+        {
+            if (_internetModeToggle == null) return;
+
+            var checkmark = _internetModeToggle.transform.Find("ToggleContainer/Btn_/Checkmark");
+            if (checkmark != null)
+                checkmark.gameObject.SetActive(_isInternetMode);
+
+            var visuals = _internetModeToggle.transform.Find("ToggleContainer/Btn_/HitArea/Visuals/Background");
+            if (visuals != null)
+            {
+                var img = visuals.GetComponent<Image>();
+                if (img != null && img.material != null)
+                    img.material.SetFloat("_GlassAlpha", _isInternetMode ? 0.35f : 0.15f);
             }
         }
         #endregion

@@ -76,6 +76,8 @@ namespace VRWorkspace.Streaming
         private const int   FALLBACK_MIN_ENCODED_FRAMES = 15;    // Require at least 15 encoded frames received first
         private DateTime    _firstEncodedFrameTime = DateTime.MinValue;
         private DateTime    _lastDecodedFrameTime = DateTime.MinValue;  // Track last successful decode
+        private DateTime    _lastEncodedFrameTime = DateTime.MinValue;  // Track last encoded frame arrival (network health)
+        private long        _encodedCountAtStallStart;                  // EncodedFramesReceived when stall detection started
         private bool        _fallbackFired;
 
         /// <summary>
@@ -213,6 +215,7 @@ namespace VRWorkspace.Streaming
             if (encodedData == null || encodedData.Length == 0) return;
 
             EncodedFramesReceived++;
+            _lastEncodedFrameTime = DateTime.UtcNow;
 
             // Start fallback timer on first encoded frame received
             if (_firstEncodedFrameTime == DateTime.MinValue)
@@ -305,6 +308,10 @@ namespace VRWorkspace.Streaming
                 // Phase 1 (quick probe): If decoder NEVER produced a frame, fail fast (3s)
                 // Phase 2 (sustained stall): If decoder worked then stopped, use longer timeout (5s)
                 // Skip when deliberately waiting for IDR (P-frames are being dropped intentionally)
+                //
+                // IMPORTANT: Only fallback when encoded frames are STILL ARRIVING but decoder
+                // can't produce output. If encoded frames also stopped → network stall, not
+                // decoder failure. Fallback to H264 would only make things worse (higher bitrate).
                 if (!_fallbackFired
                     && !_waitingForCleanIdr
                     && EncodedFramesReceived >= FALLBACK_MIN_ENCODED_FRAMES
@@ -319,11 +326,26 @@ namespace VRWorkspace.Streaming
 
                     if ((DateTime.UtcNow - referenceTime).TotalSeconds >= timeout)
                     {
-                        _fallbackFired = true;
-                        string phase = neverDecoded ? "QUICK PROBE" : "SUSTAINED STALL";
-                        Debug.LogError($"{TAG} PC{MonitorIndex} DECODER FAILURE ({phase}): received {EncodedFramesReceived} encoded frames, " +
-                            $"decoded {_decodedCount}, stalled for {timeout}s. Triggering H265→H264 fallback!");
-                        OnDecoderFailed?.Invoke(MonitorIndex);
+                        // Check if encoded frames are still arriving (network is healthy)
+                        float timeSinceLastEncoded = (float)(DateTime.UtcNow - _lastEncodedFrameTime).TotalSeconds;
+                        bool encodedFramesStillArriving = timeSinceLastEncoded < 2f;
+
+                        if (!encodedFramesStillArriving)
+                        {
+                            // Network stall: encoded frames also stopped → don't fallback,
+                            // wait for network to recover. H264 would need MORE bandwidth.
+                            Debug.LogWarning($"{TAG} PC{MonitorIndex} Stall detected but encoded frames also stopped " +
+                                $"({timeSinceLastEncoded:F1}s ago) → network issue, NOT decoder failure. Skipping fallback.");
+                        }
+                        else
+                        {
+                            // True decoder failure: encoded frames arriving but decoder can't output
+                            _fallbackFired = true;
+                            string phase = neverDecoded ? "QUICK PROBE" : "SUSTAINED STALL";
+                            Debug.LogError($"{TAG} PC{MonitorIndex} DECODER FAILURE ({phase}): received {EncodedFramesReceived} encoded frames, " +
+                                $"decoded {_decodedCount}, stalled for {timeout}s. Triggering H265→H264 fallback!");
+                            OnDecoderFailed?.Invoke(MonitorIndex);
+                        }
                     }
                 }
 

@@ -278,7 +278,14 @@ namespace VRWorkspace.UI.RTT.Components
                         break;
                     }
 
-                    // WiFi Mode: Validate host and port
+                    // Tunnel Mode: skip host/port validation, connect via tunnel URL
+                    if (!string.IsNullOrEmpty(_tunnelUrl))
+                    {
+                        CheckTokenAndConnect(_tunnelUrl, DEFAULT_PORT);
+                        return;
+                    }
+
+                    // WiFi / Internet Mode: Validate host and port
                     string host = Host;
                     string port = Port;
 
@@ -301,16 +308,15 @@ namespace VRWorkspace.UI.RTT.Components
                         return;
                     }
 
-                    // Step 1: Connect
-                    Debug.Log("[RTTRemoteMenu] Connecting via WiFi...");
-                    UpdateButtonText("CONNECTING...");
+                    // Internet Mode: check if token required, then connect or show popup
+                    if (_isInternetMode)
+                    {
+                        CheckTokenAndConnect(host, portNum);
+                        return;
+                    }
 
-                    // Lock inputs during connection
-                    VRInputFieldFactory.SetInteractable(_hostInput, false);
-                    SetUsbToggleInteractable(false);
-                    VRButtonFactory.SetInteractable(_qrButton, false);
-
-                    await _viewModel.ConnectAsync(host, portNum);
+                    // WiFi Mode: connect directly
+                    ConnectWiFi(host, portNum, null);
                     break;
 
                 case ConnectionPhase.ConfiguringSettings:
@@ -498,6 +504,7 @@ namespace VRWorkspace.UI.RTT.Components
                     UpdateButtonText("CONNECT");
                     InitializeDropdownsDisabled();
                     VRInputFieldFactory.SetInteractable(_hostInput, !_isUsbMode);  // Disabled in USB mode (requires QR scan)
+                    SetInternetToggleInteractable(true);
                     SetUsbToggleInteractable(true);
                     VRButtonFactory.SetInteractable(_qrButton, true);
                     HideSidePanels();
@@ -563,6 +570,7 @@ namespace VRWorkspace.UI.RTT.Components
                     UpdateButtonText("CONNECT");
                     InitializeDropdownsDisabled();
                     VRInputFieldFactory.SetInteractable(_hostInput, !_isUsbMode);  // Disabled in USB mode (requires QR scan)
+                    SetInternetToggleInteractable(true);
                     SetUsbToggleInteractable(true);
                     VRButtonFactory.SetInteractable(_qrButton, true);
                     HideSidePanels();
@@ -1436,18 +1444,170 @@ namespace VRWorkspace.UI.RTT.Components
                 Debug.Log($"[RTTRemoteMenu] USB IP available: {_usbTetheringIP}");
             }
 
+            // Store Tunnel URL if available
+            if (config.HasTunnelUrl)
+            {
+                _tunnelUrl = config.tunnelUrl;
+                Debug.Log($"[RTTRemoteMenu] Tunnel URL available: {_tunnelUrl}");
+            }
+
             // Set Host based on USB Mode state
             // If USB Mode is ON and USB IP available → use USB IP
-            // Otherwise → use WiFi IP
-            string hostToUse = (_isUsbMode && config.HasUsbIP) ? config.usbIP : config.ip;
+            // Tunnel URL → show tunnel URL as host
+            // Otherwise → use WiFi IP (or publicIP for internet mode)
+            string hostToUse;
+            if (_isUsbMode && config.HasUsbIP)
+                hostToUse = config.usbIP;
+            else if (config.HasTunnelUrl)
+                hostToUse = config.tunnelUrl; // Tunnel mode: show tunnel URL
+            else if (config.HasPublicIP)
+                hostToUse = config.publicIP; // Internet mode: use public IP
+            else
+                hostToUse = config.ip;
 
             if (!string.IsNullOrEmpty(hostToUse))
             {
                 VRInputFieldFactory.SetValue(_hostInput, hostToUse);
-                Debug.Log($"[RTTRemoteMenu] Host set to: {hostToUse} (USB Mode: {_isUsbMode})");
+                Debug.Log($"[RTTRemoteMenu] Host set to: {hostToUse} (USB Mode: {_isUsbMode}, Tunnel: {config.HasTunnelUrl}, Internet: {config.HasPublicIP})");
             }
 
             // Note: Port from QR is ignored - using fixed DEFAULT_PORT (8288)
+            // Note: Token is NOT in QR code for security - user must enter manually
+
+            // Auto-enable Internet Mode if QR contains tunnel or publicIP
+            if ((config.HasTunnelUrl || config.HasPublicIP) && !_isInternetMode)
+            {
+                _isInternetMode = true;
+                UpdateInternetModeToggleVisual();
+
+                // Disable USB mode if it was on
+                if (_isUsbMode)
+                {
+                    _isUsbMode = false;
+                    UpdateUsbModeToggleVisual();
+                    VRInputFieldFactory.SetInteractable(_hostInput, true);
+                }
+
+                Debug.Log("[RTTRemoteMenu] Internet Mode auto-enabled from QR code");
+            }
+        }
+        #endregion
+
+        #region Internet Mode (Token Popup)
+        /// <summary>
+        /// Check server /ping to determine if token is required, then connect or show popup.
+        /// </summary>
+        private async void CheckTokenAndConnect(string host, int port)
+        {
+            UpdateButtonText("CHECKING...");
+
+            // null = unknown (ping failed), true = required, false = not required
+            bool? requireToken = null;
+            try
+            {
+                using (var http = new System.Net.Http.HttpClient())
+                {
+                    http.Timeout = System.TimeSpan.FromSeconds(3);
+                    // Use tunnel URL for ping if available, otherwise direct IP
+                    string pingUrl = !string.IsNullOrEmpty(_tunnelUrl)
+                        ? $"{_tunnelUrl.TrimEnd('/')}/ping"
+                        : $"http://{host}:{port}/ping";
+                    var response = await http.GetStringAsync(pingUrl);
+                    requireToken = !response.Contains("\"requireToken\":false");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"[RTTRemoteMenu] Ping check failed: {ex.Message}");
+            }
+
+            if (requireToken == true)
+            {
+                // Server explicitly requires token
+                UpdateButtonText("CONNECT");
+                ShowTokenPopup(host, port);
+            }
+            else
+            {
+                // Server says no token needed, OR ping failed (try without token anyway)
+                Debug.Log($"[RTTRemoteMenu] Connecting without token (requireToken={requireToken})");
+                ConnectWiFi(host, port, null);
+            }
+        }
+
+        /// <summary>
+        /// Show token input popup for Internet mode.
+        /// On confirm, connects with the entered token.
+        /// </summary>
+        private void ShowTokenPopup(string host, int port)
+        {
+            Debug.Log($"[RTTRemoteMenu] Showing token popup for {host}:{port}");
+
+            if (_tokenPopup == null)
+            {
+                var config = new RTTPopupInputable.PopupConfig
+                {
+                    title = "ENTER TOKEN",
+                    inputLabel = "Server Token",
+                    inputPlaceholder = "6-char token",
+                    buttonText = "Connect",
+                    primaryColor = themeColor,
+                    accentColor = accentColor,
+                    font = customFont,
+                    width = 575f,
+                    padding = 33f,
+                    titleFontSize = 31,
+                    labelFontSize = 24,
+                    inputFontSize = 29,
+                    buttonFontSize = 26,
+                    buttonHeight = 72f,
+                    inputHeight = 72f,
+                    titleHeight = 55f,
+                    closeButtonSize = 50f,
+                    spacing = 22f,
+                    overlayColor = new Color(0f, 0f, 0f, 0.4f),
+                    layerName = "VirtualObjects"
+                };
+
+                if (_menuFrame != null)
+                    _tokenPopup = RTTPopupInputable.CreateWorldSpace(config, _menuFrame.transform);
+                else
+                    _tokenPopup = RTTPopupInputable.Create(transform, config);
+            }
+
+            _tokenPopup.Show(
+                onConfirm: (token) =>
+                {
+                    if (string.IsNullOrWhiteSpace(token) || token.Trim().Length != 6)
+                    {
+                        Debug.LogWarning("[RTTRemoteMenu] Token must be 6 characters");
+                        ShowTemporaryButtonText("INVALID TOKEN!", 2f);
+                        return;
+                    }
+                    ConnectWiFi(host, port, token.Trim().ToUpperInvariant());
+                },
+                onCancel: () =>
+                {
+                    Debug.Log("[RTTRemoteMenu] Token popup cancelled");
+                }
+            );
+        }
+
+        /// <summary>
+        /// Execute WiFi/Internet connection with optional token.
+        /// </summary>
+        private async void ConnectWiFi(string host, int port, string token)
+        {
+            string mode = !string.IsNullOrEmpty(_tunnelUrl) ? "Tunnel" : (_isInternetMode ? "Internet" : "WiFi");
+            Debug.Log($"[RTTRemoteMenu] Connecting via {mode}...");
+            UpdateButtonText("CONNECTING...");
+
+            // Lock inputs during connection
+            VRInputFieldFactory.SetInteractable(_hostInput, false);
+            SetUsbToggleInteractable(false);
+            VRButtonFactory.SetInteractable(_qrButton, false);
+
+            await _viewModel.ConnectAsync(host, port, token, _tunnelUrl);
         }
         #endregion
     }
