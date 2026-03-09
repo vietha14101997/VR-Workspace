@@ -10,6 +10,306 @@ namespace VRWorkspace.Streaming
     public partial class PhaseProtocolClient
     {
         private bool _allMonitorsReadyFired;
+
+        // ── Per-Track Video PeerConnections (Multi-PC mode) ───────────────────
+        // When _perTrackPcMode = true, each monitor gets its own RTCPeerConnection
+        // for video (server-created offer). Main PC retains audio + cursor DCs only.
+        // When _perTrackPcMode = false, ALL behavior is IDENTICAL to legacy code path.
+        private readonly Dictionary<int, RTCPeerConnection> _videoPcs = new Dictionary<int, RTCPeerConnection>();
+        private bool _perTrackPcMode;
+        public bool PerTrackPcMode => _perTrackPcMode;
+
+        /// <summary>
+        /// Fires when a per-track video PC generates a local ICE candidate.
+        /// Parameter: (monitorIndex, candidate)
+        /// Only fires when _perTrackPcMode = true.
+        /// </summary>
+        public event Action<int, RTCIceCandidate> OnVideoIceCandidate;
+
+        /// <summary>
+        /// Enable or disable per-track video PeerConnection mode.
+        /// Must be called BEFORE CreatePeerConnectionsAsync.
+        /// When false (default): legacy single-PC multi-track path (unchanged).
+        /// When true: main PC carries audio+cursor only; each monitor gets its own video PC.
+        /// </summary>
+        public void SetPerTrackPcMode(bool enabled)
+        {
+            _perTrackPcMode = enabled;
+            Debug.Log($"[PhaseProtocol] PerTrackPcMode set to: {enabled}");
+        }
+
+        /// <summary>
+        /// Handle a video offer from the server for a specific monitor in per-track mode.
+        /// Creates a new RTCPeerConnection, sets the remote offer, creates and returns an answer SDP.
+        /// The answer SDP should be sent back to the server via WebSocket.
+        /// Also stores the PC in _videoPcs[monitorIndex] and updates the wrapper's VideoPc field.
+        /// </summary>
+        public async Task<string> HandleVideoOfferAsync(int monitorIndex, string offerSdp)
+        {
+            if (!_perTrackPcMode)
+            {
+                Debug.LogError("[PhaseProtocol] HandleVideoOfferAsync called but _perTrackPcMode=false");
+                return null;
+            }
+
+            try
+            {
+                Debug.Log($"[PhaseProtocol] HandleVideoOfferAsync: monitorIndex={monitorIndex}, sdp.Length={offerSdp?.Length ?? 0}");
+
+                // Close existing video PC for this monitor if any
+                if (_videoPcs.TryGetValue(monitorIndex, out var oldVpc))
+                {
+                    try { oldVpc.Close(); oldVpc.Dispose(); } catch { }
+                    _videoPcs.Remove(monitorIndex);
+                }
+
+                // Create new PeerConnection (LAN mode, no STUN)
+                var cfg = new RTCConfiguration { iceServers = new RTCIceServer[0] };
+                var videoPc = new RTCPeerConnection(ref cfg);
+                Debug.Log($"[PhaseProtocol] Video PC created for monitor {monitorIndex}");
+
+                // Wire ICE candidate → fire OnVideoIceCandidate event
+                int capturedMonitor = monitorIndex;
+                videoPc.OnIceCandidate = cand =>
+                {
+                    if (cand == null) return;
+                    OnVideoIceCandidate?.Invoke(capturedMonitor, cand);
+                };
+
+                videoPc.OnIceConnectionChange = s =>
+                {
+                    if (s == RTCIceConnectionState.Failed || s == RTCIceConnectionState.Disconnected)
+                        Debug.LogWarning($"[PhaseProtocol] Video PC{capturedMonitor} ICE state: {s}");
+                };
+
+                // ── Per-track H265 receiver: create BEFORE DC opens so frames are never lost ──
+                // In per-track mode, video PCs have NO RTP tracks (only DCs), so the OnTrack
+                // callback never fires. We must create H265StreamReceiver here instead.
+                PCWrapper perTrackWrapper = null;
+                lock (_lock)
+                {
+                    if (capturedMonitor < _peerConnections.Count)
+                        perTrackWrapper = _peerConnections[capturedMonitor];
+                }
+
+                if (_selectedCodec == VideoCodec.H265 && perTrackWrapper != null)
+                {
+                    int w = _userConfig?.resolutionWidth ?? 1920;
+                    int h = _userConfig?.resolutionHeight ?? 1080;
+
+                    // Cleanup old receiver if exists
+                    if (_h265Receivers.TryGetValue(capturedMonitor, out var oldRx))
+                    {
+                        oldRx.Dispose();
+                        _h265Receivers.Remove(capturedMonitor);
+                    }
+
+                    var ptReceiver = new H265StreamReceiver(capturedMonitor, w, h);
+                    if (ptReceiver.Start())
+                    {
+                        _h265Receivers[capturedMonitor] = ptReceiver;
+                        var ptWrapper = perTrackWrapper; // capture for closure
+                        ptReceiver.OnTextureReady += (monIdx, tex) =>
+                        {
+                            ptWrapper.Texture = tex;
+                            ptWrapper.LastFrameTime = DateTime.UtcNow;
+
+                            if (ptWrapper.StreamStartTime == DateTime.MinValue)
+                                ptWrapper.StreamStartTime = DateTime.UtcNow;
+
+                            if (ptWrapper.WaitingForFirstFrame)
+                                ptWrapper.WaitingForFirstFrame = false;
+
+                            if (!_streamingStartedFired)
+                            {
+                                _streamingStartedFired = true;
+                                Debug.Log($"[PhaseProtocol] Video PC{monIdx} first frame (per-track H265), firing OnStreamingStarted");
+                                _stateMachine.TryTransition(ConnectionPhase.Streaming);
+                                HandleStreamingStartedInternal();
+                            }
+
+                            OnVideoTextureReceived?.Invoke(monIdx, tex);
+                        };
+                        ptReceiver.OnDecoderFailed += monIdx =>
+                        {
+                            Debug.LogError($"[PhaseProtocol] Video PC{monIdx} H265 decoder failed (per-track)");
+                            OnH265DecoderFailed(monIdx);
+                        };
+                        ptReceiver.OnKeyframeNeeded += monIdx => RequestKeyframe(monIdx);
+                        ptReceiver.OnCorruptionDetected += monIdx =>
+                        {
+                            TaintTrack(monIdx, "luminance corruption detected by per-track decoder");
+                        };
+                        Debug.Log($"[PhaseProtocol] Video PC{capturedMonitor} H265 receiver created (per-track mode, {w}x{h})");
+                    }
+                    else
+                    {
+                        Debug.LogError($"[PhaseProtocol] Video PC{capturedMonitor} H265 receiver failed to start");
+                    }
+                }
+
+                // Wire OnDataChannel — server creates the h265video DC on its side (it holds the offer)
+                videoPc.OnDataChannel = channel =>
+                {
+                    Debug.Log($"[PhaseProtocol] Video PC{capturedMonitor} server DataChannel: label={channel.Label}");
+
+                    string expectedLabel = $"h265video-{capturedMonitor}";
+                    if (channel.Label == expectedLabel)
+                    {
+                        channel.OnOpen = () =>
+                        {
+                            Debug.Log($"[PhaseProtocol] Video PC{capturedMonitor} h265video DC opened (per-track mode)");
+                            // Initialize LastFrameTime so auto-heal doesn't fire prematurely
+                            if (perTrackWrapper != null)
+                            {
+                                perTrackWrapper.LastFrameTime = DateTime.UtcNow;
+                                perTrackWrapper.LastNetworkActivityTime = DateTime.UtcNow;
+                            }
+                        };
+                        channel.OnClose = () =>
+                            Debug.Log($"[PhaseProtocol] Video PC{capturedMonitor} h265video DC closed (per-track mode)");
+                        channel.OnMessage = bytes =>
+                            HandleH265VideoFromDataChannel(bytes);
+
+                        // Also store in _h265VideoChannels for consistency
+                        _h265VideoChannels[capturedMonitor] = channel;
+                        Debug.Log($"[PhaseProtocol] Video PC{capturedMonitor} h265video DC wired (per-track mode)");
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[PhaseProtocol] Video PC{capturedMonitor} unexpected DC label: {channel.Label} (expected {expectedLabel})");
+                    }
+                };
+
+                // Set remote description (server's offer)
+                var fixedSdp = FixSdp(offerSdp);
+                var remoteOffer = new RTCSessionDescription { type = RTCSdpType.Offer, sdp = fixedSdp };
+                var setRemoteOp = videoPc.SetRemoteDescription(ref remoteOffer);
+                while (!setRemoteOp.IsDone)
+                    await Task.Yield();
+
+                if (setRemoteOp.IsError)
+                {
+                    Debug.LogError($"[PhaseProtocol] Video PC{monitorIndex} SetRemoteDescription failed: {setRemoteOp.Error.message}");
+                    videoPc.Close();
+                    videoPc.Dispose();
+                    return null;
+                }
+                Debug.Log($"[PhaseProtocol] Video PC{monitorIndex} remote offer set OK");
+
+                // Create answer
+                var answerOp = videoPc.CreateAnswer();
+                while (!answerOp.IsDone)
+                    await Task.Yield();
+
+                if (answerOp.IsError)
+                {
+                    Debug.LogError($"[PhaseProtocol] Video PC{monitorIndex} CreateAnswer failed");
+                    videoPc.Close();
+                    videoPc.Dispose();
+                    return null;
+                }
+
+                // Set local description
+                var answer = answerOp.Desc;
+                var setLocalOp = videoPc.SetLocalDescription(ref answer);
+                while (!setLocalOp.IsDone)
+                    await Task.Yield();
+
+                if (setLocalOp.IsError)
+                {
+                    Debug.LogError($"[PhaseProtocol] Video PC{monitorIndex} SetLocalDescription failed");
+                    videoPc.Close();
+                    videoPc.Dispose();
+                    return null;
+                }
+                Debug.Log($"[PhaseProtocol] Video PC{monitorIndex} local answer set OK");
+
+                // Store video PC — _videoPcs[monitorIndex] is the authoritative reference.
+                // The PCWrapper.PC field continues to point to the shared main PC (audio+cursor).
+                // Callers needing the video PC for monitor N should use _videoPcs[N].
+                _videoPcs[monitorIndex] = videoPc;
+                Debug.Log($"[PhaseProtocol] Video PC{monitorIndex} stored in _videoPcs dictionary");
+
+                // Flush any ICE candidates that arrived before the video PC was created
+                if (_pendingVideoIceCandidates.TryGetValue(monitorIndex, out var pendingCands))
+                {
+                    Debug.Log($"[PhaseProtocol] Video PC{monitorIndex} flushing {pendingCands.Count} pending ICE candidates");
+                    foreach (var pCand in pendingCands)
+                    {
+                        try { videoPc.AddIceCandidate(pCand); }
+                        catch (Exception ex) { Debug.LogWarning($"[PhaseProtocol] Video PC{monitorIndex} pending ICE failed: {ex.Message}"); }
+                    }
+                    _pendingVideoIceCandidates.Remove(monitorIndex);
+                }
+
+                Debug.Log($"[PhaseProtocol] Video PC{monitorIndex} ready, returning answer SDP ({answer.sdp?.Length ?? 0} chars)");
+                return answer.sdp;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[PhaseProtocol] HandleVideoOfferAsync failed for monitor {monitorIndex}: {ex.Message}\n{ex.StackTrace}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Add a remote ICE candidate to the video PeerConnection for the specified monitor.
+        /// Only valid in per-track mode. Queues candidates if video PC isn't created yet.
+        /// </summary>
+        // Pending ICE candidates for video PCs that haven't been created yet
+        private readonly Dictionary<int, List<RTCIceCandidate>> _pendingVideoIceCandidates = new Dictionary<int, List<RTCIceCandidate>>();
+
+        public void AddVideoIceCandidate(int monitorIndex, RTCIceCandidate candidate)
+        {
+            if (!_perTrackPcMode) return;
+
+            if (_videoPcs.TryGetValue(monitorIndex, out var vpc))
+            {
+                try
+                {
+                    vpc.AddIceCandidate(candidate);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[PhaseProtocol] Video PC{monitorIndex} AddIceCandidate failed: {ex.Message}");
+                }
+            }
+            else
+            {
+                // Queue candidate — video PC is still being created by HandleVideoOfferAsync
+                if (!_pendingVideoIceCandidates.TryGetValue(monitorIndex, out var pending))
+                {
+                    pending = new List<RTCIceCandidate>();
+                    _pendingVideoIceCandidates[monitorIndex] = pending;
+                }
+                pending.Add(candidate);
+            }
+        }
+
+        /// <summary>
+        /// Close and dispose all per-track video PeerConnections.
+        /// Called during cleanup or session teardown.
+        /// </summary>
+        public void CloseAllVideoPcs()
+        {
+            foreach (var kvp in _videoPcs)
+            {
+                try
+                {
+                    kvp.Value.Close();
+                    kvp.Value.Dispose();
+                    Debug.Log($"[PhaseProtocol] Video PC{kvp.Key} closed");
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[PhaseProtocol] Error closing video PC{kvp.Key}: {ex.Message}");
+                }
+            }
+            _videoPcs.Clear();
+            Debug.Log("[PhaseProtocol] All video PCs closed");
+        }
+
         /// <summary>
         /// Create PeerConnections in background so receive loop can process incoming messages.
         /// </summary>
@@ -48,11 +348,15 @@ namespace VRWorkspace.Streaming
         /// <summary>
         /// Create a single PeerConnection with N video transceivers.
         /// Produces a single offer with N m= sections.
+        /// When _perTrackPcMode = true: creates main PC with audio+cursor only (no video transceivers,
+        /// no h265video DCs). Video PCs are created separately via HandleVideoOfferAsync.
+        /// When _perTrackPcMode = false: IDENTICAL to legacy behavior.
         /// </summary>
         private async Task CreateSinglePCMultiTrackAsync(int count)
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            Debug.Log($"[PhaseProtocol] CreateSinglePCMultiTrackAsync: Creating PeerConnection for {count} monitors...");
+            string modeLabel = _perTrackPcMode ? "Per-Track Multi-PC" : "Single-PC Multi-Track";
+            Debug.Log($"[PhaseProtocol] CreateSinglePCMultiTrackAsync: Creating PeerConnection for {count} monitors ({modeLabel} mode)...");
 
             // EMPTY ICE servers - no STUN for LAN mode
             var cfg = new RTCConfiguration { iceServers = new RTCIceServer[0] };
@@ -66,21 +370,30 @@ namespace VRWorkspace.Streaming
                 var wrapper = new PCWrapper
                 {
                     Index = i,
-                    PC = pc, // All wrappers share the same PC
+                    PC = pc, // All wrappers share the same main PC
                     AnswerReceivedTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously)
                 };
                 trackWrappers.Add(wrapper);
             }
 
-            // Add N video transceivers (RecvOnly)
+            // ── Legacy mode: add video transceivers to main PC ───────────────────
+            // Per-track mode: video PCs created via HandleVideoOfferAsync — skip this block.
             var transceivers = new List<RTCRtpTransceiver>();
-            for (int i = 0; i < count; i++)
+            if (!_perTrackPcMode)
             {
-                var trans = pc.AddTransceiver(TrackKind.Video, new RTCRtpTransceiverInit { direction = RTCRtpTransceiverDirection.RecvOnly });
-                SetCodecPreferences(trans, i);
-                transceivers.Add(trans);
-                trackWrappers[i].Mid = trans.Mid; // Store MID for stats matching
-                Debug.Log($"[PhaseProtocol] Added transceiver {i} for monitor {i}, mid={trans.Mid}");
+                // Add N video transceivers (RecvOnly)
+                for (int i = 0; i < count; i++)
+                {
+                    var trans = pc.AddTransceiver(TrackKind.Video, new RTCRtpTransceiverInit { direction = RTCRtpTransceiverDirection.RecvOnly });
+                    SetCodecPreferences(trans, i);
+                    transceivers.Add(trans);
+                    trackWrappers[i].Mid = trans.Mid; // Store MID for stats matching
+                    Debug.Log($"[PhaseProtocol] Added transceiver {i} for monitor {i}, mid={trans.Mid}");
+                }
+            }
+            else
+            {
+                Debug.Log("[PhaseProtocol] Per-track mode: skipping video transceivers on main PC (video handled by per-monitor video PCs)");
             }
 
             // Add RecvOnly audio transceiver to receive Opus RTP from server.
@@ -108,26 +421,35 @@ namespace VRWorkspace.Streaming
             _cursorChannel.OnClose = () => Debug.Log("[PhaseProtocol] Cursor DataChannel closed");
             Debug.Log("[PhaseProtocol] Cursor via DataChannel (low-latency binary)");
 
-            // Per-track DataChannels for H.265 video frames.
-            // Each track gets its own DC → own SCTP buffer → no cross-track congestion.
-            // e.g., Track 1 (browser video) can't starve Track 0 (VSCode) by filling shared buffer.
-            var h265VideoInit = new RTCDataChannelInit
+            // ── Legacy mode: create per-track h265video DCs on main PC ───────────
+            // Per-track mode: h265video DCs live on the per-monitor video PCs — skip this block.
+            if (!_perTrackPcMode)
             {
-                ordered = false,
-                maxRetransmits = 0
-            };
-            _h265VideoChannels.Clear();
-            for (int t = 0; t < count; t++)
-            {
-                string label = $"h265video-{t}";
-                var ch = pc.CreateDataChannel(label, h265VideoInit);
-                int capturedTrack = t; // capture for closure
-                ch.OnMessage = bytes => HandleH265VideoFromDataChannel(bytes);
-                ch.OnOpen = () => Debug.Log($"[PhaseProtocol] H265 Video DataChannel opened: {label} (unreliable, unordered)");
-                ch.OnClose = () => Debug.Log($"[PhaseProtocol] H265 Video DataChannel closed: {label}");
-                _h265VideoChannels[t] = ch;
+                // Per-track DataChannels for H.265 video frames.
+                // Each track gets its own DC → own SCTP buffer → no cross-track congestion.
+                // e.g., Track 1 (browser video) can't starve Track 0 (VSCode) by filling shared buffer.
+                var h265VideoInit = new RTCDataChannelInit
+                {
+                    ordered = false,
+                    maxRetransmits = 0
+                };
+                _h265VideoChannels.Clear();
+                for (int t = 0; t < count; t++)
+                {
+                    string label = $"h265video-{t}";
+                    var ch = pc.CreateDataChannel(label, h265VideoInit);
+                    int capturedTrack = t; // capture for closure
+                    ch.OnMessage = bytes => HandleH265VideoFromDataChannel(bytes);
+                    ch.OnOpen = () => Debug.Log($"[PhaseProtocol] H265 Video DataChannel opened: {label} (unreliable, unordered)");
+                    ch.OnClose = () => Debug.Log($"[PhaseProtocol] H265 Video DataChannel closed: {label}");
+                    _h265VideoChannels[t] = ch;
+                }
+                Debug.Log($"[PhaseProtocol] Created {count} per-track H265 Video DataChannels (unreliable, unordered)");
             }
-            Debug.Log($"[PhaseProtocol] Created {count} per-track H265 Video DataChannels (unreliable, unordered)");
+            else
+            {
+                Debug.Log("[PhaseProtocol] Per-track mode: h265video DCs will be wired by HandleVideoOfferAsync per monitor");
+            }
 
             // Setup event handlers for single PC
             SetupSinglePCEventHandlers(pc, trackWrappers, transceivers);

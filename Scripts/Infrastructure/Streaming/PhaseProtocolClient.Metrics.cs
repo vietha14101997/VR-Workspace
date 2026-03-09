@@ -779,7 +779,13 @@ namespace VRWorkspace.Streaming
                             // bootstrap is implicitly complete (UpdateDecoderStallCheck handles it).
                             bool h265DcBootstrap = _selectedCodec == VideoCodec.H265
                                 && _h265Receivers.ContainsKey(wrapper.Index);
-                            if (!h265DcBootstrap && timeSinceNetwork > BOOTSTRAP_TIMEOUT_MS)
+
+                            // Per-track mode: video PC may not be set up yet (waiting for video_offer
+                            // from server). Don't trigger bootstrap timeout until video PC exists.
+                            bool perTrackWaiting = _perTrackPcMode
+                                && !_videoPcs.ContainsKey(wrapper.Index);
+
+                            if (!h265DcBootstrap && !perTrackWaiting && timeSinceNetwork > BOOTSTRAP_TIMEOUT_MS)
                             {
                                 Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} BOOTSTRAP TIMEOUT ({timeSinceNetwork:F0}ms) - triggering reconnect");
                                 wrapper.IsReconnecting = true;

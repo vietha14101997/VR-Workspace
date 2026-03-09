@@ -449,14 +449,35 @@ namespace VRWorkspace.Streaming
                 // ── Create phase handlers ──────────────────────────────────────
                 _phase1 = new PhaseOneHandler(SendTextAsync, _stateMachine, _isUsbMode);
                 _phase1.SetSpeedTestClient(_speedTest);
-                _phase1.OnHardwareInfoReady    += info  => { _hardwareInfo   = info;  OnHardwareInfoReceived?.Invoke(info); };
+                _phase1.OnHardwareInfoReady    += info  =>
+                {
+                    _hardwareInfo = info;
+                    OnHardwareInfoReceived?.Invoke(info);
+                    // perTrackPc capability is now embedded in hardware_info_ack JSON
+                    // Server reads it directly from HardwareInfoAckMessage.PerTrackPc
+                };
                 _phase1.OnNetworkInfoReady     += info  => { _networkInfo    = info;  UpdateConnectionType(info.connectionType, info.jitterMs); OnNetworkInfoReceived?.Invoke(info); };
                 _phase1.OnSuggestedConfigReady += cfg   => { _suggestedConfig = cfg;  _selectedCodec = _phase1.SelectedCodec; OnSuggestedConfigReceived?.Invoke(cfg); };
                 _phase1.OnSpeedTestProgress    += (d, m, p) => OnSpeedTestProgress?.Invoke(d, m, p);
 
                 _phase2 = new PhaseTwoHandler(SendTextAsync, _stateMachine, CreatePeerConnectionsInBackgroundAsync);
                 _phase2.OnConfigProgress      += (s, p, m) => { OnConfigProgress?.Invoke(s, p, m); OnServerSetupProgress?.Invoke(p); };
-                _phase2.OnConfigComplete      += monitors  => { _configuredMonitors = monitors; OnConfigComplete?.Invoke(monitors); };
+                _phase2.OnConfigComplete      += monitors  =>
+                {
+                    _configuredMonitors = monitors;
+
+                    // Set per-track PC mode BEFORE CreatePeerConnectionsInBackgroundAsync is called.
+                    // Condition: H265 codec AND multiple monitors (per-track is meaningful for multi-monitor).
+                    // Single-monitor H265 still uses legacy path for simplicity.
+                    bool enablePerTrack = _selectedCodec == VideoCodec.H265 && monitors.Count > 1;
+                    if (enablePerTrack)
+                    {
+                        SetPerTrackPcMode(true);
+                        Debug.Log($"[PhaseProtocol] PerTrackPcMode enabled (H265 + {monitors.Count} monitors)");
+                    }
+
+                    OnConfigComplete?.Invoke(monitors);
+                };
                 _phase2.OnServerSetupProgress += p         => OnServerSetupProgress?.Invoke(p);
 
                 _phase3 = new PhaseThreeHandler(SendTextAsync, _stateMachine);
@@ -465,6 +486,26 @@ namespace VRWorkspace.Streaming
                 _phase3.OnBitrateAdjusted        += (idx, kbps, reason) => OnBitrateAdjusted?.Invoke(idx, kbps, reason);
                 _phase3.OnQualityRecommendation  += (rec, reason) => OnQualityRecommendation?.Invoke(rec, reason);
                 _phase3.OnSkipToLiveAck          += () => OnSkipToLiveAck?.Invoke();
+
+                // ── Per-track video PC ICE candidate forwarding ───────────────
+                // When _perTrackPcMode=true, forward video PC local ICE candidates to server.
+                OnVideoIceCandidate += (monitorIndex, candidate) =>
+                {
+                    if (!_perTrackPcMode) return;
+                    string candStr = candidate?.Candidate ?? "";
+                    if (string.IsNullOrEmpty(candStr)) return;
+
+                    string rawCandidate = candStr.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase)
+                        ? candStr.Substring("candidate:".Length)
+                        : candStr;
+
+                    // Apply USB filtering for video PC candidates too
+                    if (!ShouldSendIceCandidate(rawCandidate)) return;
+
+                    string msg = $"{{\"type\":\"video_candidate\",\"monitorIndex\":{monitorIndex},\"candidate\":\"{EscapeJsonString(rawCandidate)}\"}}";
+                    _ = SendTextAsync(msg);
+                    Debug.Log($"[PhaseProtocol] Sent video_candidate for monitor {monitorIndex}");
+                };
 
                 // ── Start loops ───────────────────────────────────────────────
                 _ = ReceiveLoopAsync(ct);
@@ -801,6 +842,21 @@ namespace VRWorkspace.Streaming
                             HandleIceReady(json);
                             break;
 
+                        // ── Per-track video PC signaling ──────────────────────
+                        case "video_offer":
+                            if (_perTrackPcMode)
+                                _ = HandleVideoOfferMessageAsync(json);
+                            else
+                                Debug.LogWarning("[PhaseProtocol] video_offer received but perTrackPcMode=false, ignoring");
+                            break;
+
+                        case "video_candidate":
+                            if (_perTrackPcMode)
+                                HandleVideoCandidate(json);
+                            else
+                                Debug.LogWarning("[PhaseProtocol] video_candidate received but perTrackPcMode=false, ignoring");
+                            break;
+
                         // ── Phase 3 ──────────────────────────────────────────
                         case "streaming_started":
                             _phase3.HandleStreamingStarted(json);
@@ -908,6 +964,80 @@ namespace VRWorkspace.Streaming
             Debug.LogError($"[PhaseProtocol] Error in Phase {phase}: [{code}] {message}");
             _stateMachine.ForceTransition(ConnectionPhase.Error, message);
             OnError?.Invoke(message);
+        }
+
+        // ── Per-track video PC message handlers ───────────────────────────────
+
+        /// <summary>
+        /// Handle video_offer from server for a specific monitor.
+        /// Creates a video PeerConnection, generates an answer, sends it back.
+        /// Only active when _perTrackPcMode = true.
+        /// </summary>
+        private async Task HandleVideoOfferMessageAsync(SimpleJson json)
+        {
+            int monitorIndex = json.GetInt("monitorIndex");
+            string offerSdp  = json.GetString("sdp") ?? "";
+
+            if (string.IsNullOrEmpty(offerSdp))
+            {
+                Debug.LogError($"[PhaseProtocol] video_offer for monitor {monitorIndex} has empty SDP");
+                return;
+            }
+
+            Debug.Log($"[PhaseProtocol] Received video_offer for monitor {monitorIndex} (sdp.len={offerSdp.Length})");
+
+            try
+            {
+                // HandleVideoOfferAsync must run on Unity main thread (WebRTC constraint).
+                // ReceiveLoopAsync is already on the Unity main thread via the WebSocket,
+                // so this await is safe — no explicit dispatch needed.
+                var answerSdp = await HandleVideoOfferAsync(monitorIndex, offerSdp);
+
+                if (string.IsNullOrEmpty(answerSdp))
+                {
+                    Debug.LogError($"[PhaseProtocol] HandleVideoOfferAsync returned null/empty for monitor {monitorIndex}");
+                    return;
+                }
+
+                string response = $"{{\"type\":\"video_answer\",\"monitorIndex\":{monitorIndex},\"sdp\":\"{EscapeJsonString(answerSdp)}\"}}";
+                await SendTextAsync(response);
+                Debug.Log($"[PhaseProtocol] Sent video_answer for monitor {monitorIndex}");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[PhaseProtocol] video_offer handling failed for monitor {monitorIndex}: {ex.Message}");
+                // Don't rethrow — other monitors can still work
+            }
+        }
+
+        /// <summary>
+        /// Handle video_candidate from server for a specific monitor's video PC.
+        /// Only active when _perTrackPcMode = true.
+        /// </summary>
+        private void HandleVideoCandidate(SimpleJson json)
+        {
+            int monitorIndex    = json.GetInt("monitorIndex");
+            string candidateStr = json.GetString("candidate") ?? "";
+
+            if (string.IsNullOrEmpty(candidateStr))
+            {
+                Debug.LogWarning($"[PhaseProtocol] video_candidate for monitor {monitorIndex} has empty candidate");
+                return;
+            }
+
+            // Normalize: ensure "candidate:" prefix is present (Unity WebRTC expects full form)
+            string fullCand = candidateStr.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase)
+                ? candidateStr
+                : "candidate:" + candidateStr;
+
+            var iceCandidate = new RTCIceCandidate(new RTCIceCandidateInit
+            {
+                candidate     = fullCand,
+                sdpMLineIndex = 0,
+                sdpMid        = "0"
+            });
+            AddVideoIceCandidate(monitorIndex, iceCandidate);
+            Debug.Log($"[PhaseProtocol] Applied video_candidate for monitor {monitorIndex}");
         }
 
         // ── Legacy message handler ─────────────────────────────────────────────
@@ -1119,6 +1249,10 @@ namespace VRWorkspace.Streaming
             _sctpInitChannel = null;
             _cursorChannel = null;
             _h265VideoChannels.Clear();
+
+            // Close per-track video PCs (always safe — no-op if dictionary is empty)
+            CloseAllVideoPcs();
+            _perTrackPcMode = false;
 
             try { _audioPc?.Close(); _audioPc?.Dispose(); } catch { }
             _audioPc = null;

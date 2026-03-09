@@ -81,19 +81,23 @@ namespace VRWorkspace.Streaming
             byte[] paramSets = new byte[paramLen];
             Buffer.BlockCopy(data, 2, paramSets, 0, paramLen);
 
-            Debug.Log($"[PhaseProtocol] Received H265 codec config via DataChannel: track={trackIndex}, paramSets={paramLen} bytes");
-
             // Forward to the H265 handler for this track
             if (_h265Handlers.TryGetValue(trackIndex, out var handler))
             {
                 handler.SetCodecConfig(paramSets);
-                Debug.Log($"[PhaseProtocol] H265 codec config applied to handler PC{trackIndex}");
             }
             else
             {
-                Debug.LogWarning($"[PhaseProtocol] No H265 handler found for track {trackIndex}, config will be lost");
+                // Per-track mode: no Encoded Transform handler — store config for IDR prepend
+                _perTrackCodecConfig[trackIndex] = paramSets;
             }
         }
+
+        // ── Per-track codec config storage (used when H265EncodedFrameHandler is absent) ──
+        // In per-track mode, there's no Encoded Transform handler, so codec config
+        // (VPS/SPS/PPS sent as type 0x02) must be stored here and prepended to IDR data.
+        private readonly System.Collections.Generic.Dictionary<int, byte[]> _perTrackCodecConfig
+            = new System.Collections.Generic.Dictionary<int, byte[]>();
 
         // ── IDR chunk reassembly state ──
         private readonly System.Collections.Generic.Dictionary<int, byte[][]> _idrChunks
@@ -129,8 +133,6 @@ namespace VRWorkspace.Streaming
             int totalChunks = data[3];
             int dataLen = data.Length - 4;
 
-            Debug.Log($"[PhaseProtocol] Received H265 IDR chunk via DataChannel: track={trackIndex}, chunk={chunkIndex + 1}/{totalChunks}, {dataLen} bytes");
-
             if (totalChunks == 1)
             {
                 // Single chunk — no reassembly needed
@@ -146,11 +148,23 @@ namespace VRWorkspace.Streaming
                 if (_h265Handlers.TryGetValue(trackIndex, out var handler))
                 {
                     handler.FeedIdrFromDataChannel(idrData);
-                    Debug.Log($"[PhaseProtocol] H265 IDR (single chunk) fed to handler PC{trackIndex}: {idrData.Length} bytes");
+                }
+                else if (_h265Receivers.TryGetValue(trackIndex, out var receiver))
+                {
+                    // Per-track mode: prepend codec config (VPS/SPS/PPS) if available
+                    byte[] feedData = idrData;
+                    if (_perTrackCodecConfig.TryGetValue(trackIndex, out var config) && config.Length > 0)
+                    {
+                        feedData = new byte[config.Length + idrData.Length];
+                        Buffer.BlockCopy(config, 0, feedData, 0, config.Length);
+                        Buffer.BlockCopy(idrData, 0, feedData, config.Length, idrData.Length);
+                    }
+                    receiver.OnEncodedFrameReceived(feedData, true,
+                        System.Diagnostics.Stopwatch.GetTimestamp() * 1_000_000 / System.Diagnostics.Stopwatch.Frequency);
                 }
                 else
                 {
-                    Debug.LogWarning($"[PhaseProtocol] No H265 handler for track {trackIndex}, IDR data lost");
+                    Debug.LogWarning($"[PhaseProtocol] No H265 handler/receiver for track {trackIndex}, IDR data lost");
                 }
                 return;
             }
@@ -220,11 +234,23 @@ namespace VRWorkspace.Streaming
                 if (_h265Handlers.TryGetValue(trackIndex, out var handler))
                 {
                     handler.FeedIdrFromDataChannel(idrData);
-                    Debug.Log($"[PhaseProtocol] H265 IDR ({totalChunks} chunks reassembled) fed to handler PC{trackIndex}: {idrData.Length} bytes");
+                }
+                else if (_h265Receivers.TryGetValue(trackIndex, out var receiver))
+                {
+                    // Per-track mode: prepend codec config (VPS/SPS/PPS) if available
+                    byte[] feedData = idrData;
+                    if (_perTrackCodecConfig.TryGetValue(trackIndex, out var config) && config.Length > 0)
+                    {
+                        feedData = new byte[config.Length + idrData.Length];
+                        Buffer.BlockCopy(config, 0, feedData, 0, config.Length);
+                        Buffer.BlockCopy(idrData, 0, feedData, config.Length, idrData.Length);
+                    }
+                    receiver.OnEncodedFrameReceived(feedData, true,
+                        System.Diagnostics.Stopwatch.GetTimestamp() * 1_000_000 / System.Diagnostics.Stopwatch.Frequency);
                 }
                 else
                 {
-                    Debug.LogWarning($"[PhaseProtocol] No H265 handler for track {trackIndex}, reassembled IDR lost");
+                    Debug.LogWarning($"[PhaseProtocol] No H265 handler/receiver for track {trackIndex}, reassembled IDR lost");
                 }
             }
         }
@@ -312,8 +338,6 @@ namespace VRWorkspace.Streaming
                 return;
 
             _pframeCount++;
-            if (_pframeCount <= 5 || _pframeCount % 300 == 0)
-                Debug.Log($"[PhaseProtocol] H265 P-frame via DataChannel: track={trackIndex}, {pframeData.Length} bytes (total #{_pframeCount})");
 
             if (_h265Handlers.TryGetValue(trackIndex, out var handler))
             {
@@ -436,8 +460,6 @@ namespace VRWorkspace.Streaming
         {
             try
             {
-                Debug.Log($"[PhaseProtocol] HandleCursorImageRaw: rawJson.Length={rawJson.Length}");
-
                 long cursorId = ExtractJsonLong(rawJson, "cursorId");
                 int cursorTypeInt = ExtractJsonInt(rawJson, "cursorType");
                 int width = ExtractJsonInt(rawJson, "width");
@@ -446,8 +468,6 @@ namespace VRWorkspace.Streaming
                 int hotspotY = ExtractJsonInt(rawJson, "hotspotY");
                 string imageBase64 = ExtractJsonString(rawJson, "imageBase64");
                 CursorType cursorType = (CursorType)cursorTypeInt;
-
-                Debug.Log($"[PhaseProtocol] RAW Parsed cursor_image: id={cursorId}, type={cursorType}, size={width}x{height}, base64Len={imageBase64?.Length ?? 0}");
 
                 if (string.IsNullOrEmpty(imageBase64))
                 {
@@ -460,16 +480,8 @@ namespace VRWorkspace.Streaming
                 {
                     try
                     {
-                        // Log sample of base64 for debugging transmission
-                        int b64Len = imageBase64.Length;
-                        string b64Start = imageBase64.Substring(0, Math.Min(40, b64Len));
-                        string b64End = imageBase64.Substring(Math.Max(0, b64Len - 20));
-                        Debug.Log($"[PhaseProtocol] Cursor {cursorId} base64 (RAW): len={b64Len}, start={b64Start}...end={b64End}");
-
                         byte[] rgbaData = Convert.FromBase64String(imageBase64);
                         int expectedSize = width * height * 4;
-
-                        Debug.Log($"[PhaseProtocol] Cursor {cursorId} decoded: {rgbaData.Length} bytes, expected {expectedSize}");
 
                         // Handle size mismatch
                         if (rgbaData.Length != expectedSize)
@@ -479,7 +491,6 @@ namespace VRWorkspace.Streaming
 
                             if (actualSide * actualSide * 4 == rgbaData.Length && actualSide > 0 && actualSide <= 256)
                             {
-                                Debug.Log($"[PhaseProtocol] Cursor size adjusted: declared {width}x{height} -> actual {actualSide}x{actualSide}");
                                 width = actualSide;
                                 height = actualSide;
                                 expectedSize = rgbaData.Length;
@@ -524,8 +535,6 @@ namespace VRWorkspace.Streaming
                         texture.Apply();
                         texture.filterMode = FilterMode.Point;
                         texture.wrapMode = TextureWrapMode.Clamp; // Prevent edge bleeding
-
-                        Debug.Log($"[PhaseProtocol] Cursor {cursorId} texture created (RAW parser): {width}x{height}, hotspot=({hotspotX},{hotspotY})");
 
                         // Invoke event to notify renderers
                         OnCursorImageReceived?.Invoke(cursorId, cursorType, texture, hotspotX, hotspotY);
@@ -596,8 +605,6 @@ namespace VRWorkspace.Streaming
                 string imageBase64 = json.GetString("imageBase64");
                 CursorType cursorType = (CursorType)cursorTypeInt;
 
-                Debug.Log($"[PhaseProtocol] Received cursor_image: id={cursorId}, type={cursorType}, size={width}x{height}, base64Len={imageBase64?.Length ?? 0}");
-
                 if (string.IsNullOrEmpty(imageBase64))
                 {
                     Debug.LogError("[PhaseProtocol] cursor_image has empty imageBase64!");
@@ -609,16 +616,8 @@ namespace VRWorkspace.Streaming
                 {
                     try
                     {
-                        // Log sample of base64 for debugging transmission
-                        int b64Len = imageBase64.Length;
-                        string b64Start = imageBase64.Substring(0, Math.Min(40, b64Len));
-                        string b64End = imageBase64.Substring(Math.Max(0, b64Len - 20));
-                        Debug.Log($"[PhaseProtocol] Cursor {cursorId} base64: len={b64Len}, start={b64Start}...end={b64End}");
-
                         byte[] rgbaData = Convert.FromBase64String(imageBase64);
                         int expectedSize = width * height * 4;
-
-                        Debug.Log($"[PhaseProtocol] Cursor {cursorId} decoded: {rgbaData.Length} bytes, expected {expectedSize}");
 
                         // Handle size mismatch intelligently
                         if (rgbaData.Length != expectedSize)
@@ -630,7 +629,6 @@ namespace VRWorkspace.Streaming
                             // Check if data represents a square cursor of different size
                             if (actualSide * actualSide * 4 == rgbaData.Length && actualSide > 0 && actualSide <= 256)
                             {
-                                Debug.Log($"[PhaseProtocol] Cursor size adjusted: declared {width}x{height} -> actual {actualSide}x{actualSide}");
                                 width = actualSide;
                                 height = actualSide;
                                 expectedSize = rgbaData.Length;
@@ -679,8 +677,6 @@ namespace VRWorkspace.Streaming
 
                         texture.LoadRawTextureData(flippedData);
                         texture.Apply();
-
-                        Debug.Log($"[PhaseProtocol] Cursor texture loaded: {texture.width}x{texture.height}, format={texture.format}");
 
                         OnCursorImageReceived?.Invoke(cursorId, cursorType, texture, hotspotX, hotspotY);
                     }

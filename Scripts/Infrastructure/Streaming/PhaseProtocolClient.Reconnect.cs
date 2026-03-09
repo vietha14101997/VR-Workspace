@@ -14,11 +14,20 @@ namespace VRWorkspace.Streaming
         /// <summary>
         /// Reconnect a specific monitor by recreating PeerConnection and sending new offer.
         /// Called when server requests reconnect due to connection loss.
+        /// Per-track mode: only reconnects the video PC for this monitor (main PC untouched).
+        /// Legacy mode: recreates the full per-monitor PeerConnection.
         /// </summary>
         private async Task ReconnectMonitorAsync(int monitorIndex)
         {
             // Don't reconnect if application is shutting down
             if (_cts == null || _cts.IsCancellationRequested) return;
+
+            // ── Per-Track Mode: reconnect only the video PC for this monitor ──────
+            if (_perTrackPcMode)
+            {
+                await ReconnectVideoOnlyAsync(monitorIndex);
+                return;
+            }
 
             PCWrapper oldWrapper;
             lock (_lock)
@@ -31,7 +40,7 @@ namespace VRWorkspace.Streaming
                 oldWrapper = _peerConnections[monitorIndex];
             }
 
-            Debug.Log($"[PhaseProtocol] Reconnecting PC{monitorIndex}...");
+            Debug.Log($"[PhaseProtocol] Reconnecting PC{monitorIndex} (legacy mode)...");
 
             // Close old PC
             try { oldWrapper.PC?.Close(); oldWrapper.PC?.Dispose(); } catch { }
@@ -309,6 +318,30 @@ namespace VRWorkspace.Streaming
         }
 
         /// <summary>
+        /// Per-track mode Level 2 reconnect: close only the video PC for the given monitor,
+        /// then ask server to re-offer for that monitor.
+        /// Main PC (audio + cursor) and other monitors' video PCs are untouched.
+        /// </summary>
+        private async Task ReconnectVideoOnlyAsync(int monitorIndex)
+        {
+            if (_cts == null || _cts.IsCancellationRequested) return;
+            Debug.Log($"[PhaseProtocol] ReconnectVideoOnly: monitor {monitorIndex} (per-track mode)");
+
+            // Close the existing video PC for this monitor
+            if (_videoPcs.TryGetValue(monitorIndex, out var oldVpc))
+            {
+                try { oldVpc.Close(); oldVpc.Dispose(); } catch { }
+                _videoPcs.Remove(monitorIndex);
+                Debug.Log($"[PhaseProtocol] ReconnectVideoOnly: closed old video PC for monitor {monitorIndex}");
+            }
+
+            // Ask server to send a new video_offer for this monitor.
+            // The existing video_offer handler (HandleVideoOfferMessageAsync) will process the response.
+            await SendTextAsync($"{{\"type\":\"reconnect_video\",\"monitorIndex\":{monitorIndex}}}");
+            Debug.Log($"[PhaseProtocol] ReconnectVideoOnly: sent reconnect_video for monitor {monitorIndex}, awaiting new video_offer");
+        }
+
+        /// <summary>
         /// Reconnect Single-PC Multi-Track mode by recreating the PeerConnection with all transceivers.
         /// Called when the shared PeerConnection fails or disconnects during streaming.
         /// </summary>
@@ -346,6 +379,13 @@ namespace VRWorkspace.Streaming
                 Debug.LogWarning($"[PhaseProtocol] Error closing old PC: {ex.Message}");
             }
 
+            // Per-track mode: also close all video PCs for full re-signaling
+            if (_perTrackPcMode)
+            {
+                CloseAllVideoPcs();
+                Debug.Log($"[PhaseProtocol] ReconnectSinglePC (per-track): closed all video PCs, awaiting new video_offers");
+            }
+
             // Check if a newer reconnect superseded us during disposal
             if (_reconnectGeneration != gen)
             {
@@ -357,6 +397,8 @@ namespace VRWorkspace.Streaming
             _allAnswersReceivedTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             // Recreate everything using the same method as initial connection
+            // Per-track mode: CreateSinglePCMultiTrackAsync creates main PC (audio+cursor only);
+            // video PCs will be created via HandleVideoOfferMessageAsync when server sends new video_offers.
             await CreateSinglePCMultiTrackAsync(count);
 
             // Check again after async operation — a newer reconnect may have started
@@ -514,8 +556,13 @@ namespace VRWorkspace.Streaming
                 return;
             }
 
-            // Check PC connection state
-            var state = wrapper.PC?.ConnectionState ?? RTCPeerConnectionState.Closed;
+            // Check PC connection state.
+            // Per-track mode: check the video PC for this monitor, not the shared main PC.
+            RTCPeerConnectionState state;
+            if (_perTrackPcMode && _videoPcs.TryGetValue(monitorIndex, out var videoPC))
+                state = videoPC.ConnectionState;
+            else
+                state = wrapper.PC?.ConnectionState ?? RTCPeerConnectionState.Closed;
 
             // If PC is connected but frames stalled, we still need to reconnect
             // This handles the case where WebRTC connection is fine but video stopped
@@ -526,6 +573,27 @@ namespace VRWorkspace.Streaming
             else
             {
                 Debug.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal: PC state={state}, initiating reconnect...");
+            }
+
+            // Per-track mode: always reconnect video PC only (Level 2), never full PC
+            if (_perTrackPcMode)
+            {
+                try
+                {
+                    Debug.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal (per-track): reconnecting video PC only");
+                    await ReconnectVideoOnlyAsync(monitorIndex);
+                    // reconnect_video has been sent; server will respond with video_offer.
+                    // Reset flag so wrapper doesn't get stuck — video PC connection state
+                    // is tracked separately in _videoPcs[monitorIndex].
+                    wrapper.IsReconnecting = false;
+                    wrapper.ReconnectAttempts = 0;
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[PhaseProtocol] PC{monitorIndex} auto-heal (per-track) failed: {ex.Message}");
+                    wrapper.IsReconnecting = false;
+                }
+                return;
             }
 
             // If multiple monitors share same PC (Single-PC mode), we MUST reconnect the whole PC
@@ -578,7 +646,7 @@ namespace VRWorkspace.Streaming
                 }
             }
 
-            // 1. Close all PeerConnections
+            // 1. Close all PeerConnections (main + per-track video PCs)
             lock (_lock)
             {
                 foreach (var wrapper in _peerConnections)
@@ -591,6 +659,13 @@ namespace VRWorkspace.Streaming
                     catch { }
                 }
                 _peerConnections.Clear();
+            }
+
+            if (_perTrackPcMode)
+            {
+                CloseAllVideoPcs();
+                SetPerTrackPcMode(false); // Reset — re-enabled when config_complete arrives during Phase 2 restart
+                Debug.Log("[PhaseProtocol] ReconnectSession: closed all video PCs, reset perTrackPcMode");
             }
 
             // 2. Reset metrics
