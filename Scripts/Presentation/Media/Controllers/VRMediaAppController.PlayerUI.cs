@@ -308,6 +308,13 @@ namespace VRWorkspace.Media.Core
 
             if (_menuButtonFrameObject != null)
             {
+                // Refresh cached menu frame transform in case it was moved by recenter
+                if (_parentMenuFrame != null)
+                {
+                    _menuFramePosition = _parentMenuFrame.transform.position;
+                    _menuFrameRotation = _parentMenuFrame.transform.rotation;
+                }
+
                 if (isImmersive && Camera.main != null) PositionMenuButtonImmersive(Camera.main);
                 else PositionMenuButtonFlat();
             }
