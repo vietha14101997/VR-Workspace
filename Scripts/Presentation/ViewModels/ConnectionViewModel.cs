@@ -223,16 +223,45 @@ namespace VRWorkspace.ViewModels
         /// <param name="usbTetheringIP">USB Tethering IP (required)</param>
         public async Task ConnectUSBAsync(int port = 8288, string usbTetheringIP = null)
         {
-            if (string.IsNullOrEmpty(usbTetheringIP))
+            // Try ADB reverse first (localhost → USB pipe → PC, no RNDIS needed)
+            // If ADB reverse is active on PC, Android can reach server via localhost
+            bool adbSuccess = false;
+            try
             {
-                Debug.LogError("[ConnectionViewModel] USB Tethering IP is required for USB mode");
-                return;
+                Debug.Log($"[ConnectionViewModel] Trying ADB reverse (localhost:{port})...");
+                using var tcpCheck = new System.Net.Sockets.TcpClient();
+                var connectTask = tcpCheck.ConnectAsync("127.0.0.1", port);
+                if (await System.Threading.Tasks.Task.WhenAny(connectTask, System.Threading.Tasks.Task.Delay(1000)) == connectTask
+                    && tcpCheck.Connected)
+                {
+                    adbSuccess = true;
+                    _currentHost = "127.0.0.1";
+                    _currentPort = port;
+                    _transportMode = TransportMode.USB;
+                    Debug.Log($"[ConnectionViewModel] ADB reverse detected! Connecting via localhost:{port}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.Log($"[ConnectionViewModel] ADB reverse not available: {ex.Message}");
             }
 
-            _currentHost = usbTetheringIP;
-            _currentPort = port;
-            _transportMode = TransportMode.USB;
-            Debug.Log($"[ConnectionViewModel] Connecting via USB Tethering ({usbTetheringIP}:{port})");
+            // Fallback to USB Tethering (RNDIS)
+            if (!adbSuccess)
+            {
+                if (string.IsNullOrEmpty(usbTetheringIP))
+                {
+                    Debug.LogError("[ConnectionViewModel] No USB connection available (ADB reverse failed, no tethering IP)");
+                    ErrorMessage.Value = "USB cable not detected. Plug in USB cable and try again.";
+                    Phase.Value = ConnectionPhase.Error;
+                    return;
+                }
+                _currentHost = usbTetheringIP;
+                _currentPort = port;
+                _transportMode = TransportMode.USB;
+                Debug.Log($"[ConnectionViewModel] Connecting via USB Tethering ({usbTetheringIP}:{port})");
+            }
+
             await ConnectCommand.ExecuteAsync();
         }
 
@@ -613,15 +642,19 @@ namespace VRWorkspace.ViewModels
             _client = new PhaseProtocolClient();
 
             // Set USB Mode BEFORE connecting - this affects ICE candidate filtering
-            // When USB Mode is ON, only ICE candidates from the USB Tethering subnet are sent
-            if (_transportMode == TransportMode.USB)
+            // When USB Mode is ON via tethering, only ICE candidates from the USB Tethering subnet are sent
+            // When USB Mode is ON via ADB reverse (localhost), ICE filtering is disabled because
+            // WebRTC media flows through localhost → ADB pipe, not through a USB network adapter
+            if (_transportMode == TransportMode.USB && _currentHost != "127.0.0.1")
             {
                 _client.SetUsbMode(true, _currentHost);
-                Debug.Log($"[ConnectionViewModel] USB Mode: ICE filtering to subnet of {_currentHost}");
+                Debug.Log($"[ConnectionViewModel] USB Mode (tethering): ICE filtering to subnet of {_currentHost}");
             }
             else
             {
                 _client.SetUsbMode(false, null);
+                if (_transportMode == TransportMode.USB)
+                    Debug.Log("[ConnectionViewModel] USB Mode (ADB reverse): ICE filtering disabled (localhost)");
             }
 
             SubscribeToEvents();

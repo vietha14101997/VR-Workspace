@@ -66,6 +66,13 @@ namespace VRWorkspace.Streaming
         /// </summary>
         public volatile bool IsPaused;
 
+        /// <summary>
+        /// When true, server reports desktop content is unchanged (user reading, no mouse movement).
+        /// Stall detection and decode polling are suppressed to save GPU/CPU and reduce thermal load.
+        /// The last decoded frame remains displayed on the output RenderTexture.
+        /// </summary>
+        public volatile bool IsDesktopIdle;
+
         // ──────────── Fallback Detection ────────────
         // If we receive encoded frames but decode nothing for FALLBACK_TRIGGER_SECONDS,
         // fire OnDecoderFailed so the client can request H265→H264 codec downgrade.
@@ -174,8 +181,13 @@ namespace VRWorkspace.Streaming
             _uvTex.filterMode = FilterMode.Bilinear;
             _uvTex.name = $"H265_UV_Mon{MonitorIndex}";
 
-            // Output RenderTexture (full RGBA)
+            // Output RenderTexture (full RGBA) with mipmaps for anti-shimmer in VR.
+            // Without mipmaps, Trilinear filtering and anisoLevel are ineffective,
+            // causing shimmer artifacts especially at 1080p where source pixel density
+            // exceeds the VR display's effective pixel density on the quad.
             _outputRt = new RenderTexture(Width, Height, 0, RenderTextureFormat.ARGB32);
+            _outputRt.useMipMap = true;
+            _outputRt.autoGenerateMips = false; // Use SharpMipGenerator (Lanczos) instead of box filter
             _outputRt.filterMode = FilterMode.Trilinear;
             _outputRt.anisoLevel = 8;
             _outputRt.name = $"H265_Output_Mon{MonitorIndex}";
@@ -273,9 +285,9 @@ namespace VRWorkspace.Streaming
 
             if (!gotFrame)
             {
-                // When streaming is paused (user pressed Back), no frames are expected.
-                // Reset stall counter to prevent false DECODER FAILURE on resume.
-                if (IsPaused)
+                // When streaming is paused OR desktop is idle, no frames are expected.
+                // Reset stall counter to prevent false DECODER FAILURE.
+                if (IsPaused || IsDesktopIdle)
                 {
                     _noFrameTicks = 0;
                     _keyframeRequested = false;
@@ -392,6 +404,8 @@ namespace VRWorkspace.Streaming
                 _uvTex.name = $"H265_UV_Mon{MonitorIndex}";
 
                 _outputRt = new RenderTexture(Width, Height, 0, RenderTextureFormat.ARGB32);
+                _outputRt.useMipMap = true;
+                _outputRt.autoGenerateMips = false;
                 _outputRt.filterMode = FilterMode.Trilinear;
                 _outputRt.anisoLevel = 8;
                 _outputRt.name = $"H265_Output_Mon{MonitorIndex}";
@@ -481,6 +495,11 @@ namespace VRWorkspace.Streaming
 
             // Blit NV12 → RGBA output RenderTexture
             Graphics.Blit(null, _outputRt, _nv12Material);
+
+            // Generate sharp mipmaps (Lanczos-2 kernel) for anti-shimmer in VR.
+            // Limited to 4 levels (1080→540→270→135) which is sufficient for typical
+            // VR viewing distances. Each level = 1 blit call with 4x4 kernel.
+            SharpMipGenerator.Generate(_outputRt, sharpness: 0.1f, maxMipLevels: 4);
 
             // Fire callback (on main thread already)
             OnTextureReady?.Invoke(MonitorIndex, _outputRt);

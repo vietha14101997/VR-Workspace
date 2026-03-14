@@ -355,8 +355,7 @@ namespace VRWorkspace.UI.RTT.Components
             VRDropdownFactory.SetInteractable(_fpsDropdown, false);
 
             VRInputFieldFactory.SetInteractable(_hostInput, false);
-            SetInternetToggleInteractable(false);
-            SetUsbToggleInteractable(false);
+            SetTransportRadioInteractable(false);
             VRButtonFactory.SetInteractable(_qrButton, false);
 
             Debug.Log("[RTTRemoteMenu] All inputs locked (Ready state)");
@@ -379,42 +378,14 @@ namespace VRWorkspace.UI.RTT.Components
             if (_cachedSuggestedConfig != null && _cachedSuggestedConfig.maxNativeHeight > 0 && _cachedSuggestedConfig.maxNativeHeight < 1440)
                 VRDropdownFactory.SetOptionLocked(_resolutionDropdown, 2, true);
 
-            VRInputFieldFactory.SetInteractable(_hostInput, !_isUsbMode);
-            SetInternetToggleInteractable(true);
-            SetUsbToggleInteractable(true);
+            VRInputFieldFactory.SetInteractable(_hostInput, true);
+            SetTransportRadioInteractable(true);
             VRButtonFactory.SetInteractable(_qrButton, true);
 
             Debug.Log("[RTTRemoteMenu] All inputs unlocked");
         }
 
-        /// <summary>
-        /// Set USB toggle interactable state.
-        /// </summary>
-        private void SetUsbToggleInteractable(bool interactable)
-        {
-            if (_usbModeToggle == null) return;
-
-            // Find checkbox button inside toggle
-            var checkboxBtn = _usbModeToggle.transform.Find("ToggleContainer/Btn_");
-            if (checkboxBtn != null)
-            {
-                VRButtonFactory.SetInteractable(checkboxBtn.gameObject, interactable);
-            }
-        }
-
-        /// <summary>
-        /// Set Internet toggle interactable state.
-        /// </summary>
-        private void SetInternetToggleInteractable(bool interactable)
-        {
-            if (_internetModeToggle == null) return;
-
-            var checkboxBtn = _internetModeToggle.transform.Find("ToggleContainer/Btn_");
-            if (checkboxBtn != null)
-            {
-                VRButtonFactory.SetInteractable(checkboxBtn.gameObject, interactable);
-            }
-        }
+        // SetUsbToggleInteractable / SetInternetToggleInteractable replaced by SetTransportRadioInteractable in RTTRemoteMenu.cs
 
         /// <summary>
         /// Load saved host and USB mode from preferences and apply to inputs.
@@ -425,12 +396,14 @@ namespace VRWorkspace.UI.RTT.Components
             if (!string.IsNullOrEmpty(prefs.lastHost))
                 VRInputFieldFactory.SetValue(_hostInput, prefs.lastHost);
 
-            // Load USB mode state
-            _isUsbMode = prefs.usbMode;
-            UpdateUsbModeToggleVisual();
-
-            // USB mode requires QR scan - disable manual host input
-            VRInputFieldFactory.SetInteractable(_hostInput, !_isUsbMode);
+            // Load transport mode
+            switch (prefs.transportMode)
+            {
+                case "USB": _selectedTransport = 1; break;
+                case "Internet": _selectedTransport = 2; break;
+                default: _selectedTransport = 0; break;
+            }
+            UpdateTransportRadioVisuals();
         }
 
         /// <summary>
@@ -442,14 +415,14 @@ namespace VRWorkspace.UI.RTT.Components
             var prefs = RemotePreferences.Load();
             prefs.lastHost = VRInputFieldFactory.GetValue(_hostInput);
             prefs.lastPort = Port;
-            prefs.usbMode = _isUsbMode;
+            prefs.transportMode = TRANSPORT_LABELS[_selectedTransport];
             prefs.Save();
-            Debug.Log($"[RTTRemoteMenu] Saved host preference: host={prefs.lastHost}, port={prefs.lastPort}, USB={prefs.usbMode}");
+            Debug.Log($"[RTTRemoteMenu] Saved host preference: host={prefs.lastHost}, transport={prefs.transportMode}");
         }
 
         /// <summary>
-        /// Save current dropdown selections and host/USB mode to preferences.
-        /// Called when START is clicked (previously SETUP REMOTE).
+        /// Save current dropdown selections and transport mode to preferences.
+        /// Called when START is clicked.
         /// </summary>
         private void SaveCurrentSelections()
         {
@@ -461,10 +434,10 @@ namespace VRWorkspace.UI.RTT.Components
                 fps = RemotePreferences.CleanValue(FPS),
                 lastHost = VRInputFieldFactory.GetValue(_hostInput),
                 lastPort = Port,
-                usbMode = _isUsbMode
+                transportMode = TRANSPORT_LABELS[_selectedTransport]
             };
             prefs.Save();
-            Debug.Log($"[RTTRemoteMenu] Saved preferences: {prefs.monitors}mon, mode={prefs.mode}, {prefs.resolution}, {prefs.fps}, USB={prefs.usbMode}");
+            Debug.Log($"[RTTRemoteMenu] Saved preferences: {prefs.monitors}mon, mode={prefs.mode}, {prefs.resolution}, {prefs.fps}, transport={prefs.transportMode}");
         }
         #endregion
 

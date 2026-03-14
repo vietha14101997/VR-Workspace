@@ -47,11 +47,10 @@ namespace VRWorkspace.UI.RTT.Components
 
         #region Private Fields
         // UI References
-        private GameObject _hostInput;
-        private GameObject _usbModeToggle;  // USB mode checkbox (replaces port input)
-        private GameObject _internetModeToggle; // Internet mode checkbox
-        private bool _isUsbMode = false;    // Current USB mode state
-        private bool _isInternetMode = false; // Current internet mode state
+        private GameObject _hostInput;  // Hidden, only shown in Internet mode for manual IP
+        private GameObject _transportRadioGroup; // LAN / USB / Internet radio buttons
+        private GameObject[] _radioButtons = new GameObject[3]; // 0=LAN, 1=USB, 2=Internet
+        private int _selectedTransport = 0; // 0=LAN, 1=USB, 2=Internet
         private RTTPopupInputable _tokenPopup; // Token input popup for internet mode
         private bool _preferenceSaveEnabled = false;  // Guard: only save when dropdowns are properly configured
         private string _usbTetheringIP = null;  // USB Tethering IP from QR scan (for full USB streaming)
@@ -124,21 +123,23 @@ namespace VRWorkspace.UI.RTT.Components
 
         #region Public Accessors (Easy Form Data Access)
         /// <summary>
-        /// Get connection host based on mode:
-        /// - USB Mode: Use USB Tethering IP from QR scan
-        /// - WiFi Mode: Use manual host input
+        /// Get connection host based on transport mode:
+        /// - LAN: empty (auto-discovery) or manual input
+        /// - USB: USB Tethering IP from QR scan
+        /// - Internet: manual host input or tunnel URL
         /// </summary>
         public string Host {
             get {
-                // USB Mode uses USB Tethering IP from QR scan
-                if (_isUsbMode && HasUsbTetheringIP) return _usbTetheringIP;
-                // WiFi Mode uses manual host input
+                if (_selectedTransport == 1 && HasUsbTetheringIP) return _usbTetheringIP;
                 return VRInputFieldFactory.GetValue(_hostInput);
             }
         }
         public string Port => DEFAULT_PORT.ToString();
-        public bool IsUsbMode => _isUsbMode;
-        public bool IsInternetMode => _isInternetMode;
+        // Backward compat properties — derived from _selectedTransport
+        private bool _isUsbMode => _selectedTransport == 1;
+        private bool _isInternetMode => _selectedTransport == 2;
+        public bool IsUsbMode => _selectedTransport == 1;
+        public bool IsInternetMode => _selectedTransport == 2;
         public string UsbTetheringIP => _usbTetheringIP;
         public bool HasUsbTetheringIP => !string.IsNullOrEmpty(_usbTetheringIP);
         public int MonitorIndex => VRDropdownFactory.GetSelectedIndex(_monitorsDropdown);
@@ -308,58 +309,23 @@ namespace VRWorkspace.UI.RTT.Components
         }
         #endregion
 
-        #region Input Row
+        #region Transport Mode Row (LAN / USB / Internet)
+        private static readonly string[] TRANSPORT_LABELS = { "LAN", "USB", "Internet" };
+
         private void CreateInputRow(Transform parent, float x, float y, float w, float h, float gapX)
         {
             var row = CreateContainer(parent, "InputRow", x, y, w, h);
 
-            float hostW = (w - 2 * gapX) * 0.45f;
-            float usbToggleW = (w - 2 * gapX) * 0.275f;
-            float internetToggleW = (w - 2 * gapX) * 0.275f;
-
-            // Host Input
-            _hostInput = VRInputFieldFactory.CreateLabeledInputField(
-                row.transform, hostW,
-                "Host", "192.168.1.7", accentColor,
-                onEndEdit: null,
-                labelFontSize: LABEL_FONT_SIZE, inputFontSize: INPUT_FONT_SIZE, font: customFont);
-            PositionElement(_hostInput, 0, 0);
-
-            // USB Mode Toggle
-            _usbModeToggle = CreateUsbModeToggle(row.transform, usbToggleW, h);
-            PositionElement(_usbModeToggle, hostW + gapX, 0);
-
-            // Internet Mode Toggle
-            _internetModeToggle = CreateInternetModeToggle(row.transform, internetToggleW, h);
-            PositionElement(_internetModeToggle, hostW + usbToggleW + 2 * gapX, 0);
-        }
-
-        /// <summary>
-        /// Create USB Mode toggle checkbox with label.
-        /// When enabled, connects via USB Tethering IP.
-        /// </summary>
-        private GameObject CreateUsbModeToggle(Transform parent, float width, float height)
-        {
-            var container = new GameObject("UsbModeToggle");
-            container.transform.SetParent(parent, false);
-            var rt = container.AddComponent<RectTransform>();
-            rt.sizeDelta = new Vector2(width, height);
-
-            // Layout: Label on top, toggle button below
-            float labelH = height * 0.35f;
-            float toggleH = height * 0.65f;
-
-            // Label "USB Mode"
-            var labelObj = new GameObject("Label");
-            labelObj.transform.SetParent(container.transform, false);
+            // Title label "Connection" at very top
+            var labelObj = new GameObject("TransportLabel");
+            labelObj.transform.SetParent(row.transform, false);
             var labelRT = labelObj.AddComponent<RectTransform>();
-            labelRT.anchorMin = new Vector2(0, 0.65f);
+            labelRT.anchorMin = new Vector2(0, 0.8f);
             labelRT.anchorMax = new Vector2(1, 1);
             labelRT.offsetMin = Vector2.zero;
             labelRT.offsetMax = Vector2.zero;
-
             var labelTMP = labelObj.AddComponent<TextMeshProUGUI>();
-            labelTMP.text = "USB Mode";
+            labelTMP.text = "Connection";
             labelTMP.fontSize = LABEL_FONT_SIZE;
             labelTMP.color = themeColor;
             labelTMP.alignment = TextAlignmentOptions.Left;
@@ -367,17 +333,58 @@ namespace VRWorkspace.UI.RTT.Components
             labelTMP.raycastTarget = false;
             if (customFont) labelTMP.font = customFont;
 
-            // Toggle button container
-            var toggleContainer = new GameObject("ToggleContainer");
-            toggleContainer.transform.SetParent(container.transform, false);
-            var toggleContainerRT = toggleContainer.AddComponent<RectTransform>();
-            toggleContainerRT.anchorMin = new Vector2(0, 0);
-            toggleContainerRT.anchorMax = new Vector2(1, 0.6f);
-            toggleContainerRT.offsetMin = Vector2.zero;
-            toggleContainerRT.offsetMax = Vector2.zero;
+            // Checkbox row — anchored to bottom 40% (3x gap from title vs old 60%)
+            var checkboxRow = new GameObject("CheckboxRow");
+            checkboxRow.transform.SetParent(row.transform, false);
+            var checkboxRowRT = checkboxRow.AddComponent<RectTransform>();
+            checkboxRowRT.anchorMin = new Vector2(0, 0);
+            checkboxRowRT.anchorMax = new Vector2(1, 0.4f);
+            checkboxRowRT.offsetMin = Vector2.zero;
+            checkboxRowRT.offsetMax = Vector2.zero;
 
-            // Checkbox button (toggle style)
-            float checkboxSize = toggleH * 0.7f;
+            // Divide row into 3 equal columns
+            float checkboxH = h * 0.4f;
+            float checkboxSize = checkboxH * 0.85f * 1.4f; // +40% bigger checkboxes
+
+            for (int i = 0; i < 3; i++)
+            {
+                int idx = i;
+                float colMin = i / 3f;
+                float colMax = (i + 1) / 3f;
+                _radioButtons[i] = CreateTransportToggle(checkboxRow.transform, checkboxSize, checkboxH, idx);
+                var btnRT = _radioButtons[i].GetComponent<RectTransform>();
+                btnRT.anchorMin = new Vector2(colMin, 0);
+                btnRT.anchorMax = new Vector2(colMax, 1);
+                btnRT.offsetMin = Vector2.zero;
+                btnRT.offsetMax = Vector2.zero;
+            }
+
+            // Hidden host input (stores IP for Internet mode / QR scan)
+            _hostInput = VRInputFieldFactory.CreateLabeledInputField(
+                row.transform, 0.01f,
+                "", "", accentColor,
+                onEndEdit: null,
+                labelFontSize: LABEL_FONT_SIZE, inputFontSize: INPUT_FONT_SIZE, font: customFont);
+            _hostInput.SetActive(false);
+
+            UpdateTransportRadioVisuals();
+        }
+
+        /// <summary>
+        /// Create a transport toggle: old-style VRButtonFactory checkbox + label text beside it.
+        /// Container fills its anchor-based column; hover scales the inner content group.
+        /// </summary>
+        private GameObject CreateTransportToggle(Transform parent, float checkboxSize, float height, int index)
+        {
+            string label = TRANSPORT_LABELS[index];
+            int idx = index;
+
+            // Container fills anchor-based column (set by caller)
+            var container = new GameObject($"Transport_{label}");
+            container.transform.SetParent(parent, false);
+            container.AddComponent<RectTransform>();
+
+            // === Checkbox (VRButtonFactory style) ===
             var checkboxConfig = new VRButtonFactory.ButtonConfig
             {
                 label = "",
@@ -389,17 +396,18 @@ namespace VRWorkspace.UI.RTT.Components
                 cornerRadius = 0.15f,
                 backgroundAlpha = 0.15f,
                 borderWidth = 0.04f,
-                popAmount = 0.02f
+                popAmount = 0f,
+                hoverScaleAmount = 0.08f
             };
 
-            var checkboxBtn = VRButtonFactory.CreateButton(toggleContainer.transform, checkboxConfig, OnUsbModeToggleClicked);
-            var checkboxRT = checkboxBtn.GetComponent<RectTransform>();
-            checkboxRT.anchorMin = new Vector2(0, 0.5f);
-            checkboxRT.anchorMax = new Vector2(0, 0.5f);
-            checkboxRT.pivot = new Vector2(0, 0.5f);
-            checkboxRT.anchoredPosition = Vector2.zero;
+            var checkboxBtn = VRButtonFactory.CreateButton(container.transform, checkboxConfig, () => SelectTransport(idx));
+            var checkboxBtnRT = checkboxBtn.GetComponent<RectTransform>();
+            checkboxBtnRT.anchorMin = new Vector2(0, 0.5f);
+            checkboxBtnRT.anchorMax = new Vector2(0, 0.5f);
+            checkboxBtnRT.pivot = new Vector2(0, 0.5f);
+            checkboxBtnRT.anchoredPosition = Vector2.zero;
 
-            // Checkmark indicator (icon, hidden by default)
+            // Checkmark inside checkbox (hidden by default)
             var checkmark = new GameObject("Checkmark");
             checkmark.transform.SetParent(checkboxBtn.transform, false);
             var checkmarkRT = checkmark.AddComponent<RectTransform>();
@@ -407,186 +415,6 @@ namespace VRWorkspace.UI.RTT.Components
             checkmarkRT.anchorMax = new Vector2(0.85f, 0.85f);
             checkmarkRT.offsetMin = Vector2.zero;
             checkmarkRT.offsetMax = Vector2.zero;
-
-            var checkmarkImg = checkmark.AddComponent<Image>();
-            checkmarkImg.sprite = Resources.Load<Sprite>("icon_check_mark");
-            checkmarkImg.color = Color.white;  // Use white to show icon at full brightness
-            checkmarkImg.preserveAspect = true;
-            checkmarkImg.raycastTarget = false;
-            checkmark.SetActive(false); // Hidden by default
-
-            // Status label next to checkbox
-            var statusObj = new GameObject("Status");
-            statusObj.transform.SetParent(toggleContainer.transform, false);
-            var statusRT = statusObj.AddComponent<RectTransform>();
-            statusRT.anchorMin = new Vector2(0, 0);
-            statusRT.anchorMax = new Vector2(1, 1);
-            statusRT.offsetMin = new Vector2(checkboxSize + 15f, 0);
-            statusRT.offsetMax = Vector2.zero;
-
-            var statusTMP = statusObj.AddComponent<TextMeshProUGUI>();
-            statusTMP.text = "USB Tethering";
-            statusTMP.fontSize = INPUT_FONT_SIZE * 0.85f;
-            statusTMP.color = themeColor;
-            statusTMP.alignment = TextAlignmentOptions.Left;
-            statusTMP.verticalAlignment = VerticalAlignmentOptions.Middle;
-            statusTMP.raycastTarget = false;
-            if (customFont) statusTMP.font = customFont;
-
-            return container;
-        }
-
-        /// <summary>
-        /// Handle USB mode toggle click.
-        /// </summary>
-        private void OnUsbModeToggleClicked()
-        {
-            _isUsbMode = !_isUsbMode;
-            UpdateUsbModeToggleVisual();
-
-            // USB mode requires QR scan - disable manual host input
-            VRInputFieldFactory.SetInteractable(_hostInput, !_isUsbMode);
-
-            // Mutually exclusive with Internet mode
-            if (_isUsbMode && _isInternetMode)
-            {
-                _isInternetMode = false;
-                UpdateInternetModeToggleVisual();
-            }
-
-            Debug.Log($"[RTTRemoteMenu] USB Mode: {_isUsbMode}");
-        }
-
-        /// <summary>
-        /// Update USB mode toggle visual state.
-        /// </summary>
-        private void UpdateUsbModeToggleVisual()
-        {
-            if (_usbModeToggle == null) return;
-
-            // Find checkmark and update visibility (direct child of Btn_)
-            var checkmark = _usbModeToggle.transform.Find("ToggleContainer/Btn_/Checkmark");
-            if (checkmark != null)
-            {
-                checkmark.gameObject.SetActive(_isUsbMode);
-            }
-
-            // Update status text color
-            var statusTMP = _usbModeToggle.transform.Find("ToggleContainer/Status")?.GetComponent<TextMeshProUGUI>();
-            if (statusTMP != null)
-            {
-                statusTMP.color = themeColor;  // Always bright
-            }
-
-            // Update background alpha based on state
-            var visuals = _usbModeToggle.transform.Find("ToggleContainer/Btn_/HitArea/Visuals/Background");
-            if (visuals != null)
-            {
-                var img = visuals.GetComponent<Image>();
-                if (img != null && img.material != null)
-                {
-                    img.material.SetFloat("_GlassAlpha", _isUsbMode ? 0.35f : 0.15f);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Update USB mode label to show USB Tethering IP.
-        /// </summary>
-        private void UpdateUsbModeLabel()
-        {
-            if (_usbModeToggle == null) return;
-
-            var statusTMP = _usbModeToggle.transform.Find("ToggleContainer/Status")?.GetComponent<TextMeshProUGUI>();
-            if (statusTMP != null)
-            {
-                if (!string.IsNullOrEmpty(_usbTetheringIP))
-                {
-                    statusTMP.text = $"USB: {_usbTetheringIP}";
-                    statusTMP.color = _isUsbMode ? themeColor : new Color(0.4f, 0.8f, 0.4f);  // Green tint
-                }
-                else
-                {
-                    statusTMP.text = "USB Tethering";
-                    statusTMP.color = themeColor;  // Always bright
-                }
-            }
-        }
-        /// <summary>
-        /// Create Internet Mode toggle checkbox (same layout as USB toggle).
-        /// </summary>
-        private GameObject CreateInternetModeToggle(Transform parent, float width, float height)
-        {
-            Color internetColor = new Color(0.2f, 0.7f, 1f); // Cyan tint
-
-            var container = new GameObject("InternetModeToggle");
-            container.transform.SetParent(parent, false);
-            var rt = container.AddComponent<RectTransform>();
-            rt.sizeDelta = new Vector2(width, height);
-
-            // Layout: Label on top, toggle button below (same as USB toggle)
-            float labelH = height * 0.35f;
-            float toggleH = height * 0.65f;
-
-            // Label "Internet"
-            var labelObj = new GameObject("Label");
-            labelObj.transform.SetParent(container.transform, false);
-            var labelRT = labelObj.AddComponent<RectTransform>();
-            labelRT.anchorMin = new Vector2(0, 0.65f);
-            labelRT.anchorMax = new Vector2(1, 1);
-            labelRT.offsetMin = Vector2.zero;
-            labelRT.offsetMax = Vector2.zero;
-
-            var labelTMP = labelObj.AddComponent<TextMeshProUGUI>();
-            labelTMP.text = "Internet";
-            labelTMP.fontSize = LABEL_FONT_SIZE;
-            labelTMP.color = internetColor;
-            labelTMP.alignment = TextAlignmentOptions.Left;
-            labelTMP.fontStyle = FontStyles.Bold;
-            labelTMP.raycastTarget = false;
-            if (customFont) labelTMP.font = customFont;
-
-            // Toggle button container
-            var toggleContainer = new GameObject("ToggleContainer");
-            toggleContainer.transform.SetParent(container.transform, false);
-            var toggleContainerRT = toggleContainer.AddComponent<RectTransform>();
-            toggleContainerRT.anchorMin = new Vector2(0, 0);
-            toggleContainerRT.anchorMax = new Vector2(1, 0.6f);
-            toggleContainerRT.offsetMin = Vector2.zero;
-            toggleContainerRT.offsetMax = Vector2.zero;
-
-            // Checkbox button
-            float checkboxSize = toggleH * 0.7f;
-            var checkboxConfig = new VRButtonFactory.ButtonConfig
-            {
-                label = "",
-                themeColor = internetColor,
-                width = checkboxSize,
-                height = checkboxSize,
-                iconOnly = true,
-                iconSize = checkboxSize * 0.6f,
-                cornerRadius = 0.15f,
-                backgroundAlpha = 0.15f,
-                borderWidth = 0.04f,
-                popAmount = 0.02f
-            };
-
-            var checkboxBtn = VRButtonFactory.CreateButton(toggleContainer.transform, checkboxConfig, OnInternetModeToggleClicked);
-            var checkboxRT = checkboxBtn.GetComponent<RectTransform>();
-            checkboxRT.anchorMin = new Vector2(0, 0.5f);
-            checkboxRT.anchorMax = new Vector2(0, 0.5f);
-            checkboxRT.pivot = new Vector2(0, 0.5f);
-            checkboxRT.anchoredPosition = Vector2.zero;
-
-            // Checkmark indicator
-            var checkmark = new GameObject("Checkmark");
-            checkmark.transform.SetParent(checkboxBtn.transform, false);
-            var checkmarkRT = checkmark.AddComponent<RectTransform>();
-            checkmarkRT.anchorMin = new Vector2(0.15f, 0.15f);
-            checkmarkRT.anchorMax = new Vector2(0.85f, 0.85f);
-            checkmarkRT.offsetMin = Vector2.zero;
-            checkmarkRT.offsetMax = Vector2.zero;
-
             var checkmarkImg = checkmark.AddComponent<Image>();
             checkmarkImg.sprite = Resources.Load<Sprite>("icon_check_mark");
             checkmarkImg.color = Color.white;
@@ -594,57 +422,161 @@ namespace VRWorkspace.UI.RTT.Components
             checkmarkImg.raycastTarget = false;
             checkmark.SetActive(false);
 
-            // Status label next to checkbox
-            var statusObj = new GameObject("Status");
-            statusObj.transform.SetParent(toggleContainer.transform, false);
-            var statusRT = statusObj.AddComponent<RectTransform>();
-            statusRT.anchorMin = new Vector2(0, 0);
-            statusRT.anchorMax = new Vector2(1, 1);
-            statusRT.offsetMin = new Vector2(checkboxSize + 15f, 0);
-            statusRT.offsetMax = Vector2.zero;
+            // === Label with BoxCollider for VR raycast ===
+            var labelContainer = new GameObject("Label");
+            labelContainer.transform.SetParent(container.transform, false);
+            var labelContainerRT = labelContainer.AddComponent<RectTransform>();
+            // Position next to checkbox, height = checkboxSize, width fits text
+            labelContainerRT.anchorMin = new Vector2(0, 0.5f);
+            labelContainerRT.anchorMax = new Vector2(0, 0.5f);
+            labelContainerRT.pivot = new Vector2(0, 0.5f);
+            labelContainerRT.anchoredPosition = new Vector2(checkboxSize + 24f, 0);
 
-            var statusTMP = statusObj.AddComponent<TextMeshProUGUI>();
-            statusTMP.text = "Remote";
-            statusTMP.fontSize = INPUT_FONT_SIZE * 0.85f;
-            statusTMP.color = internetColor;
-            statusTMP.alignment = TextAlignmentOptions.Left;
-            statusTMP.verticalAlignment = VerticalAlignmentOptions.Middle;
-            statusTMP.raycastTarget = false;
-            if (customFont) statusTMP.font = customFont;
+            // Text (drives size via ContentSizeFitter)
+            var textTMP = labelContainer.AddComponent<TextMeshProUGUI>();
+            textTMP.text = label;
+            textTMP.enableAutoSizing = true;
+            textTMP.fontSizeMin = 14f;
+            textTMP.fontSizeMax = INPUT_FONT_SIZE;
+            textTMP.color = themeColor;
+            textTMP.alignment = TextAlignmentOptions.Left;
+            textTMP.verticalAlignment = VerticalAlignmentOptions.Middle;
+            textTMP.fontStyle = FontStyles.Bold;
+            textTMP.enableWordWrapping = false;
+            textTMP.overflowMode = TextOverflowModes.Ellipsis;
+            textTMP.raycastTarget = false;
+            if (customFont) textTMP.font = customFont;
+
+            // Auto-size to text content
+            var fitter = labelContainer.AddComponent<UnityEngine.UI.ContentSizeFitter>();
+            fitter.horizontalFit = UnityEngine.UI.ContentSizeFitter.FitMode.PreferredSize;
+            fitter.verticalFit = UnityEngine.UI.ContentSizeFitter.FitMode.PreferredSize;
+
+            // Force layout so we can read size for BoxCollider
+            UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(labelContainerRT);
+            float labelW = Mathf.Max(labelContainerRT.rect.width, 80f);
+            float labelH = Mathf.Max(labelContainerRT.rect.height, checkboxSize);
+
+            // BoxCollider for VR raycast (sized to text)
+            var labelCol = labelContainer.AddComponent<BoxCollider>();
+            labelCol.size = new Vector3(labelW, labelH, 0.1f);
+            labelCol.center = new Vector3(labelW * 0.5f, 0, -0.1f);
+
+            // Set layer same as VR UI
+            int vrLayer = LayerMask.NameToLayer("VirtualObjects");
+            if (vrLayer != -1) labelContainer.layer = vrLayer;
+
+            // Click handler
+            var labelBtn = labelContainer.AddComponent<UnityEngine.UI.Button>();
+            labelBtn.transition = UnityEngine.UI.Selectable.Transition.None;
+            labelBtn.onClick.AddListener(() => SelectTransport(idx));
+
+            // Hover effect on label (scale text)
+            var labelHover = labelContainer.AddComponent<VRWorkspace.UI.HoverEffects.HoverEffectController>();
+            labelHover.AddEffect(new VRWorkspace.UI.HoverEffects.ScaleHoverEffect().WithHoverScale(1.06f));
+
+            // === Cross-link hover: checkbox ↔ label ===
+            var checkboxHover = checkboxBtn.transform.Find("HitArea")?.GetComponent<VRWorkspace.UI.HoverEffects.HoverEffectController>();
+            if (checkboxHover != null)
+            {
+                // Hover checkbox → also hover label
+                checkboxHover.OnHoverStateChanged += (hovered) => {
+                    if (hovered) labelHover.SetForceHover(true);
+                    else labelHover.SetForceHover(false);
+                };
+                // Hover label → also hover checkbox
+                labelHover.OnHoverStateChanged += (hovered) => {
+                    if (hovered) checkboxHover.SetForceHover(true);
+                    else checkboxHover.SetForceHover(false);
+                };
+            }
 
             return container;
         }
 
-        private void OnInternetModeToggleClicked()
+        /// <summary>
+        /// Select a transport mode (0=LAN, 1=USB, 2=Internet). Single-select radio behavior.
+        /// </summary>
+        private void SelectTransport(int index)
         {
-            _isInternetMode = !_isInternetMode;
-            UpdateInternetModeToggleVisual();
-
-            // Internet mode: USB mode is mutually exclusive
-            if (_isInternetMode && _isUsbMode)
-            {
-                _isUsbMode = false;
-                UpdateUsbModeToggleVisual();
-                VRInputFieldFactory.SetInteractable(_hostInput, true);
-            }
-
-            Debug.Log($"[RTTRemoteMenu] Internet Mode: {_isInternetMode}");
+            if (index == _selectedTransport) return;
+            _selectedTransport = index;
+            UpdateTransportRadioVisuals();
+            Debug.Log($"[RTTRemoteMenu] Transport: {TRANSPORT_LABELS[index]}");
         }
 
-        private void UpdateInternetModeToggleVisual()
+        /// <summary>
+        /// Update all transport toggles: show checkmark on selected, dim unselected.
+        /// </summary>
+        private void UpdateTransportRadioVisuals()
         {
-            if (_internetModeToggle == null) return;
-
-            var checkmark = _internetModeToggle.transform.Find("ToggleContainer/Btn_/Checkmark");
-            if (checkmark != null)
-                checkmark.gameObject.SetActive(_isInternetMode);
-
-            var visuals = _internetModeToggle.transform.Find("ToggleContainer/Btn_/HitArea/Visuals/Background");
-            if (visuals != null)
+            for (int i = 0; i < 3; i++)
             {
-                var img = visuals.GetComponent<Image>();
-                if (img != null && img.material != null)
-                    img.material.SetFloat("_GlassAlpha", _isInternetMode ? 0.35f : 0.15f);
+                if (_radioButtons[i] == null) continue;
+                bool isSelected = i == _selectedTransport;
+
+                // Checkmark visibility
+                var checkmark = _radioButtons[i].transform.Find("Btn_/Checkmark");
+                if (checkmark != null)
+                    checkmark.gameObject.SetActive(isSelected);
+
+                // Checkbox background alpha
+                var bg = _radioButtons[i].transform.Find("Btn_/HitArea/Visuals/Background");
+                if (bg != null)
+                {
+                    var img = bg.GetComponent<Image>();
+                    if (img != null && img.material != null)
+                        img.material.SetFloat("_GlassAlpha", isSelected ? 0.35f : 0.15f);
+                }
+
+                // Selected: disable click, force permanent hover state
+                // Unselected: enable click, release hover
+                var checkboxBtnObj = _radioButtons[i].transform.Find("Btn_");
+                if (checkboxBtnObj != null)
+                    VRButtonFactory.SetInteractable(checkboxBtnObj.gameObject, !isSelected);
+
+                var labelBtnComp = _radioButtons[i].transform.Find("Label")?.GetComponent<UnityEngine.UI.Button>();
+                if (labelBtnComp != null)
+                    labelBtnComp.interactable = !isSelected;
+
+                var cbHover = _radioButtons[i].transform.Find("Btn_/HitArea")?.GetComponent<VRWorkspace.UI.HoverEffects.HoverEffectController>();
+                var lblHover = _radioButtons[i].transform.Find("Label")?.GetComponent<VRWorkspace.UI.HoverEffects.HoverEffectController>();
+
+                if (isSelected)
+                {
+                    // Force hover ON permanently for selected item
+                    cbHover?.SetForceHover(true);
+                    lblHover?.SetForceHover(true);
+                }
+                else
+                {
+                    // Release force hover for unselected items
+                    cbHover?.SetForceHover(false);
+                    lblHover?.SetForceHover(false);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Set all transport toggles interactable/non-interactable.
+        /// </summary>
+        private void SetTransportRadioInteractable(bool interactable)
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                if (_radioButtons[i] == null) continue;
+
+                bool isSelected = i == _selectedTransport;
+
+                // Checkbox — selected stays disabled
+                var btn = _radioButtons[i].transform.Find("Btn_");
+                if (btn != null)
+                    VRButtonFactory.SetInteractable(btn.gameObject, interactable && !isSelected);
+
+                // Label — selected stays disabled
+                var lblBtn = _radioButtons[i].transform.Find("Label")?.GetComponent<UnityEngine.UI.Button>();
+                if (lblBtn != null)
+                    lblBtn.interactable = interactable && !isSelected;
             }
         }
         #endregion

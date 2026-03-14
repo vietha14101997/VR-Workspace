@@ -400,6 +400,22 @@ namespace VRWorkspace.Streaming
             }
         }
 
+        /// <summary>
+        /// Handle desktop idle/active notification from server.
+        /// When idle, suppress decode polling and stall detection to save GPU/thermal.
+        /// </summary>
+        private void HandleMonitorIdle(SimpleJson json)
+        {
+            int monitor = json.GetInt("monitor", -1);
+            bool idle = json.GetBool("idle");
+
+            if (monitor >= 0 && _h265Receivers.TryGetValue(monitor, out var receiver))
+            {
+                receiver.IsDesktopIdle = idle;
+                Debug.Log($"[PhaseProtocol] Monitor {monitor} desktop {(idle ? "IDLE" : "ACTIVE")}");
+            }
+        }
+
         // ── Connect / stop ─────────────────────────────────────────────────────
 
         /// <summary>
@@ -876,6 +892,10 @@ namespace VRWorkspace.Streaming
 
                         case "skip_to_live_ack":
                             _phase3.HandleSkipToLiveAck();
+                            break;
+
+                        case "monitor_idle":
+                            HandleMonitorIdle(json);
                             break;
 
                         // ── Codec fallback (server ACK or server-initiated downgrade) ──

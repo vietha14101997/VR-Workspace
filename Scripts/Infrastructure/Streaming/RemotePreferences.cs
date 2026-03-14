@@ -17,7 +17,8 @@ namespace VRWorkspace.Streaming
         public string fps = "";
         public string lastHost = "";
         public string lastPort = "8288";    // default port
-        public bool usbMode = false;        // USB connection mode (via USB Tethering)
+        public string transportMode = "LAN"; // "LAN", "USB", "Internet"
+        public bool usbMode = false;        // [Deprecated] kept for backward compat — migrated to transportMode
 
         private static string FilePath => Path.Combine(
             Application.persistentDataPath, "remote_preferences.json");
@@ -39,9 +40,14 @@ namespace VRWorkspace.Streaming
                         // Backward compat: migrate old "resolution" field to "mode"
                         if (string.IsNullOrEmpty(prefs.mode) && !string.IsNullOrEmpty(prefs.resolution))
                         {
-                            // Old resolution values were "Flat Planar" or "Curved Surround"
-                            // These don't map to mode, so just default to Classic
-                            prefs.resolution = "1080p"; // Default resolution if migrating
+                            prefs.resolution = "1080p";
+                        }
+
+                        // Backward compat: migrate old usbMode bool to transportMode string
+                        if (string.IsNullOrEmpty(prefs.transportMode) || prefs.transportMode == "LAN")
+                        {
+                            if (prefs.usbMode)
+                                prefs.transportMode = "USB";
                         }
 
                         Debug.Log($"[RemotePreferences] Loaded: monitors={prefs.monitors}, mode={prefs.mode}, resolution={prefs.resolution}, fps={prefs.fps}");

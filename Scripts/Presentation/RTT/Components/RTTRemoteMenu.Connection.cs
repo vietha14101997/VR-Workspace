@@ -255,68 +255,79 @@ namespace VRWorkspace.UI.RTT.Components
             {
                 case ConnectionPhase.Disconnected:
                 case ConnectionPhase.Error:
-                    // USB Mode: Require QR scan to get USB Tethering IP
-                    if (_isUsbMode)
+                    // === LAN MODE: Always auto-discover, no manual IP ===
+                    if (_selectedTransport == 0)
                     {
-                        // USB mode requires QR scan to get the USB Tethering IP
-                        if (!HasUsbTetheringIP)
+                        Debug.Log("[RTTRemoteMenu] LAN mode — starting auto-discovery...");
+                        UpdateButtonText("SEARCHING...");
+                        SetTransportRadioInteractable(false);
+                        VRButtonFactory.SetInteractable(_qrButton, false);
+
+                        var discovered = await LanDiscoveryClient.DiscoverAsync();
+                        if (discovered != null)
                         {
-                            Debug.LogWarning("[RTTRemoteMenu] USB mode: Please scan QR code to get USB Tethering IP.");
-                            ShowTemporaryButtonText("SCAN QR CODE!", 2f);
-                            return;
+                            Debug.Log($"[RTTRemoteMenu] Found server: {discovered.ServerName} at {discovered.IP}:{discovered.Port}");
+                            VRInputFieldFactory.SetValue(_hostInput, discovered.IP);
+                            ConnectWiFi(discovered.IP, discovered.Port, null);
                         }
+                        else
+                        {
+                            Debug.LogWarning("[RTTRemoteMenu] Auto-discovery failed — no server found on LAN");
+                            SetTransportRadioInteractable(true);
+                            VRButtonFactory.SetInteractable(_qrButton, true);
+                            ShowTemporaryButtonText("SERVER NOT FOUND", 2f);
+                        }
+                        break;
+                    }
 
-                        Debug.Log($"[RTTRemoteMenu] Connecting via USB ({_usbTetheringIP})...");
+                    // === USB MODE: ADB reverse (localhost) or USB Tethering IP ===
+                    if (_selectedTransport == 1)
+                    {
+                        Debug.Log($"[RTTRemoteMenu] USB mode (tethering IP: {_usbTetheringIP ?? "none, will try ADB"})...");
                         UpdateButtonText("CONNECTING...");
-
-                        // Lock inputs during connection
-                        VRInputFieldFactory.SetInteractable(_hostInput, false);
-                        SetUsbToggleInteractable(false);
+                        SetTransportRadioInteractable(false);
                         VRButtonFactory.SetInteractable(_qrButton, false);
 
                         await _viewModel.ConnectUSBAsync(DEFAULT_PORT, _usbTetheringIP);
                         break;
                     }
 
-                    // Tunnel Mode: skip host/port validation, connect via tunnel URL
-                    if (!string.IsNullOrEmpty(_tunnelUrl))
+                    // === INTERNET MODE: Tunnel URL or manual IP ===
+                    if (_selectedTransport == 2)
                     {
-                        CheckTokenAndConnect(_tunnelUrl, DEFAULT_PORT);
-                        return;
-                    }
+                        // Tunnel URL from QR scan
+                        if (!string.IsNullOrEmpty(_tunnelUrl))
+                        {
+                            CheckTokenAndConnect(_tunnelUrl, DEFAULT_PORT);
+                            break;
+                        }
 
-                    // WiFi / Internet Mode: Validate host and port
-                    string host = Host;
-                    string port = Port;
+                        // Manual IP / hostname
+                        string host = Host;
+                        string port = Port;
 
-                    if (string.IsNullOrEmpty(host) || string.IsNullOrEmpty(port))
-                    {
-                        Debug.LogWarning("[RTTRemoteMenu] Host or port is empty");
-                        return;
-                    }
+                        if (string.IsNullOrEmpty(host) || string.IsNullOrEmpty(port))
+                        {
+                            Debug.LogWarning("[RTTRemoteMenu] Internet mode: host or port is empty — scan QR code first");
+                            ShowTemporaryButtonText("SCAN QR CODE", 2f);
+                            break;
+                        }
 
-                    if (!int.TryParse(port, out int portNum) || portNum <= 0 || portNum > 65535)
-                    {
-                        Debug.LogWarning($"[RTTRemoteMenu] Invalid port: {port}");
-                        return;
-                    }
+                        if (!int.TryParse(port, out int portNum) || portNum <= 0 || portNum > 65535)
+                        {
+                            Debug.LogWarning($"[RTTRemoteMenu] Invalid port: {port}");
+                            break;
+                        }
 
-                    // Validate host format (IP address or hostname)
-                    if (!IsValidHost(host))
-                    {
-                        Debug.LogWarning($"[RTTRemoteMenu] Invalid host format: {host}");
-                        return;
-                    }
+                        if (!IsValidHost(host))
+                        {
+                            Debug.LogWarning($"[RTTRemoteMenu] Invalid host format: {host}");
+                            break;
+                        }
 
-                    // Internet Mode: check if token required, then connect or show popup
-                    if (_isInternetMode)
-                    {
                         CheckTokenAndConnect(host, portNum);
-                        return;
+                        break;
                     }
-
-                    // WiFi Mode: connect directly
-                    ConnectWiFi(host, portNum, null);
                     break;
 
                 case ConnectionPhase.ConfiguringSettings:
@@ -503,9 +514,9 @@ namespace VRWorkspace.UI.RTT.Components
                     ShowConnectButton();
                     UpdateButtonText("CONNECT");
                     InitializeDropdownsDisabled();
-                    VRInputFieldFactory.SetInteractable(_hostInput, !_isUsbMode);  // Disabled in USB mode (requires QR scan)
-                    SetInternetToggleInteractable(true);
-                    SetUsbToggleInteractable(true);
+                    VRInputFieldFactory.SetInteractable(_hostInput, true);
+                    SetTransportRadioInteractable(true);
+                    SetTransportRadioInteractable(true);
                     VRButtonFactory.SetInteractable(_qrButton, true);
                     HideSidePanels();
                     // Clear cached data to prevent stale data on next connection
@@ -569,9 +580,9 @@ namespace VRWorkspace.UI.RTT.Components
                     ShowConnectButton();
                     UpdateButtonText("CONNECT");
                     InitializeDropdownsDisabled();
-                    VRInputFieldFactory.SetInteractable(_hostInput, !_isUsbMode);  // Disabled in USB mode (requires QR scan)
-                    SetInternetToggleInteractable(true);
-                    SetUsbToggleInteractable(true);
+                    VRInputFieldFactory.SetInteractable(_hostInput, true);
+                    SetTransportRadioInteractable(true);
+                    SetTransportRadioInteractable(true);
                     VRButtonFactory.SetInteractable(_qrButton, true);
                     HideSidePanels();
                     // Clear cached data on error
@@ -1440,7 +1451,6 @@ namespace VRWorkspace.UI.RTT.Components
             if (config.HasUsbIP)
             {
                 _usbTetheringIP = config.usbIP;
-                UpdateUsbModeLabel();
                 Debug.Log($"[RTTRemoteMenu] USB IP available: {_usbTetheringIP}");
             }
 
@@ -1451,44 +1461,28 @@ namespace VRWorkspace.UI.RTT.Components
                 Debug.Log($"[RTTRemoteMenu] Tunnel URL available: {_tunnelUrl}");
             }
 
-            // Set Host based on USB Mode state
-            // If USB Mode is ON and USB IP available → use USB IP
-            // Tunnel URL → show tunnel URL as host
-            // Otherwise → use WiFi IP (or publicIP for internet mode)
+            // Set Host based on current transport mode
             string hostToUse;
-            if (_isUsbMode && config.HasUsbIP)
+            if (_selectedTransport == 1 && config.HasUsbIP)
                 hostToUse = config.usbIP;
             else if (config.HasTunnelUrl)
-                hostToUse = config.tunnelUrl; // Tunnel mode: show tunnel URL
+                hostToUse = config.tunnelUrl;
             else if (config.HasPublicIP)
-                hostToUse = config.publicIP; // Internet mode: use public IP
+                hostToUse = config.publicIP;
             else
                 hostToUse = config.ip;
 
             if (!string.IsNullOrEmpty(hostToUse))
             {
                 VRInputFieldFactory.SetValue(_hostInput, hostToUse);
-                Debug.Log($"[RTTRemoteMenu] Host set to: {hostToUse} (USB Mode: {_isUsbMode}, Tunnel: {config.HasTunnelUrl}, Internet: {config.HasPublicIP})");
+                Debug.Log($"[RTTRemoteMenu] Host set to: {hostToUse} (transport={TRANSPORT_LABELS[_selectedTransport]})");
             }
 
-            // Note: Port from QR is ignored - using fixed DEFAULT_PORT (8288)
-            // Note: Token is NOT in QR code for security - user must enter manually
-
-            // Auto-enable Internet Mode if QR contains tunnel or publicIP
-            if ((config.HasTunnelUrl || config.HasPublicIP) && !_isInternetMode)
+            // Auto-switch to Internet mode if QR contains tunnel or publicIP
+            if ((config.HasTunnelUrl || config.HasPublicIP) && _selectedTransport != 2)
             {
-                _isInternetMode = true;
-                UpdateInternetModeToggleVisual();
-
-                // Disable USB mode if it was on
-                if (_isUsbMode)
-                {
-                    _isUsbMode = false;
-                    UpdateUsbModeToggleVisual();
-                    VRInputFieldFactory.SetInteractable(_hostInput, true);
-                }
-
-                Debug.Log("[RTTRemoteMenu] Internet Mode auto-enabled from QR code");
+                SelectTransport(2); // Switch to Internet
+                Debug.Log("[RTTRemoteMenu] Internet mode auto-enabled from QR code");
             }
         }
         #endregion
@@ -1604,7 +1598,7 @@ namespace VRWorkspace.UI.RTT.Components
 
             // Lock inputs during connection
             VRInputFieldFactory.SetInteractable(_hostInput, false);
-            SetUsbToggleInteractable(false);
+            SetTransportRadioInteractable(false);
             VRButtonFactory.SetInteractable(_qrButton, false);
 
             await _viewModel.ConnectAsync(host, port, token, _tunnelUrl);
