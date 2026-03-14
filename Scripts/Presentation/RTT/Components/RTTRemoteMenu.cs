@@ -422,18 +422,21 @@ namespace VRWorkspace.UI.RTT.Components
             checkmarkImg.raycastTarget = false;
             checkmark.SetActive(false);
 
-            // === Label with BoxCollider for VR raycast ===
-            var labelContainer = new GameObject("Label");
-            labelContainer.transform.SetParent(container.transform, false);
-            var labelContainerRT = labelContainer.AddComponent<RectTransform>();
-            // Position next to checkbox, height = checkboxSize, width fits text
-            labelContainerRT.anchorMin = new Vector2(0, 0.5f);
-            labelContainerRT.anchorMax = new Vector2(0, 0.5f);
-            labelContainerRT.pivot = new Vector2(0, 0.5f);
-            labelContainerRT.anchoredPosition = new Vector2(checkboxSize + 24f, 0);
+            // === Label — sized to text content, not full column ===
+            // Estimate width: ~INPUT_FONT_SIZE * 0.6 per char + padding
+            float estimatedTextW = label.Length * INPUT_FONT_SIZE * 0.65f + 16f;
 
-            // Text (drives size via ContentSizeFitter)
-            var textTMP = labelContainer.AddComponent<TextMeshProUGUI>();
+            var labelObj = new GameObject("Label");
+            labelObj.transform.SetParent(container.transform, false);
+            var labelRT = labelObj.AddComponent<RectTransform>();
+            labelRT.anchorMin = new Vector2(0, 0.5f);
+            labelRT.anchorMax = new Vector2(0, 0.5f);
+            labelRT.pivot = new Vector2(0, 0.5f);
+            labelRT.anchoredPosition = new Vector2(checkboxSize + 24f, 0);
+            labelRT.sizeDelta = new Vector2(estimatedTextW, checkboxSize);
+
+            // TMP text — raycastTarget = TRUE so GraphicRaycaster can hit it
+            var textTMP = labelObj.AddComponent<TextMeshProUGUI>();
             textTMP.text = label;
             textTMP.enableAutoSizing = true;
             textTMP.fontSizeMin = 14f;
@@ -444,51 +447,33 @@ namespace VRWorkspace.UI.RTT.Components
             textTMP.fontStyle = FontStyles.Bold;
             textTMP.enableWordWrapping = false;
             textTMP.overflowMode = TextOverflowModes.Ellipsis;
-            textTMP.raycastTarget = false;
+            textTMP.raycastTarget = true; // Catches GraphicRaycaster hits
             if (customFont) textTMP.font = customFont;
 
-            // Auto-size to text content
-            var fitter = labelContainer.AddComponent<UnityEngine.UI.ContentSizeFitter>();
-            fitter.horizontalFit = UnityEngine.UI.ContentSizeFitter.FitMode.PreferredSize;
-            fitter.verticalFit = UnityEngine.UI.ContentSizeFitter.FitMode.PreferredSize;
-
-            // Force layout so we can read size for BoxCollider
-            UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(labelContainerRT);
-            float labelW = Mathf.Max(labelContainerRT.rect.width, 80f);
-            float labelH = Mathf.Max(labelContainerRT.rect.height, checkboxSize);
-
-            // BoxCollider for VR raycast (sized to text)
-            var labelCol = labelContainer.AddComponent<BoxCollider>();
-            labelCol.size = new Vector3(labelW, labelH, 0.1f);
-            labelCol.center = new Vector3(labelW * 0.5f, 0, -0.1f);
-
-            // Set layer same as VR UI
-            int vrLayer = LayerMask.NameToLayer("VirtualObjects");
-            if (vrLayer != -1) labelContainer.layer = vrLayer;
-
-            // Click handler
-            var labelBtn = labelContainer.AddComponent<UnityEngine.UI.Button>();
+            // Click handler on label
+            var labelBtn = labelObj.AddComponent<UnityEngine.UI.Button>();
             labelBtn.transition = UnityEngine.UI.Selectable.Transition.None;
             labelBtn.onClick.AddListener(() => SelectTransport(idx));
 
-            // Hover effect on label (scale text)
-            var labelHover = labelContainer.AddComponent<VRWorkspace.UI.HoverEffects.HoverEffectController>();
-            labelHover.AddEffect(new VRWorkspace.UI.HoverEffects.ScaleHoverEffect().WithHoverScale(1.06f));
+            // Hover effect: color brighten (no scale)
+            Color hoverTextColor = themeColor * 1.4f; // Brighter
+            hoverTextColor.a = 1f;
+            var labelHover = labelObj.AddComponent<VRWorkspace.UI.HoverEffects.HoverEffectController>();
+            labelHover.AddEffect(new VRWorkspace.UI.HoverEffects.ColorHoverEffect()
+                .WithTargetChild("")  // Target self (the TMP on this object)
+                .WithTargetType(VRWorkspace.UI.HoverEffects.ColorHoverEffect.TargetType.Text)
+                .WithHoverColor(hoverTextColor));
 
             // === Cross-link hover: checkbox ↔ label ===
             var checkboxHover = checkboxBtn.transform.Find("HitArea")?.GetComponent<VRWorkspace.UI.HoverEffects.HoverEffectController>();
             if (checkboxHover != null)
             {
                 // Hover checkbox → also hover label
-                checkboxHover.OnHoverStateChanged += (hovered) => {
-                    if (hovered) labelHover.SetForceHover(true);
-                    else labelHover.SetForceHover(false);
-                };
+                checkboxHover.OnHoverStateChanged += (hovered) =>
+                    labelHover.SetForceHover(hovered);
                 // Hover label → also hover checkbox
-                labelHover.OnHoverStateChanged += (hovered) => {
-                    if (hovered) checkboxHover.SetForceHover(true);
-                    else checkboxHover.SetForceHover(false);
-                };
+                labelHover.OnHoverStateChanged += (hovered) =>
+                    checkboxHover.SetForceHover(hovered);
             }
 
             return container;
@@ -529,31 +514,20 @@ namespace VRWorkspace.UI.RTT.Components
                         img.material.SetFloat("_GlassAlpha", isSelected ? 0.35f : 0.15f);
                 }
 
-                // Selected: disable click, force permanent hover state
-                // Unselected: enable click, release hover
-                var checkboxBtnObj = _radioButtons[i].transform.Find("Btn_");
-                if (checkboxBtnObj != null)
-                    VRButtonFactory.SetInteractable(checkboxBtnObj.gameObject, !isSelected);
+                // Disable/enable click only (no visual dimming)
+                var cbBtnComp = _radioButtons[i].transform.Find("Btn_/HitArea")?.GetComponent<UnityEngine.UI.Button>();
+                if (cbBtnComp != null)
+                    cbBtnComp.interactable = !isSelected;
 
-                var labelBtnComp = _radioButtons[i].transform.Find("Label")?.GetComponent<UnityEngine.UI.Button>();
-                if (labelBtnComp != null)
-                    labelBtnComp.interactable = !isSelected;
+                var lblBtnComp = _radioButtons[i].transform.Find("Label")?.GetComponent<UnityEngine.UI.Button>();
+                if (lblBtnComp != null)
+                    lblBtnComp.interactable = !isSelected;
 
+                // Force hover ON permanently for selected, release for unselected
                 var cbHover = _radioButtons[i].transform.Find("Btn_/HitArea")?.GetComponent<VRWorkspace.UI.HoverEffects.HoverEffectController>();
                 var lblHover = _radioButtons[i].transform.Find("Label")?.GetComponent<VRWorkspace.UI.HoverEffects.HoverEffectController>();
-
-                if (isSelected)
-                {
-                    // Force hover ON permanently for selected item
-                    cbHover?.SetForceHover(true);
-                    lblHover?.SetForceHover(true);
-                }
-                else
-                {
-                    // Release force hover for unselected items
-                    cbHover?.SetForceHover(false);
-                    lblHover?.SetForceHover(false);
-                }
+                cbHover?.SetForceHover(isSelected);
+                lblHover?.SetForceHover(isSelected);
             }
         }
 
@@ -568,10 +542,10 @@ namespace VRWorkspace.UI.RTT.Components
 
                 bool isSelected = i == _selectedTransport;
 
-                // Checkbox — selected stays disabled
-                var btn = _radioButtons[i].transform.Find("Btn_");
-                if (btn != null)
-                    VRButtonFactory.SetInteractable(btn.gameObject, interactable && !isSelected);
+                // Checkbox — disable click only (no visual dimming), selected stays disabled
+                var cbBtn = _radioButtons[i].transform.Find("Btn_/HitArea")?.GetComponent<UnityEngine.UI.Button>();
+                if (cbBtn != null)
+                    cbBtn.interactable = interactable && !isSelected;
 
                 // Label — selected stays disabled
                 var lblBtn = _radioButtons[i].transform.Find("Label")?.GetComponent<UnityEngine.UI.Button>();
