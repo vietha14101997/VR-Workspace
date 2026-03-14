@@ -375,6 +375,8 @@ namespace VRWorkspace.UI.Components
             public HoverEffectController hoverController;
         }
         private Dictionary<int, OptionRef> _optionRefs = new Dictionary<int, OptionRef>();
+        private float _lastCloseTime;
+        public const float REOPEN_COOLDOWN = 1.5f;
 
         public int SelectedIndex => _selectedIndex;
         public GameObject DropdownPanel => _isRTTMode && _worldSpaceDropdownRoot != null ? _worldSpaceDropdownRoot : _dropdownPanel;
@@ -412,6 +414,8 @@ namespace VRWorkspace.UI.Components
 
         public void UpdateSelection(int newIndex)
         {
+            Debug.Log($"[VRDropdown] UpdateSelection({newIndex}), _optionRefs keys=[{string.Join(",", _optionRefs.Keys)}], prev _selectedIndex={_selectedIndex}");
+
             foreach (var kvp in _optionRefs)
             {
                 if (kvp.Value.background != null)
@@ -427,7 +431,7 @@ namespace VRWorkspace.UI.Components
                 }
                 if (kvp.Value.checkmark != null)
                 {
-                    kvp.Value.checkmark.color = Color.clear;
+                    kvp.Value.checkmark.gameObject.SetActive(false);
                 }
                 // Clear selected state for hover effect
                 if (kvp.Value.hoverController != null)
@@ -453,8 +457,7 @@ namespace VRWorkspace.UI.Components
                 }
                 if (optRef.checkmark != null)
                 {
-                    // Full white for maximum visibility
-                    optRef.checkmark.color = Color.white;
+                    optRef.checkmark.gameObject.SetActive(true);
                 }
                 // Set selected state for hover effect
                 if (optRef.hoverController != null)
@@ -618,10 +621,12 @@ namespace VRWorkspace.UI.Components
                 _dropdownPanel.SetActive(false);
             }
 
-            // Release force hover when panel closes
+            _lastCloseTime = Time.time;
+
+            // Reset hover state completely when panel closes
             if (_hoverController != null)
             {
-                _hoverController.SetForceHover(false);
+                _hoverController.ResetHoverState(immediate: true);
             }
             // Clear static reference
             if (CurrentlyOpenDropdown == this)
@@ -651,6 +656,9 @@ namespace VRWorkspace.UI.Components
                 else
                 {
                     _dropdownPanel.SetActive(true);
+
+                    // Re-apply selection visual state (Button ColorBlock resets on SetActive toggle)
+                    UpdateSelection(_selectedIndex);
                 }
             }
             // Force hover when panel opens
@@ -866,23 +874,39 @@ namespace VRWorkspace.UI.Components
                         _onValueChanged?.Invoke(capturedIndex, displayValue);
                     });
 
+                    // Explicitly set checkmark visibility on clone based on _selectedIndex
+                    bool isSelected = (capturedIndex == _selectedIndex);
+                    Transform checkmark = btn.transform.Find("Checkmark");
+                    if (checkmark != null)
+                    {
+                        checkmark.gameObject.SetActive(isSelected);
+                    }
+
+                    // Set background color for selected option
+                    Image optBg = btn.GetComponent<Image>();
+                    if (optBg != null)
+                    {
+                        Color themeColor = btn.colors.highlightedColor;
+                        optBg.color = isSelected
+                            ? new Color(themeColor.r, themeColor.g, themeColor.b, 0.15f)
+                            : Color.clear;
+                    }
+
                     // Re-add hover effects to cloned HoverEffectController
                     // When panel is cloned, _activeEffects (runtime list) is lost
                     HoverEffectController hoverController = btn.GetComponent<HoverEffectController>();
                     if (hoverController != null)
                     {
                         // Get theme color from button's highlightedColor (was set during CreateOptionItem)
-                        Color themeColor = btn.colors.highlightedColor;
+                        Color themeColor2 = btn.colors.highlightedColor;
                         // Reconstruct the full color with stronger hover intensity
-                        Color bgHoverColor = new Color(themeColor.r, themeColor.g, themeColor.b, 0.55f);
+                        Color bgHoverColor = new Color(themeColor2.r, themeColor2.g, themeColor2.b, 0.55f);
 
                         // Re-add background color effect
                         hoverController.AddEffect(new ColorHoverEffect()
                             .WithTargetChild("")
                             .WithHoverColor(bgHoverColor));
 
-                        // Set selected state for the currently selected option
-                        bool isSelected = (capturedIndex == _selectedIndex);
                         hoverController.SetForceHover(isSelected);
                     }
 
@@ -939,6 +963,8 @@ namespace VRWorkspace.UI.Components
             }
             else
             {
+                // Prevent VR dwell re-trigger immediately after close
+                if (Time.time - _lastCloseTime < REOPEN_COOLDOWN) return;
                 OpenDropdown();
             }
         }
@@ -979,6 +1005,26 @@ namespace VRWorkspace.UI.Components
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Directly iterate panel hierarchy to set checkmark active states based on _selectedIndex.
+        /// Bypasses _optionRefs to handle any stale-reference edge cases.
+        /// </summary>
+        /// <summary>
+        /// Enable/disable the dropdown's HitArea BoxCollider and Button.
+        /// Used to temporarily block phantom dwell clicks after option selection.
+        /// </summary>
+        public void SetHitAreaInteractable(bool interactable)
+        {
+            var hitArea = transform.Find("HitArea");
+            if (hitArea == null) return;
+
+            var col = hitArea.GetComponent<BoxCollider>();
+            if (col != null) col.enabled = interactable;
+
+            var btn = hitArea.GetComponent<Button>();
+            if (btn != null) btn.interactable = interactable;
         }
 
         private void OnDisable()

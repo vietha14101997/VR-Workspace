@@ -52,6 +52,7 @@ namespace VRWorkspace.UI.RTT.Components
         private GameObject[] _radioButtons = new GameObject[3]; // 0=LAN, 1=USB, 2=Internet
         private int _selectedTransport = 0; // 0=LAN, 1=USB, 2=Internet
         private RTTPopupInputable _tokenPopup; // Token input popup for internet mode
+        private RTTPopupInputable _serverPopup; // Server selection popup for multi-server LAN discovery
         private bool _preferenceSaveEnabled = false;  // Guard: only save when dropdowns are properly configured
         private string _usbTetheringIP = null;  // USB Tethering IP from QR scan (for full USB streaming)
         private string _tunnelUrl = null;  // Cloudflare Tunnel URL from QR scan (for zero-config internet)

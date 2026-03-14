@@ -10,7 +10,9 @@ using VRWorkspace.ViewModels;
 using VRWorkspace.Panel;
 using VRWorkspace.QRScanner;
 using VRWorkspace.UI.Components;
+using VRWorkspace.UI.HoverEffects;
 using VRWorkspace.UI.RTT;
+using VRWorkspace.VRInput;
 
 namespace VRWorkspace.UI.RTT.Components
 {
@@ -255,20 +257,28 @@ namespace VRWorkspace.UI.RTT.Components
             {
                 case ConnectionPhase.Disconnected:
                 case ConnectionPhase.Error:
-                    // === LAN MODE: Always auto-discover, no manual IP ===
+                    // === LAN MODE: Auto-discover, show picker if multiple servers ===
                     if (_selectedTransport == 0)
                     {
-                        Debug.Log("[RTTRemoteMenu] LAN mode — starting auto-discovery...");
+                        Debug.Log("[RTTRemoteMenu] LAN mode — scanning for servers...");
                         UpdateButtonText("SEARCHING...");
                         SetTransportRadioInteractable(false);
                         VRButtonFactory.SetInteractable(_qrButton, false);
 
-                        var discovered = await LanDiscoveryClient.DiscoverAsync();
-                        if (discovered != null)
+                        var servers = await LanDiscoveryClient.DiscoverAllAsync(timeoutMs: 3000);
+                        if (servers.Count == 1)
                         {
-                            Debug.Log($"[RTTRemoteMenu] Found server: {discovered.ServerName} at {discovered.IP}:{discovered.Port}");
-                            VRInputFieldFactory.SetValue(_hostInput, discovered.IP);
-                            ConnectWiFi(discovered.IP, discovered.Port, null);
+                            // Single server — connect immediately
+                            var s = servers[0];
+                            Debug.Log($"[RTTRemoteMenu] Single server found: {s.ServerName} at {s.IP}:{s.Port}");
+                            VRInputFieldFactory.SetValue(_hostInput, s.IP);
+                            ConnectWiFi(s.IP, s.Port, null);
+                        }
+                        else if (servers.Count > 1)
+                        {
+                            // Multiple servers — show selection popup
+                            Debug.Log($"[RTTRemoteMenu] Found {servers.Count} servers — showing picker");
+                            ShowServerSelectionPopup(servers);
                         }
                         else
                         {
@@ -1585,6 +1595,366 @@ namespace VRWorkspace.UI.RTT.Components
                     Debug.Log("[RTTRemoteMenu] Token popup cancelled");
                 }
             );
+        }
+
+        /// <summary>
+        /// Show popup for user to select a server when multiple found on LAN.
+        /// Reuses RTTPopupInputable (same visual style as Rename popup).
+        /// Hides the input field and injects a VRDropdown in its place.
+        /// Recreated each time to avoid stale state.
+        /// </summary>
+        private List<DiscoveryResult> _discoveredServers;
+        private int _selectedServerIndex = 0;
+
+        private void ShowServerSelectionPopup(List<DiscoveryResult> servers)
+        {
+            _discoveredServers = servers;
+            _selectedServerIndex = 0;
+
+            // Build dropdown options
+            var options = new List<string>();
+            for (int i = 0; i < servers.Count; i++)
+            {
+                var s = servers[i];
+                options.Add($"{s.ServerName}  ({s.IP})");
+            }
+
+            // Destroy old popup (clean slate each time)
+            if (_serverPopup != null)
+            {
+                Destroy(_serverPopup.gameObject);
+                _serverPopup = null;
+            }
+
+            // Cleanup stale RTTPopupMenu_WorldSpace objects from prior attempts
+            foreach (var old in FindObjectsByType<RTTPopupMenu>(FindObjectsSortMode.None))
+            {
+                if (old.gameObject.name.Contains("WorldSpace"))
+                    Destroy(old.gameObject);
+            }
+
+            // Config: dropdown font sizes -15% from RTTRemoteMenu, icon shrunk
+            float popupW = 750f;
+            float padding = 40f;
+            float titleH = 65f;
+            float spacing = 25f;
+            float buttonH = 85f;
+            float labelFontSz = 28f;
+
+            // Dropdown sizes: RTTRemoteMenu sizes reduced by 15%
+            int ddLabelFontSize = Mathf.RoundToInt(DROPDOWN_LABEL_FONT_SIZE * 0.85f);  // 34
+            int ddValueFontSize = Mathf.RoundToInt(DROPDOWN_VALUE_FONT_SIZE * 0.85f);  // 36
+            float ddBoxH = VRDropdownFactory.CalculateHeight(ddValueFontSize);  // natural height
+
+            var config = new RTTPopupInputable.PopupConfig
+            {
+                title = "Select Server",
+                inputLabel = "",       // Will be hidden
+                inputPlaceholder = "",
+                buttonText = "Connect",
+                width = popupW,
+                padding = padding,
+                titleFontSize = 38,
+                labelFontSize = labelFontSz,
+                inputFontSize = 32,
+                buttonFontSize = 32,
+                buttonHeight = buttonH,
+                inputHeight = ddBoxH,  // Only fits dropdown button, panel overflows
+                titleHeight = titleH,
+                closeButtonSize = 60f,
+                spacing = spacing,
+                primaryColor = themeColor,
+                accentColor = accentColor,
+                overlayColor = new Color(0f, 0f, 0f, 0.4f),
+                font = customFont,
+                layerName = "VirtualObjects"
+            };
+
+            _serverPopup = RTTPopupInputable.CreateWorldSpace(config, _menuFrame?.transform ?? transform);
+
+            // Modify popup content: hide input, inject dropdown
+            var popupPanel = _serverPopup.transform.Find("PopupPanel");
+            var content = popupPanel?.Find("Content");
+            if (content != null)
+            {
+                // Hide the label text and input field
+                var labelObj = content.Find("Label");
+                if (labelObj != null) labelObj.gameObject.SetActive(false);
+
+                // Hide ALL input field objects (name varies)
+                // Text value set via SetDefaultValue() before Show() to pass OnConfirmClicked validation
+                foreach (Transform child in content)
+                {
+                    if (child.name.StartsWith("InputField") || child.name.StartsWith("Input_"))
+                    {
+                        child.gameObject.SetActive(false);
+                    }
+                }
+
+                // Center dropdown between title and Connect button
+                // Available space = totalContentH - titleH - buttonH
+                // Hidden elements: label (labelFontSz*1.5) + spacing
+                float hiddenLabelH = labelFontSz * 1.5f + spacing * 0.5f;
+                float middleSpace = spacing * 0.5f + hiddenLabelH + ddBoxH + spacing;
+                float freeSpace = middleSpace - ddBoxH;
+                float dropdownY = -(titleH + freeSpace * 0.5f);
+                float contentW = popupW - padding * 2f;
+
+                // Create dropdown with reduced font sizes (-15% from RTTRemoteMenu)
+                var dropdown = VRDropdownFactory.CreateIconDropdown(
+                    content, contentW,
+                    "Server", LoadIcon("monitor"), themeColor,
+                    options, 0,
+                    onValueChanged: null,  // handlers reconnected below after reparent
+                    labelFontSize: ddLabelFontSize, valueFontSize: ddValueFontSize, font: customFont);
+
+                // Shrink icon zone: reduce from 1/3 → 1/5 width, give text more room
+                var iconZone = dropdown.transform.Find("HitArea/Visuals/Content/IconZone");
+                if (iconZone != null)
+                {
+                    var izRT = iconZone.GetComponent<RectTransform>();
+                    if (izRT != null)
+                    {
+                        // Original: anchorMin.x = ~0.05, anchorMax.x = ~0.38
+                        // Shrink to 0.05 → 0.22 (from 1/3 to ~1/5)
+                        izRT.anchorMax = new Vector2(0.22f, izRT.anchorMax.y);
+                    }
+                    // Also reduce icon size by 35%
+                    var icon = iconZone.Find("Icon");
+                    if (icon != null)
+                    {
+                        var iconRT = icon.GetComponent<RectTransform>();
+                        if (iconRT != null) iconRT.sizeDelta *= 0.65f;
+                    }
+                }
+                // Shift content zone left to match
+                var contentZone = dropdown.transform.Find("HitArea/Visuals/Content/ContentZone");
+                if (contentZone != null)
+                {
+                    var czRT = contentZone.GetComponent<RectTransform>();
+                    if (czRT != null)
+                        czRT.anchorMin = new Vector2(0.22f, czRT.anchorMin.y);
+                }
+
+                // Position dropdown
+                var ddRT = dropdown.GetComponent<RectTransform>();
+                ddRT.anchorMin = new Vector2(0.5f, 1);
+                ddRT.anchorMax = new Vector2(0.5f, 1);
+                ddRT.pivot = new Vector2(0.5f, 1);
+                ddRT.sizeDelta = new Vector2(contentW, ddBoxH);
+                ddRT.anchoredPosition = new Vector2(0, dropdownY);
+
+                // Fix dropdown panel: rendering, interaction, and alignment
+                var vrDropdown = dropdown.GetComponentInChildren<VRDropdown>();
+                if (vrDropdown != null)
+                {
+                    var panelObj = vrDropdown.DropdownPanel;
+                    if (panelObj != null)
+                    {
+                        // 1) Reparent panel to popup root canvas (floats above Connect button)
+                        panelObj.transform.SetParent(_serverPopup.transform, true);
+
+                        // 2) Set VirtualObjects layer on all panel children for VR raycast
+                        int vrLayer = LayerMask.NameToLayer("VirtualObjects");
+                        if (vrLayer != -1)
+                        {
+                            foreach (var t in panelObj.GetComponentsInChildren<Transform>(true))
+                                t.gameObject.layer = vrLayer;
+                        }
+
+                        // 3) Fix renderQueue: boost ALL content inside Options container
+                        //    above GlassGradientBackgroundOverlay (queue 3100).
+                        //    Target Options children only — not Background/Border.
+                        var optionsContainer = panelObj.transform
+                            .Find("Viewport/Visuals/Content/Options");
+                        if (optionsContainer != null)
+                        {
+                            // Boost ALL TMP text
+                            foreach (var tmp in optionsContainer
+                                .GetComponentsInChildren<TextMeshProUGUI>(true))
+                            {
+                                tmp.fontMaterial = new Material(tmp.fontMaterial)
+                                    { renderQueue = 3200 };
+                            }
+
+                            // Boost ALL images (Checkmark, Icon, Separator, option bg)
+                            foreach (var img in optionsContainer
+                                .GetComponentsInChildren<Image>(true))
+                            {
+                                var mat = img.material != null
+                                    ? new Material(img.material)
+                                    : new Material(Shader.Find("UI/Default"));
+                                mat.renderQueue = 3200;
+                                img.material = mat;
+                            }
+                        }
+
+                        // 4) Shift option text LEFT to align with dropdown value
+                        // Option text position calculated from default ICON_ZONE_RATIO (0.28 + 0.05 = 0.33)
+                        // But popup shrunk ContentZone to 0.22 → delta = (0.33 - 0.22) * contentW
+                        float textShift = (0.33f - 0.22f) * contentW;
+                        if (optionsContainer != null)
+                        {
+                            foreach (Transform optionT in optionsContainer)
+                            {
+                                // MarqueeText wraps Text under MarqueeMask
+                                var maskT = optionT.Find("MarqueeMask");
+                                var targetT = maskT != null ? maskT : optionT.Find("Text");
+                                if (targetT != null)
+                                {
+                                    var targetRT = targetT.GetComponent<RectTransform>();
+                                    if (targetRT != null)
+                                    {
+                                        targetRT.offsetMin = new Vector2(
+                                            targetRT.offsetMin.x - textShift,
+                                            targetRT.offsetMin.y);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Reconnect option click handlers after panel reparenting + visual mods.
+                // Pattern from ReconnectClonedPanelHandlers (RTT mode) — uses direct
+                // VRDropdown reference instead of closure-captured GetComponentInParent.
+                ReconnectServerDropdownHandlers(dropdown);
+            }
+
+            // Set non-empty default so OnConfirmClicked validation passes
+            _serverPopup.SetDefaultValue("server_selected");
+
+            // Show with connect/cancel callbacks
+            _serverPopup.Show(
+                onConfirm: (_) =>
+                {
+                    if (_discoveredServers != null && _selectedServerIndex < _discoveredServers.Count)
+                    {
+                        var s = _discoveredServers[_selectedServerIndex];
+                        Debug.Log($"[RTTRemoteMenu] User selected server: {s.ServerName} at {s.IP}:{s.Port}");
+                        VRInputFieldFactory.SetValue(_hostInput, s.IP);
+                        ConnectWiFi(s.IP, s.Port, null);
+                    }
+                },
+                onCancel: () =>
+                {
+                    SetTransportRadioInteractable(true);
+                    VRButtonFactory.SetInteractable(_qrButton, true);
+                    UpdateButtonText("CONNECT");
+                }
+            );
+        }
+
+        /// <summary>
+        /// Reconnect option click handlers on the server dropdown after panel reparenting.
+        /// Mirrors ReconnectClonedPanelHandlers pattern from VRDropdown RTT mode:
+        /// - Uses direct VRDropdown reference (not closure-captured GetComponentInParent)
+        /// - Explicitly manages checkmark visibility
+        /// - Ensures CloseDropdown + ForceResetDwellState are called on every selection
+        /// </summary>
+        private void ReconnectServerDropdownHandlers(GameObject dropdownWrapper)
+        {
+            var vrDropdown = dropdownWrapper.GetComponent<VRDropdown>();
+            if (vrDropdown == null) return;
+
+            var panelObj = vrDropdown.DropdownPanel;
+            if (panelObj == null) return;
+
+            // Find the Value text inside ContentZone/BottomRow (not the Label)
+            var valueObj = dropdownWrapper.transform.Find("HitArea/Visuals/Content/ContentZone/BottomRow/Value");
+            var valueTxt = valueObj?.GetComponent<TextMeshProUGUI>();
+
+            // Find all option buttons and reconnect handlers
+            var buttons = panelObj.GetComponentsInChildren<Button>(true);
+            foreach (var btn in buttons)
+            {
+                if (!btn.gameObject.name.StartsWith("Option_")) continue;
+
+                string indexStr = btn.gameObject.name.Replace("Option_", "");
+                if (!int.TryParse(indexStr, out int idx)) continue;
+
+                int capturedIndex = idx;
+
+                // Get option text from existing Text/MarqueeMask component
+                var optTxtComp = btn.GetComponentInChildren<TextMeshProUGUI>(true);
+                string optionText = optTxtComp != null ? optTxtComp.text : btn.gameObject.name;
+
+                // Re-register option refs so UpdateSelection can find checkmarks
+                Image optBg = btn.GetComponent<Image>();
+                Transform checkmarkT = btn.transform.Find("Checkmark");
+                Image checkImg = checkmarkT?.GetComponent<Image>();
+                var hoverCtrl = btn.GetComponent<HoverEffectController>();
+                if (optBg != null && checkImg != null)
+                {
+                    vrDropdown.RegisterOption(idx, optBg, checkImg, themeColor, hoverCtrl);
+                }
+
+                // Set initial checkmark state
+                bool isSelected = (idx == vrDropdown.SelectedIndex);
+                if (checkmarkT != null) checkmarkT.gameObject.SetActive(isSelected);
+
+                // Replace click handler with fresh one using direct vrDropdown reference
+                btn.onClick.RemoveAllListeners();
+                btn.onClick.AddListener(() =>
+                {
+                    Debug.Log($"[ServerDropdown] Option clicked: idx={capturedIndex}, text='{optionText}'");
+
+                    // Update display text
+                    string displayValue = optionText.Replace(" (Recommended)", "").Trim();
+                    if (valueTxt != null) valueTxt.text = displayValue;
+
+                    // Update selection state on the VRDropdown directly
+                    vrDropdown.UpdateSelection(capturedIndex);
+                    vrDropdown.CloseDropdown();
+
+                    // Update selected server index
+                    _selectedServerIndex = capturedIndex;
+
+                    // Reset gaze + block phantom dwell clicks
+                    StartCoroutine(TemporaryBlockAfterSelection(dropdownWrapper));
+                });
+            }
+
+            Debug.Log($"[ServerDropdown] Reconnected {buttons.Length} option handlers, vrDropdown={vrDropdown.GetInstanceID()}");
+        }
+
+        /// <summary>
+        /// After dropdown option selection:
+        /// 1) Reset dropdown button hover state (otherwise it stays glowing)
+        /// 2) Temporarily disable dropdown HitArea collider + button to prevent
+        ///    phantom VR dwell clicks during REOPEN_COOLDOWN period.
+        ///    Without this, the dwell system targets the still-active HitArea BoxCollider,
+        ///    triggering ToggleDropdown() which gets blocked by cooldown — consuming
+        ///    the click invisibly and requiring an extra dwell to interact with other elements.
+        /// </summary>
+        private System.Collections.IEnumerator TemporaryBlockAfterSelection(GameObject dropdownObj)
+        {
+            if (dropdownObj == null) yield break;
+
+            // 1) Force-reset dropdown button hover state
+            var hitArea = dropdownObj.transform.Find("HitArea");
+            if (hitArea != null)
+            {
+                var hoverCtrl = hitArea.GetComponent<HoverEffectController>();
+                hoverCtrl?.ResetHoverState(immediate: true);
+            }
+
+            // 2) Force-reset VR gaze dwell state to prevent phantom clicks
+            //    on stale targets (HitArea collider still active after panel closes)
+            var gazeReticle = VRGazeReticle.Instance;
+            if (gazeReticle != null)
+            {
+                gazeReticle.ForceResetDwellState();
+            }
+
+            // 3) Temporarily disable HitArea interaction during cooldown
+            var vrDropdown = dropdownObj.GetComponent<VRDropdown>();
+            if (vrDropdown != null)
+            {
+                vrDropdown.SetHitAreaInteractable(false);
+                yield return new WaitForSeconds(VRDropdown.REOPEN_COOLDOWN);
+                vrDropdown.SetHitAreaInteractable(true);
+            }
         }
 
         /// <summary>

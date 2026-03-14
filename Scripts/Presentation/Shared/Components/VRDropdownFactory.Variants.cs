@@ -6,6 +6,7 @@ using VRWorkspace.UI.HoverEffects;
 using VRWorkspace.UI.Utilities;
 using VRWorkspace.UI.Config;
 using VRWorkspace.UI.RTT;
+using VRWorkspace.UI.RTT.Components;
 
 namespace VRWorkspace.UI.Components
 {
@@ -606,11 +607,19 @@ namespace VRWorkspace.UI.Components
             HoverEffectController hoverController = option.AddComponent<HoverEffectController>();
             hoverController.TargetVisuals = option.transform;
 
-            // Add background color effect for hover feedback (stronger intensity)
-            Color bgHoverColor = new Color(config.themeColor.r, config.themeColor.g, config.themeColor.b, 0.55f);
+            // Hover: scale up text/icon/separator by ~4% (no background color change)
+            hoverController.AddEffect(new ScaleHoverEffect()
+                .WithHoverScale(1.04f)
+                .WithTransitionDuration(0.12f));
+
+            // Hover: brighten text for glow-like emphasis
+            Color textGlow = Color.Lerp(Color.white, config.themeColor, 0.15f);
+            textGlow.a = 1f;
             hoverController.AddEffect(new ColorHoverEffect()
-                .WithTargetChild("")  // Empty = target TargetVisuals directly (option has Image)
-                .WithHoverColor(bgHoverColor));
+                .WithTargetChild("Text")
+                .WithTargetType(ColorHoverEffect.TargetType.Text)
+                .WithHoverColor(textGlow)
+                .WithTransitionDuration(0.12f));
 
             // If selected, highlight background
             if (isSelected)
@@ -651,22 +660,21 @@ namespace VRWorkspace.UI.Components
             checkImg.sprite = SpriteUtility.GetCheckmarkSprite();
             checkImg.preserveAspect = true;
             checkImg.raycastTarget = false;
-            checkImg.color = isSelected ? Color.white : Color.clear; // Full white when selected
+            checkImg.color = Color.white; // Always white, visibility via SetActive
 
-            // Glow effect for checkmark when selected
-            if (isSelected)
-            {
-                Color glowCol = Color.Lerp(config.themeColor, Color.white, 0.8f);
-                glowCol.a = 0.7f;
-                Shadow checkShadow = checkObj.AddComponent<Shadow>();
-                checkShadow.effectColor = glowCol;
-                checkShadow.effectDistance = new Vector2(2f, -2f);
+            // Glow effect for checkmark (always add so UpdateSelection can toggle via SetActive)
+            Color glowCol = Color.Lerp(config.themeColor, Color.white, 0.8f);
+            glowCol.a = 0.7f;
+            Shadow checkShadow = checkObj.AddComponent<Shadow>();
+            checkShadow.effectColor = glowCol;
+            checkShadow.effectDistance = new Vector2(2f, -2f);
 
-                // Second shadow for stronger glow
-                Shadow checkShadow2 = checkObj.AddComponent<Shadow>();
-                checkShadow2.effectColor = new Color(glowCol.r, glowCol.g, glowCol.b, 0.4f);
-                checkShadow2.effectDistance = new Vector2(-1.5f, 1.5f);
-            }
+            Shadow checkShadow2 = checkObj.AddComponent<Shadow>();
+            checkShadow2.effectColor = new Color(glowCol.r, glowCol.g, glowCol.b, 0.4f);
+            checkShadow2.effectDistance = new Vector2(-1.5f, 1.5f);
+
+            // Control visibility via SetActive (not color)
+            checkObj.SetActive(isSelected);
 
             // Icon
             if (optionIcon != null)
@@ -720,10 +728,28 @@ namespace VRWorkspace.UI.Components
             txtShadow.effectColor = new Color(0f, 0f, 0f, 0.5f);
             txtShadow.effectDistance = new Vector2(1f, -1f);
 
+            // Auto-scroll long text on hover
+            var marquee = MarqueeText.Setup(txt, scrollSpeed: 40f, centerWhenFits: false);
+            if (marquee != null)
+            {
+                marquee.SetHoverMode(true);
+                marquee.gameObject.layer = renderLayer;
+
+                // Hook into HoverEffectController to start/stop scroll on hover
+                hoverController.OnHoverStateChanged += (isHovered) =>
+                {
+                    if (marquee == null) return;
+                    if (isHovered) marquee.StartScroll();
+                    else marquee.StopScroll();
+                };
+            }
+
             // Click handler
             int capturedIndex = index;
             optBtn.onClick.AddListener(() =>
             {
+                Debug.Log($"[VRDropdown] Option clicked: capturedIndex={capturedIndex}, text='{optionText}'");
+
                 // Strip "(Recommended)" suffix from displayed value
                 string displayValue = optionText.Replace(" (Recommended)", "").Trim();
                 valueTxt.text = displayValue;

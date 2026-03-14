@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -32,7 +33,20 @@ namespace VRWorkspace.Streaming
         /// </summary>
         public static async Task<DiscoveryResult> DiscoverAsync(int port = DefaultDiscoveryPort, int timeoutMs = 6000)
         {
-            Debug.Log($"[Discovery] Listening on UDP port {port} (timeout {timeoutMs}ms)...");
+            var all = await DiscoverAllAsync(port, timeoutMs);
+            return all.Count > 0 ? all[0] : null;
+        }
+
+        /// <summary>
+        /// Listen for ALL server beacons within timeout. Deduplicates by IP.
+        /// Server beacons arrive every ~2s, so 5s timeout catches at least 2 rounds.
+        /// </summary>
+        public static async Task<List<DiscoveryResult>> DiscoverAllAsync(int port = DefaultDiscoveryPort, int timeoutMs = 5000)
+        {
+            Debug.Log($"[Discovery] Scanning for servers on UDP port {port} (timeout {timeoutMs}ms)...");
+
+            var results = new List<DiscoveryResult>();
+            var seenIPs = new HashSet<string>();
 
             using var cts = new CancellationTokenSource(timeoutMs);
             UdpClient udp = null;
@@ -48,35 +62,26 @@ namespace VRWorkspace.Streaming
 
                     var completed = await Task.WhenAny(receiveTask, delayTask);
                     if (completed == delayTask || cts.IsCancellationRequested)
-                    {
-                        Debug.Log("[Discovery] Timeout — no server found");
-                        return null;
-                    }
+                        break;
 
                     var result = await receiveTask;
                     var json = Encoding.UTF8.GetString(result.Buffer);
                     Debug.Log($"[Discovery] Received from {result.RemoteEndPoint}: {json}");
 
                     var parsed = Parse(json, result.RemoteEndPoint.Address.ToString());
-                    if (parsed != null)
+                    if (parsed != null && seenIPs.Add(parsed.IP))
                     {
                         Debug.Log($"[Discovery] Found server: {parsed.ServerName} at {parsed.IP}:{parsed.Port}");
-                        return parsed;
+                        results.Add(parsed);
                     }
                 }
             }
-            catch (OperationCanceledException)
-            {
-                Debug.Log("[Discovery] Timeout — no server found");
-            }
+            catch (OperationCanceledException) { }
             catch (SocketException ex)
             {
                 Debug.LogWarning($"[Discovery] Socket error: {ex.Message}");
             }
-            catch (ObjectDisposedException)
-            {
-                // Normal on cancellation
-            }
+            catch (ObjectDisposedException) { }
             catch (Exception ex)
             {
                 Debug.LogWarning($"[Discovery] Error: {ex.Message}");
@@ -86,7 +91,8 @@ namespace VRWorkspace.Streaming
                 try { udp?.Close(); } catch { }
             }
 
-            return null;
+            Debug.Log($"[Discovery] Scan complete — found {results.Count} server(s)");
+            return results;
         }
 
         /// <summary>

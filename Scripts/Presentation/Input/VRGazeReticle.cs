@@ -499,6 +499,23 @@ namespace VRWorkspace.VRInput
         }
 
         /// <summary>
+        /// Force-reset dwell state and clear current hit target.
+        /// Call after programmatic UI dismissal (e.g. dropdown close) to prevent
+        /// phantom dwell clicks on stale targets.
+        /// </summary>
+        public void ForceResetDwellState()
+        {
+            if (_currentHitObj != null)
+            {
+                HandlePointerExit(_currentHitObj);
+                _currentHitObj = null;
+            }
+            _lastClickedButton = null;
+            _blockedDwellTarget = null;
+            ResetDwellState();
+        }
+
+        /// <summary>
         /// Send RTT click and remember the button to prevent continuous clicking
         /// </summary>
         void SendRTTClickAndLock(GameObject target)
