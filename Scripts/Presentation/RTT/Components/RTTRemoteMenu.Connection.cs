@@ -4,6 +4,7 @@ using TMPro;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading;
 using VRWorkspace.Core;
 using VRWorkspace.Streaming;
 using VRWorkspace.ViewModels;
@@ -18,6 +19,81 @@ namespace VRWorkspace.UI.RTT.Components
 {
     public partial class RTTRemoteMenu
     {
+        #region Background Discovery
+
+        // Background discovery runs when Remote menu opens, caches results for instant Connect
+        private List<DiscoveryResult> _cachedDiscoveryResults;
+        private CancellationTokenSource _backgroundDiscoveryCts;
+        private bool _isBackgroundDiscoveryRunning = false;
+
+        /// <summary>
+        /// Start background server discovery. Called when Remote menu is opened.
+        /// Results are cached so Connect button can use them instantly.
+        /// </summary>
+        public void StartBackgroundDiscovery()
+        {
+            // Don't restart if already running
+            if (_isBackgroundDiscoveryRunning) return;
+
+            // Cancel any previous discovery
+            StopBackgroundDiscovery();
+
+            _backgroundDiscoveryCts = new CancellationTokenSource();
+            _isBackgroundDiscoveryRunning = true;
+            RunBackgroundDiscoveryLoop(_backgroundDiscoveryCts.Token);
+        }
+
+        /// <summary>
+        /// Stop background discovery.
+        /// </summary>
+        public void StopBackgroundDiscovery()
+        {
+            _isBackgroundDiscoveryRunning = false;
+            _backgroundDiscoveryCts?.Cancel();
+            _backgroundDiscoveryCts?.Dispose();
+            _backgroundDiscoveryCts = null;
+        }
+
+        /// <summary>
+        /// Discovery loop: scan every 6 seconds until cancelled or server found.
+        /// Uses longer timeout (5s) for thorough scanning.
+        /// </summary>
+        private async void RunBackgroundDiscoveryLoop(CancellationToken ct)
+        {
+            Debug.Log("[RTTRemoteMenu] Background discovery started");
+            try
+            {
+                while (!ct.IsCancellationRequested)
+                {
+                    var servers = await LanDiscoveryClient.DiscoverAllAsync(timeoutMs: 5000, externalToken: ct);
+
+                    if (ct.IsCancellationRequested) break;
+
+                    if (servers.Count > 0)
+                    {
+                        _cachedDiscoveryResults = servers;
+                        Debug.Log($"[RTTRemoteMenu] Background discovery found {servers.Count} server(s)");
+                        // Keep scanning in case more servers appear, but slower
+                    }
+
+                    // Wait before next scan
+                    await System.Threading.Tasks.Task.Delay(6000, ct);
+                }
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[RTTRemoteMenu] Background discovery error: {ex.Message}");
+            }
+            finally
+            {
+                _isBackgroundDiscoveryRunning = false;
+                Debug.Log("[RTTRemoteMenu] Background discovery stopped");
+            }
+        }
+
+        #endregion
+
         #region Connect Button
         private void CreateConnectButton(Transform parent, float w, float h)
         {
@@ -257,18 +333,41 @@ namespace VRWorkspace.UI.RTT.Components
             {
                 case ConnectionPhase.Disconnected:
                 case ConnectionPhase.Error:
-                    // === LAN MODE: Auto-discover, show picker if multiple servers ===
+                    // === LAN MODE: Use cached results or scan fresh ===
                     if (_selectedTransport == 0)
                     {
-                        Debug.Log("[RTTRemoteMenu] LAN mode — scanning for servers...");
-                        UpdateButtonText("SEARCHING...");
                         SetTransportRadioInteractable(false);
                         VRButtonFactory.SetInteractable(_qrButton, false);
 
-                        var servers = await LanDiscoveryClient.DiscoverAllAsync(timeoutMs: 3000);
+                        // QR-scanned IP available → connect directly, skip discovery
+                        if (!string.IsNullOrEmpty(_lanServerIP))
+                        {
+                            Debug.Log($"[RTTRemoteMenu] Using QR-scanned IP: {_lanServerIP}:{_lanServerPort}");
+                            UpdateButtonText("CONNECTING...");
+                            VRInputFieldFactory.SetValue(_hostInput, _lanServerIP);
+                            ConnectWiFi(_lanServerIP, _lanServerPort, null);
+                            break;
+                        }
+
+                        // Try cached results from background discovery first
+                        List<DiscoveryResult> servers = null;
+                        if (_cachedDiscoveryResults != null && _cachedDiscoveryResults.Count > 0)
+                        {
+                            Debug.Log($"[RTTRemoteMenu] Using {_cachedDiscoveryResults.Count} cached discovery result(s)");
+                            servers = _cachedDiscoveryResults;
+                            _cachedDiscoveryResults = null; // Consume cache
+                        }
+                        else
+                        {
+                            // No cached results — scan fresh (with active probing)
+                            Debug.Log("[RTTRemoteMenu] LAN mode — scanning for servers...");
+                            UpdateButtonText("SEARCHING...");
+                            StopBackgroundDiscovery(); // Stop background to free UDP port
+                            servers = await LanDiscoveryClient.DiscoverAllAsync(timeoutMs: 5000);
+                        }
+
                         if (servers.Count == 1)
                         {
-                            // Single server — connect immediately
                             var s = servers[0];
                             Debug.Log($"[RTTRemoteMenu] Single server found: {s.ServerName} at {s.IP}:{s.Port}");
                             VRInputFieldFactory.SetValue(_hostInput, s.IP);
@@ -276,7 +375,6 @@ namespace VRWorkspace.UI.RTT.Components
                         }
                         else if (servers.Count > 1)
                         {
-                            // Multiple servers — show selection popup
                             Debug.Log($"[RTTRemoteMenu] Found {servers.Count} servers — showing picker");
                             ShowServerSelectionPopup(servers);
                         }
@@ -286,6 +384,8 @@ namespace VRWorkspace.UI.RTT.Components
                             SetTransportRadioInteractable(true);
                             VRButtonFactory.SetInteractable(_qrButton, true);
                             ShowTemporaryButtonText("SERVER NOT FOUND", 2f);
+                            // Restart background discovery for next attempt
+                            StartBackgroundDiscovery();
                         }
                         break;
                     }
@@ -475,21 +575,28 @@ namespace VRWorkspace.UI.RTT.Components
         }
 
         /// <summary>
-        /// Show temporary button text, then revert to original after delay.
+        /// Show temporary button text, then revert to phase-appropriate text after delay.
         /// </summary>
         private async void ShowTemporaryButtonText(string text, float duration)
         {
             if (_connectButtonText == null) return;
 
-            string originalText = _connectButtonText.text;
             _connectButtonText.text = text;
 
             await System.Threading.Tasks.Task.Delay((int)(duration * 1000));
 
-            // Only revert if text hasn't changed
+            // Revert to phase-appropriate text (not whatever text was before)
             if (_connectButtonText != null && _connectButtonText.text == text)
             {
-                _connectButtonText.text = originalText;
+                string revertText = _currentPhase switch
+                {
+                    ConnectionPhase.Disconnected => "CONNECT",
+                    ConnectionPhase.Error => "CONNECT",
+                    ConnectionPhase.ConfiguringSettings => "START",
+                    ConnectionPhase.Connecting => "CONNECTING...",
+                    _ => "CONNECT"
+                };
+                _connectButtonText.text = revertText;
             }
         }
 
@@ -535,11 +642,13 @@ namespace VRWorkspace.UI.RTT.Components
                     _cachedSuggestedConfig = null;
                     // Reset button progress tracking
                     ResetButtonProgress();
+                    // Restart background discovery for next connection attempt
+                    StartBackgroundDiscovery();
                     break;
 
                 case ConnectionPhase.Connecting:
                     UpdateButtonText("CONNECTING...");
-                    // Side panels will show when hardware_info is received via HandleHardwareInfoReceived
+                    StopBackgroundDiscovery(); // No need to discover when connected
                     break;
 
                 case ConnectionPhase.AwaitingHardwareInfo:
@@ -1471,6 +1580,19 @@ namespace VRWorkspace.UI.RTT.Components
                 Debug.Log($"[RTTRemoteMenu] Tunnel URL available: {_tunnelUrl}");
             }
 
+            // Always store LAN IP from QR (primary IP field) for direct LAN connect
+            if (!string.IsNullOrEmpty(config.ip))
+            {
+                _lanServerIP = config.ip;
+                _lanServerPort = DEFAULT_PORT;
+                if (!string.IsNullOrEmpty(config.port) && int.TryParse(config.port, out int p))
+                    _lanServerPort = p;
+
+                // Update LAN label to show scanned IP
+                UpdateLanLabel();
+                Debug.Log($"[RTTRemoteMenu] LAN IP from QR: {_lanServerIP}:{_lanServerPort}");
+            }
+
             // Set Host based on current transport mode
             string hostToUse;
             if (_selectedTransport == 1 && config.HasUsbIP)
@@ -1489,10 +1611,35 @@ namespace VRWorkspace.UI.RTT.Components
             }
 
             // Auto-switch to Internet mode if QR contains tunnel or publicIP
-            if ((config.HasTunnelUrl || config.HasPublicIP) && _selectedTransport != 2)
+            // BUT only if no LAN IP available (prefer LAN for lowest latency)
+            if ((config.HasTunnelUrl || config.HasPublicIP) && _selectedTransport != 2 && string.IsNullOrEmpty(config.ip))
             {
                 SelectTransport(2); // Switch to Internet
                 Debug.Log("[RTTRemoteMenu] Internet mode auto-enabled from QR code");
+            }
+        }
+
+        /// <summary>
+        /// Update LAN label to show scanned server IP (e.g., "LAN (192.168.1.100)")
+        /// </summary>
+        private void UpdateLanLabel()
+        {
+            if (_lanLabelText == null) return;
+
+            if (!string.IsNullOrEmpty(_lanServerIP))
+            {
+                _lanLabelText.text = $"LAN ({_lanServerIP})";
+                // Resize label to fit new text
+                var rt = _lanLabelText.GetComponent<RectTransform>();
+                if (rt != null)
+                {
+                    float estimatedW = _lanLabelText.text.Length * INPUT_FONT_SIZE * 0.55f + 16f;
+                    rt.sizeDelta = new Vector2(estimatedW, rt.sizeDelta.y);
+                }
+            }
+            else
+            {
+                _lanLabelText.text = "LAN";
             }
         }
         #endregion

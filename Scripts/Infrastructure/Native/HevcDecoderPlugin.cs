@@ -69,12 +69,18 @@ namespace VRWorkspace.Native
         }
 
         /// <summary>
-        /// Initialize the decoder with video dimensions.
+        /// Initialize the decoder with video dimensions (defaults to HEVC).
+        /// </summary>
+        public bool Initialize(int width, int height) => Initialize(width, height, false);
+
+        /// <summary>
+        /// Initialize the decoder with video dimensions and codec selection.
         /// </summary>
         /// <param name="width">Video width</param>
         /// <param name="height">Video height</param>
+        /// <param name="isH264">true for H.264/AVC, false for H.265/HEVC</param>
         /// <returns>True if initialization successful</returns>
-        public bool Initialize(int width, int height)
+        public bool Initialize(int width, int height, bool isH264)
         {
             if (_disposed)
             {
@@ -92,7 +98,7 @@ namespace VRWorkspace.Native
             try
             {
                 _decoderBridge = new AndroidJavaObject("com.vrworkspace.hevc.HevcDecoderBridge");
-                bool result = _decoderBridge.Call<bool>("initialize", width, height);
+                bool result = _decoderBridge.Call<bool>("initialize", width, height, isH264);
 
                 if (!result)
                 {

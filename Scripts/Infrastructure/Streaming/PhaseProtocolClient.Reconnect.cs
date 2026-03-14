@@ -172,10 +172,11 @@ namespace VRWorkspace.Streaming
                     wrapper.VideoTrack = v;
                     wrapper.LastFrameTime = DateTime.UtcNow; // Initialize
 
-                    if (_selectedCodec == VideoCodec.H265)
+                    if (_selectedCodec == VideoCodec.H265 || _selectedCodec == VideoCodec.H264)
                     {
-                        // H265 custom decode pipeline (same as initial connection)
-                        Debug.Log($"[PhaseProtocol] PC{idx} using H265 custom decoder pipeline (reconnect)");
+                        bool isH264 = _selectedCodec == VideoCodec.H264;
+                        string codecName = isH264 ? "H264" : "H265";
+                        Debug.Log($"[PhaseProtocol] PC{idx} using {codecName} custom decoder pipeline via DataChannel (reconnect)");
 
                         int w = _userConfig?.resolutionWidth  ?? 1920;
                         int h = _userConfig?.resolutionHeight ?? 1080;
@@ -192,7 +193,7 @@ namespace VRWorkspace.Streaming
                             _h265Handlers.Remove(idx);
                         }
 
-                        var receiver = new H265StreamReceiver(idx, w, h);
+                        var receiver = new H265StreamReceiver(idx, w, h, isH264);
                         if (receiver.Start())
                         {
                             _h265Receivers[idx] = receiver;
@@ -206,14 +207,13 @@ namespace VRWorkspace.Streaming
 
                                 if (!_streamingStartedFired)
                                 {
-                                    Debug.Log($"[PhaseProtocol] PC{idx} received first frame (H265 reconnect), firing OnStreamingStarted");
+                                    Debug.Log($"[PhaseProtocol] PC{idx} received first frame ({codecName} reconnect), firing OnStreamingStarted");
                                     _stateMachine.TryTransition(ConnectionPhase.Streaming);
                                     HandleStreamingStartedInternal();
                                 }
 
                                 OnVideoTextureReceived?.Invoke(monIdx, tex);
                             };
-                            // Hook fallback: if decoder still fails after reconnect, switch to H264
                             receiver.OnDecoderFailed += monIdx => OnH265DecoderFailed(monIdx);
                             receiver.OnKeyframeNeeded += monIdx => RequestKeyframe(monIdx);
                             receiver.OnCorruptionDetected += monIdx =>
@@ -221,17 +221,20 @@ namespace VRWorkspace.Streaming
                                 TaintTrack(monIdx, "luminance corruption detected by decoder");
                             };
 
-                            // Hook Encoded Transform
-                            try
+                            // Encoded Transform: H265 only
+                            if (!isH264)
                             {
-                                var handler = new H265EncodedFrameHandler(receiver);
-                                _h265Handlers[idx] = handler;
-                                e.Transceiver.Receiver.Transform = handler.Transform;
-                                Debug.Log($"[PhaseProtocol] PC{idx} hooked H265 custom decoder via Encoded Transform (reconnect)");
-                            }
-                            catch (Exception ex)
-                            {
-                                Debug.LogError($"[PhaseProtocol] PC{idx} failed to hook H265 Transform (reconnect): {ex.Message}");
+                                try
+                                {
+                                    var handler = new H265EncodedFrameHandler(receiver);
+                                    _h265Handlers[idx] = handler;
+                                    e.Transceiver.Receiver.Transform = handler.Transform;
+                                    Debug.Log($"[PhaseProtocol] PC{idx} hooked H265 custom decoder via Encoded Transform (reconnect)");
+                                }
+                                catch (Exception ex)
+                                {
+                                    Debug.LogError($"[PhaseProtocol] PC{idx} failed to hook H265 Transform (reconnect): {ex.Message}");
+                                }
                             }
                         }
                     }

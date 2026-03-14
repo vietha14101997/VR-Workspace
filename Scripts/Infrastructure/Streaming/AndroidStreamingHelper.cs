@@ -125,10 +125,18 @@ namespace VRWorkspace.Streaming
         /// <summary>
         /// Check if battery optimization is disabled for this app.
         /// If not, prompt user to disable it for better streaming stability.
+        /// Uses PlayerPrefs cache to skip JNI calls on subsequent launches.
         /// </summary>
         public void RequestDisableBatteryOptimization()
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
+            // Fast path: if already exempted on a previous launch, skip JNI calls entirely
+            if (PlayerPrefs.GetInt("VRWorkspace_BatteryOptExempt", 0) == 1)
+            {
+                Debug.Log("[AndroidHelper] Battery optimization already handled (cached)");
+                return;
+            }
+
             try
             {
                 using (var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
@@ -143,7 +151,6 @@ namespace VRWorkspace.Streaming
                     {
                         Debug.Log("[AndroidHelper] Requesting battery optimization exemption...");
 
-                        // Open battery optimization settings for this app
                         using (var intent = new AndroidJavaObject("android.content.Intent"))
                         using (var uriClass = new AndroidJavaClass("android.net.Uri"))
                         {
@@ -156,6 +163,9 @@ namespace VRWorkspace.Streaming
                     else
                     {
                         Debug.Log("[AndroidHelper] Battery optimization already disabled for this app");
+                        // Cache result so we skip JNI on next launch
+                        PlayerPrefs.SetInt("VRWorkspace_BatteryOptExempt", 1);
+                        PlayerPrefs.Save();
                     }
                 }
             }

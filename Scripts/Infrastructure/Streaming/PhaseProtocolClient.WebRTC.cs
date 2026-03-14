@@ -92,8 +92,9 @@ namespace VRWorkspace.Streaming
                         perTrackWrapper = _peerConnections[capturedMonitor];
                 }
 
-                if (_selectedCodec == VideoCodec.H265 && perTrackWrapper != null)
+                if ((_selectedCodec == VideoCodec.H265 || _selectedCodec == VideoCodec.H264) && perTrackWrapper != null)
                 {
+                    bool isH264 = _selectedCodec == VideoCodec.H264;
                     int w = _userConfig?.resolutionWidth ?? 1920;
                     int h = _userConfig?.resolutionHeight ?? 1080;
 
@@ -104,7 +105,7 @@ namespace VRWorkspace.Streaming
                         _h265Receivers.Remove(capturedMonitor);
                     }
 
-                    var ptReceiver = new H265StreamReceiver(capturedMonitor, w, h);
+                    var ptReceiver = new H265StreamReceiver(capturedMonitor, w, h, isH264);
                     if (ptReceiver.Start())
                     {
                         _h265Receivers[capturedMonitor] = ptReceiver;
@@ -831,18 +832,20 @@ namespace VRWorkspace.Streaming
 
                     int idx = trackIndex; // Capture for closure
 
-                    if (_selectedCodec == VideoCodec.H265)
+                    if (_selectedCodec == VideoCodec.H265 || _selectedCodec == VideoCodec.H264)
                     {
-                        Debug.Log($"[PhaseProtocol] PC{idx} using H265 custom decoder pipeline (Single-PC mode)");
-                        
+                        bool isH264 = _selectedCodec == VideoCodec.H264;
+                        string codecName = isH264 ? "H264" : "H265";
+                        Debug.Log($"[PhaseProtocol] PC{idx} using {codecName} custom decoder pipeline via DataChannel (Single-PC mode)");
+
                         // Initialize receiver with current config dimensions
                         int w = _userConfig?.resolutionWidth ?? 1920;
                         int h = _userConfig?.resolutionHeight ?? 1080;
-                        
+
                         // Cleanup old receiver/handler if they exist for this index
                         if (_h265Receivers.TryGetValue(idx, out var oldReceiver))
                         {
-                            Debug.Log($"[PhaseProtocol] Cleaning up old H265 receiver for PC{idx}");
+                            Debug.Log($"[PhaseProtocol] Cleaning up old receiver for PC{idx}");
                             oldReceiver.Dispose();
                             _h265Receivers.Remove(idx);
                         }
@@ -852,30 +855,30 @@ namespace VRWorkspace.Streaming
                             _h265Handlers.Remove(idx);
                         }
 
-                        var receiver = new H265StreamReceiver(idx, w, h);
+                        var receiver = new H265StreamReceiver(idx, w, h, isH264);
                         if (receiver.Start())
                         {
                             _h265Receivers[idx] = receiver;
                             receiver.OnTextureReady += (monIdx, tex) => {
                                 wrapper.Texture = tex;
                                 wrapper.LastFrameTime = DateTime.UtcNow;
-                                
+
                                 if (wrapper.StreamStartTime == DateTime.MinValue)
                                     wrapper.StreamStartTime = DateTime.UtcNow;
 
                                 if (!_streamingStartedFired)
                                 {
-                                    Debug.Log($"[PhaseProtocol] PC{idx} received first frame (H265), firing OnStreamingStarted");
+                                    Debug.Log($"[PhaseProtocol] PC{idx} received first frame ({codecName}), firing OnStreamingStarted");
                                     _stateMachine.TryTransition(ConnectionPhase.Streaming);
                                     HandleStreamingStartedInternal();
                                 }
-                                    
+
                                 OnVideoTextureReceived?.Invoke(monIdx, tex);
                             };
                             // Hook fallback: if decoder never produces frames, switch to H264
                             receiver.OnDecoderFailed += monIdx =>
                             {
-                                Debug.LogError($"[PhaseProtocol] PC{monIdx} H265 decoder failed, triggering fallback");
+                                Debug.LogError($"[PhaseProtocol] PC{monIdx} {codecName} decoder failed, triggering fallback");
                                 OnH265DecoderFailed(monIdx);
                             };
                             receiver.OnKeyframeNeeded += monIdx => RequestKeyframe(monIdx);
@@ -884,15 +887,19 @@ namespace VRWorkspace.Streaming
                                 TaintTrack(monIdx, "luminance corruption detected by decoder");
                             };
 
-                            // Hook into Encoded Transform (Insertable Streams)
-                            try {
-                                var handler = new H265EncodedFrameHandler(receiver);
-                                _h265Handlers[idx] = handler;
-                                e.Transceiver.Receiver.Transform = handler.Transform;
-                                
-                                Debug.Log($"[PhaseProtocol] PC{idx} hooked H265 custom decoder via Encoded Transform (Transform set: {e.Transceiver.Receiver.Transform != null})");
-                            } catch (Exception ex) {
-                                Debug.LogError($"[PhaseProtocol] PC{idx} failed to hook H265 Transform: {ex.Message}");
+                            // Hook into Encoded Transform (H265 only — Unity WebRTC Encoded Transform
+                            // doesn't fire for standard H264 RTP, and H264 video goes via DC anyway)
+                            if (!isH264)
+                            {
+                                try {
+                                    var handler = new H265EncodedFrameHandler(receiver);
+                                    _h265Handlers[idx] = handler;
+                                    e.Transceiver.Receiver.Transform = handler.Transform;
+
+                                    Debug.Log($"[PhaseProtocol] PC{idx} hooked H265 custom decoder via Encoded Transform (Transform set: {e.Transceiver.Receiver.Transform != null})");
+                                } catch (Exception ex) {
+                                    Debug.LogError($"[PhaseProtocol] PC{idx} failed to hook H265 Transform: {ex.Message}");
+                                }
                             }
                         }
                     }
@@ -1253,34 +1260,34 @@ namespace VRWorkspace.Streaming
                     // Capture mid for callback logging
                     var capturedMid = mid;
 
-                    if (_selectedCodec == VideoCodec.H265)
+                    if (_selectedCodec == VideoCodec.H265 || _selectedCodec == VideoCodec.H264)
                     {
-                        // H265 custom decode pipeline
-                        Debug.Log($"[PhaseProtocol] PC{idx} using H265 custom decoder pipeline");
-                        
+                        bool isH264 = _selectedCodec == VideoCodec.H264;
+                        string codecName = isH264 ? "H264" : "H265";
+                        Debug.Log($"[PhaseProtocol] PC{idx} using {codecName} custom decoder pipeline via DataChannel");
+
                         // Initialize receiver with current config dimensions
                         int w = _userConfig?.resolutionWidth ?? 1920;
                         int h = _userConfig?.resolutionHeight ?? 1080;
-                        var receiver = new H265StreamReceiver(idx, w, h);
+                        var receiver = new H265StreamReceiver(idx, w, h, isH264);
                         if (receiver.Start())
                         {
                             _h265Receivers[idx] = receiver;
                             receiver.OnTextureReady += (monIdx, tex) => {
                                 wrapper.Texture = tex;
                                 wrapper.LastFrameTime = DateTime.UtcNow;
-                                
+
                                 if (wrapper.StreamStartTime == DateTime.MinValue)
                                     wrapper.StreamStartTime = DateTime.UtcNow;
 
-                                // Fire OnStreamingStarted on first frame if not already fired
                                 if (!_streamingStartedFired)
                                 {
                                     _streamingStartedFired = true;
-                                    Debug.Log($"[PhaseProtocol] PC{idx} received first frame (H265), firing OnStreamingStarted as backup");
+                                    Debug.Log($"[PhaseProtocol] PC{idx} received first frame ({codecName}), firing OnStreamingStarted as backup");
                                     _stateMachine.TryTransition(ConnectionPhase.Streaming);
                                     OnStreamingStarted?.Invoke();
                                 }
-                                    
+
                                 OnVideoTextureReceived?.Invoke(monIdx, tex);
                             };
                             receiver.OnDecoderFailed += monIdx => OnH265DecoderFailed(monIdx);
@@ -1290,15 +1297,18 @@ namespace VRWorkspace.Streaming
                                 TaintTrack(monIdx, "luminance corruption detected by decoder");
                             };
 
-                            // Hook into Encoded Transform (Insertable Streams)
-                            try {
-                                var handler = new H265EncodedFrameHandler(receiver);
-                                _h265Handlers[idx] = handler;
-                                e.Transceiver.Receiver.Transform = handler.Transform;
-                                
-                                Debug.Log($"[PhaseProtocol] PC{idx} hooked H265 custom decoder via Encoded Transform");
-                            } catch (Exception ex) {
-                                Debug.LogError($"[PhaseProtocol] PC{idx} failed to hook H265 Transform: {ex.Message}");
+                            // Encoded Transform: H265 only (not needed for H264 DC path)
+                            if (!isH264)
+                            {
+                                try {
+                                    var handler = new H265EncodedFrameHandler(receiver);
+                                    _h265Handlers[idx] = handler;
+                                    e.Transceiver.Receiver.Transform = handler.Transform;
+
+                                    Debug.Log($"[PhaseProtocol] PC{idx} hooked H265 custom decoder via Encoded Transform");
+                                } catch (Exception ex) {
+                                    Debug.LogError($"[PhaseProtocol] PC{idx} failed to hook H265 Transform: {ex.Message}");
+                                }
                             }
                         }
                     }

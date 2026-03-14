@@ -31,10 +31,12 @@ namespace VRWorkspace.AI
 
         private bool _isInitialized = false;
 
-        void Start()
-        {
-            InitializeModel();
-        }
+        // Không tự động load model khi Start() — chỉ load khi được gọi tường minh qua InitializeModel()
+        // Tránh block main thread ~1 giây khi khởi động app
+        // void Start()
+        // {
+        //     InitializeModel();
+        // }
 
         public void InitializeModel()
         {

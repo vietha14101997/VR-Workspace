@@ -35,6 +35,7 @@ namespace VRWorkspace.Streaming
 
         // ──────────── Configuration ────────────
         public readonly int MonitorIndex;
+        public readonly bool IsH264;
         public int Width { get; private set; }
         public int Height { get; private set; }
 
@@ -138,11 +139,12 @@ namespace VRWorkspace.Streaming
 
         // ──────────── Constructor ────────────
 
-        public H265StreamReceiver(int monitorIndex, int width, int height)
+        public H265StreamReceiver(int monitorIndex, int width, int height, bool isH264 = false)
         {
             MonitorIndex = monitorIndex;
             Width        = width;
             Height       = height;
+            IsH264       = isH264;
         }
 
         // ──────────── Lifecycle ────────────
@@ -162,10 +164,10 @@ namespace VRWorkspace.Streaming
             }
 #endif
             _decoder = new HevcDecoderPlugin();
-            bool ok = _decoder.Initialize(Width, Height);
+            bool ok = _decoder.Initialize(Width, Height, IsH264);
             if (!ok)
             {
-                Debug.LogError($"{TAG} PC{MonitorIndex} Failed to initialize HevcDecoderPlugin {Width}x{Height}");
+                Debug.LogError($"{TAG} PC{MonitorIndex} Failed to initialize {(IsH264 ? "H264" : "HEVC")} DecoderPlugin {Width}x{Height}");
                 _decoder.Dispose();
                 _decoder = null;
                 return false;

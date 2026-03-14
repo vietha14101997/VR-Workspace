@@ -56,6 +56,9 @@ namespace VRWorkspace.UI.RTT.Components
         private bool _preferenceSaveEnabled = false;  // Guard: only save when dropdowns are properly configured
         private string _usbTetheringIP = null;  // USB Tethering IP from QR scan (for full USB streaming)
         private string _tunnelUrl = null;  // Cloudflare Tunnel URL from QR scan (for zero-config internet)
+        private string _lanServerIP = null;  // LAN IP from QR scan (direct connect without discovery)
+        private int _lanServerPort = 8288;   // LAN port from QR scan
+        private TextMeshProUGUI _lanLabelText; // Reference to LAN label for showing scanned IP
         private const int DEFAULT_PORT = 8288;
         private GameObject _monitorsDropdown;
         private GameObject _modeDropdown;
@@ -283,6 +286,10 @@ namespace VRWorkspace.UI.RTT.Components
             // Update UI with current state
             HandlePhaseChanged(_viewModel.Phase.Value);
 
+            // Start background server discovery immediately (LAN mode)
+            // Results will be cached so Connect button responds instantly
+            StartBackgroundDiscovery();
+
             Debug.Log("[RTTRemoteMenu] Bound to ConnectionViewModel");
         }
         #endregion
@@ -450,6 +457,9 @@ namespace VRWorkspace.UI.RTT.Components
             textTMP.overflowMode = TextOverflowModes.Ellipsis;
             textTMP.raycastTarget = true; // Catches GraphicRaycaster hits
             if (customFont) textTMP.font = customFont;
+
+            // Save LAN label reference for QR IP display
+            if (index == 0) _lanLabelText = textTMP;
 
             // Click handler on label
             var labelBtn = labelObj.AddComponent<UnityEngine.UI.Button>();
@@ -766,6 +776,9 @@ namespace VRWorkspace.UI.RTT.Components
         private void OnDestroy()
         {
             Debug.Log("[RTTRemoteMenu] OnDestroy called - this will stop all coroutines including CreateSidePanelContent!");
+
+            // Stop background discovery
+            StopBackgroundDiscovery();
 
             DisableHorizontalSeparators();
 

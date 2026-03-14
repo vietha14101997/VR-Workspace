@@ -8,13 +8,10 @@ namespace VRWorkspace.VRInput
     using VRWorkspace.UI.Components;
     using VRWorkspace.UI.RTT.Components;
     using VRWorkspace.UI.RTT.Input;
-    using VRWorkspace.MathFilters; // Cho MadgwickAHRS
-    using VRWorkspace.AI;          // Cho DriftDataCollector
     #if UNITY_EDITOR
     using UnityEditor;
     #endif
 
-    [RequireComponent(typeof(VRWorkspace.AI.DriftAIClassifier))]
     public partial class VRGazeReticle : MonoBehaviour
     {
         [Header("Configuration")]
@@ -65,42 +62,17 @@ namespace VRWorkspace.VRInput
         [Range(0.1f, 3f)]
         public float deadZoneThreshold = 0.8f;
 
-        [Header("Drift Correction")]
-        [Tooltip("Cường độ chỉnh drift pitch/roll bằng accelerometer")]
-        [Range(0.01f, 0.5f)]
-        public float driftCorrectionStrength = 0.15f;
-
-        [Tooltip("Bật/tắt chỉnh drift bằng accelerometer")]
-        public bool driftCorrectionEnabled = true;
-
-        [Tooltip("Hệ số lọc low-pass cho accelerometer (thấp = lọc mạnh hơn, ít noise)")]
-        [Range(0.01f, 0.3f)]
-        public float accelFilterAlpha = 0.05f;
-
-        [Tooltip("Cường độ bù yaw drift khi đứng yên")]
-        [Range(0.01f, 0.5f)]
-        public float yawDriftDamping = 0.3f;
-
         [Header("Compass Yaw Correction")]
-        [Tooltip("Bật/tắt chỉnh yaw drift bằng magnetometer (compass)")]
+        [Tooltip("Bật/tắt chỉnh yaw drift bằng compass (cần thiết vì Cardboard XR không dùng compass)")]
         public bool compassCorrectionEnabled = true;
 
         [Tooltip("Cường độ chỉnh yaw theo compass (thấp = mượt hơn, ít giật)")]
-        [Range(0.01f, 0.3f)]
-        public float compassCorrectionStrength = 0.08f;
+        [Range(0.005f, 0.1f)]
+        public float compassCorrectionStrength = 0.02f;
 
-        [Tooltip("Hệ số lọc low-pass cho compass heading (thấp = lọc mạnh hơn)")]
-        [Range(0.01f, 0.2f)]
-        public float compassFilterAlpha = 0.03f;
-        
-        [Header("Madgwick Sensor Fusion")]
-        [Tooltip("Bật/tắt thay thế logic cũ bằng Madgwick AHRS")]
-        public bool useMadgwickFilter = true;
-        [Tooltip("Hệ số bù trừ Beta của Madgwick (cao = tin Accel/Compass nhiều hơn)")]
-        [Range(0.0f, 1.0f)]
-        public float madgwickBeta = 0.1f;
-        [Tooltip("Auto-Record IMU dataset cho AI khi Compass đang tốt")]
-        public bool recordDatasetForAI = false;
+        [Tooltip("Hệ số lọc low-pass cho compass heading (thấp = lọc mạnh, ít nhiễu)")]
+        [Range(0.005f, 0.1f)]
+        public float compassFilterAlpha = 0.02f;
 
         private Image _reticleImage;
         private Camera _cam;
@@ -152,29 +124,14 @@ namespace VRWorkspace.VRInput
         private float _currentSmoothingFactor;
         private bool _stabilizationInitialized = false;
 
-        // Accelerometer low-pass filter state
-        private Vector3 _filteredAccel = Vector3.zero;
-        private bool _accelInitialized = false;
+        // Dead zone lock state
+        private Quaternion _lockedRotation;
+        private bool _isLocked = false;
 
-        // Yaw drift compensation state
-        private float _stationaryYaw;
-        private float _stationaryTimer = 0f;
-        private const float kStationaryLockDelay = 0.15f; // seconds before locking yaw
-
-        // Compass (magnetometer) yaw correction state
+        // Compass yaw correction state
         private bool _compassInitialized = false;
         private float _filteredCompassHeading = 0f;
         private float _compassYawOffset = 0f;
-
-        // Gyro bias estimation state
-        private Vector3 _gyroBiasEstimate = Vector3.zero;
-        private const float kBiasEstimationAlpha = 0.005f;
-        private float _biasEstimationTimer = 0f;
-        
-        // Madgwick & AI
-        private MadgwickAHRS _madgwick;
-        private DriftDataCollector _dataCollector;
-        private DriftAIClassifier _aiClassifier;
 
         // Singleton access helper (optional, or use FindObjectOfType)
         public static VRGazeReticle Instance { get; private set; }
@@ -205,30 +162,13 @@ namespace VRWorkspace.VRInput
             _pointerData = new PointerEventData(EventSystem.current);
             _lastGazeDirection = _cam.transform.forward;
 
-            // Initialize head stabilization
+            // Initialize head stabilization (dead zone + smoothing + compass yaw correction)
             InitializeStabilization();
-            
-            // Khởi tạo hệ thống mới
-            if (useMadgwickFilter)
-            {
-                Input.gyro.enabled = true; // Bắt buộc bật con quay
-                Input.compass.enabled = true; // Bật la bàn
-                Input.location.Start(); // Hardware Android yêu cầu LocationService Start mới cho đọc Magnetometer
-                _madgwick = new MadgwickAHRS(1f / 60f, madgwickBeta);
-                // Khởi tạo hướng đầu tiên
-                _madgwick.Reset(_cam.transform.rotation);
-            }
-            
-            _dataCollector = gameObject.GetComponent<DriftDataCollector>();
-            if (_dataCollector == null)
-            {
-                _dataCollector = gameObject.AddComponent<DriftDataCollector>();
-            }
 
-            _aiClassifier = gameObject.GetComponent<DriftAIClassifier>();
-            if (_aiClassifier == null)
+            // Bật compass cho yaw correction (Cardboard XR không dùng compass nên yaw sẽ drift nếu thiếu)
+            if (compassCorrectionEnabled)
             {
-                _aiClassifier = gameObject.AddComponent<DriftAIClassifier>();
+                Input.compass.enabled = true;
             }
         }
 
@@ -1322,26 +1262,22 @@ namespace VRWorkspace.VRInput
 
         #region Head Stabilization
 
+        /// <summary>
+        /// Approach: Trust Cardboard XR (TrackedPoseDriver) for base rotation.
+        /// Add only: Dead Zone + Adaptive Smoothing + Compass Yaw Correction.
+        /// Compass is needed because Cardboard XR does NOT use magnetometer,
+        /// so yaw will drift over time without an absolute reference.
+        /// </summary>
         void InitializeStabilization()
         {
             if (_cam != null && headStabilizationEnabled)
             {
                 _stabilizedRotation = _cam.transform.rotation;
+                _lockedRotation = _stabilizedRotation;
                 _previousEuler = _cam.transform.eulerAngles;
                 _currentSmoothingFactor = stillSmoothingFactor;
-                _stationaryYaw = _cam.transform.eulerAngles.y;
-                _stationaryTimer = 0f;
-                _accelInitialized = false;
-                _compassInitialized = false;
-                _gyroBiasEstimate = Vector3.zero;
-                _biasEstimationTimer = 0f;
+                _isLocked = false;
                 _stabilizationInitialized = true;
-
-                // Enable compass for yaw drift correction
-                if (compassCorrectionEnabled)
-                {
-                    Input.compass.enabled = true;
-                }
             }
         }
 
@@ -1353,14 +1289,6 @@ namespace VRWorkspace.VRInput
             }
         }
 
-        void OnDisable()
-        {
-            if (compassCorrectionEnabled)
-            {
-                Input.compass.enabled = false;
-            }
-        }
-
         void ApplyHeadStabilization()
         {
             if (_cam == null) return;
@@ -1368,180 +1296,92 @@ namespace VRWorkspace.VRInput
             float dt = Time.deltaTime;
             if (dt <= 0f) return;
 
-            // Get raw rotation from TrackedPoseDriver
+            // Cardboard XR (TrackedPoseDriver) đã set rotation trước LateUpdate
             Quaternion rawRotation = _cam.transform.rotation;
-
-            // Nếu đang dùng Madgwick, áp dụng thuật toán riêng
-            if (useMadgwickFilter)
-            {
-                ApplyMadgwickAHRS(dt);
-                // Vẫn cập nhật last euler cho logic Dwell/Click
-                _previousEuler = _cam.transform.eulerAngles;
-                return;
-            }
-
-            // Calculate angular velocity for adaptive smoothing
             Vector3 currentEuler = rawRotation.eulerAngles;
             Vector3 deltaEuler = DeltaAngles(_previousEuler, currentEuler);
+            float angularSpeed = deltaEuler.magnitude / dt;
 
-            // === GYRO BIAS ESTIMATION: compensate systematic drift ===
-            Vector3 rawAngularVelocity = deltaEuler / dt;
-            Vector3 biasCompensatedDelta = deltaEuler - _gyroBiasEstimate * dt;
-            float angularSpeed = biasCompensatedDelta.magnitude / dt;
-
-            // === DEAD ZONE: Ignore micro-movements (gyroscope noise) ===
-            bool isStationary = angularSpeed < deadZoneThreshold;
-            if (isStationary)
+            // === DEAD ZONE: dưới ngưỡng → khóa camera hoàn toàn ===
+            if (angularSpeed < deadZoneThreshold)
             {
-                _stationaryTimer += dt;
-
-                // Update bias estimate when stationary for > 1s
-                _biasEstimationTimer += dt;
-                if (_biasEstimationTimer > 1f)
+                if (!_isLocked)
                 {
-                    _gyroBiasEstimate = Vector3.Lerp(
-                        _gyroBiasEstimate, rawAngularVelocity, kBiasEstimationAlpha);
+                    _lockedRotation = _stabilizedRotation;
+                    _isLocked = true;
                 }
+
+                // Khi đứng yên, vẫn áp dụng compass correction nhẹ để sửa drift tích lũy
+                if (compassCorrectionEnabled)
+                {
+                    ApplyCompassYawCorrection(ref _lockedRotation, dt);
+                }
+
+                _cam.transform.rotation = _lockedRotation;
             }
             else
             {
-                // Above dead zone - apply adaptive smoothing
-                _stationaryTimer = 0f;
-                _biasEstimationTimer = 0f;
+                // Trên ngưỡng dead zone → user đang quay đầu thật
+                _isLocked = false;
+
                 _currentSmoothingFactor = CalculateAdaptiveSmoothingFactor(angularSpeed);
                 _stabilizedRotation = Quaternion.Slerp(_stabilizedRotation, rawRotation, _currentSmoothingFactor);
+
+                // Compass correction khi di chuyển (nhẹ hơn)
+                if (compassCorrectionEnabled)
+                {
+                    ApplyCompassYawCorrection(ref _stabilizedRotation, dt);
+                }
+
+                _cam.transform.rotation = _stabilizedRotation;
             }
 
-            // === DRIFT CORRECTION (Pitch/Roll via accelerometer) ===
-            if (driftCorrectionEnabled)
-            {
-                ApplyDriftCorrection(ref _stabilizedRotation, isStationary);
-            }
-
-            // === COMPASS YAW CORRECTION (absolute yaw reference) ===
-            bool compassActive = compassCorrectionEnabled && _compassInitialized;
-            if (compassCorrectionEnabled)
-            {
-                ApplyCompassYawCorrection(ref _stabilizedRotation, isStationary, dt);
-            }
-
-            // === YAW DRIFT COMPENSATION (fallback when compass unavailable) ===
-            if (!compassActive && isStationary && _stationaryTimer > kStationaryLockDelay)
-            {
-                ApplyYawDriftCompensation(ref _stabilizedRotation, dt);
-            }
-            else if (!isStationary)
-            {
-                // Update the "intended" yaw while user is actively moving
-                _stationaryYaw = _stabilizedRotation.eulerAngles.y;
-            }
-
-            // Apply stabilized rotation to camera
-            _cam.transform.rotation = _stabilizedRotation;
-
-            // Store for next frame
             _previousEuler = currentEuler;
         }
 
-        void ApplyMadgwickAHRS(float dt)
+        /// <summary>
+        /// Sửa yaw drift bằng compass. Cardboard XR không dùng magnetometer
+        /// nên yaw sẽ trôi dần theo thời gian — compass là tham chiếu tuyệt đối duy nhất cho yaw.
+        /// </summary>
+        void ApplyCompassYawCorrection(ref Quaternion rotation, float dt)
         {
-            if (_madgwick == null) return;
-            _madgwick.SamplePeriod = dt;
-            _madgwick.Beta = madgwickBeta;
-            
-            // Get raw sensor values
-            Vector3 gyro = Input.gyro.rotationRateUnbiased; // rad/s (Trừ Bias có sẵn của HW)
-            if (gyro == Vector3.zero) gyro = Input.gyro.rotationRate; // Fallback nếu chưa trừ bias
+            // Chỉ dùng compass khi dữ liệu đáng tin cậy
+            // headingAccuracy < 0 = invalid, > 45° = quá nhiễu
+            if (Input.compass.headingAccuracy < 0f || Input.compass.headingAccuracy > 45f)
+                return;
 
-            Vector3 accel = Input.acceleration;             // g
-            Vector3 mag = Input.compass.rawVector;          // uT
+            float compassHeading = Input.compass.trueHeading;
 
-            // Fallback 1: Lấy từ XR Subsystem nếu thiết bị VR chiếm quyền cảm biến
-            UnityEngine.XR.InputDevice xrDevice = UnityEngine.XR.InputDevices.GetDeviceAtXRNode(UnityEngine.XR.XRNode.CenterEye);
-            if (xrDevice.isValid)
+            if (!_compassInitialized)
             {
-                if (gyro == Vector3.zero) xrDevice.TryGetFeatureValue(UnityEngine.XR.CommonUsages.deviceAngularVelocity, out gyro);
-                if (accel == Vector3.zero) xrDevice.TryGetFeatureValue(UnityEngine.XR.CommonUsages.deviceAcceleration, out accel);
+                _filteredCompassHeading = compassHeading;
+                _compassYawOffset = Mathf.DeltaAngle(compassHeading, rotation.eulerAngles.y);
+                _compassInitialized = true;
+                return;
             }
 
-            // Fallback 2: Tự tính toán vận tốc xoay (Angular Velocity) dựa trên Tracking Camera (Cực kỳ chính xác vì kính VR lấy trực tiếp từ IMU)
-            if (gyro == Vector3.zero && dt > 0)
+            // Low-pass filter compass (circular) để giảm nhiễu
+            float headingDelta = Mathf.DeltaAngle(_filteredCompassHeading, compassHeading);
+            _filteredCompassHeading += headingDelta * compassFilterAlpha;
+            _filteredCompassHeading = (_filteredCompassHeading % 360f + 360f) % 360f;
+
+            // Yaw kỳ vọng theo compass
+            float expectedYaw = (_filteredCompassHeading + _compassYawOffset) % 360f;
+            if (expectedYaw < 0f) expectedYaw += 360f;
+
+            // Sai lệch giữa camera hiện tại và compass
+            float yawError = Mathf.DeltaAngle(rotation.eulerAngles.y, expectedYaw);
+
+            // Nếu sai lệch > 20° → user đã quay vật lý, re-sync offset
+            if (Mathf.Abs(yawError) > 20f)
             {
-                // Note: DeltaAngles trả về góc Degree, ta cần chuyển sang Radian/s để feed vào AI và Madgwick
-                Vector3 delta = DeltaAngles(_previousEuler, _cam.transform.eulerAngles);
-                gyro = (delta / dt) * Mathf.Deg2Rad;
+                _compassYawOffset = Mathf.DeltaAngle(_filteredCompassHeading, rotation.eulerAngles.y);
+                return;
             }
 
-            // Fallback 3: Tự tính toán trọng lực dựa trên hướng Up của tracking Camera (1g hướng xuống)
-            if (accel == Vector3.zero)
-            {
-                accel = -_cam.transform.up; 
-            }
-            
-            // Check compass reliability
-            float compassAccuracy = Input.compass.headingAccuracy;
-            bool isCompassReliable = (compassAccuracy >= 0f && compassAccuracy <= 45f);
-
-            // Process Sensor Fusion
-            if (compassCorrectionEnabled && isCompassReliable)
-            {
-                // Tính toán Full 9-DOF
-                _madgwick.Update(
-                    gyro.x, gyro.y, gyro.z,
-                    accel.x, accel.y, accel.z,
-                    mag.x, mag.y, mag.z
-                );
-            }
-            else
-            {
-                // La bàn loạn -> Fallback về 6-DOF (Gyro + Accel) - Chấp nhận Yaw bị Drift từ từ
-                _madgwick.UpdateIMU(
-                    gyro.x, gyro.y, gyro.z,
-                    accel.x, accel.y, accel.z
-                );
-            }
-
-            // Calculate stationary state to train AI (AI needs to know when user is actually stopping)
-            float angularSpeed = gyro.magnitude;
-            bool isStationary = angularSpeed < (deadZoneThreshold * Mathf.Deg2Rad);
-            
-            // --- DATA COLLECTION FOR AI ---
-            if (recordDatasetForAI && _dataCollector != null)
-            {
-                if (!_dataCollector.isRecording) _dataCollector.StartRecording();
-                
-                // Mấu chốt: Chỉ lấy nhãn (TargetYawDrift) khi la bàn đáng tin cậy!
-                // Giả lập lượng "tín hiệu trôi gây ra nếu không có Compass".
-                // Bằng cách so sánh Yaw của (6-DOF) với Yaw đã chuẩn hoá của Madgwick.
-                float targetYawDrift = 0f;
-                // (Trong đk thực tế, bạn có thể lấy chênh lệch giữa TrackedPoseDriver và Madgwick filter làm Label Drift)
-                float trackedYaw = _cam.transform.rotation.eulerAngles.y;
-                float madgwickYaw = _madgwick.Quaternion.eulerAngles.y;
-                targetYawDrift = Mathf.DeltaAngle(trackedYaw, madgwickYaw);
-
-                _dataCollector.RecordFrame(gyro, accel, mag, isStationary, targetYawDrift);
-            }
-            else if (!recordDatasetForAI && _dataCollector != null && _dataCollector.isRecording)
-            {
-                _dataCollector.StopRecording();
-            }
-
-            // --- AI INFERENCE (HỖ TRỢ KHI LA BÀN NHIỄU/MẤT TÍN HIỆU) ---
-            if (!isCompassReliable && isStationary && _aiClassifier != null)
-            {
-                // Dự đoán lượng trôi dạt (Yaw Drift) do IMU nhiễu
-                float predictedDriftSpeed = _aiClassifier.PredictYawDrift(gyro, accel, mag);
-                
-                // Trừ bù lượng Drift cho Vector Quaternion của Madgwick (Chỉ bù quanh trục Y)
-                Quaternion compensation = Quaternion.Euler(0f, -predictedDriftSpeed * dt, 0f);
-                _madgwick.Reset(compensation * _madgwick.Quaternion);
-            }
-
-            // Dùng quaternion từ AI/Madgwick gán sang camera
-            // Unity camera Y up, Z forward - Quat từ thuật toán có thể cần mapping axis tuỳ dòng kính
-            // Ở đây tạm thời match trực tiếp (giả định Input.gyro trả đúng hệ toạ độ tay trái)
-            _stabilizedRotation = _madgwick.Quaternion;
-            _cam.transform.rotation = _stabilizedRotation;
+            // Chỉnh yaw từ từ, tránh giật
+            float correction = yawError * compassCorrectionStrength * dt;
+            rotation = Quaternion.AngleAxis(correction, Vector3.up) * rotation;
         }
 
         float CalculateAdaptiveSmoothingFactor(float angularSpeed)
@@ -1551,122 +1391,9 @@ namespace VRWorkspace.VRInput
             if (angularSpeed <= stillThreshold)
                 return stillSmoothingFactor;
 
-            // Smooth interpolation between still and fast thresholds
             float t = (angularSpeed - stillThreshold) / (fastThreshold - stillThreshold);
-            t = t * t * (3f - 2f * t); // SmoothStep for gradual transition
+            t = t * t * (3f - 2f * t); // SmoothStep
             return Mathf.Lerp(stillSmoothingFactor, movingSmoothingFactor, t);
-        }
-
-        void ApplyDriftCorrection(ref Quaternion rotation, bool isStationary)
-        {
-            // Get and filter accelerometer data
-            Vector3 rawAccel = Input.acceleration;
-            float accelMagnitude = rawAccel.magnitude;
-
-            // Only process valid accelerometer readings (near 1g = device not in freefall/fast motion)
-            if (accelMagnitude < 0.8f || accelMagnitude > 1.2f)
-                return;
-
-            // Low-pass filter accelerometer to remove noise
-            if (!_accelInitialized)
-            {
-                _filteredAccel = rawAccel;
-                _accelInitialized = true;
-            }
-            else
-            {
-                _filteredAccel = Vector3.Lerp(_filteredAccel, rawAccel, accelFilterAlpha);
-            }
-
-            // Normalized filtered gravity-up vector
-            Vector3 accelUp = -_filteredAccel.normalized;
-
-            // Get current up from stabilized rotation
-            Vector3 currentUp = rotation * Vector3.up;
-
-            // Calculate pitch/roll correction only (preserve yaw)
-            Quaternion correction = Quaternion.FromToRotation(currentUp, accelUp);
-
-            // Stronger correction when stationary, gentler when moving
-            float strength = isStationary
-                ? driftCorrectionStrength * 2f
-                : driftCorrectionStrength;
-            float correctionStep = strength * Time.deltaTime;
-            rotation = Quaternion.Slerp(Quaternion.identity, correction, correctionStep) * rotation;
-        }
-
-        void ApplyCompassYawCorrection(ref Quaternion rotation, bool isStationary, float dt)
-        {
-            // Skip if compass data unreliable (headingAccuracy < 0 means invalid)
-            // Android returns accuracy in degrees: 0/15/30/45 steps
-            if (Input.compass.headingAccuracy < 0f || Input.compass.headingAccuracy > 45f)
-                return;
-
-            float compassHeading = Input.compass.trueHeading;
-
-            // Low-pass filter compass heading (circular averaging to handle 0/360 wrap)
-            if (!_compassInitialized)
-            {
-                _filteredCompassHeading = compassHeading;
-                // Calculate offset: align compass coordinate system with gyro yaw (normalized to [-180, 180])
-                _compassYawOffset = Mathf.DeltaAngle(compassHeading, rotation.eulerAngles.y);
-                _compassInitialized = true;
-                return;
-            }
-
-            // Circular low-pass filter: use delta angle to avoid 359->1 jump issues
-            float headingDelta = Mathf.DeltaAngle(_filteredCompassHeading, compassHeading);
-            _filteredCompassHeading += headingDelta * compassFilterAlpha;
-            // Normalize to 0-360
-            _filteredCompassHeading = (_filteredCompassHeading % 360f + 360f) % 360f;
-
-            // Expected yaw based on compass + offset
-            float expectedYaw = _filteredCompassHeading + _compassYawOffset;
-            expectedYaw = (expectedYaw % 360f + 360f) % 360f;
-
-            // Calculate yaw error
-            Vector3 euler = rotation.eulerAngles;
-            float yawError = Mathf.DeltaAngle(euler.y, expectedYaw);
-
-            // Only correct reasonable drift (ignore if user physically rotated = large delta)
-            if (Mathf.Abs(yawError) > 20f)
-            {
-                // Large discrepancy: re-sync offset (user likely turned physically)
-                _compassYawOffset = Mathf.DeltaAngle(_filteredCompassHeading, euler.y);
-                return;
-            }
-
-            // Stronger correction when stationary, gentler when moving
-            float strength = isStationary
-                ? compassCorrectionStrength * 2f
-                : compassCorrectionStrength;
-
-            // Use AngleAxis to avoid gimbal lock at extreme pitch angles
-            float correctionAmount = yawError * strength * dt;
-            Quaternion yawCorrection = Quaternion.AngleAxis(correctionAmount, Vector3.up);
-            rotation = yawCorrection * rotation;
-        }
-
-        void ApplyYawDriftCompensation(ref Quaternion rotation, float dt)
-        {
-            // Extract current euler from stabilized rotation
-            Vector3 euler = rotation.eulerAngles;
-            float currentYaw = euler.y;
-
-            // Calculate yaw difference
-            float yawDelta = Mathf.DeltaAngle(currentYaw, _stationaryYaw);
-
-            // Only correct if drift is small enough to be noise (not intentional movement we missed)
-            float absYawDelta = Mathf.Abs(yawDelta);
-            if (absYawDelta > 15f) return;
-
-            // Progressive damping: smaller drift → faster correction (avoid oscillation at large deltas)
-            float progressiveDamping = yawDriftDamping * (1f + 2f * (1f - absYawDelta / 15f));
-
-            // Use AngleAxis to avoid gimbal lock at extreme pitch angles
-            float correction = yawDelta * progressiveDamping * dt;
-            Quaternion yawCorrection = Quaternion.AngleAxis(correction, Vector3.up);
-            rotation = yawCorrection * rotation;
         }
 
         Vector3 DeltaAngles(Vector3 from, Vector3 to)
@@ -1686,19 +1413,10 @@ namespace VRWorkspace.VRInput
             if (_cam != null)
             {
                 _stabilizedRotation = _cam.transform.rotation;
+                _lockedRotation = _stabilizedRotation;
                 _previousEuler = _cam.transform.eulerAngles;
-                _stationaryYaw = _cam.transform.eulerAngles.y;
-                _stationaryTimer = 0f;
-                _accelInitialized = false;
+                _isLocked = false;
                 _compassInitialized = false;
-                _gyroBiasEstimate = Vector3.zero;
-                _biasEstimationTimer = 0f;
-                
-                if (_madgwick != null)
-                {
-                    // Reset lại điểm mốc
-                    _madgwick.Reset(_cam.transform.rotation);
-                }
             }
         }
 

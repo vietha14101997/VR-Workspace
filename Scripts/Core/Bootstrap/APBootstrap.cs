@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 using VRWorkspace.Streaming;
 
 namespace VRWorkspace.Core
@@ -29,17 +30,28 @@ namespace VRWorkspace.Core
     #endif
 
     #if UNITY_ANDROID && !UNITY_EDITOR
-            // Request all permissions at startup (storage, camera, etc.)
-            // This runs before battery optimization to avoid overwhelming user with dialogs
+            // Defer permission requests to avoid blocking startup rendering.
+            // JNI calls (GetAndroidSDKVersion, HasManageExternalStorage, etc.) block main thread.
+            // Wait a few frames so UI renders first, then request permissions in background.
+            StartCoroutine(DeferredPermissionRequest());
+    #endif
+        }
+
+    #if UNITY_ANDROID && !UNITY_EDITOR
+        private IEnumerator DeferredPermissionRequest()
+        {
+            // Wait 3 frames to let Cardboard XR + RTT UI fully initialize and render
+            yield return null;
+            yield return null;
+            yield return null;
+
             AppPermissionManager.Instance?.RequestAllPermissions((allGranted) =>
             {
                 Debug.Log($"[APBootstrap] Permissions complete. All granted: {allGranted}");
-
-                // Request battery optimization exemption after permissions
                 AndroidStreamingHelper.Instance?.RequestDisableBatteryOptimization();
             });
-    #endif
         }
+    #endif
 
         private void InitializePermissionManager()
         {

@@ -68,10 +68,42 @@ namespace VRWorkspace.Core
         }
 
     #if UNITY_ANDROID && !UNITY_EDITOR
+        // Cached SDK version to avoid repeated JNI calls
+        private int _cachedSdkVersion = -1;
+
         private IEnumerator RequestAllPermissionsCoroutine()
         {
-            int sdkVersion = GetAndroidSDKVersion();
+            // === FAST PATH: Skip heavy JNI calls if permissions were already granted ===
+            // PlayerPrefs check is instant (no JNI), avoids 500ms+ of blocking on every startup
+            bool previouslyRequested = PlayerPrefs.GetInt(PREF_PERMISSIONS_REQUESTED, 0) == 1;
+            if (previouslyRequested)
+            {
+                // Permissions were processed before — do a lightweight check
+                // Spread JNI calls across frames to avoid single-frame freeze
+                yield return null; // 1 frame gap
+                _cachedSdkVersion = GetAndroidSDKVersion();
+
+                yield return null; // 1 frame gap
+                HasAllPermissions = CheckAllPermissions();
+
+                if (HasAllPermissions)
+                {
+                    Debug.Log("[PermissionManager] Permissions already granted (fast path)");
+                    OnPermissionsComplete?.Invoke(true);
+                    yield break;
+                }
+                // Permissions were revoked — fall through to full request flow
+                Debug.Log("[PermissionManager] Permissions previously requested but not all granted — re-requesting");
+            }
+
+            // === FULL PATH: First launch or permissions revoked ===
+            // Spread JNI calls across frames
+            yield return null;
+            int sdkVersion = _cachedSdkVersion > 0 ? _cachedSdkVersion : GetAndroidSDKVersion();
+            _cachedSdkVersion = sdkVersion;
             Debug.Log($"[PermissionManager] Starting permission requests for Android SDK {sdkVersion}");
+
+            yield return null; // Let a frame render before camera permission dialog
 
             // Step 1: Request Camera permission (for QR Scanner)
             yield return StartCoroutine(RequestCameraPermission((granted) => {
@@ -81,12 +113,11 @@ namespace VRWorkspace.Core
             // Step 2: Request Storage permissions based on SDK version
             if (sdkVersion >= 30)
             {
-                // Android 11+: Request MANAGE_EXTERNAL_STORAGE for full file access
+                yield return null; // Frame gap before JNI call
                 bool hasFullAccess = HasManageExternalStoragePermission();
 
                 if (!hasFullAccess)
                 {
-                    // Check if user previously declined
                     bool previouslyDeclined = PlayerPrefs.GetInt(PREF_FULL_ACCESS_DECLINED, 0) == 1;
 
                     if (!previouslyDeclined)
@@ -94,11 +125,9 @@ namespace VRWorkspace.Core
                         Debug.Log("[PermissionManager] Requesting MANAGE_EXTERNAL_STORAGE...");
                         OpenManageAllFilesSettings();
 
-                        // Wait for user to return from Settings
                         yield return new WaitForSeconds(0.5f);
 
-                        // Poll for permission grant (user may take time in Settings)
-                        float timeout = 60f; // Wait up to 60 seconds
+                        float timeout = 60f;
                         float elapsed = 0f;
                         while (elapsed < timeout)
                         {
@@ -108,10 +137,8 @@ namespace VRWorkspace.Core
                                 break;
                             }
 
-                            // Check if app is in foreground (user returned from Settings)
                             if (Application.isFocused && elapsed > 2f)
                             {
-                                // User returned but didn't grant permission
                                 Debug.Log("[PermissionManager] User returned without granting full access");
                                 PlayerPrefs.SetInt(PREF_FULL_ACCESS_DECLINED, 1);
                                 PlayerPrefs.Save();
@@ -123,7 +150,6 @@ namespace VRWorkspace.Core
                         }
                     }
 
-                    // If still no full access, request media permissions as fallback (Android 13+)
                     if (!HasManageExternalStoragePermission() && sdkVersion >= 33)
                     {
                         yield return StartCoroutine(RequestMediaPermissions((granted) => {
@@ -134,7 +160,6 @@ namespace VRWorkspace.Core
             }
             else
             {
-                // Android 10 and below: Request legacy storage permissions
                 yield return StartCoroutine(RequestLegacyStoragePermissions((granted) => {
                     // Legacy storage access
                 }));
@@ -145,6 +170,7 @@ namespace VRWorkspace.Core
             PlayerPrefs.Save();
 
             // Final check
+            yield return null; // Frame gap before JNI
             HasAllPermissions = CheckAllPermissions();
             Debug.Log($"[PermissionManager] Permission request complete. All granted: {HasAllPermissions}");
 
