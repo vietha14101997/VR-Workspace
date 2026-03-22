@@ -97,6 +97,10 @@ namespace VRWorkspace.Streaming
         private readonly List<RTCIceCandidateInit> _pendingAudioRemoteCandidates = new();
         private int _pcGeneration; // Incremented on cleanup to guard stale PC callbacks
 
+        // ── First frame tracking ─────────────────────────────────────────────
+        private readonly HashSet<int> _monitorsWithFirstFrame = new HashSet<int>();
+        private bool _allFirstFramesFired;
+
         // ── Frame timing / FPS ────────────────────────────────────────────────
         private long  _serverClockOffset;
         private float _lastServerTargetFps = 60f;
@@ -150,6 +154,10 @@ namespace VRWorkspace.Streaming
         public event Action<int, int>                          OnMonitorIceProgress;
         public event Action<int>                               OnMonitorIceComplete;
         public event Action                                    OnAllMonitorsReady;
+        /// <summary>Fired when a monitor's first frame has been decoded (monitorIndex).</summary>
+        public event Action<int>                               OnMonitorFirstFrame;
+        /// <summary>Fired when ALL monitors have decoded their first frame.</summary>
+        public event Action                                    OnAllMonitorsFirstFrame;
         public event Action                                    OnConnectionHealthCritical;
         public event Action<string[]>                          OnReconnectFailed;
         public event Action                                    OnSessionReconnectRequested;
@@ -401,6 +409,31 @@ namespace VRWorkspace.Streaming
         }
 
         /// <summary>
+        /// Wire first-frame tracking on a receiver. When all monitors decode their first
+        /// frame, fires OnAllMonitorsFirstFrame so UI can safely hide the menu.
+        /// </summary>
+        private void WireFirstFrameTracking(H265StreamReceiver receiver)
+        {
+            receiver.OnFirstFrameDecoded += (monitorIndex) =>
+            {
+                bool allReady;
+                lock (_monitorsWithFirstFrame)
+                {
+                    _monitorsWithFirstFrame.Add(monitorIndex);
+                    allReady = !_allFirstFramesFired && _monitorsWithFirstFrame.Count >= _expectedMonitorCount;
+                    if (allReady) _allFirstFramesFired = true;
+                }
+                Debug.Log($"[PhaseProtocol] Monitor {monitorIndex} first frame decoded ({_monitorsWithFirstFrame.Count}/{_expectedMonitorCount})");
+                OnMonitorFirstFrame?.Invoke(monitorIndex);
+                if (allReady)
+                {
+                    Debug.Log("[PhaseProtocol] ALL monitors have first frame — ready to display");
+                    OnAllMonitorsFirstFrame?.Invoke();
+                }
+            };
+        }
+
+        /// <summary>
         /// Handle desktop idle/active notification from server.
         /// When idle, suppress decode polling and stall detection to save GPU/thermal.
         /// </summary>
@@ -411,8 +444,11 @@ namespace VRWorkspace.Streaming
 
             if (monitor >= 0 && _h265Receivers.TryGetValue(monitor, out var receiver))
             {
+                // Only log on actual state change (avoid spam from rapid ACTIVE↔IDLE transitions)
+                bool wasIdle = receiver.IsDesktopIdle;
                 receiver.IsDesktopIdle = idle;
-                Debug.Log($"[PhaseProtocol] Monitor {monitor} desktop {(idle ? "IDLE" : "ACTIVE")}");
+                if (idle != wasIdle)
+                    Debug.Log($"[PhaseProtocol] Monitor {monitor} desktop {(idle ? "IDLE" : "ACTIVE")}");
             }
         }
 

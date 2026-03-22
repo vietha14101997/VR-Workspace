@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using UnityEngine;
 using TMPro;
 using System.Collections.Generic;
@@ -950,10 +951,42 @@ namespace VRWorkspace.UI.RTT.Controllers
             // Create Remote Taskbar that follows ClusterRig
             CreateRemoteTaskbar();
 
-            // Hide main menu and taskbar when ClusterRig appears
-            HideMainMenuAndTaskbar();
+            // Don't hide menu yet — wait until ALL monitors have their first frame decoded.
+            // This ensures the user sees desktop content on all panels before the menu disappears.
+            // Timeout after 5s to avoid stuck menu if a monitor fails to decode.
+            var vm = ServiceLocator.Get<ConnectionViewModel>();
+            if (vm != null)
+            {
+                bool firstFrameReceived = false;
+                vm.OnAllMonitorsFirstFrame += () =>
+                {
+                    if (firstFrameReceived) return;
+                    firstFrameReceived = true;
+                    Debug.Log("[RTTRemoteMenuController] All monitors have first frame — hiding menu");
+                    HideMainMenuAndTaskbar();
+                };
+                // Safety timeout: hide menu after 5s even if some monitors haven't decoded
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(5000);
+                    if (!firstFrameReceived)
+                    {
+                        firstFrameReceived = true;
+                        VRWorkspace.Core.MainThreadDispatcher.Enqueue(() =>
+                        {
+                            Debug.LogWarning("[RTTRemoteMenuController] Timeout waiting for all first frames — hiding menu anyway");
+                            HideMainMenuAndTaskbar();
+                        });
+                    }
+                });
+            }
+            else
+            {
+                // Fallback: hide immediately if no ViewModel
+                HideMainMenuAndTaskbar();
+            }
 
-            Debug.Log("[RTTRemoteMenuController] ClusterRig created inside RTTMenu - streaming active");
+            Debug.Log("[RTTRemoteMenuController] ClusterRig created inside RTTMenu - waiting for first frames before hiding menu");
         }
 
         /// <summary>

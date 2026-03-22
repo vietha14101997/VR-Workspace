@@ -277,6 +277,17 @@ namespace VRWorkspace.Streaming
                     var timeSinceFrame = (DateTime.UtcNow - wrapper.LastFrameTime).TotalMilliseconds;
                     if (timeSinceFrame > frameGapThreshold && wrapper.FrameCount > 10)
                     {
+                        // Check if server is still sending frames — if not, desktop is idle (not a stall).
+                        // LastNetworkActivityTime is updated when encoded data arrives via DataChannel.
+                        var timeSinceNetwork = (DateTime.UtcNow - wrapper.LastNetworkActivityTime).TotalMilliseconds;
+                        if (timeSinceNetwork > frameGapThreshold)
+                        {
+                            // Server not sending data → desktop idle → not a real stall.
+                            // Reset frame time to prevent gap from growing forever.
+                            wrapper.LastFrameTime = DateTime.UtcNow;
+                            continue;
+                        }
+
                         if ((DateTime.UtcNow - _lastSkipToLiveTime).TotalSeconds >= SkipToLiveCooldownSeconds)
                         {
                             Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} frame gap {timeSinceFrame:F0}ms (threshold={frameGapThreshold:F0}ms) - skip_to_live");
@@ -297,17 +308,36 @@ namespace VRWorkspace.Streaming
                     }
                 }
 
-                // Monitor drift detection
+                // Monitor drift detection — only when both monitors are actively receiving data.
+                // When one monitor is idle (no server data), drift is meaningless.
                 if (_peerConnections.Count > 1 && minFrameTime != DateTime.MaxValue && maxFrameTime != DateTime.MinValue)
                 {
                     var drift = (maxFrameTime - minFrameTime).TotalMilliseconds;
                     if (drift > driftThreshold && laggingMonitor >= 0)
                     {
-                        if ((DateTime.UtcNow - _lastSkipToLiveTime).TotalSeconds >= SkipToLiveCooldownSeconds)
+                        // Check if the lagging monitor is actually receiving data from server.
+                        // If server stopped sending (desktop idle), drift is not a real problem.
+                        bool isLaggingIdle = false;
+                        var laggingWrapper = _peerConnections.FirstOrDefault(w => w.Index == laggingMonitor);
+                        if (laggingWrapper != null)
                         {
-                            Debug.LogWarning($"[PhaseProtocol] Monitor drift: PC{laggingMonitor} is {drift:F0}ms behind (threshold={driftThreshold:F0}ms) - skip_to_live");
+                            var timeSinceNetwork = (DateTime.UtcNow - laggingWrapper.LastNetworkActivityTime).TotalMilliseconds;
+                            if (timeSinceNetwork > driftThreshold)
+                            {
+                                // Server not sending data to this monitor → desktop idle → suppress
+                                laggingWrapper.LastFrameTime = DateTime.UtcNow;
+                                isLaggingIdle = true;
+                            }
                         }
-                        SkipToLive(laggingMonitor);
+
+                        if (!isLaggingIdle)
+                        {
+                            if ((DateTime.UtcNow - _lastSkipToLiveTime).TotalSeconds >= SkipToLiveCooldownSeconds)
+                            {
+                                Debug.LogWarning($"[PhaseProtocol] Monitor drift: PC{laggingMonitor} is {drift:F0}ms behind (threshold={driftThreshold:F0}ms) - skip_to_live");
+                            }
+                            SkipToLive(laggingMonitor);
+                        }
                     }
                 }
             }

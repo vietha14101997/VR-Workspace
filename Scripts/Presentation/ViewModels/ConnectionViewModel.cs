@@ -117,6 +117,8 @@ namespace VRWorkspace.ViewModels
         /// UI should show "Connecting..." and wait for auto-start.
         /// </summary>
         public event Action OnAllMonitorsReady;
+        /// <summary>Fired when ALL monitors have decoded their first frame — safe to hide menu.</summary>
+        public event Action OnAllMonitorsFirstFrame;
 
         /// <summary>
         /// Fired when a remote audio track is received from the server.
@@ -834,8 +836,21 @@ namespace VRWorkspace.ViewModels
             _client.OnMonitorIceComplete += idx =>
             {
                 if (_clientGeneration != subscribedGeneration) return;
-                ReadyMonitorCount.Value = ReadyMonitorCount.Value + 1;
-                Debug.Log($"[ConnectionViewModel] Monitor {idx} ICE complete. Ready: {ReadyMonitorCount.Value}/{TotalMonitorCount.Value}");
+                // Cap at TotalMonitorCount to prevent 3/2, 4/2 on ICE renegotiation
+                int total = TotalMonitorCount.Value;
+                int current = ReadyMonitorCount.Value;
+                if (current < total)
+                {
+                    ReadyMonitorCount.Value = current + 1;
+                    Debug.Log($"[ConnectionViewModel] Monitor {idx} ICE complete. Ready: {ReadyMonitorCount.Value}/{total}");
+                }
+            };
+
+            _client.OnAllMonitorsFirstFrame += () =>
+            {
+                if (_clientGeneration != subscribedGeneration) return;
+                Debug.Log("[ConnectionViewModel] All monitors first frame decoded, firing OnAllMonitorsFirstFrame");
+                OnAllMonitorsFirstFrame?.Invoke();
             };
 
             _client.OnAllMonitorsReady += async () =>

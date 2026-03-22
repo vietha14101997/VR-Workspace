@@ -74,6 +74,12 @@ namespace VRWorkspace.Streaming
         /// </summary>
         public volatile bool IsDesktopIdle;
 
+        /// <summary>Fired once when the first frame is successfully decoded for this monitor.</summary>
+        public event Action<int> OnFirstFrameDecoded;
+
+        // Desktop idle detection: track if server stopped sending new encoded frames
+        private long _lastEncodedCountForStall;
+
         // ──────────── Fallback Detection ────────────
         // If we receive encoded frames but decode nothing for FALLBACK_TRIGGER_SECONDS,
         // fire OnDecoderFailed so the client can request H265→H264 codec downgrade.
@@ -278,6 +284,10 @@ namespace VRWorkspace.Streaming
                 gotFrame = true;
                 _decodedCount++;
 
+                // Fire first-frame event (once) so UI can wait for all monitors to have content
+                if (_decodedCount == 1)
+                    OnFirstFrameDecoded?.Invoke(MonitorIndex);
+
                 // Throttled diagnostic logging to confirm frame output
                 if (_decodedCount % 300 == 0 || _decodedCount < 10)
                 {
@@ -298,6 +308,19 @@ namespace VRWorkspace.Streaming
                 }
 
                 _noFrameTicks++;
+
+                // Desktop idle detection: if server stopped sending frames (EncodedFramesReceived
+                // hasn't increased), the desktop is static — no stall, no keyframe request needed.
+                // The last decoded frame remains displayed correctly.
+                if (_decodedCount > 0 && EncodedFramesReceived == _lastEncodedCountForStall)
+                {
+                    // Server not sending new frames → desktop idle → suppress stall detection
+                    _noFrameTicks = 0;
+                    _keyframeRequested = false;
+                    return;
+                }
+                _lastEncodedCountForStall = EncodedFramesReceived;
+
                 // Request keyframe after ~0.75s stall (45 ticks at 60fps) — fast recovery for corruption
                 if (_noFrameTicks == 45 && !_keyframeRequested && _decodedCount > 0)
                 {
@@ -309,7 +332,7 @@ namespace VRWorkspace.Streaming
                     OnKeyframeNeeded?.Invoke(MonitorIndex);
                 }
 
-                // Log warning every ~3s (180 ticks at 60fps) if decoder has never stalled before
+                // Log warning every ~3s (180 ticks at 60fps)
                 if (_noFrameTicks == 180 || _noFrameTicks == 600 || _noFrameTicks == 1200)
                 {
                     float elapsedSinceStart = (float)(DateTime.UtcNow - _firstEncodedFrameTime).TotalSeconds;

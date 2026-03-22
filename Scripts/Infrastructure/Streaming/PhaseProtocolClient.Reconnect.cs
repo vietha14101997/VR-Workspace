@@ -194,6 +194,7 @@ namespace VRWorkspace.Streaming
                         }
 
                         var receiver = new H265StreamReceiver(idx, w, h, isH264);
+                        WireFirstFrameTracking(receiver);
                         if (receiver.Start())
                         {
                             _h265Receivers[idx] = receiver;

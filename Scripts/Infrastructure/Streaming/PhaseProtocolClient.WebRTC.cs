@@ -106,6 +106,7 @@ namespace VRWorkspace.Streaming
                     }
 
                     var ptReceiver = new H265StreamReceiver(capturedMonitor, w, h, isH264);
+                    WireFirstFrameTracking(ptReceiver);
                     if (ptReceiver.Start())
                     {
                         _h265Receivers[capturedMonitor] = ptReceiver;
@@ -166,6 +167,10 @@ namespace VRWorkspace.Streaming
                                 perTrackWrapper.LastFrameTime = DateTime.UtcNow;
                                 perTrackWrapper.LastNetworkActivityTime = DateTime.UtcNow;
                             }
+                            // Request initial frame from server — ensures display even on idle desktops.
+                            // Server resets InitialFrameSent + forces keyframe for this monitor.
+                            _ = SendTextAsync($"{{\"type\":\"request_initial_frame\",\"monitorIndex\":{capturedMonitor}}}");
+                            Debug.Log($"[PhaseProtocol] Video PC{capturedMonitor} requested initial frame from server");
                         };
                         channel.OnClose = () =>
                             Debug.Log($"[PhaseProtocol] Video PC{capturedMonitor} h265video DC closed (per-track mode)");
@@ -175,6 +180,12 @@ namespace VRWorkspace.Streaming
                         // Also store in _h265VideoChannels for consistency
                         _h265VideoChannels[capturedMonitor] = channel;
                         Debug.Log($"[PhaseProtocol] Video PC{capturedMonitor} h265video DC wired (per-track mode)");
+
+                        // Request initial frame immediately when DC is wired (not OnOpen).
+                        // Unity WebRTC may fire OnOpen BEFORE OnDataChannel callback completes,
+                        // causing OnOpen handler to be missed. Sending here guarantees delivery.
+                        _ = SendTextAsync($"{{\"type\":\"request_initial_frame\",\"monitorIndex\":{capturedMonitor}}}");
+                        Debug.Log($"[PhaseProtocol] Video PC{capturedMonitor} requested initial frame from server");
                     }
                     else
                     {
@@ -712,9 +723,14 @@ namespace VRWorkspace.Streaming
 
                 if (s == RTCIceConnectionState.Connected || s == RTCIceConnectionState.Completed)
                 {
-                    for (int i = 0; i < trackWrappers.Count; i++)
-                        OnMonitorIceComplete?.Invoke(i);
-                    CheckAllMonitorsConnected();
+                    // Only fire ICE complete once — ICE may re-enter Connected/Completed
+                    // state on consent checks, which would duplicate-fire the event.
+                    if (!_allMonitorsReadyFired)
+                    {
+                        for (int i = 0; i < trackWrappers.Count; i++)
+                            OnMonitorIceComplete?.Invoke(i);
+                        CheckAllMonitorsConnected();
+                    }
                 }
                 else if (s == RTCIceConnectionState.Disconnected || s == RTCIceConnectionState.Failed)
                 {
@@ -856,6 +872,7 @@ namespace VRWorkspace.Streaming
                         }
 
                         var receiver = new H265StreamReceiver(idx, w, h, isH264);
+                        WireFirstFrameTracking(receiver);
                         if (receiver.Start())
                         {
                             _h265Receivers[idx] = receiver;
@@ -1270,6 +1287,7 @@ namespace VRWorkspace.Streaming
                         int w = _userConfig?.resolutionWidth ?? 1920;
                         int h = _userConfig?.resolutionHeight ?? 1080;
                         var receiver = new H265StreamReceiver(idx, w, h, isH264);
+                        WireFirstFrameTracking(receiver);
                         if (receiver.Start())
                         {
                             _h265Receivers[idx] = receiver;
