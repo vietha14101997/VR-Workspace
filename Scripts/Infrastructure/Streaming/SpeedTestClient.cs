@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 using Interlocked = System.Threading.Interlocked;
+using VRWorkspace.Core;
 
 namespace VRWorkspace.Streaming
 {
@@ -87,27 +88,27 @@ namespace VRWorkspace.Streaming
         /// </summary>
         public async Task<SpeedTestResult> RunSpeedTestAsync()
         {
-            Debug.Log("[SpeedTest] Client-initiated speed test starting (browser-matched version)...");
+            AppLog.Log("[SpeedTest] Client-initiated speed test starting (browser-matched version)...");
 
             var result = new SpeedTestResult();
 
             // 1. Ping test (5 samples with high-resolution timing)
-            Debug.Log("[SpeedTest] Running ping test...");
+            AppLog.Log("[SpeedTest] Running ping test...");
             await MeasurePingAsync();
             result.PingMs = PingMs;
             result.JitterMs = JitterMs;
-            Debug.Log($"[SpeedTest] Ping: {PingMs:F1}ms, Jitter: {JitterMs:F1}ms");
+            AppLog.Log($"[SpeedTest] Ping: {PingMs:F1}ms, Jitter: {JitterMs:F1}ms");
 
             // Fire event so UI can update immediately
             OnPingJitterResult?.Invoke(PingMs, JitterMs);
 
             // 2. Bandwidth test (4 seconds with warmup)
-            Debug.Log($"[SpeedTest] Running bandwidth test ({SPEED_TEST_DURATION_MS}ms with {WARMUP_PERIOD_MS}ms warmup)...");
+            AppLog.Log($"[SpeedTest] Running bandwidth test ({SPEED_TEST_DURATION_MS}ms with {WARMUP_PERIOD_MS}ms warmup)...");
             var culture = System.Globalization.CultureInfo.InvariantCulture;
             var requestJson = "{\"type\":\"speedtest_request\",\"direction\":\"download\",\"durationMs\":" + SPEED_TEST_DURATION_MS + "}";
             await SendTextAsync(requestJson);
             result.BandwidthMbps = await MeasureDownloadAsync();
-            Debug.Log($"[SpeedTest] Bandwidth: {result.BandwidthMbps:F1} Mbps");
+            AppLog.Log($"[SpeedTest] Bandwidth: {result.BandwidthMbps:F1} Mbps");
 
             // 3. Send final results to server
             var bandwidthStr = result.BandwidthMbps.ToString("F2", culture);
@@ -115,7 +116,7 @@ namespace VRWorkspace.Streaming
             var jitterStr = result.JitterMs.ToString("F2", culture);
             var resultMsg = "{\"type\":\"speedtest_result\",\"bandwidthMbps\":" + bandwidthStr + ",\"pingMs\":" + pingStr + ",\"jitterMs\":" + jitterStr + "}";
             await SendTextAsync(resultMsg);
-            Debug.Log($"[SpeedTest] Sent speedtest_result to server");
+            AppLog.Log($"[SpeedTest] Sent speedtest_result to server");
 
             BandwidthMbps = result.BandwidthMbps;
 
@@ -149,12 +150,12 @@ namespace VRWorkspace.Streaming
                     {
                         var discarded = _pingTimes[_pingTimes.Count - 1];
                         _pingTimes.RemoveAt(_pingTimes.Count - 1);
-                        Debug.Log($"[SpeedTest] Warmup ping {i + 1}: {discarded:F1}ms (discarded)");
+                        AppLog.Log($"[SpeedTest] Warmup ping {i + 1}: {discarded:F1}ms (discarded)");
                     }
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning($"[SpeedTest] Ping sample {i + 1} failed: {ex.Message}");
+                    AppLog.LogWarning($"[SpeedTest] Ping sample {i + 1} failed: {ex.Message}");
                 }
 
                 await Task.Delay(20, _ct);
@@ -182,7 +183,7 @@ namespace VRWorkspace.Streaming
                     JitterMs = jitterSum / (_pingTimes.Count - 1);
                 }
 
-                Debug.Log($"[SpeedTest] Ping stats: {_pingTimes.Count} samples, median={PingMs:F1}ms, jitter={JitterMs:F1}ms, range=[{_pingTimes[0]:F1}-{_pingTimes[_pingTimes.Count - 1]:F1}]ms");
+                AppLog.Log($"[SpeedTest] Ping stats: {_pingTimes.Count} samples, median={PingMs:F1}ms, jitter={JitterMs:F1}ms, range=[{_pingTimes[0]:F1}-{_pingTimes[_pingTimes.Count - 1]:F1}]ms");
             }
         }
 
@@ -241,7 +242,7 @@ namespace VRWorkspace.Streaming
             {
                 // Timeout - calculate from what we received
                 mbps = CalculateBandwidth();
-                Debug.LogWarning($"[SpeedTest] Timeout waiting for speedtest_end, calculated: {mbps:F1} Mbps");
+                AppLog.LogWarning($"[SpeedTest] Timeout waiting for speedtest_end, calculated: {mbps:F1} Mbps");
             }
 
             OnSpeedProgress?.Invoke("bandwidth", mbps, 100);
@@ -314,7 +315,7 @@ namespace VRWorkspace.Streaming
             {
                 if (Interlocked.CompareExchange(ref _measurementStartTicks, now, 0) == 0)
                 {
-                    Debug.Log("[SpeedTest] First byte received - starting warmup...");
+                    AppLog.Log("[SpeedTest] First byte received - starting warmup...");
                 }
                 startTicks = Interlocked.Read(ref _measurementStartTicks);
             }
@@ -329,7 +330,7 @@ namespace VRWorkspace.Streaming
                     _warmupComplete = true;
                     Interlocked.Exchange(ref _measurementStartTicks, now); // Reset timing atomically
                     Interlocked.Exchange(ref _bytesReceived, 0);           // Reset byte count atomically
-                    Debug.Log("[SpeedTest] Warmup complete - starting measurement");
+                    AppLog.Log("[SpeedTest] Warmup complete - starting measurement");
                 }
                 Interlocked.Add(ref _bytesReceived, byteCount); // Atomic add
 
@@ -357,7 +358,7 @@ namespace VRWorkspace.Streaming
             if (!_isRunning) return;
 
             var mbps = CalculateBandwidth();
-            Debug.Log($"[SpeedTest] speedtest_end received - Final: {_bytesReceived} bytes = {mbps:F1} Mbps");
+            AppLog.Log($"[SpeedTest] speedtest_end received - Final: {_bytesReceived} bytes = {mbps:F1} Mbps");
 
             _bandwidthComplete?.TrySetResult(mbps);
         }
@@ -374,7 +375,7 @@ namespace VRWorkspace.Streaming
         public async Task HandleSpeedTestStartAsync(string direction, int chunkSize, int durationMs)
 #pragma warning restore CS1998
         {
-            Debug.Log($"[SpeedTest] Legacy speedtest_start: {direction} (chunk={chunkSize}, duration={durationMs}ms)");
+            AppLog.Log($"[SpeedTest] Legacy speedtest_start: {direction} (chunk={chunkSize}, duration={durationMs}ms)");
 
             _currentDirection = direction;
             _durationMs = durationMs;
@@ -396,7 +397,7 @@ namespace VRWorkspace.Streaming
         /// </summary>
         public void HandleSpeedTestStart(string direction, int chunkSize, int durationMs)
         {
-            Debug.Log($"[SpeedTest] Legacy speedtest_start (sync): {direction}");
+            AppLog.Log($"[SpeedTest] Legacy speedtest_start (sync): {direction}");
 
             _currentDirection = direction;
             _durationMs = durationMs;
@@ -418,8 +419,8 @@ namespace VRWorkspace.Streaming
             _isRunning = false;
             var mbps = CalculateBandwidth();
 
-            Debug.Log($"[SpeedTest] Legacy {direction} complete: {_bytesReceived} bytes = {mbps:F1} Mbps");
-            Debug.Log($"[SpeedTest] Server reported: {serverBytes} bytes in {serverDurationMs}ms");
+            AppLog.Log($"[SpeedTest] Legacy {direction} complete: {_bytesReceived} bytes = {mbps:F1} Mbps");
+            AppLog.Log($"[SpeedTest] Server reported: {serverBytes} bytes in {serverDurationMs}ms");
 
             if (direction == "download")
             {
@@ -436,7 +437,7 @@ namespace VRWorkspace.Streaming
         /// </summary>
         public async Task RunUploadTestAsync(int chunkSize, int durationMs)
         {
-            Debug.Log($"[SpeedTest] Starting upload test (chunk={chunkSize}, duration={durationMs}ms)");
+            AppLog.Log($"[SpeedTest] Starting upload test (chunk={chunkSize}, duration={durationMs}ms)");
 
             _currentDirection = "upload";
             _isRunning = true;
@@ -467,7 +468,7 @@ namespace VRWorkspace.Streaming
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning($"[SpeedTest] Upload error: {ex.Message}");
+                    AppLog.LogWarning($"[SpeedTest] Upload error: {ex.Message}");
                     break;
                 }
             }
@@ -481,7 +482,7 @@ namespace VRWorkspace.Streaming
             var seconds = totalElapsedMs / 1000.0;
             var uploadMbps = seconds > 0 ? (bytesSent * 8.0) / (seconds * 1_000_000) : 0;
 
-            Debug.Log($"[SpeedTest] Upload complete: {bytesSent} bytes in {seconds:F2}s = {uploadMbps:F1} Mbps");
+            AppLog.Log($"[SpeedTest] Upload complete: {bytesSent} bytes in {seconds:F2}s = {uploadMbps:F1} Mbps");
             OnProgress?.Invoke("upload", 100);
         }
 
@@ -496,7 +497,7 @@ namespace VRWorkspace.Streaming
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[SpeedTest] Failed to send pong: {ex.Message}");
+                AppLog.LogWarning($"[SpeedTest] Failed to send pong: {ex.Message}");
             }
         }
 

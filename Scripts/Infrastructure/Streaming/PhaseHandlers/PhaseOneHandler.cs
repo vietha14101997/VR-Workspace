@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using UnityEngine;
+using VRWorkspace.Core;
 
 namespace VRWorkspace.Streaming
 {
@@ -65,7 +66,7 @@ namespace VRWorkspace.Streaming
 
         public async Task HandleHardwareInfoAsync(SimpleJson json)
         {
-            Debug.Log("[Phase1] Received hardware_info");
+            AppLog.Log("[Phase1] Received hardware_info");
 
             var device      = json.GetObject("device");
             var encoder     = json.GetObject("encoder");
@@ -96,8 +97,8 @@ namespace VRWorkspace.Streaming
             HardwareInfo.preferredCodec = encoder?.GetString("preferredCodec") ?? "H264";
             HardwareInfo.supportsHevc   = encoder?.GetBool("supportsHevc")     ?? false;
 
-            Debug.Log($"[Phase1] Server: {HardwareInfo.deviceName}, GPU: {HardwareInfo.gpu} ({HardwareInfo.gpuVramGB}GB)");
-            Debug.Log($"[Phase1] Encoder: {HardwareInfo.encoderType}, HW: {HardwareInfo.hwAccelEnabled}");
+            AppLog.Log($"[Phase1] Server: {HardwareInfo.deviceName}, GPU: {HardwareInfo.gpu} ({HardwareInfo.gpuVramGB}GB)");
+            AppLog.Log($"[Phase1] Encoder: {HardwareInfo.encoderType}, HW: {HardwareInfo.hwAccelEnabled}");
 
             OnHardwareInfoReady?.Invoke(HardwareInfo);
 
@@ -111,7 +112,7 @@ namespace VRWorkspace.Streaming
             // For VR headsets: Screen.currentResolution gives the device display resolution
             int screenWidth = Screen.currentResolution.width;
             int screenHeight = Screen.currentResolution.height;
-            Debug.Log($"[Phase1] Client screen resolution: {screenWidth}x{screenHeight}");
+            AppLog.Log($"[Phase1] Client screen resolution: {screenWidth}x{screenHeight}");
 
             var ackJson       =
                 $"{{\"type\":\"hardware_info_ack\",\"clientCodecs\":{{" +
@@ -124,7 +125,7 @@ namespace VRWorkspace.Streaming
                 $"\"screenHeight\":{screenHeight}" +
                 $"}},\"perTrackPc\":true}}";
             await _send(ackJson);
-            Debug.Log("[Phase1] hardware_info_ack sent");
+            AppLog.Log("[Phase1] hardware_info_ack sent");
 
             _stateMachine.TryTransition(ConnectionPhase.SpeedTesting);
 
@@ -143,7 +144,7 @@ namespace VRWorkspace.Streaming
             var chunkSize  = json.GetInt("chunkSize");
             var durationMs = json.GetInt("durationMs");
 
-            Debug.Log($"[Phase1] speedtest_start: dir={direction}, chunk={chunkSize}, dur={durationMs}ms");
+            AppLog.Log($"[Phase1] speedtest_start: dir={direction}, chunk={chunkSize}, dur={durationMs}ms");
 
             if (_speedTest != null)
                 await _speedTest.HandleSpeedTestStartAsync(direction, chunkSize, durationMs);
@@ -155,7 +156,7 @@ namespace VRWorkspace.Streaming
             var totalBytes = json.GetLong("totalBytes");
             var durationMs = json.GetLong("durationMs");
 
-            Debug.Log($"[Phase1] speedtest_end: dir={direction}, phase={_stateMachine.CurrentPhase}");
+            AppLog.Log($"[Phase1] speedtest_end: dir={direction}, phase={_stateMachine.CurrentPhase}");
 
             _speedTest?.HandleSpeedTestEnd();
             await (_speedTest?.HandleSpeedTestEndAsync(direction, totalBytes, durationMs) ?? Task.CompletedTask);
@@ -166,7 +167,7 @@ namespace VRWorkspace.Streaming
 
         public void HandleNetworkInfo(SimpleJson json)
         {
-            Debug.Log($"[Phase1] network_info received, phase={_stateMachine.CurrentPhase}");
+            AppLog.Log($"[Phase1] network_info received, phase={_stateMachine.CurrentPhase}");
 
             NetworkInfo = new NetworkTestResult
             {
@@ -176,7 +177,7 @@ namespace VRWorkspace.Streaming
                 connectionType  = json.GetString("connectionType") ?? "Unknown"
             };
 
-            Debug.Log($"[Phase1] Network: {NetworkInfo.connectionType}, Ping: {NetworkInfo.pingMs:F1}ms, BW: {NetworkInfo.bandwidthMbps:F0}Mbps");
+            AppLog.Log($"[Phase1] Network: {NetworkInfo.connectionType}, Ping: {NetworkInfo.pingMs:F1}ms, BW: {NetworkInfo.bandwidthMbps:F0}Mbps");
 
             _stateMachine.TryTransition(ConnectionPhase.AwaitingSuggestedConfig);
             OnNetworkInfoReady?.Invoke(NetworkInfo);
@@ -184,7 +185,7 @@ namespace VRWorkspace.Streaming
 
         public void HandleSuggestedConfig(SimpleJson json)
         {
-            Debug.Log($"[Phase1] suggested_config received, phase={_stateMachine.CurrentPhase}");
+            AppLog.Log($"[Phase1] suggested_config received, phase={_stateMachine.CurrentPhase}");
 
             var resolution     = json.GetObject("resolution");
             string connType    = json.GetString("connectionType") ?? "Unknown";
@@ -230,12 +231,12 @@ namespace VRWorkspace.Streaming
                         NetworkInfo.usbVersion                 = usbVersion;
                         NetworkInfo.usbEstimatedBandwidthMbps  = usbBwMbps;
 
-                        Debug.Log($"[Phase1] USB mode activated: latency={usbLatencyMs:F2}ms, ver={usbVersion}, bw={usbBwMbps:F0}Mbps");
+                        AppLog.Log($"[Phase1] USB mode activated: latency={usbLatencyMs:F2}ms, ver={usbVersion}, bw={usbBwMbps:F0}Mbps");
                     }
                 }
                 else
                 {
-                    Debug.LogWarning("[Phase1] networkInfo object is null in suggested_config");
+                    AppLog.LogWarning("[Phase1] networkInfo object is null in suggested_config");
                 }
 
                 OnNetworkInfoReady?.Invoke(NetworkInfo);
@@ -253,12 +254,12 @@ namespace VRWorkspace.Streaming
             // H265 capability gate: if server suggests H265 but device can't decode it, override to H264
             if (SelectedCodec == VideoCodec.H265 && !H265CapabilityTest.IsDeviceCapable())
             {
-                Debug.LogWarning("[Phase1] Server suggested H265 but device failed capability test — overriding to H264");
+                AppLog.LogWarning("[Phase1] Server suggested H265 but device failed capability test — overriding to H264");
                 SelectedCodec = VideoCodec.H264;
                 SuggestedConfig.selectedCodec = "H264";
             }
 
-            Debug.Log($"[Phase1] Suggested: {SuggestedConfig.monitors}mon @ {SuggestedConfig.resolutionWidth}x{SuggestedConfig.resolutionHeight}, {SuggestedConfig.fps}fps, {SuggestedConfig.bitrateKbps}kbps, codec={SuggestedConfig.selectedCodec}, connType={connType}");
+            AppLog.Log($"[Phase1] Suggested: {SuggestedConfig.monitors}mon @ {SuggestedConfig.resolutionWidth}x{SuggestedConfig.resolutionHeight}, {SuggestedConfig.fps}fps, {SuggestedConfig.bitrateKbps}kbps, codec={SuggestedConfig.selectedCodec}, connType={connType}");
 
             // Handle race: suggested_config may arrive while still in SpeedTesting
             var phase = _stateMachine.CurrentPhase;
@@ -282,7 +283,7 @@ namespace VRWorkspace.Streaming
             {
                 if (_isUsbMode)
                 {
-                    Debug.Log("[Phase1] USB Mode: skipping WebSocket speedtest, using server values");
+                    AppLog.Log("[Phase1] USB Mode: skipping WebSocket speedtest, using server values");
 
                     NetworkInfo = new NetworkTestResult
                     {
@@ -318,7 +319,7 @@ namespace VRWorkspace.Streaming
                 };
 
                 OnNetworkInfoReady?.Invoke(NetworkInfo);
-                Debug.Log($"[Phase1] Speed test done: {NetworkInfo.bandwidthMbps:F1}Mbps, {NetworkInfo.pingMs:F1}ms ping, type={networkType}");
+                AppLog.Log($"[Phase1] Speed test done: {NetworkInfo.bandwidthMbps:F1}Mbps, {NetworkInfo.pingMs:F1}ms ping, type={networkType}");
                 _stateMachine.TryTransition(ConnectionPhase.AwaitingSuggestedConfig);
             }
             catch (Exception ex)
@@ -335,7 +336,7 @@ namespace VRWorkspace.Streaming
                 ",\"pingMs\":"   + pingMs.ToString("F1", ci) +
                 ",\"jitterMs\":" + jitterMs.ToString("F1", ci) + "}";
             await _send(json);
-            Debug.Log($"[Phase1] speedtest_result sent: {bwMbps:F1}Mbps, {pingMs:F1}ms");
+            AppLog.Log($"[Phase1] speedtest_result sent: {bwMbps:F1}Mbps, {pingMs:F1}ms");
         }
 
         private static MonitorInfo[] ParseMonitors(System.Collections.Generic.List<SimpleJson> arr)
@@ -374,7 +375,7 @@ namespace VRWorkspace.Streaming
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[Phase1] Network adapter detection failed: {ex.Message}");
+                AppLog.LogWarning($"[Phase1] Network adapter detection failed: {ex.Message}");
             }
             return "Unknown";
         }
@@ -402,11 +403,11 @@ namespace VRWorkspace.Streaming
             try
             {
                 hevcAvailable = Native.HevcDecoderPlugin.IsAvailable();
-                Debug.Log($"[Phase1] HEVC hardware decoder available: {hevcAvailable}");
+                AppLog.Log($"[Phase1] HEVC hardware decoder available: {hevcAvailable}");
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[Phase1] HEVC availability check failed: {ex.Message}");
+                AppLog.LogWarning($"[Phase1] HEVC availability check failed: {ex.Message}");
             }
 #endif
 
@@ -430,11 +431,11 @@ namespace VRWorkspace.Streaming
             {
                 using (var ver = new UnityEngine.AndroidJavaClass("android.os.Build$VERSION"))
                     cap.apiLevel = ver.GetStatic<int>("SDK_INT");
-                Debug.Log($"[Phase1] Android API {cap.apiLevel}, device: {cap.deviceModel}");
+                AppLog.Log($"[Phase1] Android API {cap.apiLevel}, device: {cap.deviceModel}");
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[Phase1] Failed to get Android device info: {ex.Message}");
+                AppLog.LogWarning($"[Phase1] Failed to get Android device info: {ex.Message}");
             }
 #endif
             return cap;

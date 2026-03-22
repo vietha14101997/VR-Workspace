@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using UnityEngine;
+using VRWorkspace.Core;
 
 namespace VRWorkspace.Streaming
 {
@@ -234,7 +235,7 @@ namespace VRWorkspace.Streaming
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[SimpleJson] Parse error: {ex.Message}");
+                AppLog.LogWarning($"[SimpleJson] Parse error: {ex.Message}");
             }
 
             return result;

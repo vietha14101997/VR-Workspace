@@ -1,4 +1,5 @@
 using UnityEngine;
+using VRWorkspace.Core;
 
 namespace VRWorkspace.Streaming
 {

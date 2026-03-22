@@ -9,6 +9,7 @@ using System.Linq;
 using Unity.WebRTC;
 using UnityEngine;
 using VRWorkspace.Native;
+using VRWorkspace.Core;
 
 namespace VRWorkspace.Streaming
 {
@@ -251,7 +252,7 @@ namespace VRWorkspace.Streaming
         {
             _isUsbMode   = isUsb;
             _usbServerIP = serverIP;
-            Debug.Log($"[PhaseProtocol] USB Mode: {_isUsbMode}, Server IP: {_usbServerIP ?? "null"}");
+            AppLog.Log($"[PhaseProtocol] USB Mode: {_isUsbMode}, Server IP: {_usbServerIP ?? "null"}");
         }
 
         private bool ShouldSendIceCandidate(string candidateStr)
@@ -260,7 +261,7 @@ namespace VRWorkspace.Streaming
 
             if (string.IsNullOrEmpty(_usbServerIP))
             {
-                Debug.LogWarning("[PhaseProtocol] USB mode but no server IP set, sending candidate anyway");
+                AppLog.LogWarning("[PhaseProtocol] USB mode but no server IP set, sending candidate anyway");
                 return true;
             }
 
@@ -273,9 +274,9 @@ namespace VRWorkspace.Streaming
             bool   sameSubnet    = serverSubnet == candidateSubnet;
 
             if (!sameSubnet)
-                Debug.Log($"[PhaseProtocol] USB Mode: Filtering non-USB candidate: {candidateIP} (server subnet: {serverSubnet})");
+                AppLog.Log($"[PhaseProtocol] USB Mode: Filtering non-USB candidate: {candidateIP} (server subnet: {serverSubnet})");
             else
-                Debug.Log($"[PhaseProtocol] USB Mode: Allowing USB candidate: {candidateIP}");
+                AppLog.Log($"[PhaseProtocol] USB Mode: Allowing USB candidate: {candidateIP}");
 
             return sameSubnet;
         }
@@ -343,7 +344,7 @@ namespace VRWorkspace.Streaming
                 if (_userConfig != null)
                     _userConfig.selectedCodec = "H264";
 
-                Debug.Log("[PhaseProtocol] Codec switched to H264, notifying server...");
+                AppLog.Log("[PhaseProtocol] Codec switched to H264, notifying server...");
 
                 // 3. Notify server so it can switch encoder from H265→H264
                 if (_ws?.State == System.Net.WebSockets.WebSocketState.Open)
@@ -354,7 +355,7 @@ namespace VRWorkspace.Streaming
                     }
                     catch (Exception ex)
                     {
-                        Debug.LogWarning($"[PhaseProtocol] codec_fallback send failed: {ex.Message}");
+                        AppLog.LogWarning($"[PhaseProtocol] codec_fallback send failed: {ex.Message}");
                     }
                 }
 
@@ -364,12 +365,12 @@ namespace VRWorkspace.Streaming
                 // 5. Wait for server to acknowledge codec switch before reconnecting.
                 //    This prevents the race where the server responds to a stale H265 auto-heal offer
                 //    with an H265 answer, which would then be incorrectly applied to the new H264 PC.
-                Debug.Log("[PhaseProtocol] Waiting for server codec switch ACK before reconnecting...");
+                AppLog.Log("[PhaseProtocol] Waiting for server codec switch ACK before reconnecting...");
                 await Task.Delay(500); // Allow server to process codec_fallback and switch encoder
 
                 // 6. Reconnect entire PeerConnection with H264 codec preferences.
                 //    ReconnectSinglePCAsync() uses _selectedCodec (now H264) in SetCodecPreferences().
-                Debug.Log("[PhaseProtocol] Initiating Single-PC reconnect with H264...");
+                AppLog.Log("[PhaseProtocol] Initiating Single-PC reconnect with H264...");
                 _streamingStartedFired = false;
                 await ReconnectSinglePCAsync();
             }
@@ -393,13 +394,13 @@ namespace VRWorkspace.Streaming
         {
             var codec = json.GetString("codec") ?? "H264";
             var reason = json.GetString("reason") ?? "";
-            Debug.Log($"[PhaseProtocol] Server acknowledged codec switch → {codec} (reason: {reason})");
+            AppLog.Log($"[PhaseProtocol] Server acknowledged codec switch → {codec} (reason: {reason})");
 
             // If server sends codec_switch proactively (e.g. H265 not supported on server hardware),
             // also update our local codec preference.
             if (codec.Equals("H264", StringComparison.OrdinalIgnoreCase) && _selectedCodec == VideoCodec.H265)
             {
-                Debug.Log("[PhaseProtocol] Server-initiated codec downgrade: H265 → H264");
+                AppLog.Log("[PhaseProtocol] Server-initiated codec downgrade: H265 → H264");
                 if (!_h265FallbackTriggered)
                 {
                     _h265FallbackTriggered = true;
@@ -423,11 +424,11 @@ namespace VRWorkspace.Streaming
                     allReady = !_allFirstFramesFired && _monitorsWithFirstFrame.Count >= _expectedMonitorCount;
                     if (allReady) _allFirstFramesFired = true;
                 }
-                Debug.Log($"[PhaseProtocol] Monitor {monitorIndex} first frame decoded ({_monitorsWithFirstFrame.Count}/{_expectedMonitorCount})");
+                AppLog.Log($"[PhaseProtocol] Monitor {monitorIndex} first frame decoded ({_monitorsWithFirstFrame.Count}/{_expectedMonitorCount})");
                 OnMonitorFirstFrame?.Invoke(monitorIndex);
                 if (allReady)
                 {
-                    Debug.Log("[PhaseProtocol] ALL monitors have first frame — ready to display");
+                    AppLog.Log("[PhaseProtocol] ALL monitors have first frame — ready to display");
                     OnAllMonitorsFirstFrame?.Invoke();
                 }
             };
@@ -448,7 +449,7 @@ namespace VRWorkspace.Streaming
                 bool wasIdle = receiver.IsDesktopIdle;
                 receiver.IsDesktopIdle = idle;
                 if (idle != wasIdle)
-                    Debug.Log($"[PhaseProtocol] Monitor {monitor} desktop {(idle ? "IDLE" : "ACTIVE")}");
+                    AppLog.Log($"[PhaseProtocol] Monitor {monitor} desktop {(idle ? "IDLE" : "ACTIVE")}");
             }
         }
 
@@ -461,7 +462,7 @@ namespace VRWorkspace.Streaming
         {
             if (_stateMachine.IsConnected)
             {
-                Debug.LogWarning("[PhaseProtocol] Already connected");
+                AppLog.LogWarning("[PhaseProtocol] Already connected");
                 return;
             }
 
@@ -472,7 +473,7 @@ namespace VRWorkspace.Streaming
             if (!serverUrl.Contains("protocol="))
                 serverUrl += serverUrl.Contains("?") ? "&protocol=v2" : "?protocol=v2";
 
-            Debug.Log($"[PhaseProtocol] Connecting to {serverUrl}");
+            AppLog.Log($"[PhaseProtocol] Connecting to {serverUrl}");
             _stateMachine.TryTransition(ConnectionPhase.Connecting);
 
             try
@@ -483,7 +484,7 @@ namespace VRWorkspace.Streaming
                 using var connectLinked = CancellationTokenSource.CreateLinkedTokenSource(ct, connectTimeout.Token);
                 await _ws.ConnectAsync(new Uri(serverUrl), connectLinked.Token);
 
-                Debug.Log("[PhaseProtocol] WebSocket connected, waiting for hardware_info");
+                AppLog.Log("[PhaseProtocol] WebSocket connected, waiting for hardware_info");
                 _stateMachine.TryTransition(ConnectionPhase.AwaitingHardwareInfo);
 
                 // Speed test client (shared between WebSocket and Phase1Handler)
@@ -525,7 +526,7 @@ namespace VRWorkspace.Streaming
                     if (enablePerTrack)
                     {
                         SetPerTrackPcMode(true);
-                        Debug.Log($"[PhaseProtocol] PerTrackPcMode enabled (H265 + {monitors.Count} monitors)");
+                        AppLog.Log($"[PhaseProtocol] PerTrackPcMode enabled (H265 + {monitors.Count} monitors)");
                     }
 
                     OnConfigComplete?.Invoke(monitors);
@@ -556,7 +557,7 @@ namespace VRWorkspace.Streaming
 
                     string msg = $"{{\"type\":\"video_candidate\",\"monitorIndex\":{monitorIndex},\"candidate\":\"{EscapeJsonString(rawCandidate)}\"}}";
                     _ = SendTextAsync(msg);
-                    Debug.Log($"[PhaseProtocol] Sent video_candidate for monitor {monitorIndex}");
+                    AppLog.Log($"[PhaseProtocol] Sent video_candidate for monitor {monitorIndex}");
                 };
 
                 // ── Start loops ───────────────────────────────────────────────
@@ -607,11 +608,11 @@ namespace VRWorkspace.Streaming
         /// </summary>
         public async Task ProceedToPhase2Async(StreamingConfig config)
         {
-            Debug.Log($"[PhaseProtocol] ProceedToPhase2Async, phase={_stateMachine.CurrentPhase}");
+            AppLog.Log($"[PhaseProtocol] ProceedToPhase2Async, phase={_stateMachine.CurrentPhase}");
 
             if (!_stateMachine.IsInPhase(ConnectionPhase.ConfiguringSettings))
             {
-                Debug.LogWarning($"[PhaseProtocol] Cannot proceed to Phase 2 from {_stateMachine.CurrentPhase}");
+                AppLog.LogWarning($"[PhaseProtocol] Cannot proceed to Phase 2 from {_stateMachine.CurrentPhase}");
                 return;
             }
 
@@ -633,11 +634,11 @@ namespace VRWorkspace.Streaming
 
             if (!canStart && !force)
             {
-                Debug.LogWarning($"[PhaseProtocol] Cannot start streaming from {phase}");
+                AppLog.LogWarning($"[PhaseProtocol] Cannot start streaming from {phase}");
                 return;
             }
 
-            Debug.Log("[PhaseProtocol] Starting streaming (Phase 3)");
+            AppLog.Log("[PhaseProtocol] Starting streaming (Phase 3)");
             _stateMachine.TryTransition(ConnectionPhase.StartingStream);
             await SendTextAsync("{\"type\":\"start_streaming\"}");
         }
@@ -647,7 +648,7 @@ namespace VRWorkspace.Streaming
         /// </summary>
         public async Task StopAsync()
         {
-            Debug.Log("[PhaseProtocol] Stopping...");
+            AppLog.Log("[PhaseProtocol] Stopping...");
             _isIntentionalDisconnect = true;
 
             try
@@ -676,7 +677,7 @@ namespace VRWorkspace.Streaming
 
         public async Task PauseStreamingAsync()
         {
-            if (_ws?.State != WebSocketState.Open) { Debug.LogWarning("[PhaseProtocol] PauseStreaming skipped: WebSocket not open"); return; }
+            if (_ws?.State != WebSocketState.Open) { AppLog.LogWarning("[PhaseProtocol] PauseStreaming skipped: WebSocket not open"); return; }
             _isStreamingPaused = true;
             // Propagate pause to H265 receivers to suppress stall detection
             foreach (var r in _h265Receivers.Values) r.IsPaused = true;
@@ -685,7 +686,7 @@ namespace VRWorkspace.Streaming
 
         public async Task ResumeStreamingAsync()
         {
-            if (_ws?.State != WebSocketState.Open) { Debug.LogWarning("[PhaseProtocol] ResumeStreaming skipped: WebSocket not open"); return; }
+            if (_ws?.State != WebSocketState.Open) { AppLog.LogWarning("[PhaseProtocol] ResumeStreaming skipped: WebSocket not open"); return; }
             _isStreamingPaused = false;
             // Propagate resume to H265 receivers
             foreach (var r in _h265Receivers.Values) r.IsPaused = false;
@@ -694,25 +695,25 @@ namespace VRWorkspace.Streaming
 
         public async Task PauseMonitorAsync(int monitorIndex)
         {
-            if (_ws?.State != WebSocketState.Open) { Debug.LogWarning("[PhaseProtocol] PauseMonitor skipped: WebSocket not open"); return; }
+            if (_ws?.State != WebSocketState.Open) { AppLog.LogWarning("[PhaseProtocol] PauseMonitor skipped: WebSocket not open"); return; }
             await _phase3.PauseMonitorAsync(monitorIndex);
         }
 
         public async Task ResumeMonitorAsync(int monitorIndex)
         {
-            if (_ws?.State != WebSocketState.Open) { Debug.LogWarning("[PhaseProtocol] ResumeMonitor skipped: WebSocket not open"); return; }
+            if (_ws?.State != WebSocketState.Open) { AppLog.LogWarning("[PhaseProtocol] ResumeMonitor skipped: WebSocket not open"); return; }
             await _phase3.ResumeMonitorAsync(monitorIndex);
         }
 
         public async void RequestKeyframe(int monitorIndex = -1)
         {
-            if (_ws?.State != WebSocketState.Open) { Debug.LogWarning($"[PhaseProtocol] RequestKeyframe skipped: ws={_ws?.State}"); return; }
+            if (_ws?.State != WebSocketState.Open) { AppLog.LogWarning($"[PhaseProtocol] RequestKeyframe skipped: ws={_ws?.State}"); return; }
             await _phase3.RequestKeyframeAsync(monitorIndex);
         }
 
         public async void SkipToLive(int monitorIndex = -1)
         {
-            if (_ws?.State != WebSocketState.Open) { Debug.LogWarning($"[PhaseProtocol] SkipToLive skipped: ws={_ws?.State}"); return; }
+            if (_ws?.State != WebSocketState.Open) { AppLog.LogWarning($"[PhaseProtocol] SkipToLive skipped: ws={_ws?.State}"); return; }
 
             // Cooldown guard
             if ((DateTime.UtcNow - _lastSkipToLiveTime).TotalSeconds < SkipToLiveCooldownSeconds)
@@ -723,7 +724,7 @@ namespace VRWorkspace.Streaming
             _skipCountResetTime = DateTime.UtcNow;
 
             if (_consecutiveSkipCount >= SKIP_COUNT_THRESHOLD)
-                Debug.LogWarning($"[PhaseProtocol] skip_to_live frequency high ({_consecutiveSkipCount} in 30s), cooldown={SkipToLiveCooldownSeconds:F1}s");
+                AppLog.LogWarning($"[PhaseProtocol] skip_to_live frequency high ({_consecutiveSkipCount} in 30s), cooldown={SkipToLiveCooldownSeconds:F1}s");
 
             await _phase3.SkipToLiveAsync(monitorIndex);
         }
@@ -732,7 +733,7 @@ namespace VRWorkspace.Streaming
 
         public async Task UpdateConfigAsync(int? fps, int? resolutionHeight)
         {
-            if (_ws?.State != WebSocketState.Open) { Debug.LogWarning($"[PhaseProtocol] UpdateConfigAsync skipped: ws={_ws?.State}"); return; }
+            if (_ws?.State != WebSocketState.Open) { AppLog.LogWarning($"[PhaseProtocol] UpdateConfigAsync skipped: ws={_ws?.State}"); return; }
             await _phase3.UpdateConfigAsync(fps, resolutionHeight);
         }
 
@@ -756,7 +757,7 @@ namespace VRWorkspace.Streaming
                     }
                     catch (OperationCanceledException) when (!ct.IsCancellationRequested)
                     {
-                        Debug.LogWarning("[PhaseProtocol] Receive timeout – checking connection health");
+                        AppLog.LogWarning("[PhaseProtocol] Receive timeout – checking connection health");
                         if (_missedPongCount > 0)
                         {
                             Debug.LogError("[PhaseProtocol] Connection appears dead – triggering reconnect");
@@ -767,7 +768,7 @@ namespace VRWorkspace.Streaming
 
                     if (first.MessageType == WebSocketMessageType.Close)
                     {
-                        Debug.Log("[PhaseProtocol] WebSocket closed by server");
+                        AppLog.Log("[PhaseProtocol] WebSocket closed by server");
                         _stateMachine.ForceTransition(ConnectionPhase.Disconnected);
                         OnDisconnected?.Invoke();
                         return;
@@ -805,7 +806,7 @@ namespace VRWorkspace.Streaming
             }
             catch (OperationCanceledException)
             {
-                Debug.Log("[PhaseProtocol] Receive loop cancelled");
+                AppLog.Log("[PhaseProtocol] Receive loop cancelled");
             }
             catch (Exception ex)
             {
@@ -820,12 +821,12 @@ namespace VRWorkspace.Streaming
         private async Task HandleTextMessageAsync(string text)
         {
             if (VerboseLogging && !text.Contains("cursor_position"))
-                Debug.Log($"[PhaseProtocol] Received: {text.Substring(0, Math.Min(100, text.Length))}...");
+                AppLog.Log($"[PhaseProtocol] Received: {text.Substring(0, Math.Min(100, text.Length))}...");
 
             // cursor_image has a raw-parse fast path (avoid base64 corruption via SimpleJson)
             if (text.Contains("\"type\":\"cursor_image\"") || text.Contains("\"Type\":\"cursor_image\""))
             {
-                if (VerboseLogging) Debug.Log($"[PhaseProtocol] cursor_image RAW message length: {text.Length}");
+                if (VerboseLogging) AppLog.Log($"[PhaseProtocol] cursor_image RAW message length: {text.Length}");
                 HandleCursorImageRaw(text);
                 return;
             }
@@ -899,14 +900,14 @@ namespace VRWorkspace.Streaming
                             if (_perTrackPcMode)
                                 _ = HandleVideoOfferMessageAsync(json);
                             else
-                                Debug.LogWarning("[PhaseProtocol] video_offer received but perTrackPcMode=false, ignoring");
+                                AppLog.LogWarning("[PhaseProtocol] video_offer received but perTrackPcMode=false, ignoring");
                             break;
 
                         case "video_candidate":
                             if (_perTrackPcMode)
                                 HandleVideoCandidate(json);
                             else
-                                Debug.LogWarning("[PhaseProtocol] video_candidate received but perTrackPcMode=false, ignoring");
+                                AppLog.LogWarning("[PhaseProtocol] video_candidate received but perTrackPcMode=false, ignoring");
                             break;
 
                         // ── Phase 3 ──────────────────────────────────────────
@@ -973,24 +974,24 @@ namespace VRWorkspace.Streaming
                             {
                                 string? codec = json.GetString("suggestedCodec");
                                 string? reason = json.GetString("reason");
-                                Debug.LogWarning($"[PhaseProtocol] Server requested reconnect (type={type}, reason={reason}, suggested={codec})");
+                                AppLog.LogWarning($"[PhaseProtocol] Server requested reconnect (type={type}, reason={reason}, suggested={codec})");
                                 _ = ReconnectSessionAsync(codec);
                             }
                             break;
 
                         case null:
                         case "":
-                            Debug.LogWarning($"[PhaseProtocol] Empty/null type! Raw: {text.Substring(0, Math.Min(300, text.Length))}");
+                            AppLog.LogWarning($"[PhaseProtocol] Empty/null type! Raw: {text.Substring(0, Math.Min(300, text.Length))}");
                             break;
 
                         default:
-                            Debug.LogWarning($"[PhaseProtocol] Unknown message type: '{type}'");
+                            AppLog.LogWarning($"[PhaseProtocol] Unknown message type: '{type}'");
                             break;
                     }
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning($"[PhaseProtocol] JSON parse failed: {ex.Message}");
+                    AppLog.LogWarning($"[PhaseProtocol] JSON parse failed: {ex.Message}");
                 }
             }
             else if (text.Equals("ping", StringComparison.OrdinalIgnoreCase))
@@ -1040,7 +1041,7 @@ namespace VRWorkspace.Streaming
                 return;
             }
 
-            Debug.Log($"[PhaseProtocol] Received video_offer for monitor {monitorIndex} (sdp.len={offerSdp.Length})");
+            AppLog.Log($"[PhaseProtocol] Received video_offer for monitor {monitorIndex} (sdp.len={offerSdp.Length})");
 
             try
             {
@@ -1057,7 +1058,7 @@ namespace VRWorkspace.Streaming
 
                 string response = $"{{\"type\":\"video_answer\",\"monitorIndex\":{monitorIndex},\"sdp\":\"{EscapeJsonString(answerSdp)}\"}}";
                 await SendTextAsync(response);
-                Debug.Log($"[PhaseProtocol] Sent video_answer for monitor {monitorIndex}");
+                AppLog.Log($"[PhaseProtocol] Sent video_answer for monitor {monitorIndex}");
             }
             catch (Exception ex)
             {
@@ -1077,7 +1078,7 @@ namespace VRWorkspace.Streaming
 
             if (string.IsNullOrEmpty(candidateStr))
             {
-                Debug.LogWarning($"[PhaseProtocol] video_candidate for monitor {monitorIndex} has empty candidate");
+                AppLog.LogWarning($"[PhaseProtocol] video_candidate for monitor {monitorIndex} has empty candidate");
                 return;
             }
 
@@ -1093,7 +1094,7 @@ namespace VRWorkspace.Streaming
                 sdpMid        = "0"
             });
             AddVideoIceCandidate(monitorIndex, iceCandidate);
-            Debug.Log($"[PhaseProtocol] Applied video_candidate for monitor {monitorIndex}");
+            AppLog.Log($"[PhaseProtocol] Applied video_candidate for monitor {monitorIndex}");
         }
 
         // ── Legacy message handler ─────────────────────────────────────────────
@@ -1105,7 +1106,7 @@ namespace VRWorkspace.Streaming
                 var rest = text.Substring(10);
                 if (int.TryParse(rest.Trim(), out int monIdx))
                 {
-                    Debug.Log($"[PhaseProtocol] Server requested reconnect for monitor {monIdx}");
+                    AppLog.Log($"[PhaseProtocol] Server requested reconnect for monitor {monIdx}");
                     await ReconnectMonitorAsync(monIdx);
                 }
                 return;
@@ -1164,7 +1165,7 @@ namespace VRWorkspace.Streaming
                     {
                         _missedPongCount++;
                         _metrics.RecordMissedPong();
-                        Debug.LogWarning($"[PhaseProtocol] Pong timeout! {timeSinceLastPong}ms, missed={_missedPongCount}");
+                        AppLog.LogWarning($"[PhaseProtocol] Pong timeout! {timeSinceLastPong}ms, missed={_missedPongCount}");
 
                         if (_missedPongCount >= MAX_MISSED_PONGS)
                         {
@@ -1174,7 +1175,7 @@ namespace VRWorkspace.Streaming
                             // working connection once Phase 3 starts.
                             if (_stateMachine.IsInPhase2)
                             {
-                                Debug.LogWarning("[PhaseProtocol] Pong timeout during Phase 2 (server busy with display setup) – skipping reconnect");
+                                AppLog.LogWarning("[PhaseProtocol] Pong timeout during Phase 2 (server busy with display setup) – skipping reconnect");
                             }
                             else
                             {
@@ -1200,7 +1201,7 @@ namespace VRWorkspace.Streaming
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning($"[PhaseProtocol] Keepalive error: {ex.Message}");
+                    AppLog.LogWarning($"[PhaseProtocol] Keepalive error: {ex.Message}");
                 }
 
                 await Task.Delay(PING_INTERVAL_MS, ct);
@@ -1224,7 +1225,7 @@ namespace VRWorkspace.Streaming
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[PhaseProtocol] Send error: {ex.Message}");
+                AppLog.LogWarning($"[PhaseProtocol] Send error: {ex.Message}");
             }
         }
 
@@ -1276,12 +1277,12 @@ namespace VRWorkspace.Streaming
             }
 
             if (removedCount > 0)
-                Debug.Log($"[PhaseProtocol] FixSdp: Removed {removedCount} embedded ICE candidates");
+                AppLog.Log($"[PhaseProtocol] FixSdp: Removed {removedCount} embedded ICE candidates");
 
             var result = string.Join("\r\n", processed);
             if (!result.EndsWith("\r\n")) result += "\r\n";
 
-            Debug.Log($"[PhaseProtocol] FixSdp: {processed.Count} lines, {result.Length} chars");
+            AppLog.Log($"[PhaseProtocol] FixSdp: {processed.Count} lines, {result.Length} chars");
             return result;
         }
 

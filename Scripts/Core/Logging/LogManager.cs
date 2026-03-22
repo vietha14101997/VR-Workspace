@@ -46,7 +46,7 @@ namespace VRWorkspace.Core
             #if UNITY_EDITOR
             Debug.unityLogger.filterLogType = LogType.Log; // Show all logs in editor
             #else
-            Debug.unityLogger.filterLogType = LogType.Log; // Show only errors in production
+            Debug.unityLogger.filterLogType = LogType.Error; // Show only errors in production
             #endif
         }
 

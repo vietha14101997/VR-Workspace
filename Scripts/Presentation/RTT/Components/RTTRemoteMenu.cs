@@ -453,7 +453,7 @@ namespace VRWorkspace.UI.RTT.Components
             textTMP.alignment = TextAlignmentOptions.Left;
             textTMP.verticalAlignment = VerticalAlignmentOptions.Middle;
             textTMP.fontStyle = FontStyles.Bold;
-            textTMP.enableWordWrapping = false;
+            textTMP.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
             textTMP.overflowMode = TextOverflowModes.Ellipsis;
             textTMP.raycastTarget = true; // Catches GraphicRaycaster hits
             if (customFont) textTMP.font = customFont;

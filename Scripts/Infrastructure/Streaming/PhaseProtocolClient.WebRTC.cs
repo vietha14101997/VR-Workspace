@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Unity.WebRTC;
 using UnityEngine;
+using VRWorkspace.Core;
 
 namespace VRWorkspace.Streaming
 {
@@ -35,7 +36,7 @@ namespace VRWorkspace.Streaming
         public void SetPerTrackPcMode(bool enabled)
         {
             _perTrackPcMode = enabled;
-            Debug.Log($"[PhaseProtocol] PerTrackPcMode set to: {enabled}");
+            AppLog.Log($"[PhaseProtocol] PerTrackPcMode set to: {enabled}");
         }
 
         /// <summary>
@@ -54,7 +55,7 @@ namespace VRWorkspace.Streaming
 
             try
             {
-                Debug.Log($"[PhaseProtocol] HandleVideoOfferAsync: monitorIndex={monitorIndex}, sdp.Length={offerSdp?.Length ?? 0}");
+                AppLog.Log($"[PhaseProtocol] HandleVideoOfferAsync: monitorIndex={monitorIndex}, sdp.Length={offerSdp?.Length ?? 0}");
 
                 // Close existing video PC for this monitor if any
                 if (_videoPcs.TryGetValue(monitorIndex, out var oldVpc))
@@ -66,7 +67,7 @@ namespace VRWorkspace.Streaming
                 // Create new PeerConnection (LAN mode, no STUN)
                 var cfg = new RTCConfiguration { iceServers = new RTCIceServer[0] };
                 var videoPc = new RTCPeerConnection(ref cfg);
-                Debug.Log($"[PhaseProtocol] Video PC created for monitor {monitorIndex}");
+                AppLog.Log($"[PhaseProtocol] Video PC created for monitor {monitorIndex}");
 
                 // Wire ICE candidate → fire OnVideoIceCandidate event
                 int capturedMonitor = monitorIndex;
@@ -79,7 +80,7 @@ namespace VRWorkspace.Streaming
                 videoPc.OnIceConnectionChange = s =>
                 {
                     if (s == RTCIceConnectionState.Failed || s == RTCIceConnectionState.Disconnected)
-                        Debug.LogWarning($"[PhaseProtocol] Video PC{capturedMonitor} ICE state: {s}");
+                        AppLog.LogWarning($"[PhaseProtocol] Video PC{capturedMonitor} ICE state: {s}");
                 };
 
                 // ── Per-track H265 receiver: create BEFORE DC opens so frames are never lost ──
@@ -125,7 +126,7 @@ namespace VRWorkspace.Streaming
                             if (!_streamingStartedFired)
                             {
                                 _streamingStartedFired = true;
-                                Debug.Log($"[PhaseProtocol] Video PC{monIdx} first frame (per-track H265), firing OnStreamingStarted");
+                                AppLog.Log($"[PhaseProtocol] Video PC{monIdx} first frame (per-track H265), firing OnStreamingStarted");
                                 _stateMachine.TryTransition(ConnectionPhase.Streaming);
                                 HandleStreamingStartedInternal();
                             }
@@ -142,7 +143,7 @@ namespace VRWorkspace.Streaming
                         {
                             TaintTrack(monIdx, "luminance corruption detected by per-track decoder");
                         };
-                        Debug.Log($"[PhaseProtocol] Video PC{capturedMonitor} H265 receiver created (per-track mode, {w}x{h})");
+                        AppLog.Log($"[PhaseProtocol] Video PC{capturedMonitor} H265 receiver created (per-track mode, {w}x{h})");
                     }
                     else
                     {
@@ -153,14 +154,14 @@ namespace VRWorkspace.Streaming
                 // Wire OnDataChannel — server creates the h265video DC on its side (it holds the offer)
                 videoPc.OnDataChannel = channel =>
                 {
-                    Debug.Log($"[PhaseProtocol] Video PC{capturedMonitor} server DataChannel: label={channel.Label}");
+                    AppLog.Log($"[PhaseProtocol] Video PC{capturedMonitor} server DataChannel: label={channel.Label}");
 
                     string expectedLabel = $"h265video-{capturedMonitor}";
                     if (channel.Label == expectedLabel)
                     {
                         channel.OnOpen = () =>
                         {
-                            Debug.Log($"[PhaseProtocol] Video PC{capturedMonitor} h265video DC opened (per-track mode)");
+                            AppLog.Log($"[PhaseProtocol] Video PC{capturedMonitor} h265video DC opened (per-track mode)");
                             // Initialize LastFrameTime so auto-heal doesn't fire prematurely
                             if (perTrackWrapper != null)
                             {
@@ -170,26 +171,26 @@ namespace VRWorkspace.Streaming
                             // Request initial frame from server — ensures display even on idle desktops.
                             // Server resets InitialFrameSent + forces keyframe for this monitor.
                             _ = SendTextAsync($"{{\"type\":\"request_initial_frame\",\"monitorIndex\":{capturedMonitor}}}");
-                            Debug.Log($"[PhaseProtocol] Video PC{capturedMonitor} requested initial frame from server");
+                            AppLog.Log($"[PhaseProtocol] Video PC{capturedMonitor} requested initial frame from server");
                         };
                         channel.OnClose = () =>
-                            Debug.Log($"[PhaseProtocol] Video PC{capturedMonitor} h265video DC closed (per-track mode)");
+                            AppLog.Log($"[PhaseProtocol] Video PC{capturedMonitor} h265video DC closed (per-track mode)");
                         channel.OnMessage = bytes =>
                             HandleH265VideoFromDataChannel(bytes);
 
                         // Also store in _h265VideoChannels for consistency
                         _h265VideoChannels[capturedMonitor] = channel;
-                        Debug.Log($"[PhaseProtocol] Video PC{capturedMonitor} h265video DC wired (per-track mode)");
+                        AppLog.Log($"[PhaseProtocol] Video PC{capturedMonitor} h265video DC wired (per-track mode)");
 
                         // Request initial frame immediately when DC is wired (not OnOpen).
                         // Unity WebRTC may fire OnOpen BEFORE OnDataChannel callback completes,
                         // causing OnOpen handler to be missed. Sending here guarantees delivery.
                         _ = SendTextAsync($"{{\"type\":\"request_initial_frame\",\"monitorIndex\":{capturedMonitor}}}");
-                        Debug.Log($"[PhaseProtocol] Video PC{capturedMonitor} requested initial frame from server");
+                        AppLog.Log($"[PhaseProtocol] Video PC{capturedMonitor} requested initial frame from server");
                     }
                     else
                     {
-                        Debug.LogWarning($"[PhaseProtocol] Video PC{capturedMonitor} unexpected DC label: {channel.Label} (expected {expectedLabel})");
+                        AppLog.LogWarning($"[PhaseProtocol] Video PC{capturedMonitor} unexpected DC label: {channel.Label} (expected {expectedLabel})");
                     }
                 };
 
@@ -207,7 +208,7 @@ namespace VRWorkspace.Streaming
                     videoPc.Dispose();
                     return null;
                 }
-                Debug.Log($"[PhaseProtocol] Video PC{monitorIndex} remote offer set OK");
+                AppLog.Log($"[PhaseProtocol] Video PC{monitorIndex} remote offer set OK");
 
                 // Create answer
                 var answerOp = videoPc.CreateAnswer();
@@ -235,27 +236,27 @@ namespace VRWorkspace.Streaming
                     videoPc.Dispose();
                     return null;
                 }
-                Debug.Log($"[PhaseProtocol] Video PC{monitorIndex} local answer set OK");
+                AppLog.Log($"[PhaseProtocol] Video PC{monitorIndex} local answer set OK");
 
                 // Store video PC — _videoPcs[monitorIndex] is the authoritative reference.
                 // The PCWrapper.PC field continues to point to the shared main PC (audio+cursor).
                 // Callers needing the video PC for monitor N should use _videoPcs[N].
                 _videoPcs[monitorIndex] = videoPc;
-                Debug.Log($"[PhaseProtocol] Video PC{monitorIndex} stored in _videoPcs dictionary");
+                AppLog.Log($"[PhaseProtocol] Video PC{monitorIndex} stored in _videoPcs dictionary");
 
                 // Flush any ICE candidates that arrived before the video PC was created
                 if (_pendingVideoIceCandidates.TryGetValue(monitorIndex, out var pendingCands))
                 {
-                    Debug.Log($"[PhaseProtocol] Video PC{monitorIndex} flushing {pendingCands.Count} pending ICE candidates");
+                    AppLog.Log($"[PhaseProtocol] Video PC{monitorIndex} flushing {pendingCands.Count} pending ICE candidates");
                     foreach (var pCand in pendingCands)
                     {
                         try { videoPc.AddIceCandidate(pCand); }
-                        catch (Exception ex) { Debug.LogWarning($"[PhaseProtocol] Video PC{monitorIndex} pending ICE failed: {ex.Message}"); }
+                        catch (Exception ex) { AppLog.LogWarning($"[PhaseProtocol] Video PC{monitorIndex} pending ICE failed: {ex.Message}"); }
                     }
                     _pendingVideoIceCandidates.Remove(monitorIndex);
                 }
 
-                Debug.Log($"[PhaseProtocol] Video PC{monitorIndex} ready, returning answer SDP ({answer.sdp?.Length ?? 0} chars)");
+                AppLog.Log($"[PhaseProtocol] Video PC{monitorIndex} ready, returning answer SDP ({answer.sdp?.Length ?? 0} chars)");
                 return answer.sdp;
             }
             catch (Exception ex)
@@ -284,7 +285,7 @@ namespace VRWorkspace.Streaming
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning($"[PhaseProtocol] Video PC{monitorIndex} AddIceCandidate failed: {ex.Message}");
+                    AppLog.LogWarning($"[PhaseProtocol] Video PC{monitorIndex} AddIceCandidate failed: {ex.Message}");
                 }
             }
             else
@@ -311,15 +312,15 @@ namespace VRWorkspace.Streaming
                 {
                     kvp.Value.Close();
                     kvp.Value.Dispose();
-                    Debug.Log($"[PhaseProtocol] Video PC{kvp.Key} closed");
+                    AppLog.Log($"[PhaseProtocol] Video PC{kvp.Key} closed");
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning($"[PhaseProtocol] Error closing video PC{kvp.Key}: {ex.Message}");
+                    AppLog.LogWarning($"[PhaseProtocol] Error closing video PC{kvp.Key}: {ex.Message}");
                 }
             }
             _videoPcs.Clear();
-            Debug.Log("[PhaseProtocol] All video PCs closed");
+            AppLog.Log("[PhaseProtocol] All video PCs closed");
         }
 
         /// <summary>
@@ -330,7 +331,7 @@ namespace VRWorkspace.Streaming
             try
             {
                 await CreatePeerConnectionsAsync(count);
-                Debug.Log("[PhaseProtocol] CreatePeerConnectionsAsync completed successfully");
+                AppLog.Log("[PhaseProtocol] CreatePeerConnectionsAsync completed successfully");
             }
             catch (Exception ex)
             {
@@ -346,7 +347,7 @@ namespace VRWorkspace.Streaming
         /// </summary>
         private async Task CreatePeerConnectionsAsync(int count)
         {
-            Debug.Log($"[PhaseProtocol] Creating SINGLE PeerConnection with {count} video transceivers (Single-PC Multi-Track mode)");
+            AppLog.Log($"[PhaseProtocol] Creating SINGLE PeerConnection with {count} video transceivers (Single-PC Multi-Track mode)");
 
             _expectedMonitorCount = count;
 
@@ -368,12 +369,12 @@ namespace VRWorkspace.Streaming
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
             string modeLabel = _perTrackPcMode ? "Per-Track Multi-PC" : "Single-PC Multi-Track";
-            Debug.Log($"[PhaseProtocol] CreateSinglePCMultiTrackAsync: Creating PeerConnection for {count} monitors ({modeLabel} mode)...");
+            AppLog.Log($"[PhaseProtocol] CreateSinglePCMultiTrackAsync: Creating PeerConnection for {count} monitors ({modeLabel} mode)...");
 
             // EMPTY ICE servers - no STUN for LAN mode
             var cfg = new RTCConfiguration { iceServers = new RTCIceServer[0] };
             var pc = new RTCPeerConnection(ref cfg);
-            Debug.Log($"[PhaseProtocol] PeerConnection created: {pc != null}, SignalingState={pc?.SignalingState}");
+            AppLog.Log($"[PhaseProtocol] PeerConnection created: {pc != null}, SignalingState={pc?.SignalingState}");
 
             // Create wrapper for each track (for texture/frame tracking)
             var trackWrappers = new List<PCWrapper>();
@@ -400,12 +401,12 @@ namespace VRWorkspace.Streaming
                     SetCodecPreferences(trans, i);
                     transceivers.Add(trans);
                     trackWrappers[i].Mid = trans.Mid; // Store MID for stats matching
-                    Debug.Log($"[PhaseProtocol] Added transceiver {i} for monitor {i}, mid={trans.Mid}");
+                    AppLog.Log($"[PhaseProtocol] Added transceiver {i} for monitor {i}, mid={trans.Mid}");
                 }
             }
             else
             {
-                Debug.Log("[PhaseProtocol] Per-track mode: skipping video transceivers on main PC (video handled by per-monitor video PCs)");
+                AppLog.Log("[PhaseProtocol] Per-track mode: skipping video transceivers on main PC (video handled by per-monitor video PCs)");
             }
 
             // Add RecvOnly audio transceiver to receive Opus RTP from server.
@@ -413,7 +414,7 @@ namespace VRWorkspace.Streaming
             // no head-of-line blocking from H.265 video DataChannel traffic.
             var audioTrans = pc.AddTransceiver(TrackKind.Audio);
             audioTrans.Direction = RTCRtpTransceiverDirection.RecvOnly;
-            Debug.Log("[PhaseProtocol] Added RecvOnly audio transceiver to main PC (RTP Opus)");
+            AppLog.Log("[PhaseProtocol] Added RecvOnly audio transceiver to main PC (RTP Opus)");
 
             // DataChannel for audio (fallback if RTP audio negotiation fails)
             _sctpInitChannel = pc.CreateDataChannel("audio");
@@ -421,17 +422,17 @@ namespace VRWorkspace.Streaming
             {
                 OnAudioDataReceived?.Invoke(bytes);
             };
-            _sctpInitChannel.OnOpen = () => Debug.Log("[PhaseProtocol] Audio DataChannel opened");
-            _sctpInitChannel.OnClose = () => Debug.Log("[PhaseProtocol] Audio DataChannel closed");
-            Debug.Log("[PhaseProtocol] Audio DataChannel created (fallback)");
+            _sctpInitChannel.OnOpen = () => AppLog.Log("[PhaseProtocol] Audio DataChannel opened");
+            _sctpInitChannel.OnClose = () => AppLog.Log("[PhaseProtocol] Audio DataChannel closed");
+            AppLog.Log("[PhaseProtocol] Audio DataChannel created (fallback)");
 
             // Client creates "cursor" DataChannel for low-latency cursor position updates.
             // Server sends binary cursor position (19 bytes) through this channel (UDP-like latency).
             _cursorChannel = pc.CreateDataChannel("cursor");
             _cursorChannel.OnMessage = bytes => HandleCursorFromDataChannel(bytes);
-            _cursorChannel.OnOpen = () => Debug.Log("[PhaseProtocol] Cursor DataChannel opened");
-            _cursorChannel.OnClose = () => Debug.Log("[PhaseProtocol] Cursor DataChannel closed");
-            Debug.Log("[PhaseProtocol] Cursor via DataChannel (low-latency binary)");
+            _cursorChannel.OnOpen = () => AppLog.Log("[PhaseProtocol] Cursor DataChannel opened");
+            _cursorChannel.OnClose = () => AppLog.Log("[PhaseProtocol] Cursor DataChannel closed");
+            AppLog.Log("[PhaseProtocol] Cursor via DataChannel (low-latency binary)");
 
             // ── Legacy mode: create per-track h265video DCs on main PC ───────────
             // Per-track mode: h265video DCs live on the per-monitor video PCs — skip this block.
@@ -452,15 +453,15 @@ namespace VRWorkspace.Streaming
                     var ch = pc.CreateDataChannel(label, h265VideoInit);
                     int capturedTrack = t; // capture for closure
                     ch.OnMessage = bytes => HandleH265VideoFromDataChannel(bytes);
-                    ch.OnOpen = () => Debug.Log($"[PhaseProtocol] H265 Video DataChannel opened: {label} (unreliable, unordered)");
-                    ch.OnClose = () => Debug.Log($"[PhaseProtocol] H265 Video DataChannel closed: {label}");
+                    ch.OnOpen = () => AppLog.Log($"[PhaseProtocol] H265 Video DataChannel opened: {label} (unreliable, unordered)");
+                    ch.OnClose = () => AppLog.Log($"[PhaseProtocol] H265 Video DataChannel closed: {label}");
                     _h265VideoChannels[t] = ch;
                 }
-                Debug.Log($"[PhaseProtocol] Created {count} per-track H265 Video DataChannels (unreliable, unordered)");
+                AppLog.Log($"[PhaseProtocol] Created {count} per-track H265 Video DataChannels (unreliable, unordered)");
             }
             else
             {
-                Debug.Log("[PhaseProtocol] Per-track mode: h265video DCs will be wired by HandleVideoOfferAsync per monitor");
+                AppLog.Log("[PhaseProtocol] Per-track mode: h265video DCs will be wired by HandleVideoOfferAsync per monitor");
             }
 
             // Setup event handlers for single PC
@@ -501,7 +502,7 @@ namespace VRWorkspace.Streaming
 
             // Send SINGLE offer (no monitorIndex)
             await SendTextAsync($"{{\"type\":\"offer\",\"monitorIndex\":0,\"sdp\":\"{EscapeJsonString(offer.sdp)}\"}}");
-            Debug.Log($"[PhaseProtocol] Single-PC offer sent with {count} m= sections ({sw.ElapsedMilliseconds}ms)");
+            AppLog.Log($"[PhaseProtocol] Single-PC offer sent with {count} m= sections ({sw.ElapsedMilliseconds}ms)");
 
             // Audio now goes through main PC as RTP track (not separate Audio PC).
             // RTP audio on the same ICE connection is NOT affected by SCTP congestion
@@ -516,16 +517,16 @@ namespace VRWorkspace.Streaming
 
                 if (completedTask == _allAnswersReceivedTcs.Task)
                 {
-                    Debug.Log($"[PhaseProtocol] Single-PC answer received in {sw.ElapsedMilliseconds}ms");
+                    AppLog.Log($"[PhaseProtocol] Single-PC answer received in {sw.ElapsedMilliseconds}ms");
                 }
                 else
                 {
-                    Debug.LogWarning($"[PhaseProtocol] Single-PC answer timeout after {sw.ElapsedMilliseconds}ms");
+                    AppLog.LogWarning($"[PhaseProtocol] Single-PC answer timeout after {sw.ElapsedMilliseconds}ms");
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[PhaseProtocol] Answer waiting exception: {ex.Message}");
+                AppLog.LogWarning($"[PhaseProtocol] Answer waiting exception: {ex.Message}");
             }
         }
 
@@ -541,26 +542,26 @@ namespace VRWorkspace.Streaming
             {
                 var cfg = new RTCConfiguration { iceServers = new RTCIceServer[0] };
                 _audioPc = new RTCPeerConnection(ref cfg);
-                Debug.Log("[PhaseProtocol] Audio PeerConnection created (RTP Opus transport)");
+                AppLog.Log("[PhaseProtocol] Audio PeerConnection created (RTP Opus transport)");
 
                 // Add recvonly audio transceiver to receive Opus RTP from server.
                 // Server sends Opus via _audioPc.SendAudio() — goes through ICE/DTLS/UDP,
                 // completely bypassing SCTP (which is broken on Unity WebRTC for audio PC).
                 var transceiver = _audioPc.AddTransceiver(TrackKind.Audio);
                 transceiver.Direction = RTCRtpTransceiverDirection.RecvOnly;
-                Debug.Log("[PhaseProtocol] Audio PC: added recvonly audio transceiver for Opus RTP");
+                AppLog.Log("[PhaseProtocol] Audio PC: added recvonly audio transceiver for Opus RTP");
 
                 // OnTrack: receive audio MediaStreamTrack from server
                 _audioPc.OnTrack = e =>
                 {
                     if (e.Track is AudioStreamTrack audioTrack)
                     {
-                        Debug.Log($"[PhaseProtocol] Audio PC OnTrack: received audio track (RTP Opus, dedicated PC)");
+                        AppLog.Log($"[PhaseProtocol] Audio PC OnTrack: received audio track (RTP Opus, dedicated PC)");
                         OnAudioTrackReceived?.Invoke(audioTrack);
                     }
                     else
                     {
-                        Debug.LogWarning($"[PhaseProtocol] Audio PC OnTrack: unexpected track kind={e.Track?.Kind}");
+                        AppLog.LogWarning($"[PhaseProtocol] Audio PC OnTrack: unexpected track kind={e.Track?.Kind}");
                     }
                 };
 
@@ -575,7 +576,7 @@ namespace VRWorkspace.Streaming
 
                 _audioPc.OnIceConnectionChange = state =>
                 {
-                    Debug.Log($"[PhaseProtocol] Audio PC ICE state: {state}");
+                    AppLog.Log($"[PhaseProtocol] Audio PC ICE state: {state}");
                 };
 
                 // Create and send offer
@@ -589,7 +590,7 @@ namespace VRWorkspace.Streaming
                 if (setLocalOp.IsError) { Debug.LogError("[PhaseProtocol] Audio PC SetLocal failed"); return; }
 
                 await SendTextAsync($"{{\"type\":\"audio_offer\",\"sdp\":\"{EscapeJsonString(offer.sdp)}\"}}");
-                Debug.Log("[PhaseProtocol] Audio PC offer sent (RTP Opus transport)");
+                AppLog.Log("[PhaseProtocol] Audio PC offer sent (RTP Opus transport)");
             }
             catch (Exception ex)
             {
@@ -609,7 +610,7 @@ namespace VRWorkspace.Streaming
                 if (string.IsNullOrEmpty(sdp)) { Debug.LogError("[PhaseProtocol] Audio answer has empty SDP"); return; }
 
                 // Log raw SDP for debugging
-                Debug.Log($"[PhaseProtocol] Audio answer SDP ({sdp.Length} chars):\n{sdp}");
+                AppLog.Log($"[PhaseProtocol] Audio answer SDP ({sdp.Length} chars):\n{sdp}");
 
                 // Use the same FixSdp() as main PC to normalize line endings,
                 // remove empty lines, and ensure trailing \r\n — required by libwebrtc
@@ -618,7 +619,7 @@ namespace VRWorkspace.Streaming
                 // Ensure setup:active (not actpass) for answerer per RFC 5763
                 sdp = sdp.Replace("a=setup:actpass", "a=setup:active");
 
-                Debug.Log($"[PhaseProtocol] Audio answer fixed SDP ({sdp.Length} chars):\n{sdp}");
+                AppLog.Log($"[PhaseProtocol] Audio answer fixed SDP ({sdp.Length} chars):\n{sdp}");
 
                 var answer = new RTCSessionDescription { type = RTCSdpType.Answer, sdp = sdp };
                 var op = _audioPc.SetRemoteDescription(ref answer);
@@ -630,7 +631,7 @@ namespace VRWorkspace.Streaming
                 }
                 else
                 {
-                    Debug.Log("[PhaseProtocol] Audio PC answer applied successfully");
+                    AppLog.Log("[PhaseProtocol] Audio PC answer applied successfully");
 
                     // Flush any audio ICE candidates that arrived before answer was applied
                     _audioAnswerApplied = true;
@@ -642,7 +643,7 @@ namespace VRWorkspace.Streaming
                     }
                     if (pending.Count > 0)
                     {
-                        Debug.Log($"[PhaseProtocol] Flushing {pending.Count} buffered audio ICE candidates");
+                        AppLog.Log($"[PhaseProtocol] Flushing {pending.Count} buffered audio ICE candidates");
                         foreach (var init in pending)
                         {
                             _audioPc.AddIceCandidate(new RTCIceCandidate(init));
@@ -682,16 +683,16 @@ namespace VRWorkspace.Streaming
                     {
                         _pendingAudioRemoteCandidates.Add(init);
                     }
-                    Debug.Log($"[PhaseProtocol] Audio ICE candidate buffered (answer pending, {_pendingAudioRemoteCandidates.Count} queued)");
+                    AppLog.Log($"[PhaseProtocol] Audio ICE candidate buffered (answer pending, {_pendingAudioRemoteCandidates.Count} queued)");
                     return;
                 }
 
                 _audioPc.AddIceCandidate(new RTCIceCandidate(init));
-                Debug.Log($"[PhaseProtocol] Audio ICE candidate added: {candStr.Substring(0, Math.Min(60, candStr.Length))}...");
+                AppLog.Log($"[PhaseProtocol] Audio ICE candidate added: {candStr.Substring(0, Math.Min(60, candStr.Length))}...");
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[PhaseProtocol] Audio ICE candidate failed: {ex.Message}");
+                AppLog.LogWarning($"[PhaseProtocol] Audio ICE candidate failed: {ex.Message}");
             }
         }
 
@@ -701,13 +702,13 @@ namespace VRWorkspace.Streaming
         /// </summary>
         private void SetupSinglePCEventHandlers(RTCPeerConnection pc, List<PCWrapper> trackWrappers, List<RTCRtpTransceiver> transceivers)
         {
-            Debug.Log($"[PhaseProtocol] Setting up Single-PC event handlers for {trackWrappers.Count} tracks");
+            AppLog.Log($"[PhaseProtocol] Setting up Single-PC event handlers for {trackWrappers.Count} tracks");
             int gen = _pcGeneration; // Capture generation to guard against stale callbacks
 
             pc.OnIceConnectionChange = s =>
             {
                 if (_pcGeneration != gen) return; // Stale PC callback after cleanup
-                Debug.Log($"[PhaseProtocol] Single-PC ICE: {s}");
+                AppLog.Log($"[PhaseProtocol] Single-PC ICE: {s}");
 
                 // Fire progress for all monitors
                 int progress = s switch
@@ -750,7 +751,7 @@ namespace VRWorkspace.Streaming
                             return; // ICE recovered on its own
                         if (trackWrappers[0].IsReconnecting) return; // Already reconnecting
 
-                        Debug.LogWarning($"[PhaseProtocol] Single-PC ICE still {currentIce} after 3s grace, triggering reconnect");
+                        AppLog.LogWarning($"[PhaseProtocol] Single-PC ICE still {currentIce} after 3s grace, triggering reconnect");
                         trackWrappers[0].IsReconnecting = true;
                         _ = ReconnectSinglePCAsync();
                     });
@@ -760,7 +761,7 @@ namespace VRWorkspace.Streaming
             pc.OnConnectionStateChange = s =>
             {
                 if (_pcGeneration != gen) return; // Stale PC callback after cleanup
-                Debug.Log($"[PhaseProtocol] Single-PC State: {s}");
+                AppLog.Log($"[PhaseProtocol] Single-PC State: {s}");
                 if (s == RTCPeerConnectionState.Connected)
                 {
                     foreach (var w in trackWrappers)
@@ -779,7 +780,7 @@ namespace VRWorkspace.Streaming
                     if (_stateMachine.IsStreaming && !trackWrappers[0].IsReconnecting)
                     {
                         trackWrappers[0].IsReconnecting = true;
-                        Debug.Log("[PhaseProtocol] Single-PC initiating full reconnect...");
+                        AppLog.Log("[PhaseProtocol] Single-PC initiating full reconnect...");
                         _ = ReconnectSinglePCAsync();
                     }
                 }
@@ -790,18 +791,18 @@ namespace VRWorkspace.Streaming
             {
                 if (string.IsNullOrEmpty(cand.Candidate))
                 {
-                    Debug.Log("[PhaseProtocol] Single-PC local ICE gathering complete (empty candidate)");
+                    AppLog.Log("[PhaseProtocol] Single-PC local ICE gathering complete (empty candidate)");
                     if (trackWrappers[0].OfferSent)
                         _ = SendTextAsync("{\"type\":\"end_of_candidates\",\"monitorIndex\":0}");
                     return;
                 }
 
                 string msg = cand.Candidate;
-                Debug.Log($"[PhaseProtocol] Single-PC local ICE candidate: {msg.Substring(0, Math.Min(60, msg.Length))}...");
+                AppLog.Log($"[PhaseProtocol] Single-PC local ICE candidate: {msg.Substring(0, Math.Min(60, msg.Length))}...");
 
                 if (_skipTcpIceCandidates && (msg.Contains(" tcp ", StringComparison.OrdinalIgnoreCase) || msg.Contains("tcptype", StringComparison.OrdinalIgnoreCase)))
                 {
-                    Debug.Log("[PhaseProtocol] Skipping TCP candidate");
+                    AppLog.Log("[PhaseProtocol] Skipping TCP candidate");
                     return;
                 }
 
@@ -820,7 +821,7 @@ namespace VRWorkspace.Streaming
             pc.OnTrack = e =>
             {
                 var mid = e.Transceiver?.Mid ?? "null";
-                Debug.Log($"[PhaseProtocol] Single-PC OnTrack: kind={e.Track?.Kind}, enabled={e.Track?.Enabled}, mid={mid}");
+                AppLog.Log($"[PhaseProtocol] Single-PC OnTrack: kind={e.Track?.Kind}, enabled={e.Track?.Enabled}, mid={mid}");
 
                 if (e.Track is VideoStreamTrack v)
                 {
@@ -838,7 +839,7 @@ namespace VRWorkspace.Streaming
 
                     if (trackIndex < 0 || trackIndex >= trackWrappers.Count)
                     {
-                        Debug.LogWarning($"[PhaseProtocol] Received track for unknown transceiver, mid={mid}");
+                        AppLog.LogWarning($"[PhaseProtocol] Received track for unknown transceiver, mid={mid}");
                         return;
                     }
 
@@ -852,7 +853,7 @@ namespace VRWorkspace.Streaming
                     {
                         bool isH264 = _selectedCodec == VideoCodec.H264;
                         string codecName = isH264 ? "H264" : "H265";
-                        Debug.Log($"[PhaseProtocol] PC{idx} using {codecName} custom decoder pipeline via DataChannel (Single-PC mode)");
+                        AppLog.Log($"[PhaseProtocol] PC{idx} using {codecName} custom decoder pipeline via DataChannel (Single-PC mode)");
 
                         // Initialize receiver with current config dimensions
                         int w = _userConfig?.resolutionWidth ?? 1920;
@@ -861,7 +862,7 @@ namespace VRWorkspace.Streaming
                         // Cleanup old receiver/handler if they exist for this index
                         if (_h265Receivers.TryGetValue(idx, out var oldReceiver))
                         {
-                            Debug.Log($"[PhaseProtocol] Cleaning up old receiver for PC{idx}");
+                            AppLog.Log($"[PhaseProtocol] Cleaning up old receiver for PC{idx}");
                             oldReceiver.Dispose();
                             _h265Receivers.Remove(idx);
                         }
@@ -885,7 +886,7 @@ namespace VRWorkspace.Streaming
 
                                 if (!_streamingStartedFired)
                                 {
-                                    Debug.Log($"[PhaseProtocol] PC{idx} received first frame ({codecName}), firing OnStreamingStarted");
+                                    AppLog.Log($"[PhaseProtocol] PC{idx} received first frame ({codecName}), firing OnStreamingStarted");
                                     _stateMachine.TryTransition(ConnectionPhase.Streaming);
                                     HandleStreamingStartedInternal();
                                 }
@@ -913,7 +914,7 @@ namespace VRWorkspace.Streaming
                                     _h265Handlers[idx] = handler;
                                     e.Transceiver.Receiver.Transform = handler.Transform;
 
-                                    Debug.Log($"[PhaseProtocol] PC{idx} hooked H265 custom decoder via Encoded Transform (Transform set: {e.Transceiver.Receiver.Transform != null})");
+                                    AppLog.Log($"[PhaseProtocol] PC{idx} hooked H265 custom decoder via Encoded Transform (Transform set: {e.Transceiver.Receiver.Transform != null})");
                                 } catch (Exception ex) {
                                     Debug.LogError($"[PhaseProtocol] PC{idx} failed to hook H265 Transform: {ex.Message}");
                                 }
@@ -937,19 +938,19 @@ namespace VRWorkspace.Streaming
                             if (!_streamingStartedFired)
                             {
                                 _streamingStartedFired = true;
-                                Debug.Log($"[PhaseProtocol] Track {idx} received first frame, firing OnStreamingStarted");
+                                AppLog.Log($"[PhaseProtocol] Track {idx} received first frame, firing OnStreamingStarted");
                                 _stateMachine.TryTransition(ConnectionPhase.Streaming);
                                 OnStreamingStarted?.Invoke();
                             }
 
                             OnVideoTextureReceived?.Invoke(idx, tex);
                         };
-                        Debug.Log($"[PhaseProtocol] Track {trackIndex} attached to standard OnVideoReceived callback");
+                        AppLog.Log($"[PhaseProtocol] Track {trackIndex} attached to standard OnVideoReceived callback");
                     }
                 }
                 else if (e.Track is AudioStreamTrack audioTrack)
                 {
-                    Debug.Log($"[PhaseProtocol] Received audio track, mid={mid}");
+                    AppLog.Log($"[PhaseProtocol] Received audio track, mid={mid}");
                     OnAudioTrackReceived?.Invoke(audioTrack);
                 }
             };
@@ -957,7 +958,7 @@ namespace VRWorkspace.Streaming
             // Fallback: handle server-created DataChannels (if any)
             pc.OnDataChannel = channel =>
             {
-                Debug.Log($"[PhaseProtocol] Server DataChannel received: label={channel.Label}");
+                AppLog.Log($"[PhaseProtocol] Server DataChannel received: label={channel.Label}");
             };
         }
 
@@ -984,7 +985,7 @@ namespace VRWorkspace.Streaming
 
             // Wait for all PC creation tasks to complete (offer sent)
             await Task.WhenAll(tasks);
-            Debug.Log($"[PhaseProtocol] All {count} offers sent in parallel ({sw.ElapsedMilliseconds}ms)");
+            AppLog.Log($"[PhaseProtocol] All {count} offers sent in parallel ({sw.ElapsedMilliseconds}ms)");
 
             // Event-driven wait for answers (no polling!) with timeout
             const int TOTAL_ANSWER_TIMEOUT_MS = 10000; // 10 seconds for ALL answers
@@ -997,13 +998,13 @@ namespace VRWorkspace.Streaming
 
                 if (completedTask == _allAnswersReceivedTcs.Task)
                 {
-                    Debug.Log($"[PhaseProtocol] All {count} answers received in {sw.ElapsedMilliseconds}ms (event-driven success)");
+                    AppLog.Log($"[PhaseProtocol] All {count} answers received in {sw.ElapsedMilliseconds}ms (event-driven success)");
                     return true;
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[PhaseProtocol] Answer waiting exception: {ex.Message}");
+                AppLog.LogWarning($"[PhaseProtocol] Answer waiting exception: {ex.Message}");
             }
 
             // Check final state on timeout
@@ -1013,7 +1014,7 @@ namespace VRWorkspace.Streaming
                 finalAnswers = _peerConnections.Count(p => p.AnswerSet);
             }
 
-            Debug.LogWarning($"[PhaseProtocol] Parallel timeout after {sw.ElapsedMilliseconds}ms: {finalAnswers}/{count} answers received");
+            AppLog.LogWarning($"[PhaseProtocol] Parallel timeout after {sw.ElapsedMilliseconds}ms: {finalAnswers}/{count} answers received");
             return finalAnswers >= count;
         }
 
@@ -1067,13 +1068,13 @@ namespace VRWorkspace.Streaming
 
             // Send offer first
             await SendTextAsync($"{{\"type\":\"offer\",\"monitorIndex\":{idx},\"sdp\":\"{EscapeJsonString(offer.sdp)}\"}}");
-            Debug.Log($"[PhaseProtocol] PC{idx} offer sent (parallel)");
+            AppLog.Log($"[PhaseProtocol] PC{idx} offer sent (parallel)");
 
             // Mark offer as sent and flush queued candidates
             wrapper.OfferSent = true;
             if (wrapper.QueuedCandidates.Count > 0)
             {
-                Debug.Log($"[PhaseProtocol] PC{idx} flushing {wrapper.QueuedCandidates.Count} queued ICE candidates");
+                AppLog.Log($"[PhaseProtocol] PC{idx} flushing {wrapper.QueuedCandidates.Count} queued ICE candidates");
                 foreach (var candJson in wrapper.QueuedCandidates)
                 {
                     _ = SendTextAsync(candJson);
@@ -1088,7 +1089,7 @@ namespace VRWorkspace.Streaming
         /// </summary>
         private async Task CreatePeerConnectionsSequentialAsync(int count)
         {
-            Debug.Log($"[PhaseProtocol] Sequential fallback for {count} PCs");
+            AppLog.Log($"[PhaseProtocol] Sequential fallback for {count} PCs");
 
             // Clear any partial results from parallel attempt
             lock (_lock)
@@ -1120,9 +1121,9 @@ namespace VRWorkspace.Streaming
                     var completedTask = await Task.WhenAny(wrapper.AnswerReceivedTcs.Task, timeoutTask);
 
                     if (completedTask == wrapper.AnswerReceivedTcs.Task)
-                        Debug.Log($"[PhaseProtocol] PC{idx} answer received in {sw.ElapsedMilliseconds}ms (sequential event-driven)");
+                        AppLog.Log($"[PhaseProtocol] PC{idx} answer received in {sw.ElapsedMilliseconds}ms (sequential event-driven)");
                     else
-                        Debug.LogWarning($"[PhaseProtocol] PC{idx} answer timeout after {sw.ElapsedMilliseconds}ms (sequential)");
+                        AppLog.LogWarning($"[PhaseProtocol] PC{idx} answer timeout after {sw.ElapsedMilliseconds}ms (sequential)");
                 }
             }
         }
@@ -1169,7 +1170,7 @@ namespace VRWorkspace.Streaming
                     break;
             }
 
-            Debug.Log($"[PhaseProtocol] PC{idx} codec preferences: {_selectedCodec} first, total {preferredCodecs.Length} codecs");
+            AppLog.Log($"[PhaseProtocol] PC{idx} codec preferences: {_selectedCodec} first, total {preferredCodecs.Length} codecs");
             trans.SetCodecPreferences(preferredCodecs);
         }
 
@@ -1183,7 +1184,7 @@ namespace VRWorkspace.Streaming
             pc.OnIceConnectionChange = s =>
             {
                 if (_pcGeneration != gen) return; // Stale PC callback after cleanup
-                Debug.Log($"[PhaseProtocol] PC{idx} ICE: {s}");
+                AppLog.Log($"[PhaseProtocol] PC{idx} ICE: {s}");
 
                 // Fire ICE progress events for UI
                 int progress = s switch
@@ -1207,7 +1208,7 @@ namespace VRWorkspace.Streaming
             pc.OnConnectionStateChange = s =>
             {
                 if (_pcGeneration != gen) return; // Stale PC callback after cleanup
-                Debug.Log($"[PhaseProtocol] PC{idx} State: {s}");
+                AppLog.Log($"[PhaseProtocol] PC{idx} State: {s}");
                 if (s == RTCPeerConnectionState.Connected)
                 {
                     wrapper.LastConnectedTime = DateTime.UtcNow;
@@ -1219,7 +1220,7 @@ namespace VRWorkspace.Streaming
                     if (_stateMachine.IsStreaming && !wrapper.IsReconnecting)
                     {
                         wrapper.IsReconnecting = true;
-                        Debug.Log($"[PhaseProtocol] PC{idx} initiating auto-heal...");
+                        AppLog.Log($"[PhaseProtocol] PC{idx} initiating auto-heal...");
                         _ = AutoHealMonitorAsync(idx);
                     }
                 }
@@ -1254,7 +1255,7 @@ namespace VRWorkspace.Streaming
                 if (!wrapper.OfferSent)
                 {
                     wrapper.QueuedCandidates.Add(candidateJson);
-                    Debug.Log($"[PhaseProtocol] PC{idx} queued ICE candidate (offer not sent yet)");
+                    AppLog.Log($"[PhaseProtocol] PC{idx} queued ICE candidate (offer not sent yet)");
                 }
                 else
                 {
@@ -1269,7 +1270,7 @@ namespace VRWorkspace.Streaming
                 {
                     var mid = e.Transceiver?.Mid ?? "null";
                     var trackId = v.Id ?? "unknown";
-                    Debug.Log($"[PhaseProtocol] PC{idx} OnTrack: mid={mid}, trackId={trackId}");
+                    AppLog.Log($"[PhaseProtocol] PC{idx} OnTrack: mid={mid}, trackId={trackId}");
 
                     wrapper.VideoTrack = v;
                     wrapper.LastFrameTime = DateTime.UtcNow;
@@ -1281,7 +1282,7 @@ namespace VRWorkspace.Streaming
                     {
                         bool isH264 = _selectedCodec == VideoCodec.H264;
                         string codecName = isH264 ? "H264" : "H265";
-                        Debug.Log($"[PhaseProtocol] PC{idx} using {codecName} custom decoder pipeline via DataChannel");
+                        AppLog.Log($"[PhaseProtocol] PC{idx} using {codecName} custom decoder pipeline via DataChannel");
 
                         // Initialize receiver with current config dimensions
                         int w = _userConfig?.resolutionWidth ?? 1920;
@@ -1301,7 +1302,7 @@ namespace VRWorkspace.Streaming
                                 if (!_streamingStartedFired)
                                 {
                                     _streamingStartedFired = true;
-                                    Debug.Log($"[PhaseProtocol] PC{idx} received first frame ({codecName}), firing OnStreamingStarted as backup");
+                                    AppLog.Log($"[PhaseProtocol] PC{idx} received first frame ({codecName}), firing OnStreamingStarted as backup");
                                     _stateMachine.TryTransition(ConnectionPhase.Streaming);
                                     OnStreamingStarted?.Invoke();
                                 }
@@ -1323,7 +1324,7 @@ namespace VRWorkspace.Streaming
                                     _h265Handlers[idx] = handler;
                                     e.Transceiver.Receiver.Transform = handler.Transform;
 
-                                    Debug.Log($"[PhaseProtocol] PC{idx} hooked H265 custom decoder via Encoded Transform");
+                                    AppLog.Log($"[PhaseProtocol] PC{idx} hooked H265 custom decoder via Encoded Transform");
                                 } catch (Exception ex) {
                                     Debug.LogError($"[PhaseProtocol] PC{idx} failed to hook H265 Transform: {ex.Message}");
                                 }
@@ -1348,14 +1349,14 @@ namespace VRWorkspace.Streaming
                             // Debug: Log callback trigger (first few frames only)
                             if (wrapper.FrameCount <= 3)
                             {
-                                Debug.Log($"[PhaseProtocol] PC{idx} OnVideoReceived mid={capturedMid}, frame={wrapper.FrameCount}, tex={tex?.width}x{tex?.height}");
+                                AppLog.Log($"[PhaseProtocol] PC{idx} OnVideoReceived mid={capturedMid}, frame={wrapper.FrameCount}, tex={tex?.width}x{tex?.height}");
                             }
 
                             // Fire OnStreamingStarted on first frame if not already fired
                             if (!_streamingStartedFired)
                             {
                                 _streamingStartedFired = true;
-                                Debug.Log($"[PhaseProtocol] PC{idx} received first frame, firing OnStreamingStarted as backup");
+                                AppLog.Log($"[PhaseProtocol] PC{idx} received first frame, firing OnStreamingStarted as backup");
                                 _stateMachine.TryTransition(ConnectionPhase.Streaming);
                                 OnStreamingStarted?.Invoke();
                             }
@@ -1363,11 +1364,11 @@ namespace VRWorkspace.Streaming
                             OnVideoTextureReceived?.Invoke(idx, tex);
                         };
                     }
-                    Debug.Log($"[PhaseProtocol] PC{idx} received video track, mid={mid}");
+                    AppLog.Log($"[PhaseProtocol] PC{idx} received video track, mid={mid}");
                 }
                 else if (e.Track is AudioStreamTrack audioTrack)
                 {
-                    Debug.Log($"[PhaseProtocol] PC{idx} received audio track, mid={e.Transceiver?.Mid}");
+                    AppLog.Log($"[PhaseProtocol] PC{idx} received audio track, mid={e.Transceiver?.Mid}");
                     OnAudioTrackReceived?.Invoke(audioTrack);
                 }
             };
@@ -1381,18 +1382,18 @@ namespace VRWorkspace.Streaming
             // Debug: Show raw SDP info (first 200 chars, escape control chars for visibility)
             var rawPreview = rawSdp.Length > 200 ? rawSdp.Substring(0, 200) : rawSdp;
             rawPreview = rawPreview.Replace("\r", "\\r").Replace("\n", "\\n");
-            Debug.Log($"[PhaseProtocol] PC{monitorIndex} raw SDP preview: {rawPreview}");
+            AppLog.Log($"[PhaseProtocol] PC{monitorIndex} raw SDP preview: {rawPreview}");
 
             var sdp = FixSdp(rawSdp);
 
-            Debug.Log($"[PhaseProtocol] PC{monitorIndex} received answer (SDP: {rawSdp.Length} -> {sdp.Length} bytes)");
+            AppLog.Log($"[PhaseProtocol] PC{monitorIndex} received answer (SDP: {rawSdp.Length} -> {sdp.Length} bytes)");
 
             PCWrapper wrapper;
             lock (_lock)
             {
                 if (monitorIndex < 0 || monitorIndex >= _peerConnections.Count)
                 {
-                    Debug.LogWarning($"[PhaseProtocol] PC{monitorIndex} answer ignored: index out of range");
+                    AppLog.LogWarning($"[PhaseProtocol] PC{monitorIndex} answer ignored: index out of range");
                     return;
                 }
                 wrapper = _peerConnections[monitorIndex];
@@ -1407,14 +1408,14 @@ namespace VRWorkspace.Streaming
             try
             {
                 // Check PC is in correct state
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} SignalingState={wrapper.PC.SignalingState}, IceState={wrapper.PC.IceConnectionState}");
+                AppLog.Log($"[PhaseProtocol] PC{monitorIndex} SignalingState={wrapper.PC.SignalingState}, IceState={wrapper.PC.IceConnectionState}");
                 if (wrapper.PC.SignalingState != RTCSignalingState.HaveLocalOffer)
                 {
                     Debug.LogError($"[PhaseProtocol] PC{monitorIndex} wrong state: {wrapper.PC.SignalingState}");
                     return;
                 }
 
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} calling SetRemoteDescription (SDP len={sdp.Length})...");
+                AppLog.Log($"[PhaseProtocol] PC{monitorIndex} calling SetRemoteDescription (SDP len={sdp.Length})...");
                 var answer = new RTCSessionDescription { type = RTCSdpType.Answer, sdp = sdp };
                 var setRemoteOp = wrapper.PC.SetRemoteDescription(ref answer);
 
@@ -1424,7 +1425,7 @@ namespace VRWorkspace.Streaming
                     return;
                 }
 
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} SetRemoteDescription called, waiting for completion...");
+                AppLog.Log($"[PhaseProtocol] PC{monitorIndex} SetRemoteDescription called, waiting for completion...");
 
                 // Wait for operation to complete (max 5 seconds)
                 var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -1434,10 +1435,10 @@ namespace VRWorkspace.Streaming
                     await Task.Delay(10);
                     waitCount++;
                     if (waitCount % 100 == 0) // Log every 1 second
-                        Debug.Log($"[PhaseProtocol] PC{monitorIndex} still waiting... {sw.ElapsedMilliseconds}ms, IsDone={setRemoteOp.IsDone}, IsError={setRemoteOp.IsError}");
+                        AppLog.Log($"[PhaseProtocol] PC{monitorIndex} still waiting... {sw.ElapsedMilliseconds}ms, IsDone={setRemoteOp.IsDone}, IsError={setRemoteOp.IsError}");
                 }
 
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} SetRemoteDescription wait done: IsDone={setRemoteOp.IsDone}, IsError={setRemoteOp.IsError}, elapsed={sw.ElapsedMilliseconds}ms");
+                AppLog.Log($"[PhaseProtocol] PC{monitorIndex} SetRemoteDescription wait done: IsDone={setRemoteOp.IsDone}, IsError={setRemoteOp.IsError}, elapsed={sw.ElapsedMilliseconds}ms");
 
                 if (!setRemoteOp.IsDone || setRemoteOp.IsError)
                 {
@@ -1450,7 +1451,7 @@ namespace VRWorkspace.Streaming
                 }
 
                 wrapper.AnswerSet = true;
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} answer set OK ({sw.ElapsedMilliseconds}ms)");
+                AppLog.Log($"[PhaseProtocol] PC{monitorIndex} answer set OK ({sw.ElapsedMilliseconds}ms)");
 
                 // Single-PC mode: Mark ALL wrappers as AnswerSet (they share the same PC)
                 // This is safe because all wrappers point to the same PC
@@ -1460,7 +1461,7 @@ namespace VRWorkspace.Streaming
                                           _peerConnections.All(w => w.PC == wrapper.PC);
                     if (isSinglePCMode)
                     {
-                        Debug.Log("[PhaseProtocol] Single-PC mode: marking all wrappers as AnswerSet");
+                        AppLog.Log("[PhaseProtocol] Single-PC mode: marking all wrappers as AnswerSet");
                         foreach (var w in _peerConnections)
                         {
                             w.AnswerSet = true;
@@ -1509,7 +1510,7 @@ namespace VRWorkspace.Streaming
 
             if (answersReceived >= _expectedMonitorCount)
             {
-                Debug.Log($"[PhaseProtocol] All {_expectedMonitorCount} answers received, signaling TCS");
+                AppLog.Log($"[PhaseProtocol] All {_expectedMonitorCount} answers received, signaling TCS");
                 _allAnswersReceivedTcs.TrySetResult(true);
             }
         }
@@ -1521,11 +1522,11 @@ namespace VRWorkspace.Streaming
 
             if (_skipTcpIceCandidates && (candStr.Contains(" tcp ", StringComparison.OrdinalIgnoreCase) || candStr.Contains("tcptype", StringComparison.OrdinalIgnoreCase)))
             {
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} Skipped remote TCP candidate");
+                AppLog.Log($"[PhaseProtocol] PC{monitorIndex} Skipped remote TCP candidate");
                 return;
             }
 
-            Debug.Log($"[PhaseProtocol] PC{monitorIndex} received ICE candidate");
+            AppLog.Log($"[PhaseProtocol] PC{monitorIndex} received ICE candidate");
 
             PCWrapper wrapper;
             lock (_lock)
@@ -1536,12 +1537,12 @@ namespace VRWorkspace.Streaming
 
             if (wrapper.AnswerSet)
             {
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} adding remote ICE candidate (AnswerSet=true)");
+                AppLog.Log($"[PhaseProtocol] PC{monitorIndex} adding remote ICE candidate (AnswerSet=true)");
                 AddIceCandidate(wrapper, candStr);
             }
             else
             {
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} queuing remote ICE candidate (AnswerSet=false, pending={wrapper.PendingIce.Count + 1})");
+                AppLog.Log($"[PhaseProtocol] PC{monitorIndex} queuing remote ICE candidate (AnswerSet=false, pending={wrapper.PendingIce.Count + 1})");
                 wrapper.PendingIce.Add(candStr);
             }
         }
@@ -1549,7 +1550,7 @@ namespace VRWorkspace.Streaming
         private void HandleEndOfCandidates(SimpleJson json)
         {
             var monitorIndex = json.GetInt("monitorIndex");
-            Debug.Log($"[PhaseProtocol] PC{monitorIndex} server ICE complete");
+            AppLog.Log($"[PhaseProtocol] PC{monitorIndex} server ICE complete");
             CheckIceComplete();
         }
 
@@ -1560,18 +1561,18 @@ namespace VRWorkspace.Streaming
         private void HandleIceReady(SimpleJson json)
         {
             var monitorCount = json.GetInt("monitorCount");
-            Debug.Log($"[PhaseProtocol] Server confirmed {monitorCount} ICE connections ready");
+            AppLog.Log($"[PhaseProtocol] Server confirmed {monitorCount} ICE connections ready");
 
             if (_stateMachine.CurrentPhase == ConnectionPhase.ICENegotiating)
             {
-                Debug.Log("[PhaseProtocol] Transitioning to ReadyToStream (server-initiated via ice_ready)");
+                AppLog.Log("[PhaseProtocol] Transitioning to ReadyToStream (server-initiated via ice_ready)");
                 _stateMachine.TryTransition(ConnectionPhase.ReadyToStream);
                 _ = SendTextAsync("{\"type\":\"proceed\",\"phase\":3}");
                 OnReadyToStream?.Invoke();
             }
             else if (_stateMachine.CurrentPhase == ConnectionPhase.Streaming)
             {
-                Debug.Log("[PhaseProtocol] ice_ready received during Streaming phase (reconnect).");
+                AppLog.Log("[PhaseProtocol] ice_ready received during Streaming phase (reconnect).");
                 // The server is already in Phase 3 or expects a signal if it reset its state.
                 // We should make sure we're synchronized. We could send a proceed phase 3 just in case,
                 // but we might not need to if the server is already streaming.
@@ -1580,7 +1581,7 @@ namespace VRWorkspace.Streaming
             }
             else
             {
-                Debug.Log($"[PhaseProtocol] ice_ready received but phase is {_stateMachine.CurrentPhase}, ignoring");
+                AppLog.Log($"[PhaseProtocol] ice_ready received but phase is {_stateMachine.CurrentPhase}, ignoring");
             }
         }
 
@@ -1590,11 +1591,11 @@ namespace VRWorkspace.Streaming
             {
                 var fullCand = candStr.StartsWith("candidate:", StringComparison.OrdinalIgnoreCase) ? candStr : "candidate:" + candStr;
                 wrapper.PC.AddIceCandidate(new RTCIceCandidate(new RTCIceCandidateInit { candidate = fullCand, sdpMLineIndex = 0, sdpMid = "0" }));
-                Debug.Log($"[PhaseProtocol] PC{wrapper.Index} Added ICE candidate");
+                AppLog.Log($"[PhaseProtocol] PC{wrapper.Index} Added ICE candidate");
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} AddICE error: {ex.Message}");
+                AppLog.LogWarning($"[PhaseProtocol] PC{wrapper.Index} AddICE error: {ex.Message}");
             }
         }
 
@@ -1607,7 +1608,7 @@ namespace VRWorkspace.Streaming
                 int created = _peerConnections.Count;
                 int answered = _peerConnections.Count(p => p.AnswerSet);
                 int expected = _expectedMonitorCount;
-                Debug.Log($"[PhaseProtocol] CheckIceComplete: {answered}/{created} PCs have answers (expected {expected} total), phase={_stateMachine.CurrentPhase}");
+                AppLog.Log($"[PhaseProtocol] CheckIceComplete: {answered}/{created} PCs have answers (expected {expected} total), phase={_stateMachine.CurrentPhase}");
 
                 // IMPORTANT: Wait for ALL expected PCs to be created AND have answers
                 // This prevents proceeding too early when creating PCs sequentially
@@ -1615,13 +1616,13 @@ namespace VRWorkspace.Streaming
                 {
                     if (_stateMachine.CurrentPhase == ConnectionPhase.ICENegotiating)
                     {
-                        Debug.Log($"[PhaseProtocol] All {expected} PeerConnections ready, transitioning to ReadyToStream");
+                        AppLog.Log($"[PhaseProtocol] All {expected} PeerConnections ready, transitioning to ReadyToStream");
                         _stateMachine.TryTransition(ConnectionPhase.ReadyToStream);
                         shouldSendProceed = true;
                     }
                     else
                     {
-                        Debug.LogWarning($"[PhaseProtocol] All PCs ready but phase is {_stateMachine.CurrentPhase}, not ICENegotiating");
+                        AppLog.LogWarning($"[PhaseProtocol] All PCs ready but phase is {_stateMachine.CurrentPhase}, not ICENegotiating");
                     }
                 }
             }
@@ -1629,7 +1630,7 @@ namespace VRWorkspace.Streaming
             // Send proceed message outside of lock
             if (shouldSendProceed)
             {
-                Debug.Log("[PhaseProtocol] Sending proceed message for phase 3");
+                AppLog.Log("[PhaseProtocol] Sending proceed message for phase 3");
                 _ = SendTextAsync("{\"type\":\"proceed\",\"phase\":3}");
                 OnReadyToStream?.Invoke();
             }
@@ -1649,12 +1650,12 @@ namespace VRWorkspace.Streaming
                     (p.PC.IceConnectionState == RTCIceConnectionState.Connected ||
                      p.PC.IceConnectionState == RTCIceConnectionState.Completed));
 
-                Debug.Log($"[PhaseProtocol] CheckAllMonitorsConnected: {connected}/{_expectedMonitorCount}");
+                AppLog.Log($"[PhaseProtocol] CheckAllMonitorsConnected: {connected}/{_expectedMonitorCount}");
 
                 if (connected >= _expectedMonitorCount)
                 {
                     _allMonitorsReadyFired = true;
-                    Debug.Log("[PhaseProtocol] All monitors connected, firing OnAllMonitorsReady");
+                    AppLog.Log("[PhaseProtocol] All monitors connected, firing OnAllMonitorsReady");
                     OnAllMonitorsReady?.Invoke();
                 }
             }

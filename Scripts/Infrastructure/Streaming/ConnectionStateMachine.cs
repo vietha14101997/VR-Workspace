@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using VRWorkspace.Core;
 
 namespace VRWorkspace.Streaming
 {
@@ -83,7 +84,7 @@ namespace VRWorkspace.Streaming
             {
                 if (!IsValidTransition(_currentPhase, newPhase))
                 {
-                    Debug.LogWarning($"[StateMachine] Invalid transition: {_currentPhase} -> {newPhase}");
+                    AppLog.LogWarning($"[StateMachine] Invalid transition: {_currentPhase} -> {newPhase}");
                     return false;
                 }
 
@@ -99,7 +100,7 @@ namespace VRWorkspace.Streaming
                     _lastError = null;
                 }
 
-                Debug.Log($"[StateMachine] {oldPhase} -> {newPhase}" + (message != null ? $": {message}" : ""));
+                AppLog.Log($"[StateMachine] {oldPhase} -> {newPhase}" + (message != null ? $": {message}" : ""));
 
                 // Fire event outside lock to prevent deadlocks
                 var handler = PhaseChanged;
@@ -134,7 +135,7 @@ namespace VRWorkspace.Streaming
                     _lastError = message ?? "Unknown error";
                 }
 
-                Debug.Log($"[StateMachine] FORCE: {oldPhase} -> {newPhase}" + (message != null ? $": {message}" : ""));
+                AppLog.Log($"[StateMachine] FORCE: {oldPhase} -> {newPhase}" + (message != null ? $": {message}" : ""));
 
                 var handler = PhaseChanged;
                 handler?.Invoke(this, new PhaseChangedEventArgs(oldPhase, newPhase, message));

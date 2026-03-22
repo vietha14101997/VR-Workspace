@@ -954,11 +954,10 @@ namespace VRWorkspace.UI.RTT.Controllers
             // Don't hide menu yet — wait until ALL monitors have their first frame decoded.
             // This ensures the user sees desktop content on all panels before the menu disappears.
             // Timeout after 5s to avoid stuck menu if a monitor fails to decode.
-            var vm = ServiceLocator.Get<ConnectionViewModel>();
-            if (vm != null)
+            if (_viewModel != null)
             {
                 bool firstFrameReceived = false;
-                vm.OnAllMonitorsFirstFrame += () =>
+                _viewModel.OnAllMonitorsFirstFrame += () =>
                 {
                     if (firstFrameReceived) return;
                     firstFrameReceived = true;

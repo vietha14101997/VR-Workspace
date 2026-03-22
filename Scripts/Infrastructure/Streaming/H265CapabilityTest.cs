@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using VRWorkspace.Native;
+using VRWorkspace.Core;
 
 namespace VRWorkspace.Streaming
 {
@@ -33,7 +34,7 @@ namespace VRWorkspace.Streaming
                 // Step 1: Check if MediaCodec reports HEVC support
                 if (!HevcDecoderPlugin.IsAvailable())
                 {
-                    Debug.Log("[H265Test] MediaCodec reports no HEVC decoder available");
+                    AppLog.Log("[H265Test] MediaCodec reports no HEVC decoder available");
                     _capable = false;
                     return false;
                 }
@@ -46,12 +47,12 @@ namespace VRWorkspace.Streaming
 
                 if (!initOk)
                 {
-                    Debug.LogWarning("[H265Test] HEVC decoder init failed (320x240 test)");
+                    AppLog.LogWarning("[H265Test] HEVC decoder init failed (320x240 test)");
                     _capable = false;
                     return false;
                 }
 
-                Debug.Log("[H265Test] HEVC decoder init OK — device is H265 capable");
+                AppLog.Log("[H265Test] HEVC decoder init OK — device is H265 capable");
                 _capable = true;
                 return true;
             }
@@ -62,7 +63,7 @@ namespace VRWorkspace.Streaming
                 return false;
             }
 #else
-            Debug.Log("[H265Test] Not Android — H265 hardware decode not available");
+            AppLog.Log("[H265Test] Not Android — H265 hardware decode not available");
             _capable = false;
             return false;
 #endif

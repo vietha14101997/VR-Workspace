@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using VRWorkspace.Core;
 
 namespace VRWorkspace.Streaming
 {
@@ -107,7 +108,7 @@ namespace VRWorkspace.Streaming
             else if (!_inFuSession)
             {
                 // Middle/end fragment arrived before start — discard
-                Debug.LogWarning($"{TAG} FU fragment arrived before start, discarding");
+                AppLog.LogWarning($"{TAG} FU fragment arrived before start, discarding");
                 return;
             }
 
@@ -191,7 +192,7 @@ namespace VRWorkspace.Streaming
             // Only log important types or throttle
             if (isKeyFrame || nalType == 32 || nalType == 33 || nalType == 34) // VPS, SPS, PPS, or Key
             {
-                Debug.Log($"{TAG} Emitting NAL: type={nalType}, size={nal.Length}, isKey={isKeyFrame}, ts={timestamp}");
+                AppLog.Log($"{TAG} Emitting NAL: type={nalType}, size={nal.Length}, isKey={isKeyFrame}, ts={timestamp}");
             }
 
             byte[] output = new byte[4 + (nal.Length - dataStart)];

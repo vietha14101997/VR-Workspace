@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using UnityEngine;
+using VRWorkspace.Core;
 
 namespace VRWorkspace.Streaming
 {
@@ -50,14 +51,14 @@ namespace VRWorkspace.Streaming
                                 prefs.transportMode = "USB";
                         }
 
-                        Debug.Log($"[RemotePreferences] Loaded: monitors={prefs.monitors}, mode={prefs.mode}, resolution={prefs.resolution}, fps={prefs.fps}");
+                        AppLog.Log($"[RemotePreferences] Loaded: monitors={prefs.monitors}, mode={prefs.mode}, resolution={prefs.resolution}, fps={prefs.fps}");
                         return prefs;
                     }
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[RemotePreferences] Failed to load: {ex.Message}");
+                AppLog.LogWarning($"[RemotePreferences] Failed to load: {ex.Message}");
             }
 
             return new RemotePreferences();
@@ -72,7 +73,7 @@ namespace VRWorkspace.Streaming
             {
                 string json = JsonUtility.ToJson(this, true);
                 File.WriteAllText(FilePath, json);
-                Debug.Log($"[RemotePreferences] Saved to {FilePath}");
+                AppLog.Log($"[RemotePreferences] Saved to {FilePath}");
             }
             catch (Exception ex)
             {

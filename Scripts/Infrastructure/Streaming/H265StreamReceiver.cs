@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using UnityEngine;
 using VRWorkspace.Native;
+using VRWorkspace.Core;
 
 namespace VRWorkspace.Streaming
 {
@@ -219,7 +220,7 @@ namespace VRWorkspace.Streaming
             _uvBuf = new byte[(Width / 2) * (Height / 2) * 2]; // RG16 = 2 bytes/pixel
 
             _initialized = true;
-            Debug.Log($"{TAG} PC{MonitorIndex} Initialized {Width}x{Height}");
+            AppLog.Log($"{TAG} PC{MonitorIndex} Initialized {Width}x{Height}");
             return true;
         }
 
@@ -247,7 +248,7 @@ namespace VRWorkspace.Streaming
                 if (isKeyFrame)
                 {
                     _waitingForCleanIdr = false;
-                    Debug.Log($"{TAG} PC{MonitorIndex} Clean IDR received — reference chain restored, accepting P-frames again");
+                    AppLog.Log($"{TAG} PC{MonitorIndex} Clean IDR received — reference chain restored, accepting P-frames again");
                 }
                 else
                 {
@@ -260,7 +261,7 @@ namespace VRWorkspace.Streaming
             
             if (isKeyFrame && EncodedFramesReceived < 20)
             {
-                Debug.Log($"{TAG} PC{MonitorIndex} Keyframe pushed to decoder {(pushed ? "successfully" : "FAILED")}: {encodedData.Length} bytes");
+                AppLog.Log($"{TAG} PC{MonitorIndex} Keyframe pushed to decoder {(pushed ? "successfully" : "FAILED")}: {encodedData.Length} bytes");
             }
         }
 
@@ -291,7 +292,7 @@ namespace VRWorkspace.Streaming
                 // Throttled diagnostic logging to confirm frame output
                 if (_decodedCount % 300 == 0 || _decodedCount < 10)
                 {
-                    Debug.Log($"{TAG} PC{MonitorIndex} Frame decoded: #{_decodedCount}, size={_decoder.FrameWidth}x{_decoder.FrameHeight}");
+                    AppLog.Log($"{TAG} PC{MonitorIndex} Frame decoded: #{_decodedCount}, size={_decoder.FrameWidth}x{_decoder.FrameHeight}");
                 }
             }
 
@@ -328,15 +329,27 @@ namespace VRWorkspace.Streaming
                     // Push stall reference forward: give server time to respond to keyframe request
                     // before triggering DECODER FAILURE fallback. Server may be draining DC buffer.
                     _lastDecodedFrameTime = DateTime.UtcNow;
-                    Debug.LogWarning($"{TAG} PC{MonitorIndex} Short stall detected ({_noFrameTicks} ticks, ~{_noFrameTicks / 60f:F1}s), requesting keyframe");
+                    AppLog.LogWarning($"{TAG} PC{MonitorIndex} Short stall detected ({_noFrameTicks} ticks, ~{_noFrameTicks / 60f:F1}s), requesting keyframe");
                     OnKeyframeNeeded?.Invoke(MonitorIndex);
+                }
+
+                // Self-recovery: flush decoder + request keyframe at 1.5s (90 ticks).
+                // Android MediaCodec can hang on a single instance while others work fine.
+                // Flushing clears the stuck frame and restores the decode pipeline.
+                if (_noFrameTicks == 90 && _decodedCount > 0)
+                {
+                    Debug.LogWarning($"{TAG} PC{MonitorIndex} Decoder stall 3s — flushing decoder for self-recovery");
+                    Flush();
+                    _keyframeRequested = false; // Allow fresh keyframe request after flush
+                    OnKeyframeNeeded?.Invoke(MonitorIndex);
+                    _lastDecodedFrameTime = DateTime.UtcNow; // Reset fallback timer
                 }
 
                 // Log warning every ~3s (180 ticks at 60fps)
                 if (_noFrameTicks == 180 || _noFrameTicks == 600 || _noFrameTicks == 1200)
                 {
                     float elapsedSinceStart = (float)(DateTime.UtcNow - _firstEncodedFrameTime).TotalSeconds;
-                    Debug.LogWarning($"{TAG} PC{MonitorIndex} SUSTAINED STALL: No frame from decoder for {_noFrameTicks} ticks ({elapsedSinceStart:F1}s). " +
+                    AppLog.LogWarning($"{TAG} PC{MonitorIndex} SUSTAINED STALL: No frame from decoder for {_noFrameTicks} ticks ({elapsedSinceStart:F1}s). " +
                         $"Stats: decoded={_decodedCount}, encoded={EncodedFramesReceived} (gap={EncodedFramesReceived - _decodedCount}). " +
                         $"Plugin: initialized={_decoder.IsInitialized}, strides={_decoder.YStride}/{_decoder.UVStride}, size={_decoder.FrameWidth}x{_decoder.FrameHeight}");
                 }
@@ -367,12 +380,23 @@ namespace VRWorkspace.Streaming
                         float timeSinceLastEncoded = (float)(DateTime.UtcNow - _lastEncodedFrameTime).TotalSeconds;
                         bool encodedFramesStillArriving = timeSinceLastEncoded < 2f;
 
+                        // Require meaningful decode gap before triggering fallback.
+                        // A gap of 1-2 frames on 2000+ total is normal (MediaCodec pipeline delay),
+                        // NOT decoder failure. Only trigger when gap >= 5 frames.
+                        long decodeGap = EncodedFramesReceived - _decodedCount;
+                        bool significantGap = neverDecoded || decodeGap >= 5;
+
                         if (!encodedFramesStillArriving)
                         {
-                            // Network stall: encoded frames also stopped → don't fallback,
-                            // wait for network to recover. H264 would need MORE bandwidth.
-                            Debug.LogWarning($"{TAG} PC{MonitorIndex} Stall detected but encoded frames also stopped " +
+                            // Network stall: encoded frames also stopped → don't fallback.
+                            AppLog.LogWarning($"{TAG} PC{MonitorIndex} Stall detected but encoded frames also stopped " +
                                 $"({timeSinceLastEncoded:F1}s ago) → network issue, NOT decoder failure. Skipping fallback.");
+                        }
+                        else if (!significantGap)
+                        {
+                            // Tiny gap (1-2 frames) on a working decoder — MediaCodec pipeline delay,
+                            // not a real failure. Reset reference time and keep waiting.
+                            _lastDecodedFrameTime = DateTime.UtcNow;
                         }
                         else
                         {
@@ -380,7 +404,7 @@ namespace VRWorkspace.Streaming
                             _fallbackFired = true;
                             string phase = neverDecoded ? "QUICK PROBE" : "SUSTAINED STALL";
                             Debug.LogError($"{TAG} PC{MonitorIndex} DECODER FAILURE ({phase}): received {EncodedFramesReceived} encoded frames, " +
-                                $"decoded {_decodedCount}, stalled for {timeout}s. Triggering H265→H264 fallback!");
+                                $"decoded {_decodedCount}, gap={decodeGap}, stalled for {timeout}s. Triggering H265→H264 fallback!");
                             OnDecoderFailed?.Invoke(MonitorIndex);
                         }
                     }
@@ -410,7 +434,7 @@ namespace VRWorkspace.Streaming
             // UnityException (LoadRawTextureData: not enough data provided).
             if (fWidth != Width || fHeight != Height)
             {
-                Debug.LogWarning($"{TAG} PC{MonitorIndex} Resolution changed dynamically: {Width}x{Height} -> {fWidth}x{fHeight}. Reallocating textures.");
+                AppLog.LogWarning($"{TAG} PC{MonitorIndex} Resolution changed dynamically: {Width}x{Height} -> {fWidth}x{fHeight}. Reallocating textures.");
                 
                 Width = fWidth;
                 Height = fHeight;
@@ -478,7 +502,7 @@ namespace VRWorkspace.Streaming
                 {
                     _corruptionSuspected = true;
                     _lastCorruptionTime = DateTime.UtcNow;
-                    Debug.LogWarning($"{TAG} PC{MonitorIndex} CORRUPTION DETECTED: rapid luminance oscillation (decoded={_decodedCount}).");
+                    AppLog.LogWarning($"{TAG} PC{MonitorIndex} CORRUPTION DETECTED: rapid luminance oscillation (decoded={_decodedCount}).");
 
                     // Fire corruption event — TaintTrack handles flush + keyframe + P-frame gating
                     OnCorruptionDetected?.Invoke(MonitorIndex);
@@ -489,7 +513,7 @@ namespace VRWorkspace.Streaming
             {
                 // Corruption resolved (3s of clean frames)
                 _corruptionSuspected = false;
-                Debug.Log($"{TAG} PC{MonitorIndex} Corruption resolved (3s clean)");
+                AppLog.Log($"{TAG} PC{MonitorIndex} Corruption resolved (3s clean)");
             }
 
             // Upload UV plane: always use stride-copy to produce exactly uvWidth*uvHeight*2 bytes.
@@ -542,7 +566,7 @@ namespace VRWorkspace.Streaming
             {
                 _decoder?.Flush();
                 _waitingForCleanIdr = true;
-                Debug.Log($"{TAG} PC{MonitorIndex} Flushed — waiting for clean IDR before accepting P-frames");
+                AppLog.Log($"{TAG} PC{MonitorIndex} Flushed — waiting for clean IDR before accepting P-frames");
             }
         }
 
@@ -645,7 +669,7 @@ namespace VRWorkspace.Streaming
             if (_nv12Material != null) { UnityEngine.Object.Destroy(_nv12Material); _nv12Material = null; }
 
             _initialized = false;
-            Debug.Log($"{TAG} PC{MonitorIndex} Disposed (decoded={_decodedCount})");
+            AppLog.Log($"{TAG} PC{MonitorIndex} Disposed (decoded={_decodedCount})");
         }
 
         // ──────────── Helpers ────────────

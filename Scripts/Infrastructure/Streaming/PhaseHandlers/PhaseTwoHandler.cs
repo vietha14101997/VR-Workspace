@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using UnityEngine;
+using VRWorkspace.Core;
 
 namespace VRWorkspace.Streaming
 {
@@ -54,12 +55,12 @@ namespace VRWorkspace.Streaming
         /// </summary>
         public async Task SendConfigAsync(StreamingConfig config)
         {
-            Debug.Log($"[Phase2] Sending config: {StreamingOptimizer.FormatConfig(config)}");
+            AppLog.Log($"[Phase2] Sending config: {StreamingOptimizer.FormatConfig(config)}");
 
             _stateMachine.TryTransition(ConnectionPhase.SendingDisplayConfig);
 
             await _send("{\"type\":\"proceed\",\"phase\":2}");
-            Debug.Log("[Phase2] proceed(2) sent");
+            AppLog.Log("[Phase2] proceed(2) sent");
 
             var preferGpuStr    = string.IsNullOrEmpty(config.preferGpu)
                                     ? "null"
@@ -80,7 +81,7 @@ namespace VRWorkspace.Streaming
                 $"\"preferGpu\":{preferGpuStr}}}";
 
             await _send(displayConfigJson);
-            Debug.Log("[Phase2] display_config sent");
+            AppLog.Log("[Phase2] display_config sent");
 
             _stateMachine.TryTransition(ConnectionPhase.AwaitingSetupComplete);
         }
@@ -93,7 +94,7 @@ namespace VRWorkspace.Streaming
             var progress = json.GetInt("progress");
             var message  = json.GetString("message") ?? "";
 
-            Debug.Log($"[Phase2] Config progress: {step} {progress}% – {message}");
+            AppLog.Log($"[Phase2] Config progress: {step} {progress}% – {message}");
 
             OnConfigProgress?.Invoke(step, progress, message);
             OnServerSetupProgress?.Invoke(progress);
@@ -101,7 +102,7 @@ namespace VRWorkspace.Streaming
 
         public Task HandleConfigCompleteAsync(SimpleJson json)
         {
-            Debug.Log("[Phase2] config_complete received, starting ICE negotiation");
+            AppLog.Log("[Phase2] config_complete received, starting ICE negotiation");
 
             var monitorsArr     = json.GetArray("monitors");
             ConfiguredMonitors  = monitorsArr?.Select(m => new MonitorInfo
@@ -118,7 +119,7 @@ namespace VRWorkspace.Streaming
             _stateMachine.TryTransition(ConnectionPhase.ICENegotiating);
 
             // Fire-and-forget: receive loop must stay unblocked while PCs are created
-            Debug.Log("[Phase2] Launching CreatePeerConnections in background...");
+            AppLog.Log("[Phase2] Launching CreatePeerConnections in background...");
             _ = _onCreatePeerConnections(ConfiguredMonitors.Count);
 
             return Task.CompletedTask;

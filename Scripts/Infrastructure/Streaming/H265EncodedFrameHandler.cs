@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Unity.WebRTC;
 using UnityEngine;
 using Unity.Collections;
+using VRWorkspace.Core;
 
 namespace VRWorkspace.Streaming
 {
@@ -68,7 +69,7 @@ namespace VRWorkspace.Streaming
             _fuBuffer = new List<byte>();
             
             Transform = new RTCRtpScriptTransform(TrackKind.Video, OnTransformedFrame);
-            Debug.Log($"{TAG} PC{_receiver.MonitorIndex} handler created (gates on DataChannel codec config + IDR)");
+            AppLog.Log($"{TAG} PC{_receiver.MonitorIndex} handler created (gates on DataChannel codec config + IDR)");
         }
 
         /// <summary>
@@ -84,7 +85,7 @@ namespace VRWorkspace.Streaming
             if (_waitingForCodecConfig)
             {
                 _waitingForCodecConfig = false;
-                Debug.Log($"{TAG} PC{_receiver?.MonitorIndex} ★ Codec config gate OPENED ({annexBParamSets.Length} bytes)");
+                AppLog.Log($"{TAG} PC{_receiver?.MonitorIndex} ★ Codec config gate OPENED ({annexBParamSets.Length} bytes)");
             }
             
             // Log NAL types in the config
@@ -103,7 +104,7 @@ namespace VRWorkspace.Streaming
                     i += sc;
                 }
             }
-            Debug.Log(sb.ToString());
+            AppLog.Log(sb.ToString());
         }
 
         /// <summary>
@@ -125,7 +126,7 @@ namespace VRWorkspace.Streaming
                 Buffer.BlockCopy(idrAnnexBData, 0, outputData, config.Length, idrAnnexBData.Length);
             }
 
-            Debug.Log($"{TAG} PC{_receiver?.MonitorIndex} ★ IDR from DataChannel: {outputData.Length} bytes (raw IDR={idrAnnexBData.Length})");
+            AppLog.Log($"{TAG} PC{_receiver?.MonitorIndex} ★ IDR from DataChannel: {outputData.Length} bytes (raw IDR={idrAnnexBData.Length})");
 
             _decoderBootstrapped = true;
             _frameCount++;
@@ -143,7 +144,7 @@ namespace VRWorkspace.Streaming
 
             _frameCount++;
             if (_frameCount <= 10 || _frameCount % 300 == 0)
-                Debug.Log($"{TAG} PC{_receiver?.MonitorIndex} P-frame from DataChannel: {pframeAnnexBData.Length} bytes (frame #{_frameCount})");
+                AppLog.Log($"{TAG} PC{_receiver?.MonitorIndex} P-frame from DataChannel: {pframeAnnexBData.Length} bytes (frame #{_frameCount})");
 
             _decoderBootstrapped = true;
             _receiver.OnEncodedFrameReceived(pframeAnnexBData, false, GetTimestampUs());
@@ -166,7 +167,7 @@ namespace VRWorkspace.Streaming
                 else
                 {
                     if (_packetCount % 300 == 0)
-                        Debug.LogWarning($"{TAG} Received non-video frame type: {e.Frame.GetType().Name}");
+                        AppLog.LogWarning($"{TAG} Received non-video frame type: {e.Frame.GetType().Name}");
                 }
             }
             catch (Exception ex)
@@ -196,7 +197,7 @@ namespace VRWorkspace.Streaming
                 var hex = new System.Text.StringBuilder();
                 for (int i = 0; i < dumpLen; i++)
                     hex.Append(data[i].ToString("X2")).Append(" ");
-                Debug.Log($"{TAG} PC{_receiver?.MonitorIndex} RAW pkt#{_packetCount}: len={data.Length}, ts={rtpTimestamp}, WebRTC_Type={frame.Type}, hex=[{hex}]");
+                AppLog.Log($"{TAG} PC{_receiver?.MonitorIndex} RAW pkt#{_packetCount}: len={data.Length}, ts={rtpTimestamp}, WebRTC_Type={frame.Type}, hex=[{hex}]");
             }
 
             // ── HYBRID MODE: IDR comes via DataChannel, P-frames come via RTP here. ──
@@ -206,7 +207,7 @@ namespace VRWorkspace.Streaming
             {
                 _droppedBeforeConfig++;
                 if (_droppedBeforeConfig <= 5 || _droppedBeforeConfig % 500 == 0)
-                    Debug.Log($"{TAG} PC{_receiver?.MonitorIndex} Dropped (waiting for IDR bootstrap): #{_droppedBeforeConfig}, len={data.Length}");
+                    AppLog.Log($"{TAG} PC{_receiver?.MonitorIndex} Dropped (waiting for IDR bootstrap): #{_droppedBeforeConfig}, len={data.Length}");
                 return;
             }
 
@@ -223,12 +224,12 @@ namespace VRWorkspace.Streaming
                 _frameCount++;
                 if (_isFirstFrame)
                 {
-                    Debug.Log($"{TAG} PC{_receiver?.MonitorIndex} ★ FIRST FRAME (Annex-B passthrough): len={outputData.Length}, key={isKeyFrame}");
+                    AppLog.Log($"{TAG} PC{_receiver?.MonitorIndex} ★ FIRST FRAME (Annex-B passthrough): len={outputData.Length}, key={isKeyFrame}");
                     LogNalBreakdown(outputData);
                     _isFirstFrame = false;
                 }
                 if (_frameCount % 300 == 0 || _frameCount < 10 || isKeyFrame)
-                    Debug.Log($"{TAG} PC{_receiver?.MonitorIndex} Frame #{_frameCount}: len={outputData.Length}, key={isKeyFrame}, type=AnnexB");
+                    AppLog.Log($"{TAG} PC{_receiver?.MonitorIndex} Frame #{_frameCount}: len={outputData.Length}, key={isKeyFrame}, type=AnnexB");
 
                 _receiver.OnEncodedFrameReceived(outputData, isKeyFrame, GetTimestampUs());
                 return;
@@ -246,7 +247,7 @@ namespace VRWorkspace.Streaming
                                   nalType == 32 ? "VPS" : nalType == 33 ? "SPS" : nalType == 34 ? "PPS" :
                                   (nalType >= 19 && nalType <= 21) ? "IDR" :
                                   nalType <= 9 ? "TRAIL" : $"NAL({nalType})";
-                Debug.Log($"{TAG} PC{_receiver?.MonitorIndex} pkt#{_packetCount}: type={nalType}({typeDesc}), len={data.Length}, ts={rtpTimestamp}");
+                AppLog.Log($"{TAG} PC{_receiver?.MonitorIndex} pkt#{_packetCount}: type={nalType}({typeDesc}), len={data.Length}, ts={rtpTimestamp}");
             }
 
             // Check if we moved to a new frame (different RTP timestamp)
@@ -326,7 +327,7 @@ namespace VRWorkspace.Streaming
                                     _fuOriginalNalType == 34 ? "PPS" :
                                     (_fuOriginalNalType >= 19 && _fuOriginalNalType <= 20) ? "IDR" : 
                                     _fuOriginalNalType <= 9 ? "TRAIL" : $"NAL({_fuOriginalNalType})";
-                    Debug.Log($"{TAG} PC{_receiver?.MonitorIndex} FU reassembled: type={_fuOriginalNalType}({nalDesc}), size={completeNal.Length}");
+                    AppLog.Log($"{TAG} PC{_receiver?.MonitorIndex} FU reassembled: type={_fuOriginalNalType}({nalDesc}), size={completeNal.Length}");
                 }
 
                 _fuBuffer.Clear();
@@ -391,12 +392,12 @@ namespace VRWorkspace.Streaming
 
             if (_isFirstFrame)
             {
-                Debug.Log($"{TAG} PC{_receiver?.MonitorIndex} ★ FIRST FRAME (reassembled): nalCount={_currentFrameNals.Count}, totalLen={outputData.Length}, isKey={isKeyFrame}");
+                AppLog.Log($"{TAG} PC{_receiver?.MonitorIndex} ★ FIRST FRAME (reassembled): nalCount={_currentFrameNals.Count}, totalLen={outputData.Length}, isKey={isKeyFrame}");
                 LogNalBreakdown(outputData);
                 _isFirstFrame = false;
             }
             if (_frameCount % 300 == 0 || _frameCount < 20)
-                Debug.Log($"{TAG} PC{_receiver?.MonitorIndex} Frame #{_frameCount}: {_currentFrameNals.Count} NALs, {outputData.Length} bytes, key={isKeyFrame}");
+                AppLog.Log($"{TAG} PC{_receiver?.MonitorIndex} Frame #{_frameCount}: {_currentFrameNals.Count} NALs, {outputData.Length} bytes, key={isKeyFrame}");
 
             _receiver.OnEncodedFrameReceived(outputData, isKeyFrame, GetTimestampUs());
 
@@ -478,7 +479,7 @@ namespace VRWorkspace.Streaming
                     string desc = type == 32 ? "VPS" : type == 33 ? "SPS" : type == 34 ? "PPS" :
                                   type == 19 ? "IDR_W_RADL" : type == 20 ? "IDR_N_LP" :
                                   type <= 9 ? $"TRAIL({type})" : $"OTHER({type})";
-                    Debug.Log($"{TAG}   NAL[{nalIndex}] @ offset {i}: type={type} ({desc})");
+                    AppLog.Log($"{TAG}   NAL[{nalIndex}] @ offset {i}: type={type} ({desc})");
                     nalIndex++;
                     i += startSize;
                 }
@@ -502,7 +503,7 @@ namespace VRWorkspace.Streaming
 
             if (!_codecConfigApplied)
             {
-                Debug.Log($"{TAG} PC{_receiver?.MonitorIndex} ★ Prepended codec config ({config.Length} bytes) to IDR ({frameData.Length} bytes) → {combined.Length} bytes");
+                AppLog.Log($"{TAG} PC{_receiver?.MonitorIndex} ★ Prepended codec config ({config.Length} bytes) to IDR ({frameData.Length} bytes) → {combined.Length} bytes");
                 _codecConfigApplied = true;
             }
 
@@ -523,7 +524,7 @@ namespace VRWorkspace.Streaming
             if (_decoderBootstrapped)
             {
                 _decoderBootstrapped = false;
-                Debug.Log($"{TAG} PC{_receiver?.MonitorIndex} Bootstrap gate RE-CLOSED (corruption recovery). RTP P-frames will be dropped until next IDR from DataChannel.");
+                AppLog.Log($"{TAG} PC{_receiver?.MonitorIndex} Bootstrap gate RE-CLOSED (corruption recovery). RTP P-frames will be dropped until next IDR from DataChannel.");
             }
         }
 
@@ -543,7 +544,7 @@ namespace VRWorkspace.Streaming
             _currentFrameHasKeyNal = false;
             _fuBuffer.Clear();
             _fuOriginalNalType = -1;
-            Debug.Log($"{TAG} PC{_receiver?.MonitorIndex} State reset (waiting for codec config + IDR from DataChannel)");
+            AppLog.Log($"{TAG} PC{_receiver?.MonitorIndex} State reset (waiting for codec config + IDR from DataChannel)");
         }
 
         public void Dispose()

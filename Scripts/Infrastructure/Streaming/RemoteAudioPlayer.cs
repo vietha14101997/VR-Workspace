@@ -1,5 +1,6 @@
 using Unity.WebRTC;
 using UnityEngine;
+using VRWorkspace.Core;
 
 namespace VRWorkspace.Streaming
 {
@@ -26,7 +27,7 @@ namespace VRWorkspace.Streaming
             var audioConfig = AudioSettings.GetConfiguration();
             audioConfig.dspBufferSize = 256;
             AudioSettings.Reset(audioConfig);
-            Debug.Log($"[RemoteAudioPlayer] DSP buffer set to 256 for low latency");
+            AppLog.Log($"[RemoteAudioPlayer] DSP buffer set to 256 for low latency");
         }
 
         /// <summary>
@@ -49,7 +50,7 @@ namespace VRWorkspace.Streaming
             _audioSource.loop = false;
             _audioSource.Play();
 
-            Debug.Log("[RemoteAudioPlayer] Audio track set and playing");
+            AppLog.Log("[RemoteAudioPlayer] Audio track set and playing");
         }
 
         /// <summary>
@@ -60,7 +61,7 @@ namespace VRWorkspace.Streaming
             _audioSource.Stop();
             _audioSource.clip = null;
             _currentTrack = null;
-            Debug.Log("[RemoteAudioPlayer] Audio stopped");
+            AppLog.Log("[RemoteAudioPlayer] Audio stopped");
         }
 
         /// <summary>

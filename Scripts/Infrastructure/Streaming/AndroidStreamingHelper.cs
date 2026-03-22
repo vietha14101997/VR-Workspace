@@ -1,4 +1,5 @@
 using UnityEngine;
+using VRWorkspace.Core;
 
 namespace VRWorkspace.Streaming
 {
@@ -54,7 +55,7 @@ namespace VRWorkspace.Streaming
                     _wifiLock = wifiManager.Call<AndroidJavaObject>("createWifiLock", 3, "VRWorkspace_WifiLock");
                     _wifiLock.Call("setReferenceCounted", false);
                     _wifiLock.Call("acquire");
-                    Debug.Log("[AndroidHelper] Wi-Fi Lock acquired (HIGH_PERF mode)");
+                    AppLog.Log("[AndroidHelper] Wi-Fi Lock acquired (HIGH_PERF mode)");
                 }
 
                 // Acquire Wake Lock (PARTIAL_WAKE_LOCK keeps CPU running)
@@ -65,18 +66,18 @@ namespace VRWorkspace.Streaming
                     _wakeLock = powerManager.Call<AndroidJavaObject>("newWakeLock", 1, "VRWorkspace:StreamingWakeLock");
                     _wakeLock.Call("setReferenceCounted", false);
                     _wakeLock.Call("acquire");
-                    Debug.Log("[AndroidHelper] Wake Lock acquired (PARTIAL mode)");
+                    AppLog.Log("[AndroidHelper] Wake Lock acquired (PARTIAL mode)");
                 }
 
                 _isAcquired = true;
-                Debug.Log("[AndroidHelper] All power locks acquired for stable streaming");
+                AppLog.Log("[AndroidHelper] All power locks acquired for stable streaming");
             }
             catch (System.Exception ex)
             {
                 Debug.LogError($"[AndroidHelper] Failed to acquire locks: {ex.Message}");
             }
 #else
-            Debug.Log("[AndroidHelper] Power locks only available on Android device");
+            AppLog.Log("[AndroidHelper] Power locks only available on Android device");
 #endif
         }
 
@@ -95,7 +96,7 @@ namespace VRWorkspace.Streaming
                     if (_wifiLock.Call<bool>("isHeld"))
                     {
                         _wifiLock.Call("release");
-                        Debug.Log("[AndroidHelper] Wi-Fi Lock released");
+                        AppLog.Log("[AndroidHelper] Wi-Fi Lock released");
                     }
                     _wifiLock.Dispose();
                     _wifiLock = null;
@@ -106,14 +107,14 @@ namespace VRWorkspace.Streaming
                     if (_wakeLock.Call<bool>("isHeld"))
                     {
                         _wakeLock.Call("release");
-                        Debug.Log("[AndroidHelper] Wake Lock released");
+                        AppLog.Log("[AndroidHelper] Wake Lock released");
                     }
                     _wakeLock.Dispose();
                     _wakeLock = null;
                 }
 
                 _isAcquired = false;
-                Debug.Log("[AndroidHelper] All power locks released");
+                AppLog.Log("[AndroidHelper] All power locks released");
             }
             catch (System.Exception ex)
             {
@@ -133,7 +134,7 @@ namespace VRWorkspace.Streaming
             // Fast path: if already exempted on a previous launch, skip JNI calls entirely
             if (PlayerPrefs.GetInt("VRWorkspace_BatteryOptExempt", 0) == 1)
             {
-                Debug.Log("[AndroidHelper] Battery optimization already handled (cached)");
+                AppLog.Log("[AndroidHelper] Battery optimization already handled (cached)");
                 return;
             }
 
@@ -149,7 +150,7 @@ namespace VRWorkspace.Streaming
 
                     if (!isIgnoring)
                     {
-                        Debug.Log("[AndroidHelper] Requesting battery optimization exemption...");
+                        AppLog.Log("[AndroidHelper] Requesting battery optimization exemption...");
 
                         using (var intent = new AndroidJavaObject("android.content.Intent"))
                         using (var uriClass = new AndroidJavaClass("android.net.Uri"))
@@ -162,7 +163,7 @@ namespace VRWorkspace.Streaming
                     }
                     else
                     {
-                        Debug.Log("[AndroidHelper] Battery optimization already disabled for this app");
+                        AppLog.Log("[AndroidHelper] Battery optimization already disabled for this app");
                         // Cache result so we skip JNI on next launch
                         PlayerPrefs.SetInt("VRWorkspace_BatteryOptExempt", 1);
                         PlayerPrefs.Save();
@@ -182,7 +183,7 @@ namespace VRWorkspace.Streaming
         public void SetKeepScreenOn(bool keepOn)
         {
             Screen.sleepTimeout = keepOn ? SleepTimeout.NeverSleep : SleepTimeout.SystemSetting;
-            Debug.Log($"[AndroidHelper] Screen sleep: {(keepOn ? "disabled" : "system default")}");
+            AppLog.Log($"[AndroidHelper] Screen sleep: {(keepOn ? "disabled" : "system default")}");
         }
 
         private void OnDestroy()
@@ -196,11 +197,11 @@ namespace VRWorkspace.Streaming
             // to maintain streaming connection
             if (pauseStatus)
             {
-                Debug.Log("[AndroidHelper] App paused - keeping locks active");
+                AppLog.Log("[AndroidHelper] App paused - keeping locks active");
             }
             else
             {
-                Debug.Log("[AndroidHelper] App resumed");
+                AppLog.Log("[AndroidHelper] App resumed");
             }
         }
 

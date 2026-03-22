@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Unity.WebRTC;
 using UnityEngine;
+using VRWorkspace.Core;
 
 namespace VRWorkspace.Streaming
 {
@@ -164,7 +165,7 @@ namespace VRWorkspace.Streaming
             if (_streamingStartTime == DateTime.MinValue)
             {
                 _streamingStartTime = DateTime.UtcNow;
-                Debug.Log("[PhaseProtocol] Streaming started - latency checks will begin after warmup period");
+                AppLog.Log("[PhaseProtocol] Streaming started - latency checks will begin after warmup period");
             }
 
             // Calculate time since streaming started
@@ -187,7 +188,7 @@ namespace VRWorkspace.Streaming
                 {
                     if ((DateTime.UtcNow - _lastExtremeSkipTime).TotalSeconds >= ExtremeSkipCooldownSeconds)
                     {
-                        Debug.LogWarning($"[PhaseProtocol] EXTREME RTT during warmup ({streamingDurationSeconds:F1}s): {currentRtt:F0}ms - skip_to_live");
+                        AppLog.LogWarning($"[PhaseProtocol] EXTREME RTT during warmup ({streamingDurationSeconds:F1}s): {currentRtt:F0}ms - skip_to_live");
                         _lastExtremeSkipTime = DateTime.UtcNow;
                         _lastSkipToLiveTime = DateTime.UtcNow;
                         SkipToLiveImmediate(-1);
@@ -204,7 +205,7 @@ namespace VRWorkspace.Streaming
                 // CRITICAL: RTT is 5+ seconds. Client is severely behind.
                 if ((DateTime.UtcNow - _lastExtremeSkipTime).TotalSeconds >= ExtremeSkipCooldownSeconds)
                 {
-                    Debug.LogWarning($"[PhaseProtocol] EXTREME RTT detected: {currentRtt:F0}ms - IMMEDIATE skip_to_live");
+                    AppLog.LogWarning($"[PhaseProtocol] EXTREME RTT detected: {currentRtt:F0}ms - IMMEDIATE skip_to_live");
                     _lastExtremeSkipTime = DateTime.UtcNow;
                     _lastSkipToLiveTime = DateTime.UtcNow;
                     SkipToLiveImmediate(-1);
@@ -218,7 +219,7 @@ namespace VRWorkspace.Streaming
                 // HIGH RTT: 3-5 seconds. Client is falling behind.
                 if ((DateTime.UtcNow - _lastSkipToLiveTime).TotalSeconds >= SkipToLiveCooldownSeconds)
                 {
-                    Debug.LogWarning($"[PhaseProtocol] HIGH RTT detected: {currentRtt:F0}ms - skip_to_live");
+                    AppLog.LogWarning($"[PhaseProtocol] HIGH RTT detected: {currentRtt:F0}ms - skip_to_live");
                     SkipToLive(-1);
                 }
                 return;
@@ -237,7 +238,7 @@ namespace VRWorkspace.Streaming
                 {
                     if ((DateTime.UtcNow - _lastSkipToLiveTime).TotalSeconds >= SkipToLiveCooldownSeconds)
                     {
-                        Debug.LogWarning($"[PhaseProtocol] FPS CRISIS: {effectiveFps:F1}/{targetFps:F0} fps - skip_to_live");
+                        AppLog.LogWarning($"[PhaseProtocol] FPS CRISIS: {effectiveFps:F1}/{targetFps:F0} fps - skip_to_live");
                         SkipToLive(-1);
                     }
                     return;
@@ -251,7 +252,7 @@ namespace VRWorkspace.Streaming
             {
                 if ((DateTime.UtcNow - _lastSkipToLiveTime).TotalSeconds >= SkipToLiveCooldownSeconds)
                 {
-                    Debug.LogWarning($"[PhaseProtocol] PACKET LOSS CRISIS: {packetLoss:P0} - skip_to_live + keyframe");
+                    AppLog.LogWarning($"[PhaseProtocol] PACKET LOSS CRISIS: {packetLoss:P0} - skip_to_live + keyframe");
                     SkipToLive(-1);
                     RequestKeyframe(-1);
                 }
@@ -290,7 +291,7 @@ namespace VRWorkspace.Streaming
 
                         if ((DateTime.UtcNow - _lastSkipToLiveTime).TotalSeconds >= SkipToLiveCooldownSeconds)
                         {
-                            Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} frame gap {timeSinceFrame:F0}ms (threshold={frameGapThreshold:F0}ms) - skip_to_live");
+                            AppLog.LogWarning($"[PhaseProtocol] PC{wrapper.Index} frame gap {timeSinceFrame:F0}ms (threshold={frameGapThreshold:F0}ms) - skip_to_live");
                         }
                         SkipToLive(wrapper.Index);
                         return;
@@ -334,7 +335,7 @@ namespace VRWorkspace.Streaming
                         {
                             if ((DateTime.UtcNow - _lastSkipToLiveTime).TotalSeconds >= SkipToLiveCooldownSeconds)
                             {
-                                Debug.LogWarning($"[PhaseProtocol] Monitor drift: PC{laggingMonitor} is {drift:F0}ms behind (threshold={driftThreshold:F0}ms) - skip_to_live");
+                                AppLog.LogWarning($"[PhaseProtocol] Monitor drift: PC{laggingMonitor} is {drift:F0}ms behind (threshold={driftThreshold:F0}ms) - skip_to_live");
                             }
                             SkipToLive(laggingMonitor);
                         }
@@ -357,7 +358,7 @@ namespace VRWorkspace.Streaming
                 string msg = monitorIndex >= 0
                     ? $"{{\"type\":\"skip_to_live\",\"monitor\":{monitorIndex},\"urgent\":true}}"
                     : "{\"type\":\"skip_to_live\",\"urgent\":true}";
-                Debug.LogWarning($"[PhaseProtocol] URGENT skip_to_live (bypassing cooldown)");
+                AppLog.LogWarning($"[PhaseProtocol] URGENT skip_to_live (bypassing cooldown)");
                 await SendTextAsync(msg);
 
                 // Also request keyframe to ensure clean recovery
@@ -366,7 +367,7 @@ namespace VRWorkspace.Streaming
                     ? $"{{\"type\":\"request_keyframe\",\"monitorIndex\":{monitorIndex}}}"
                     : "{\"type\":\"request_keyframe\"}";
                 await SendTextAsync(keyframeMsg);
-                if (VerboseLogging) Debug.Log($"[PhaseProtocol] Follow-up keyframe request sent");
+                if (VerboseLogging) AppLog.Log($"[PhaseProtocol] Follow-up keyframe request sent");
             }
             catch (Exception ex)
             {
@@ -422,7 +423,7 @@ namespace VRWorkspace.Streaming
                     float avgFps = totalSeconds > 0 ? (float)(wrapper.TotalFramesReceived / totalSeconds) : 0;
 
                     // TODO: Remove DIAG log after debugging stall recovery
-                    if (VerboseLogging) Debug.Log($"[DIAG:FPS] Mon{wrapper.Index}: {effectiveFps:F1}fps, rendered={wrapper.RenderedFrameCount}, dropped={wrapper.DroppedFrameCount}, total={wrapper.TotalFramesReceived}, window={windowSeconds:F2}s, avg={avgFps:F1}fps");
+                    if (VerboseLogging) AppLog.Log($"[DIAG:FPS] Mon{wrapper.Index}: {effectiveFps:F1}fps, rendered={wrapper.RenderedFrameCount}, dropped={wrapper.DroppedFrameCount}, total={wrapper.TotalFramesReceived}, window={windowSeconds:F2}s, avg={avgFps:F1}fps");
 
                     // Reset window
                     ResetFpsWindow(wrapper);
@@ -503,7 +504,7 @@ namespace VRWorkspace.Streaming
             _ = SendTextAsync(feedbackJson);
 
             // TODO: Remove DIAG log after debugging stall recovery
-            if (VerboseLogging) Debug.Log($"[DIAG:QF] RTT={_metrics.CurrentPingMs:F0}ms, jitter={_metrics.JitterMs:F1}ms, loss={_metrics.PacketLossRate:P2}, fps={_metrics.EffectiveFps:F1}/{_lastServerTargetFps:F0}, health={_metrics.HealthScore}, buf={bufferStatus}, rendered={totalRendered}, dropped={totalDropped}");
+            if (VerboseLogging) AppLog.Log($"[DIAG:QF] RTT={_metrics.CurrentPingMs:F0}ms, jitter={_metrics.JitterMs:F1}ms, loss={_metrics.PacketLossRate:P2}, fps={_metrics.EffectiveFps:F1}/{_lastServerTargetFps:F0}, health={_metrics.HealthScore}, buf={bufferStatus}, rendered={totalRendered}, dropped={totalDropped}");
         }
 
         /// <summary>
@@ -539,7 +540,7 @@ namespace VRWorkspace.Streaming
                             var timeSinceFrame = wrapper.LastFrameTime != default
                                 ? (DateTime.UtcNow - wrapper.LastFrameTime).TotalMilliseconds
                                 : -1;
-                            Debug.Log($"[PhaseProtocol] PollTextures PC{wrapper.Index}: " +
+                            AppLog.Log($"[PhaseProtocol] PollTextures PC{wrapper.Index}: " +
                                 $"track={(track != null ? "valid" : "null")}, " +
                                 $"tex={(tex != null ? $"{tex.width}x{tex.height}" : "null")}, " +
                                 $"cached={(wrapper.Texture != null ? "set" : "null")}, " +
@@ -566,13 +567,13 @@ namespace VRWorkspace.Streaming
                                     // Debug log first 10 frames and every 300 frames after - disabled by default
                                     if (VerboseLogging && (wrapper.FrameCount <= 10 || wrapper.FrameCount % 300 == 0))
                                     {
-                                        Debug.Log($"[PhaseProtocol] PC{wrapper.Index} texture ptr CHANGED: {wrapper.LastTexturePtr:X} -> {currentPtr:X}, frames={wrapper.FrameCount}");
+                                        AppLog.Log($"[PhaseProtocol] PC{wrapper.Index} texture ptr CHANGED: {wrapper.LastTexturePtr:X} -> {currentPtr:X}, frames={wrapper.FrameCount}");
                                     }
                                 }
                                 else
                                 {
                                     if (VerboseLogging)
-                                        Debug.Log($"[PhaseProtocol] PC{wrapper.Index} first texture ptr: {currentPtr:X}");
+                                        AppLog.Log($"[PhaseProtocol] PC{wrapper.Index} first texture ptr: {currentPtr:X}");
                                     wrapper.FirstTextureTime = DateTime.UtcNow;
                                 }
                                 wrapper.LastTexturePtr = currentPtr;
@@ -647,7 +648,7 @@ namespace VRWorkspace.Streaming
                             else if (wrapper.Texture != null && _pollCount <= 5)
                             {
                                 string webRtcTexInfo = tex != null ? tex.width + "x" + tex.height : "null";
-                                Debug.Log($"[PhaseProtocol] PC{wrapper.Index} H265: preserving custom decoder texture {wrapper.Texture.width}x{wrapper.Texture.height}, WebRTC tex={webRtcTexInfo}");
+                                AppLog.Log($"[PhaseProtocol] PC{wrapper.Index} H265: preserving custom decoder texture {wrapper.Texture.width}x{wrapper.Texture.height}, WebRTC tex={webRtcTexInfo}");
                             }
 
                         }
@@ -712,7 +713,7 @@ namespace VRWorkspace.Streaming
                             anyFallback = true;
                     }
                 }
-                Debug.Log($"[DIAG:STATE] polls={_pollCount}, totalFrames={totalFrames}, dropped={totalDropped}, " +
+                AppLog.Log($"[DIAG:STATE] polls={_pollCount}, totalFrames={totalFrames}, dropped={totalDropped}, " +
                     $"fps={_metrics.EffectiveFps:F1}/{_lastServerTargetFps:F0}, RTT={_metrics.CurrentPingMs:F0}ms, " +
                     $"loss={_metrics.PacketLossRate:P2}, health={_metrics.HealthScore}, wifi={_isWiFiConnection}, " +
                     $"decoderFrames={totalDecoded}, fallback={anyFallback}");
@@ -735,7 +736,7 @@ namespace VRWorkspace.Streaming
             if (loss > 0.03f && _prevPacketLoss < 0.01f &&
                 (DateTime.UtcNow - _lastProactiveKeyframeTime).TotalSeconds >= 2.0)
             {
-                Debug.LogWarning($"[DIAG:LOSS] Loss spike {_prevPacketLoss:P1}\u2192{loss:P1}, proactive keyframe burst");
+                AppLog.LogWarning($"[DIAG:LOSS] Loss spike {_prevPacketLoss:P1}\u2192{loss:P1}, proactive keyframe burst");
                 _ = SendTextAsync("{\"type\":\"request_keyframe_burst\",\"count\":3}");
                 _lastProactiveKeyframeTime = DateTime.UtcNow;
             }
@@ -753,7 +754,7 @@ namespace VRWorkspace.Streaming
             const int WIFI_CHECK_INTERVAL_MS = 300;    // WiFi: check every 0.3s for faster detection
             const int INITIAL_GRACE_PERIOD_MS = 5000;
 
-            Debug.Log("[PhaseProtocol] Frame stall monitor started");
+            AppLog.Log("[PhaseProtocol] Frame stall monitor started");
 
             await Task.Delay(INITIAL_GRACE_PERIOD_MS, ct);
 
@@ -817,7 +818,7 @@ namespace VRWorkspace.Streaming
 
                             if (!h265DcBootstrap && !perTrackWaiting && timeSinceNetwork > BOOTSTRAP_TIMEOUT_MS)
                             {
-                                Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} BOOTSTRAP TIMEOUT ({timeSinceNetwork:F0}ms) - triggering reconnect");
+                                AppLog.LogWarning($"[PhaseProtocol] PC{wrapper.Index} BOOTSTRAP TIMEOUT ({timeSinceNetwork:F0}ms) - triggering reconnect");
                                 wrapper.IsReconnecting = true;
                                 _ = AutoHealMonitorAsync(wrapper.Index);
                             }
@@ -842,7 +843,7 @@ namespace VRWorkspace.Streaming
                              var timeSinceDecoderRecovery = (DateTime.UtcNow - wrapper.LastDecoderStallRecoveryTime).TotalMilliseconds;
                              if (timeSinceDecoderRecovery > 3000) // 3s grace after decoder recovery
                              {
-                                  Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} NETWORK STALL ({timeSinceNetwork:F0}ms silence) - triggering repair");
+                                  AppLog.LogWarning($"[PhaseProtocol] PC{wrapper.Index} NETWORK STALL ({timeSinceNetwork:F0}ms silence) - triggering repair");
                                   // GraduatedRecovery handles WiFi silence better than direct reconnect
                                   _ = GraduatedRecoveryAsync(wrapper.Index);
                              }
@@ -858,13 +859,13 @@ namespace VRWorkspace.Streaming
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning($"[PhaseProtocol] Frame stall monitor error: {ex.Message}");
+                    AppLog.LogWarning($"[PhaseProtocol] Frame stall monitor error: {ex.Message}");
                     int checkInterval = _isWiFiConnection ? WIFI_CHECK_INTERVAL_MS : CHECK_INTERVAL_MS;
                     await Task.Delay(checkInterval, ct);
                 }
             }
 
-            Debug.Log("[PhaseProtocol] Frame stall monitor stopped");
+            AppLog.Log("[PhaseProtocol] Frame stall monitor stopped");
         }
 
         /// <summary>
@@ -958,7 +959,7 @@ namespace VRWorkspace.Streaming
                                 // First frame decoded - exit bootstrap window
                                 if (wrapper.WaitingForFirstFrame)
                                 {
-                                    Debug.Log($"[PhaseProtocol] PC{wrapper.Index} bootstrap complete (first frame decoded)");
+                                    AppLog.Log($"[PhaseProtocol] PC{wrapper.Index} bootstrap complete (first frame decoded)");
                                     wrapper.WaitingForFirstFrame = false;
                                 }
                             }
@@ -978,7 +979,7 @@ namespace VRWorkspace.Streaming
                                     networkActive &&
                                     timeSinceRecovery > RECOVERY_COOLDOWN_MS)
                                 {
-                                    Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} DECODER STALL (Path B)! " +
+                                    AppLog.LogWarning($"[PhaseProtocol] PC{wrapper.Index} DECODER STALL (Path B)! " +
                                         $"framesDecoded={decoded} (last={wrapper.LastWebRTCFramesDecoded}) frozen for {timeSinceAdvance:F0}ms" +
                                         (isH265DC ? " (H265 DC mode)" : $" while bytes are flowing ({timeSinceNetwork:F0}ms)") + ".");
 
@@ -991,7 +992,7 @@ namespace VRWorkspace.Streaming
                                 // 5. Escalation
                                 if (timeSinceAdvance > ESCALATE_TO_RECONNECT_MS && !wrapper.IsReconnecting)
                                 {
-                                     Debug.LogWarning($"[PhaseProtocol] PC{wrapper.Index} persistent stall ({timeSinceAdvance/1000:F1}s), triggering auto-heal");
+                                     AppLog.LogWarning($"[PhaseProtocol] PC{wrapper.Index} persistent stall ({timeSinceAdvance/1000:F1}s), triggering auto-heal");
                                      HandleDecoderStallOrFreeze(wrapper.Index, "Persistent stall escalation");
                                 }
                             }
@@ -1007,7 +1008,7 @@ namespace VRWorkspace.Streaming
             catch (Exception ex)
             {
                 if (VerboseLogging)
-                    Debug.LogWarning($"[PhaseProtocol] Stall check error PC{wrapper.Index}: {ex.Message}");
+                    AppLog.LogWarning($"[PhaseProtocol] Stall check error PC{wrapper.Index}: {ex.Message}");
             }
         }
 
@@ -1060,7 +1061,7 @@ namespace VRWorkspace.Streaming
             _freezeCount++;
             _h265StallStrikes++; // Persistent cumulative count across recoveries
             
-            Debug.LogWarning($"[PhaseProtocol] {reason} (strike #{_freezeCount}, total strikes={_h265StallStrikes})!");
+            AppLog.LogWarning($"[PhaseProtocol] {reason} (strike #{_freezeCount}, total strikes={_h265StallStrikes})!");
 
             // Update stats
             _metrics?.RecordStall();
@@ -1125,7 +1126,7 @@ namespace VRWorkspace.Streaming
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning($"[PhaseProtocol] Error parsing frame timing: {ex.Message}");
+                    AppLog.LogWarning($"[PhaseProtocol] Error parsing frame timing: {ex.Message}");
                 }
             }
 
@@ -1165,7 +1166,7 @@ namespace VRWorkspace.Streaming
                     {
                         // Mode 1: TexturePtrDetection works - use real frames for reliable freeze detection
                         if (VerboseLogging)
-                            Debug.Log($"[PhaseProtocol] Freeze check (ptr mode): server +{serverFrameAdvance}, client real +{realFrameAdvance}, loss={_metrics.PacketLossRate:P1}");
+                            AppLog.Log($"[PhaseProtocol] Freeze check (ptr mode): server +{serverFrameAdvance}, client real +{realFrameAdvance}, loss={_metrics.PacketLossRate:P1}");
 
                         // Freeze detected: server advanced many frames but client decoded none
                         if (serverFrameAdvance >= DecoderFreezeThresholdFrames && realFrameAdvance < 5)
@@ -1175,7 +1176,7 @@ namespace VRWorkspace.Streaming
                             if (_isWiFiConnection && _metrics.PacketLossRate > 0.30f)
                             {
                                 if (VerboseLogging)
-                                    Debug.Log($"[PhaseProtocol] Freeze check SKIP: High packet loss ({_metrics.PacketLossRate:P0}), waiting for ABR adjustment");
+                                    AppLog.Log($"[PhaseProtocol] Freeze check SKIP: High packet loss ({_metrics.PacketLossRate:P0}), waiting for ABR adjustment");
                             }
                             else
                             {
@@ -1187,7 +1188,7 @@ namespace VRWorkspace.Streaming
                             // Good frame flow, reset freeze count
                             if (_freezeCount > 0)
                             {
-                                if (VerboseLogging) Debug.Log($"[PhaseProtocol] Freeze recovery confirmed, resetting freeze count (was {_freezeCount})");
+                                if (VerboseLogging) AppLog.Log($"[PhaseProtocol] Freeze recovery confirmed, resetting freeze count (was {_freezeCount})");
                                 _freezeCount = 0;
                             }
                         }
@@ -1196,12 +1197,12 @@ namespace VRWorkspace.Streaming
                     {
                         // Mode 2: Fallback mode - can't detect real frames, use preventive keyframes
                         if (VerboseLogging)
-                            Debug.Log($"[PhaseProtocol] Freeze check (fallback mode): server +{serverFrameAdvance}, interval={PreventiveKeyframeIntervalSeconds:F0}s");
+                            AppLog.Log($"[PhaseProtocol] Freeze check (fallback mode): server +{serverFrameAdvance}, interval={PreventiveKeyframeIntervalSeconds:F0}s");
 
                         var timeSinceLastPreventive = (DateTime.UtcNow - _lastPreventiveKeyframeTime).TotalSeconds;
                         if (timeSinceLastPreventive >= PreventiveKeyframeIntervalSeconds)
                         {
-                            if (VerboseLogging) Debug.Log($"[PhaseProtocol] Fallback mode: Sending preventive keyframe request (last was {timeSinceLastPreventive:F0}s ago)");
+                            if (VerboseLogging) AppLog.Log($"[PhaseProtocol] Fallback mode: Sending preventive keyframe request (last was {timeSinceLastPreventive:F0}s ago)");
                             RequestKeyframe(-1); // Request keyframe for all monitors
                             _lastPreventiveKeyframeTime = DateTime.UtcNow;
                         }
@@ -1284,7 +1285,7 @@ namespace VRWorkspace.Streaming
             float targetFps = targetFpsD > 0 ? (float)targetFpsD : 60f;
 
             _lastServerTargetFps = targetFps;
-            if (VerboseLogging) Debug.Log($"[PhaseProtocol] Server adjusted FPS: monitor {monitorIndex} → {targetFps:F1} fps");
+            if (VerboseLogging) AppLog.Log($"[PhaseProtocol] Server adjusted FPS: monitor {monitorIndex} → {targetFps:F1} fps");
 
             OnFpsAdjusted?.Invoke(monitorIndex, targetFps);
         }
@@ -1299,7 +1300,7 @@ namespace VRWorkspace.Streaming
             int bitrateKbps = json.GetInt("bitrateKbps");
             string reason = json.GetString("reason") ?? "adaptive";
 
-            Debug.Log($"[DIAG:BITRATE] Server adjusted: mon{monitorIndex} → {bitrateKbps}kbps ({reason})");
+            AppLog.Log($"[DIAG:BITRATE] Server adjusted: mon{monitorIndex} → {bitrateKbps}kbps ({reason})");
 
             // Fire event for UI update if needed
             OnBitrateAdjusted?.Invoke(monitorIndex, bitrateKbps, reason);
@@ -1314,7 +1315,7 @@ namespace VRWorkspace.Streaming
             string recommendation = json.GetString("recommendation") ?? ""; // e.g., "reduce_fps", "reduce_resolution", "reduce_bitrate"
             string reason = json.GetString("reason") ?? "";
 
-            Debug.Log($"[PhaseProtocol] Server quality recommendation: {recommendation} - {reason}");
+            AppLog.Log($"[PhaseProtocol] Server quality recommendation: {recommendation} - {reason}");
 
             // Fire event for UI/settings to handle
             OnQualityRecommendation?.Invoke(recommendation, reason);
@@ -1338,8 +1339,8 @@ namespace VRWorkspace.Streaming
             _metrics.ConnectionType = connectionType ?? "Unknown";
             _metrics.IsWiFiConnection = _isWiFiConnection;
 
-            Debug.Log($"[PhaseProtocol] Connection type: {connectionType}, WiFi mode: {_isWiFiConnection}");
-            Debug.Log($"[PhaseProtocol] Active thresholds - FrameGap: {FrameGapThresholdMs}ms, MonitorDrift: {MonitorDriftThresholdMs}ms, FreezeThreshold: {DecoderFreezeThresholdFrames} frames");
+            AppLog.Log($"[PhaseProtocol] Connection type: {connectionType}, WiFi mode: {_isWiFiConnection}");
+            AppLog.Log($"[PhaseProtocol] Active thresholds - FrameGap: {FrameGapThresholdMs}ms, MonitorDrift: {MonitorDriftThresholdMs}ms, FreezeThreshold: {DecoderFreezeThresholdFrames} frames");
         }
 
         /// <summary>

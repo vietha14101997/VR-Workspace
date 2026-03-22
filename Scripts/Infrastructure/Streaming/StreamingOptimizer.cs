@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using VRWorkspace.Core;
 
 namespace VRWorkspace.Streaming
 {
@@ -253,8 +254,8 @@ namespace VRWorkspace.Streaming
             // Build reason string
             config.reason = BuildReasonString(hardware, network, config);
 
-            Debug.Log($"[StreamingOptimizer] Calculated config: {config.resolutionWidth}x{config.resolutionHeight} @ {config.fps}fps, {config.bitrateKbps}kbps, {config.monitors} monitors");
-            Debug.Log($"[StreamingOptimizer] Reason: {config.reason}");
+            AppLog.Log($"[StreamingOptimizer] Calculated config: {config.resolutionWidth}x{config.resolutionHeight} @ {config.fps}fps, {config.bitrateKbps}kbps, {config.monitors} monitors");
+            AppLog.Log($"[StreamingOptimizer] Reason: {config.reason}");
 
             return config;
         }

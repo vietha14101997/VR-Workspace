@@ -4,6 +4,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
+using VRWorkspace.Core;
 
 namespace VRWorkspace.Streaming
 {
@@ -76,7 +77,7 @@ namespace VRWorkspace.Streaming
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[WSTransport] Send error: {ex.Message}");
+                AppLog.LogWarning($"[WSTransport] Send error: {ex.Message}");
             }
         }
 
@@ -130,7 +131,7 @@ namespace VRWorkspace.Streaming
                     }
                     catch (OperationCanceledException) when (!ct.IsCancellationRequested)
                     {
-                        Debug.LogWarning("[WSTransport] Receive timeout – checking connection health");
+                        AppLog.LogWarning("[WSTransport] Receive timeout – checking connection health");
                         if (_missedPongCount > 0)
                             OnError?.Invoke("WebSocket receive timeout with missed pongs");
                         continue;
@@ -138,7 +139,7 @@ namespace VRWorkspace.Streaming
 
                     if (first.MessageType == WebSocketMessageType.Close)
                     {
-                        Debug.Log("[WSTransport] Remote closed WebSocket");
+                        AppLog.Log("[WSTransport] Remote closed WebSocket");
                         OnDisconnected?.Invoke();
                         return;
                     }
@@ -192,7 +193,7 @@ namespace VRWorkspace.Streaming
             }
             catch (OperationCanceledException)
             {
-                Debug.Log("[WSTransport] Receive loop cancelled");
+                AppLog.Log("[WSTransport] Receive loop cancelled");
             }
             catch (Exception ex)
             {
@@ -217,7 +218,7 @@ namespace VRWorkspace.Streaming
                     if (_lastPongReceivedMs > 0 && timeSinceLastPong > PONG_TIMEOUT_MS)
                     {
                         _missedPongCount++;
-                        Debug.LogWarning(
+                        AppLog.LogWarning(
                             $"[WSTransport] Pong timeout! {timeSinceLastPong} ms since last pong, missed={_missedPongCount}");
 
                         if (_missedPongCount >= MAX_MISSED_PONGS)
@@ -232,7 +233,7 @@ namespace VRWorkspace.Streaming
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning($"[WSTransport] Keepalive error: {ex.Message}");
+                    AppLog.LogWarning($"[WSTransport] Keepalive error: {ex.Message}");
                 }
 
                 await Task.Delay(PING_INTERVAL_MS, ct);

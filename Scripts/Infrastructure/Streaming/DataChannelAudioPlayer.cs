@@ -2,6 +2,7 @@ using System;
 using Concentus;
 using Concentus.Enums;
 using UnityEngine;
+using VRWorkspace.Core;
 
 namespace VRWorkspace.Streaming
 {
@@ -53,12 +54,12 @@ namespace VRWorkspace.Streaming
 
             // Force 48kHz DSP to match Opus decoder + low-latency buffer
             var audioConfig = AudioSettings.GetConfiguration();
-            Debug.Log($"[DataChannelAudioPlayer] DSP before: rate={audioConfig.sampleRate}, buf={audioConfig.dspBufferSize}, speakers={audioConfig.speakerMode}");
+            AppLog.Log($"[DataChannelAudioPlayer] DSP before: rate={audioConfig.sampleRate}, buf={audioConfig.dspBufferSize}, speakers={audioConfig.speakerMode}");
             audioConfig.dspBufferSize = 256;
             audioConfig.sampleRate = SAMPLE_RATE; // Must match Opus decoder (48kHz)
             AudioSettings.Reset(audioConfig);
             var newConfig = AudioSettings.GetConfiguration();
-            Debug.Log($"[DataChannelAudioPlayer] DSP after: rate={newConfig.sampleRate}, buf={newConfig.dspBufferSize}, speakers={newConfig.speakerMode}");
+            AppLog.Log($"[DataChannelAudioPlayer] DSP after: rate={newConfig.sampleRate}, buf={newConfig.dspBufferSize}, speakers={newConfig.speakerMode}");
             _cachedOutputRate = AudioSettings.outputSampleRate; // Cache for audio thread
         }
 
@@ -77,7 +78,7 @@ namespace VRWorkspace.Streaming
             _audioSource.loop = true;
             _audioSource.Play();
 
-            Debug.Log("[DataChannelAudioPlayer] Playback started");
+            AppLog.Log("[DataChannelAudioPlayer] Playback started");
         }
 
         /// <summary>
@@ -117,7 +118,7 @@ namespace VRWorkspace.Streaming
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[DataChannelAudioPlayer] Decode error: {ex.Message}");
+                AppLog.LogWarning($"[DataChannelAudioPlayer] Decode error: {ex.Message}");
             }
         }
 
@@ -133,7 +134,7 @@ namespace VRWorkspace.Streaming
             if (!_loggedDspInfo)
             {
                 _loggedDspInfo = true;
-                Debug.Log($"[DataChannelAudioPlayer] OnAudioFilterRead: data.Length={data.Length}, channels={channels}, outputRate={_cachedOutputRate}");
+                AppLog.Log($"[DataChannelAudioPlayer] OnAudioFilterRead: data.Length={data.Length}, channels={channels}, outputRate={_cachedOutputRate}");
             }
 
             int available = AvailableSamples();
@@ -228,7 +229,7 @@ namespace VRWorkspace.Streaming
             }
             _writePos = 0;
             _readPos = 0;
-            Debug.Log("[DataChannelAudioPlayer] Stopped");
+            AppLog.Log("[DataChannelAudioPlayer] Stopped");
         }
 
         void OnDestroy()

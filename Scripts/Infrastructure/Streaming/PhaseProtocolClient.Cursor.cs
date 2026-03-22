@@ -1,6 +1,7 @@
 using System;
 using System.Text;
 using UnityEngine;
+using VRWorkspace.Core;
 
 namespace VRWorkspace.Streaming
 {
@@ -164,7 +165,7 @@ namespace VRWorkspace.Streaming
                 }
                 else
                 {
-                    Debug.LogWarning($"[PhaseProtocol] No H265 handler/receiver for track {trackIndex}, IDR data lost");
+                    AppLog.LogWarning($"[PhaseProtocol] No H265 handler/receiver for track {trackIndex}, IDR data lost");
                 }
                 return;
             }
@@ -179,7 +180,7 @@ namespace VRWorkspace.Streaming
                     int receivedCount = 0;
                     for (int i = 0; i < oldChunks.Length; i++)
                         if (oldChunks[i] != null) receivedCount++;
-                    Debug.LogWarning($"[PhaseProtocol] IDR chunk loss detected for track {trackIndex}: had {receivedCount}/{oldChunks.Length} chunks, discarding stale assembly");
+                    AppLog.LogWarning($"[PhaseProtocol] IDR chunk loss detected for track {trackIndex}: had {receivedCount}/{oldChunks.Length} chunks, discarding stale assembly");
                     TaintTrack(trackIndex, "IDR chunk loss");
                 }
                 chunks = new byte[totalChunks][];
@@ -194,7 +195,7 @@ namespace VRWorkspace.Streaming
                     if (chunks[i] != null) receivedCount++;
                 if (receivedCount < chunks.Length)
                 {
-                    Debug.LogWarning($"[PhaseProtocol] New IDR started but previous incomplete for track {trackIndex}: {receivedCount}/{chunks.Length}");
+                    AppLog.LogWarning($"[PhaseProtocol] New IDR started but previous incomplete for track {trackIndex}: {receivedCount}/{chunks.Length}");
                 }
                 chunks = new byte[totalChunks][];
                 _idrChunks[trackIndex] = chunks;
@@ -250,7 +251,7 @@ namespace VRWorkspace.Streaming
                 }
                 else
                 {
-                    Debug.LogWarning($"[PhaseProtocol] No H265 handler/receiver for track {trackIndex}, reassembled IDR lost");
+                    AppLog.LogWarning($"[PhaseProtocol] No H265 handler/receiver for track {trackIndex}, reassembled IDR lost");
                 }
             }
         }
@@ -292,7 +293,7 @@ namespace VRWorkspace.Streaming
                 {
                     _consecutiveDroppedPframes++;
                     if (_consecutiveDroppedPframes <= 5 || _consecutiveDroppedPframes % 50 == 0)
-                        Debug.LogWarning($"[PhaseProtocol] P-frame chunk loss for track {trackIndex} (consecutive: {_consecutiveDroppedPframes})");
+                        AppLog.LogWarning($"[PhaseProtocol] P-frame chunk loss for track {trackIndex} (consecutive: {_consecutiveDroppedPframes})");
 
                     // ANY P-frame chunk loss breaks the reference chain — taint immediately
                     TaintTrack(trackIndex, $"P-frame chunk loss (consecutive: {_consecutiveDroppedPframes})");
@@ -502,7 +503,7 @@ namespace VRWorkspace.Streaming
                             }
                             else
                             {
-                                Debug.LogWarning($"[PhaseProtocol] RGBA larger than expected ({rgbaData.Length} > {expectedSize}), truncating");
+                                AppLog.LogWarning($"[PhaseProtocol] RGBA larger than expected ({rgbaData.Length} > {expectedSize}), truncating");
                                 var truncated = new byte[expectedSize];
                                 Array.Copy(rgbaData, truncated, expectedSize);
                                 rgbaData = truncated;
@@ -562,7 +563,7 @@ namespace VRWorkspace.Streaming
             _taintedTracks.Add(trackIndex);
 
             if (!wasAlreadyTainted)
-                Debug.LogWarning($"[PhaseProtocol] Track {trackIndex} TAINTED: {reason}. P-frames will be dropped until next IDR.");
+                AppLog.LogWarning($"[PhaseProtocol] Track {trackIndex} TAINTED: {reason}. P-frames will be dropped until next IDR.");
 
             // Flush the decoder to clear corrupted reference frames
             if (_h265Receivers.TryGetValue(trackIndex, out var receiver))
@@ -585,7 +586,7 @@ namespace VRWorkspace.Streaming
         private void UntaintTrack(int trackIndex)
         {
             if (_taintedTracks.Remove(trackIndex))
-                Debug.Log($"[PhaseProtocol] Track {trackIndex} UNTAINTED: clean IDR received, P-frames resumed.");
+                AppLog.Log($"[PhaseProtocol] Track {trackIndex} UNTAINTED: clean IDR received, P-frames resumed.");
         }
 
         /// <summary>
@@ -641,7 +642,7 @@ namespace VRWorkspace.Streaming
                             else
                             {
                                 // Truncate extra bytes
-                                Debug.LogWarning($"[PhaseProtocol] RGBA larger than expected ({rgbaData.Length} > {expectedSize}), truncating");
+                                AppLog.LogWarning($"[PhaseProtocol] RGBA larger than expected ({rgbaData.Length} > {expectedSize}), truncating");
                                 var truncated = new byte[expectedSize];
                                 Array.Copy(rgbaData, truncated, expectedSize);
                                 rgbaData = truncated;

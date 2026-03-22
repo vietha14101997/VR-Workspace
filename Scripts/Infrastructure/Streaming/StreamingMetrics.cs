@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using VRWorkspace.Core;
 
 namespace VRWorkspace.Streaming
 {
@@ -297,7 +298,7 @@ namespace VRWorkspace.Streaming
             if (isUsbMode)
             {
                 ConnectionType = "USB";
-                UnityEngine.Debug.Log($"[StreamingMetrics] USB Mode: latency={usbLatencyMs:F2}ms, version={usbVersion}, bandwidth={usbBandwidthMbps}Mbps");
+                AppLog.Log($"[StreamingMetrics] USB Mode: latency={usbLatencyMs:F2}ms, version={usbVersion}, bandwidth={usbBandwidthMbps}Mbps");
             }
         }
 

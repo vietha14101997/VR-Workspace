@@ -6,6 +6,7 @@ using System.Net.WebSockets;
 using System.Threading.Tasks;
 using Unity.WebRTC;
 using UnityEngine;
+using VRWorkspace.Core;
 
 namespace VRWorkspace.Streaming
 {
@@ -34,13 +35,13 @@ namespace VRWorkspace.Streaming
             {
                 if (monitorIndex < 0 || monitorIndex >= _peerConnections.Count)
                 {
-                    Debug.LogWarning($"[PhaseProtocol] Reconnect ignored: invalid monitor index {monitorIndex}");
+                    AppLog.LogWarning($"[PhaseProtocol] Reconnect ignored: invalid monitor index {monitorIndex}");
                     return;
                 }
                 oldWrapper = _peerConnections[monitorIndex];
             }
 
-            Debug.Log($"[PhaseProtocol] Reconnecting PC{monitorIndex} (legacy mode)...");
+            AppLog.Log($"[PhaseProtocol] Reconnecting PC{monitorIndex} (legacy mode)...");
 
             // Close old PC
             try { oldWrapper.PC?.Close(); oldWrapper.PC?.Dispose(); } catch { }
@@ -68,13 +69,13 @@ namespace VRWorkspace.Streaming
             // Without these, server has no audio/cursor channels after reconnect
             _sctpInitChannel = pc.CreateDataChannel("audio");
             _sctpInitChannel.OnMessage = bytes => { OnAudioDataReceived?.Invoke(bytes); };
-            _sctpInitChannel.OnOpen = () => Debug.Log("[PhaseProtocol] Audio DataChannel opened (reconnect)");
-            _sctpInitChannel.OnClose = () => Debug.Log("[PhaseProtocol] Audio DataChannel closed (reconnect)");
+            _sctpInitChannel.OnOpen = () => AppLog.Log("[PhaseProtocol] Audio DataChannel opened (reconnect)");
+            _sctpInitChannel.OnClose = () => AppLog.Log("[PhaseProtocol] Audio DataChannel closed (reconnect)");
 
             _cursorChannel = pc.CreateDataChannel("cursor");
             _cursorChannel.OnMessage = bytes => HandleCursorFromDataChannel(bytes);
-            _cursorChannel.OnOpen = () => Debug.Log("[PhaseProtocol] Cursor DataChannel opened (reconnect)");
-            _cursorChannel.OnClose = () => Debug.Log("[PhaseProtocol] Cursor DataChannel closed (reconnect)");
+            _cursorChannel.OnOpen = () => AppLog.Log("[PhaseProtocol] Cursor DataChannel opened (reconnect)");
+            _cursorChannel.OnClose = () => AppLog.Log("[PhaseProtocol] Cursor DataChannel closed (reconnect)");
 
             // Re-create per-track H265 video DataChannels
             var h265VideoInit = new RTCDataChannelInit { ordered = false, maxRetransmits = 0 };
@@ -85,23 +86,23 @@ namespace VRWorkspace.Streaming
                 var ch = pc.CreateDataChannel(label, h265VideoInit);
                 int capturedTrack = t;
                 ch.OnMessage = bytes => HandleH265VideoFromDataChannel(bytes);
-                ch.OnOpen = () => Debug.Log($"[PhaseProtocol] H265 Video DC opened: {label} (reconnect)");
-                ch.OnClose = () => Debug.Log($"[PhaseProtocol] H265 Video DC closed: {label} (reconnect)");
+                ch.OnOpen = () => AppLog.Log($"[PhaseProtocol] H265 Video DC opened: {label} (reconnect)");
+                ch.OnClose = () => AppLog.Log($"[PhaseProtocol] H265 Video DC closed: {label} (reconnect)");
                 _h265VideoChannels[t] = ch;
             }
-            Debug.Log($"[PhaseProtocol] PC{idx} DataChannels created (audio+cursor+{_expectedMonitorCount}x h265video) on reconnect");
+            AppLog.Log($"[PhaseProtocol] PC{idx} DataChannels created (audio+cursor+{_expectedMonitorCount}x h265video) on reconnect");
 
             // Connection state handlers
             pc.OnIceConnectionChange = s =>
             {
-                Debug.Log($"[PhaseProtocol] PC{idx} ICE (reconnected): {s}");
+                AppLog.Log($"[PhaseProtocol] PC{idx} ICE (reconnected): {s}");
             };
             pc.OnConnectionStateChange = s =>
             {
-                Debug.Log($"[PhaseProtocol] PC{idx} State (reconnected): {s}");
+                AppLog.Log($"[PhaseProtocol] PC{idx} State (reconnected): {s}");
                 if (s == RTCPeerConnectionState.Connected)
                 {
-                    Debug.Log($"[PhaseProtocol] PC{idx} reconnect successful!");
+                    AppLog.Log($"[PhaseProtocol] PC{idx} reconnect successful!");
                     wrapper.LastConnectedTime = DateTime.UtcNow;
                     wrapper.IsReconnecting = false;
                     wrapper.ReconnectAttempts = 0; // Reset on successful reconnection
@@ -116,14 +117,14 @@ namespace VRWorkspace.Streaming
                 }
                 else if (s == RTCPeerConnectionState.Failed || s == RTCPeerConnectionState.Disconnected)
                 {
-                    Debug.LogWarning($"[PhaseProtocol] PC{idx} connection lost again after reconnect");
+                    AppLog.LogWarning($"[PhaseProtocol] PC{idx} connection lost again after reconnect");
                     _metrics.RecordIceDisconnect();
 
                     // Auto-heal again if still streaming
                     if (_stateMachine.IsStreaming && !wrapper.IsReconnecting)
                     {
                         wrapper.IsReconnecting = true;
-                        Debug.Log($"[PhaseProtocol] PC{idx} re-initiating auto-heal...");
+                        AppLog.Log($"[PhaseProtocol] PC{idx} re-initiating auto-heal...");
                         _ = AutoHealMonitorAsync(idx);
                     }
                 }
@@ -156,7 +157,7 @@ namespace VRWorkspace.Streaming
                 if (!wrapper.OfferSent)
                 {
                     wrapper.QueuedCandidates.Add(candidateJson);
-                    Debug.Log($"[PhaseProtocol] PC{idx} queued ICE candidate on reconnect (offer not sent yet)");
+                    AppLog.Log($"[PhaseProtocol] PC{idx} queued ICE candidate on reconnect (offer not sent yet)");
                 }
                 else
                 {
@@ -176,7 +177,7 @@ namespace VRWorkspace.Streaming
                     {
                         bool isH264 = _selectedCodec == VideoCodec.H264;
                         string codecName = isH264 ? "H264" : "H265";
-                        Debug.Log($"[PhaseProtocol] PC{idx} using {codecName} custom decoder pipeline via DataChannel (reconnect)");
+                        AppLog.Log($"[PhaseProtocol] PC{idx} using {codecName} custom decoder pipeline via DataChannel (reconnect)");
 
                         int w = _userConfig?.resolutionWidth  ?? 1920;
                         int h = _userConfig?.resolutionHeight ?? 1080;
@@ -208,7 +209,7 @@ namespace VRWorkspace.Streaming
 
                                 if (!_streamingStartedFired)
                                 {
-                                    Debug.Log($"[PhaseProtocol] PC{idx} received first frame ({codecName} reconnect), firing OnStreamingStarted");
+                                    AppLog.Log($"[PhaseProtocol] PC{idx} received first frame ({codecName} reconnect), firing OnStreamingStarted");
                                     _stateMachine.TryTransition(ConnectionPhase.Streaming);
                                     HandleStreamingStartedInternal();
                                 }
@@ -230,7 +231,7 @@ namespace VRWorkspace.Streaming
                                     var handler = new H265EncodedFrameHandler(receiver);
                                     _h265Handlers[idx] = handler;
                                     e.Transceiver.Receiver.Transform = handler.Transform;
-                                    Debug.Log($"[PhaseProtocol] PC{idx} hooked H265 custom decoder via Encoded Transform (reconnect)");
+                                    AppLog.Log($"[PhaseProtocol] PC{idx} hooked H265 custom decoder via Encoded Transform (reconnect)");
                                 }
                                 catch (Exception ex)
                                 {
@@ -258,7 +259,7 @@ namespace VRWorkspace.Streaming
                             if (!_streamingStartedFired)
                             {
                                 _streamingStartedFired = true;
-                                Debug.Log($"[PhaseProtocol] PC{idx} received first frame (reconnected), firing OnStreamingStarted");
+                                AppLog.Log($"[PhaseProtocol] PC{idx} received first frame (reconnected), firing OnStreamingStarted");
                                 _stateMachine.TryTransition(ConnectionPhase.Streaming);
                                 OnStreamingStarted?.Invoke();
                             }
@@ -266,7 +267,7 @@ namespace VRWorkspace.Streaming
                             OnVideoTextureReceived?.Invoke(idx, tex);
                         };
                     }
-                    Debug.Log($"[PhaseProtocol] PC{idx} received video track (reconnected)");
+                    AppLog.Log($"[PhaseProtocol] PC{idx} received video track (reconnected)");
                 }
             };
 
@@ -306,13 +307,13 @@ namespace VRWorkspace.Streaming
 
             // Send offer first
             await SendTextAsync($"{{\"type\":\"offer\",\"monitorIndex\":{idx},\"sdp\":\"{EscapeJsonString(offer.sdp)}\"}}");
-            Debug.Log($"[PhaseProtocol] PC{idx} reconnect offer sent");
+            AppLog.Log($"[PhaseProtocol] PC{idx} reconnect offer sent");
 
             // Mark offer as sent and flush queued candidates
             wrapper.OfferSent = true;
             if (wrapper.QueuedCandidates.Count > 0)
             {
-                Debug.Log($"[PhaseProtocol] PC{idx} flushing {wrapper.QueuedCandidates.Count} queued ICE candidates on reconnect");
+                AppLog.Log($"[PhaseProtocol] PC{idx} flushing {wrapper.QueuedCandidates.Count} queued ICE candidates on reconnect");
                 foreach (var candJson in wrapper.QueuedCandidates)
                 {
                     _ = SendTextAsync(candJson);
@@ -329,20 +330,20 @@ namespace VRWorkspace.Streaming
         private async Task ReconnectVideoOnlyAsync(int monitorIndex)
         {
             if (_cts == null || _cts.IsCancellationRequested) return;
-            Debug.Log($"[PhaseProtocol] ReconnectVideoOnly: monitor {monitorIndex} (per-track mode)");
+            AppLog.Log($"[PhaseProtocol] ReconnectVideoOnly: monitor {monitorIndex} (per-track mode)");
 
             // Close the existing video PC for this monitor
             if (_videoPcs.TryGetValue(monitorIndex, out var oldVpc))
             {
                 try { oldVpc.Close(); oldVpc.Dispose(); } catch { }
                 _videoPcs.Remove(monitorIndex);
-                Debug.Log($"[PhaseProtocol] ReconnectVideoOnly: closed old video PC for monitor {monitorIndex}");
+                AppLog.Log($"[PhaseProtocol] ReconnectVideoOnly: closed old video PC for monitor {monitorIndex}");
             }
 
             // Ask server to send a new video_offer for this monitor.
             // The existing video_offer handler (HandleVideoOfferMessageAsync) will process the response.
             await SendTextAsync($"{{\"type\":\"reconnect_video\",\"monitorIndex\":{monitorIndex}}}");
-            Debug.Log($"[PhaseProtocol] ReconnectVideoOnly: sent reconnect_video for monitor {monitorIndex}, awaiting new video_offer");
+            AppLog.Log($"[PhaseProtocol] ReconnectVideoOnly: sent reconnect_video for monitor {monitorIndex}, awaiting new video_offer");
         }
 
         /// <summary>
@@ -362,7 +363,7 @@ namespace VRWorkspace.Streaming
                 count = _peerConnections.Count;
                 if (count == 0)
                 {
-                    Debug.LogWarning("[PhaseProtocol] ReconnectSinglePC: No monitors to reconnect");
+                    AppLog.LogWarning("[PhaseProtocol] ReconnectSinglePC: No monitors to reconnect");
                     return;
                 }
                 oldPc = _peerConnections[0].PC;
@@ -370,7 +371,7 @@ namespace VRWorkspace.Streaming
 
             // Increment reconnect generation to invalidate any in-flight answers from previous reconnects
             int gen = ++_reconnectGeneration;
-            Debug.Log($"[PhaseProtocol] ReconnectSinglePC: Reconnecting {count} monitors (gen={gen})...");
+            AppLog.Log($"[PhaseProtocol] ReconnectSinglePC: Reconnecting {count} monitors (gen={gen})...");
 
             // Close old PeerConnection
             try
@@ -380,20 +381,20 @@ namespace VRWorkspace.Streaming
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[PhaseProtocol] Error closing old PC: {ex.Message}");
+                AppLog.LogWarning($"[PhaseProtocol] Error closing old PC: {ex.Message}");
             }
 
             // Per-track mode: also close all video PCs for full re-signaling
             if (_perTrackPcMode)
             {
                 CloseAllVideoPcs();
-                Debug.Log($"[PhaseProtocol] ReconnectSinglePC (per-track): closed all video PCs, awaiting new video_offers");
+                AppLog.Log($"[PhaseProtocol] ReconnectSinglePC (per-track): closed all video PCs, awaiting new video_offers");
             }
 
             // Check if a newer reconnect superseded us during disposal
             if (_reconnectGeneration != gen)
             {
-                Debug.LogWarning($"[PhaseProtocol] ReconnectSinglePC gen={gen} superseded by gen={_reconnectGeneration}, aborting");
+                AppLog.LogWarning($"[PhaseProtocol] ReconnectSinglePC gen={gen} superseded by gen={_reconnectGeneration}, aborting");
                 return;
             }
 
@@ -408,11 +409,11 @@ namespace VRWorkspace.Streaming
             // Check again after async operation — a newer reconnect may have started
             if (_reconnectGeneration != gen)
             {
-                Debug.LogWarning($"[PhaseProtocol] ReconnectSinglePC gen={gen} superseded after PC creation, aborting");
+                AppLog.LogWarning($"[PhaseProtocol] ReconnectSinglePC gen={gen} superseded after PC creation, aborting");
                 return;
             }
 
-            Debug.Log("[PhaseProtocol] ReconnectSinglePC: Reconnection initiated, waiting for answer...");
+            AppLog.Log("[PhaseProtocol] ReconnectSinglePC: Reconnection initiated, waiting for answer...");
         }
 
         /// <summary>
@@ -442,7 +443,7 @@ namespace VRWorkspace.Streaming
 
                 // STEP 1: Keyframe burst
                 wrapper.GraduatedRecoveryStep = 1;
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} graduated step 1: keyframe burst (count={burstCount})");
+                AppLog.Log($"[PhaseProtocol] PC{monitorIndex} graduated step 1: keyframe burst (count={burstCount})");
                 await SendTextAsync($"{{\"type\":\"request_keyframe_burst\",\"monitorIndex\":{monitorIndex},\"count\":{burstCount}}}");
 
                 // Wait for frames to resume (USB needs longer for SCTP to deliver)
@@ -454,13 +455,13 @@ namespace VRWorkspace.Streaming
                 // 500ms window: new SSRC after reconnect needs time for jitter buffer init
                 if (timeSinceDecoderAdvance < 500)
                 {
-                    Debug.Log($"[PhaseProtocol] PC{monitorIndex} recovered at step 1 (decoder advanced {timeSinceDecoderAdvance:F0}ms ago)");
+                    AppLog.Log($"[PhaseProtocol] PC{monitorIndex} recovered at step 1 (decoder advanced {timeSinceDecoderAdvance:F0}ms ago)");
                     return;
                 }
 
                 // STEP 2: Skip-to-live + keyframe burst (handles accumulated buffer delay)
                 wrapper.GraduatedRecoveryStep = 2;
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} graduated step 2: skip + keyframe burst (count={burstCount})");
+                AppLog.Log($"[PhaseProtocol] PC{monitorIndex} graduated step 2: skip + keyframe burst (count={burstCount})");
                 SkipToLiveImmediate(monitorIndex);
                 await Task.Delay(50);
                 await SendTextAsync($"{{\"type\":\"request_keyframe_burst\",\"monitorIndex\":{monitorIndex},\"count\":{burstCount}}}");
@@ -470,26 +471,26 @@ namespace VRWorkspace.Streaming
                 timeSinceDecoderAdvance = (DateTime.UtcNow - wrapper.LastDecoderAdvanceTime).TotalMilliseconds;
                 if (timeSinceDecoderAdvance < 500)
                 {
-                    Debug.Log($"[PhaseProtocol] PC{monitorIndex} recovered at step 2!");
+                    AppLog.Log($"[PhaseProtocol] PC{monitorIndex} recovered at step 2!");
                     return;
                 }
 
                 // STEP 3: Full reconnect (last resort)
                 wrapper.GraduatedRecoveryStep = 3;
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} graduated step 2 failed, triggering reconnection...");
+                AppLog.Log($"[PhaseProtocol] PC{monitorIndex} graduated step 2 failed, triggering reconnection...");
                 
                 bool isSinglePC = false;
                 lock (_lock) { isSinglePC = _peerConnections.Count > 1 && _peerConnections.All(w => w.PC == wrapper.PC); }
 
                 if (isSinglePC)
                 {
-                    Debug.Log($"[PhaseProtocol] PC{monitorIndex} graduated step 3: full Single-PC reconnect");
+                    AppLog.Log($"[PhaseProtocol] PC{monitorIndex} graduated step 3: full Single-PC reconnect");
                     wrapper.IsReconnecting = true;
                     _ = ReconnectSinglePCAsync();
                 }
                 else
                 {
-                    Debug.Log($"[PhaseProtocol] PC{monitorIndex} graduated step 3: monitor reconnect");
+                    AppLog.Log($"[PhaseProtocol] PC{monitorIndex} graduated step 3: monitor reconnect");
                     wrapper.IsReconnecting = true;
                     await AutoHealMonitorAsync(monitorIndex);
                 }
@@ -530,14 +531,14 @@ namespace VRWorkspace.Streaming
             // Fast linear backoff for VR: 500ms, 1s, 1.5s, 2s, 2.5s (VR needs fast recovery)
             int delayMs = 500 + (wrapper.ReconnectAttempts * 500);
             wrapper.ReconnectAttempts++;
-            Debug.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal: attempt {wrapper.ReconnectAttempts}/{PCWrapper.MaxReconnectAttempts}, waiting {delayMs}ms...");
+            AppLog.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal: attempt {wrapper.ReconnectAttempts}/{PCWrapper.MaxReconnectAttempts}, waiting {delayMs}ms...");
             await Task.Delay(delayMs);
 
             // Check if we're still streaming and need reconnect
             if (_cts == null || _cts.IsCancellationRequested) return;
             if (!_stateMachine.IsStreaming)
             {
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal: no longer streaming, skip reconnect");
+                AppLog.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal: no longer streaming, skip reconnect");
                 wrapper.IsReconnecting = false;
                 return;
             }
@@ -545,7 +546,7 @@ namespace VRWorkspace.Streaming
             // Abort auto-heal if H265 fallback has been triggered — fallback handles its own reconnect
             if (_h265FallbackTriggered || _h265FallbackInProgress)
             {
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal: H265 fallback in progress, aborting auto-heal");
+                AppLog.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal: H265 fallback in progress, aborting auto-heal");
                 wrapper.IsReconnecting = false;
                 return;
             }
@@ -554,7 +555,7 @@ namespace VRWorkspace.Streaming
             var timeSinceFrame = DateTime.UtcNow - wrapper.LastFrameTime;
             if (timeSinceFrame.TotalMilliseconds < 2000) // Frames flowing within last 2s
             {
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal: frames recovered ({timeSinceFrame.TotalMilliseconds:F0}ms since last frame), skip reconnect");
+                AppLog.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal: frames recovered ({timeSinceFrame.TotalMilliseconds:F0}ms since last frame), skip reconnect");
                 wrapper.IsReconnecting = false;
                 wrapper.ReconnectAttempts = 0; // Reset on success
                 return;
@@ -572,11 +573,11 @@ namespace VRWorkspace.Streaming
             // This handles the case where WebRTC connection is fine but video stopped
             if (state == RTCPeerConnectionState.Connected)
             {
-                Debug.LogWarning($"[PhaseProtocol] PC{monitorIndex} auto-heal: PC Connected but frames stalled for {timeSinceFrame.TotalMilliseconds:F0}ms - forcing reconnect");
+                AppLog.LogWarning($"[PhaseProtocol] PC{monitorIndex} auto-heal: PC Connected but frames stalled for {timeSinceFrame.TotalMilliseconds:F0}ms - forcing reconnect");
             }
             else
             {
-                Debug.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal: PC state={state}, initiating reconnect...");
+                AppLog.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal: PC state={state}, initiating reconnect...");
             }
 
             // Per-track mode: always reconnect video PC only (Level 2), never full PC
@@ -584,7 +585,7 @@ namespace VRWorkspace.Streaming
             {
                 try
                 {
-                    Debug.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal (per-track): reconnecting video PC only");
+                    AppLog.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal (per-track): reconnecting video PC only");
                     await ReconnectVideoOnlyAsync(monitorIndex);
                     // reconnect_video has been sent; server will respond with video_offer.
                     // Reset flag so wrapper doesn't get stuck — video PC connection state
@@ -612,7 +613,7 @@ namespace VRWorkspace.Streaming
             {
                 if (isSinglePC)
                 {
-                    Debug.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal: Triggering full Single-PC multi-track reconnect");
+                    AppLog.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal: Triggering full Single-PC multi-track reconnect");
                     await ReconnectSinglePCAsync();
                 }
                 else
@@ -634,14 +635,14 @@ namespace VRWorkspace.Streaming
         /// </summary>
         public async Task ReconnectSessionAsync(string? suggestedCodec = null)
         {
-            Debug.Log($"[PhaseProtocol] Starting full session reconnect (suggestedCodec={suggestedCodec ?? "none"})...");
+            AppLog.Log($"[PhaseProtocol] Starting full session reconnect (suggestedCodec={suggestedCodec ?? "none"})...");
 
             // 0. Handle codec suggestion if provided
             if (!string.IsNullOrEmpty(suggestedCodec))
             {
                 if (suggestedCodec.Equals("H264", StringComparison.OrdinalIgnoreCase))
                 {
-                    Debug.Log("[PhaseProtocol] Reconnecting with fallback codec: H264");
+                    AppLog.Log("[PhaseProtocol] Reconnecting with fallback codec: H264");
                     _selectedCodec = VideoCodec.H264;
                     if (_userConfig != null) _userConfig.selectedCodec = "H264";
                     
@@ -669,7 +670,7 @@ namespace VRWorkspace.Streaming
             {
                 CloseAllVideoPcs();
                 SetPerTrackPcMode(false); // Reset — re-enabled when config_complete arrives during Phase 2 restart
-                Debug.Log("[PhaseProtocol] ReconnectSession: closed all video PCs, reset perTrackPcMode");
+                AppLog.Log("[PhaseProtocol] ReconnectSession: closed all video PCs, reset perTrackPcMode");
             }
 
             // 2. Reset metrics
@@ -683,7 +684,7 @@ namespace VRWorkspace.Streaming
             // 4. Re-run Phase 2 (ICE negotiation) with preserved config
             if (_userConfig != null && _ws?.State == WebSocketState.Open)
             {
-                Debug.Log("[PhaseProtocol] Requesting Phase 2 restart with existing config");
+                AppLog.Log("[PhaseProtocol] Requesting Phase 2 restart with existing config");
 
                 // Send restart request to server
                 await SendTextAsync("{\"type\":\"restart_phase2\"}");
@@ -705,7 +706,7 @@ namespace VRWorkspace.Streaming
         /// </summary>
         public void RetryReconnect()
         {
-            Debug.Log("[PhaseProtocol] User requested retry - resetting reconnect counters");
+            AppLog.Log("[PhaseProtocol] User requested retry - resetting reconnect counters");
 
             lock (_lock)
             {

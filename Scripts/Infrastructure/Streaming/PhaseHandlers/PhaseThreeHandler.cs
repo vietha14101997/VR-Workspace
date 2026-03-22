@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using UnityEngine;
+using VRWorkspace.Core;
 
 namespace VRWorkspace.Streaming
 {
@@ -46,7 +47,7 @@ namespace VRWorkspace.Streaming
         /// </summary>
         public void HandleStreamingStarted(SimpleJson json)
         {
-            Debug.Log("[Phase3] streaming_started received");
+            AppLog.Log("[Phase3] streaming_started received");
             _stateMachine.TryTransition(ConnectionPhase.Streaming);
             OnStreamingStarted?.Invoke();
         }
@@ -76,7 +77,7 @@ namespace VRWorkspace.Streaming
             string recommendation = json.GetString("recommendation") ?? "";
             string reason         = json.GetString("reason")         ?? "";
 
-            Debug.Log($"[Phase3] quality_recommendation: {recommendation} – {reason}");
+            AppLog.Log($"[Phase3] quality_recommendation: {recommendation} – {reason}");
             OnQualityRecommendation?.Invoke(recommendation, reason);
         }
 
@@ -92,28 +93,28 @@ namespace VRWorkspace.Streaming
         {
             if (!EnsureStreaming("PauseStreaming")) return;
             await _send("{\"type\":\"pause_streaming\"}");
-            Debug.Log("[Phase3] pause_streaming sent");
+            AppLog.Log("[Phase3] pause_streaming sent");
         }
 
         public async Task ResumeStreamingAsync()
         {
             if (!EnsureStreaming("ResumeStreaming")) return;
             await _send("{\"type\":\"resume_streaming\"}");
-            Debug.Log("[Phase3] resume_streaming sent");
+            AppLog.Log("[Phase3] resume_streaming sent");
         }
 
         public async Task PauseMonitorAsync(int monitorIndex)
         {
             if (!EnsureStreaming("PauseMonitor")) return;
             await _send($"{{\"type\":\"pause_monitor\",\"monitorIndex\":{monitorIndex}}}");
-            Debug.Log($"[Phase3] pause_monitor sent: index={monitorIndex}");
+            AppLog.Log($"[Phase3] pause_monitor sent: index={monitorIndex}");
         }
 
         public async Task ResumeMonitorAsync(int monitorIndex)
         {
             if (!EnsureStreaming("ResumeMonitor")) return;
             await _send($"{{\"type\":\"resume_monitor\",\"monitorIndex\":{monitorIndex}}}");
-            Debug.Log($"[Phase3] resume_monitor sent: index={monitorIndex}");
+            AppLog.Log($"[Phase3] resume_monitor sent: index={monitorIndex}");
         }
 
         public async Task RequestKeyframeAsync(int monitorIndex = -1)
@@ -133,7 +134,7 @@ namespace VRWorkspace.Streaming
                 ? $"{{\"type\":\"skip_to_live\",\"monitor\":{monitorIndex}}}"
                 : "{\"type\":\"skip_to_live\"}";
             await _send(msg);
-            Debug.Log($"[Phase3] skip_to_live sent (monitor={monitorIndex})");
+            AppLog.Log($"[Phase3] skip_to_live sent (monitor={monitorIndex})");
         }
 
         /// <summary>
@@ -147,7 +148,7 @@ namespace VRWorkspace.Streaming
                 ? $"{{\"type\":\"skip_to_live\",\"monitor\":{monitorIndex},\"urgent\":true}}"
                 : "{\"type\":\"skip_to_live\",\"urgent\":true}";
             await _send(msg);
-            Debug.Log($"[Phase3] URGENT skip_to_live sent (monitor={monitorIndex})");
+            AppLog.Log($"[Phase3] URGENT skip_to_live sent (monitor={monitorIndex})");
 
             // Brief pause so server can process skip before we ask for a keyframe
             await Task.Delay(50);
@@ -166,7 +167,7 @@ namespace VRWorkspace.Streaming
             if (resolutionHeight.HasValue) parts.Add($"\"resolutionHeight\":{resolutionHeight.Value}");
 
             string json = "{" + string.Join(",", parts) + "}";
-            Debug.Log($"[Phase3] update_config: {json}");
+            AppLog.Log($"[Phase3] update_config: {json}");
             await _send(json);
         }
 
@@ -175,7 +176,7 @@ namespace VRWorkspace.Streaming
         private bool EnsureStreaming(string caller)
         {
             if (_stateMachine.IsStreaming) return true;
-            Debug.LogWarning($"[Phase3] {caller} skipped: not streaming (state={_stateMachine.CurrentPhase})");
+            AppLog.LogWarning($"[Phase3] {caller} skipped: not streaming (state={_stateMachine.CurrentPhase})");
             return false;
         }
     }
