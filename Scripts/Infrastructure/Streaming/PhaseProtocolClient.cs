@@ -1,4 +1,4 @@
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Net.WebSockets;
@@ -56,8 +56,8 @@ namespace VRWorkspace.Streaming
         public static bool VerboseLogging = false;
 
         // ── WebSocket / cancellation ──────────────────────────────────────────
-        private ClientWebSocket         _ws;
-        private CancellationTokenSource _cts;
+        private ClientWebSocket?         _ws;
+        private CancellationTokenSource? _cts;
         private volatile bool           _isIntentionalDisconnect;
         private readonly object         _lock = new object();
 
@@ -65,35 +65,35 @@ namespace VRWorkspace.Streaming
         private readonly ConnectionStateMachine _stateMachine = new ConnectionStateMachine();
 
         // ── Phase handlers (created on ConnectAsync) ──────────────────────────
-        private PhaseOneHandler   _phase1;
-        private PhaseTwoHandler   _phase2;
-        private PhaseThreeHandler _phase3;
+        private PhaseOneHandler?   _phase1;
+        private PhaseTwoHandler?   _phase2;
+        private PhaseThreeHandler? _phase3;
 
         // ── Phase 1 data (surfaced from handler for external consumers) ───────
-        private ServerHardwareInfo   _hardwareInfo;
-        private NetworkTestResult    _networkInfo;
-        private SuggestedStreamConfig _suggestedConfig;
+        private ServerHardwareInfo?   _hardwareInfo;
+        private NetworkTestResult?    _networkInfo;
+        private SuggestedStreamConfig? _suggestedConfig;
 
         // ── Phase 2 data ──────────────────────────────────────────────────────
-        private StreamingConfig      _userConfig;
+        private StreamingConfig?      _userConfig;
         private List<MonitorInfo>    _configuredMonitors = new List<MonitorInfo>();
 
         // ── Speed test ────────────────────────────────────────────────────────
-        private SpeedTestClient _speedTest;
+        private SpeedTestClient? _speedTest;
 
         // ── WebRTC ────────────────────────────────────────────────────────────
         private readonly List<PCWrapper> _peerConnections = new List<PCWrapper>();
         private bool   _skipTcpIceCandidates = true;
         private int    _expectedMonitorCount;
-        private TaskCompletionSource<bool> _allAnswersReceivedTcs;
+        private TaskCompletionSource<bool>? _allAnswersReceivedTcs;
         private bool   _streamingStartedFired;
-        private RTCDataChannel _sctpInitChannel; // Kept alive to maintain SCTP transport for audio DataChannel
-        private RTCDataChannel _cursorChannel;   // Low-latency cursor position updates (binary, UDP-like)
+        private RTCDataChannel? _sctpInitChannel; // Kept alive to maintain SCTP transport for audio DataChannel
+        private RTCDataChannel? _cursorChannel;   // Low-latency cursor position updates (binary, UDP-like)
         // Per-track DataChannels for H.265 video (unreliable, unordered).
         // Each track has its own DC → own SCTP buffer → no cross-track congestion.
         // Labels: "h265video-0", "h265video-1", etc.
         private readonly Dictionary<int, RTCDataChannel> _h265VideoChannels = new Dictionary<int, RTCDataChannel>();
-        private RTCPeerConnection _audioPc; // Dedicated PeerConnection for audio DC (isolated SCTP, no H.265 video congestion)
+        private RTCPeerConnection? _audioPc; // Dedicated PeerConnection for audio DC (isolated SCTP, no H.265 video congestion)
         private volatile bool _audioAnswerApplied;
         private readonly List<RTCIceCandidateInit> _pendingAudioRemoteCandidates = new();
         private int _pcGeneration; // Incremented on cleanup to guard stale PC callbacks
@@ -114,7 +114,7 @@ namespace VRWorkspace.Streaming
 
         // ── USB mode ──────────────────────────────────────────────────────────
         private bool   _isUsbMode    = false;
-        private string _usbServerIP  = null;
+        private string? _usbServerIP  = null;
 
         // ── Codec ─────────────────────────────────────────────────────────────
         private VideoCodec _selectedCodec = VideoCodec.H264;
@@ -124,51 +124,42 @@ namespace VRWorkspace.Streaming
         private readonly Dictionary<int, H265StreamReceiver> _h265Receivers = new Dictionary<int, H265StreamReceiver>();
         private readonly Dictionary<int, H265EncodedFrameHandler> _h265Handlers = new Dictionary<int, H265EncodedFrameHandler>();
 
-        // ── H265→H264 Codec Fallback ──────────────────────────────────────────
-        private volatile bool _h265FallbackTriggered = false;
-        private volatile bool _h265FallbackInProgress = false;
-        private int           _h265StallStrikes = 0; // Cumulative strikes for persistent H265 stalls
-        private volatile int  _reconnectGeneration = 0; // Guards against stale SDP answers from superseded reconnects
+        // Guards against stale SDP answers from superseded reconnects
+        private volatile int _reconnectGeneration = 0;
 
         // ── Receive loop internals ─────────────────────────────────────────────
         private int   _msgCounter            = 0;
         private const int RECEIVE_TIMEOUT_MS = 30000;
 
         // ── Events ───────────────────────────────────────────────────────────
-        public event Action<ServerHardwareInfo>                OnHardwareInfoReceived;
-        public event Action<NetworkTestResult>                 OnNetworkInfoReceived;
-        public event Action<SuggestedStreamConfig>             OnSuggestedConfigReceived;
-        public event Action<string, int, string>               OnConfigProgress;       // step, progress, message
-        public event Action<List<MonitorInfo>>                 OnConfigComplete;
-        public event Action                                    OnReadyToStream;
-        public event Action<int, Texture>                      OnVideoTextureReceived; // monitorIndex, texture
-        public event Action<AudioStreamTrack>                  OnAudioTrackReceived;   // remote audio track (RTP, legacy)
-        public event Action<byte[]>                            OnAudioDataReceived;    // DataChannel audio (low-latency)
-        public event Action                                    OnStreamingStarted;
-        public event Action<string>                            OnError;
-        public event Action                                    OnDisconnected;
-        public event Action<int, float, float, bool, CursorType, long> OnCursorPosition;
-        public event Action<long, CursorType, Texture2D, int, int>     OnCursorImageReceived;
-        public event Action<int, float>                        OnFpsAdjusted;
-        public event Action<long, long>                        OnFrameTimingReceived;
-        public event Action<int>                               OnServerSetupProgress;
-        public event Action<int, int>                          OnMonitorIceProgress;
-        public event Action<int>                               OnMonitorIceComplete;
-        public event Action                                    OnAllMonitorsReady;
+        public event Action<ServerHardwareInfo>?                OnHardwareInfoReceived;
+        public event Action<NetworkTestResult>?                 OnNetworkInfoReceived;
+        public event Action<SuggestedStreamConfig>?             OnSuggestedConfigReceived;
+        public event Action<string, int, string>?               OnConfigProgress;       // step, progress, message
+        public event Action<List<MonitorInfo>>?                 OnConfigComplete;
+        public event Action?                                    OnReadyToStream;
+        public event Action<int, Texture>?                      OnVideoTextureReceived; // monitorIndex, texture
+        public event Action<AudioStreamTrack>?                  OnAudioTrackReceived;   // remote audio track (RTP, legacy)
+        public event Action<byte[]>?                            OnAudioDataReceived;    // DataChannel audio (low-latency)
+        public event Action?                                    OnStreamingStarted;
+        public event Action<string>?                            OnError;
+        public event Action?                                    OnDisconnected;
+        public event Action<int, float, float, bool, CursorType, long>? OnCursorPosition;
+        public event Action<long, CursorType, Texture2D, int, int>?     OnCursorImageReceived;
+        public event Action<int, float>?                        OnFpsAdjusted;
+        public event Action<long, long>?                        OnFrameTimingReceived;
+        public event Action<int>?                               OnServerSetupProgress;
+        public event Action<int, int>?                          OnMonitorIceProgress;
+        public event Action<int>?                               OnMonitorIceComplete;
+        public event Action?                                    OnAllMonitorsReady;
         /// <summary>Fired when a monitor's first frame has been decoded (monitorIndex).</summary>
-        public event Action<int>                               OnMonitorFirstFrame;
+        public event Action<int>?                               OnMonitorFirstFrame;
         /// <summary>Fired when ALL monitors have decoded their first frame.</summary>
-        public event Action                                    OnAllMonitorsFirstFrame;
-        public event Action                                    OnConnectionHealthCritical;
-        public event Action<string[]>                          OnReconnectFailed;
-        public event Action                                    OnSessionReconnectRequested;
-        public event Action<string, double, int>               OnSpeedTestProgress;
-        /// <summary>
-        /// Fires when H265 decoder fails and codec is being switched to H264.
-        /// Parameter: fallbackCodec (always "H264" currently).
-        /// </summary>
-        public event Action<string>                            OnCodecFallback;
-
+        public event Action?                                    OnAllMonitorsFirstFrame;
+        public event Action?                                    OnConnectionHealthCritical;
+        public event Action<string[]>?                          OnReconnectFailed;
+        public event Action?                                    OnSessionReconnectRequested;
+        public event Action<string, double, int>?               OnSpeedTestProgress;
         // NOTE: OnSkipToLiveAck, OnBitrateAdjusted, OnQualityRecommendation are declared
         // in PhaseProtocolClient.Metrics.cs (that partial also owns SkipToLiveImmediate).
 
@@ -176,10 +167,10 @@ namespace VRWorkspace.Streaming
         private class PCWrapper
         {
             public int   Index;
-            public RTCPeerConnection PC;
-            public VideoStreamTrack  VideoTrack;
-            public string            Mid;         // For Single-PC stats matching
-            public Texture           Texture;
+            public RTCPeerConnection? PC;
+            public VideoStreamTrack?  VideoTrack;
+            public string?            Mid;         // For Single-PC stats matching
+            public Texture?           Texture;
             public bool  AnswerSet;
             public bool  OfferSent;
             public List<string> PendingIce        = new List<string>();
@@ -194,7 +185,7 @@ namespace VRWorkspace.Streaming
             public bool  TexturePtrDetectionWorking;
             public DateTime FirstTextureTime;
             public int   RealFrameCount;
-            public TaskCompletionSource<bool> AnswerReceivedTcs;
+            public TaskCompletionSource<bool>? AnswerReceivedTcs;
 
             // FPS feedback tracking
             public int      RenderedFrameCount;
@@ -231,10 +222,10 @@ namespace VRWorkspace.Streaming
 
         // ── Public properties ─────────────────────────────────────────────────
         public ConnectionStateMachine StateMachine    => _stateMachine;
-        public ServerHardwareInfo     HardwareInfo    => _hardwareInfo;
-        public NetworkTestResult      NetworkInfo      => _networkInfo;
-        public SuggestedStreamConfig  SuggestedConfig => _suggestedConfig;
-        public StreamingConfig        UserConfig       => _userConfig;
+        public ServerHardwareInfo?     HardwareInfo    => _hardwareInfo;
+        public NetworkTestResult?      NetworkInfo      => _networkInfo;
+        public SuggestedStreamConfig?  SuggestedConfig => _suggestedConfig;
+        public StreamingConfig?        UserConfig       => _userConfig;
         public int                    MonitorCount     => _peerConnections.Count;
         public bool                   IsConnected      => _ws?.State == WebSocketState.Open;
         public bool                   IsStreaming       => _stateMachine.IsStreaming;
@@ -248,7 +239,7 @@ namespace VRWorkspace.Streaming
         /// <summary>
         /// Enable/disable USB-only ICE candidate filtering.
         /// </summary>
-        public void SetUsbMode(bool isUsb, string serverIP = null)
+        public void SetUsbMode(bool isUsb, string? serverIP = null)
         {
             _isUsbMode   = isUsb;
             _usbServerIP = serverIP;
@@ -290,122 +281,13 @@ namespace VRWorkspace.Streaming
 
         // ── Texture access ────────────────────────────────────────────────────
 
-        public Texture GetTexture(int index)
+        public Texture? GetTexture(int index)
         {
             lock (_lock)
             {
                 if (index >= 0 && index < _peerConnections.Count)
                     return _peerConnections[index].Texture;
                 return null;
-            }
-        }
-
-        // ── H265 → H264 Codec Fallback ────────────────────────────────────────
-
-        /// <summary>
-        /// Called when H265StreamReceiver.OnDecoderFailed fires (any monitor).
-        /// Tears down H265 pipeline, notifies server, then reconnects using H264.
-        /// Safe to call from any thread; idempotent due to _h265FallbackTriggered flag.
-        /// </summary>
-        internal void OnH265DecoderFailed(int monitorIndex)
-        {
-            if (_h265FallbackTriggered || _h265FallbackInProgress) return;
-            _h265FallbackTriggered = true;
-            _ = TriggerCodecFallbackAsync();
-        }
-
-        private async Task TriggerCodecFallbackAsync()
-        {
-            if (_h265FallbackInProgress) return;
-            _h265FallbackInProgress = true;
-
-            Debug.LogError("[PhaseProtocol] H265 DECODER FAILURE — switching to H264 fallback");
-
-            try
-            {
-                // 1. Dispose all H265 receivers and handlers
-                lock (_lock)
-                {
-                    foreach (var r in _h265Receivers.Values)
-                        try { r.Dispose(); } catch { }
-                    _h265Receivers.Clear();
-
-                    foreach (var h in _h265Handlers.Values)
-                        try { h.Dispose(); } catch { }
-                    _h265Handlers.Clear();
-
-                    // Clear cached textures so UI shows loading instead of stale H265 frame
-                    foreach (var w in _peerConnections)
-                        w.Texture = null;
-                }
-
-                // 2. Switch codec locally BEFORE reconnect so SetCodecPreferences picks up H264
-                _selectedCodec = VideoCodec.H264;
-                if (_userConfig != null)
-                    _userConfig.selectedCodec = "H264";
-
-                AppLog.Log("[PhaseProtocol] Codec switched to H264, notifying server...");
-
-                // 3. Notify server so it can switch encoder from H265→H264
-                if (_ws?.State == System.Net.WebSockets.WebSocketState.Open)
-                {
-                    try
-                    {
-                        await SendTextAsync("{\"type\":\"codec_fallback\",\"from\":\"H265\",\"to\":\"H264\",\"reason\":\"decoder_failure\"}");
-                    }
-                    catch (Exception ex)
-                    {
-                        AppLog.LogWarning($"[PhaseProtocol] codec_fallback send failed: {ex.Message}");
-                    }
-                }
-
-                // 4. Notify UI (e.g. show toast "Switched to H264 for compatibility")
-                OnCodecFallback?.Invoke("H264");
-
-                // 5. Wait for server to acknowledge codec switch before reconnecting.
-                //    This prevents the race where the server responds to a stale H265 auto-heal offer
-                //    with an H265 answer, which would then be incorrectly applied to the new H264 PC.
-                AppLog.Log("[PhaseProtocol] Waiting for server codec switch ACK before reconnecting...");
-                await Task.Delay(500); // Allow server to process codec_fallback and switch encoder
-
-                // 6. Reconnect entire PeerConnection with H264 codec preferences.
-                //    ReconnectSinglePCAsync() uses _selectedCodec (now H264) in SetCodecPreferences().
-                AppLog.Log("[PhaseProtocol] Initiating Single-PC reconnect with H264...");
-                _streamingStartedFired = false;
-                await ReconnectSinglePCAsync();
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[PhaseProtocol] TriggerCodecFallbackAsync failed: {ex.Message}");
-            }
-            finally
-            {
-                _h265FallbackInProgress = false;
-                _h265FallbackTriggered = false; // Reset so auto-heal works for H264 after fallback
-                _h265StallStrikes = 0;
-                _freezeCount = 0;
-            }
-        }
-
-        /// <summary>
-        /// Handle codec_switch ACK from server (optional — server may send this after processing codec_fallback).
-        /// </summary>
-        private void HandleCodecSwitch(SimpleJson json)
-        {
-            var codec = json.GetString("codec") ?? "H264";
-            var reason = json.GetString("reason") ?? "";
-            AppLog.Log($"[PhaseProtocol] Server acknowledged codec switch → {codec} (reason: {reason})");
-
-            // If server sends codec_switch proactively (e.g. H265 not supported on server hardware),
-            // also update our local codec preference.
-            if (codec.Equals("H264", StringComparison.OrdinalIgnoreCase) && _selectedCodec == VideoCodec.H265)
-            {
-                AppLog.Log("[PhaseProtocol] Server-initiated codec downgrade: H265 → H264");
-                if (!_h265FallbackTriggered)
-                {
-                    _h265FallbackTriggered = true;
-                    _ = TriggerCodecFallbackAsync();
-                }
             }
         }
 
@@ -596,7 +478,7 @@ namespace VRWorkspace.Streaming
             {
                 _streamingStartedFired = true;
                 // Start frame stall monitor
-                _ = FrameStallMonitorAsync(_cts.Token);
+                _ = FrameStallMonitorAsync(_cts!.Token);
                 OnStreamingStarted?.Invoke();
             }
         }
@@ -617,7 +499,7 @@ namespace VRWorkspace.Streaming
             }
 
             _userConfig = config;
-            await _phase2.SendConfigAsync(config);
+            await _phase2!.SendConfigAsync(config);
         }
 
         /// <summary>
@@ -679,36 +561,32 @@ namespace VRWorkspace.Streaming
         {
             if (_ws?.State != WebSocketState.Open) { AppLog.LogWarning("[PhaseProtocol] PauseStreaming skipped: WebSocket not open"); return; }
             _isStreamingPaused = true;
-            // Propagate pause to H265 receivers to suppress stall detection
-            foreach (var r in _h265Receivers.Values) r.IsPaused = true;
-            await _phase3.PauseStreamingAsync();
+            await _phase3!.PauseStreamingAsync();
         }
 
         public async Task ResumeStreamingAsync()
         {
             if (_ws?.State != WebSocketState.Open) { AppLog.LogWarning("[PhaseProtocol] ResumeStreaming skipped: WebSocket not open"); return; }
             _isStreamingPaused = false;
-            // Propagate resume to H265 receivers
-            foreach (var r in _h265Receivers.Values) r.IsPaused = false;
-            await _phase3.ResumeStreamingAsync();
+            await _phase3!.ResumeStreamingAsync();
         }
 
         public async Task PauseMonitorAsync(int monitorIndex)
         {
             if (_ws?.State != WebSocketState.Open) { AppLog.LogWarning("[PhaseProtocol] PauseMonitor skipped: WebSocket not open"); return; }
-            await _phase3.PauseMonitorAsync(monitorIndex);
+            await _phase3!.PauseMonitorAsync(monitorIndex);
         }
 
         public async Task ResumeMonitorAsync(int monitorIndex)
         {
             if (_ws?.State != WebSocketState.Open) { AppLog.LogWarning("[PhaseProtocol] ResumeMonitor skipped: WebSocket not open"); return; }
-            await _phase3.ResumeMonitorAsync(monitorIndex);
+            await _phase3!.ResumeMonitorAsync(monitorIndex);
         }
 
         public async void RequestKeyframe(int monitorIndex = -1)
         {
             if (_ws?.State != WebSocketState.Open) { AppLog.LogWarning($"[PhaseProtocol] RequestKeyframe skipped: ws={_ws?.State}"); return; }
-            await _phase3.RequestKeyframeAsync(monitorIndex);
+            await _phase3!.RequestKeyframeAsync(monitorIndex);
         }
 
         public async void SkipToLive(int monitorIndex = -1)
@@ -726,7 +604,7 @@ namespace VRWorkspace.Streaming
             if (_consecutiveSkipCount >= SKIP_COUNT_THRESHOLD)
                 AppLog.LogWarning($"[PhaseProtocol] skip_to_live frequency high ({_consecutiveSkipCount} in 30s), cooldown={SkipToLiveCooldownSeconds:F1}s");
 
-            await _phase3.SkipToLiveAsync(monitorIndex);
+            await _phase3!.SkipToLiveAsync(monitorIndex);
         }
 
         // SkipToLiveImmediate is defined in PhaseProtocolClient.Metrics.cs partial.
@@ -734,7 +612,7 @@ namespace VRWorkspace.Streaming
         public async Task UpdateConfigAsync(int? fps, int? resolutionHeight)
         {
             if (_ws?.State != WebSocketState.Open) { AppLog.LogWarning($"[PhaseProtocol] UpdateConfigAsync skipped: ws={_ws?.State}"); return; }
-            await _phase3.UpdateConfigAsync(fps, resolutionHeight);
+            await _phase3!.UpdateConfigAsync(fps, resolutionHeight);
         }
 
         // ── Receive loop ──────────────────────────────────────────────────────
@@ -745,7 +623,7 @@ namespace VRWorkspace.Streaming
 
             try
             {
-                while (_ws.State == WebSocketState.Open && !ct.IsCancellationRequested)
+                while (_ws!.State == WebSocketState.Open && !ct.IsCancellationRequested)
                 {
                     WebSocketReceiveResult first;
 
@@ -842,32 +720,32 @@ namespace VRWorkspace.Streaming
                     {
                         // ── Phase 1 ──────────────────────────────────────────
                         case "hardware_info":
-                            await _phase1.HandleHardwareInfoAsync(json);
+                            await _phase1!.HandleHardwareInfoAsync(json);
                             break;
 
                         case "speedtest_start":
-                            await _phase1.HandleSpeedTestStartAsync(json);
+                            await _phase1!.HandleSpeedTestStartAsync(json);
                             break;
 
                         case "speedtest_end":
-                            await _phase1.HandleSpeedTestEndAsync(json);
+                            await _phase1!.HandleSpeedTestEndAsync(json);
                             break;
 
                         case "network_info":
-                            _phase1.HandleNetworkInfo(json);
+                            _phase1!.HandleNetworkInfo(json);
                             break;
 
                         case "suggested_config":
-                            _phase1.HandleSuggestedConfig(json);
+                            _phase1!.HandleSuggestedConfig(json);
                             break;
 
                         // ── Phase 2 ──────────────────────────────────────────
                         case "config_progress":
-                            _phase2.HandleConfigProgress(json);
+                            _phase2!.HandleConfigProgress(json);
                             break;
 
                         case "config_complete":
-                            await _phase2.HandleConfigCompleteAsync(json);
+                            await _phase2!.HandleConfigCompleteAsync(json);
                             break;
 
                         // ── WebRTC (partial file) ─────────────────────────────
@@ -912,32 +790,27 @@ namespace VRWorkspace.Streaming
 
                         // ── Phase 3 ──────────────────────────────────────────
                         case "streaming_started":
-                            _phase3.HandleStreamingStarted(json);
+                            _phase3!.HandleStreamingStarted(json);
                             break;
 
                         case "fps_adjusted":
-                            _phase3.HandleFpsAdjusted(json);
+                            _phase3!.HandleFpsAdjusted(json);
                             break;
 
                         case "bitrate_adjusted":
-                            _phase3.HandleBitrateAdjusted(json);
+                            _phase3!.HandleBitrateAdjusted(json);
                             break;
 
                         case "quality_recommendation":
-                            _phase3.HandleQualityRecommendation(json);
+                            _phase3!.HandleQualityRecommendation(json);
                             break;
 
                         case "skip_to_live_ack":
-                            _phase3.HandleSkipToLiveAck();
+                            _phase3!.HandleSkipToLiveAck();
                             break;
 
                         case "monitor_idle":
                             HandleMonitorIdle(json);
-                            break;
-
-                        // ── Codec fallback (server ACK or server-initiated downgrade) ──
-                        case "codec_switch":
-                            HandleCodecSwitch(json);
                             break;
 
                         // ── Cursor (partial file) ─────────────────────────────
@@ -1217,11 +1090,11 @@ namespace VRWorkspace.Streaming
             try
             {
                 var bytes = Encoding.UTF8.GetBytes(text);
-                await _ws.SendAsync(
+                await _ws!.SendAsync(
                     new ArraySegment<byte>(bytes),
                     WebSocketMessageType.Text,
                     endOfMessage: true,
-                    _cts.Token);
+                    _cts!.Token);
             }
             catch (Exception ex)
             {
@@ -1336,9 +1209,6 @@ namespace VRWorkspace.Streaming
 
             _metrics.ResetAll();
             _freezeCount = 0;
-            _h265StallStrikes = 0;
-            _h265FallbackTriggered = false;
-            _h265FallbackInProgress = false;
 
             try { _ws?.Abort(); _ws?.Dispose(); } catch { }
             _ws = null;
@@ -1347,7 +1217,6 @@ namespace VRWorkspace.Streaming
         public void ResetStallStrikes()
         {
             _freezeCount = 0;
-            // Note: _h265StallStrikes is preserved for long-term health monitoring
         }
 
         public void Dispose() => Cleanup();

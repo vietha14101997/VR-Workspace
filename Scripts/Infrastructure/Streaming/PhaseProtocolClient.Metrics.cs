@@ -116,6 +116,11 @@ namespace VRWorkspace.Streaming
         private DateTime _lastPreventiveKeyframeTime = DateTime.MinValue;
         private int _freezeCount = 0; // Track consecutive freeze detections for graduated response
 
+        // Weak network detection: connection alive but no frames for extended period
+        private DateTime _lastAnyFrameDecodedTime = DateTime.UtcNow;
+        private const float WEAK_NETWORK_TIMEOUT_SECONDS = 15f; // 15s with no frames = hopeless
+        private bool _weakNetworkFired;
+
         // FPS Feedback constants (for adaptive encoding + server-side stall detection)
         private const float FPS_FEEDBACK_INTERVAL_SECONDS = 0.5f;  // Send feedback every 500ms for ≤1s stall detection
         private const float FPS_CHANGE_THRESHOLD = 5.0f;           // Report if FPS differs by 5+ (logging only)
@@ -1059,23 +1064,11 @@ namespace VRWorkspace.Streaming
         private void HandleDecoderStallOrFreeze(int monitorIndex, string reason)
         {
             _freezeCount++;
-            _h265StallStrikes++; // Persistent cumulative count across recoveries
-            
-            AppLog.LogWarning($"[PhaseProtocol] {reason} (strike #{_freezeCount}, total strikes={_h265StallStrikes})!");
+
+            AppLog.LogWarning($"[PhaseProtocol] {reason} (strike #{_freezeCount})!");
 
             // Update stats
             _metrics?.RecordStall();
-
-            // Fallback check for H265 (relaxed: 5 sustained stalls or 15 total strikes)
-            if (_selectedCodec == VideoCodec.H265 && (_freezeCount >= 5 || _h265StallStrikes >= 15))
-            {
-                string triggerReason = _freezeCount >= 3 ? $"sustained stall (strike {_freezeCount})" : $"flakey instability ({_h265StallStrikes} total strikes)";
-                Debug.LogError($"[PhaseProtocol] H265 fallback threshold reached: {triggerReason} — triggering H264 fallback");
-                
-                OnH265DecoderFailed(monitorIndex);
-                _freezeCount = 0; 
-                return;
-            }
 
             // Standard recovery: trigger GraduatedRecoveryAsync
             // This will handle Step 1 (Keyframe), Step 2 (Skip+Keyframe), Step 3 (Reconnect)
@@ -1185,12 +1178,23 @@ namespace VRWorkspace.Streaming
                         }
                         else if (realFrameAdvance >= 10)
                         {
-                            // Good frame flow, reset freeze count
+                            // Good frame flow — update last decoded time and reset counters
+                            _lastAnyFrameDecodedTime = DateTime.UtcNow;
+                            _weakNetworkFired = false;
                             if (_freezeCount > 0)
                             {
                                 if (VerboseLogging) AppLog.Log($"[PhaseProtocol] Freeze recovery confirmed, resetting freeze count (was {_freezeCount})");
                                 _freezeCount = 0;
                             }
+                        }
+
+                        // Weak network detection: if no frames decoded for 15+ seconds
+                        // despite connection being alive, the network is too degraded to stream.
+                        if (!_weakNetworkFired && (DateTime.UtcNow - _lastAnyFrameDecodedTime).TotalSeconds >= WEAK_NETWORK_TIMEOUT_SECONDS)
+                        {
+                            _weakNetworkFired = true;
+                            Debug.LogError($"[PhaseProtocol] WEAK NETWORK: No frames decoded for {WEAK_NETWORK_TIMEOUT_SECONDS}s — disconnecting");
+                            OnDisconnected?.Invoke();
                         }
                     }
                     else

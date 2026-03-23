@@ -102,16 +102,27 @@ namespace VRWorkspace.VRInput
 
         private void Awake()
         {
+#pragma warning disable CS0618 // ServiceLocator is obsolete — VContainer migration pending
             _viewModel = ServiceLocator.Get<ConnectionViewModel>();
+#pragma warning restore CS0618
         }
 
         private void Update()
         {
             if (!_isActive || _viewModel == null) return;
 
-            ProcessMouse();
-            ProcessKeyboard();
-            ProcessGamepad();
+            try
+            {
+                ProcessMouse();
+                ProcessKeyboard();
+                ProcessGamepad();
+            }
+            catch (System.Exception ex)
+            {
+                // Input System can throw when BT devices disconnect mid-frame.
+                // Catch here to prevent native crash propagation.
+                Debug.LogWarning($"[RemoteInput] Input processing error (device disconnected?): {ex.Message}");
+            }
         }
 
         private void ProcessMouse()

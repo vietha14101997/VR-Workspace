@@ -62,13 +62,6 @@ namespace VRWorkspace.Streaming
         private long _decodedCount;
 
         /// <summary>
-        /// When true, stall detection is suppressed. Set by PhaseProtocolClient when
-        /// streaming is paused (user pressed Back). Without this, no-frame condition
-        /// during pause triggers false DECODER FAILURE → H265→H264 fallback.
-        /// </summary>
-        public volatile bool IsPaused;
-
-        /// <summary>
         /// When true, server reports desktop content is unchanged (user reading, no mouse movement).
         /// Stall detection and decode polling are suppressed to save GPU/CPU and reduce thermal load.
         /// The last decoded frame remains displayed on the output RenderTexture.
@@ -80,27 +73,6 @@ namespace VRWorkspace.Streaming
 
         // Desktop idle detection: track if server stopped sending new encoded frames
         private long _lastEncodedCountForStall;
-
-        // ──────────── Fallback Detection ────────────
-        // If we receive encoded frames but decode nothing for FALLBACK_TRIGGER_SECONDS,
-        // fire OnDecoderFailed so the client can request H265→H264 codec downgrade.
-        // Phase 1 (quick probe): Fast fallback if decoder never outputs a single frame
-        // Phase 2 (sustained): Slower fallback for mid-stream stalls (decoder worked then stopped)
-        private const float FALLBACK_PROBE_SECONDS = 3f;         // 3s quick probe — fast fail if decoder can't start
-        private const float FALLBACK_TRIGGER_SECONDS = 5f;       // 5s sustained stall after initial success
-        private const int   FALLBACK_MIN_ENCODED_FRAMES = 15;    // Require at least 15 encoded frames received first
-        private DateTime    _firstEncodedFrameTime = DateTime.MinValue;
-        private DateTime    _lastDecodedFrameTime = DateTime.MinValue;  // Track last successful decode
-        private DateTime    _lastEncodedFrameTime = DateTime.MinValue;  // Track last encoded frame arrival (network health)
-        private long        _encodedCountAtStallStart;                  // EncodedFramesReceived when stall detection started
-        private bool        _fallbackFired;
-
-        /// <summary>
-        /// Fires when the H265 decoder consistently fails to produce frames.
-        /// Signals that the client should request H265→H264 fallback from the server.
-        /// Parameters: monitorIndex
-        /// </summary>
-        public event Action<int> OnDecoderFailed;
 
         /// <summary>
         /// Fires when a short stall is detected — request keyframe before full fallback.
@@ -236,11 +208,7 @@ namespace VRWorkspace.Streaming
             if (encodedData == null || encodedData.Length == 0) return;
 
             EncodedFramesReceived++;
-            _lastEncodedFrameTime = DateTime.UtcNow;
 
-            // Start fallback timer on first encoded frame received
-            if (_firstEncodedFrameTime == DateTime.MinValue)
-                _firstEncodedFrameTime = DateTime.UtcNow;
 
             // IDR gate: after flush, drop P-frames until a keyframe restores the reference chain
             if (_waitingForCleanIdr)
@@ -300,11 +268,11 @@ namespace VRWorkspace.Streaming
             {
                 // When streaming is paused OR desktop is idle, no frames are expected.
                 // Reset stall counter to prevent false DECODER FAILURE.
-                if (IsPaused || IsDesktopIdle)
+                if (IsDesktopIdle)
                 {
                     _noFrameTicks = 0;
                     _keyframeRequested = false;
-                    _lastDecodedFrameTime = DateTime.UtcNow;
+
                     return;
                 }
 
@@ -328,7 +296,7 @@ namespace VRWorkspace.Streaming
                     _keyframeRequested = true;
                     // Push stall reference forward: give server time to respond to keyframe request
                     // before triggering DECODER FAILURE fallback. Server may be draining DC buffer.
-                    _lastDecodedFrameTime = DateTime.UtcNow;
+
                     AppLog.LogWarning($"{TAG} PC{MonitorIndex} Short stall detected ({_noFrameTicks} ticks, ~{_noFrameTicks / 60f:F1}s), requesting keyframe");
                     OnKeyframeNeeded?.Invoke(MonitorIndex);
                 }
@@ -342,72 +310,15 @@ namespace VRWorkspace.Streaming
                     Flush();
                     _keyframeRequested = false; // Allow fresh keyframe request after flush
                     OnKeyframeNeeded?.Invoke(MonitorIndex);
-                    _lastDecodedFrameTime = DateTime.UtcNow; // Reset fallback timer
                 }
 
                 // Log warning every ~3s (180 ticks at 60fps)
                 if (_noFrameTicks == 180 || _noFrameTicks == 600 || _noFrameTicks == 1200)
                 {
-                    float elapsedSinceStart = (float)(DateTime.UtcNow - _firstEncodedFrameTime).TotalSeconds;
-                    AppLog.LogWarning($"{TAG} PC{MonitorIndex} SUSTAINED STALL: No frame from decoder for {_noFrameTicks} ticks ({elapsedSinceStart:F1}s). " +
+                    float elapsed = _noFrameTicks / 60f;
+                    AppLog.LogWarning($"{TAG} PC{MonitorIndex} SUSTAINED STALL: No frame from decoder for {_noFrameTicks} ticks ({elapsed:F1}s). " +
                         $"Stats: decoded={_decodedCount}, encoded={EncodedFramesReceived} (gap={EncodedFramesReceived - _decodedCount}). " +
                         $"Plugin: initialized={_decoder.IsInitialized}, strides={_decoder.YStride}/{_decoder.UVStride}, size={_decoder.FrameWidth}x{_decoder.FrameHeight}");
-                }
-
-                // ── Fallback detection (2-phase) ─────────────────────────────────
-                // Phase 1 (quick probe): If decoder NEVER produced a frame, fail fast (3s)
-                // Phase 2 (sustained stall): If decoder worked then stopped, use longer timeout (5s)
-                // Skip when deliberately waiting for IDR (P-frames are being dropped intentionally)
-                //
-                // IMPORTANT: Only fallback when encoded frames are STILL ARRIVING but decoder
-                // can't produce output. If encoded frames also stopped → network stall, not
-                // decoder failure. Fallback to H264 would only make things worse (higher bitrate).
-                if (!_fallbackFired
-                    && !_waitingForCleanIdr
-                    && EncodedFramesReceived >= FALLBACK_MIN_ENCODED_FRAMES
-                    && _firstEncodedFrameTime != DateTime.MinValue)
-                {
-                    bool neverDecoded = _decodedCount == 0;
-                    float timeout = neverDecoded ? FALLBACK_PROBE_SECONDS : FALLBACK_TRIGGER_SECONDS;
-
-                    var referenceTime = _lastDecodedFrameTime != DateTime.MinValue
-                        ? _lastDecodedFrameTime
-                        : _firstEncodedFrameTime;
-
-                    if ((DateTime.UtcNow - referenceTime).TotalSeconds >= timeout)
-                    {
-                        // Check if encoded frames are still arriving (network is healthy)
-                        float timeSinceLastEncoded = (float)(DateTime.UtcNow - _lastEncodedFrameTime).TotalSeconds;
-                        bool encodedFramesStillArriving = timeSinceLastEncoded < 2f;
-
-                        // Require meaningful decode gap before triggering fallback.
-                        // A gap of 1-2 frames on 2000+ total is normal (MediaCodec pipeline delay),
-                        // NOT decoder failure. Only trigger when gap >= 5 frames.
-                        long decodeGap = EncodedFramesReceived - _decodedCount;
-                        bool significantGap = neverDecoded || decodeGap >= 5;
-
-                        if (!encodedFramesStillArriving)
-                        {
-                            // Network stall: encoded frames also stopped → don't fallback.
-                            AppLog.LogWarning($"{TAG} PC{MonitorIndex} Stall detected but encoded frames also stopped " +
-                                $"({timeSinceLastEncoded:F1}s ago) → network issue, NOT decoder failure. Skipping fallback.");
-                        }
-                        else if (!significantGap)
-                        {
-                            // Tiny gap (1-2 frames) on a working decoder — MediaCodec pipeline delay,
-                            // not a real failure. Reset reference time and keep waiting.
-                            _lastDecodedFrameTime = DateTime.UtcNow;
-                        }
-                        else
-                        {
-                            // True decoder failure: encoded frames arriving but decoder can't output
-                            _fallbackFired = true;
-                            string phase = neverDecoded ? "QUICK PROBE" : "SUSTAINED STALL";
-                            Debug.LogError($"{TAG} PC{MonitorIndex} DECODER FAILURE ({phase}): received {EncodedFramesReceived} encoded frames, " +
-                                $"decoded {_decodedCount}, gap={decodeGap}, stalled for {timeout}s. Triggering H265→H264 fallback!");
-                            OnDecoderFailed?.Invoke(MonitorIndex);
-                        }
-                    }
                 }
 
                 return;
@@ -415,8 +326,6 @@ namespace VRWorkspace.Streaming
 
             _noFrameTicks = 0; // Reset on successful frame
             _keyframeRequested = false; // Allow new keyframe request on next stall
-            _lastDecodedFrameTime = DateTime.UtcNow; // Track last successful decode for stall detection
-
             // Get Y plane data
             byte[] yData  = _decoder.GetYPlaneData();
             byte[] uvData = _decoder.GetUVPlaneData();

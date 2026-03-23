@@ -362,6 +362,21 @@ namespace VRWorkspace.ViewModels
         }
 
         /// <summary>
+        /// Force disconnect due to unrecoverable connection failure.
+        /// Called when auto-reconnect exhausts all attempts or weak network is detected.
+        /// Fires OnConnectionLost so UI can return to menu.
+        /// </summary>
+        public event Action<string> OnConnectionLost;
+
+        public async void ForceDisconnect(string reason)
+        {
+            Debug.LogError($"[ConnectionViewModel] ForceDisconnect: {reason}");
+            OnConnectionLost?.Invoke(reason);
+            ResetAllState();
+            await StopClientAsync();
+        }
+
+        /// <summary>
         /// Reset all observable properties to initial state.
         /// Call this synchronously when closing app to ensure clean slate.
         /// </summary>
@@ -799,10 +814,24 @@ namespace VRWorkspace.ViewModels
 
             _client.OnDisconnected += () =>
             {
-                if (_clientGeneration != subscribedGeneration) return; // Ignore stale disconnect events!
+                if (_clientGeneration != subscribedGeneration) return;
+                // If we were streaming, this is an unexpected disconnect — force cleanup
+                bool wasStreaming = IsStreaming.Value;
                 Phase.Value = ConnectionPhase.Disconnected;
                 IsConnected.Value = false;
                 IsStreaming.Value = false;
+                if (wasStreaming)
+                {
+                    AppLog.LogWarning("[ConnectionViewModel] Unexpected disconnect during streaming");
+                    OnConnectionLost?.Invoke("Connection lost");
+                }
+            };
+
+            _client.OnReconnectFailed += (options) =>
+            {
+                if (_clientGeneration != subscribedGeneration) return;
+                Debug.LogError($"[ConnectionViewModel] Reconnect failed after all attempts");
+                ForceDisconnect("Auto-reconnect failed after multiple attempts");
             };
 
             _client.OnCursorPosition += (monitorIndex, u, v, visible, cursorType, cursorId) =>

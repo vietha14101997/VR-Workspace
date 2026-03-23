@@ -249,10 +249,10 @@ namespace VRWorkspace.Core
 
         public async System.Threading.Tasks.Task ExecuteAsync()
         {
-            if (!CanExecute) return;
-
             lock (_lock)
             {
+                if (_isExecuting) return;
+                if (!(_canExecute?.Invoke() ?? true)) return;
                 _isExecuting = true;
             }
 

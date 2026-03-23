@@ -129,6 +129,7 @@ namespace VRWorkspace.UI.RTT.Controllers
                 _viewModel.IsStreaming.OnChanged += HandleStreamingStateChanged;
                 _viewModel.OnCursorPositionChanged += HandleCursorPosition;
                 _viewModel.OnCursorImageReceived += HandleCursorImageReceived;
+                _viewModel.OnConnectionLost += HandleConnectionLost;
             }
             else
             {
@@ -192,6 +193,7 @@ namespace VRWorkspace.UI.RTT.Controllers
                 _viewModel.IsStreaming.OnChanged -= HandleStreamingStateChanged;
                 _viewModel.OnCursorPositionChanged -= HandleCursorPosition;
                 _viewModel.OnCursorImageReceived -= HandleCursorImageReceived;
+                _viewModel.OnConnectionLost -= HandleConnectionLost;
             }
 
             // Hide cursors before cleanup and clear cache
@@ -417,6 +419,16 @@ namespace VRWorkspace.UI.RTT.Controllers
         /// Handle DISCONNECT button click.
         /// Cleanup ClusterRig and remote taskbar, reset to initial state.
         /// </summary>
+        /// <summary>
+        /// Called when connection is lost unexpectedly (ICE failed, reconnect exhausted, weak network).
+        /// Performs the same cleanup as user-initiated disconnect, returning to menu.
+        /// </summary>
+        private void HandleConnectionLost(string reason)
+        {
+            Debug.LogWarning($"[RTTRemoteMenuController] Connection lost: {reason} — returning to menu");
+            HandleDisconnectClicked();
+        }
+
         private void HandleDisconnectClicked()
         {
             Debug.Log("[RTTRemoteMenuController] DISCONNECT clicked - cleaning up streaming resources");

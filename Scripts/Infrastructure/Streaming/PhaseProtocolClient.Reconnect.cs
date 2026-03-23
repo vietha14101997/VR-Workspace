@@ -1,4 +1,4 @@
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -220,7 +220,6 @@ namespace VRWorkspace.Streaming
 
                                 OnVideoTextureReceived?.Invoke(monIdx, tex);
                             };
-                            receiver.OnDecoderFailed += monIdx => OnH265DecoderFailed(monIdx);
                             receiver.OnKeyframeNeeded += monIdx => RequestKeyframe(monIdx);
                             receiver.OnCorruptionDetected += monIdx =>
                             {
@@ -361,7 +360,7 @@ namespace VRWorkspace.Streaming
 
             // Get current monitor count
             int count;
-            RTCPeerConnection oldPc;
+            RTCPeerConnection? oldPc;
             lock (_lock)
             {
                 count = _peerConnections.Count;
@@ -452,7 +451,7 @@ namespace VRWorkspace.Streaming
 
                 // Wait for frames to resume (USB needs longer for SCTP to deliver)
                 int step1Delay = _isUsbMode ? 1500 : (_isWiFiConnection ? 600 : 300);
-                await Task.Delay(step1Delay, _cts.Token);
+                await Task.Delay(step1Delay, _cts!.Token);
 
                 // Verify recovery using GROUND TRUTH (Decoder advance time)
                 var timeSinceDecoderAdvance = (DateTime.UtcNow - wrapper.LastDecoderAdvanceTime).TotalMilliseconds;
@@ -547,14 +546,6 @@ namespace VRWorkspace.Streaming
                 return;
             }
 
-            // Abort auto-heal if H265 fallback has been triggered — fallback handles its own reconnect
-            if (_h265FallbackTriggered || _h265FallbackInProgress)
-            {
-                AppLog.Log($"[PhaseProtocol] PC{monitorIndex} auto-heal: H265 fallback in progress, aborting auto-heal");
-                wrapper.IsReconnecting = false;
-                return;
-            }
-
             // Check if frames are now flowing (frame stall recovered naturally)
             var timeSinceFrame = DateTime.UtcNow - wrapper.LastFrameTime;
             if (timeSinceFrame.TotalMilliseconds < 2000) // Frames flowing within last 2s
@@ -641,20 +632,6 @@ namespace VRWorkspace.Streaming
         {
             AppLog.Log($"[PhaseProtocol] Starting full session reconnect (suggestedCodec={suggestedCodec ?? "none"})...");
 
-            // 0. Handle codec suggestion if provided
-            if (!string.IsNullOrEmpty(suggestedCodec))
-            {
-                if (suggestedCodec.Equals("H264", StringComparison.OrdinalIgnoreCase))
-                {
-                    AppLog.Log("[PhaseProtocol] Reconnecting with fallback codec: H264");
-                    _selectedCodec = VideoCodec.H264;
-                    if (_userConfig != null) _userConfig.selectedCodec = "H264";
-                    
-                    // Fire event for UI
-                    OnCodecFallback?.Invoke("H264");
-                }
-            }
-
             // 1. Close all PeerConnections (main + per-track video PCs)
             lock (_lock)
             {
@@ -679,7 +656,6 @@ namespace VRWorkspace.Streaming
 
             // 2. Reset metrics
             _metrics.ResetAll();
-            _h265StallStrikes = 0; // Reset stall strikes on reconnect
             _streamingStartedFired = false;
 
             // 3. Transition to reconnecting state

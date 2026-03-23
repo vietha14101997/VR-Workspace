@@ -133,11 +133,6 @@ namespace VRWorkspace.Streaming
 
                             OnVideoTextureReceived?.Invoke(monIdx, tex);
                         };
-                        ptReceiver.OnDecoderFailed += monIdx =>
-                        {
-                            Debug.LogError($"[PhaseProtocol] Video PC{monIdx} H265 decoder failed (per-track)");
-                            OnH265DecoderFailed(monIdx);
-                        };
                         ptReceiver.OnKeyframeNeeded += monIdx => RequestKeyframe(monIdx);
                         ptReceiver.OnCorruptionDetected += monIdx =>
                         {
@@ -899,12 +894,6 @@ namespace VRWorkspace.Streaming
 
                                 OnVideoTextureReceived?.Invoke(monIdx, tex);
                             };
-                            // Hook fallback: if decoder never produces frames, switch to H264
-                            receiver.OnDecoderFailed += monIdx =>
-                            {
-                                Debug.LogError($"[PhaseProtocol] PC{monIdx} {codecName} decoder failed, triggering fallback");
-                                OnH265DecoderFailed(monIdx);
-                            };
                             receiver.OnKeyframeNeeded += monIdx => RequestKeyframe(monIdx);
                             receiver.OnCorruptionDetected += monIdx =>
                             {
@@ -1315,7 +1304,6 @@ namespace VRWorkspace.Streaming
 
                                 OnVideoTextureReceived?.Invoke(monIdx, tex);
                             };
-                            receiver.OnDecoderFailed += monIdx => OnH265DecoderFailed(monIdx);
                             receiver.OnKeyframeNeeded += monIdx => RequestKeyframe(monIdx);
                             receiver.OnCorruptionDetected += monIdx =>
                             {

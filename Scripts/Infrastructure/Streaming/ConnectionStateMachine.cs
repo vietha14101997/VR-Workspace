@@ -80,6 +80,9 @@ namespace VRWorkspace.Streaming
         /// </summary>
         public bool TryTransition(ConnectionPhase newPhase, string message = null)
         {
+            ConnectionPhase oldPhase;
+            EventHandler<PhaseChangedEventArgs> handler;
+
             lock (_lock)
             {
                 if (!IsValidTransition(_currentPhase, newPhase))
@@ -88,7 +91,7 @@ namespace VRWorkspace.Streaming
                     return false;
                 }
 
-                var oldPhase = _currentPhase;
+                oldPhase = _currentPhase;
                 _currentPhase = newPhase;
 
                 if (newPhase == ConnectionPhase.Error)
@@ -102,22 +105,23 @@ namespace VRWorkspace.Streaming
 
                 AppLog.Log($"[StateMachine] {oldPhase} -> {newPhase}" + (message != null ? $": {message}" : ""));
 
-                // Fire event outside lock to prevent deadlocks
-                var handler = PhaseChanged;
-                if (handler != null)
-                {
-                    try
-                    {
-                        handler.Invoke(this, new PhaseChangedEventArgs(oldPhase, newPhase, message));
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.LogError($"[StateMachine] Event handler error: {ex.Message}");
-                    }
-                }
-
-                return true;
+                handler = PhaseChanged;
             }
+
+            // Fire event outside lock to prevent deadlocks
+            if (handler != null)
+            {
+                try
+                {
+                    handler.Invoke(this, new PhaseChangedEventArgs(oldPhase, newPhase, message));
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[StateMachine] Event handler error: {ex.Message}");
+                }
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -125,9 +129,12 @@ namespace VRWorkspace.Streaming
         /// </summary>
         public void ForceTransition(ConnectionPhase newPhase, string message = null)
         {
+            ConnectionPhase oldPhase;
+            EventHandler<PhaseChangedEventArgs> handler;
+
             lock (_lock)
             {
-                var oldPhase = _currentPhase;
+                oldPhase = _currentPhase;
                 _currentPhase = newPhase;
 
                 if (newPhase == ConnectionPhase.Error)
@@ -137,9 +144,11 @@ namespace VRWorkspace.Streaming
 
                 AppLog.Log($"[StateMachine] FORCE: {oldPhase} -> {newPhase}" + (message != null ? $": {message}" : ""));
 
-                var handler = PhaseChanged;
-                handler?.Invoke(this, new PhaseChangedEventArgs(oldPhase, newPhase, message));
+                handler = PhaseChanged;
             }
+
+            // Fire event outside lock to prevent deadlocks
+            handler?.Invoke(this, new PhaseChangedEventArgs(oldPhase, newPhase, message));
         }
 
         /// <summary>
