@@ -588,6 +588,17 @@ namespace VRWorkspace.ViewModels
             _client?.SkipToLive();
         }
 
+        // ── Remote Input Forwarding (BT mouse/keyboard → server) ──────────
+
+        public void SendMouseMove(short dx, short dy) => _client?.SendMouseMove(dx, dy);
+        public void SendMouseButton(byte button, bool down) => _client?.SendMouseButton(button, down);
+        public void SendMouseWheel(short deltaY, short deltaX = 0) => _client?.SendMouseWheel(deltaY, deltaX);
+        public void SendKey(ushort vk, bool down) => _client?.SendKey(vk, down);
+        public void SendText(string text) => _client?.SendText(text);
+        public void SendWarpCursor(int monitorIndex, float u, float v) => _client?.SendWarpCursor(monitorIndex, u, v);
+        public void SendGamepadState(ushort buttons, byte lt, byte rt, short lx, short ly, short rx, short ry) =>
+            _client?.SendGamepadState(buttons, lt, rt, lx, ly, rx, ry);
+
         /// <summary>
         /// Get streaming metrics (latency, jitter, FPS, etc.).
         /// Returns null if not connected.

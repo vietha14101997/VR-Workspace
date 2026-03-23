@@ -434,6 +434,12 @@ namespace VRWorkspace.Streaming
             _cursorChannel.OnClose = () => AppLog.Log("[PhaseProtocol] Cursor DataChannel closed");
             AppLog.Log("[PhaseProtocol] Cursor via DataChannel (low-latency binary)");
 
+            // Client→Server input DC for BT mouse/keyboard forwarding
+            _inputChannel = pc.CreateDataChannel("input");
+            _inputChannel.OnOpen = () => AppLog.Log("[PhaseProtocol] Input DataChannel opened (mouse/keyboard forwarding)");
+            _inputChannel.OnClose = () => AppLog.Log("[PhaseProtocol] Input DataChannel closed");
+            AppLog.Log("[PhaseProtocol] Input DataChannel created");
+
             // ── Legacy mode: create per-track h265video DCs on main PC ───────────
             // Per-track mode: h265video DCs live on the per-monitor video PCs — skip this block.
             if (!_perTrackPcMode)

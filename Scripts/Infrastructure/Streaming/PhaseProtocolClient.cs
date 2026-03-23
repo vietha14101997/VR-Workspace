@@ -1305,6 +1305,7 @@ namespace VRWorkspace.Streaming
 
             _sctpInitChannel = null;
             _cursorChannel = null;
+            _inputChannel = null;
             _h265VideoChannels.Clear();
 
             // Close per-track video PCs (always safe — no-op if dictionary is empty)

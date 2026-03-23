@@ -48,6 +48,9 @@ namespace VRWorkspace.UI.RTT.Controllers
         // Cursor tracking
         private int _activeCursorPanelIndex = -1;
 
+        // Remote input forwarding (BT mouse/keyboard → server)
+        private VRWorkspace.VRInput.RemoteInputBridge _inputBridge;
+
         // Mipmap textures for anti-aliasing at distance
         private RenderTexture[] _mipmapTextures;
         private float _lastMipmapDebugTime;
@@ -887,6 +890,19 @@ namespace VRWorkspace.UI.RTT.Controllers
                 // Create ClusterRig now that streaming is ready
                 CreateClusterRigForStreaming(_pendingConfig);
                 _pendingConfig = null;
+            }
+
+            // Activate/deactivate remote input forwarding (BT mouse/keyboard)
+            if (isStreaming)
+            {
+                if (_inputBridge == null)
+                    _inputBridge = gameObject.AddComponent<VRWorkspace.VRInput.RemoteInputBridge>();
+                _inputBridge.SetActive(true);
+            }
+            else
+            {
+                if (_inputBridge != null)
+                    _inputBridge.SetActive(false);
             }
         }
 
