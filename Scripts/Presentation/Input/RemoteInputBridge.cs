@@ -28,8 +28,14 @@ namespace VRWorkspace.VRInput
         [Tooltip("Interval between key repeats (seconds)")]
         public float keyRepeatInterval = 0.033f; // ~30 repeats/sec, matches Windows default
 
+        [Header("VR Mode Head Tracking")]
+        [Tooltip("Sensitivity multiplier for head rotation mapping to mouse delta")]
+        public float headTrackingSensitivity = 15.0f;
+
         private ConnectionViewModel _viewModel;
         private bool _isActive;
+        private bool _isVrModeActive;
+        private Quaternion _lastCameraRotation;
 
         // Key repeat state: track held keys with their timestamps
         private readonly Dictionary<Key, float> _heldKeyTimestamps = new Dictionary<Key, float>();
@@ -107,12 +113,45 @@ namespace VRWorkspace.VRInput
 #pragma warning restore CS0618
         }
 
+        private void Start()
+        {
+            if (_viewModel != null)
+            {
+                _viewModel.OnVrModeChanged += HandleVrModeChanged;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (_viewModel != null)
+            {
+                _viewModel.OnVrModeChanged -= HandleVrModeChanged;
+            }
+        }
+
+        private void HandleVrModeChanged(bool enabled)
+        {
+            _isVrModeActive = enabled;
+            if (enabled)
+            {
+                _lastCameraRotation = Camera.main != null ? Camera.main.transform.localRotation : Quaternion.identity;
+                SetActive(true);
+                AppLog.Log("[RemoteInput] VR Mode Activated — head tracking enabled");
+            }
+            else
+            {
+                SetActive(false);
+                AppLog.Log("[RemoteInput] VR Mode Deactivated");
+            }
+        }
+
         private void Update()
         {
             if (!_isActive || _viewModel == null) return;
 
             try
             {
+                ProcessHeadTracking();
                 ProcessMouse();
                 ProcessKeyboard();
                 ProcessGamepad();
@@ -122,6 +161,36 @@ namespace VRWorkspace.VRInput
                 // Input System can throw when BT devices disconnect mid-frame.
                 // Catch here to prevent native crash propagation.
                 Debug.LogWarning($"[RemoteInput] Input processing error (device disconnected?): {ex.Message}");
+            }
+        }
+
+        private void ProcessHeadTracking()
+        {
+            if (!_isVrModeActive) return;
+
+            var mainCam = Camera.main;
+            if (mainCam == null) return;
+
+            Quaternion currentRotation = mainCam.transform.localRotation;
+            
+            // Calculate relative rotation delta from last frame
+            Quaternion delta = Quaternion.Inverse(_lastCameraRotation) * currentRotation;
+            
+            float deltaYaw = delta.eulerAngles.y;
+            if (deltaYaw > 180f) deltaYaw -= 360f;
+
+            float deltaPitch = delta.eulerAngles.x;
+            if (deltaPitch > 180f) deltaPitch -= 360f;
+
+            _lastCameraRotation = currentRotation;
+
+            // Map angle changes to relative mouse pixels
+            short dx = (short)(deltaYaw * headTrackingSensitivity);
+            short dy = (short)(-deltaPitch * headTrackingSensitivity); // Invert Y axis for Windows Y-down
+
+            if (dx != 0 || dy != 0)
+            {
+                _viewModel.SendMouseMove(dx, dy);
             }
         }
 

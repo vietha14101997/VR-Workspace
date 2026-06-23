@@ -230,7 +230,7 @@ namespace VRWorkspace.Media.UI
             crumbRT.offsetMin = new Vector2(20f, 0);
             crumbRT.offsetMax = new Vector2(-520f, 0);  // Leave room for item count and refresh button
 
-            Debug.Log($"[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to {_breadcrumbContainer.name}, instanceID={GetInstanceID()}");
+            Debug.Log($"[RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to {_breadcrumbContainer.name}, instanceID={GetEntityId()}");
 
             // Edit Controls Container (hidden by default)
             CreateEditControlsInRow2(rowRT);

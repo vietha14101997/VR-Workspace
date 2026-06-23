@@ -33,7 +33,7 @@ namespace VRWorkspace.UI.RTT.Input
 
                 if (_instance == null)
                 {
-                    _instance = FindFirstObjectByType<RTTRaycastManager>();
+                    _instance = FindAnyObjectByType<RTTRaycastManager>();
 
                     if (_instance == null)
                     {

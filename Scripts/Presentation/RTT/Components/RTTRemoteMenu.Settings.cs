@@ -164,7 +164,7 @@ namespace VRWorkspace.UI.RTT.Components
         {
             bool isCurvedSurround = monitorIndex >= 3; // Ultrawide or Super Ultrawide
 
-            var clusterRig = FindFirstObjectByType<WorldPanelClusterRig>();
+            var clusterRig = FindAnyObjectByType<WorldPanelClusterRig>();
             if (clusterRig != null)
             {
                 clusterRig.SetStyle(isCurvedSurround);

@@ -160,6 +160,7 @@ namespace VRWorkspace.Streaming
         public event Action<string[]>?                          OnReconnectFailed;
         public event Action?                                    OnSessionReconnectRequested;
         public event Action<string, double, int>?               OnSpeedTestProgress;
+        public event Action<bool>?                              OnVrModeChanged;
         // NOTE: OnSkipToLiveAck, OnBitrateAdjusted, OnQualityRecommendation are declared
         // in PhaseProtocolClient.Metrics.cs (that partial also owns SkipToLiveImmediate).
 
@@ -811,6 +812,10 @@ namespace VRWorkspace.Streaming
 
                         case "monitor_idle":
                             HandleMonitorIdle(json);
+                            break;
+
+                        case "vr_mode_changed":
+                            OnVrModeChanged?.Invoke(json.GetBool("enabled"));
                             break;
 
                         // ── Cursor (partial file) ─────────────────────────────

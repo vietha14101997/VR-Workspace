@@ -53,7 +53,7 @@ namespace VRWorkspace.UI.RTT
 
                 if (_instance == null)
                 {
-                    _instance = FindFirstObjectByType<RTTManager>();
+                    _instance = FindAnyObjectByType<RTTManager>();
 
                     if (_instance == null)
                     {
@@ -471,7 +471,7 @@ namespace VRWorkspace.UI.RTT
         {
             // Find RTTMenu container first
             if (menu == null)
-                menu = RTTMenu.Instance ?? FindFirstObjectByType<RTTMenu>();
+                menu = RTTMenu.Instance ?? FindAnyObjectByType<RTTMenu>();
 
             if (mainMenuFrame == null)
             {
@@ -480,11 +480,11 @@ namespace VRWorkspace.UI.RTT
                     mainMenuFrame = menu.MainFrame;
                 // Fallback to static instance or FindObjectOfType
                 if (mainMenuFrame == null)
-                    mainMenuFrame = RTTMenuFrame.PrimaryInstance ?? FindFirstObjectByType<RTTMenuFrame>();
+                    mainMenuFrame = RTTMenuFrame.PrimaryInstance ?? FindAnyObjectByType<RTTMenuFrame>();
             }
 
             if (taskbar == null)
-                taskbar = RTTTaskbar.Instance ?? FindFirstObjectByType<RTTTaskbar>();
+                taskbar = RTTTaskbar.Instance ?? FindAnyObjectByType<RTTTaskbar>();
 
             if (mainMenuController == null)
             {
@@ -803,6 +803,9 @@ namespace VRWorkspace.UI.RTT
             OnMenuStateChanged?.Invoke(_currentMenuState);
             mainMenuFrame.MarkDirty();
             Debug.Log("[RTTManager] Showing Main Menu (persistent)");
+
+            // Force switch to Remote Menu
+            SwitchToRemoteMenu();
         }
 
         public void SwitchToRemoteMenu()
@@ -815,6 +818,17 @@ namespace VRWorkspace.UI.RTT
 
             // Destroy any other non-MainMenu content
             DestroyCurrentMenuContent();
+
+            if (remoteMenuController == null)
+            {
+                remoteMenuController = GetComponentInChildren<RTTRemoteMenuController>();
+                if (remoteMenuController == null)
+                {
+                    var controllerObj = new GameObject("RemoteMenuController_Default");
+                    controllerObj.transform.SetParent(transform);
+                    remoteMenuController = controllerObj.AddComponent<RTTRemoteMenuController>();
+                }
+            }
 
             if (remoteMenuController != null)
             {

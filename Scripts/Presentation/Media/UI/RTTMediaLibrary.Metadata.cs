@@ -103,7 +103,7 @@ namespace VRWorkspace.Media.UI
             // Fallback: find breadcrumb container from hierarchy if reference is lost
             if (_breadcrumbContainer == null)
             {
-                Debug.LogWarning($"[RTTMediaLibrary] Breadcrumb container reference lost (instanceID={GetInstanceID()}), searching in hierarchy...");
+                Debug.LogWarning($"[RTTMediaLibrary] Breadcrumb container reference lost (instanceID={GetEntityId()}), searching in hierarchy...");
                 var row2 = _headerRT?.Find("Row2");
                 if (row2 != null)
                 {

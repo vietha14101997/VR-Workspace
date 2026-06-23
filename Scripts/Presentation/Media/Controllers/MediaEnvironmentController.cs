@@ -138,7 +138,7 @@ namespace VRWorkspace.Media.Core
         private void CacheLights()
         {
             // Find all lights in the scene (excluding directional sun light for VR)
-            Light[] allLights = FindObjectsByType<Light>(FindObjectsSortMode.None);
+            Light[] allLights = FindObjectsByType<Light>();
 
             // Filter to room/environment lights (point and spot)
             var roomLights = new System.Collections.Generic.List<Light>();

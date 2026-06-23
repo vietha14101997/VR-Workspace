@@ -56,11 +56,11 @@ namespace VRWorkspace.Core.Coroutines
     [DisallowMultipleComponent]
     internal sealed class ScopeHolder : MonoBehaviour
     {
-        private readonly Dictionary<int, CoroutineScope> _scopes = new Dictionary<int, CoroutineScope>();
+        private readonly Dictionary<UnityEngine.EntityId, CoroutineScope> _scopes = new Dictionary<UnityEngine.EntityId, CoroutineScope>();
 
         internal CoroutineScope GetOrCreateScope(MonoBehaviour owner, CoroutineDispatcher dispatcher)
         {
-            int id = owner.GetInstanceID();
+            UnityEngine.EntityId id = owner.GetEntityId();
 
             if (_scopes.TryGetValue(id, out var existing) && !existing.IsDisposed)
                 return existing;

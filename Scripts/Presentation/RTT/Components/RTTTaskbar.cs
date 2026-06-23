@@ -107,7 +107,7 @@ namespace VRWorkspace.UI.RTT.Components
 
         private void SyncPassthroughWithModeController()
         {
-            var modeController = FindFirstObjectByType<ModeController>();
+            var modeController = FindAnyObjectByType<ModeController>();
             if (modeController != null)
             {
                 _isPassthroughOn = modeController.mode == ViewMode.RealWorld;
@@ -247,7 +247,7 @@ namespace VRWorkspace.UI.RTT.Components
 
             UpdateEyeButtonColor();
 
-            var modeController = FindFirstObjectByType<ModeController>();
+            var modeController = FindAnyObjectByType<ModeController>();
             if (modeController != null)
             {
                 modeController.SetMode(_isPassthroughOn ? ViewMode.RealWorld : ViewMode.VirtualSpace);
@@ -284,7 +284,7 @@ namespace VRWorkspace.UI.RTT.Components
                 envController.SetLightsEnabled(isOn);
             }
 
-            var modeController = FindFirstObjectByType<ModeController>();
+            var modeController = FindAnyObjectByType<ModeController>();
 
             if (!_isLightOn)
             {
@@ -614,7 +614,7 @@ namespace VRWorkspace.UI.RTT.Components
                 _isPassthroughOn = isOn;
                 UpdateEyeButtonColor();
 
-                var modeController = FindFirstObjectByType<ModeController>();
+                var modeController = FindAnyObjectByType<ModeController>();
                 if (modeController != null)
                 {
                     modeController.SetMode(_isPassthroughOn ? ViewMode.RealWorld : ViewMode.VirtualSpace);
@@ -653,7 +653,7 @@ namespace VRWorkspace.UI.RTT.Components
         private System.Collections.IEnumerator RecenterRoutine()
         {
             VRGazeReticle reticle = VRGazeReticle.Instance;
-            if (reticle == null) reticle = FindFirstObjectByType<VRGazeReticle>();
+            if (reticle == null) reticle = FindAnyObjectByType<VRGazeReticle>();
 
             if (reticle != null)
             {

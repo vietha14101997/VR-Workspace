@@ -133,6 +133,11 @@ namespace VRWorkspace.ViewModels
         public event Action<byte[]> OnDCAudioData;
 
         /// <summary>
+        /// VR Mode status change event from server.
+        /// </summary>
+        public event Action<bool> OnVrModeChanged;
+
+        /// <summary>
         /// Cached audio track for late subscribers (OnTrack fires before RemoteAudioPlayer exists).
         /// </summary>
         public AudioStreamTrack CachedAudioTrack => _cachedAudioTrack;
@@ -795,6 +800,12 @@ namespace VRWorkspace.ViewModels
             {
                 if (_clientGeneration != subscribedGeneration) return;
                 OnDCAudioData?.Invoke(data);
+            };
+
+            _client.OnVrModeChanged += (enabled) =>
+            {
+                if (_clientGeneration != subscribedGeneration) return;
+                OnVrModeChanged?.Invoke(enabled);
             };
 
             _client.OnStreamingStarted += () =>

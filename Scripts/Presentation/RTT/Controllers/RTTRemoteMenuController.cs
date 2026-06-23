@@ -130,6 +130,7 @@ namespace VRWorkspace.UI.RTT.Controllers
                 _viewModel.OnCursorPositionChanged += HandleCursorPosition;
                 _viewModel.OnCursorImageReceived += HandleCursorImageReceived;
                 _viewModel.OnConnectionLost += HandleConnectionLost;
+                _viewModel.OnVrModeChanged += HandleVrModeChanged;
             }
             else
             {
@@ -147,7 +148,7 @@ namespace VRWorkspace.UI.RTT.Controllers
             if (connectionPipeline != null) return;
 
             // Try to find existing
-            connectionPipeline = FindFirstObjectByType<RemoteConnectionPipeline>();
+            connectionPipeline = FindAnyObjectByType<RemoteConnectionPipeline>();
 
             // Create if not found
             if (connectionPipeline == null)
@@ -194,6 +195,7 @@ namespace VRWorkspace.UI.RTT.Controllers
                 _viewModel.OnCursorPositionChanged -= HandleCursorPosition;
                 _viewModel.OnCursorImageReceived -= HandleCursorImageReceived;
                 _viewModel.OnConnectionLost -= HandleConnectionLost;
+                _viewModel.OnVrModeChanged -= HandleVrModeChanged;
             }
 
             // Hide cursors before cleanup and clear cache
@@ -915,6 +917,22 @@ namespace VRWorkspace.UI.RTT.Controllers
             {
                 if (_inputBridge != null)
                     _inputBridge.SetActive(false);
+            }
+        }
+
+        private void HandleVrModeChanged(bool enabled)
+        {
+            Debug.Log($"[RTTRemoteMenuController] HandleVrModeChanged: {enabled}");
+            if (_clusterRig != null && _clusterRig.panels != null)
+            {
+                foreach (var panel in _clusterRig.panels)
+                {
+                    if (panel != null)
+                    {
+                        panel.stereoMode = enabled ? VRWorkspace.Media.Data.StereoMode.SideBySide : VRWorkspace.Media.Data.StereoMode.Mono;
+                        panel.Apply();
+                    }
+                }
             }
         }
 
