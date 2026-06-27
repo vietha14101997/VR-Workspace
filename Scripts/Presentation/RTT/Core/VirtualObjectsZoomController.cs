@@ -273,28 +273,36 @@ namespace VRWorkspace.UI.RTT
             Vector3 cameraPos = cam.transform.position;
             Vector3 primaryPos = _primaryFrame.transform.position;
 
-            // CRITICAL: Direction from Camera to Primary, projected onto XZ plane
-            // This keeps vertical (Y) position intact — zoom only changes horizontal distance.
-            Vector3 toPrimary = primaryPos - cameraPos;
-            toPrimary.y = 0f;
-            float currentHorizontalDist = toPrimary.magnitude;
+            // Capture the original Y offset between primary frame and camera.
+            // Goal: whatever toPrimary.y is right now, it must be the same after the move.
+            float yOffset = primaryPos.y - cameraPos.y;
 
-            if (currentHorizontalDist < 0.001f)
+            Vector3 toPrimary = primaryPos - cameraPos;
+            float currentDist = toPrimary.magnitude;
+
+            if (currentDist < 0.001f)
             {
-                // Camera directly above/below primary, use camera forward as fallback
+                // Camera too close to primary, use camera forward as fallback
                 toPrimary = cam.transform.forward;
-                toPrimary.y = 0f;
-                if (toPrimary.sqrMagnitude < 0.001f) toPrimary = Vector3.forward;
-                currentHorizontalDist = _currentDistance;
+                currentDist = _currentDistance;
             }
 
             Vector3 direction = toPrimary.normalized;
 
             // Calculate delta distance to move
-            float deltaDist = newDistance - currentHorizontalDist;
+            float deltaDist = newDistance - currentDist;
 
-            // Move entire VirtualObjects container along this direction (XZ only)
-            virtualObjectsRoot.position += direction * deltaDist;
+            // Apply movement along the full 3D direction
+            Vector3 newPos = virtualObjectsRoot.position + direction * deltaDist;
+
+            // Preserve Y offset: virtualObjectsRoot.y must yield (primary.y - camera.y) == yOffset.
+            // Primary frame sits at localPos.y = 0 inside VirtualObjects, so primary.y == virtualObjectsRoot.y.
+            // Therefore we set newPos.y so that primary.y - camera.y == yOffset.
+            float newCameraY = cam.transform.position.y;
+            float targetRootY = newCameraY + yOffset;
+            newPos.y = targetRootY;
+
+            virtualObjectsRoot.position = newPos;
 
             _currentDistance = newDistance;
 
