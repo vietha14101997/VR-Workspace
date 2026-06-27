@@ -147,7 +147,7 @@ namespace VRWorkspace.UI.RTT.Controllers
             if (connectionPipeline != null) return;
 
             // Try to find existing
-            connectionPipeline = FindFirstObjectByType<RemoteConnectionPipeline>();
+            connectionPipeline = FindAnyObjectByType<RemoteConnectionPipeline>();
 
             // Create if not found
             if (connectionPipeline == null)

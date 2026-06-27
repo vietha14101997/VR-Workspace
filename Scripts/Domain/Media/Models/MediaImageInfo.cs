@@ -68,9 +68,11 @@ namespace VRWorkspace.Media.Data
         public float ExposureTime;
 
         /// <summary>GPS latitude</summary>
+        [NonSerialized]
         public double? Latitude;
 
         /// <summary>GPS longitude</summary>
+        [NonSerialized]
         public double? Longitude;
         #endregion
 

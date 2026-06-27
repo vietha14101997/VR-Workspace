@@ -21,6 +21,7 @@ namespace VRWorkspace.Media.Data
 
         #region Audio Properties
         /// <summary>Audio duration</summary>
+        [NonSerialized]
         public TimeSpan Duration;
 
         /// <summary>Audio file format</summary>
@@ -102,6 +103,7 @@ namespace VRWorkspace.Media.Data
         public List<string> PlaylistIds;
 
         /// <summary>Last playback position for resume</summary>
+        [NonSerialized]
         public TimeSpan LastPosition;
         #endregion
 

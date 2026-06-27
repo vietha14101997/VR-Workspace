@@ -96,7 +96,7 @@ namespace VRWorkspace.QRScanner
         {
             // Find RTTTaskbar if not set
             if (_rttTaskbar == null)
-                _rttTaskbar = FindFirstObjectByType<RTTTaskbar>();
+                _rttTaskbar = FindAnyObjectByType<RTTTaskbar>();
 
             // Calculate cancel button position
             _cancelButtonDistance = frameDistance;

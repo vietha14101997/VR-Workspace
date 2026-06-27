@@ -58,9 +58,13 @@ namespace VRWorkspace.VRInput
         public float fastThreshold = 25f;
 
         [Header("Dead Zone")]
-        [Tooltip("Ngưỡng dead zone (độ/giây) - chuyển động dưới mức này bị bỏ qua hoàn toàn")]
+        [Tooltip("Ngưỡng dead zone (độ/giây) - chuyển động dưới mức này bị bỏ qua hoàn toàn. Khi đặt máy xuống bàn, gyro vẫn dao động ~1-2°/s do MEMS bias → đặt 2.0-3.0 để chống drift")]
         [Range(0.1f, 3f)]
-        public float deadZoneThreshold = 0.8f;
+        public float deadZoneThreshold = 2.5f;
+
+        [Tooltip("Ngưỡng để thoát khỏi trạng thái khóa (độ/giây). Phải > deadZoneThreshold để tạo hysteresis, tránh dao động LOCKED/MOVING khi gyro dao động quanh biên")]
+        [Range(0.5f, 10f)]
+        public float unlockThreshold = 5.0f;
 
         [Header("Compass Yaw Correction")]
         [Tooltip("Bật/tắt chỉnh yaw drift bằng compass (cần thiết vì Cardboard XR không dùng compass)")]
@@ -1302,8 +1306,14 @@ namespace VRWorkspace.VRInput
             Vector3 deltaEuler = DeltaAngles(_previousEuler, currentEuler);
             float angularSpeed = deltaEuler.magnitude / dt;
 
+            // === HYSTERESIS: dùng ngưỡng khác nhau tùy trạng thái ===
+            // Tránh dao động LOCKED/MOVING khi gyro dao động quanh biên
+            // (vd: gyro noise 1-2°/s khi đặt máy xuống bàn sẽ không còn
+            // "lái" _stabilizedRotation theo rawRotation qua Slerp).
+            float threshold = _isLocked ? unlockThreshold : deadZoneThreshold;
+
             // === DEAD ZONE: dưới ngưỡng → khóa camera hoàn toàn ===
-            if (angularSpeed < deadZoneThreshold)
+            if (angularSpeed < threshold)
             {
                 if (!_isLocked)
                 {

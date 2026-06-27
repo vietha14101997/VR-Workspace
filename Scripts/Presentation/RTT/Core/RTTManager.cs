@@ -53,7 +53,7 @@ namespace VRWorkspace.UI.RTT
 
                 if (_instance == null)
                 {
-                    _instance = FindFirstObjectByType<RTTManager>();
+                    _instance = FindAnyObjectByType<RTTManager>();
 
                     if (_instance == null)
                     {
@@ -115,11 +115,7 @@ namespace VRWorkspace.UI.RTT
         [SerializeField] private bool autoShowMainMenu = true;
 
         [Tooltip("Pre-initialize all app menus in background after main menu stabilizes")]
-        [SerializeField] private bool enableBackgroundPreInit = true;
-
-        [Header("Auto Recenter")]
-        [Tooltip("Automatically recenter objects in front of user when app starts")]
-        [SerializeField] private bool autoRecenterOnStart = true;
+        [SerializeField] private bool enableBackgroundPreInit = false;
         #endregion
 
         #region Panel Management Fields
@@ -135,7 +131,6 @@ namespace VRWorkspace.UI.RTT
 
         // Extracted responsibility managers
         private RTTThemeManager _themeManager;
-        private RTTRecenterController _recenterController;
         private RTTImmersiveModeController _immersiveModeController;
         private Dictionary<RTTAppRegistry.AppType, IRTTAppContentFactory> _appFactories;
         #endregion
@@ -149,7 +144,9 @@ namespace VRWorkspace.UI.RTT
         private GameObject _mainMenuContent;
         private bool _mainMenuInitialized = false;
         private bool _mainMenuCreating = false;
-        private bool _hasAutoRecentered = false;
+
+        // Pause state to avoid expensive rendering while app is backgrounded
+        private bool _isPaused = false;
 
         // Stored delegate for theme property change subscription (allows clean unsubscribe)
         private Action _themePropertyChangedDelegate;
@@ -352,11 +349,6 @@ namespace VRWorkspace.UI.RTT
                     Application.Quit();
                 }
 
-                if (Api.IsTriggerHeldPressed)
-                {
-                    PerformInstantRecenter();
-                }
-
                 if (Api.HasNewDeviceParams())
                 {
                     Api.ReloadDeviceParams();
@@ -382,6 +374,51 @@ namespace VRWorkspace.UI.RTT
         private void OnApplicationQuit()
         {
             _applicationQuitting = true;
+        }
+
+        private void OnApplicationPause(bool pauseStatus)
+        {
+            _isPaused = pauseStatus;
+
+            var panels = _panelManager?.RegisteredPanels;
+            if (panels == null) return;
+
+            if (pauseStatus)
+            {
+                // Backgrounded: disable RTT UI cameras to free GPU and avoid
+                // wasted rendering while the user cannot see the panels.
+                int disabled = 0;
+                foreach (var panel in panels)
+                {
+                    if (panel == null) continue;
+                    var cam = panel.GetUICamera();
+                    if (cam != null && cam.enabled)
+                    {
+                        cam.enabled = false;
+                        disabled++;
+                    }
+                }
+                Debug.Log($"[RTTManager] Paused - disabled {disabled} RTT cameras");
+            }
+            else
+            {
+                // Resumed: re-enable cameras and mark all panels dirty so they
+                // re-render fresh content. Android may have reclaimed textures
+                // while in background.
+                int enabled = 0;
+                foreach (var panel in panels)
+                {
+                    if (panel == null) continue;
+                    var cam = panel.GetUICamera();
+                    if (cam != null && !cam.enabled)
+                    {
+                        cam.enabled = true;
+                        enabled++;
+                    }
+                    panel.MarkDirty();
+                }
+                Debug.Log($"[RTTManager] Resumed - re-enabled {enabled} RTT cameras and marked panels dirty");
+            }
         }
         #endregion
 
@@ -415,9 +452,6 @@ namespace VRWorkspace.UI.RTT
             _themeManager = new RTTThemeManager(themeConfig, primaryFont);
             _themeManager.OnThemeChanged += () => OnThemeChanged?.Invoke();
             _themeManager.OnFontChanged += () => OnFontChanged?.Invoke();
-
-            // Recenter Controller
-            _recenterController = new RTTRecenterController();
 
             // Immersive Mode Controller
             _immersiveModeController = new RTTImmersiveModeController();
@@ -471,7 +505,7 @@ namespace VRWorkspace.UI.RTT
         {
             // Find RTTMenu container first
             if (menu == null)
-                menu = RTTMenu.Instance ?? FindFirstObjectByType<RTTMenu>();
+                menu = RTTMenu.Instance ?? FindAnyObjectByType<RTTMenu>();
 
             if (mainMenuFrame == null)
             {
@@ -480,11 +514,11 @@ namespace VRWorkspace.UI.RTT
                     mainMenuFrame = menu.MainFrame;
                 // Fallback to static instance or FindObjectOfType
                 if (mainMenuFrame == null)
-                    mainMenuFrame = RTTMenuFrame.PrimaryInstance ?? FindFirstObjectByType<RTTMenuFrame>();
+                    mainMenuFrame = RTTMenuFrame.PrimaryInstance ?? FindAnyObjectByType<RTTMenuFrame>();
             }
 
             if (taskbar == null)
-                taskbar = RTTTaskbar.Instance ?? FindFirstObjectByType<RTTTaskbar>();
+                taskbar = RTTTaskbar.Instance ?? FindAnyObjectByType<RTTTaskbar>();
 
             if (mainMenuController == null)
             {
@@ -535,12 +569,6 @@ namespace VRWorkspace.UI.RTT
 
             try
             {
-                // Start camera-follow immediately (before waiting for MainMenu)
-                if (autoRecenterOnStart && !_hasAutoRecentered)
-                {
-                    StartStartupCameraFollow();
-                }
-
                 // Wait for ContentContainer to be ready (spread across frames)
                 await UniTask.WaitUntil(() => mainMenuFrame.ContentContainer != null,
                     cancellationToken: this.GetCancellationTokenOnDestroy());
@@ -562,37 +590,6 @@ namespace VRWorkspace.UI.RTT
             {
                 _mainMenuCreating = false;
             }
-        }
-
-        /// <summary>
-        /// Start continuous camera-follow at startup.
-        /// VirtualObjects track camera's horizontal axis until camera tracking is detected
-        /// AND MainMenu initialization is complete.
-        /// </summary>
-        private void StartStartupCameraFollow()
-        {
-            _recenterController?.StartStartupCameraFollow();
-        }
-
-        private void LateUpdate()
-        {
-            if (_recenterController == null || !_recenterController.IsFollowActive) return;
-
-            bool completed = _recenterController.UpdateCameraFollow(_mainMenuInitialized);
-            if (completed)
-            {
-                _hasAutoRecentered = true;
-            }
-        }
-
-        /// <summary>
-        /// Perform instant recenter without animation.
-        /// Moves all VirtualObjects to face the camera.
-        /// Also calls Cardboard API Recenter on Android to reset headset tracking.
-        /// </summary>
-        public void PerformInstantRecenter()
-        {
-            _recenterController?.PerformInstantRecenter();
         }
 
         /// <summary>

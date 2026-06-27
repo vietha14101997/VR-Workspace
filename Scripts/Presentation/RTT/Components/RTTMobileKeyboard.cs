@@ -919,7 +919,7 @@ namespace VRWorkspace.UI.RTT.Components
             _renderTexture.filterMode = FilterMode.Bilinear;
             _renderTexture.useMipMap = false;
             _renderTexture.autoGenerateMips = false;
-            _renderTexture.name = $"RTT_{GetType().Name}_{GetInstanceID()}";
+            _renderTexture.name = $"RTT_{GetType().Name}_{GetEntityId()}";
 
             if (!_renderTexture.Create())
             {

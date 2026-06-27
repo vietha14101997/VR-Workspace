@@ -89,7 +89,7 @@ namespace VRWorkspace.Panel
         // Event fired when panel enabled state changes
         public event System.Action<int, bool> OnPanelEnabledChanged;
 
-        Camera Cam => Application.isPlaying ? Camera.main : FindFirstObjectByType<Camera>();
+        Camera Cam => Application.isPlaying ? Camera.main : FindAnyObjectByType<Camera>();
 
         /// <summary>
         /// Get arc radius for panel positioning.

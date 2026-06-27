@@ -30,6 +30,12 @@ namespace VRWorkspace.Utilities
         private Mouse mouse;
         private Keyboard keyboard;
 
+        // TrackedPoseDriver state — saved on Start, restored on OnDisable
+        // so XR tracking doesn't fight the editor mouse-look controller.
+        private bool _trackedPoseDriverWasEnabled = false;
+        private bool _trackedPoseDriverStateCaptured = false;
+        private Camera _trackedPoseCamera;
+
         private void Start()
         {
             // Get input devices
@@ -48,6 +54,12 @@ namespace VRWorkspace.Utilities
                 return;
             }
 
+            // Disable TrackedPoseDriver on the main camera so that
+            // Cardboard XR / XR Device Simulator cannot keep rotating the
+            // camera after mouse-look is toggled off (which previously
+            // caused a slow drift when the user pressed Alt).
+            DisableTrackedPoseDriverForEditor();
+
             // Initialize rotation from current camera rotation
             Vector3 currentRotation = transform.eulerAngles;
             rotationX = currentRotation.y;
@@ -59,6 +71,31 @@ namespace VRWorkspace.Utilities
 
             // Start with mouse look active
             SetMouseLookActive(true);
+        }
+
+        private void DisableTrackedPoseDriverForEditor()
+        {
+            var cam = Camera.main;
+            if (cam == null) return;
+
+            var tpd = cam.GetComponent<UnityEngine.InputSystem.XR.TrackedPoseDriver>();
+            if (tpd == null) return;
+
+            _trackedPoseCamera = cam;
+            _trackedPoseDriverWasEnabled = tpd.enabled;
+            _trackedPoseDriverStateCaptured = true;
+            tpd.enabled = false;
+        }
+
+        private void RestoreTrackedPoseDriver()
+        {
+            if (!_trackedPoseDriverStateCaptured || _trackedPoseCamera == null) return;
+
+            var tpd = _trackedPoseCamera.GetComponent<UnityEngine.InputSystem.XR.TrackedPoseDriver>();
+            if (tpd != null) tpd.enabled = _trackedPoseDriverWasEnabled;
+
+            _trackedPoseDriverStateCaptured = false;
+            _trackedPoseCamera = null;
         }
 
         private void Update()
@@ -159,6 +196,10 @@ namespace VRWorkspace.Utilities
             // Ensure cursor is visible when script is disabled
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
+
+            // Re-enable TrackedPoseDriver so runtime VR tracking works
+            // again when this Editor-only helper is torn down.
+            RestoreTrackedPoseDriver();
         }
 
         private void OnApplicationFocus(bool hasFocus)

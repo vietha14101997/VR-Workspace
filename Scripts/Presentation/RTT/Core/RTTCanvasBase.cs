@@ -263,7 +263,7 @@ namespace VRWorkspace.UI.RTT
                 _renderTexture.mipMapBias = mipMapBias;
             }
 
-            _renderTexture.name = $"RTT_{GetType().Name}_{GetInstanceID()}";
+            _renderTexture.name = $"RTT_{GetType().Name}_{GetEntityId()}";
 
             if (!_renderTexture.Create())
             {
@@ -355,7 +355,7 @@ namespace VRWorkspace.UI.RTT
                 _renderTexture.mipMapBias = mipMapBias;
             }
 
-            _renderTexture.name = $"RTT_{GetType().Name}_{GetInstanceID()}";
+            _renderTexture.name = $"RTT_{GetType().Name}_{GetEntityId()}";
             _renderTexture.Create();
 
             // Update references

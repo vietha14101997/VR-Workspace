@@ -33,7 +33,7 @@ namespace VRWorkspace.UI.RTT.Input
 
                 if (_instance == null)
                 {
-                    _instance = FindFirstObjectByType<RTTRaycastManager>();
+                    _instance = FindAnyObjectByType<RTTRaycastManager>();
 
                     if (_instance == null)
                     {
@@ -692,6 +692,7 @@ namespace VRWorkspace.UI.RTT.Input
         public GameObject hitUIElement;
 
         /// <summary>The full raycast result from GraphicRaycaster</summary>
+        [System.NonSerialized]
         public RaycastResult raycastResult;
 
         /// <summary>Distance from ray origin to hit point</summary>

@@ -1512,7 +1512,7 @@ namespace VRWorkspace.UI.RTT.Components
             }
 
             // Find RTTTaskbar
-            RTTTaskbar taskbar = FindFirstObjectByType<RTTTaskbar>();
+            RTTTaskbar taskbar = FindAnyObjectByType<RTTTaskbar>();
 
             // Create QRScannerManager
             GameObject managerObj = new GameObject("QRScannerManager");
@@ -1774,7 +1774,7 @@ namespace VRWorkspace.UI.RTT.Components
             }
 
             // Cleanup stale RTTPopupMenu_WorldSpace objects from prior attempts
-            foreach (var old in FindObjectsByType<RTTPopupMenu>(FindObjectsSortMode.None))
+            foreach (var old in FindObjectsByType<RTTPopupMenu>())
             {
                 if (old.gameObject.name.Contains("WorldSpace"))
                     Destroy(old.gameObject);
@@ -2062,7 +2062,7 @@ namespace VRWorkspace.UI.RTT.Components
                 });
             }
 
-            Debug.Log($"[ServerDropdown] Reconnected {buttons.Length} option handlers, vrDropdown={vrDropdown.GetInstanceID()}");
+            Debug.Log($"[ServerDropdown] Reconnected {buttons.Length} option handlers, vrDropdown={vrDropdown.GetEntityId()}");
         }
 
         /// <summary>

@@ -620,7 +620,7 @@ namespace VRWorkspace.UI.RTT.Components
         // Breadcrumb Update Logic
         public void UpdateBreadcrumbs(string path)
         {
-            Debug.Log($"[RTTFileManager] UpdateBreadcrumbs called with path: {path}, container null: {_breadcrumbContainer == null}, instance: {GetInstanceID()}");
+            Debug.Log($"[RTTFileManager] UpdateBreadcrumbs called with path: {path}, container null: {_breadcrumbContainer == null}, instance: {GetEntityId()}");
 
             // Update New Folder button state based on folder creation permission
             UpdateNewFolderButtonState();

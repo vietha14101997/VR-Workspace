@@ -29,7 +29,7 @@ namespace VRWorkspace.UI.RTT.Components
 
             if (Camera.main != null) return Camera.main;
 
-            Camera[] allCameras = Object.FindObjectsByType<Camera>(FindObjectsSortMode.None);
+            Camera[] allCameras = Object.FindObjectsByType<Camera>();
             foreach (var cam in allCameras)
             {
                 if (!cam.name.Contains("UI") && cam.gameObject.activeInHierarchy)

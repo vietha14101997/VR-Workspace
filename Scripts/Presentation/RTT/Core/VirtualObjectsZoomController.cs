@@ -873,26 +873,6 @@ namespace VRWorkspace.UI.RTT
         }
         #endregion
 
-        #region Recenter Support
-        /// <summary>
-        /// Called after recenter operation to recalculate current distance.
-        /// </summary>
-        public void OnRecenter()
-        {
-            if (_primaryFrame == null || Camera.main == null) return;
-
-            // Recalculate distance after recenter
-            _currentDistance = Vector3.Distance(
-                Camera.main.transform.position,
-                _primaryFrame.transform.position
-            );
-
-            _currentDistance = Mathf.Clamp(_currentDistance, minDistance, maxDistance);
-
-            Debug.Log($"[VirtualObjectsZoomController] Recenter: distance recalculated to {_currentDistance:F2}m");
-        }
-        #endregion
-
         #region Editor
     #if UNITY_EDITOR
         private void OnValidate()

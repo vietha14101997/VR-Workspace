@@ -1,0 +1,16 @@
+Assets\VR-Workspace\Scripts\Domain\Media\Models\MediaImageInfo.cs(71,24): warning UAC1001: Field 'Latitude' type 'double?' is skipped by serialization (missing the [Serializable] attribute). Refer to the Serialization rules analyzer reference. (https://docs.unity3d.com/6000.5/Documentation/Manual/script-serialization-analyzer.html#uac1001)
+
+Assets\VR-Workspace\Scripts\Domain\Media\Models\MediaAudioInfo.cs(24,25): warning UAC1001: Field 'Duration' type 'System.TimeSpan' is skipped by serialization (missing the [Serializable] attribute). Refer to the Serialization rules analyzer reference. (https://docs.unity3d.com/6000.5/Documentation/Manual/script-serialization-analyzer.html#uac1001)
+
+Assets\VR-Workspace\Scripts\Domain\Media\Models\MediaVideoInfo.cs(24,25): warning UAC1001: Field 'Duration' type 'System.TimeSpan' is skipped by serialization (missing the [Serializable] attribute). Refer to the Serialization rules analyzer reference. (https://docs.unity3d.com/6000.5/Documentation/Manual/script-serialization-analyzer.html#uac1001)
+
+Assets\VR-Workspace\Scripts\Domain\Media\Models\MediaImageInfo.cs(74,24): warning UAC1001: Field 'Longitude' type 'double?' is skipped by serialization (missing the [Serializable] attribute). Refer to the Serialization rules analyzer reference. (https://docs.unity3d.com/6000.5/Documentation/Manual/script-serialization-analyzer.html#uac1001)
+
+Assets\VR-Workspace\Scripts\Domain\Media\Models\MediaVideoInfo.cs(64,25): warning UAC1001: Field 'LastPosition' type 'System.TimeSpan' is skipped by serialization (missing the [Serializable] attribute). Refer to the Serialization rules analyzer reference. (https://docs.unity3d.com/6000.5/Documentation/Manual/script-serialization-analyzer.html#uac1001)
+
+Assets\VR-Workspace\Scripts\Domain\Media\Models\MediaAudioInfo.cs(105,25): warning UAC1001: Field 'LastPosition' type 'System.TimeSpan' is skipped by serialization (missing the [Serializable] attribute). Refer to the Serialization rules analyzer reference. (https://docs.unity3d.com/6000.5/Documentation/Manual/script-serialization-analyzer.html#uac1001)
+
+Assets\VR-Workspace\Scripts\Presentation\RTT\Input\RTTRaycastManager.cs(695,30): warning UAC1001: Field 'raycastResult' type 'UnityEngine.EventSystems.RaycastResult' is skipped by serialization (missing the [Serializable] attribute). Refer to the Serialization rules analyzer reference. (https://docs.unity3d.com/6000.5/Documentation/Manual/script-serialization-analyzer.html#uac1001)
+
+Assets\VR-Workspace\Scripts\Presentation\RTT\Components\RTTPopupMenu.cs(75,27): warning UAC1001: Field 'color' type 'UnityEngine.Color?' is skipped by serialization (missing the [Serializable] attribute). Refer to the Serialization rules analyzer reference. (https://docs.unity3d.com/6000.5/Documentation/Manual/script-serialization-analyzer.html#uac1001)
+

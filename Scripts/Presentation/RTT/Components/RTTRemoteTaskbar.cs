@@ -38,7 +38,6 @@ namespace VRWorkspace.UI.RTT.Components
         [SerializeField] private Sprite iconBack;
         [SerializeField] private Sprite iconEye;
         [SerializeField] private Sprite iconEyeClose;
-        [SerializeField] private Sprite iconRecenter;
         [SerializeField] private Sprite iconZoom;
         [SerializeField] private Sprite iconMonitor;
         [SerializeField] private Sprite iconEnviroment;
@@ -266,9 +265,6 @@ namespace VRWorkspace.UI.RTT.Components
 
             // 5. Eye button (opens expansion with Passthrough + Light)
             _eyeButton = CreateIconButton(section1, iconEye, "Eye", _cyanColor, buttonSize, OnEyeClicked);
-
-            // 6. Recenter
-            CreateIconButton(section1, iconRecenter, "Recenter", _cyanColor, buttonSize, RecenterObject);
         }
 
         private void OnBackClicked()
@@ -1078,7 +1074,7 @@ namespace VRWorkspace.UI.RTT.Components
 
         private void SyncPassthroughWithModeController()
         {
-            var modeController = FindFirstObjectByType<ModeController>();
+            var modeController = FindAnyObjectByType<ModeController>();
             if (modeController != null)
             {
                 _isPassthroughOn = modeController.mode == ViewMode.RealWorld;
@@ -1107,7 +1103,7 @@ namespace VRWorkspace.UI.RTT.Components
 
             UpdateEyeButtonColor();
 
-            var modeController = FindFirstObjectByType<ModeController>();
+            var modeController = FindAnyObjectByType<ModeController>();
             if (modeController != null)
             {
                 modeController.SetMode(_isPassthroughOn ? ViewMode.RealWorld : ViewMode.VirtualSpace);
@@ -1144,7 +1140,7 @@ namespace VRWorkspace.UI.RTT.Components
                 envController.SetLightsEnabled(isOn);
             }
 
-            var modeController = FindFirstObjectByType<ModeController>();
+            var modeController = FindAnyObjectByType<ModeController>();
 
             if (!_isLightOn)
             {
@@ -1299,7 +1295,7 @@ namespace VRWorkspace.UI.RTT.Components
                 _isPassthroughOn = isOn;
                 UpdateEyeButtonColor();
 
-                var modeController = FindFirstObjectByType<ModeController>();
+                var modeController = FindAnyObjectByType<ModeController>();
                 if (modeController != null)
                 {
                     modeController.SetMode(_isPassthroughOn ? ViewMode.RealWorld : ViewMode.VirtualSpace);
@@ -1315,139 +1311,6 @@ namespace VRWorkspace.UI.RTT.Components
             {
                 OnLightToggled(isOn);
             }
-        }
-        #endregion
-
-        #region Recenter
-        private void RecenterObject()
-        {
-            Debug.Log("[RTTRemoteTaskbar] Recenter clicked");
-            StartCoroutine(RecenterRoutine());
-        }
-
-        private IEnumerator RecenterRoutine()
-        {
-            VRGazeReticle reticle = VRGazeReticle.Instance;
-            if (reticle == null) reticle = FindFirstObjectByType<VRGazeReticle>();
-
-            if (reticle != null)
-            {
-                reticle.EnterRecenterMode(iconRecenter);
-            }
-
-            float duration = 2.0f;
-            float elapsed = 0f;
-
-            while (elapsed < duration)
-            {
-                elapsed += Time.deltaTime;
-                float progress = Mathf.Clamp01(elapsed / duration);
-
-                if (reticle != null)
-                {
-                    reticle.UpdateRecenterProgress(progress);
-                }
-
-                yield return null;
-            }
-
-            Camera cam = Camera.main;
-            if (cam != null)
-            {
-                RecenterAllVirtualObjects(cam);
-            }
-
-            if (reticle != null)
-            {
-                reticle.ExitRecenterMode();
-            }
-
-            _miniFrame.MarkDirty();
-            Debug.Log("[RTTRemoteTaskbar] Recenter complete.");
-        }
-
-        private void RecenterAllVirtualObjects(Camera cam)
-        {
-            GameObject virtualObjectsParent = GameObject.Find("VirtualObjects");
-            if (virtualObjectsParent == null)
-            {
-                Debug.LogWarning("[RTTRemoteTaskbar] VirtualObjects parent not found");
-                RecenterFollowTarget(cam);
-                return;
-            }
-
-            // Find primary menu frame as pivot
-            RTTMenuFrame primary = RTTMenuFrame.PrimaryInstance;
-            if (primary == null)
-            {
-                RecenterFollowTarget(cam);
-                return;
-            }
-
-            Vector3 pivotPos = primary.transform.position;
-            Quaternion pivotRot = primary.transform.rotation;
-
-            List<Transform> children = new List<Transform>();
-            List<Vector3> relativePositions = new List<Vector3>();
-            List<Quaternion> relativeRotations = new List<Quaternion>();
-
-            foreach (Transform child in virtualObjectsParent.transform)
-            {
-                children.Add(child);
-                Vector3 relPos = Quaternion.Inverse(pivotRot) * (child.position - pivotPos);
-                relativePositions.Add(relPos);
-                Quaternion relRot = Quaternion.Inverse(pivotRot) * child.rotation;
-                relativeRotations.Add(relRot);
-            }
-
-            Vector3 camForward = cam.transform.forward;
-            camForward.y = 0;
-            if (camForward.sqrMagnitude < 0.001f) camForward = Vector3.forward;
-            camForward.Normalize();
-
-            Vector3 camPos = cam.transform.position;
-            float hDist = Vector2.Distance(
-                new Vector2(pivotPos.x, pivotPos.z),
-                new Vector2(camPos.x, camPos.z)
-            );
-
-            Vector3 newPivotPos = camPos + camForward * hDist;
-            newPivotPos.y = pivotPos.y;
-            Quaternion newPivotRot = Quaternion.LookRotation(camForward);
-
-            for (int i = 0; i < children.Count; i++)
-            {
-                Transform child = children[i];
-                child.position = newPivotPos + newPivotRot * relativePositions[i];
-                child.rotation = newPivotRot * relativeRotations[i];
-            }
-        }
-
-        private void RecenterFollowTarget(Camera cam)
-        {
-            var followTarget = _miniFrame.GetFollowTarget();
-            if (followTarget != null)
-            {
-                RecenterTransform(followTarget, cam);
-            }
-        }
-
-        private void RecenterTransform(Transform target, Camera cam)
-        {
-            Vector3 camForward = cam.transform.forward;
-            camForward.y = 0;
-            if (camForward.sqrMagnitude < 0.001f) camForward = Vector3.forward;
-            camForward.Normalize();
-
-            Vector3 currentPos = target.position;
-            Vector3 camPos = cam.transform.position;
-            float hDist = Vector2.Distance(new Vector2(currentPos.x, currentPos.z), new Vector2(camPos.x, camPos.z));
-
-            Vector3 newPos = camPos + camForward * hDist;
-            newPos.y = currentPos.y;
-
-            target.position = newPos;
-            target.rotation = Quaternion.LookRotation(camForward);
         }
         #endregion
 
@@ -1681,7 +1544,6 @@ namespace VRWorkspace.UI.RTT.Components
             if (iconBack == null) iconBack = LoadIcon("back");
             if (iconEye == null) iconEye = LoadIcon("eye");
             if (iconEyeClose == null) iconEyeClose = LoadIcon("eye_close");
-            if (iconRecenter == null) iconRecenter = LoadIcon("recenter");
             if (iconZoom == null) iconZoom = LoadIcon("zoom");
             if (iconMonitor == null) iconMonitor = LoadIcon("resolution");
             if (iconEnviroment == null) iconEnviroment = LoadIcon("enviroment");
@@ -1721,7 +1583,7 @@ namespace VRWorkspace.UI.RTT.Components
                 }
             }
 
-            Debug.Log($"[RTTRemoteTaskbar] Icons loaded - Back:{iconBack != null}, Eye:{iconEye != null}, EyeClose:{iconEyeClose != null}, Recenter:{iconRecenter != null}, Zoom:{iconZoom != null}, Monitor:{iconMonitor != null}");
+            Debug.Log($"[RTTRemoteTaskbar] Icons loaded - Back:{iconBack != null}, Eye:{iconEye != null}, EyeClose:{iconEyeClose != null}, Zoom:{iconZoom != null}, Monitor:{iconMonitor != null}");
             Debug.Log($"[RTTRemoteTaskbar] Loaded icons - Resolution: {_resolutionIcons.Count}, FPS: {_fpsIcons.Count}/3, Screens: {_screenIcons.Count}/3");
         }
 

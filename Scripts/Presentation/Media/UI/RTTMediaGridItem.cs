@@ -1045,7 +1045,7 @@ namespace VRWorkspace.Media.UI
             }
 
             // Option 3: Find any TMP font in scene
-            var existingTMP = FindFirstObjectByType<TextMeshProUGUI>();
+            var existingTMP = FindAnyObjectByType<TextMeshProUGUI>();
             if (existingTMP != null && existingTMP.font != null)
             {
                 _cachedFallbackFont = existingTMP.font;

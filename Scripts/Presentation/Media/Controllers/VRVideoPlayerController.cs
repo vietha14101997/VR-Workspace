@@ -1101,7 +1101,7 @@ namespace VRWorkspace.Media.Core
         private System.Collections.IEnumerator RecenterRoutine()
         {
             VRGazeReticle reticle = VRGazeReticle.Instance;
-            if (reticle == null) reticle = FindFirstObjectByType<VRGazeReticle>();
+            if (reticle == null) reticle = FindAnyObjectByType<VRGazeReticle>();
 
             // Load recenter icon from Resources (icon files are directly in Resources folder)
             Sprite recenterIcon = Resources.Load<Sprite>("icon_recenter");
