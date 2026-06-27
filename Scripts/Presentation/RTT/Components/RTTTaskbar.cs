@@ -30,6 +30,7 @@ namespace VRWorkspace.UI.RTT.Components
         [SerializeField] private Sprite iconSettings;
         [SerializeField] private Sprite iconEye;
         [SerializeField] private Sprite iconEyeClose;
+        [SerializeField] private Sprite iconRecenter;
         [SerializeField] private Sprite iconHome;
         #endregion
 
@@ -449,6 +450,9 @@ namespace VRWorkspace.UI.RTT.Components
 
             // Eye (opens expansion with Passthrough + Light)
             _eyeButton = CreateIconButton(section1, iconEye, "Eye", cyanColor, buttonSize, ShowEyeExpansion);
+
+            // Recenter
+            CreateIconButton(section1, iconRecenter, "Recenter", cyanColor, buttonSize, RecenterObject);
         }
 
         private void AddAppButtons()
@@ -638,6 +642,14 @@ namespace VRWorkspace.UI.RTT.Components
                 _miniFrame.MarkDirty();
                 Debug.Log($"[RTTTaskbar] Light set to {(_isLightOn ? "ON" : "OFF")}");
             }
+        }
+
+        private void RecenterObject()
+        {
+            Debug.Log("[RTTTaskbar] Recenter clicked");
+            Transform fallback = _miniFrame != null ? _miniFrame.GetFollowTarget() : transform;
+            StartCoroutine(VirtualObjectsRecenter.RunWithReticleProgress(
+                this, fallback, iconRecenter, () => _miniFrame?.MarkDirty()));
         }
 
         /// <summary>
@@ -1294,9 +1306,10 @@ namespace VRWorkspace.UI.RTT.Components
             if (iconSettings == null) iconSettings = LoadIcon("settings");
             if (iconEye == null) iconEye = LoadIcon("eye");
             if (iconEyeClose == null) iconEyeClose = LoadIcon("eye_close");
+            if (iconRecenter == null) iconRecenter = LoadIcon("recenter");
             if (iconHome == null) iconHome = LoadIcon("home");
 
-            Debug.Log($"[RTTTaskbar] Icons loaded - Quit:{iconQuit != null}, Settings:{iconSettings != null}, Eye:{iconEye != null}, EyeClose:{iconEyeClose != null}, Home:{iconHome != null}");
+            Debug.Log($"[RTTTaskbar] Icons loaded - Quit:{iconQuit != null}, Settings:{iconSettings != null}, Eye:{iconEye != null}, EyeClose:{iconEyeClose != null}, Recenter:{iconRecenter != null}, Home:{iconHome != null}");
         }
 
         private static HashSet<string> _warnedIcons = new HashSet<string>();

@@ -273,24 +273,27 @@ namespace VRWorkspace.UI.RTT
             Vector3 cameraPos = cam.transform.position;
             Vector3 primaryPos = _primaryFrame.transform.position;
 
-            // CRITICAL: Direction from Camera to Primary, NOT camera.forward
-            // This ensures zoom maintains relative positions regardless of camera orientation
+            // CRITICAL: Direction from Camera to Primary, projected onto XZ plane
+            // This keeps vertical (Y) position intact — zoom only changes horizontal distance.
             Vector3 toPrimary = primaryPos - cameraPos;
-            float currentDist = toPrimary.magnitude;
+            toPrimary.y = 0f;
+            float currentHorizontalDist = toPrimary.magnitude;
 
-            if (currentDist < 0.001f)
+            if (currentHorizontalDist < 0.001f)
             {
-                // Camera too close to primary, use camera forward as fallback
+                // Camera directly above/below primary, use camera forward as fallback
                 toPrimary = cam.transform.forward;
-                currentDist = _currentDistance;
+                toPrimary.y = 0f;
+                if (toPrimary.sqrMagnitude < 0.001f) toPrimary = Vector3.forward;
+                currentHorizontalDist = _currentDistance;
             }
 
             Vector3 direction = toPrimary.normalized;
 
             // Calculate delta distance to move
-            float deltaDist = newDistance - currentDist;
+            float deltaDist = newDistance - currentHorizontalDist;
 
-            // Move entire VirtualObjects container along this direction
+            // Move entire VirtualObjects container along this direction (XZ only)
             virtualObjectsRoot.position += direction * deltaDist;
 
             _currentDistance = newDistance;

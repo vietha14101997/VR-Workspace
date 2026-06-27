@@ -12,7 +12,6 @@ using VRWorkspace.Core;
 using VRWorkspace.Core.Coroutines;
 using VRWorkspace.ViewModels;
 using VRWorkspace.UI.RTT;
-using VRWorkspace.VRInput;
 using VRWorkspace.Media.Core;
 using VRWorkspace.Panel;
 using VRWorkspace.UI.RTT.Components;
@@ -321,13 +320,6 @@ namespace VRWorkspace.UI.RTT
                 Api.ScanDeviceParams();
             }
     #endif
-
-            // Initialize NonVRModeController if not present
-            if (NonVRModeController.Instance == null)
-            {
-                var controllerGO = new GameObject("NonVRModeController");
-                controllerGO.AddComponent<NonVRModeController>();
-            }
         }
 
         private void Update()
@@ -336,26 +328,22 @@ namespace VRWorkspace.UI.RTT
             _qualityManager?.PeriodicUpdate();
 
     #if UNITY_ANDROID && !UNITY_EDITOR
-            // Skip Cardboard API calls when in non-VR mode (XR is deinitialized)
-            if (NonVRModeController.Instance == null || !NonVRModeController.Instance.IsNonVRMode)
+            if (Api.IsGearButtonPressed)
             {
-                if (Api.IsGearButtonPressed)
-                {
-                    Api.ScanDeviceParams();
-                }
-
-                if (Api.IsCloseButtonPressed)
-                {
-                    Application.Quit();
-                }
-
-                if (Api.HasNewDeviceParams())
-                {
-                    Api.ReloadDeviceParams();
-                }
-
-                Api.UpdateScreenParams();
+                Api.ScanDeviceParams();
             }
+
+            if (Api.IsCloseButtonPressed)
+            {
+                Application.Quit();
+            }
+
+            if (Api.HasNewDeviceParams())
+            {
+                Api.ReloadDeviceParams();
+            }
+
+            Api.UpdateScreenParams();
     #endif
         }
 

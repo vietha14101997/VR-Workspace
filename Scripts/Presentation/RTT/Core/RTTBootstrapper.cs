@@ -1,4 +1,6 @@
+using System.Collections;
 using UnityEngine;
+using VRWorkspace.Bootstrap;
 using VRWorkspace.UI.RTT.Components;
 
 namespace VRWorkspace.UI.RTT
@@ -65,8 +67,17 @@ namespace VRWorkspace.UI.RTT
         {
             if (autoInitialize)
             {
-                Initialize();
+                StartCoroutine(InitializeWhenReady());
             }
+        }
+
+        private IEnumerator InitializeWhenReady()
+        {
+            yield return VRReadyGate.WaitUntilReady(this);
+            if (this == null) yield break;
+
+            Initialize();
+            RecenterToCameraView();
         }
         #endregion
 
@@ -220,6 +231,44 @@ namespace VRWorkspace.UI.RTT
             _menu.transform.rotation = rotation;
 
             Debug.Log("[RTTBootstrapper] RTTMenu oriented towards camera");
+        }
+
+        /// <summary>
+        /// After Initialize(), reposition VirtualObjects so the primary menu sits in front
+        /// of the camera at its current horizontal distance. If the scene's pivot XZ is
+        /// too close to the camera (hDist under threshold), pre-position this transform at
+        /// a fallback distance so the recenter math produces a usable result.
+        /// </summary>
+        private void RecenterToCameraView()
+        {
+            const float FALLBACK_HORIZONTAL_DISTANCE = 2.0f;
+            const float MIN_USABLE_HORIZONTAL_DISTANCE = 0.5f;
+
+            Camera cam = Camera.main;
+            if (cam == null) return;
+
+            RTTMenuFrame primary = RTTMenuFrame.PrimaryInstance;
+            if (primary == null) return;
+
+            Vector3 camPos = cam.transform.position;
+            Vector2 pivotXZ = new Vector2(primary.transform.position.x, primary.transform.position.z);
+            Vector2 camXZ = new Vector2(camPos.x, camPos.z);
+            float hDist = Vector2.Distance(pivotXZ, camXZ);
+
+            if (hDist < MIN_USABLE_HORIZONTAL_DISTANCE)
+            {
+                Vector3 camForward = cam.transform.forward;
+                camForward.y = 0f;
+                if (camForward.sqrMagnitude < 0.001f) camForward = Vector3.forward;
+                camForward.Normalize();
+
+                Vector3 newPos = camPos + camForward * FALLBACK_HORIZONTAL_DISTANCE;
+                newPos.y = transform.position.y;
+                transform.position = newPos;
+                Debug.Log($"[RTTBootstrapper] Pre-positioned VirtualObjects at fallback {FALLBACK_HORIZONTAL_DISTANCE}m from camera (scene pivot hDist={hDist:F2}m)");
+            }
+
+            VirtualObjectsRecenter.RepositionAllVirtualObjects(cam, null);
         }
 
         private void RegisterWithManager()

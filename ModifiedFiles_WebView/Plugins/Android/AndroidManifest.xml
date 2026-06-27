@@ -4,8 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 	<!-- Streaming stability permissions (merged with Unity's manifest) -->
 
-    <!-- Internet: Required for WebView -->
-    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Internet: Required for WebView (declared automatically by Unity - removed duplicate) -->
 
     <!-- Wake Lock: Keep CPU active during streaming -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />

@@ -38,6 +38,7 @@ namespace VRWorkspace.UI.RTT.Components
         [SerializeField] private Sprite iconBack;
         [SerializeField] private Sprite iconEye;
         [SerializeField] private Sprite iconEyeClose;
+        [SerializeField] private Sprite iconRecenter;
         [SerializeField] private Sprite iconZoom;
         [SerializeField] private Sprite iconMonitor;
         [SerializeField] private Sprite iconEnviroment;
@@ -265,6 +266,9 @@ namespace VRWorkspace.UI.RTT.Components
 
             // 5. Eye button (opens expansion with Passthrough + Light)
             _eyeButton = CreateIconButton(section1, iconEye, "Eye", _cyanColor, buttonSize, OnEyeClicked);
+
+            // 6. Recenter
+            CreateIconButton(section1, iconRecenter, "Recenter", _cyanColor, buttonSize, RecenterObject);
         }
 
         private void OnBackClicked()
@@ -1314,6 +1318,14 @@ namespace VRWorkspace.UI.RTT.Components
         }
         #endregion
 
+        private void RecenterObject()
+        {
+            Debug.Log("[RTTRemoteTaskbar] Recenter clicked");
+            Transform fallback = _miniFrame != null ? _miniFrame.GetFollowTarget() : transform;
+            StartCoroutine(VirtualObjectsRecenter.RunWithReticleProgress(
+                this, fallback, iconRecenter, () => _miniFrame?.MarkDirty()));
+        }
+
         #region Button Factory
         private GameObject CreateIconButton(Transform parent, Sprite icon, string name, Color glowColor, float buttonSize, Action onClick)
         {
@@ -1544,6 +1556,7 @@ namespace VRWorkspace.UI.RTT.Components
             if (iconBack == null) iconBack = LoadIcon("back");
             if (iconEye == null) iconEye = LoadIcon("eye");
             if (iconEyeClose == null) iconEyeClose = LoadIcon("eye_close");
+            if (iconRecenter == null) iconRecenter = LoadIcon("recenter");
             if (iconZoom == null) iconZoom = LoadIcon("zoom");
             if (iconMonitor == null) iconMonitor = LoadIcon("resolution");
             if (iconEnviroment == null) iconEnviroment = LoadIcon("enviroment");
@@ -1583,7 +1596,7 @@ namespace VRWorkspace.UI.RTT.Components
                 }
             }
 
-            Debug.Log($"[RTTRemoteTaskbar] Icons loaded - Back:{iconBack != null}, Eye:{iconEye != null}, EyeClose:{iconEyeClose != null}, Zoom:{iconZoom != null}, Monitor:{iconMonitor != null}");
+            Debug.Log($"[RTTRemoteTaskbar] Icons loaded - Back:{iconBack != null}, Eye:{iconEye != null}, EyeClose:{iconEyeClose != null}, Recenter:{iconRecenter != null}, Zoom:{iconZoom != null}, Monitor:{iconMonitor != null}");
             Debug.Log($"[RTTRemoteTaskbar] Loaded icons - Resolution: {_resolutionIcons.Count}, FPS: {_fpsIcons.Count}/3, Screens: {_screenIcons.Count}/3");
         }
 
