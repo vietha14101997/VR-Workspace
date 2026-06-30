@@ -18,6 +18,17 @@ namespace VRWorkspace.Core
         public static AppPermissionManager Instance { get; private set; }
 
         /// <summary>
+        /// Reset static singleton at the start of each Play session.
+        /// Without this, Instance keeps a ghost reference to a destroyed object
+        /// on the 2nd Play onwards (Unity doesn't reset static fields on Play exit).
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticInstance()
+        {
+            Instance = null;
+        }
+
+        /// <summary>
         /// Event fired when all permissions have been processed (granted or denied).
         /// </summary>
         public event Action<bool> OnPermissionsComplete;

@@ -25,6 +25,18 @@ namespace VRWorkspace.UI.RTT.Components
         private static RTTMobileKeyboard _instance;
         public static RTTMobileKeyboard Instance => _instance;
         public static RTTMobileKeyboard CurrentlyOpenKeyboard { get; private set; }
+
+        /// <summary>
+        /// Reset static singletons at the start of each Play session.
+        /// Without this, _instance and CurrentlyOpenKeyboard keep ghost references to
+        /// destroyed keyboards on the 2nd Play onwards (Unity doesn't reset static fields on Play exit).
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticInstance()
+        {
+            _instance = null;
+            CurrentlyOpenKeyboard = null;
+        }
         #endregion
 
         #region Configuration

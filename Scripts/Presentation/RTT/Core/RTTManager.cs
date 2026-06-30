@@ -64,6 +64,19 @@ namespace VRWorkspace.UI.RTT
                 return _instance;
             }
         }
+
+        /// <summary>
+        /// Reset static singleton state at the start of each Play session.
+        /// Without this, _applicationQuitting stays true after the previous session's
+        /// OnApplicationQuit, causing Instance to return null on the next Play.
+        /// See: https://docs.unity3d.com/ScriptReference/RuntimeInitializeOnLoadMethodAttribute.html
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticState()
+        {
+            _instance = null;
+            _applicationQuitting = false;
+        }
         #endregion
 
         #region Configuration Assets

@@ -140,6 +140,17 @@ namespace VRWorkspace.VRInput
         // Singleton access helper (optional, or use FindObjectOfType)
         public static VRGazeReticle Instance { get; private set; }
 
+        /// <summary>
+        /// Reset static singleton at the start of each Play session.
+        /// Without this, Instance keeps a ghost reference to a destroyed object
+        /// on the 2nd Play onwards (Unity doesn't reset static fields on Play exit).
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticInstance()
+        {
+            Instance = null;
+        }
+
         void Awake()
         {
             Instance = this;

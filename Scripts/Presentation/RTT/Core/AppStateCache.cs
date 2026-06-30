@@ -70,6 +70,17 @@ namespace VRWorkspace.UI.RTT
             }
         }
 
+        /// <summary>
+        /// Reset static singleton at the start of each Play session.
+        /// Without this, _instance keeps a stale reference to the previous session's
+        /// cache (with potentially invalid file paths / disposed resources).
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticInstance()
+        {
+            _instance = null;
+        }
+
         #endregion
 
         #region Configuration

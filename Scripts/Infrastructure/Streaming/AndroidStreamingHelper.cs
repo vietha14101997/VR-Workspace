@@ -12,6 +12,17 @@ namespace VRWorkspace.Streaming
         private static AndroidStreamingHelper _instance;
         public static AndroidStreamingHelper Instance => _instance;
 
+        /// <summary>
+        /// Reset static singleton at the start of each Play session.
+        /// Without this, _instance keeps a ghost reference to a destroyed object
+        /// on the 2nd Play onwards (Unity doesn't reset static fields on Play exit).
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticInstance()
+        {
+            _instance = null;
+        }
+
 #if UNITY_ANDROID && !UNITY_EDITOR
         private AndroidJavaObject _wifiLock;
         private AndroidJavaObject _wakeLock;

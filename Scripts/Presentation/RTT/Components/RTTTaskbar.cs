@@ -22,6 +22,18 @@ namespace VRWorkspace.UI.RTT.Components
         #region Static Instance
         private static RTTTaskbar _instance;
         public static RTTTaskbar Instance => _instance;
+
+        /// <summary>
+        /// Reset static singleton at the start of each Play session.
+        /// RTTTaskbar assigns _instance in Start() (not Awake), which means a ghost
+        /// reference from the previous Play session would survive and block the
+        /// duplicate-destroy guard during the 2nd Play onwards.
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticInstance()
+        {
+            _instance = null;
+        }
         #endregion
 
         #region Configuration
