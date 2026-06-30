@@ -5,12 +5,18 @@ using UnityEngine.SceneManagement;
 namespace VRWorkspace.VRInput
 {
     /// <summary>
-    /// Boot-time gatekeeper that owns two responsibilities:
+    /// Boot-time gatekeeper with three responsibilities:
     /// <list type="number">
-    ///   <item>Hides the system cursor and locks it in place so that
-    ///         the Android/Linux/Win cursor is never visible on the
-    ///         VR display when a mouse is connected.</item>
-    ///   <item>Replaces the EventSystem's <c>BaseInputModule</c>
+    ///   <item><b>Hides the system cursor visually</b> so that the
+    ///         Android/Linux/Win cursor is never visible on the VR
+    ///         display when a mouse is connected.</item>
+    ///   <item><b>Keeps mouse / touch / keyboard signals readable</b>
+    ///         via the new Input System. A future in-app custom cursor
+    ///         can read <c>Mouse.current.position</c>,
+    ///         <c>Mouse.current.delta</c>, <c>Mouse.current.leftButton</c>
+    ///         etc. to drive its own pointer logic. Same for
+    ///         <c>Touchscreen.current</c> and <c>Keyboard.current</c>.</item>
+    ///   <item><b>Replaces the EventSystem's <c>BaseInputModule</c></b>
     ///         (typically <c>InputSystemUIInputModule</c>) with a
     ///         <see cref="NullInputModule"/> so that mouse / touch /
     ///         gamepad pointer input can no longer fire UI events
@@ -22,11 +28,23 @@ namespace VRWorkspace.VRInput
     /// </summary>
     /// <remarks>
     /// <para>
+    /// Design contract for the future custom cursor:
+    /// <list type="bullet">
+    ///   <item><c>Mouse.current.delta.ReadValue()</c> — relative movement since last frame (works regardless of lockState)</item>
+    ///   <item><c>Mouse.current.position.ReadValue()</c> — absolute screen position (requires lockState = None)</item>
+    ///   <item><c>Mouse.current.leftButton.wasPressedThisFrame</c> — click detection</item>
+    ///   <item>To fire UI events on the RTT panel: use
+    ///         <c>RTTRaycastManager.Instance.SendClick()</c> exactly like
+    ///         Reticle Dwell-Click does.</item>
+    /// </list>
+    /// </para>
+    /// <para>
     /// We deliberately do <b>not</b> call <c>InputSystem.DisableDevice(Mouse)</c>
     /// or <c>DisableDevice(Touchscreen)</c>. The new Input System device
     /// objects must stay enabled so that <see cref="RemoteInputBridge"/>
     /// can continue to read raw BT-mouse movement and forward it to the
-    /// remote desktop server.
+    /// remote desktop server, AND so the future custom cursor can use
+    /// mouse signals.
     /// </para>
     /// <para>
     /// The controller self-instantiates via
@@ -92,7 +110,13 @@ namespace VRWorkspace.VRInput
 
         private static void ApplyCursorHidden()
         {
-            Cursor.lockState = CursorLockMode.Locked;
+            // Hide the OS cursor visually. We deliberately do NOT set
+            // CursorLockMode.Locked — a future in-app custom cursor may
+            // need to read Mouse.current.position.ReadValue() to render a
+            // 2D pointer, and that position would be pinned to screen
+            // center while locked. Keeping lockState = None preserves
+            // absolute position while still hiding the visual cursor.
+            Cursor.lockState = CursorLockMode.None;
             Cursor.visible = false;
         }
 
