@@ -90,6 +90,12 @@ namespace VRWorkspace.UI.RTT.Components
         public event Action OnBackspacePressed;
         public event Action OnEnterPressed;
         public event Action OnClosePressed;
+
+        /// <summary>Phase 11 VCS hook: fired after Show() has positioned + visible'd the keyboard.</summary>
+        public event Action OnKeyboardShown;
+
+        /// <summary>Phase 11 VCS hook: fired at the start of Hide() before resources are released.</summary>
+        public event Action OnKeyboardHidden;
         #endregion
 
         #region Private Fields
@@ -879,6 +885,7 @@ namespace VRWorkspace.UI.RTT.Components
             MarkDirty();
 
             Debug.Log("[RTTMobileKeyboard] Shown");
+            OnKeyboardShown?.Invoke();
         }
 
         [Header("Resource Management")]
@@ -888,6 +895,7 @@ namespace VRWorkspace.UI.RTT.Components
         public new void Hide()
         {
             base.Hide(); // Call base to properly set visibility
+            OnKeyboardHidden?.Invoke();
             _targetInputField = null;
 
             if (CurrentlyOpenKeyboard == this)

@@ -79,6 +79,16 @@ namespace VRWorkspace.UI.RTT
 
         /// <summary>Invoked when visibility changes (bool = isVisible)</summary>
         public event Action<bool> OnVisibilityChanged;
+
+        // ----- Static broadcasts (Phase 5: VCS auto-register hooks) -----
+        /// <summary>Static: fired after OnRTTCreated on any instance. Used by VCS auto-registrar.</summary>
+        public static event Action<RTTCanvasBase> OnAnyRTTSurfaceCreated;
+
+        /// <summary>Static: fired after OnRTTDestroyed on any instance. Used by VCS auto-registrar.</summary>
+        public static event Action<RTTCanvasBase> OnAnyRTTSurfaceDestroyed;
+
+        /// <summary>Static: fired after OnVisibilityChanged on any instance (slightly redundant — re-passed).</summary>
+        public static event Action<RTTCanvasBase, bool> OnAnyRTTVisibilityChanged;
         #endregion
 
         #region Properties
@@ -202,6 +212,8 @@ namespace VRWorkspace.UI.RTT
                 RTTManager.Instance?.RegisterPanel(this);
 
                 OnRTTCreated?.Invoke();
+                OnAnyRTTSurfaceCreated?.Invoke(this);
+                OnAnyRTTVisibilityChanged?.Invoke(this, _isVisible);
 
                 if (config != null && config.logPerformanceMetrics)
                 {
@@ -695,6 +707,9 @@ namespace VRWorkspace.UI.RTT
             if (wasVisible != visible)
                 OnVisibilityChanged?.Invoke(visible);
 
+            if (wasVisible != visible)
+                OnAnyRTTVisibilityChanged?.Invoke(this, visible);
+
             if (visible)
                 MarkDirty();
         }
@@ -724,6 +739,7 @@ namespace VRWorkspace.UI.RTT
         protected virtual void Cleanup()
         {
             OnRTTDestroyed?.Invoke();
+            OnAnyRTTSurfaceDestroyed?.Invoke(this);
 
             // Unregister from manager
             RTTManager.Instance?.UnregisterPanel(this);
