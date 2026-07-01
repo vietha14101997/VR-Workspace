@@ -32,10 +32,6 @@ namespace VRWorkspace.Presentation.Input.Cursor
         private SpriteRenderer _cursorRenderer;
         private Transform _currentParent;
         private Sprite _currentSprite;
-        private string _lastDiagnosticParent;
-        private Vector2 _lastLoggedUV;
-        private string _lastLoggedParentName;
-        private float _lastLogTime;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStaticState()
@@ -138,49 +134,24 @@ namespace VRWorkspace.Presentation.Input.Cursor
                 _currentParent = quad.transform;
             }
 
-            // Local position derived directly from cursor.UV. Visual position MUST match
-            // click position (UV → screen pixel for GraphicRaycaster); any visual-only
-            // margin would cause clicks to hit the wrong element.
+            // Hotspot position: the exact UV coordinate. ClickDispatcher raycasts
+            // through CursorWorldPosition, so this MUST be at the UV point.
             Vector2 size = canvas.GetWorldSize();
-            Vector3 localPos = new Vector3(
+            Vector3 hotspotLocal = new Vector3(
                 (cursor.UV.x - 0.5f) * size.x,
                 (cursor.UV.y - 0.5f) * size.y,
                 localZOffset);
-            _cursor3D.transform.localPosition = localPos;
-            _cursor3D.transform.localScale = new Vector3(cursorWorldSize, cursorWorldSize, 1f);
-            CursorWorldPosition = quad.transform.TransformPoint(localPos);
+            CursorWorldPosition = quad.transform.TransformPoint(hotspotLocal);
 
-            // DIAGNOSTIC: project cursor's WORLD position back to screen pixel via Camera.main
-            // and compare against what GraphicRaycaster would receive (UV * RT.size).
-            // If these disagree, visual ≠ click target.
-            // Only log when UV actually changed (or every ~0.2s when static) to avoid spam.
-            Vector3 worldPos = quad.transform.TransformPoint(localPos);
-            Camera cam = Camera.main;
-            if (cam != null && _cursor3D.activeSelf)
-            {
-                Vector3 sp = cam.WorldToScreenPoint(worldPos);
-                var rt = canvas.GetRenderTexture();
-                int rtW = rt != null ? rt.width : 0;
-                int rtH = rt != null ? rt.height : 0;
-                float t = Time.unscaledTime;
-                bool uvChanged = (cursor.UV - _lastLoggedUV).sqrMagnitude > 1e-6f;
-                bool parentChanged = _lastLoggedParentName != quad.transform.name;
-                bool periodicTick = (t - _lastLogTime) > 0.5f;
-                if (uvChanged || parentChanged || periodicTick)
-                {
-                    Debug.Log(
-                        $"[CursorVisual] panel='{canvas.name}' " +
-                        $"cursor.UV=({cursor.UV.x:F3},{cursor.UV.y:F3}) " +
-                        $"local=({localPos.x:F2},{localPos.y:F2}) " +
-                        $"world=({worldPos.x:F2},{worldPos.y:F2},{worldPos.z:F2}) " +
-                        $"cam.WorldToScreen=({sp.x:F0},{sp.y:F0},d={sp.z:F2}) " +
-                        $"rt={rtW}x{rtH} expectedForGraphicRaycaster=({cursor.UV.x*rtW:F0},{cursor.UV.y*rtH:F0})"
-                    );
-                    _lastLoggedUV = cursor.UV;
-                    _lastLoggedParentName = quad.transform.name;
-                    _lastLogTime = t;
-                }
-            }
+            // Visual offset: shift the sprite so the arrow tip (top-left corner)
+            // sits at the hotspot. The sprite's pivot is at center, so we push
+            // the visual half-size to the right and half-size downward.
+            Vector3 visualLocal = hotspotLocal + new Vector3(
+                cursorWorldSize * 0.5f,
+                -cursorWorldSize * 0.5f,
+                0f);
+            _cursor3D.transform.localPosition = visualLocal;
+            _cursor3D.transform.localScale = new Vector3(cursorWorldSize, cursorWorldSize, 1f);
 
             if (!_cursor3D.activeSelf) SetVisible(true);
         }

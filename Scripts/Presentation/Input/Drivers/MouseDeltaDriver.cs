@@ -59,7 +59,6 @@ namespace VRWorkspace.Presentation.Input.Drivers
             //    when the cursor appeared on screen but no button responded.
             if (mouse.leftButton != null && mouse.leftButton.wasPressedThisFrame)
             {
-                Debug.Log($"[MouseDriver] CLICK. Cursor: surfaceId={vcs.Cursor.SurfaceId}, uv={vcs.Cursor.UV}, mode={vcs.Mode}");
                 vcs.RaiseClick();
             }
 

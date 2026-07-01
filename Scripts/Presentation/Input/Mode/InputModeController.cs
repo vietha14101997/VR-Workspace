@@ -140,12 +140,7 @@ namespace VRWorkspace.Presentation.Input.Mode
                 var vcs = VirtualCursorSpace.Instance;
                 if (vcs.Cursor.SurfaceId == null)
                 {
-                    Debug.Log("[InputModeController] ApplyMode non-Gaze: cursor unbound → SnapCursorToCenter");
                     vcs.SnapCursorToCenter();
-                }
-                else
-                {
-                    Debug.Log($"[InputModeController] ApplyMode non-Gaze: cursor already bound to {vcs.Cursor.SurfaceId}");
                 }
                 WorldSpaceCursorRenderer.Instance?.SetVisible(true);
             }

@@ -110,13 +110,19 @@ namespace VRWorkspace.VRInput
 
         private static void ApplyCursorHidden()
         {
-            // Hide the OS cursor visually. We deliberately do NOT set
-            // CursorLockMode.Locked — a future in-app custom cursor may
-            // need to read Mouse.current.position.ReadValue() to render a
-            // 2D pointer, and that position would be pinned to screen
-            // center while locked. Keeping lockState = None preserves
-            // absolute position while still hiding the visual cursor.
+            // On Android, use Locked mode to completely hide the system mouse
+            // pointer and pin it to screen center. This prevents the invisible
+            // cursor from reaching the status bar edge and triggering the
+            // notification shade pull-down. Locked is safe here because
+            // MouseDeltaDriver uses Mouse.current.delta (relative movement),
+            // never Mouse.current.position (absolute), so cursor lock doesn't
+            // affect VCS input at all.
+            // On Editor/Desktop we keep None for normal development workflow.
+#if UNITY_ANDROID && !UNITY_EDITOR
+            Cursor.lockState = CursorLockMode.Locked;
+#else
             Cursor.lockState = CursorLockMode.None;
+#endif
             Cursor.visible = false;
         }
 

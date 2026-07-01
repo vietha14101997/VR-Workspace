@@ -88,24 +88,20 @@ namespace VRWorkspace.Presentation.Input.Click
         {
             if (!cursor.SurfaceId.HasValue)
             {
-                Debug.Log("[ClickDispatcher] ABORT: cursor.SurfaceId is null");
                 return;
             }
 
             var vcs = VirtualCursorSpace.Instance;
             if (vcs == null || !vcs.Surfaces.TryGet(cursor.SurfaceId.Value, out var surface))
             {
-                Debug.Log($"[ClickDispatcher] ABORT: surface {cursor.SurfaceId} not in registry");
                 return;
             }
 
             var canvas = surface.RuntimeRef as RTTCanvasBase;
             if (canvas == null)
             {
-                Debug.Log($"[ClickDispatcher] ABORT: surface.RuntimeRef is null or not RTTCanvasBase");
                 return;
             }
-            Debug.Log($"[ClickDispatcher] canvas '{canvas.name}' UV=({cursor.UV.x:F3},{cursor.UV.y:F3}) -> world raycast");
 
             // Click-outside-keyboard suppression
             var keyboard = RTTMobileKeyboard.CurrentlyOpenKeyboard;
@@ -113,7 +109,6 @@ namespace VRWorkspace.Presentation.Input.Click
                 && surface.RuntimeRef as RTTMobileKeyboard != keyboard
                 && !IsInsideKeyboard(surface))
             {
-                Debug.Log("[ClickDispatcher] keyboard open + cursor not on keyboard -> closing keyboard, suppressing click");
                 keyboard.Hide();
                 return;
             }
@@ -123,14 +118,12 @@ namespace VRWorkspace.Presentation.Input.Click
             var renderer = WorldSpaceCursorRenderer.Instance;
             if (raycastMgr == null || renderer == null)
             {
-                Debug.Log("[ClickDispatcher] ABORT: raycastMgr or renderer missing");
                 return;
             }
 
             Camera cam = Camera.main;
             if (cam == null)
             {
-                Debug.Log("[ClickDispatcher] ABORT: Camera.main null");
                 return;
             }
 
@@ -139,14 +132,12 @@ namespace VRWorkspace.Presentation.Input.Click
             float dist = dir.magnitude;
             if (dist < 0.01f)
             {
-                Debug.Log("[ClickDispatcher] ABORT: cursor too close to camera");
                 return;
             }
             dir /= dist;
 
             Ray ray = new Ray(cam.transform.position, dir);
             var hit = raycastMgr.Raycast(ray);
-            Debug.Log($"[ClickDispatcher] world raycast origin={cam.transform.position} dir={dir} cursorWorld={worldPos} hit.isValid={hit.isValid} hitElement={hit.hitUIElement?.name ?? "null"}");
 
             if (!hit.isValid || hit.hitUIElement == null) return;
             // The Raycast above already populated _currentHit; SendClick dispatches using it.
