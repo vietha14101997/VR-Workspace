@@ -134,24 +134,37 @@ namespace VRWorkspace.Presentation.Input.Cursor
                 _currentParent = quad.transform;
             }
 
-            // Hotspot position: the exact UV coordinate. ClickDispatcher raycasts
-            // through CursorWorldPosition, so this MUST be at the UV point.
-            Vector2 size = canvas.GetWorldSize();
             Vector3 hotspotLocal = new Vector3(
-                (cursor.UV.x - 0.5f) * size.x,
-                (cursor.UV.y - 0.5f) * size.y,
+                cursor.UV.x - 0.5f,
+                cursor.UV.y - 0.5f,
                 localZOffset);
             CursorWorldPosition = quad.transform.TransformPoint(hotspotLocal);
 
-            // Visual offset: shift the sprite so the arrow tip (top-left corner)
-            // sits at the hotspot. The sprite's pivot is at center, so we push
-            // the visual half-size to the right and half-size downward.
-            Vector3 visualLocal = hotspotLocal + new Vector3(
-                cursorWorldSize * 0.5f,
-                -cursorWorldSize * 0.5f,
-                0f);
-            _cursor3D.transform.localPosition = visualLocal;
-            _cursor3D.transform.localScale = new Vector3(cursorWorldSize, cursorWorldSize, 1f);
+            // Sprite dimensions in Unity units (handles custom sizes)
+            Vector2 spriteSize = Vector2.one;
+            if (_currentSprite != null)
+            {
+                spriteSize = new Vector2(
+                    _currentSprite.rect.width / _currentSprite.pixelsPerUnit,
+                    _currentSprite.rect.height / _currentSprite.pixelsPerUnit);
+            }
+
+            // Desired visual size in world meters (maintaining texture aspect ratio)
+            float worldW = cursorWorldSize * spriteSize.x;
+            float worldH = cursorWorldSize * spriteSize.y;
+
+            // Offset the center of the sprite so its top-left corner lies exactly at CursorWorldPosition
+            Vector3 worldOffset = quad.transform.right * (worldW * 0.5f) - quad.transform.up * (worldH * 0.5f);
+            
+            _cursor3D.transform.position = CursorWorldPosition + worldOffset;
+            _cursor3D.transform.rotation = quad.transform.rotation;
+
+            // Scale to world size, neutralizing parent quad scale
+            Vector3 parentScale = quad.transform.lossyScale;
+            _cursor3D.transform.localScale = new Vector3(
+                cursorWorldSize / Mathf.Max(1e-4f, parentScale.x),
+                cursorWorldSize / Mathf.Max(1e-4f, parentScale.y),
+                1f);
 
             if (!_cursor3D.activeSelf) SetVisible(true);
         }
