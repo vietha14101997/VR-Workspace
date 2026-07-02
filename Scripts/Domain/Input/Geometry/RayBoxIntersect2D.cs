@@ -54,12 +54,15 @@ namespace VRWorkspace.Domain.Input.Geometry
             Rect bounds,
             float bufferZone = 0f)
         {
-            // Shrink bounds by bufferZone (sticky edge)
+            Rect originalBounds = bounds;
+
+            // Shrink bounds by bufferZone (sticky edge) to define hit detection bounds
+            Rect hitBounds = bounds;
             if (bufferZone > 0f)
             {
                 float bx = bounds.width  * bufferZone;
                 float by = bounds.height * bufferZone;
-                bounds = new Rect(
+                hitBounds = new Rect(
                     bounds.xMin + bx,
                     bounds.yMin + by,
                     Mathf.Max(0f, bounds.width  - 2f * bx),
@@ -71,53 +74,74 @@ namespace VRWorkspace.Domain.Input.Geometry
             Vector2 d = direction.normalized;
 
             // Slab test (Kay-Kajiya). Compute t intervals for each axis.
-            // t ranges where the ray is inside the slab.
-            float tMin = float.NegativeInfinity;
-            float tMax = float.PositiveInfinity;
+            // t ranges where the ray is inside the slab of hitBounds.
+            float tMinHit = float.NegativeInfinity;
+            float tMaxHit = float.PositiveInfinity;
 
             if (Mathf.Abs(d.x) < 1e-8f)
             {
-                // Ray parallel to Y axis. If origin outside X slab, miss; else t in [0, ∞) on Y handled below.
-                if (origin.x < bounds.xMin || origin.x > bounds.xMax) return RayBoxHit2D.Miss;
+                // Ray parallel to Y axis. If origin outside X slab, miss.
+                if (origin.x < hitBounds.xMin || origin.x > hitBounds.xMax) return RayBoxHit2D.Miss;
             }
             else
             {
                 float inv = 1f / d.x;
-                float t1 = (bounds.xMin - origin.x) * inv;
-                float t2 = (bounds.xMax - origin.x) * inv;
+                float t1 = (hitBounds.xMin - origin.x) * inv;
+                float t2 = (hitBounds.xMax - origin.x) * inv;
                 if (t1 > t2) (t1, t2) = (t2, t1);
-                if (t1 > tMin) tMin = t1;
-                if (t2 < tMax) tMax = t2;
-                if (tMin > tMax) return RayBoxHit2D.Miss;
+                if (t1 > tMinHit) tMinHit = t1;
+                if (t2 < tMaxHit) tMaxHit = t2;
+                if (tMinHit > tMaxHit) return RayBoxHit2D.Miss;
             }
 
             if (Mathf.Abs(d.y) < 1e-8f)
             {
-                if (origin.y < bounds.yMin || origin.y > bounds.yMax) return RayBoxHit2D.Miss;
+                if (origin.y < hitBounds.yMin || origin.y > hitBounds.yMax) return RayBoxHit2D.Miss;
             }
             else
             {
                 float inv = 1f / d.y;
-                float t1 = (bounds.yMin - origin.y) * inv;
-                float t2 = (bounds.yMax - origin.y) * inv;
+                float t1 = (hitBounds.yMin - origin.y) * inv;
+                float t2 = (hitBounds.yMax - origin.y) * inv;
                 if (t1 > t2) (t1, t2) = (t2, t1);
-                if (t1 > tMin) tMin = t1;
-                if (t2 < tMax) tMax = t2;
-                if (tMin > tMax) return RayBoxHit2D.Miss;
+                if (t1 > tMinHit) tMinHit = t1;
+                if (t2 < tMaxHit) tMaxHit = t2;
+                if (tMinHit > tMaxHit) return RayBoxHit2D.Miss;
             }
 
-            // Hit. Choose entry t (tMin if origin is outside box, else 0).
-            float tEnter = tMin > 0f ? tMin : 0f;
-            // If origin is inside the box we still report 0; EntryUV computed from exit-side hit
-            // for "natural" behavior. Caller can clamp UV.
+            // We hit the detection bounds! Now calculate entry point and entryUV on ORIGINAL bounds.
+            float tMinOrig = float.NegativeInfinity;
+            float tMaxOrig = float.PositiveInfinity;
+
+            if (Mathf.Abs(d.x) >= 1e-8f)
+            {
+                float inv = 1f / d.x;
+                float t1 = (originalBounds.xMin - origin.x) * inv;
+                float t2 = (originalBounds.xMax - origin.x) * inv;
+                if (t1 > t2) (t1, t2) = (t2, t1);
+                if (t1 > tMinOrig) tMinOrig = t1;
+                if (t2 < tMaxOrig) tMaxOrig = t2;
+            }
+
+            if (Mathf.Abs(d.y) >= 1e-8f)
+            {
+                float inv = 1f / d.y;
+                float t1 = (originalBounds.yMin - origin.y) * inv;
+                float t2 = (originalBounds.yMax - origin.y) * inv;
+                if (t1 > t2) (t1, t2) = (t2, t1);
+                if (t1 > tMinOrig) tMinOrig = t1;
+                if (t2 < tMaxOrig) tMaxOrig = t2;
+            }
+
+            // Hit. Choose entry t (tMinOrig if origin is outside box, else 0).
+            float tEnter = tMinOrig > 0f ? tMinOrig : 0f;
             Vector2 worldPoint = origin + d * tEnter;
             Vector2 entryUV = new Vector2(
-                (worldPoint.x - bounds.xMin) / Mathf.Max(1e-6f, bounds.width),
-                (worldPoint.y - bounds.yMin) / Mathf.Max(1e-6f, bounds.height));
+                (worldPoint.x - originalBounds.xMin) / Mathf.Max(1e-6f, originalBounds.width),
+                (worldPoint.y - originalBounds.yMin) / Mathf.Max(1e-6f, originalBounds.height));
 
             // Staircase rejection: an entryUV whose component is outside [0,1] means the
-            // hit lies outside the surface's actual bounds (the ray pierced a phantom slab).
-            // Caller should treat that as a miss.
+            // hit lies outside the surface's actual bounds.
             if (entryUV.x < -1e-4f || entryUV.x > 1f + 1e-4f ||
                 entryUV.y < -1e-4f || entryUV.y > 1f + 1e-4f)
                 return RayBoxHit2D.Miss;

@@ -110,10 +110,11 @@ namespace VRWorkspace.Domain.Input
         // ----- Cursor mutation -----
 
         /// <summary>
-        /// Apply a UV-space delta. Cursor is clamped to the current surface (no edge traversal).
-        /// This matches the "red-dot Reticle" UX: cursor lives on whatever panel it's bound to,
-        /// and can only move within that panel. Use <see cref="SnapCursorTo"/> for system-driven
-        /// surface switches (e.g. when a keyboard pops up, when a side panel closes).
+        /// Apply a UV-space delta with automatic edge traversal.
+        /// When the cursor overflows [0,1] on any axis, we attempt to traverse
+        /// to an adjacent visible surface via <see cref="TryTraverseEdge"/>.
+        /// The staircase constraint (Decision 4) is enforced by RayBoxIntersect2D:
+        /// only regions sharing X (or Y) coordinates allow the cursor to cross.
         /// </summary>
         public void MoveCursor(Vector2 deltaUV)
         {
@@ -121,9 +122,88 @@ namespace VRWorkspace.Domain.Input
             if (!_surfaces.TryGet(Cursor.SurfaceId.Value, out var current)) return;
 
             Vector2 nextUV = Cursor.UV + deltaUV;
-            nextUV.x = Mathf.Clamp01(nextUV.x);
-            nextUV.y = Mathf.Clamp01(nextUV.y);
-            SetCursor(current.SurfaceId, nextUV);
+
+            // Detect overflow on each axis
+            float yOverflow = nextUV.y < 0f ? -nextUV.y : (nextUV.y > 1f ? nextUV.y - 1f : 0f);
+            float xOverflow = nextUV.x < 0f ? -nextUV.x : (nextUV.x > 1f ? nextUV.x - 1f : 0f);
+
+            bool traversed = false;
+            Guid targetId = default;
+            Vector2 entryUV = Vector2.zero;
+            EdgeDirection traversedDir = EdgeDirection.Down;
+
+            if (yOverflow > 0f || xOverflow > 0f)
+            {
+                // Check dominant overflow axis first (vertical for Main↔Taskbar/Pagination)
+                if (yOverflow >= xOverflow)
+                {
+                    EdgeDirection yDir = nextUV.y < 0f ? EdgeDirection.Down : EdgeDirection.Up;
+                    if (TryTraverseEdge(yDir, out targetId, out entryUV))
+                    {
+                        traversed = true;
+                        traversedDir = yDir;
+                    }
+                    else if (xOverflow > 0f)
+                    {
+                        EdgeDirection xDir = nextUV.x < 0f ? EdgeDirection.Left : EdgeDirection.Right;
+                        if (TryTraverseEdge(xDir, out targetId, out entryUV))
+                        {
+                            traversed = true;
+                            traversedDir = xDir;
+                        }
+                    }
+                }
+                else
+                {
+                    EdgeDirection xDir = nextUV.x < 0f ? EdgeDirection.Left : EdgeDirection.Right;
+                    if (TryTraverseEdge(xDir, out targetId, out entryUV))
+                    {
+                        traversed = true;
+                        traversedDir = xDir;
+                    }
+                    else if (yOverflow > 0f)
+                    {
+                        EdgeDirection yDir = nextUV.y < 0f ? EdgeDirection.Down : EdgeDirection.Up;
+                        if (TryTraverseEdge(yDir, out targetId, out entryUV))
+                        {
+                            traversed = true;
+                            traversedDir = yDir;
+                        }
+                    }
+                }
+            }
+
+            if (traversed && _surfaces.TryGet(targetId, out var target))
+            {
+                // Apply the remaining overflow delta, scaled from source to target surface
+                Vector2 finalUV = entryUV;
+
+                if (traversedDir == EdgeDirection.Down || traversedDir == EdgeDirection.Up)
+                {
+                    // Y axis traversed: scale Y overflow + X frame delta to target coords
+                    float yOver = traversedDir == EdgeDirection.Down ? nextUV.y : nextUV.y - 1f;
+                    finalUV.y += (yOver * current.Size.y) / Mathf.Max(1e-4f, target.Size.y);
+                    finalUV.x += (deltaUV.x * current.Size.x) / Mathf.Max(1e-4f, target.Size.x);
+                }
+                else
+                {
+                    // X axis traversed: scale X overflow + Y frame delta to target coords
+                    float xOver = traversedDir == EdgeDirection.Left ? nextUV.x : nextUV.x - 1f;
+                    finalUV.x += (xOver * current.Size.x) / Mathf.Max(1e-4f, target.Size.x);
+                    finalUV.y += (deltaUV.y * current.Size.y) / Mathf.Max(1e-4f, target.Size.y);
+                }
+
+                finalUV.x = Mathf.Clamp01(finalUV.x);
+                finalUV.y = Mathf.Clamp01(finalUV.y);
+                SetCursor(targetId, finalUV);
+            }
+            else
+            {
+                // No traversal — clamp within current surface
+                nextUV.x = Mathf.Clamp01(nextUV.x);
+                nextUV.y = Mathf.Clamp01(nextUV.y);
+                SetCursor(current.SurfaceId, nextUV);
+            }
         }
 
         public void SetCursorUV(Vector2 uv)

@@ -290,6 +290,7 @@ namespace VRWorkspace.UI.RTT.Components
         {
             _isVisible = false;
             _currentType = ExpansionType.None;
+            SetVisible(false);
 
             if (gameObject.activeInHierarchy)
             {
@@ -572,6 +573,7 @@ namespace VRWorkspace.UI.RTT.Components
             // Show
             gameObject.SetActive(true);
             _isVisible = true;
+            SetVisible(true);
 
             // NOTE: Not setting CurrentlyOpenExpansion - click-outside-to-close is disabled for all expansion types
 

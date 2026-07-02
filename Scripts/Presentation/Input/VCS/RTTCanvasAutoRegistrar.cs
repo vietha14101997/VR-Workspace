@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using VRWorkspace.Domain.Input;
 using VRWorkspace.UI.RTT;
+using VRWorkspace.UI.RTT.Components;
 
 namespace VRWorkspace.Presentation.Input.VCS
 {
@@ -60,6 +61,39 @@ namespace VRWorkspace.Presentation.Input.VCS
             if (Instance == this) Instance = null;
         }
 
+        private Transform GetReferenceTransform()
+        {
+            var refFrame = RTTMenuFrame.PrimaryInstance;
+            if (refFrame != null) return refFrame.transform;
+
+            var activeFrame = FindAnyObjectByType<RTTMenuFrame>();
+            if (activeFrame != null) return activeFrame.transform;
+
+            return null;
+        }
+
+        private Vector2 GetVirtualCenter(RTTCanvasBase canvas, Transform refT = null)
+        {
+            if (canvas == null) return Vector2.zero;
+
+            if (refT == null) refT = GetReferenceTransform();
+
+            if (refT != null && refT != canvas.transform)
+            {
+                Vector3 relativePos = canvas.transform.position - refT.position;
+                Vector3 localPos = refT.InverseTransformDirection(relativePos);
+                return new Vector2(localPos.x, localPos.y);
+            }
+
+            if (refT == canvas.transform)
+            {
+                return Vector2.zero;
+            }
+
+            var pos = canvas.transform.position;
+            return new Vector2(pos.x, pos.y);
+        }
+
         private void OnSurfaceCreated(RTTCanvasBase canvas)
         {
             if (canvas == null || _idMap.ContainsKey(canvas)) return;
@@ -71,13 +105,12 @@ namespace VRWorkspace.Presentation.Input.VCS
                 _idMap[canvas] = surfaceId;
             }
 
-            var pos = canvas.transform.position;
             var size = canvas.GetWorldSize();
             var (edges, priority) = ResolveOverride(canvas) ?? (EdgePolicy.All, SurfacePriority.Default);
 
             var surface = new VirtualSurface(
                 surfaceId,
-                new Vector2(pos.x, pos.y),
+                GetVirtualCenter(canvas),
                 new Vector2(size.x, size.y),
                 edges,
                 priority,
@@ -102,6 +135,42 @@ namespace VRWorkspace.Presentation.Input.VCS
             if (_idMap.TryGetValue(canvas, out var id))
             {
                 VirtualCursorSpace.Instance?.NotifySurfaceVisibilityChanged(id, isVisible);
+            }
+        }
+
+        private void LateUpdate()
+        {
+            var vcs = VirtualCursorSpace.Instance;
+            if (vcs == null) return;
+
+            Transform refT = GetReferenceTransform();
+
+            foreach (var kvp in _idMap)
+            {
+                var canvas = kvp.Key;
+                if (canvas == null) continue;
+
+                var id = kvp.Value;
+                Vector2 currentCenter = GetVirtualCenter(canvas, refT);
+                Vector2 currentSize = canvas.GetWorldSize();
+
+                if (vcs.Surfaces.TryGet(id, out var surface))
+                {
+                    if (surface.Center == currentCenter && surface.Size == currentSize)
+                    {
+                        continue;
+                    }
+
+                    var updated = new VirtualSurface(
+                        id,
+                        currentCenter,
+                        currentSize,
+                        surface.Edges,
+                        surface.Priority,
+                        canvas);
+                    vcs.RegisterSurface(updated);
+                    vcs.NotifySurfaceVisibilityChanged(id, surface.IsVisible);
+                }
             }
         }
 
