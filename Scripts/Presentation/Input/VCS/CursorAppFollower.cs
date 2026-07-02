@@ -106,7 +106,7 @@ namespace VRWorkspace.Presentation.Input.VCS
                 && RTTCanvasAutoRegistrar.Instance.TryGetSurfaceId(mainMenuFrame).HasValue)
             {
                 var mainId = RTTCanvasAutoRegistrar.Instance.TryGetSurfaceId(mainMenuFrame).Value;
-                vcs.SnapCursorTo(mainId);
+                vcs.SnapCursorTo(mainId, preserveWorldPosition: true);
             }
             else
             {
@@ -136,7 +136,7 @@ namespace VRWorkspace.Presentation.Input.VCS
             if (surfaceId.HasValue)
             {
                 Debug.Log($"[CursorAppFollower] snap cursor to surfaceId={surfaceId.Value} (frame='{instance?.Frame?.name}')");
-                VirtualCursorSpace.Instance?.SnapCursorTo(surfaceId.Value);
+                VirtualCursorSpace.Instance?.SnapCursorTo(surfaceId.Value, preserveWorldPosition: true);
             }
             else
             {

@@ -218,9 +218,21 @@ namespace VRWorkspace.Domain.Input
             if (s != null) SnapCursorTo(s.SurfaceId);
         }
 
-        public void SnapCursorTo(Guid surfaceId)
+        public void SnapCursorTo(Guid surfaceId, bool preserveWorldPosition = false)
         {
-            SetCursor(surfaceId, new Vector2(0.5f, 0.5f));
+            if (preserveWorldPosition && Cursor.SurfaceId.HasValue 
+                && _surfaces.TryGet(Cursor.SurfaceId.Value, out var current) 
+                && _surfaces.TryGet(surfaceId, out var target))
+            {
+                Vector2 worldPos = current.Center + (Cursor.UV - new Vector2(0.5f, 0.5f)) * current.Size;
+                float u = (worldPos.x - target.Center.x) / Mathf.Max(1e-4f, target.Size.x) + 0.5f;
+                float v = (worldPos.y - target.Center.y) / Mathf.Max(1e-4f, target.Size.y) + 0.5f;
+                SetCursor(surfaceId, new Vector2(Mathf.Clamp01(u), Mathf.Clamp01(v)));
+            }
+            else
+            {
+                SetCursor(surfaceId, new Vector2(0.5f, 0.5f));
+            }
         }
 
         private void SetCursor(Guid? surfaceId, Vector2 uv)

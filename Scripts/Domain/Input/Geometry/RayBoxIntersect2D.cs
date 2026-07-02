@@ -60,8 +60,17 @@ namespace VRWorkspace.Domain.Input.Geometry
             Rect hitBounds = bounds;
             if (bufferZone > 0f)
             {
-                float bx = bounds.width  * bufferZone;
-                float by = bounds.height * bufferZone;
+                float bx = 0f;
+                float by = 0f;
+                if (Mathf.Abs(direction.x) > Mathf.Abs(direction.y))
+                {
+                    bx = bounds.width * bufferZone;
+                }
+                else
+                {
+                    by = bounds.height * bufferZone;
+                }
+
                 hitBounds = new Rect(
                     bounds.xMin + bx,
                     bounds.yMin + by,
