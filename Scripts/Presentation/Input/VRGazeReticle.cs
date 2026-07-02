@@ -189,6 +189,11 @@ namespace VRWorkspace.VRInput
 
         void Update()
         {
+            if (_canvasRT != null && !_canvasRT.gameObject.activeSelf)
+            {
+                return;
+            }
+
             if (_isRecentering)
             {
                 UpdateRecenterPosition();
@@ -1438,6 +1443,17 @@ namespace VRWorkspace.VRInput
                 _previousEuler = _cam.transform.eulerAngles;
                 _isLocked = false;
                 _compassInitialized = false;
+            }
+        }
+
+        /// <summary>
+        /// Show or hide the entire gaze reticle canvas.
+        /// </summary>
+        public void SetReticleVisible(bool visible)
+        {
+            if (_canvasRT != null)
+            {
+                _canvasRT.gameObject.SetActive(visible);
             }
         }
 

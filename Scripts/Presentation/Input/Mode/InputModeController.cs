@@ -113,6 +113,7 @@ namespace VRWorkspace.Presentation.Input.Mode
                 {
                     VRGazeReticle.Instance.useRTTRaycast = true;
                     VRGazeReticle.Instance.dwellClickEnabled = true;
+                    VRGazeReticle.Instance.SetReticleVisible(true);
                 }
                 WorldSpaceCursorRenderer.Instance?.SetVisible(false);
 
@@ -128,6 +129,7 @@ namespace VRWorkspace.Presentation.Input.Mode
                     VRGazeReticle.Instance.useRTTRaycast = false;
                     VRGazeReticle.Instance.dwellClickEnabled = false;
                     VRGazeReticle.Instance.ForceResetDwellState();
+                    VRGazeReticle.Instance.SetReticleVisible(false);
                 }
 
                 VirtualCursorSpace.GetOrCreate().RequestModeSwitch(mode);

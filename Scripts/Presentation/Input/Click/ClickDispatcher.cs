@@ -7,6 +7,7 @@ using VRWorkspace.Presentation.Input.Cursor;
 using VRWorkspace.Presentation.Input.VCS;
 using VRWorkspace.UI.RTT;
 using VRWorkspace.UI.RTT.Components;
+using VRWorkspace.UI.HoverEffects;
 
 namespace VRWorkspace.Presentation.Input.Click
 {
@@ -51,6 +52,7 @@ namespace VRWorkspace.Presentation.Input.Click
         }
 
         private bool _subscribed;
+        private GameObject _currentHoveredObject;
 
         private void OnEnable()
         {
@@ -65,6 +67,7 @@ namespace VRWorkspace.Presentation.Input.Click
                 VirtualCursorSpace.Instance.OnClickDispatched -= OnClickDispatched;
             }
             _subscribed = false;
+            ClearHover();
         }
 
         private void Update()
@@ -73,6 +76,7 @@ namespace VRWorkspace.Presentation.Input.Click
             // registers, which may happen AFTER this MonoBehaviour's OnEnable. Without
             // this retry, click events are silently dropped on the very first session.
             TrySubscribe();
+            UpdateHover();
         }
 
         private void TrySubscribe()
@@ -81,6 +85,140 @@ namespace VRWorkspace.Presentation.Input.Click
             if (VirtualCursorSpace.Instance == null) return;
             VirtualCursorSpace.Instance.OnClickDispatched += OnClickDispatched;
             _subscribed = true;
+        }
+
+        private void UpdateHover()
+        {
+            var vcs = VirtualCursorSpace.Instance;
+            if (vcs == null || vcs.Mode == InputMode.Gaze)
+            {
+                ClearHover();
+                return;
+            }
+
+            var cursor = vcs.Cursor;
+            if (!cursor.IsVisible || !cursor.SurfaceId.HasValue)
+            {
+                ClearHover();
+                return;
+            }
+
+            if (!vcs.Surfaces.TryGet(cursor.SurfaceId.Value, out var surface))
+            {
+                ClearHover();
+                return;
+            }
+
+            var renderer = WorldSpaceCursorRenderer.Instance;
+            Camera cam = Camera.main;
+            if (renderer == null || cam == null)
+            {
+                ClearHover();
+                return;
+            }
+
+            GameObject hitObj = null;
+            PointerEventData pointerData = new PointerEventData(EventSystem.current);
+
+            var canvas = surface.RuntimeRef as RTTCanvasBase;
+            var actionBar = surface.RuntimeRef as ActionBarSurfaceController;
+
+            if (canvas != null)
+            {
+                var raycastMgr = VRWorkspace.UI.RTT.Input.RTTRaycastManager.Instance;
+                if (raycastMgr != null)
+                {
+                    Vector3 worldPos = renderer.CursorWorldPosition;
+                    Vector3 dir = (worldPos - cam.transform.position);
+                    float dist = dir.magnitude;
+                    if (dist > 0.01f)
+                    {
+                        Ray ray = new Ray(cam.transform.position, dir / dist);
+                        var hit = raycastMgr.Raycast(ray);
+                        if (hit.isValid)
+                        {
+                            hitObj = hit.hitUIElement;
+                            
+                            // Re-use RTTRaycastManager's pointer event data if available
+                            // to keep pointer state consistent
+                            var pDataField = raycastMgr.GetType().GetField("_pointerEventData", 
+                                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                            if (pDataField != null)
+                            {
+                                var pData = pDataField.GetValue(raycastMgr) as PointerEventData;
+                                if (pData != null) pointerData = pData;
+                            }
+                        }
+                    }
+                }
+            }
+            else if (actionBar != null)
+            {
+                var graphicRaycaster = actionBar.GetComponentInChildren<GraphicRaycaster>();
+                if (graphicRaycaster != null)
+                {
+                    Vector3 worldPos = renderer.CursorWorldPosition;
+                    Vector2 screenPos = cam.WorldToScreenPoint(worldPos);
+                    pointerData.position = screenPos;
+
+                    var results = new List<RaycastResult>();
+                    graphicRaycaster.Raycast(pointerData, results);
+                    if (results.Count > 0)
+                    {
+                        hitObj = results[0].gameObject;
+                    }
+                }
+            }
+
+            if (_currentHoveredObject != hitObj)
+            {
+                if (_currentHoveredObject != null)
+                {
+                    ExecuteEvents.Execute(_currentHoveredObject, pointerData, ExecuteEvents.pointerExitHandler);
+                    var selectable = _currentHoveredObject.GetComponentInParent<Selectable>();
+                    if (selectable != null) selectable.OnPointerExit(pointerData);
+
+                    var hoverCtrl = _currentHoveredObject.GetComponent<HoverEffectController>();
+                    if (hoverCtrl == null) hoverCtrl = _currentHoveredObject.GetComponentInParent<HoverEffectController>();
+                    if (hoverCtrl != null) hoverCtrl.OnPointerExit(null);
+                }
+
+                _currentHoveredObject = hitObj;
+
+                if (hitObj != null)
+                {
+                    ExecuteEvents.Execute(hitObj, pointerData, ExecuteEvents.pointerEnterHandler);
+                    var selectable = hitObj.GetComponentInParent<Selectable>();
+                    if (selectable != null) selectable.OnPointerEnter(pointerData);
+
+                    var hoverCtrl = hitObj.GetComponent<HoverEffectController>();
+                    if (hoverCtrl == null) hoverCtrl = hitObj.GetComponentInParent<HoverEffectController>();
+                    if (hoverCtrl != null) hoverCtrl.OnPointerEnter(null);
+                }
+                
+                // If it is an RTT canvas, mark dirty to redraw hover highlights
+                if (canvas != null)
+                {
+                    canvas.MarkDirty();
+                }
+            }
+        }
+
+        private void ClearHover()
+        {
+            if (_currentHoveredObject != null)
+            {
+                PointerEventData pointerData = new PointerEventData(EventSystem.current);
+                ExecuteEvents.Execute(_currentHoveredObject, pointerData, ExecuteEvents.pointerExitHandler);
+                var selectable = _currentHoveredObject.GetComponentInParent<Selectable>();
+                if (selectable != null) selectable.OnPointerExit(pointerData);
+
+                var hoverCtrl = _currentHoveredObject.GetComponent<HoverEffectController>();
+                if (hoverCtrl == null) hoverCtrl = _currentHoveredObject.GetComponentInParent<HoverEffectController>();
+                if (hoverCtrl != null) hoverCtrl.OnPointerExit(null);
+
+                _currentHoveredObject = null;
+            }
         }
 
         private void OnDestroy()
