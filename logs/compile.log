@@ -1,0 +1,28 @@
+Assets\VR-Workspace\Scripts\Presentation\Input\Click\ClickDispatcher.cs(108,73): error CS0246: The type or namespace name 'GraphicRaycaster' could not be found (are you missing a using directive or an assembly reference?)
+
+Assets\VR-Workspace\Scripts\Presentation\Input\Click\ClickDispatcher.cs(111,28): error CS0136: A local or parameter named 'cam' cannot be declared in this scope because that name is used in an enclosing local scope to define a local or parameter
+
+Assets\VR-Workspace\Scripts\Presentation\Input\Click\ClickDispatcher.cs(114,33): error CS0136: A local or parameter named 'worldPos' cannot be declared in this scope because that name is used in an enclosing local scope to define a local or parameter
+
+Assets\VR-Workspace\Scripts\Presentation\Input\Click\ClickDispatcher.cs(117,47): error CS0246: The type or namespace name 'PointerEventData' could not be found (are you missing a using directive or an assembly reference?)
+
+Assets\VR-Workspace\Scripts\Presentation\Input\Click\ClickDispatcher.cs(117,64): error CS0103: The name 'EventSystem' does not exist in the current context
+
+Assets\VR-Workspace\Scripts\Presentation\Input\Click\ClickDispatcher.cs(122,43): error CS0246: The type or namespace name 'List<>' could not be found (are you missing a using directive or an assembly reference?)
+
+Assets\VR-Workspace\Scripts\Presentation\Input\Click\ClickDispatcher.cs(122,48): error CS0246: The type or namespace name 'RaycastResult' could not be found (are you missing a using directive or an assembly reference?)
+
+Assets\VR-Workspace\Scripts\Presentation\Input\Click\ClickDispatcher.cs(128,70): error CS0246: The type or namespace name 'Button' could not be found (are you missing a using directive or an assembly reference?)
+
+Assets\VR-Workspace\Scripts\Presentation\Input\Click\ClickDispatcher.cs(131,33): error CS0103: The name 'ExecuteEvents' does not exist in the current context
+
+Assets\VR-Workspace\Scripts\Presentation\Input\Click\ClickDispatcher.cs(131,87): error CS0103: The name 'ExecuteEvents' does not exist in the current context
+
+Assets\VR-Workspace\Scripts\Presentation\Input\Click\ClickDispatcher.cs(135,78): error CS0246: The type or namespace name 'IPointerClickHandler' could not be found (are you missing a using directive or an assembly reference?)
+
+Assets\VR-Workspace\Scripts\Presentation\Input\Click\ClickDispatcher.cs(143,41): error CS0103: The name 'ExecuteEvents' does not exist in the current context
+
+Assets\VR-Workspace\Scripts\Presentation\Input\Click\ClickDispatcher.cs(143,91): error CS0103: The name 'ExecuteEvents' does not exist in the current context
+
+Assets\VR-Workspace\Scripts\Presentation\Input\Click\ClickDispatcher.cs(168,17): error CS0128: A local variable or function named 'renderer' is already defined in this scope
+

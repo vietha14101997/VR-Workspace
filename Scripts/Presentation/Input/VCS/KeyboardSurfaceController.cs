@@ -92,7 +92,7 @@ namespace VRWorkspace.Presentation.Input.VCS
                 var kb = vcs.Surfaces.TryGet(kbId.Value, out var s) ? s : null;
                 if (kb != null)
                 {
-                    vcs.Surfaces.Unregister(kbId.Value);
+                    vcs.UnregisterSurface(kbId.Value);
                     vcs.RegisterSurface(new VirtualSurface(
                         kbId.Value,
                         kb.Center,
@@ -117,7 +117,7 @@ namespace VRWorkspace.Presentation.Input.VCS
                 var kb = vcs.Surfaces.TryGet(kbId.Value, out var s) ? s : null;
                 if (kb != null)
                 {
-                    vcs.Surfaces.Unregister(kbId.Value);
+                    vcs.UnregisterSurface(kbId.Value);
                     vcs.RegisterSurface(new VirtualSurface(
                         kbId.Value,
                         kb.Center,
@@ -125,6 +125,7 @@ namespace VRWorkspace.Presentation.Input.VCS
                         EdgePolicy.All,
                         SurfacePriority.Modal,
                         kb.RuntimeRef));
+                    vcs.NotifySurfaceVisibilityChanged(kbId.Value, false); // Restored keyboard is physically hidden
                 }
             }
         }
@@ -151,30 +152,12 @@ namespace VRWorkspace.Presentation.Input.VCS
 
         private void LateUpdate()
         {
-            // Late-bind taskbar reference on first use (it may not exist at OnEnable).
+            // Late-bind taskbar/pagination references on first use (they may not exist at OnEnable).
             if (_taskbar == null) _taskbar = RTTTaskbar.Instance;
             if (_pagination == null) _pagination = FindAnyObjectByType<RTTFilePagination>(FindObjectsInactive.Include);
 
-            // Sync keyboard surface center with its actual runtime world position.
-            var vcs = VirtualCursorSpace.Instance;
-            if (vcs == null || _keyboard == null) return;
-
-            var kbId = FindSurfaceIdFor(_keyboard);
-            if (!kbId.HasValue) return;
-            if (!vcs.Surfaces.TryGet(kbId.Value, out var surface)) return;
-
-            var pos = _keyboard.transform.position;
-            var newCenter = new Vector2(pos.x, pos.y);
-            if (surface.Center == newCenter) return;
-
-            vcs.Surfaces.Unregister(kbId.Value);
-            vcs.RegisterSurface(new VirtualSurface(
-                kbId.Value,
-                newCenter,
-                surface.Size,
-                surface.Edges,
-                SurfacePriority.Modal,
-                surface.RuntimeRef));
+            // NOTE: Keyboard center sync is handled by RTTCanvasAutoRegistrar.LateUpdate (Order -8000)
+            // which automatically syncs ALL RTTCanvasBase positions every frame.  No duplication needed.
         }
 
         private static Guid? FindSurfaceIdFor(RTTCanvasBase canvas)

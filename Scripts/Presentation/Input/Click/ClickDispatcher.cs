@@ -1,6 +1,10 @@
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using VRWorkspace.Domain.Input;
 using VRWorkspace.Presentation.Input.Cursor;
+using VRWorkspace.Presentation.Input.VCS;
 using VRWorkspace.UI.RTT;
 using VRWorkspace.UI.RTT.Components;
 
@@ -97,15 +101,66 @@ namespace VRWorkspace.Presentation.Input.Click
                 return;
             }
 
-            var canvas = surface.RuntimeRef as RTTCanvasBase;
-            if (canvas == null)
+            var renderer = WorldSpaceCursorRenderer.Instance;
+            Camera cam = Camera.main;
+            if (renderer == null || cam == null)
             {
                 return;
             }
 
+            var canvas = surface.RuntimeRef as RTTCanvasBase;
+
+            // ── ActionBar fallback: WorldSpace canvas click dispatch ──────────
+            var actionBar = surface.RuntimeRef as ActionBarSurfaceController;
+            if (actionBar != null && canvas == null)
+            {
+                var graphicRaycaster = actionBar.GetComponentInChildren<GraphicRaycaster>();
+                if (graphicRaycaster != null)
+                {
+                    Vector3 worldPos = renderer.CursorWorldPosition;
+                    Vector2 screenPos = cam.WorldToScreenPoint(worldPos);
+
+                    var pointerData = new PointerEventData(EventSystem.current)
+                    {
+                        position = screenPos
+                    };
+
+                    var results = new List<RaycastResult>();
+                    graphicRaycaster.Raycast(pointerData, results);
+
+                    if (results.Count > 0)
+                    {
+                        var target = results[0].gameObject;
+                        var button = target.GetComponentInParent<Button>();
+                        if (button != null && button.interactable)
+                        {
+                            ExecuteEvents.Execute(button.gameObject, pointerData, ExecuteEvents.pointerClickHandler);
+                            return;
+                        }
+                        
+                        var clickHandlers = target.GetComponentsInParent<IPointerClickHandler>();
+                        if (clickHandlers != null && clickHandlers.Length > 0)
+                        {
+                            foreach (var handler in clickHandlers)
+                            {
+                                var mb = handler as MonoBehaviour;
+                                if (mb != null && mb.enabled)
+                                {
+                                    ExecuteEvents.Execute(mb.gameObject, pointerData, ExecuteEvents.pointerClickHandler);
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+                return;
+            }
+            // ──────────────────────────────────────────────────────────────────
+
             // Click-outside-keyboard suppression
             var keyboard = RTTMobileKeyboard.CurrentlyOpenKeyboard;
             if (keyboard != null
+                && canvas != null                                  // skip suppression for WorldSpace bars
                 && surface.RuntimeRef as RTTMobileKeyboard != keyboard
                 && !IsInsideKeyboard(surface))
             {
@@ -115,20 +170,13 @@ namespace VRWorkspace.Presentation.Input.Click
 
             // World-based raycast — same flow as gaze reticle, ensures visual == click target.
             var raycastMgr = VRWorkspace.UI.RTT.Input.RTTRaycastManager.Instance;
-            var renderer = WorldSpaceCursorRenderer.Instance;
-            if (raycastMgr == null || renderer == null)
+            if (raycastMgr == null)
             {
                 return;
             }
 
-            Camera cam = Camera.main;
-            if (cam == null)
-            {
-                return;
-            }
-
-            Vector3 worldPos = renderer.CursorWorldPosition;
-            Vector3 dir = (worldPos - cam.transform.position);
+            Vector3 clickWorldPos = renderer.CursorWorldPosition;
+            Vector3 dir = (clickWorldPos - cam.transform.position);
             float dist = dir.magnitude;
             if (dist < 0.01f)
             {

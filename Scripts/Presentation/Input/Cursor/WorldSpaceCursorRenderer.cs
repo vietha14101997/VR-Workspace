@@ -1,6 +1,8 @@
 using UnityEngine;
 using VRWorkspace.Domain.Input;
 using VRWorkspace.UI.RTT;
+using VRWorkspace.UI.RTT.Components;
+using VRWorkspace.Presentation.Input.VCS;
 
 namespace VRWorkspace.Presentation.Input.Cursor
 {
@@ -121,26 +123,52 @@ namespace VRWorkspace.Presentation.Input.Cursor
                 return;
             }
 
+            Transform refT = GetReferenceTransform();
+            if (refT == null) { SetVisible(false); return; }
+
             var canvas = surface.RuntimeRef as RTTCanvasBase;
-            if (canvas == null) { SetVisible(false); return; }
+            var actionBar = surface.RuntimeRef as ActionBarSurfaceController;
 
-            var quad = canvas.GetQuadCollider();
-            if (quad == null) { SetVisible(false); return; }
-
-            // Reparent only when the active surface changes — avoids layout costs every frame.
-            if (_currentParent != quad.transform)
+            Transform targetT = null;
+            if (canvas != null)
             {
-                _cursor3D.transform.SetParent(quad.transform, worldPositionStays: false);
-                _currentParent = quad.transform;
+                var quad = canvas.GetQuadCollider();
+                if (quad != null) targetT = quad.transform;
+            }
+            else if (actionBar != null)
+            {
+                targetT = actionBar.transform;
             }
 
-            Vector3 hotspotLocal = new Vector3(
-                cursor.UV.x - 0.5f,
-                cursor.UV.y - 0.5f,
-                localZOffset);
-            CursorWorldPosition = quad.transform.TransformPoint(hotspotLocal);
+            if (targetT == null) { SetVisible(false); return; }
 
-            // Sprite dimensions in Unity units (handles custom sizes)
+            // 1) Find the physical size of the active surface
+            Vector2 physicalSize = Vector2.one;
+            if (canvas != null)
+            {
+                physicalSize = canvas.GetWorldSize();
+            }
+            else if (actionBar != null)
+            {
+                physicalSize = actionBar.PhysicalSize;
+            }
+
+            // 2) Position the visual cursor directly on the physical surface based on its UV
+            Vector3 hotspot = targetT.position
+                + targetT.right * ((cursor.UV.x - 0.5f) * physicalSize.x)
+                + targetT.up * ((cursor.UV.y - 0.5f) * physicalSize.y);
+
+            // Apply Z-offset along local forward to prevent z-fighting
+            CursorWorldPosition = hotspot + targetT.forward * localZOffset;
+
+            // Reparent only when the active surface changes
+            if (_currentParent != targetT)
+            {
+                _cursor3D.transform.SetParent(targetT, worldPositionStays: true);
+                _currentParent = targetT;
+            }
+
+            // Sprite dimensions
             Vector2 spriteSize = Vector2.one;
             if (_currentSprite != null)
             {
@@ -149,24 +177,33 @@ namespace VRWorkspace.Presentation.Input.Cursor
                     _currentSprite.rect.height / _currentSprite.pixelsPerUnit);
             }
 
-            // Desired visual size in world meters (maintaining texture aspect ratio)
+            // Desired visual size in world meters
             float worldW = cursorWorldSize * spriteSize.x;
             float worldH = cursorWorldSize * spriteSize.y;
-
-            // Offset the center of the sprite so its top-left corner lies exactly at CursorWorldPosition
-            Vector3 worldOffset = quad.transform.right * (worldW * 0.5f) - quad.transform.up * (worldH * 0.5f);
+            Vector3 worldOffset = targetT.right * (worldW * 0.5f) - targetT.up * (worldH * 0.5f);
             
             _cursor3D.transform.position = CursorWorldPosition + worldOffset;
-            _cursor3D.transform.rotation = quad.transform.rotation;
+            _cursor3D.transform.rotation = targetT.rotation;
 
-            // Scale to world size, neutralizing parent quad scale
-            Vector3 parentScale = quad.transform.lossyScale;
+            // Scale to world size, neutralizing parent transform scale
+            Vector3 parentScale = targetT.lossyScale;
             _cursor3D.transform.localScale = new Vector3(
                 cursorWorldSize / Mathf.Max(1e-4f, parentScale.x),
                 cursorWorldSize / Mathf.Max(1e-4f, parentScale.y),
                 1f);
 
             if (!_cursor3D.activeSelf) SetVisible(true);
+        }
+
+        private Transform GetReferenceTransform()
+        {
+            var refFrame = RTTMenuFrame.PrimaryInstance;
+            if (refFrame != null) return refFrame.transform;
+
+            var activeFrame = FindAnyObjectByType<RTTMenuFrame>();
+            if (activeFrame != null) return activeFrame.transform;
+
+            return null;
         }
     }
 }

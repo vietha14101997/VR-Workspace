@@ -13,6 +13,7 @@ using VRWorkspace.UI.Components;
 using VRWorkspace.UI.RTT;
 using VRWorkspace.UI.RTT.Components;
 using VRWorkspace.UI.RTT.Controllers;
+using VRWorkspace.Presentation.Input.VCS;
 
 namespace VRWorkspace.Media.UI
 {
@@ -639,6 +640,19 @@ namespace VRWorkspace.Media.UI
                 _accentColor,
                 _font
             );
+
+            // Register the action bar as a VCS surface so the cursor can traverse
+            // from the Right Side Panel downward into the bar (mirrors Main → Pagination).
+            float frameHeight = RTTToolbar.Instance != null && RTTToolbar.Instance.TaskbarHeight > 0
+                ? RTTToolbar.Instance.TaskbarHeight
+                : 0.12f;
+            var barCtrl = ActionBarSurfaceController.Attach(
+                _mediaActionBar.gameObject,
+                panelWidth,
+                frameHeight,
+                _rightFrame);
+            // Mirror bar visibility into VCS
+            _mediaActionBar.OnVisibilityChanged += visible => barCtrl?.NotifyVisible(visible);
 
             // Wire up events
             _mediaActionBar.OnPlayClicked += OnPlayButtonClicked;

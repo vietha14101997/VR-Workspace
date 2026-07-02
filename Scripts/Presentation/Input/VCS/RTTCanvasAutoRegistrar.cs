@@ -72,7 +72,66 @@ namespace VRWorkspace.Presentation.Input.VCS
             return null;
         }
 
-        private Vector2 GetVirtualCenter(RTTCanvasBase canvas, Transform refT = null)
+        /// <summary>
+        /// Project a 3D world position onto a reference transform's XY plane along the camera ray.
+        /// This ensures panels shifted closer to the camera (e.g. RTTMobileKeyboard via cameraProximity)
+        /// are projected back to their logical 2D coordinate positions in VCS space, preventing gaps/jumps.
+        /// </summary>
+        public static Vector2 ProjectToVirtualSpace(Vector3 worldPos, Transform refT)
+        {
+            if (refT == null) return new Vector2(worldPos.x, worldPos.y);
+
+            Camera cam = Camera.main;
+            if (cam != null)
+            {
+                Vector3 cameraPos = cam.transform.position;
+                Vector3 rayDir = worldPos - cameraPos;
+                float denom = Vector3.Dot(rayDir, refT.forward);
+                if (Mathf.Abs(denom) > 0.0001f)
+                {
+                    float t = Vector3.Dot(refT.position - cameraPos, refT.forward) / denom;
+                    Vector3 projectedPoint = cameraPos + t * rayDir;
+                    Vector3 localPos = refT.InverseTransformPoint(projectedPoint);
+                    return new Vector2(localPos.x, localPos.y);
+                }
+            }
+
+            // Fallback
+            Vector3 relativePos = worldPos - refT.position;
+            Vector3 localPos2 = refT.InverseTransformDirection(relativePos);
+            return new Vector2(localPos2.x, localPos2.y);
+        }
+
+        public static Vector2 GetProjectedSize(Transform targetT, Vector2 physicalSize, Transform refT)
+        {
+            if (refT == null || refT == targetT)
+            {
+                return physicalSize;
+            }
+
+            Vector3 center = targetT.position;
+            Vector2 projCenter = ProjectToVirtualSpace(center, refT);
+            Vector2 projRight  = ProjectToVirtualSpace(center + targetT.right * (physicalSize.x / 2f), refT);
+            Vector2 projTop    = ProjectToVirtualSpace(center + targetT.up * (physicalSize.y / 2f), refT);
+
+            float projW = Mathf.Abs(projRight.x - projCenter.x) * 2f;
+            float projH = Mathf.Abs(projTop.y - projCenter.y) * 2f;
+
+            return new Vector2(
+                Mathf.Max(projW, physicalSize.x),
+                Mathf.Max(projH, physicalSize.y)
+            );
+        }
+
+        public Vector2 GetVirtualSize(RTTCanvasBase canvas, Transform refT = null)
+        {
+            if (canvas == null) return Vector2.zero;
+            if (refT == null) refT = GetReferenceTransform();
+            return GetProjectedSize(canvas.transform, canvas.GetWorldSize(), refT);
+        }
+
+
+        public Vector2 GetVirtualCenter(RTTCanvasBase canvas, Transform refT = null)
         {
             if (canvas == null) return Vector2.zero;
 
@@ -80,9 +139,7 @@ namespace VRWorkspace.Presentation.Input.VCS
 
             if (refT != null && refT != canvas.transform)
             {
-                Vector3 relativePos = canvas.transform.position - refT.position;
-                Vector3 localPos = refT.InverseTransformDirection(relativePos);
-                return new Vector2(localPos.x, localPos.y);
+                return ProjectToVirtualSpace(canvas.transform.position, refT);
             }
 
             if (refT == canvas.transform)
@@ -105,13 +162,13 @@ namespace VRWorkspace.Presentation.Input.VCS
                 _idMap[canvas] = surfaceId;
             }
 
-            var size = canvas.GetWorldSize();
+            var size = GetVirtualSize(canvas);
             var (edges, priority) = ResolveOverride(canvas) ?? (EdgePolicy.All, SurfacePriority.Default);
 
             var surface = new VirtualSurface(
                 surfaceId,
                 GetVirtualCenter(canvas),
-                new Vector2(size.x, size.y),
+                size,
                 edges,
                 priority,
                 canvas);
@@ -152,7 +209,7 @@ namespace VRWorkspace.Presentation.Input.VCS
 
                 var id = kvp.Value;
                 Vector2 currentCenter = GetVirtualCenter(canvas, refT);
-                Vector2 currentSize = canvas.GetWorldSize();
+                Vector2 currentSize = GetVirtualSize(canvas, refT);
 
                 if (vcs.Surfaces.TryGet(id, out var surface))
                 {
@@ -178,8 +235,14 @@ namespace VRWorkspace.Presentation.Input.VCS
         private (EdgePolicy edges, int priority)? ResolveOverride(RTTCanvasBase canvas)
         {
             var o = canvas.GetComponent<VirtualSurfaceOverride>();
-            if (o == null) return null;
-            return (o.Edges, o.Priority);
+            if (o != null) return (o.Edges, o.Priority);
+
+            if (canvas is RTTMobileKeyboard)
+            {
+                return (EdgePolicy.Up, SurfacePriority.Modal);
+            }
+
+            return null;
         }
 
         /// <summary>Public lookup: VCS surface id for a given canvas, or null if not yet registered.</summary>

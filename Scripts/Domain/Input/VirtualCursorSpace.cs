@@ -123,6 +123,50 @@ namespace VRWorkspace.Domain.Input
 
             Vector2 nextUV = Cursor.UV + deltaUV;
 
+            // Check priority-based overlap: if the new position falls inside a higher-priority
+            // visible surface, traverse to it immediately. This prevents the cursor from going
+            // behind the overlapping surface (occlusion) and ensures smooth visual transition.
+            Vector2 currentWorldPos = current.Center + (Cursor.UV - new Vector2(0.5f, 0.5f)) * current.Size;
+            Vector2 nextWorldPos = current.Center + (nextUV - new Vector2(0.5f, 0.5f)) * current.Size;
+
+            VirtualSurface overlapTarget = null;
+            foreach (var candidate in _surfaces.All)
+            {
+                if (candidate.SurfaceId == current.SurfaceId) continue;
+                if (!candidate.IsVisible) continue;
+                if (candidate.Priority <= current.Priority) continue;
+
+                // Verify the candidate bounds contain the next position
+                if (candidate.Bounds.Contains(nextWorldPos))
+                {
+                    // Check if we entered through an allowed edge of the candidate
+                    Vector2 moveDir = nextWorldPos - currentWorldPos;
+                    EdgeDirection entryDir = EdgeDirection.Up;
+                    if (Mathf.Abs(moveDir.x) > Mathf.Abs(moveDir.y))
+                    {
+                        entryDir = moveDir.x > 0f ? EdgeDirection.Left : EdgeDirection.Right;
+                    }
+                    else
+                    {
+                        entryDir = moveDir.y > 0f ? EdgeDirection.Down : EdgeDirection.Up;
+                    }
+
+                    if (candidate.Allows(entryDir))
+                    {
+                        overlapTarget = candidate;
+                        break;
+                    }
+                }
+            }
+
+            if (overlapTarget != null)
+            {
+                float u = (nextWorldPos.x - overlapTarget.Center.x) / Mathf.Max(1e-4f, overlapTarget.Size.x) + 0.5f;
+                float v = (nextWorldPos.y - overlapTarget.Center.y) / Mathf.Max(1e-4f, overlapTarget.Size.y) + 0.5f;
+                SetCursor(overlapTarget.SurfaceId, new Vector2(Mathf.Clamp01(u), Mathf.Clamp01(v)));
+                return;
+            }
+
             // Detect overflow on each axis
             float yOverflow = nextUV.y < 0f ? -nextUV.y : (nextUV.y > 1f ? nextUV.y - 1f : 0f);
             float xOverflow = nextUV.x < 0f ? -nextUV.x : (nextUV.x > 1f ? nextUV.x - 1f : 0f);
