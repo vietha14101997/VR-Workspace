@@ -41,6 +41,7 @@ namespace VRWorkspace.Presentation.Input.Cursor
         // and avoids "doesn't move" bug from syncing VCS.Cursor.UV (which can pin it).
         private bool _cursorFrozenAtPopupHit;
         private Vector3 _frozenCursorWorldPos;
+        private Quaternion _frozenCursorRotation;
         private Vector2 _prevCursorUV;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -163,6 +164,7 @@ namespace VRWorkspace.Presentation.Input.Cursor
                 _cursorFrozenAtPopupHit = true;
                 _frozenCursorWorldPos = popupDispatcher.LastPopupWorldHit
                     + popupDispatcher.LastPopupTransform.forward * 0.015f;
+                _frozenCursorRotation = popupDispatcher.LastPopupTransform.rotation;
                 _prevCursorUV = cursor.UV;
                 return;
             }
@@ -185,9 +187,26 @@ namespace VRWorkspace.Presentation.Input.Cursor
                 else
                 {
                     // Keep cursor pinned to where user clicked the button.
-                    _cursor3D.transform.position = _frozenCursorWorldPos;
-                    _cursor3D.transform.rotation = Quaternion.identity;
-                    _cursor3D.transform.localScale = new Vector3(cursorWorldSize, cursorWorldSize, 1f);
+                    // Use saved rotation (popup's orientation) — Quaternion.identity would
+                    // face away from camera and flip the sprite horizontally.
+                    // Apply same worldOffset logic as popup/RTTMenuFrame for visual consistency.
+                    Vector2 frozenSpriteSize = GetCurrentSpriteSize();
+                    float frozenWorldW = cursorWorldSize * frozenSpriteSize.x;
+                    float frozenWorldH = cursorWorldSize * frozenSpriteSize.y;
+                    Vector3 frozenWorldOffset = _frozenCursorRotation * Vector3.right * (frozenWorldW * 0.5f)
+                                              - _frozenCursorRotation * Vector3.up * (frozenWorldH * 0.5f);
+                    _cursor3D.transform.position = _frozenCursorWorldPos + frozenWorldOffset;
+                    _cursor3D.transform.rotation = _frozenCursorRotation;
+
+                    // Compensate parent scale (cursor may still be child of RTTMenuFrame quad).
+                    Vector3 frozenParentScale = _cursor3D.transform.parent != null
+                        ? _cursor3D.transform.parent.lossyScale
+                        : Vector3.one;
+                    _cursor3D.transform.localScale = new Vector3(
+                        cursorWorldSize / Mathf.Max(1e-4f, frozenParentScale.x),
+                        cursorWorldSize / Mathf.Max(1e-4f, frozenParentScale.y),
+                        1f);
+
                     if (!_cursor3D.activeSelf) SetVisible(true);
                     _prevCursorUV = cursor.UV;
                     return;
@@ -251,23 +270,48 @@ namespace VRWorkspace.Presentation.Input.Cursor
         /// <summary>
         /// Position the cursor visual directly on the popup BoxCollider at the world hit point.
         /// IMPORTANT: cursor is NOT reparented to popup — that would deactivate cursor when
-        /// popup.gameObject.SetActive(false). Cursor stays at renderer container (active parent).
+        /// popup.gameObject.SetActive(false). Cursor stays at its current parent (might still
+        /// be RTTMenuFrame quad with non-uniform scale from previous frame).
+        ///
+        /// Compensates for parent scale so cursor visual world size is always cursorWorldSize,
+        /// regardless of parent's lossyScale.
         /// </summary>
         private void ApplyPopupCursor(Transform popupT, Vector3 worldHit)
         {
-            // Offset 0.015m in front of popup BoxCollider (depth = 0.1m). Keeps cursor visually
-            // on top of popup content without z-fighting.
-            CursorWorldPosition = worldHit + popupT.forward * 0.015f;
+            // Z-offset same as RTTMenuFrame branch. With high sortingOrder, cursor always
+            // renders on top of popup content regardless of Z.
+            CursorWorldPosition = worldHit + popupT.forward * localZOffset;
 
-            // Keep cursor at renderer's transform (active parent). Set world position directly.
-            // Note: do NOT reparent to popupT — that would disable cursor when popup closes.
-            _cursor3D.transform.position = CursorWorldPosition;
+            // Apply same worldOffset as RTTMenuFrame branch — positions sprite's top-left
+            // at hotspot for consistent cursor visual across all surfaces.
+            Vector2 spriteSize = GetCurrentSpriteSize();
+            float worldW = cursorWorldSize * spriteSize.x;
+            float worldH = cursorWorldSize * spriteSize.y;
+            Vector3 worldOffset = popupT.right * (worldW * 0.5f) - popupT.up * (worldH * 0.5f);
+
+            _cursor3D.transform.position = CursorWorldPosition + worldOffset;
             _cursor3D.transform.rotation = popupT.rotation;
 
-            // Cursor's parent (renderer container) has scale=1, so no compensation needed.
-            _cursor3D.transform.localScale = new Vector3(cursorWorldSize, cursorWorldSize, 1f);
+            // CRITICAL: compensate for parent scale (RTTMenuFrame quad has scale (1.6, 0.9, 1)).
+            // Without this, cursor's world scale would be localScale * parentScale = much larger
+            // than intended. By dividing, world scale = cursorWorldSize consistently.
+            Vector3 parentScale = _cursor3D.transform.parent != null
+                ? _cursor3D.transform.parent.lossyScale
+                : Vector3.one;
+            _cursor3D.transform.localScale = new Vector3(
+                cursorWorldSize / Mathf.Max(1e-4f, parentScale.x),
+                cursorWorldSize / Mathf.Max(1e-4f, parentScale.y),
+                1f);
 
             if (!_cursor3D.activeSelf) SetVisible(true);
+        }
+
+        private Vector2 GetCurrentSpriteSize()
+        {
+            if (_currentSprite == null) return Vector2.one;
+            return new Vector2(
+                _currentSprite.rect.width / _currentSprite.pixelsPerUnit,
+                _currentSprite.rect.height / _currentSprite.pixelsPerUnit);
         }
 
         private Transform GetReferenceTransform()
