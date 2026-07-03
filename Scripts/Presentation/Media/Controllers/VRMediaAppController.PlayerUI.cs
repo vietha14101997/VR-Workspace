@@ -24,6 +24,7 @@ using VRWorkspace.UI.RTT.Components;
 using VRWorkspace.Presentation.Media.Controllers;
 using VRWorkspace.Domain.Input;
 using VRWorkspace.Presentation.Input.Mode;
+using VRWorkspace.Presentation.Input.Cursor;
 
 namespace VRWorkspace.Media.Core
 {
@@ -197,6 +198,15 @@ namespace VRWorkspace.Media.Core
                         // Snap cursor to center of mediaPlayer bounds so click target is predictable
                         vcs.SetCursorUV(new Vector2(0.5f, 0.5f));
                     }
+
+                    // Explicitly hide the cursor visual now, via a hard override that can't
+                    // be undone by the normal surface-based show logic later in the same
+                    // frame. Don't rely solely on VirtualSurface.IsVisible propagating through
+                    // WorldSpaceCursorRenderer: MediaPlayerSurfaceController re-registers a
+                    // brand-new VirtualSurface whenever the union bounds change (e.g.
+                    // side/settings frames toggling active on Hide()), and that race can leave
+                    // the surface briefly/incorrectly visible depending on frame timing.
+                    WorldSpaceCursorRenderer.Instance?.SetForceHidden(true);
                 }
                 else
                 {
@@ -214,6 +224,12 @@ namespace VRWorkspace.Media.Core
                     {
                         Debug.Log($"[VAC_DBG-G] SHOW path: no saved UV to restore (initial show or already restored)");
                     }
+
+                    // Release the hard override so normal per-frame positioning/visibility
+                    // (driven by VirtualSurface.IsVisible) resumes. Positioning happens the
+                    // same frame in WorldSpaceCursorRenderer.LateUpdate, so there's no visible
+                    // jump to the wrong spot.
+                    WorldSpaceCursorRenderer.Instance?.SetForceHidden(false);
                 }
 
                 // Notify VCS surface — controls hidden → cursor goes out of bounds

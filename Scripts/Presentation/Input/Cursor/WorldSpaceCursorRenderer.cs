@@ -44,6 +44,13 @@ namespace VRWorkspace.Presentation.Input.Cursor
         private Quaternion _frozenCursorRotation;
         private Vector2 _prevCursorUV;
 
+        // Explicit hard-override, independent of VirtualSurface.IsVisible. Callers that need
+        // a guaranteed hide (e.g. mediaPlayer controls dismissing) should use SetForceHidden(true)
+        // rather than SetVisible(false) directly — SetVisible alone can get silently re-enabled
+        // later in the same LateUpdate by the normal surface-based show logic below if the
+        // surface's IsVisible flag hasn't (yet) caught up. Checked first, before anything else.
+        private bool _forceHidden;
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStaticState()
         {
@@ -106,6 +113,20 @@ namespace VRWorkspace.Presentation.Input.Cursor
         public void Hide() => SetVisible(false);
 
         /// <summary>
+        /// Hard-override that guarantees the cursor stays hidden regardless of the normal
+        /// surface-based visibility logic in LateUpdate. Use this (not SetVisible) whenever
+        /// a caller needs the hide to be reliable — e.g. mediaPlayer controls dismissing —
+        /// since the underlying VirtualSurface.IsVisible flag can lag by a frame or get
+        /// re-registered mid-transition. Call SetForceHidden(false) to release the override
+        /// and let normal per-frame positioning/visibility resume.
+        /// </summary>
+        public void SetForceHidden(bool hidden)
+        {
+            _forceHidden = hidden;
+            if (hidden) SetVisible(false);
+        }
+
+        /// <summary>
         /// World position of the cursor on its current surface quad. Updated every LateUpdate.
         /// Click dispatcher reads this to synthesize a Ray through Camera.main → this point,
         /// matching the gaze-reticle flow. Visual position == click ray direction → no UV-mapping drift.
@@ -120,6 +141,12 @@ namespace VRWorkspace.Presentation.Input.Cursor
         {
             var vcs = VirtualCursorSpace.Instance;
             if (vcs == null || _cursor3D == null) return;
+
+            if (_forceHidden)
+            {
+                SetVisible(false);
+                return;
+            }
 
             var cursor = vcs.Cursor;
             if (!cursor.IsVisible || cursor.SurfaceId == null || vcs.Surfaces.Count == 0)

@@ -21,6 +21,14 @@ namespace VRWorkspace.Presentation.Input.VCS
         private Guid _surfaceId;
         private bool _registered;
 
+        // Desired visibility, set via NotifyVisible(). Must survive re-registration:
+        // RegisterOrUpdateSurface() creates a *new* VirtualSurface whenever bounds change
+        // (e.g. side/settings frame toggled active on Show/Hide), and VirtualSurface's
+        // constructor always defaults IsVisible=true. Without caching it here, that
+        // reconstruction silently wipes out a Hide()-driven IsVisible=false on the very
+        // next frame, so the world-space cursor never actually disappears.
+        private bool _isVisible = true;
+
         // ── Inner frames (whitelist, NOT Overlay/MenuButton) ────────────
         private Transform _controlsFrame;
         private Transform _sideFrame;
@@ -59,6 +67,7 @@ namespace VRWorkspace.Presentation.Input.VCS
         /// <summary>Called by RTTMediaControlsPanel on Show/Hide.</summary>
         public void NotifyVisible(bool visible)
         {
+            _isVisible = visible;
             var vcs = VirtualCursorSpace.Instance;
             if (vcs == null) return;
             vcs.NotifySurfaceVisibilityChanged(_surfaceId, visible);
@@ -127,6 +136,17 @@ namespace VRWorkspace.Presentation.Input.VCS
 
             vcs.RegisterSurface(surface);
             _registered = true;
+
+            // VirtualSurface's constructor always defaults IsVisible=true. Re-apply our
+            // cached desired visibility so a Hide() that happened moments earlier (and
+            // triggered this very re-registration by toggling side/settings frames
+            // active) isn't silently undone — otherwise the world-space cursor never
+            // actually hides. IsVisible's setter is internal to VRWorkspace.Input, so we
+            // go through the same public API RTTMediaControlsPanel.Hide()/Show() use.
+            if (!_isVisible)
+            {
+                vcs.NotifySurfaceVisibilityChanged(_surfaceId, false);
+            }
         }
 
         private Bounds? ComputeWorldBounds()
