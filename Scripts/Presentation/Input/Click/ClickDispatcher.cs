@@ -31,7 +31,7 @@ namespace VRWorkspace.Presentation.Input.Click
     ///   2. Click anywhere else → forward via world raycast.
     /// </summary>
     [DefaultExecutionOrder(-5000)]
-    public sealed class ClickDispatcher : MonoBehaviour
+    public sealed partial class ClickDispatcher : MonoBehaviour
     {
         public static ClickDispatcher Instance { get; private set; }
 
@@ -122,6 +122,26 @@ namespace VRWorkspace.Presentation.Input.Click
 
             var canvas = surface.RuntimeRef as RTTCanvasBase;
             var actionBar = surface.RuntimeRef as ActionBarSurfaceController;
+
+            // ── Popup-first branch: when any WorldSpace popup is open, raycast against
+            //    the popup's BoxCollider FIRST (popup is closer to camera than RTTMenuFrame).
+            //    See ClickDispatcher.Popup.cs for helper implementations.
+            if (GetActiveWorldSpacePopup() != null)
+            {
+                var popupResult = TryPopupRaycast(cam);
+                if (popupResult.raycastHit && popupResult.isPartOfActivePopup)
+                {
+                    hitObj = popupResult.uiElement;
+                }
+                // If raycast missed popup or hit something outside popup, hitObj stays null
+                // → no UI element hovered. Existing hover dispatch below handles ClearHover.
+            }
+            else
+            {
+                // No popup open — make sure popup hit cache is cleared so WorldSpaceCursorRenderer
+                // doesn't keep applying the (now-stale) popup hit position every frame.
+                ClearPopupHitCache();
+            }
 
             if (canvas != null)
             {
@@ -243,6 +263,28 @@ namespace VRWorkspace.Presentation.Input.Click
             Camera cam = Camera.main;
             if (renderer == null || cam == null)
             {
+                return;
+            }
+
+            // ── Popup-first branch: when any WorldSpace popup is open, raycast against
+            //    the popup FIRST (popup is 2-5cm closer to camera than RTTMenuFrame).
+            //    If click hits popup UI → dispatch click. If click misses popup (or hits popup
+            //    BoxCollider but no interactive UI element under the cursor, e.g., popup
+            //    background) → hide popup and suppress the click. This defensive close matches
+            //    VRGazeReticle line 720-734 behaviour.
+            if (GetActiveWorldSpacePopup() != null)
+            {
+                var popupResult = TryPopupRaycast(cam);
+                if (popupResult.raycastHit && popupResult.isPartOfActivePopup && popupResult.uiElement != null)
+                {
+                    DispatchClickToPopup(popupResult, cam);
+                }
+                else
+                {
+                    // Click ray missed active popup (or hit popup background without interactive UI).
+                    // Close it (matches VRGazeReticle).
+                    CloseActivePopup();
+                }
                 return;
             }
 

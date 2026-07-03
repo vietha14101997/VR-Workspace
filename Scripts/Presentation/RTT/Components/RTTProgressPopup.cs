@@ -90,6 +90,23 @@ namespace VRWorkspace.UI.RTT.Components
 
         public bool IsVisible => gameObject.activeSelf;
         public static RTTProgressPopup CurrentlyOpenPopup { get; private set; }
+
+        /// <summary>
+        /// Check if a GameObject is part of this popup panel (used by VCS click dispatch).
+        /// </summary>
+        public bool IsPartOfPopupPanel(GameObject obj)
+        {
+            if (obj == null) return false;
+            if (_popupObject == null) return false;
+            Transform current = obj.transform;
+            while (current != null)
+            {
+                if (current.gameObject == _popupObject || current.gameObject == gameObject)
+                    return true;
+                current = current.parent;
+            }
+            return false;
+        }
         public event Action OnHide;
 
         #endregion

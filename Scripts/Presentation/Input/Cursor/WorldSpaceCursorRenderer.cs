@@ -3,6 +3,7 @@ using VRWorkspace.Domain.Input;
 using VRWorkspace.UI.RTT;
 using VRWorkspace.UI.RTT.Components;
 using VRWorkspace.Presentation.Input.VCS;
+using VRWorkspace.Presentation.Input.Click;
 
 namespace VRWorkspace.Presentation.Input.Cursor
 {
@@ -34,6 +35,13 @@ namespace VRWorkspace.Presentation.Input.Cursor
         private SpriteRenderer _cursorRenderer;
         private Transform _currentParent;
         private Sprite _currentSprite;
+
+        // Track cursor's frozen state (cursor stuck at popup hit position until mouse moves).
+        // This avoids "jump" when popup closes (cursor stays visually at clicked position)
+        // and avoids "doesn't move" bug from syncing VCS.Cursor.UV (which can pin it).
+        private bool _cursorFrozenAtPopupHit;
+        private Vector3 _frozenCursorWorldPos;
+        private Vector2 _prevCursorUV;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStaticState()
@@ -77,7 +85,9 @@ namespace VRWorkspace.Presentation.Input.Cursor
                   ?? Resources.GetBuiltinResource<Sprite>("UI/Skin/Knob.psd");
             _cursorRenderer.sprite = _currentSprite;
             _cursorRenderer.color = tint;
-            _cursorRenderer.sortingOrder = 100; // render on top of quad material
+            // Use max sortingOrder so cursor always renders on top of WorldSpace popups
+            // (popups use sortingOrder=100 — cursor must beat them consistently).
+            _cursorRenderer.sortingOrder = short.MaxValue;
             _cursor3D.transform.localScale = new Vector3(cursorWorldSize, cursorWorldSize, 1f);
         }
 
@@ -142,6 +152,49 @@ namespace VRWorkspace.Presentation.Input.Cursor
 
             if (targetT == null) { SetVisible(false); return; }
 
+            // ── Popup override: when cursor ray hits an active WorldSpace popup,
+            //    place cursor visual at popup hit point (NOT reparented to popup — that
+            //    would deactivate cursor when popup closes).
+            //    See ClickDispatcher.Popup.cs for hit detection.
+            var popupDispatcher = ClickDispatcher.Instance;
+            if (popupDispatcher != null && popupDispatcher.HasPopupHit && popupDispatcher.LastPopupTransform != null)
+            {
+                ApplyPopupCursor(popupDispatcher.LastPopupTransform, popupDispatcher.LastPopupWorldHit);
+                _cursorFrozenAtPopupHit = true;
+                _frozenCursorWorldPos = popupDispatcher.LastPopupWorldHit
+                    + popupDispatcher.LastPopupTransform.forward * 0.015f;
+                _prevCursorUV = cursor.UV;
+                return;
+            }
+
+            // ── Frozen cursor handling: when popup was just closed, keep cursor visually
+            //    at clicked position until mouse moves. Avoids both:
+            //    1) "Cursor jump" bug (cursor teleports to old VCS.UV on RTTMenuFrame).
+            //    2) "Cursor doesn't move" bug (syncing VCS.UV pinned cursor).
+            if (_cursorFrozenAtPopupHit)
+            {
+                // Unfreeze as soon as mouse moves VCS.Cursor.UV (delta applied by
+                // MouseDeltaDriver earlier this frame).
+                bool mouseMoved = !Mathf.Approximately(cursor.UV.x, _prevCursorUV.x)
+                                || !Mathf.Approximately(cursor.UV.y, _prevCursorUV.y);
+                if (mouseMoved)
+                {
+                    _cursorFrozenAtPopupHit = false;
+                    // Fall through to normal RTTMenuFrame positioning below.
+                }
+                else
+                {
+                    // Keep cursor pinned to where user clicked the button.
+                    _cursor3D.transform.position = _frozenCursorWorldPos;
+                    _cursor3D.transform.rotation = Quaternion.identity;
+                    _cursor3D.transform.localScale = new Vector3(cursorWorldSize, cursorWorldSize, 1f);
+                    if (!_cursor3D.activeSelf) SetVisible(true);
+                    _prevCursorUV = cursor.UV;
+                    return;
+                }
+            }
+            _prevCursorUV = cursor.UV;
+
             // 1) Find the physical size of the active surface
             Vector2 physicalSize = Vector2.one;
             if (canvas != null)
@@ -191,6 +244,28 @@ namespace VRWorkspace.Presentation.Input.Cursor
                 cursorWorldSize / Mathf.Max(1e-4f, parentScale.x),
                 cursorWorldSize / Mathf.Max(1e-4f, parentScale.y),
                 1f);
+
+            if (!_cursor3D.activeSelf) SetVisible(true);
+        }
+
+        /// <summary>
+        /// Position the cursor visual directly on the popup BoxCollider at the world hit point.
+        /// IMPORTANT: cursor is NOT reparented to popup — that would deactivate cursor when
+        /// popup.gameObject.SetActive(false). Cursor stays at renderer container (active parent).
+        /// </summary>
+        private void ApplyPopupCursor(Transform popupT, Vector3 worldHit)
+        {
+            // Offset 0.015m in front of popup BoxCollider (depth = 0.1m). Keeps cursor visually
+            // on top of popup content without z-fighting.
+            CursorWorldPosition = worldHit + popupT.forward * 0.015f;
+
+            // Keep cursor at renderer's transform (active parent). Set world position directly.
+            // Note: do NOT reparent to popupT — that would disable cursor when popup closes.
+            _cursor3D.transform.position = CursorWorldPosition;
+            _cursor3D.transform.rotation = popupT.rotation;
+
+            // Cursor's parent (renderer container) has scale=1, so no compensation needed.
+            _cursor3D.transform.localScale = new Vector3(cursorWorldSize, cursorWorldSize, 1f);
 
             if (!_cursor3D.activeSelf) SetVisible(true);
         }
