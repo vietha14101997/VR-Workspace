@@ -1162,12 +1162,14 @@ namespace VRWorkspace.Media.UI
         /// </summary>
         public void Show()
         {
+            Debug.Log($"[RTTCP_DBG-F] Show() called, gameObject.activeSelf={gameObject.activeSelf}, gameObject.activeInHierarchy={gameObject.activeInHierarchy}");
             if (_fadeCoroutine != null)
             {
                 StopCoroutine(_fadeCoroutine);
             }
             _fadeCoroutine = StartCoroutine(FadeIn());
             IsVisible = true;
+            Debug.Log($"[RTTCP_DBG-F] Show() set IsVisible=true");
 
             // Re-enable parent frame's display quad collider (was disabled on hide)
             SetParentFrameColliderEnabled(true);
@@ -1205,8 +1207,9 @@ namespace VRWorkspace.Media.UI
             _fadeCoroutine = StartCoroutine(FadeOut());
             IsVisible = false;
 
-            // Hide overlay, show menu button (only menu button remains near video screen)
-            if (_overlayFrameObject != null) _overlayFrameObject.SetActive(false);
+            // KEEP overlay ACTIVE so DismissButton.onClick can fire as wake-up trigger
+            // when user clicks in empty area while controls are hidden. The menu button
+            // is hidden in Mouse/Gamepad mode by VRMediaAppController.ApplyMenuButtonVisibilityByMode.
             if (_menuButtonFrameObject != null) _menuButtonFrameObject.SetActive(true);
             if (_sideControlsFrameObject != null) _sideControlsFrameObject.SetActive(false);
             if (_queuePagination != null) _queuePagination.HideImmediate();

@@ -134,6 +134,13 @@ namespace VRWorkspace.Presentation.Input.Cursor
                 return;
             }
 
+            // Hide cursor when its current surface is invisible (e.g., mediaPlayer controls hidden)
+            if (!surface.IsVisible)
+            {
+                SetVisible(false);
+                return;
+            }
+
             Transform refT = GetReferenceTransform();
             if (refT == null) { SetVisible(false); return; }
 

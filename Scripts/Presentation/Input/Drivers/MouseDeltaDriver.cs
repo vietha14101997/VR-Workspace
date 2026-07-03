@@ -59,7 +59,9 @@ namespace VRWorkspace.Presentation.Input.Drivers
             //    when the cursor appeared on screen but no button responded.
             if (mouse.leftButton != null && mouse.leftButton.wasPressedThisFrame)
             {
+                Debug.Log($"[MED_DBG-A] Mouse click fired, vcs.Cursor.SurfaceId={vcs.Cursor.SurfaceId}, IsVisible={vcs.Cursor.IsVisible}, UV={vcs.Cursor.UV}");
                 vcs.RaiseClick();
+                Debug.Log($"[MED_DBG-A2] RaiseClick returned");
             }
 
             // 2) Then apply the per-frame delta (cursor movement).

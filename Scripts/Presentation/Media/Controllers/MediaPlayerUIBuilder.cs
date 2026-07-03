@@ -10,6 +10,7 @@ using VRWorkspace.Media.Data;
 using VRWorkspace.Media.UI;
 using VRWorkspace.Media.Utils;
 using VRWorkspace.UI.RTT.Components;
+using VRWorkspace.Presentation.Input.VCS;
 
 namespace VRWorkspace.Presentation.Media.Controllers
 {
@@ -406,6 +407,29 @@ namespace VRWorkspace.Presentation.Media.Controllers
                 btnCol.center = new Vector3(0, 0, -5);
             }
             result.MenuButtonFrameObject.SetActive(false);
+
+            // ====================================================== //
+            // 4b. VCS surface for cursor bounds (Phase 1)            //
+            // ====================================================== //
+            result.SurfaceController = MediaPlayerSurfaceController.Attach(
+                result.PlayerControlsGroup,
+                result.ControlsFrameObject,
+                result.SideControlsFrameObject,
+                result.SettingsFrameObject);
+            result.SurfaceController = MediaPlayerSurfaceController.Attach(
+                result.PlayerControlsGroup,
+                result.ControlsFrameObject,
+                result.SideControlsFrameObject,
+                result.SettingsFrameObject);
+
+            // ====================================================== //
+            // 4c. Auto-hide timer (Phase 4) — countdown when cursor  //
+            //     is stationary in empty area between controls/side  //
+            // ====================================================== //
+            result.AutoHideTimer = VRWorkspace.Presentation.Input.Cursor.MediaPlayerAutoHideTimer.Attach(
+                result.PlayerControlsGroup,
+                result.SurfaceController,
+                result.ControlsPanel);
 
             // ====================================================== //
             // 5. Error Dialog                                         //
@@ -858,6 +882,12 @@ namespace VRWorkspace.Presentation.Media.Controllers
         public Button BlockerButton;
         public GameObject UISettingsPopupFrame;
         public RTTMediaUISettingsPopup UISettingsPopup;
+
+        // VCS surface for cursor bounds (Phase 1)
+        public MediaPlayerSurfaceController SurfaceController;
+
+        // Auto-hide timer (Phase 4)
+        public VRWorkspace.Presentation.Input.Cursor.MediaPlayerAutoHideTimer AutoHideTimer;
 
         // Layout metrics needed by VRMediaAppController for positioning
         public float SideControlsBaseX;

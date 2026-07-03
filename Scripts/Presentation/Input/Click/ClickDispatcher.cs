@@ -248,14 +248,17 @@ namespace VRWorkspace.Presentation.Input.Click
 
         private void OnClickDispatched(CursorState cursor)
         {
+            Debug.Log($"[CD_DBG-B0] OnClickDispatched ENTRY, cursor.SurfaceId={cursor.SurfaceId.HasValue}, value={cursor.SurfaceId}, IsVisible={cursor.IsVisible}");
             if (!cursor.SurfaceId.HasValue)
             {
+                Debug.Log($"[CD_DBG-B1] EARLY RETURN: cursor.SurfaceId is null");
                 return;
             }
 
             var vcs = VirtualCursorSpace.Instance;
             if (vcs == null || !vcs.Surfaces.TryGet(cursor.SurfaceId.Value, out var surface))
             {
+                Debug.Log($"[CD_DBG-B2] EARLY RETURN: vcs={vcs != null}, surface found={vcs != null && vcs.Surfaces.TryGet(cursor.SurfaceId.Value, out _)}");
                 return;
             }
 
@@ -263,7 +266,24 @@ namespace VRWorkspace.Presentation.Input.Click
             Camera cam = Camera.main;
             if (renderer == null || cam == null)
             {
+                Debug.Log($"[CD_DBG-B] OnClickDispatched EARLY RETURN: renderer={renderer != null}, cam={cam != null}");
                 return;
+            }
+            Debug.Log($"[CD_DBG-B] OnClickDispatched entry, cursor.SurfaceId={cursor.SurfaceId}, surface found");
+
+            // ── MediaPlayer branch: when cursor is on mediaPlayer surface, dispatch click as
+            //    mediaPlayer UI (empty-area hide / wake-from-hidden). See
+            //    ClickDispatcher.MediaPlayer.cs for full implementation.
+            Vector3 _mpWorldPos = renderer.CursorWorldPosition;
+            Vector3 _mpDir = (_mpWorldPos - cam.transform.position);
+            float _mpDist = _mpDir.magnitude;
+            if (_mpDist > 0.01f)
+            {
+                Ray _mpRay = new Ray(cam.transform.position, _mpDir / _mpDist);
+                if (TryDispatchMediaPlayerClick(cam, _mpRay))
+                {
+                    return;
+                }
             }
 
             // ── Popup-first branch: when any WorldSpace popup is open, raycast against

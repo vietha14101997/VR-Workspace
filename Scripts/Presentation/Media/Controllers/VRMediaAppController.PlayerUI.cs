@@ -22,6 +22,8 @@ using VRWorkspace.Media.UI;
 using VRWorkspace.Media.Utils;
 using VRWorkspace.UI.RTT.Components;
 using VRWorkspace.Presentation.Media.Controllers;
+using VRWorkspace.Domain.Input;
+using VRWorkspace.Presentation.Input.Mode;
 
 namespace VRWorkspace.Media.Core
 {
@@ -124,6 +126,7 @@ namespace VRWorkspace.Media.Core
             _settingsPanel = r.SettingsPanel;
             _menuButtonFrameObject = r.MenuButtonFrameObject;
             _menuButtonQuadOriginalScale = r.MenuButtonQuadOriginalScale;
+            _surfaceController = r.SurfaceController;
             _errorDialog = r.ErrorDialog;
             _sideControlsBaseX = r.SideControlsBaseX;
             _sideControlsBaseY = r.SideControlsBaseY;
@@ -135,12 +138,25 @@ namespace VRWorkspace.Media.Core
             _uiSettingsPopupFrame = r.UISettingsPopupFrame;
             _uiSettingsBlocker = r.UISettingsBlocker;
 
-            // Wire dismiss overlay button
+            // Wire dismiss overlay button — smart dismiss/wake-up
+            // (overlay stays active so this button works both as Hide trigger and wake-up trigger)
             if (r.DismissButton != null)
             {
                 r.DismissButton.onClick.AddListener(() =>
                 {
-                    _controlsPanel?.Hide();
+                    Debug.Log("[VAC_DBG-J] DismissButton clicked, controlsPanel.IsVisible=" +
+                        (_controlsPanel != null ? _controlsPanel.IsVisible.ToString() : "null"));
+                    if (_controlsPanel != null)
+                    {
+                        if (_controlsPanel.IsVisible)
+                        {
+                            _controlsPanel.Hide();
+                        }
+                        else
+                        {
+                            _controlsPanel.Show(); // wake-up from hidden
+                        }
+                    }
                     _playerController?.HideProjectionPopup();
                     _playerController?.HideEnvironmentPopup();
                 });
@@ -164,8 +180,60 @@ namespace VRWorkspace.Media.Core
             // Hide UI settings popup when controls panel hides
             _controlsPanel.OnVisibilityChanged += (visible) =>
             {
-                if (!visible) HideUISettingsPopup();
+                Debug.Log($"[VAC_DBG-G] OnVisibilityChanged fired, visible={visible}, _cursorUVOnHide={_cursorUVOnHide}");
+                var vcs = VirtualCursorSpace.Instance;
+
+                if (!visible)
+                {
+                    HideUISettingsPopup();
+                    // Lock cursor movement so mouse delta doesn't drift it during hidden state
+                    if (vcs != null) vcs.CursorMovementLocked = true;
+
+                    // Save cursor UV position for restore on wake-up
+                    if (vcs != null && vcs.Cursor.SurfaceId.HasValue)
+                    {
+                        _cursorUVOnHide = vcs.Cursor.UV;
+                        Debug.Log($"[VAC_DBG-G] HID path: saved cursor UV={_cursorUVOnHide}, locked movement");
+                        // Snap cursor to center of mediaPlayer bounds so click target is predictable
+                        vcs.SetCursorUV(new Vector2(0.5f, 0.5f));
+                    }
+                }
+                else
+                {
+                    // Unlock cursor movement so user can interact again
+                    if (vcs != null) vcs.CursorMovementLocked = false;
+
+                    // Restore cursor position on wake-up (was saved on Hide)
+                    if (_cursorUVOnHide.x >= 0f && vcs != null)
+                    {
+                        Debug.Log($"[VAC_DBG-G] SHOW path: restoring cursor UV to {_cursorUVOnHide}, unlocked movement");
+                        vcs.SetCursorUV(_cursorUVOnHide);
+                        _cursorUVOnHide = new Vector2(-1f, -1f);
+                    }
+                    else
+                    {
+                        Debug.Log($"[VAC_DBG-G] SHOW path: no saved UV to restore (initial show or already restored)");
+                    }
+                }
+
+                // Notify VCS surface — controls hidden → cursor goes out of bounds
+                _surfaceController?.NotifyVisible(visible);
+
+                // Override menu button visibility (Bug 1 fix):
+                // RTTMediaControlsPanel.Hide() always shows menu button, but in Mouse/Gamepad
+                // mode we want menu button hidden (cursor handles show/hide via bounds).
+                ApplyMenuButtonVisibilityByMode(CurrentModeFromState());
             };
+
+            // Phase 5: Menu button is hidden in Mouse/Gamepad mode (cursor handles show/hide).
+            // Only visible in Gaze mode (reticle user needs the toggle button).
+            ApplyMenuButtonVisibilityByMode(InputModeController.Instance != null
+                ? CurrentModeFromState()
+                : InputMode.Gaze);
+            if (InputModeController.Instance != null)
+            {
+                InputModeController.Instance.OnInputModeChanged += ApplyMenuButtonVisibilityByMode;
+            }
 
             // Wire menu show button
             if (r.MenuShowButton != null)
@@ -262,6 +330,10 @@ namespace VRWorkspace.Media.Core
             _controlsContainer?.SetActive(false);
         }
 
+        // Phase 2+3: cursor UV saved when controls hide, restored when controls show.
+        // Sentinel value (-1,-1) means "no saved UV".
+        private Vector2 _cursorUVOnHide = new Vector2(-1f, -1f);
+
         #endregion
 
         #region Event Handlers
@@ -357,6 +429,28 @@ namespace VRWorkspace.Media.Core
             if (_playerControlsGroup == null) return;
             _playerControlsGroup.transform.localPosition =
                 _playerControlsBaseLocalPos + new Vector3(0, _uiHeightOffset, -_uiDepthOffset);
+        }
+
+        // Phase 5: Menu button visibility follows input mode.
+        // Gaze mode: menu button visible (reticle user toggles controls).
+        // Mouse/Gamepad mode: menu button hidden (cursor handles show/hide via bounds).
+        private void ApplyMenuButtonVisibilityByMode(InputMode mode)
+        {
+            if (_menuButtonFrameObject == null) return;
+            // Only show menu button when controls are HIDDEN (it exists to bring controls back).
+            bool showMenuButton = (mode == InputMode.Gaze) && !_controlsPanel.IsVisible;
+            _menuButtonFrameObject.SetActive(showMenuButton);
+        }
+
+        private InputMode CurrentModeFromState()
+        {
+            var field = typeof(InputModeController).GetField("_currentMode",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (field != null && InputModeController.Instance != null)
+            {
+                return (InputMode)field.GetValue(InputModeController.Instance);
+            }
+            return InputMode.Gaze;
         }
 
         private void ScaleMenuButtonQuad(float scaleFactor)

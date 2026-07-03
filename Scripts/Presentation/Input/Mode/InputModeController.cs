@@ -24,6 +24,9 @@ namespace VRWorkspace.Presentation.Input.Mode
     {
         public static InputModeController Instance { get; private set; }
 
+        /// <summary>Fired whenever the input mode switches (Gaze ↔ Mouse ↔ Gamepad).</summary>
+        public event System.Action<InputMode> OnInputModeChanged;
+
         [SerializeField] private float mouseIdleToGazeSeconds = 5f;
 
         private InputMode _currentMode = InputMode.Gaze;
@@ -104,6 +107,8 @@ namespace VRWorkspace.Presentation.Input.Mode
 
         private void ApplyMode(InputMode mode)
         {
+            // Fire event before applying so subscribers can react to the new mode.
+            OnInputModeChanged?.Invoke(mode);
             // Note: VRGazeReticle.useRTTRaycast and dwellClickEnabled are public fields
             // (file Presentation/Input/VRGazeReticle.cs:25/38). Toggling them disables
             // the gaze path entirely while non-Gaze modes are active.

@@ -41,6 +41,13 @@ namespace VRWorkspace.Domain.Input
         // ----- Cursor state -----
         public CursorState Cursor { get; private set; } = CursorState.Inactive(InputMode.Gaze);
 
+        /// <summary>
+        /// When true, MoveCursor is a no-op (mouse delta ignored). Used by mediaPlayer to
+        /// freeze cursor when controls auto-hide, so the user's mouse motion doesn't drift
+        /// the cursor away from its frozen position.
+        /// </summary>
+        public bool CursorMovementLocked { get; set; } = false;
+
         // ----- Events -----
         public event Action<VirtualSurface> OnSurfaceRegistered;
         public event Action<Guid>            OnSurfaceUnregistered;
@@ -118,6 +125,7 @@ namespace VRWorkspace.Domain.Input
         /// </summary>
         public void MoveCursor(Vector2 deltaUV)
         {
+            if (CursorMovementLocked) return;
             if (!Cursor.SurfaceId.HasValue) return;
             if (!_surfaces.TryGet(Cursor.SurfaceId.Value, out var current)) return;
 
