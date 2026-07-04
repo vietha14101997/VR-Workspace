@@ -11,6 +11,7 @@ using VRWorkspace.UI.RTT;
 using VRWorkspace.UI.RTT.Services;
 using VRWorkspace.Utilities;
 using VRWorkspace.Presentation.Input.VCS;
+using VRWorkspace.Domain.Input;
 
 namespace VRWorkspace.UI.RTT.Components
 {
@@ -427,6 +428,22 @@ namespace VRWorkspace.UI.RTT.Components
 
                         // Fade in the frame quads
                         FadeInAllFrames();
+
+                        // Explicitly re-home the cursor onto File Manager's own surface.
+                        // The DirectVideoPlayer's HidePlayerUI() tries to do this too, but it
+                        // discovers its return surface via GetComponentInParent<RTTMenuFrame>()
+                        // starting from its own hierarchy — and DirectVideoPlayer is parented
+                        // under RTTManager.transform (a sibling of _menuFrame, not a child of
+                        // it), so that lookup finds nothing there. File Manager knows exactly
+                        // which surface it's returning to, so do it here instead.
+                        if (_menuFrame != null)
+                        {
+                            var menuSurfaceId = RTTCanvasAutoRegistrar.Instance?.TryGetSurfaceId(_menuFrame);
+                            if (menuSurfaceId.HasValue)
+                            {
+                                VirtualCursorSpace.Instance?.SnapCursorTo(menuSurfaceId.Value);
+                            }
+                        }
                     }
                 );
 

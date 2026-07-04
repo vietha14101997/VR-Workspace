@@ -81,6 +81,23 @@ namespace VRWorkspace.Presentation.Input.VCS
 
         private void OnDestroy()
         {
+            Unregister();
+        }
+
+        /// <summary>
+        /// Explicitly unregister this surface from the VCS. Callers that merely
+        /// SetActive(false) the PlayerControlsGroup (rather than destroying it — e.g.
+        /// HidePlayerUI() on exiting back to Library/FileManager) MUST call this first.
+        /// Deactivating alone stops this component's LateUpdate (so the stale surface is
+        /// never refreshed or auto-unregistered) and — since the world-space cursor is
+        /// parented directly under this hierarchy's display quad — also drags the cursor
+        /// GameObject down to activeInHierarchy=false with it, with nothing left to hand
+        /// the cursor off to a new surface. Unregistering triggers VCS's existing
+        /// fallback-to-highest-priority-visible-surface logic, which re-homes (and
+        /// re-parents) the cursor onto whatever surface the user is switching to.
+        /// </summary>
+        public void Unregister()
+        {
             var vcs = VirtualCursorSpace.Instance;
             if (vcs != null && _registered)
             {

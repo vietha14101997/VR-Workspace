@@ -25,6 +25,7 @@ using VRWorkspace.Presentation.Media.Controllers;
 using VRWorkspace.Domain.Input;
 using VRWorkspace.Presentation.Input.Mode;
 using VRWorkspace.Presentation.Input.Cursor;
+using VRWorkspace.Presentation.Input.VCS;
 
 namespace VRWorkspace.Media.Core
 {
@@ -341,6 +342,37 @@ namespace VRWorkspace.Media.Core
             _uiSettingsPopupFrame?.SetActive(false);
             _uiSettingsBlocker?.SetActive(false);
             _controlsFollowCamera = false;
+
+            // Must run BEFORE deactivating _controlsContainer below. SetActive(false) alone
+            // stops MediaPlayerSurfaceController's LateUpdate (so it never unregisters
+            // itself) and drags the world-space cursor — parented under this hierarchy's
+            // display quad — down to activeInHierarchy=false with nothing to hand it off
+            // to. Explicitly unregistering lets VCS fall back to the next highest-priority
+            // visible surface (Library/FileManager, already shown by this point) and
+            // re-home the cursor there. Also release any leftover force-hidden override
+            // in case we're exiting while controls happened to be hidden.
+            _surfaceController?.Unregister();
+            WorldSpaceCursorRenderer.Instance?.SetForceHidden(false);
+
+            // Belt-and-suspenders: don't rely solely on VCS's automatic
+            // highest-priority-visible fallback triggered by Unregister() above — its
+            // correctness depends on the Library/FileManager RTTMenuFrame surface having
+            // already flipped to IsVisible=true by this exact point (via ShowLibraryUI()
+            // above firing RTTCanvasBase.OnEnable synchronously), which is timing-sensitive
+            // and easy to silently break with future changes. Explicitly snap the cursor
+            // onto the menu frame surface so it deterministically ends up somewhere valid.
+            if (_parentMenuFrame != null)
+            {
+                var menuSurfaceId = RTTCanvasAutoRegistrar.Instance?.TryGetSurfaceId(_parentMenuFrame);
+                if (menuSurfaceId.HasValue)
+                {
+                    VirtualCursorSpace.Instance?.SnapCursorTo(menuSurfaceId.Value);
+                }
+                else
+                {
+                    Debug.LogWarning("[VRMediaAppController] HidePlayerUI: menu frame has no registered VCS surface yet — cursor may be stranded.");
+                }
+            }
 
             _controlsPanel?.gameObject.SetActive(false);
             _controlsContainer?.SetActive(false);

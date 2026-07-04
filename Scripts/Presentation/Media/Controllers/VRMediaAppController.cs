@@ -229,9 +229,15 @@ namespace VRWorkspace.Media.Core
             _transitionCoroutine = _playbackCoordinator.FadeOutAndCleanupDirectPlay(() =>
             {
                 RTTManager.Instance?.ExitImmersiveMode();
-                HidePlayerUI();
+                // Show the caller's UI (e.g. File Manager) FIRST, so its RTTMenuFrame surface
+                // is already visible in VCS by the time HidePlayerUI() below unregisters the
+                // player surface and re-homes the cursor. Doing it in the other order (as
+                // this used to) left the cursor snapping onto a surface that hadn't flipped
+                // visible yet, stranding it invisible with nowhere usable to land — same
+                // class of bug SwitchToLibrary() avoids by calling ShowLibraryUI() first.
                 _onDirectPlayExit?.Invoke();
                 _onDirectPlayExit = null;
+                HidePlayerUI();
                 Cleanup();
                 if (_activeDirectPlayer == this) _activeDirectPlayer = null;
                 Destroy(gameObject);
