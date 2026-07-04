@@ -173,6 +173,7 @@ namespace VRWorkspace.Presentation.Input.Cursor
 
             var canvas = surface.RuntimeRef as RTTCanvasBase;
             var actionBar = surface.RuntimeRef as ActionBarSurfaceController;
+            var cursorAnchor = surface.RuntimeRef as IVirtualCursorAnchor;
 
             Transform targetT = null;
             if (canvas != null)
@@ -183,6 +184,10 @@ namespace VRWorkspace.Presentation.Input.Cursor
             else if (actionBar != null)
             {
                 targetT = actionBar.transform;
+            }
+            else if (cursorAnchor != null)
+            {
+                targetT = cursorAnchor.AnchorTransform;
             }
 
             if (targetT == null) { SetVisible(false); return; }
@@ -257,6 +262,10 @@ namespace VRWorkspace.Presentation.Input.Cursor
             else if (actionBar != null)
             {
                 physicalSize = actionBar.PhysicalSize;
+            }
+            else if (cursorAnchor != null)
+            {
+                physicalSize = cursorAnchor.PhysicalSize;
             }
 
             // 2) Position the visual cursor directly on the physical surface based on its UV

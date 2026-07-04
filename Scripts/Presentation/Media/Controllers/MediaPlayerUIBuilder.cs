@@ -11,6 +11,7 @@ using VRWorkspace.Media.UI;
 using VRWorkspace.Media.Utils;
 using VRWorkspace.UI.RTT.Components;
 using VRWorkspace.Presentation.Input.VCS;
+using VRWorkspace.Domain.Input;
 
 namespace VRWorkspace.Presentation.Media.Controllers
 {
@@ -162,6 +163,14 @@ namespace VRWorkspace.Presentation.Media.Controllers
             var controlsFrame = controlsFrameObj.AddComponent<RTTMenuFrame>();
             result.ControlsCanvasBase = controlsFrame;
 
+            // New hub-and-spoke VCS topology (replaces the old single merged bounding box):
+            // Controls only connects UP into the invisible Hub — its other edges are outer
+            // boundaries with nothing to traverse into, so the cursor clamps there instead of
+            // escaping. Must be added before ForceInitialize() below: RTTCanvasAutoRegistrar
+            // reads this override once, at surface-creation time.
+            controlsFrameObj.AddComponent<VirtualSurfaceOverride>()
+                .Configure(EdgePolicy.Up, SurfacePriority.Standard);
+
             controlsFrame.Configure(physicalWidth, physicalHeight, controlsWidth);
             controlsFrame.SetGlassBackgroundEnabled(false);
             controlsFrame.SetFloatingDataEnabled(false);
@@ -207,6 +216,12 @@ namespace VRWorkspace.Presentation.Media.Controllers
             float sidePhysicalH = sideLogicalHeight / density;
             result.SidePhysicalW = sidePhysicalW;
             result.SidePhysicalH = sidePhysicalH;
+
+            // Queue panel only connects back into the Hub through its edge nearest to
+            // Controls (Left when the panel sits to the right, per sideControlsSide — the
+            // mirrored case flips to Right). All other edges are outer boundaries.
+            result.SideControlsFrameObject.AddComponent<VirtualSurfaceOverride>()
+                .Configure(sideControlsSide >= 0 ? EdgePolicy.Left : EdgePolicy.Right, SurfacePriority.Standard);
 
             sideFrame.Configure(sidePhysicalW, sidePhysicalH, sideLogicalWidth);
             sideFrame.SetGlassBackgroundEnabled(false);
@@ -262,6 +277,12 @@ namespace VRWorkspace.Presentation.Media.Controllers
                 result.SettingsFrameObject.layer = vLayer;
 
                 var settingsMenuFrame = result.SettingsFrameObject.AddComponent<RTTMenuFrame>();
+
+                // Same rule as Queue — Settings and Queue are mutually exclusive, so whichever
+                // is open connects back into the Hub the same way.
+                result.SettingsFrameObject.AddComponent<VirtualSurfaceOverride>()
+                    .Configure(sideControlsSide >= 0 ? EdgePolicy.Left : EdgePolicy.Right, SurfacePriority.Standard);
+
                 settingsMenuFrame.Configure(settingsPhysicalW, settingsTotalH, settingsLogicalW);
                 settingsMenuFrame.SetGlassBackgroundEnabled(false);
                 settingsMenuFrame.SetFloatingDataEnabled(false);
@@ -416,11 +437,17 @@ namespace VRWorkspace.Presentation.Media.Controllers
                 result.ControlsFrameObject,
                 result.SideControlsFrameObject,
                 result.SettingsFrameObject);
-            result.SurfaceController = MediaPlayerSurfaceController.Attach(
+
+            // ====================================================== //
+            // 4b2. Invisible Hub surface (video display area)        //
+            //      Controls --Up--> Hub --Right--> Queue/Settings    //
+            // ====================================================== //
+            result.HubSurfaceController = MediaPlayerHubSurfaceController.Attach(
                 result.PlayerControlsGroup,
-                result.ControlsFrameObject,
-                result.SideControlsFrameObject,
-                result.SettingsFrameObject);
+                result.ControlsCanvasBase,
+                result.SideControlsFrameObject.GetComponent<RTTMenuFrame>(),
+                result.SettingsFrameObject.GetComponent<RTTMenuFrame>(),
+                sideControlsSide);
 
             // ====================================================== //
             // 4c. Auto-hide timer (Phase 4) — countdown when cursor  //
@@ -885,6 +912,7 @@ namespace VRWorkspace.Presentation.Media.Controllers
 
         // VCS surface for cursor bounds (Phase 1)
         public MediaPlayerSurfaceController SurfaceController;
+        public MediaPlayerHubSurfaceController HubSurfaceController;
 
         // Auto-hide timer (Phase 4)
         public VRWorkspace.Presentation.Input.Cursor.MediaPlayerAutoHideTimer AutoHideTimer;

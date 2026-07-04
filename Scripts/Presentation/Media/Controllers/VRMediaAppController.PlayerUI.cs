@@ -129,6 +129,7 @@ namespace VRWorkspace.Media.Core
             _menuButtonFrameObject = r.MenuButtonFrameObject;
             _menuButtonQuadOriginalScale = r.MenuButtonQuadOriginalScale;
             _surfaceController = r.SurfaceController;
+            _hubSurfaceController = r.HubSurfaceController;
             _errorDialog = r.ErrorDialog;
             _sideControlsBaseX = r.SideControlsBaseX;
             _sideControlsBaseY = r.SideControlsBaseY;
@@ -235,6 +236,7 @@ namespace VRWorkspace.Media.Core
 
                 // Notify VCS surface — controls hidden → cursor goes out of bounds
                 _surfaceController?.NotifyVisible(visible);
+                _hubSurfaceController?.NotifyVisible(visible);
 
                 // Override menu button visibility (Bug 1 fix):
                 // RTTMediaControlsPanel.Hide() always shows menu button, but in Mouse/Gamepad
@@ -352,6 +354,7 @@ namespace VRWorkspace.Media.Core
             // re-home the cursor there. Also release any leftover force-hidden override
             // in case we're exiting while controls happened to be hidden.
             _surfaceController?.Unregister();
+            _hubSurfaceController?.Unregister();
             WorldSpaceCursorRenderer.Instance?.SetForceHidden(false);
 
             // Belt-and-suspenders: don't rely solely on VCS's automatic

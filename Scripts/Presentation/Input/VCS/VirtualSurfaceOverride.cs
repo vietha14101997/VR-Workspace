@@ -17,5 +17,18 @@ namespace VRWorkspace.Presentation.Input.VCS
 
         public EdgePolicy Edges   => edges;
         public int        Priority => priority;
+
+        /// <summary>
+        /// Programmatic setup for code that builds panels at runtime (e.g.
+        /// MediaPlayerUIBuilder) rather than authoring EdgePolicy/priority in the Inspector.
+        /// Must be called BEFORE the canvas's RTTCanvasBase.Initialize() runs (i.e. before
+        /// ForceInitialize()/OnEnable's first pass) — RTTCanvasAutoRegistrar.ResolveOverride()
+        /// reads this component's values only once, at OnAnyRTTSurfaceCreated time.
+        /// </summary>
+        public void Configure(EdgePolicy newEdges, int newPriority)
+        {
+            edges = newEdges;
+            priority = newPriority;
+        }
     }
 }
