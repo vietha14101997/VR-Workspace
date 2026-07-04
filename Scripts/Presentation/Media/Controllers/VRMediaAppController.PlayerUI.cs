@@ -128,7 +128,6 @@ namespace VRWorkspace.Media.Core
             _settingsPanel = r.SettingsPanel;
             _menuButtonFrameObject = r.MenuButtonFrameObject;
             _menuButtonQuadOriginalScale = r.MenuButtonQuadOriginalScale;
-            _surfaceController = r.SurfaceController;
             _hubSurfaceController = r.HubSurfaceController;
             _errorDialog = r.ErrorDialog;
             _sideControlsBaseX = r.SideControlsBaseX;
@@ -204,8 +203,8 @@ namespace VRWorkspace.Media.Core
                     // Explicitly hide the cursor visual now, via a hard override that can't
                     // be undone by the normal surface-based show logic later in the same
                     // frame. Don't rely solely on VirtualSurface.IsVisible propagating through
-                    // WorldSpaceCursorRenderer: MediaPlayerSurfaceController re-registers a
-                    // brand-new VirtualSurface whenever the union bounds change (e.g.
+                    // WorldSpaceCursorRenderer: MediaPlayerHubSurfaceController re-registers a
+                    // brand-new VirtualSurface whenever the hub bounds change (e.g.
                     // side/settings frames toggling active on Hide()), and that race can leave
                     // the surface briefly/incorrectly visible depending on frame timing.
                     WorldSpaceCursorRenderer.Instance?.SetForceHidden(true);
@@ -235,7 +234,6 @@ namespace VRWorkspace.Media.Core
                 }
 
                 // Notify VCS surface — controls hidden → cursor goes out of bounds
-                _surfaceController?.NotifyVisible(visible);
                 _hubSurfaceController?.NotifyVisible(visible);
 
                 // Override menu button visibility (Bug 1 fix):
@@ -337,6 +335,20 @@ namespace VRWorkspace.Media.Core
                 _controlsPanel.ResetToQueueView();
                 _controlsPanel.Show();
             }
+
+            // Hand the VCS cursor off onto the Hub surface. Nothing does this
+            // automatically: CursorAppFollower only snaps the cursor onto the media
+            // app's outer RTTMenuFrame when the app first opens, and nothing after that
+            // ever moves it onto the Hub/Controls/Queue/Settings surfaces this player UI
+            // just built. Without this, the cursor stays parked on that much larger
+            // outer surface (EdgePolicy.All, sized to the whole app window) for the rest
+            // of the session — free to roam the entire app window well outside the
+            // controls/hub staircase, which is exactly the "cursor escapes" symptom.
+            if (_hubSurfaceController != null)
+            {
+                VirtualCursorSpace.Instance?.SnapCursorTo(
+                    _hubSurfaceController.SurfaceId, preserveWorldPosition: true);
+            }
         }
 
         private void HidePlayerUI()
@@ -346,14 +358,13 @@ namespace VRWorkspace.Media.Core
             _controlsFollowCamera = false;
 
             // Must run BEFORE deactivating _controlsContainer below. SetActive(false) alone
-            // stops MediaPlayerSurfaceController's LateUpdate (so it never unregisters
+            // stops MediaPlayerHubSurfaceController's LateUpdate (so it never unregisters
             // itself) and drags the world-space cursor — parented under this hierarchy's
             // display quad — down to activeInHierarchy=false with nothing to hand it off
             // to. Explicitly unregistering lets VCS fall back to the next highest-priority
             // visible surface (Library/FileManager, already shown by this point) and
             // re-home the cursor there. Also release any leftover force-hidden override
             // in case we're exiting while controls happened to be hidden.
-            _surfaceController?.Unregister();
             _hubSurfaceController?.Unregister();
             WorldSpaceCursorRenderer.Instance?.SetForceHidden(false);
 

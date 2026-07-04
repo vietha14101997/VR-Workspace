@@ -58,6 +58,17 @@ namespace VRWorkspace.Presentation.Input.VCS
         public Transform AnchorTransform => _anchor;
         public Vector2 PhysicalSize => _physicalSize;
 
+        /// <summary>
+        /// Stable VCS surface id, assigned once in <see cref="Attach"/> and reused across
+        /// every re-registration in <see cref="RegisterOrUpdateSurface"/>. Exposed so callers
+        /// (e.g. VRMediaAppController) can explicitly hand the cursor off onto the hub
+        /// system via <c>VirtualCursorSpace.SnapCursorTo</c> — nothing does this
+        /// automatically, so without an explicit snap the cursor stays wherever it was
+        /// before the player UI opened (e.g. the app's outer RTTMenuFrame) and never
+        /// enters the hub/controls/queue/settings bounds at all.
+        /// </summary>
+        public Guid SurfaceId => _surfaceId;
+
         private Transform _refFrameTransform =>
             RTTMenuFrame.PrimaryInstance != null
                 ? RTTMenuFrame.PrimaryInstance.transform

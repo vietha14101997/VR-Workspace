@@ -82,7 +82,6 @@ namespace VRWorkspace.Media.Core
         private Vector3 _menuButtonQuadOriginalScale;
 
         // VCS surface for mediaPlayer cursor bounds (Phase 1)
-        private VRWorkspace.Presentation.Input.VCS.MediaPlayerSurfaceController _surfaceController;
         private VRWorkspace.Presentation.Input.VCS.MediaPlayerHubSurfaceController _hubSurfaceController;
 
         // Immersive follow-camera state

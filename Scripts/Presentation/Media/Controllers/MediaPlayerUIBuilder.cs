@@ -430,17 +430,26 @@ namespace VRWorkspace.Presentation.Media.Controllers
             result.MenuButtonFrameObject.SetActive(false);
 
             // ====================================================== //
-            // 4b. VCS surface for cursor bounds (Phase 1)            //
-            // ====================================================== //
-            result.SurfaceController = MediaPlayerSurfaceController.Attach(
-                result.PlayerControlsGroup,
-                result.ControlsFrameObject,
-                result.SideControlsFrameObject,
-                result.SettingsFrameObject);
-
-            // ====================================================== //
-            // 4b2. Invisible Hub surface (video display area)        //
+            // 4b. Invisible Hub surface (video display area)         //
             //      Controls --Up--> Hub --Right--> Queue/Settings    //
+            //                                                          //
+            // NOTE: this replaces the old single merged "controls +   //
+            // side + settings" bounding-box surface (formerly         //
+            // MediaPlayerSurfaceController). That legacy surface is   //
+            // intentionally no longer registered here: it was a       //
+            // single axis-aligned rectangle spanning from Controls'   //
+            // bottom-left all the way to the side panel's top-right,  //
+            // which necessarily included empty "dead space" (e.g.     //
+            // above Controls and left of the side panel) that isn't   //
+            // part of any real UI element. Because that surface also  //
+            // registered at SurfacePriority.SidePanel (higher than    //
+            // the Standard priority used by Controls/Hub/Queue/       //
+            // Settings), the cursor kept getting snapped/re-homed     //
+            // onto it and could then freely roam that dead space —    //
+            // i.e. escape the intended staircase-shaped bounds. The   //
+            // Hub + Controls + Queue/Settings trio below is the only  //
+            // geometry that should ever be registered for cursor      //
+            // bounds now; do not re-add the old union surface.        //
             // ====================================================== //
             result.HubSurfaceController = MediaPlayerHubSurfaceController.Attach(
                 result.PlayerControlsGroup,
@@ -455,7 +464,7 @@ namespace VRWorkspace.Presentation.Media.Controllers
             // ====================================================== //
             result.AutoHideTimer = VRWorkspace.Presentation.Input.Cursor.MediaPlayerAutoHideTimer.Attach(
                 result.PlayerControlsGroup,
-                result.SurfaceController,
+                result.HubSurfaceController,
                 result.ControlsPanel);
 
             // ====================================================== //
@@ -911,7 +920,6 @@ namespace VRWorkspace.Presentation.Media.Controllers
         public RTTMediaUISettingsPopup UISettingsPopup;
 
         // VCS surface for cursor bounds (Phase 1)
-        public MediaPlayerSurfaceController SurfaceController;
         public MediaPlayerHubSurfaceController HubSurfaceController;
 
         // Auto-hide timer (Phase 4)

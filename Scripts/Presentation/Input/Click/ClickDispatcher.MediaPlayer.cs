@@ -17,13 +17,23 @@ namespace VRWorkspace.Presentation.Input.Click
     ///   1. Click in mediaPlayer bounds but NOT on UI element → Hide controls
     ///   2. Click when controls are hidden → Show controls (cursor appears)
     ///
+    /// Under the hub-and-spoke VCS topology (see MediaPlayerHubSurfaceController)
+    /// the cursor's "current surface" while inside the mediaPlayer UI can be any of
+    /// four distinct VirtualSurfaces: the Controls/Queue/Settings RTTCanvasBase
+    /// panels, or the invisible Hub. There is no longer a single merged surface to
+    /// type-check against, so instead we identify "this surface belongs to the
+    /// mediaPlayer" by walking up to find a MediaPlayerHubSurfaceController — which
+    /// is attached directly on the PlayerControlsGroup root that all four surfaces
+    /// share as an ancestor.
+    ///
     /// This file complements ClickDispatcher.Popup.cs (popup-first branch)
     /// and ClickDispatcher.cs (RTT canvas / ActionBar branches).
     /// </summary>
     public sealed partial class ClickDispatcher
     {
-        // Cached reference to the active mediaPlayer controller (set on first mediaPlayer click)
-        private MediaPlayerSurfaceController _lastMediaPlayerSurface;
+        // Cached reference to the active mediaPlayer's root (PlayerControlsGroup transform,
+        // shared by Controls/Hub/Queue/Settings), set on first mediaPlayer click.
+        private Transform _lastMediaPlayerRoot;
         private RTTMediaControlsPanel _lastMediaPlayerControlsPanel;
         private GameObject _lastMenuButtonFrame;  // Menu button frame (must not be intercepted)
 
@@ -36,42 +46,28 @@ namespace VRWorkspace.Presentation.Input.Click
             var vcs = VirtualCursorSpace.Instance;
             if (vcs == null || !vcs.Cursor.SurfaceId.HasValue)
             {
-                Debug.Log($"[MP_DBG-C] TryDispatchMediaPlayerClick EARLY RETURN: vcs={vcs != null}, cursor.SurfaceId.HasValue={vcs?.Cursor.SurfaceId.HasValue}");
                 return false;
             }
             if (!vcs.Surfaces.TryGet(vcs.Cursor.SurfaceId.Value, out var surface))
             {
-                Debug.Log($"[MP_DBG-C] TryDispatchMediaPlayerClick EARLY RETURN: surface not found for SurfaceId={vcs.Cursor.SurfaceId}");
                 return false;
             }
 
-            var mediaPlayer = surface.RuntimeRef as MediaPlayerSurfaceController;
-            if (mediaPlayer == null)
+            Transform mediaPlayerRoot = GetMediaPlayerRoot(surface.RuntimeRef);
+            if (mediaPlayerRoot == null)
             {
-                Debug.Log($"[MP_DBG-C] TryDispatchMediaPlayerClick EARLY RETURN: RuntimeRef is NOT MediaPlayerSurfaceController, it's={surface.RuntimeRef?.GetType().Name}");
                 return false;
             }
-            Debug.Log($"[MP_DBG-C] TryDispatchMediaPlayerClick entry, surface.IsVisible={surface.IsVisible}");
 
             // Cache reference for later use
-            _lastMediaPlayerSurface = mediaPlayer;
-            _lastMediaPlayerControlsPanel = FindMediaPlayerControlsPanel(mediaPlayer);
-            _lastMenuButtonFrame = FindMenuButtonFrame(mediaPlayer);
-            Debug.Log($"[MP_DBG-C] _lastMediaPlayerControlsPanel={_lastMediaPlayerControlsPanel != null}, _lastMenuButtonFrame={_lastMenuButtonFrame != null}");
+            _lastMediaPlayerRoot = mediaPlayerRoot;
+            _lastMediaPlayerControlsPanel = FindMediaPlayerControlsPanel(mediaPlayerRoot);
+            _lastMenuButtonFrame = FindMenuButtonFrame(mediaPlayerRoot);
 
             // CASE 1: Controls hidden → Show them (wake from hidden)
             if (!surface.IsVisible)
             {
-                Debug.Log($"[MP_DBG-D] CASE 1 detected: surface.IsVisible=false, calling Show()");
-                if (_lastMediaPlayerControlsPanel != null)
-                {
-                    _lastMediaPlayerControlsPanel.Show();
-                    Debug.Log($"[MP_DBG-E] Show() called, IsVisible now={_lastMediaPlayerControlsPanel.IsVisible}");
-                }
-                else
-                {
-                    Debug.Log($"[MP_DBG-D] CASE 1 BUT _lastMediaPlayerControlsPanel is NULL!");
-                }
+                _lastMediaPlayerControlsPanel?.Show();
                 return true;
             }
 
@@ -83,10 +79,7 @@ namespace VRWorkspace.Presentation.Input.Click
             if (!hitSomething)
             {
                 // Ray missed everything in popup mask → empty space → Hide
-                if (_lastMediaPlayerControlsPanel != null)
-                {
-                    _lastMediaPlayerControlsPanel.Hide();
-                }
+                _lastMediaPlayerControlsPanel?.Hide();
                 return true;
             }
 
@@ -108,16 +101,36 @@ namespace VRWorkspace.Presentation.Input.Click
             }
 
             // Hit something that's NOT a UI element (could be overlay or other) → Hide
-            if (_lastMediaPlayerControlsPanel != null)
-            {
-                _lastMediaPlayerControlsPanel.Hide();
-            }
+            _lastMediaPlayerControlsPanel?.Hide();
             return true;
+        }
+
+        /// <summary>
+        /// Given a VirtualSurface's RuntimeRef, returns the mediaPlayer's PlayerControlsGroup
+        /// transform if that surface belongs to the (currently open) mediaPlayer UI, or null
+        /// otherwise. Handles both the Hub (RuntimeRef is the hub controller itself, attached
+        /// directly on PlayerControlsGroup) and the Controls/Queue/Settings canvases
+        /// (RuntimeRef is their RTTCanvasBase, which lives somewhere under the same root).
+        /// </summary>
+        private static Transform GetMediaPlayerRoot(object runtimeRef)
+        {
+            if (runtimeRef is MediaPlayerHubSurfaceController hub)
+            {
+                return hub.transform;
+            }
+
+            if (runtimeRef is RTTCanvasBase canvas)
+            {
+                var siblingHub = canvas.GetComponentInParent<MediaPlayerHubSurfaceController>();
+                if (siblingHub != null) return siblingHub.transform;
+            }
+
+            return null;
         }
 
         private bool IsPartOfMediaPlayerRTT(GameObject go)
         {
-            if (go == null) return false;
+            if (go == null || _lastMediaPlayerRoot == null) return false;
             // Walk up parents to find RTTCanvasBase
             Transform current = go.transform;
             while (current != null)
@@ -126,8 +139,7 @@ namespace VRWorkspace.Presentation.Input.Click
                 if (canvas != null)
                 {
                     // Check if this canvas is part of mediaPlayer UI (controls, side, settings)
-                    if (canvas.transform.IsChildOf(_lastMediaPlayerSurface.transform) ||
-                        canvas.transform == _lastMediaPlayerSurface.transform)
+                    if (canvas.transform.IsChildOf(_lastMediaPlayerRoot))
                     {
                         return true;
                     }
@@ -137,23 +149,20 @@ namespace VRWorkspace.Presentation.Input.Click
             return false;
         }
 
-        private static RTTMediaControlsPanel FindMediaPlayerControlsPanel(MediaPlayerSurfaceController surface)
+        private static RTTMediaControlsPanel FindMediaPlayerControlsPanel(Transform playerControlsRoot)
         {
-            // Walk children of PlayerControlsGroup to find RTTMediaControlsPanel
-            var panel = surface.GetComponentInChildren<RTTMediaControlsPanel>(true);
-            return panel;
+            if (playerControlsRoot == null) return null;
+            return playerControlsRoot.GetComponentInChildren<RTTMediaControlsPanel>(true);
         }
 
         /// <summary>
         /// Find the menu button frame GameObject within PlayerControlsGroup children.
         /// Returns null if not found (e.g., menu button hidden by mode-aware code).
         /// </summary>
-        private static GameObject FindMenuButtonFrame(MediaPlayerSurfaceController surface)
+        private static GameObject FindMenuButtonFrame(Transform playerControlsRoot)
         {
-            // The menu button frame is a sibling/child of mediaPlayer UI. Look for any
-            // GameObject named "MenuButtonFrame" or similar in PlayerControlsGroup hierarchy.
-            if (surface == null) return null;
-            var transforms = surface.GetComponentsInChildren<Transform>(true);
+            if (playerControlsRoot == null) return null;
+            var transforms = playerControlsRoot.GetComponentsInChildren<Transform>(true);
             foreach (var t in transforms)
             {
                 if (t.name == "MenuButtonFrame") return t.gameObject;
