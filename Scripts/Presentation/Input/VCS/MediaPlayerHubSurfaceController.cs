@@ -53,6 +53,7 @@ namespace VRWorkspace.Presentation.Input.VCS
 
         // Cached VCS coords (re-registered only on change)
         private Vector2 _lastCenter;
+        private float _dbgLogTimer;
         private Vector2 _lastSize;
 
         public Transform AnchorTransform => _anchor;
@@ -183,6 +184,18 @@ namespace VRWorkspace.Presentation.Input.VCS
 
             if (newSize.x <= 0.001f || newSize.y <= 0.001f) return; // degenerate, skip this frame
 
+            // [HUB_DBG] Throttled comparison: Hub's own computed edges vs the raw
+            // GetVirtualCenter/GetVirtualSize this frame for Controls and the active side
+            // panel. If Hub.left != controlsLeft or Hub.top != sideTop by more than a hair,
+            // that's the exact numeric overshoot to chase (formula/depth/parallax mismatch)
+            // rather than a re-registration/tie-break issue (already fixed).
+            _dbgLogTimer -= Time.deltaTime;
+            if (_dbgLogTimer <= 0f)
+            {
+                _dbgLogTimer = 2f;
+                Debug.Log($"[HUB_DBG] left={left:F4} right={right:F4} top={top:F4} bottom={bottom:F4} | controlsLeft={controlsLeft:F4} controlsTop={controlsTop:F4} | sideLeft={sideLeft:F4} sideRight={sideRight:F4} sideTop={sideTop:F4} | hubCenter={newCenter} hubSize={newSize}");
+            }
+
             // Keep the anchor transform positioned/oriented in world space so
             // WorldSpaceCursorRenderer's targetT.position / .right / .up / .forward /
             // .rotation / .lossyScale all behave exactly like a real panel's quad transform.
@@ -199,7 +212,7 @@ namespace VRWorkspace.Presentation.Input.VCS
                 newCenter,
                 newSize,
                 edges,
-                SurfacePriority.Standard,
+                SurfacePriority.SidePanel, // > outer background's Default(100); wins ties in TryTraverseEdge
                 this); // RuntimeRef = this (IVirtualCursorAnchor)
 
             vcs.RegisterSurface(surface);
@@ -225,44 +238,57 @@ namespace VRWorkspace.Presentation.Input.VCS
             _anchor.rotation = refT.rotation;
             _anchor.localScale = Vector3.one;
 
+            // Depth (along refT.forward) that the real UI quads actually sit at. refT is the
+            // outer RTTMenuFrame's bare plane — it is NOT where Controls/Queue/Settings render;
+            // those are pushed forward/back from it for layering. Without this offset the
+            // anchor sits exactly on refT's plane, which in practice matches the video's own
+            // depth rather than the UI's, so the cursor visually renders behind/under the
+            // Controls panel instead of in front of it. Controls is the always-present
+            // reference; Queue/Settings are assumed to share the same depth (same rigid
+            // PlayerControlsGroup composition, only offset in X/Y).
+            float depth = 0f;
+            var controlsQuad = _controlsCanvas != null ? _controlsCanvas.GetQuadCollider() : null;
+            if (controlsQuad != null)
+            {
+                depth = Vector3.Dot(controlsQuad.transform.position - refT.position, refT.forward);
+            }
+
             Vector3 worldPos = refT.position
                 + refT.right * vcsCenter.x
-                + refT.up * vcsCenter.y;
+                + refT.up * vcsCenter.y
+                + refT.forward * depth;
             _anchor.position = worldPos;
         }
 
         /// <summary>
-        /// Projects an RTTCanvasBase's quad bounds into VCS space and returns its left/right/
-        /// top/bottom edges (VCS meters), using the same corner-projection approach as
-        /// MediaPlayerSurfaceController (handles rotation, unlike naive world min/max).
+        /// Returns an RTTCanvasBase's left/right/top/bottom edges (VCS meters), computed via
+        /// the EXACT SAME formula RTTCanvasAutoRegistrar uses to register that canvas's own
+        /// surface (canvas.transform.position + canvas.GetWorldSize(), projected through
+        /// ProjectToVirtualSpace) — NOT a separately-derived quad-collider projection.
+        ///
+        /// This must match bit-for-bit: any discrepancy between how Hub computes "where
+        /// Queue's left edge is" and where Queue's own VirtualSurface is actually registered
+        /// leaves a gap/overlap that TryTraverseEdge's ray cast can miss, falling through to
+        /// whatever larger surface (e.g. the outer Main Menu RTTMenuFrame, EdgePolicy.All)
+        /// happens to also cover that point — exactly the "cursor escapes past Queue" bug.
         /// </summary>
         private static bool TryGetProjectedEdges(
             RTTCanvasBase canvas, Transform refT,
             out float left, out float right, out float top, out float bottom)
         {
             left = right = top = bottom = 0f;
+            if (canvas == null) return false;
 
-            var quad = canvas.GetQuadCollider();
-            if (quad == null) return false;
+            var registrar = RTTCanvasAutoRegistrar.Instance;
+            if (registrar == null) return false;
 
-            Bounds b = quad.bounds;
-            Vector3 ext = b.extents;
-            Vector3 c1 = b.center + new Vector3(ext.x, ext.y, 0);   // top-right
-            Vector3 c2 = b.center + new Vector3(-ext.x, ext.y, 0);  // top-left
-            Vector3 c3 = b.center + new Vector3(ext.x, -ext.y, 0);  // bottom-right
+            Vector2 center = registrar.GetVirtualCenter(canvas, refT);
+            Vector2 size = registrar.GetVirtualSize(canvas, refT);
 
-            Vector2 pCenter = RTTCanvasAutoRegistrar.ProjectToVirtualSpace(b.center, refT);
-            Vector2 p1 = RTTCanvasAutoRegistrar.ProjectToVirtualSpace(c1, refT);
-            Vector2 p2 = RTTCanvasAutoRegistrar.ProjectToVirtualSpace(c2, refT);
-            Vector2 p3 = RTTCanvasAutoRegistrar.ProjectToVirtualSpace(c3, refT);
-
-            float halfW = Mathf.Abs(p1.x - p2.x) * 0.5f;
-            float halfH = Mathf.Abs(p1.y - p3.y) * 0.5f;
-
-            left = pCenter.x - halfW;
-            right = pCenter.x + halfW;
-            top = pCenter.y + halfH;
-            bottom = pCenter.y - halfH;
+            left = center.x - size.x * 0.5f;
+            right = center.x + size.x * 0.5f;
+            top = center.y + size.y * 0.5f;
+            bottom = center.y - size.y * 0.5f;
             return true;
         }
     }

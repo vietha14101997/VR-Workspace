@@ -50,6 +50,7 @@ namespace VRWorkspace.Presentation.Input.Cursor
         // later in the same LateUpdate by the normal surface-based show logic below if the
         // surface's IsVisible flag hasn't (yet) caught up. Checked first, before anything else.
         private bool _forceHidden;
+        private Transform _lastLoggedTargetT; // [VCS_DBG] change-detection only
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStaticState()
@@ -192,6 +193,17 @@ namespace VRWorkspace.Presentation.Input.Cursor
 
             if (targetT == null) { SetVisible(false); return; }
 
+            // [VCS_DBG] Log whenever the resolved target transform changes surface/object —
+            // catches exactly the moment of a reported Z jump (e.g. Hub -> Controls), showing
+            // targetT's identity and depth along refT.forward so the two can be compared
+            // directly instead of guessing which one is "wrong."
+            if (targetT != _lastLoggedTargetT)
+            {
+                _lastLoggedTargetT = targetT;
+                float depthAlongRefT = Vector3.Dot(targetT.position - refT.position, refT.forward);
+                Debug.Log($"[VCS_DBG] targetT changed -> name={targetT.name} kind={(canvas != null ? "RTTCanvasBase:" + canvas.name : actionBar != null ? "ActionBar" : "IVirtualCursorAnchor")} worldPos={targetT.position} depthAlongRefTForward={depthAlongRefT:F4}");
+            }
+
             // ── Popup override: when cursor ray hits an active WorldSpace popup,
             //    place cursor visual at popup hit point (NOT reparented to popup — that
             //    would deactivate cursor when popup closes).
@@ -257,7 +269,9 @@ namespace VRWorkspace.Presentation.Input.Cursor
             Vector2 physicalSize = Vector2.one;
             if (canvas != null)
             {
-                physicalSize = canvas.GetWorldSize();
+                physicalSize = RTTCanvasAutoRegistrar.Instance != null
+                    ? RTTCanvasAutoRegistrar.Instance.GetVirtualSize(canvas, refT)
+                    : canvas.GetWorldSize();
             }
             else if (actionBar != null)
             {

@@ -61,9 +61,7 @@ namespace VRWorkspace.Media.Projections
 
             _worldPanel.contentTexture = texture;
             _worldPanel.Apply();
-
-            Debug.Log($"[FlatProjectionRenderer] SetTexture: {(texture != null ? $"{texture.width}x{texture.height}" : "null")}");
-
+            
             // Update resolution for aspect ratio calculations
             if (texture != null)
             {

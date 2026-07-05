@@ -287,10 +287,37 @@ namespace VRWorkspace.Domain.Input
             }
         }
 
+        /// <summary>
+        /// Diagnostic switch: when true, every cursor state change logs the surface it's
+        /// on (by RuntimeRef type + registered Center/Size) plus the UV. Turn on
+        /// temporarily to pin down "cursor escaped bounds" reports precisely — it tells
+        /// you definitively whether the cursor is sitting on the surface you expect
+        /// (e.g. MediaPlayerHubSurfaceController) with correct-looking bounds, or on a
+        /// completely different/unexpected surface (e.g. the app's outer RTTMenuFrame),
+        /// which are two very different bugs to chase. Leave off by default — this fires
+        /// every mouse-move frame.
+        /// </summary>
+        public static bool DebugLogging = false;
+
         private void SetCursor(Guid? surfaceId, Vector2 uv)
         {
             var newState = new CursorState(surfaceId, uv, Cursor.Mode, surfaceId.HasValue);
             Cursor = newState;
+
+            if (DebugLogging)
+            {
+                if (surfaceId.HasValue && _surfaces.TryGet(surfaceId.Value, out var s))
+                {
+                    Debug.Log($"[VCS_DBG] surface={s.RuntimeRef?.GetType().Name ?? "null"} " +
+                              $"id={surfaceId.Value} center={s.Center} size={s.Size} edges={s.Edges} " +
+                              $"priority={s.Priority} uv={uv}");
+                }
+                else
+                {
+                    Debug.Log($"[VCS_DBG] surfaceId={surfaceId} NOT FOUND IN REGISTRY (orphaned) uv={uv}");
+                }
+            }
+
             OnCursorMoved?.Invoke(newState);
         }
 
@@ -334,7 +361,18 @@ namespace VRWorkspace.Domain.Input
                 var hit = RayBoxIntersect2D.Intersect(exitPoint, rayDir, candidate.Bounds, bufferZone);
                 if (!hit.DidHit) continue;
 
-                if (hit.Distance < bestDistance)
+                // Distance ties (typically both ~0 — e.g. a large surface that already
+                // contains the exit point, tying with a small adjacent surface touching it
+                // exactly) are broken by priority rather than by enumeration order, which is
+                // otherwise arbitrary/dictionary-dependent and can pick an unrelated large
+                // overlapping surface over the intended, precisely-adjacent one.
+                const float distanceEpsilon = 1e-4f;
+                bool strictlyCloser = hit.Distance < bestDistance - distanceEpsilon;
+                bool tiedButHigherPriority =
+                    Mathf.Abs(hit.Distance - bestDistance) <= distanceEpsilon &&
+                    (bestTarget == null || candidate.Priority > bestTarget.Priority);
+
+                if (strictlyCloser || tiedButHigherPriority)
                 {
                     bestDistance = hit.Distance;
                     bestTarget   = candidate;

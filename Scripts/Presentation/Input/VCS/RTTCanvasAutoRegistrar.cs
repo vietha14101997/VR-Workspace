@@ -123,13 +123,67 @@ namespace VRWorkspace.Presentation.Input.VCS
             );
         }
 
+        /// <summary>
+        /// Camera-independent counterpart to <see cref="ProjectToVirtualSpace"/>: a plain
+        /// orthogonal projection onto refT's plane (dot product against refT.right/refT.up),
+        /// with no camera-ray/perspective step at all.
+        ///
+        /// ProjectToVirtualSpace exists specifically for panels that visually shift closer to
+        /// the camera at runtime (e.g. RTTMobileKeyboard's proximity behavior) — the camera
+        /// ray keeps their logical VCS position/size stable as that shift happens. Panels that
+        /// never do that (Controls/Queue/Settings/Pagination/Hub: rigidly fixed relative to
+        /// refT, just at a static depth offset) get no benefit from that camera-ray step —
+        /// instead it introduces perspective magnification proportional to camera distance,
+        /// which is exactly what caused Hub/Controls/Queue's registered bounds to be larger
+        /// than their true visual size and to disagree slightly with each frame from the
+        /// camera's current position. Use this for anything at a fixed depth offset.
+        /// </summary>
+        public static Vector2 ProjectToVirtualSpaceOrthogonal(Vector3 worldPos, Transform refT)
+        {
+            if (refT == null) return new Vector2(worldPos.x, worldPos.y);
+            Vector3 relative = worldPos - refT.position;
+            return new Vector2(Vector3.Dot(relative, refT.right), Vector3.Dot(relative, refT.up));
+        }
+
+        /// <summary>Orthogonal counterpart to <see cref="GetProjectedSize"/> — see remarks there.</summary>
+        public static Vector2 GetProjectedSizeOrthogonal(Transform targetT, Vector2 physicalSize, Transform refT)
+        {
+            if (refT == null || refT == targetT)
+            {
+                return physicalSize;
+            }
+
+            Vector3 center = targetT.position;
+            Vector2 projCenter = ProjectToVirtualSpaceOrthogonal(center, refT);
+            Vector2 projRight  = ProjectToVirtualSpaceOrthogonal(center + targetT.right * (physicalSize.x / 2f), refT);
+            Vector2 projTop    = ProjectToVirtualSpaceOrthogonal(center + targetT.up * (physicalSize.y / 2f), refT);
+
+            float projW = Mathf.Abs(projRight.x - projCenter.x) * 2f;
+            float projH = Mathf.Abs(projTop.y - projCenter.y) * 2f;
+
+            return new Vector2(projW, projH);
+        }
+
         public Vector2 GetVirtualSize(RTTCanvasBase canvas, Transform refT = null)
         {
             if (canvas == null) return Vector2.zero;
             if (refT == null) refT = GetReferenceTransform();
-            return GetProjectedSize(canvas.transform, canvas.GetWorldSize(), refT);
-        }
 
+            Vector2 physicalSize = canvas.GetWorldSize();
+
+            Vector2 size = UsesOrthogonalProjection(canvas)
+                ? GetProjectedSizeOrthogonal(canvas.transform, physicalSize, refT)
+                : GetProjectedSize(canvas.transform, physicalSize, refT);
+
+            var inset = GetContentInset(canvas);
+            if (inset.HasValue)
+            {
+                var i = inset.Value; // x=left, y=right, z=top, w=bottom
+                size.x -= (i.x + i.y);
+                size.y -= (i.z + i.w);
+            }
+            return size;
+        }
 
         public Vector2 GetVirtualCenter(RTTCanvasBase canvas, Transform refT = null)
         {
@@ -137,18 +191,50 @@ namespace VRWorkspace.Presentation.Input.VCS
 
             if (refT == null) refT = GetReferenceTransform();
 
+            Vector2 center;
             if (refT != null && refT != canvas.transform)
             {
-                return ProjectToVirtualSpace(canvas.transform.position, refT);
+                center = UsesOrthogonalProjection(canvas)
+                    ? ProjectToVirtualSpaceOrthogonal(canvas.transform.position, refT)
+                    : ProjectToVirtualSpace(canvas.transform.position, refT);
             }
-
-            if (refT == canvas.transform)
+            else if (refT == canvas.transform)
             {
-                return Vector2.zero;
+                center = Vector2.zero;
+            }
+            else
+            {
+                var pos = canvas.transform.position;
+                center = new Vector2(pos.x, pos.y);
             }
 
-            var pos = canvas.transform.position;
-            return new Vector2(pos.x, pos.y);
+            // Real UI margins are rarely symmetric (e.g. Controls: 15px left/right, 100px top,
+            // 0px bottom) — shrinking size alone (assuming an unchanged center) would still
+            // misplace every edge except by coincidence. Shift center by the left/right and
+            // top/bottom imbalance so each edge lands exactly where GetVirtualSize's shrunk
+            // size says it should, not just "smaller, but still centered on the raw quad."
+            var inset = GetContentInset(canvas);
+            if (inset.HasValue)
+            {
+                var i = inset.Value; // x=left, y=right, z=top, w=bottom
+                center.x += (i.x - i.y) * 0.5f;
+                center.y += (i.w - i.z) * 0.5f;
+            }
+            return center;
+        }
+
+        /// <summary>Whether this canvas opted into camera-independent projection via its
+        /// VirtualSurfaceOverride (see ProjectToVirtualSpaceOrthogonal remarks for why).</summary>
+        private static bool UsesOrthogonalProjection(RTTCanvasBase canvas)
+        {
+            var o = canvas.GetComponent<VirtualSurfaceOverride>();
+            return o != null && o.UseOrthogonalProjection;
+        }
+
+        private static Vector4? GetContentInset(RTTCanvasBase canvas)
+        {
+            var o = canvas.GetComponent<VirtualSurfaceOverride>();
+            return o != null ? o.ContentInset : null;
         }
 
         private void OnSurfaceCreated(RTTCanvasBase canvas)

@@ -336,6 +336,12 @@ namespace VRWorkspace.Media.Core
                 _controlsPanel.Show();
             }
 
+            // TEMP DIAGNOSTIC: log every cursor surface/UV change while the player UI is
+            // open, so we can see exactly which surface the cursor is really on when it
+            // "escapes" instead of guessing further. Search the log for "[VCS_DBG]".
+            // Safe to remove once the escape bug is confirmed fixed.
+            VirtualCursorSpace.DebugLogging = true;
+
             // Hand the VCS cursor off onto the Hub surface. Nothing does this
             // automatically: CursorAppFollower only snaps the cursor onto the media
             // app's outer RTTMenuFrame when the app first opens, and nothing after that
