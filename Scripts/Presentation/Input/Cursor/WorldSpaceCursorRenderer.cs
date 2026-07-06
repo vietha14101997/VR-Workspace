@@ -269,7 +269,16 @@ namespace VRWorkspace.Presentation.Input.Cursor
             Vector2 physicalSize = Vector2.one;
             if (canvas != null)
             {
-                physicalSize = RTTCanvasAutoRegistrar.Instance != null
+                // Only panels that opted into a VirtualSurfaceOverride (currently: the video
+                // player's Controls/Queue/Settings/Pagination) need GetVirtualSize's
+                // inset/orthogonal-corrected value — that's what their own VCS-registered
+                // bounds actually use, so cursor positioning must match it exactly (see the
+                // "jerk on Hub->Controls/Queue transition" fix). Every other RTTCanvasBase
+                // (Main Menu, Library, etc.) never had this mismatch and must keep using the
+                // raw GetWorldSize() — applying GetVirtualSize's camera-ray projection to them
+                // regressed their previously-correct cursor alignment.
+                bool hasOverride = canvas.GetComponent<VirtualSurfaceOverride>() != null;
+                physicalSize = (hasOverride && RTTCanvasAutoRegistrar.Instance != null)
                     ? RTTCanvasAutoRegistrar.Instance.GetVirtualSize(canvas, refT)
                     : canvas.GetWorldSize();
             }
@@ -283,9 +292,21 @@ namespace VRWorkspace.Presentation.Input.Cursor
             }
 
             // 2) Position the visual cursor directly on the physical surface based on its UV
+            //
+            // IMPORTANT: physicalSize (and cursor.UV's clamping/traversal) are quantities in
+            // refT's coordinate frame — that's the frame VCS registration (GetVirtualCenter/
+            // GetVirtualSize) and 2D traversal (TryTraverseEdge) use throughout. The offset
+            // from center must therefore be scaled along refT.right/refT.up, NOT targetT's own
+            // local axes. For a target with any rotation relative to refT (common for side
+            // panels angled toward the user), targetT.right/up diverge from refT.right/up —
+            // using the wrong axes here made the reconstructed position increasingly wrong
+            // the farther the UV was from center (0,0 offset = no error; large offset = large
+            // error), which is exactly the "drift toward center, worse near edges/corners"
+            // symptom. targetT.position is still correct as the anchor point — it's the
+            // target's true 3D center, independent of which frame's axes describe the offset.
             Vector3 hotspot = targetT.position
-                + targetT.right * ((cursor.UV.x - 0.5f) * physicalSize.x)
-                + targetT.up * ((cursor.UV.y - 0.5f) * physicalSize.y);
+                + refT.right * ((cursor.UV.x - 0.5f) * physicalSize.x)
+                + refT.up * ((cursor.UV.y - 0.5f) * physicalSize.y);
 
             // Apply Z-offset along local forward to prevent z-fighting
             CursorWorldPosition = hotspot + targetT.forward * localZOffset;
