@@ -202,6 +202,33 @@ namespace VRWorkspace.Presentation.Media.Controllers
             // boundaries with nothing to traverse into, so the cursor clamps there instead of
             // escaping. Must be added before ForceInitialize() below: RTTCanvasAutoRegistrar
             // reads this override once, at surface-creation time.
+            // Horizontal (left/right) inset — confirmed correct by direct testing:
+            // 1) Quad vs container: the quad is `expandedWidth` = _containerWidth + 2*padding
+            //    wide (padding = _containerWidth*0.05, for a background glow effect), while
+            //    RTTMediaControlsPanel's own canvas is initialized at _containerWidth — i.e.
+            //    it's centered within the quad with `padding` empty space on each side.
+            // 2) Within that canvas, RTTMediaControlsPanel.BuildUI()'s outer VerticalLayoutGroup
+            //    adds a further 15px hover-effect clearance on each side (hoverMargin).
+            float quadToContainerPadding = _containerWidth * 0.05f; // padding, from expandedWidth above
+            const float controlsHoverMarginPx = 15f;
+            float insetLeftPx = quadToContainerPadding + controlsHoverMarginPx;
+            float insetRightPx = quadToContainerPadding + controlsHoverMarginPx;
+
+            // Vertical (top/bottom) inset — the layout-traced asymmetric guess (100px top from
+            // TOP_SPACER, 0px bottom, reasoning it sits flush with the canvas) turned out
+            // incomplete: testing showed ~10% excess remaining on BOTH top and bottom, meaning
+            // there's at least one more margin source inside RTTMediaControlsPanel's body panel
+            // (candidates: BG_VERTICAL_SPACING_RATIO's internal top/bottom padding, and/or Zone
+            // A's own button padding within its 200px zone) not fully accounted for by tracing
+            // the outer layout.padding alone. Using the reported ~10% directly (symmetric) for
+            // now instead of continuing to guess additional layout constants — tune
+            // controlsVerticalMarginPercent if 10% isn't exactly right after this test.
+            const float controlsVerticalMarginPercent = 0.10f;
+            float insetTopPx = controlsHeight * controlsVerticalMarginPercent;
+            float insetBottomPx = controlsHeight * controlsVerticalMarginPercent;
+
+            var controlsSurfaceOverride = controlsFrameObj.AddComponent<VirtualSurfaceOverride>();
+            controlsSurfaceOverride.Configure(EdgePolicy.Up, SurfacePriority.SidePanel, orthogonalProjection: true);
             // Priority SidePanel (>Default) is required, not cosmetic: when a traversal ray's
             // exit point already lies inside the outer background RTTMenuFrame's bounds (very
             // likely — that surface is huge), RayBoxIntersect2D reports Distance=0 for it,
@@ -209,31 +236,6 @@ namespace VRWorkspace.Presentation.Media.Controllers
             // TryTraverseEdge breaks such ties by priority, so every mediaPlayer surface must
             // outrank the background's Default(100) or traversal can land on the background
             // instead of the intended adjacent surface.
-            var controlsSurfaceOverride = controlsFrameObj.AddComponent<VirtualSurfaceOverride>();
-            controlsSurfaceOverride.Configure(EdgePolicy.Up, SurfacePriority.SidePanel, orthogonalProjection: true);
-            // Two independent, now precisely-known sources of margin between Controls' quad
-            // (registered in VCS) and its true visual/interactive content, both traced to
-            // source rather than guessed:
-            //
-            // 1) Quad vs container: the quad is `expandedWidth` = _containerWidth + 2*padding
-            //    wide (padding = _containerWidth*0.05, for a background glow effect), while
-            //    RTTMediaControlsPanel's own canvas is initialized at _containerWidth — i.e.
-            //    it's centered within the quad with `padding` empty space on each side.
-            //
-            // 2) Within that canvas, RTTMediaControlsPanel.BuildUI()'s outer VerticalLayoutGroup
-            //    uses `layout.padding = new RectOffset(hoverMargin=15, hoverMargin=15,
-            //    TOP_SPACER=100, bottom=0)` (see RTTMediaControlsPanel.cs) — 15px hover-effect
-            //    clearance left/right, a 100px empty spacer above Zone A (header), and no
-            //    bottom padding at all (the body panel sits flush with the canvas bottom).
-            //
-            // Total inset (logical px, converted to metres via density) = source (1) + (2):
-            float quadToContainerPadding = _containerWidth * 0.05f; // padding, from expandedWidth above
-            const float controlsHoverMarginPx = 15f;
-            const float controlsTopSpacerPx = 100f;
-            float insetLeftPx = quadToContainerPadding + controlsHoverMarginPx;
-            float insetRightPx = quadToContainerPadding + controlsHoverMarginPx;
-            float insetTopPx = controlsTopSpacerPx;
-            const float insetBottomPx = 0f;
             controlsSurfaceOverride.ConfigureContentInset(
                 insetLeftPx / density, insetRightPx / density,
                 insetTopPx / density, insetBottomPx / density);

@@ -148,20 +148,17 @@ namespace VRWorkspace.Presentation.Input.VCS
         /// <summary>Orthogonal counterpart to <see cref="GetProjectedSize"/> — see remarks there.</summary>
         public static Vector2 GetProjectedSizeOrthogonal(Transform targetT, Vector2 physicalSize, Transform refT)
         {
-            if (refT == null || refT == targetT)
-            {
-                return physicalSize;
-            }
-
-            Vector3 center = targetT.position;
-            Vector2 projCenter = ProjectToVirtualSpaceOrthogonal(center, refT);
-            Vector2 projRight  = ProjectToVirtualSpaceOrthogonal(center + targetT.right * (physicalSize.x / 2f), refT);
-            Vector2 projTop    = ProjectToVirtualSpaceOrthogonal(center + targetT.up * (physicalSize.y / 2f), refT);
-
-            float projW = Mathf.Abs(projRight.x - projCenter.x) * 2f;
-            float projH = Mathf.Abs(projTop.y - projCenter.y) * 2f;
-
-            return new Vector2(projW, projH);
+            // Unlike the camera-ray version, orthogonal panels don't need size re-derived via
+            // projection at all: they're rigid (not camera-shifting), so their true
+            // GetWorldSize() IS their stable VCS size. Re-deriving it by projecting
+            // targetT.right/up onto refT.right/up (as a previous version of this method did)
+            // shrinks the apparent size by cos(rotation angle) whenever targetT is rotated
+            // relative to refT — which many side panels are, slightly, to angle toward the
+            // user — making them register narrower than their true visible width. Only the
+            // CENTER needs projecting (see GetVirtualCenter/ProjectToVirtualSpaceOrthogonal),
+            // to place the panel correctly in VCS's flat 2D coordinate space; the size itself
+            // should just pass through unchanged.
+            return physicalSize;
         }
 
         public Vector2 GetVirtualSize(RTTCanvasBase canvas, Transform refT = null)
