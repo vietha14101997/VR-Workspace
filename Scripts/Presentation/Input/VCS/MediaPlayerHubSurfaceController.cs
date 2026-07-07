@@ -235,19 +235,22 @@ namespace VRWorkspace.Presentation.Input.VCS
         {
             if (_anchor == null) return;
 
-            _anchor.rotation = refT.rotation;
+            // Depth (along refT.forward) that the real UI quads actually sit at, and the
+            // rotation Hub's anchor should actually use. refT is the outer Main Menu's own
+            // transform — this app billboards each panel independently to face the camera, so
+            // Main Menu's rotation is NOT the same as Controls/Queue/Settings' own (they're at
+            // a different screen position, so their billboard angle differs). Using refT's
+            // rotation for Hub's anchor made it diverge from its true neighbors' orientation —
+            // worst exactly at the seams, which is what produced the reported arc when crossing
+            // from Hub's top edge into Queue. Controls is the always-present reference here
+            // (Queue/Settings are assumed to share its rotation — same rigid
+            // PlayerControlsGroup composition).
+            var controlsQuad = _controlsCanvas != null ? _controlsCanvas.GetQuadCollider() : null;
+
+            _anchor.rotation = controlsQuad != null ? controlsQuad.transform.rotation : refT.rotation;
             _anchor.localScale = Vector3.one;
 
-            // Depth (along refT.forward) that the real UI quads actually sit at. refT is the
-            // outer RTTMenuFrame's bare plane — it is NOT where Controls/Queue/Settings render;
-            // those are pushed forward/back from it for layering. Without this offset the
-            // anchor sits exactly on refT's plane, which in practice matches the video's own
-            // depth rather than the UI's, so the cursor visually renders behind/under the
-            // Controls panel instead of in front of it. Controls is the always-present
-            // reference; Queue/Settings are assumed to share the same depth (same rigid
-            // PlayerControlsGroup composition, only offset in X/Y).
             float depth = 0f;
-            var controlsQuad = _controlsCanvas != null ? _controlsCanvas.GetQuadCollider() : null;
             if (controlsQuad != null)
             {
                 depth = Vector3.Dot(controlsQuad.transform.position - refT.position, refT.forward);

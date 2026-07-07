@@ -402,15 +402,29 @@ namespace VRWorkspace.Presentation.Media.Controllers
 
                 result.QueuePagination = paginationObj.AddComponent<RTTFilePagination>();
 
-                // Pagination only connects back up into Queue. Priority SidePanel (see
-                // Controls override above) so it also wins distance ties against the outer
-                // background RTTMenuFrame.
-                paginationObj.AddComponent<VirtualSurfaceOverride>()
-                    .Configure(EdgePolicy.Up, SurfacePriority.SidePanel, orthogonalProjection: true);
-
                 float queuePixelW = sidePhysicalW / paginationPixelToMeter;
                 float btnSize = Mathf.Round(Mathf.Clamp(queuePixelW * 0.16f, 50f, 90f));
                 float paginationFrameW = queuePixelW + 2f * btnSize;
+
+                // Pagination only connects back up into Queue. Priority SidePanel (see
+                // Controls override above) so it also wins distance ties against the outer
+                // background RTTMenuFrame.
+                //
+                // ContentInset shrinks Pagination's REGISTERED width down to Queue's own width
+                // (queuePixelW), trimming off the extra `btnSize` on each side that its display
+                // quad has for the prev/next arrow buttons (paginationFrameW = queuePixelW +
+                // 2*btnSize). Without this, the outer btnSize-wide strips on either side have
+                // no Queue directly above them — the Up-traversal ray from there misses Queue
+                // entirely and was landing on the giant background RTTMenuFrame instead
+                // (surfaces the cursor "flying off and roaming free" when moving diagonally
+                // toward Pagination's outer edge, and a corner-pull artifact right at the
+                // boundary of that gap).
+                float paginationHorizontalInsetMeters = btnSize * paginationPixelToMeter;
+                var paginationSurfaceOverride = paginationObj.AddComponent<VirtualSurfaceOverride>();
+                paginationSurfaceOverride.Configure(EdgePolicy.Up, SurfacePriority.SidePanel, orthogonalProjection: true);
+                paginationSurfaceOverride.ConfigureContentInset(
+                    paginationHorizontalInsetMeters, paginationHorizontalInsetMeters, 0f, 0f);
+
                 result.QueuePagination.Initialize((IPaginationController)result.QueuePanel, paginationFrameW, 3);
 
                 result.QueuePagination.SetGlassColors(

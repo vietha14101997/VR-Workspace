@@ -421,12 +421,25 @@ namespace VRWorkspace.Domain.Input
         {
             Vector2 c = s.Center;
             Vector2 half = s.Size * 0.5f;
+
+            // Nudge the cross-axis coordinate slightly inward from the extreme corners.
+            // Two adjacent surfaces are often registered with edges deliberately aligned
+            // exactly (e.g. Pagination's width matched to Queue's) — a ray exiting right at
+            // that shared corner is a floating-point-fragile boundary case that can graze
+            // past the intended neighbor and fall through to an unrelated, larger surface
+            // that also happens to cover that point (the "escapes to the background" bug).
+            // A tiny inset keeps the ray's start comfortably inside the true adjacent range
+            // without being perceptible as a position error.
+            const float cornerEpsilon = 0.01f;
+            float cross = dir == EdgeDirection.Down || dir == EdgeDirection.Up ? uv.x : uv.y;
+            cross = Mathf.Clamp(cross, cornerEpsilon, 1f - cornerEpsilon);
+
             return dir switch
             {
-                EdgeDirection.Down  => new Vector2(c.x + (uv.x - 0.5f) * s.Size.x, c.y - half.y),
-                EdgeDirection.Up    => new Vector2(c.x + (uv.x - 0.5f) * s.Size.x, c.y + half.y),
-                EdgeDirection.Left  => new Vector2(c.x - half.x, c.y + (uv.y - 0.5f) * s.Size.y),
-                EdgeDirection.Right => new Vector2(c.x + half.x, c.y + (uv.y - 0.5f) * s.Size.y),
+                EdgeDirection.Down  => new Vector2(c.x + (cross - 0.5f) * s.Size.x, c.y - half.y),
+                EdgeDirection.Up    => new Vector2(c.x + (cross - 0.5f) * s.Size.x, c.y + half.y),
+                EdgeDirection.Left  => new Vector2(c.x - half.x, c.y + (cross - 0.5f) * s.Size.y),
+                EdgeDirection.Right => new Vector2(c.x + half.x, c.y + (cross - 0.5f) * s.Size.y),
                 _ => c
             };
         }

@@ -293,20 +293,18 @@ namespace VRWorkspace.Presentation.Input.Cursor
 
             // 2) Position the visual cursor directly on the physical surface based on its UV
             //
-            // IMPORTANT: physicalSize (and cursor.UV's clamping/traversal) are quantities in
-            // refT's coordinate frame — that's the frame VCS registration (GetVirtualCenter/
-            // GetVirtualSize) and 2D traversal (TryTraverseEdge) use throughout. The offset
-            // from center must therefore be scaled along refT.right/refT.up, NOT targetT's own
-            // local axes. For a target with any rotation relative to refT (common for side
-            // panels angled toward the user), targetT.right/up diverge from refT.right/up —
-            // using the wrong axes here made the reconstructed position increasingly wrong
-            // the farther the UV was from center (0,0 offset = no error; large offset = large
-            // error), which is exactly the "drift toward center, worse near edges/corners"
-            // symptom. targetT.position is still correct as the anchor point — it's the
-            // target's true 3D center, independent of which frame's axes describe the offset.
+            // NOTE: an earlier attempt switched this to refT.right/up, reasoning that
+            // physicalSize/UV are refT-frame quantities so the offset should be scaled along
+            // refT's axes for consistency. That assumption doesn't hold for this app's video
+            // player panels (Controls/Queue/Settings/Hub), which are individually rotated
+            // relative to refT as part of the curved-screen layout — using one shared frame
+            // for all of them turned each panel's true straight edge into an arc, and pulled
+            // the cursor toward a corner when crossing between differently-rotated panels
+            // (e.g. Queue -> Pagination). targetT's own axes correctly follow each panel's
+            // actual orientation, so reconstruction stays flat/straight per panel.
             Vector3 hotspot = targetT.position
-                + refT.right * ((cursor.UV.x - 0.5f) * physicalSize.x)
-                + refT.up * ((cursor.UV.y - 0.5f) * physicalSize.y);
+                + targetT.right * ((cursor.UV.x - 0.5f) * physicalSize.x)
+                + targetT.up * ((cursor.UV.y - 0.5f) * physicalSize.y);
 
             // Apply Z-offset along local forward to prevent z-fighting
             CursorWorldPosition = hotspot + targetT.forward * localZOffset;
