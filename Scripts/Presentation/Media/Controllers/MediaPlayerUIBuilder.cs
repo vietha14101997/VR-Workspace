@@ -293,11 +293,23 @@ namespace VRWorkspace.Presentation.Media.Controllers
             // distance ties against the outer background RTTMenuFrame during traversal.
             // Also allow Down: Queue's Pagination strip sits directly below it and needs a
             // route in (see section 3c below, which grants Pagination the matching Up edge).
-            result.SideControlsFrameObject.AddComponent<VirtualSurfaceOverride>()
-                .Configure(
-                    (sideControlsSide >= 0 ? EdgePolicy.Left : EdgePolicy.Right) | EdgePolicy.Down,
-                    SurfacePriority.SidePanel,
-                    orthogonalProjection: true);
+            var queueSurfaceOverride = result.SideControlsFrameObject.AddComponent<VirtualSurfaceOverride>();
+            queueSurfaceOverride.Configure(
+                (sideControlsSide >= 0 ? EdgePolicy.Left : EdgePolicy.Right) | EdgePolicy.Down,
+                SurfacePriority.SidePanel,
+                orthogonalProjection: true);
+
+            // RTTMediaQueuePanel insets its header (title + shuffle button), and separately
+            // its item thumbnails/titles, by SIDE_MARGIN_RATIO=0.055 (5.5%) of _width on each
+            // side (see RTTMediaQueuePanel.cs: `_sideMargin = _width * SIDE_MARGIN_RATIO`,
+            // applied to headerRT/titleRT offsets). To prevent coordinate gaps on the side
+            // adjacent to the Hub (where they should align exactly at the physical boundary),
+            // we dynamically clear the inset on the inner edge (Left when panel is on right,
+            // Right when panel is on left) while preserving it on the outer edge.
+            float queueLeftInset = (sideControlsSide >= 0) ? 0f : (sidePhysicalW * 0.055f);
+            float queueRightInset = (sideControlsSide >= 0) ? (sidePhysicalW * 0.055f) : 0f;
+            queueSurfaceOverride.ConfigureContentInset(queueLeftInset, queueRightInset, 0f, 0f);
+            Debug.Log($"[HUB_DBG] Configured Queue's ContentInset: overrideInstanceId={queueSurfaceOverride.GetEntityId()} onGameObject={result.SideControlsFrameObject.GetEntityId()} ContentInset={queueSurfaceOverride.ContentInset}");
 
             sideFrame.Configure(sidePhysicalW, sidePhysicalH, sideLogicalWidth);
             sideFrame.SetGlassBackgroundEnabled(false);
@@ -357,8 +369,16 @@ namespace VRWorkspace.Presentation.Media.Controllers
                 // Same rule as Queue — Settings and Queue are mutually exclusive, so whichever
                 // is open connects back into the Hub the same way. Priority SidePanel for the
                 // same tie-breaking reason (see Controls override above).
-                result.SettingsFrameObject.AddComponent<VirtualSurfaceOverride>()
-                    .Configure(sideControlsSide >= 0 ? EdgePolicy.Left : EdgePolicy.Right, SurfacePriority.SidePanel, orthogonalProjection: true);
+                var settingsSurfaceOverride = result.SettingsFrameObject.AddComponent<VirtualSurfaceOverride>();
+                settingsSurfaceOverride.Configure(sideControlsSide >= 0 ? EdgePolicy.Left : EdgePolicy.Right, SurfacePriority.SidePanel, orthogonalProjection: true);
+
+                // RTTMediaSettingsPanel uses the identical SIDE_MARGIN_RATIO=0.055 (5.5%)
+                // left/right content inset as Queue (same constant, confirmed in
+                // RTTMediaSettingsPanel.cs). Clear the inset on the inner edge adjacent
+                // to the Hub to align physical boundaries exactly.
+                float settingsLeftInset = (sideControlsSide >= 0) ? (settingsPhysicalW * 0.055f) : 0f;
+                float settingsRightInset = (sideControlsSide >= 0) ? 0f : (settingsPhysicalW * 0.055f);
+                settingsSurfaceOverride.ConfigureContentInset(settingsLeftInset, settingsRightInset, 0f, 0f);
 
                 settingsMenuFrame.Configure(settingsPhysicalW, settingsTotalH, settingsLogicalW);
                 settingsMenuFrame.SetGlassBackgroundEnabled(false);
@@ -410,20 +430,24 @@ namespace VRWorkspace.Presentation.Media.Controllers
                 // Controls override above) so it also wins distance ties against the outer
                 // background RTTMenuFrame.
                 //
-                // ContentInset shrinks Pagination's REGISTERED width down to Queue's own width
-                // (queuePixelW), trimming off the extra `btnSize` on each side that its display
-                // quad has for the prev/next arrow buttons (paginationFrameW = queuePixelW +
-                // 2*btnSize). Without this, the outer btnSize-wide strips on either side have
-                // no Queue directly above them — the Up-traversal ray from there misses Queue
-                // entirely and was landing on the giant background RTTMenuFrame instead
-                // (surfaces the cursor "flying off and roaming free" when moving diagonally
-                // toward Pagination's outer edge, and a corner-pull artifact right at the
-                // boundary of that gap).
-                float paginationHorizontalInsetMeters = btnSize * paginationPixelToMeter;
+                // NOTE: Pagination's display quad is intentionally wider than Queue
+                // (paginationFrameW = queuePixelW + 2*btnSize, for the prev/next arrow
+                // buttons) — a previous attempt shrank Pagination's REGISTERED VCS size down
+                // to Queue's width via ContentInset to close that gap, but that introduced a
+                // worse regression (cursor jumping left by half of Queue's width when crossing
+                // Queue -> Pagination) and doesn't match how Library handles the analogous
+                // Pagination/Taskbar size relationship (no special override there either).
+                // Registering Pagination at its true, wider size instead.
                 var paginationSurfaceOverride = paginationObj.AddComponent<VirtualSurfaceOverride>();
                 paginationSurfaceOverride.Configure(EdgePolicy.Up, SurfacePriority.SidePanel, orthogonalProjection: true);
-                paginationSurfaceOverride.ConfigureContentInset(
-                    paginationHorizontalInsetMeters, paginationHorizontalInsetMeters, 0f, 0f);
+                // Shrink Pagination's registered VCS width using ContentInset so that its
+                // VCS bounds match Queue's visual bounds exactly (since Pagination has extra
+                // width on the sides for the prev/next arrow buttons). Now that both Queue
+                // and Pagination align at the exact same physical X coordinates, there is
+                // no horizontal jump when transitioning, and Pagination does not overlap
+                // with the Controls/Hub.
+                float paginationInsetMeters = btnSize * paginationPixelToMeter;
+                paginationSurfaceOverride.ConfigureContentInset(paginationInsetMeters, paginationInsetMeters, 0f, 0f);
 
                 result.QueuePagination.Initialize((IPaginationController)result.QueuePanel, paginationFrameW, 3);
 

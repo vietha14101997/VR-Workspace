@@ -147,37 +147,18 @@ namespace VRWorkspace.Presentation.Input.VCS
             var refT = _refFrameTransform;
             if (refT == null) return;
 
-            if (!TryGetProjectedEdges(_controlsCanvas, refT, out var controlsLeft, out _, out var controlsTop, out _))
+            if (!TryGetProjectedEdges(_controlsCanvas, refT, out var controlsLeft, out var controlsRight, out var controlsTop, out _))
                 return;
-            if (!TryGetProjectedEdges(sideCanvas, refT, out var sideLeft, out var sideRight, out var sideTop, out _))
+            if (!TryGetProjectedEdges(sideCanvas, refT, out _, out _, out var sideTop, out _))
                 return;
 
             bool rightSide = _sideControlsSide >= 0;
 
-            float left, right, top, bottom;
-            EdgePolicy edges;
-
-            if (rightSide)
-            {
-                // Side panel sits to the right of Controls.
-                left = controlsLeft;
-                right = sideLeft;      // near edge of the side panel
-                top = sideTop;
-                bottom = controlsTop;
-                edges = EdgePolicy.Down | EdgePolicy.Right;
-            }
-            else
-            {
-                // Mirrored: side panel sits to the left of Controls.
-                if (!TryGetProjectedEdges(_controlsCanvas, refT, out _, out var controlsRight, out _, out _))
-                    return;
-
-                left = sideRight;      // near edge of the side panel
-                right = controlsRight;
-                top = sideTop;
-                bottom = controlsTop;
-                edges = EdgePolicy.Down | EdgePolicy.Left;
-            }
+            float left = controlsLeft;
+            float right = controlsRight;
+            float top = sideTop;
+            float bottom = controlsTop;
+            EdgePolicy edges = EdgePolicy.Down | (rightSide ? EdgePolicy.Right : EdgePolicy.Left);
 
             Vector2 newCenter = new Vector2((left + right) * 0.5f, (top + bottom) * 0.5f);
             Vector2 newSize = new Vector2(Mathf.Abs(right - left), Mathf.Abs(top - bottom));
@@ -193,7 +174,7 @@ namespace VRWorkspace.Presentation.Input.VCS
             if (_dbgLogTimer <= 0f)
             {
                 _dbgLogTimer = 2f;
-                Debug.Log($"[HUB_DBG] left={left:F4} right={right:F4} top={top:F4} bottom={bottom:F4} | controlsLeft={controlsLeft:F4} controlsTop={controlsTop:F4} | sideLeft={sideLeft:F4} sideRight={sideRight:F4} sideTop={sideTop:F4} | hubCenter={newCenter} hubSize={newSize}");
+                Debug.Log($"[HUB_DBG] left={left:F4} right={right:F4} top={top:F4} bottom={bottom:F4} | controlsLeft={controlsLeft:F4} controlsTop={controlsTop:F4} | sideTop={sideTop:F4} | hubCenter={newCenter} hubSize={newSize}");
             }
 
             // Keep the anchor transform positioned/oriented in world space so
@@ -247,7 +228,17 @@ namespace VRWorkspace.Presentation.Input.VCS
             // PlayerControlsGroup composition).
             var controlsQuad = _controlsCanvas != null ? _controlsCanvas.GetQuadCollider() : null;
 
-            _anchor.rotation = controlsQuad != null ? controlsQuad.transform.rotation : refT.rotation;
+            if (controlsQuad != null)
+            {
+                Vector3 forward = controlsQuad.transform.forward;
+                forward.y = 0;
+                if (forward.sqrMagnitude < 1e-5f) forward = Vector3.forward;
+                _anchor.rotation = Quaternion.LookRotation(forward.normalized, Vector3.up);
+            }
+            else
+            {
+                _anchor.rotation = refT.rotation;
+            }
             _anchor.localScale = Vector3.one;
 
             float depth = 0f;

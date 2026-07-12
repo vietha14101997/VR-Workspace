@@ -293,15 +293,22 @@ namespace VRWorkspace.Presentation.Input.Cursor
 
             // 2) Position the visual cursor directly on the physical surface based on its UV
             //
-            // NOTE: an earlier attempt switched this to refT.right/up, reasoning that
-            // physicalSize/UV are refT-frame quantities so the offset should be scaled along
-            // refT's axes for consistency. That assumption doesn't hold for this app's video
-            // player panels (Controls/Queue/Settings/Hub), which are individually rotated
-            // relative to refT as part of the curved-screen layout — using one shared frame
-            // for all of them turned each panel's true straight edge into an arc, and pulled
-            // the cursor toward a corner when crossing between differently-rotated panels
-            // (e.g. Queue -> Pagination). targetT's own axes correctly follow each panel's
-            // actual orientation, so reconstruction stays flat/straight per panel.
+            // physicalSize (and cursor.UV's clamping/traversal bounds) are quantities in
+            // refT's coordinate frame — that's the frame VCS registration (GetVirtualCenter/
+            // GetVirtualSize) and 2D traversal (TryTraverseEdge) use throughout. The offset
+            // from center must therefore be scaled along refT.right/refT.up, NOT targetT's own
+            // local axes — if targetT has any rotation relative to refT (common for panels
+            // angled toward the user), using its own axes here reconstructs the wrong world
+            // position, worse the farther the UV is from center (confirmed: cursor visibly
+            // dragged toward the shared edge's center, worst near the edge's two ends).
+            // targetT.position is still correct as the anchor point — it's the target's true
+            // 3D center, independent of which frame's axes describe the offset from it.
+            //
+            // (An earlier attempt at this exact fix was reverted after apparently causing an
+            // arced top edge and a corner-pull entering Pagination — those turned out to be
+            // pre-existing, unrelated bugs (Hub's anchor was using the wrong rotation source;
+            // Pagination had a separate corner/unit conversion bug), now fixed at their own
+            // root cause, so this fix is back in place.)
             Vector3 hotspot = targetT.position
                 + targetT.right * ((cursor.UV.x - 0.5f) * physicalSize.x)
                 + targetT.up * ((cursor.UV.y - 0.5f) * physicalSize.y);

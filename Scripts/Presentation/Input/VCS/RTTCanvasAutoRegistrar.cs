@@ -168,16 +168,40 @@ namespace VRWorkspace.Presentation.Input.VCS
 
             Vector2 physicalSize = canvas.GetWorldSize();
 
+            // Account for relative scale between canvas and refT
+            if (refT != null && refT != canvas.transform)
+            {
+                Vector3 canvasLossy = canvas.transform.lossyScale;
+                Vector3 refLossy = refT.lossyScale;
+                physicalSize.x *= (canvasLossy.x / Mathf.Max(1e-4f, refLossy.x));
+                physicalSize.y *= (canvasLossy.y / Mathf.Max(1e-4f, refLossy.y));
+            }
+
             Vector2 size = UsesOrthogonalProjection(canvas)
                 ? GetProjectedSizeOrthogonal(canvas.transform, physicalSize, refT)
                 : GetProjectedSize(canvas.transform, physicalSize, refT);
 
             var inset = GetContentInset(canvas);
+            // [HUB_DBG] Temporary trace: confirm whether GetContentInset actually returns a
+            // value at this call site, and what raw/pre-inset size looks like, to isolate
+            // why Queue's registered size wasn't shrinking despite ConfigureContentInset.
+            if (canvas.name.Contains("Side") || canvas.name.Contains("Queue"))
+            {
+                var ov = canvas.GetComponent<VirtualSurfaceOverride>();
+                Debug.Log($"[HUB_DBG] GetVirtualSize({canvas.name}): hasOverrideComponent={(ov != null)} overrideInstanceId={(ov != null ? ov.GetEntityId().ToString() : "N/A")} inset={(inset.HasValue ? inset.Value.ToString() : "NULL")} physicalSize(raw)={physicalSize} size(pre-inset)={size}");
+            }
             if (inset.HasValue)
             {
                 var i = inset.Value; // x=left, y=right, z=top, w=bottom
-                size.x -= (i.x + i.y);
-                size.y -= (i.z + i.w);
+                float scaleX = 1f;
+                float scaleY = 1f;
+                if (refT != null && refT != canvas.transform)
+                {
+                    scaleX = canvas.transform.lossyScale.x / Mathf.Max(1e-4f, refT.lossyScale.x);
+                    scaleY = canvas.transform.lossyScale.y / Mathf.Max(1e-4f, refT.lossyScale.y);
+                }
+                size.x -= (i.x + i.y) * scaleX;
+                size.y -= (i.z + i.w) * scaleY;
             }
             return size;
         }
@@ -214,8 +238,15 @@ namespace VRWorkspace.Presentation.Input.VCS
             if (inset.HasValue)
             {
                 var i = inset.Value; // x=left, y=right, z=top, w=bottom
-                center.x += (i.x - i.y) * 0.5f;
-                center.y += (i.w - i.z) * 0.5f;
+                float scaleX = 1f;
+                float scaleY = 1f;
+                if (refT != null && refT != canvas.transform)
+                {
+                    scaleX = canvas.transform.lossyScale.x / Mathf.Max(1e-4f, refT.lossyScale.x);
+                    scaleY = canvas.transform.lossyScale.y / Mathf.Max(1e-4f, refT.lossyScale.y);
+                }
+                center.x += (i.x - i.y) * 0.5f * scaleX;
+                center.y += (i.w - i.z) * 0.5f * scaleY;
             }
             return center;
         }
