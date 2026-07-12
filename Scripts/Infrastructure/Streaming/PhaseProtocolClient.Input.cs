@@ -25,10 +25,29 @@ namespace VRWorkspace.Streaming
         private readonly byte[] _gamepadBuffer = new byte[13];
 
         private bool IsInputChannelReady =>
-            _inputChannel != null && _inputChannel.ReadyState == RTCDataChannelState.Open;
+            _mediaRelayActive ||
+            (_inputChannel != null && _inputChannel.ReadyState == RTCDataChannelState.Open);
 
         private void TrySendInput(byte[] buffer)
         {
+            // Media relay mode: wrap with 0xF5 channel prefix and send over WebSocket
+            if (_mediaRelayActive)
+            {
+                try
+                {
+                    var relayBuffer = new byte[1 + buffer.Length];
+                    relayBuffer[0] = 0xF5; // Input channel
+                    Buffer.BlockCopy(buffer, 0, relayBuffer, 1, buffer.Length);
+                    _ = SendBytesAsync(relayBuffer, 0, relayBuffer.Length);
+                }
+                catch (Exception)
+                {
+                    // WebSocket send failed — safe to ignore
+                }
+                return;
+            }
+
+            // Normal mode: send via DataChannel
             try
             {
                 var dc = _inputChannel;

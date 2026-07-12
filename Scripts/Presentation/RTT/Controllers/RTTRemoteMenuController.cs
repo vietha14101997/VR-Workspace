@@ -44,6 +44,7 @@ namespace VRWorkspace.UI.RTT.Controllers
         // Remote audio playback (auto-created when streaming starts)
         private RemoteAudioPlayer _audioPlayer;
         private DataChannelAudioPlayer _dcAudioPlayer; // Fallback: Opus via DataChannel when Audio PC ICE fails
+        private bool _mediaRelayActive; // True when media relay (WebSocket fallback) is active
 
         // Cursor tracking
         private int _activeCursorPanelIndex = -1;
@@ -765,32 +766,31 @@ namespace VRWorkspace.UI.RTT.Controllers
         {
             CleanupRemoteAudioPlayer();
 
-            // Create RTP player FIRST — its Awake() calls AudioSettings.Reset() which kills all audio.
-            // DataChannelAudioPlayer.StartPlayback() must happen AFTER to survive the reset.
+            // 1. RTP Player (Primary) - Most reliable on high-bitrate video
             var rtpAudioObj = new GameObject("RemoteAudioPlayer");
             rtpAudioObj.transform.SetParent(transform, false);
             rtpAudioObj.AddComponent<AudioSource>();
             _audioPlayer = rtpAudioObj.AddComponent<RemoteAudioPlayer>();
-            // Primary: RTP audio (independent UDP transport, not affected by H.265 SCTP congestion)
+            _audioPlayer.SetMute(false); // Unmuted: RTP is now primary
 
-            // Fallback: DataChannel audio (shares SCTP with H.265 video → congestion causes delay+distortion)
+            // 2. DC Player (Fallback) - Muted, used only for media relay or when RTP fails
             var dcAudioObj = new GameObject("DataChannelAudioPlayer");
             dcAudioObj.transform.SetParent(transform, false);
             dcAudioObj.AddComponent<AudioSource>();
             _dcAudioPlayer = dcAudioObj.AddComponent<DataChannelAudioPlayer>();
-            _dcAudioPlayer.StartPlayback(); // Must be AFTER RemoteAudioPlayer's AudioSettings.Reset()
-            _dcAudioPlayer.SetMute(true); // Muted: RTP audio is primary (DC shares SCTP with H.265 video)
+            _dcAudioPlayer.StartPlayback();
+            _dcAudioPlayer.SetMute(true); // Muted by default
 
             if (_viewModel != null)
             {
                 _viewModel.OnDCAudioData += HandleDCAudioData;
                 _viewModel.OnRemoteAudioTrackReceived += _audioPlayer.SetTrack;
+                _viewModel.OnMediaRelayStateChanged += HandleMediaRelayStateChanged;
 
-                // Audio track may already be cached (OnTrack fires in Phase 2, before player is created in Phase 3)
                 var cachedTrack = _viewModel.CachedAudioTrack;
                 if (cachedTrack != null)
                 {
-                    Debug.Log("[RTTRemoteMenuController] Using cached audio track for RTP player");
+                    Debug.Log("[RTTRemoteMenuController] Using cached audio track for RTP player (primary)");
                     _audioPlayer.SetTrack(cachedTrack);
                 }
             }
@@ -800,11 +800,29 @@ namespace VRWorkspace.UI.RTT.Controllers
 
         private void HandleDCAudioData(byte[] data)
         {
-            // DataChannel audio fallback — feeds DC player (muted unless RTP fails).
-            // DC shares SCTP with H.265 video, causing congestion. RTP is primary.
+            if (_dcAudioPlayer == null) return;
+
+            if (_mediaRelayActive)
+            {
+                // Media relay sends raw PCM16 — write directly to ring buffer
+                _dcAudioPlayer.OnPCMFrame(data, 0, data.Length);
+            }
+            else
+            {
+                // Normal mode: DataChannel sends Opus frames
+                _dcAudioPlayer.OnOpusFrame(data, 0, data.Length);
+            }
+        }
+
+        private void HandleMediaRelayStateChanged(bool active)
+        {
+            _mediaRelayActive = active;
+            // Switch to DC audio when in media relay (WebSocket fallback),
+            // since RTP PC is not available.
             if (_dcAudioPlayer != null)
             {
-                _dcAudioPlayer.OnOpusFrame(data, 0, data.Length);
+                _dcAudioPlayer.SetMute(!active);
+                Debug.Log($"[RTTRemoteMenuController] Media relay {(active ? "active" : "stopped")}: DC audio {(active ? "unmuted" : "muted")}");
             }
         }
 
@@ -832,6 +850,7 @@ namespace VRWorkspace.UI.RTT.Controllers
                 if (_viewModel != null)
                 {
                     _viewModel.OnDCAudioData -= HandleDCAudioData;
+                    _viewModel.OnMediaRelayStateChanged -= HandleMediaRelayStateChanged;
                 }
 
                 _dcAudioPlayer.StopAudio();

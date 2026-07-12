@@ -64,8 +64,8 @@ namespace VRWorkspace.Streaming
                     _videoPcs.Remove(monitorIndex);
                 }
 
-                // Create new PeerConnection (LAN mode, no STUN)
-                var cfg = new RTCConfiguration { iceServers = new RTCIceServer[0] };
+                // Create new PeerConnection using server-provided ICE configuration
+                var cfg = GetRTCConfiguration();
                 var videoPc = new RTCPeerConnection(ref cfg);
                 AppLog.Log($"[PhaseProtocol] Video PC created for monitor {monitorIndex}");
 
@@ -138,7 +138,7 @@ namespace VRWorkspace.Streaming
                         {
                             TaintTrack(monIdx, "luminance corruption detected by per-track decoder");
                         };
-                        AppLog.Log($"[PhaseProtocol] Video PC{capturedMonitor} H265 receiver created (per-track mode, {w}x{h})");
+                        Debug.Log($"[PhaseProtocol] Video PC{capturedMonitor} H265 receiver created (per-track mode, {w}x{h})");
                     }
                     else
                     {
@@ -149,14 +149,14 @@ namespace VRWorkspace.Streaming
                 // Wire OnDataChannel — server creates the h265video DC on its side (it holds the offer)
                 videoPc.OnDataChannel = channel =>
                 {
-                    AppLog.Log($"[PhaseProtocol] Video PC{capturedMonitor} server DataChannel: label={channel.Label}");
+                    Debug.Log($"[PhaseProtocol] Video PC{capturedMonitor} server DataChannel: label={channel.Label}");
 
                     string expectedLabel = $"h265video-{capturedMonitor}";
                     if (channel.Label == expectedLabel)
                     {
                         channel.OnOpen = () =>
                         {
-                            AppLog.Log($"[PhaseProtocol] Video PC{capturedMonitor} h265video DC opened (per-track mode)");
+                            Debug.Log($"[PhaseProtocol] Video PC{capturedMonitor} h265video DC opened (per-track mode)");
                             // Initialize LastFrameTime so auto-heal doesn't fire prematurely
                             if (perTrackWrapper != null)
                             {
@@ -166,26 +166,26 @@ namespace VRWorkspace.Streaming
                             // Request initial frame from server — ensures display even on idle desktops.
                             // Server resets InitialFrameSent + forces keyframe for this monitor.
                             _ = SendTextAsync($"{{\"type\":\"request_initial_frame\",\"monitorIndex\":{capturedMonitor}}}");
-                            AppLog.Log($"[PhaseProtocol] Video PC{capturedMonitor} requested initial frame from server");
+                            Debug.Log($"[PhaseProtocol] Video PC{capturedMonitor} requested initial frame from server");
                         };
                         channel.OnClose = () =>
-                            AppLog.Log($"[PhaseProtocol] Video PC{capturedMonitor} h265video DC closed (per-track mode)");
+                            Debug.Log($"[PhaseProtocol] Video PC{capturedMonitor} h265video DC closed (per-track mode)");
                         channel.OnMessage = bytes =>
                             HandleH265VideoFromDataChannel(bytes);
 
                         // Also store in _h265VideoChannels for consistency
                         _h265VideoChannels[capturedMonitor] = channel;
-                        AppLog.Log($"[PhaseProtocol] Video PC{capturedMonitor} h265video DC wired (per-track mode)");
+                        Debug.Log($"[PhaseProtocol] Video PC{capturedMonitor} h265video DC wired (per-track mode)");
 
                         // Request initial frame immediately when DC is wired (not OnOpen).
                         // Unity WebRTC may fire OnOpen BEFORE OnDataChannel callback completes,
                         // causing OnOpen handler to be missed. Sending here guarantees delivery.
                         _ = SendTextAsync($"{{\"type\":\"request_initial_frame\",\"monitorIndex\":{capturedMonitor}}}");
-                        AppLog.Log($"[PhaseProtocol] Video PC{capturedMonitor} requested initial frame from server");
+                        Debug.Log($"[PhaseProtocol] Video PC{capturedMonitor} requested initial frame from server");
                     }
                     else
                     {
-                        AppLog.LogWarning($"[PhaseProtocol] Video PC{capturedMonitor} unexpected DC label: {channel.Label} (expected {expectedLabel})");
+                        Debug.LogWarning($"[PhaseProtocol] Video PC{capturedMonitor} unexpected DC label: {channel.Label} (expected {expectedLabel})");
                     }
                 };
 
@@ -366,8 +366,8 @@ namespace VRWorkspace.Streaming
             string modeLabel = _perTrackPcMode ? "Per-Track Multi-PC" : "Single-PC Multi-Track";
             AppLog.Log($"[PhaseProtocol] CreateSinglePCMultiTrackAsync: Creating PeerConnection for {count} monitors ({modeLabel} mode)...");
 
-            // EMPTY ICE servers - no STUN for LAN mode
-            var cfg = new RTCConfiguration { iceServers = new RTCIceServer[0] };
+            // Create PeerConnection using server-provided ICE configuration
+            var cfg = GetRTCConfiguration();
             var pc = new RTCPeerConnection(ref cfg);
             AppLog.Log($"[PhaseProtocol] PeerConnection created: {pc != null}, SignalingState={pc?.SignalingState}");
 
@@ -541,7 +541,7 @@ namespace VRWorkspace.Streaming
         {
             try
             {
-                var cfg = new RTCConfiguration { iceServers = new RTCIceServer[0] };
+                var cfg = GetRTCConfiguration();
                 _audioPc = new RTCPeerConnection(ref cfg);
                 AppLog.Log("[PhaseProtocol] Audio PeerConnection created (RTP Opus transport)");
 
@@ -1019,9 +1019,8 @@ namespace VRWorkspace.Streaming
         /// </summary>
         private async Task CreateSinglePCAsync(int idx)
         {
-            // EMPTY ICE servers (like browser) - no STUN lookup delay!
-            // Browser: new RTCPeerConnection({ iceServers: [], iceCandidatePoolSize: 0 })
-            var cfg = new RTCConfiguration { iceServers = new RTCIceServer[0] };
+            // Create PeerConnection using server-provided ICE configuration
+            var cfg = GetRTCConfiguration();
             var pc = new RTCPeerConnection(ref cfg);
             var wrapper = new PCWrapper
             {
@@ -1653,6 +1652,19 @@ namespace VRWorkspace.Streaming
                     OnAllMonitorsReady?.Invoke();
                 }
             }
+        }
+
+        /// <summary>
+        /// Reads ICE servers from _phase2.IceServers and returns a full RTCConfiguration,
+        /// falling back to an empty array for LAN/USB modes.
+        /// </summary>
+        private RTCConfiguration GetRTCConfiguration()
+        {
+            var servers = (_phase2 != null && _phase2.IceServers != null)
+                ? _phase2.IceServers.ToArray()
+                : new RTCIceServer[0];
+
+            return new RTCConfiguration { iceServers = servers };
         }
     }
 }

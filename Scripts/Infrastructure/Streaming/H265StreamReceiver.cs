@@ -163,14 +163,11 @@ namespace VRWorkspace.Streaming
             _uvTex.name = $"H265_UV_Mon{MonitorIndex}";
 
             // Output RenderTexture (full RGBA) with mipmaps for anti-shimmer in VR.
-            // Without mipmaps, Trilinear filtering and anisoLevel are ineffective,
-            // causing shimmer artifacts especially at 1080p where source pixel density
-            // exceeds the VR display's effective pixel density on the quad.
             _outputRt = new RenderTexture(Width, Height, 0, RenderTextureFormat.ARGB32);
             _outputRt.useMipMap = true;
-            _outputRt.autoGenerateMips = false; // Use SharpMipGenerator (Lanczos) instead of box filter
+            _outputRt.autoGenerateMips = false;
             _outputRt.filterMode = FilterMode.Trilinear;
-            _outputRt.anisoLevel = 8;
+            _outputRt.anisoLevel = 16; // Maximize anisotropic filtering for VR quad stability
             _outputRt.name = $"H265_Output_Mon{MonitorIndex}";
             _outputRt.Create();
 
@@ -338,13 +335,11 @@ namespace VRWorkspace.Streaming
             int fHeight  = _decoder.FrameHeight;
 
             // Handle resolution changes by reallocating textures and buffers.
-            // If the decoder starts outputting a lower/higher resolution than configured
-            // (e.g. Adaptive Bitrate downscaling), we must recreate textures to prevent
-            // UnityException (LoadRawTextureData: not enough data provided).
             if (fWidth != Width || fHeight != Height)
             {
                 AppLog.LogWarning($"{TAG} PC{MonitorIndex} Resolution changed dynamically: {Width}x{Height} -> {fWidth}x{fHeight}. Reallocating textures.");
                 
+                // CRITICAL: Stop frame processing for one tick to allow re-allocation
                 Width = fWidth;
                 Height = fHeight;
                 
@@ -355,17 +350,19 @@ namespace VRWorkspace.Streaming
                 // Recreate textures with the new dimensions
                 _yTex = new Texture2D(Width, Height, TextureFormat.R8, false, true);
                 _yTex.filterMode = FilterMode.Bilinear;
+                _yTex.wrapMode = TextureWrapMode.Clamp;
                 _yTex.name = $"H265_Y_Mon{MonitorIndex}";
 
                 _uvTex = new Texture2D(Width / 2, Height / 2, TextureFormat.RG16, false, true);
                 _uvTex.filterMode = FilterMode.Bilinear;
+                _uvTex.wrapMode = TextureWrapMode.Clamp;
                 _uvTex.name = $"H265_UV_Mon{MonitorIndex}";
 
                 _outputRt = new RenderTexture(Width, Height, 0, RenderTextureFormat.ARGB32);
                 _outputRt.useMipMap = true;
                 _outputRt.autoGenerateMips = false;
                 _outputRt.filterMode = FilterMode.Trilinear;
-                _outputRt.anisoLevel = 8;
+                _outputRt.anisoLevel = 16;
                 _outputRt.name = $"H265_Output_Mon{MonitorIndex}";
                 _outputRt.Create();
                 
@@ -379,11 +376,13 @@ namespace VRWorkspace.Streaming
                 // Re-allocate the byte buffers
                 _yBuf = new byte[Width * Height];
                 _uvBuf = new byte[(Width / 2) * (Height / 2) * 2];
+
+                // Notify UI that the texture object has changed
+                OnTextureReady?.Invoke(MonitorIndex, _outputRt);
+                return; // Wait for next tick to upload data
             }
 
             // Upload Y plane: always use stride-copy to produce exactly fWidth*fHeight bytes.
-            // Passing the raw buffer (which may be larger due to MediaCodec stride alignment)
-            // to LoadRawTextureData would throw an exception or produce a black texture.
             {
                 int yNeeded = fWidth * fHeight;
                 if (_yBuf == null || _yBuf.Length < yNeeded)
@@ -391,12 +390,10 @@ namespace VRWorkspace.Streaming
 
                 if (yStride == fWidth)
                 {
-                    // No padding: fast copy entire buffer (only the exact needed bytes)
                     Buffer.BlockCopy(yData, 0, _yBuf, 0, yNeeded);
                 }
                 else
                 {
-                    // Stride padding present: copy row by row
                     for (int row = 0; row < fHeight; row++)
                         Buffer.BlockCopy(yData, row * yStride, _yBuf, row * fWidth, fWidth);
                 }
@@ -404,33 +401,11 @@ namespace VRWorkspace.Streaming
                 _yTex.Apply(false, false);
             }
 
-            // ── Corruption detection (cheap: 16 sample points from Y plane) ──
-            if (CheckFrameCorruption(yData, fWidth, fHeight, yStride))
-            {
-                if (!_corruptionSuspected || (DateTime.UtcNow - _lastCorruptionTime).TotalSeconds > 2.0)
-                {
-                    _corruptionSuspected = true;
-                    _lastCorruptionTime = DateTime.UtcNow;
-                    AppLog.LogWarning($"{TAG} PC{MonitorIndex} CORRUPTION DETECTED: rapid luminance oscillation (decoded={_decodedCount}).");
-
-                    // Fire corruption event — TaintTrack handles flush + keyframe + P-frame gating
-                    OnCorruptionDetected?.Invoke(MonitorIndex);
-                    return; // Skip displaying this corrupted frame
-                }
-            }
-            else if (_corruptionSuspected && (DateTime.UtcNow - _lastCorruptionTime).TotalSeconds > 3.0)
-            {
-                // Corruption resolved (3s of clean frames)
-                _corruptionSuspected = false;
-                AppLog.Log($"{TAG} PC{MonitorIndex} Corruption resolved (3s clean)");
-            }
-
-            // Upload UV plane: always use stride-copy to produce exactly uvWidth*uvHeight*2 bytes.
-            // Android NV12 UV plane is interleaved (CbCr), RG16 format = 2 bytes per pixel.
+            // Upload UV plane
             {
                 int uvWidth    = fWidth  / 2;
                 int uvHeight   = fHeight / 2;
-                int uvRowBytes = uvWidth * 2; // RG16: 2 bytes per UV pixel
+                int uvRowBytes = uvWidth * 2;
                 int uvNeeded   = uvRowBytes * uvHeight;
 
                 if (_uvBuf == null || _uvBuf.Length < uvNeeded)
@@ -438,12 +413,10 @@ namespace VRWorkspace.Streaming
 
                 if (uvStride == uvRowBytes)
                 {
-                    // No padding: fast copy exact needed bytes
                     Buffer.BlockCopy(uvData, 0, _uvBuf, 0, uvNeeded);
                 }
                 else
                 {
-                    // Stride padding present: copy row by row
                     for (int row = 0; row < uvHeight; row++)
                         Buffer.BlockCopy(uvData, row * uvStride, _uvBuf, row * uvRowBytes, uvRowBytes);
                 }
@@ -455,9 +428,27 @@ namespace VRWorkspace.Streaming
             Graphics.Blit(null, _outputRt, _nv12Material);
 
             // Generate sharp mipmaps (Lanczos-2 kernel) for anti-shimmer in VR.
-            // Limited to 4 levels (1080→540→270→135) which is sufficient for typical
-            // VR viewing distances. Each level = 1 blit call with 4x4 kernel.
-            SharpMipGenerator.Generate(_outputRt, sharpness: 0.1f, maxMipLevels: 4);
+            // Limited to 6 levels to ensure coverage even at distance.
+            SharpMipGenerator.Generate(_outputRt, sharpness: 0.1f, maxMipLevels: 6);
+
+            // ── Corruption detection (Move after blit to avoid blocking data flow) ──
+            if (CheckFrameCorruption(yData, fWidth, fHeight, yStride))
+            {
+                if (!_corruptionSuspected || (DateTime.UtcNow - _lastCorruptionTime).TotalSeconds > 2.0)
+                {
+                    _corruptionSuspected = true;
+                    _lastCorruptionTime = DateTime.UtcNow;
+                    AppLog.LogWarning($"{TAG} PC{MonitorIndex} CORRUPTION DETECTED: rapid luminance oscillation.");
+
+                    // Fire corruption event — TaintTrack handles flush + keyframe + P-frame gating
+                    OnCorruptionDetected?.Invoke(MonitorIndex);
+                }
+            }
+            else if (_corruptionSuspected && (DateTime.UtcNow - _lastCorruptionTime).TotalSeconds > 3.0)
+            {
+                _corruptionSuspected = false;
+                AppLog.Log($"{TAG} PC{MonitorIndex} Corruption resolved (3s clean)");
+            }
 
             // Fire callback (on main thread already)
             OnTextureReady?.Invoke(MonitorIndex, _outputRt);

@@ -1342,8 +1342,10 @@ namespace VRWorkspace.UI.RTT.Components
         /// </summary>
         private void EnsureBothPanelsVisible()
         {
-            // Don't show side panels if disconnected or error
-            if (_currentPhase == ConnectionPhase.Disconnected || _currentPhase == ConnectionPhase.Error)
+            // Don't show side panels if disconnected, error, or already streaming
+            // Streaming guard prevents late HandleNetworkInfoReceived callbacks from
+            // re-showing panels after they've been hidden by HideSidePanels()
+            if (_currentPhase == ConnectionPhase.Disconnected || _currentPhase == ConnectionPhase.Error || _currentPhase == ConnectionPhase.Streaming)
             {
                 return;
             }

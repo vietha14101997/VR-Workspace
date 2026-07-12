@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using UnityEngine;
 using VRWorkspace.Core;
+using Unity.WebRTC;
+
 
 namespace VRWorkspace.Streaming
 {
@@ -30,6 +32,8 @@ namespace VRWorkspace.Streaming
 
         // ── State ────────────────────────────────────────────────────────────────
         public List<MonitorInfo> ConfiguredMonitors { get; private set; } = new List<MonitorInfo>();
+        public List<RTCIceServer> IceServers { get; private set; } = new List<RTCIceServer>();
+
 
         // ── Events ───────────────────────────────────────────────────────────────
         public event Action<string, int, string>  OnConfigProgress;   // step, percent, message
@@ -113,6 +117,29 @@ namespace VRWorkspace.Streaming
                 height    = m.GetInt("h"),
                 isVirtual = m.GetBool("isVirtual")
             }).ToList() ?? new List<MonitorInfo>();
+
+            // Parse iceServers from payload if provided
+            var iceServersList = new List<RTCIceServer>();
+            var iceServersArr = json.GetArray("iceServers");
+            if (iceServersArr != null)
+            {
+                foreach (var serverJson in iceServersArr)
+                {
+                    var urlsList = serverJson.GetStringArray("urls");
+                    if (urlsList != null && urlsList.Count > 0)
+                    {
+                        var iceServer = new RTCIceServer
+                        {
+                            urls = urlsList.ToArray(),
+                            username = serverJson.GetString("username"),
+                            credential = serverJson.GetString("credential")
+                        };
+                        iceServersList.Add(iceServer);
+                    }
+                }
+            }
+            IceServers = iceServersList;
+            AppLog.Log($"[Phase2] Parsed {IceServers.Count} ICE servers from server");
 
             OnConfigComplete?.Invoke(ConfiguredMonitors);
 

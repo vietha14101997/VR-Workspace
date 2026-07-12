@@ -40,6 +40,14 @@ namespace VRWorkspace.Streaming
             return null;
         }
 
+        public List<string> GetStringArray(string key)
+        {
+            if (_data.TryGetValue(key, out var v) && v is List<object> list)
+                return list.Select(o => o?.ToString() ?? "").ToList();
+            return null;
+        }
+
+
         public static string Serialize(object obj)
         {
             if (obj == null) return "null";

@@ -53,13 +53,8 @@ namespace VRWorkspace.Streaming
             _audioSource.playOnAwake = false;
 
             // Force 48kHz DSP to match Opus decoder + low-latency buffer
-            var audioConfig = AudioSettings.GetConfiguration();
-            AppLog.Log($"[DataChannelAudioPlayer] DSP before: rate={audioConfig.sampleRate}, buf={audioConfig.dspBufferSize}, speakers={audioConfig.speakerMode}");
-            audioConfig.dspBufferSize = 256;
-            audioConfig.sampleRate = SAMPLE_RATE; // Must match Opus decoder (48kHz)
-            AudioSettings.Reset(audioConfig);
-            var newConfig = AudioSettings.GetConfiguration();
-            AppLog.Log($"[DataChannelAudioPlayer] DSP after: rate={newConfig.sampleRate}, buf={newConfig.dspBufferSize}, speakers={newConfig.speakerMode}");
+            // NOTE: Global AudioSettings.Reset is disabled here to prevent
+            // conflicts with the primary RTP audio player.
             _cachedOutputRate = AudioSettings.outputSampleRate; // Cache for audio thread
         }
 
@@ -213,6 +208,34 @@ namespace VRWorkspace.Streaming
             int avail = w - r;
             if (avail < 0) avail += RING_CAPACITY;
             return avail;
+        }
+
+        /// <summary>
+        /// Feed raw PCM16 audio data directly (bypasses Opus decode).
+        /// Used by media relay fallback which sends uncompressed 16-bit signed LE PCM.
+        /// Called from main thread.
+        /// </summary>
+        /// <param name="pcmData">Buffer containing PCM16 samples (little-endian, interleaved stereo)</param>
+        /// <param name="offset">Start offset in the buffer</param>
+        /// <param name="length">Length of PCM data in bytes (must be even)</param>
+        public void OnPCMFrame(byte[] pcmData, int offset, int length)
+        {
+            if (pcmData == null || length <= 0) return;
+
+            // Each PCM16 sample = 2 bytes
+            int sampleCount = length / 2;
+            if (sampleCount <= 0) return;
+
+            int wp = _writePos;
+            for (int i = 0; i < sampleCount; i++)
+            {
+                int byteIdx = offset + i * 2;
+                // Little-endian 16-bit signed → float
+                short sample = (short)(pcmData[byteIdx] | (pcmData[byteIdx + 1] << 8));
+                _ring[(wp + i) % RING_CAPACITY] = sample / 32768f;
+            }
+            // Atomic update after all samples written (volatile write)
+            _writePos = (wp + sampleCount) % RING_CAPACITY;
         }
 
         public void SetVolume(float volume) => _audioSource.volume = Mathf.Clamp01(volume);

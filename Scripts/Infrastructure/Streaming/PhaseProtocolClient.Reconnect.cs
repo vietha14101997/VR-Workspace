@@ -46,13 +46,8 @@ namespace VRWorkspace.Streaming
             // Close old PC
             try { oldWrapper.PC?.Close(); oldWrapper.PC?.Dispose(); } catch { }
 
-            // Create new PeerConnection with STUN servers for better stability
-            var iceServers = new RTCIceServer[]
-            {
-                new RTCIceServer { urls = new[] { "stun:stun.l.google.com:19302" } },
-                new RTCIceServer { urls = new[] { "stun:stun1.l.google.com:19302" } },
-            };
-            var cfg = new RTCConfiguration { iceServers = iceServers };
+            // Use server-provided ICE servers (TURN/STUN) from config_complete
+            var cfg = GetRTCConfiguration();
             var pc = new RTCPeerConnection(ref cfg);
             var wrapper = new PCWrapper { Index = monitorIndex, PC = pc };
 
