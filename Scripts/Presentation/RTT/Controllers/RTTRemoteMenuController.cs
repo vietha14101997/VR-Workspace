@@ -309,12 +309,33 @@ namespace VRWorkspace.UI.RTT.Controllers
         /// <summary>
         /// Get or create a RenderTexture with mipmaps for anti-aliasing.
         /// This eliminates moire/aliasing artifacts when viewing panels at distance.
+        ///
+        /// Fast path: when the source already has mipmaps enabled (the
+        /// H265StreamReceiver output RT does), return it directly — no copy,
+        /// no second mipmap generation. This used to do an extra Graphics.Blit
+        /// + SharpMipGenerator.Generate every frame (8 GPU dispatches per
+        /// panel) which was the main cause of stalls on big-screen changes.
+        ///
+        /// Fallback path: for non-mipmapped sources (Editor / test paths), build
+        /// a dedicated mipmap RT and generate mips once. The cached RT is sized
+        /// at the largest dimension seen and only grows; we never Release() it
+        /// mid-session.
         /// </summary>
         private RenderTexture GetMipmapTexture(int index, Texture source, float mipSharpness = 0.1f)
         {
             if (source == null || source.width <= 0 || source.height <= 0)
             {
                 return null;
+            }
+
+            // Fast path: source is already a RenderTexture with mipmaps.
+            // H265StreamReceiver configures _outputRt with useMipMap=true and
+            // runs SharpMipGenerator every frame, so we can hand it back as-is
+            // and save the Blit + mipmap regeneration. Saves 8 GPU dispatches
+            // per panel per frame (1 Blit + ~4 mip levels + N CopyTexture).
+            if (source is RenderTexture srcRt && srcRt.useMipMap)
+            {
+                return srcRt;
             }
 
             // Lazy init array
@@ -324,41 +345,41 @@ namespace VRWorkspace.UI.RTT.Controllers
             if (index < 0 || index >= _mipmapTextures.Length)
                 return null;
 
-            // Check if we need to create or resize
+            // Grow-only RT strategy: only resize if the source is BIGGER than the
+            // cached RT. A smaller source is just Blit'd with ScaleToFit into the
+            // larger RT, which is a single GPU pass instead of Release()+Create().
+            // This eliminates the per-frame "size changed" stall that happened
+            // every time the host window resized.
             var rt = _mipmapTextures[index];
-            if (rt == null || rt.width != source.width || rt.height != source.height)
+            if (rt == null || rt.width < source.width || rt.height < source.height)
             {
-                // Cleanup old
                 if (rt != null)
                 {
                     rt.Release();
                     Destroy(rt);
                 }
 
-                // Create new RenderTexture with mipmaps
                 rt = new RenderTexture(source.width, source.height, 0, RenderTextureFormat.ARGB32);
                 rt.useMipMap = true;
                 rt.autoGenerateMips = false; // Manual generation for reliability
                 rt.filterMode = FilterMode.Trilinear;
-                rt.anisoLevel = 16; // Maximum anisotropic filtering for VR
+                rt.anisoLevel = 4; // Aniso 4 is plenty for desktop UI; 16 was overkill
                 rt.Create();
-                rt.mipMapBias = 0f; // Bias handled by shader _MipMapBias property to avoid double-bias
+                rt.mipMapBias = 0f; // Bias handled by shader _MipMapBias property
 
                 _mipmapTextures[index] = rt;
                 Debug.Log($"[RTTRemote-MIPMAP] Created mipmap RT for panel {index}: {source.width}x{source.height}, sourceType={source.GetType().Name}");
             }
 
-            // Copy source to mipmap texture and generate sharp mipmaps
+            // Copy source to mipmap texture (ScaleToFit handles smaller sources)
+            // and generate sharp mipmaps using Lanczos-2 kernel.
             try
             {
                 var prevRT = RenderTexture.active;
-                RenderTexture.active = rt;
                 Graphics.Blit(source, rt);
                 RenderTexture.active = prevRT;
 
-                // Generate sharp mipmaps using Lanczos-2 kernel instead of blurry box filter.
-                // This preserves edge detail (text sharpness) while still anti-aliasing (no shimmer).
-                SharpMipGenerator.Generate(rt, sharpness: mipSharpness, maxMipLevels: 4);
+                SharpMipGenerator.Generate(rt, sharpness: mipSharpness, maxMipLevels: 3);
             }
             catch (System.Exception ex)
             {

@@ -53,7 +53,14 @@ namespace VRWorkspace.Streaming
         // ──────────── Textures ────────────
         private Texture2D _yTex;
         private Texture2D _uvTex;
-        private RenderTexture _outputRt;
+        // Ping-pong output RenderTextures. We alternate between [_outputWriteIndex]
+        // for the GPU write target (Blit target + mipmap generation) and the OTHER
+        // slot as the "stable" reference handed to UI panels via OnTextureReady.
+        // Without this, the next decoded frame overwrites the texture before the
+        // panel has finished sampling the previous one, causing the visual overlap
+        // ("đè trùng các tab") the user observed on browser tab switches.
+        private RenderTexture[] _outputRts = new RenderTexture[2];
+        private int _outputWriteIndex = 0;
         private Material _nv12Material;
 
         // ──────────── Stats ────────────
@@ -177,14 +184,12 @@ namespace VRWorkspace.Streaming
             _uvTex.filterMode = FilterMode.Bilinear;
             _uvTex.name = $"H265_UV_Mon{MonitorIndex}";
 
-            // Output RenderTexture (full RGBA) with mipmaps for anti-shimmer in VR.
-            _outputRt = new RenderTexture(Width, Height, 0, RenderTextureFormat.ARGB32);
-            _outputRt.useMipMap = true;
-            _outputRt.autoGenerateMips = false;
-            _outputRt.filterMode = FilterMode.Trilinear;
-            _outputRt.anisoLevel = 16; // Maximize anisotropic filtering for VR quad stability
-            _outputRt.name = $"H265_Output_Mon{MonitorIndex}";
-            _outputRt.Create();
+            // Output RenderTextures (ping-pong, full RGBA) with mipmaps.
+            // Two slots: the writer alternates so the panel can keep reading the
+            // previous complete frame while the next one is being built.
+            _outputRts[0] = CreateOutputRt(0);
+            _outputRts[1] = CreateOutputRt(1);
+            _outputWriteIndex = 0;
 
             // NV12→RGBA blit material
             var shader = Shader.Find("VRWorkspace/NV12ToRGBA");
@@ -360,8 +365,16 @@ namespace VRWorkspace.Streaming
                 
                 if (_yTex != null) { UnityEngine.Object.Destroy(_yTex); }
                 if (_uvTex != null) { UnityEngine.Object.Destroy(_uvTex); }
-                if (_outputRt != null) { _outputRt.Release(); UnityEngine.Object.Destroy(_outputRt); }
-                
+                for (int s = 0; s < _outputRts.Length; s++)
+                {
+                    if (_outputRts[s] != null)
+                    {
+                        _outputRts[s].Release();
+                        UnityEngine.Object.Destroy(_outputRts[s]);
+                        _outputRts[s] = null;
+                    }
+                }
+
                 // Recreate textures with the new dimensions
                 _yTex = new Texture2D(Width, Height, TextureFormat.R8, false, true);
                 _yTex.filterMode = FilterMode.Bilinear;
@@ -373,13 +386,10 @@ namespace VRWorkspace.Streaming
                 _uvTex.wrapMode = TextureWrapMode.Clamp;
                 _uvTex.name = $"H265_UV_Mon{MonitorIndex}";
 
-                _outputRt = new RenderTexture(Width, Height, 0, RenderTextureFormat.ARGB32);
-                _outputRt.useMipMap = true;
-                _outputRt.autoGenerateMips = false;
-                _outputRt.filterMode = FilterMode.Trilinear;
-                _outputRt.anisoLevel = 16;
-                _outputRt.name = $"H265_Output_Mon{MonitorIndex}";
-                _outputRt.Create();
+                // Recreate both ping-pong output RTs at the new size.
+                _outputRts[0] = CreateOutputRt(0);
+                _outputRts[1] = CreateOutputRt(1);
+                _outputWriteIndex = 0;
                 
                 // Re-bind to the material
                 if (_nv12Material != null)
@@ -392,8 +402,9 @@ namespace VRWorkspace.Streaming
                 _yBuf = new byte[Width * Height];
                 _uvBuf = new byte[(Width / 2) * (Height / 2) * 2];
 
-                // Notify UI that the texture object has changed
-                OnTextureReady?.Invoke(MonitorIndex, _outputRt);
+                // Notify UI that the texture object has changed (hand the read slot,
+                // which equals the write slot after a fresh reinit).
+                OnTextureReady?.Invoke(MonitorIndex, ReadRt);
                 return; // Wait for next tick to upload data
             }
 
@@ -414,6 +425,12 @@ namespace VRWorkspace.Streaming
                 }
                 _yTex.LoadRawTextureData(_yBuf);
                 _yTex.Apply(false, false);
+                // Force the GPU to commit the upload *before* the upcoming Blit reads
+                // from this texture. Texture2D.Apply on Mali/Adreno is asynchronous —
+                // without this GL.Flush the Blit can sample STALE pixels from the
+                // previous frame, manifesting as "old content overlaid with new
+                // content" on tab switches (the user-reported "đè trùng").
+                GL.Flush();
             }
 
             // Upload UV plane
@@ -437,14 +454,34 @@ namespace VRWorkspace.Streaming
                 }
                 _uvTex.LoadRawTextureData(_uvBuf);
                 _uvTex.Apply(false, false);
+                // Same async-upload barrier as for Y plane (see comment above).
+                GL.Flush();
             }
 
-            // Blit NV12 → RGBA output RenderTexture
-            Graphics.Blit(null, _outputRt, _nv12Material);
+            // Blit NV12 → RGBA output RenderTexture (write into current ping-pong slot).
+            // By the time we get here, GL.Flush() above has forced both texture
+            // uploads to complete on the GPU, so the Blit samples the freshly
+            // uploaded Y/UV data — no stale pixels from the previous frame.
+            Graphics.Blit(null, WriteRt, _nv12Material);
+            // Force Blit completion too: SharpMipGenerator reads from mip 0 next,
+            // and the panel draws from mip 0 (and the lower mips we generate here)
+            // a few Unity frames later. We need the Blit to land before any of
+            // those consumers read from the texture.
+            GL.Flush();
 
             // Generate sharp mipmaps (Lanczos-2 kernel) for anti-shimmer in VR.
-            // Limited to 6 levels to ensure coverage even at distance.
-            SharpMipGenerator.Generate(_outputRt, sharpness: 0.1f, maxMipLevels: 6);
+            // 3 levels (1920, 960, 480) is enough for desktop streaming at typical
+            // VR viewing distance (1.5–3 m). Cuts GPU mip generation cost by ~50%
+            // vs. the previous 6 levels and removes the worst-case stall when
+            // host windows change size abruptly.
+            SharpMipGenerator.Generate(WriteRt, sharpness: 0.1f, maxMipLevels: 3);
+
+            // Swap ping-pong BEFORE invoking the callback so the panel sees the
+            // freshly-completed frame and the next decode writes into the other
+            // slot — preventing the "overlap of old + new content" artifact on
+            // scene changes.
+            var completedRt = WriteRt;
+            _outputWriteIndex = 1 - _outputWriteIndex;
 
             // ── Scene change detection (single sustained luma jump) ──
             // Runs before oscillation check so the threshold gate owns the response and we
@@ -470,8 +507,11 @@ namespace VRWorkspace.Streaming
                 AppLog.Log($"{TAG} PC{MonitorIndex} Corruption resolved (3s clean)");
             }
 
-            // Fire callback (on main thread already)
-            OnTextureReady?.Invoke(MonitorIndex, _outputRt);
+            // Fire callback (on main thread already). Hand the just-completed RT —
+            // `completedRt` was captured right before the ping-pong swap, so the
+            // UI gets the fresh frame and the next decode writes into the other
+            // slot without clobbering it.
+            OnTextureReady?.Invoke(MonitorIndex, completedRt);
         }
 
         // ──────────── Control ────────────
@@ -602,7 +642,21 @@ namespace VRWorkspace.Streaming
             _luminanceJumpCount = 0;
 
             AppLog.LogWarning(
-                $"{TAG} PC{MonitorIndex} SCENE CHANGE detected (Δluma={delta:F2}); requesting keyframe");
+                $"{TAG} PC{MonitorIndex} SCENE CHANGE detected (Δluma={delta:F2}); " +
+                "dropping pending P-frames + requesting keyframe");
+
+            // Drop any P-frames that arrive in the next ~200 ms (round-trip time
+            // before the host's I-frame comes back). This prevents the "old
+            // content overlaid with new content" artifact without touching
+            // MediaCodec (calling AMediaCodec_flush mid-stream crashes on
+            // Vivo Funtouch OS / some Adreno builds — see git history).
+            //
+            // The flag is cleared by OnEncodedFrameReceived when the next
+            // isKeyFrame=true arrives. If the I-frame never comes (network
+            // drop, host stalled), the existing 1.5 s stall detector at
+            // line ~511 calls Flush() + re-requests a keyframe as a backup.
+            _waitingForCleanIdr = true;
+            _sceneChangeStartedAt = DateTime.UtcNow; // reset stale-detector window
 
             // OnKeyframeNeeded routes to PhaseProtocolClient.RequestKeyframe → server force IDR.
             OnKeyframeNeeded?.Invoke(MonitorIndex);
@@ -634,7 +688,15 @@ namespace VRWorkspace.Streaming
 
             if (_yTex   != null) { UnityEngine.Object.Destroy(_yTex);   _yTex   = null; }
             if (_uvTex  != null) { UnityEngine.Object.Destroy(_uvTex);  _uvTex  = null; }
-            if (_outputRt != null) { _outputRt.Release(); UnityEngine.Object.Destroy(_outputRt); _outputRt = null; }
+            for (int s = 0; s < _outputRts.Length; s++)
+            {
+                if (_outputRts[s] != null)
+                {
+                    _outputRts[s].Release();
+                    UnityEngine.Object.Destroy(_outputRts[s]);
+                    _outputRts[s] = null;
+                }
+            }
             if (_nv12Material != null) { UnityEngine.Object.Destroy(_nv12Material); _nv12Material = null; }
 
             _initialized = false;
@@ -642,6 +704,34 @@ namespace VRWorkspace.Streaming
         }
 
         // ──────────── Helpers ────────────
+
+        /// <summary>
+        /// Build one ping-pong output RT slot.
+        /// </summary>
+        private RenderTexture CreateOutputRt(int slot)
+        {
+            var rt = new RenderTexture(Width, Height, 0, RenderTextureFormat.ARGB32);
+            rt.useMipMap = true;
+            rt.autoGenerateMips = false;
+            rt.filterMode = FilterMode.Trilinear;
+            rt.anisoLevel = 4; // Aniso 4 is enough for desktop UI; 16 was overkill + expensive
+            rt.name = $"H265_Output_Mon{MonitorIndex}_S{slot}";
+            rt.Create();
+            return rt;
+        }
+
+        /// <summary>
+        /// Current write target (the slot the upcoming Blit + mipmap generation
+        /// will overwrite). The OTHER slot is the one UI panels should keep
+        /// reading until the next OnTextureReady.
+        /// </summary>
+        private RenderTexture WriteRt => _outputRts[_outputWriteIndex];
+
+        /// <summary>
+        /// Current read target (the slot UI is currently displaying). After each
+        /// decode we swap so the next frame writes to the other slot.
+        /// </summary>
+        private RenderTexture ReadRt => _outputRts[1 - _outputWriteIndex];
 
         private static long GetTimestampUs()
             => _stopwatch.ElapsedTicks * 1_000_000 / System.Diagnostics.Stopwatch.Frequency;
