@@ -486,6 +486,10 @@ namespace VRWorkspace.Streaming
             if (!_streamingStartedFired)
             {
                 _streamingStartedFired = true;
+                // Reset weak-network timer at stream start so a stale value carried over from a
+                // previous session (or from before Phase 3) cannot trigger an immediate
+                // disconnect when the host GPU encoder is still warming up.
+                ResetWeakNetworkTimer();
                 // Start frame stall monitor
                 _ = FrameStallMonitorAsync(_cts!.Token);
                 OnStreamingStarted?.Invoke();
@@ -662,6 +666,13 @@ namespace VRWorkspace.Streaming
                     }
 
                     _msgCounter++;
+
+                    // Any inbound WebSocket message proves the server is alive. Used by the
+                    // weak-network detector so an idle desktop — which produces no encoded
+                    // frames but still sends the 5 s keep-alive ping and frameTiming messages —
+                    // does not look like a dead connection. Tracked separately from the
+                    // frame-decoded timer (which still drives freeze/keyframe logic).
+                    NoteServerContact();
 
                     // Binary message (media relay or speed test data)
                     if (first.MessageType == WebSocketMessageType.Binary)
@@ -909,6 +920,11 @@ namespace VRWorkspace.Streaming
             }
             else if (text.Equals("ping", StringComparison.OrdinalIgnoreCase))
             {
+                // Server-initiated keep-alive ping (5 s interval, see
+                // RemotePlayServer/.../PhaseProtocolHandler.Phase3.cs StartKeepAlive). Refresh
+                // the weak-network timer so an idle desktop that produces no encoded frames
+                // still keeps the connection alive.
+                NoteServerContact();
                 _ = SendTextAsync("pong");
             }
             else if (text.Equals("pong", StringComparison.OrdinalIgnoreCase) ||

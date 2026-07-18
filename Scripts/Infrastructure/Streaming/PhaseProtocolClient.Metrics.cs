@@ -116,10 +116,39 @@ namespace VRWorkspace.Streaming
         private DateTime _lastPreventiveKeyframeTime = DateTime.MinValue;
         private int _freezeCount = 0; // Track consecutive freeze detections for graduated response
 
-        // Weak network detection: connection alive but no frames for extended period
+        // Weak network detection: the server sends a WebSocket "ping" every 5 s as a keep-alive
+        // (PhaseProtocolHandler.Phase3.cs: StartKeepAlive). When the desktop is static the
+        // server skips encoded frames to save GPU/bandwidth, so a frame-decoded timer alone
+        // would misfire on every idle period. Track "any server message" instead and use it
+        // for the weak-network check; frame-decoded tracking stays for freeze detection only.
+        private DateTime _lastServerContactTime = DateTime.UtcNow;
         private DateTime _lastAnyFrameDecodedTime = DateTime.UtcNow;
-        private const float WEAK_NETWORK_TIMEOUT_SECONDS = 15f; // 15s with no frames = hopeless
+        private const float WEAK_NETWORK_TIMEOUT_SECONDS = 15f; // 3 missed server pings = dead
         private bool _weakNetworkFired;
+
+        /// <summary>
+        /// Refresh the weak-network timer. Call from any code path that receives a message
+        /// from the server (ping, frameTiming, audio, etc.) so that an idle desktop — which
+        /// produces no encoded frames but still sends the 5 s keep-alive — does not look like
+        /// a dead connection.
+        /// </summary>
+        internal void NoteServerContact()
+        {
+            _lastServerContactTime = DateTime.UtcNow;
+            _weakNetworkFired = false;
+        }
+
+        /// <summary>
+        /// Reset the weak-network disconnect timer so a freshly-started stream is not
+        /// immediately disconnected by a stale value carried over from before Phase 3.
+        /// Called from HandleStreamingStartedInternal.
+        /// </summary>
+        internal void ResetWeakNetworkTimer()
+        {
+            _lastServerContactTime = DateTime.UtcNow;
+            _lastAnyFrameDecodedTime = DateTime.UtcNow;
+            _weakNetworkFired = false;
+        }
 
         // FPS Feedback constants (for adaptive encoding + server-side stall detection)
         private const float FPS_FEEDBACK_INTERVAL_SECONDS = 0.5f;  // Send feedback every 500ms for ≤1s stall detection
@@ -1085,6 +1114,10 @@ namespace VRWorkspace.Streaming
 
         private void HandleFrameTiming(SimpleJson json)
         {
+            // Server is sending us a frame-timing message — proves the WebSocket is alive even
+            // when no frames are being encoded (idle desktop / GPU encoder queue backlog).
+            NoteServerContact();
+
             long serverTime = json.GetLong("serverTime");
             if (serverTime <= 0) return;
 
@@ -1176,11 +1209,10 @@ namespace VRWorkspace.Streaming
                                 HandleDecoderStallOrFreeze(-1, $"Decoder freeze (server +{serverFrameAdvance}, client +{realFrameAdvance})");
                             }
                         }
-                        else if (realFrameAdvance >= 10)
+                        else if (realFrameAdvance > 0)
                         {
-                            // Good frame flow — update last decoded time and reset counters
+                            // Frames decoded — refresh the freeze-detection counters.
                             _lastAnyFrameDecodedTime = DateTime.UtcNow;
-                            _weakNetworkFired = false;
                             if (_freezeCount > 0)
                             {
                                 if (VerboseLogging) AppLog.Log($"[PhaseProtocol] Freeze recovery confirmed, resetting freeze count (was {_freezeCount})");
@@ -1188,12 +1220,14 @@ namespace VRWorkspace.Streaming
                             }
                         }
 
-                        // Weak network detection: if no frames decoded for 15+ seconds
-                        // despite connection being alive, the network is too degraded to stream.
-                        if (!_weakNetworkFired && (DateTime.UtcNow - _lastAnyFrameDecodedTime).TotalSeconds >= WEAK_NETWORK_TIMEOUT_SECONDS)
+                        // Weak network detection: based on server-contact, NOT frame-decoded.
+                        // The server sends a WebSocket "ping" every 5 s regardless of whether the
+                        // desktop is active, so a missing ping means the connection is truly
+                        // dead — not just that the screen is idle or the GPU encoder is slow.
+                        if (!_weakNetworkFired && (DateTime.UtcNow - _lastServerContactTime).TotalSeconds >= WEAK_NETWORK_TIMEOUT_SECONDS)
                         {
                             _weakNetworkFired = true;
-                            Debug.LogError($"[PhaseProtocol] WEAK NETWORK: No frames decoded for {WEAK_NETWORK_TIMEOUT_SECONDS}s — disconnecting");
+                            Debug.LogError($"[PhaseProtocol] WEAK NETWORK: No server contact for {WEAK_NETWORK_TIMEOUT_SECONDS}s — disconnecting");
                             OnDisconnected?.Invoke();
                         }
                     }

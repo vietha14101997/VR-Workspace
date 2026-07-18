@@ -96,6 +96,21 @@ namespace VRWorkspace.Streaming
         private DateTime _lastLuminanceJumpTime = DateTime.MinValue;
         private const float LUMINANCE_JUMP_WINDOW_SECONDS = 1.0f; // Reset jump count after 1s calm
 
+        // ──────────── Scene Change Detection ────────────
+        // A single large sustained luminance delta (e.g. browser tab switch, fullscreen
+        // window open/close) is a host scene change. The HEVC encoder keeps sending P-frames
+        // with motion vectors against the previous content, which decodes correctly on
+        // Android MediaCodec but corrupts on Unity because our CPU readback + texture upload
+        // + mipmap pipeline can drop intermediate frames during the burst, leaving the
+        // decoder with stale references. Request an IDR the moment we see the jump so the
+        // server force-encodes a fresh keyframe and the decoder resets its reference chain.
+        private const float SCENE_CHANGE_THRESHOLD = 0.35f;       // 35% absolute luma delta in one frame
+        private const int SCENE_CHANGE_COOLDOWN_MS = 500;          // per-monitor throttle
+        private const float SCENE_CHANGE_SETTLE_DELTA = 0.10f;     // consecutive-frame delta that counts as "settled"
+        private long _lastSceneChangeKeyframeRequestTicks;
+        private bool _sceneChangeInProgress;
+        private DateTime _sceneChangeStartedAt = DateTime.MinValue;
+
         // Corruption recovery state
         private bool _corruptionSuspected;
         private DateTime _lastCorruptionTime = DateTime.MinValue;
@@ -431,6 +446,11 @@ namespace VRWorkspace.Streaming
             // Limited to 6 levels to ensure coverage even at distance.
             SharpMipGenerator.Generate(_outputRt, sharpness: 0.1f, maxMipLevels: 6);
 
+            // ── Scene change detection (single sustained luma jump) ──
+            // Runs before oscillation check so the threshold gate owns the response and we
+            // don't double-fire via the corruption path while the new scene settles.
+            HandleSceneChange(yData, fWidth, fHeight, yStride);
+
             // ── Corruption detection (Move after blit to avoid blocking data flow) ──
             if (CheckFrameCorruption(yData, fWidth, fHeight, yStride))
             {
@@ -506,6 +526,11 @@ namespace VRWorkspace.Streaming
         /// </summary>
         private bool CheckFrameCorruption(byte[] yData, int width, int height, int stride)
         {
+            // While a scene change is settling, the oscillation gate owns nothing — the
+            // scene-change handler already asked for a keyframe, so any oscillation here is
+            // just the new scene stabilising, not real corruption.
+            if (_sceneChangeInProgress) return false;
+
             float avgLum = SampleAverageLuminance(yData, width, height, stride);
 
             if (_prevAvgLuminance < 0f)
@@ -537,6 +562,50 @@ namespace VRWorkspace.Streaming
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Detect a single-frame large luminance jump (host scene change such as browser tab
+        /// switch or fullscreen window open/close). On detection, request an IDR keyframe from
+        /// the server so the Unity decode pipeline can recover its reference chain before
+        /// corruption becomes visible. Per-monitor throttle prevents request spam when many
+        /// frames are dropped back-to-back during the burst.
+        /// </summary>
+        private void HandleSceneChange(byte[] yData, int width, int height, int stride)
+        {
+            if (_prevAvgLuminance < 0f) return; // First sample: nothing to compare against
+
+            float avgLum = SampleAverageLuminance(yData, width, height, stride);
+            float delta = Mathf.Abs(avgLum - _prevAvgLuminance);
+
+            if (_sceneChangeInProgress)
+            {
+                // Settle: either the next frame is calm, or we time out after 1s. Either way
+                // we let the oscillation gate take over for the rest of the stream.
+                if (delta <= SCENE_CHANGE_SETTLE_DELTA ||
+                    (DateTime.UtcNow - _sceneChangeStartedAt).TotalSeconds > 1.0)
+                {
+                    _sceneChangeInProgress = false;
+                }
+                return;
+            }
+
+            if (delta < SCENE_CHANGE_THRESHOLD) return;
+
+            long nowTicks = System.Diagnostics.Stopwatch.GetTimestamp();
+            long cooldownTicks = SCENE_CHANGE_COOLDOWN_MS * System.Diagnostics.Stopwatch.Frequency / 1000;
+            if (nowTicks - _lastSceneChangeKeyframeRequestTicks < cooldownTicks) return;
+
+            _lastSceneChangeKeyframeRequestTicks = nowTicks;
+            _sceneChangeInProgress = true;
+            _sceneChangeStartedAt = DateTime.UtcNow;
+            _luminanceJumpCount = 0;
+
+            AppLog.LogWarning(
+                $"{TAG} PC{MonitorIndex} SCENE CHANGE detected (Δluma={delta:F2}); requesting keyframe");
+
+            // OnKeyframeNeeded routes to PhaseProtocolClient.RequestKeyframe → server force IDR.
+            OnKeyframeNeeded?.Invoke(MonitorIndex);
         }
 
         public void SetFlipY(bool flip)
