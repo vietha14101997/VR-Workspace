@@ -307,19 +307,19 @@ namespace VRWorkspace.UI.RTT.Controllers
         }
 
         /// <summary>
-        /// Get or create a RenderTexture with mipmaps for anti-aliasing.
-        /// This eliminates moire/aliasing artifacts when viewing panels at distance.
+        /// Get a RenderTexture suitable for the panel material to sample.
         ///
-        /// Fast path: when the source already has mipmaps enabled (the
-        /// H265StreamReceiver output RT does), return it directly — no copy,
-        /// no second mipmap generation. This used to do an extra Graphics.Blit
-        /// + SharpMipGenerator.Generate every frame (8 GPU dispatches per
-        /// panel) which was the main cause of stalls on big-screen changes.
+        /// Plan A: NO mipmap generation here. Just return the source directly.
+        /// Previously this function built a SECOND mipmap RT (Blit +
+        /// SharpMipGenerator.Generate) every time the source was non-mipmap.
+        /// That was 6 extra GPU dispatches per panel per frame and re-introduced
+        /// the half-built mip texel artifact on tab switches.
         ///
-        /// Fallback path: for non-mipmapped sources (Editor / test paths), build
-        /// a dedicated mipmap RT and generate mips once. The cached RT is sized
-        /// at the largest dimension seen and only grows; we never Release() it
-        /// mid-session.
+        /// Plan C update: the new H265StreamReceiver passes a Texture2D
+        /// (the bridge's shared MediaCodec output texture). We now pass-through
+        /// ANY Texture in the fast path so the panel samples the same texture
+        /// MediaCodec writes to — exactly one GL handle producer→consumer,
+        /// zero copies.
         /// </summary>
         private RenderTexture GetMipmapTexture(int index, Texture source, float mipSharpness = 0.1f)
         {
@@ -328,17 +328,24 @@ namespace VRWorkspace.UI.RTT.Controllers
                 return null;
             }
 
-            // Fast path: source is already a RenderTexture with mipmaps.
-            // H265StreamReceiver configures _outputRt with useMipMap=true and
-            // runs SharpMipGenerator every frame, so we can hand it back as-is
-            // and save the Blit + mipmap regeneration. Saves 8 GPU dispatches
-            // per panel per frame (1 Blit + ~4 mip levels + N CopyTexture).
-            if (source is RenderTexture srcRt && srcRt.useMipMap)
+            // Plan A / Plan C fast path: any RenderTexture source passes through
+            // directly. No copy, no Blit, no mipmap generation. Plan A's whole
+            // point is to reduce GPU stages to minimize partial-state artifacts.
+            if (source is RenderTexture srcRt)
             {
                 return srcRt;
             }
 
-            // Lazy init array
+            // Plan C: Texture2D sources (the new direct-surface bridge shared
+            // texture) also pass through. The panel material samples whatever
+            // the producer writes into; no intermediate Blit needed.
+            if (source is Texture2D)
+            {
+                return null; // signal "no RT, panel should use the source directly"
+            }
+
+            // Fallback path (legacy Editor/byte-buffer path) — kept for safety
+            // but should no longer be reached in production.
             if (_mipmapTextures == null)
                 _mipmapTextures = new RenderTexture[16]; // Max 16 monitors
 

@@ -1,596 +1,592 @@
-2026/07/19 01:03:43.044 12501 12501 Info Unity resumeUnity
-2026/07/19 01:03:43.050 12501 12501 Info Unity onResume
-2026/07/19 01:03:43.129 12501 12539 Info Unity MemoryManager: Using 'Dynamic Heap' Allocator.
-2026/07/19 01:03:43.151 12501 12501 Info Unity windowFocusChanged: true
-2026/07/19 01:03:43.166 12501 12539 Info Unity SetGameState: isLoading: true, mode: UNKNOWN, label: -2, quality: -1
-2026/07/19 01:03:43.181 12501 12539 Error Unity java.lang.ClassNotFoundException: Didn't find class "com.google.android.play.core.assetpacks.AssetPackManager" on path: DexPathList[[zip file "/data/app/~~j4Ov48D_zPi2bfN5F_EkQA==/com.Reka.VRWorkSpace-WugrGeGja948y_t24hq_7g==/base.apk"],nativeLibraryDirectories=[/data/app/~~j4Ov48D_zPi2bfN5F_EkQA==/com.Reka.VRWorkSpace-WugrGeGja948y_t24hq_7g==/lib/arm64, /data/app/~~j4Ov48D_zPi2bfN5F_EkQA==/com.Reka.VRWorkSpace-WugrGeGja948y_t24hq_7g==/base.apk!/lib/arm64-v8a, /system/lib64, /system_ext/lib64]]
-2026/07/19 01:03:43.254 12501 12539 Info Unity SystemInfo CPU = ARM64 FP ASIMD AES, Cores = 8, Memory = 11284mb
-2026/07/19 01:03:43.254 12501 12539 Info Unity SystemInfo ARM big.LITTLE configuration: 5 big (mask: 0xf8), 3 little (mask: 0x7)
-2026/07/19 01:03:43.256 12501 12539 Info Unity ApplicationInfo 'com.Reka.VRWorkSpace', Version '0.1', Min API Level '29', Target API Level '36'
-2026/07/19 01:03:43.256 12501 12539 Info Unity Built from '6000.5/staging' branch, Version '6000.5.1f1 (0d9463e84828)', Build type 'Development', Scripting Backend 'il2cpp', CPU 'arm64-v8a', Stripping 'Disabled'
-2026/07/19 01:03:43.256 12501 12539 Info Unity Device Model 'vivo V2352GA', OS 'Android OS 16 (API 36)'
-2026/07/19 01:03:43.561 12501 12539 Info Unity Company Name: Reka
-2026/07/19 01:03:43.561 12501 12539 Info Unity Product Name: VRWorkSpace
-2026/07/19 01:03:43.575 12501 12539 Info Unity [XR] [CardboardXrMain]: Display subsystem successfully loaded.
-2026/07/19 01:03:43.575 12501 12539 Info Unity [XR] [CardboardXrMain]: Input subsystem successfully loaded.
-2026/07/19 01:03:43.900 12501 12539 Info Unity XRGeneral Settings awakening...
-2026/07/19 01:03:43.900 12501 12539 Info Unity UnityEngine.DebugLogHandler:Internal_Log(LogType, LogOption, String, Object)
-2026/07/19 01:03:43.900 12501 12539 Info Unity UnityEngine.XR.Management.XRGeneralSettings:Awake()
-2026/07/19 01:03:43.987 12501 12539 Info Unity [XR] [CardboardXrInputProvider]: Lifecycle initialized
-2026/07/19 01:03:44.002 12501 12539 Info Unity SetGameState: isLoading: false, mode: UNKNOWN, label: -1, quality: 2
-2026/07/19 01:03:44.031 12501 12539 Info Unity [XR] [CardboardXrInputProvider]: Lifecycle started
-2026/07/19 01:03:44.035 12501 12539 Info Unity SetGameState: isLoading: true, mode: UNKNOWN, label: 0, quality: 2
-2026/07/19 01:03:44.055 12501 12670 Warn Unity The referenced script on this Behaviour (Game Object 'AppRoot') is missing!
-2026/07/19 01:03:44.056 12501 12670 Warn Unity The referenced script on this Behaviour (Game Object 'Player') is missing!
-2026/07/19 01:03:44.064 12501 12539 Info Unity [XR] [CardboardXrInputProvider]: No events to handle
-2026/07/19 01:03:44.065 12501 12625 Info Unity [XR] [CardboardXrDisplayProvider]: Initializes Cardboard API.
-2026/07/19 01:03:48.598 12501 12539 Info Unity [MainThreadDispatcher] Initialized on thread 1
-2026/07/19 01:03:48.612 12501 12539 Info Unity [APBootstrap] AndroidStreamingHelper initialized
-2026/07/19 01:03:48.612 12501 12539 Info Unity [APBootstrap] AppPermissionManager initialized
-2026/07/19 01:03:48.612 12501 12539 Info Unity Starting camera passthrough
-2026/07/19 01:03:48.662 12501 12539 Info Unity Camera2 0 is a simple camera
-2026/07/19 01:03:48.667 12501 12539 Info Unity Camera2 1 is a simple camera
-2026/07/19 01:03:48.678 12501 12539 Info Unity Camera2: 0 focal length 4.84
-2026/07/19 01:03:48.679 12501 12539 Info Unity Camera2: sensor size 6.5536 x 4.9152
-2026/07/19 01:03:48.679 12501 12539 Info Unity Camera2: focal length equivalent 26
-2026/07/19 01:03:48.707 12501 12539 Info Unity Camera2: 1 focal length 3.74
-2026/07/19 01:03:48.707 12501 12539 Info Unity Camera2: sensor size 4.608 x 3.456
-2026/07/19 01:03:48.707 12501 12539 Info Unity Camera2: focal length equivalent 29
-2026/07/19 01:03:48.716 12501 12539 Info Unity Found 2 camera devices
-2026/07/19 01:03:48.716 12501 12539 Info Unity Camera 0: Camera 0 (front facing: False)
-2026/07/19 01:03:48.716 12501 12539 Info Unity Camera 1: Camera 1 (front facing: True)
-2026/07/19 01:03:48.716 12501 12539 Info Unity Selected back camera: Camera 0
-2026/07/19 01:03:48.716 12501 12539 Info Unity Starting webcam texture: Camera 0 at 1280x720
-2026/07/19 01:03:48.721 12501 12539 Info Unity Camera2: Hardware level: 3
-2026/07/19 01:03:48.722 12501 12539 Info Unity Camera2: FrameSize 4096 x 3072 [2.613983692063143]
-2026/07/19 01:03:48.722 12501 12539 Info Unity Camera2: FrameSize 4080 x 3072 [2.6100697927420065]
-2026/07/19 01:03:48.722 12501 12539 Info Unity Camera2: FrameSize 4096 x 2304 [2.3263016196113617]
-2026/07/19 01:03:48.722 12501 12539 Info Unity Camera2: FrameSize 4096 x 2304 [2.3263016196113617]
-2026/07/19 01:03:48.722 12501 12539 Info Unity Camera2: FrameSize 4080 x 2296 [2.318909455913901]
-2026/07/19 01:03:48.722 12501 12539 Info Unity Camera2: FrameSize 3840 x 2160 [2.1972245773362196]
-2026/07/19 01:03:48.722 12501 12539 Info Unity Camera2: FrameSize 3264 x 2448 [2.1598687907924505]
-2026/07/19 01:03:48.722 12501 12539 Info Unity Camera2: FrameSize 3200 x 2400 [2.120263536200091]
-2026/07/19 01:03:48.722 12501 12539 Info Unity Camera2: FrameSize 4096 x 1844 [2.1035920019121193]
-2026/07/19 01:03:48.722 12501 12539 Info Unity Camera2: FrameSize 4080 x 1836 [2.0953302696548795]
-2026/07/19 01:03:48.722 12501 12539 Info Unity Camera2: FrameSize 3200 x 2000 [1.9379419794061366]
-2026/07/19 01:03:48.722 12501 12539 Info Unity Camera2: FrameSize 3264 x 1836 [1.8721867183406695]
-2026/07/19 01:03:48.722 12501 12539 Info Unity Camera2: FrameSize 3200 x 1800 [1.83258146374831]
-2026/07/19 01:03:48.722 12501 12539 Info Unity Camera2: FrameSize 2560 x 1920 [1.6739764335716716]
-2026/07/19 01:03:48.722 12501 12539 Info Unity Camera2: FrameSize 3264 x 1472 [1.6512194464490553]
-2026/07/19 01:03:48.722 12501 12539 Info Unity Camera2: FrameSize 3200 x 1456 [1.6204877486206852]
-2026/07/19 01:03:48.722 12501 12539 Info Unity Camera2: FrameSize 2304 x 1728 [1.463255402256019]
-2026/07/19 01:03:48.722 12501 12539 Info Unity Camera2: FrameSize 2560 x 1440 [1.3862943611198906]
-2026/07/19 01:03:48.722 12501 12539 Info Unity Camera2: FrameSize 1920 x 1920 [1.3862943611198906]
-2026/07/19 01:03:48.722 12501 12539 Info Unity Camera2: FrameSize 2800 x 1260 [1.3423751271850553]
-2026/07/19 01:03:48.722 12501 12539 Info Unity Camera2: FrameSize 2048 x 1536 [1.2276893309432522]
-2026/07/19 01:03:48.722 12501 12539 Info Unity Camera2: FrameSize 2304 x 1296 [1.175573329804238]
-2026/07/19 01:03:48.723 12501 12539 Info Unity Camera2: FrameSize 1920 x 1440 [1.0986122886681098]
-2026/07/19 01:03:48.723 12501 12539 Info Unity Camera2: FrameSize 2304 x 1040 [0.9555114450274363]
-2026/07/19 01:03:48.723 12501 12539 Info Unity Camera2: FrameSize 1920 x 1080 [0.8109302162163289]
-2026/07/19 01:03:48.723 12501 12539 Info Unity Camera2: FrameSize 1632 x 1224 [0.7735744296725598]
-2026/07/19 01:03:48.723 12501 12539 Info Unity Camera2: FrameSize 1600 x 1200 [0.7339691750802004]
-2026/07/19 01:03:48.723 12501 12539 Info Unity Camera2: FrameSize 1920 x 864 [0.5877866649021191]
-2026/07/19 01:03:48.723 12501 12539 Info Unity Camera2: FrameSize 1440 x 1080 [0.523248143764548]
-2026/07/19 01:03:48.723 12501 12539 Info Unity Camera2: FrameSize 1920 x 800 [0.5108256237659907]
-2026/07/19 01:03:48.723 12501 12539 Info Unity Camera2: FrameSize 1280 x 960 [0.2876820724517809]
-2026/07/19 01:03:48.723 12501 12539 Info Unity Camera2: FrameSize 1080 x 1080 [0.5753641449035618]
-2026/07/19 01:03:48.723 12501 12539 Info Unity Camera2: FrameSize 1600 x 720 [0.2231435513142097]
-2026/07/19 01:03:48.723 12501 12539 Info Unity Camera2: FrameSize 1440 x 720 [0.11778303565638351]
-2026/07/19 01:03:48.723 12501 12539 Info Unity Camera2: FrameSize 1280 x 720 [0.0]
-2026/07/19 01:03:48.723 12501 12539 Info Unity Camera2: FrameSize 1024 x 768 [0.28768207245178096]
-2026/07/19 01:03:48.723 12501 12539 Info Unity Camera2: FrameSize 960 x 540 [0.5753641449035617]
-2026/07/19 01:03:48.723 12501 12539 Info Unity Camera2: FrameSize 800 x 600 [0.6523251860396903]
-2026/07/19 01:03:48.723 12501 12539 Info Unity Camera2: FrameSize 800 x 480 [0.8754687373539001]
-2026/07/19 01:03:48.723 12501 12539 Info Unity Camera2: FrameSize 720 x 480 [0.9808292530117262]
-2026/07/19 01:03:48.723 12501 12539 Info Unity Camera2: FrameSize 640 x 480 [1.0986122886681096]
-2026/07/19 01:03:48.723 12501 12539 Info Unity Camera2: FrameSize 352 x 288 [2.207274913189721]
-2026/07/19 01:03:48.723 12501 12539 Info Unity Camera2: FrameSize 320 x 240 [2.4849066497880004]
-2026/07/19 01:03:48.723 12501 12539 Info Unity Camera2: FrameSize 176 x 144 [3.593569274309611]
-2026/07/19 01:03:48.723 12501 12539 Info Unity Camera2: FPS requested: 60 set: 30
-2026/07/19 01:03:48.723 12501 12539 Info Unity Camera2: Open logical camera 0
-2026/07/19 01:03:48.764 12501 12711 Info Unity Camera2: CameraDevice opened.
-2026/07/19 01:03:48.771 12501 12539 Info Unity Camera2: Start preview.
-2026/07/19 01:03:48.860 12501 12711 Info Unity Camera2: CaptureSession is configured.
-2026/07/19 01:03:48.923 12501 12539 Info Unity SetGameState: isLoading: false, mode: UNKNOWN, label: 0, quality: 2
-2026/07/19 01:03:48.928 12501 12539 Info Unity [CardboardApi] Device params found.
-2026/07/19 01:03:48.929 12501 12539 Info Unity [RTTRaycastManager] Auto-initialized layer mask to VirtualObjects (layer 3)
-2026/07/19 01:03:48.950 12501 12539 Info Unity [CursorAppFollower] subscribed to RTTAppManager events
-2026/07/19 01:03:48.952 12501 12539 Info Unity [CardboardApi] Reload device parameters.
-2026/07/19 01:03:48.953 12501 12625 Info Unity [XR] [CardboardXrDisplayProvider]: Initializes Cardboard API.
-2026/07/19 01:03:49.033 12501 12539 Info Unity [PermissionManager] Permission check: Storage=True, Camera=True
-2026/07/19 01:03:49.033 12501 12539 Info Unity [PermissionManager] Permissions already granted (fast path)
-2026/07/19 01:03:49.033 12501 12539 Info Unity [APBootstrap] Permissions complete. All granted: True
-2026/07/19 01:03:49.049 12501 12539 Info Unity [RTTMenu] Created main frame
-2026/07/19 01:03:49.049 12501 12539 Info Unity [RTTBootstrapper] Created RTTMenu with RTTMenuFrame_main
-2026/07/19 01:03:49.049 12501 12539 Info Unity [RTTBootstrapper] RTTMenu oriented towards camera
-2026/07/19 01:03:49.049 12501 12539 Info Unity [RTTToolbar] Created
-2026/07/19 01:03:49.062 12501 12539 Info Unity [RTTTaskbar] Icons loaded - Quit:True, Settings:True, Eye:True, EyeClose:True, Recenter:True, Home:True
-2026/07/19 01:03:49.063 12501 12539 Info Unity [RTTToolbar] Initialized with taskbar. Size: 0,913x0,331m, followTarget: RTTMenu
-2026/07/19 01:03:49.063 12501 12539 Info Unity [RTTBootstrapper] Created RTTTaskbar in RTTToolbar, following RTTMenu
-2026/07/19 01:03:49.063 12501 12539 Info Unity [RTTBootstrapper] RTTManager found, registering new frame and taskbar
-2026/07/19 01:03:49.065 12501 12539 Info Unity [RTTTaskbar] SelectSlot(0) called, current active: 0
-2026/07/19 01:03:49.068 12501 12539 Info Unity [VirtualObjectsZoomController] Configured: min=1m, max=2,5m, default=2,2m, step=0,1m
-2026/07/19 01:03:49.068 12501 12539 Info Unity [VirtualObjectsZoomController] Moving VirtualObjects from 0,08m to default 2,20m
-2026/07/19 01:03:49.068 12501 12539 Info Unity [VirtualObjectsZoomController] Zoom set to 2,20m (delta: 2,120m)
-2026/07/19 01:03:49.068 12501 12539 Info Unity [RTTBootstrapper] Created VirtualObjectsZoomController (range: 1m - 2,5m, default: 2,2m)
-2026/07/19 01:03:49.068 12501 12539 Info Unity [RTTBootstrapper] Initialization complete
-2026/07/19 01:03:49.076 12501 12539 Info Unity [RTTMenuFrame] UI built: 1920x1080 logical pixels
-2026/07/19 01:03:49.296 12501 12539 Info Unity [RTTMiniFrame] UI built: 1095,5x128 pixels
-2026/07/19 01:03:49.335 12501 12539 Info Unity Webcam texture initialized successfully after 2 frames
-2026/07/19 01:03:49.369 12501 12539 Info Unity [MediaEnvironmentController] Found environment root: VirtualEnvironment
-2026/07/19 01:03:49.370 12501 12539 Info Unity [MediaEnvironmentController] Cached 1 room lights
-2026/07/19 01:03:49.370 12501 12539 Info Unity [MediaEnvironmentController] Initialized
-2026/07/19 01:03:49.462 12501 12539 Info Unity [RTTMainMenuController] Icons loaded async - Remote:True, Browser:True, Media:True, Files:False
-2026/07/19 01:03:49.487 12501 12539 Info Unity [RTTMainMenu] Built 6 items in 3x2 grid
-2026/07/19 01:03:49.487 12501 12539 Info Unity [RTTMainMenuController] Main Menu created async (useRegistry=True, itemCount=6)
-2026/07/19 01:03:49.487 12501 12539 Info Unity [RTTManager] Main Menu initialized (persistent, cannot be closed)
-2026/07/19 01:03:49.488 12501 12539 Info Unity [RTTAppManager] Background pre-init started (UniTask)
-2026/07/19 01:03:49.488 12501 12539 Info Unity [RTTMenu] Created app frame: remote
-2026/07/19 01:03:49.488 12501 12539 Info Unity [RTTManager] Background app pre-initialization triggered
-2026/07/19 01:03:49.495 12501 12539 Info Unity [RTTMenuFrame] UI built: 1920x1080 logical pixels
-2026/07/19 01:03:49.522 12501 12539 Info Unity [RemoteAppContentFactory] Creating RemoteMenu content...
-2026/07/19 01:03:49.524 12501 12539 Info Unity [RTTRemoteMenu] OnEnable called
-2026/07/19 01:03:49.571 12501 12539 Info Unity [RTTRemoteMenu] UI built
-2026/07/19 01:03:49.572 12501 12539 Info Unity [VRDropdown] UpdateSelection(0), _optionRefs keys=[0,1,2,3,4], prev _selectedIndex=1
-2026/07/19 01:03:49.572 12501 12539 Info Unity [RTTRemoteMenu] Monitor selection changed: index=0, value=----
-2026/07/19 01:03:49.573 12501 12539 Info Unity [RTTRemoteMenu] No cached info, skipping recalculation
-2026/07/19 01:03:49.573 12501 12539 Info Unity [VRDropdown] UpdateSelection(0), _optionRefs keys=[0,1], prev _selectedIndex=0
-2026/07/19 01:03:49.573 12501 12539 Info Unity [RTTRemoteMenu] Mode changed: index=0, value=Classic
-2026/07/19 01:03:49.573 12501 12539 Info Unity [VRDropdown] UpdateSelection(0), _optionRefs keys=[0,1,2], prev _selectedIndex=1
-2026/07/19 01:03:49.573 12501 12539 Info Unity [RTTRemoteMenu] Resolution changed: index=0, value=----
-2026/07/19 01:03:49.573 12501 12539 Info Unity [VRDropdown] UpdateSelection(0), _optionRefs keys=[0,1,2], prev _selectedIndex=1
-2026/07/19 01:03:49.573 12501 12539 Info Unity [RTTRemoteMenu] FPS changed: index=0, value=----
-2026/07/19 01:03:49.574 12501 12539 Info Unity [RTTRemoteMenu] CreateSidePanels called, _menuFrame null: False
-2026/07/19 01:03:49.574 12501 12539 Info Unity [RTTRemoteMenu] Creating Hardware Info Panel (left) with sphere positioning...
-2026/07/19 01:03:49.574 12501 12539 Info Unity [VirtualObjectsZoomController] Registered side panel: HardwareInfoPanel (side=-1, mainW=1,6, sideW=0,5333334, gap=0,05)
-2026/07/19 01:03:49.574 12501 12539 Info Unity [RTTRemoteMenu] Registered HardwareInfoPanel with VirtualObjectsZoomController
-2026/07/19 01:03:49.574 12501 12539 Info Unity [RTTRemoteMenu] PlaceSidePanel: mainPos=(-0.07, 0.00, 2.28), panelPos=(-1.15, 0.00, 2.12)
-2026/07/19 01:03:49.574 12501 12539 Info Unity [RTTRemoteMenu] CreateSidePanelContent started for HardwareInfo
-2026/07/19 01:03:49.574 12501 12539 Info Unity [RTTRemoteMenu] Hardware frame created: True
-2026/07/19 01:03:49.574 12501 12539 Info Unity [RTTRemoteMenu] Creating Network Info Panel (right) with sphere positioning...
-2026/07/19 01:03:49.574 12501 12539 Info Unity [VirtualObjectsZoomController] Registered side panel: NetworkInfoPanel (side=1, mainW=1,6, sideW=0,5333334, gap=0,05)
-2026/07/19 01:03:49.574 12501 12539 Info Unity [RTTRemoteMenu] Registered NetworkInfoPanel with VirtualObjectsZoomController
-2026/07/19 01:03:49.574 12501 12539 Info Unity [RTTRemoteMenu] PlaceSidePanel: mainPos=(-0.07, 0.00, 2.28), panelPos=(1.02, 0.00, 2.19)
-2026/07/19 01:03:49.574 12501 12539 Info Unity [RTTRemoteMenu] CreateSidePanelContent started for NetworkInfo
-2026/07/19 01:03:49.574 12501 12539 Info Unity [RTTRemoteMenu] Network frame created: True
-2026/07/19 01:03:49.574 12501 12539 Info Unity [RTTRemoteMenu] Side panels created (0,53m x 0,90m) gap=0,05m with sphere positioning (hidden)
-2026/07/19 01:03:49.579 12501 12539 Info Unity [ServiceLocator] Registered: ConnectionViewModel
-2026/07/19 01:03:49.579 12501 12539 Info Unity [RTTRemoteMenu] HandlePhaseChanged: Disconnected -> Disconnected
-2026/07/19 01:03:49.579 12501 12539 Info Unity [VRDropdown] UpdateSelection(0), _optionRefs keys=[0,1,2,3,4], prev _selectedIndex=0
-2026/07/19 01:03:49.579 12501 12539 Info Unity [RTTRemoteMenu] Monitor selection changed: index=0, value=----
-2026/07/19 01:03:49.580 12501 12539 Info Unity [RTTRemoteMenu] No cached info, skipping recalculation
-2026/07/19 01:03:49.580 12501 12539 Info Unity [VRDropdown] UpdateSelection(0), _optionRefs keys=[0,1], prev _selectedIndex=0
-2026/07/19 01:03:49.580 12501 12539 Info Unity [RTTRemoteMenu] Mode changed: index=0, value=Classic
-2026/07/19 01:03:49.580 12501 12539 Info Unity [VRDropdown] UpdateSelection(0), _optionRefs keys=[0,1,2], prev _selectedIndex=0
-2026/07/19 01:03:49.580 12501 12539 Info Unity [RTTRemoteMenu] Resolution changed: index=0, value=----
-2026/07/19 01:03:49.580 12501 12539 Info Unity [VRDropdown] UpdateSelection(0), _optionRefs keys=[0,1,2], prev _selectedIndex=0
-2026/07/19 01:03:49.580 12501 12539 Info Unity [RTTRemoteMenu] FPS changed: index=0, value=----
-2026/07/19 01:03:49.580 12501 12539 Info Unity [RTTRemoteMenu] Hardware frame hidden
-2026/07/19 01:03:49.580 12501 12539 Info Unity [RTTRemoteMenu] Network frame hidden
-2026/07/19 01:03:49.580 12501 12539 Info Unity [RTTRemoteMenu] HideSidePanels completed
-2026/07/19 01:03:49.580 12501 12539 Info Unity [RTTRemoteMenu] Background discovery started
-2026/07/19 01:03:49.581 12501 12539 Info Unity [Discovery] Scanning for servers on UDP port 8289 (timeout 5000ms)...
-2026/07/19 01:03:49.604 12501 12539 Info Unity [RTTRemoteMenu] Bound to ConnectionViewModel
-2026/07/19 01:03:49.617 12501 12539 Info Unity [RTTRemoteMenu] Frame not initialized for HardwareInfo, calling EnsureInitialized()
-2026/07/19 01:03:49.619 12501 12539 Info Unity [RTTMenuFrame] UI built: 640x1080 logical pixels
-2026/07/19 01:03:49.619 12501 12539 Info Unity [RTTRemoteMenu] Frame initialized for HardwareInfo after 0 frames, ContentContainer valid
-2026/07/19 01:03:49.619 12501 12539 Info Unity [RTTRemoteMenu] Frame not initialized for NetworkInfo, calling EnsureInitialized()
-2026/07/19 01:03:49.622 12501 12539 Info Unity [RTTMenuFrame] UI built: 640x1080 logical pixels
-2026/07/19 01:03:49.622 12501 12539 Info Unity [RTTRemoteMenu] Frame initialized for NetworkInfo after 0 frames, ContentContainer valid
-2026/07/19 01:03:49.623 12501 12539 Info Unity [Discovery] Found server: HANGUYEN at 192.168.1.211:8288
-2026/07/19 01:03:49.647 12501 12539 Info Unity [RTTRemoteMenu] Created InfoPanel_HardwareInfo, parent set to ContentContainer
-2026/07/19 01:03:49.649 12501 12539 Info Unity [RTTInfoSidePanel] BuildUI started for HardwareInfo, container=ContentContainer
-2026/07/19 01:03:49.649 12501 12539 Info Unity [RTTInfoSidePanel] Already parented to ContentContainer
-2026/07/19 01:03:49.649 12501 12539 Info Unity [RTTInfoSidePanel] Calculated max label width for HardwareInfo: 155 (Base: 130 + 25)
-2026/07/19 01:03:49.649 12501 12539 Info Unity [RTTInfoSidePanel] Built for type: HardwareInfo, _isBuilt=True, parent=ContentContainer
-2026/07/19 01:03:49.649 12501 12539 Info Unity [RTTRemoteMenu] InfoPanel_HardwareInfo BuildUI completed, parent=ContentContainer
-2026/07/19 01:03:49.649 12501 12539 Info Unity [RTTInfoSidePanel] ShowLoadingState called for HardwareInfo, _isBuilt=True
-2026/07/19 01:03:49.650 12501 12539 Info Unity [RTTRemoteMenu] Created InfoPanel_NetworkInfo, parent set to ContentContainer
-2026/07/19 01:03:49.650 12501 12539 Info Unity [RTTInfoSidePanel] BuildUI started for NetworkInfo, container=ContentContainer
-2026/07/19 01:03:49.650 12501 12539 Info Unity [RTTInfoSidePanel] Already parented to ContentContainer
-2026/07/19 01:03:49.650 12501 12539 Info Unity [RTTInfoSidePanel] Calculated max label width for NetworkInfo: 225 (Base: 200 + 25)
-2026/07/19 01:03:49.650 12501 12539 Info Unity [RTTInfoSidePanel] Built for type: NetworkInfo, _isBuilt=True, parent=ContentContainer
-2026/07/19 01:03:49.650 12501 12539 Info Unity [RTTRemoteMenu] InfoPanel_NetworkInfo BuildUI completed, parent=ContentContainer
-2026/07/19 01:03:49.650 12501 12539 Info Unity [RTTInfoSidePanel] ShowSpeedTestLoadingState called for NetworkInfo, _isBuilt=True
-2026/07/19 01:03:49.684 12501 12539 Info Unity [RTTAppManager] Pre-initialized app: remote in 195,9ms
-2026/07/19 01:03:49.730 12501 12539 Info Unity [RTTMenu] Created app frame: media
-2026/07/19 01:03:49.734 12501 12539 Info Unity [RTTMenuFrame] UI built: 1920x1080 logical pixels
-2026/07/19 01:03:49.763 12501 12539 Info Unity [MediaAppContentFactory] Creating Media content...
-2026/07/19 01:03:49.765 12501 12539 Info Unity [VRMediaAppController] Projection parented to VirtualObjects for zoom support
-2026/07/19 01:03:49.766 12501 12539 Info Unity [VRMediaAppController] Found camera rig: Player
-2026/07/19 01:03:49.768 12501 12539 Info Unity [VRVideoProjectionSystem] Created FlatProjectionRenderer
-2026/07/19 01:03:49.768 12501 12539 Info Unity [VRVideoProjectionSystem] Initialized
-2026/07/19 01:03:49.775 12501 12539 Info Unity [MediaLibraryService] Cache loading disabled - will scan on demand
-2026/07/19 01:03:49.784 12501 12539 Info Unity [VirtualObjectsZoomController] Registered side panel: MediaNavigationPanel (side=-1, mainW=1,6, sideW=0,5333334, gap=0,05)
-2026/07/19 01:03:49.787 12501 12539 Info Unity [RTTMenuFrame] UI built: 640x1080 logical pixels
-2026/07/19 01:03:49.787 12501 12539 Info Unity [RTTMediaLibrary] CreateLeftPanelContent started at 5,752s
-2026/07/19 01:03:49.803 12501 12539 Info Unity [RTTMediaLibrary] Left panel content created at 5,768s
-2026/07/19 01:03:49.803 12501 12539 Info Unity [VirtualObjectsZoomController] Registered side panel: MediaDetailPanel (side=1, mainW=1,6, sideW=0,5333334, gap=0,05)
-2026/07/19 01:03:49.805 12501 12539 Info Unity [RTTMenuFrame] UI built: 640x1080 logical pixels
-2026/07/19 01:03:49.806 12501 12539 Info Unity [RTTMediaLibrary] CreateRightPanelContent started at 5,771s
-2026/07/19 01:03:49.820 12501 12539 Info Unity [RTTMediaLibrary] Right panel content created at 5,785s
-2026/07/19 01:03:49.823 12501 12539 Info Unity [RTTPopupMenu] CreateWorldSpace: layer 'VirtualObjects' = 3, mainCam: VRCamera
-2026/07/19 01:03:49.826 12501 12539 Info Unity [RTTPopupMenu] Created world-space popup
-2026/07/19 01:03:49.834 12501 12539 Info Unity [RTTPopupMenu] CreateWorldSpace: layer 'VirtualObjects' = 3, mainCam: VRCamera
-2026/07/19 01:03:49.835 12501 12539 Info Unity [RTTPopupMenu] Created world-space popup
-2026/07/19 01:03:49.845 12501 12539 Info Unity [RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=568105589213751440
-2026/07/19 01:03:49.849 12501 12539 Info Unity [RTTMediaLibrary] After CreateHeaderRows: _headerRT=True, _breadcrumbContainer=True
-2026/07/19 01:03:49.913 12501 12539 Info Unity [RTTMediaLibrary] Creating 2 breadcrumb segments for: All Media > Videos
-2026/07/19 01:03:49.914 12501 12539 Info Unity [RTTMediaLibrary] Created 2 breadcrumb pills for path: All Media > Videos
-2026/07/19 01:03:49.914 12501 12539 Info Unity [RTTMediaLibraryController] No cached data, will scan immediately
-2026/07/19 01:03:49.914 12501 12539 Info Unity [RTTMediaLibraryController] No data available, starting scan...
-2026/07/19 01:03:49.914 12501 12539 Info Unity [MediaLibraryScanner] Using Android MediaStore for fast media discovery...
-2026/07/19 01:03:49.927 12501 12539 Info Unity [AndroidMediaStoreHelper] Found 4 Video items
-2026/07/19 01:03:49.937 12501 12539 Info Unity [AndroidMediaStoreHelper] Found 387 Image items
-2026/07/19 01:03:50.028 12501 12539 Info Unity [AndroidMediaStoreHelper] Found 1 Audio items
-2026/07/19 01:03:50.030 12501 12539 Info Unity [MediaLibraryScanner] MediaStore query returned 392 items in 116ms
-2026/07/19 01:03:50.041 12501 12539 Info Unity [RTTMediaLibraryController] Starting fresh scan (no cache)
-2026/07/19 01:03:50.041 12501 12539 Warn Unity [MediaLibraryScanner] Already scanning
-2026/07/19 01:03:50.042 12501 12539 Info Unity [RTTMediaLibrary] Center grid created
-2026/07/19 01:03:50.042 12501 12539 Info Unity [VRMediaAppController] Library UI built
-2026/07/19 01:03:50.042 12501 12539 Info Unity [VRMediaAppController] Media app created
-2026/07/19 01:03:50.054 12501 12539 Info Unity [RTTMediaLibrary] InitializePageSizeDeferred: itemsPerPage=8
-2026/07/19 01:03:50.123 12501 12539 Info Unity [RTTAppManager] Pre-initialized app: media in 393,7ms
-2026/07/19 01:03:50.155 12501 12539 Info Unity [MediaLibraryScanner] MediaStore scan complete in 241ms
-2026/07/19 01:03:50.168 12501 12539 Info Unity [RTTMediaGridItem] Duration badge for 'Screenrecording_20260719_001810': show=True, duration=11,2s, text='0:11', font=NotoSansKR-Regular_TMP_Primary
-2026/07/19 01:03:50.174 12501 12539 Info Unity [Cache] DISK READ: 0ms (43KB)
-2026/07/19 01:03:50.175 12501 12539 Info Unity [Cache] DISK DECODE: 1ms (230x512)
-2026/07/19 01:03:50.188 12501 12539 Info Unity [RTTMediaGridItem] Duration badge for 'Screenrecording_20260718_235758': show=True, duration=21,762s, text='0:21', font=NotoSansKR-Regular_TMP_Primary
-2026/07/19 01:03:50.190 12501 12539 Info Unity [Cache] DISK READ: 0ms (187KB)
-2026/07/19 01:03:50.194 12501 12539 Info Unity [Cache] DISK DECODE: 3ms (230x512)
-2026/07/19 01:03:50.210 12501 12539 Info Unity [RTTMediaGridItem] Duration badge for 'Screenrecording_20260718_235847': show=True, duration=17,352s, text='0:17', font=NotoSansKR-Regular_TMP_Primary
-2026/07/19 01:03:50.212 12501 12539 Info Unity [Cache] DISK READ: 0ms (151KB)
-2026/07/19 01:03:50.215 12501 12539 Info Unity [Cache] DISK DECODE: 2ms (230x512)
-2026/07/19 01:03:50.229 12501 12539 Info Unity [RTTMediaGridItem] Duration badge for 'Ph├ám Nh├ón Tu Ti├¬n Tß║¡p 181': show=True, duration=1190,998s, text='19:50', font=NotoSansKR-Regular_TMP_Primary
-2026/07/19 01:03:50.232 12501 12539 Info Unity [Cache] DISK READ: 0ms (293KB)
-2026/07/19 01:03:50.236 12501 12539 Info Unity [Cache] DISK DECODE: 4ms (512x288)
-2026/07/19 01:03:50.255 12501 12539 Info Unity [RTTMediaGrid] Auto-selecting first item: Screenrecording_20260719_001810
-2026/07/19 01:03:50.257 12501 12539 Info Unity [Detail] REQUEST: Screenrecording_20260719_001810.mp4
-2026/07/19 01:03:50.259 12501 12539 Info Unity [Cache] DISK READ: 0ms (36KB)
-2026/07/19 01:03:50.260 12501 12539 Info Unity [Cache] DISK DECODE: 1ms (230x512)
-2026/07/19 01:03:50.270 12501 12539 Info Unity [Detail] RECEIVED: Screenrecording_20260719_001810.mp4 wait=12ms assign=0ms
-2026/07/19 01:03:50.273 12501 12539 Info Unity [VideoHeaderParser] Duration from mvhd: 11,2s
-2026/07/19 01:03:50.273 12501 12539 Info Unity [VideoHeaderParser] Dimensions from tkhd: 720x1600
-2026/07/19 01:03:50.273 12501 12539 Info Unity [VideoHeaderParser] Codec: avc1
-2026/07/19 01:03:50.273 12501 12539 Info Unity [Detail] UpdateInfo: Screenrecording_20260719_001810.mp4 name=1ms preview=13ms metadata=3ms total=17ms
-2026/07/19 01:03:50.275 12501 12539 Info Unity [Detail] REQUEST: Screenrecording_20260719_001810.mp4
-2026/07/19 01:03:50.275 12501 12539 Info Unity [Detail] RECEIVED: Screenrecording_20260719_001810.mp4 wait=0ms assign=0ms
-2026/07/19 01:03:50.276 12501 12539 Info Unity [Detail] UpdateInfo: Screenrecording_20260719_001810.mp4 name=0ms preview=0ms metadata=1ms total=1ms
-2026/07/19 01:03:50.278 12501 12539 Info Unity [AppStateCache] Saved state for media with 4 items
-2026/07/19 01:03:50.278 12501 12539 Info Unity [RTTMediaLibraryController] CacheCurrentState: Cached 4 items
-2026/07/19 01:03:50.285 12501 12539 Info Unity [MediaCacheService] Saved 392 items to cache (with metadata & dimensions)
-2026/07/19 01:03:50.285 12501 12539 Info Unity [MediaLibraryService] Triggering metadata preload for 392 files
-2026/07/19 01:03:50.285 12501 12539 Info Unity [FileMetadataService] Starting background preload for 392 files
-2026/07/19 01:03:50.285 12501 12539 Info Unity [MediaLibraryScanner] Scan complete: 392 media files
-2026/07/19 01:03:50.289 12501 12539 Info Unity [RTTMenu] Created app frame: folder
-2026/07/19 01:03:50.291 12501 12539 Info Unity [RTTMenuFrame] UI built: 1920x1080 logical pixels
-2026/07/19 01:03:50.323 12501 12539 Info Unity [FilesAppContentFactory] Creating FileManager content...
-2026/07/19 01:03:50.333 12501 12539 Info Unity [RTTFileManager] PlaceSidePanel: innerEdge=(-0.92, 0.00, 2.25), panelPos=(-1.15, 0.00, 2.12)
-2026/07/19 01:03:50.333 12501 12539 Info Unity [VirtualObjectsZoomController] Registered side panel: FileNavigationPanel (side=-1, mainW=1,6, sideW=0,5333334, gap=0,05)
-2026/07/19 01:03:50.333 12501 12539 Info Unity [RTTFileManager] Registered FileNavigationPanel with VirtualObjectsZoomController
-2026/07/19 01:03:50.333 12501 12539 Info Unity [RTTFileManager] Placed FileNavigationPanel: pos=(-1.15, 0.00, 2.12)
-2026/07/19 01:03:50.336 12501 12539 Info Unity [RTTMenuFrame] UI built: 640x1080 logical pixels
-2026/07/19 01:03:50.340 12501 12539 Info Unity [FileSystemService] Root path set to: /storage/emulated/0
-2026/07/19 01:03:50.343 12501 12539 Info Unity [RTTFileManager] PlaceSidePanel: innerEdge=(0.78, 0.00, 2.31), panelPos=(1.02, 0.00, 2.19)
-2026/07/19 01:03:50.343 12501 12539 Info Unity [VirtualObjectsZoomController] Registered side panel: FileDetailPanel (side=1, mainW=1,6, sideW=0,5333334, gap=0,05)
-2026/07/19 01:03:50.343 12501 12539 Info Unity [RTTFileManager] Registered FileDetailPanel with VirtualObjectsZoomController
-2026/07/19 01:03:50.343 12501 12539 Info Unity [RTTFileManager] Placed FileDetailPanel: pos=(1.02, 0.00, 2.19)
-2026/07/19 01:03:50.346 12501 12539 Info Unity [RTTMenuFrame] UI built: 640x1080 logical pixels
-2026/07/19 01:03:50.353 12501 12539 Info Unity [RTTFileActionBar] Buttons created
-2026/07/19 01:03:50.354 12501 12539 Info Unity [RTTFileActionBar] Initialized, following: FileDetailPanel
-2026/07/19 01:03:50.354 12501 12539 Info Unity [RTTFileManager] File action bar created (hidden initially)
-2026/07/19 01:03:50.356 12501 12539 Info Unity [RTTPopupMenu] CreateWorldSpace: layer 'VirtualObjects' = 3, mainCam: VRCamera
-2026/07/19 01:03:50.357 12501 12539 Info Unity [RTTPopupMenu] Created world-space popup
-2026/07/19 01:03:50.371 12501 12539 Info Unity [Controller] CanCreateFolderHere called, _currentPath: 'root'
-2026/07/19 01:03:50.372 12501 12539 Info Unity [FileSystemService] CanCreateFolderInPath called with path: 'root'
-2026/07/19 01:03:50.372 12501 12539 Info Unity [FileSystemService] Path is 'root' or empty, returning false
-2026/07/19 01:03:50.372 12501 12539 Info Unity [Controller] CanCreateFolderHere result: False
-2026/07/19 01:03:50.372 12501 12539 Info Unity [RTTFileManager] UpdateNewFolderButtonState: canCreate=False
-2026/07/19 01:03:50.372 12501 12539 Info Unity [RTTFileManager] BoxCollider.enabled set to False
-2026/07/19 01:03:50.372 12501 12539 Info Unity [RTTFileManager] New Folder button DISABLED - alpha=0,4
-2026/07/19 01:03:50.372 12501 12539 Info Unity [RTTFileManager] Text Area found and offsetMin set to: (30.00, 0.00)
-2026/07/19 01:03:50.378 12501 12539 Info Unity [RTTFileGrid] CalculateGridMetrics: width=1770, availableWidth=1730, columnsPerRow=4, cellWidth=395, spacingX=30
-2026/07/19 01:03:50.393 12501 12539 Info Unity [Controller] SetSortOptionsNoRefresh: sortBy=Name, ascending=True
-2026/07/19 01:03:50.393 12501 12539 Info Unity [Controller] View is ready. Checking storage permissions...
-2026/07/19 01:03:50.393 12501 12539 Info Unity [Controller] Permissions already granted via AppPermissionManager.
-2026/07/19 01:03:50.393 12501 12539 Info Unity [Controller] NavigateToInternalAsync: path='root', restorePage=False, clickedFolder=''
-2026/07/19 01:03:50.393 12501 12539 Info Unity [RTTFileManager] UpdateBreadcrumbs called with path: root, container null: True, instance: 568105589213742616
-2026/07/19 01:03:50.393 12501 12539 Info Unity [Controller] CanCreateFolderHere called, _currentPath: 'root'
-2026/07/19 01:03:50.393 12501 12539 Info Unity [FileSystemService] CanCreateFolderInPath called with path: 'root'
-2026/07/19 01:03:50.393 12501 12539 Info Unity [FileSystemService] Path is 'root' or empty, returning false
-2026/07/19 01:03:50.393 12501 12539 Info Unity [Controller] CanCreateFolderHere result: False
-2026/07/19 01:03:50.393 12501 12539 Info Unity [RTTFileManager] UpdateNewFolderButtonState: canCreate=False
-2026/07/19 01:03:50.393 12501 12539 Info Unity [RTTFileManager] BoxCollider.enabled set to False
-2026/07/19 01:03:50.393 12501 12539 Info Unity [RTTFileManager] New Folder button DISABLED - alpha=0,4
-2026/07/19 01:03:50.393 12501 12539 Warn Unity [RTTFileManager] Breadcrumb container reference lost, searching in hierarchy...
-2026/07/19 01:03:50.393 12501 12539 Info Unity [RTTFileManager] Found breadcrumb container from hierarchy: True
-2026/07/19 01:03:50.394 12501 12539 Info Unity [RTTFileManager] Created 1 breadcrumbs for path: /storage/emulated/0
-2026/07/19 01:03:50.394 12501 12539 Info Unity [FileSystemService] Reading directory async: /storage/emulated/0
-2026/07/19 01:03:50.409 12501 12539 Info Unity [FileSystemService] Quick count: 39 items (dirs=35, files=4)
-2026/07/19 01:03:50.409 12501 12539 Info Unity [Controller] Quick count received: 39 items
-2026/07/19 01:03:50.410 12501 12539 Info Unity [TextEncodingHelper] Normalized NFD->NFC: 'T├¬╠úp cu╠ëa t├┤i' (13 chars) -> 'Tß╗çp cß╗ºa t├┤i' (11 chars)
-2026/07/19 01:03:50.410 12501 12539 Info Unity [FileSystemService] Found 27 items async (26 folders, 1 files)
-2026/07/19 01:03:50.410 12501 12539 Info Unity [Controller] Using full data (load completed quickly): 27 items
-2026/07/19 01:03:50.410 12501 12539 Info Unity [Controller] CalculateTotalPages: totalFiles=27, pageSize=8, totalPages=4
-2026/07/19 01:03:50.433 12501 12539 Info Unity [RTTFileGrid] Progressive binding started: 15 items queued
-2026/07/19 01:03:50.439 12501 12539 Info Unity [RTTFileGrid] Progressive bind frame: 5 items, 10 remaining
-2026/07/19 01:03:50.443 12501 12539 Info Unity [RTTFileGrid] GetVisibleRowsForPagination: height=748,1688, availableHeight=728,1688, rowHeight=350, rowsFloat=2,080482, visibleRows=2
-2026/07/19 01:03:50.446 12501 12539 Info Unity [Detail] UpdateInfo: 0 name=0ms preview=0ms metadata=2ms total=2ms
-2026/07/19 01:03:50.447 12501 12539 Info Unity [RTTFileManagerController] Menu created
-2026/07/19 01:03:50.467 12501 12539 Info Unity [RTTFileGrid] Progressive bind frame: 5 items, 5 remaining
-2026/07/19 01:03:50.469 12501 12539 Info Unity [VideoHeaderParser] Duration from mvhd: 1191,0s
-2026/07/19 01:03:50.469 12501 12539 Info Unity [VideoHeaderParser] Dimensions from tkhd: 1920x1080
-2026/07/19 01:03:50.473 12501 12539 Info Unity [VideoHeaderParser] Codec: avc1
-2026/07/19 01:03:50.477 12501 12539 Info Unity [VideoHeaderParser] Duration from mvhd: 21,8s
-2026/07/19 01:03:50.477 12501 12539 Info Unity [VideoHeaderParser] Dimensions from tkhd: 720x1600
-2026/07/19 01:03:50.477 12501 12539 Info Unity [VideoHeaderParser] Codec: avc1
-2026/07/19 01:03:50.479 12501 12539 Info Unity [VideoHeaderParser] Duration from mvhd: 17,4s
-2026/07/19 01:03:50.479 12501 12539 Info Unity [VideoHeaderParser] Dimensions from tkhd: 720x1600
-2026/07/19 01:03:50.479 12501 12539 Info Unity [VideoHeaderParser] Codec: avc1
-2026/07/19 01:03:50.529 12501 12539 Info Unity [RTTFileGrid] Progressive bind frame: 2 items, 3 remaining
-2026/07/19 01:03:50.600 12501 12539 Info Unity [RTTFileGrid] Progressive bind frame: 1 items, 2 remaining
-2026/07/19 01:03:50.616 12501 12539 Info Unity [RTTFileGrid] Progressive bind frame: 2 items, 0 remaining
-2026/07/19 01:03:50.628 12501 12539 Info Unity [RTTAppManager] Pre-initialized app: folder in 338,8ms
-2026/07/19 01:03:50.676 12501 12539 Info Unity [RTTAppManager] Background pre-init complete: 3 apps in 1188,6ms
-2026/07/19 01:03:50.814 12501 12539 Info Unity [FileMetadataService] Preload complete: 4 loaded, 1 cached, 387 failed (528ms)
-2026/07/19 01:03:51.996 12501 12539 Info Unity [RTTMainMenu] Click started: remote at 7,961s
-2026/07/19 01:03:51.996 12501 12539 Info Unity [RTTMainMenu] PrepareApp called: remote at 7,961s (+0,2ms)
-2026/07/19 01:03:51.996 12501 12539 Info Unity [RTTAppManager] PrepareApp: remote already active, preparing, or pre-initialized. Skipping redundant creation.
-2026/07/19 01:03:51.996 12501 12539 Info Unity [RTTMainMenu] Button animation started: remote at 7,961s (+0,3ms)
-2026/07/19 01:03:52.097 12501 12539 Info Unity [RTTMainMenu] Button animation ended: remote at 8,062s (+100,9ms)
-2026/07/19 01:03:52.097 12501 12539 Info Unity [RTTMainMenu] OpenPreparedApp called: remote at 8,062s (+101,0ms)
-2026/07/19 01:03:52.097 12501 12539 Info Unity [RTTAppManager] OpenPreparedApp: Using pre-initialized instance for remote
-2026/07/19 01:03:52.097 12501 12539 Info Unity [RTTMainMenu] Click flow completed: remote at 8,062s (total: +101,4ms)
-2026/07/19 01:03:52.217 12501 12539 Info Unity [RTTRemoteMenu] OnEnable called
-2026/07/19 01:03:52.365 12501 12539 Info Unity [RTTTaskbar] RegisterApp called - slotIndex=1, icon=icon_remote
-2026/07/19 01:03:52.365 12501 12539 Info Unity [RTTTaskbar] SetSlotIcon - slot=AppBtn_AppSlot_1, icon=icon_remote, slotIndex=1
-2026/07/19 01:03:52.365 12501 12539 Info Unity [RTTTaskbar] SetSlotIcon - removed 0 old children
-2026/07/19 01:03:52.366 12501 12539 Info Unity [RTTTaskbar] SetSlotIcon - created iconBtn=Btn_icon_remote, slot.childCount now=1
-2026/07/19 01:03:52.367 12501 12539 Info Unity [RTTTaskbar] Registered app slot 1, total apps: 1
-2026/07/19 01:03:52.367 12501 12539 Info Unity [RTTTaskbar] SelectSlot(1) called, current active: 0
-2026/07/19 01:03:52.367 12501 12539 Info Unity [RTTTaskbar] Selected app with slot index 1
-2026/07/19 01:03:52.371 12501 12539 Info Unity [RTTRemoteMenu] OnEnable called
-2026/07/19 01:03:52.372 12501 12539 Info Unity [RTTTaskbar] SelectSlot(1) called, current active: 1
-2026/07/19 01:03:52.372 12501 12539 Info Unity [RTTAppManager] Pre-init app shown: remote in 274,8ms
-2026/07/19 01:03:52.372 12501 12539 Info Unity [CursorAppFollower] OnAppOpened appId=remote instance=VRWorkspace.UI.RTT.RTTAppInstance frame=RTTMenuFrame_remote (VRWorkspace.UI.RTT.Components.RTTMenuFrame)
-2026/07/19 01:03:52.372 12501 12539 Info Unity [CursorAppFollower] snap cursor to surfaceId=09e247b5-4932-4705-a631-022c72c874f1 (frame='RTTMenuFrame_remote')
-2026/07/19 01:03:52.372 12501 12539 Info Unity [VCS_DBG] targetT changed -> name=DisplayQuad_RTTMenuFrame kind=RTTCanvasBase:RTTMenuFrame_remote worldPos=(-0.07, 0.00, 2.28) depthAlongRefTForward=0,0000
-2026/07/19 01:03:54.300 12501 12539 Info Unity [RTTRemoteMenu] Button clicked! viewModel=True, currentPhase=Disconnected
-2026/07/19 01:03:54.300 12501 12539 Info Unity [RTTRemoteMenu] LAN mode ΓÇö scanning for servers...
-2026/07/19 01:03:54.301 12501 12539 Info Unity [Discovery] Scan complete ΓÇö found 1 server(s)
-2026/07/19 01:03:54.301 12501 12539 Info Unity [RTTRemoteMenu] Background discovery stopped
-2026/07/19 01:03:54.301 12501 12539 Info Unity [Discovery] Scanning for servers on UDP port 8289 (timeout 5000ms)...
-2026/07/19 01:03:54.334 12501 12539 Info Unity [Discovery] Found server: HANGUYEN at 192.168.1.211:8288
-2026/07/19 01:03:59.310 12501 12539 Info Unity [Discovery] Scan complete ΓÇö found 1 server(s)
-2026/07/19 01:03:59.310 12501 12539 Info Unity [RTTRemoteMenu] Single server found: HANGUYEN at 192.168.1.211:8288
-2026/07/19 01:03:59.310 12501 12539 Info Unity [RTTRemoteMenu] Connecting via WiFi...
-2026/07/19 01:03:59.319 12501 12539 Info Unity [RTTRemoteMenu] HandlePhaseChanged: Disconnected -> Connecting
-2026/07/19 01:03:59.319 12501 12539 Info Unity [ConnectionViewModel] Connecting to ws://192.168.1.211:8288/signal?protocol=v2 (transport=WiFi)
-2026/07/19 01:03:59.567 12501 12539 Info Unity [RTTRemoteMenu] HandleHardwareInfoReceived called, info null: False, panel null: False
-2026/07/19 01:03:59.567 12501 12539 Info Unity [RTTRemoteMenu] EnsureBothPanelsVisible: Showing hardware frame
-2026/07/19 01:03:59.570 12501 12539 Info Unity [RTTInfoSidePanel] SetHardwareInfo: HANGUYEN
-2026/07/19 01:03:59.570 12501 12539 Info Unity [RTTRemoteMenu] EnsureBothPanelsVisible: Showing network frame
-2026/07/19 01:03:59.572 12501 12539 Info Unity [RTTInfoSidePanel] ShowSpeedTestLoadingState called for NetworkInfo, _isBuilt=True
-2026/07/19 01:03:59.573 12501 12539 Info Unity [RTTInfoSidePanel] SetHardwareInfo: HANGUYEN
-2026/07/19 01:03:59.573 12501 12539 Info Unity [RTTRemoteMenu] Updated hardware info panel: HANGUYEN
-2026/07/19 01:03:59.573 12501 12539 Info Unity [RTTRemoteMenu] HandlePhaseChanged: Connecting -> SpeedTesting
-2026/07/19 01:03:59.754 12501 12539 Info Unity [HevcDecoder] Initialized 320x240
-2026/07/19 01:03:59.768 12501 12539 Info Unity [HevcDecoder] Disposed explicitly
-2026/07/19 01:03:59.770 12501 12539 Info Unity [VRDropdown] UpdateSelection(1), _optionRefs keys=[0,1,2,3,4], prev _selectedIndex=0
-2026/07/19 01:03:59.770 12501 12539 Info Unity [RTTRemoteMenu] Monitor selection changed: index=1, value=2 Monitors
-2026/07/19 01:03:59.771 12501 12539 Info Unity [RTTRemoteMenu] No cached info, skipping recalculation
-2026/07/19 01:03:59.771 12501 12539 Info Unity [VRDropdown] UpdateSelection(0), _optionRefs keys=[0,1], prev _selectedIndex=0
-2026/07/19 01:03:59.771 12501 12539 Info Unity [RTTRemoteMenu] Mode changed: index=0, value=Classic
-2026/07/19 01:03:59.772 12501 12539 Info Unity [VRDropdown] UpdateSelection(1), _optionRefs keys=[0,1,2], prev _selectedIndex=0
-2026/07/19 01:03:59.772 12501 12539 Info Unity [RTTRemoteMenu] Resolution changed: index=1, value=1080p
-2026/07/19 01:03:59.772 12501 12539 Info Unity [RTTRemoteMenu] 1440p locked: server max native height = 1080p
-2026/07/19 01:03:59.772 12501 12539 Info Unity [RTTRemoteMenu] FindOptionIndex: '45 FPS' not found in options. Normalized: '45 FPS'
-2026/07/19 01:03:59.772 12501 12539 Info Unity [VRDropdown] UpdateSelection(1), _optionRefs keys=[0,1,2], prev _selectedIndex=0
-2026/07/19 01:03:59.773 12501 12539 Info Unity [RTTRemoteMenu] FPS changed: index=1, value=60 FPS
-2026/07/19 01:03:59.773 12501 12539 Info Unity [RTTRemoteMenu] Applied config: SAVED prefs ΓÇö Mon=2, Resolution=1080p, FPS=60 FPS
-2026/07/19 01:03:59.773 12501 12539 Info Unity [RTTRemoteMenu] Server suggested: 3mon, 1080p, 45fps (shown as Recommended)
-2026/07/19 01:03:59.773 12501 12539 Info Unity [RTTRemoteMenu] HandlePhaseChanged: SpeedTesting -> ConfiguringSettings
-2026/07/19 01:04:00.277 12501 12539 Info Unity [RTTRemoteMenu] HandleNetworkInfoReceived called, info null: False, panel null: False
-2026/07/19 01:04:00.279 12501 12539 Info Unity [RTTInfoSidePanel] SetNetworkInfo: 16,5ms
-2026/07/19 01:04:00.279 12501 12539 Info Unity [RTTRemoteMenu] Updated network info panel: 16,5ms, 0Mbps
-2026/07/19 01:04:05.155 12501 12539 Info Unity [RTTRemoteMenu] Button clicked! viewModel=True, currentPhase=ConfiguringSettings
-2026/07/19 01:04:05.155 12501 12539 Info Unity [RTTRemoteMenu] Starting with button progress...
-2026/07/19 01:04:05.155 12501 12539 Info Unity [RTTRemoteMenu] BuildConfigFromForm: Resolution raw='1080p (Recommended)', cleaned='1080p', suggested=1080
-2026/07/19 01:04:05.155 12501 12539 Info Unity [RTTRemoteMenu] BuildConfigFromForm: Parsed resolution=1080p -> 1920x1080
-2026/07/19 01:04:05.155 12501 12539 Info Unity [RTTRemoteMenu] BuildConfigFromForm: 2mon (standard) @ 1920x1080, 60fps
-2026/07/19 01:04:05.156 12501 12539 Info Unity [RTTRemoteMenu] Saved preferences: 1mon, mode=Classic, 1080p, 60 FPS, transport=LAN
-2026/07/19 01:04:05.156 12501 12539 Info Unity [RTTRemoteMenu] All inputs locked (Ready state)
-2026/07/19 01:04:05.157 12501 12539 Info Unity [ConnectionViewModel] StartWithProgressAsync: 2 monitors, 20000kbps, 60fps
-2026/07/19 01:04:05.157 12501 12539 Info Unity [RTTRemoteMenuController] HandleStartWithProgress: 2 monitors - waiting for streaming ready
-2026/07/19 01:04:05.158 12501 12539 Info Unity [WorldPanelCursor] Cursor cache cleared
-2026/07/19 01:04:05.327 12501 12539 Info Unity [RTTRemoteMenu] HandleNetworkInfoReceived called, info null: False, panel null: False
-2026/07/19 01:04:05.328 12501 12539 Info Unity [RTTInfoSidePanel] SetNetworkInfo: 16,5ms
-2026/07/19 01:04:05.328 12501 12539 Info Unity [RTTRemoteMenu] Updated network info panel: 16,5ms, 0Mbps
-2026/07/19 01:04:06.682 12501 12539 Info Unity [RTTRemoteMenu] HandlePhaseChanged: ConfiguringSettings -> ICENegotiating
-2026/07/19 01:04:06.682 12501 12539 Info Unity [RTTRemoteMenu] All inputs locked (Ready state)
-2026/07/19 01:04:06.934 12501 12539 Info Unity [ConnectionViewModel] Audio track received and cached
-2026/07/19 01:04:06.937 12501 12539 Info Unity [RTTRemoteMenu] HandlePhaseChanged: ICENegotiating -> ReadyToStream
-2026/07/19 01:04:07.035 12501 12539 Info Unity [HevcDecoder] Initialized 1920x1080
-2026/07/19 01:04:07.042 12501 12539 Info Unity [PhaseProtocol] Video PC0 H265 receiver created (per-track mode, 1920x1080)
-2026/07/19 01:04:07.056 12501 12539 Info Unity [ConnectionViewModel] Monitor 0 ICE complete. Ready: 1/2
-2026/07/19 01:04:07.056 12501 12539 Info Unity [ConnectionViewModel] Monitor 1 ICE complete. Ready: 2/2
-2026/07/19 01:04:07.057 12501 12539 Info Unity [ConnectionViewModel] All monitors ready, firing OnAllMonitorsReady
-2026/07/19 01:04:07.057 12501 12539 Info Unity [RTTRemoteMenuController] All monitors ready - waiting for streaming to start
-2026/07/19 01:04:07.057 12501 12539 Info Unity [ConnectionViewModel] Delaying 1 second for stability...
-2026/07/19 01:04:07.128 12501 12539 Info Unity [HevcDecoder] Initialized 1920x1080
-2026/07/19 01:04:07.134 12501 12539 Info Unity [PhaseProtocol] Video PC1 H265 receiver created (per-track mode, 1920x1080)
-2026/07/19 01:04:07.261 12501 12539 Info Unity [PhaseProtocol] Video PC0 server DataChannel: label=h265video-0
-2026/07/19 01:04:07.261 12501 12539 Info Unity [PhaseProtocol] Video PC0 h265video DC wired (per-track mode)
-2026/07/19 01:04:07.261 12501 12539 Info Unity [PhaseProtocol] Video PC0 requested initial frame from server
-2026/07/19 01:04:07.261 12501 12539 Info Unity [PhaseProtocol] Video PC1 server DataChannel: label=h265video-1
-2026/07/19 01:04:07.261 12501 12539 Info Unity [PhaseProtocol] Video PC1 h265video DC wired (per-track mode)
-2026/07/19 01:04:07.261 12501 12539 Info Unity [PhaseProtocol] Video PC1 requested initial frame from server
-2026/07/19 01:04:08.061 12501 12539 Info Unity [ConnectionViewModel] Auto-starting streaming (force=False)...
-2026/07/19 01:04:08.112 12501 12539 Info Unity [RTTRemoteMenu] HandlePhaseChanged: ReadyToStream -> Streaming
-2026/07/19 01:04:08.113 12501 12539 Info Unity [RTTRemoteMenu] Hardware frame hidden
-2026/07/19 01:04:08.113 12501 12539 Info Unity [RTTRemoteMenu] Network frame hidden
-2026/07/19 01:04:08.113 12501 12539 Info Unity [RTTRemoteMenu] HideSidePanels completed
-2026/07/19 01:04:08.113 12501 12539 Info Unity [RTTRemoteMenuController] Creating ClusterRig for streaming: 2 monitors
-2026/07/19 01:04:08.114 12501 12539 Info Unity [RTTMenu] SetClusterRig: ClusterRig parented with useParentOrigin=true
-2026/07/19 01:04:08.116 12501 12539 Info Unity [WorldPanelClusterRig] LayoutFromParentOrigin: 2 panels, mode=FlatPlanar
-2026/07/19 01:04:08.116 12501 12539 Info Unity [ClusterVisualFlatPlanar] Initialize() called
-2026/07/19 01:04:08.116 12501 12539 Info Unity [ClusterVisualFlatPlanar] Initializing for 2 panels
-2026/07/19 01:04:08.117 12501 12539 Info Unity [ClusterVisualFlatPlanar] GenerateMeshes: totalPanels=2, enabledCount=2, enabledIndices=[0,1], panelWidth=1,600m
-2026/07/19 01:04:08.117 12501 12539 Info Unity [FlatPlanarMeshGenerator] Generated mesh: 2 panels, 33 vertices, bounds=(2.67, 0.90, 1.19), center=(0.54, 0.00, -0.59)
-2026/07/19 01:04:08.117 12501 12539 Info Unity [ClusterVisualFlatPlanar] Mesh Gen - panelWidth: 1,600m, panelHeight: 0,900m, panelCount: 2, arcRadius: 1,80m, meshMarginH: 0 (full width)
-2026/07/19 01:04:08.118 12501 12539 Info Unity [ClusterVisualFlatPlanar] Yaw angle per panel: 47,9┬░, foldSegments: 6, gap: 0,0000m, overlap: 0,0015m
-2026/07/19 01:04:08.118 12501 12539 Info Unity [ClusterVisualFlatPlanar] CreateVisualLayers: expandedMesh.bounds=Center: (0.52, 0.00, -0.63), Extents: (1.42, 0.55, 0.63)
-2026/07/19 01:04:08.118 12501 12539 Info Unity [ClusterVisualFlatPlanar] Created visual layers: background and border hidden, content only
-2026/07/19 01:04:08.118 12501 12539 Info Unity [ClusterVisualFlatPlanar] Background material applied: shader=Custom/ClusterBackgroundCurved, clusterWidth=3,62, clusterHeight=1,10
-2026/07/19 01:04:08.118 12501 12539 Info Unity [ClusterVisualFlatPlanar] Content material applied: shader=Custom/ClusterContentFlatPlanar
-2026/07/19 01:04:08.118 12501 12539 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
-2026/07/19 01:04:08.118 12501 12539 Info Unity [ClusterVisualFlatPlanar] Initialize() completed successfully
-2026/07/19 01:04:08.118 12501 12539 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
-2026/07/19 01:04:08.118 12501 12539 Info Unity [ClusterVisualFlatPlanar] Background material applied: shader=Custom/ClusterBackgroundCurved, clusterWidth=3,62, clusterHeight=1,10
-2026/07/19 01:04:08.118 12501 12539 Info Unity [ClusterVisualFlatPlanar] Background material applied: shader=Custom/ClusterBackgroundCurved, clusterWidth=3,62, clusterHeight=1,10
-2026/07/19 01:04:08.118 12501 12539 Info Unity [ClusterVisualFlatPlanar] Content material applied: shader=Custom/ClusterContentFlatPlanar
-2026/07/19 01:04:08.118 12501 12539 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
-2026/07/19 01:04:08.118 12501 12539 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
-2026/07/19 01:04:08.118 12501 12539 Info Unity [ClusterVisualFlatPlanar] GenerateMeshes: totalPanels=2, enabledCount=2, enabledIndices=[0,1], panelWidth=1,600m
-2026/07/19 01:04:08.118 12501 12539 Info Unity [FlatPlanarMeshGenerator] Generated mesh: 2 panels, 33 vertices, bounds=(2.67, 0.90, 1.19), center=(0.54, 0.00, -0.59)
-2026/07/19 01:04:08.119 12501 12539 Info Unity [ClusterVisualFlatPlanar] Mesh Gen - panelWidth: 1,600m, panelHeight: 0,900m, panelCount: 2, arcRadius: 1,80m, meshMarginH: 0 (full width)
-2026/07/19 01:04:08.119 12501 12539 Info Unity [ClusterVisualFlatPlanar] Yaw angle per panel: 47,9┬░, foldSegments: 6, gap: 0,0000m, overlap: 0,0015m
-2026/07/19 01:04:08.119 12501 12539 Info Unity [ClusterVisualFlatPlanar] Background material applied: shader=Custom/ClusterBackgroundCurved, clusterWidth=3,62, clusterHeight=1,10
-2026/07/19 01:04:08.119 12501 12539 Info Unity [ClusterVisualFlatPlanar] Content material applied: shader=Custom/ClusterContentFlatPlanar
-2026/07/19 01:04:08.119 12501 12539 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
-2026/07/19 01:04:08.119 12501 12539 Info Unity [ClusterVisualFlatPlanar] GenerateMeshes: totalPanels=2, enabledCount=2, enabledIndices=[0,1], panelWidth=1,600m
-2026/07/19 01:04:08.119 12501 12539 Info Unity [FlatPlanarMeshGenerator] Generated mesh: 2 panels, 33 vertices, bounds=(2.67, 0.90, 1.19), center=(0.54, 0.00, -0.59)
-2026/07/19 01:04:08.119 12501 12539 Info Unity [ClusterVisualFlatPlanar] Mesh Gen - panelWidth: 1,600m, panelHeight: 0,900m, panelCount: 2, arcRadius: 1,80m, meshMarginH: 0 (full width)
-2026/07/19 01:04:08.119 12501 12539 Info Unity [ClusterVisualFlatPlanar] Yaw angle per panel: 47,9┬░, foldSegments: 6, gap: 0,0000m, overlap: 0,0015m
-2026/07/19 01:04:08.119 12501 12539 Info Unity [ClusterVisualFlatPlanar] Background material applied: shader=Custom/ClusterBackgroundCurved, clusterWidth=3,62, clusterHeight=1,10
-2026/07/19 01:04:08.119 12501 12539 Info Unity [ClusterVisualFlatPlanar] Content material applied: shader=Custom/ClusterContentFlatPlanar
-2026/07/19 01:04:08.119 12501 12539 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
-2026/07/19 01:04:08.119 12501 12539 Info Unity [ClusterVisualFlatPlanar] GenerateMeshes: totalPanels=2, enabledCount=2, enabledIndices=[0,1], panelWidth=1,600m
-2026/07/19 01:04:08.119 12501 12539 Info Unity [FlatPlanarMeshGenerator] Generated mesh: 2 panels, 33 vertices, bounds=(2.67, 0.90, 1.19), center=(0.54, 0.00, -0.59)
-2026/07/19 01:04:08.119 12501 12539 Info Unity [ClusterVisualFlatPlanar] Mesh Gen - panelWidth: 1,600m, panelHeight: 0,900m, panelCount: 2, arcRadius: 1,80m, meshMarginH: 0 (full width)
-2026/07/19 01:04:08.119 12501 12539 Info Unity [ClusterVisualFlatPlanar] Yaw angle per panel: 47,9┬░, foldSegments: 6, gap: 0,0000m, overlap: 0,0015m
-2026/07/19 01:04:08.119 12501 12539 Info Unity [ClusterVisualFlatPlanar] Background material applied: shader=Custom/ClusterBackgroundCurved, clusterWidth=3,52, clusterHeight=1,05
-2026/07/19 01:04:08.119 12501 12539 Info Unity [ClusterVisualFlatPlanar] Content material applied: shader=Custom/ClusterContentFlatPlanar
-2026/07/19 01:04:08.119 12501 12539 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
-2026/07/19 01:04:08.120 12501 12539 Info Unity [WorldPanelClusterRig] Applied Flat Planar: unified content layer, boards hidden
-2026/07/19 01:04:08.120 12501 12539 Info Unity [WorldPanelClusterRig] Built 2 panels with cluster visuals (no sample textures)
-2026/07/19 01:04:08.120 12501 12539 Info Unity [RTTRemoteMenuController] Applied style: Flat Planar (Standard)
-2026/07/19 01:04:08.120 12501 12539 Info Unity [NativeAudioSink] JNI static method IDs cached
-2026/07/19 01:04:08.137 12501 12539 Info Unity [NativeAudioSink] RegisterDeviceRouter(handle=-5476376620410796032)
-2026/07/19 01:04:08.140 12501 12539 Info Unity [NativeAudioSink] RegisterDeviceRouter OK
-2026/07/19 01:04:08.140 12501 12539 Info Unity [NativeAudioSink] opened: sr=48000 ch=2 handle=-5476376620410796032
-2026/07/19 01:04:08.141 12501 12539 Info Unity [RTTRemoteMenuController] Cached audio track wired to RTP player (kept muted; DC is primary)
-2026/07/19 01:04:08.141 12501 12539 Info Unity [RTTRemoteMenuController] Created audio players (DC primary unmuted, RTP fallback muted)
-2026/07/19 01:04:08.141 12501 12539 Info Unity [RTTRemoteMenuController] Saved zoom distance: 2,20m
-2026/07/19 01:04:08.158 12501 12539 Info Unity [RTTRemoteTaskbar] Icons loaded - Back:True, Eye:True, EyeClose:True, Recenter:True, Zoom:True, Monitor:True
-2026/07/19 01:04:08.158 12501 12539 Info Unity [RTTRemoteTaskbar] Loaded icons - Resolution: 3, FPS: 3/3, Screens: 3/3
-2026/07/19 01:04:08.158 12501 12539 Info Unity [RTTToolbar] Initialized with taskbar. Size: 0,913x0,331m, followTarget: RTTMenu
-2026/07/19 01:04:08.158 12501 12539 Info Unity [RTTRemoteMenuController] Created RTTRemoteTaskbar in RTTToolbar, following RTTMenu
-2026/07/19 01:04:08.159 12501 12539 Info Unity [RTTRemoteMenuController] ClusterRig created inside RTTMenu - waiting for first frames before hiding menu
-2026/07/19 01:04:08.166 12501 12539 Info Unity [RTTMiniFrame] UI built: 1197,5x128 pixels
-2026/07/19 01:04:08.177 12501 12539 Info Unity [WorldPanelClusterRig] LayoutFromParentOrigin: 2 panels, mode=FlatPlanar
-2026/07/19 01:04:08.177 12501 12539 Info Unity [H265-DIAG] Frames per track: T1=1
-2026/07/19 01:04:08.181 12501 12539 Info Unity [HevcDecoder] JNI method IDs cached successfully
-2026/07/19 01:04:08.194 12501 12539 Info Unity [HevcDecoder] JNI method IDs cached successfully
-2026/07/19 01:04:08.218 12501 12539 Info Unity [RTTTaskbarExpansion] Icons loaded - Resolution: 3/3, FPS: 3/3, Passthrough: True, LightOn: True, LightOff: True, FlatMonitor: True, CurvedMonitor: True
-2026/07/19 01:04:08.218 12501 12539 Info Unity [RTTRemoteTaskbar] Expansion panel created in RTTToolbar
-2026/07/19 01:04:08.219 12501 12539 Info Unity [RTTMenuFrame] UI built: 840x788,7323 logical pixels
-2026/07/19 01:04:08.238 12501 12539 Info Unity [RTTRemoteTaskbar] Screen Settings popup created
-2026/07/19 01:04:08.245 12501 12539 Info Unity [RTTTaskbarExpansion] UI built: 326x128 pixels
-2026/07/19 01:04:08.259 12501 12539 Info Unity [PhaseProtocol] Monitor 0 first frame decoded (1/2)
-2026/07/19 01:04:08.273 12501 12539 Info Unity [PhaseProtocol] Monitor 1 first frame decoded (2/2)
-2026/07/19 01:04:08.273 12501 12539 Info Unity [PhaseProtocol] ALL monitors have first frame ΓÇö ready to display
-2026/07/19 01:04:08.273 12501 12539 Info Unity [ConnectionViewModel] All monitors first frame decoded, firing OnAllMonitorsFirstFrame
-2026/07/19 01:04:08.273 12501 12539 Info Unity [RTTRemoteMenuController] All monitors have first frame ΓÇö hiding menu
-2026/07/19 01:04:08.273 12501 12539 Info Unity [RTTRemoteMenuController] Hidden RTTMenuFrame
-2026/07/19 01:04:08.274 12501 12539 Info Unity [RTTRemoteMenuController] Hidden RTTTaskbar
-2026/07/19 01:04:08.286 12501 12539 Info Unity [VirtualObjectsZoomController] Zoom set to 1,75m (delta: -0,442m)
-2026/07/19 01:04:08.286 12501 12539 Info Unity [WorldPanelClusterRig] LayoutFromParentOrigin: 2 panels, mode=FlatPlanar
-2026/07/19 01:04:08.307 12501 12539 Info Unity [WorldPanelClusterRig] LayoutFromParentOrigin: 2 panels, mode=FlatPlanar
-2026/07/19 01:04:08.307 12501 12539 Info Unity [ClusterVisualFlatPlanar] Arc radius changed: 1,800 -> 1,750, regenerating mesh
-2026/07/19 01:04:08.307 12501 12539 Info Unity [ClusterVisualFlatPlanar] Rebuild() called
-2026/07/19 01:04:08.307 12501 12539 Info Unity [ClusterVisualFlatPlanar] Initialize() called
-2026/07/19 01:04:08.307 12501 12539 Info Unity [ClusterVisualFlatPlanar] Initializing for 2 panels
-2026/07/19 01:04:08.307 12501 12539 Info Unity [ClusterVisualFlatPlanar] GenerateMeshes: totalPanels=2, enabledCount=2, enabledIndices=[0,1], panelWidth=1,600m
-2026/07/19 01:04:08.307 12501 12539 Info Unity [FlatPlanarMeshGenerator] Generated mesh: 2 panels, 33 vertices, bounds=(2.65, 0.90, 1.21), center=(0.52, 0.00, -0.60)
-2026/07/19 01:04:08.307 12501 12539 Info Unity [ClusterVisualFlatPlanar] Mesh Gen - panelWidth: 1,600m, panelHeight: 0,900m, panelCount: 2, arcRadius: 1,75m, meshMarginH: 0 (full width)
-2026/07/19 01:04:08.307 12501 12539 Info Unity [ClusterVisualFlatPlanar] Yaw angle per panel: 49,1┬░, foldSegments: 6, gap: 0,0000m, overlap: 0,0015m
-2026/07/19 01:04:08.307 12501 12539 Info Unity [ClusterVisualFlatPlanar] CreateVisualLayers: expandedMesh.bounds=Center: (0.51, 0.00, -0.63), Extents: (1.39, 0.53, 0.63)
-2026/07/19 01:04:08.308 12501 12539 Info Unity [ClusterVisualFlatPlanar] Created visual layers: background and border hidden, content only
-2026/07/19 01:04:08.308 12501 12539 Info Unity [ClusterVisualFlatPlanar] Background material applied: shader=Custom/ClusterBackgroundCurved, clusterWidth=3,52, clusterHeight=1,05
-2026/07/19 01:04:08.308 12501 12539 Info Unity [ClusterVisualFlatPlanar] Content material applied: shader=Custom/ClusterContentFlatPlanar
-2026/07/19 01:04:08.308 12501 12539 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
-2026/07/19 01:04:08.308 12501 12539 Info Unity [ClusterVisualFlatPlanar] Initialize() completed successfully
-2026/07/19 01:04:11.740 12501 12539 Info Unity [WorldPanelClusterRig] LayoutFromParentOrigin: 1 panels, mode=FlatPlanar
-2026/07/19 01:04:11.740 12501 12539 Info Unity [WorldPanelClusterRig] RebuildClusterVisuals: Rebuilding flat planar visual, enabledPanels=1
-2026/07/19 01:04:11.740 12501 12539 Info Unity [ClusterVisualFlatPlanar] Initialize() called
-2026/07/19 01:04:11.740 12501 12539 Info Unity [ClusterVisualFlatPlanar] Initializing for 2 panels
-2026/07/19 01:04:11.740 12501 12539 Info Unity [ClusterVisualFlatPlanar] GenerateMeshes: totalPanels=2, enabledCount=1, enabledIndices=[1], panelWidth=1,600m
-2026/07/19 01:04:11.740 12501 12539 Info Unity [FlatPlanarMeshGenerator] Generated mesh: 1 panels, 6 vertices, bounds=(1.60, 0.90, 0.00), center=(0.00, 0.00, 0.00)
-2026/07/19 01:04:11.741 12501 12539 Info Unity [ClusterVisualFlatPlanar] Mesh Gen - panelWidth: 1,600m, panelHeight: 0,900m, panelCount: 1, arcRadius: 1,75m, meshMarginH: 0 (full width)
-2026/07/19 01:04:11.741 12501 12539 Info Unity [ClusterVisualFlatPlanar] Yaw angle per panel: 49,1┬░, foldSegments: 6, gap: 0,0000m, overlap: 0,0015m
-2026/07/19 01:04:11.741 12501 12539 Info Unity [ClusterVisualFlatPlanar] CreateVisualLayers: expandedMesh.bounds=Center: (0.00, 0.00, 0.00), Extents: (0.88, 0.53, 0.00)
-2026/07/19 01:04:11.741 12501 12539 Info Unity [ClusterVisualFlatPlanar] Created visual layers: background and border hidden, content only
-2026/07/19 01:04:11.741 12501 12539 Info Unity [ClusterVisualFlatPlanar] Background material applied: shader=Custom/ClusterBackgroundCurved, clusterWidth=1,75, clusterHeight=1,05
-2026/07/19 01:04:11.741 12501 12539 Info Unity [ClusterVisualFlatPlanar] Content material applied: shader=Custom/ClusterContentFlatPlanar
-2026/07/19 01:04:11.741 12501 12539 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
-2026/07/19 01:04:11.741 12501 12539 Info Unity [ClusterVisualFlatPlanar] Initialize() completed successfully
-2026/07/19 01:04:11.741 12501 12539 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
-2026/07/19 01:04:11.741 12501 12539 Info Unity [ClusterVisualFlatPlanar] Background material applied: shader=Custom/ClusterBackgroundCurved, clusterWidth=1,75, clusterHeight=1,05
-2026/07/19 01:04:11.741 12501 12539 Info Unity [ClusterVisualFlatPlanar] Background material applied: shader=Custom/ClusterBackgroundCurved, clusterWidth=1,75, clusterHeight=1,05
-2026/07/19 01:04:11.741 12501 12539 Info Unity [ClusterVisualFlatPlanar] Content material applied: shader=Custom/ClusterContentFlatPlanar
-2026/07/19 01:04:11.742 12501 12539 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
-2026/07/19 01:04:11.742 12501 12539 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
-2026/07/19 01:04:11.742 12501 12539 Info Unity [ClusterVisualFlatPlanar] GenerateMeshes: totalPanels=2, enabledCount=1, enabledIndices=[1], panelWidth=1,600m
-2026/07/19 01:04:11.742 12501 12539 Info Unity [FlatPlanarMeshGenerator] Generated mesh: 1 panels, 6 vertices, bounds=(1.60, 0.90, 0.00), center=(0.00, 0.00, 0.00)
-2026/07/19 01:04:11.742 12501 12539 Info Unity [ClusterVisualFlatPlanar] Mesh Gen - panelWidth: 1,600m, panelHeight: 0,900m, panelCount: 1, arcRadius: 1,75m, meshMarginH: 0 (full width)
-2026/07/19 01:04:11.742 12501 12539 Info Unity [ClusterVisualFlatPlanar] Yaw angle per panel: 49,1┬░, foldSegments: 6, gap: 0,0000m, overlap: 0,0015m
-2026/07/19 01:04:11.742 12501 12539 Info Unity [ClusterVisualFlatPlanar] Background material applied: shader=Custom/ClusterBackgroundCurved, clusterWidth=1,75, clusterHeight=1,05
-2026/07/19 01:04:11.742 12501 12539 Info Unity [ClusterVisualFlatPlanar] Content material applied: shader=Custom/ClusterContentFlatPlanar
-2026/07/19 01:04:11.742 12501 12539 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
-2026/07/19 01:04:11.742 12501 12539 Info Unity [ClusterVisualFlatPlanar] Background material applied: shader=Custom/ClusterBackgroundCurved, clusterWidth=1,75, clusterHeight=1,05
-2026/07/19 01:04:11.742 12501 12539 Info Unity [ClusterVisualFlatPlanar] Content material applied: shader=Custom/ClusterContentFlatPlanar
-2026/07/19 01:04:11.742 12501 12539 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
-2026/07/19 01:04:11.742 12501 12539 Info Unity [WorldPanelClusterRig] Applied Flat Planar: unified content layer, boards hidden
-2026/07/19 01:04:11.742 12501 12539 Info Unity [WorldPanelClusterRig] Panel 0 disabled. Enabled panels: 1/2
-2026/07/19 01:04:14.397 12501 12539 Info Unity [H265-DIAG] Frames per track: T1=6 T0=8
-2026/07/19 01:04:17.587 12501 12539 Info Unity [HevcDecoder] Frame decoded: 1920x1080, stride=1920
-2026/07/19 01:04:19.398 12501 12539 Info Unity [H265-DIAG] Frames per track: T1=175 T0=8
-2026/07/19 01:04:19.578 12501 12539 Info Unity [HevcDecoder] Frame decoded: 1920x1080, stride=1920
-2026/07/19 01:04:23.574 12501 12539 Info Unity [HevcDecoder] Frame decoded: 1920x1080, stride=1920
-2026/07/19 01:04:23.592 12501 12539 Info Unity [HevcDecoder] Frame decoded: 1920x1080, stride=1920
-2026/07/19 01:04:24.408 12501 12539 Info Unity [H265-DIAG] Frames per track: T1=367 T0=8
-2026/07/19 01:04:25.577 12501 12539 Info Unity [HevcDecoder] Frame decoded: 1920x1080, stride=1920
-2026/07/19 01:04:25.579 12501 12539 Info Unity [HevcDecoder] Frame decoded: 1920x1080, stride=1920
-2026/07/19 01:04:27.583 12501 12539 Info Unity [HevcDecoder] Frame decoded: 1920x1080, stride=1920
-2026/07/19 01:04:29.562 12501 12539 Info Unity [H265-DIAG] Frames per track: T1=592 T0=8
-2026/07/19 01:04:29.580 12501 12539 Info Unity [HevcDecoder] Frame decoded: 1920x1080, stride=1920
-2026/07/19 01:04:31.586 12501 12539 Info Unity [HevcDecoder] Frame decoded: 1920x1080, stride=1920
-2026/07/19 01:04:33.588 12501 12539 Info Unity [HevcDecoder] Frame decoded: 1920x1080, stride=1920
-2026/07/19 01:04:34.790 12501 12539 Info Unity [H265-DIAG] Frames per track: T1=666 T0=8
-2026/07/19 01:04:37.581 12501 12539 Info Unity [HevcDecoder] Frame decoded: 1920x1080, stride=1920
-2026/07/19 01:04:40.169 12501 12539 Info Unity [H265-DIAG] Frames per track: T1=818 T0=8
-2026/07/19 01:04:41.589 12501 12539 Info Unity [HevcDecoder] Frame decoded: 1920x1080, stride=1920
-2026/07/19 01:04:43.578 12501 12539 Info Unity [HevcDecoder] Frame decoded: 1920x1080, stride=1920
-2026/07/19 01:04:45.241 12501 12539 Info Unity [H265-DIAG] Frames per track: T1=960 T0=8
-2026/07/19 01:04:45.576 12501 12539 Info Unity [HevcDecoder] Frame decoded: 1920x1080, stride=1920
-2026/07/19 01:04:45.592 12501 12539 Info Unity [HevcDecoder] Frame decoded: 1920x1080, stride=1920
-2026/07/19 01:04:47.586 12501 12539 Info Unity [HevcDecoder] Frame decoded: 1920x1080, stride=1920
-2026/07/19 01:04:47.591 12501 12539 Info Unity [HevcDecoder] Frame decoded: 1920x1080, stride=1920
-2026/07/19 01:04:49.589 12501 12539 Info Unity [HevcDecoder] Frame decoded: 1920x1080, stride=1920
-2026/07/19 01:04:50.249 12501 12539 Info Unity [H265-DIAG] Frames per track: T1=1068 T0=8
-2026/07/19 01:04:51.583 12501 12539 Info Unity [HevcDecoder] Frame decoded: 1920x1080, stride=1920
-2026/07/19 01:04:55.258 12501 12539 Info Unity [H265-DIAG] Frames per track: T1=1216 T0=8
-2026/07/19 01:05:00.276 12501 12539 Info Unity [H265-DIAG] Frames per track: T1=1388 T0=8
-2026/07/19 01:05:01.592 12501 12539 Info Unity [HevcDecoder] Frame decoded: 1920x1080, stride=1920
-2026/07/19 01:05:03.574 12501 12539 Info Unity [HevcDecoder] Frame decoded: 1920x1080, stride=1920
-2026/07/19 01:05:03.589 12501 12539 Info Unity [HevcDecoder] Frame decoded: 1920x1080, stride=1920
-2026/07/19 01:05:05.294 12501 12539 Info Unity [H265-DIAG] Frames per track: T1=1545 T0=8
-2026/07/19 01:05:06.053 12501 12501 Info Unity onPause
-2026/07/19 01:05:07.054 12501 12501 Info Unity Surface destroyed while running without focus - pausing Unity
-2026/07/19 01:05:07.059 12501 12501 Info Unity pauseUnity
-2026/07/19 01:05:07.089 12501 12539 Info Unity [XR] [CardboardXrInputProvider]: Lifecycle stopped
-2026/07/19 01:05:07.109 12501 12539 Info Unity [RTTManager] Paused - disabled 0 RTT cameras
-2026/07/19 01:05:07.110 12501 12539 Info Unity Camera2: Pause preview.
-2026/07/19 01:05:07.111 12501 12539 Info Unity Camera2: Close.
-2026/07/19 01:05:07.111 12501 12539 Info Unity Camera2: Stop preview.
+2026/08/02 19:55:19.193 14386 14386 Info Unity resumeUnity
+2026/08/02 19:55:19.200 14386 14386 Info Unity onResume
+2026/08/02 19:55:19.267 14386 14422 Info Unity MemoryManager: Using 'Dynamic Heap' Allocator.
+2026/08/02 19:55:19.304 14386 14386 Info Unity windowFocusChanged: true
+2026/08/02 19:55:19.329 14386 14422 Info Unity SetGameState: isLoading: true, mode: UNKNOWN, label: -2, quality: -1
+2026/08/02 19:55:19.347 14386 14422 Error Unity java.lang.ClassNotFoundException: Didn't find class "com.google.android.play.core.assetpacks.AssetPackManager" on path: DexPathList[[zip file "/data/app/~~1UNgd4lZ8YoPkiw8BO6Udw==/com.Reka.VRWorkSpace-osCiH1G8hAaBZaBhNrB4rw==/base.apk"],nativeLibraryDirectories=[/data/app/~~1UNgd4lZ8YoPkiw8BO6Udw==/com.Reka.VRWorkSpace-osCiH1G8hAaBZaBhNrB4rw==/lib/arm64, /data/app/~~1UNgd4lZ8YoPkiw8BO6Udw==/com.Reka.VRWorkSpace-osCiH1G8hAaBZaBhNrB4rw==/base.apk!/lib/arm64-v8a, /system/lib64, /system_ext/lib64]]
+2026/08/02 19:55:19.436 14386 14422 Info Unity SystemInfo CPU = ARM64 FP ASIMD AES, Cores = 8, Memory = 11284mb
+2026/08/02 19:55:19.436 14386 14422 Info Unity SystemInfo ARM big.LITTLE configuration: 5 big (mask: 0xf8), 3 little (mask: 0x7)
+2026/08/02 19:55:19.437 14386 14422 Info Unity ApplicationInfo 'com.Reka.VRWorkSpace', Version '0.1', Min API Level '29', Target API Level '36'
+2026/08/02 19:55:19.437 14386 14422 Info Unity Built from '6000.5/staging' branch, Version '6000.5.1f1 (0d9463e84828)', Build type 'Development', Scripting Backend 'il2cpp', CPU 'arm64-v8a', Stripping 'Disabled'
+2026/08/02 19:55:19.437 14386 14422 Info Unity Device Model 'vivo V2352GA', OS 'Android OS 16 (API 36)'
+2026/08/02 19:55:19.799 14386 14422 Info Unity Company Name: Reka
+2026/08/02 19:55:19.799 14386 14422 Info Unity Product Name: VRWorkSpace
+2026/08/02 19:55:19.834 14386 14422 Info Unity [XR] [CardboardXrMain]: Display subsystem successfully loaded.
+2026/08/02 19:55:19.834 14386 14422 Info Unity [XR] [CardboardXrMain]: Input subsystem successfully loaded.
+2026/08/02 19:55:20.149 14386 14422 Info Unity XRGeneral Settings awakening...
+2026/08/02 19:55:20.149 14386 14422 Info Unity UnityEngine.DebugLogHandler:Internal_Log(LogType, LogOption, String, Object)
+2026/08/02 19:55:20.149 14386 14422 Info Unity UnityEngine.XR.Management.XRGeneralSettings:Awake()
+2026/08/02 19:55:20.240 14386 14422 Info Unity [XR] [CardboardXrInputProvider]: Lifecycle initialized
+2026/08/02 19:55:20.253 14386 14422 Info Unity SetGameState: isLoading: false, mode: UNKNOWN, label: -1, quality: 2
+2026/08/02 19:55:20.280 14386 14422 Info Unity [XR] [CardboardXrInputProvider]: Lifecycle started
+2026/08/02 19:55:20.286 14386 14422 Info Unity SetGameState: isLoading: true, mode: UNKNOWN, label: 0, quality: 2
+2026/08/02 19:55:20.305 14386 14547 Warn Unity The referenced script on this Behaviour (Game Object 'AppRoot') is missing!
+2026/08/02 19:55:20.306 14386 14547 Warn Unity The referenced script on this Behaviour (Game Object 'Player') is missing!
+2026/08/02 19:55:20.312 14386 14422 Info Unity [XR] [CardboardXrInputProvider]: No events to handle
+2026/08/02 19:55:20.313 14386 14498 Info Unity [XR] [CardboardXrDisplayProvider]: Initializes Cardboard API.
+2026/08/02 19:55:24.854 14386 14422 Info Unity [MainThreadDispatcher] Initialized on thread 1
+2026/08/02 19:55:24.872 14386 14422 Info Unity [APBootstrap] AndroidStreamingHelper initialized
+2026/08/02 19:55:24.872 14386 14422 Info Unity [APBootstrap] AppPermissionManager initialized
+2026/08/02 19:55:24.872 14386 14422 Info Unity Starting camera passthrough
+2026/08/02 19:55:24.923 14386 14422 Info Unity Camera2 0 is a simple camera
+2026/08/02 19:55:24.927 14386 14422 Info Unity Camera2 1 is a simple camera
+2026/08/02 19:55:24.939 14386 14422 Info Unity Camera2: 0 focal length 4.84
+2026/08/02 19:55:24.940 14386 14422 Info Unity Camera2: sensor size 6.5536 x 4.9152
+2026/08/02 19:55:24.940 14386 14422 Info Unity Camera2: focal length equivalent 26
+2026/08/02 19:55:24.974 14386 14422 Info Unity Camera2: 1 focal length 3.74
+2026/08/02 19:55:24.974 14386 14422 Info Unity Camera2: sensor size 4.608 x 3.456
+2026/08/02 19:55:24.974 14386 14422 Info Unity Camera2: focal length equivalent 29
+2026/08/02 19:55:24.976 14386 14422 Info Unity Found 2 camera devices
+2026/08/02 19:55:24.977 14386 14422 Info Unity Camera 0: Camera 0 (front facing: False)
+2026/08/02 19:55:24.977 14386 14422 Info Unity Camera 1: Camera 1 (front facing: True)
+2026/08/02 19:55:24.977 14386 14422 Info Unity Selected back camera: Camera 0
+2026/08/02 19:55:24.977 14386 14422 Info Unity Starting webcam texture: Camera 0 at 1280x720
+2026/08/02 19:55:24.981 14386 14422 Info Unity Camera2: Hardware level: 3
+2026/08/02 19:55:24.981 14386 14422 Info Unity Camera2: FrameSize 4096 x 3072 [2.613983692063143]
+2026/08/02 19:55:24.981 14386 14422 Info Unity Camera2: FrameSize 4080 x 3072 [2.6100697927420065]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 4096 x 2304 [2.3263016196113617]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 4096 x 2304 [2.3263016196113617]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 4080 x 2296 [2.318909455913901]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 3840 x 2160 [2.1972245773362196]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 3264 x 2448 [2.1598687907924505]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 3200 x 2400 [2.120263536200091]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 4096 x 1844 [2.1035920019121193]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 4080 x 1836 [2.0953302696548795]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 3200 x 2000 [1.9379419794061366]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 3264 x 1836 [1.8721867183406695]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 3200 x 1800 [1.83258146374831]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 2560 x 1920 [1.6739764335716716]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 3264 x 1472 [1.6512194464490553]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 3200 x 1456 [1.6204877486206852]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 2304 x 1728 [1.463255402256019]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 2560 x 1440 [1.3862943611198906]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 1920 x 1920 [1.3862943611198906]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 2800 x 1260 [1.3423751271850553]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 2048 x 1536 [1.2276893309432522]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 2304 x 1296 [1.175573329804238]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 1920 x 1440 [1.0986122886681098]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 2304 x 1040 [0.9555114450274363]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 1920 x 1080 [0.8109302162163289]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 1632 x 1224 [0.7735744296725598]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 1600 x 1200 [0.7339691750802004]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 1920 x 864 [0.5877866649021191]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 1440 x 1080 [0.523248143764548]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 1920 x 800 [0.5108256237659907]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 1280 x 960 [0.2876820724517809]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 1080 x 1080 [0.5753641449035618]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 1600 x 720 [0.2231435513142097]
+2026/08/02 19:55:24.982 14386 14422 Info Unity Camera2: FrameSize 1440 x 720 [0.11778303565638351]
+2026/08/02 19:55:24.983 14386 14422 Info Unity Camera2: FrameSize 1280 x 720 [0.0]
+2026/08/02 19:55:24.983 14386 14422 Info Unity Camera2: FrameSize 1024 x 768 [0.28768207245178096]
+2026/08/02 19:55:24.983 14386 14422 Info Unity Camera2: FrameSize 960 x 540 [0.5753641449035617]
+2026/08/02 19:55:24.983 14386 14422 Info Unity Camera2: FrameSize 800 x 600 [0.6523251860396903]
+2026/08/02 19:55:24.983 14386 14422 Info Unity Camera2: FrameSize 800 x 480 [0.8754687373539001]
+2026/08/02 19:55:24.983 14386 14422 Info Unity Camera2: FrameSize 720 x 480 [0.9808292530117262]
+2026/08/02 19:55:24.983 14386 14422 Info Unity Camera2: FrameSize 640 x 480 [1.0986122886681096]
+2026/08/02 19:55:24.983 14386 14422 Info Unity Camera2: FrameSize 352 x 288 [2.207274913189721]
+2026/08/02 19:55:24.983 14386 14422 Info Unity Camera2: FrameSize 320 x 240 [2.4849066497880004]
+2026/08/02 19:55:24.983 14386 14422 Info Unity Camera2: FrameSize 176 x 144 [3.593569274309611]
+2026/08/02 19:55:24.983 14386 14422 Info Unity Camera2: FPS requested: 60 set: 30
+2026/08/02 19:55:24.983 14386 14422 Info Unity Camera2: Open logical camera 0
+2026/08/02 19:55:25.023 14386 14633 Info Unity Camera2: CameraDevice opened.
+2026/08/02 19:55:25.031 14386 14422 Info Unity Camera2: Start preview.
+2026/08/02 19:55:25.125 14386 14633 Info Unity Camera2: CaptureSession is configured.
+2026/08/02 19:55:25.197 14386 14422 Info Unity SetGameState: isLoading: false, mode: UNKNOWN, label: 0, quality: 2
+2026/08/02 19:55:25.201 14386 14422 Info Unity [CardboardApi] Device params found.
+2026/08/02 19:55:25.202 14386 14422 Info Unity [RTTRaycastManager] Auto-initialized layer mask to VirtualObjects (layer 3)
+2026/08/02 19:55:25.224 14386 14422 Info Unity [CursorAppFollower] subscribed to RTTAppManager events
+2026/08/02 19:55:25.226 14386 14422 Info Unity [CardboardApi] Reload device parameters.
+2026/08/02 19:55:25.227 14386 14498 Info Unity [XR] [CardboardXrDisplayProvider]: Initializes Cardboard API.
+2026/08/02 19:55:25.309 14386 14422 Info Unity [PermissionManager] Permission check: Storage=True, Camera=True
+2026/08/02 19:55:25.309 14386 14422 Info Unity [PermissionManager] Permissions already granted (fast path)
+2026/08/02 19:55:25.309 14386 14422 Info Unity [APBootstrap] Permissions complete. All granted: True
+2026/08/02 19:55:25.325 14386 14422 Info Unity [RTTMenu] Created main frame
+2026/08/02 19:55:25.325 14386 14422 Info Unity [RTTBootstrapper] Created RTTMenu with RTTMenuFrame_main
+2026/08/02 19:55:25.325 14386 14422 Info Unity [RTTBootstrapper] RTTMenu oriented towards camera
+2026/08/02 19:55:25.325 14386 14422 Info Unity [RTTToolbar] Created
+2026/08/02 19:55:25.333 14386 14422 Info Unity [RTTTaskbar] Icons loaded - Quit:True, Settings:True, Eye:True, EyeClose:True, Recenter:True, Home:True
+2026/08/02 19:55:25.334 14386 14422 Info Unity [RTTToolbar] Initialized with taskbar. Size: 0,913x0,331m, followTarget: RTTMenu
+2026/08/02 19:55:25.334 14386 14422 Info Unity [RTTBootstrapper] Created RTTTaskbar in RTTToolbar, following RTTMenu
+2026/08/02 19:55:25.334 14386 14422 Info Unity [RTTBootstrapper] RTTManager found, registering new frame and taskbar
+2026/08/02 19:55:25.336 14386 14422 Info Unity [RTTTaskbar] SelectSlot(0) called, current active: 0
+2026/08/02 19:55:25.338 14386 14422 Info Unity [VirtualObjectsZoomController] Configured: min=1m, max=2,5m, default=2,2m, step=0,1m
+2026/08/02 19:55:25.338 14386 14422 Info Unity [VirtualObjectsZoomController] Moving VirtualObjects from 0,08m to default 2,20m
+2026/08/02 19:55:25.338 14386 14422 Info Unity [VirtualObjectsZoomController] Zoom set to 2,20m (delta: 2,119m)
+2026/08/02 19:55:25.338 14386 14422 Info Unity [RTTBootstrapper] Created VirtualObjectsZoomController (range: 1m - 2,5m, default: 2,2m)
+2026/08/02 19:55:25.338 14386 14422 Info Unity [RTTBootstrapper] Initialization complete
+2026/08/02 19:55:25.345 14386 14422 Info Unity [RTTMenuFrame] UI built: 1920x1080 logical pixels
+2026/08/02 19:55:25.566 14386 14422 Info Unity [RTTMiniFrame] UI built: 1095,5x128 pixels
+2026/08/02 19:55:25.612 14386 14422 Info Unity Webcam texture initialized successfully after 2 frames
+2026/08/02 19:55:25.640 14386 14422 Info Unity [MediaEnvironmentController] Found environment root: VirtualEnvironment
+2026/08/02 19:55:25.641 14386 14422 Info Unity [MediaEnvironmentController] Cached 1 room lights
+2026/08/02 19:55:25.641 14386 14422 Info Unity [MediaEnvironmentController] Initialized
+2026/08/02 19:55:25.735 14386 14422 Info Unity [RTTMainMenuController] Icons loaded async - Remote:True, Browser:True, Media:True, Files:False
+2026/08/02 19:55:25.761 14386 14422 Info Unity [RTTMainMenu] Built 6 items in 3x2 grid
+2026/08/02 19:55:25.761 14386 14422 Info Unity [RTTMainMenuController] Main Menu created async (useRegistry=True, itemCount=6)
+2026/08/02 19:55:25.761 14386 14422 Info Unity [RTTManager] Main Menu initialized (persistent, cannot be closed)
+2026/08/02 19:55:25.761 14386 14422 Info Unity [RTTAppManager] Background pre-init started (UniTask)
+2026/08/02 19:55:25.762 14386 14422 Info Unity [RTTMenu] Created app frame: remote
+2026/08/02 19:55:25.762 14386 14422 Info Unity [RTTManager] Background app pre-initialization triggered
+2026/08/02 19:55:25.769 14386 14422 Info Unity [RTTMenuFrame] UI built: 1920x1080 logical pixels
+2026/08/02 19:55:25.796 14386 14422 Info Unity [RemoteAppContentFactory] Creating RemoteMenu content...
+2026/08/02 19:55:25.799 14386 14422 Info Unity [RTTRemoteMenu] OnEnable called
+2026/08/02 19:55:25.848 14386 14422 Info Unity [RTTRemoteMenu] UI built
+2026/08/02 19:55:25.848 14386 14422 Info Unity [VRDropdown] UpdateSelection(0), _optionRefs keys=[0,1,2,3,4], prev _selectedIndex=1
+2026/08/02 19:55:25.848 14386 14422 Info Unity [RTTRemoteMenu] Monitor selection changed: index=0, value=----
+2026/08/02 19:55:25.849 14386 14422 Info Unity [RTTRemoteMenu] No cached info, skipping recalculation
+2026/08/02 19:55:25.849 14386 14422 Info Unity [VRDropdown] UpdateSelection(0), _optionRefs keys=[0,1], prev _selectedIndex=0
+2026/08/02 19:55:25.849 14386 14422 Info Unity [RTTRemoteMenu] Mode changed: index=0, value=Classic
+2026/08/02 19:55:25.849 14386 14422 Info Unity [VRDropdown] UpdateSelection(0), _optionRefs keys=[0,1,2], prev _selectedIndex=1
+2026/08/02 19:55:25.849 14386 14422 Info Unity [RTTRemoteMenu] Resolution changed: index=0, value=----
+2026/08/02 19:55:25.849 14386 14422 Info Unity [VRDropdown] UpdateSelection(0), _optionRefs keys=[0,1,2], prev _selectedIndex=1
+2026/08/02 19:55:25.849 14386 14422 Info Unity [RTTRemoteMenu] FPS changed: index=0, value=----
+2026/08/02 19:55:25.849 14386 14422 Info Unity [RTTRemoteMenu] CreateSidePanels called, _menuFrame null: False
+2026/08/02 19:55:25.849 14386 14422 Info Unity [RTTRemoteMenu] Creating Hardware Info Panel (left) with sphere positioning...
+2026/08/02 19:55:25.850 14386 14422 Info Unity [VirtualObjectsZoomController] Registered side panel: HardwareInfoPanel (side=-1, mainW=1,6, sideW=0,5333334, gap=0,05)
+2026/08/02 19:55:25.850 14386 14422 Info Unity [RTTRemoteMenu] Registered HardwareInfoPanel with VirtualObjectsZoomController
+2026/08/02 19:55:25.850 14386 14422 Info Unity [RTTRemoteMenu] PlaceSidePanel: mainPos=(-1.76, 0.00, 1.45), panelPos=(-2.35, 0.00, 0.54)
+2026/08/02 19:55:25.850 14386 14422 Info Unity [RTTRemoteMenu] CreateSidePanelContent started for HardwareInfo
+2026/08/02 19:55:25.850 14386 14422 Info Unity [RTTRemoteMenu] Hardware frame created: True
+2026/08/02 19:55:25.850 14386 14422 Info Unity [RTTRemoteMenu] Creating Network Info Panel (right) with sphere positioning...
+2026/08/02 19:55:25.850 14386 14422 Info Unity [VirtualObjectsZoomController] Registered side panel: NetworkInfoPanel (side=1, mainW=1,6, sideW=0,5333334, gap=0,05)
+2026/08/02 19:55:25.850 14386 14422 Info Unity [RTTRemoteMenu] Registered NetworkInfoPanel with VirtualObjectsZoomController
+2026/08/02 19:55:25.850 14386 14422 Info Unity [RTTRemoteMenu] PlaceSidePanel: mainPos=(-1.76, 0.00, 1.45), panelPos=(-0.97, 0.00, 2.21)
+2026/08/02 19:55:25.850 14386 14422 Info Unity [RTTRemoteMenu] CreateSidePanelContent started for NetworkInfo
+2026/08/02 19:55:25.850 14386 14422 Info Unity [RTTRemoteMenu] Network frame created: True
+2026/08/02 19:55:25.850 14386 14422 Info Unity [RTTRemoteMenu] Side panels created (0,53m x 0,90m) gap=0,05m with sphere positioning (hidden)
+2026/08/02 19:55:25.854 14386 14422 Info Unity [ServiceLocator] Registered: ConnectionViewModel
+2026/08/02 19:55:25.854 14386 14422 Info Unity [RTTRemoteMenu] HandlePhaseChanged: Disconnected -> Disconnected
+2026/08/02 19:55:25.854 14386 14422 Info Unity [VRDropdown] UpdateSelection(0), _optionRefs keys=[0,1,2,3,4], prev _selectedIndex=0
+2026/08/02 19:55:25.854 14386 14422 Info Unity [RTTRemoteMenu] Monitor selection changed: index=0, value=----
+2026/08/02 19:55:25.854 14386 14422 Info Unity [RTTRemoteMenu] No cached info, skipping recalculation
+2026/08/02 19:55:25.854 14386 14422 Info Unity [VRDropdown] UpdateSelection(0), _optionRefs keys=[0,1], prev _selectedIndex=0
+2026/08/02 19:55:25.854 14386 14422 Info Unity [RTTRemoteMenu] Mode changed: index=0, value=Classic
+2026/08/02 19:55:25.854 14386 14422 Info Unity [VRDropdown] UpdateSelection(0), _optionRefs keys=[0,1,2], prev _selectedIndex=0
+2026/08/02 19:55:25.854 14386 14422 Info Unity [RTTRemoteMenu] Resolution changed: index=0, value=----
+2026/08/02 19:55:25.854 14386 14422 Info Unity [VRDropdown] UpdateSelection(0), _optionRefs keys=[0,1,2], prev _selectedIndex=0
+2026/08/02 19:55:25.854 14386 14422 Info Unity [RTTRemoteMenu] FPS changed: index=0, value=----
+2026/08/02 19:55:25.854 14386 14422 Info Unity [RTTRemoteMenu] Hardware frame hidden
+2026/08/02 19:55:25.854 14386 14422 Info Unity [RTTRemoteMenu] Network frame hidden
+2026/08/02 19:55:25.854 14386 14422 Info Unity [RTTRemoteMenu] HideSidePanels completed
+2026/08/02 19:55:25.854 14386 14422 Info Unity [RTTRemoteMenu] Background discovery started
+2026/08/02 19:55:25.856 14386 14422 Info Unity [Discovery] Scanning for servers on UDP port 8289 (timeout 5000ms)...
+2026/08/02 19:55:25.877 14386 14422 Info Unity [RTTRemoteMenu] Bound to ConnectionViewModel
+2026/08/02 19:55:25.891 14386 14422 Info Unity [RTTRemoteMenu] Frame not initialized for HardwareInfo, calling EnsureInitialized()
+2026/08/02 19:55:25.893 14386 14422 Info Unity [RTTMenuFrame] UI built: 640x1080 logical pixels
+2026/08/02 19:55:25.894 14386 14422 Info Unity [RTTRemoteMenu] Frame initialized for HardwareInfo after 0 frames, ContentContainer valid
+2026/08/02 19:55:25.894 14386 14422 Info Unity [RTTRemoteMenu] Frame not initialized for NetworkInfo, calling EnsureInitialized()
+2026/08/02 19:55:25.900 14386 14422 Info Unity [RTTMenuFrame] UI built: 640x1080 logical pixels
+2026/08/02 19:55:25.900 14386 14422 Info Unity [RTTRemoteMenu] Frame initialized for NetworkInfo after 0 frames, ContentContainer valid
+2026/08/02 19:55:25.901 14386 14422 Info Unity [Discovery] Found server: HANGUYEN at 192.168.1.211:8288
+2026/08/02 19:55:25.925 14386 14422 Info Unity [RTTRemoteMenu] Created InfoPanel_HardwareInfo, parent set to ContentContainer
+2026/08/02 19:55:25.927 14386 14422 Info Unity [RTTInfoSidePanel] BuildUI started for HardwareInfo, container=ContentContainer
+2026/08/02 19:55:25.927 14386 14422 Info Unity [RTTInfoSidePanel] Already parented to ContentContainer
+2026/08/02 19:55:25.927 14386 14422 Info Unity [RTTInfoSidePanel] Calculated max label width for HardwareInfo: 155 (Base: 130 + 25)
+2026/08/02 19:55:25.927 14386 14422 Info Unity [RTTInfoSidePanel] Built for type: HardwareInfo, _isBuilt=True, parent=ContentContainer
+2026/08/02 19:55:25.927 14386 14422 Info Unity [RTTRemoteMenu] InfoPanel_HardwareInfo BuildUI completed, parent=ContentContainer
+2026/08/02 19:55:25.927 14386 14422 Info Unity [RTTInfoSidePanel] ShowLoadingState called for HardwareInfo, _isBuilt=True
+2026/08/02 19:55:25.929 14386 14422 Info Unity [RTTRemoteMenu] Created InfoPanel_NetworkInfo, parent set to ContentContainer
+2026/08/02 19:55:25.929 14386 14422 Info Unity [RTTInfoSidePanel] BuildUI started for NetworkInfo, container=ContentContainer
+2026/08/02 19:55:25.930 14386 14422 Info Unity [RTTInfoSidePanel] Already parented to ContentContainer
+2026/08/02 19:55:25.930 14386 14422 Info Unity [RTTInfoSidePanel] Calculated max label width for NetworkInfo: 225 (Base: 200 + 25)
+2026/08/02 19:55:25.930 14386 14422 Info Unity [RTTInfoSidePanel] Built for type: NetworkInfo, _isBuilt=True, parent=ContentContainer
+2026/08/02 19:55:25.930 14386 14422 Info Unity [RTTRemoteMenu] InfoPanel_NetworkInfo BuildUI completed, parent=ContentContainer
+2026/08/02 19:55:25.930 14386 14422 Info Unity [RTTInfoSidePanel] ShowSpeedTestLoadingState called for NetworkInfo, _isBuilt=True
+2026/08/02 19:55:25.961 14386 14422 Info Unity [RTTAppManager] Pre-initialized app: remote in 198,9ms
+2026/08/02 19:55:26.009 14386 14422 Info Unity [RTTMenu] Created app frame: media
+2026/08/02 19:55:26.015 14386 14422 Info Unity [RTTMenuFrame] UI built: 1920x1080 logical pixels
+2026/08/02 19:55:26.042 14386 14422 Info Unity [MediaAppContentFactory] Creating Media content...
+2026/08/02 19:55:26.043 14386 14422 Info Unity [VRMediaAppController] Projection parented to VirtualObjects for zoom support
+2026/08/02 19:55:26.043 14386 14422 Info Unity [VRMediaAppController] Found camera rig: Player
+2026/08/02 19:55:26.046 14386 14422 Info Unity [VRVideoProjectionSystem] Created FlatProjectionRenderer
+2026/08/02 19:55:26.046 14386 14422 Info Unity [VRVideoProjectionSystem] Initialized
+2026/08/02 19:55:26.053 14386 14422 Info Unity [MediaLibraryService] Cache loading disabled - will scan on demand
+2026/08/02 19:55:26.063 14386 14422 Info Unity [VirtualObjectsZoomController] Registered side panel: MediaNavigationPanel (side=-1, mainW=1,6, sideW=0,5333334, gap=0,05)
+2026/08/02 19:55:26.065 14386 14422 Info Unity [RTTMenuFrame] UI built: 640x1080 logical pixels
+2026/08/02 19:55:26.066 14386 14422 Info Unity [RTTMediaLibrary] CreateLeftPanelContent started at 5,779s
+2026/08/02 19:55:26.082 14386 14422 Info Unity [RTTMediaLibrary] Left panel content created at 5,795s
+2026/08/02 19:55:26.082 14386 14422 Info Unity [VirtualObjectsZoomController] Registered side panel: MediaDetailPanel (side=1, mainW=1,6, sideW=0,5333334, gap=0,05)
+2026/08/02 19:55:26.084 14386 14422 Info Unity [RTTMenuFrame] UI built: 640x1080 logical pixels
+2026/08/02 19:55:26.084 14386 14422 Info Unity [RTTMediaLibrary] CreateRightPanelContent started at 5,798s
+2026/08/02 19:55:26.100 14386 14422 Info Unity [RTTMediaLibrary] Right panel content created at 5,814s
+2026/08/02 19:55:26.102 14386 14422 Info Unity [RTTPopupMenu] CreateWorldSpace: layer 'VirtualObjects' = 3, mainCam: VRCamera
+2026/08/02 19:55:26.104 14386 14422 Info Unity [RTTPopupMenu] Created world-space popup
+2026/08/02 19:55:26.112 14386 14422 Info Unity [RTTPopupMenu] CreateWorldSpace: layer 'VirtualObjects' = 3, mainCam: VRCamera
+2026/08/02 19:55:26.112 14386 14422 Info Unity [RTTPopupMenu] Created world-space popup
+2026/08/02 19:55:26.120 14386 14422 Info Unity [RTTMediaLibrary] CreateRow2: _breadcrumbContainer SET to Breadcrumbs, instanceID=568105589213751440
+2026/08/02 19:55:26.125 14386 14422 Info Unity [RTTMediaLibrary] After CreateHeaderRows: _headerRT=True, _breadcrumbContainer=True
+2026/08/02 19:55:26.151 14386 14422 Info Unity [RTTMediaLibrary] Creating 2 breadcrumb segments for: All Media > Videos
+2026/08/02 19:55:26.151 14386 14422 Info Unity [RTTMediaLibrary] Created 2 breadcrumb pills for path: All Media > Videos
+2026/08/02 19:55:26.151 14386 14422 Info Unity [RTTMediaLibraryController] No cached data, will scan immediately
+2026/08/02 19:55:26.151 14386 14422 Info Unity [RTTMediaLibraryController] No data available, starting scan...
+2026/08/02 19:55:26.151 14386 14422 Info Unity [MediaLibraryScanner] Using Android MediaStore for fast media discovery...
+2026/08/02 19:55:26.163 14386 14422 Info Unity [AndroidMediaStoreHelper] Found 8 Video items
+2026/08/02 19:55:26.174 14386 14422 Info Unity [AndroidMediaStoreHelper] Found 435 Image items
+2026/08/02 19:55:26.249 14386 14422 Info Unity [AndroidMediaStoreHelper] Found 1 Audio items
+2026/08/02 19:55:26.250 14386 14422 Info Unity [MediaLibraryScanner] MediaStore query returned 444 items in 98ms
+2026/08/02 19:55:26.269 14386 14422 Info Unity [RTTMediaLibraryController] Starting fresh scan (no cache)
+2026/08/02 19:55:26.269 14386 14422 Warn Unity [MediaLibraryScanner] Already scanning
+2026/08/02 19:55:26.269 14386 14422 Info Unity [RTTMediaLibrary] Center grid created
+2026/08/02 19:55:26.269 14386 14422 Info Unity [VRMediaAppController] Library UI built
+2026/08/02 19:55:26.269 14386 14422 Info Unity [VRMediaAppController] Media app created
+2026/08/02 19:55:26.287 14386 14422 Info Unity [RTTMediaLibrary] InitializePageSizeDeferred: itemsPerPage=8
+2026/08/02 19:55:26.352 14386 14422 Info Unity [RTTAppManager] Pre-initialized app: media in 343,3ms
+2026/08/02 19:55:26.400 14386 14422 Info Unity [RTTMenu] Created app frame: folder
+2026/08/02 19:55:26.404 14386 14422 Info Unity [RTTMenuFrame] UI built: 1920x1080 logical pixels
+2026/08/02 19:55:26.405 14386 14422 Info Unity [MediaLibraryScanner] MediaStore scan complete in 253ms
+2026/08/02 19:55:26.420 14386 14422 Info Unity [RTTMediaGridItem] Duration badge for 'Screenrecording_20260801_183251_com.HoYoverse.NapVn': show=True, duration=90,689s, text='1:30', font=NotoSansKR-Regular_TMP_Primary
+2026/08/02 19:55:26.433 14386 14422 Info Unity [Cache] DISK READ: 8ms (243KB)
+2026/08/02 19:55:26.436 14386 14422 Info Unity [Cache] DISK DECODE: 3ms (230x512)
+2026/08/02 19:55:26.455 14386 14422 Info Unity [RTTMediaGridItem] Duration badge for 'Screenrecording_20260801_183447_com.HoYoverse.NapVn': show=True, duration=136,275s, text='2:16', font=NotoSansKR-Regular_TMP_Primary
+2026/08/02 19:55:26.461 14386 14422 Info Unity [Cache] DISK READ: 2ms (239KB)
+2026/08/02 19:55:26.465 14386 14422 Info Unity [Cache] DISK DECODE: 4ms (230x512)
+2026/08/02 19:55:26.482 14386 14422 Info Unity [RTTMediaGridItem] Duration badge for 'Screenrecording_20260801_185737_com.HoYoverse.NapVn': show=True, duration=201,12s, text='3:21', font=NotoSansKR-Regular_TMP_Primary
+2026/08/02 19:55:26.487 14386 14422 Info Unity [Cache] DISK READ: 2ms (284KB)
+2026/08/02 19:55:26.492 14386 14422 Info Unity [Cache] DISK DECODE: 4ms (230x512)
+2026/08/02 19:55:26.515 14386 14422 Info Unity [RTTMediaGridItem] Duration badge for 'Screenrecording_20260731_111620_com.HoYoverse.NapVn': show=True, duration=52,736s, text='0:52', font=NotoSansKR-Regular_TMP_Primary
+2026/08/02 19:55:26.518 14386 14422 Info Unity [Cache] DISK READ: 2ms (201KB)
+2026/08/02 19:55:26.522 14386 14422 Info Unity [Cache] DISK DECODE: 3ms (230x512)
+2026/08/02 19:55:26.542 14386 14422 Info Unity [RTTMediaGridItem] Duration badge for 'Tß║¡p 01 ├üc Nß╗» Nß╗¡a Vß╗¥i': show=True, duration=1430,001s, text='23:50', font=NotoSansKR-Regular_TMP_Primary
+2026/08/02 19:55:26.543 14386 14422 Info Unity [Cache] DISK READ: 0ms (300KB)
+2026/08/02 19:55:26.547 14386 14422 Info Unity [Cache] DISK DECODE: 3ms (512x288)
+2026/08/02 19:55:26.564 14386 14422 Info Unity [RTTMediaGridItem] Duration badge for 'Tß║¡p 02 ├üc Nß╗» Nß╗¡a Vß╗¥i': show=True, duration=1430,048s, text='23:50', font=NotoSansKR-Regular_TMP_Primary
+2026/08/02 19:55:26.566 14386 14422 Info Unity [Cache] DISK READ: 0ms (193KB)
+2026/08/02 19:55:26.568 14386 14422 Info Unity [Cache] DISK DECODE: 2ms (512x288)
+2026/08/02 19:55:26.585 14386 14422 Info Unity [RTTMediaGridItem] Duration badge for 'Tß║¡p 03 ├üc Nß╗» Nß╗¡a Vß╗¥i': show=True, duration=1430,094s, text='23:50', font=NotoSansKR-Regular_TMP_Primary
+2026/08/02 19:55:26.588 14386 14422 Info Unity [Cache] DISK READ: 0ms (241KB)
+2026/08/02 19:55:26.592 14386 14422 Info Unity [Cache] DISK DECODE: 3ms (512x288)
+2026/08/02 19:55:26.615 14386 14422 Info Unity [RTTMediaGridItem] Duration badge for 'Ph├ám Nh├ón Tu Ti├¬n Tß║¡p 181': show=True, duration=1190,998s, text='19:50', font=NotoSansKR-Regular_TMP_Primary
+2026/08/02 19:55:26.620 14386 14422 Info Unity [Cache] DISK READ: 0ms (293KB)
+2026/08/02 19:55:26.625 14386 14422 Info Unity [Cache] DISK DECODE: 4ms (512x288)
+2026/08/02 19:55:26.647 14386 14422 Info Unity [RTTMediaGrid] Auto-selecting first item: Screenrecording_20260801_183251_com.HoYoverse.NapVn
+2026/08/02 19:55:26.648 14386 14422 Info Unity [Detail] REQUEST: Screenrecording_20260801_183251_com.HoYoverse.NapVn.mp4
+2026/08/02 19:55:26.652 14386 14422 Info Unity [Cache] DISK READ: 0ms (246KB)
+2026/08/02 19:55:26.656 14386 14422 Info Unity [Cache] DISK DECODE: 3ms (230x512)
+2026/08/02 19:55:26.675 14386 14422 Info Unity [Detail] RECEIVED: Screenrecording_20260801_183251_com.HoYoverse.NapVn.mp4 wait=27ms assign=0ms
+2026/08/02 19:55:26.679 14386 14422 Info Unity [VideoHeaderParser] Duration from mvhd: 90,7s
+2026/08/02 19:55:26.679 14386 14422 Info Unity [VideoHeaderParser] Dimensions from tkhd: 720x1600
+2026/08/02 19:55:26.679 14386 14422 Info Unity [VideoHeaderParser] Codec: avc1
+2026/08/02 19:55:26.680 14386 14422 Info Unity [Detail] UpdateInfo: Screenrecording_20260801_183251_com.HoYoverse.NapVn.mp4 name=0ms preview=27ms metadata=5ms total=32ms
+2026/08/02 19:55:26.681 14386 14422 Info Unity [Detail] REQUEST: Screenrecording_20260801_183251_com.HoYoverse.NapVn.mp4
+2026/08/02 19:55:26.681 14386 14422 Info Unity [Detail] RECEIVED: Screenrecording_20260801_183251_com.HoYoverse.NapVn.mp4 wait=0ms assign=0ms
+2026/08/02 19:55:26.682 14386 14422 Info Unity [Detail] UpdateInfo: Screenrecording_20260801_183251_com.HoYoverse.NapVn.mp4 name=0ms preview=0ms metadata=0ms total=0ms
+2026/08/02 19:55:26.683 14386 14422 Info Unity [AppStateCache] Saved state for media with 8 items
+2026/08/02 19:55:26.683 14386 14422 Info Unity [RTTMediaLibraryController] CacheCurrentState: Cached 8 items
+2026/08/02 19:55:26.694 14386 14422 Info Unity [MediaCacheService] Saved 444 items to cache (with metadata & dimensions)
+2026/08/02 19:55:26.694 14386 14422 Info Unity [MediaLibraryService] Triggering metadata preload for 444 files
+2026/08/02 19:55:26.694 14386 14422 Info Unity [FileMetadataService] Starting background preload for 444 files
+2026/08/02 19:55:26.694 14386 14422 Info Unity [MediaLibraryScanner] Scan complete: 444 media files
+2026/08/02 19:55:26.716 14386 14422 Info Unity [FilesAppContentFactory] Creating FileManager content...
+2026/08/02 19:55:26.729 14386 14422 Info Unity [RTTFileManager] PlaceSidePanel: innerEdge=(-2.30, 0.00, 0.80), panelPos=(-2.35, 0.00, 0.54)
+2026/08/02 19:55:26.729 14386 14422 Info Unity [VirtualObjectsZoomController] Registered side panel: FileNavigationPanel (side=-1, mainW=1,6, sideW=0,5333334, gap=0,05)
+2026/08/02 19:55:26.729 14386 14422 Info Unity [RTTFileManager] Registered FileNavigationPanel with VirtualObjectsZoomController
+2026/08/02 19:55:26.729 14386 14422 Info Unity [RTTFileManager] Placed FileNavigationPanel: pos=(-2.35, 0.00, 0.54)
+2026/08/02 19:55:26.732 14386 14422 Info Unity [RTTMenuFrame] UI built: 640x1080 logical pixels
+2026/08/02 19:55:26.737 14386 14422 Info Unity [FileSystemService] Root path set to: /storage/emulated/0
+2026/08/02 19:55:26.741 14386 14422 Info Unity [RTTFileManager] PlaceSidePanel: innerEdge=(-1.22, 0.00, 2.11), panelPos=(-0.97, 0.00, 2.21)
+2026/08/02 19:55:26.741 14386 14422 Info Unity [VirtualObjectsZoomController] Registered side panel: FileDetailPanel (side=1, mainW=1,6, sideW=0,5333334, gap=0,05)
+2026/08/02 19:55:26.741 14386 14422 Info Unity [RTTFileManager] Registered FileDetailPanel with VirtualObjectsZoomController
+2026/08/02 19:55:26.741 14386 14422 Info Unity [RTTFileManager] Placed FileDetailPanel: pos=(-0.97, 0.00, 2.21)
+2026/08/02 19:55:26.743 14386 14422 Info Unity [RTTMenuFrame] UI built: 640x1080 logical pixels
+2026/08/02 19:55:26.750 14386 14422 Info Unity [RTTFileActionBar] Buttons created
+2026/08/02 19:55:26.750 14386 14422 Info Unity [RTTFileActionBar] Initialized, following: FileDetailPanel
+2026/08/02 19:55:26.750 14386 14422 Info Unity [RTTFileManager] File action bar created (hidden initially)
+2026/08/02 19:55:26.751 14386 14422 Info Unity [RTTPopupMenu] CreateWorldSpace: layer 'VirtualObjects' = 3, mainCam: VRCamera
+2026/08/02 19:55:26.752 14386 14422 Info Unity [RTTPopupMenu] Created world-space popup
+2026/08/02 19:55:26.764 14386 14422 Info Unity [Controller] CanCreateFolderHere called, _currentPath: 'root'
+2026/08/02 19:55:26.765 14386 14422 Info Unity [FileSystemService] CanCreateFolderInPath called with path: 'root'
+2026/08/02 19:55:26.765 14386 14422 Info Unity [FileSystemService] Path is 'root' or empty, returning false
+2026/08/02 19:55:26.765 14386 14422 Info Unity [Controller] CanCreateFolderHere result: False
+2026/08/02 19:55:26.765 14386 14422 Info Unity [RTTFileManager] UpdateNewFolderButtonState: canCreate=False
+2026/08/02 19:55:26.765 14386 14422 Info Unity [RTTFileManager] BoxCollider.enabled set to False
+2026/08/02 19:55:26.765 14386 14422 Info Unity [RTTFileManager] New Folder button DISABLED - alpha=0,4
+2026/08/02 19:55:26.766 14386 14422 Info Unity [RTTFileManager] Text Area found and offsetMin set to: (30.00, 0.00)
+2026/08/02 19:55:26.774 14386 14422 Info Unity [RTTFileGrid] CalculateGridMetrics: width=1770, availableWidth=1730, columnsPerRow=4, cellWidth=395, spacingX=30
+2026/08/02 19:55:26.801 14386 14422 Info Unity [Controller] SetSortOptionsNoRefresh: sortBy=Name, ascending=True
+2026/08/02 19:55:26.801 14386 14422 Info Unity [Controller] View is ready. Checking storage permissions...
+2026/08/02 19:55:26.801 14386 14422 Info Unity [Controller] Permissions already granted via AppPermissionManager.
+2026/08/02 19:55:26.801 14386 14422 Info Unity [Controller] NavigateToInternalAsync: path='root', restorePage=False, clickedFolder=''
+2026/08/02 19:55:26.803 14386 14422 Info Unity [RTTFileManager] UpdateBreadcrumbs called with path: root, container null: True, instance: 568105589213742564
+2026/08/02 19:55:26.803 14386 14422 Info Unity [Controller] CanCreateFolderHere called, _currentPath: 'root'
+2026/08/02 19:55:26.803 14386 14422 Info Unity [FileSystemService] CanCreateFolderInPath called with path: 'root'
+2026/08/02 19:55:26.803 14386 14422 Info Unity [FileSystemService] Path is 'root' or empty, returning false
+2026/08/02 19:55:26.803 14386 14422 Info Unity [Controller] CanCreateFolderHere result: False
+2026/08/02 19:55:26.803 14386 14422 Info Unity [RTTFileManager] UpdateNewFolderButtonState: canCreate=False
+2026/08/02 19:55:26.803 14386 14422 Info Unity [RTTFileManager] BoxCollider.enabled set to False
+2026/08/02 19:55:26.803 14386 14422 Info Unity [RTTFileManager] New Folder button DISABLED - alpha=0,4
+2026/08/02 19:55:26.803 14386 14422 Warn Unity [RTTFileManager] Breadcrumb container reference lost, searching in hierarchy...
+2026/08/02 19:55:26.803 14386 14422 Info Unity [RTTFileManager] Found breadcrumb container from hierarchy: True
+2026/08/02 19:55:26.803 14386 14422 Info Unity [RTTFileManager] Created 1 breadcrumbs for path: /storage/emulated/0
+2026/08/02 19:55:26.803 14386 14422 Info Unity [FileSystemService] Reading directory async: /storage/emulated/0
+2026/08/02 19:55:26.811 14386 14422 Info Unity [FileSystemService] Quick count: 38 items (dirs=34, files=4)
+2026/08/02 19:55:26.811 14386 14422 Info Unity [Controller] Quick count received: 38 items
+2026/08/02 19:55:26.812 14386 14422 Info Unity [TextEncodingHelper] Normalized NFD->NFC: 'T├¬╠úp cu╠ëa t├┤i' (13 chars) -> 'Tß╗çp cß╗ºa t├┤i' (11 chars)
+2026/08/02 19:55:26.812 14386 14422 Info Unity [FileSystemService] Found 26 items async (25 folders, 1 files)
+2026/08/02 19:55:26.812 14386 14422 Info Unity [Controller] Using full data (load completed quickly): 26 items
+2026/08/02 19:55:26.812 14386 14422 Info Unity [Controller] CalculateTotalPages: totalFiles=26, pageSize=8, totalPages=4
+2026/08/02 19:55:26.824 14386 14422 Info Unity [RTTFileGrid] Progressive binding started: 14 items queued
+2026/08/02 19:55:26.830 14386 14422 Info Unity [RTTFileGrid] Progressive bind frame: 9 items, 5 remaining
+2026/08/02 19:55:26.832 14386 14422 Info Unity [RTTFileGrid] GetVisibleRowsForPagination: height=748,1688, availableHeight=728,1688, rowHeight=350, rowsFloat=2,080482, visibleRows=2
+2026/08/02 19:55:26.834 14386 14422 Info Unity [Detail] UpdateInfo: 0 name=0ms preview=0ms metadata=1ms total=1ms
+2026/08/02 19:55:26.834 14386 14422 Info Unity [RTTFileManagerController] Menu created
+2026/08/02 19:55:26.884 14386 14422 Info Unity [RTTFileGrid] Progressive bind frame: 2 items, 3 remaining
+2026/08/02 19:55:26.960 14386 14422 Info Unity [RTTFileGrid] Progressive bind frame: 1 items, 2 remaining
+2026/08/02 19:55:26.970 14386 14422 Info Unity [RTTFileGrid] Progressive bind frame: 2 items, 0 remaining
+2026/08/02 19:55:26.971 14386 14422 Info Unity [VideoHeaderParser] Duration from mvhd: 1191,0s
+2026/08/02 19:55:26.972 14386 14422 Info Unity [VideoHeaderParser] Dimensions from tkhd: 1920x1080
+2026/08/02 19:55:26.972 14386 14422 Info Unity [VideoHeaderParser] Codec: avc1
+2026/08/02 19:55:26.974 14386 14422 Info Unity [VideoHeaderParser] Duration from mvhd: 52,7s
+2026/08/02 19:55:26.974 14386 14422 Info Unity [VideoHeaderParser] Dimensions from tkhd: 720x1600
+2026/08/02 19:55:26.974 14386 14422 Info Unity [VideoHeaderParser] Codec: avc1
+2026/08/02 19:55:26.975 14386 14422 Info Unity [VideoHeaderParser] Duration from mvhd: 136,3s
+2026/08/02 19:55:26.975 14386 14422 Info Unity [VideoHeaderParser] Dimensions from tkhd: 720x1600
+2026/08/02 19:55:26.975 14386 14422 Info Unity [VideoHeaderParser] Codec: avc1
+2026/08/02 19:55:26.976 14386 14422 Info Unity [VideoHeaderParser] Duration from mvhd: 201,1s
+2026/08/02 19:55:26.976 14386 14422 Info Unity [VideoHeaderParser] Dimensions from tkhd: 720x1600
+2026/08/02 19:55:26.976 14386 14422 Info Unity [VideoHeaderParser] Codec: avc1
+2026/08/02 19:55:26.982 14386 14422 Info Unity [RTTFileGrid] Progressive binding complete: 14 items bound total
+2026/08/02 19:55:27.002 14386 14422 Info Unity [RTTAppManager] Pre-initialized app: folder in 602,3ms
+2026/08/02 19:55:27.049 14386 14422 Info Unity [RTTAppManager] Background pre-init complete: 3 apps in 1287,0ms
+2026/08/02 19:55:27.253 14386 14422 Info Unity [VideoHeaderParser] Duration from mvhd: 1430,0s
+2026/08/02 19:55:27.253 14386 14422 Info Unity [VideoHeaderParser] Dimensions from tkhd: 1920x1080
+2026/08/02 19:55:27.253 14386 14422 Info Unity [VideoHeaderParser] Codec: avc1
+2026/08/02 19:55:27.270 14386 14422 Info Unity [VideoHeaderParser] Duration from mvhd: 1430,0s
+2026/08/02 19:55:27.270 14386 14422 Info Unity [VideoHeaderParser] Dimensions from tkhd: 1920x1080
+2026/08/02 19:55:27.270 14386 14422 Info Unity [VideoHeaderParser] Codec: avc1
+2026/08/02 19:55:27.272 14386 14422 Info Unity [VideoHeaderParser] Duration from mvhd: 1430,1s
+2026/08/02 19:55:27.272 14386 14422 Info Unity [VideoHeaderParser] Dimensions from tkhd: 1920x1080
+2026/08/02 19:55:27.272 14386 14422 Info Unity [VideoHeaderParser] Codec: avc1
+2026/08/02 19:55:27.273 14386 14422 Info Unity [FileMetadataService] Preload complete: 8 loaded, 1 cached, 435 failed (579ms)
+2026/08/02 19:55:28.408 14386 14422 Info Unity [RTTMainMenu] Click started: remote at 8,121s
+2026/08/02 19:55:28.408 14386 14422 Info Unity [RTTMainMenu] PrepareApp called: remote at 8,122s (+0,1ms)
+2026/08/02 19:55:28.408 14386 14422 Info Unity [RTTAppManager] PrepareApp: remote already active, preparing, or pre-initialized. Skipping redundant creation.
+2026/08/02 19:55:28.408 14386 14422 Info Unity [RTTMainMenu] Button animation started: remote at 8,122s (+0,2ms)
+2026/08/02 19:55:28.508 14386 14422 Info Unity [RTTMainMenu] Button animation ended: remote at 8,222s (+100,1ms)
+2026/08/02 19:55:28.508 14386 14422 Info Unity [RTTMainMenu] OpenPreparedApp called: remote at 8,222s (+100,2ms)
+2026/08/02 19:55:28.508 14386 14422 Info Unity [RTTAppManager] OpenPreparedApp: Using pre-initialized instance for remote
+2026/08/02 19:55:28.508 14386 14422 Info Unity [RTTMainMenu] Click flow completed: remote at 8,222s (total: +100,6ms)
+2026/08/02 19:55:28.628 14386 14422 Info Unity [RTTRemoteMenu] OnEnable called
+2026/08/02 19:55:28.794 14386 14422 Info Unity [RTTTaskbar] RegisterApp called - slotIndex=1, icon=icon_remote
+2026/08/02 19:55:28.794 14386 14422 Info Unity [RTTTaskbar] SetSlotIcon - slot=AppBtn_AppSlot_1, icon=icon_remote, slotIndex=1
+2026/08/02 19:55:28.794 14386 14422 Info Unity [RTTTaskbar] SetSlotIcon - removed 0 old children
+2026/08/02 19:55:28.795 14386 14422 Info Unity [RTTTaskbar] SetSlotIcon - created iconBtn=Btn_icon_remote, slot.childCount now=1
+2026/08/02 19:55:28.795 14386 14422 Info Unity [RTTTaskbar] Registered app slot 1, total apps: 1
+2026/08/02 19:55:28.795 14386 14422 Info Unity [RTTTaskbar] SelectSlot(1) called, current active: 0
+2026/08/02 19:55:28.796 14386 14422 Info Unity [RTTTaskbar] Selected app with slot index 1
+2026/08/02 19:55:28.800 14386 14422 Info Unity [RTTRemoteMenu] OnEnable called
+2026/08/02 19:55:28.801 14386 14422 Info Unity [RTTTaskbar] SelectSlot(1) called, current active: 1
+2026/08/02 19:55:28.801 14386 14422 Info Unity [RTTAppManager] Pre-init app shown: remote in 292,3ms
+2026/08/02 19:55:28.801 14386 14422 Info Unity [CursorAppFollower] OnAppOpened appId=remote instance=VRWorkspace.UI.RTT.RTTAppInstance frame=RTTMenuFrame_remote (VRWorkspace.UI.RTT.Components.RTTMenuFrame)
+2026/08/02 19:55:28.801 14386 14422 Info Unity [CursorAppFollower] snap cursor to surfaceId=a0e1e86e-a194-449b-b041-d84a5b5f412f (frame='RTTMenuFrame_remote')
+2026/08/02 19:55:28.801 14386 14422 Info Unity [VCS_DBG] targetT changed -> name=DisplayQuad_RTTMenuFrame kind=RTTCanvasBase:RTTMenuFrame_remote worldPos=(-1.76, 0.00, 1.45) depthAlongRefTForward=0,0000
+2026/08/02 19:55:30.866 14386 14422 Info Unity [Discovery] Scan complete ΓÇö found 1 server(s)
+2026/08/02 19:55:30.866 14386 14422 Info Unity [RTTRemoteMenu] Background discovery found 1 server(s)
+2026/08/02 19:55:32.099 14386 14422 Info Unity [RTTRemoteMenu] Button clicked! viewModel=True, currentPhase=Disconnected
+2026/08/02 19:55:32.099 14386 14422 Info Unity [RTTRemoteMenu] Using 1 cached discovery result(s)
+2026/08/02 19:55:32.099 14386 14422 Info Unity [RTTRemoteMenu] Single server found: HANGUYEN at 192.168.1.211:8288
+2026/08/02 19:55:32.099 14386 14422 Info Unity [RTTRemoteMenu] Connecting via WiFi...
+2026/08/02 19:55:32.106 14386 14422 Info Unity [RTTRemoteMenu] HandlePhaseChanged: Disconnected -> Connecting
+2026/08/02 19:55:32.107 14386 14422 Info Unity [RTTRemoteMenu] Background discovery stopped
+2026/08/02 19:55:32.107 14386 14422 Info Unity [ConnectionViewModel] Connecting to ws://192.168.1.211:8288/signal?protocol=v2 (transport=WiFi)
+2026/08/02 19:55:32.457 14386 14422 Info Unity [RTTRemoteMenu] HandleHardwareInfoReceived called, info null: False, panel null: False
+2026/08/02 19:55:32.457 14386 14422 Info Unity [RTTRemoteMenu] EnsureBothPanelsVisible: Showing hardware frame
+2026/08/02 19:55:32.459 14386 14422 Info Unity [RTTInfoSidePanel] SetHardwareInfo: HANGUYEN
+2026/08/02 19:55:32.459 14386 14422 Info Unity [RTTRemoteMenu] EnsureBothPanelsVisible: Showing network frame
+2026/08/02 19:55:32.461 14386 14422 Info Unity [RTTInfoSidePanel] ShowSpeedTestLoadingState called for NetworkInfo, _isBuilt=True
+2026/08/02 19:55:32.462 14386 14422 Info Unity [RTTInfoSidePanel] SetHardwareInfo: HANGUYEN
+2026/08/02 19:55:32.462 14386 14422 Info Unity [RTTRemoteMenu] Updated hardware info panel: HANGUYEN
+2026/08/02 19:55:32.462 14386 14422 Info Unity [RTTRemoteMenu] HandlePhaseChanged: Connecting -> SpeedTesting
+2026/08/02 19:55:32.644 14386 14422 Info Unity [HevcDecoder] Initialized 320x240
+2026/08/02 19:55:32.656 14386 14422 Info Unity [HevcDecoder] Disposed explicitly
+2026/08/02 19:55:32.661 14386 14422 Info Unity [VRDropdown] UpdateSelection(1), _optionRefs keys=[0,1,2,3,4], prev _selectedIndex=0
+2026/08/02 19:55:32.661 14386 14422 Info Unity [RTTRemoteMenu] Monitor selection changed: index=1, value=2 Monitors
+2026/08/02 19:55:32.662 14386 14422 Info Unity [RTTRemoteMenu] No cached info, skipping recalculation
+2026/08/02 19:55:32.662 14386 14422 Info Unity [VRDropdown] UpdateSelection(0), _optionRefs keys=[0,1], prev _selectedIndex=0
+2026/08/02 19:55:32.662 14386 14422 Info Unity [RTTRemoteMenu] Mode changed: index=0, value=Classic
+2026/08/02 19:55:32.663 14386 14422 Info Unity [VRDropdown] UpdateSelection(1), _optionRefs keys=[0,1,2], prev _selectedIndex=0
+2026/08/02 19:55:32.663 14386 14422 Info Unity [RTTRemoteMenu] Resolution changed: index=1, value=1080p
+2026/08/02 19:55:32.663 14386 14422 Info Unity [RTTRemoteMenu] 1440p locked: server max native height = 1080p
+2026/08/02 19:55:32.663 14386 14422 Info Unity [RTTRemoteMenu] FindOptionIndex: '45 FPS' not found in options. Normalized: '45 FPS'
+2026/08/02 19:55:32.663 14386 14422 Info Unity [VRDropdown] UpdateSelection(1), _optionRefs keys=[0,1,2], prev _selectedIndex=0
+2026/08/02 19:55:32.663 14386 14422 Info Unity [RTTRemoteMenu] FPS changed: index=1, value=60 FPS
+2026/08/02 19:55:32.663 14386 14422 Info Unity [RTTRemoteMenu] Applied config: SAVED prefs ΓÇö Mon=2, Resolution=1080p, FPS=60 FPS
+2026/08/02 19:55:32.663 14386 14422 Info Unity [RTTRemoteMenu] Server suggested: 3mon, 1080p, 45fps (shown as Recommended)
+2026/08/02 19:55:32.663 14386 14422 Info Unity [RTTRemoteMenu] HandlePhaseChanged: SpeedTesting -> ConfiguringSettings
+2026/08/02 19:55:33.160 14386 14422 Info Unity [RTTRemoteMenu] HandleNetworkInfoReceived called, info null: False, panel null: False
+2026/08/02 19:55:33.161 14386 14422 Info Unity [RTTInfoSidePanel] SetNetworkInfo: 16,8ms
+2026/08/02 19:55:33.161 14386 14422 Info Unity [RTTRemoteMenu] Updated network info panel: 16,8ms, 0Mbps
+2026/08/02 19:55:37.696 14386 14422 Info Unity [RTTRemoteMenu] Button clicked! viewModel=True, currentPhase=ConfiguringSettings
+2026/08/02 19:55:37.696 14386 14422 Info Unity [RTTRemoteMenu] Starting with button progress...
+2026/08/02 19:55:37.697 14386 14422 Info Unity [RTTRemoteMenu] BuildConfigFromForm: Resolution raw='1080p (Recommended)', cleaned='1080p', suggested=1080
+2026/08/02 19:55:37.697 14386 14422 Info Unity [RTTRemoteMenu] BuildConfigFromForm: Parsed resolution=1080p -> 1920x1080
+2026/08/02 19:55:37.697 14386 14422 Info Unity [RTTRemoteMenu] BuildConfigFromForm: 2mon (standard) @ 1920x1080, 60fps
+2026/08/02 19:55:37.697 14386 14422 Info Unity [RTTRemoteMenu] Saved preferences: 1mon, mode=Classic, 1080p, 60 FPS, transport=LAN
+2026/08/02 19:55:37.698 14386 14422 Info Unity [RTTRemoteMenu] All inputs locked (Ready state)
+2026/08/02 19:55:37.699 14386 14422 Info Unity [ConnectionViewModel] StartWithProgressAsync: 2 monitors, 20000kbps, 60fps
+2026/08/02 19:55:37.699 14386 14422 Info Unity [RTTRemoteMenuController] HandleStartWithProgress: 2 monitors - waiting for streaming ready
+2026/08/02 19:55:37.700 14386 14422 Info Unity [WorldPanelCursor] Cursor cache cleared
+2026/08/02 19:55:38.204 14386 14422 Info Unity [RTTRemoteMenu] HandleNetworkInfoReceived called, info null: False, panel null: False
+2026/08/02 19:55:38.206 14386 14422 Info Unity [RTTInfoSidePanel] SetNetworkInfo: 16,8ms
+2026/08/02 19:55:38.206 14386 14422 Info Unity [RTTRemoteMenu] Updated network info panel: 16,8ms, 0Mbps
+2026/08/02 19:55:39.370 14386 14422 Info Unity [RTTRemoteMenu] HandlePhaseChanged: ConfiguringSettings -> ICENegotiating
+2026/08/02 19:55:39.370 14386 14422 Info Unity [RTTRemoteMenu] All inputs locked (Ready state)
+2026/08/02 19:55:39.724 14386 14422 Info Unity [ConnectionViewModel] Audio track received and cached
+2026/08/02 19:55:39.727 14386 14422 Info Unity [RTTRemoteMenu] HandlePhaseChanged: ICENegotiating -> ReadyToStream
+2026/08/02 19:55:39.771 14386 14422 Info Unity [HevcDecoder] OES plugin callback ptr=0x78BD1C8AC8 (raw native)
+2026/08/02 19:55:39.773 14386 14422 Info Unity [HevcDecoder] AllocateOesTexture: OES=188 + 2D=189 for 1920x1080
+2026/08/02 19:55:39.818 14386 14422 Info Unity [HevcDecoderPlugin] SURFACE_MODE_STARTED handle=-5476376613966228816 oesTexId=188 tex2dId=189 1920x1080 build=2357a2de3f264bf490fc5889882b07c9
+2026/08/02 19:55:39.818 14386 14422 Info Unity [H265Receiver] PIPELINE=DIRECT_SURFACE_PLAN_C texId=189 1920x1080 build=2357a2de3f264bf490fc5889882b07c9
+2026/08/02 19:55:39.818 14386 14422 Info Unity [PhaseProtocol] Video PC0 H265 receiver created (per-track mode, 1920x1080)
+2026/08/02 19:55:39.826 14386 14422 Info Unity [ConnectionViewModel] Monitor 0 ICE complete. Ready: 1/2
+2026/08/02 19:55:39.826 14386 14422 Info Unity [ConnectionViewModel] Monitor 1 ICE complete. Ready: 2/2
+2026/08/02 19:55:39.827 14386 14422 Info Unity [ConnectionViewModel] All monitors ready, firing OnAllMonitorsReady
+2026/08/02 19:55:39.827 14386 14422 Info Unity [RTTRemoteMenuController] All monitors ready - waiting for streaming to start
+2026/08/02 19:55:39.827 14386 14422 Info Unity [ConnectionViewModel] Delaying 1 second for stability...
+2026/08/02 19:55:39.855 14386 14422 Info Unity [HevcDecoder] AllocateOesTexture: OES=190 + 2D=191 for 1920x1080
+2026/08/02 19:55:39.897 14386 14422 Info Unity [HevcDecoderPlugin] SURFACE_MODE_STARTED handle=-5476376613966233072 oesTexId=190 tex2dId=191 1920x1080 build=2357a2de3f264bf490fc5889882b07c9
+2026/08/02 19:55:39.898 14386 14422 Info Unity [H265Receiver] PIPELINE=DIRECT_SURFACE_PLAN_C texId=191 1920x1080 build=2357a2de3f264bf490fc5889882b07c9
+2026/08/02 19:55:39.898 14386 14422 Info Unity [PhaseProtocol] Video PC1 H265 receiver created (per-track mode, 1920x1080)
+2026/08/02 19:55:40.074 14386 14422 Info Unity [PhaseProtocol] Video PC0 server DataChannel: label=h265video-0
+2026/08/02 19:55:40.074 14386 14422 Info Unity [PhaseProtocol] Video PC0 h265video DC wired (per-track mode)
+2026/08/02 19:55:40.074 14386 14422 Info Unity [PhaseProtocol] Video PC0 requested initial frame from server
+2026/08/02 19:55:40.074 14386 14422 Info Unity [PhaseProtocol] Video PC1 server DataChannel: label=h265video-1
+2026/08/02 19:55:40.074 14386 14422 Info Unity [PhaseProtocol] Video PC1 h265video DC wired (per-track mode)
+2026/08/02 19:55:40.074 14386 14422 Info Unity [PhaseProtocol] Video PC1 requested initial frame from server
+2026/08/02 19:55:40.841 14386 14422 Info Unity [ConnectionViewModel] Auto-starting streaming (force=False)...
+2026/08/02 19:55:40.869 14386 14422 Info Unity [RTTRemoteMenu] HandlePhaseChanged: ReadyToStream -> Streaming
+2026/08/02 19:55:40.870 14386 14422 Info Unity [RTTRemoteMenu] Hardware frame hidden
+2026/08/02 19:55:40.870 14386 14422 Info Unity [RTTRemoteMenu] Network frame hidden
+2026/08/02 19:55:40.870 14386 14422 Info Unity [RTTRemoteMenu] HideSidePanels completed
+2026/08/02 19:55:40.871 14386 14422 Info Unity [RTTRemoteMenuController] Creating ClusterRig for streaming: 2 monitors
+2026/08/02 19:55:40.872 14386 14422 Info Unity [RTTMenu] SetClusterRig: ClusterRig parented with useParentOrigin=true
+2026/08/02 19:55:40.873 14386 14422 Info Unity [WorldPanelClusterRig] LayoutFromParentOrigin: 2 panels, mode=FlatPlanar
+2026/08/02 19:55:40.874 14386 14422 Info Unity [ClusterVisualFlatPlanar] Initialize() called
+2026/08/02 19:55:40.874 14386 14422 Info Unity [ClusterVisualFlatPlanar] Initializing for 2 panels
+2026/08/02 19:55:40.874 14386 14422 Info Unity [ClusterVisualFlatPlanar] GenerateMeshes: totalPanels=2, enabledCount=2, enabledIndices=[0,1], panelWidth=1,600m
+2026/08/02 19:55:40.874 14386 14422 Info Unity [FlatPlanarMeshGenerator] Generated mesh: 2 panels, 33 vertices, bounds=(2.67, 0.90, 1.19), center=(0.54, 0.00, -0.59)
+2026/08/02 19:55:40.874 14386 14422 Info Unity [ClusterVisualFlatPlanar] Mesh Gen - panelWidth: 1,600m, panelHeight: 0,900m, panelCount: 2, arcRadius: 1,80m, meshMarginH: 0 (full width)
+2026/08/02 19:55:40.875 14386 14422 Info Unity [ClusterVisualFlatPlanar] Yaw angle per panel: 47,9┬░, foldSegments: 6, gap: 0,0000m, overlap: 0,0015m
+2026/08/02 19:55:40.875 14386 14422 Info Unity [ClusterVisualFlatPlanar] CreateVisualLayers: expandedMesh.bounds=Center: (0.52, 0.00, -0.63), Extents: (1.42, 0.55, 0.63)
+2026/08/02 19:55:40.875 14386 14422 Info Unity [ClusterVisualFlatPlanar] Created visual layers: background and border hidden, content only
+2026/08/02 19:55:40.875 14386 14422 Info Unity [ClusterVisualFlatPlanar] Background material applied: shader=Custom/ClusterBackgroundCurved, clusterWidth=3,62, clusterHeight=1,10
+2026/08/02 19:55:40.875 14386 14422 Info Unity [ClusterVisualFlatPlanar] Content material applied: shader=Custom/ClusterContentFlatPlanar
+2026/08/02 19:55:40.875 14386 14422 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
+2026/08/02 19:55:40.875 14386 14422 Info Unity [ClusterVisualFlatPlanar] Initialize() completed successfully
+2026/08/02 19:55:40.875 14386 14422 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
+2026/08/02 19:55:40.875 14386 14422 Info Unity [ClusterVisualFlatPlanar] Background material applied: shader=Custom/ClusterBackgroundCurved, clusterWidth=3,62, clusterHeight=1,10
+2026/08/02 19:55:40.875 14386 14422 Info Unity [ClusterVisualFlatPlanar] Background material applied: shader=Custom/ClusterBackgroundCurved, clusterWidth=3,62, clusterHeight=1,10
+2026/08/02 19:55:40.875 14386 14422 Info Unity [ClusterVisualFlatPlanar] Content material applied: shader=Custom/ClusterContentFlatPlanar
+2026/08/02 19:55:40.875 14386 14422 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
+2026/08/02 19:55:40.875 14386 14422 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
+2026/08/02 19:55:40.875 14386 14422 Info Unity [ClusterVisualFlatPlanar] GenerateMeshes: totalPanels=2, enabledCount=2, enabledIndices=[0,1], panelWidth=1,600m
+2026/08/02 19:55:40.875 14386 14422 Info Unity [FlatPlanarMeshGenerator] Generated mesh: 2 panels, 33 vertices, bounds=(2.67, 0.90, 1.19), center=(0.54, 0.00, -0.59)
+2026/08/02 19:55:40.876 14386 14422 Info Unity [ClusterVisualFlatPlanar] Mesh Gen - panelWidth: 1,600m, panelHeight: 0,900m, panelCount: 2, arcRadius: 1,80m, meshMarginH: 0 (full width)
+2026/08/02 19:55:40.876 14386 14422 Info Unity [ClusterVisualFlatPlanar] Yaw angle per panel: 47,9┬░, foldSegments: 6, gap: 0,0000m, overlap: 0,0015m
+2026/08/02 19:55:40.876 14386 14422 Info Unity [ClusterVisualFlatPlanar] Background material applied: shader=Custom/ClusterBackgroundCurved, clusterWidth=3,62, clusterHeight=1,10
+2026/08/02 19:55:40.876 14386 14422 Info Unity [ClusterVisualFlatPlanar] Content material applied: shader=Custom/ClusterContentFlatPlanar
+2026/08/02 19:55:40.876 14386 14422 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
+2026/08/02 19:55:40.876 14386 14422 Info Unity [ClusterVisualFlatPlanar] GenerateMeshes: totalPanels=2, enabledCount=2, enabledIndices=[0,1], panelWidth=1,600m
+2026/08/02 19:55:40.876 14386 14422 Info Unity [FlatPlanarMeshGenerator] Generated mesh: 2 panels, 33 vertices, bounds=(2.67, 0.90, 1.19), center=(0.54, 0.00, -0.59)
+2026/08/02 19:55:40.876 14386 14422 Info Unity [ClusterVisualFlatPlanar] Mesh Gen - panelWidth: 1,600m, panelHeight: 0,900m, panelCount: 2, arcRadius: 1,80m, meshMarginH: 0 (full width)
+2026/08/02 19:55:40.876 14386 14422 Info Unity [ClusterVisualFlatPlanar] Yaw angle per panel: 47,9┬░, foldSegments: 6, gap: 0,0000m, overlap: 0,0015m
+2026/08/02 19:55:40.876 14386 14422 Info Unity [ClusterVisualFlatPlanar] Background material applied: shader=Custom/ClusterBackgroundCurved, clusterWidth=3,62, clusterHeight=1,10
+2026/08/02 19:55:40.876 14386 14422 Info Unity [ClusterVisualFlatPlanar] Content material applied: shader=Custom/ClusterContentFlatPlanar
+2026/08/02 19:55:40.876 14386 14422 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
+2026/08/02 19:55:40.876 14386 14422 Info Unity [ClusterVisualFlatPlanar] GenerateMeshes: totalPanels=2, enabledCount=2, enabledIndices=[0,1], panelWidth=1,600m
+2026/08/02 19:55:40.876 14386 14422 Info Unity [FlatPlanarMeshGenerator] Generated mesh: 2 panels, 33 vertices, bounds=(2.67, 0.90, 1.19), center=(0.54, 0.00, -0.59)
+2026/08/02 19:55:40.877 14386 14422 Info Unity [ClusterVisualFlatPlanar] Mesh Gen - panelWidth: 1,600m, panelHeight: 0,900m, panelCount: 2, arcRadius: 1,80m, meshMarginH: 0 (full width)
+2026/08/02 19:55:40.877 14386 14422 Info Unity [ClusterVisualFlatPlanar] Yaw angle per panel: 47,9┬░, foldSegments: 6, gap: 0,0000m, overlap: 0,0015m
+2026/08/02 19:55:40.877 14386 14422 Info Unity [ClusterVisualFlatPlanar] Background material applied: shader=Custom/ClusterBackgroundCurved, clusterWidth=3,52, clusterHeight=1,05
+2026/08/02 19:55:40.877 14386 14422 Info Unity [ClusterVisualFlatPlanar] Content material applied: shader=Custom/ClusterContentFlatPlanar
+2026/08/02 19:55:40.877 14386 14422 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
+2026/08/02 19:55:40.877 14386 14422 Info Unity [WorldPanelClusterRig] Applied Flat Planar: unified content layer, boards hidden
+2026/08/02 19:55:40.877 14386 14422 Info Unity [WorldPanelClusterRig] Built 2 panels with cluster visuals (no sample textures)
+2026/08/02 19:55:40.877 14386 14422 Info Unity [RTTRemoteMenuController] Applied style: Flat Planar (Standard)
+2026/08/02 19:55:40.877 14386 14422 Info Unity [NativeAudioSink] JNI static method IDs cached
+2026/08/02 19:55:40.896 14386 14422 Info Unity [NativeAudioSink] RegisterDeviceRouter(handle=-5476376616382155136)
+2026/08/02 19:55:40.899 14386 14422 Info Unity [NativeAudioSink] RegisterDeviceRouter OK
+2026/08/02 19:55:40.899 14386 14422 Info Unity [NativeAudioSink] opened: sr=48000 ch=2 handle=-5476376616382155136
+2026/08/02 19:55:40.899 14386 14422 Info Unity [RTTRemoteMenuController] Cached audio track wired to RTP player (kept muted; DC is primary)
+2026/08/02 19:55:40.900 14386 14422 Info Unity [RTTRemoteMenuController] Created audio players (DC primary unmuted, RTP fallback muted)
+2026/08/02 19:55:40.900 14386 14422 Info Unity [RTTRemoteMenuController] Saved zoom distance: 2,20m
+2026/08/02 19:55:40.913 14386 14422 Info Unity [RTTRemoteTaskbar] Icons loaded - Back:True, Eye:True, EyeClose:True, Recenter:True, Zoom:True, Monitor:True
+2026/08/02 19:55:40.913 14386 14422 Info Unity [RTTRemoteTaskbar] Loaded icons - Resolution: 3, FPS: 3/3, Screens: 3/3
+2026/08/02 19:55:40.913 14386 14422 Info Unity [RTTToolbar] Initialized with taskbar. Size: 0,913x0,331m, followTarget: RTTMenu
+2026/08/02 19:55:40.913 14386 14422 Info Unity [RTTRemoteMenuController] Created RTTRemoteTaskbar in RTTToolbar, following RTTMenu
+2026/08/02 19:55:40.914 14386 14422 Info Unity [RTTRemoteMenuController] ClusterRig created inside RTTMenu - waiting for first frames before hiding menu
+2026/08/02 19:55:40.924 14386 14422 Info Unity [RTTMiniFrame] UI built: 1197,5x128 pixels
+2026/08/02 19:55:40.937 14386 14422 Info Unity [WorldPanelClusterRig] LayoutFromParentOrigin: 2 panels, mode=FlatPlanar
+2026/08/02 19:55:40.937 14386 14422 Info Unity [H265-DIAG] Frames per track: T1=1
+2026/08/02 19:55:40.938 14386 14422 Info Unity [HevcDecoder] JNI method IDs cached (instance + static)
+2026/08/02 19:55:40.941 14386 14422 Info Unity [H265Receiver] PC1 Keyframe pushed OK: 102488 bytes
+2026/08/02 19:55:40.959 14386 14422 Info Unity [RTTTaskbarExpansion] Icons loaded - Resolution: 3/3, FPS: 3/3, Passthrough: True, LightOn: True, LightOff: True, FlatMonitor: True, CurvedMonitor: True
+2026/08/02 19:55:40.959 14386 14422 Info Unity [RTTRemoteTaskbar] Expansion panel created in RTTToolbar
+2026/08/02 19:55:40.960 14386 14422 Info Unity [RTTMenuFrame] UI built: 840x788,7323 logical pixels
+2026/08/02 19:55:40.977 14386 14422 Info Unity [RTTRemoteTaskbar] Screen Settings popup created
+2026/08/02 19:55:40.979 14386 14422 Info Unity [HevcDecoder] JNI method IDs cached (instance + static)
+2026/08/02 19:55:40.984 14386 14422 Info Unity [H265Receiver] PC0 Keyframe pushed OK: 142701 bytes
+2026/08/02 19:55:40.987 14386 14422 Info Unity [RTTTaskbarExpansion] UI built: 326x128 pixels
+2026/08/02 19:55:41.001 14386 14422 Info Unity [PhaseProtocol] Monitor 1 first frame decoded (1/2)
+2026/08/02 19:55:41.001 14386 14422 Info Unity [H265Receiver] PC1 Frame drained: #1
+2026/08/02 19:55:41.001 14386 14422 Info Unity [H265Receiver] PC1 Frame drained: #2
+2026/08/02 19:55:41.021 14386 14422 Info Unity [PhaseProtocol] Monitor 0 first frame decoded (2/2)
+2026/08/02 19:55:41.021 14386 14422 Info Unity [PhaseProtocol] ALL monitors have first frame ΓÇö ready to display
+2026/08/02 19:55:41.021 14386 14422 Info Unity [ConnectionViewModel] All monitors first frame decoded, firing OnAllMonitorsFirstFrame
+2026/08/02 19:55:41.022 14386 14422 Info Unity [RTTRemoteMenuController] All monitors have first frame ΓÇö hiding menu
+2026/08/02 19:55:41.022 14386 14422 Info Unity [RTTRemoteMenuController] Hidden RTTMenuFrame
+2026/08/02 19:55:41.022 14386 14422 Info Unity [RTTRemoteMenuController] Hidden RTTTaskbar
+2026/08/02 19:55:41.022 14386 14422 Info Unity [H265Receiver] PC0 Frame drained: #1
+2026/08/02 19:55:41.022 14386 14422 Info Unity [H265Receiver] PC0 Frame drained: #2
+2026/08/02 19:55:41.023 14386 14422 Info Unity [VirtualObjectsZoomController] Zoom set to 1,75m (delta: -0,448m)
+2026/08/02 19:55:41.023 14386 14422 Info Unity [WorldPanelClusterRig] LayoutFromParentOrigin: 2 panels, mode=FlatPlanar
+2026/08/02 19:55:41.035 14386 14422 Info Unity [H265Receiver] PC0 Frame drained: #3
+2026/08/02 19:55:41.035 14386 14422 Info Unity [H265Receiver] PC0 Frame drained: #4
+2026/08/02 19:55:41.035 14386 14422 Info Unity [WorldPanelClusterRig] LayoutFromParentOrigin: 2 panels, mode=FlatPlanar
+2026/08/02 19:55:41.036 14386 14422 Info Unity [ClusterVisualFlatPlanar] Arc radius changed: 1,800 -> 1,750, regenerating mesh
+2026/08/02 19:55:41.036 14386 14422 Info Unity [ClusterVisualFlatPlanar] Rebuild() called
+2026/08/02 19:55:41.036 14386 14422 Info Unity [ClusterVisualFlatPlanar] Initialize() called
+2026/08/02 19:55:41.036 14386 14422 Info Unity [ClusterVisualFlatPlanar] Initializing for 2 panels
+2026/08/02 19:55:41.036 14386 14422 Info Unity [ClusterVisualFlatPlanar] GenerateMeshes: totalPanels=2, enabledCount=2, enabledIndices=[0,1], panelWidth=1,600m
+2026/08/02 19:55:41.036 14386 14422 Info Unity [FlatPlanarMeshGenerator] Generated mesh: 2 panels, 33 vertices, bounds=(2.65, 0.90, 1.21), center=(0.52, 0.00, -0.60)
+2026/08/02 19:55:41.036 14386 14422 Info Unity [ClusterVisualFlatPlanar] Mesh Gen - panelWidth: 1,600m, panelHeight: 0,900m, panelCount: 2, arcRadius: 1,75m, meshMarginH: 0 (full width)
+2026/08/02 19:55:41.036 14386 14422 Info Unity [ClusterVisualFlatPlanar] Yaw angle per panel: 49,1┬░, foldSegments: 6, gap: 0,0000m, overlap: 0,0015m
+2026/08/02 19:55:41.036 14386 14422 Info Unity [ClusterVisualFlatPlanar] CreateVisualLayers: expandedMesh.bounds=Center: (0.51, 0.00, -0.63), Extents: (1.39, 0.53, 0.63)
+2026/08/02 19:55:41.036 14386 14422 Info Unity [ClusterVisualFlatPlanar] Created visual layers: background and border hidden, content only
+2026/08/02 19:55:41.036 14386 14422 Info Unity [ClusterVisualFlatPlanar] Background material applied: shader=Custom/ClusterBackgroundCurved, clusterWidth=3,52, clusterHeight=1,05
+2026/08/02 19:55:41.036 14386 14422 Info Unity [ClusterVisualFlatPlanar] Content material applied: shader=Custom/ClusterContentFlatPlanar
+2026/08/02 19:55:41.036 14386 14422 Info Unity [ClusterVisualFlatPlanar] Border material applied: shader=Custom/ClusterBorderCurved
+2026/08/02 19:55:41.037 14386 14422 Info Unity [ClusterVisualFlatPlanar] Initialize() completed successfully
+2026/08/02 19:55:41.069 14386 14422 Info Unity [H265Receiver] PC0 Frame drained: #5
+2026/08/02 19:55:41.085 14386 14422 Info Unity [H265Receiver] PC0 Frame drained: #6
+2026/08/02 19:55:41.104 14386 14422 Info Unity [H265Receiver] PC0 Frame drained: #7
+2026/08/02 19:55:41.104 14386 14422 Info Unity [H265Receiver] PC0 Frame drained: #8
+2026/08/02 19:55:41.118 14386 14422 Info Unity [H265Receiver] PC0 Frame drained: #9
+2026/08/02 19:55:43.324 14386 14422 Info Unity [H265Receiver] PC1 Frame drained: #3
+2026/08/02 19:55:43.340 14386 14422 Info Unity [H265Receiver] PC1 Frame drained: #4
+2026/08/02 19:55:43.373 14386 14422 Info Unity [H265Receiver] PC1 Frame drained: #5
+2026/08/02 19:55:43.391 14386 14422 Info Unity [H265Receiver] PC1 Frame drained: #6
+2026/08/02 19:55:43.857 14386 14422 Info Unity [H265Receiver] PC1 Frame drained: #7
+2026/08/02 19:55:43.976 14386 14422 Info Unity [H265Receiver] PC1 Frame drained: #8
+2026/08/02 19:55:43.976 14386 14422 Info Unity [H265Receiver] PC1 Frame drained: #9
+2026/08/02 19:55:45.950 14386 14422 Info Unity [H265-DIAG] Frames per track: T1=102 T0=69
+2026/08/02 19:55:50.796 14386 14422 Info Unity [H265Receiver] PC1 Frame drained: #300
+2026/08/02 19:55:50.978 14386 14422 Info Unity [H265-DIAG] Frames per track: T1=352 T0=101
+2026/08/02 19:55:55.991 14386 14422 Info Unity [H265-DIAG] Frames per track: T1=589 T0=103
+2026/08/02 19:56:00.181 14386 14422 Info Unity [H265Receiver] PC1 Frame drained: #600
+2026/08/02 19:56:01.032 14386 14422 Info Unity [H265-DIAG] Frames per track: T1=756 T0=109
+2026/08/02 19:56:06.036 14386 14422 Info Unity [H265-DIAG] Frames per track: T1=907 T0=110
+2026/08/02 19:56:10.192 14386 14422 Info Unity [H265Receiver] PC1 Frame drained: #900
+2026/08/02 19:56:11.044 14386 14422 Info Unity [H265-DIAG] Frames per track: T1=1071 T0=112
+2026/08/02 19:56:16.492 14386 14422 Info Unity [H265-DIAG] Frames per track: T1=1230 T0=116
+2026/08/02 19:56:17.628 14386 14386 Info Unity onPause
+2026/08/02 19:56:18.293 14386 14386 Info Unity Surface destroyed while running without focus - pausing Unity
+2026/08/02 19:56:18.297 14386 14386 Info Unity pauseUnity
+2026/08/02 19:56:18.307 14386 14422 Info Unity [XR] [CardboardXrInputProvider]: Lifecycle stopped
+2026/08/02 19:56:18.331 14386 14422 Info Unity [RTTManager] Paused - disabled 1 RTT cameras
+2026/08/02 19:56:18.332 14386 14422 Info Unity Camera2: Pause preview.
+2026/08/02 19:56:18.333 14386 14422 Info Unity Camera2: Close.
+2026/08/02 19:56:18.333 14386 14422 Info Unity Camera2: Stop preview.
+2026/08/02 19:56:18.549 14386 14633 Info Unity Camera2: CameraDevice closed.
+2026/08/02 19:56:18.554 14386 14422 Info Unity SetGameState: isLoading: false, mode: CONTENT, label: -6, quality: 2
+2026/08/02 19:56:18.567 14386 14386 Info Unity windowFocusChanged: false
+2026/08/02 19:56:19.088 14386 14386 Info Unity onDestroy

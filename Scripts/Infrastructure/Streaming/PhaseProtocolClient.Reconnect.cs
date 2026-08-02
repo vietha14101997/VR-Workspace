@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Unity.WebRTC;
 using UnityEngine;
 using VRWorkspace.Core;
+using VRWorkspace.Native;
 
 namespace VRWorkspace.Streaming
 {
