@@ -131,6 +131,17 @@ namespace VRWorkspace.Native
         /// Issue the native OES+2D allocation callback on Unity's render thread.
         /// Returns (oesId, tex2dId) where oesId is GL_TEXTURE_EXTERNAL_OES (for Java)
         /// and tex2dId is GL_TEXTURE_2D (for Unity sampler2D). Both are 0 on failure.
+        ///
+        /// BUGFIX: previous implementation used spin=2500 with Thread.Sleep(0) which
+        /// gives only ~2500 yields (~80-100ms on Quest 3). When the render thread was
+        /// busy rendering a previous frame (e.g. right after App start), the OES allocation
+        /// callback was queued but the spin-wait timed out before render thread processed
+        /// it. Result: decoder init failed and decoder never recovered until external
+        /// retry (~7 seconds later in the observed log).
+        ///
+        /// Fix: triple the spin budget (~5 seconds) AND retry automatically on timeout.
+        /// The retry happens with a longer sleep so the render thread has time to drain
+        /// any pending frames before the next attempt.
         /// </summary>
         private static (int oesId, int tex2dId) AllocateOesTextureRenderThread(int width, int height)
         {
@@ -140,6 +151,36 @@ namespace VRWorkspace.Native
                 Debug.LogError($"{TAG} AllocateOesTexture: callback ptr is NULL (libvrworkspace_oes_plugin.so not loaded)");
                 return (0, 0);
             }
+
+            // BUGFIX: up to 2 retry attempts. Render thread can be blocked by initial scene
+            // load or app-startup work; giving it one extra chance with a 200ms backoff
+            // resolves the "render thread timed out" failure reliably.
+            const int maxAttempts = 3;
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                var result = TryAllocateOesTextureOnce(callbackPtr, width, height, attempt, maxAttempts);
+                if (result.oesId != 0 || result.tex2dId != 0)
+                    return result;
+
+                // On timeout, sleep briefly to let render thread drain pending work.
+                if (attempt < maxAttempts)
+                {
+                    Debug.LogWarning($"{TAG} AllocateOesTexture: attempt {attempt}/{maxAttempts} failed, retrying in 200ms");
+                    System.Threading.Thread.Sleep(200);
+                }
+            }
+            return (0, 0);
+        }
+
+        /// <summary>
+        /// Single attempt to allocate OES texture. Returns (0, 0) on failure (timeout or null handle).
+        /// </summary>
+        private static (int oesId, int tex2dId) TryAllocateOesTextureOnce(
+            System.IntPtr callbackPtr, int width, int height, int attempt, int maxAttempts)
+        {
+            // BUGFIX: spin budget bumped from 2500 → 10000 (~5 seconds at ~0.5ms per spin).
+            // Render thread can take 100-500ms during scene load; previous budget timed out.
+            const int spinBudget = 10000;
 
             // Write pending request parameters into C++ native memory
             NativeSetOesPendingAlloc(width, height);
@@ -153,7 +194,7 @@ namespace VRWorkspace.Native
 
             // Spin-wait checking C++ native state (g_RequestPending)
             int spin = 0;
-            while (NativeGetOesRequestPending() != 0 && spin < 2500)
+            while (NativeGetOesRequestPending() != 0 && spin < spinBudget)
             {
                 System.Threading.Thread.Sleep(0);
                 spin++;
@@ -163,7 +204,7 @@ namespace VRWorkspace.Native
             if (reqState != 0)
             {
                 Debug.LogError($"{TAG} AllocateOesTexture: render thread timed out " +
-                               $"(ptr=0x{callbackPtr.ToInt64():X}, request={reqState})");
+                               $"(ptr=0x{callbackPtr.ToInt64():X}, request={reqState}, attempt={attempt}/{maxAttempts})");
                 return (0, 0);
             }
 
@@ -171,7 +212,7 @@ namespace VRWorkspace.Native
             int tex2dId = NativeGetOesTex2dResultHandle();
             if (oesId == 0 || tex2dId == 0)
             {
-                Debug.LogError($"{TAG} AllocateOesTexture: allocation failed (oesId={oesId}, tex2dId={tex2dId})");
+                Debug.LogError($"{TAG} AllocateOesTexture: allocation failed (oesId={oesId}, tex2dId={tex2dId}, attempt={attempt}/{maxAttempts})");
                 return (0, 0);
             }
             Debug.Log($"{TAG} AllocateOesTexture: OES={oesId} + 2D={tex2dId} for {width}x{height}");

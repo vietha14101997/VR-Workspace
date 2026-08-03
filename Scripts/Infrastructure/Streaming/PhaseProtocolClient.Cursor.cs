@@ -157,6 +157,20 @@ namespace VRWorkspace.Streaming
         /// <summary>
         /// Handle H265 IDR keyframe data received via DataChannel side-channel.
         /// Robust to out-of-order chunks on unordered SCTP.
+        ///
+        /// BUGFIX: previous logic reset the chunk array ONLY when
+        /// `chunks.Length != totalChunks`. With AMF HEVC at fixed GOP_SIZE,
+        /// every IDR has roughly the same size (200-450KB → 4-8 chunks of 60KB),
+        /// so chunks.Length matches across consecutive IDRs. WebRTC's dc.send()
+        /// is async, so IDR#2 chunks can arrive at the client BEFORE IDR#1 has
+        /// finished reassembling. The old code would silently overwrite IDR#1's
+        /// chunks with IDR#2's chunks at the same indices, producing a corrupt
+        /// mixed IDR that the decoder rejects — and the watchdog then fires
+        /// "No IDR in 2,5s" forever.
+        ///
+        /// Fix: always reset the array when chunkIndex=0 arrives. chunkIndex=0
+        /// unambiguously means "start of a new IDR" (the server sends chunks 0..N-1
+        /// in order within a single IDR).
         /// </summary>
         private void HandleH265IdrData(byte[] data)
         {
@@ -176,6 +190,7 @@ namespace VRWorkspace.Streaming
 
                 _pframeChunks.Remove(trackIndex);
                 _idrChunks.Remove(trackIndex);
+                _idrChunkStartTimes.Remove(trackIndex);
                 _consecutiveDroppedPframes = 0;
                 UntaintTrack(trackIndex);
                 _reassemblingIdrTracks.Remove(trackIndex);
@@ -185,22 +200,17 @@ namespace VRWorkspace.Streaming
             }
 
             // Multi-chunk reassembly
-            if (!_idrChunks.TryGetValue(trackIndex, out var chunks) || chunks.Length != totalChunks)
+            byte[][] chunks;
+            if (chunkIndex == 0 ||
+                !_idrChunks.TryGetValue(trackIndex, out chunks) ||
+                chunks.Length != totalChunks)
             {
-                // New reassembly window
+                // New reassembly window (always start fresh on chunkIndex=0 — see BUGFIX above)
                 chunks = new byte[totalChunks][];
                 _idrChunks[trackIndex] = chunks;
                 _idrChunkStartTimes[trackIndex] = DateTime.UtcNow;
-                _reassemblingIdrTracks.Add(trackIndex); // BLOCK P-frames until complete
-            }
-            else if ((DateTime.UtcNow - _idrChunkStartTimes[trackIndex]).TotalMilliseconds > 500)
-            {
-                // Timeout - reset reassembly
-                AppLog.LogWarning($"[PhaseProtocol] IDR reassembly timeout for track {trackIndex}, restarting");
-                chunks = new byte[totalChunks][];
-                _idrChunks[trackIndex] = chunks;
-                _idrChunkStartTimes[trackIndex] = DateTime.UtcNow;
-                _reassemblingIdrTracks.Add(trackIndex);
+                if (!_reassemblingIdrTracks.Contains(trackIndex))
+                    _reassemblingIdrTracks.Add(trackIndex); // BLOCK P-frames until complete
             }
 
             // Store chunk (allow out-of-order arrival)
@@ -277,7 +287,16 @@ namespace VRWorkspace.Streaming
                 return;
             }
 
-            if (!_pframeChunks.TryGetValue(trackIndex, out var chunks) || chunks.Length != totalChunks)
+            // BUGFIX (same pattern as IDR): always reset on chunkIndex=0 (start of new P-frame).
+            // With many P-frames per second (60fps encoded), adjacent P-frames are often
+            // identical in size → same totalChunks. The old code would silently overwrite
+            // P-frame N's chunks with P-frame N+1's chunks when chunkLengths matched,
+            // producing a corrupt mixed P-frame that the decoder rejects → visible
+            // artifacts and reference-chain drift.
+            byte[][] chunks;
+            if (chunkIndex == 0 ||
+                !_pframeChunks.TryGetValue(trackIndex, out chunks) ||
+                chunks.Length != totalChunks)
             {
                 chunks = new byte[totalChunks][];
                 _pframeChunks[trackIndex] = chunks;
@@ -285,6 +304,7 @@ namespace VRWorkspace.Streaming
             }
             else if ((DateTime.UtcNow - _pframeChunkStartTimes[trackIndex]).TotalMilliseconds > 200)
             {
+                // Stale window (chunks held too long without completion) — start fresh.
                 chunks = new byte[totalChunks][];
                 _pframeChunks[trackIndex] = chunks;
                 _pframeChunkStartTimes[trackIndex] = DateTime.UtcNow;

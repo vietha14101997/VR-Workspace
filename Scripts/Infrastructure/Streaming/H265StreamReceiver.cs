@@ -81,6 +81,27 @@ namespace VRWorkspace.Streaming
         private const int KEYFRAME_NUDGE_THRESHOLD = 45;   // ~0.75s @ 60Hz
         private const int KEYFRAME_STALL_THRESHOLD  = 90;   // ~1.5s
 
+        // ── IDR-age watchdog ──
+        // Bug: tab-switch on the host produces P-frame-only updates for up to GOP seconds.
+        // P-frames reference the OLD keyframe (e.g. Messenger), so the client decoder
+        // reconstructs "Messenger layout + YouTube video area" until the next IDR arrives.
+        //
+        // PRIMARY FIX is now on the host: when client sends input (Tab / click / Ctrl-key),
+        // the host proactively forces an IDR within ~1 frame. So this watchdog is only a
+        // safety net for cases where the host missed an input (DC packet loss, reconnect
+        // after desync, etc.) — it's intentionally relaxed so it doesn't spam the host
+        // with `request_keyframe` when input-driven IDRs are already arriving on time.
+        //
+        // BUGFIX: 2500ms was too aggressive for IDLE desktop scenarios. With AMF HEVC's
+        // GOP_SIZE configured in FRAMES (not seconds), an idle track encoding at 2 fps
+        // gets an IDR only every ~5 seconds (60 frames at 2fps). The watchdog at 2.5s
+        // would fire BETWEEN actual IDRs → false alarm → request_keyframe storm.
+        // Bumped to 5000ms so idle tracks don't trigger spurious requests.
+        private long _lastIdrReceiveMs;
+        private long _lastIdrRequestMs;
+        private const int IDR_STALE_AGE_MS       = 5000;  // request IDR if none in 5s (was 2.5s)
+        private const int IDR_REQUEST_COOLDOWN_MS = 3000;  // throttle to <= 1/3s (was 2s)
+
         // ──────────── Events ────────────
         public event Action<int> OnFirstFrameDecoded;
         public event Action<int> OnKeyframeNeeded;
@@ -149,6 +170,17 @@ namespace VRWorkspace.Streaming
             int flags = 0;
             if (isKeyFrame) flags |= BUFFER_FLAG_KEY_FRAME;
 
+            // Record IDR arrival time for the IDR-age watchdog (see _lastIdrReceiveMs).
+            // We update ONLY on the first IDR after bootstrap or after a long IDR gap —
+            // duplicate IDRs from a keyframe burst (host DC resync) shouldn't reset the
+            // watchdog clock prematurely.
+            if (isKeyFrame)
+            {
+                long nowMs = NowMs();
+                if (_lastIdrReceiveMs == 0 || nowMs - _lastIdrReceiveMs > 200)
+                    _lastIdrReceiveMs = nowMs;
+            }
+
             bool pushed = _decoder.PushEncodedFrame(encodedData,
                 presentationTimeUs > 0 ? presentationTimeUs : GetTimestampUs(),
                 isKeyFrame);
@@ -179,6 +211,24 @@ namespace VRWorkspace.Streaming
                 OnTextureReady?.Invoke(MonitorIndex, _sharedTexture);
                 _noFrameTicks = 0;
                 _keyframeRequested = false;
+
+                // ── IDR-age watchdog ──
+                // If we have been receiving frames for a while but haven't seen an
+                // IDR in IDR_STALE_AGE_MS, the host's GOP-pacing or scenecut may
+                // be stuck. Force an IDR to break out of a possible "P-frame referencing
+                // stale keyframe" loop (the original tab-switch bug).
+                if (_lastIdrReceiveMs > 0 && _decodedCount > 0)
+                {
+                    long nowMs = NowMs();
+                    if (nowMs - _lastIdrReceiveMs > IDR_STALE_AGE_MS &&
+                        nowMs - _lastIdrRequestMs > IDR_REQUEST_COOLDOWN_MS)
+                    {
+                        _lastIdrRequestMs = nowMs;
+                        Debug.LogWarning($"{TAG} PC{MonitorIndex} No IDR in {(nowMs - _lastIdrReceiveMs) / 1000f:F1}s — requesting keyframe (tab-switch safeguard)");
+                        OnKeyframeNeeded?.Invoke(MonitorIndex);
+                    }
+                }
+
                 return;
             }
 
@@ -236,6 +286,9 @@ namespace VRWorkspace.Streaming
 
         private static long GetTimestampUs()
             => _stopwatch.ElapsedTicks * 1_000_000 / System.Diagnostics.Stopwatch.Frequency;
+
+        private static long NowMs()
+            => _stopwatch.ElapsedMilliseconds;
 
         public override string ToString()
             => $"H265StreamReceiver PC{MonitorIndex} {Width}x{Height} {(IsH264 ? "H264" : "HEVC")} directSurface";
