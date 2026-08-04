@@ -59,13 +59,6 @@ namespace VRWorkspace.Streaming
         // panel material — no intermediate RenderTexture / Blit needed.
         private Texture2D _sharedTexture => _decoder != null ? _decoder.SharedSurfaceTexture : null;
 
-        // ─── Corruption detection (Y-plane luminance oscillation) ───
-        // Reserved for future use if we hook a fallback byte-buffer path.
-        // In direct-surface mode the luminance data is on GPU only, so we
-        // rely on host-side scene-change heuristics (host inserts IDR on
-        // user activity) rather than CPU-side luma thresholds.
-        private float _prevAvgLuminance = -1f;
-
         // Stats
         public long EncodedFramesReceived { get; private set; }
         public long DecodedFrameCount     => _decodedCount;
@@ -165,7 +158,6 @@ namespace VRWorkspace.Streaming
             EncodedFramesReceived++;
 
             const int BUFFER_FLAG_KEY_FRAME = 1;
-            const int BUFFER_FLAG_CODEC_CONFIG = 16;
 
             int flags = 0;
             if (isKeyFrame) flags |= BUFFER_FLAG_KEY_FRAME;
