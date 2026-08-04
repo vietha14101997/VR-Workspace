@@ -455,9 +455,42 @@ namespace VRWorkspace.Streaming
                     var ch = pc.CreateDataChannel(label, h265VideoInit);
                     int capturedTrack = t; // capture for closure
                     ch.OnMessage = bytes => HandleH265VideoFromDataChannel(bytes);
-                    ch.OnOpen = () => AppLog.Log($"[PhaseProtocol] H265 Video DataChannel opened: {label} (unreliable, unordered)");
+                    ch.OnOpen = () =>
+                    {
+                        AppLog.Log($"[PhaseProtocol] H265 Video DataChannel opened: {label} (unreliable, unordered)");
+                        // BUGFIX (single-PC mode 1-monitor stuck): without this, the server's
+                        // DC `ondatachannel` may fire its `RequestKeyframe` AFTER the capture
+                        // loop has already started. If the desktop is idle, the capture loop
+                        // skips encode (FrameChangeDecision), and the next "desktop changed"
+                        // event may not arrive for a long time on a static screen → client
+                        // never receives an IDR → OnStreamingStarted never fires → cluster rig
+                        // never created → "stuck after connected" symptom.
+                        // Per-track PC mode already does this at HandleVideoOfferAsync; mirror it here.
+                        PCWrapper wrapperForDc = null;
+                        lock (_lock)
+                        {
+                            if (capturedTrack < _peerConnections.Count)
+                                wrapperForDc = _peerConnections[capturedTrack];
+                        }
+                        if (wrapperForDc != null)
+                        {
+                            wrapperForDc.LastFrameTime = DateTime.UtcNow;
+                            wrapperForDc.LastNetworkActivityTime = DateTime.UtcNow;
+                        }
+                        _ = SendTextAsync($"{{\"type\":\"request_initial_frame\",\"monitorIndex\":{capturedTrack}}}");
+                        AppLog.Log($"[PhaseProtocol] PC{capturedTrack} requested initial frame from server (single-PC mode)");
+                    };
                     ch.OnClose = () => AppLog.Log($"[PhaseProtocol] H265 Video DataChannel closed: {label}");
                     _h265VideoChannels[t] = ch;
+
+                    // Request initial frame immediately when DC is wired (not OnOpen).
+                    // Unity WebRTC may fire OnOpen BEFORE the OnMessage/OnOpen callbacks are
+                    // fully installed, causing OnOpen handler to be missed. Sending here
+                    // guarantees the server receives the request even if OnOpen races.
+                    // Server-side handler (Phase3.cs:536-562) resets InitialFrameSent and
+                    // calls RequestKeyframe(force=true), so the next captured frame becomes an IDR.
+                    _ = SendTextAsync($"{{\"type\":\"request_initial_frame\",\"monitorIndex\":{t}}}");
+                    AppLog.Log($"[PhaseProtocol] PC{t} requested initial frame from server (single-PC mode, immediate)");
                 }
                 AppLog.Log($"[PhaseProtocol] Created {count} per-track H265 Video DataChannels (unreliable, unordered)");
             }
