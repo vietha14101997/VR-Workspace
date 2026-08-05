@@ -12,7 +12,10 @@ namespace VRWorkspace.Core
     {
         void Awake()
         {
-            Application.targetFrameRate = 60;      // Cardboard/stream: giữ 60 cho ổn định
+            // Match headset refresh rate (72Hz Cardboard, 72-90Hz standalone).
+            // 60fps with 72Hz+ compositor causes async-reprojection churn
+            // (extra GPU work for reprojected frames). Lock to native refresh.
+            Application.targetFrameRate = 72;
             QualitySettings.vSyncCount = 1;        // BẬT vSync để tránh tearing (sọc chéo)
             Screen.sleepTimeout = SleepTimeout.NeverSleep;
 

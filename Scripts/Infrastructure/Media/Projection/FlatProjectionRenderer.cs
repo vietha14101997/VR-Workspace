@@ -380,17 +380,27 @@ namespace VRWorkspace.Media.Projections
             // Add WorldPanelPlus
             _worldPanel = go.AddComponent<WorldPanelPlus>();
 
-            // Configure WorldPanelPlus defaults
+            // Configure WorldPanelPlus defaults — preserve original video quality,
+            // disable ALL enhancement passes (they alter source data without benefit
+            // on a head-on viewed video panel):
+            //   stableAA=false  → 5-tap tex2Dlod path → 1-tap tex2Dgrad (5× less texture bandwidth)
+            //   shimmerBlend=0  → no extra trilinear blend
+            //   temporalSmooth=0 → no previous-frame dependency (cache-friendly)
+            //   maxMipLevel=0   → no mip chain lookups (we already disabled mips)
             _worldPanel.useBoardEdgeFeather = true;
             _worldPanel.boardEdgeWidthUV = 0.02f;
             _worldPanel.boardCornerRadius = 0.03f;
-            _worldPanel.boardEdgeColor = Color.black; // Dark border looks good for video
+            _worldPanel.boardEdgeColor = Color.black;
             _worldPanel.panelTint = Color.white;
-            _worldPanel.enableSharpening = true;
-            _worldPanel.sharpnessStrength = 0.5f;
-            _worldPanel.anisoLevel = 16;
-            _worldPanel.mipMapBias = -0.3f;
-            _worldPanel.cursorEnable = false; // No cursor for video projection
+            _worldPanel.enableSharpening = false;
+            _worldPanel.sharpnessStrength = 0f;
+            _worldPanel.anisoLevel = 1;
+            _worldPanel.mipMapBias = 0f;
+            _worldPanel.maxMipLevel = 0f;
+            _worldPanel.stableAA = false;
+            _worldPanel.shimmerBlend = 0f;
+            _worldPanel.temporalSmooth = 0f;
+            _worldPanel.cursorEnable = false;
 
             // Initialize
             _worldPanel.Rebuild();

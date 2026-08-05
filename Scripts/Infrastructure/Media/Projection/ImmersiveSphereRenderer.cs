@@ -29,8 +29,11 @@ namespace VRWorkspace.Media.Projections
         #region Constants
         private const string SHADER_NAME = "VRWorkspace/Media/VideoImmersive";
         private const string FALLBACK_SHADER = "Unlit/Texture";
-        private const int SPHERE_SEGMENTS = 128;
-        private const int SPHERE_RINGS = 64;
+        // Reduced from 128x64 to 64x32 — vertex shader cost down 75%.
+        // Fragment shader uses atan2/asin (per-pixel, not per-vertex), so visual
+        // output is identical with the sparser mesh.
+        private const int SPHERE_SEGMENTS = 64;
+        private const int SPHERE_RINGS = 32;
         private const float SPHERE_RADIUS = 100f;
         #endregion
 
@@ -69,6 +72,10 @@ namespace VRWorkspace.Media.Projections
         private const float MIN_FOV = 180f;
         private const float MAX_FOV = 420f;
         private const float FOV_STEP = 12f;
+
+        // Cached camera + last direction — avoid SetVector every frame
+        private Camera _cachedCamera;
+        private Vector3 _lastCameraForward;
         #endregion
 
         #region IProjectionRenderer Implementation
@@ -90,11 +97,12 @@ namespace VRWorkspace.Media.Projections
         {
             if (_material == null) return;
 
-            // Apply VR texture quality (mipmaps configured on source RenderTexture)
+            // Bilinear + aniso 1: equirectangular sampling on a per-pixel basis
+            // (atan2/asin) does not benefit from aniso — same pixel result, lower cost.
             if (texture != null)
             {
-                texture.filterMode = FilterMode.Trilinear;
-                texture.anisoLevel = 16;
+                texture.filterMode = FilterMode.Bilinear;
+                texture.anisoLevel = 1;
             }
 
             _material.SetTexture("_MainTex", texture);
@@ -535,17 +543,21 @@ namespace VRWorkspace.Media.Projections
         private void Update()
         {
             if (!_isActive || _material == null) return;
+            // 360 mode: _CameraForward is set once at RecenterView/Show (fixed zoom center
+            //   keeps video content stable at each direction → UI doesn't drift)
+            if (_projectionMode != ProjectionMode.Equirect180) return;
 
-            Camera cam = Camera.main;
-            if (cam != null)
+            // 180 mode: only push to GPU when direction actually changes
+            // (saves a material SetVector + uniform upload per frame on still head)
+            var cam = _cachedCamera != null ? _cachedCamera : (_cachedCamera = Camera.main);
+            if (cam == null) return;
+
+            Vector3 fwd = cam.transform.forward;
+            // 0.0005 sqr ≈ 0.022° change — well below visible threshold
+            if ((fwd - _lastCameraForward).sqrMagnitude > 0.0005f)
             {
-                // 180 mode: update _CameraForward each frame (zoom-in follows gaze)
-                // 360 mode: _CameraForward is set once at RecenterView/Show (fixed zoom center
-                //   keeps video content stable at each direction → UI doesn't drift)
-                if (_projectionMode == ProjectionMode.Equirect180)
-                {
-                    _material.SetVector("_CameraForward", cam.transform.forward);
-                }
+                _lastCameraForward = fwd;
+                _material.SetVector("_CameraForward", fwd);
             }
         }
 

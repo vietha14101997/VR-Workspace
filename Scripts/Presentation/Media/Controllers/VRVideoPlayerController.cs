@@ -1285,21 +1285,12 @@ namespace VRWorkspace.Media.Core
         #region Unity Lifecycle
         private void Update()
         {
-            // Update video texture to projection (for frame updates)
-            if (_playbackEngine != null && _playbackEngine.IsPlaying && _projectionSystem != null)
-            {
-                if (_playbackEngine.UseNV12Output)
-                {
-                    _projectionSystem.SetTextureNV12(
-                        _playbackEngine.YPlaneTexture,
-                        _playbackEngine.UVPlaneTexture
-                    );
-                }
-                else
-                {
-                    _projectionSystem.SetTexture(_playbackEngine.OutputTexture);
-                }
-            }
+            // Removed per-frame SetTexture call.
+            // OutputTexture is already bound to the renderer in HandleVideoPrepared().
+            // VideoPlayer writes to targetTexture directly each frame; the shader
+            // sampler sees the new pixels without needing material.SetTexture rebinding.
+            // Per-frame rebinding caused material dirty flag + uniform upload overhead.
+            // NV12 path is bound once at Prepare and does not change handles during playback.
         }
 
         private void OnApplicationQuit()

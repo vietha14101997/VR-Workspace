@@ -38,6 +38,7 @@ namespace VRWorkspace.Media.Core
         private Transform _projectionRoot;
         private DisplaySettings _currentSettings = DisplaySettings.Default;
         private bool _isInitialized = false;
+        private Camera _cachedMainCamera; // Cached Camera.main — lookup is expensive per frame
 
         // Save flat position when switching to immersive so we can restore it
         private Vector3 _savedFlatPosition;
@@ -591,9 +592,10 @@ namespace VRWorkspace.Media.Core
         private void LateUpdate()
         {
             if (_projectionRoot == null) return;
+            if (!IsVisible) return; // Skip all work when projection is hidden
 
-            // Use Camera.main for consistent face-to-camera with controls UI
-            Camera cam = Camera.main;
+            // Cache Camera.main — the lookup internally does FindGameObjectWithTag.
+            var cam = _cachedMainCamera != null ? _cachedMainCamera : (_cachedMainCamera = Camera.main);
             if (cam == null) return;
 
             if (IsImmersiveProjection())
@@ -604,7 +606,7 @@ namespace VRWorkspace.Media.Core
                 _projectionRoot.position = cam.transform.position;
                 _projectionRoot.rotation = Quaternion.identity;
             }
-            else if (IsVisible && _hasFlatWorldPosition)
+            else if (_hasFlatWorldPosition)
             {
                 // Flat projection: apply cached world position (fixed in world space)
                 // and face-to-camera rotation.

@@ -141,6 +141,22 @@ namespace VRWorkspace.UI.RTT
         private RTTQualityManager _qualityManager;
         private RTTAppManager _appManager;
 
+#if UNITY_ANDROID && !UNITY_EDITOR
+        // Rising-edge latch + cooldown for Cardboard's IsGearButtonPressed / IsCloseButtonPressed.
+        // These return true for the entire press duration — without latching, we would
+        // fire ScanDeviceParams() / Application.Quit() every frame and stack multiple
+        // QR scanner activities (forcing 4× back-presses to dismiss).
+        //
+        // Cooldown is needed for a subtle edge case: when the user holds the gear
+        // button while the QR scanner activity is open, Update() is paused. On
+        // returning to the app, the latch is stale and a fresh rising edge fires
+        // immediately, opening another scanner. The cooldown prevents this.
+        private bool _wasGearButtonPressed;
+        private bool _wasCloseButtonPressed;
+        private float _lastGearScanTime = -10f;
+        private const float GEAR_SCAN_COOLDOWN = 2.0f; // seconds
+#endif
+
         // Extracted responsibility managers
         private RTTThemeManager _themeManager;
         private RTTImmersiveModeController _immersiveModeController;
@@ -341,15 +357,25 @@ namespace VRWorkspace.UI.RTT
             _qualityManager?.PeriodicUpdate();
 
     #if UNITY_ANDROID && !UNITY_EDITOR
-            if (Api.IsGearButtonPressed)
+            // Rising-edge detection + cooldown: Cardboard's IsGearButtonPressed returns true
+            // for the entire press duration. Without latching we stack QR activities.
+            // Cooldown guards the resume-from-scanner edge case where the latch is
+            // stale (Update paused while in scanner) and would false-trigger.
+            bool gearPressed = Api.IsGearButtonPressed;
+            if (gearPressed && !_wasGearButtonPressed
+                && Time.unscaledTime - _lastGearScanTime > GEAR_SCAN_COOLDOWN)
             {
                 Api.ScanDeviceParams();
+                _lastGearScanTime = Time.unscaledTime;
             }
+            _wasGearButtonPressed = gearPressed;
 
-            if (Api.IsCloseButtonPressed)
+            bool closePressed = Api.IsCloseButtonPressed;
+            if (closePressed && !_wasCloseButtonPressed)
             {
                 Application.Quit();
             }
+            _wasCloseButtonPressed = closePressed;
 
             if (Api.HasNewDeviceParams())
             {

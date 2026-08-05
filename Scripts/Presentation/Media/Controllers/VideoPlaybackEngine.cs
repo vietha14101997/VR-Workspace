@@ -406,11 +406,14 @@ namespace VRWorkspace.Media.Core
         {
             CleanupRenderTexture();
 
+            // Preserves original video quality: no mipmaps (always sampled at mip 0),
+            // no aniso (video screen is viewed head-on), bilinear filter.
+            // Saves ~33% bandwidth + 33% VRAM vs previous config.
             OutputTexture = new RenderTexture(width, height, 0, RenderTextureFormat.ARGB32);
-            OutputTexture.useMipMap = true;
-            OutputTexture.autoGenerateMips = true;
-            OutputTexture.filterMode = FilterMode.Trilinear;
-            OutputTexture.anisoLevel = 16;
+            OutputTexture.useMipMap = false;
+            OutputTexture.autoGenerateMips = false;
+            OutputTexture.filterMode = FilterMode.Bilinear;
+            OutputTexture.anisoLevel = 1;
             OutputTexture.wrapMode = TextureWrapMode.Clamp;
             OutputTexture.Create();
 
