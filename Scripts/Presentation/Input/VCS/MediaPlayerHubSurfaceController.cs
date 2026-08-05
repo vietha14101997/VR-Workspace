@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using VRWorkspace.Domain.Input;
+using VRWorkspace.Presentation.Input.Mode;
 using VRWorkspace.UI.RTT;
 using VRWorkspace.UI.RTT.Components;
 
@@ -121,9 +122,51 @@ namespace VRWorkspace.Presentation.Input.VCS
             RegisterOrUpdateSurface();
         }
 
+        private void OnEnable()
+        {
+            // Subscribe to mode changes so we can re-evaluate registration when the
+            // user toggles between Gaze and Cursor input modes.
+            var controller = InputModeController.Instance;
+            if (controller != null)
+            {
+                controller.OnInputModeChanged += OnInputModeChanged;
+            }
+        }
+
+        private void OnDisable()
+        {
+            var controller = InputModeController.Instance;
+            if (controller != null)
+            {
+                controller.OnInputModeChanged -= OnInputModeChanged;
+            }
+        }
+
         private void OnDestroy()
         {
             Unregister();
+        }
+
+        /// <summary>
+        /// Returns true when the current input mode is Gaze (no cursor). In Gaze mode the
+        /// Hub surface is intentionally NOT registered with VCS — it is the invisible plane
+        /// that the virtual cursor traverses on in Mouse/Gamepad modes, and has no job in
+        /// Gaze mode. Keeping it unregistered also prevents any conceptual coupling between
+        /// the two modes (the user sometimes mistakes the Hub for the reason the gaze
+        /// reticle appears on the video screen — separate mode, separate surface).
+        /// </summary>
+        private static bool IsGazeMode()
+        {
+            var controller = InputModeController.Instance;
+            return controller != null && controller.Mode == InputMode.Gaze;
+        }
+
+        private void OnInputModeChanged(InputMode mode)
+        {
+            // Force re-evaluation next LateUpdate so unreachable cache state doesn't
+            // suppress the (un)register that the new mode requires.
+            _lastCenter = Vector2.zero;
+            _lastSize = Vector2.zero;
         }
 
         public void Unregister()
@@ -140,6 +183,18 @@ namespace VRWorkspace.Presentation.Input.VCS
         {
             var vcs = VirtualCursorSpace.Instance;
             if (vcs == null) return;
+
+            // Gaze mode: the Hub surface is the invisible plane that the virtual cursor
+            // traverses. With no cursor in Gaze mode, registering it would only clutter
+            // VCS's surface list and provide a path for the cursor to "snap" onto the
+            // video display area when the user later plugs in a mouse. Unregister any
+            // prior registration and exit — the surface will re-register on the next
+            // mode flip to Mouse/Gamepad via OnInputModeChanged.
+            if (IsGazeMode())
+            {
+                if (_registered) Unregister();
+                return;
+            }
 
             var sideCanvas = ActiveSideCanvas;
             if (_controlsCanvas == null || sideCanvas == null) return;

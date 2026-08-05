@@ -32,6 +32,10 @@ namespace VRWorkspace.Presentation.Input.Mode
         private InputMode _currentMode = InputMode.Gaze;
         private float _lastMouseDeltaTime;
 
+        /// <summary>Currently active input mode. Public accessor for subsystems that need to
+        /// branch on mode (e.g. Video Player hiding its invisible Hub surface in Gaze mode).</summary>
+        public InputMode Mode => _currentMode;
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStaticState()
         {
@@ -120,7 +124,13 @@ namespace VRWorkspace.Presentation.Input.Mode
                     VRGazeReticle.Instance.dwellClickEnabled = true;
                     VRGazeReticle.Instance.SetReticleVisible(true);
                 }
-                WorldSpaceCursorRenderer.Instance?.SetVisible(false);
+                // Hard-cursor-hidden in Gaze mode: SetForceHidden(true) sticks across any
+                // subsequent Surface-driven visibility flips (e.g. CursorAppFollower
+                // snapping onto a newly-opened app's surface mid-session, which would
+                // otherwise re-show the cursor for one frame before WorldSpaceCursorRenderer's
+                // per-frame mode check noticed). The WorldSpaceCursorRenderer LateUpdate also
+                // independently rechecks the mode and returns early — belt-and-suspenders.
+                WorldSpaceCursorRenderer.Instance?.SetForceHidden(true);
 
                 VirtualCursorSpace.GetOrCreate().RequestModeSwitch(mode);
                 // Hide cursor by setting state to inactive
@@ -149,6 +159,9 @@ namespace VRWorkspace.Presentation.Input.Mode
                 {
                     vcs.SnapCursorToCenter();
                 }
+                // Release the Gaze-mode force-hidden override so the cursor becomes
+                // visible again per the normal surface-driven visibility logic.
+                WorldSpaceCursorRenderer.Instance?.SetForceHidden(false);
                 WorldSpaceCursorRenderer.Instance?.SetVisible(true);
             }
         }

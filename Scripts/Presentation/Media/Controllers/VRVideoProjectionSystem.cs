@@ -30,6 +30,18 @@ namespace VRWorkspace.Media.Core
 
         /// <summary>Current projection root world rotation</summary>
         public Quaternion ProjectionRotation => _projectionRoot != null ? _projectionRoot.rotation : Quaternion.identity;
+
+        /// <summary>Current screen scale (1.0 = default, 0.5–3.0). Used by the Gaze-mode
+        /// Menu Button to keep its visual size and gaze-target collider proportional
+        /// to the video screen.</summary>
+        public float CurrentScale => _currentSettings.Scale;
+
+        /// <summary>Live flat-screen world position (recomputed every LateUpdate from
+        /// the camera's direction and the saved flat transform's distance). Falls back
+        /// to <see cref="SavedFlatPosition"/> when the lazy position cache hasn't been
+        /// populated yet. The Menu Button tracks this so it follows the video screen
+        /// when the user dollies the camera in/out.</summary>
+        public Vector3 FlatWorldPosition => _hasFlatWorldPosition ? _flatWorldPosition : _savedFlatPosition;
         #endregion
 
         #region Private Fields

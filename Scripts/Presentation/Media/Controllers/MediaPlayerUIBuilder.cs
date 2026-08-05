@@ -548,6 +548,17 @@ namespace VRWorkspace.Presentation.Media.Controllers
                 btnCol.size = new Vector3(menuBtnPixels, menuBtnPixels, 10);
                 btnCol.center = new Vector3(0, 0, -5);
             }
+
+            // Phase 6: Auto-hide timer for the Gaze-mode wake-up button. The button
+            // shrinks-to-disappear after 10s of no gaze activity, then fades back in
+            // when the user's gaze enters the 2m collider area, and fades out again
+            // once the gaze leaves. See MenuButtonAutoHideTimer for the policy.
+            var cam = Camera.main;
+            if (cam != null)
+            {
+                VRWorkspace.Presentation.Media.Controllers.MenuButtonAutoHideTimer.AttachTo(
+                    result.MenuButtonFrameObject, cam);
+            }
             result.MenuButtonFrameObject.SetActive(false);
 
             // ====================================================== //

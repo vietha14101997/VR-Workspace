@@ -1,5 +1,6 @@
 using UnityEngine;
 using VRWorkspace.Domain.Input;
+using VRWorkspace.Presentation.Input.Mode;
 using VRWorkspace.UI.RTT;
 using VRWorkspace.UI.RTT.Components;
 using VRWorkspace.Presentation.Input.VCS;
@@ -142,6 +143,22 @@ namespace VRWorkspace.Presentation.Input.Cursor
         {
             var vcs = VirtualCursorSpace.Instance;
             if (vcs == null || _cursor3D == null) return;
+
+            // Gaze mode = absolute separation from Cursor mode: the cursor visual MUST
+            // never show, regardless of VCS state (CursorAppFollower snapping onto a
+            // newly-opened app's surface, MediaPlayerHubSurfaceController re-registering,
+            // any other code path that sets Cursor.IsVisible = true). The reticle is the
+            // sole visual in Gaze mode.
+            //
+            // We can't rely on _forceHidden alone — other subsystems (e.g.
+            // VRMediaAppController.OnVisibilityChanged) flip that flag based on controls
+            // visibility and would re-show the cursor in Gaze mode.
+            var modeController = InputModeController.Instance;
+            if (modeController != null && modeController.Mode == InputMode.Gaze)
+            {
+                SetVisible(false);
+                return;
+            }
 
             if (_forceHidden)
             {
