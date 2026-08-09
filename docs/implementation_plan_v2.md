@@ -61,9 +61,9 @@ public class RTTConfig : ScriptableObject
     [Tooltip("Chỉ render lại khi UI thay đổi")]
     public bool useDirtyFlag = true;
 
-    [Tooltip("Số frame tối đa giữa các lần render (0 = luôn render)")]
-    [Range(0, 10)]
-    public int maxFrameSkip = 2;
+    [Tooltip("Chu kỳ safety refresh theo frame (0 = chỉ render khi dirty). Giá trị 1-6 được clamp lên 7 khi chạy để giảm nhiệt mobile.")]
+    [Range(0, 30)]
+    public int maxFrameSkip = 7;
 
     [Header("Debug")]
     public bool showDebugGizmos = false;

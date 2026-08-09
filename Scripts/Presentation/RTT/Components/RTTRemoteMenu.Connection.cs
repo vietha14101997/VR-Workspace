@@ -32,6 +32,12 @@ namespace VRWorkspace.UI.RTT.Components
         /// </summary>
         public void StartBackgroundDiscovery()
         {
+            if (!ShouldRunBackgroundDiscovery())
+            {
+                StopBackgroundDiscovery();
+                return;
+            }
+
             // Don't restart if already running
             if (_isBackgroundDiscoveryRunning) return;
 
@@ -40,7 +46,7 @@ namespace VRWorkspace.UI.RTT.Components
 
             _backgroundDiscoveryCts = new CancellationTokenSource();
             _isBackgroundDiscoveryRunning = true;
-            RunBackgroundDiscoveryLoop(_backgroundDiscoveryCts.Token);
+            RunBackgroundDiscoveryLoop(_backgroundDiscoveryCts);
         }
 
         /// <summary>
@@ -52,14 +58,32 @@ namespace VRWorkspace.UI.RTT.Components
             _backgroundDiscoveryCts?.Cancel();
             _backgroundDiscoveryCts?.Dispose();
             _backgroundDiscoveryCts = null;
+            _cachedDiscoveryResults = null;
         }
 
         /// <summary>
         /// Discovery loop: scan every 6 seconds until cancelled or server found.
         /// Uses longer timeout (5s) for thorough scanning.
         /// </summary>
-        private async void RunBackgroundDiscoveryLoop(CancellationToken ct)
+        private bool ShouldRunBackgroundDiscovery()
         {
+            return isActiveAndEnabled &&
+                   _viewModel != null &&
+                   _selectedTransport == 0 &&
+                   (_currentPhase == ConnectionPhase.Disconnected || _currentPhase == ConnectionPhase.Error);
+        }
+
+        private void RefreshBackgroundDiscovery()
+        {
+            if (ShouldRunBackgroundDiscovery())
+                StartBackgroundDiscovery();
+            else
+                StopBackgroundDiscovery();
+        }
+
+        private async void RunBackgroundDiscoveryLoop(CancellationTokenSource owner)
+        {
+            CancellationToken ct = owner.Token;
             Debug.Log("[RTTRemoteMenu] Background discovery started");
             try
             {
@@ -75,6 +99,10 @@ namespace VRWorkspace.UI.RTT.Components
                         Debug.Log($"[RTTRemoteMenu] Background discovery found {servers.Count} server(s)");
                         // Keep scanning in case more servers appear, but slower
                     }
+                    else
+                    {
+                        _cachedDiscoveryResults = null;
+                    }
 
                     // Wait before next scan
                     await System.Threading.Tasks.Task.Delay(6000, ct);
@@ -87,8 +115,13 @@ namespace VRWorkspace.UI.RTT.Components
             }
             finally
             {
-                _isBackgroundDiscoveryRunning = false;
-                Debug.Log("[RTTRemoteMenu] Background discovery stopped");
+                if (ReferenceEquals(_backgroundDiscoveryCts, owner))
+                {
+                    _isBackgroundDiscoveryRunning = false;
+                    _backgroundDiscoveryCts.Dispose();
+                    _backgroundDiscoveryCts = null;
+                    Debug.Log("[RTTRemoteMenu] Background discovery stopped");
+                }
             }
         }
 
@@ -642,13 +675,10 @@ namespace VRWorkspace.UI.RTT.Components
                     _cachedSuggestedConfig = null;
                     // Reset button progress tracking
                     ResetButtonProgress();
-                    // Restart background discovery for next connection attempt
-                    StartBackgroundDiscovery();
                     break;
 
                 case ConnectionPhase.Connecting:
                     UpdateButtonText("CONNECTING...");
-                    StopBackgroundDiscovery(); // No need to discover when connected
                     break;
 
                 case ConnectionPhase.AwaitingHardwareInfo:
@@ -712,6 +742,8 @@ namespace VRWorkspace.UI.RTT.Components
                     ResetButtonProgress();
                     break;
             }
+
+            RefreshBackgroundDiscovery();
         }
 
         /// <summary>

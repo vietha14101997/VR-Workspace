@@ -94,6 +94,7 @@ namespace VRWorkspace.UI.RTT.Input
         // Reusable event data (avoid GC)
         private PointerEventData _pointerEventData;
         private List<RaycastResult> _raycastResults = new List<RaycastResult>();
+        private readonly List<GraphicRaycaster> _nestedRaycasters = new List<GraphicRaycaster>();
         #endregion
 
         #region Properties
@@ -303,10 +304,11 @@ namespace VRWorkspace.UI.RTT.Input
         /// </summary>
         private void RaycastNestedCanvases(Transform root, Vector2 screenPos)
         {
-            // Find all GraphicRaycasters in children (excluding the root one we already used)
-            var nestedRaycasters = root.GetComponentsInChildren<GraphicRaycaster>(false);
+            // Reuse the list because this path runs every gaze frame.
+            _nestedRaycasters.Clear();
+            root.GetComponentsInChildren(false, _nestedRaycasters);
 
-            foreach (var raycaster in nestedRaycasters)
+            foreach (var raycaster in _nestedRaycasters)
             {
                 // Skip the root raycaster (already processed)
                 if (raycaster.transform == root) continue;

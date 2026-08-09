@@ -239,6 +239,8 @@ namespace VRWorkspace.Media.Core
                 // Override menu button visibility (Bug 1 fix):
                 // RTTMediaControlsPanel.Hide() always shows menu button, but in Mouse/Gamepad
                 // mode we want menu button hidden (cursor handles show/hide via bounds).
+                if (!visible && ProjectionSystem != null && !ProjectionSystem.IsImmersiveProjection())
+                    PositionMenuButtonFlat();
                 ApplyMenuButtonVisibilityByMode(CurrentModeFromState());
             };
 
@@ -359,6 +361,7 @@ namespace VRWorkspace.Media.Core
 
         private void HidePlayerUI()
         {
+            _errorDialog?.HideImmediate();
             _uiSettingsPopupFrame?.SetActive(false);
             _uiSettingsBlocker?.SetActive(false);
             _controlsFollowCamera = false;
@@ -570,9 +573,17 @@ namespace VRWorkspace.Media.Core
             if (_menuButtonFrameObject == null) return;
 
             float menuBtnPhysical = 90f / 1200f;
-            Vector3 pos = _menuFramePosition + new Vector3(0, -0.5f - menuBtnPhysical * 1.5f, 0);
+            bool hasProjectionAnchor = ProjectionSystem != null && ProjectionSystem.HasSavedFlatTransform;
+            Vector3 anchorPosition = hasProjectionAnchor
+                ? ProjectionSystem.FlatWorldPosition
+                : _menuFramePosition;
+            Quaternion anchorRotation = hasProjectionAnchor
+                ? ProjectionSystem.ProjectionRotation
+                : _menuFrameRotation;
+
+            Vector3 pos = anchorPosition + Vector3.up * (-0.5f - menuBtnPhysical * 1.5f);
             _menuButtonFrameObject.transform.position = pos;
-            _menuButtonFrameObject.transform.rotation = _menuFrameRotation;
+            _menuButtonFrameObject.transform.rotation = anchorRotation;
             ScaleMenuButtonQuad(1.0f);
             _menuButtonFollowCamera = false;
 

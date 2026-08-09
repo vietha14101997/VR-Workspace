@@ -114,6 +114,12 @@ namespace VRWorkspace.UI.RTT.Components
         #endregion
 
         #region Lifecycle
+        private const float StatusUpdateInterval = 1f;
+        private float _nextStatusUpdateTime;
+        private int _lastClockMinute = -1;
+        private int _lastBatteryPercent = int.MinValue;
+        private NetworkReachability _lastNetworkReachability = (NetworkReachability)(-1);
+
         protected override void Awake()
         {
             // Calculate sizes before base.Awake()
@@ -126,6 +132,12 @@ namespace VRWorkspace.UI.RTT.Components
             base.Awake();
         }
 
+        protected override void OnEnable()
+        {
+            base.OnEnable();
+            _nextStatusUpdateTime = 0f;
+        }
+
         protected override void OnDestroy()
         {
             if (_glassMaterial != null) Destroy(_glassMaterial);
@@ -135,12 +147,15 @@ namespace VRWorkspace.UI.RTT.Components
 
         protected override void LateUpdate()
         {
-            base.LateUpdate();
+            if (_isInitialized && _isVisible && Time.unscaledTime >= _nextStatusUpdateTime)
+            {
+                _nextStatusUpdateTime = Time.unscaledTime + StatusUpdateInterval;
+                UpdateClock();
+                UpdateBattery();
+                UpdateNetwork();
+            }
 
-            // Update status displays
-            UpdateClock();
-            UpdateBattery();
-            UpdateNetwork();
+            base.LateUpdate();
 
             // Note: Position tracking is now handled by RTTToolbar parent
         }
@@ -533,6 +548,8 @@ namespace VRWorkspace.UI.RTT.Components
         {
             if (_networkElement == null) return;
 
+            _lastNetworkReachability = (NetworkReachability)(-1);
+
             // Clear existing
             for (int i = _networkElement.transform.childCount - 1; i >= 0; i--)
             {
@@ -758,52 +775,58 @@ namespace VRWorkspace.UI.RTT.Components
         #region Status Updates
         private void UpdateClock()
         {
-            if (_clockText != null)
+            if (_clockText == null) return;
+
+            DateTime now = DateTime.Now;
+            int minute = now.Hour * 60 + now.Minute;
+            if (_lastClockMinute != minute)
             {
-                string newTime = DateTime.Now.ToString("HH:mm");
-                if (_clockText.text != newTime)
-                {
-                    _clockText.text = newTime;
-                    MarkDirty();
-                }
+                _lastClockMinute = minute;
+                _clockText.text = now.ToString("HH:mm");
+                MarkDirty();
             }
         }
 
         private void UpdateBattery()
         {
-            if (_batteryText != null)
+            if (_batteryText == null) return;
+
+            float battLevel = SystemInfo.batteryLevel;
+            float displayLevel = (battLevel < 0) ? 1.0f : battLevel;
+            int batteryPercent = Mathf.FloorToInt(displayLevel * 100);
+            if (_lastBatteryPercent != batteryPercent)
             {
-                float battLevel = SystemInfo.batteryLevel;
-                float displayLevel = (battLevel < 0) ? 1.0f : battLevel;
-                string battStr = Mathf.FloorToInt(displayLevel * 100).ToString();
+                _lastBatteryPercent = batteryPercent;
+                _batteryText.text = batteryPercent.ToString();
 
-                if (_batteryText.text != battStr)
+                if (_batteryFillImage != null)
                 {
-                    _batteryText.text = battStr;
-
-                    if (_batteryFillImage != null)
-                    {
-                        _batteryFillImage.fillAmount = displayLevel;
-                    }
-                    MarkDirty();
+                    _batteryFillImage.fillAmount = displayLevel;
                 }
+                MarkDirty();
             }
         }
 
         private void UpdateNetwork()
         {
+            NetworkReachability reachability = Application.internetReachability;
+            if (_lastNetworkReachability == reachability) return;
+
+            _lastNetworkReachability = reachability;
+            bool hasNetwork = reachability != NetworkReachability.NotReachable;
+
             if (_networkIcon != null)
             {
                 Color iconColor = Color.Lerp(glowColorA, Color.white, 0.9f);
-                bool hasNetwork = Application.internetReachability != NetworkReachability.NotReachable;
                 _networkIcon.color = hasNetwork ? iconColor : new Color(iconColor.r, iconColor.g, iconColor.b, 0.3f);
             }
 
             if (_networkText != null)
             {
-                bool hasNetwork = Application.internetReachability != NetworkReachability.NotReachable;
                 _networkText.text = hasNetwork ? "WiFi" : "No WiFi";
             }
+
+            MarkDirty();
         }
         #endregion
 

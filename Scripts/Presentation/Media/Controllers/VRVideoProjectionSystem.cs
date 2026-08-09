@@ -67,8 +67,8 @@ namespace VRWorkspace.Media.Core
         public bool HasSavedFlatTransform => _hasSavedFlatTransform;
 
         /// <summary>
-        /// Update saved flat transform without moving the projection root.
-        /// Used during recenter to point controls/sphere alignment toward the new forward direction.
+        /// Update the saved flat transform. Flat mode applies the pose atomically so
+        /// dependent UI never observes an intermediate pre-LateUpdate position.
         /// </summary>
         public void UpdateSavedFlatTransform(Vector3 position, Quaternion rotation)
         {
@@ -76,11 +76,38 @@ namespace VRWorkspace.Media.Core
             _savedFlatRotation = rotation;
             _hasSavedFlatTransform = true;
 
-            // Immediately recompute the flat world position so the projection screen 
-            // follows the new recentered direction in Flat mode.
-            if (IsVisible && !IsImmersiveProjection())
+            Camera cam = _cachedMainCamera != null ? _cachedMainCamera : (_cachedMainCamera = Camera.main);
+            if (cam != null)
             {
-                ComputeFlatWorldPosition();
+                Vector3 horizontal = position - cam.transform.position;
+                horizontal.y = 0f;
+                if (horizontal.sqrMagnitude > 0.001f)
+                {
+                    _flatDirection = horizontal.normalized;
+                }
+                else
+                {
+                    Vector3 rotationForward = rotation * Vector3.forward;
+                    rotationForward.y = 0f;
+                    if (rotationForward.sqrMagnitude > 0.001f)
+                        _flatDirection = rotationForward.normalized;
+                }
+            }
+
+            if (IsImmersiveProjection())
+            {
+                // The immersive root must remain camera-centered with identity rotation.
+                // Invalidate the flat cache so returning to flat recomputes from this pose.
+                _hasFlatWorldPosition = false;
+                return;
+            }
+
+            _flatWorldPosition = position;
+            _hasFlatWorldPosition = true;
+
+            if (_projectionRoot != null)
+            {
+                _projectionRoot.SetPositionAndRotation(position, rotation);
             }
         }
         #endregion

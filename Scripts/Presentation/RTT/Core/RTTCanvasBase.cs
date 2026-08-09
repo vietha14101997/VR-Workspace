@@ -61,6 +61,7 @@ namespace VRWorkspace.UI.RTT
         protected int _framesSinceLastRender = 0;
         protected float _lastDirtyTime;
         protected bool _continuousRender = false; // For animated content that needs constant updates
+        private const int MinimumPeriodicRefreshFrames = 7;
 
         // State tracking
         protected bool _isInitialized = false;
@@ -640,8 +641,11 @@ namespace VRWorkspace.UI.RTT
 
             // Check if we should render
             // Continuous render mode always renders (for animated content)
+            int periodicRefreshFrames = config.maxFrameSkip > 0
+                ? Mathf.Max(config.maxFrameSkip, MinimumPeriodicRefreshFrames)
+                : 0;
             bool shouldRender = _isDirty || _continuousRender ||
-                (config.maxFrameSkip > 0 && _framesSinceLastRender >= config.maxFrameSkip);
+                (periodicRefreshFrames > 0 && _framesSinceLastRender >= periodicRefreshFrames);
 
             if (shouldRender)
             {

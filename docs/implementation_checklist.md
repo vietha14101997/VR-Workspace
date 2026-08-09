@@ -254,6 +254,9 @@
 - [ ] Test: Primary instance accessible globally
 
 ### 3.2 RTTTaskbar (từ VRTaskbar)
+
+Current architecture: the Light button directly controls `MediaEnvironmentController`; there is no Eye/Passthrough expansion. `MainScene` uses one display/XR camera while RTT canvases retain offscreen RenderTexture cameras.
+
 - [ ] Tạo file `RTTTaskbar.cs`
 - [ ] Kế thừa từ RTTCanvasBase
 - [ ] **Configuration**
@@ -269,7 +272,7 @@
   - [ ] BuildUI()
 - [ ] **UI Building (copy logic từ VRTaskbar)**
   - [ ] CreateThreeSections()
-  - [ ] CreateControlButtons() - Quit, Settings, Passthrough, Recenter
+  - [ ] CreateControlButtons() - Quit, Settings, Light, Recenter
   - [ ] CreateAppButtons() - Home + 3 slots
   - [ ] CreateStatusDisplay() - Clock, Battery, WiFi
 - [ ] **Position Methods**
@@ -283,7 +286,7 @@
 - [ ] Test: Buttons clickable via gaze
 - [ ] Test: Clock updates real-time
 - [ ] Test: Battery indicator working
-- [ ] Test: Passthrough toggle works
+- [ ] Test: Light button toggles the virtual environment directly
 
 ### 3.3 RTTMobileKeyboard (từ VRMobileKeyboard)
 - [ ] Tạo file `RTTMobileKeyboard.cs`

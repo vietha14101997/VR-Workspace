@@ -638,7 +638,7 @@ namespace VRWorkspace.Presentation.Media.Controllers
             // 5. Error Dialog                                         //
             // ====================================================== //
             var errorDialogObj = new GameObject("MediaErrorDialog");
-            errorDialogObj.transform.SetParent(_libraryContainer, false);
+            errorDialogObj.transform.SetParent(controlsContent, false);
 
             var errorDialogRT = errorDialogObj.AddComponent<RectTransform>();
             errorDialogRT.anchorMin = Vector2.zero;
@@ -648,7 +648,6 @@ namespace VRWorkspace.Presentation.Media.Controllers
 
             result.ErrorDialog = errorDialogObj.AddComponent<MediaErrorDialog>();
             result.ErrorDialog.Initialize(_font, _primaryColor, _accentColor);
-            errorDialogObj.SetActive(false); // Start hidden; Show() will activate it
 
             // ====================================================== //
             // 6. Projection & Environment popups                      //

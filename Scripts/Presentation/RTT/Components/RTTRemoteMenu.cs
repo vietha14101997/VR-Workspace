@@ -286,9 +286,8 @@ namespace VRWorkspace.UI.RTT.Components
             // Update UI with current state
             HandlePhaseChanged(_viewModel.Phase.Value);
 
-            // Start background server discovery immediately (LAN mode)
-            // Results will be cached so Connect button responds instantly
-            StartBackgroundDiscovery();
+            // Discovery follows visibility, transport, and connection lifecycle.
+            RefreshBackgroundDiscovery();
 
             Debug.Log("[RTTRemoteMenu] Bound to ConnectionViewModel");
         }
@@ -498,6 +497,7 @@ namespace VRWorkspace.UI.RTT.Components
             if (index == _selectedTransport) return;
             _selectedTransport = index;
             UpdateTransportRadioVisuals();
+            RefreshBackgroundDiscovery();
             Debug.Log($"[RTTRemoteMenu] Transport: {TRANSPORT_LABELS[index]}");
         }
 
@@ -749,12 +749,13 @@ namespace VRWorkspace.UI.RTT.Components
 
         private void OnDisable()
         {
-            // Normal behavior during preparation - coroutines will be paused and resumed on enable
+            StopBackgroundDiscovery();
         }
 
         private void OnEnable()
         {
             Debug.Log("[RTTRemoteMenu] OnEnable called");
+            RefreshBackgroundDiscovery();
 
             // Restart side panel coroutines if they were interrupted before completion
             // Coroutines don't automatically resume after disable/enable in Unity

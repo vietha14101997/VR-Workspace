@@ -70,9 +70,11 @@ WorldPanelClusterRig
     └── WorldPanelPlus[] (curved panel array for multi-monitor)
 ```
 
+MainScene uses one display/XR camera (`VRCamera`) for the virtual environment. RTT panels keep their own offscreen cameras with RenderTexture targets. Global camera passthrough and the RealWorld/VirtualSpace mode split are not part of the application architecture.
+
 ### Directory Structure
 
-- `Scripts/Core/` - ServiceLocator, ObservableProperty, MainThreadDispatcher, ModeController
+- `Scripts/Core/` - ServiceLocator, ObservableProperty, MainThreadDispatcher
 - `Scripts/Streaming/` - PhaseProtocolClient, ConnectionStateMachine, SpeedTestClient
 - `Scripts/ViewModels/` - ConnectionViewModel (MVVM binding layer)
 - `Scripts/UI/RTT/Core/` - RTTManager, RTTCanvasBase, RTTConfig, RTTThemeConfig

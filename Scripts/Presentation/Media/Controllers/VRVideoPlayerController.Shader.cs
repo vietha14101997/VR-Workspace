@@ -78,11 +78,11 @@ namespace VRWorkspace.Media.Core
             {
                 // Flat: position controls below the screen, facing same direction as screen
                 Vector3 screenPos = _projectionSystem != null
-                    ? _projectionSystem.ProjectionPosition
+                    ? _projectionSystem.FlatWorldPosition
                     : container.position;
 
                 newPos = screenPos;
-                newPos.y = camPos.y - 0.625f;
+                newPos.y = screenPos.y - 0.625f;
 
                 // Face direction = from camera toward screen (horizontal)
                 Vector3 toScreen = screenPos - camPos;

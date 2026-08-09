@@ -673,7 +673,7 @@ namespace VRWorkspace.UI.RTT.Controllers
             // Add RTTMiniFrame first (required component)
             RTTMiniFrame frame = taskbarObj.AddComponent<RTTMiniFrame>();
             frame.Configure(
-                sec1Capacity: 6,    // Back, Bitrate, FPS, Zoom, Passthrough, Recenter
+                sec1Capacity: 6,    // Back, Resolution, FPS, Screen Settings, Light, Recenter
                 sec2Capacity: 3,    // 3 monitor slots
                 btnSize: 90f,
                 btnSpacing: 12f,

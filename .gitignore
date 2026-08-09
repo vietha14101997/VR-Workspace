@@ -1,4 +1,5 @@
 *.meta
+!Scripts/Core/Platform/VrQuality.cs.meta
 *.unity
 *.prefab
 Scenes/MainScene.unity
