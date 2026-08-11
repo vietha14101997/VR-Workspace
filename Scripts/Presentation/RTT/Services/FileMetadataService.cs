@@ -1003,6 +1003,8 @@ namespace VRWorkspace.UI.RTT.Services
             _isPreloading = true;
             int preloaded = 0;
             int skipped = 0;
+            int unsupported = 0;
+            int failed = 0;
             var sw = System.Diagnostics.Stopwatch.StartNew();
 
             Debug.Log($"[FileMetadataService] Starting background preload for {filePaths.Count} files");
@@ -1034,6 +1036,10 @@ namespace VRWorkspace.UI.RTT.Services
                         _videoMetadataCache[filePath] = metadata;
                         preloaded++;
                     }
+                    else
+                    {
+                        failed++;
+                    }
                 }
                 else if (isAudio)
                 {
@@ -1051,6 +1057,14 @@ namespace VRWorkspace.UI.RTT.Services
                         _audioMetadataCache[filePath] = metadata;
                         preloaded++;
                     }
+                    else
+                    {
+                        failed++;
+                    }
+                }
+                else
+                {
+                    unsupported++;
                 }
 
                 // Yield every 20 items to keep UI responsive
@@ -1062,7 +1076,7 @@ namespace VRWorkspace.UI.RTT.Services
             _isPreloading = false;
             _preloadCoroutine = null;
 
-            Debug.Log($"[FileMetadataService] Preload complete: {preloaded} loaded, {skipped} cached, {filePaths.Count - preloaded - skipped} failed ({sw.ElapsedMilliseconds}ms)");
+            Debug.Log($"[FileMetadataService] Preload complete: {preloaded} loaded, {skipped} cached, {unsupported} unsupported, {failed} failed ({sw.ElapsedMilliseconds}ms)");
         }
 
         /// <summary>

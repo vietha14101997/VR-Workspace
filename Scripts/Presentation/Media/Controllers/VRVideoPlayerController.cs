@@ -1110,6 +1110,14 @@ namespace VRWorkspace.Media.Core
 
         private System.Collections.IEnumerator RecenterRoutine()
         {
+            CardboardTrackingController tracking = CardboardTrackingController.Instance;
+            if (tracking == null) tracking = FindAnyObjectByType<CardboardTrackingController>();
+            if (tracking != null && !tracking.BeginManualRecenter(this))
+            {
+                _recenterCoroutine = null;
+                yield break;
+            }
+
             VRGazeReticle reticle = VRGazeReticle.Instance;
             if (reticle == null) reticle = FindAnyObjectByType<VRGazeReticle>();
             _recenterReticle = reticle;
@@ -1129,7 +1137,7 @@ namespace VRWorkspace.Media.Core
 
             while (elapsed < duration)
             {
-                elapsed += Time.deltaTime;
+                elapsed += Time.unscaledDeltaTime;
                 float progress = Mathf.Clamp01(elapsed / duration);
 
                 if (reticle != null)
@@ -1138,6 +1146,23 @@ namespace VRWorkspace.Media.Core
                 }
 
                 yield return null;
+            }
+
+            float settleTimeout = 0.5f;
+            while (tracking != null && !tracking.IsRecenterSettled && settleTimeout > 0f)
+            {
+                settleTimeout -= Time.unscaledDeltaTime;
+                yield return null;
+            }
+
+            if (tracking != null && !tracking.IsRecenterSettled)
+            {
+                tracking.CancelManualRecenter(this);
+                if (reticle != null && !tracking.IsRecentering) reticle.ExitRecenterMode();
+                _recenterReticle = null;
+                _recenterCoroutine = null;
+                Debug.LogWarning("[VRVideoPlayerController] Recenter cancelled because tracking did not settle.");
+                yield break;
             }
 
             // Recenter virtual objects and projection
@@ -1195,9 +1220,11 @@ namespace VRWorkspace.Media.Core
                     _projectionSystem.CurrentStereoMode);
             }
 
+            tracking?.CompleteManualRecenter(this);
             if (reticle != null)
             {
-                reticle.ExitRecenterMode();
+                if (tracking == null || !tracking.IsRecentering)
+                    reticle.ExitRecenterMode();
             }
 
             _recenterReticle = null;
@@ -1216,8 +1243,15 @@ namespace VRWorkspace.Media.Core
 
             if (_recenterReticle != null)
             {
-                _recenterReticle.ExitRecenterMode();
+                CardboardTrackingController tracking = CardboardTrackingController.Instance;
+                tracking?.CancelManualRecenter(this);
+                if (tracking == null || !tracking.IsRecentering)
+                    _recenterReticle.ExitRecenterMode();
                 _recenterReticle = null;
+            }
+            else
+            {
+                CardboardTrackingController.Instance?.CancelManualRecenter(this);
             }
         }
 

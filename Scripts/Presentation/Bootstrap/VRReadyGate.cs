@@ -17,7 +17,8 @@ namespace VRWorkspace.Bootstrap
     public static class VRReadyGate
     {
         private const float STABILITY_DISTANCE_THRESHOLD_M = 0.05f;
-        private const int REQUIRED_STABLE_FRAMES = 2;
+        private const float STABILITY_ANGLE_THRESHOLD_DEG = 0.5f;
+        private const int REQUIRED_STABLE_FRAMES = 5;
         private const int INITIAL_SETTLE_FRAMES = 3;
 
         public static IEnumerator WaitUntilReady(MonoBehaviour host)
@@ -40,6 +41,7 @@ namespace VRWorkspace.Bootstrap
 
             int stableFrames = 0;
             Vector3 lastPos = cam.transform.position;
+            Quaternion lastRotation = cam.transform.rotation;
             while (host != null && stableFrames < REQUIRED_STABLE_FRAMES)
             {
                 yield return null;
@@ -52,11 +54,15 @@ namespace VRWorkspace.Bootstrap
 
                 Vector3 curPos = current.transform.position;
                 float dist = Vector3.Distance(curPos, lastPos);
-                if (dist < STABILITY_DISTANCE_THRESHOLD_M)
+                Quaternion curRotation = current.transform.rotation;
+                float angle = Quaternion.Angle(curRotation, lastRotation);
+                if (dist < STABILITY_DISTANCE_THRESHOLD_M &&
+                    angle < STABILITY_ANGLE_THRESHOLD_DEG)
                     stableFrames++;
                 else
                     stableFrames = 0;
                 lastPos = curPos;
+                lastRotation = curRotation;
             }
 
             yield return null;

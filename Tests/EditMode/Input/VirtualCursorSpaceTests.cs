@@ -137,7 +137,7 @@ namespace VRWorkspace.Tests.EditMode.Input
             Assert.IsTrue(traversed);
             Assert.AreEqual(taskId, target);
             Assert.That(entryUV.x, Is.InRange(0f, 1f));
-            Assert.AreEqual(1f, entryUV.y, 0.05f); // entry is at top edge (y=1) of taskbar
+            Assert.AreEqual(0.95f, entryUV.y, 1e-3f); // 5% sticky buffer keeps entry just inside the top edge.
         }
 
         [Test]

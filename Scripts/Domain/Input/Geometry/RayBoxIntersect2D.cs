@@ -143,7 +143,7 @@ namespace VRWorkspace.Domain.Input.Geometry
             }
 
             // Hit. Choose entry t (tMinOrig if origin is outside box, else 0).
-            float tEnter = tMinOrig > 0f ? tMinOrig : 0f;
+            float tEnter = tMinHit > 0f ? tMinHit : 0f;
             Vector2 worldPoint = origin + d * tEnter;
             Vector2 entryUV = new Vector2(
                 (worldPoint.x - originalBounds.xMin) / Mathf.Max(1e-6f, originalBounds.width),

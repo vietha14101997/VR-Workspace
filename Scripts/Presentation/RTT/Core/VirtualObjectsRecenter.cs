@@ -25,6 +25,11 @@ namespace VRWorkspace.UI.RTT
         {
             if (owner == null) yield break;
 
+            CardboardTrackingController tracking = CardboardTrackingController.Instance;
+            if (tracking == null)
+                tracking = UnityEngine.Object.FindAnyObjectByType<CardboardTrackingController>();
+            if (tracking != null && !tracking.BeginManualRecenter(owner)) yield break;
+
             VRGazeReticle reticle = VRGazeReticle.Instance;
             if (reticle == null) reticle = UnityEngine.Object.FindAnyObjectByType<VRGazeReticle>();
             if (reticle != null) reticle.EnterRecenterMode(icon);
@@ -33,10 +38,24 @@ namespace VRWorkspace.UI.RTT
             float elapsed = 0f;
             while (elapsed < duration)
             {
-                elapsed += Time.deltaTime;
+                elapsed += Time.unscaledDeltaTime;
                 if (reticle != null)
                     reticle.UpdateRecenterProgress(Mathf.Clamp01(elapsed / duration));
                 yield return null;
+            }
+
+            float settleTimeout = 0.5f;
+            while (tracking != null && !tracking.IsRecenterSettled && settleTimeout > 0f)
+            {
+                settleTimeout -= Time.unscaledDeltaTime;
+                yield return null;
+            }
+
+            if (tracking != null && !tracking.IsRecenterSettled)
+            {
+                tracking.CancelManualRecenter(owner);
+                if (reticle != null && !tracking.IsRecentering) reticle.ExitRecenterMode();
+                yield break;
             }
 
             Camera cam = Camera.main;
@@ -45,7 +64,9 @@ namespace VRWorkspace.UI.RTT
                 RepositionAllVirtualObjects(cam, fallbackTarget);
             }
 
-            if (reticle != null) reticle.ExitRecenterMode();
+            tracking?.CompleteManualRecenter(owner);
+            if (reticle != null && (tracking == null || !tracking.IsRecentering))
+                reticle.ExitRecenterMode();
             onComplete?.Invoke();
         }
 

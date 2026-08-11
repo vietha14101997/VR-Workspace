@@ -465,9 +465,9 @@ namespace VRWorkspace.UI.RTT.Components
             // Left Container for Breadcrumbs
             GameObject crumbContainer = new GameObject("Breadcrumbs");
             crumbContainer.transform.SetParent(rowRT, false);
-            _breadcrumbContainer = crumbContainer.transform;
 
             RectTransform crumbRT = crumbContainer.AddComponent<RectTransform>();
+            _breadcrumbContainer = crumbRT;
             crumbRT.anchorMin = new Vector2(0, 0);
             crumbRT.anchorMax = new Vector2(1, 1);
             crumbRT.pivot = new Vector2(0, 0.5f);
