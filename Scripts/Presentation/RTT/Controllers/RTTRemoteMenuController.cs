@@ -790,34 +790,33 @@ namespace VRWorkspace.UI.RTT.Controllers
         /// Create RemoteAudioPlayer dynamically for desktop audio playback.
         /// Auto-subscribes to OnRemoteAudioTrackReceived from ViewModel.
         ///
-        /// Audio routing on the wire:
-        ///   - Host primary path is raw PCM16 over the audio DataChannel (SIPSorceryStreamer.Audio.cs)
-        ///   - Opus RTP is negotiated in SDP for fallback only when the DC is unavailable
-        ///   - Media relay (WebSocket fallback) also delivers raw PCM16 via the 0xF2 channel
-        /// Therefore the DC player is the actual primary sink; the RTP player is wired up so
-        /// the Unity WebRTC decoder is pre-allocated, but muted because no Opus RTP traffic
-        /// arrives in the normal case.
+        /// Audio routing after server-side Opus RTP migration:
+        ///   - Host default path is Opus RTP with DTX (LATENCY_CONSTRAINED_VBR)
+        ///   - USB transport still uses raw PCM16 over the audio DataChannel
+        ///   - Media relay also uses Opus RTP
+        /// Therefore the RTP player is the primary sink; the DC player is kept
+        /// as fallback for USB connections only and auto-unmutes if DC data arrives.
         /// </summary>
         private void CreateRemoteAudioPlayer()
         {
             CleanupRemoteAudioPlayer();
 
-            // 1. DC Player (Primary) - receives raw PCM16 from the host DataChannel.
-            // Bypasses Opus encode/decode + libwebrtc NetEQ jitter for ~20-40ms lower latency.
+            // 1. DC Player (Fallback) - receives raw PCM16 from the host DataChannel.
+            // Only active when host uses USB transport (UsePcmDataChannelAudio=true).
             var dcAudioObj = new GameObject("DataChannelAudioPlayer");
             dcAudioObj.transform.SetParent(transform, false);
             dcAudioObj.AddComponent<AudioSource>();
             _dcAudioPlayer = dcAudioObj.AddComponent<DataChannelAudioPlayer>();
             _dcAudioPlayer.StartPlayback();
-            _dcAudioPlayer.SetMute(false); // Primary: unmuted
+            _dcAudioPlayer.SetMute(true); // Fallback: muted — only used if host sends raw PCM via DC (USB)
 
-            // 2. RTP Player (Fallback) - kept allocated in case the host falls back to Opus RTP,
-            // but muted by default because the host sends nothing via RTP while DC is open.
+            // 2. RTP Player (Primary) - the host now sends Opus RTP by default across
+            // both P2P Direct and Relay connections (LATENCY_CONSTRAINED_VBR + DTX).
             var rtpAudioObj = new GameObject("RemoteAudioPlayer");
             rtpAudioObj.transform.SetParent(transform, false);
             rtpAudioObj.AddComponent<AudioSource>();
             _audioPlayer = rtpAudioObj.AddComponent<RemoteAudioPlayer>();
-            _audioPlayer.SetMute(true); // Muted: only unmuted if host actually sends Opus RTP
+            _audioPlayer.SetMute(false); // Primary: unmuted — host sends Opus RTP with DTX
 
             if (_viewModel != null)
             {
@@ -828,33 +827,37 @@ namespace VRWorkspace.UI.RTT.Controllers
                 var cachedTrack = _viewModel.CachedAudioTrack;
                 if (cachedTrack != null)
                 {
-                    Debug.Log("[RTTRemoteMenuController] Cached audio track wired to RTP player (kept muted; DC is primary)");
+                    Debug.Log("[RTTRemoteMenuController] Cached audio track wired to RTP player (primary)");
                     _audioPlayer.SetTrack(cachedTrack);
                 }
             }
 
-            Debug.Log("[RTTRemoteMenuController] Created audio players (DC primary unmuted, RTP fallback muted)");
+            Debug.Log("[RTTRemoteMenuController] Created audio players (RTP primary unmuted, DC fallback muted)");
         }
+
+        private bool _dcAudioSwitched = false;
 
         private void HandleDCAudioData(byte[] data)
         {
             if (_dcAudioPlayer == null) return;
 
-            // Both code paths deliver raw PCM16:
-            //   - Normal WebRTC: host sends 48kHz/2ch/PCM16 over the audio DataChannel
-            //   - Media relay:   host sends raw PCM16 framed as 0xF2 binary WebSocket messages
-            // In neither case does the host send Opus over the DataChannel, so the Opus
-            // decoder path is dead code that produced the "cách cách" artifacts when it
-            // tried to decode PCM16 bytes as Opus.
+            // If the host sends raw PCM16 via DataChannel (USB transport only),
+            // auto-unmute DC player and mute RTP player for that session.
+            if (!_dcAudioSwitched)
+            {
+                _dcAudioSwitched = true;
+                _dcAudioPlayer.SetMute(false);
+                if (_audioPlayer != null) _audioPlayer.SetMute(true);
+                Debug.Log("[RTTRemoteMenuController] DC audio data detected — switching to DC primary");
+            }
             _dcAudioPlayer.OnPCMFrame(data, 0, data.Length);
         }
 
         private void HandleMediaRelayStateChanged(bool active)
         {
             _mediaRelayActive = active;
-            // DC is primary in both modes; nothing to toggle here. Kept as a no-op so existing
-            // event subscribers don't break and the diagnostic log still records relay state.
-            Debug.Log($"[RTTRemoteMenuController] Media relay {(active ? "active" : "stopped")}: DC audio remains primary");
+            // RTP is primary in both direct and relay modes.
+            Debug.Log($"[RTTRemoteMenuController] Media relay {(active ? "active" : "stopped")}: RTP audio remains primary");
         }
 
         /// <summary>
@@ -875,7 +878,7 @@ namespace VRWorkspace.UI.RTT.Controllers
                 _audioPlayer = null;
             }
 
-            // Cleanup DataChannel audio player (fallback, muted)
+            // Cleanup DataChannel audio player (fallback)
             if (_dcAudioPlayer != null)
             {
                 if (_viewModel != null)
@@ -888,6 +891,8 @@ namespace VRWorkspace.UI.RTT.Controllers
                 Destroy(_dcAudioPlayer.gameObject);
                 _dcAudioPlayer = null;
             }
+
+            _dcAudioSwitched = false;
         }
 
         /// <summary>
